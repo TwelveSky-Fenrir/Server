@@ -1,6 +1,8 @@
-﻿using System.Net;
+﻿using System.Buffers.Binary;
+using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using Fenrir.Framework.Extensions;
 using Fenrir.GameServer.Metadata;
 using Microsoft.Extensions.Logging;
 
@@ -10,11 +12,11 @@ public class TcpLoginServer
 {
     private const int Port = 11091;
     private const string IpAddress = "127.0.0.1";
+    private static int _sessionIdCounter;
     private readonly ILogger<TcpLoginServer> _logger;
     private readonly UnifiedProtocolHandler _protocolHandler;
     private readonly TcpListener _server;
     private readonly SessionManager _sessionManager;
-    private static int _sessionIdCounter = 0;
 
     public TcpLoginServer(ILogger<TcpLoginServer> logger)
     {
@@ -30,7 +32,6 @@ public class TcpLoginServer
         _logger.LogInformation($"Serveur démarré sur {IpAddress}:{Port}");
 
         while (true)
-        {
             try
             {
                 var client = await _server.AcceptTcpClientAsync();
@@ -43,7 +44,6 @@ public class TcpLoginServer
             {
                 _logger.LogError(ex, "Erreur lors de l'acceptation d'un nouveau client.");
             }
-        }
     }
 
     private async Task HandleClientAsync(UserSession session)
@@ -56,23 +56,23 @@ public class TcpLoginServer
                 networkStream.ReadTimeout = 5000;
 
                 // Envoi du message de handshake initial
-                byte[] handshakePacket = CreateHandshakePacket(session.SessionId);
+                var handshakePacket = CreateHandshakePacket(session.SessionId);
                 await session.Client.Client.AcceptAsync();
                 await networkStream.WriteAsync(handshakePacket, 0, handshakePacket.Length);
                 _logger.LogInformation("Message de handshake envoyé.");
 
-                byte[] buffer = new byte[4096];
-                Socket socket = session.Client.Client;
-                bool handshakeValid = false;
+                var buffer = new byte[4096];
+                var socket = session.Client.Client;
+                var handshakeValid = false;
 
                 // Tentative de handshake avec le client
-                for (int attempt = 0; attempt < 10 && !handshakeValid; attempt++)
+                for (var attempt = 0; attempt < 10 && !handshakeValid; attempt++)
                 {
                     _logger.LogInformation("Attente de la réponse de handshake du client...");
                     if (networkStream.DataAvailable)
                     {
-                        int bytesRead = await networkStream.ReadAsync(buffer, 0, buffer.Length);
-                        string clientResponse = Encoding.ASCII.GetString(buffer, 0, bytesRead);
+                        var bytesRead = await networkStream.ReadAsync(buffer, 0, buffer.Length);
+                        var clientResponse = Encoding.ASCII.GetString(buffer, 0, bytesRead);
 
                         if (clientResponse == "HELLO SERVER")
                         {
@@ -93,7 +93,8 @@ public class TcpLoginServer
 
                 if (!handshakeValid)
                 {
-                    _logger.LogWarning("Le handshake n'a pas pu être validé après plusieurs tentatives. Fermeture de la connexion.");
+                    _logger.LogWarning(
+                        "Le handshake n'a pas pu être validé après plusieurs tentatives. Fermeture de la connexion.");
                     return;
                 }
 
@@ -113,7 +114,7 @@ public class TcpLoginServer
                     {
                         if (networkStream.DataAvailable)
                         {
-                            int bytesRead = await networkStream.ReadAsync(buffer, 0, buffer.Length);
+                            var bytesRead = await networkStream.ReadAsync(buffer, 0, buffer.Length);
                             _logger.LogInformation($"Bytes lus: {bytesRead}");
 
                             if (bytesRead == 0)
@@ -123,45 +124,60 @@ public class TcpLoginServer
                             }
 
                             // Log des données brutes avant déchiffrement
-                            string rawData = BitConverter.ToString(buffer, 0, bytesRead);
+                            var rawData = BitConverter.ToString(buffer, 0, bytesRead);
                             _logger.LogInformation($"Données brutes reçues : {rawData}");
 
                             // Appliquer le XOR pour déchiffrer les données reçues
                             _logger.LogInformation("Application du XOR pour le déchiffrement...");
-                            var decryptedBuffer = XorHandler.ApplyXor(buffer, bytesRead);
+
+
+                            // TODO: what about current position?
+                            XorEncryption.Decrypt(buffer.AsSpan(0, bytesRead));
                             _logger.LogInformation("Déchiffrement du buffer terminé.");
 
                             // Log des données déchiffrées
-                            string decryptedData = BitConverter.ToString(decryptedBuffer, 0, bytesRead);
+                            // TODO: Why the heck is this using strings?
+                            var decryptedData = BitConverter.ToString(buffer, 0, bytesRead);
                             _logger.LogInformation($"Données déchiffrées : {decryptedData}");
 
                             // Convertir le buffer en MessageMetadata pour le traitement
                             if (bytesRead >= 9) // Vérifier que la taille minimale est respectée
                             {
+                                // TODO: consider if this needs to be ReadOnly?
+                                // This will copy data, if we just agree not to write to it, no need for a new allocation?
+                                ReadOnlyMemory<byte> readOnlyMemory = buffer.AsSpan(9, bytesRead - 9).ToArray();
+                                // How about a read only span?
+                                // ReadOnlySpan<byte> readOnlySpan = new ReadOnlySpan<byte>(buffer, 9, bytesRead - 9);
                                 var messageMetadata = new MessageMetadata(
-                                    MessageLength: BitConverter.ToInt32(decryptedBuffer, 0),
-                                    MessageUserId: BitConverter.ToInt32(decryptedBuffer, 4),
-                                    MessageProtocolId: decryptedBuffer[8],
-                                    MessagePayload: new ReadOnlyMemory<byte>(decryptedBuffer, 9, bytesRead - 9)
+                                    BinaryPrimitives.ReadInt32LittleEndian(buffer.AsSpan(0, 4)),
+                                    BinaryPrimitives.ReadInt32LittleEndian(buffer.AsSpan(4, 4)),
+                                    buffer[8],
+                                    readOnlyMemory
                                 );
 
-                                // Traiter le message reçu avec UnifiedProtocolHandler
+                                // var messageMetadata = new MessageMetadata(
+                                //     BitConverter.ToInt32(decryptedBuffer, 0),
+                                //     BitConverter.ToInt32(decryptedBuffer, 4),
+                                //     decryptedBuffer[8],
+                                //     new ReadOnlyMemory<byte>(decryptedBuffer, 9, bytesRead - 9)
+                                // );
+
                                 await _protocolHandler.HandleClientProtocolAsync(session, messageMetadata);
                             }
                             else
                             {
-                                _logger.LogWarning("Paquet reçu trop petit pour contenir un en-tête valide.");
+                                _logger.LogWarning("Packet received too small to contain a valid header.");
                             }
                         }
                         else
                         {
-                            _logger.LogInformation("Aucune donnée disponible pour le moment, en attente...");
-                            await Task.Delay(500);
+                            _logger.LogInformation("No data available at the moment, waiting...");
+                            await Task.Delay(500); // TODO: Remove this.
                         }
                     }
                     catch (IOException ioEx)
                     {
-                        _logger.LogWarning(ioEx, "Timeout ou erreur de lecture sur le réseau");
+                        _logger.LogWarning(ioEx, "Error");
                         break;
                     }
                 }
@@ -169,24 +185,25 @@ public class TcpLoginServer
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Erreur lors de la gestion du client.");
+            _logger.LogError(ex, "Error while handling the client.");
         }
         finally
         {
             _sessionManager.RemoveSession(session.SessionId);
             session.Client.Close();
-            _logger.LogInformation("Connexion client fermée.");
+            // TODO: Event?
+            _logger.LogInformation("Client connection closed.");
         }
     }
 
     private byte[] CreateHandshakePacket(int sessionId)
     {
-        // Création d'un paquet structuré pour envoyer "HELLO" en tant que handshake
-        int messageLength = 9; // Longueur totale du message (int + int + byte)
-        int messageUserId = sessionId;
-        byte protocolId = 0x01; // Protocole pour "HELLO"
+        // TODO: Use structs although for a header only packet no actual data length we might want to keep it simpler like send id.
+        var messageLength = 9; // (int + int + byte)
+        var messageUserId = sessionId;
+        byte protocolId = 0x01; // PacketType.HelloPacket
 
-        byte[] packet = new byte[messageLength];
+        var packet = new byte[messageLength];
         BitConverter.GetBytes(messageLength).CopyTo(packet, 0);
         BitConverter.GetBytes(messageUserId).CopyTo(packet, 4);
         packet[8] = protocolId;

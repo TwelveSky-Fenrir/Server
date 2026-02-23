@@ -2,11 +2,9 @@
 
 namespace Fenrir.LoginServer.Network.Protocol;
 
-public sealed class ServerZoneInfoRequestMessage : Message
+public sealed class ServerZoneInfoRequestMessage : Packet
 {
     public new const PacketType Type = PacketType.ServerZoneInfo;
-    
-    public override PacketType PacketType => Type;
 
     public ServerZoneInfoRequestMessage()
     {
@@ -16,6 +14,8 @@ public sealed class ServerZoneInfoRequestMessage : Message
     {
         AvatarPost = avatarPost;
     }
+
+    public override PacketType PacketType => Type;
 
     public int AvatarPost { get; set; }
 

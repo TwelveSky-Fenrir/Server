@@ -1,11 +1,11 @@
 ﻿<Solution>
-  <Folder Name="/Libs/">
-    <Project Path="Libs\Fenrir.Framework\Fenrir.Framework.csproj" Type="Classic C#" />
-    <Project Path="Libs\Fenrir.Network\Fenrir.Network.csproj" Type="Classic C#" />
-  </Folder>
-  <Folder Name="/Srcs/">
-    <Project Path="Fenrir.AuthServer\Fenrir.AuthServer.csproj" Type="Classic C#" />
-    <Project Path="Srcs\Fenrir.GameServer\Fenrir.GameServer.csproj" Type="Classic C#" />
-    <Project Path="Srcs\Fenrir.LoginServer\Fenrir.LoginServer.csproj" Type="Classic C#" />
-  </Folder>
+    <Folder Name="/Libs/">
+        <Project Path="Libs\Fenrir.Framework\Fenrir.Framework.csproj" Type="Classic C#"/>
+        <Project Path="Libs\Fenrir.Network\Fenrir.Network.csproj" Type="Classic C#"/>
+    </Folder>
+    <Folder Name="/Srcs/">
+        <Project Path="Fenrir.AuthServer\Fenrir.AuthServer.csproj" Type="Classic C#"/>
+        <Project Path="Srcs\Fenrir.GameServer\Fenrir.GameServer.csproj" Type="Classic C#"/>
+        <Project Path="Srcs\Fenrir.LoginServer\Fenrir.LoginServer.csproj" Type="Classic C#"/>
+    </Folder>
 </Solution>

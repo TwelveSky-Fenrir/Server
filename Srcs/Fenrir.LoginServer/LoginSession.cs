@@ -1,4 +1,5 @@
 ﻿using System.IO.Pipelines;
+using System.Net;
 using System.Net.Sockets;
 using Fenrir.LoginServer.Network.Metadata;
 using Fenrir.Network.Dispatcher;
@@ -10,53 +11,56 @@ using Microsoft.Extensions.Logging;
 namespace Fenrir.LoginServer;
 
 public sealed class LoginSession(
-    Socket socket,
-    IMessageParser<MessageMetadata> messageParser,
-    IMessageDispatcher<MessageMetadata> messageDispatcher,
+    IPEndPoint remoteEndPoint,
+    //IMessageParser<Packet> messageParser,
+    //IMessageDispatcher<PacketType, MessageMetadata, Packet> messageDispatcher,
     ILogger logger,
     FenrirServerOptions options)
-    : FenrirSession<MessageMetadata>(socket, messageParser, messageDispatcher, logger, options)
+    : Session(logger, options, "", remoteEndPoint) // TODO: Fix this.
 {
-    public int SessionId { get; set; }
     
-    private const byte XorKey = 0x5A; // Clé XOR utilisée pour le chiffrement/déchiffrement
+    // TODO: Composition? Traits? (hasXorEncryption?)
+    private const byte XorKey = 0x00; // TODO: Move somewhere else?
+    public new int SessionId { get; set; }
 
-    public ValueTask SendAsync<TMessage>()
-        where TMessage : Message, new()
-    {
-        return SendAsync(new TMessage());
-    }
-    
-    public ValueTask SendAsync(Message message)
-    {
-        using var writer = new BinaryWriter(new MemoryStream());
-        message.Serialize(writer);
-        
-        var payload = ((MemoryStream)writer.BaseStream).ToArray();
-        
-        for (var i = 0; i < payload.Length; i++)
-            payload[i] ^= XorKey;
+    // public ValueTask SendAsync<TMessage>()
+    //     where TMessage : Message<PacketType>, new()
+    // {
+    //     return SendAsync(new TMessage());
+    // }
 
-        var metadata = new MessageMetadata(payload.Length, SessionId, (byte)message.PacketType, payload);
-        
-        var buffer = _messageEncoder.EncodeMessage(metadata, true);
-        
-        var vt = _pipe.Output.WriteAsync(buffer, SessionClosed);
-        
-        return vt.IsCompletedSuccessfully
-            ? ValueTask.CompletedTask
-            : WaitAndFlush(vt);
-
-        static async ValueTask WaitAndFlush(ValueTask<FlushResult> vt)
-        {
-            try
-            {
-                await vt.ConfigureAwait(false);
-            }
-            catch
-            {
-                // ignored
-            }
-        }
-    }
+    // TODO: Sending should be done in parent class too?
+    //
+    // public ValueTask SendAsync(Message<PacketType> message)
+    // {
+    //     using var writer = new BinaryWriter(new MemoryStream());
+    //     message.Serialize(writer);
+    //
+    //     var payload = ((MemoryStream)writer.BaseStream).ToArray();
+    //
+    //     for (var i = 0; i < payload.Length; i++)
+    //         payload[i] ^= XorKey;
+    //
+    //     var metadata = new MessageMetadata(payload.Length, SessionId, (byte)message.PacketType, payload);
+    //
+    //     var buffer = _messageEncoder.EncodeMessage(metadata, true);
+    //
+    //     var vt = _pipe.Output.WriteAsync(buffer, SessionClosed);
+    //
+    //     return vt.IsCompletedSuccessfully
+    //         ? ValueTask.CompletedTask
+    //         : WaitAndFlush(vt);
+    //
+    //     static async ValueTask WaitAndFlush(ValueTask<FlushResult> vt)
+    //     {
+    //         try
+    //         {
+    //             await vt.ConfigureAwait(false);
+    //         }
+    //         catch
+    //         {
+    //             // ignored
+    //         }
+    //     }
+    // }
 }

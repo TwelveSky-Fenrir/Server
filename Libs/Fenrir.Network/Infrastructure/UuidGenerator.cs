@@ -8,12 +8,10 @@ internal static class UuidGenerator
 
     public static string NewGuid()
     {
+        // TODO: Why not just use existing GUID generators?
         return string.Create(13, Interlocked.Increment(ref _lastId), (buffer, value) =>
         {
-            for (var i = 0; i < buffer.Length; i++)
-            {
-                buffer[buffer.Length - 1 - i] = Chars[(value >> (5 * i)) & 31];
-            }
+            for (var i = 0; i < buffer.Length; i++) buffer[buffer.Length - 1 - i] = Chars[(value >> (5 * i)) & 31];
         });
     }
 }

@@ -3,7 +3,6 @@
 /// <summary>Describes a way to encode a network message.</summary>
 /// <typeparam name="TMessage">The type of the message.</typeparam>
 public interface IMessageEncoder<in TMessage>
-    where TMessage : struct
 {
 	/// <summary>Encodes a network message.</summary>
 	/// <param name="message">The message to encode.</param>

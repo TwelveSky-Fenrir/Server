@@ -7,13 +7,15 @@ using Microsoft.Extensions.Options;
 namespace Fenrir.Network.Collections;
 
 /// <inheritdoc />
-public class SessionCollection<TSession, TMessage>(IOptions<FenrirServerOptions> options) : ISessionCollection<TSession>
-    where TMessage : struct
-    where TSession : FenrirSession<TMessage>
+/// TODO: Why does session collection need to know about TMessage?
+///  TODO Session should be interface?
+public class SessionCollection(IOptions<FenrirServerOptions> options)
+    : ISessionCollection<ISession>
 {
     private FenrirServerOptions Options { get; } = options.Value;
 
-    private ConcurrentDictionary<string, TSession> Sessions { get; } = new(StringComparer.InvariantCultureIgnoreCase);
+    private ConcurrentDictionary<string, ISession> Sessions { get; } =
+        new(StringComparer.InvariantCultureIgnoreCase);
 
     /// <inheritdoc />
     public int Count => Sessions.Count;
@@ -25,13 +27,13 @@ public class SessionCollection<TSession, TMessage>(IOptions<FenrirServerOptions>
     public bool IsFull => Options.MaxConnections > 0 && Count >= Options.MaxConnections;
 
     /// <inheritdoc />
-    public void AddSession(TSession session)
+    public void AddSession(ISession session)
     {
         Sessions.TryAdd(session.SessionId, session);
     }
 
     /// <inheritdoc />
-    public TSession? GetSession(string sessionId)
+    public ISession? GetSession(string sessionId)
     {
         return Sessions.GetValueOrDefault(sessionId);
     }
@@ -43,13 +45,13 @@ public class SessionCollection<TSession, TMessage>(IOptions<FenrirServerOptions>
     }
 
     /// <inheritdoc />
-    public TSession? GetSession(Func<TSession, bool> predicate)
+    public ISession? GetSession(Func<ISession, bool> predicate)
     {
         return Sessions.Values.FirstOrDefault(predicate);
     }
 
     /// <inheritdoc />
-    public void RemoveSession(Func<TSession, bool> predicate)
+    public void RemoveSession(Func<ISession, bool> predicate)
     {
         var session = Sessions.Values.FirstOrDefault(predicate);
 
@@ -60,32 +62,35 @@ public class SessionCollection<TSession, TMessage>(IOptions<FenrirServerOptions>
     }
 
     /// <inheritdoc />
-    public bool TryGetSession(string sessionId, [NotNullWhen(true)] out TSession? session)
+    public bool TryGetSession(string sessionId, [NotNullWhen(true)] out ISession? session)
     {
         return Sessions.TryGetValue(sessionId, out session);
     }
 
     /// <inheritdoc />
-    public bool TryRemoveSession(string sessionId, [NotNullWhen(true)] out TSession? session)
+    public bool TryRemoveSession(string sessionId, [NotNullWhen(true)] out ISession? session)
     {
         return Sessions.TryRemove(sessionId, out session);
     }
 
     /// <inheritdoc />
-    public bool TryGetSession(Func<TSession, bool> predicate, [NotNullWhen(true)] out TSession? session)
+    public bool TryGetSession(Func<ISession, bool> predicate,
+        [NotNullWhen(true)] out ISession? session)
     {
         return (session = Sessions.Values.FirstOrDefault(predicate)) is not null;
     }
 
     /// <inheritdoc />
-    public bool TryRemoveSession(Func<TSession, bool> predicate, [NotNullWhen(true)] out TSession? session)
+    public bool TryRemoveSession(Func<ISession, bool> predicate,
+        [NotNullWhen(true)] out ISession? session)
     {
         return (session = Sessions.Values.FirstOrDefault(predicate)) is not null &&
                Sessions.TryRemove(session.SessionId, out _);
     }
 
     /// <inheritdoc />
-    public IEnumerable<TSession> GetSessions(Func<TSession, bool>? predicate = null)
+    public IEnumerable<ISession> GetSessions(
+        Func<ISession, bool>? predicate = null)
     {
         return predicate is null
             ? Sessions.Values
@@ -93,7 +98,7 @@ public class SessionCollection<TSession, TMessage>(IOptions<FenrirServerOptions>
     }
 
     /// <inheritdoc />
-    public void RemoveSessions(Func<TSession, bool>? predicate = null)
+    public void RemoveSessions(Func<ISession, bool>? predicate = null)
     {
         if (predicate is null)
         {
@@ -106,19 +111,20 @@ public class SessionCollection<TSession, TMessage>(IOptions<FenrirServerOptions>
     }
 
     /// <inheritdoc />
-    public bool AnySession(Func<TSession, bool> predicate)
+    public bool AnySession(Func<ISession, bool> predicate)
     {
         return Sessions.Values.Any(predicate);
     }
 
     /// <inheritdoc />
-    public int CountSessions(Func<TSession, bool> predicate)
+    public int CountSessions(Func<ISession, bool> predicate)
     {
         return Sessions.Values.Count(predicate);
     }
 
     /// <inheritdoc />
-    public Task ExecuteAsync(Action<TSession> action, Func<TSession, bool>? predicate = null)
+    public Task ExecuteAsync(Action<ISession> action,
+        Func<ISession, bool>? predicate = null)
     {
         var sessions = predicate is null
             ? Sessions.Values
@@ -128,7 +134,8 @@ public class SessionCollection<TSession, TMessage>(IOptions<FenrirServerOptions>
     }
 
     /// <inheritdoc />
-    public Task ExecuteAsync(Func<TSession, ValueTask> action, Func<TSession, bool>? predicate = null)
+    public Task ExecuteAsync(Func<ISession, ValueTask> action,
+        Func<ISession, bool>? predicate = null)
     {
         var sessions = predicate is null
             ? Sessions.Values
@@ -138,7 +145,8 @@ public class SessionCollection<TSession, TMessage>(IOptions<FenrirServerOptions>
     }
 
     /// <inheritdoc />
-    public Task ExecuteAsync(Func<TSession, Task> action, Func<TSession, bool>? predicate = null)
+    public Task ExecuteAsync(Func<ISession, Task> action,
+        Func<ISession, bool>? predicate = null)
     {
         var sessions = predicate is null
             ? Sessions.Values

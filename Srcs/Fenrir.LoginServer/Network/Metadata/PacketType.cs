@@ -1,7 +1,6 @@
 ﻿namespace Fenrir.LoginServer.Network.Metadata;
 
-public enum 
-    PacketType : byte
+public enum PacketType : byte
 {
     Unknown = 0,
     Hello = 0x01,

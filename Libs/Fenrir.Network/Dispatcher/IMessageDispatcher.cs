@@ -1,15 +1,29 @@
-﻿using Fenrir.Network.Transport;
+﻿using Fenrir.Network.Framing;
+using Fenrir.Network.Transport;
 
 namespace Fenrir.Network.Dispatcher;
 
 /// <summary>Represents a dispatcher that can be used to invoke asynchronous message delegates.</summary>
-/// <typeparam name="TMessage">The type of the message.</typeparam>
-public interface IMessageDispatcher<TMessage>
-    where TMessage : struct
-{
-	/// <summary>Asynchronously invokes the specified message delegate.</summary>
-	/// <param name="session">The session that is associated with the message.</param>
-	/// <param name="message">The message that is being dispatched.</param>
-	/// <returns>A result that represents the dispatch operation.</returns>
-	Task<DispatchResults> DispatchAsync(FenrirSession<TMessage> session, TMessage message);
-}
+// public interface IMessageDispatcher<TPacketType, TMessage>
+// {
+//     // What about ValueTask?
+//     Task<DispatchResults> DispatchAsync(IClient client, TMessage message);
+//
+//     bool RegisterHandler(TPacketType packetType, Func<IClient, ValueTask>> handler)
+//     {
+//         return false;
+//     }
+//
+//     // TODO: Should TMessage or IMessage?
+//     bool RegisterHandler(TPacketType packetType, Func<IClient, TMessage, ValueTask>> handler)
+//     {
+//         return false;
+//     }
+// }
+
+// TODO: How to add Server to this? so that a packet handler can interact with the state around it etc?
+
+// public interface IServer
+// {
+//
+// }

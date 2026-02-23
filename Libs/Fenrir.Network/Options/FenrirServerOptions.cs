@@ -5,6 +5,9 @@ namespace Fenrir.Network.Options;
 /// <summary>Represents a configuration for the transport layer.</summary>
 public class FenrirServerOptions
 {
+    // TODO: Rename this to bind address?
+    // TODO: What about Nat Translation?
+    
     /// <summary>Gets the ip address.</summary>
     public required string IpAddress { get; set; }
 
@@ -25,6 +28,8 @@ public class FenrirServerOptions
 
     /// <summary>Gets the keep alive interval.</summary>
     public int KeepAliveInterval { get; set; }
+    
+    public int RecvBuffersize { get; set; }
 
     internal IPEndPoint GetRemoteEndPoint()
     {

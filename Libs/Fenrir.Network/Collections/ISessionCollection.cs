@@ -1,10 +1,9 @@
 ﻿using System.Diagnostics.CodeAnalysis;
+using Fenrir.Network.Transport;
 
 namespace Fenrir.Network.Collections;
 
-/// <summary>Represents a thread-safe collection of <typeparamref name="TSession" />.</summary>
-/// <typeparam name="TSession">The type of the session.</typeparam>
-public interface ISessionCollection<TSession>
+public interface ISessionCollection<TSession> where TSession : ISession
 {
     /// <summary>Gets the number of sessions in the collection.</summary>
     int Count { get; }
@@ -97,4 +96,9 @@ public interface ISessionCollection<TSession>
     /// <param name="action">The action to execute.</param>
     /// <param name="predicate">The predicate that determines whether the session is found.</param>
     Task ExecuteAsync(Func<TSession, Task> action, Func<TSession, bool>? predicate = null);
+    
+    // TODO: How can we send to all in an area?
+    // TODO: How can we send to all in a group?
+    // TODO: How can we send to all in a party?
+    // TODO: How can we send to a specific session?, Account or Character etc.
 }

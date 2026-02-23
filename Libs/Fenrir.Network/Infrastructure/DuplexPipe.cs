@@ -15,4 +15,6 @@ public sealed record DuplexPipe(PipeReader Input, PipeWriter Output) : IDuplexPi
 
         return new DuplexPipe(PipeReader.Create(ns), PipeWriter.Create(ns));
     }
+	
+	// TODO: If one end is disposed, so should the other end?
 }

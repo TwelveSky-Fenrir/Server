@@ -2,7 +2,8 @@
 
 public static class XorHelper
 {
-    private const byte XorKey = 0x5A; // Clé XOR utilisée pour le chiffrement/déchiffrement
+    // TODO: Why is there two implementations of Xor?
+    private const byte XorKey = 0x00;
 
     public static byte[] ApplyXor(byte[] data, int length)
     {
@@ -13,10 +14,8 @@ public static class XorHelper
 
     public static byte[] ApplyXor(ReadOnlyMemory<byte> responseMetadataMessagePayload, int byteSize)
     {
-        // Récupérer le buffer à partir de ReadOnlyMemory<byte>
         var dataBuffer = responseMetadataMessagePayload.ToArray();
 
-        // Appliquer le chiffrement XOR en utilisant la méthode existante
         return ApplyXor(dataBuffer, byteSize);
     }
 }

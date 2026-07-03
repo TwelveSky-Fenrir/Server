@@ -182,6 +182,60 @@ public class CharacterWorldPersistenceTests
     }
 
     [Fact]
+    public async Task ReplaceTwoContainersAsync_ReplacesBothContainersAtomically()
+    {
+        var characterId = await CreateCharacterAsync();
+        var itemId = await ScalarAsync<int>("SELECT MIN(ItemId) FROM world.Items;");
+
+        // Arrange: item sitting in inventory slot 0 (container 0).
+        await _characters.ReplaceContainerAsync(characterId, 0,
+            [new CharacterItemSlotTvp(0, itemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 42)],
+            CancellationToken.None);
+
+        // Equip it: container 0 loses the slot, container 2 (Equipment) gains it -- ONE call, one transaction
+        // (the cross-container twin of ReplaceContainerAsync; see usp_CharacterItems_ReplaceTwoContainers).
+        await _characters.ReplaceTwoContainersAsync(
+            characterId, 0, [], 2,
+            [new CharacterItemSlotTvp(5, itemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 42)],
+            CancellationToken.None);
+
+        var afterEquip = await _characters.GetWorldEntryBundleAsync(characterId, CancellationToken.None);
+        Assert.NotNull(afterEquip);
+        var equipped = Assert.Single(afterEquip.Items);
+        Assert.Equal(2, equipped.Container);
+        Assert.Equal(5, equipped.Slot);
+        Assert.Equal(42, equipped.Serial);
+    }
+
+    [Fact]
+    public async Task ReplaceTwoContainersAsync_SameContainerTwice_ThrowsWithoutMutatingEitherSide()
+    {
+        var characterId = await CreateCharacterAsync();
+        var itemId = await ScalarAsync<int>("SELECT MIN(ItemId) FROM world.Items;");
+
+        await _characters.ReplaceContainerAsync(characterId, 0,
+            [new CharacterItemSlotTvp(0, itemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 7)],
+            CancellationToken.None);
+
+        var ex = await Record.ExceptionAsync(() => _characters.ReplaceTwoContainersAsync(
+            characterId, 0, [new CharacterItemSlotTvp(1, itemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 8)],
+            0, [new CharacterItemSlotTvp(2, itemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 9)],
+            CancellationToken.None).AsTask());
+
+        Assert.NotNull(ex);
+        var sqlException = ex as SqlException ?? ex!.InnerException as SqlException;
+        if (sqlException is not null)
+            Assert.Equal(50260, sqlException.Number);
+
+        // The guard fires BEFORE either DELETE/INSERT pair runs -- the original slot 0 row must be untouched.
+        var afterFailedCall = await _characters.GetWorldEntryBundleAsync(characterId, CancellationToken.None);
+        Assert.NotNull(afterFailedCall);
+        var survivor = Assert.Single(afterFailedCall.Items);
+        Assert.Equal(0, survivor.Slot);
+        Assert.Equal(7, survivor.Serial);
+    }
+
+    [Fact]
     public async Task PersistProgressAsync_AppliesANewerFlush_ButIgnoresAStaleReplay_AndAcceptsAnEmptyBatch()
     {
         var characterId = await CreateCharacterAsync();

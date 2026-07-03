@@ -39,7 +39,7 @@ internal sealed class FieldModel
     /// <summary>Carries <c>[LegacyUidField]</c> (only <c>LC_LOGIN_RECV.Id</c>, §3.3).</summary>
     public bool IsLegacyUidField { get; init; }
 
-    /// <summary><c>[AvatarXorKind]</c> — <c>None</c> if absent (only <c>LcUserAvatarRecv2</c> uses it, §3.2).</summary>
+    /// <summary><c>[AvatarXorKind]</c> — <c>None</c> if absent (only <c>AvatarRosterResponse</c> uses it, §3.2).</summary>
     public AvatarXorKind AvatarXor { get; init; } = AvatarXorKind.None;
 
     public int AvatarXorRowLength { get; init; }

@@ -119,6 +119,7 @@
 50_procedures/game/usp_Character_GetForWorldEntry.sql
 50_procedures/game/usp_Character_PersistBatch.sql
 50_procedures/game/usp_CharacterItems_ReplaceContainer.sql
+50_procedures/game/usp_CharacterItems_ReplaceTwoContainers.sql
 50_procedures/game/usp_Character_PersistProgressBatch.sql
 50_procedures/game/usp_Character_AdjustMoney.sql
 50_procedures/runtime/usp_SessionTicket_Create.sql

@@ -26,7 +26,7 @@ public sealed class SessionLoopTests
         var dispatcher = new RecordingFrameDispatcher();
         var loopTask = SessionLoop.RunAsync(session, dispatcher, null, CancellationToken.None);
 
-        var frame = BuildClientFrame(CzHeartbeatSend.Opcode, CzHeartbeatSend.PayloadSize);
+        var frame = BuildClientFrame(HeartbeatRequest.Opcode, HeartbeatRequest.PayloadSize);
         await pipe.PeerToSession.WriteAsync(frame);
         await pipe.PeerToSession.CompleteAsync(); // closes the client side so the loop terminates deterministically
 
@@ -35,7 +35,7 @@ public sealed class SessionLoopTests
         var records = dispatcher.Records;
         Assert.Single(records);
         Assert.Equal(FenrirServer.Zone, records[0].Server);
-        Assert.Equal(CzHeartbeatSend.Opcode, records[0].Opcode);
+        Assert.Equal(HeartbeatRequest.Opcode, records[0].Opcode);
         Assert.Equal(session.SessionId, records[0].SessionId);
         Assert.True(frame.AsSpan(LegacyHeaders.ClientPacketSize).SequenceEqual(records[0].Payload));
         Assert.Equal(DisconnectReason.ClientClosed, session.DisconnectReason);
@@ -49,7 +49,7 @@ public sealed class SessionLoopTests
         var dispatcher = new RecordingFrameDispatcher();
         var loopTask = SessionLoop.RunAsync(session, dispatcher, null, CancellationToken.None);
 
-        var frame = BuildClientFrame(CzHeartbeatSend.Opcode, CzHeartbeatSend.PayloadSize, 0x40);
+        var frame = BuildClientFrame(HeartbeatRequest.Opcode, HeartbeatRequest.PayloadSize, 0x40);
 
         for (var i = 0; i < frame.Length; i++)
         {
@@ -68,7 +68,7 @@ public sealed class SessionLoopTests
 
         var records = dispatcher.Records;
         Assert.Single(records);
-        Assert.Equal(CzHeartbeatSend.Opcode, records[0].Opcode);
+        Assert.Equal(HeartbeatRequest.Opcode, records[0].Opcode);
         Assert.True(frame.AsSpan(LegacyHeaders.ClientPacketSize).SequenceEqual(records[0].Payload));
     }
 
@@ -80,8 +80,8 @@ public sealed class SessionLoopTests
         var dispatcher = new RecordingFrameDispatcher();
         var loopTask = SessionLoop.RunAsync(session, dispatcher, null, CancellationToken.None);
 
-        // RegisterAvatarSend is only allowed once TicketConsumed (§8.1) -> illegal here.
-        var frame = BuildClientFrame(CzRegisterAvatarSend.Opcode, CzRegisterAvatarSend.PayloadSize);
+        // EnterWorld is only allowed once TicketConsumed (§8.1) -> illegal here.
+        var frame = BuildClientFrame(EnterWorldRequest.Opcode, EnterWorldRequest.PayloadSize);
         await pipe.PeerToSession.WriteAsync(frame);
 
         await AwaitLoopAsync(loopTask); // session.Abort() ends the current iteration itself, no client-close needed
@@ -118,7 +118,7 @@ public sealed class SessionLoopTests
         var dispatcher = new RecordingFrameDispatcher();
         var loopTask = SessionLoop.RunAsync(session, dispatcher, new AlwaysRejectRateLimiter(), CancellationToken.None);
 
-        var frame = BuildClientFrame(CzHeartbeatSend.Opcode, CzHeartbeatSend.PayloadSize);
+        var frame = BuildClientFrame(HeartbeatRequest.Opcode, HeartbeatRequest.PayloadSize);
         await pipe.PeerToSession.WriteAsync(frame);
 
         await AwaitLoopAsync(loopTask);

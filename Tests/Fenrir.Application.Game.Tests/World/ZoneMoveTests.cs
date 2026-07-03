@@ -13,7 +13,7 @@ namespace Fenrir.Application.Game.Tests.World;
 /// </summary>
 public class ZoneMoveTests
 {
-    private static readonly int OneFrame = FrameWriter.FrameSizeOf<ZcAvatarActionRecv>();
+    private static readonly int OneFrame = FrameWriter.FrameSizeOf<AvatarActionResponse>();
 
     private static ActionInfo MoveTo(float x, float z)
     {

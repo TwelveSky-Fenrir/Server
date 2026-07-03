@@ -9,7 +9,7 @@ namespace Fenrir.Application.Login;
 ///     success AND failure — is answered by exactly <c>LC_LOGIN_RECV</c> + 3× <c>LC_USER_AVATAR_RECV2</c> (one per
 ///     slot, zeroed when empty) + <c>LC_RECOMMAND_WORLD_RECV</c> (24) + <c>LC_RECOMMAND_WORLD2_RECV</c> (26), in
 ///     that order. The single legacy exception (playuser result 4 with a local session found: kick + <c>return</c>
-///     with no reply at all) maps to Fenrir's SessionRegistry eviction, see <c>ClLoginSendHandler</c>.
+///     with no reply at all) maps to Fenrir's SessionRegistry eviction, see <c>LoginHandler</c>.
 ///     Static and side-effect-free apart from <see cref="Send" /> so the exact wire sequence is unit-testable
 ///     without a database (Tests/Fenrir.Application.Login.Tests/LoginTrainTests).
 /// </summary>
@@ -25,16 +25,16 @@ public static class LoginTrain
     public const string ExistingPinMask = "****";
 
     // Locals of the legacy serializer that are never assigned -> always three zeros on the wire (report §5.24).
-    private static readonly LcRecommandWorldRecv RecommandWorld = new()
+    private static readonly WorldRecommendationResponse RecommandWorld = new()
         { AddKillOtherTribe0 = 0, AddKillOtherTribe1 = 0, AddKillOtherTribe2 = 0 };
 
-    private static readonly LcRecommandWorld2Recv RecommandWorld2 = new()
+    private static readonly WorldRecommendationFinalResponse RecommandWorld2 = new()
         { AddKillOtherTribe0 = 0, AddKillOtherTribe1 = 0, AddKillOtherTribe2 = 0 };
 
     // Template for an empty character-select slot: every LC_USER_AVATAR_RECV2 field at its wire-zero value
     // (mirrors Avatars/AvatarInfoFactory.Zeroed's convention). A populated slot overrides only the handful of
     // DB-backed fields via a `with` expression, instead of repeating the other ~20 zeroed fields twice.
-    private static readonly LcUserAvatarRecv2 EmptyAvatarSlot = new()
+    private static readonly AvatarRosterResponse EmptyAvatarSlot = new()
     {
         VisibleState = 0,
         SpecialState = 0,
@@ -72,9 +72,9 @@ public static class LoginTrain
     ///     Every LC_LOGIN_RECV field at its "nothing to report" value. The legacy always-zero fields
     ///     (tGoodFellow/tLoginPlace/tLoginPremium/tSecretCard*/tGiftInfo, report §5.11) are pinned here in one place.
     /// </summary>
-    public static LcLoginRecv BuildLoginRecv(int result, string id, int secondLoginSort, string mousePassword)
+    public static LoginResponse BuildLoginRecv(int result, string id, int secondLoginSort, string mousePassword)
     {
-        return new LcLoginRecv
+        return new LoginResponse
         {
             Result = result,
             Id = id,
@@ -95,9 +95,9 @@ public static class LoginTrain
     ///     Exactly <see cref="AvatarSlotCount" /> entries, always in slot order, zeroed for an empty slot —
     ///     never fewer (report §4.11.9: the legacy loops over MAX_USER_AVATAR_NUM unconditionally).
     /// </summary>
-    public static LcUserAvatarRecv2[] BuildAvatarSlots(IReadOnlyCollection<CharacterSummaryDto> characters)
+    public static AvatarRosterResponse[] BuildAvatarSlots(IReadOnlyCollection<CharacterSummaryDto> characters)
     {
-        var slots = new LcUserAvatarRecv2[AvatarSlotCount];
+        var slots = new AvatarRosterResponse[AvatarSlotCount];
         for (var slot = 0; slot < AvatarSlotCount; slot++)
         {
             var character = characters.FirstOrDefault(c => c.Slot == slot);
@@ -118,13 +118,13 @@ public static class LoginTrain
     }
 
     /// <summary>The failure train's avatar block: 3 zeroed slots (the legacy mAvatarInfo is still zero pre-login).</summary>
-    public static LcUserAvatarRecv2[] BuildEmptyAvatarSlots()
+    public static AvatarRosterResponse[] BuildEmptyAvatarSlots()
     {
         return [EmptyAvatarSlot, EmptyAvatarSlot, EmptyAvatarSlot];
     }
 
     /// <summary>Puts the full 6-packet train on the wire in the legacy SEND_LOGIN order.</summary>
-    public static void Send(IPacketSession session, in LcLoginRecv loginRecv, LcUserAvatarRecv2[] avatarSlots)
+    public static void Send(IPacketSession session, in LoginResponse loginRecv, AvatarRosterResponse[] avatarSlots)
     {
         session.Send(loginRecv);
         foreach (var slot in avatarSlots)

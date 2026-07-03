@@ -13,7 +13,7 @@ namespace Fenrir.Application.Game.World;
 ///     <see cref="GameServerOptions.Maps" /> (ADR-0012: a shard hosts a DISJOINT partition of maps), built once
 ///     at startup into a <see cref="FrozenDictionary{TKey,TValue}" /> and never mutated after. Everything that
 ///     used to inject the single M1 <c>Zone</c> singleton injects this instead: routing
-///     (<c>CzRegisterAvatarSendHandler</c>) resolves <c>character.MapId</c> here, the tick host runs one task
+///     (<c>EnterWorldHandler</c>) resolves <c>character.MapId</c> here, the tick host runs one task
 ///     per <see cref="Zones" /> entry, and the process-wide readers (write-behind flush, heartbeat CCU) go
 ///     through <see cref="TryGetPlayer" />/<see cref="TotalPlayerCount" />.
 /// </summary>
@@ -32,14 +32,6 @@ public sealed class ZoneRegistry
         _zones = opts.Maps.ToFrozenDictionary(
             mapId => mapId,
             mapId => new Zone(mapId, opts, movementRules, dirtyTracker, [], zoneLogger));
-
-        // Back-reference set exactly once, here, before any zone's RunAsync/Tick ever runs (this constructor
-        // returns before ZoneTickHost can start a single task) -- never reassigned afterwards, so there is no
-        // race to guard against. This is what lets a zone's OWN tick resolve and hand off to another hosted
-        // zone WITHOUT a client packet driving it (Zone.ApplyDeath's cross-zone revive) -- the same "settable
-        // property written once from outside, benign by construction" posture as ZoneClientSession.CurrentZone.
-        foreach (var zone in _zones.Values)
-            zone.Registry = this;
     }
 
     /// <summary>Every hosted zone, in no particular order — the tick host launches one loop per entry.</summary>

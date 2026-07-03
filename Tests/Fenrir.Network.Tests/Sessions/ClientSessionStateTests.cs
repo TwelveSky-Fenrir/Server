@@ -10,43 +10,43 @@ namespace Fenrir.Network.Tests.Sessions;
 /// </summary>
 public class ClientSessionStateTests
 {
-    // ClLoginSend: AllowedStates = [Connected, VersionOk] — legal at the start of the login flow, no longer legal
+    // LoginRequest: AllowedStates = [Connected, VersionOk] — legal at the start of the login flow, no longer legal
     // once the account is authenticated further down the flow.
     [Fact]
     public void Login_LoginSend_AllowedWhileConnected_ForbiddenAfterCharSelect()
     {
         var session = new LoginClientSession(1, new FakeDuplexPipe());
 
-        Assert.True(session.IsOpcodeAllowed(Opcodes.Login.Incoming.LoginSend));
+        Assert.True(session.IsOpcodeAllowed(Opcodes.Login.Incoming.Login));
 
         session.MarkCharSelect();
 
-        Assert.False(session.IsOpcodeAllowed(Opcodes.Login.Incoming.LoginSend));
+        Assert.False(session.IsOpcodeAllowed(Opcodes.Login.Incoming.Login));
     }
 
-    // ClCreateAvatarSend2: AllowedStates = [Authenticated, CharSelect] — illegal before credentials are verified.
+    // CreateAvatarRequest: AllowedStates = [Authenticated, CharSelect] — illegal before credentials are verified.
     [Fact]
     public void Login_CreateAvatarSend2_ForbiddenWhileConnected_AllowedAfterAuthenticated()
     {
         var session = new LoginClientSession(1, new FakeDuplexPipe());
 
-        Assert.False(session.IsOpcodeAllowed(Opcodes.Login.Incoming.CreateAvatarSend2));
+        Assert.False(session.IsOpcodeAllowed(Opcodes.Login.Incoming.CreateAvatar));
 
         session.MarkAuthenticated(1);
 
-        Assert.True(session.IsOpcodeAllowed(Opcodes.Login.Incoming.CreateAvatarSend2));
+        Assert.True(session.IsOpcodeAllowed(Opcodes.Login.Incoming.CreateAvatar));
     }
 
-    // CzTempRegisterSend: AllowedStates = [Connected] only — the ticket hand-off packet is one-shot.
+    // ZoneHandshakeRequest: AllowedStates = [Connected] only — the ticket hand-off packet is one-shot.
     [Fact]
     public void Zone_TempRegisterSend_AllowedOnlyWhileConnected()
     {
         var session = new ZoneClientSession(1, new FakeDuplexPipe());
 
-        Assert.True(session.IsOpcodeAllowed(Opcodes.Zone.Incoming.TempRegisterSend));
+        Assert.True(session.IsOpcodeAllowed(Opcodes.Zone.Incoming.ZoneHandshake));
 
         session.MarkTicketConsumed(1, 1);
 
-        Assert.False(session.IsOpcodeAllowed(Opcodes.Zone.Incoming.TempRegisterSend));
+        Assert.False(session.IsOpcodeAllowed(Opcodes.Zone.Incoming.ZoneHandshake));
     }
 }

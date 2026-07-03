@@ -22,7 +22,7 @@ if (string.IsNullOrWhiteSpace(password))
     return 1;
 }
 
-// ClLoginSend.Password is [FixedString(33)] on the wire: a null-terminated Latin1 char[33], so the real
+// LoginRequest.Password is [FixedString(33)] on the wire: a null-terminated Latin1 char[33], so the real
 // BuildEU33 client can physically send at most 32 usable characters. Anything longer hashes and stores fine
 // here but produces an account the legacy client can never authenticate -- fail loudly now instead of leaving
 // a silently unusable account to be discovered later at login.

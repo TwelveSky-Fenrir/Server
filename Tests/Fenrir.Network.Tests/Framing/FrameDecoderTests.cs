@@ -7,7 +7,7 @@ namespace Fenrir.Network.Tests.Framing;
 
 public class FrameDecoderTests
 {
-    // CzHeartbeatSend/CzTempRegisterSend are both Zone-owned [FenrirPacket]s — the server value only
+    // HeartbeatRequest/ZoneHandshakeRequest are both Zone-owned [FenrirPacket]s — the server value only
     // matters for opcode-table selection, so a single constant keeps the frame-shaped tests focused.
     private const FenrirServer Server = FenrirServer.Zone;
 
@@ -18,14 +18,14 @@ public class FrameDecoderTests
     [Fact]
     public void TryReadFrame_SingleCompleteFrame_CzHeartbeatSend_DecodesOpcodeAndPayload()
     {
-        var frameBytes = BuildFrame(CzHeartbeatSend.Opcode, CzHeartbeatSend.PayloadSize, 1);
+        var frameBytes = BuildFrame(HeartbeatRequest.Opcode, HeartbeatRequest.PayloadSize, 1);
         var buffer = new ReadOnlySequence<byte>(frameBytes);
 
         var decoded = FrameDecoder.TryReadFrame(ref buffer, Server, out var frame);
 
         Assert.True(decoded);
         Assert.Equal(Server, frame.Server);
-        Assert.Equal(CzHeartbeatSend.Opcode, frame.Opcode);
+        Assert.Equal(HeartbeatRequest.Opcode, frame.Opcode);
         Assert.Equal(frameBytes[LegacyHeaders.ClientPacketSize..], frame.Payload.ToArray());
         Assert.Equal(0, buffer.Length); // the whole frame — and nothing more — was consumed
     }
@@ -35,9 +35,9 @@ public class FrameDecoderTests
     {
         byte[][] frames =
         [
-            BuildFrame(CzHeartbeatSend.Opcode, CzHeartbeatSend.PayloadSize, 1),
-            BuildFrame(CzHeartbeatSend.Opcode, CzHeartbeatSend.PayloadSize, 2),
-            BuildFrame(CzHeartbeatSend.Opcode, CzHeartbeatSend.PayloadSize, 3)
+            BuildFrame(HeartbeatRequest.Opcode, HeartbeatRequest.PayloadSize, 1),
+            BuildFrame(HeartbeatRequest.Opcode, HeartbeatRequest.PayloadSize, 2),
+            BuildFrame(HeartbeatRequest.Opcode, HeartbeatRequest.PayloadSize, 3)
         ];
 
         var concatenated = new byte[frames.Sum(f => f.Length)];
@@ -55,7 +55,7 @@ public class FrameDecoderTests
             var decoded = FrameDecoder.TryReadFrame(ref buffer, Server, out var frame);
 
             Assert.True(decoded);
-            Assert.Equal(CzHeartbeatSend.Opcode, frame.Opcode);
+            Assert.Equal(HeartbeatRequest.Opcode, frame.Opcode);
             Assert.Equal(expected[LegacyHeaders.ClientPacketSize..], frame.Payload.ToArray());
         }
 
@@ -109,15 +109,15 @@ public class FrameDecoderTests
     }
 
     // The gate criterion for this phase: fragmentation at every single byte boundary must never corrupt or
-    // drop a frame, and must never be mistaken for a complete one. CzTempRegisterSend (272 bytes total) is
+    // drop a frame, and must never be mistaken for a complete one. ZoneHandshakeRequest (272 bytes total) is
     // built as an explicit two-segment ReadOnlySequenceSegment chain, re-cut at every position from 1 to 271 —
     // a flat byte[]-backed ReadOnlySequence can never exercise the header/payload-straddles-segment case that
     // a real Pipe delivers in production.
     [Fact]
     public void TryReadFrame_CzTempRegisterSend_FragmentedAtEveryByteBoundary_NeverCorruptsNeverMisfires()
     {
-        var frameSize = LegacyHeaders.ClientPacketSize + CzTempRegisterSend.PayloadSize;
-        var fullFrame = BuildFrame(CzTempRegisterSend.Opcode, CzTempRegisterSend.PayloadSize, 5);
+        var frameSize = LegacyHeaders.ClientPacketSize + ZoneHandshakeRequest.PayloadSize;
+        var fullFrame = BuildFrame(ZoneHandshakeRequest.Opcode, ZoneHandshakeRequest.PayloadSize, 5);
         var expectedPayload = fullFrame[LegacyHeaders.ClientPacketSize..];
 
         var fragmentationCases = 0;
@@ -141,7 +141,7 @@ public class FrameDecoderTests
             var decodedComplete = FrameDecoder.TryReadFrame(ref complete, Server, out var frame);
 
             Assert.True(decodedComplete);
-            Assert.Equal(CzTempRegisterSend.Opcode, frame.Opcode);
+            Assert.Equal(ZoneHandshakeRequest.Opcode, frame.Opcode);
             Assert.Equal(expectedPayload, frame.Payload.ToArray());
             Assert.Equal(0, complete.Length);
 

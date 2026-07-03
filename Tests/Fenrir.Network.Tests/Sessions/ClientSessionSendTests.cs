@@ -7,14 +7,14 @@ namespace Fenrir.Network.Tests.Sessions;
 /// <summary>Confirms <c>ClientSession</c>'s two send paths put the exact expected bytes on the wire.</summary>
 public class ClientSessionSendTests
 {
-    // ZcConnectOkRecv declares no Obfuscation (defaults to None): frame is just [opcode byte][4-byte little-endian
+    // ZoneGreetingResponse declares no Obfuscation (defaults to None): frame is just [opcode byte][4-byte little-endian
     // RandomNumber], nothing more — the case FrameWriter takes with no XorPacketGlobal step.
     [Fact]
     public async Task Send_WritesOpcodeAndPayload_ForPacketWithoutObfuscation()
     {
         var pipe = new FakeDuplexPipe();
         var session = new ZoneClientSession(1, pipe);
-        var packet = new ZcConnectOkRecv { RandomNumber = 0x12345678 };
+        var packet = new ZoneGreetingResponse { RandomNumber = 0x12345678 };
 
         session.Send(packet);
 

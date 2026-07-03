@@ -13,7 +13,7 @@ namespace Fenrir.Application.Game.Tests.World;
 /// </summary>
 public class ZoneEnterTests
 {
-    private static readonly int OneFrame = FrameWriter.FrameSizeOf<ZcAvatarActionRecv>();
+    private static readonly int OneFrame = FrameWriter.FrameSizeOf<AvatarActionResponse>();
 
     [Fact]
     public void Enter_NewArrivalLearnsAboutEachPreExistingNeighbor()

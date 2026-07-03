@@ -47,6 +47,11 @@ NOT EXISTS (SELECT 1 FROM admin.ErrorCatalog WHERE ErrorNumber = 50241)
     VALUES (50241, N'game', N'usp_Cash_Debit/usp_Cash_Credit: cash amount must be positive.');
 
 IF
+NOT EXISTS (SELECT 1 FROM admin.ErrorCatalog WHERE ErrorNumber = 50260)
+    INSERT INTO admin.ErrorCatalog (ErrorNumber, SchemaName, Description)
+    VALUES (50260, N'game', N'usp_CharacterItems_ReplaceTwoContainers: ContainerA and ContainerB must differ.');
+
+IF
 NOT EXISTS (SELECT 1 FROM admin.ErrorCatalog WHERE ErrorNumber = 50306)
     INSERT INTO admin.ErrorCatalog (ErrorNumber, SchemaName, Description)
     VALUES (50306, N'admin', N'usp_Mute_Create: a mute must target at least one of @AccountId or @CharacterId.');

@@ -119,6 +119,30 @@ public class ZoneHandoffTests
     }
 
     [Fact]
+    public void Leave_WithHandoffPosition_LandsAtTheOverriddenPosition_NotWhereverThePlayerWasStanding()
+    {
+        // The mechanism ZoneMoveHandler (portal/NPC transfer) and Zone.ApplyDeath
+        // (cross-zone revive) both rely on: the resolved ARRIVAL point travels inside the Leave command
+        // itself, never by mutating PlayerRuntimeState directly (single-writer invariant).
+        var dirtyTracker = new DirtyTracker<int>();
+        var source = ZoneTestKit.CreateZone(1, dirtyTracker: dirtyTracker);
+        var target = ZoneTestKit.CreateZone(2, dirtyTracker: dirtyTracker);
+        var (session, _) = ZoneTestKit.CreateSession(1);
+
+        source.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1, posX: 10f, posY: 0f, posZ: 10f)));
+        source.Tick(TimeSpan.FromMilliseconds(50));
+
+        source.Post(ZoneCommand.Leave(10, target, (500f, 7f, 900f)));
+        source.Tick(TimeSpan.FromMilliseconds(50));
+        target.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.True(target.TryGetPlayer(10, out var arrived));
+        Assert.Equal(500f, arrived!.PosX);
+        Assert.Equal(7f, arrived.PosY);
+        Assert.Equal(900f, arrived.PosZ);
+    }
+
+    [Fact]
     public void Leave_WithoutHandoffTarget_IsAPlainDisconnect_PlayerEndsUpInNoZone()
     {
         var zone = ZoneTestKit.CreateZone(1);

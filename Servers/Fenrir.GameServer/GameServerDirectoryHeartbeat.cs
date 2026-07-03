@@ -28,7 +28,7 @@ public sealed class GameServerDirectoryHeartbeat(
                 // TickP99Ms: no tick-duration metric pipeline exists yet in M1 (OpenTelemetry wiring is a Phase 8
                 // concern, architecture reference §13) -- 0 is an honest "not measured yet", not a fabricated
                 // number, and it never affects GetDirectoryAsync's selection (LoginServer's M1 shard-pick is
-                // FirstOrDefault, not load-based -- see ClDemandZoneServerInfoSendHandler's own comment).
+                // FirstOrDefault, not load-based -- see ZoneTransferHandler's own comment).
                 await directory.HeartbeatAsync(opts.ShardId, opts.PublicHost, opts.Port, zones.TotalPlayerCount,
                         opts.Capacity, 0f, stoppingToken)
                     .ConfigureAwait(false);

@@ -24,7 +24,7 @@ public static class LoginHandlersServiceCollectionExtensions
 {
     public static IServiceCollection AddLoginHandlers(this IServiceCollection services)
     {
-        // Not a handler itself, but has no other registration site yet (ClLoginSendHandler is its only consumer today).
+        // Not a handler itself, but has no other registration site yet (LoginHandler is its only consumer today).
         services.AddSingleton<LoginIpRateLimiter>();
 
         return services.AddGeneratedPacketHandlers();

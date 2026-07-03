@@ -88,7 +88,7 @@ public sealed class LoginConnectionHost(
         session.InboundStreamXorKey = unchecked((byte)randomNumber);
         connection.GetInboundXorKey = () => session.InboundStreamXorKey;
 
-        session.Send(new LcLoginConnectOkRecv
+        session.Send(new LoginGreetingResponse
         {
             RandomNumber = randomNumber,
             MaxPlayerNum = options.Value.MaxPlayerNum,

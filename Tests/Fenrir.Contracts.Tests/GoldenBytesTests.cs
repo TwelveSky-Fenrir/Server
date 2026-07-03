@@ -24,7 +24,7 @@ public class GoldenBytesTests
     {
         // §2.1/§4.5: tPad0..tPad4 (offsets 0..19) are dead residue -> zero on the wire;
         // tRandomNumber@20, tMaxPlayerNum@24, tGagePlayerNum@28, tPresentPlayerNum@32 (payload 36 bytes).
-        var packet = new LcLoginConnectOkRecv
+        var packet = new LoginGreetingResponse
         {
             RandomNumber = 0x1A2B3C4D,
             MaxPlayerNum = 1000,
@@ -32,9 +32,9 @@ public class GoldenBytesTests
             PresentPlayerNum = 250
         };
 
-        Assert.Equal(36, LcLoginConnectOkRecv.PayloadSize);
+        Assert.Equal(36, LoginGreetingResponse.PayloadSize);
 
-        var payload = new byte[LcLoginConnectOkRecv.PayloadSize];
+        var payload = new byte[LoginGreetingResponse.PayloadSize];
         var written = packet.Write(payload);
         Assert.Equal(36, written);
 
@@ -49,13 +49,13 @@ public class GoldenBytesTests
         // §3.1 XOR_PACKET: buf[0]^=0x10, buf[1..size-2]^=0xFE, buf[size-1] untouched. Simulated here
         // on the full frame (opcode + payload) as the future send layer (Phase 3) will do.
         var frame = new byte[1 + payload.Length];
-        frame[0] = LcLoginConnectOkRecv.Opcode;
+        frame[0] = LoginGreetingResponse.Opcode;
         payload.CopyTo(frame, 1);
         var lastByteBeforeXor = frame[^1];
 
         LegacyXor.ApplyPacketXor(frame);
 
-        Assert.Equal((byte)(LcLoginConnectOkRecv.Opcode ^ 0x10), frame[0]);
+        Assert.Equal((byte)(LoginGreetingResponse.Opcode ^ 0x10), frame[0]);
         Assert.Equal(lastByteBeforeXor, frame[^1]);
     }
 
@@ -65,9 +65,9 @@ public class GoldenBytesTests
         // §4.3: ID char[255]@0, Password char[33]@255, Version int@288, Adapter LOGIN_ADAPTER_INFO@292
         // (AdapterName char[128]@292, PhysicalAddressLength ULONG@420, PhysicalAddress BYTE[8]@424,
         // IPAddress char[16]@432). Payload = 255+33+4+156 = 448 bytes.
-        Assert.Equal(448, ClLoginSend.PayloadSize);
+        Assert.Equal(448, LoginRequest.PayloadSize);
 
-        var payload = new byte[ClLoginSend.PayloadSize];
+        var payload = new byte[LoginRequest.PayloadSize];
         WriteFixedString(payload.AsSpan(0, 255), "GoldenUser");
         WriteFixedString(payload.AsSpan(255, 33), "Secr3t");
         BinaryPrimitives.WriteInt32LittleEndian(payload.AsSpan(288, 4), 42);
@@ -76,7 +76,7 @@ public class GoldenBytesTests
         new byte[] { 0xDE, 0xAD, 0xBE, 0xEF, 0x01, 0x02, 0x00, 0x00 }.CopyTo(payload.AsSpan(424, 8));
         WriteFixedString(payload.AsSpan(432, 16), "192.168.1.10");
 
-        Assert.True(ClLoginSend.TryRead(payload, out var packet));
+        Assert.True(LoginRequest.TryRead(payload, out var packet));
         Assert.Equal("GoldenUser", packet.Id);
         Assert.Equal("Secr3t", packet.Password);
         Assert.Equal(42, packet.Version);
@@ -90,7 +90,7 @@ public class GoldenBytesTests
     public void LcDemandZoneServerInfoRecv_GoldenBytes_Write()
     {
         // §2.11: Result int@0, Ip char[16]@4, Port int@20, Zone int@24. Payload = 4+16+4+4 = 28 bytes.
-        var packet = new LcDemandZoneServerInfoRecv
+        var packet = new ZoneTransferResponse
         {
             Result = 1,
             Ip = "10.0.0.5",
@@ -98,9 +98,9 @@ public class GoldenBytesTests
             Zone = 3
         };
 
-        Assert.Equal(28, LcDemandZoneServerInfoRecv.PayloadSize);
+        Assert.Equal(28, ZoneTransferResponse.PayloadSize);
 
-        var payload = new byte[LcDemandZoneServerInfoRecv.PayloadSize];
+        var payload = new byte[ZoneTransferResponse.PayloadSize];
         var written = packet.Write(payload);
         Assert.Equal(28, written);
 
@@ -117,11 +117,11 @@ public class GoldenBytesTests
     public void ZcConnectOkRecv_GoldenBytes_Write()
     {
         // §3.1: RandomNumber int@0. Payload = 4 bytes (plaintext stream seed, out of Contracts' scope).
-        var packet = new ZcConnectOkRecv { RandomNumber = unchecked(0x77AABBCC) };
+        var packet = new ZoneGreetingResponse { RandomNumber = unchecked(0x77AABBCC) };
 
-        Assert.Equal(4, ZcConnectOkRecv.PayloadSize);
+        Assert.Equal(4, ZoneGreetingResponse.PayloadSize);
 
-        var payload = new byte[ZcConnectOkRecv.PayloadSize];
+        var payload = new byte[ZoneGreetingResponse.PayloadSize];
         var written = packet.Write(payload);
         Assert.Equal(4, written);
 
@@ -136,9 +136,9 @@ public class GoldenBytesTests
     {
         // §3.4: Id char[255]@0, AvatarName char[13]@255, Action ACTION_INFO@268 (104 bytes).
         // Payload = 255+13+104 = 372 bytes.
-        Assert.Equal(372, CzRegisterAvatarSend.PayloadSize);
+        Assert.Equal(372, EnterWorldRequest.PayloadSize);
 
-        var payload = new byte[CzRegisterAvatarSend.PayloadSize];
+        var payload = new byte[EnterWorldRequest.PayloadSize];
         WriteFixedString(payload.AsSpan(0, 255), "Hero");
         WriteFixedString(payload.AsSpan(255, 13), "HeroAvatar");
 
@@ -170,7 +170,7 @@ public class GoldenBytesTests
         BinaryPrimitives.WriteInt32LittleEndian(payload.AsSpan(actionOffset + 96, 4), 76); // SkillGradeNum2
         BinaryPrimitives.WriteInt32LittleEndian(payload.AsSpan(actionOffset + 100, 4), 77); // SkillValue
 
-        Assert.True(CzRegisterAvatarSend.TryRead(payload, out var packet));
+        Assert.True(EnterWorldRequest.TryRead(payload, out var packet));
         Assert.Equal("Hero", packet.Id);
         Assert.Equal("HeroAvatar", packet.AvatarName);
         Assert.Equal(1, packet.Action.Type);
@@ -285,7 +285,7 @@ public class GoldenBytesTests
             StellarCoreNumber = 40
         };
 
-        var packet = new ZcAvatarActionRecv
+        var packet = new AvatarActionResponse
         {
             ServerIndex = 777,
             UniqueNumber = 0xCAFEBABEu,
@@ -293,9 +293,9 @@ public class GoldenBytesTests
             CheckChangeActionState = 999
         };
 
-        Assert.Equal(644, ZcAvatarActionRecv.PayloadSize);
+        Assert.Equal(644, AvatarActionResponse.PayloadSize);
 
-        var payload = new byte[ZcAvatarActionRecv.PayloadSize];
+        var payload = new byte[AvatarActionResponse.PayloadSize];
         var written = packet.Write(payload);
         Assert.Equal(644, written);
 

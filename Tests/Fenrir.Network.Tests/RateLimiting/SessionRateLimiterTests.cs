@@ -10,7 +10,7 @@ public class SessionRateLimiterTests
     // refill rate keeps the whole test well within one token's worth of wall-clock time, so nothing here can
     // flake on timing. Capacity is read from the policy rather than hard-coded so the test survives re-tuning.
     private const FenrirServer Server = FenrirServer.Zone;
-    private const byte Opcode = Opcodes.Zone.Incoming.HeartbeatSend;
+    private const byte Opcode = Opcodes.Zone.Incoming.Heartbeat;
 
     [Fact]
     public void TryConsume_TwoSessions_HaveIndependentBuckets()

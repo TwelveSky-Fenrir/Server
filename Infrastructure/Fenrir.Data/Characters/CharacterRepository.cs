@@ -145,6 +145,34 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db)
     }
 
     /// <summary>
+    ///     Whole-container replace of TWO containers in ONE transaction (usp_CharacterItems_ReplaceTwoContainers,
+    ///     D7 regime (b)) -- the cross-container twin of <see cref="ReplaceContainerAsync" />, for a single client
+    ///     move whose FROM and TO slots live in different containers (e.g. equip: inventory -&gt; equipment).
+    ///     Calling <see cref="ReplaceContainerAsync" /> twice for such a move would commit each container in its
+    ///     OWN transaction -- a fault between the two calls could durably remove an item from its source without
+    ///     ever durably adding it to its destination. This method closes that window: both containers commit or
+    ///     roll back together.
+    /// </summary>
+    public async ValueTask ReplaceTwoContainersAsync(int characterId, byte containerA,
+        IReadOnlyList<CharacterItemSlotTvp> itemsA, byte containerB, IReadOnlyList<CharacterItemSlotTvp> itemsB,
+        CancellationToken ct)
+    {
+        var builder = new StoredProcedureParametersBuilder("game", "usp_CharacterItems_ReplaceTwoContainers", 0)
+            .AddParameter("CharacterId", characterId, SqlDbType.Int)
+            .AddParameter("ContainerA", containerA, SqlDbType.TinyInt);
+
+        if (itemsA.Count > 0)
+            builder.AddTvpParameter("ItemsA", itemsA);
+
+        builder.AddParameter("ContainerB", containerB, SqlDbType.TinyInt);
+
+        if (itemsB.Count > 0)
+            builder.AddTvpParameter("ItemsB", itemsB);
+
+        await Db.ExecuteAsync(builder.Build(), ct);
+    }
+
+    /// <summary>
     ///     Write-behind progression flush (D7 regime (a)) -- the progression twin of
     ///     <see cref="PersistPositionsAsync" />, idempotent on the same per-character FlushSequence, so replays of
     ///     either batch flavor never regress state.

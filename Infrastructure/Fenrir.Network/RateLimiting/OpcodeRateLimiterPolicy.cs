@@ -20,10 +20,10 @@ public static class OpcodeRateLimiterPolicy
     private static readonly (int Capacity, double TokensPerSecond) Heartbeat = (2, 1d / 5d);
 
     /// <summary>
-    ///     Everything else declared for M1 (e.g. <see cref="Opcodes.Login.Incoming.ClientOkForLoginSend" />,
-    ///     <see cref="Opcodes.Login.Incoming.CreateAvatarSend2" />, <see cref="Opcodes.Login.Incoming.DeleteAvatarSend" />,
-    ///     <see cref="Opcodes.Login.Incoming.DemandZoneServerInfoSend" />,
-    ///     <see cref="Opcodes.Zone.Incoming.ClientOkForZoneSend" />):
+    ///     Everything else declared for M1 (e.g. <see cref="Opcodes.Login.Incoming.LoginKeepAlive" />,
+    ///     <see cref="Opcodes.Login.Incoming.CreateAvatar" />, <see cref="Opcodes.Login.Incoming.DeleteAvatar" />,
+    ///     <see cref="Opcodes.Login.Incoming.ZoneTransfer" />,
+    ///     <see cref="Opcodes.Zone.Incoming.ZoneReady" />):
     ///     each fires at most a handful of times per session lifetime, so §8.5's reference burst of 3 is widened to 5
     ///     here since one bucket now covers several unrelated low-frequency opcodes instead of just one.
     /// </summary>
@@ -51,14 +51,14 @@ public static class OpcodeRateLimiterPolicy
     {
         return (server, opcode) switch
         {
-            (FenrirServer.Login, Opcodes.Login.Incoming.LoginSend) => Auth,
-            (FenrirServer.Zone, Opcodes.Zone.Incoming.TempRegisterSend) => Auth,
-            (FenrirServer.Zone, Opcodes.Zone.Incoming.RegisterAvatarSend) => Auth,
+            (FenrirServer.Login, Opcodes.Login.Incoming.Login) => Auth,
+            (FenrirServer.Zone, Opcodes.Zone.Incoming.ZoneHandshake) => Auth,
+            (FenrirServer.Zone, Opcodes.Zone.Incoming.EnterWorld) => Auth,
 
-            (FenrirServer.Zone, Opcodes.Zone.Incoming.AvatarActionSend) => Movement,
-            (FenrirServer.Zone, Opcodes.Zone.Incoming.UpdateAvatarAction) => Movement,
+            (FenrirServer.Zone, Opcodes.Zone.Incoming.AvatarAction) => Movement,
+            (FenrirServer.Zone, Opcodes.Zone.Incoming.AvatarActionResume) => Movement,
 
-            (FenrirServer.Zone, Opcodes.Zone.Incoming.HeartbeatSend) => Heartbeat,
+            (FenrirServer.Zone, Opcodes.Zone.Incoming.Heartbeat) => Heartbeat,
 
             _ => Default
         };

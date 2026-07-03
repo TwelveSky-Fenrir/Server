@@ -8,7 +8,7 @@ namespace Fenrir.Data.Characters;
 /// <summary>
 ///     Rename surface for CL_CHANGE_AVATAR_NAME_SEND (op 19), deliberately split from
 ///     <see cref="CharacterRepository" /> (a parallel workstream owns that file) and expressed as an interface so
-///     <c>ClChangeAvatarNameSendHandler</c> is unit-testable without a SQL container.
+///     <c>RenameAvatarHandler</c> is unit-testable without a SQL container.
 /// </summary>
 public interface ICharacterRenameRepository
 {

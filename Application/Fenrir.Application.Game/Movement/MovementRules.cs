@@ -37,8 +37,8 @@ public sealed class MovementRules(IOptions<GameServerOptions> options)
     ///     target XZ is <see cref="ZoneGeometry.IsWalkable">walkable</see> and its claimed Y is not meaningfully
     ///     below the terrain's own <see cref="ZoneGeometry.TryGetGroundHeight">resolved ground height</see> there.
     ///     A move failing either the walkability or the below-ground check is rejected exactly like a
-    ///     speed-implausible one — same resync mechanism, <see cref="World.Zone.HandleMove" /> does not
-    ///     distinguish why a move was rejected.
+    ///     speed-implausible one — same resync mechanism, <c>Zone.HandleMove</c> does not distinguish why a
+    ///     move was rejected.
     /// </summary>
     /// <remarks>
     ///     <paramref name="geometry" /> is null whenever no zone geometry is loaded (missing <c>.WM</c> file, a

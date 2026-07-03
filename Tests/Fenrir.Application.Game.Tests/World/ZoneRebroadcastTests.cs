@@ -15,7 +15,7 @@ namespace Fenrir.Application.Game.Tests.World;
 /// </summary>
 public class ZoneRebroadcastTests
 {
-    private static readonly int OneFrame = FrameWriter.FrameSizeOf<ZcAvatarActionRecv>();
+    private static readonly int OneFrame = FrameWriter.FrameSizeOf<AvatarActionResponse>();
 
     [Fact]
     public void StationaryPlayer_IsReAnnouncedToNeighbors_AfterTheLegacyCadenceElapses()

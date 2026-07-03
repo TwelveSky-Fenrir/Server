@@ -9,38 +9,38 @@ public class FrameWriterTests
     [Fact]
     public void FrameSizeOf_ZcConnectOkRecv_IsHeaderPlusPayload()
     {
-        Assert.Equal(1 + ZcConnectOkRecv.PayloadSize, FrameWriter.FrameSizeOf<ZcConnectOkRecv>());
+        Assert.Equal(1 + ZoneGreetingResponse.PayloadSize, FrameWriter.FrameSizeOf<ZoneGreetingResponse>());
     }
 
     [Fact]
     public void FrameSizeOf_ZcTempRegisterRecv_IsHeaderPlusPayload()
     {
-        Assert.Equal(1 + ZcTempRegisterRecv.PayloadSize, FrameWriter.FrameSizeOf<ZcTempRegisterRecv>());
+        Assert.Equal(1 + ZoneHandshakeResponse.PayloadSize, FrameWriter.FrameSizeOf<ZoneHandshakeResponse>());
     }
 
     [Fact]
     public void FrameSizeOf_LcLoginConnectOkRecv_IsHeaderPlusPayload()
     {
-        Assert.Equal(1 + LcLoginConnectOkRecv.PayloadSize, FrameWriter.FrameSizeOf<LcLoginConnectOkRecv>());
+        Assert.Equal(1 + LoginGreetingResponse.PayloadSize, FrameWriter.FrameSizeOf<LoginGreetingResponse>());
     }
 
     [Fact]
     public void WriteFrame_NoObfuscation_ZcConnectOkRecv_HeaderIsRawOpcodeAndPayloadMatchesManualWrite()
     {
-        var packet = new ZcConnectOkRecv { RandomNumber = 0x12345678 };
+        var packet = new ZoneGreetingResponse { RandomNumber = 0x12345678 };
 
-        Span<byte> destination = stackalloc byte[FrameWriter.FrameSizeOf<ZcConnectOkRecv>()];
+        Span<byte> destination = stackalloc byte[FrameWriter.FrameSizeOf<ZoneGreetingResponse>()];
         var written = FrameWriter.WriteFrame(packet, destination);
 
         Assert.Equal(destination.Length, written);
-        Assert.Equal(FrameWriter.FrameSizeOf<ZcConnectOkRecv>(), written);
-        Assert.Equal(1 + ZcConnectOkRecv.PayloadSize, written);
+        Assert.Equal(FrameWriter.FrameSizeOf<ZoneGreetingResponse>(), written);
+        Assert.Equal(1 + ZoneGreetingResponse.PayloadSize, written);
 
         // Undeclared Obfuscation -> WriteFrame never enters the XOR branch, so destination[0] is left in
         // whatever state it was written in (the "before xor" state, since there is no "after" for this packet).
-        Assert.Equal(ZcConnectOkRecv.Opcode, destination[0]);
+        Assert.Equal(ZoneGreetingResponse.Opcode, destination[0]);
 
-        Span<byte> expectedPayload = stackalloc byte[ZcConnectOkRecv.PayloadSize];
+        Span<byte> expectedPayload = stackalloc byte[ZoneGreetingResponse.PayloadSize];
         packet.Write(expectedPayload);
         Assert.True(expectedPayload.SequenceEqual(destination[1..]));
     }
@@ -48,17 +48,17 @@ public class FrameWriterTests
     [Fact]
     public void WriteFrame_NoObfuscation_ZcTempRegisterRecv_HeaderIsRawOpcodeAndPayloadMatchesManualWrite()
     {
-        var packet = new ZcTempRegisterRecv { Result = 7 };
+        var packet = new ZoneHandshakeResponse { Result = 7 };
 
-        Span<byte> destination = stackalloc byte[FrameWriter.FrameSizeOf<ZcTempRegisterRecv>()];
+        Span<byte> destination = stackalloc byte[FrameWriter.FrameSizeOf<ZoneHandshakeResponse>()];
         var written = FrameWriter.WriteFrame(packet, destination);
 
         Assert.Equal(destination.Length, written);
-        Assert.Equal(FrameWriter.FrameSizeOf<ZcTempRegisterRecv>(), written);
-        Assert.Equal(1 + ZcTempRegisterRecv.PayloadSize, written);
-        Assert.Equal(ZcTempRegisterRecv.Opcode, destination[0]);
+        Assert.Equal(FrameWriter.FrameSizeOf<ZoneHandshakeResponse>(), written);
+        Assert.Equal(1 + ZoneHandshakeResponse.PayloadSize, written);
+        Assert.Equal(ZoneHandshakeResponse.Opcode, destination[0]);
 
-        Span<byte> expectedPayload = stackalloc byte[ZcTempRegisterRecv.PayloadSize];
+        Span<byte> expectedPayload = stackalloc byte[ZoneHandshakeResponse.PayloadSize];
         packet.Write(expectedPayload);
         Assert.True(expectedPayload.SequenceEqual(destination[1..]));
     }
@@ -66,7 +66,7 @@ public class FrameWriterTests
     [Fact]
     public void WriteFrame_XorPacketGlobal_LcLoginConnectOkRecv_AppliesWholeFrameXorAndSparesLastByte()
     {
-        var packet = new LcLoginConnectOkRecv
+        var packet = new LoginGreetingResponse
         {
             RandomNumber = 0x11223344,
             MaxPlayerNum = 500,
@@ -74,17 +74,17 @@ public class FrameWriterTests
             PresentPlayerNum = 7
         };
 
-        Span<byte> destination = stackalloc byte[FrameWriter.FrameSizeOf<LcLoginConnectOkRecv>()];
+        Span<byte> destination = stackalloc byte[FrameWriter.FrameSizeOf<LoginGreetingResponse>()];
         var written = FrameWriter.WriteFrame(packet, destination);
 
         Assert.Equal(destination.Length, written);
-        Assert.Equal(FrameWriter.FrameSizeOf<LcLoginConnectOkRecv>(), written);
-        Assert.Equal(1 + LcLoginConnectOkRecv.PayloadSize, written);
+        Assert.Equal(FrameWriter.FrameSizeOf<LoginGreetingResponse>(), written);
+        Assert.Equal(1 + LoginGreetingResponse.PayloadSize, written);
 
         // ApplyPacketXor (§3.1): buf[0] ^= 0x10 -> the header byte moves from the raw opcode to opcode^0x10.
-        Assert.Equal((byte)(LcLoginConnectOkRecv.Opcode ^ 0x10), destination[0]);
+        Assert.Equal((byte)(LoginGreetingResponse.Opcode ^ 0x10), destination[0]);
 
-        Span<byte> rawPayload = stackalloc byte[LcLoginConnectOkRecv.PayloadSize];
+        Span<byte> rawPayload = stackalloc byte[LoginGreetingResponse.PayloadSize];
         packet.Write(rawPayload);
 
         // buf[size-1] is spared by ApplyPacketXor -> the frame's last byte still equals Write's raw output.

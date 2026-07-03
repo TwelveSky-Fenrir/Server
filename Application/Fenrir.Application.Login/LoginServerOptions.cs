@@ -12,7 +12,7 @@ public sealed class LoginServerOptions
     public int Port { get; init; } = 29998;
 
     /// <summary>
-    ///     Compared against <c>ClLoginSend.Version</c> (wire contract §4.2: mismatch → <c>LcLoginRecv.Result = 4</c>).
+    ///     Compared against <c>LoginRequest.Version</c> (wire contract §4.2: mismatch → <c>LoginResponse.Result = 4</c>).
     ///     <c>[Server.Info].Version</c> in the legacy ini — NOT the "33" used as a placeholder in the wire
     ///     contract's illustrative golden vector (§9.1).
     /// </summary>

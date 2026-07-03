@@ -1,5 +1,7 @@
+using Fenrir.Application.Game.Stats;
 using Fenrir.Contracts.Abstractions;
 using Fenrir.Contracts.Packets.Shared;
+using Fenrir.Data.Characters;
 
 namespace Fenrir.Application.Game.World;
 
@@ -39,7 +41,7 @@ public readonly struct ZoneCommand
     ///     <see cref="HandoffTarget" /> is not null: overrides the position <see cref="ZoneTransfer.CreateEnterData" />
     ///     snapshots into the target's <c>Enter</c>, instead of the player's current in-zone position. Null means
     ///     "keep the current position" (a plain zone-boundary handoff, unaffected). Non-null is how a resolved
-    ///     portal/NPC-transfer arrival point (<c>CzDemandZoneServerInfo2SendHandler</c>) or a resolved
+    ///     portal/NPC-transfer arrival point (<c>ZoneMoveHandler</c>) or a resolved
     ///     death-respawn spot (<see cref="Zone.ApplyDeath" />) reaches the target zone's <c>Enter</c> WITHOUT the
     ///     poster ever touching <see cref="PlayerRuntimeState" /> directly (single-writer invariant, architecture
     ///     reference §10.1) — the override travels as plain data inside this command and is applied by the
@@ -73,7 +75,11 @@ public readonly struct ZoneCommand
 ///     wire contract §5.3) and is ready to be simulated. Everything the tick needs to seed a
 ///     <see cref="PlayerRuntimeState" /> without querying <c>Fenrir.Data</c> itself — the zone tick never touches
 ///     SQL directly (architecture reference §10.5: "SQL est un journal de durabilité, pas un participant au
-///     gameplay").
+///     gameplay"). This is also why <see cref="Items" />/<see cref="Stats" /> below are the caller's
+///     ALREADY-COMPUTED equipment rows and effective stats (<c>EnterWorldHandler</c> resolves these
+///     against <c>WorldDataCache</c> before ever posting this command) rather than raw catalog lookups Zone
+///     itself would have to perform — <c>Zone.HandleEnter</c> only ever copies them onto the new
+///     <see cref="PlayerRuntimeState" />, never computes them.
 /// </summary>
 public sealed record PlayerEnterData(
     IPacketSession Session,
@@ -92,4 +98,8 @@ public sealed record PlayerEnterData(
     int MaxLife,
     int Mana,
     int MaxMana,
-    long FlushSequence);
+    long FlushSequence,
+    bool IsDead = false,
+    TimeSpan? ReviveRemaining = null,
+    IReadOnlyList<CharacterItemSlotDto>? Items = null,
+    EffectiveStats? Stats = null);

@@ -50,18 +50,18 @@ public class LoginSessionPinStateTests
         session.MarkAuthenticated(1);
         session.MarkPinRequired();
 
-        Assert.True(session.IsOpcodeAllowed(Opcodes.Login.Incoming.ClientOkForLoginSend));
-        Assert.True(session.IsOpcodeAllowed(Opcodes.Login.Incoming.CreateMousePasswordSend));
-        Assert.True(session.IsOpcodeAllowed(Opcodes.Login.Incoming.ChangeMousePasswordSend));
-        Assert.True(session.IsOpcodeAllowed(Opcodes.Login.Incoming.LoginMousePasswordSend));
+        Assert.True(session.IsOpcodeAllowed(Opcodes.Login.Incoming.LoginKeepAlive));
+        Assert.True(session.IsOpcodeAllowed(Opcodes.Login.Incoming.CreateMousePin));
+        Assert.True(session.IsOpcodeAllowed(Opcodes.Login.Incoming.ChangeMousePin));
+        Assert.True(session.IsOpcodeAllowed(Opcodes.Login.Incoming.VerifyMousePin));
 
         // The char-select opcodes must stay closed until the PIN gate opens (legacy Quit() on !IsSecondLogin()).
-        Assert.False(session.IsOpcodeAllowed(Opcodes.Login.Incoming.CreateAvatarSend2));
-        Assert.False(session.IsOpcodeAllowed(Opcodes.Login.Incoming.DeleteAvatarSend));
-        Assert.False(session.IsOpcodeAllowed(Opcodes.Login.Incoming.ChangeAvatarNameSend));
-        Assert.False(session.IsOpcodeAllowed(Opcodes.Login.Incoming.WantGiftSend));
-        Assert.False(session.IsOpcodeAllowed(Opcodes.Login.Incoming.DemandZoneServerInfoSend));
-        Assert.False(session.IsOpcodeAllowed(Opcodes.Login.Incoming.GiftInfoSend));
+        Assert.False(session.IsOpcodeAllowed(Opcodes.Login.Incoming.CreateAvatar));
+        Assert.False(session.IsOpcodeAllowed(Opcodes.Login.Incoming.DeleteAvatar));
+        Assert.False(session.IsOpcodeAllowed(Opcodes.Login.Incoming.RenameAvatar));
+        Assert.False(session.IsOpcodeAllowed(Opcodes.Login.Incoming.ClaimGift));
+        Assert.False(session.IsOpcodeAllowed(Opcodes.Login.Incoming.ZoneTransfer));
+        Assert.False(session.IsOpcodeAllowed(Opcodes.Login.Incoming.GiftList));
     }
 
     [Fact]
@@ -74,15 +74,15 @@ public class LoginSessionPinStateTests
         session.MarkCharSelect();
 
         Assert.Equal(LoginSessionState.CharSelect, session.State);
-        Assert.True(session.IsOpcodeAllowed(Opcodes.Login.Incoming.CreateAvatarSend2));
-        Assert.True(session.IsOpcodeAllowed(Opcodes.Login.Incoming.ChangeAvatarNameSend));
-        Assert.True(session.IsOpcodeAllowed(Opcodes.Login.Incoming.WantGiftSend));
-        Assert.True(session.IsOpcodeAllowed(Opcodes.Login.Incoming.GiftInfoSend));
+        Assert.True(session.IsOpcodeAllowed(Opcodes.Login.Incoming.CreateAvatar));
+        Assert.True(session.IsOpcodeAllowed(Opcodes.Login.Incoming.RenameAvatar));
+        Assert.True(session.IsOpcodeAllowed(Opcodes.Login.Incoming.ClaimGift));
+        Assert.True(session.IsOpcodeAllowed(Opcodes.Login.Incoming.GiftList));
 
         // Ops 13/14/15 are only legal while the gate is still closed.
-        Assert.False(session.IsOpcodeAllowed(Opcodes.Login.Incoming.CreateMousePasswordSend));
-        Assert.False(session.IsOpcodeAllowed(Opcodes.Login.Incoming.ChangeMousePasswordSend));
-        Assert.False(session.IsOpcodeAllowed(Opcodes.Login.Incoming.LoginMousePasswordSend));
+        Assert.False(session.IsOpcodeAllowed(Opcodes.Login.Incoming.CreateMousePin));
+        Assert.False(session.IsOpcodeAllowed(Opcodes.Login.Incoming.ChangeMousePin));
+        Assert.False(session.IsOpcodeAllowed(Opcodes.Login.Incoming.VerifyMousePin));
     }
 
     [Fact]
@@ -92,12 +92,12 @@ public class LoginSessionPinStateTests
         var session = new LoginClientSession(1, new FakeDuplexPipe());
         session.MarkAuthenticated(1);
 
-        Assert.True(session.IsOpcodeAllowed(Opcodes.Login.Incoming.CreateAvatarSend2));
-        Assert.True(session.IsOpcodeAllowed(Opcodes.Login.Incoming.DemandZoneServerInfoSend));
+        Assert.True(session.IsOpcodeAllowed(Opcodes.Login.Incoming.CreateAvatar));
+        Assert.True(session.IsOpcodeAllowed(Opcodes.Login.Incoming.ZoneTransfer));
 
         // But the mandatory-PIN-only opcodes are not legal here (session never entered PinRequired).
-        Assert.False(session.IsOpcodeAllowed(Opcodes.Login.Incoming.CreateMousePasswordSend));
-        Assert.False(session.IsOpcodeAllowed(Opcodes.Login.Incoming.LoginMousePasswordSend));
+        Assert.False(session.IsOpcodeAllowed(Opcodes.Login.Incoming.CreateMousePin));
+        Assert.False(session.IsOpcodeAllowed(Opcodes.Login.Incoming.VerifyMousePin));
     }
 
     [Fact]
@@ -107,10 +107,10 @@ public class LoginSessionPinStateTests
         session.MarkAuthenticated(1);
         session.MarkCharSelect();
 
-        Assert.False(session.IsOpcodeAllowed(Opcodes.Login.Incoming.FailMoveZone1Send));
+        Assert.False(session.IsOpcodeAllowed(Opcodes.Login.Incoming.ZoneTransferFailure));
 
         session.MarkHandoverIssued();
 
-        Assert.True(session.IsOpcodeAllowed(Opcodes.Login.Incoming.FailMoveZone1Send));
+        Assert.True(session.IsOpcodeAllowed(Opcodes.Login.Incoming.ZoneTransferFailure));
     }
 }

@@ -1,3 +1,5 @@
+using Fenrir.Application.Game.Inventory;
+using Fenrir.Application.Game.World;
 using Fenrir.Contracts.Packets.Shared;
 using Fenrir.Data.Characters;
 
@@ -11,8 +13,17 @@ namespace Fenrir.Application.Game.Avatars;
 /// </summary>
 public static class AvatarInfoFactory
 {
-    /// <summary>Projects a persisted character onto the wire struct for ZC_REGISTER_AVATAR_RECV / world entry.</summary>
-    public static AvatarInfo CreateForCharacter(CharacterWorldEntryDto character)
+    /// <summary>
+    ///     Projects a persisted character (the A3-extended world-entry snapshot, RS0 of
+    ///     usp_Character_GetForWorldEntry) plus its item rows (RS1) onto the wire struct for
+    ///     ZC_REGISTER_AVATAR_RECV / world entry. Unlike the earlier M1-prefix
+    ///     <see cref="CharacterWorldEntryDto" /> overload this replaces, this also carries progression
+    ///     (stats/money/title/halo/rebirth) and the real Equipment container -- see
+    ///     <see cref="BuildEquipArrayFromRows" />'s own remarks for exactly which of <c>AvatarInfo.Equip</c>'s
+    ///     4 ints/slot are populated.
+    /// </summary>
+    public static AvatarInfo CreateForCharacter(CharacterWorldSnapshotDto character,
+        IReadOnlyList<CharacterItemSlotDto> items)
     {
         return AvatarInfoTemplates.Zeroed with
         {
@@ -22,6 +33,23 @@ public static class AvatarInfoFactory
             HeadType = character.HeadType,
             FaceType = character.FaceType,
             Level1 = character.Level,
+            Level2 = character.Level2,
+            Vit = character.StatVit,
+            Str = character.StatStr,
+            Int = character.StatInt,
+            Dex = character.StatDex,
+            StatPoint = character.StatPoints,
+            SkillPoint = character.SkillPoints,
+            Money = (int)character.Money,
+            InventoryDate = character.InventoryDate,
+            StoreDate = character.StoreDate,
+            StoreMoney = (int)character.StoreMoney,
+            BigMoney = character.BigMoney,
+            BigStoreMoney = character.BigStoreMoney,
+            Title = character.Title,
+            Halo = character.Halo,
+            RebirthNum = character.RebirthCount,
+            Equip = BuildEquipArrayFromRows(items),
             LogoutInfo =
             [
                 character.MapId,
@@ -32,5 +60,90 @@ public static class AvatarInfoFactory
                 character.Mana
             ]
         };
+    }
+
+    /// <summary>
+    ///     Same projection, but from a LIVE <see cref="PlayerRuntimeState" /> instead of a fresh SQL read --
+    ///     used mid-session (in-process zone transfer, <c>ZoneMoveHandler</c>) where the
+    ///     source of truth is the zone's own in-memory state, and the destination map/position must be the
+    ///     JUST-RESOLVED arrival point, not whatever is still on <paramref name="state" /> (still the source
+    ///     zone's own position at the point this is called -- the transfer hasn't happened yet).
+    /// </summary>
+    public static AvatarInfo CreateForRuntimeState(PlayerRuntimeState state, short mapId, float posX, float posY,
+        float posZ)
+    {
+        return AvatarInfoTemplates.Zeroed with
+        {
+            Name = state.Name,
+            Tribe = state.Tribe,
+            Gender = state.Gender,
+            HeadType = state.HeadType,
+            FaceType = state.FaceType,
+            Level1 = state.Level,
+            Vit = state.StatVit,
+            Str = state.StatStr,
+            Int = state.StatInt,
+            Dex = state.StatDex,
+            StatPoint = state.StatPoints,
+            SkillPoint = state.SkillPoints,
+            Title = state.Title,
+            Halo = state.Halo,
+            RebirthNum = state.RebirthCount,
+            Equip = BuildEquipArrayFromContainer(state.Inventory.GetContainer(ContainerMatrix.Equipment)),
+            LogoutInfo = [mapId, (int)posX, (int)posY, (int)posZ, state.Life, state.Mana]
+        };
+    }
+
+    /// <summary>
+    ///     <c>AvatarInfo.Equip</c> (52 ints = <c>aEquip[13][4]</c>, report 11 §2): per occupied slot, ints
+    ///     [0]=ItemId, [1]=ExpireDate ("durée/état" per the report), [2]=the packed IS/IU/IM/IZ upgrade bytes
+    ///     (<see cref="PackUpgradeBytes" />). OPEN ISSUE: the 4th int's role (<c>aEquip[slot][3]</c>) was never
+    ///     located in the source pass -- left at its wire-zero default rather than guessed.
+    /// </summary>
+    private static int[] BuildEquipArrayFromRows(IReadOnlyList<CharacterItemSlotDto> items)
+    {
+        var equip = new int[52];
+
+        foreach (var item in items)
+        {
+            if (item.Container != ContainerMatrix.Equipment || item.Slot >= 13)
+                continue;
+
+            var baseIndex = item.Slot * 4;
+            equip[baseIndex] = item.ItemId;
+            equip[baseIndex + 1] = item.ExpireDate;
+            equip[baseIndex + 2] = PackUpgradeBytes(item.Enchant, item.Combine, item.Refine, item.Socket);
+        }
+
+        return equip;
+    }
+
+    /// <summary>Same projection as <see cref="BuildEquipArrayFromRows" />, from the live in-memory Equipment container.</summary>
+    private static int[] BuildEquipArrayFromContainer(IReadOnlyDictionary<byte, ItemStack> equipmentContainer)
+    {
+        var equip = new int[52];
+
+        foreach (var (slot, stack) in equipmentContainer)
+        {
+            if (slot >= 13)
+                continue;
+
+            var baseIndex = slot * 4;
+            equip[baseIndex] = stack.ItemId;
+            equip[baseIndex + 1] = stack.ExpireDate;
+            equip[baseIndex + 2] = PackUpgradeBytes(stack.Enchant, stack.Combine, stack.Refine, stack.Socket);
+        }
+
+        return equip;
+    }
+
+    /// <summary>
+    ///     <c>SetISIUIMValue(IS,IU,IM,IZ)</c> (report 11 §2): 4 bytes packed little-endian into one int, each
+    ///     read back as a signed char by the legacy -- the bit PATTERN is identical whether read as signed or
+    ///     unsigned, so packing our unsigned TINYINT columns this way reproduces the same wire int.
+    /// </summary>
+    private static int PackUpgradeBytes(byte enchant, byte combine, byte refine, byte socket)
+    {
+        return enchant | (combine << 8) | (refine << 16) | (socket << 24);
     }
 }

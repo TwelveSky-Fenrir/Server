@@ -2,6 +2,7 @@ using System.Buffers;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Threading.Channels;
+using Fenrir.Application.Game.Inventory;
 using Fenrir.Application.Game.Movement;
 using Fenrir.Application.Game.Simulation;
 using Fenrir.Application.Game.World.Geometry;
@@ -46,6 +47,19 @@ public sealed class Zone(
     private readonly Channel<ZoneCommand> _inbox = Channel.CreateBounded<ZoneCommand>(
         new BoundedChannelOptions(8192) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
+    /// <summary>
+    ///     Second, SEPARATE inbox for already-validated-and-SQL-durable inventory results
+    ///     (<see cref="InventoryZoneCommand" />, posted by <c>GenericActionHandler</c>). Deliberately not
+    ///     folded into <see cref="_inbox" />/<see cref="ZoneCommand" />'s own union: this task's perimeter is
+    ///     additive only (Application/Fenrir.Application.Game/Inventory/ + Handlers/) and must never require
+    ///     editing <see cref="DrainInbox" />'s existing switch -- see <see cref="DrainInventoryCommands" />'s
+    ///     own remarks for the full rationale. Same bounded/drop-on-full posture as <see cref="_inbox" />: by
+    ///     the time a command reaches here its SQL write already committed, so a dropped command only leaves
+    ///     this zone's in-memory mirror stale (self-heals on the player's next world entry), never a lost item.
+    /// </summary>
+    private readonly Channel<InventoryZoneCommand> _inventoryInbox = Channel.CreateBounded<InventoryZoneCommand>(
+        new BoundedChannelOptions(2048) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+
     private readonly KeyValuePair<string, object?> _mapTag = ZoneTickMetrics.MapTag(mapId);
 
     // ConcurrentDictionary, not a plain Dictionary: the tick is the sole WRITER (single-writer invariant intact),
@@ -78,31 +92,6 @@ public sealed class Zone(
     public ZoneGeometry? Geometry { get; } = TryLoadGeometry(mapId, options, logger);
 
     /// <summary>
-    ///     Cross-zone lookup this zone's OWN tick uses to resolve a handoff it initiates ITSELF rather than one
-    ///     driven by an incoming client packet (currently only <see cref="ApplyDeath" />'s cross-zone revive to
-    ///     a tribe capital) — set exactly once by <see cref="ZoneRegistry" /> right after constructing every
-    ///     zone, before any <see cref="RunAsync" />/<see cref="Tick" /> starts (see its own remarks). Null in
-    ///     unit tests that build a bare <c>Zone</c> directly (<c>ZoneTestKit</c>): the cross-zone revive branch
-    ///     then degrades to a logged revive-in-place rather than throwing (see <see cref="Revive" />).
-    /// </summary>
-    public ZoneRegistry? Registry { get; set; }
-
-    /// <summary>
-    ///     Tribe "born spot" table (legacy <c>IsBornSpot</c>, S04_MyWork05.cpp:4776-4806) — hardcoded in the
-    ///     legacy C++ itself, not sourced from any <c>.BIN</c>/<c>.IMG</c> table, so no <c>world.*</c> schema
-    ///     change is warranted to carry it. Index = tribe id (0-3). Serves BOTH halves of
-    ///     <see cref="ResolveDeathDestination" />: the walk-in point of a tribe's own capital, whether the
-    ///     player is already there ("revive in place") or being sent home from elsewhere.
-    /// </summary>
-    private static readonly (short ZoneNumber, float X, float Y, float Z)[] TribeCapitals =
-    [
-        (1, 6f, 0f, -7f), // tribe 0
-        (6, -190f, 0f, 1270f), // tribe 1
-        (11, 447f, 1f, 440f), // tribe 2
-        (140, 0f, 0f, -6f) // tribe 3
-    ];
-
-    /// <summary>
     ///     Enqueues a command for the next tick. Never blocks: a full inbox drops the write (architecture reference
     ///     §10.1) rather than stall whichever session thread posted it — a dropped Move is simply superseded by the client's
     ///     next one.
@@ -110,6 +99,17 @@ public sealed class Zone(
     public bool Post(in ZoneCommand command)
     {
         return _inbox.Writer.TryWrite(command);
+    }
+
+    /// <summary>
+    ///     Enqueues an already-validated, already-SQL-durable inventory result for this zone's own tick to
+    ///     mirror into <see cref="PlayerRuntimeState.Inventory" />/<see cref="PlayerRuntimeState.Stats" /> --
+    ///     see <see cref="_inventoryInbox" />'s remarks for why this is a separate channel from
+    ///     <see cref="Post" />/<see cref="ZoneCommand" />.
+    /// </summary>
+    public bool PostInventoryCommand(in InventoryZoneCommand command)
+    {
+        return _inventoryInbox.Writer.TryWrite(command);
     }
 
     public bool TryGetPlayer(int characterId, out PlayerRuntimeState? state)
@@ -154,6 +154,10 @@ public sealed class Zone(
 
         var t0 = Stopwatch.GetTimestamp();
         DrainInbox();
+        // Separate inbox/method on purpose (see _inventoryInbox's remarks): this task's perimeter must stay
+        // additive-only and never edit DrainInbox's own switch. Folded into the same "Drain" timing bucket
+        // below since it is, in spirit, just another inbox drain.
+        DrainInventoryCommands();
         var t1 = Stopwatch.GetTimestamp();
         Simulate(_accumulator.Advance(elapsed));
         var t2 = Stopwatch.GetTimestamp();
@@ -198,6 +202,52 @@ public sealed class Zone(
     }
 
     /// <summary>
+    ///     Drains <see cref="_inventoryInbox" />: applies each already-validated, already-SQL-durable
+    ///     <see cref="InventoryZoneCommand" /> (<c>GenericActionHandler</c>) onto the live
+    ///     <see cref="PlayerRuntimeState" /> -- the ONLY place <see cref="PlayerRuntimeState.Inventory" />/
+    ///     <see cref="PlayerRuntimeState.Stats" /> are mutated after world entry, preserving the single-writer
+    ///     invariant (architecture reference §10.1) exactly like <see cref="DrainInbox" /> does for position/
+    ///     vitals. Kept as its OWN method/channel rather than a new <see cref="ZoneCommandKind" /> case: this
+    ///     task's perimeter (V2 Inventory &amp; Equipment) is additive-only and must never edit
+    ///     <see cref="DrainInbox" />'s existing switch.
+    /// </summary>
+    private void DrainInventoryCommands()
+    {
+        while (_inventoryInbox.Reader.TryRead(out var command))
+            try
+            {
+                ApplyInventoryCommand(in command);
+            }
+            catch (Exception ex)
+            {
+                // Same containment posture as DrainInbox: one bad inventory command must never take the whole
+                // tick loop down for every other player in the zone.
+                logger.LogError(ex, "Zone {MapId} inventory command for character {CharacterId} failed", MapId,
+                    command.CharacterId);
+            }
+    }
+
+    /// <summary>
+    ///     No validation, no I/O, no business logic here on purpose (see <see cref="InventoryZoneCommand" />'s
+    ///     own remarks) -- everything was already decided and already persisted by the posting handler before
+    ///     this ever reached the inbox. A no-op (no log) if the character already left this zone by the time
+    ///     the tick drains this: their SQL write is already durable regardless, so there is nothing left to
+    ///     mirror -- the exact same benign race <see cref="ApplyDeath" /> already accepts for a similarly-timed
+    ///     disconnect.
+    /// </summary>
+    private void ApplyInventoryCommand(in InventoryZoneCommand command)
+    {
+        if (!_players.TryGetValue(command.CharacterId, out var state))
+            return;
+
+        foreach (var snapshot in command.Containers)
+            state.Inventory.ReplaceContainer(snapshot.Container, snapshot.Slots);
+
+        if (command.UpdatedStats is { } stats)
+            state.Stats = stats;
+    }
+
+    /// <summary>
     ///     Runs every registered <see cref="ISimulationSystem" /> in declared order, once per frame that has at
     ///     least one whole 500 ms legacy tick due (decision D4). Empty list today: the monster/buff/regen/spawn
     ///     systems arrive in Phase C — this is their wiring point, kept live (and metered) so adding a system is
@@ -225,7 +275,7 @@ public sealed class Zone(
     /// <summary>
     ///     Keep-alive rebroadcast (report 05 §0 item 6): the legacy loop re-emits every avatar's current state
     ///     to its surroundings every 3.5 s (<c>tLogicAvatarTick</c>) even when idle, so late-arriving or
-    ///     packet-lossy neighbors converge. Same wire packet as a move (<see cref="ZcAvatarActionRecv" />),
+    ///     packet-lossy neighbors converge. Same wire packet as a move (<see cref="AvatarActionResponse" />),
     ///     serialize-once per avatar via <see cref="BroadcastAvatarAction" />. Monsters and ground items get
     ///     their own 5 s pass here in Phase C (<see cref="LegacyTime.MonsterRebroadcastInterval" />).
     /// </summary>
@@ -268,8 +318,30 @@ public sealed class Zone(
             MaxMana = data.MaxMana,
             FlushSequence = data.FlushSequence,
             LastMoveUtc = DateTime.UtcNow,
-            LastAvatarRebroadcastAt = _clock
+            LastAvatarRebroadcastAt = _clock,
+            // Carried through an in-process handoff (ZoneTransfer.CreateEnterData) so a player mid-death who
+            // transfers zones before the auto-revive fires doesn't silently come back "alive" with 0 HP on
+            // arrival -- defaults false for a fresh SQL-backed world entry, which is never mid-death (a login
+            // is, by construction, a NEW session -- the legacy's own HP-force-to-1 register-time dance, report
+            // 12 §4.2 step 4, is a distinct concern this DTO does not need to model: no persisted "IsDead"
+            // column exists in game.Characters, since Vitals are not yet part of any write-behind flush -- see
+            // this task's StructuredOutput openIssues).
+            IsDead = data.IsDead,
+            // This zone's OWN clock plus whatever remained of the timer in the SOURCE zone (data.ReviveRemaining,
+            // already translated out of the source's absolute clock by ZoneTransfer.CreateEnterData) -- NOT a
+            // fresh full delay, and NOT left at the type's own zero-default (which ProcessPendingRevives would
+            // immediately treat as overdue) when the arriving player is mid-death.
+            ReviveAtZoneClock = _clock + (data.ReviveRemaining ?? TimeSpan.Zero)
         };
+
+        // Items/Stats are already-computed data handed down through the command (PlayerEnterData's own
+        // remarks) -- this is a plain copy, never a catalog lookup or a StatCalculator call: those happened
+        // in the poster (EnterWorldHandler for a fresh world entry, ZoneTransfer.CreateEnterData for
+        // an in-process handoff), keeping this tick-thread method's cost independent of WorldDataCache size.
+        if (data.Items is { } items)
+            state.Inventory.Seed(items);
+        if (data.Stats is { } stats)
+            state.Stats = stats;
 
         var cell = _grid.CellOf(state.PosX, state.PosZ);
         state.CurrentCell = cell;
@@ -325,7 +397,7 @@ public sealed class Zone(
         // learns of them when ITS tick drains the command, so the character never exists in two zones at once
         // and no state is ever shared across ticks. handoffPosition (set by a portal/NPC-transfer handler or by
         // ApplyDeath's cross-zone revive) overrides where the snapshot lands -- see ZoneCommand.HandoffPosition.
-        var enterData = ZoneTransfer.CreateEnterData(state, handoffTarget.MapId, handoffPosition);
+        var enterData = ZoneTransfer.CreateEnterData(state, handoffTarget.MapId, _clock, handoffPosition);
 
         if (!handoffTarget.Post(ZoneCommand.Enter(characterId, enterData)))
         {
@@ -380,12 +452,6 @@ public sealed class Zone(
 
         state.Life = 0;
         state.IsDead = true;
-
-        var destination = ResolveDeathDestination(state.Tribe);
-        state.ReviveZoneNumber = destination.ZoneNumber;
-        state.ReviveX = destination.X;
-        state.ReviveY = destination.Y;
-        state.ReviveZ = destination.Z;
         state.ReviveAtZoneClock = _clock + LegacyTime.DeathReviveDelay;
 
         dirtyTracker.MarkDirty(characterId, DirtyFlags.Vitals);
@@ -421,102 +487,57 @@ public sealed class Zone(
     }
 
     /// <summary>
-    ///     Legacy-documented respawn target for a death in THIS zone (report 12 §4.2, <c>ZONEMOVEINFO::ReturnNextZoneAfterDeath</c>,
-    ///     Header/S19_MyZoneMoveInfo.cpp:1280): dying already inside one's own tribe capital revives IN PLACE;
-    ///     dying anywhere else sends the player home to that capital. Both branches resolve to the same
-    ///     <see cref="TribeCapitals" /> row -- "in place" is simply the case where that row's zone already
-    ///     equals <see cref="MapId" />.
-    /// </summary>
-    /// <remarks>
-    ///     DOCUMENTED SIMPLIFICATION (D8 iso-behavior policy — a real gap, not a silent guess): the legacy rule
-    ///     ALSO keeps a player in place when the current zone belongs to their tribe's ALLIANCE or is NEUTRAL
-    ///     (<c>ReturnZoneTribeInfo1 == -1</c>), and falls back to zone 38 in some further unspecified cases
-    ///     ("selon les cas", report 12). Neither branch is reproducible today: <c>world.Zones</c> carries no
-    ///     tribe-ownership column (report 05 §12's <c>ZONEMAININFO</c> mapping was never migrated, see
-    ///     Database/30_tables/world/Zones.sql) and Fenrir has no alliance system yet (Phase C/V7). This method
-    ///     therefore only ever returns "same zone" (own capital) or "own capital" — never a third-party zone or
-    ///     zone 38. A death in a neutral field zone will always send the player home instead of reviving them in
-    ///     place, a conservative divergence flagged as an open issue rather than guessed at.
-    /// </remarks>
-    private (short ZoneNumber, float X, float Y, float Z) ResolveDeathDestination(byte tribe)
-    {
-        if (tribe >= TribeCapitals.Length)
-        {
-            logger.LogWarning(
-                "ResolveDeathDestination: tribe {Tribe} has no known capital (expected 0-3) -- defaulting to tribe 0's",
-                tribe);
-            return TribeCapitals[0];
-        }
-
-        return TribeCapitals[tribe];
-    }
-
-    /// <summary>
     ///     Sweeps every dead player whose scheduled revive (<see cref="ApplyDeath" />) is due, in this frame's
-    ///     tick -- same enumeration posture as <see cref="RebroadcastAvatars" />: this tick thread is the sole
-    ///     mutator, so a lock-free direct enumeration of <see cref="_players" /> is safe.
+    ///     tick. Due entries are snapshotted into a small list first (allocated only on a tick with at least
+    ///     one due revive, the rare case) purely to keep the enumeration pattern consistent with any future
+    ///     revive step that might need to mutate <see cref="_players" />; <see cref="Revive" /> itself never
+    ///     removes an entry today.
     /// </summary>
     private void ProcessPendingRevives()
     {
+        List<(int CharacterId, PlayerRuntimeState State)>? due = null;
+
         foreach (var (characterId, state) in _players)
         {
             if (!state.IsDead || _clock < state.ReviveAtZoneClock)
                 continue;
 
-            Revive(characterId, state);
+            (due ??= []).Add((characterId, state));
         }
+
+        if (due is null)
+            return;
+
+        foreach (var (characterId, state) in due)
+            Revive(characterId, state);
     }
 
     /// <summary>
     ///     Executes a due revive resolved by <see cref="ApplyDeath" />: HP forced to 1 regardless of MaxLife
-    ///     (report 12 §4.2, matching the legacy <c>REGISTER_AVATAR_SEND</c> flow's own force-to-1), then either
-    ///     a same-zone reposition or a cross-zone handoff reusing the EXACT same in-process mechanism as a
-    ///     client-driven portal transfer (<see cref="HandleLeave" />) — just triggered by this zone's own tick
-    ///     instead of a client packet.
+    ///     (report 12 §4.2, matching the legacy <c>REGISTER_AVATAR_SEND</c> flow's own force-to-1), IN PLACE --
+    ///     same zone, same position. This mirrors the legacy's own documented behavior (report 12 §4.2/§4.3):
+    ///     after the delay, the server only auto-clears the death flag locally ("le client peut se relever
+    ///     localement, il n'envoie pas de paquet de résurrection dédié") -- an actual cross-zone "return to
+    ///     town" transfer is ALWAYS client-driven (CZ_DEMAND_ZONE_SERVER_INFO_2, Sort=3, the client's own
+    ///     chosen destination zone number), already fully handled by the existing, direction-agnostic
+    ///     <c>ZoneMoveHandler</c> (which works whether the player is dead or
+    ///     alive). An earlier pass here had this auto-timer ALSO perform an unconditional cross-zone teleport to
+    ///     a hardcoded tribe capital -- removed: it both diverged from the documented legacy behavior and (worse)
+    ///     dropped the destination silently to zone/position 0 for any player handed off to another zone while
+    ///     still dead (no field carried a pending cross-zone revive through <see cref="ZoneTransfer.CreateEnterData" />),
+    ///     causing the auto-timer to misfire on arrival. Reviving strictly in place removes that whole class of
+    ///     bug by construction: there is no cross-zone state left to lose.
     /// </summary>
     private void Revive(int characterId, PlayerRuntimeState state)
     {
         state.IsDead = false;
         state.Life = 1;
 
-        if (state.ReviveZoneNumber == MapId)
-        {
-            state.PosX = state.ReviveX;
-            state.PosY = state.ReviveY;
-            state.PosZ = state.ReviveZ;
+        dirtyTracker.MarkDirty(characterId, DirtyFlags.Vitals);
 
-            var newCell = _grid.CellOf(state.PosX, state.PosZ);
-            _grid.Move(characterId, state.CurrentCell, newCell);
-            state.CurrentCell = newCell;
-
-            dirtyTracker.MarkDirty(characterId, DirtyFlags.Position | DirtyFlags.Vitals);
-
-            SendAvatarAction(state.Session, state);
-            var neighbors = _grid.Neighbors(newCell).Where(id => id != characterId).ToArray();
-            BroadcastAvatarAction(neighbors, state);
-            return;
-        }
-
-        if (Registry is null || !Registry.TryGet(state.ReviveZoneNumber, out var targetZone))
-        {
-            // No registry wired (a bare Zone in a unit test) or the capital isn't hosted by this shard
-            // (ADR-0012 -- same "out of scope, single shard today" posture as CzDemandZoneServerInfo2SendHandler):
-            // degrade to reviving in place rather than stranding the player mid-death forever.
-            logger.LogWarning(
-                "Character {CharacterId} died in zone {MapId} but its revive target zone {TargetZone} is not resolvable -- reviving in place instead",
-                characterId, MapId, state.ReviveZoneNumber);
-
-            dirtyTracker.MarkDirty(characterId, DirtyFlags.Vitals);
-            SendAvatarAction(state.Session, state);
-            var neighbors = _grid.Neighbors(state.CurrentCell).Where(id => id != characterId).ToArray();
-            BroadcastAvatarAction(neighbors, state);
-            return;
-        }
-
-        // Cross-zone revive: same-thread call, not a re-posted command -- we ARE this zone's tick right now,
-        // so calling HandleLeave directly preserves the single-writer invariant exactly as well as draining it
-        // from the inbox would, without paying an extra tick's latency.
-        HandleLeave(characterId, targetZone, (state.ReviveX, state.ReviveY, state.ReviveZ));
+        SendAvatarAction(state.Session, state);
+        var neighbors = _grid.Neighbors(state.CurrentCell).Where(id => id != characterId).ToArray();
+        BroadcastAvatarAction(neighbors, state);
     }
 
     private void HandleMove(int characterId, in ActionInfo action)
@@ -571,7 +592,7 @@ public sealed class Zone(
             return;
 
         var packet = action is null ? BuildAvatarActionRecv(state) : BuildAvatarActionRecv(state, action.Value);
-        var total = FrameWriter.FrameSizeOf<ZcAvatarActionRecv>();
+        var total = FrameWriter.FrameSizeOf<AvatarActionResponse>();
         var rented = ArrayPool<byte>.Shared.Rent(total);
 
         try
@@ -601,7 +622,7 @@ public sealed class Zone(
         }
     }
 
-    private static ZcAvatarActionRecv BuildAvatarActionRecv(PlayerRuntimeState state)
+    private static AvatarActionResponse BuildAvatarActionRecv(PlayerRuntimeState state)
     {
         return BuildAvatarActionRecv(state, new ActionInfo
         {
@@ -627,14 +648,14 @@ public sealed class Zone(
     }
 
     /// <summary>
-    ///     Internal (not private): reused by <c>CzDemandZoneServerInfo2SendHandler</c> to build the self-spawn
+    ///     Internal (not private): reused by <c>ZoneMoveHandler</c> to build the self-spawn
     ///     packet for a zone-transfer's fresh world-state push, with an explicit <paramref name="action" />
     ///     carrying the just-resolved ARRIVAL position rather than <paramref name="state" />'s own (still the
     ///     source zone's, single-writer invariant preserved -- see that handler's remarks).
     /// </summary>
-    internal static ZcAvatarActionRecv BuildAvatarActionRecv(PlayerRuntimeState state, ActionInfo action)
+    internal static AvatarActionResponse BuildAvatarActionRecv(PlayerRuntimeState state, ActionInfo action)
     {
-        return new ZcAvatarActionRecv
+        return new AvatarActionResponse
         {
             ServerIndex = state.CharacterId,
             UniqueNumber = state.UniqueNumber,
@@ -656,11 +677,13 @@ public sealed class Zone(
                 FaceType = state.FaceType,
                 Level1 = state.Level,
                 Level2 = 0,
-                EquipForView = new int[26],
+                // Reflects the live Equipment container instead of a hardcoded blank -- see
+                // EquipmentViewCodec's own remarks (shared with EnterWorldHandler's self-spawn).
+                EquipForView = EquipmentViewCodec.BuildEquipForView(state.Inventory.GetContainer(ContainerMatrix.Equipment)),
                 AnimalNumber = 0,
-                Title = 0,
-                Halo = 0,
-                RebirthNum = 0,
+                Title = state.Title,
+                Halo = state.Halo,
+                RebirthNum = state.RebirthCount,
                 BattleTeam = 0,
                 Action = action,
                 MaxLifeValue = state.MaxLife,

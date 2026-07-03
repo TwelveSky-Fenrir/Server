@@ -108,7 +108,7 @@ public sealed class ZoneConnectionHost(
         session.InboundStreamXorKey = unchecked((byte)randomNumber);
         connection.GetInboundXorKey = () => session.InboundStreamXorKey;
 
-        session.Send(new ZcConnectOkRecv { RandomNumber = randomNumber });
+        session.Send(new ZoneGreetingResponse { RandomNumber = randomNumber });
     }
 
     public override void Dispose()

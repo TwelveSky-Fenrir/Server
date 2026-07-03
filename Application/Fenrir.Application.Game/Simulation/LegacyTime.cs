@@ -25,7 +25,7 @@ public static class LegacyTime
 
     /// <summary>
     ///     Keep-alive re-broadcast cadence for avatar positions: 3.5 s (<c>tLogicAvatarTick = 3.5f</c>, report 05
-    ///     §0 item 6 — re-emitted via <c>B_AVATAR_ACTION_RECV2</c> in the legacy loop, <c>ZcAvatarActionRecv</c>
+    ///     §0 item 6 — re-emitted via <c>B_AVATAR_ACTION_RECV2</c> in the legacy loop, <c>AvatarActionResponse</c>
     ///     to AOI neighbors here).
     /// </summary>
     public static readonly TimeSpan AvatarRebroadcastInterval = TimeSpan.FromSeconds(3.5);

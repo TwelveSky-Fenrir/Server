@@ -29,9 +29,9 @@ public class LoginTrainTests
             FrameOf(avatarSlots[0]),
             FrameOf(avatarSlots[1]),
             FrameOf(avatarSlots[2]),
-            FrameOf(new LcRecommandWorldRecv
+            FrameOf(new WorldRecommendationResponse
                 { AddKillOtherTribe0 = 0, AddKillOtherTribe1 = 0, AddKillOtherTribe2 = 0 }),
-            FrameOf(new LcRecommandWorld2Recv
+            FrameOf(new WorldRecommendationFinalResponse
                 { AddKillOtherTribe0 = 0, AddKillOtherTribe1 = 0, AddKillOtherTribe2 = 0 }));
 
         var actual = await PacketAssert.ReadSentBytesAsync(pipe);
@@ -53,9 +53,9 @@ public class LoginTrainTests
         var expected = Concat(
             FrameOf(expectedLoginRecv),
             FrameOf(emptySlot), FrameOf(emptySlot), FrameOf(emptySlot),
-            FrameOf(new LcRecommandWorldRecv
+            FrameOf(new WorldRecommendationResponse
                 { AddKillOtherTribe0 = 0, AddKillOtherTribe1 = 0, AddKillOtherTribe2 = 0 }),
-            FrameOf(new LcRecommandWorld2Recv
+            FrameOf(new WorldRecommendationFinalResponse
                 { AddKillOtherTribe0 = 0, AddKillOtherTribe1 = 0, AddKillOtherTribe2 = 0 }));
 
         Assert.Equal(expected, actual);

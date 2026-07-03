@@ -13,7 +13,8 @@ public class ZoneRegistryTests
     {
         var options = ZoneTestKit.Options(maps);
         return new ZoneRegistry(Options.Create(options),
-            new MovementRules(Options.Create(options)), new DirtyTracker<int>(), NullLogger<Zone>.Instance);
+            new MovementRules(Options.Create(options)), new DirtyTracker<int>(), NullLogger<Zone>.Instance,
+            ZoneTestKit.EmptyWorldData(), []);
     }
 
     [Fact]

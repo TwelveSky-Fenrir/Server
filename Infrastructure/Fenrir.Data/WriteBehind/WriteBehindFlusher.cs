@@ -166,12 +166,10 @@ public sealed class WriteBehindFlusher<TKey> : IWriteBehindFlusher where TKey : 
 
                 var thresholdReached = _tracker.Count >= _entityThreshold;
 
-                if ((intervalElapsed || immediateRequested || thresholdReached) && _tracker.Count > 0)
-                {
-                    var batch = _tracker.DrainAll();
-                    if (batch.Count > 0)
-                        await FlushBatchAsync(batch, loopCt).ConfigureAwait(false);
-                }
+                if ((!intervalElapsed && !immediateRequested && !thresholdReached) || _tracker.Count <= 0) continue;
+                var batch = _tracker.DrainAll();
+                if (batch.Count > 0)
+                    await FlushBatchAsync(batch, loopCt).ConfigureAwait(false);
             }
         }
         finally

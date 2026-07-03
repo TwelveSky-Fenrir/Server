@@ -43,11 +43,9 @@ public sealed class DirtyTracker<TKey> where TKey : notnull
                 continue; // lost a race with a concurrent MarkDirty/DrainAll on this key -- retry
             }
 
-            if (_entries.TryAdd(key, flags))
-            {
-                Interlocked.Increment(ref _count);
-                return;
-            }
+            if (!_entries.TryAdd(key, flags)) continue;
+            Interlocked.Increment(ref _count);
+            return;
 
             // Another thread added this key between our TryGetValue and TryAdd -- loop back and merge into it.
         }

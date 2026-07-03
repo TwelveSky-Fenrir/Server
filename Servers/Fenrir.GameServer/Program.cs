@@ -2,7 +2,9 @@ using Fenrir.Application.Game;
 using Fenrir.Application.Game.Dispatching;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Movement;
+using Fenrir.Application.Game.Simulation;
 using Fenrir.Application.Game.World;
+using Fenrir.Application.Game.World.Monsters;
 using Fenrir.Contracts.Abstractions;
 using Fenrir.Contracts.Dispatch;
 using Fenrir.Data;
@@ -29,8 +31,20 @@ builder.Services.AddSingleton<IFrameDispatcher, ZoneFrameDispatcher>();
 
 builder.Services.AddSingleton<MovementRules>();
 builder.Services.AddSingleton<DirtyTracker<int>>();
+
+// Registration order IS simulation order within a zone's tick (report 05 §0 / ZoneRegistry's own remarks):
+// buffs must expire before meditation regen reads a (possibly just-cleared) sit-skill for the frame; monster
+// AI (report 05 §0 item 7, "boucle monstres") runs before that same tick's respawn scan (item 12, "boucle
+// spawns", ~10 s cadence) -- MonsterSpawnScheduler's own Simulate() call also drains that tick's kills before
+// scanning, so the ordering here only affects freshly-spawned monsters getting one extra tick of AI sooner.
+builder.Services.AddSingleton<ISimulationSystem, BuffExpirySystem>();
+builder.Services.AddSingleton<ISimulationSystem, MeditationRegenSystem>();
+builder.Services.AddSingleton<ISimulationSystem, MonsterAiSystem>();
+builder.Services.AddSingleton<ISimulationSystem, MonsterSpawnScheduler>();
+
 builder.Services.AddSingleton<ZoneRegistry>();
 builder.Services.AddHostedService<ZoneTickHost>();
+builder.Services.AddHostedService<MonsterLootFlushHost>();
 
 // Same "one instance, three registrations" pattern for a hosted service other code also needs to call directly.
 builder.Services.AddSingleton<PositionWriteBehindHost>();

@@ -1,7 +1,9 @@
 using System.Collections.Frozen;
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
+using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Movement;
+using Fenrir.Application.Game.Simulation;
 using Fenrir.Data.WriteBehind;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -22,16 +24,19 @@ public sealed class ZoneRegistry
     private readonly FrozenDictionary<short, Zone> _zones;
 
     public ZoneRegistry(IOptions<GameServerOptions> options, MovementRules movementRules,
-        DirtyTracker<int> dirtyTracker, ILogger<Zone> zoneLogger)
+        DirtyTracker<int> dirtyTracker, ILogger<Zone> zoneLogger, WorldDataCache worldData,
+        IEnumerable<ISimulationSystem> simulationSystems)
     {
         var opts = options.Value;
 
-        // Simulation systems are wired empty for every zone until Phase C delivers the first real ones
-        // (monster IA, buffs, regen, spawns) -- the ORDERED per-zone list is the extension point, not a
-        // registry-level service collection, because legacy order within a tick is semantic (report 05 §0).
+        // DI registration order IS simulation order (report 05 §0's deterministic legacy sequence) -- every
+        // zone shares the exact same ordered list of systems, resolved once here rather than per-zone, since
+        // ISimulationSystem instances are stateless singletons that operate on whichever Zone they're handed.
+        var systems = simulationSystems.ToImmutableArray();
+
         _zones = opts.Maps.ToFrozenDictionary(
             mapId => mapId,
-            mapId => new Zone(mapId, opts, movementRules, dirtyTracker, [], zoneLogger));
+            mapId => new Zone(mapId, opts, movementRules, dirtyTracker, systems, zoneLogger, worldData));
     }
 
     /// <summary>Every hosted zone, in no particular order — the tick host launches one loop per entry.</summary>

@@ -51,6 +51,36 @@ public static class LegacyTime
     public static readonly TimeSpan DeathReviveDelay = ToTimeSpan(10);
 
     /// <summary>
+    ///     Monster respawn-scan cadence: every 20 legacy ticks (~10 s, <c>mTickCount %20 == 0</c>,
+    ///     report 05 §0 item 12 / §1: "SummonMonster() toutes les ~10 s (tick %20)"). The per-slot respawn
+    ///     COUNTDOWN itself still decrements every legacy tick for accuracy; only the ATTEMPT to actually pop
+    ///     a due slot is gated to this cadence, matching the legacy scan-pass semantics exactly (a slot whose
+    ///     timer elapses between two scans still waits for the next scan boundary before it visibly repops).
+    ///     Consumed by <see cref="World.Monsters.MonsterSpawnScheduler" />.
+    /// </summary>
+    public const int MonsterRespawnScanLegacyTicks = 20;
+
+    /// <summary>
+    ///     Ground item lifetime: 60 000 ms from creation (report 05 §5 "ITEM_OBJECT" lifecycle:
+    ///     "expiration à 60 000 ms ⇒ B_ITEM_ACTION_RECV(...,3) (disparition) + Free()"). Consumed by the
+    ///     ground-item expiry sweep in <see cref="World.Zone" />.
+    /// </summary>
+    public static readonly TimeSpan GroundItemLifetime = TimeSpan.FromMilliseconds(60_000);
+
+    /// <summary>
+    ///     A dropped item becomes free for ANY player to pick up this long after creation, regardless of who
+    ///     killed the monster (report 05 §5 <c>CheckPossibleGetItem</c>: "libre pour tous après 30 s").
+    /// </summary>
+    public static readonly TimeSpan GroundItemFreeForAllDelay = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    ///     When the killer was in a party at drop time (<c>iDropSort == 1</c>), the killer's party can also
+    ///     pick the item up starting this long after creation -- BEFORE the universal 30 s free-for-all
+    ///     window (report 05 §5: "iDropSort==1 ⇒ le groupe (iPartyName) peut ramasser après 10 s").
+    /// </summary>
+    public static readonly TimeSpan GroundItemPartyShareDelay = TimeSpan.FromSeconds(10);
+
+    /// <summary>
     ///     Real duration of <paramref name="legacyTicks" /> legacy ticks (e.g. a 20-legacy-tick buff = 10 s,
     ///     never 1 s — see the anti-×10 remark on this class).
     /// </summary>

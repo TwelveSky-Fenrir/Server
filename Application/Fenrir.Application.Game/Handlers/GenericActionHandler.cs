@@ -3,6 +3,7 @@ using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Inventory;
 using Fenrir.Application.Game.Stats;
 using Fenrir.Application.Game.World;
+using Fenrir.Application.Game.World.Loot;
 using Fenrir.Contracts.Abstractions;
 using Fenrir.Contracts.Packets.Shared;
 using Fenrir.Contracts.Packets.Zone;
@@ -61,6 +62,15 @@ public sealed class GenericActionHandler(
             // Anti-fuzzing default case (report 04 §PROCESS_DATA switch): a tSort that exists in NO legacy
             // family at all, not merely one Fenrir hasn't wired up yet.
             zoneSession.Abort(DisconnectReason.Faulted);
+            return;
+        }
+
+        // tSort 201 (ground -> inventory pickup, report 04 line 40 / 05 §5) does not fit the container-move
+        // (from,to) shape the rest of this handler implements -- its "from" is the zone's ground-item pool,
+        // not a player container. Handled by a dedicated branch/policy (GroundItemPickupPolicy) instead.
+        if (sort == 201)
+        {
+            await HandlePickupAsync(packet, session, zoneSession, zone, state, characterId, cancellationToken);
             return;
         }
 
@@ -151,6 +161,97 @@ public sealed class GenericActionHandler(
         if (!zone.PostInventoryCommand(new InventoryZoneCommand(characterId, containers, updatedStats)))
             logger.LogError(
                 "Zone {MapId} inventory inbox full: dropped container-move mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
+                zone.MapId, characterId);
+    }
+
+    /// <summary>
+    ///     tSort 201 -- ground-item pickup (report 04 line 40 / 05 §5, verified against
+    ///     <c>MyWork::ProcessForGetItem</c>, <c>Server/ts25zone/S04_MyWork05.cpp:250-373</c>). D7 regime (b):
+    ///     the destination container (or the money balance) is persisted SYNCHRONOUSLY, exactly like
+    ///     <see cref="HandleAsync" />'s own container-move path, BEFORE the client ever sees success.
+    /// </summary>
+    /// <remarks>
+    ///     OPEN ISSUE: if the SQL write (or the <see cref="WorldDataCache.ItemsById" /> lookup, which should
+    ///     never actually miss for an item this pass's own drop pipeline created) fails AFTER
+    ///     <see cref="Zone.TryClaimGroundItem" /> already atomically removed the item from the zone's ground
+    ///     pool, the item is lost rather than restored -- a deliberate, safe (never duplicates) simplification
+    ///     for what should be an exceedingly rare fault window; see <see cref="Inventory.GroundItemPickupPolicy" />'s
+    ///     own remarks for the analogous, more likely "destination occupied" case.
+    /// </remarks>
+    private async ValueTask HandlePickupAsync(GenericActionRequest packet, IPacketSession session,
+        ZoneClientSession zoneSession, Zone zone, PlayerRuntimeState state, int characterId,
+        CancellationToken cancellationToken)
+    {
+        // Structurally always 28 bytes available (Data is a fixed 130-byte array) -- defensive nonetheless,
+        // mirroring the legacy's own "recast tData, bail on incoherence" contract (same guard the
+        // container-move path above already applies).
+        if (!DefaultPData.TryRead(packet.Data, out var move))
+        {
+            zoneSession.Abort(DisconnectReason.Faulted);
+            return;
+        }
+
+        // Structural bounds the legacy Quit()s on (S04_MyWork05.cpp:265-276): tPage2/tIndex2 must address a
+        // real inventory slot, tXPost2/tYPost2 must be a legal 0-7 sub-grid coordinate. Fenrir's flat-slot
+        // ContainerMatrix does not use the sub-grid for addressing (see GroundItemPickupPolicy's own class
+        // remarks), but the range check is still reproduced here for anti-fuzzing parity with the source.
+        if (move.Page2 is not (ContainerMatrix.InventoryPage0 or ContainerMatrix.InventoryPage1) ||
+            !ContainerMatrix.IsValidSlot((byte)move.Page2, move.Index2) ||
+            move.XPost2 is < 0 or > 7 || move.YPost2 is < 0 or > 7)
+        {
+            zoneSession.Abort(DisconnectReason.Faulted);
+            return;
+        }
+
+        var claimOutcome = zone.TryClaimGroundItem(move.Page1, unchecked((uint)move.Index1), state.Name,
+            claimantPartyName: null, state.PosX, state.PosY, state.PosZ, out var groundItem);
+
+        if (claimOutcome != GroundItemClaimOutcome.Success || groundItem is null)
+        {
+            // Matches the legacy's own soft-fail contract exactly: CheckPossibleGetItem/unique-number
+            // mismatch/distance all just leave tResult at 1 (return TRUE), never Quit().
+            SendResult(session, packet.Sort, packet.Data, success: false);
+            return;
+        }
+
+        if (!worldData.ItemsById.TryGetValue(groundItem.ItemId, out var itemDefinition))
+        {
+            // Cannot happen from this pass's own drop pipeline (it only ever rolls real catalog ids) -- mirrors
+            // the legacy's own "mITEM.Search returns NULL" Quit() guard rather than silently failing.
+            zoneSession.Abort(DisconnectReason.Faulted);
+            return;
+        }
+
+        var destinationContainer = (byte)move.Page2;
+        var destinationSlot = (byte)move.Index2;
+        var existingStack = state.Inventory.GetSlot(destinationContainer, destinationSlot);
+
+        var resolved = GroundItemPickupPolicy.Resolve(itemDefinition, groundItem, existingStack);
+        if (!resolved.Succeeded)
+        {
+            SendResult(session, packet.Sort, packet.Data, success: false);
+            return;
+        }
+
+        if (resolved.Outcome == GroundItemPickupPolicy.Outcome.Money)
+        {
+            await characters.AdjustMoneyAsync(characterId, resolved.MoneyAmount, 0, cancellationToken);
+            SendResult(session, packet.Sort, packet.Data, success: true);
+            return;
+        }
+
+        var projectedContainer = state.Inventory.GetContainer(destinationContainer)
+            .SetItem(destinationSlot, resolved.NewSlot!.Value);
+
+        await characters.ReplaceContainerAsync(characterId, destinationContainer, ToTvps(projectedContainer),
+            cancellationToken);
+
+        SendResult(session, packet.Sort, packet.Data, success: true);
+
+        var containers = ImmutableArray.Create(new InventoryContainerSnapshot(destinationContainer, projectedContainer));
+        if (!zone.PostInventoryCommand(new InventoryZoneCommand(characterId, containers, null)))
+            logger.LogError(
+                "Zone {MapId} inventory inbox full: dropped pickup mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
                 zone.MapId, characterId);
     }
 

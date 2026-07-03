@@ -1,6 +1,7 @@
 using Fenrir.Application.Game.Inventory;
 using Fenrir.Application.Game.Stats;
 using Fenrir.Contracts.Abstractions;
+using Fenrir.Contracts.Packets.Shared;
 
 namespace Fenrir.Application.Game.World;
 
@@ -152,4 +153,63 @@ public sealed class PlayerRuntimeState
     ///     no destination zone/position needs to be carried alongside this timestamp.
     /// </summary>
     public TimeSpan ReviveAtZoneClock { get; set; }
+
+    /// <summary>
+    ///     Mirrors the legacy's own persistent <c>mDATA.aAction.aSort</c> (report 05 §7/§12 §4.2) -- the last
+    ///     accepted avatar action's Sort, updated by <see cref="Zone.HandleMove" /> alongside position for
+    ///     EVERY action, not just movement (the wire carries one unified action for move/sit/skill-cast alike).
+    ///     Read by <see cref="Simulation.MeditationRegenSystem" /> (31 = sitting/meditating) and by
+    ///     <c>Zone.ApplySkillCast</c>'s own gating. 0 = idle, matching the legacy default.
+    /// </summary>
+    public int ActionSort { get; set; }
+
+    /// <summary>
+    ///     The skill number/grade points riding on the last accepted action (<c>ActionInfo.SkillNumber</c>/
+    ///     <c>SkillGradeNum1/2</c>) -- kept live (not reset to 0 between ticks, matching the legacy's own
+    ///     persistent <c>mDATA.aAction</c>) so <see cref="Simulation.MeditationRegenSystem" /> can resolve
+    ///     "which sit-skill is this player using" every legacy tick without the client having to resend it.
+    /// </summary>
+    public int ActionSkillNumber { get; set; }
+
+    public int ActionSkillGradeNum1 { get; set; }
+    public int ActionSkillGradeNum2 { get; set; }
+
+    /// <summary>
+    ///     Live BUFF_INFO mirror (35 slots x [value, duration-in-legacy-ticks], report 12 §4.2 / report §7
+    ///     point 4) -- fed to <see cref="Stats.StatCalculator.ComputeEffectiveStats" /> as the buff snapshot and
+    ///     decremented/expired by <see cref="Simulation.BuffExpirySystem" /> every legacy tick.
+    /// </summary>
+    /// <remarks>
+    ///     Deliberately a FRESH per-instance array (never <c>Fenrir.Contracts.Packets.Shared.WorldStateTemplates.ZeroedBuffInfo</c>,
+    ///     which is one process-wide SHARED static instance) -- reusing that template here would let every
+    ///     player's buffs alias the same backing <c>int[]</c> and corrupt each other.
+    /// </remarks>
+    public BuffInfo Buffs { get; } = new() { Buff = new int[70] };
+
+    /// <summary>
+    ///     Zone-clock instant this character last entered/re-entered a zone (fresh world entry OR an in-process
+    ///     handoff arrival) -- the legacy's <c>mTickCountFor01SecondForProtect</c> (report 05 §4 point 1:
+    ///     <c>PROTECT_TICK</c> = 20 legacy ticks / 10s anti-chain-attack grace window, checked for BOTH sides of
+    ///     an attack). <c>Server/ts25zone/S04_MyWork02.cpp:838,1783</c> are the field's ONLY two write sites in
+    ///     the whole legacy source (registration, and the client's one-time post-load "aSort==0" action) --
+    ///     it is NEVER refreshed by taking or dealing damage, so this is a one-shot spawn/arrival grace period,
+    ///     not a rolling "stop hitting me" cooldown (a prior pass here refreshed it on every hit taken, which
+    ///     made two players who traded even a single blow mutually unable to fight anyone for the next 10s --
+    ///     see <see cref="Zone.HandleEnter" />, the sole write site now). NULL (not <see cref="TimeSpan.Zero" />)
+    ///     means "never entered a zone yet" -- zero is a real, reachable zone-clock instant (a fresh zone / a
+    ///     player who entered before any tick elapsed), so using it as the "never" sentinel would incorrectly
+    ///     gate every player's first attack during the zone's first
+    ///     <see cref="Combat.CombatResolver.ProtectDuration" /> of simulated lifetime.
+    /// </summary>
+    public TimeSpan? ZoneEntryAtZoneClock { get; set; }
+
+    /// <summary>
+    ///     Zone-clock instant of this character's last accepted skill cast (Sort=30) -- a global, one-cast-per-
+    ///     legacy-tick anti-flood gate modeled after the VERIFIED USE_INVENTORY_ITEM anti-flood pattern (report
+    ///     04 §2: "1 seul 'use' par tick logique par joueur"), since reports 04/05/12 do not document a distinct
+    ///     per-skill reuse-delay for generic (non-attack) skill casts -- see <c>Zone.ApplySkillCast</c>'s own
+    ///     remarks and this task's StructuredOutput open issues. NULL means "never cast" -- same zero-is-a-real-
+    ///     instant reasoning as <see cref="LastDamagedAtZoneClock" />.
+    /// </summary>
+    public TimeSpan? LastSkillCastAtZoneClock { get; set; }
 }

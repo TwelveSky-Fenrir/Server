@@ -2,6 +2,7 @@ using System.Collections.Frozen;
 using System.Collections.Immutable;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Stats;
+using Fenrir.Contracts.Packets.Shared;
 using Fenrir.Data.World;
 
 namespace Fenrir.Application.Game.Inventory;
@@ -46,18 +47,21 @@ public static class EquipmentService
     /// <summary>
     ///     Recomputes <c>PlayerRuntimeState.Stats</c> from a (possibly just-changed) Equipment
     ///     container snapshot. Called at world entry (<c>EnterWorldHandler</c>, no move involved --
-    ///     just the persisted equipment) and after every accepted equip/unequip move
+    ///     just the persisted equipment), after every accepted equip/unequip move
     ///     (<c>GenericActionHandler</c>, on the PROJECTED post-move container -- see
-    ///     <see cref="ContainerMatrix.ApplyMove" />). Buffs are intentionally omitted (null): none of this
-    ///     pass's callers track active buffs yet (Phase C/V3 territory) -- matches
-    ///     <see cref="StatCalculator.ComputeEffectiveStats" />'s own documented "null = no buffs" default.
+    ///     <see cref="ContainerMatrix.ApplyMove" />), and by <c>Zone</c>'s own tick whenever the live buff
+    ///     snapshot changes (a skill-cast buff applied, or <see cref="Fenrir.Application.Game.Simulation.BuffExpirySystem" />
+    ///     expiring a slot -- Phase C/V3 Combat). <paramref name="buffs" /> defaults to null (no buffs applied,
+    ///     matching <see cref="StatCalculator.ComputeEffectiveStats" />'s own "null = no buffs" default) so
+    ///     every pre-V3 caller keeps compiling and behaving exactly as before.
     /// </summary>
     public static EffectiveStats RecomputeStats(
         CharacterBaseAttributes attributes,
         IReadOnlyDictionary<byte, ItemStack> equipmentContainer,
-        WorldDataCache worldData)
+        WorldDataCache worldData,
+        BuffInfo? buffs = null)
     {
         var equipped = BuildEquippedSlots(equipmentContainer, worldData.ItemsById);
-        return StatCalculator.ComputeEffectiveStats(attributes, equipped, worldData.LevelsByLevel);
+        return StatCalculator.ComputeEffectiveStats(attributes, equipped, worldData.LevelsByLevel, buffs);
     }
 }

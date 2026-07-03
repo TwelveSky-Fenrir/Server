@@ -1,0 +1,118 @@
+using Fenrir.Application.Game.Combat;
+
+namespace Fenrir.Application.Game.Tests.Combat;
+
+/// <summary>
+///     Covers <see cref="ExperienceFormulas" /> -- both the monster-kill XP GAIN path
+///     (<c>MONSTER_OBJECT::ProcessForExp</c>, report 05 §5) and the MvP death XP LOSS path (report 05 §4),
+///     verified against <c>Server/ts25zone/S07_MyGame05.cpp</c> / <c>S07_MyGame02.cpp</c> / <c>function.h</c>.
+/// </summary>
+public class ExperienceFormulasTests
+{
+    [Theory]
+    [InlineData(50, 50)] // < 100 -> pass-through
+    [InlineData(99, 99)]
+    [InlineData(100, 102)]
+    [InlineData(113, 143)]
+    [InlineData(145, 335)]
+    [InlineData(157, 815)]
+    public void ReturnFixedLevel_MatchesTheVerifiedTable(int level, int expected)
+    {
+        Assert.Equal(expected, ExperienceFormulas.ReturnFixedLevel(level));
+    }
+
+    [Fact]
+    public void ReturnFixedLevel_OutsideTheTable_ReturnsOne()
+    {
+        Assert.Equal(1, ExperienceFormulas.ReturnFixedLevel(158));
+        Assert.Equal(1, ExperienceFormulas.ReturnFixedLevel(9999));
+    }
+
+    [Fact]
+    public void MonsterKillExperience_ZeroGeneralExperience_GrantsNothing()
+    {
+        Assert.Equal(0, ExperienceFormulas.ComputeMonsterKillExperience(50, 50, 0));
+    }
+
+    [Fact]
+    public void MonsterKillExperience_UnfavorableGapOverNine_GrantsNothing()
+    {
+        // killerFixedLevel(60) - monsterRealLevel(50) = 10 > 9 -> refused.
+        Assert.Equal(0, ExperienceFormulas.ComputeMonsterKillExperience(60, 50, 1000));
+    }
+
+    [Fact]
+    public void MonsterKillExperience_EqualLevels_GrantsFullBase()
+    {
+        // Neither branch's gap term applies (killer <= monster, gap=0): gain = base * (1 + 0 - 0) = base.
+        Assert.Equal(1000, ExperienceFormulas.ComputeMonsterKillExperience(50, 50, 1000));
+    }
+
+    [Fact]
+    public void MonsterKillExperience_FavorableGapWithinTwenty_ScalesUpTenPercentPerLevel()
+    {
+        // monster(55) > killer(50): gap=5 -> gain = 1000 * (1 + 5*0.1) = 1500.
+        Assert.Equal(1500, ExperienceFormulas.ComputeMonsterKillExperience(50, 55, 1000));
+    }
+
+    [Fact]
+    public void MonsterKillExperience_FavorableGapOverTwenty_Triples()
+    {
+        // monster(80) > killer(50): gap=30 > 20 -> gain = 1000 * 3 = 3000.
+        Assert.Equal(3000, ExperienceFormulas.ComputeMonsterKillExperience(50, 80, 1000));
+    }
+
+    [Fact]
+    public void MonsterKillExperience_UnfavorableGapWithinNine_ScalesDownTenPercentPerLevel()
+    {
+        // killer(55) > monster(50): gap=5 -> gain = 1000 * (1 - 5*0.1) = 500.
+        Assert.Equal(500, ExperienceFormulas.ComputeMonsterKillExperience(55, 50, 1000));
+    }
+
+    [Fact]
+    public void MonsterKillExperience_UnfavorableGapNeverGoesNegative()
+    {
+        // killer(59) > monster(50): gap=9 (still allowed, not > 9) -> 1000*(1-9*0.1f). Float precision means
+        // 9*0.1f is a hair under 0.9f, so the exact result is a hair under 100 -- (int) truncates to 99, NOT
+        // 100 (this exact truncation-of-a-near-integer is the same float math the legacy's own C++ performs,
+        // not a bug in this port). Never negative either way.
+        Assert.Equal(99, ExperienceFormulas.ComputeMonsterKillExperience(59, 50, 1000));
+    }
+
+    [Theory]
+    [InlineData(112, 3)] // below LV_M1(113) -> divide by 3
+    [InlineData(113, 5)] // at/above LV_M1 -> divide by 5
+    [InlineData(200, 5)]
+    public void ApplyRebirthDivisor_SplitsOnLvM1(int characterLevel, int divisor)
+    {
+        Assert.Equal(3000 / divisor, ExperienceFormulas.ApplyRebirthDivisor(3000, characterLevel));
+    }
+
+    [Fact]
+    public void ApplyRebirthDivisor_NonPositiveGain_StaysZero()
+    {
+        Assert.Equal(0, ExperienceFormulas.ApplyRebirthDivisor(0, 50));
+        Assert.Equal(0, ExperienceFormulas.ApplyRebirthDivisor(-100, 50));
+    }
+
+    [Fact]
+    public void DeathExperienceLoss_IsFivePercentOfExperienceAboveTheLevelFloor()
+    {
+        // (10000 - 2000) * 0.05 = 400.
+        Assert.Equal(400, ExperienceFormulas.ComputeDeathExperienceLoss(10000, 2000));
+    }
+
+    [Fact]
+    public void DeathExperienceLoss_BelowOne_RoundsDownToZero()
+    {
+        Assert.Equal(0, ExperienceFormulas.ComputeDeathExperienceLoss(2010, 2000)); // (2010-2000)*0.05=0.5 -> 0
+    }
+
+    [Fact]
+    public void DeathExperienceLoss_NeverExceedsCurrentExperience()
+    {
+        // A pathologically low levelFactor1 would compute a loss far bigger than the character even has --
+        // clamped down to currentExperience itself, never going negative.
+        Assert.Equal(100, ExperienceFormulas.ComputeDeathExperienceLoss(100, -100_000));
+    }
+}

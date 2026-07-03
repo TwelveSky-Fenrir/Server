@@ -1,0 +1,45 @@
+using System.Buffers.Binary;
+using Fenrir.Contracts.Packets.Zone;
+
+namespace Fenrir.Contracts.Tests.Packets.Zone;
+
+/// <summary>
+///     ZC_EXCHANGE_ITEM_RECV (ZONE.h:526-531, 32-byte payload): Result/Cost/Value[6] — same typedef as
+///     <see cref="ZcHighItemRecv" />/<see cref="ZcLowItemRecv" />.
+/// </summary>
+public class ZcExchangeItemRecvTests
+{
+    [Fact]
+    public void PayloadSize_MatchesContract()
+    {
+        Assert.Equal(32, ZcExchangeItemRecv.PayloadSize);
+        Assert.Equal(Opcodes.Zone.Outgoing.ExchangeItemRecv, ZcExchangeItemRecv.Opcode);
+    }
+
+    [Fact]
+    public void Write_MatchesGoldenBytes()
+    {
+        var value = CreatePopulated();
+
+        var actual = new byte[ZcExchangeItemRecv.PayloadSize];
+        value.Write(actual);
+
+        var expected = new byte[32];
+        EncodeGolden(expected, value);
+
+        Assert.Equal(expected, actual);
+    }
+
+    private static ZcExchangeItemRecv CreatePopulated()
+    {
+        return new ZcExchangeItemRecv { Result = 11, Cost = 22, Value = [100, 101, 102, 103, 104, 105] };
+    }
+
+    private static void EncodeGolden(Span<byte> destination, ZcExchangeItemRecv value)
+    {
+        BinaryPrimitives.WriteInt32LittleEndian(destination, value.Result);
+        BinaryPrimitives.WriteInt32LittleEndian(destination[4..], value.Cost);
+        for (var i = 0; i < 6; i++)
+            BinaryPrimitives.WriteInt32LittleEndian(destination[(8 + i * 4)..], value.Value[i]);
+    }
+}

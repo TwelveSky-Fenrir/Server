@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <FenrirExecutable>true</FenrirExecutable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Core\Fenrir.Domain\Fenrir.Domain.csproj"/>
+    <ProjectReference Include="..\..\Infrastructure\Fenrir.Data\Fenrir.Data.csproj"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Version managed centrally by Directory.Packages.props (CPM) -->
+    <PackageReference Include="CaeriusNet"/>
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,35 @@
+using System.Buffers.Binary;
+using System.Text;
+using Fenrir.Contracts.Packets.Login;
+
+namespace Fenrir.Contracts.Tests.Packets.Login;
+
+public class LcChangeMousePasswordRecvTests
+{
+    [Fact]
+    public void PayloadSize_MatchesContractConstant()
+    {
+        // ExpectedSize=10 (1-byte outbound header) -> 9-byte payload (int + char[5]), same struct as op 13 in LOGIN.h.
+        Assert.Equal(9, LcChangeMousePasswordRecv.PayloadSize);
+    }
+
+    [Fact]
+    public void RoundTrip_PreservesAllFields_NoObfuscation()
+    {
+        // Result=1 with the "0000" mask: the legacy old-PIN-mismatch reply shape (S04_MyWork02.cpp l.515).
+        var packet = new LcChangeMousePasswordRecv { Result = 1, MousePassword = "0000" };
+
+        var buffer = new byte[LcChangeMousePasswordRecv.PayloadSize];
+        var written = packet.Write(buffer);
+
+        Assert.Equal(LcChangeMousePasswordRecv.PayloadSize, written);
+        Assert.Equal(packet.Result, BinaryPrimitives.ReadInt32LittleEndian(buffer.AsSpan(0, 4)));
+        Assert.Equal(packet.MousePassword, DecodeFixedString(buffer.AsSpan(4, 5)));
+    }
+
+    private static string DecodeFixedString(ReadOnlySpan<byte> span)
+    {
+        var nullIndex = span.IndexOf((byte)0);
+        return Encoding.Latin1.GetString(nullIndex < 0 ? span : span[..nullIndex]);
+    }
+}

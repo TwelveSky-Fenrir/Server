@@ -1,0 +1,15 @@
+using Fenrir.Contracts.Abstractions;
+using Fenrir.Contracts.Attributes;
+using Fenrir.Contracts.Wire;
+
+namespace Fenrir.Contracts.Packets.Zone;
+
+[FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.ClientOkForZoneSend,
+    ExpectedSize = 25, AllowedStates = [(byte)ZoneSessionState.Registering])]
+public readonly partial record struct CzClientOkForZoneSend : IIncomingPacket<CzClientOkForZoneSend>
+{
+    public required int Tribe { get; init; }
+    public required int AutoTime { get; init; }
+    public required int AutoTime2 { get; init; }
+    public required int AutoState { get; init; }
+}

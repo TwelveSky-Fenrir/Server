@@ -1,0 +1,32 @@
+-- database/50_procedures/game/usp_TowerState_EnsureInitialized.sql
+-- Contract: idempotent bootstrap -- creates the 12 tower rows (TowerIndex 0-11, uncontrolled) the first
+-- time it is ever called; a no-op on every later call. Meant to be called once by GameServer at world
+-- startup, since this table starts empty (no seed script -- see game.TowerState) and the application can
+-- only ever reach it through a procedure (no direct table grants).
+-- Result set: none. Idempotent: yes.
+CREATE PROCEDURE game.usp_TowerState_EnsureInitialized
+    AS
+BEGIN
+    SET
+NOCOUNT ON;
+    SET
+XACT_ABORT ON;
+
+    IF
+NOT EXISTS (SELECT 1 FROM game.TowerState)
+BEGIN
+INSERT INTO game.TowerState (TowerIndex, ControllingTribeId, CapturedAtUtc)
+VALUES (0, NULL, NULL),
+       (1, NULL, NULL),
+       (2, NULL, NULL),
+       (3, NULL, NULL),
+       (4, NULL, NULL),
+       (5, NULL, NULL),
+       (6, NULL, NULL),
+       (7, NULL, NULL),
+       (8, NULL, NULL),
+       (9, NULL, NULL),
+       (10, NULL, NULL),
+       (11, NULL, NULL);
+END;
+END;

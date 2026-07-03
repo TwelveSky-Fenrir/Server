@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Core\Fenrir.Contracts\Fenrir.Contracts.csproj"/>
+    <ProjectReference Include="..\..\Core\Fenrir.Domain\Fenrir.Domain.csproj"/>
+    <ProjectReference Include="..\..\Infrastructure\Fenrir.Network\Fenrir.Network.csproj"/>
+    <ProjectReference Include="..\..\Infrastructure\Fenrir.Data\Fenrir.Data.csproj"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Both must be loaded into the analyzer host, same reasoning as Fenrir.Contracts.csproj: Dispatch calls
+         into Analysis at generator runtime, and a ProjectReference-as-Analyzer only loads the directly
+         referenced assembly, not its own transitive references. This is where MessageDispatcher/PacketHandlerHub
+         actually get generated (IInlinePacketHandler<T>/IAsyncPacketHandler<T> declared in THIS project) —
+         deliberately not on Fenrir.Contracts, which never declares a handler (see Fenrir.Generators.Dispatch's
+         HandlerDispatchIncrementalGenerator doc comment). -->
+    <ProjectReference Include="..\..\Analysis\Fenrir.Generators.Analysis\Fenrir.Generators.Analysis.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false"/>
+    <ProjectReference Include="..\..\Generators\Fenrir.Generators.Dispatch\Fenrir.Generators.Dispatch.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false"/>
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

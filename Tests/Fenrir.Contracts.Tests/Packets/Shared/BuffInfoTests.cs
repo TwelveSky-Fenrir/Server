@@ -1,0 +1,30 @@
+using Fenrir.Contracts.Packets.Shared;
+using Fenrir.Contracts.Tests.TestSupport;
+
+namespace Fenrir.Contracts.Tests.Packets.Shared;
+
+public class BuffInfoTests
+{
+    [Fact]
+    public void WireSize_MatchesContract()
+    {
+        Assert.Equal(280, BuffInfo.WireSize);
+    }
+
+    [Fact]
+    public void RoundTrip_PreservesAllFields()
+    {
+        var v = new SequentialValueFactory();
+        var buffInfo = new BuffInfo
+        {
+            Buff = v.NextIntArray(70)
+        };
+
+        var buffer = new byte[BuffInfo.WireSize];
+        var written = buffInfo.Write(buffer);
+        Assert.Equal(BuffInfo.WireSize, written);
+
+        Assert.True(BuffInfo.TryRead(buffer, out var roundTripped));
+        StructuralAssert.DeepEqual(buffInfo, roundTripped);
+    }
+}

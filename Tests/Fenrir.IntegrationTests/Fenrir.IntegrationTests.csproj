@@ -19,10 +19,15 @@
          same override, scoped here instead of touching the shared props/targets. -->
     <InvariantGlobalization>false</InvariantGlobalization>
     <!-- Aspire.AppHost.Sdk (above) defaults every ProjectReference to an orchestrated "Aspire resource"
-         (ReferenceOutputAssembly=false). This project never calls builder.AddProject -- LoginServer/GameServer
+         (ReferenceOutputAssembly=false). This project never calls builder.AddProject: LoginServer/GameServer
          are launched as plain child processes (see FenrirEnvironmentFixture), and Fenrir.Contracts/Fenrir.Data
-         are compiled against directly -- so that default is wrong here across the board. Documented opt-out. -->
+         are compiled against directly, so that default is wrong here across the board. Documented opt-out. -->
     <TreatProjectReferencesAsResources>false</TreatProjectReferencesAsResources>
+    <!-- Directory.Build.props sets IsAotCompatible=true repo-wide, which flags FenrirEnvironmentFixture's
+         Assembly.Location use (locating the already-built LoginServer/GameServer .dll to launch as a plain
+         child process) as IL3000. This test host is never published single-file/AOT, so the warning doesn't
+         apply here; same NoWarn pattern Directory.Build.targets already uses for FenrirExecutable projects. -->
+    <NoWarn>$(NoWarn);IL3000</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

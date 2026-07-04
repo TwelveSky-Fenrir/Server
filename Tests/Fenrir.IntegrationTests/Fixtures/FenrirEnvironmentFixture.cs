@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
+using System.Reflection;
 using System.Text;
 using Aspire.Hosting.Testing;
 using Fenrir.Data.Security;
@@ -68,7 +69,7 @@ public sealed class FenrirEnvironmentFixture : IAsyncLifetime
         GamePort = ReserveEphemeralLoopbackPort();
 
         _loginProcess = StartServerProcess(
-            typeof(LoginConnectionHost).Assembly.Location,
+            OriginalBuildOutputDllPath(typeof(LoginConnectionHost).Assembly),
             _loginLog, _loginLogLock,
             new Dictionary<string, string?>
             {
@@ -78,7 +79,7 @@ public sealed class FenrirEnvironmentFixture : IAsyncLifetime
         await WaitForServerReadyAsync(_loginProcess, LoginPort, "LoginServer", _loginLog, _loginLogLock);
 
         _gameProcess = StartServerProcess(
-            typeof(ZoneConnectionHost).Assembly.Location,
+            OriginalBuildOutputDllPath(typeof(ZoneConnectionHost).Assembly),
             _gameLog, _gameLogLock,
             new Dictionary<string, string?>
             {
@@ -205,6 +206,23 @@ public sealed class FenrirEnvironmentFixture : IAsyncLifetime
 
         var accountId = (int)(await command.ExecuteScalarAsync())!;
         return accountId;
+    }
+
+    /// <summary>
+    ///     This test project implicitly references the AspNetCore shared framework (via Aspire.Hosting.Testing),
+    ///     so its own build omits Microsoft.Extensions.Hosting.dll from its output (assumed supplied by that shared
+    ///     framework) -- which also strips it from the copied Fenrir.LoginServer.dll/Fenrir.GameServer.dll sitting
+    ///     alongside it, even though those servers' own runtimeconfig.json only declares Microsoft.NETCore.App and
+    ///     has no such fallback. Launching from each server's own original build output directory (same
+    ///     Configuration/TFM as this test run) avoids the mismatch entirely.
+    /// </summary>
+    private static string OriginalBuildOutputDllPath(Assembly serverAssembly)
+    {
+        var tfmDir = new DirectoryInfo(AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar));
+        var repoRoot = tfmDir.Parent!.Parent!.Parent!.Parent!.FullName;
+        var assemblyName = serverAssembly.GetName().Name!;
+        return Path.Combine(repoRoot, "Servers", assemblyName, "bin", tfmDir.Parent.Name, tfmDir.Name,
+            assemblyName + ".dll");
     }
 
     private static Process StartServerProcess(string assemblyDllPath, StringBuilder log, Lock logLock,

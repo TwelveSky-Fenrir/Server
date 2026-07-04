@@ -1,8 +1,8 @@
 using CaeriusNet.Abstractions;
 using CaeriusNet.Builders;
 using Fenrir.Data.Accounts;
+using Fenrir.Data.Security;
 using Fenrir.Data.Tests.Fixtures;
-using Fenrir.Domain.Security;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
 

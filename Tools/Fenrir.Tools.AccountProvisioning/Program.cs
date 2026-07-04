@@ -1,7 +1,7 @@
 using CaeriusNet.Abstractions;
 using CaeriusNet.Builders;
 using Fenrir.Data.Accounts;
-using Fenrir.Domain.Security;
+using Fenrir.Data.Security;
 using Microsoft.Extensions.DependencyInjection;
 
 // The legacy client (BuildEU33) has no sign-up screen, so this CLI is the only way to provision an account.

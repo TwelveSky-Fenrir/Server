@@ -1,5 +1,5 @@
 using Fenrir.Data.Accounts;
-using Fenrir.Domain.Security;
+using Fenrir.Data.Security;
 
 namespace Fenrir.Application.Login.Tests.TestSupport;
 

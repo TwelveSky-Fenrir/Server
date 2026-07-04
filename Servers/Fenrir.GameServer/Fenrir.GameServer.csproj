@@ -13,7 +13,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Core\Fenrir.Contracts\Fenrir.Contracts.csproj"/>
-    <ProjectReference Include="..\..\Core\Fenrir.Domain\Fenrir.Domain.csproj"/>
     <ProjectReference Include="..\..\Infrastructure\Fenrir.Network\Fenrir.Network.csproj"/>
     <ProjectReference Include="..\..\Infrastructure\Fenrir.Data\Fenrir.Data.csproj"/>
     <ProjectReference Include="..\..\Application\Fenrir.Application.Game\Fenrir.Application.Game.csproj"/>

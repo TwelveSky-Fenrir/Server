@@ -2,7 +2,7 @@ using Fenrir.Application.Login.Pins;
 using Fenrir.Contracts.Abstractions;
 using Fenrir.Contracts.Packets.Login;
 using Fenrir.Data.Accounts;
-using Fenrir.Domain.Security;
+using Fenrir.Data.Security;
 using Fenrir.Network.Sessions;
 
 namespace Fenrir.Application.Login.Handlers;

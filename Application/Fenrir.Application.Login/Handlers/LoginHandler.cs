@@ -3,7 +3,7 @@ using Fenrir.Contracts.Abstractions;
 using Fenrir.Contracts.Packets.Login;
 using Fenrir.Data.Accounts;
 using Fenrir.Data.Characters;
-using Fenrir.Domain.Security;
+using Fenrir.Data.Security;
 using Fenrir.Network.Sessions;
 using Microsoft.Extensions.Options;
 

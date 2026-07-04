@@ -2,7 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Konscious.Security.Cryptography;
 
-namespace Fenrir.Domain.Security;
+namespace Fenrir.Data.Security;
 
 /// <summary>Argon2id hashing; wire stays clear-text for legacy client compat, but nothing server-side stores/compares a plain password.</summary>
 public static class PasswordHasher

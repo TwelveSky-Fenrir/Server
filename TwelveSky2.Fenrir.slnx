@@ -11,7 +11,6 @@
   </Folder>
   <Folder Name="/Core/">
     <Project Path="Core/Fenrir.Contracts/Fenrir.Contracts.csproj"/>
-    <Project Path="Core/Fenrir.Domain/Fenrir.Domain.csproj"/>
   </Folder>
   <Folder Name="/Generators/">
     <Project Path="Generators/Fenrir.Generators.Dispatch/Fenrir.Generators.Dispatch.csproj"/>
@@ -34,7 +33,6 @@
     <Project Path="Tests/Fenrir.Application.Login.Tests/Fenrir.Application.Login.Tests.csproj"/>
     <Project Path="Tests/Fenrir.Contracts.Tests/Fenrir.Contracts.Tests.csproj"/>
     <Project Path="Tests/Fenrir.Data.Tests/Fenrir.Data.Tests.csproj"/>
-    <Project Path="Tests/Fenrir.Domain.Tests/Fenrir.Domain.Tests.csproj"/>
     <Project Path="Tests/Fenrir.IntegrationTests/Fenrir.IntegrationTests.csproj"/>
     <Project Path="Tests/Fenrir.Network.Tests/Fenrir.Network.Tests.csproj"/>
   </Folder>

@@ -1,6 +1,6 @@
-using Fenrir.Domain.Security;
+using Fenrir.Data.Security;
 
-namespace Fenrir.Domain.Tests;
+namespace Fenrir.Data.Tests.Security;
 
 public class PasswordHasherTests
 {

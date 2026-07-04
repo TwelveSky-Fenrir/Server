@@ -1,11 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Core\Fenrir.Domain\Fenrir.Domain.csproj"/>
-  </ItemGroup>
-
-  <ItemGroup>
     <PackageReference Include="CaeriusNet"/>
+    <PackageReference Include="Konscious.Security.Cryptography.Argon2"/>
   </ItemGroup>
 
   <PropertyGroup>

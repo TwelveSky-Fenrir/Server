@@ -6,7 +6,7 @@ using Fenrir.Network.Sessions;
 namespace Fenrir.Application.Login.Handlers;
 
 /// <summary>Op18 CL_DELETE_AVATAR_SEND: deletes the character at the requested slot (wire contract §4.6).</summary>
-public sealed class DeleteAvatarHandler(CharacterRepository characters) : IAsyncPacketHandler<DeleteAvatarRequest>
+public sealed class DeleteAvatarHandler(ICharacterRepository characters) : IAsyncPacketHandler<DeleteAvatarRequest>
 {
     public async ValueTask HandleAsync(DeleteAvatarRequest packet, IPacketSession session,
         CancellationToken cancellationToken)

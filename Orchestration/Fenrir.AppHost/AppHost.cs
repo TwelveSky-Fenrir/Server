@@ -47,10 +47,9 @@ foreach (var shardId in shardIds)
         .WaitForCompletion(migrator)
         .WithEndpoint(name: "game-tcp", scheme: "tcp", port: gamePort, targetPort: gamePort, isProxied: false)
         .WithEnvironment("Game__ShardId", shardId.ToString())
-        .WithEnvironment("Game__Port", gamePort.ToString())
-        // One zone actor per entry; a second map is Game__Maps__1, etc. Across shards the sets MUST stay
-        // disjoint (ADR-0012) -- these keys override appsettings.json's Game:Maps index-by-index.
-        .WithEnvironment("Game__Maps__0", "1");
+        .WithEnvironment("Game__Port", gamePort.ToString());
+        // Hosted maps come from admin.ShardMapAssignments (seeded 1:1 for shard 1 -> map 1), not config --
+        // across shards the assigned sets MUST stay disjoint (ADR-0012, enforced by that table's own UQ).
 }
 
 builder.Build().Run();

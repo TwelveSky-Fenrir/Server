@@ -11,24 +11,18 @@ namespace Fenrir.Application.Game.Handlers.Social;
 /// <summary>
 ///     CZ_TEACHER_START_SEND (opcode 62) -- MASTER-only (the original asker), consumes the accepted
 ///     negotiation and durably bonds both sides in one transaction (<see cref="MentorRepository.BondAsync" />)
-///     before mirroring onto both live <see cref="PlayerRuntimeState" />s. <c>Sort=1</c> to the master
-///     (attached name = new student), <c>Sort=2</c> to the student (attached name = new master) --
-///     verified, the inverse of an earlier inventory pass's note.
+///     before mirroring onto both live <see cref="PlayerRuntimeState" />s. Sort=1 to master, Sort=2 to
+///     student (verified against source).
 /// </summary>
 /// <remarks>
-///     Review finding (Phase C/V6): this used to set <c>student.TeacherCharacterId = masterId;</c> DIRECTLY
-///     from the master's own request thread -- a genuine single-writer-invariant violation (the master and
-///     student can be hosted by two different zones/tick threads), unlike this handler's OWN
-///     <see cref="PlayerRuntimeState.StudentCharacterId" /> write, which stays a direct self-mutation (the
-///     same narrow, accepted posture <c>FriendAddHandler</c> uses). The student's own field is now mirrored
-///     via <see cref="MentorZoneCommand" />, posted to the student's OWN hosting zone (resolved via
-///     <see cref="ZoneRegistry.TryGetPlayerAndZone" />), exactly like <c>GenericActionHandler</c> already
-///     does for Inventory/Skill mirrors.
+///     Master and student can be hosted by different zones/tick threads, so only this handler's own
+///     master-side field is mutated directly; the student's side is mirrored via a zone command instead
+///     (see inline comments below).
 /// </remarks>
 public sealed class MentorStartHandler(
     ZoneRegistry zones,
     MentorRegistry mentors,
-    MentorRepository repository,
+    IMentorRepository repository,
     ILogger<MentorStartHandler> logger)
     : IAsyncPacketHandler<MentorStartRequest>
 {

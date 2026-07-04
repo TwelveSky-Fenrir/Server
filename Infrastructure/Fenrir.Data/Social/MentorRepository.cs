@@ -12,7 +12,7 @@ namespace Fenrir.Data.Social;
 ///     relationship -- named to avoid colliding with the already-established <c>Mentor*</c> wire/opcode
 ///     naming (Opcodes.Zone.Incoming/Outgoing.Mentor*) this batch's handlers implement against.
 /// </summary>
-public sealed record MentorRepository(ICaeriusNetDbContext Db)
+public sealed record MentorRepository(ICaeriusNetDbContext Db) : IMentorRepository
 {
     /// <summary>Loaded once at world entry (AVATAR_INFO's Teacher/Student fields).</summary>
     public async ValueTask<CharacterMentorDto?> GetForCharacterAsync(int characterId, CancellationToken ct)

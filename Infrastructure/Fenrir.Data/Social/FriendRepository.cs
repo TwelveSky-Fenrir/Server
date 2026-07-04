@@ -12,7 +12,7 @@ namespace Fenrir.Data.Social;
 ///     One-directional by design (see game.CharacterFriends' own header): a row here only ever says
 ///     "CharacterId considers FriendCharacterId a friend".
 /// </summary>
-public sealed record FriendRepository(ICaeriusNetDbContext Db)
+public sealed record FriendRepository(ICaeriusNetDbContext Db) : IFriendRepository
 {
     /// <summary>Loaded once at world entry (AVATAR_INFO's <c>Friend[10]</c> field) -- never re-queried afterwards; live mutations (Add/Remove) go through the same call sites that update the in-memory mirror.</summary>
     public async ValueTask<ReadOnlyCollection<CharacterFriendDto>> GetByCharacterAsync(int characterId,

@@ -11,7 +11,7 @@ namespace Fenrir.Data.Accounts;
 ///     leaks past this type. AccountId is the legacy uUserIdx (ADR-0005) -- usp_Account_Create hands back the new
 ///     IDENTITY value directly, so callers never mint account ids client-side.
 /// </summary>
-public sealed record AccountRepository(ICaeriusNetDbContext Db)
+public sealed record AccountRepository(ICaeriusNetDbContext Db) : IAccountRepository
 {
     public async ValueTask<AuthenticateAccountDto?> AuthenticateAsync(string loginName, CancellationToken ct)
     {

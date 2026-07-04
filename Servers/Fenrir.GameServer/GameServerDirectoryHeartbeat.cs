@@ -11,7 +11,7 @@ namespace Fenrir.GameServer;
 ///     invisible to every CL_DEMAND_ZONE_SERVER_INFO_SEND, indistinguishable from "no shard available".
 /// </summary>
 public sealed class GameServerDirectoryHeartbeat(
-    GameServerDirectoryRepository directory,
+    IGameServerDirectoryRepository directory,
     ZoneRegistry zones,
     IOptions<GameServerOptions> options,
     ILogger<GameServerDirectoryHeartbeat> logger) : BackgroundService

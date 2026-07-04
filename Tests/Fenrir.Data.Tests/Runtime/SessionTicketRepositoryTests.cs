@@ -17,7 +17,7 @@ namespace Fenrir.Data.Tests.Runtime;
 public sealed class SessionTicketRepositoryTests : IDisposable
 {
     private readonly ServiceProvider _provider;
-    private readonly SessionTicketRepository _repository;
+    private readonly ISessionTicketRepository _repository;
 
     public SessionTicketRepositoryTests(SqlServerFixture fixture)
     {

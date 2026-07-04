@@ -14,7 +14,7 @@ namespace Fenrir.Data.Tribes;
 ///     field. Phase C/V7 Guilds &amp; Tribes adds the sub-master WRITE surface (TRIBE_WORK tSort 2/3, doc
 ///     10 §2) plus the read GetAllAsync needs for TRIBE_WORK's own gates (tSort 5's per-tribe point check).
 /// </summary>
-public sealed record TribeRepository(ICaeriusNetDbContext Db)
+public sealed record TribeRepository(ICaeriusNetDbContext Db) : ITribeRepository
 {
     /// <summary>
     ///     Loaded once at world entry, same posture as <c>MuteRepository</c>/<c>GuildRepository</c>. 1 =

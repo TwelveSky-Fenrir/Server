@@ -2,6 +2,7 @@ using System.Buffers;
 using System.Collections.Frozen;
 using System.Collections.Immutable;
 using Fenrir.Application.Game.Combat;
+using Fenrir.Application.Game.Commerce;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Movement;
 using Fenrir.Application.Game.Simulation;
@@ -20,16 +21,16 @@ namespace Fenrir.Application.Game.Tests.TestSupport;
 /// </summary>
 internal static class ZoneTestKit
 {
-    public static GameServerOptions Options(params short[] maps)
+    public static GameServerOptions Options()
     {
-        return new GameServerOptions { Maps = maps.Length == 0 ? [1] : maps };
+        return new GameServerOptions();
     }
 
     public static Zone CreateZone(short mapId, GameServerOptions? options = null,
         DirtyTracker<int>? dirtyTracker = null, IReadOnlyList<ISimulationSystem>? simulationSystems = null,
         WorldDataCache? worldData = null, IRandomSource? randomSource = null)
     {
-        var opts = options ?? Options(mapId);
+        var opts = options ?? Options();
         return new Zone(mapId, opts, new MovementRules(Microsoft.Extensions.Options.Options.Create(opts)),
             dirtyTracker ?? new DirtyTracker<int>(), simulationSystems ?? [], NullLogger<Zone>.Instance,
             worldData ?? EmptyWorldData(), randomSource);

@@ -7,6 +7,7 @@ using Fenrir.Application.Game.World;
 using Fenrir.Contracts.Abstractions;
 using Fenrir.Contracts.Packets.Shared;
 using Fenrir.Contracts.Packets.Zone;
+using Fenrir.Data.Admin;
 using Fenrir.Data.Characters;
 using Fenrir.Data.Commerce;
 using Fenrir.Network.Sessions;
@@ -17,32 +18,30 @@ namespace Fenrir.Application.Game.Handlers.Commerce;
 /// <summary>
 ///     CZ_START_PSHOP_SEND (opcode 31, contracts/04_commerce.md, verified <c>S04_MyWork02.cpp:6021-6348</c>).
 ///     <c>Sort</c> 1 = live personal shop (a pure display overlay -- items never leave
-///     <see cref="PlayerRuntimeState.Inventory" />, see that property's own remarks), 2 = offline/deputy
-///     shop (items DO physically leave the owner's live inventory into game.OfflineShopItems, D7 regime
-///     (b)). Runtime-gated to zone 37 under <c>PPSHOP_V2</c> for BOTH sorts (verified: the very first
-///     check in the source, before the sort switch, applies uniformly).
+///     <see cref="PlayerRuntimeState.Inventory" />), 2 = offline/deputy shop (items physically leave into
+///     game.OfflineShopItems). Both sorts gated to zone 37 under <c>PPSHOP_V2</c> (verified, checked before
+///     the sort switch).
 /// </summary>
 /// <remarks>
-///     OPEN ISSUES (documented, not guessed): <c>CheckPossiblePShopRegion</c> (a per-tribe/zone sub-region
-///     gate) is NOT modeled -- treated as "anywhere in zone 37" (a safe superset, not a security hole: the
-///     zone-37 gate itself is the real restriction). <c>aAction.aSort != 1</c> ("must be standing") is NOT
-///     modeled -- its exact semantics were not verified against <see cref="PlayerRuntimeState.ActionSort" />'s
-///     own established 0-idle convention (they conflict), so gating on it risked blocking legitimate opens
-///     on a guess rather than a verified rule. <c>iCheckAvatarShop</c> (item barred from personal-shop
-///     sale) is NOT modeled -- no such field exists on <c>ItemRowDto</c> yet. The proxy shop's rental
-///     expiration (<c>aProxyShopDate</c>) has no Fenrir column -- a fixed 7-day window from open time is
-///     used instead (see <see cref="ProxyShopDurationDays" />).
+///     OPEN ISSUES (documented, not guessed): <c>CheckPossiblePShopRegion</c> (per-tribe/zone sub-region
+///     gate) not modeled -- treated as "anywhere in zone 37" (a safe superset). <c>aAction.aSort != 1</c>
+///     ("must be standing") not modeled -- its semantics conflict with
+///     <see cref="PlayerRuntimeState.ActionSort" />'s established 0-idle convention and weren't verified,
+///     so it's not enforced on a guess. <c>iCheckAvatarShop</c> (item barred from personal-shop sale) not
+///     modeled -- no such field exists on <c>ItemRowDto</c> yet. The proxy shop's rental expiration
+///     (<c>aProxyShopDate</c>) has no Fenrir column -- a Fenrir-invented window is used instead,
+///     admin-tunable via <c>ProxyShopDurationDays</c> (<see cref="IGameSettingsRepository" />) since
+///     there's no legacy value to stay iso to.
 /// </remarks>
 public sealed class OpenShopStallHandler(
-    OfflineShopRepository offlineShops,
+    IOfflineShopRepository offlineShops,
+    IGameSettingsRepository gameSettings,
     WorldDataCache worldData,
     ILogger<OpenShopStallHandler> logger)
     : IAsyncPacketHandler<OpenShopStallRequest>
 {
     /// <summary>Zone 37 only, verified for BOTH sorts under PPSHOP_V2 (S04_MyWork02.cpp:6040).</summary>
     public const short PshopZoneNumber = 37;
-
-    private const int ProxyShopDurationDays = 7;
 
     public async ValueTask HandleAsync(OpenShopStallRequest packet, IPacketSession session,
         CancellationToken cancellationToken)
@@ -127,9 +126,8 @@ public sealed class OpenShopStallHandler(
                     view.ItemId, view.Quantity, view.Value, view.Serial, view.Price, SocketData: null));
         }
 
-        // Fresh server-assigned UniqueNumber -- the legacy's own mGAME.mAvatarPShopUniqueNumber++ counter;
-        // CharacterId-derived is a reasonable, documented stand-in (same posture PlayerRuntimeState.UniqueNumber
-        // already takes for the analogous avatar-object field).
+        // Fresh server-assigned UniqueNumber (legacy: mGAME.mAvatarPShopUniqueNumber++); CharacterId-derived
+        // is a documented stand-in, same posture as PlayerRuntimeState.UniqueNumber.
         var uniqueNumber = unchecked((uint)(characterId * 2 + (isProxy ? 1 : 0)));
         var listing = packet.PshopInfo with { UniqueNumber = uniqueNumber };
 
@@ -173,7 +171,8 @@ public sealed class OpenShopStallHandler(
                 page1 = page1.Remove((byte)view.InventoryIndex);
         }
 
-        var shopDate = LegacyDate.Today() + ProxyShopDurationDays; // see class remarks -- NOT the same int arithmetic as a real calendar add, but this field is only ever compared for equality/staleness, never date-added-to, elsewhere in this pass.
+        var settings = await gameSettings.GetAsync(cancellationToken);
+        var shopDate = GameDate.Today() + settings.ProxyShopDurationDays; // not real calendar-add arithmetic -- shopDate is only ever compared for equality/staleness elsewhere, never added-to again.
 
         try
         {

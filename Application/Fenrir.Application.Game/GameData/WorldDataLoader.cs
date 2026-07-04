@@ -13,7 +13,7 @@ namespace Fenrir.Application.Game.GameData;
 ///     a failure here (unreachable SQL, unseeded database) is fatal by design, exactly like the legacy
 ///     refusing to start without its shared-memory .IMG data.
 /// </summary>
-public sealed class WorldDataLoader(WorldDataRepository repository, ILogger<WorldDataLoader> logger)
+public sealed class WorldDataLoader(IWorldDataRepository repository, ILogger<WorldDataLoader> logger)
 {
     private WorldDataCache? _cache;
 

@@ -8,14 +8,13 @@ using Fenrir.Network.Sessions;
 namespace Fenrir.Application.Game.Handlers.Commerce;
 
 /// <summary>
-///     CZ_GET_REWARD_ITEM_SEND (opcode 154, contracts/04_commerce.md) -- the 7-day login-reward catalog +
-///     this character's own claim cursor. world.RewardBundles has exactly 1 row in this build (verified,
-///     RewardBundleItemRowDto's own header) -- hardcoded here rather than resolved dynamically, matching
-///     that same single-bundle reality. Unlike the legacy's aggressive <c>Quit()</c> on ANY IPC/lookup
-///     failure, an unknown character here just returns the neutral all-day-7 answer (Fenrir has no IPC
-///     hop to fail in the first place -- a genuinely different failure surface, not a corrected behavior).
+///     CZ_GET_REWARD_ITEM_SEND (opcode 154, contracts/04_commerce.md) -- the 7-day login-reward catalog
+///     plus this character's own claim cursor. world.RewardBundles has exactly 1 row in this build
+///     (verified), hardcoded here rather than resolved dynamically. Unlike the legacy's aggressive
+///     <c>Quit()</c> on any IPC/lookup failure, an unknown character here just returns the neutral
+///     all-day-7 answer (Fenrir has no IPC hop to fail in the first place).
 /// </summary>
-public sealed class GetDailyRewardCatalogHandler(CharacterRepository characters, WorldDataCache worldData)
+public sealed class GetDailyRewardCatalogHandler(ICharacterRepository characters, WorldDataCache worldData)
     : IAsyncPacketHandler<GetDailyRewardCatalogRequest>
 {
     private const int RewardBundleId = 1;
@@ -26,7 +25,7 @@ public sealed class GetDailyRewardCatalogHandler(CharacterRepository characters,
         var zoneSession = (ZoneClientSession)session;
         var characterId = zoneSession.CharacterId!.Value;
 
-        var state = await characters.GetRewardClaimStateAsync(characterId, LegacyDate.Today(), cancellationToken);
+        var state = await characters.GetRewardClaimStateAsync(characterId, GameDate.Today(), cancellationToken);
 
         var rewardItems = new int[7];
         if (worldData.RewardBundleItemsByBundleId.TryGetValue(RewardBundleId, out var slots))

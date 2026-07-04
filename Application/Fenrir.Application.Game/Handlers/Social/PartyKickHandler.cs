@@ -7,10 +7,9 @@ using Fenrir.Network.Sessions;
 namespace Fenrir.Application.Game.Handlers.Social;
 
 /// <summary>
-///     CZ_PARTY_EXILE_SEND (opcode 70). Reserved to the party LEADER (silent no-op otherwise, contract's
-///     own "réservé au CHEF"). A self-targeted kick is not specially guarded here either (see
-///     <see cref="Party.TryRemoveMember" />'s own remarks) -- faithfully reproduces the legacy's own lack
-///     of such a guard.
+///     CZ_PARTY_EXILE_SEND (opcode 70). Reserved to the party leader (silent no-op otherwise, contract's
+///     own "réservé au CHEF"). A self-targeted kick is not specially guarded (see
+///     <see cref="Party.TryRemoveMember" />) -- faithfully matches the legacy's own lack of a guard.
 /// </summary>
 public sealed class PartyKickHandler(ZoneRegistry zones, PartyRegistry parties) : IInlinePacketHandler<PartyKickRequest>
 {
@@ -42,9 +41,8 @@ public sealed class PartyKickHandler(ZoneRegistry zones, PartyRegistry parties) 
 
         if (!disbanded)
         {
-            // Look up the roster via ANY surviving member, not necessarily leaderId -- a self-targeted
-            // kick (targetId == leaderId, not specially guarded, see class remarks) would otherwise make
-            // this lookup miss, since leaderId itself was just removed from the roster index.
+            // Look up the roster via any surviving member, not leaderId -- a self-targeted kick removes
+            // leaderId from the roster index too, so anchoring on it would miss (see class summary).
             var anchor = membersBeforeKick.FirstOrDefault(id => id != targetId);
             var remaining = parties.GetMembers(anchor);
             if (remaining.Count > 0)

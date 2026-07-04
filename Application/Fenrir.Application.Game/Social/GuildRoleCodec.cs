@@ -1,15 +1,11 @@
 namespace Fenrir.Application.Game.Social;
 
 /// <summary>
-///     Translates between game.GuildMembers' DB-side role enum (0 member, 1 sub-master, 2 master -- the
-///     table's own header comment) and the legacy wire's <c>aGuildRole</c> encoding (0 master, 1
-///     sub-master, 2 member -- VERIFIED against the actual write sites, not the DB comment: master gets
-///     role 0 (<c>S04_MyWork02.cpp:10148</c> assigns a fresh member role 2; the "Guild Transfer Leader"
-///     handler at l.10613-10664 demotes the outgoing master to 2 and promotes the incoming one to 0; the
-///     guild-master-only gate throughout the same file is literally <c>aGuildRole != 0 =&gt; return</c>)).
-///     This is a real, easy-to-miss inversion between the two layers -- the DB migration's own comment is
-///     backwards relative to the wire, a documented lesson-learned catch from this pass (do not compare
-///     the raw DB byte against a wire constant, or vice versa, without going through this type).
+///     Translates game.GuildMembers' DB role (0 member, 1 sub-master, 2 master) to/from the legacy
+///     wire's <c>aGuildRole</c> encoding (0 master, 1 sub-master, 2 member) -- VERIFIED against actual
+///     write sites (<c>S04_MyWork02.cpp:10148</c>, 10613-10664), not the DB migration's own comment, which
+///     is backwards relative to the wire. Never compare a raw DB role byte against a wire constant
+///     directly -- always go through this type.
 /// </summary>
 public static class GuildRoleCodec
 {
@@ -26,12 +22,9 @@ public static class GuildRoleCodec
     }
 
     /// <summary>
-    ///     Wire <c>aGuildRole</c> (0/1/2) -&gt; DB role (2/1/0) -- GUILD_WORK tSort 9's own request encoding
-    ///     (1=promote to sub-master, 2=demote to member, doc 10 §1) uses the SAME 0=master/1=sub-master/
-    ///     2=member wire convention as AVATAR_INFO's own <c>aGuildRole</c>. <see cref="DbRoleToWire" /> is
-    ///     mathematically self-inverting (a pure swap of 0/2, 1 fixed), so this delegates to it rather than
-    ///     duplicating the same switch -- kept as its own named method purely so call sites read correctly
-    ///     ("wire to DB" vs "DB to wire"), not because the underlying logic differs.
+    ///     Wire <c>aGuildRole</c> -&gt; DB role. GUILD_WORK tSort 9 uses the same wire convention as
+    ///     AVATAR_INFO's <c>aGuildRole</c>, and <see cref="DbRoleToWire" /> is self-inverting, so this
+    ///     just delegates to it -- kept as a separate named method only so call sites read correctly.
     /// </summary>
     public static byte WireRoleToDb(int wireRole)
     {

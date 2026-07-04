@@ -12,25 +12,20 @@ using Microsoft.Extensions.Logging;
 namespace Fenrir.Application.Game.Handlers.Commerce;
 
 /// <summary>
-///     CZ_CLAIM_REWARD_ITEM_SEND (opcode 155, contracts/04_commerce.md, verified <c>S04_MyWork02.cpp:
-///     15648-15699</c>). "Already claimed today" is modeled as a date comparison
-///     (<see cref="LegacyDate.Today" /> vs. game.Characters.RewardClaimDate) rather than the legacy's own
-///     opaque per-session <c>uRewardClaimState</c> flag -- see that column's migration header for why (no
-///     daily-reset call site for that flag was locatable in the available ts25zone source). The granted
-///     quantity is ALWAYS 1 (verified: the legacy's own <c>SendItemToInventory</c> call passes a
-///     quantity parameter that is itself just a 0/1 "is this a Sort==99 coupon" display flag, not a real
-///     stack size -- Fenrir's own <see cref="ItemStack" /> convention already normalizes a non-stackable
-///     grant to Quantity=1 regardless, see <see cref="World.Npcs.NpcShopPolicy.ResolveBuy" />'s identical
-///     precedent). D7 regime (b): the claim-day advance + the granted item commit atomically
+///     CZ_CLAIM_REWARD_ITEM_SEND (opcode 155, contracts/04_commerce.md, verified <c>S04_MyWork02.cpp:15648-15699</c>).
+///     "Already claimed today" is modeled as a date comparison (<see cref="GameDate.Today" /> vs.
+///     game.Characters.RewardClaimDate) rather than the legacy's own per-session <c>uRewardClaimState</c>
+///     flag -- no daily-reset call site for that flag was locatable in the available source. Granted
+///     quantity is always 1 (the legacy's own quantity param is really just a Sort==99 coupon display
+///     flag, not a stack size). Claim-day advance and item grant commit atomically
 ///     (<see cref="CharacterRepository.ClaimDailyRewardAsync" />).
 /// </summary>
 /// <remarks>
-///     OPEN ISSUE: the wire's <c>InvenX</c>/<c>InvenY</c> sub-cell position has no Fenrir equivalent
-///     (flat-slot addressing, same documented gap <see cref="World.Loot.GroundItemPickupPolicy" /> already
-///     carries) -- reported as (0, 0) on a successful claim, a cosmetic-only simplification.
+///     OPEN ISSUE: the wire's <c>InvenX</c>/<c>InvenY</c> sub-cell position has no Fenrir equivalent (same
+///     gap as <see cref="World.Loot.GroundItemPickupPolicy" />) -- reported as (0, 0) on a successful claim.
 /// </remarks>
 public sealed class ClaimDailyRewardHandler(
-    CharacterRepository characters,
+    ICharacterRepository characters,
     WorldDataCache worldData,
     ILogger<ClaimDailyRewardHandler> logger)
     : IAsyncPacketHandler<ClaimDailyRewardRequest>
@@ -62,7 +57,7 @@ public sealed class ClaimDailyRewardHandler(
         ZoneClientSession zoneSession, Zone zone, PlayerRuntimeState state, int characterId,
         CancellationToken cancellationToken)
     {
-        var today = LegacyDate.Today();
+        var today = GameDate.Today();
         var claimState = await characters.GetRewardClaimStateAsync(characterId, today, cancellationToken);
         if (claimState is null)
         {

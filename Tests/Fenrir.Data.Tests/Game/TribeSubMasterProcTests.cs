@@ -19,8 +19,8 @@ namespace Fenrir.Data.Tests.Game;
 [Collection("SqlServer")]
 public class TribeSubMasterProcTests
 {
-    private readonly AccountRepository _accounts;
-    private readonly CharacterRepository _characters;
+    private readonly IAccountRepository _accounts;
+    private readonly ICharacterRepository _characters;
     private readonly string _connectionString;
 
     public TribeSubMasterProcTests(SqlServerFixture fixture)

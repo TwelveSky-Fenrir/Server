@@ -40,27 +40,29 @@ public static class FenrirDataServiceCollectionExtensions
             .WithAspireSqlServer(connectionName)
             .Build();
 
-        builder.Services.AddSingleton<AccountRepository>();
+        builder.Services.AddSingleton<IAccountRepository, AccountRepository>();
         builder.Services.AddSingleton<IAccountPinRepository, AccountPinRepository>();
-        builder.Services.AddSingleton<CharacterRepository>();
+        builder.Services.AddSingleton<ICharacterRepository, CharacterRepository>();
         builder.Services.AddSingleton<ICharacterRenameRepository, CharacterRenameRepository>();
-        builder.Services.AddSingleton<SessionTicketRepository>();
-        builder.Services.AddSingleton<GameServerDirectoryRepository>();
+        builder.Services.AddSingleton<ISessionTicketRepository, SessionTicketRepository>();
+        builder.Services.AddSingleton<IGameServerDirectoryRepository, GameServerDirectoryRepository>();
+        builder.Services.AddSingleton<IShardMapAssignmentRepository, ShardMapAssignmentRepository>();
+        builder.Services.AddSingleton<IGameSettingsRepository, GameSettingsRepository>();
 
         // Phase C/V6 Social.
-        builder.Services.AddSingleton<MuteRepository>();
-        builder.Services.AddSingleton<GuildRepository>();
-        builder.Services.AddSingleton<TribeRepository>();
-        builder.Services.AddSingleton<FriendRepository>();
-        builder.Services.AddSingleton<MentorRepository>();
+        builder.Services.AddSingleton<IMuteRepository, MuteRepository>();
+        builder.Services.AddSingleton<IGuildRepository, GuildRepository>();
+        builder.Services.AddSingleton<ITribeRepository, TribeRepository>();
+        builder.Services.AddSingleton<IFriendRepository, FriendRepository>();
+        builder.Services.AddSingleton<IMentorRepository, MentorRepository>();
 
         // Server Logic V9 Progression.
-        builder.Services.AddSingleton<HeroRankingRepository>();
-        builder.Services.AddSingleton<TowerRepository>();
+        builder.Services.AddSingleton<IHeroRankingRepository, HeroRankingRepository>();
+        builder.Services.AddSingleton<ITowerRepository, TowerRepository>();
 
         // Server Logic V8 Player Commerce & Cash.
-        builder.Services.AddSingleton<CashRepository>();
-        builder.Services.AddSingleton<OfflineShopRepository>();
+        builder.Services.AddSingleton<ICashRepository, CashRepository>();
+        builder.Services.AddSingleton<IOfflineShopRepository, OfflineShopRepository>();
         builder.Services.AddSingleton<IGiftRepository, GiftRepository>();
 
         return builder;

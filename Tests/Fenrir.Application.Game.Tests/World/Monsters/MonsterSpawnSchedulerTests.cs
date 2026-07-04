@@ -58,7 +58,7 @@ public class MonsterSpawnSchedulerTests
     {
         var zone = CreateZone(CacheWithOneRegion(number: 3));
 
-        zone.Tick(LegacyTime.LegacyTick);
+        zone.Tick(SimulationClock.LegacyTick);
 
         Assert.Equal(3, zone.MonsterCount);
     }
@@ -68,7 +68,7 @@ public class MonsterSpawnSchedulerTests
     {
         var zone = CreateZone(CacheWithOneRegion(number: 1));
 
-        zone.Tick(LegacyTime.LegacyTick);
+        zone.Tick(SimulationClock.LegacyTick);
 
         Assert.True(zone.TryGetMonster(1, out var monster));
         var dx = monster!.PosX - 100;
@@ -80,20 +80,20 @@ public class MonsterSpawnSchedulerTests
     public void KilledMonster_IsRemovedImmediately_AndDoesNotRespawnBeforeItsTimer()
     {
         var zone = CreateZone(CacheWithOneRegion(number: 1, summonTimeSeconds: 100));
-        zone.Tick(LegacyTime.LegacyTick);
+        zone.Tick(SimulationClock.LegacyTick);
         Assert.Equal(1, zone.MonsterCount);
 
         zone.TryDamageMonster(1, 10_000, attackerCharacterId: null, out var died, out _);
         Assert.True(died);
 
         // Drain the death (loot/respawn arming) on the next tick.
-        zone.Tick(LegacyTime.LegacyTick);
+        zone.Tick(SimulationClock.LegacyTick);
 
         Assert.Equal(0, zone.MonsterCount);
 
         // Advance well past the respawn scan cadence (10 s) but nowhere near the 100 s respawn timer.
         for (var i = 0; i < 30; i++)
-            zone.Tick(LegacyTime.LegacyTick);
+            zone.Tick(SimulationClock.LegacyTick);
 
         Assert.Equal(0, zone.MonsterCount);
     }
@@ -102,14 +102,14 @@ public class MonsterSpawnSchedulerTests
     public void KilledMonster_Respawns_AfterItsTimerAndTheNextScan()
     {
         var zone = CreateZone(CacheWithOneRegion(number: 1, summonTimeSeconds: 2));
-        zone.Tick(LegacyTime.LegacyTick);
+        zone.Tick(SimulationClock.LegacyTick);
         Assert.Equal(1, zone.MonsterCount);
 
         zone.TryDamageMonster(1, 10_000, attackerCharacterId: null, out _, out _);
 
         // 2 s respawn timer + up to 10 s until the next scan boundary -- well past both.
         for (var i = 0; i < 40; i++) // 40 * 500ms = 20 s
-            zone.Tick(LegacyTime.LegacyTick);
+            zone.Tick(SimulationClock.LegacyTick);
 
         Assert.Equal(1, zone.MonsterCount);
     }
@@ -122,12 +122,12 @@ public class MonsterSpawnSchedulerTests
         var zone = CreateZone(cache);
         var (session, _) = ZoneTestKit.CreateSession(1);
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1, "Killer", level: 1)));
-        zone.Tick(LegacyTime.LegacyTick);
+        zone.Tick(SimulationClock.LegacyTick);
         Assert.Equal(1, zone.MonsterCount);
 
         zone.TryDamageMonster(1, 10_000, attackerCharacterId: 10, out _, out _);
 
-        zone.Tick(LegacyTime.LegacyTick);
+        zone.Tick(SimulationClock.LegacyTick);
 
         // Money is queued for the background flush host, not applied to PlayerRuntimeState directly (Money is
         // deliberately not modeled there -- see CharacterProgressTvp's own remarks).
@@ -144,12 +144,12 @@ public class MonsterSpawnSchedulerTests
     public void MonsterKill_WithNoResolvableKiller_NeverThrows_AndGrantsNothing()
     {
         var zone = CreateZone(CacheWithOneRegion(number: 1));
-        zone.Tick(LegacyTime.LegacyTick);
+        zone.Tick(SimulationClock.LegacyTick);
         Assert.Equal(1, zone.MonsterCount);
 
         zone.TryDamageMonster(1, 10_000, attackerCharacterId: 999, out _, out _);
 
-        zone.Tick(LegacyTime.LegacyTick); // must not throw
+        zone.Tick(SimulationClock.LegacyTick); // must not throw
 
         Assert.Empty(zone.DrainPendingMoneyGrants());
     }

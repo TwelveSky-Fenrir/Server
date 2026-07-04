@@ -11,17 +11,17 @@ namespace Fenrir.Application.Game.Handlers;
 ///     ticket→session handover (ADR-0005): the LoginServer minted a single-use session ticket for this AccountId
 ///     immediately after authenticating the player and handed the account-shard pair to the client via
 ///     CL_DEMAND_ZONE_SERVER_INFO_SEND. The GameServer never re-checks credentials -- consuming a live ticket for
-///     the AccountId embedded in tID (once de-obfuscated, see <see cref="LegacyUidCodec" />) IS the proof of
+///     the AccountId embedded in tID (once de-obfuscated, see <see cref="ObfuscatedUidCodec" />) IS the proof of
 ///     identity. A missing/expired/already-consumed ticket, or one minted for a different shard, is refused
 ///     identically (Result=1) to avoid leaking which failure mode occurred to an unauthenticated peer.
 /// </summary>
-public sealed class ZoneHandshakeHandler(SessionTicketRepository tickets, IOptions<GameServerOptions> options)
+public sealed class ZoneHandshakeHandler(ISessionTicketRepository tickets, IOptions<GameServerOptions> options)
     : IAsyncPacketHandler<ZoneHandshakeRequest>
 {
     public async ValueTask HandleAsync(ZoneHandshakeRequest packet, IPacketSession session,
         CancellationToken cancellationToken)
     {
-        if (!LegacyUidCodec.TryDecodeAccountId(packet.Id, out var accountId))
+        if (!ObfuscatedUidCodec.TryDecodeAccountId(packet.Id, out var accountId))
         {
             session.Send(new ZoneHandshakeResponse { Result = 1 });
             return;

@@ -20,10 +20,10 @@ namespace Fenrir.Data.Tests.Game;
 [Collection("SqlServer")]
 public class CommerceProcTests
 {
-    private readonly AccountRepository _accounts;
-    private readonly CharacterRepository _characters;
-    private readonly CashRepository _cash;
-    private readonly OfflineShopRepository _offlineShops;
+    private readonly IAccountRepository _accounts;
+    private readonly ICharacterRepository _characters;
+    private readonly ICashRepository _cash;
+    private readonly IOfflineShopRepository _offlineShops;
     private readonly GiftRepository _gifts;
     private readonly string _connectionString;
 

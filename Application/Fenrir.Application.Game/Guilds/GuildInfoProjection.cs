@@ -6,12 +6,9 @@ namespace Fenrir.Application.Game.Guilds;
 /// <summary>
 ///     Pure projection from the normalized game.Guilds/GuildMembers/GuildNotices rows onto the wire's
 ///     GUILD_INFO struct (ZC_GUILD_WORK_RECV, Core/Fenrir.Contracts/Packets/Shared/GuildInfo.cs -- 50
-///     fixed member slots, contracts/06_guild_tribe.md). The legacy's own slot ASSIGNMENT (which of the
-///     50 gMember array slots a member occupies) has no Fenrir equivalent -- normalized storage has no
-///     slot index at all, only presence -- so slots here are filled in <see cref="GuildRosterRowDto.JoinedAtUtc" />
-///     order (oldest member first); nothing in the wire contract or any client behavior documented in the
-///     reports depends on WHICH of the 50 slots a name occupies, only on presence/role/call-name, so this
-///     is a safe, documented inference, not a guess at gameplay-affecting behavior.
+///     fixed member slots, contracts/06_guild_tribe.md). Normalized storage has no slot index, so slots
+///     are filled in <see cref="GuildRosterRowDto.JoinedAtUtc" /> order (oldest first); nothing in the
+///     wire contract depends on which slot a name occupies, only on presence/role/call-name.
 /// </summary>
 public static class GuildInfoProjection
 {
@@ -19,9 +16,8 @@ public static class GuildInfoProjection
     private const int MaxNotices = 4;
 
     /// <summary>
-    ///     Zero-filled GUILD_INFO for every failure response (and the legacy's own tSort 1001 success quirk,
-    ///     doc 10 §1 quirk 4) -- Fenrir's replacement for the legacy's uninitialized-stack-garbage leak on
-    ///     those same responses.
+    ///     Zero-filled GUILD_INFO for every failure response (and the legacy's tSort 1001 success quirk,
+    ///     doc 10 §1 quirk 4) -- replaces the legacy's uninitialized-stack-garbage leak on those responses.
     /// </summary>
     public static GuildInfo Empty()
     {
@@ -57,8 +53,8 @@ public static class GuildInfoProjection
         var subMaster1 = "";
         var subMaster2 = "";
 
-        // Oldest-joined-first slot assignment -- see class remarks. Ordered defensively here (rather than
-        // trusting the caller's own query ORDER BY) since slot 0 must be deterministic across callers.
+        // Oldest-first slot order (see class remarks); sorted here rather than trusted from the caller's
+        // query, since slot 0 must be deterministic across callers.
         var ordered = roster.OrderBy(r => r.JoinedAtUtc).ToArray();
         for (var i = 0; i < ordered.Length && i < MaxMembers; i++)
         {

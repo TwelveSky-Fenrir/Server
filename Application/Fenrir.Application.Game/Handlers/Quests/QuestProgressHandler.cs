@@ -12,24 +12,21 @@ using Microsoft.Extensions.Logging;
 namespace Fenrir.Application.Game.Handlers.Quests;
 
 /// <summary>
-///     CZ_PROCESS_QUEST_SEND (opcode 36, report 04 §5, verified byte-for-byte against
+///     CZ_PROCESS_QUEST_SEND (opcode 36, verified byte-for-byte against
 ///     <c>Server/ts25zone/S04_MyWork02.cpp:7307-7563</c>) -- the 5-action quest state machine
-///     (<see cref="QuestStateMachine" />). EVERY rejection in the legacy source is a <c>Quit()</c> -- there
-///     is NO clean <c>tResult</c> failure path for this opcode at all, so every failed precondition here
-///     aborts the session, matching that exactly.
+///     (<see cref="QuestStateMachine" />). Every rejection in the legacy source is a <c>Quit()</c>; there is
+///     no clean <c>tResult</c> failure path for this opcode.
 /// </summary>
 /// <remarks>
-///     D7 regime (b): reward money and any inventory container touched are persisted SYNCHRONOUSLY, in ONE
-///     transaction with the quest-state row itself (<c>usp_CharacterQuest_ApplyTransition</c>) -- BEFORE
-///     the client ever sees success, exactly the same posture <c>GenericActionHandler</c>'s NPC-shop
-///     buy/sell already established (a quest reward is the same class of economy action). CP/XP rewards
-///     are write-behind (same regime as <c>Zone.GrantMonsterKillExperience</c>/ContributionPoints already
-///     use) -- mirrored via <see cref="QuestZoneCommand" /> AFTER the SQL commit, awaited before this
-///     handler's <see cref="PlayerRuntimeState.EconomyActionLock" /> is released (lesson: a duplication
-///     race requires BOTH the read and the mirror to happen while holding the lock).
+///     Reward money and any touched container are persisted synchronously in ONE transaction with the
+///     quest-state row (<c>usp_CharacterQuest_ApplyTransition</c>) before the client sees success -- same
+///     posture as <c>GenericActionHandler</c>'s NPC-shop buy/sell. CP/XP/TeacherPoint rewards are
+///     write-behind, mirrored via <see cref="QuestZoneCommand" /> after the SQL commit and awaited before
+///     <see cref="PlayerRuntimeState.EconomyActionLock" /> releases -- a duplication race requires both the
+///     read and the mirror to happen while holding the lock.
 /// </remarks>
 public sealed class QuestProgressHandler(
-    CharacterRepository characters,
+    ICharacterRepository characters,
     WorldDataCache worldData,
     QuestCatalog questCatalog,
     ILogger<QuestProgressHandler> logger)
@@ -150,10 +147,9 @@ public sealed class QuestProgressHandler(
                 return;
             }
 
-            // Skip the deposit (but keep the already-validated slot check above) when no type-6 reward item
-            // is actually configured for this quest -- see QuestStateMachine.Complete's own remarks; the
-            // legacy would write ItemId 0 into the slot here, which Fenrir's presence-keyed container model
-            // would otherwise misread as "occupied by nothing", a documented, safe adaptation.
+            // Skip the deposit when no type-6 reward item is configured (still keep the slot check above).
+            // Legacy would write ItemId 0 here, which Fenrir's presence-keyed container model would misread
+            // as empty -- a documented, safe adaptation.
             if (result.RewardItemId > 0)
                 edits.Deposit(container, slot,
                     new ItemStack(result.RewardItemId, result.RewardItemQuantity, 0, 0, 0, 0, 0, 0, 0, 0, 0));
@@ -213,9 +209,8 @@ public sealed class QuestProgressHandler(
             return;
         }
 
-        // ChangeQuestItem swaps the ITEM ID in place (same slot) and zeroes quantity/upgrade/serial --
-        // verified S07_MyGame04.cpp:2223-2244. A missing source item cannot happen here (present-state
-        // already required it via hasItem), but is handled defensively rather than assumed.
+        // A missing source item can't happen here (present-state already required it via hasItem), but
+        // TryReplaceFirstMatch (below) handles it defensively rather than assuming success.
         if (!edits.TryReplaceFirstMatch(result.FromItemId, _ =>
                 new ItemStack(result.ToItemId, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)))
         {
@@ -256,7 +251,7 @@ public sealed class QuestProgressHandler(
     }
 
     /// <summary>Shared tail for Accept/Complete/Exchange: persist (quest-state + optional money + up to 2 containers) in ONE transaction, then mirror onto the live PlayerRuntimeState.</summary>
-    private static async ValueTask PersistAndMirrorAsync(CharacterRepository characters, Zone zone,
+    private static async ValueTask PersistAndMirrorAsync(ICharacterRepository characters, Zone zone,
         ILogger logger, int characterId, QuestProgress newProgress, long deltaMoney, int experienceDelta,
         int contributionPointsDelta, int teacherPointDelta, ContainerEdits edits, CancellationToken ct)
     {
@@ -315,10 +310,9 @@ public sealed class QuestProgressHandler(
     }
 
     /// <summary>
-    ///     Accumulates up to 2 (only Inventory pages 0/1 are ever touched by a quest action) projected
-    ///     container edits over the live <see cref="PlayerRuntimeState.Inventory" /> snapshot, so a
-    ///     delete-then-deposit sequence that lands on the SAME container merges into ONE final projection
-    ///     instead of racing itself.
+    ///     Accumulates projected container edits (only inventory pages 0/1 are ever touched by a quest
+    ///     action) over the live <see cref="PlayerRuntimeState.Inventory" /> snapshot, so a delete-then-deposit
+    ///     sequence on the SAME container merges into one final projection instead of racing itself.
     /// </summary>
     private sealed class ContainerEdits(PlayerRuntimeState state)
     {

@@ -35,8 +35,8 @@ internal static class OpcodeRegistryEmitter
         foreach (var packet in ordered)
         {
             var headerSize = packet.Direction == FenrirDirection.Incoming
-                ? LegacyHeaderSizes.ClientPacketSize
-                : LegacyHeaderSizes.DefaultPacketSize;
+                ? WireHeaderSizes.ClientPacketSize
+                : WireHeaderSizes.DefaultPacketSize;
             var frameSize = packet.FieldsSize + headerSize;
             writer.Line(
                 $"({ServerLiteral(packet.Server)}, {DirectionLiteral(packet.Direction)}, {packet.Opcode}) => {frameSize},");

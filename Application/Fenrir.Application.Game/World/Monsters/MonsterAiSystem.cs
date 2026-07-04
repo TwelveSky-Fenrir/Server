@@ -38,7 +38,7 @@ namespace Fenrir.Application.Game.World.Monsters;
 public sealed class MonsterAiSystem : ISimulationSystem
 {
     /// <summary>One legacy tick's worth of movement time, matching the report's own "vitesse × dTime" with dTime ≈ 0.5 s.</summary>
-    private const float TickSeconds = LegacyTime.LegacyTickMilliseconds / 1000f;
+    private const float TickSeconds = SimulationClock.LegacyTickMilliseconds / 1000f;
 
     /// <summary>Close enough to "arrived" that jitter/overshoot never leaves a monster oscillating around its destination.</summary>
     private const float ArrivalEpsilon = 1f;

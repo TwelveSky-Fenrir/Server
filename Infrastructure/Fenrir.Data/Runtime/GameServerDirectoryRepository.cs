@@ -11,7 +11,7 @@ namespace Fenrir.Data.Runtime;
 ///     Access to runtime.GameServerDirectory (architecture reference §12.4): one warm row per live shard, kept
 ///     fresh by each shard's own heartbeat so Login can pick a destination without fanning out to every shard.
 /// </summary>
-public sealed record GameServerDirectoryRepository(ICaeriusNetDbContext Db)
+public sealed record GameServerDirectoryRepository(ICaeriusNetDbContext Db) : IGameServerDirectoryRepository
 {
     // In-memory OLTP table, sub-millisecond procs -- a short timeout fails fast instead of masking a stuck request.
     private const int CommandTimeoutSeconds = 5;

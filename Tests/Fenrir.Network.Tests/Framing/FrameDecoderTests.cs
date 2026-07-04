@@ -26,7 +26,7 @@ public class FrameDecoderTests
         Assert.True(decoded);
         Assert.Equal(Server, frame.Server);
         Assert.Equal(HeartbeatRequest.Opcode, frame.Opcode);
-        Assert.Equal(frameBytes[LegacyHeaders.ClientPacketSize..], frame.Payload.ToArray());
+        Assert.Equal(frameBytes[WireHeaderSizes.ClientPacketSize..], frame.Payload.ToArray());
         Assert.Equal(0, buffer.Length); // the whole frame — and nothing more — was consumed
     }
 
@@ -56,7 +56,7 @@ public class FrameDecoderTests
 
             Assert.True(decoded);
             Assert.Equal(HeartbeatRequest.Opcode, frame.Opcode);
-            Assert.Equal(expected[LegacyHeaders.ClientPacketSize..], frame.Payload.ToArray());
+            Assert.Equal(expected[WireHeaderSizes.ClientPacketSize..], frame.Payload.ToArray());
         }
 
         Assert.Equal(0, buffer.Length);
@@ -68,7 +68,7 @@ public class FrameDecoderTests
     public void TryReadFrame_UnregisteredOpcode_ThrowsProtocolViolationException_WithServerAndOpcode(
         FenrirServer server)
     {
-        var header = new byte[LegacyHeaders.ClientPacketSize];
+        var header = new byte[WireHeaderSizes.ClientPacketSize];
         header[8] = UnregisteredOpcode;
         var buffer = new ReadOnlySequence<byte>(header);
 
@@ -116,9 +116,9 @@ public class FrameDecoderTests
     [Fact]
     public void TryReadFrame_CzTempRegisterSend_FragmentedAtEveryByteBoundary_NeverCorruptsNeverMisfires()
     {
-        var frameSize = LegacyHeaders.ClientPacketSize + ZoneHandshakeRequest.PayloadSize;
+        var frameSize = WireHeaderSizes.ClientPacketSize + ZoneHandshakeRequest.PayloadSize;
         var fullFrame = BuildFrame(ZoneHandshakeRequest.Opcode, ZoneHandshakeRequest.PayloadSize, 5);
-        var expectedPayload = fullFrame[LegacyHeaders.ClientPacketSize..];
+        var expectedPayload = fullFrame[WireHeaderSizes.ClientPacketSize..];
 
         var fragmentationCases = 0;
         for (var cut = 1; cut < frameSize; cut++)
@@ -158,7 +158,7 @@ public class FrameDecoderTests
     /// </summary>
     private static byte[] BuildFrame(byte opcode, int payloadSize, int seed)
     {
-        var frame = new byte[LegacyHeaders.ClientPacketSize + payloadSize];
+        var frame = new byte[WireHeaderSizes.ClientPacketSize + payloadSize];
 
         // tPacket1/tPacket2 (offsets 0..7) carry no framing information in BuildEU33 — filled with
         // non-zero noise to prove FrameDecoder never looks at them.
@@ -166,7 +166,7 @@ public class FrameDecoderTests
         frame[8] = opcode;
 
         for (var i = 0; i < payloadSize; i++)
-            frame[LegacyHeaders.ClientPacketSize + i] = (byte)(seed + i);
+            frame[WireHeaderSizes.ClientPacketSize + i] = (byte)(seed + i);
 
         return frame;
     }

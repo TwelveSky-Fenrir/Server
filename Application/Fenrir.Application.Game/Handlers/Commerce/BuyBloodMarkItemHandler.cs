@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using Fenrir.Application.Game.Commerce;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Inventory;
 using Fenrir.Application.Game.World;
@@ -12,16 +13,14 @@ using Microsoft.Extensions.Logging;
 namespace Fenrir.Application.Game.Handlers.Commerce;
 
 /// <summary>
-///     CZ_BUY_BLOOD_MARK_SEND (opcode 141, contracts/04_commerce.md, USE_BLOOD family, verified
-///     <c>S04_MyWork02.cpp:15235-15372</c>). Legacy quirk preserved exactly (D8): the client's own
-///     submitted <c>tValue[3]</c> ("buy quantity") is ONLY ever used as an anti-cheat plausibility bound
-///     ([1, 999], stackable-only if &gt; 1) -- the quantity actually GRANTED always comes from the
-///     catalog's own fixed <c>Quantity</c> for that slot, never from the client. D7 regime (b): BloodCoin
-///     debit + the touched container commit atomically
+///     CZ_BUY_BLOOD_MARK_SEND (opcode 141, contracts/04_commerce.md, verified <c>S04_MyWork02.cpp:15235-15372</c>).
+///     ANTI-CHEAT: the client's submitted quantity (<c>tValue[3]</c>) is only a plausibility bound
+///     ([1, 999]) -- the quantity actually granted always comes from the catalog's own fixed
+///     <c>Quantity</c>, never the client. BloodCoin debit and the container commit atomically
 ///     (<see cref="CharacterRepository.SpendBloodCoinAndReplaceContainerAsync" />).
 /// </summary>
 public sealed class BuyBloodMarkItemHandler(
-    CharacterRepository characters,
+    ICharacterRepository characters,
     WorldDataCache worldData,
     ILogger<BuyBloodMarkItemHandler> logger)
     : IAsyncPacketHandler<BuyBloodMarkItemRequest>
@@ -72,7 +71,7 @@ public sealed class BuyBloodMarkItemHandler(
         }
 
         var buyQuantity = packet.Value[3];
-        if (buyQuantity < 1 || buyQuantity > GroundItemPickupPolicy.MaxStackQuantity)
+        if (buyQuantity is < 1 or > GroundItemPickupPolicy.MaxStackQuantity)
         {
             session.Send(new BuyBloodMarkItemResponse
                 { Result = ShopSpecificError, BloodCoin = 0, Page1 = page, Index1 = slot, Value = packet.Value });

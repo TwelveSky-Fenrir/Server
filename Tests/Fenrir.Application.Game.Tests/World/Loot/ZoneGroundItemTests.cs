@@ -21,7 +21,7 @@ public class ZoneGroundItemTests
 
     /// <summary>
     ///     Always draws the maximum possible value -- makes the guaranteed potion drop (DropRate at the
-    ///     <see cref="Loot.LegacyRandom.RandomNumber" /> ceiling) succeed deterministically while making the
+    ///     <see cref="Loot.LootRandomSource.RandomNumber" /> ceiling) succeed deterministically while making the
     ///     UNCONDITIONAL item-864 roll (report 05 §5, threshold 1000 out of a possible 1,000,000) as
     ///     unreachable as possible, so these tests only ever see the ONE potion they configured, never a
     ///     stray second item.
@@ -70,12 +70,12 @@ public class ZoneGroundItemTests
         killerCharacterId = 20;
         zone.Post(ZoneCommand.Enter(killerCharacterId,
             ZoneTestKit.EnterData(session, 1, "Looter", posX: 50, posZ: 50, level: 1))); // matches monster.ItemLevel (drop eligibility gap <= 9)
-        zone.Tick(LegacyTime.LegacyTick); // enters + pops the monster
+        zone.Tick(SimulationClock.LegacyTick); // enters + pops the monster
 
         Assert.True(zone.TryGetMonster(1, out var monster1));
         zone.TryDamageMonster(1, 10_000, killerCharacterId, out var died, out _);
         Assert.True(died);
-        zone.Tick(LegacyTime.LegacyTick); // drains the death: rolls the guaranteed potion drop
+        zone.Tick(SimulationClock.LegacyTick); // drains the death: rolls the guaranteed potion drop
 
         Assert.Equal(1, zone.GroundItemCount);
         return zone;

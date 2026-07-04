@@ -8,7 +8,7 @@ public enum DuelAskOutcome
     TargetBusy // 5
 }
 
-/// <summary>Why an active duel ended -- <see cref="Zone.ApplyDeath" />/<c>HandleLeave</c> resolve this automatically; <c>DuelStartHandler</c>'s own explicit end path is not modeled (see <see cref="DuelRegistry" />'s class remarks: the wire protocol has no CZ_DUEL_END_SEND at all).</summary>
+/// <summary>Why an active duel ended -- resolved automatically by <see cref="Zone.ApplyDeath" />/<c>HandleLeave</c> (see <see cref="DuelRegistry" /> remarks: no client end opcode exists).</summary>
 public enum DuelEndReason
 {
     Death,
@@ -26,30 +26,21 @@ public sealed record ActiveDuel(int UniqueNumber, int PlayerA, int PlayerB, bool
 
 /// <summary>
 ///     Process-wide 1v1 duel authority (CZ_DUEL_* family, contracts/05_social.md). Same ask/cancel/answer
-///     shape as <c>Party.PartyRegistry</c>/<c>Friends.FriendRegistry</c>; unlike those, acceptance (state
-///     3) is SYMMETRIC -- both sides may send CZ_DUEL_START_SEND, whichever arrives FIRST arms the duel
-///     for both (verified, contracts/05_social.md: the START handler's own guard is "exige
-///     mDuelProcessState==3" on the CALLER's side only, and it immediately emits ZC_DUEL_START_RECV to
-///     BOTH players -- there is no separate "the other side must also confirm" step).
+///     shape as <c>Party.PartyRegistry</c>/<c>Friends.FriendRegistry</c>, but acceptance is SYMMETRIC --
+///     either side's CZ_DUEL_START_SEND arms the duel for both (verified: the START handler only checks
+///     "mDuelProcessState==3" on the CALLER, then emits ZC_DUEL_START_RECV to both -- no separate
+///     confirm-from-both step exists).
 /// </summary>
 /// <remarks>
-///     SCOPE CUT, explicit (mission brief: "document exactly what's real vs out of scope"): the wire
-///     protocol has NO client-sent "give up/end duel" opcode at all (CZ 43-46 is the entire incoming
-///     family) -- report 05 §0 point 5 states a duel ends via "timeout, mort, fuite" (timeout, death,
-///     zone departure), all THREE of which are server-detected conditions, not client requests. This
-///     pass wires DEATH (<see cref="Zone.ApplyDeath" />) and DEPARTURE (<c>Zone.HandleLeave</c>, "fuite")
-///     -- both cheap, already-existing Zone hook points -- but NOT the 180 s timeout countdown
-///     (ZC_DUEL_TIME_INFO ticks + auto-end), which would need a new periodic timer/hosted service this
-///     pass does not add. A duel that nobody dies in or leaves therefore currently never auto-times-out
-///     -- a known, documented limitation, not a silent gap.
+///     SCOPE CUT: the wire protocol has no client "end duel" opcode -- a duel only ends via DEATH
+///     (<see cref="Zone.ApplyDeath" />) or DEPARTURE (<c>Zone.HandleLeave</c>), both wired here. The
+///     180s ZC_DUEL_TIME_INFO timeout auto-end is NOT implemented (would need a new periodic
+///     timer/hosted service) -- a duel nobody dies in or leaves therefore never times out.
 ///     <para>
-///     Also NOT modeled (same "no subsystem yet" cut <c>Combat.CombatResolver</c> already documents for
-///     <c>mCase</c> 1): actual duel COMBAT resolution. Two same-tribe duelists still cannot deal damage
-///     to each other via the existing attack path (<c>CombatResolver.ResolveEnemyTribeAttack</c> rejects
-///     same-tribe attackers outright, and <c>mCase</c> 1 is dropped unimplemented by
-///     <c>Zone.ApplyCombatCommand</c>) -- this batch adds the CHALLENGE/START/END lifecycle and the
-///     "potions forbidden" flag (<see cref="ActiveDuel.NoPotions" />, wired for whenever a potion-use
-///     handler exists to consult it) faithfully, but does not itself unlock same-tribe PvP damage.
+///     Also NOT modeled: actual duel combat. Same-tribe attacks are still rejected outright by
+///     <c>CombatResolver.ResolveEnemyTribeAttack</c>, so this batch wires the CHALLENGE/START/END
+///     lifecycle and the "potions forbidden" flag (<see cref="ActiveDuel.NoPotions" />) faithfully
+///     without itself unlocking same-tribe PvP damage.
 ///     </para>
 /// </remarks>
 public sealed class DuelRegistry
@@ -127,7 +118,7 @@ public sealed class DuelRegistry
         }
     }
 
-    /// <summary>CZ_DUEL_START_SEND -- callable by EITHER accepted side; the "no potions" flag is the ORIGINAL challenge's own Sort==1 choice, carried through unchanged regardless of who starts.</summary>
+    /// <summary>CZ_DUEL_START_SEND -- callable by either accepted side; the original challenger's no-potions flag (see <see cref="_noPotionsByChallenger" />) carries through regardless of who starts.</summary>
     public bool TryStart(int callerId, out ActiveDuel duel)
     {
         lock (_lock)

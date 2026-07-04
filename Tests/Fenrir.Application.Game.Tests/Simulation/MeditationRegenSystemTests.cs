@@ -69,7 +69,7 @@ public class MeditationRegenSystemTests
         var startMana = state.Mana; // 300
 
         zone.Post(ZoneCommand.Move(10, SitAction(7, 5)));
-        zone.Tick(LegacyTime.LegacyTick);
+        zone.Tick(SimulationClock.LegacyTick);
 
         Assert.Equal(startLife + 10, state.Life);
         Assert.Equal(startMana + 10, state.Mana);
@@ -81,7 +81,7 @@ public class MeditationRegenSystemTests
         var (zone, state) = SetUp(lifeDivisor: 84, manaDivisor: 32);
         var startLife = state.Life;
 
-        zone.Tick(LegacyTime.LegacyTick); // ActionSort stays 0 (idle) -- no Move posted.
+        zone.Tick(SimulationClock.LegacyTick); // ActionSort stays 0 (idle) -- no Move posted.
 
         Assert.Equal(startLife, state.Life);
     }
@@ -92,7 +92,7 @@ public class MeditationRegenSystemTests
         var (zone, state) = SetUp(lifeDivisor: 1, manaDivisor: 1); // regen = MaxLife/1 = MaxLife -> huge overshoot
         zone.Post(ZoneCommand.Move(10, SitAction(7, 5)));
 
-        zone.Tick(LegacyTime.LegacyTick);
+        zone.Tick(SimulationClock.LegacyTick);
 
         Assert.Equal(state.MaxLife, state.Life);
         Assert.Equal(state.MaxMana, state.Mana);

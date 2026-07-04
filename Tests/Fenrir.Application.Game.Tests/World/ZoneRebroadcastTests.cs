@@ -8,7 +8,7 @@ namespace Fenrir.Application.Game.Tests.World;
 
 /// <summary>
 ///     Covers the periodic keep-alive avatar rebroadcast (report 05 §0 item 6,
-///     <see cref="LegacyTime.AvatarRebroadcastInterval" />
+///     <see cref="SimulationClock.AvatarRebroadcastInterval" />
 ///     = 3.5 s): an idle avatar must still be re-announced to its AOI neighbors on this cadence, measured
 ///     against <see cref="Zone" />'s own simulated clock (<see cref="Zone.Tick" />) rather than wall time --
 ///     which is exactly what makes it testable without a real timer or a sleep.
@@ -35,7 +35,7 @@ public class ZoneRebroadcastTests
         ZoneTestKit.DrainOutbound(pipeB);
 
         // Just under the cadence: neither idle avatar has been re-announced yet.
-        zone.Tick(LegacyTime.AvatarRebroadcastInterval - TimeSpan.FromMilliseconds(100));
+        zone.Tick(SimulationClock.AvatarRebroadcastInterval - TimeSpan.FromMilliseconds(100));
         Assert.Empty(ZoneTestKit.DrainOutbound(pipeA));
         Assert.Empty(ZoneTestKit.DrainOutbound(pipeB));
 
@@ -79,7 +79,7 @@ public class ZoneRebroadcastTests
         ZoneTestKit.DrainOutbound(pipeA);
         ZoneTestKit.DrainOutbound(pipeB);
 
-        zone.Tick(LegacyTime.AvatarRebroadcastInterval);
+        zone.Tick(SimulationClock.AvatarRebroadcastInterval);
         Assert.Equal(OneFrame, ZoneTestKit.DrainOutbound(pipeA).Length);
 
         // Immediately after firing, the next cadence has NOT elapsed yet -- the keep-alive is a fixed period,
@@ -87,7 +87,7 @@ public class ZoneRebroadcastTests
         zone.Tick(TimeSpan.FromSeconds(1));
         Assert.Empty(ZoneTestKit.DrainOutbound(pipeA));
 
-        zone.Tick(LegacyTime.AvatarRebroadcastInterval - TimeSpan.FromSeconds(1));
+        zone.Tick(SimulationClock.AvatarRebroadcastInterval - TimeSpan.FromSeconds(1));
         Assert.Equal(OneFrame, ZoneTestKit.DrainOutbound(pipeA).Length);
     }
 
@@ -101,7 +101,7 @@ public class ZoneRebroadcastTests
         zone.Tick(TimeSpan.FromMilliseconds(50));
         ZoneTestKit.DrainOutbound(pipe);
 
-        zone.Tick(LegacyTime.AvatarRebroadcastInterval + TimeSpan.FromSeconds(1));
+        zone.Tick(SimulationClock.AvatarRebroadcastInterval + TimeSpan.FromSeconds(1));
 
         Assert.Empty(ZoneTestKit.DrainOutbound(pipe));
     }

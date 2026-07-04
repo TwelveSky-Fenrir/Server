@@ -14,7 +14,7 @@ namespace Fenrir.Application.Game.Handlers.Commerce;
 /// </summary>
 public sealed class ViewShopStallHandler : IInlinePacketHandler<ViewShopStallRequest>
 {
-    /// <summary>Client-ignored placeholder for the "requester has never opened a stall" case -- see this method's own "legacy trap" remarks. A real (non-null) FixedString/FixedArray shape, never <c>default(PshopInfo)</c> (whose null <see cref="PshopInfo.Name"/>/arrays the wire writer cannot serialize).</summary>
+    /// <summary>Placeholder for "requester never opened a stall" (client-ignored). Must be a real FixedString/FixedArray shape, never <c>default(PshopInfo)</c> -- its null <see cref="PshopInfo.Name"/>/arrays can't serialize on the wire.</summary>
     internal static readonly PshopInfo EmptyPshopInfo = new()
         { UniqueNumber = 0, Name = string.Empty, ItemInfo = new int[225], SocketInfo = new int[75] };
 
@@ -41,8 +41,8 @@ public sealed class ViewShopStallHandler : IInlinePacketHandler<ViewShopStallReq
                 break;
             }
 
-        // Legacy trap (verified, contract doc): on either error path the PshopInfo carries the
-        // REQUESTER's own stall, not the target's -- content the client is documented to ignore.
+        // Legacy trap (verified): on either error path the PshopInfo carries the REQUESTER's own stall,
+        // not the target's -- content the client is documented to ignore.
         var ownListing = requester.PshopListing ?? EmptyPshopInfo;
 
         if (target is null)

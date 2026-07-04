@@ -11,10 +11,12 @@ public class ZoneRegistryTests
 {
     private static ZoneRegistry CreateRegistry(params short[] maps)
     {
-        var options = ZoneTestKit.Options(maps);
-        return new ZoneRegistry(Options.Create(options),
+        var options = ZoneTestKit.Options();
+        var registry = new ZoneRegistry(Options.Create(options),
             new MovementRules(Options.Create(options)), new DirtyTracker<int>(), NullLogger<Zone>.Instance,
             ZoneTestKit.EmptyWorldData(), []);
+        registry.Initialize(maps);
+        return registry;
     }
 
     [Fact]

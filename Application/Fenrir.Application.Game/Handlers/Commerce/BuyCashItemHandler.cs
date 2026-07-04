@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using Fenrir.Application.Game.Commerce;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Inventory;
 using Fenrir.Application.Game.World;
@@ -14,24 +15,22 @@ namespace Fenrir.Application.Game.Handlers.Commerce;
 
 /// <summary>
 ///     CZ_BUY_CASH_ITEM_SEND (opcode 42, contracts/04_commerce.md) -- purchase a cash-shop item. ANTI-CHEAT:
-///     price and granted item/quantity are resolved ENTIRELY from <see cref="WorldDataCache.CashCatalog" />'s
-///     <c>CostInfoIndex</c> lookup (<c>CashCatalogBuilder</c>, verified <c>MyDB::GetItemMall</c>) -- the
-///     client's own submitted <c>Value[6]</c> is never trusted for price/item, only echoed back. D7 regime
-///     (b): the account's cash debit + the character's item grant commit in ONE transaction
+///     price and granted item/quantity are resolved entirely from <see cref="WorldDataCache.CashCatalog" />'s
+///     <c>CostInfoIndex</c> lookup -- the client's submitted <c>Value[6]</c> is never trusted, only echoed
+///     back. Cash debit and item grant commit in one transaction
 ///     (<see cref="CashRepository.DebitAndGrantItemAsync" />).
 /// </summary>
 /// <remarks>
-///     NOT modeled (documented, not guessed): the 200 ms runtime anti-spam gate (<c>mTickBuyCash</c>) and
-///     the <c>Version</c> mismatch "invalidation branch", verified largely commented out in the legacy
-///     source itself -- reproducing dead code would be a fabrication, not fidelity.
+///     Not modeled: the 200ms anti-spam gate (<c>mTickBuyCash</c>) and the <c>Version</c> mismatch branch --
+///     verified largely dead code in the legacy source, so not reproduced.
 /// </remarks>
 public sealed class BuyCashItemHandler(
-    CashRepository cash,
+    ICashRepository cash,
     WorldDataCache worldData,
     ILogger<BuyCashItemHandler> logger)
     : IAsyncPacketHandler<BuyCashItemRequest>
 {
-    /// <summary><c>60704</c> -- the legacy's own "shop-specific" magic error code (verified reused for structural cash-shop rejects, e.g. CZ_BUY_BLOOD_MARK_SEND's identical reuse of ZC_BUY_CASH_ITEM_RECV).</summary>
+    /// <summary><c>60704</c> -- the legacy's shared "shop-specific" error code, reused verbatim across cash-shop-family rejects (e.g. blood-mark purchase).</summary>
     private const int ShopSpecificError = 60704;
 
     public async ValueTask HandleAsync(BuyCashItemRequest packet, IPacketSession session,
@@ -41,7 +40,6 @@ public sealed class BuyCashItemHandler(
         var characterId = zoneSession.CharacterId!.Value;
         var accountId = zoneSession.AccountId!.Value;
 
-        // Benign staleness (mid-handoff/disconnect) -- same defensive posture as every other InWorld handler.
         if (zoneSession.CurrentZone is not Zone zone || !zone.TryGetPlayer(characterId, out var state) ||
             state is null)
             return;
@@ -119,8 +117,8 @@ public sealed class BuyCashItemHandler(
         }
         catch (Exception ex)
         {
-            // Insufficient cash balance (usp_Cash_DebitAndGrantItem's own guard, shared with usp_Cash_Debit) --
-            // logged so a transient/unrelated SQL fault is distinguishable from real insufficient funds.
+            // Insufficient cash balance (usp_Cash_DebitAndGrantItem's guard) -- logged to distinguish
+            // from a transient/unrelated SQL fault.
             logger.LogWarning(ex,
                 "Account {AccountId} cash-shop purchase DebitAndGrantItemAsync failed (treated as insufficient cash)",
                 accountId);

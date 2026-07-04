@@ -53,7 +53,7 @@ public class GoldenBytesTests
         payload.CopyTo(frame, 1);
         var lastByteBeforeXor = frame[^1];
 
-        LegacyXor.ApplyPacketXor(frame);
+        WireXor.ApplyPacketXor(frame);
 
         Assert.Equal((byte)(LoginGreetingResponse.Opcode ^ 0x10), frame[0]);
         Assert.Equal(lastByteBeforeXor, frame[^1]);

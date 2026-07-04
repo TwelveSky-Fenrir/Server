@@ -7,12 +7,11 @@ namespace Fenrir.Application.Game.Social.Trade;
 ///     wire arrays (contracts/05_social.md: <c>Trade[8][4]</c>, <c>TradeSocket[8][3]</c>).
 /// </summary>
 /// <remarks>
-///     OPEN ISSUE: the exact meaning of each slot's 4 ints is NOT broken down in contracts/05_social.md
-///     (unlike AvatarInfo.Equip, which report 11 §2 documents field-by-field) and this pass did not
-///     re-derive it from the raw C++ TRADE struct byte-for-byte. Modeled here as
-///     [0]=ItemId, [1]=Quantity, [2]=packed upgrade bytes (same <c>SetISIUIMValue</c> packing
-///     <c>AvatarInfoFactory.PackUpgradeBytes</c> already uses for Equip), [3]=ExpireDate -- a reasonable,
-///     DOCUMENTED inference by analogy, not an independently verified layout.
+///     OPEN ISSUE: contracts/05_social.md does not break down each slot's 4 ints field-by-field (unlike
+///     AvatarInfo.Equip), and this pass did not re-derive the layout from the raw C++ TRADE struct.
+///     Modeled here as [0]=ItemId, [1]=Quantity, [2]=packed upgrade bytes (same packing as
+///     <c>AvatarInfoFactory.PackUpgradeBytes</c>), [3]=ExpireDate -- a documented inference by analogy,
+///     not a verified layout.
 /// </remarks>
 public static class TradeOfferCodec
 {

@@ -33,8 +33,8 @@ namespace Fenrir.Application.Game.Handlers.Tribes;
 /// </remarks>
 public sealed class TribeActionHandler(
     ZoneRegistry zones,
-    TribeRepository tribes,
-    CharacterRepository characters,
+    ITribeRepository tribes,
+    ICharacterRepository characters,
     WorldDataCache worldData,
     ILogger<TribeActionHandler> logger) : IAsyncPacketHandler<TribeActionRequest>
 {
@@ -181,10 +181,9 @@ public sealed class TribeActionHandler(
             return;
         }
 
-        // Legacy checks "already a sub-master" by NAME against the raw client string, before ever resolving
-        // an online target -- resolved here via name->id (independent of online state) rather than the
-        // fragile "is this OTHER sub-master currently online in THIS zone" lookup a same-zone-only search
-        // would require (most sub-masters are not the one sending this packet).
+        // Legacy checks "already a sub-master" by NAME against the raw client string, before resolving an
+        // online target -- resolved here via name->id (independent of online state) rather than a
+        // same-zone-only lookup, since most sub-masters won't be online in this zone.
         var targetIdByName = await characters.GetIdByNameAsync(targetName, ct);
         var subMasters = await tribes.GetSubMastersAsync(state.Tribe, ct);
         if (targetIdByName is { } knownId && subMasters.Any(s => s.CharacterId == knownId))
@@ -311,13 +310,12 @@ public sealed class TribeActionHandler(
     /// <remarks>
     ///     DEFERRED (documented, not fabricated): the full gate also requires every tribe's world point total
     ///     &gt;100, the requester's tribe being the current minimum (<c>ReturnSmallTribe</c>), that tribe's
-    ///     share &lt;20% of the realm total, AND <c>mWorldInfo-&gt;mTribeSymbolBattle==1</c> -- a WORLD-scope
-    ///     flag (game.WorldState.TribeSymbolBattle) that no scheduled job in Fenrir ever sets to 1 (the
-    ///     "tribe symbol battle" world event that would flip it is an entirely separate, unimplemented
-    ///     system). Since that flag is always false today, the ENTIRE gate is unconditionally unreachable
-    ///     regardless of the point-share sub-checks -- implementing those now would be untestable dead
-    ///     weight; only the always-decisive role check plus an honest abort are implemented. A future batch
-    ///     that adds the tribe-symbol-battle world event should complete this gate's point-share logic too.
+    ///     share &lt;20% of the realm total, AND a world-scope <c>mTribeSymbolBattle==1</c> flag
+    ///     (game.WorldState.TribeSymbolBattle) that no scheduled job ever sets (the "tribe symbol battle"
+    ///     world event that would flip it is a separate, unimplemented system). Since that flag is always
+    ///     false, the gate is unconditionally unreachable, so only the always-decisive role check plus an
+    ///     honest abort are implemented; a future tribe-symbol-battle event should complete the point-share
+    ///     logic too.
     /// </remarks>
     private void HandleTribeSkill(TribeActionRequest packet, IPacketSession session, ZoneClientSession zoneSession,
         PlayerRuntimeState state)
@@ -433,17 +431,15 @@ public sealed class TribeActionHandler(
 
     /// <summary>
     ///     tSort 8 -- level-milestone bonus claim (S04_MyWork02.cpp:11233-11326). <c>aBonusItemLevel</c> is
-    ///     session-scoped only and never populated by any batch to date (see
-    ///     <see cref="PlayerRuntimeState.BonusItemLevel" />'s own remarks) -- this dispatch is fully
-    ///     implemented and correctly aborts for the (currently universal) zero case, matching the legacy's
-    ///     own <c>Quit()</c> exactly.
+    ///     session-scoped and never populated by any batch to date (see
+    ///     <see cref="PlayerRuntimeState.BonusItemLevel" />), so this always aborts today -- matching the
+    ///     legacy's own <c>Quit()</c> for the same zero case.
     /// </summary>
     /// <remarks>
-    ///     DEFERRED: only tiers 45/65/85/105 and LV_M33 (=145, contracts/06_guild_tribe.md's own resolved
-    ///     constant) are matched -- LV_M2/M8/M14/M20/M26/M32's exact numeric level values are not resolved
-    ///     by any report available to this pass (not guessed, per this task's own instructions); an
-    ///     unmatched value correctly falls to the same default-abort branch the source itself uses for any
-    ///     value it does not recognize either, so this is under-coverage, not a new incorrect acceptance.
+    ///     DEFERRED: only tiers 45/65/85/105 and LV_M33 (=145, contracts/06_guild_tribe.md) are matched --
+    ///     LV_M2/M8/M14/M20/M26/M32's exact level values aren't resolved by any available report (not
+    ///     guessed). An unmatched value falls to the same default-abort branch the source uses for
+    ///     unrecognized values, so this is under-coverage, not incorrect acceptance.
     /// </remarks>
     private async ValueTask HandleLevelBonusAsync(TribeActionRequest packet, IPacketSession session,
         ZoneClientSession zoneSession, Zone zone, PlayerRuntimeState state, int characterId, CancellationToken ct)
@@ -526,16 +522,12 @@ public sealed class TribeActionHandler(
     /// <remarks>
     ///     DEFERRED (documented, not fabricated): the real gate is <c>aRebirthNum &lt; MAX_REBIRTH_LIMIT(12)
     ///     &amp;&amp; (aLevel1+aLevel2)==(MAX_LIMIT_LEVEL_NUM+MAX_LIMIT_HIGH_LEVEL_NUM) &amp;&amp; aExp2&gt;=
-    ///     ReturnHighExpValue(aLevel2) &amp;&amp; aKillOtherTribe&gt;=10000</c>. Level2/Exp2 (the "high
-    ///     level"/rebirth martial-level progression track) are not modeled anywhere in Fenrir to date --
-    ///     Experience is stored as ONE merged BIGINT (game.Characters_progression.sql's own header), and
-    ///     Exp1/Exp2 are not even split back out onto the AVATAR_INFO wire template yet
-    ///     (<c>AvatarInfoFactory</c> leaves both at 0). Implementing the Level1+Level2==157 gate would
-    ///     therefore require fabricating a Level2 progression system this domain does not own (that is a
-    ///     Combat/leveling concern). This dispatch is wired (so an unknown-to-the-client sort doesn't fall
-    ///     through incorrectly) but always aborts, exactly matching what the legacy would ACTUALLY do for
-    ///     every real Fenrir character today (no character can satisfy the Level2 gate, so the real source
-    ///     would also <c>Quit()</c> here for every current player, just via a different specific check).
+    ///     ReturnHighExpValue(aLevel2) &amp;&amp; aKillOtherTribe&gt;=10000</c>. Fenrir has no Level2/Exp2
+    ///     ("high level"/rebirth martial track) -- Experience is one merged BIGINT
+    ///     (game.Characters_progression.sql) and <c>AvatarInfoFactory</c> leaves Exp1/Exp2 at 0 -- so the
+    ///     Level1+Level2==157 gate would require fabricating a Level2 system this domain doesn't own (a
+    ///     Combat/leveling concern). This always aborts, matching what the real source would also do for
+    ///     every current character today (none can satisfy the Level2 gate).
     /// </remarks>
     private void HandleRebirth(ZoneClientSession zoneSession)
     {
@@ -631,10 +623,10 @@ public sealed class TribeActionHandler(
     }
 
     /// <summary>
-    ///     Server Logic V9 Progression's pet stat contribution (same pattern as <c>GenericActionHandler</c>'s
-    ///     own equipment-move recompute, verified against its exact call site) -- none of this handler's own
-    ///     actions touch equipment, so the CURRENT container/growth/activity are always the right inputs
-    ///     (unlike GenericActionHandler's own projected-container nuance for an in-flight equip/unequip).
+    ///     Pet stat contribution (same pattern as <c>GenericActionHandler</c>'s equipment-move recompute) --
+    ///     none of this handler's actions touch equipment, so the current container/growth/activity are
+    ///     always the right inputs (unlike GenericActionHandler's projected-container nuance for an
+    ///     in-flight equip/unequip).
     /// </summary>
     private Stats.PetStatContribution ComputePetContribution(PlayerRuntimeState state,
         IReadOnlyDictionary<byte, ItemStack> equipmentContainer)

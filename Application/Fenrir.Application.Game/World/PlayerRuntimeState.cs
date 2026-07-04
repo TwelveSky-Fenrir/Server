@@ -162,7 +162,7 @@ public sealed class PlayerRuntimeState
     /// <summary>
     ///     Zone-clock instant (the zone's own simulated <c>TimeSpan</c> clock, not wall time) of the last
     ///     keep-alive rebroadcast of this avatar to its AOI neighbors — the 3.5 s legacy cadence
-    ///     (<see cref="Simulation.LegacyTime.AvatarRebroadcastInterval" />) is measured from this. Stamped at
+    ///     (<see cref="Simulation.SimulationClock.AvatarRebroadcastInterval" />) is measured from this. Stamped at
     ///     Enter, refreshed only by the rebroadcast itself (a keep-alive, exactly like the legacy
     ///     <c>tLogicAvatarTick</c> — moving does NOT reset it).
     /// </summary>

@@ -21,17 +21,17 @@ public enum TribeHaloEnchantOutcome
 /// <summary>
 ///     Pure port of <c>GetHaloCostumeEnchantRate</c> (verified in full, <c>Server/Header/function.h:2165-2214</c>)
 ///     plus the two-roll decision tree around it (<c>Server/ts25zone/S04_MyWork02.cpp:11128-11230</c>, TRIBE_WORK
-///     tSort 7). No I/O, no <c>PlayerRuntimeState</c>/<c>Zone</c> dependency -- <see cref="Tribes.TribeActionHandler" />
-///     supplies the current aHalo/aProtectForHalo and reads the result back.
+///     tSort 7). No I/O or state dependency -- <see cref="Tribes.TribeActionHandler" /> supplies the current
+///     aHalo/aProtectForHalo and reads the result back.
 /// </summary>
 public static class TribeHaloEnchantResolver
 {
     /// <summary>
     ///     <c>GetHaloCostumeEnchantRate(tCurrentImprove, &amp;tSuccess, &amp;tFail, &amp;tDecrease)</c> --
-    ///     <paramref name="currentHalo" /> is <c>aHalo</c> (the C++ internally adds 1, "pCurrentImprove").
-    ///     <see cref="SuccessRate" /> is a FLAT 15 regardless of tier (only <see cref="DecreaseRate" />
-    ///     varies, in 10-point brackets of <c>pCurrentImprove</c>, +3 per bracket up to 30 at 90+). Both are
-    ///     percentage points out of 100 for a <c>rand() % 100</c> roll.
+    ///     <paramref name="currentHalo" /> is <c>aHalo</c> (the C++ adds 1 internally, "pCurrentImprove").
+    ///     <see cref="SuccessRate" /> is a flat 15 regardless of tier; only <see cref="DecreaseRate" /> varies,
+    ///     +3 per 10-point bracket of <c>pCurrentImprove</c>, up to 30 at 90+. Both are percentage points for
+    ///     a <c>rand() % 100</c> roll.
     /// </summary>
     public static (int SuccessRate, int DecreaseRate) GetRates(int currentHalo)
     {
@@ -56,11 +56,10 @@ public static class TribeHaloEnchantResolver
 
     /// <summary>
     ///     One full attempt: preconditions (CP/money/halo-cap) are the CALLER's job (<c>TribeActionHandler</c>,
-    ///     which also debits the fixed 100 CP / 1,000,000 money cost BEFORE calling this -- the legacy debits
-    ///     unconditionally once past the preconditions, before either roll). Consumes exactly 1 or 2 draws
-    ///     from <paramref name="random" />, in the source's own order (success roll, then -- only if that
-    ///     roll failed -- the downgrade roll), matching <see cref="IRandomSource" />'s own "one draw per
-    ///     legacy rand_mir() call site" contract.
+    ///     which debits the fixed 100 CP / 1,000,000 money cost before calling this, matching the legacy's
+    ///     unconditional debit). Consumes 1 or 2 draws from <paramref name="random" /> in the source's own
+    ///     order (success roll, then -- only on failure -- the downgrade roll), per <see cref="IRandomSource" />'s
+    ///     "one draw per legacy rand_mir() call site" contract.
     /// </summary>
     public static (TribeHaloEnchantOutcome Outcome, int NewHalo, int NewProtectForHalo) Resolve(
         int currentHalo, int currentProtectForHalo, IRandomSource random)

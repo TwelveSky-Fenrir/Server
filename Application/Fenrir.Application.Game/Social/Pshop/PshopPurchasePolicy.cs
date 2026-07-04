@@ -6,11 +6,10 @@ using Fenrir.Contracts.Packets.Shared;
 namespace Fenrir.Application.Game.Social.Pshop;
 
 /// <summary>
-///     Pure, Zone-independent policy for the LIVE personal-shop-stall family (CZ_START/BUY_PSHOP_SEND,
-///     contracts/04_commerce.md, verified <c>S04_MyWork02.cpp:6021-7124</c>). <see cref="PshopInfo.ItemInfo" />
-///     is a flat <c>int[225]</c> = <c>[5 pages][5 slots][9 fields]</c> row-major (see that type's own
-///     remarks for the 9-field layout) -- <see cref="FlatIndex" /> is the one place that indexing math
-///     lives, everything else in this type and its callers goes through it.
+///     Pure, Zone-independent policy for the live personal-shop-stall family (CZ_START/BUY_PSHOP_SEND,
+///     verified <c>S04_MyWork02.cpp:6021-7124</c>). <see cref="PshopInfo.ItemInfo" /> is a flat
+///     <c>int[225]</c> = <c>[5 pages][5 slots][9 fields]</c> row-major (field layout on that type's own
+///     remarks) -- <see cref="FlatIndex" /> is the one place indexing math lives.
 /// </summary>
 public static class PshopPurchasePolicy
 {
@@ -53,12 +52,11 @@ public static class PshopPurchasePolicy
     }
 
     /// <summary>
-    ///     Validates ONE occupied slot of a submitted PSHOP_INFO at open time against the seller's LIVE
-    ///     inventory (S04_MyWork02.cpp:6140-6305, the always-taken "else" branch -- Fenrir's non-preloading
-    ///     proxy flow means the <c>sell.page==-1</c> preload-only branch never applies here, see
-    ///     <see cref="PlayerRuntimeState.PshopOpen" />'s own remarks). <c>iCheckAvatarShop</c> (item barred
-    ///     from personal-shop sale) is NOT modeled -- no such field exists on Fenrir's <see cref="ItemRowDto" />
-    ///     yet (documented open issue, not a guess).
+    ///     Validates ONE occupied PSHOP_INFO slot at open time against the seller's live inventory
+    ///     (S04_MyWork02.cpp:6140-6305 "else" branch -- Fenrir's non-preloading proxy flow means the
+    ///     <c>sell.page==-1</c> preload branch never applies, see <see cref="PlayerRuntimeState.PshopOpen" />).
+    ///     <c>iCheckAvatarShop</c> (item barred from personal-shop sale) is NOT modeled -- no such field
+    ///     exists on <see cref="ItemRowDto" /> yet (documented open issue).
     /// </summary>
     public static OpenSlotOutcome ValidateOpenSlot(SlotView slot, ItemDefinition? itemDefinition, ItemStack? liveSlot)
     {

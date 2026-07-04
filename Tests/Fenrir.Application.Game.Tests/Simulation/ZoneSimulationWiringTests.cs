@@ -30,7 +30,7 @@ public class ZoneSimulationWiringTests
         var system = new RecordingSystem(log, "only");
         var zone = ZoneTestKit.CreateZone(1, simulationSystems: [system]);
 
-        zone.Tick(LegacyTime.LegacyTick);
+        zone.Tick(SimulationClock.LegacyTick);
 
         Assert.Equal(1, system.CallCount);
         Assert.Equal(1, system.LastLegacyTicksElapsed);
@@ -59,7 +59,7 @@ public class ZoneSimulationWiringTests
         var third = new RecordingSystem(log, "third");
         var zone = ZoneTestKit.CreateZone(1, simulationSystems: [first, second, third]);
 
-        zone.Tick(LegacyTime.LegacyTick);
+        zone.Tick(SimulationClock.LegacyTick);
 
         string[] expectedOrder = ["first", "second", "third"];
         Assert.Equal(expectedOrder, log);
@@ -73,7 +73,7 @@ public class ZoneSimulationWiringTests
         var healthy = new RecordingSystem(log, "healthy");
         var zone = ZoneTestKit.CreateZone(1, simulationSystems: [faulty, healthy]);
 
-        zone.Tick(LegacyTime.LegacyTick);
+        zone.Tick(SimulationClock.LegacyTick);
 
         string[] expectedOrder = ["faulty", "healthy"];
         Assert.Equal(expectedOrder, log);

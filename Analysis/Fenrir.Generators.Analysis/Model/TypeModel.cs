@@ -29,7 +29,7 @@ internal sealed class TypeModel
 
     public byte Opcode { get; init; }
 
-    public LegacyObfuscation Obfuscation { get; init; }
+    public WireObfuscationMode Obfuscation { get; init; }
 
     public bool Compressed { get; init; }
 

@@ -34,15 +34,15 @@ public sealed record GroundItemEntity(
 {
     public bool IsExpired(TimeSpan nowZoneClock)
     {
-        return nowZoneClock - CreatedAtZoneClock >= LegacyTime.GroundItemLifetime;
+        return nowZoneClock - CreatedAtZoneClock >= SimulationClock.GroundItemLifetime;
     }
 
     /// <summary>
     ///     Ports <c>ITEM_OBJECT::CheckPossibleGetItem</c>'s ownership window (report 05 §5, DISTANCE is
     ///     checked separately by the caller -- see <see cref="Zone.TryClaimGroundItem" />): the exact killer
-    ///     name always owns it; anyone owns it once <see cref="LegacyTime.GroundItemFreeForAllDelay" /> (30 s)
+    ///     name always owns it; anyone owns it once <see cref="SimulationClock.GroundItemFreeForAllDelay" /> (30 s)
     ///     has passed; and when the killer was in a party at drop time (<see cref="DropSort" /> == 1), the
-    ///     SAME party can also claim it after <see cref="LegacyTime.GroundItemPartyShareDelay" /> (10 s) --
+    ///     SAME party can also claim it after <see cref="SimulationClock.GroundItemPartyShareDelay" /> (10 s) --
     ///     BEFORE the universal free-for-all window.
     /// </summary>
     /// <remarks>
@@ -58,12 +58,12 @@ public sealed record GroundItemEntity(
         if (string.Equals(Master, claimantName, StringComparison.Ordinal))
             return true;
 
-        if (IsExpired(nowZoneClock) || nowZoneClock - CreatedAtZoneClock >= LegacyTime.GroundItemFreeForAllDelay)
+        if (IsExpired(nowZoneClock) || nowZoneClock - CreatedAtZoneClock >= SimulationClock.GroundItemFreeForAllDelay)
             return true;
 
         if (DropSort == 1 && !string.IsNullOrEmpty(claimantPartyName) &&
             string.Equals(PartyName, claimantPartyName, StringComparison.Ordinal) &&
-            nowZoneClock - CreatedAtZoneClock >= LegacyTime.GroundItemPartyShareDelay)
+            nowZoneClock - CreatedAtZoneClock >= SimulationClock.GroundItemPartyShareDelay)
             return true;
 
         return false;

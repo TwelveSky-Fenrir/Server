@@ -47,7 +47,7 @@ public static class CombatResolver
     /// <summary><c>PROTECT_TICK</c> (S07_MyGame02.cpp:9) -- 20 legacy ticks = 10s anti-chain-attack window after either side last took damage.</summary>
     public const int ProtectTickLegacyTicks = 20;
 
-    public static readonly TimeSpan ProtectDuration = LegacyTime.ToTimeSpan(ProtectTickLegacyTicks);
+    public static readonly TimeSpan ProtectDuration = SimulationClock.ToTimeSpan(ProtectTickLegacyTicks);
 
     /// <summary>
     ///     Skill number 78 is explicitly excluded from the critical roll at its OWN call site (l.1123, l.1205) --

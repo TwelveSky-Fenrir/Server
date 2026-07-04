@@ -10,10 +10,10 @@ public interface IOutgoingPacket : IFenrirPacket
 {
     /// <summary>
     ///     Whole-frame obfuscation the send layer must apply after writing header+payload (§3.1). Field-level obfuscation
-    ///     (<see cref="LegacyObfuscation.XorFieldAvatar" />) is already baked into <see cref="Write" /> itself and needs no
+    ///     (<see cref="WireObfuscationMode.XorFieldAvatar" />) is already baked into <see cref="Write" /> itself and needs no
     ///     extra step here.
     /// </summary>
-    public static abstract LegacyObfuscation Obfuscation { get; }
+    public static abstract WireObfuscationMode Obfuscation { get; }
 
     public int Write(Span<byte> destination);
 }

@@ -13,24 +13,22 @@ using Microsoft.Extensions.Logging;
 namespace Fenrir.Application.Game.Handlers.Commerce;
 
 /// <summary>
-///     CZ_SET_DEPUTY_PSHOP_SEND (opcode 109, contracts/04_commerce.md, verified <c>S07_MyGame09.cpp:
-///     557-884</c>). <c>BuySort</c> 1 = RETRIEVE an unsold item from the CALLER'S OWN closed shop back to
-///     their own inventory (<c>Self*</c> fields = destination); <c>BuySort</c> 2 = PURCHASE from ANOTHER
-///     character's OPEN shop (<c>AvatarName</c> resolves the seller, <c>Sell*</c> fields = the shop slot,
-///     <c>Self*</c> = the buyer's own destination). Only the BUYER/retriever is ever a live participant --
-///     the seller's shop money/items live purely in SQL (game.OfflineShops), so NO dual-lock/second
-///     participant is ever needed here (unlike <c>BuyShopItemHandler</c>'s live-PShop twin) -- see
-///     <see cref="OfflineShopRepository.ExecutePurchaseAsync" />'s own remarks.
+///     CZ_SET_DEPUTY_PSHOP_SEND (opcode 109, contracts/04_commerce.md, verified <c>S07_MyGame09.cpp:557-884</c>).
+///     <c>BuySort</c> 1 = RETRIEVE an unsold item from the CALLER'S OWN closed shop back to their own
+///     inventory; <c>BuySort</c> 2 = PURCHASE from ANOTHER character's OPEN shop (<c>AvatarName</c>
+///     resolves the seller). Only the buyer/retriever is ever a live participant -- the seller's shop
+///     money/items live purely in SQL (game.OfflineShops), so no dual-lock is needed here (unlike
+///     <c>BuyShopItemHandler</c>'s live-PShop twin).
 /// </summary>
 /// <remarks>
-///     SCOPE SIMPLIFICATION (documented): the legacy's result-code taxonomy for this action is large
-///     (100/101/102/1/2/4/5/1000...) -- collapsed here to 0 (success) / 1 (generic mismatch or unknown
-///     shop) / 2 (insufficient funds or a money/item cap) for maintainability; every failure still cleanly
-///     replies (never a spurious Abort) except genuinely malformed/out-of-range wire fields.
+///     SCOPE SIMPLIFICATION: the legacy's result-code taxonomy for this action is large
+///     (100/101/102/1/2/4/5/1000...) -- collapsed here to 0 (success) / 1 (mismatch or unknown shop) / 2
+///     (insufficient funds or a cap); every failure still cleanly replies except genuinely
+///     malformed/out-of-range wire fields.
 /// </remarks>
 public sealed class UpdateProxyShopHandler(
-    OfflineShopRepository offlineShops,
-    CharacterRepository characters,
+    IOfflineShopRepository offlineShops,
+    ICharacterRepository characters,
     WorldDataCache worldData,
     ILogger<UpdateProxyShopHandler> logger)
     : IAsyncPacketHandler<UpdateProxyShopRequest>
@@ -147,11 +145,9 @@ public sealed class UpdateProxyShopHandler(
             return;
         }
 
-        // Review finding: buying from ONE'S OWN offline shop would let the item come back into live
-        // inventory while the ShopState stayed OPEN -- bypassing RETRIEVE's own "must be closed" gate and
-        // effectively refunding the price paid (it lands right back in the same shop's withdrawable
-        // earnings). No legacy evidence either confirms or forbids this edge case; rejecting it is the
-        // safe, conservative choice (a real player never legitimately needs to buy their own listing).
+        // Buying from ONE'S OWN open shop would return the item to live inventory while ShopState stays
+        // OPEN, bypassing RETRIEVE's "must be closed" gate and refunding the price into the shop's own
+        // earnings. No legacy evidence either way; rejected as the safe, conservative choice.
         if (sellerId.Value == characterId)
         {
             zoneSession.Abort(DisconnectReason.Faulted);

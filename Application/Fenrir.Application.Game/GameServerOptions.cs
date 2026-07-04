@@ -2,8 +2,10 @@ namespace Fenrir.Application.Game;
 
 /// <summary>
 ///     Bound from the <c>Game</c> configuration section. One process = one shard hosting the DISJOINT set of
-///     maps in <see cref="Maps" /> — one <see cref="World.Zone" /> actor per entry (ADR-0012). M1's deployment
-///     is a single shard hosting map 1, but that is configuration, not code.
+///     maps assigned to <see cref="ShardId" /> in <c>admin.ShardMapAssignments</c> — one <see cref="World.Zone" />
+///     actor per assigned map (ADR-0012), resolved at boot via <c>IShardMapAssignmentRepository</c> and handed
+///     to <see cref="World.ZoneRegistry" />'s <c>Initialize</c>. M1's deployment is a single shard hosting map
+///     1, but that is database configuration, not code.
 /// </summary>
 public sealed class GameServerOptions
 {
@@ -14,26 +16,11 @@ public sealed class GameServerOptions
     public int Port { get; init; } = 1100;
 
     /// <summary>
-    ///     Identifies this process's row in <c>runtime.GameServerDirectory</c> (ADR-0005-adjacent: not a wire-visible
-    ///     value).
+    ///     Identifies this process's row in <c>runtime.GameServerDirectory</c> (ADR-0005-adjacent: not a
+    ///     wire-visible value) AND the key looked up in <c>admin.ShardMapAssignments</c> to resolve which maps
+    ///     this process hosts.
     /// </summary>
     public byte ShardId { get; init; } = 1;
-
-    /// <summary>
-    ///     Map ids hosted by this shard — <see cref="World.ZoneRegistry" /> builds one zone actor per entry.
-    ///     Bound from <c>Game:Maps</c> (env form: <c>Game__Maps__0=1</c>, <c>Game__Maps__1=2</c>, ...). Must be
-    ///     non-empty, positive, and duplicate-free (validator-enforced); across SHARDS the sets must also be
-    ///     disjoint (ADR-0012 — not machine-checked yet, single-shard today).
-    /// </summary>
-    /// <remarks>
-    ///     The compiled-in default is deliberately EMPTY: the runtime configuration binder CONCATENATES bound
-    ///     array items onto whatever the property already returns (it never replaces), so a <c>[1]</c> default
-    ///     here plus <c>Game__Maps__0=1</c> from AppHost would bind to <c>[1, 1]</c> and fail the duplicate
-    ///     check at startup. The effective "nothing configured → map 1" default therefore lives in
-    ///     <c>Servers/Fenrir.GameServer/appsettings.json</c> (<c>"Game": { "Maps": [ 1 ] }</c>), which the env
-    ///     overrides KEY-BY-KEY (<c>Game:Maps:0</c>) before binding — no concatenation between providers.
-    /// </remarks>
-    public short[] Maps { get; init; } = [];
 
     /// <summary>
     ///     Legacy game-data folder (region/world files: <c>WORLD/Z0NN.WM</c>, etc.) -- a dev-only NTFS junction at

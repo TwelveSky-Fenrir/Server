@@ -10,7 +10,7 @@ namespace Fenrir.Data.Admin;
 ///     repository lands with the Phase C chat vertical"). Singleton, injected only with
 ///     ICaeriusNetDbContext, same posture as every other repository in this project.
 /// </summary>
-public sealed record MuteRepository(ICaeriusNetDbContext Db)
+public sealed record MuteRepository(ICaeriusNetDbContext Db) : IMuteRepository
 {
     /// <summary>
     ///     Called ONCE at world entry (alongside <c>CharacterRepository.GetWorldEntryBundleAsync</c>) --

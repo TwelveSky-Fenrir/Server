@@ -11,13 +11,10 @@ public enum GuildInviteAskOutcome
 /// <summary>
 ///     Process-wide guild-invitation negotiation authority (Phase C/V7 Guilds &amp; Tribes, CZ_GUILD_ASK/
 ///     CANCEL/ANSWER family, opcodes 72-74 -- doc 10 §0/§1, verified against
-///     Server/ts25zone/S04_MyWork02.cpp:9827-9967). Mirrors the legacy's own <c>mGuildProcessState</c>
-///     machine (1=asker waiting, 2=target waiting to answer, 3=accepted -- the asker must then send
-///     CZ_GUILD_WORK_SEND tSort 3 to finalize) with the exact same shape as
-///     <see cref="Social.Friends.FriendRegistry" />'s own ask/cancel/answer negotiation, plus one addition:
-///     <see cref="_acceptedFor" /> survives PAST the answer (legacy state 3) because, like a friend accept,
-///     acceptance here does not immediately perform the join -- the ASKER (not the target) must separately
-///     send GUILD_WORK tSort 3 afterwards to actually finalize it (see <see cref="TryConsumeAccepted" />).
+///     Server/ts25zone/S04_MyWork02.cpp:9827-9967). Mirrors the legacy's <c>mGuildProcessState</c> machine
+///     (1=asker waiting, 2=target waiting to answer, 3=accepted), same shape as
+///     <see cref="Social.Friends.FriendRegistry" />'s negotiation but with <see cref="_acceptedFor" />
+///     surviving past the answer -- see <see cref="TryConsumeAccepted" /> for why.
 /// </summary>
 public sealed class GuildInviteRegistry
 {
@@ -80,11 +77,11 @@ public sealed class GuildInviteRegistry
     }
 
     /// <summary>
-    ///     GUILD_WORK tSort 3 (invite finalize)'s own precondition ("both sides in state 3") -- the ASKER
+    ///     GUILD_WORK tSort 3 (invite finalize)'s precondition ("both sides in state 3") -- the ASKER
     ///     consumes this, not the target (doc 10 §1 tSort 3: "l'inviteur devra envoyer CZ 75 tSort 3"). No
-    ///     name/id travels on that request's wire payload (tData is ignored for tSort 3), so the target is
-    ///     whichever character <paramref name="askerId" /> most recently had an accepted answer with.
-    ///     Consumed (cleared) on success -- a repeat GUILD_WORK tSort 3 with nothing pending correctly fails.
+    ///     name/id travels on that request's payload, so the target is whichever character
+    ///     <paramref name="askerId" /> most recently had an accepted answer with. Cleared on success, so a
+    ///     repeat call with nothing pending correctly fails.
     /// </summary>
     public bool TryConsumeAccepted(int askerId, out int targetId)
     {

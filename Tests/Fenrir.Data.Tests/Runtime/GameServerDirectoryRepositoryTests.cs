@@ -22,7 +22,7 @@ public sealed class GameServerDirectoryRepositoryTests : IDisposable
     private static readonly TimeSpan CacheBypassDelay = TimeSpan.FromMilliseconds(2500);
 
     private readonly ServiceProvider _provider;
-    private readonly GameServerDirectoryRepository _repository;
+    private readonly IGameServerDirectoryRepository _repository;
 
     public GameServerDirectoryRepositoryTests(SqlServerFixture fixture)
     {

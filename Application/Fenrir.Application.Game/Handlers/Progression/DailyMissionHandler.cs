@@ -14,26 +14,23 @@ using Microsoft.Extensions.Logging;
 namespace Fenrir.Application.Game.Handlers.Progression;
 
 /// <summary>
-///     CZ_MISSION_COMPLETE_SEND (opcode 126, verified <c>S04_MyWork02.cpp:14521-14618</c>) -- the daily
-///     mission view/claim action. <see cref="DailyMissionRequest.Sort" /> must be 1 (view) or 2 (claim),
-///     else <c>Quit()</c>. tSort=1 is a pure read (no gate at all). tSort=2 gates on level &gt;= LV_M1 (113)
-///     AND <see cref="PlayerRuntimeState.MissionJoinWar" /> &gt;= 1 AND
-///     <see cref="PlayerRuntimeState.MissionKillOtherTribe" /> &gt;= 10 (both Quit()-worthy) -- the
-///     <c>aKillMonster</c>/<c>aPlayTime</c> gates are compiled OUT in EU33 (<c>USE_DAILY_UI_MONSTER_KILL</c>
-///     OFF, verified) so they never block a claim. A full inventory on a successful claim is a CLEAN
-///     failure (<c>Result = 3</c>), not a <c>Quit()</c> -- the only soft-fail path in this handler.
+///     CZ_MISSION_COMPLETE_SEND (opcode 126, verified <c>S04_MyWork02.cpp:14521-14618</c>) -- daily mission
+///     view/claim action. <see cref="DailyMissionRequest.Sort" /> must be 1 (view, no gate) or 2 (claim),
+///     else <c>Quit()</c>. Claim gates on level &gt;= LV_M1 (113) AND
+///     <see cref="PlayerRuntimeState.MissionJoinWar" /> &gt;= 1 AND
+///     <see cref="PlayerRuntimeState.MissionKillOtherTribe" /> &gt;= 10 (Quit()-worthy) -- the
+///     <c>aKillMonster</c>/<c>aPlayTime</c> gates are compiled out in EU33 (<c>USE_DAILY_UI_MONSTER_KILL</c>
+///     OFF) so they never block a claim. A full inventory on claim is a clean failure (<c>Result = 3</c>),
+///     the only soft-fail path here.
 /// </summary>
 /// <remarks>
-///     OPEN ISSUE (Server Logic V9 Progression, documented not guessed): <see cref="PlayerRuntimeState.MissionJoinWar" />/
-///     <see cref="PlayerRuntimeState.MissionKillOtherTribe" />'s only verified increment hooks (regular-war
-///     "zone049" participation / PvP-kill <c>ProcessForKillOtherTribe</c>) live inside subsystems report
-///     05 §13/this feature's own remarks already document as out of Fenrir's scope -- both counters stay 0
-///     for every character until those exist, so tSort=2 is real and correctly gated but currently
-///     unreachable end to end. The reward item pool (<see cref="DailyMissionRewardTable" />) is the
-///     verified LNW33 <c>GetDailyMissionReward</c> table, not invented.
+///     OPEN ISSUE: <see cref="PlayerRuntimeState.MissionJoinWar" />/<see cref="PlayerRuntimeState.MissionKillOtherTribe" />'s
+///     only increment hooks (war participation / PvP-kill tracking) are out of Fenrir's scope, so both stay
+///     0 for every character -- tSort=2 is correctly gated but currently unreachable end to end. The reward
+///     pool (<see cref="DailyMissionRewardTable" />) is the verified LNW33 <c>GetDailyMissionReward</c> table.
 /// </remarks>
 public sealed class DailyMissionHandler(
-    CharacterRepository characters,
+    ICharacterRepository characters,
     WorldDataCache worldData,
     ILogger<DailyMissionHandler> logger)
     : IAsyncPacketHandler<DailyMissionRequest>
@@ -91,8 +88,7 @@ public sealed class DailyMissionHandler(
         var itemId = DailyMissionRewardTable.Roll(Random.Shared.NextDouble);
         if (!worldData.ItemsById.TryGetValue(itemId, out var itemDefinition))
         {
-            // Cannot happen against a real, fully-seeded catalog -- mirrors the legacy's own
-            // "mITEM.Search returns NULL" Quit() guard rather than silently failing.
+            // Cannot happen against a fully-seeded catalog -- mirrors legacy's "mITEM.Search returns NULL" Quit() guard.
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }

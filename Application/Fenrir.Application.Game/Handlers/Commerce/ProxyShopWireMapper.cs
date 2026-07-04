@@ -14,8 +14,7 @@ internal static class ProxyShopWireMapper
         var wireItems = new ProxyShopItem[MaxSlots];
         var sockets = new int[MaxSlots * 3];
 
-        // A plain `new ProxyShopItem[MaxSlots]` already zero-initializes every unlisted slot to a valid
-        // all-zero ProxyShopItem -- no second pass needed.
+        // new ProxyShopItem[MaxSlots] already zero-initializes unlisted slots -- no second fill pass needed.
         foreach (var item in items)
         {
             if (item.SlotIndex is < 0 or >= MaxSlots || item.ItemId is not { } itemId)

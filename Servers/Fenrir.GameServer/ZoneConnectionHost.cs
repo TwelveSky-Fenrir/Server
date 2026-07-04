@@ -22,6 +22,7 @@ namespace Fenrir.GameServer;
 /// </summary>
 public sealed class ZoneConnectionHost(
     IOptions<GameServerOptions> options,
+    ZoneRegistry zones,
     IFrameDispatcher dispatcher,
     ISessionRateLimiter rateLimiter,
     SessionRegistry registry,
@@ -39,7 +40,7 @@ public sealed class ZoneConnectionHost(
                 new ZoneClientSession(sessionId, transport, remoteEndPoint));
 
         logger.LogInformation("GameServer listening on port {Port} (shard {ShardId}, maps [{Maps}])", opts.Port,
-            opts.ShardId, string.Join(", ", opts.Maps));
+            opts.ShardId, string.Join(", ", zones.Zones.Select(z => z.MapId).Order()));
 
         try
         {

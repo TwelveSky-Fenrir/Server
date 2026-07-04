@@ -12,38 +12,58 @@ using Microsoft.Extensions.Options;
 namespace Fenrir.Application.Game.World;
 
 /// <summary>
-///     The process's fixed set of zone actors — one <see cref="Zone" /> per entry of
-///     <see cref="GameServerOptions.Maps" /> (ADR-0012: a shard hosts a DISJOINT partition of maps), built once
-///     at startup into a <see cref="FrozenDictionary{TKey,TValue}" /> and never mutated after. Everything that
-///     used to inject the single M1 <c>Zone</c> singleton injects this instead: routing
-///     (<c>EnterWorldHandler</c>) resolves <c>character.MapId</c> here, the tick host runs one task
-///     per <see cref="Zones" /> entry, and the process-wide readers (write-behind flush, heartbeat CCU) go
-///     through <see cref="TryGetPlayer" />/<see cref="TotalPlayerCount" />.
+///     The process's fixed set of zone actors — one <see cref="Zone" /> per hosted map id (ADR-0012: a shard
+///     hosts a DISJOINT partition of maps), built once at startup (<see cref="Initialize" />) into a
+///     <see cref="FrozenDictionary{TKey,TValue}" /> and never mutated after. Everything that used to inject
+///     the single M1 <c>Zone</c> singleton injects this instead: routing (<c>EnterWorldHandler</c>) resolves
+///     <c>character.MapId</c> here, the tick host runs one task per <see cref="Zones" /> entry, and the
+///     process-wide readers (write-behind flush, heartbeat CCU) go through
+///     <see cref="TryGetPlayer" />/<see cref="TotalPlayerCount" />.
 /// </summary>
 public sealed class ZoneRegistry
 {
-    private readonly FrozenDictionary<short, Zone> _zones;
+    private readonly GameServerOptions _options;
+    private readonly MovementRules _movementRules;
+    private readonly DirtyTracker<int> _dirtyTracker;
+    private readonly ILogger<Zone> _zoneLogger;
+    private readonly WorldDataCache _worldData;
+    private readonly ImmutableArray<ISimulationSystem> _systems;
+    private readonly QuestCatalog _questCatalog;
+    private FrozenDictionary<short, Zone> _zones = FrozenDictionary<short, Zone>.Empty;
 
     public ZoneRegistry(IOptions<GameServerOptions> options, MovementRules movementRules,
         DirtyTracker<int> dirtyTracker, ILogger<Zone> zoneLogger, WorldDataCache worldData,
         IEnumerable<ISimulationSystem> simulationSystems, QuestCatalog? questCatalog = null)
     {
-        var opts = options.Value;
+        _options = options.Value;
+        _movementRules = movementRules;
+        _dirtyTracker = dirtyTracker;
+        _zoneLogger = zoneLogger;
+        _worldData = worldData;
 
         // DI registration order IS simulation order (report 05 §0's deterministic legacy sequence) -- every
         // zone shares the exact same ordered list of systems, resolved once here rather than per-zone, since
         // ISimulationSystem instances are stateless singletons that operate on whichever Zone they're handed.
-        var systems = simulationSystems.ToImmutableArray();
+        _systems = simulationSystems.ToImmutableArray();
 
         // Server Logic V9 Progression: one process-wide QuestCatalog shared by every zone this registry
         // builds -- optional (falls back to Zone's own per-zone-built default, see Zone's own remarks) so
         // pre-existing test call sites (ZoneRegistryTests) that construct this directly keep compiling.
-        var catalog = questCatalog ?? new QuestCatalog(worldData);
+        _questCatalog = questCatalog ?? new QuestCatalog(worldData);
+    }
 
-        _zones = opts.Maps.ToFrozenDictionary(
+    /// <summary>
+    ///     Builds one Zone actor per hosted map id. Must run exactly once at boot, before ZoneTickHost starts
+    ///     or any handler resolves a map through this registry -- GameServer's Program.cs calls this right
+    ///     after resolving the shard's map list from admin.ShardMapAssignments, the same "explicit async
+    ///     warm-up before host.RunAsync" shape WorldDataLoader.InitializeAsync already uses for world.* data.
+    /// </summary>
+    public void Initialize(IReadOnlyCollection<short> maps)
+    {
+        _zones = maps.ToFrozenDictionary(
             mapId => mapId,
-            mapId => new Zone(mapId, opts, movementRules, dirtyTracker, systems, zoneLogger, worldData,
-                questCatalog: catalog));
+            mapId => new Zone(mapId, _options, _movementRules, _dirtyTracker, _systems, _zoneLogger, _worldData,
+                questCatalog: _questCatalog));
     }
 
     /// <summary>Every hosted zone, in no particular order — the tick host launches one loop per entry.</summary>

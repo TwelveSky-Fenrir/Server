@@ -38,14 +38,14 @@ namespace Fenrir.Application.Game.Handlers;
 ///     this is computed here rather than inside <c>Zone.HandleEnter</c>.
 /// </remarks>
 public sealed class EnterWorldHandler(
-    CharacterRepository characters,
+    ICharacterRepository characters,
     WorldDataCache worldData,
     ZoneRegistry zones,
-    MuteRepository mutes,
-    GuildRepository guilds,
-    TribeRepository tribes,
-    FriendRepository friends,
-    MentorRepository mentors,
+    IMuteRepository mutes,
+    IGuildRepository guilds,
+    ITribeRepository tribes,
+    IFriendRepository friends,
+    IMentorRepository mentors,
     ILogger<EnterWorldHandler> logger)
     : IAsyncPacketHandler<EnterWorldRequest>
 {
@@ -58,7 +58,7 @@ public sealed class EnterWorldHandler(
 
         // Anti-tamper #1 (§5.3): re-verify atoi(tID+2)==uUserIdx -- tID must still name the account this socket
         // was ticketed for (CZ_TEMP_REGISTER_SEND already checked this once, at op11).
-        if (!LegacyUidCodec.TryDecodeAccountId(packet.Id, out var decodedAccountId) || decodedAccountId != accountId)
+        if (!ObfuscatedUidCodec.TryDecodeAccountId(packet.Id, out var decodedAccountId) || decodedAccountId != accountId)
         {
             zoneSession.Abort(DisconnectReason.Faulted);
             return;

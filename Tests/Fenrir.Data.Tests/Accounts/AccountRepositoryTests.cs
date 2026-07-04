@@ -17,7 +17,7 @@ public sealed class AccountRepositoryTests
 {
     private const string SamplePassword = "Correct horse battery staple";
 
-    private readonly AccountRepository _repository;
+    private readonly IAccountRepository _repository;
 
     public AccountRepositoryTests(SqlServerFixture fixture)
     {

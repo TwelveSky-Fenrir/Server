@@ -57,7 +57,7 @@ public class ZoneMonsterCombatTests
         pipe = sessionPipe;
         zone.Post(ZoneCommand.Enter(characterId,
             ZoneTestKit.EnterData(session, 1, "Attacker", posX: 100, posZ: 100)));
-        zone.Tick(LegacyTime.LegacyTick); // enters + pops the monster
+        zone.Tick(SimulationClock.LegacyTick); // enters + pops the monster
 
         Assert.True(zone.TryGetPlayer(characterId, out var attacker));
         attacker!.Stats = StrongAttacker;
@@ -100,7 +100,7 @@ public class ZoneMonsterCombatTests
 
         var forged = MeleeAgainstMonster(10, monster!) with { UniqueNumber2 = monster!.UniqueNumber + 999 };
         zone.PostCombatCommand(new CombatCommand { AttackerCharacterId = 10, AttackInfo = forged });
-        zone.Tick(LegacyTime.LegacyTick);
+        zone.Tick(SimulationClock.LegacyTick);
 
         Assert.True(zone.TryGetMonster(1, out var stillAlive));
         Assert.Equal(1000, stillAlive!.Life);
@@ -118,7 +118,7 @@ public class ZoneMonsterCombatTests
             AttackerCharacterId = 10,
             AttackInfo = MeleeAgainstMonster(10, monster)
         });
-        zone.Tick(LegacyTime.LegacyTick);
+        zone.Tick(SimulationClock.LegacyTick);
 
         Assert.True(zone.TryGetMonster(1, out var damaged));
         Assert.True(damaged!.Life < startingLife);
@@ -139,7 +139,7 @@ public class ZoneMonsterCombatTests
                 AttackerCharacterId = 10,
                 AttackInfo = MeleeAgainstMonster(10, monster!)
             });
-            zone.Tick(LegacyTime.LegacyTick);
+            zone.Tick(SimulationClock.LegacyTick);
         }
 
         Assert.Equal(0, zone.MonsterCount);

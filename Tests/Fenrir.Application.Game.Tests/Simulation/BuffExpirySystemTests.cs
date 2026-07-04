@@ -23,7 +23,7 @@ public class BuffExpirySystemTests
         state!.Buffs.Buff[0] = 25; // slot 0 value
         state.Buffs.Buff[1] = 3; // slot 0 duration = 3 legacy ticks
 
-        zone.Tick(LegacyTime.LegacyTick);
+        zone.Tick(SimulationClock.LegacyTick);
 
         Assert.Equal(25, state.Buffs.Buff[0]);
         Assert.Equal(2, state.Buffs.Buff[1]);
@@ -41,7 +41,7 @@ public class BuffExpirySystemTests
         state!.Buffs.Buff[10 * 2] = 40; // Critical buff slot
         state.Buffs.Buff[10 * 2 + 1] = 1; // 1 legacy tick left
 
-        zone.Tick(LegacyTime.LegacyTick);
+        zone.Tick(SimulationClock.LegacyTick);
 
         Assert.Equal(0, state.Buffs.Buff[10 * 2]);
         Assert.Equal(0, state.Buffs.Buff[10 * 2 + 1]);
@@ -57,7 +57,7 @@ public class BuffExpirySystemTests
 
         Assert.True(zone.TryGetPlayer(10, out var state));
 
-        zone.Tick(LegacyTime.LegacyTick);
+        zone.Tick(SimulationClock.LegacyTick);
 
         Assert.All(state!.Buffs.Buff, v => Assert.Equal(0, v));
     }

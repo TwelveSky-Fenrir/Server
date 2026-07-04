@@ -91,7 +91,7 @@ public sealed class MonsterDropRoller(
             RollGeneralItems(monster.Monster, monster.DropCategoryRates, killerTribe, killerLuck, items);
             RollExtraItems(monster.DropExtraItems, items);
 
-            if (LegacyRandom.RandomNumber(random) <= UnconditionalItem864Threshold)
+            if (LootRandomSource.RandomNumber(random) <= UnconditionalItem864Threshold)
                 items.Add(new DroppedItem(UnconditionalItem864Id, 1));
         }
 
@@ -108,7 +108,7 @@ public sealed class MonsterDropRoller(
         if (dropMoney is not { DropRate: > 0 } money)
             return null;
 
-        if (LegacyRandom.RandomNumber(random) > (int)((money.DropRate + killerLuck) * itemDropRatio))
+        if (LootRandomSource.RandomNumber(random) > (int)((money.DropRate + killerLuck) * itemDropRatio))
             return null;
 
         var size = money.MinAmount + random.Next(money.MaxAmount - money.MinAmount + 1);
@@ -128,7 +128,7 @@ public sealed class MonsterDropRoller(
             if (potion.DropRate <= 0)
                 continue;
 
-            if (LegacyRandom.RandomNumber(random) <= (int)((potion.DropRate + killerLuck) * itemDropRatio))
+            if (LootRandomSource.RandomNumber(random) <= (int)((potion.DropRate + killerLuck) * itemDropRatio))
                 items.Add(new DroppedItem(potion.PotionItemId, 1));
         }
     }
@@ -181,7 +181,7 @@ public sealed class MonsterDropRoller(
                 temp = (int)(rate.Value * rareRatio);
             }
 
-            if (LegacyRandom.RandomNumber(random) > temp)
+            if (LootRandomSource.RandomNumber(random) > temp)
                 continue;
 
             var itemId = GeneralItemDropResolver.Resolve(worldData, random, killerTribe, itemType, levelLow, levelHigh);
@@ -198,7 +198,7 @@ public sealed class MonsterDropRoller(
             if (extra.DropRate <= 0 || extra.ItemId is not { } itemId)
                 continue;
 
-            if (LegacyRandom.RandomNumber(random) > extra.DropRate)
+            if (LootRandomSource.RandomNumber(random) > extra.DropRate)
                 continue;
 
             if (!worldData.ItemsById.TryGetValue(itemId, out var definition) || definition.Item.CheckMonsterDrop != 2)

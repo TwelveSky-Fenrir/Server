@@ -13,13 +13,13 @@ namespace Fenrir.Application.Game.Handlers.Progression;
 /// </summary>
 /// <remarks>
 ///     <see cref="PlayerRuntimeState.AutoLifeRatio" />/<see cref="PlayerRuntimeState.AutoManaRatio" /> are
-///     written directly from this request thread, NOT via a <c>Zone</c> tick-mirrored command -- the same
-///     "own-character, non-economy scalar preference" exception <see cref="PlayerRuntimeState.Friends" />/
-///     <c>TeacherCharacterId</c> already document: nothing else ever reads or writes these two fields for
-///     ANY other character, and no item/money value object is involved, so the strict single-writer
-///     posture <see cref="PlayerRuntimeState.EconomyActionLock" /> exists to protect does not apply here.
+///     written directly from this request thread, not via a <c>Zone</c>-mirrored command -- same
+///     "own-character, non-economy scalar" exception as <see cref="PlayerRuntimeState.Friends" />/
+///     <c>TeacherCharacterId</c>: nothing else touches these fields for another character, and no item/money
+///     value is involved, so <see cref="PlayerRuntimeState.EconomyActionLock" />'s single-writer posture
+///     doesn't apply.
 /// </remarks>
-public sealed class AutoPotionThresholdHandler(CharacterRepository characters)
+public sealed class AutoPotionThresholdHandler(ICharacterRepository characters)
     : IAsyncPacketHandler<AutoPotionThresholdRequest>
 {
     public async ValueTask HandleAsync(AutoPotionThresholdRequest packet, IPacketSession session,

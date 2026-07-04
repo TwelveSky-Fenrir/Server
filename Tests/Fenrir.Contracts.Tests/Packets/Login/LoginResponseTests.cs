@@ -45,7 +45,7 @@ public class LcLoginRecvTests
         // the send layer (§3.3). ApplyUidXor is involutive as long as the content has no 0x10/0xFE
         // byte, so re-applying it to Write's output recovers the plaintext.
         var idBytes = buffer.AsSpan(4, 255).ToArray();
-        LegacyXor.ApplyUidXor(idBytes);
+        WireXor.ApplyUidXor(idBytes);
         Assert.Equal(packet.Id, DecodeFixedString(idBytes));
 
         Assert.Equal(packet.UserSort, BinaryPrimitives.ReadInt32LittleEndian(buffer.AsSpan(259, 4)));

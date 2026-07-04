@@ -5,13 +5,10 @@ public class GameServerOptionsValidatorTests
     private static readonly GameServerOptionsValidator Validator = new();
 
     // GameServerOptions is a plain sealed class (not a record), so "with" expressions are not available --
-    // build a fresh, fully-valid instance per call and override only the field under test. Maps defaults to
-    // [1] HERE because the compiled-in GameServerOptions default is deliberately empty (binder concatenation,
-    // see the property's remarks) -- the valid baseline must supply it like appsettings.json does.
+    // build a fresh, fully-valid instance per call and override only the field under test.
     private static GameServerOptions Options(
         int port = 1100,
         byte shardId = 1,
-        short[]? maps = null,
         string? publicHost = "127.0.0.1",
         int tickRateHz = 20,
         float aoiCellSize = 75f,
@@ -24,7 +21,6 @@ public class GameServerOptionsValidatorTests
         {
             Port = port,
             ShardId = shardId,
-            Maps = maps ?? [1],
             PublicHost = publicHost!,
             TickRateHz = tickRateHz,
             AoiCellSize = aoiCellSize,
@@ -62,47 +58,6 @@ public class GameServerOptionsValidatorTests
 
         Assert.True(result.Failed);
         Assert.Contains(result.Failures!, f => f.Contains("Game:ShardId"));
-    }
-
-    [Fact]
-    public void Validate_MultipleDistinctMaps_Succeeds()
-    {
-        var result = Validator.Validate(null, Options(maps: [1, 2, 33]));
-
-        Assert.True(result.Succeeded);
-    }
-
-    // The empty case is exactly what an unbound GameServerOptions looks like (compiled-in default is [],
-    // see the property's remarks) -- it must fail loudly at ValidateOnStart, not boot a shard with no world.
-    [Fact]
-    public void Validate_MapsEmpty_Fails()
-    {
-        var result = Validator.Validate(null, Options(maps: []));
-
-        Assert.True(result.Failed);
-        Assert.Contains(result.Failures!, f => f.Contains("Game:Maps"));
-    }
-
-    [Theory]
-    [InlineData((short)0)]
-    [InlineData((short)-1)]
-    public void Validate_MapsEntryNotPositive_Fails(short mapId)
-    {
-        var result = Validator.Validate(null, Options(maps: [1, mapId]));
-
-        Assert.True(result.Failed);
-        Assert.Contains(result.Failures!, f => f.Contains("Game:Maps"));
-    }
-
-    // Duplicates are how the binder-concatenation trap (non-empty compiled-in default + bound entries)
-    // would manifest -- the validator is the tripwire that turns it into a clear startup failure.
-    [Fact]
-    public void Validate_MapsDuplicate_Fails()
-    {
-        var result = Validator.Validate(null, Options(maps: [1, 2, 1]));
-
-        Assert.True(result.Failed);
-        Assert.Contains(result.Failures!, f => f.Contains("Game:Maps"));
     }
 
     [Theory]

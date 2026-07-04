@@ -6,12 +6,10 @@ using Fenrir.Network.Sessions;
 namespace Fenrir.Application.Game.Handlers.Social;
 
 /// <summary>
-///     CZ_TEACHER_STATE_SEND (opcode 64) -- neither a teacher nor a student ⇒ Quit(). Checks reciprocity
-///     with the ONLINE partner in this SAME zone; an offline/other-zone partner gets no reply at all
-///     (contract's own "partenaire hors zone = pas de réponse"). Reasonable, documented reading where the
-///     source's own dual-partner shape (a character with BOTH a teacher AND a student, not fully
-///     re-verified against a single-partner-checking source citation) is ambiguous -- prefers the
-///     teacher-side reciprocity check when both exist (open issue).
+///     CZ_TEACHER_STATE_SEND (opcode 64) -- neither teacher nor student ⇒ Quit(). Checks reciprocity with
+///     the online partner in the same zone only; an offline/other-zone partner gets no reply (contract's
+///     own "partenaire hors zone = pas de réponse"). Open issue: a character with both a teacher and a
+///     student prefers the teacher-side check here, not fully re-verified against source.
 /// </summary>
 public sealed class MentorStatusHandler : IInlinePacketHandler<MentorStatusRequest>
 {

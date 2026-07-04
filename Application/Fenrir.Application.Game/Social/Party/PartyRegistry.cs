@@ -16,11 +16,9 @@ public enum PartyInviteOutcome
     TargetAlreadyPartied,
 
     /// <summary>
-    ///     Not a soft ZC 73 code at all -- the legacy <c>Quit()</c>s the INVITER outright for any of:
-    ///     already in a party and not its leader, a same-tribe-or-allied mismatch (alliance is not
-    ///     modeled -- see <see cref="PartyRegistry" />'s own remarks), or a &gt;9 cumulative level gap.
-    ///     The caller (handler) translates this into <c>ClientSession.Abort</c>, matching every other
-    ///     anti-fuzzing guard in this codebase.
+    ///     Not a soft ZC 73 code -- the legacy <c>Quit()</c>s the INVITER outright for: already partied
+    ///     and not leader, a same-tribe-or-allied mismatch (alliance not modeled, see class remarks), or
+    ///     a &gt;9 cumulative level gap. The caller translates this into <c>ClientSession.Abort</c>.
     /// </summary>
     InviterMustDisconnect
 }
@@ -35,15 +33,14 @@ public enum PartyJoinOutcome
     Joined,
 
     /// <summary>
-    ///     The inviter's party was already at <see cref="PartyRegistry.MaxMembers" /> -- verified against
-    ///     ts25center's own join loop (S04_MyWork02.cpp:1377-1385): it silently does NOT add the new
-    ///     member if every slot is occupied (no error code exists for this case at all -- neither side is
-    ///     told). Preserved verbatim, not "fixed" with an invented error code.
+    ///     The inviter's party was already at <see cref="PartyRegistry.MaxMembers" /> -- verified
+    ///     (S04_MyWork02.cpp:1377-1385) the legacy silently drops the join with no error code at all.
+    ///     Preserved verbatim, not "fixed" with an invented one.
     /// </summary>
     PartyWasFull
 }
 
-/// <summary>One party's composition -- <see cref="LeaderId" /> is always <c>Members[0]</c>, matching the legacy's own "party name IS the leader's name" identity (ts25center's <c>mPartyList</c>, keyed by leader name; Fenrir keys by the leader's CharacterId instead -- a stable, collision-free identity a renamed/duplicate-named character could never violate).</summary>
+/// <summary>One party's composition -- <see cref="LeaderId" /> is always <c>Members[0]</c>. Legacy keyed parties by leader NAME (ts25center's <c>mPartyList</c>); Fenrir keys by leader CharacterId instead, a stable identity a rename/duplicate name can't violate.</summary>
 public sealed class Party
 {
     private readonly List<int> _members;
@@ -67,12 +64,10 @@ public sealed class Party
     }
 
     /// <summary>
-    ///     Removes <paramref name="characterId" /> and shifts every subsequent slot down by one -- the
-    ///     exact ts25center leave/kick algorithm (S04_MyWork02.cpp:1418-1428: find the slot, clear it,
-    ///     then shift everything after it left by one). If the LEADER's own id is ever removed this way
-    ///     (self-kick is not guarded against by the legacy source either, see <c>PartyRegistry.TryKick</c>'s
-    ///     own remarks), <see cref="Members" />[0] silently becomes the next member -- a faithfully
-    ///     reproduced legacy quirk, not a designed "leader promotion" feature.
+    ///     Removes <paramref name="characterId" /> and shifts subsequent slots down by one (verified
+    ///     ts25center algorithm, S04_MyWork02.cpp:1418-1428). If the LEADER is removed this way,
+    ///     <see cref="Members" />[0] silently becomes the next member -- a faithfully reproduced legacy
+    ///     quirk (self-kick isn't guarded against in the source either), not a designed promotion feature.
     /// </summary>
     internal bool TryRemoveMember(int characterId)
     {
@@ -81,17 +76,12 @@ public sealed class Party
 }
 
 /// <summary>
-///     Process-wide party authority (mission brief: "design PartyRegistry as its own process-wide
-///     singleton, not zone-local state" -- a party can span multiple <c>Zone</c> actors, exactly like the
-///     legacy's <c>ts25center</c> owned party roster/negotiation state independently of any one
-///     <c>ts25zone</c> process; Fenrir collapses that separate "center" process into this one in-process
-///     singleton, per report 04's own note that the center relay "devient un simple broadcast in-process"
-///     in a mono-GameServer topology). Deliberately does NOT depend on <c>ZoneRegistry</c>/<c>Zone</c> --
-///     every method takes plain values the caller (a handler, which DOES have zone access) already has in
-///     hand, keeping this type pure and independently unit-testable, same posture as
-///     <c>ContainerMatrix</c>/<c>CombatResolver</c>. A single internal lock guards every dictionary: party
-///     actions are rare (human-paced, not a per-tick hot path), so a coarse lock is the right trade-off,
-///     not a bottleneck.
+///     Process-wide party authority -- a party can span multiple <c>Zone</c> actors, mirroring how the
+///     legacy's <c>ts25center</c> owned party state independently of any one <c>ts25zone</c> process.
+///     Deliberately does NOT depend on <c>ZoneRegistry</c>/<c>Zone</c>: callers pass plain values they
+///     already have, keeping this type pure and unit-testable (same posture as <c>ContainerMatrix</c>/
+///     <c>CombatResolver</c>). A single lock guards every dictionary -- party actions are rare
+///     (human-paced, not per-tick), so a coarse lock is fine, not a bottleneck.
 /// </summary>
 /// <remarks>
 ///     Alliance is NOT modeled (mirrors <c>Combat.CombatResolver</c>'s own documented simplification):
@@ -157,24 +147,19 @@ public sealed class PartyRegistry
     }
 
     /// <summary>
-    ///     CZ_PARTY_ASK_SEND. The caller has ALREADY resolved the target by name within the inviter's own
-    ///     zone (SearchAvatar's real scope, verified S04_MyWork02.cpp:9590 -- party invites, like duel/
-    ///     trade/friend/mentor, can only ever target someone physically in the same zone) and gathered
-    ///     both sides' plain level/tribe/busy snapshot.
+    ///     CZ_PARTY_ASK_SEND. The caller has already resolved the target by name within the inviter's
+    ///     own zone (verified S04_MyWork02.cpp:9590 -- party/duel/trade/friend/mentor invites can only
+    ///     ever target someone in the same zone) and gathered both sides' level/tribe/busy snapshot.
     /// </summary>
     public PartyInviteOutcome TryInvite(int inviterId, int inviterCumulativeLevel, byte inviterTribe,
         int inviteeId, int inviteeCumulativeLevel, byte inviteeTribe)
     {
         lock (_lock)
         {
-            // Check order verified against PARTY_ASK_SEND, S04_MyWork02.cpp:9563-9614: inviter-already-partied
-            // first, then target-already-partied (oAvatar.aPartyName[0] non-empty, reply code 6) BEFORE the
-            // tribe/level-gap Quit()s -- a prior pass here had target-already-partied checked AFTER tribe/level,
-            // so an input where both were simultaneously true disconnected the inviter where the legacy would
-            // have sent a soft "already partied" reply instead. Inviter-busy (IsNegotiating) has no direct
-            // legacy equivalent in this function (mPartyProcessState is overwritten unconditionally at the end)
-            // but is kept as a reasonable "check my own state" guard, bundled next to the other inviter-side
-            // check rather than at its own unverified position.
+            // Check order verified (S04_MyWork02.cpp:9563-9614): inviter-already-partied, then
+            // target-already-partied (code 6) BEFORE the tribe/level-gap Quit()s -- a prior version checked
+            // target-already-partied AFTER tribe/level, wrongly disconnecting the inviter when both were true.
+            // Inviter-busy (IsNegotiating) has no direct legacy equivalent here but is kept as a self-state guard.
             if (_leaderByMember.TryGetValue(inviterId, out var inviterPartyLeader) && inviterPartyLeader != inviterId)
                 return PartyInviteOutcome.InviterMustDisconnect; // already partied and not the leader
 

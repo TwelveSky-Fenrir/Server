@@ -15,7 +15,7 @@ namespace Fenrir.Data.Commerce;
 ///     debit+grant write is new (D7 regime (b): a cash-shop purchase must never take an account's money
 ///     without also durably granting the item).
 /// </summary>
-public sealed record CashRepository(ICaeriusNetDbContext Db)
+public sealed record CashRepository(ICaeriusNetDbContext Db) : ICashRepository
 {
     public async ValueTask<int> GetBalanceAsync(int accountId, CancellationToken ct)
     {

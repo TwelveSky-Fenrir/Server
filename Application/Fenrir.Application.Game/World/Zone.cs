@@ -30,14 +30,14 @@ namespace Fenrir.Application.Game.World;
 ///     l'etat monde"). Every player position, the AOI grid, and the dirty-tracker marking are touched ONLY from
 ///     this zone's tick (<see cref="RunAsync" /> → <see cref="Tick" />) — everything else (handlers, the
 ///     connection host, another zone's handoff) only ever calls <see cref="Post" /> and waits for the next tick.
-///     Instances are built by <see cref="ZoneRegistry" /> from <see cref="GameServerOptions.Maps" />, one
+///     Instances are built by <see cref="ZoneRegistry.Initialize" /> from this shard's hosted map ids, one
 ///     <see cref="RunAsync" /> task each (ADR-0012).
 /// </summary>
 /// <remarks>
 ///     The tick runs in stages (report 05 §0's legacy loop, adapted): drain inbox → simulate (whole 500 ms
-///     legacy ticks via <see cref="LegacyTickAccumulator" />, decision D4) → periodic keep-alive rebroadcast
+///     legacy ticks via <see cref="SimulationTickAccumulator" />, decision D4) → periodic keep-alive rebroadcast
 ///     (avatars every 3.5 s; the monster/item 5 s slots arrive with their entity pools in Phase C — their
-///     verified cadences already live in <see cref="LegacyTime" />). Implements <see cref="IZoneActor" /> so
+///     verified cadences already live in <see cref="SimulationClock" />). Implements <see cref="IZoneActor" /> so
 ///     <see cref="ZoneClientSession.CurrentZone" /> can carry the reference across the Network/Application
 ///     layer boundary.
 /// </remarks>
@@ -52,7 +52,7 @@ public sealed class Zone(
     IRandomSource? randomSource = null,
     QuestCatalog? questCatalog = null) : IZoneActor
 {
-    private readonly LegacyTickAccumulator _accumulator = new();
+    private readonly SimulationTickAccumulator _accumulator = new();
 
     /// <summary>
     ///     Server Logic V9 Progression -- resolved once per zone. Null (production default from
@@ -208,7 +208,7 @@ public sealed class Zone(
     ///     Server-initiated monster-kill money grants (<see cref="Monsters.MonsterSpawnScheduler" />'s own
     ///     loot pipeline) -- queued rather than awaited inline because <see cref="Tick" /> is fully synchronous
     ///     and must never block on SQL I/O; drained by a dedicated background flush host
-    ///     (<c>Fenrir.GameServer.MonsterLootFlushHost</c>) from any thread (<see cref="ConcurrentQueue{T}" />'s
+    ///     (<see cref="MonsterLootFlushHost" />) from any thread (<see cref="ConcurrentQueue{T}" />'s
     ///     own thread-safety). Unlike a client-requested pickup (D7 regime, awaited synchronously in
     ///     <c>GenericActionHandler</c>), a kill reward has no client ack to gate on durability.
     /// </summary>
@@ -754,7 +754,7 @@ public sealed class Zone(
         using var timer = new PeriodicTimer(tickInterval);
 
         // Real elapsed time between frames is measured, not assumed to equal tickInterval: PeriodicTimer
-        // coalesces missed periods, and the LegacyTickAccumulator must be paid in actual time or the 2 Hz
+        // coalesces missed periods, and the SimulationTickAccumulator must be paid in actual time or the 2 Hz
         // simulation would silently slow down under load.
         var lastFrame = Stopwatch.GetTimestamp();
 
@@ -1687,7 +1687,7 @@ public sealed class Zone(
     ///     to its surroundings every 3.5 s (<c>tLogicAvatarTick</c>) even when idle, so late-arriving or
     ///     packet-lossy neighbors converge. Same wire packet as a move (<see cref="AvatarActionResponse" />),
     ///     serialize-once per avatar via <see cref="BroadcastAvatarAction" />. Monsters and ground items get
-    ///     their own 5 s pass here in Phase C (<see cref="LegacyTime.MonsterRebroadcastInterval" />).
+    ///     their own 5 s pass here in Phase C (<see cref="SimulationClock.MonsterRebroadcastInterval" />).
     /// </summary>
     private void RebroadcastAvatars()
     {
@@ -1695,7 +1695,7 @@ public sealed class Zone(
         // tick thread is the only mutator anyway.
         foreach (var (characterId, state) in _players)
         {
-            if (_clock - state.LastAvatarRebroadcastAt < LegacyTime.AvatarRebroadcastInterval)
+            if (_clock - state.LastAvatarRebroadcastAt < SimulationClock.AvatarRebroadcastInterval)
                 continue;
 
             state.LastAvatarRebroadcastAt = _clock;
@@ -1705,12 +1705,12 @@ public sealed class Zone(
         }
     }
 
-    /// <summary>V4 keep-alive rebroadcast for monsters -- 5 s cadence (<see cref="LegacyTime.MonsterRebroadcastInterval" />, report 05 §0 item 7).</summary>
+    /// <summary>V4 keep-alive rebroadcast for monsters -- 5 s cadence (<see cref="SimulationClock.MonsterRebroadcastInterval" />, report 05 §0 item 7).</summary>
     private void RebroadcastMonsters()
     {
         foreach (var monster in _monsters.Values)
         {
-            if (_clock - monster.LastRebroadcastAt < LegacyTime.MonsterRebroadcastInterval)
+            if (_clock - monster.LastRebroadcastAt < SimulationClock.MonsterRebroadcastInterval)
                 continue;
 
             monster.LastRebroadcastAt = _clock;
@@ -1718,13 +1718,13 @@ public sealed class Zone(
         }
     }
 
-    /// <summary>V4 keep-alive rebroadcast for ground items -- 5 s cadence (<see cref="LegacyTime.GroundItemRebroadcastInterval" />, report 05 §0 item 8).</summary>
+    /// <summary>V4 keep-alive rebroadcast for ground items -- 5 s cadence (<see cref="SimulationClock.GroundItemRebroadcastInterval" />, report 05 §0 item 8).</summary>
     private void RebroadcastGroundItems()
     {
         foreach (var (index, item) in _groundItems)
         {
             var last = _groundItemLastRebroadcast.TryGetValue(index, out var t) ? t : TimeSpan.MinValue;
-            if (_clock - last < LegacyTime.GroundItemRebroadcastInterval)
+            if (_clock - last < SimulationClock.GroundItemRebroadcastInterval)
                 continue;
 
             _groundItemLastRebroadcast[index] = _clock;
@@ -1732,7 +1732,7 @@ public sealed class Zone(
         }
     }
 
-    /// <summary>60 s lifetime sweep (<see cref="LegacyTime.GroundItemLifetime" />, report 05 §5) -- despawns and broadcasts every expired ground item still present.</summary>
+    /// <summary>60 s lifetime sweep (<see cref="SimulationClock.GroundItemLifetime" />, report 05 §5) -- despawns and broadcasts every expired ground item still present.</summary>
     private void ExpireGroundItems()
     {
         List<(int Index, GroundItemEntity Item)>? expired = null;
@@ -2085,7 +2085,7 @@ public sealed class Zone(
 
     /// <summary>
     ///     Kills <paramref name="characterId" /> in this zone: Life → 0, <see cref="PlayerRuntimeState.IsDead" />
-    ///     set, and an automatic revive scheduled <see cref="LegacyTime.DeathReviveDelay" /> later (report 12
+    ///     set, and an automatic revive scheduled <see cref="SimulationClock.DeathReviveDelay" /> later (report 12
     ///     §4.2). PUBLIC and characterId-addressed on purpose: the Phase C/V3 combat handler (killing-blow
     ///     resolution) is the intended caller, and it must never need a <see cref="PlayerRuntimeState" />
     ///     reference itself — only this zone's own tick may construct/mutate one (single-writer invariant,
@@ -2118,7 +2118,7 @@ public sealed class Zone(
 
         state.Life = 0;
         state.IsDead = true;
-        state.ReviveAtZoneClock = _clock + LegacyTime.DeathReviveDelay;
+        state.ReviveAtZoneClock = _clock + SimulationClock.DeathReviveDelay;
 
         dirtyTracker.MarkDirty(characterId, DirtyFlags.Vitals);
 
@@ -2298,7 +2298,7 @@ public sealed class Zone(
         // One skill-cast per legacy tick, modeled after the verified USE_INVENTORY_ITEM anti-flood gate
         // (report 04 §2) -- see LastSkillCastAtZoneClock's own remarks for why this specific analog was chosen
         // over inventing a per-skill cooldown value no report documents. Null (never cast) always passes.
-        if (state.LastSkillCastAtZoneClock is { } lastCast && _clock - lastCast < LegacyTime.LegacyTick)
+        if (state.LastSkillCastAtZoneClock is { } lastCast && _clock - lastCast < SimulationClock.LegacyTick)
             return;
 
         worldData.SkillsById.TryGetValue(action.SkillNumber, out var skillDef);

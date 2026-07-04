@@ -11,16 +11,13 @@ public enum MentorAskOutcome
 }
 
 /// <summary>
-///     Process-wide teacher/student ("mentor") negotiation authority (CZ_TEACHER_* family --
-///     Fenrir's already-established naming is <c>Mentor</c>, Opcodes.Zone.Incoming/Outgoing.Mentor*, to
-///     avoid colliding with the .NET <c>Teacher</c>/<c>Student</c> wire property names on
-///     <c>AvatarInfo</c>). The durable bond itself lives in game.Characters.TeacherCharacterId/
-///     StudentCharacterId (<c>MentorRepository</c>) -- this registry only tracks the ask/cancel/answer
-///     handshake, exactly like <c>Friends.FriendRegistry</c>. Unlike Friend (where each side separately
-///     "makes" the bond), CZ_TEACHER_START_SEND is a SINGLE action taken by the MASTER (the original
-///     asker -- contracts/05_social.md: "l'émetteur est le futur MAÎTRE") that bonds both sides in one
-///     shot, so the accepted-but-not-yet-started state only needs to be remembered once, keyed by the
-///     master.
+///     Process-wide teacher/student ("mentor") negotiation authority (CZ_TEACHER_* family -- named
+///     <c>Mentor</c> here to avoid colliding with the wire's own <c>Teacher</c>/<c>Student</c> AvatarInfo
+///     properties). The durable bond lives in game.Characters.TeacherCharacterId/StudentCharacterId
+///     (<c>MentorRepository</c>); this registry only tracks the ask/cancel/answer handshake, like
+///     <c>Friends.FriendRegistry</c>. Unlike Friend, CZ_TEACHER_START_SEND is a single action taken by
+///     the MASTER that bonds both sides at once, so the accepted state is remembered keyed by master
+///     only.
 /// </summary>
 public sealed class MentorRegistry
 {

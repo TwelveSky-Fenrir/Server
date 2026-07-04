@@ -7,10 +7,10 @@ using Fenrir.Network.Sessions;
 namespace Fenrir.Application.Game.Handlers.Social;
 
 /// <summary>
-///     CZ_TRADE_START_SEND (opcode 50) -- callable by EITHER accepted side (both were already marked
-///     accepted at answer time, see <see cref="TradeRegistry" />'s own remarks). Allocates a fresh, EMPTY
-///     <see cref="TradeSession" /> and sends ZC_TRADE_START_RECV CROSSED (contract's own "chaque joueur
-///     reçoit l'offre de L'AUTRE") -- both offers start empty, so this is a zeroed payload either way.
+///     CZ_TRADE_START_SEND (opcode 50) -- callable by either accepted side (both already marked accepted
+///     at answer time, see <see cref="TradeRegistry" />). Allocates a fresh, empty
+///     <see cref="TradeSession" /> and sends ZC_TRADE_START_RECV crossed (each player receives the OTHER's
+///     offer) -- both start empty, so it's a zeroed payload either way.
 /// </summary>
 public sealed class TradeStartHandler(ZoneRegistry zones, TradeRegistry trades) : IInlinePacketHandler<TradeStartRequest>
 {

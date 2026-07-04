@@ -52,9 +52,9 @@ namespace Fenrir.Application.Login.Handlers;
 ///     </list>
 /// </summary>
 public sealed class LoginHandler(
-    AccountRepository accounts,
+    IAccountRepository accounts,
     IAccountPinRepository pins,
-    CharacterRepository characters,
+    ICharacterRepository characters,
     LoginIpRateLimiter ipRateLimiter,
     IOptions<LoginServerOptions> options,
     SessionRegistry registry) : IAsyncPacketHandler<LoginRequest>

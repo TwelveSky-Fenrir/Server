@@ -14,7 +14,7 @@ public static class WorldDataServiceCollectionExtensions
 {
     public static IServiceCollection AddWorldData(this IServiceCollection services)
     {
-        services.AddSingleton<WorldDataRepository>();
+        services.AddSingleton<IWorldDataRepository, WorldDataRepository>();
         services.AddSingleton<WorldDataLoader>();
         services.AddSingleton(static provider => provider.GetRequiredService<WorldDataLoader>().Cache);
 

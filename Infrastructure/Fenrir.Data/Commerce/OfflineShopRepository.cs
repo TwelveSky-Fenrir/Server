@@ -13,7 +13,7 @@ namespace Fenrir.Data.Commerce;
 ///     134-137). Singleton, injected only with <see cref="ICaeriusNetDbContext" />, same posture as every
 ///     other repository in this assembly (architecture reference §11.1).
 /// </summary>
-public sealed record OfflineShopRepository(ICaeriusNetDbContext Db)
+public sealed record OfflineShopRepository(ICaeriusNetDbContext Db) : IOfflineShopRepository
 {
     /// <summary>Own-view read (CZ_GET_DEPUTY_PSHOP_SEND sort 1/2) -- the shop row (null if never opened) plus every occupied slot.</summary>
     public async ValueTask<(OfflineShopRowDto? Shop, IReadOnlyList<OfflineShopItemRowDto> Items)> GetByCharacterAsync(

@@ -94,7 +94,7 @@ public sealed class MonsterSpawnScheduler(
                 slot.RespawnTicksRemaining = Math.Max(0, slot.RespawnTicksRemaining - legacyTicksElapsed);
 
         state.TicksSinceLastScan += legacyTicksElapsed;
-        if (state.TicksSinceLastScan < LegacyTime.MonsterRespawnScanLegacyTicks)
+        if (state.TicksSinceLastScan < SimulationClock.MonsterRespawnScanLegacyTicks)
             return;
 
         state.TicksSinceLastScan = 0;
@@ -194,14 +194,14 @@ public sealed class MonsterSpawnScheduler(
         var minSeconds = monster.SummonTime1;
         var maxSeconds = monster.SummonTime2;
         var seconds = maxSeconds > minSeconds ? minSeconds + random.Next(maxSeconds - minSeconds + 1) : minSeconds;
-        return LegacyTime.ToWholeLegacyTicks(TimeSpan.FromSeconds(Math.Max(0, seconds)));
+        return SimulationClock.ToWholeLegacyTicks(TimeSpan.FromSeconds(Math.Max(0, seconds)));
     }
 
     /// <summary>
     ///     Loot pipeline + XP-grant seam for one kill (report 05 §5). Runs entirely on the zone's own tick
     ///     thread (single-writer invariant) -- money grants are handed to <see cref="Zone.QueueMoneyGrant" />
     ///     (a fire-and-forget-safe queue a dedicated background flusher drains, see
-    ///     <c>Fenrir.GameServer.MonsterLootFlushHost</c>) rather than awaited here, since <see cref="Zone.Tick" />
+    ///     <see cref="MonsterLootFlushHost" />) rather than awaited here, since <see cref="Zone.Tick" />
     ///     is fully synchronous and must never block on SQL I/O.
     /// </summary>
     private void ProcessDeath(Zone zone, MonsterZoneSpawnState state, DeadMonsterEvent death)

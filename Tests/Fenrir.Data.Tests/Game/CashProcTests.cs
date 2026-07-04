@@ -17,7 +17,7 @@ namespace Fenrir.Data.Tests.Game;
 [Collection("SqlServer")]
 public class CashProcTests
 {
-    private readonly AccountRepository _accounts;
+    private readonly IAccountRepository _accounts;
     private readonly string _connectionString;
 
     public CashProcTests(SqlServerFixture fixture)

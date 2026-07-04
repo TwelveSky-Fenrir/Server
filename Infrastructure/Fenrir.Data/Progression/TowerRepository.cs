@@ -13,7 +13,7 @@ namespace Fenrir.Data.Progression;
 ///     this feature's own StructuredOutput open issues -- so only <see cref="EnsureInitializedAsync" />/
 ///     <see cref="GetAllAsync" /> are exposed; there is no SetController caller yet.
 /// </summary>
-public sealed record TowerRepository(ICaeriusNetDbContext Db)
+public sealed record TowerRepository(ICaeriusNetDbContext Db) : ITowerRepository
 {
     /// <summary>Idempotent bootstrap (usp_TowerState_EnsureInitialized) -- creates the 12 uncontrolled tower rows on the very first call, a no-op afterwards.</summary>
     public async ValueTask EnsureInitializedAsync(CancellationToken ct)

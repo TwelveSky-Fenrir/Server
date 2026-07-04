@@ -9,10 +9,9 @@ public static class TradeLimits
 }
 
 /// <summary>
-///     One side's offer -- 8 item slots (each a reference to WHERE in that character's own inventory the
-///     offered stack currently lives, so the atomic commit can remove it from there) plus the two money
-///     pools. <see cref="MenuState" /> is the legacy's own CZ_TRADE_MENU_SEND 2-notch machine: 0 = open,
-///     1 = locked, 2 = confirmed (contracts/05_social.md).
+///     One side's offer -- 8 item slots (each a reference to where in inventory the offered stack
+///     currently lives, so commit can remove it from there) plus the two money pools.
+///     <see cref="MenuState" /> is CZ_TRADE_MENU_SEND's own state machine: 0 open, 1 locked, 2 confirmed.
 /// </summary>
 public sealed class TradeOfferSide
 {
@@ -25,11 +24,10 @@ public sealed class TradeOfferSide
 }
 
 /// <summary>
-///     One active trade negotiation's shared state -- allocated at CZ_TRADE_START_SEND, both participants'
-///     handlers resolve the SAME instance via <c>TradeRegistry</c>. Deliberately NOT persisted (matches
-///     the legacy exactly -- transient trade state is never written to SQL, verified by
-///     game.Characters_progression.sql's own header: "Deliberately NOT columns here: ... transient trade
-///     state (never persisted, matching legacy)").
+///     One active trade negotiation's shared state -- allocated at CZ_TRADE_START_SEND, both
+///     participants' handlers resolve the SAME instance via <c>TradeRegistry</c>. Deliberately NOT
+///     persisted, matching the legacy (verified: game.Characters_progression.sql's header lists
+///     transient trade state as intentionally excluded).
 /// </summary>
 public sealed class TradeSession
 {

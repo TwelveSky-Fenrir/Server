@@ -1,5 +1,6 @@
 using Fenrir.Application.Game;
 using Fenrir.Application.Game.Dispatching;
+using Fenrir.Data.Admin;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Movement;
 using Fenrir.Application.Game.Quests;
@@ -85,6 +86,20 @@ PacketHandlerHub.Initialize(host.Services);
 // Hosted services (including ZoneConnectionHost) only start inside host.Run(), so awaiting this here
 // guarantees the world.* reference-data cache is fully populated before the first connection is accepted --
 // a SQL failure or an unseeded database aborts startup instead of silently serving an empty world.
+// ZoneRegistry's constructor depends on WorldDataCache, so this must complete before anything below resolves it.
 await host.Services.GetRequiredService<WorldDataLoader>().InitializeAsync(CancellationToken.None);
+
+// Resolves this shard's hosted maps from admin.ShardMapAssignments (replaces the old Game:Maps config list)
+// and builds one Zone actor per map -- must run before ZoneTickHost/ZoneConnectionHost start accepting ticks
+// or connections.
+var shardId = host.Services.GetRequiredService<IOptions<GameServerOptions>>().Value.ShardId;
+var hostedMaps = await host.Services.GetRequiredService<IShardMapAssignmentRepository>()
+    .GetHostedMapsAsync(shardId, CancellationToken.None);
+
+if (hostedMaps.Count == 0)
+    throw new InvalidOperationException(
+        $"No maps assigned to shard {shardId} in admin.ShardMapAssignments -- a GameServer hosting no world is always a configuration mistake.");
+
+host.Services.GetRequiredService<ZoneRegistry>().Initialize(hostedMaps);
 
 await host.RunAsync();

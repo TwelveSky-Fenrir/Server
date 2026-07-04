@@ -7,12 +7,11 @@ using Fenrir.Network.Sessions;
 namespace Fenrir.Application.Game.Handlers.Social;
 
 /// <summary>
-///     CZ_TEACHER_END_SEND (opcode 63) -- neither a teacher nor a student ⇒ Quit(). Clears BOTH pointers
-///     on the CALLING character's own row only -- the partner's opposite pointer is deliberately left
-///     untouched (preserved legacy asymmetry, see <see cref="MentorRepository.ClearForCharacterAsync" />'s
-///     own remarks).
+///     CZ_TEACHER_END_SEND (opcode 63) -- neither teacher nor student ⇒ Quit(). Clears only the caller's
+///     own pointers; the partner's opposite pointer is deliberately left untouched (preserved legacy
+///     asymmetry, see <see cref="MentorRepository.ClearForCharacterAsync" />).
 /// </summary>
-public sealed class MentorEndHandler(MentorRepository repository) : IAsyncPacketHandler<MentorEndRequest>
+public sealed class MentorEndHandler(IMentorRepository repository) : IAsyncPacketHandler<MentorEndRequest>
 {
     public async ValueTask HandleAsync(MentorEndRequest packet, IPacketSession session,
         CancellationToken cancellationToken)

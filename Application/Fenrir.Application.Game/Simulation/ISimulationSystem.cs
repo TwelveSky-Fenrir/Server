@@ -14,7 +14,7 @@ public interface ISimulationSystem
 {
     /// <summary>
     ///     Advances this system by <paramref name="legacyTicksElapsed" /> legacy ticks of 500 ms each
-    ///     (<see cref="LegacyTime" /> — NOT network frames). Called from the zone tick only when at least one
+    ///     (<see cref="SimulationClock" /> — NOT network frames). Called from the zone tick only when at least one
     ///     whole legacy tick is due, i.e. roughly twice per second; a burst greater than 1 means the host
     ///     stalled and the system must catch up (decrement multi-tick timers by the full amount, not by 1).
     /// </summary>

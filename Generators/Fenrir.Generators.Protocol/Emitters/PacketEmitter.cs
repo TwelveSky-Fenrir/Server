@@ -39,7 +39,7 @@ internal static class PacketEmitter
         {
             writer.Line();
             writer.Line(
-                $"public static global::Fenrir.Contracts.Wire.LegacyObfuscation Obfuscation => global::Fenrir.Contracts.Wire.LegacyObfuscation.{model.Obfuscation};");
+                $"public static global::Fenrir.Contracts.Wire.WireObfuscationMode Obfuscation => global::Fenrir.Contracts.Wire.WireObfuscationMode.{model.Obfuscation};");
         }
 
         if (emitTryRead)
@@ -229,17 +229,17 @@ internal static class PacketEmitter
                 switch (field.AvatarXor)
                 {
                     case AvatarXorKind.Int:
-                        writer.Line($"global::Fenrir.Contracts.Wire.LegacyXor.XorInt({slice});");
+                        writer.Line($"global::Fenrir.Contracts.Wire.WireXor.XorInt({slice});");
                         break;
                     case AvatarXorKind.IntArray:
-                        writer.Line($"global::Fenrir.Contracts.Wire.LegacyXor.XorIntArray({slice});");
+                        writer.Line($"global::Fenrir.Contracts.Wire.WireXor.XorIntArray({slice});");
                         break;
                     case AvatarXorKind.Char:
-                        writer.Line($"global::Fenrir.Contracts.Wire.LegacyXor.XorChar({slice});");
+                        writer.Line($"global::Fenrir.Contracts.Wire.WireXor.XorChar({slice});");
                         break;
                     case AvatarXorKind.Char2:
                         writer.Line(
-                            $"global::Fenrir.Contracts.Wire.LegacyXor.XorChar2Rows({slice}, {field.AvatarXorRowLength});");
+                            $"global::Fenrir.Contracts.Wire.WireXor.XorChar2Rows({slice}, {field.AvatarXorRowLength});");
                         break;
                 }
 
@@ -251,9 +251,9 @@ internal static class PacketEmitter
         {
             writer.Line();
             writer.Line(
-                "// [LegacyUidField] (§3.3): double-XOR of tID, independent of the global XOR_PACKET applied later by the send layer.");
+                "// [ObfuscatedUidField] (§3.3): double-XOR of tID, independent of the global XOR_PACKET applied later by the send layer.");
             writer.Line(
-                $"global::Fenrir.Contracts.Wire.LegacyXor.ApplyUidXor(destination.Slice({legacyUidField.Offset}, {legacyUidField.OwnSize}));");
+                $"global::Fenrir.Contracts.Wire.WireXor.ApplyUidXor(destination.Slice({legacyUidField.Offset}, {legacyUidField.OwnSize}));");
         }
 
         writer.Line();

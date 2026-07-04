@@ -102,14 +102,14 @@ public class LcUserAvatarRecv2Tests
     private static int ReadXoredInt(byte[] buffer, int offset)
     {
         var bytes = buffer.AsSpan(offset, 4).ToArray();
-        LegacyXor.XorInt(bytes);
+        WireXor.XorInt(bytes);
         return BinaryPrimitives.ReadInt32LittleEndian(bytes);
     }
 
     private static int[] ReadXoredIntArray(byte[] buffer, int offset, int count)
     {
         var bytes = buffer.AsSpan(offset, count * 4).ToArray();
-        LegacyXor.XorIntArray(bytes);
+        WireXor.XorIntArray(bytes);
 
         var result = new int[count];
         for (var i = 0; i < count; i++)
@@ -121,7 +121,7 @@ public class LcUserAvatarRecv2Tests
     private static string ReadXoredChar(byte[] buffer, int offset, int length)
     {
         var bytes = buffer.AsSpan(offset, length).ToArray();
-        LegacyXor.XorIntArray(bytes);
+        WireXor.XorIntArray(bytes);
 
         var nullIndex = Array.IndexOf(bytes, (byte)0);
         return Encoding.Latin1.GetString(bytes, 0, nullIndex < 0 ? bytes.Length : nullIndex);

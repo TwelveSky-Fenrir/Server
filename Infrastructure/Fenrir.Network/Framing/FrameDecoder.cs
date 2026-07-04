@@ -20,11 +20,11 @@ public static class FrameDecoder
     {
         frame = default;
 
-        if (buffer.Length < LegacyHeaders.ClientPacketSize)
+        if (buffer.Length < WireHeaderSizes.ClientPacketSize)
             return false;
 
-        Span<byte> header = stackalloc byte[LegacyHeaders.ClientPacketSize];
-        buffer.Slice(0, LegacyHeaders.ClientPacketSize).CopyTo(header);
+        Span<byte> header = stackalloc byte[WireHeaderSizes.ClientPacketSize];
+        buffer.Slice(0, WireHeaderSizes.ClientPacketSize).CopyTo(header);
         var opcode = header[8]; // tProtocol; tPacket1/tPacket2 (offsets 0/4) carry no framing information in BuildEU33
 
         int frameSize;
@@ -40,7 +40,7 @@ public static class FrameDecoder
         if (buffer.Length < frameSize)
             return false; // header seen, payload not fully arrived yet — wait for more bytes
 
-        var payload = buffer.Slice(LegacyHeaders.ClientPacketSize, frameSize - LegacyHeaders.ClientPacketSize);
+        var payload = buffer.Slice(WireHeaderSizes.ClientPacketSize, frameSize - WireHeaderSizes.ClientPacketSize);
         frame = new Frame(server, opcode, payload);
         buffer = buffer.Slice(frameSize);
         return true;

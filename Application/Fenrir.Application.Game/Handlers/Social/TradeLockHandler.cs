@@ -10,35 +10,23 @@ using Fenrir.Network.Sessions;
 namespace Fenrir.Application.Game.Handlers.Social;
 
 /// <summary>
-///     CZ_TRADE_MENU_SEND (opcode 51) -- the 2-notch confirm machine (contracts/05_social.md): first call
-///     locks (menu 0→1, ZC_TRADE_MENU_RECV CheckMe=0 to self/1 to other), second call confirms (1→2, same
-///     echo shape -- a reasonable inference: the contract's own text only spells out the FIRST
-///     transition's echo, open issue). Once BOTH sides reach menu==2, this handler performs the ATOMIC
-///     two-character commit (<see cref="CharacterRepository.ExecuteTradeAsync" />, D7 regime (b)) THEN --
-///     single-writer invariant, exactly like <c>GenericActionHandler</c> -- posts each side's own
-///     ALREADY-DURABLE new container contents back onto THEIR OWN zone via
-///     <see cref="Zone.PostInventoryCommandAndWaitAsync" /> rather than mutating
-///     <see cref="PlayerRuntimeState.Inventory" /> directly from this request thread; the zone's own tick
-///     performs the actual mirror. Ends the session with ZC_TRADE_END_RECV Result=0 to both. An overflow
-///     (the receiving side has no free inventory slot for an incoming item,
-///     <see cref="TradeCommitPlanner.Plan.Overflowed" />) aborts the WHOLE commit -- no SQL call is made, no
-///     partial state, matching D7's "no partial commit" standard exactly like a mid-write SQL fault would
-///     have to.
+///     CZ_TRADE_MENU_SEND (opcode 51) -- the 2-notch confirm machine: first call locks (menu 0→1,
+///     ZC_TRADE_MENU_RECV CheckMe=0 to self/1 to other), second call confirms (1→2, same echo shape --
+///     an inference, since the contract only spells out the first transition's echo; open issue). Once
+///     both sides reach menu==2, performs the atomic two-character commit
+///     (<see cref="CharacterRepository.ExecuteTradeAsync" />, D7 regime (b)), then mirrors each side's new
+///     container back onto their own zone (single-writer invariant, see remarks) and ends with
+///     ZC_TRADE_END_RECV Result=0. An overflow (<see cref="TradeCommitPlanner.Plan.Overflowed" />) aborts
+///     the whole commit -- no partial state (D7 "no partial commit").
 /// </summary>
 /// <remarks>
-///     Review finding (Phase C/V6): the commit section used to read BOTH players' live
-///     <see cref="PlayerRuntimeState.Inventory" /> (potentially hosted by two different zones/tick threads)
-///     with no synchronization at all -- any unrelated inventory-affecting event for either party between
-///     "plan built" and "SQL commit" (a loot pickup, a hotkey potion use, an NPC purchase) would be silently
-///     overwritten by the commit's own unconditional whole-container replace. Both players'
-///     <see cref="PlayerRuntimeState.EconomyActionLock" /> are now acquired (in a FIXED order -- the smaller
-///     CharacterId first, always, regardless of which side's request triggers the commit -- to rule out a
-///     lock-ordering deadlock against a hypothetical future two-lock caller) around the ENTIRE plan/commit/
-///     mirror-wait sequence, the exact same lock every other economy handler
-///     (<c>GenericActionHandler</c>/<c>EnchantItemHandler</c>/<c>CraftItemHandler</c>) already uses for its
-///     own single-character version of this same race.
+///     Both players' <see cref="PlayerRuntimeState.EconomyActionLock" /> are acquired, in a fixed order
+///     (smaller CharacterId first, regardless of which side's request triggers the commit) to rule out a
+///     lock-ordering deadlock, around the entire plan/commit/mirror-wait sequence -- same pattern as
+///     <c>GenericActionHandler</c>/<c>EnchantItemHandler</c>/<c>CraftItemHandler</c> use for their own
+///     single-character version of this race.
 /// </remarks>
-public sealed class TradeLockHandler(ZoneRegistry zones, TradeRegistry trades, CharacterRepository characters)
+public sealed class TradeLockHandler(ZoneRegistry zones, TradeRegistry trades, ICharacterRepository characters)
     : IAsyncPacketHandler<TradeLockRequest>
 {
     public async ValueTask HandleAsync(TradeLockRequest packet, IPacketSession session,
@@ -66,8 +54,7 @@ public sealed class TradeLockHandler(ZoneRegistry zones, TradeRegistry trades, C
         if (trade.SideA.MenuState < 2 || trade.SideB.MenuState < 2)
             return;
 
-        // Fixed acquisition order (smaller CharacterId first) regardless of which side's own request reached
-        // menu==2 last -- see class remarks on why this rules out a lock-ordering deadlock.
+        // Fixed order (smaller CharacterId first) -- see class remarks on why this rules out deadlock.
         var (first, second) = playerA.CharacterId < playerB.CharacterId ? (playerA, playerB) : (playerB, playerA);
 
         await first.EconomyActionLock.WaitAsync(cancellationToken);
@@ -104,10 +91,8 @@ public sealed class TradeLockHandler(ZoneRegistry zones, TradeRegistry trades, C
 
         if (planA.Overflowed || planB.Overflowed)
         {
-            // D7 "no partial commit": abort the whole trade rather than silently drop an item or
-            // partially apply it. No error code exists on the wire for this case -- reset both menus to
-            // locked (1) so the players can free up space and re-confirm, matching the least-surprising
-            // legacy-adjacent behavior absent a documented specific response.
+            // D7 "no partial commit": abort rather than drop/partially apply an item. No wire error code
+            // exists for this case, so reset both menus to locked (1) so players can free space and retry.
             trade.SideA.MenuState = 1;
             trade.SideB.MenuState = 1;
             return;
@@ -130,7 +115,7 @@ public sealed class TradeLockHandler(ZoneRegistry zones, TradeRegistry trades, C
         playerB.Session.Send(result);
     }
 
-    /// <summary>Single-writer invariant: the durable result is already committed to SQL above -- this asks that player's OWN zone tick to mirror it into <see cref="PlayerRuntimeState.Inventory" /> and WAITS for that mirror to actually apply (not merely be posted), same posture as <c>GenericActionHandler</c>'s own <see cref="Zone.PostInventoryCommandAndWaitAsync" /> calls -- see this type's own class remarks.</summary>
+    /// <summary>Mirrors the already-committed SQL result into the player's own zone and waits for it to apply (single-writer invariant, see class summary).</summary>
     private static async Task PostMirrorAndWaitAsync(Zone zone, int characterId, TradeCommitPlanner.Plan plan,
         CancellationToken cancellationToken)
     {

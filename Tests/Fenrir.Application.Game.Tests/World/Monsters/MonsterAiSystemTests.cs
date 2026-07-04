@@ -75,7 +75,7 @@ public class MonsterAiSystemTests
         var scheduler = new MonsterSpawnScheduler(cache, randomFactory: static () => new ZeroScatterRandom());
         var ai = new MonsterAiSystem();
         // See class remarks: one huge AOI cell removes spawn-scatter-vs-AOI-cell flakiness from these tests.
-        var options = new GameServerOptions { Maps = [1], AoiCellSize = 100_000f };
+        var options = new GameServerOptions { AoiCellSize = 100_000f };
         return ZoneTestKit.CreateZone(1, options: options, simulationSystems: [scheduler, ai], worldData: cache);
     }
 
@@ -85,14 +85,14 @@ public class MonsterAiSystemTests
         var zone = CreateZone(CacheWithOneRegion(frameInfo1: 3, frameInfo3: 1, radiusInfo1: 0, radiusInfo2: 0,
             walkSpeed: 0, runSpeed: 0, regionRadius: 0));
 
-        zone.Tick(LegacyTime.LegacyTick); // tick 1: spawns, StateTicks 0 -> 1
+        zone.Tick(SimulationClock.LegacyTick); // tick 1: spawns, StateTicks 0 -> 1
         Assert.True(zone.TryGetMonster(1, out var monster));
         Assert.Equal(MonsterAiState.Spawning, monster!.AiState);
 
-        zone.Tick(LegacyTime.LegacyTick); // tick 2: StateTicks 1 -> 2
+        zone.Tick(SimulationClock.LegacyTick); // tick 2: StateTicks 1 -> 2
         Assert.Equal(MonsterAiState.Spawning, monster.AiState);
 
-        zone.Tick(LegacyTime.LegacyTick); // tick 3: StateTicks 2 -> 3 >= 3 -> Decision
+        zone.Tick(SimulationClock.LegacyTick); // tick 3: StateTicks 2 -> 3 >= 3 -> Decision
         Assert.Equal(MonsterAiState.Decision, monster.AiState);
     }
 
@@ -103,7 +103,7 @@ public class MonsterAiSystemTests
             walkSpeed: 10, runSpeed: 10, regionRadius: 0));
 
         for (var i = 0; i < 5; i++)
-            zone.Tick(LegacyTime.LegacyTick);
+            zone.Tick(SimulationClock.LegacyTick);
 
         Assert.True(zone.TryGetMonster(1, out var monster));
         Assert.Equal(MonsterAiState.Decision, monster!.AiState);
@@ -125,7 +125,7 @@ public class MonsterAiSystemTests
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1, "Target", posX: 1, posZ: 0)));
 
         for (var i = 0; i < 10; i++)
-            zone.Tick(LegacyTime.LegacyTick);
+            zone.Tick(SimulationClock.LegacyTick);
 
         Assert.True(zone.TryGetMonster(1, out var monster));
         Assert.NotEqual(MonsterAiState.Chase, monster!.AiState);
@@ -148,7 +148,7 @@ public class MonsterAiSystemTests
         var reachedAttackWindup = false;
         for (var i = 0; i < 10 && !reachedAttackWindup; i++)
         {
-            zone.Tick(LegacyTime.LegacyTick);
+            zone.Tick(SimulationClock.LegacyTick);
             Assert.True(zone.TryGetMonster(1, out var monster));
             if (monster!.AiState == MonsterAiState.AttackWindup)
                 reachedAttackWindup = true;
@@ -166,16 +166,16 @@ public class MonsterAiSystemTests
         // Attack range covers the whole map (radiusInfo2=1000) so the monster attacks in place, no chase movement.
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1, "Target", posX: 10, posZ: 0)));
 
-        zone.Tick(LegacyTime.LegacyTick); // spawn (FrameInfo1=1 -> Decision already this same tick's next pass)
-        zone.Tick(LegacyTime.LegacyTick); // Decision detects -> Chase
-        zone.Tick(LegacyTime.LegacyTick); // Chase: already in range -> AttackWindup, StateTicks=0
+        zone.Tick(SimulationClock.LegacyTick); // spawn (FrameInfo1=1 -> Decision already this same tick's next pass)
+        zone.Tick(SimulationClock.LegacyTick); // Decision detects -> Chase
+        zone.Tick(SimulationClock.LegacyTick); // Chase: already in range -> AttackWindup, StateTicks=0
         Assert.True(zone.TryGetMonster(1, out var monster));
         Assert.Equal(MonsterAiState.AttackWindup, monster!.AiState);
 
-        zone.Tick(LegacyTime.LegacyTick); // StateTicks 0->1, still < 2
+        zone.Tick(SimulationClock.LegacyTick); // StateTicks 0->1, still < 2
         Assert.Equal(MonsterAiState.AttackWindup, monster.AiState);
 
-        zone.Tick(LegacyTime.LegacyTick); // StateTicks 1->2 >= 2 -> Decision
+        zone.Tick(SimulationClock.LegacyTick); // StateTicks 1->2 >= 2 -> Decision
         Assert.Equal(MonsterAiState.Decision, monster.AiState);
     }
 
@@ -192,7 +192,7 @@ public class MonsterAiSystemTests
 
         // The spawn scatter (report 05 §1) means "home" is NOT necessarily (0,0,0) -- read it once the
         // monster exists rather than assuming the region's own nominal location.
-        zone.Tick(LegacyTime.LegacyTick);
+        zone.Tick(SimulationClock.LegacyTick);
         Assert.True(zone.TryGetMonster(1, out var spawned));
         var homeX = spawned!.HomeX;
         var homeZ = spawned.HomeZ;
@@ -206,7 +206,7 @@ public class MonsterAiSystemTests
         var returnedHome = false;
         for (var i = 0; i < 10 && !returnedHome; i++)
         {
-            zone.Tick(LegacyTime.LegacyTick);
+            zone.Tick(SimulationClock.LegacyTick);
             Assert.True(zone.TryGetMonster(1, out monster));
             if (monster!.AiState == MonsterAiState.Spawning &&
                 MathF.Abs(monster.PosX - homeX) <= arrivalEpsilon &&

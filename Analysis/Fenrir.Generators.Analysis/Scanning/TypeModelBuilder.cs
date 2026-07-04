@@ -27,7 +27,7 @@ internal static class TypeModelBuilder
         var server = (FenrirServer)attribute.GetCtorInt32(0);
         var direction = (FenrirDirection)attribute.GetCtorInt32(1);
         var opcode = (byte)attribute.GetCtorInt32(2);
-        var obfuscation = (LegacyObfuscation)attribute.GetNamedByteEnum("Obfuscation", 0);
+        var obfuscation = (WireObfuscationMode)attribute.GetNamedByteEnum("Obfuscation", 0);
         var compressed = attribute.GetNamedBool("Compressed", false);
         var expectedSize = attribute.GetNamedInt32("ExpectedSize", -1);
         var allowedStates = attribute.GetNamedByteArray("AllowedStates");
@@ -38,8 +38,8 @@ internal static class TypeModelBuilder
         diagnostics.AddRange(fieldDiagnostics);
 
         var headerSize = direction == FenrirDirection.Incoming
-            ? LegacyHeaderSizes.ClientPacketSize
-            : LegacyHeaderSizes.DefaultPacketSize;
+            ? WireHeaderSizes.ClientPacketSize
+            : WireHeaderSizes.DefaultPacketSize;
         var computedTotal = headerSize + fieldsSize;
 
         if (expectedSize != -1 && expectedSize != computedTotal)

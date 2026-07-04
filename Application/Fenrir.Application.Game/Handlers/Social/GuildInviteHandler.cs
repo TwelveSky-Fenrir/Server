@@ -16,10 +16,9 @@ namespace Fenrir.Application.Game.Handlers.Social;
 ///     Success ⇒ ZC_GUILD_ASK_RECV to the target.
 /// </summary>
 /// <remarks>
-///     OPEN ISSUE: the legacy also gates on <c>CheckCommunityWork()</c>/action-sort 11-12 (stunned/dead) for
-///     both sides and <c>IsMovingZone()</c> for the target -- none of those concepts have a direct
-///     <see cref="PlayerRuntimeState" /> equivalent wired up by any earlier batch, so they are not
-///     reproduced here (a documented, narrow gap, not a fabricated substitute).
+///     OPEN ISSUE: the legacy also gates on <c>CheckCommunityWork()</c>/action-sort 11-12 (stunned/dead)
+///     and <c>IsMovingZone()</c> (target) -- neither has a <see cref="PlayerRuntimeState" /> equivalent, so
+///     this is a documented gap, not a fabricated substitute.
 /// </remarks>
 public sealed class GuildInviteHandler(GuildInviteRegistry invites) : IInlinePacketHandler<GuildInviteRequest>
 {

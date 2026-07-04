@@ -16,13 +16,10 @@ public enum ChatBroadcastKind : byte
 }
 
 /// <summary>
-///     Posted by <c>LocalChatHandler</c>/<c>ShoutHandler</c>/<c>TribeChatHandler</c> for the ONE thing
-///     only <see cref="Zone" />'s own tick thread can safely resolve: the AOI-grid neighbor set (Local)
-///     or the live player set (Shout/Tribe) -- both are tick-owned state (<c>Zone</c>'s own remarks on
-///     <c>_grid</c>/<c>_players</c>), same "own channel, own drain" posture as <see cref="Combat.CombatCommand" />/
-///     <c>Inventory.InventoryZoneCommand</c>. Content emptiness/mute gating already happened in the
-///     handler (needs only the SENDER's own state, which the handler already has via
-///     <c>Zone.TryGetPlayer</c>) -- this command is always a legitimate, already-cleared send.
+///     Posted by <c>LocalChatHandler</c>/<c>ShoutHandler</c>/<c>TribeChatHandler</c> so <see cref="Zone" />'s
+///     own tick thread can resolve the audience (AOI grid for Local, live player set for Shout/Tribe) --
+///     same "own channel, own drain" posture as <see cref="Combat.CombatCommand" />. Content/mute gating
+///     already happened in the handler, so this command is always a pre-validated send.
 /// </summary>
 public readonly struct ChatZoneCommand
 {

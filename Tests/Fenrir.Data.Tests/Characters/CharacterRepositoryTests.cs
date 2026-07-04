@@ -18,8 +18,8 @@ namespace Fenrir.Data.Tests.Characters;
 [Collection("SqlServer")]
 public class CharacterRepositoryTests
 {
-    private readonly AccountRepository _accounts;
-    private readonly CharacterRepository _characters;
+    private readonly IAccountRepository _accounts;
+    private readonly ICharacterRepository _characters;
 
     public CharacterRepositoryTests(SqlServerFixture fixture)
     {

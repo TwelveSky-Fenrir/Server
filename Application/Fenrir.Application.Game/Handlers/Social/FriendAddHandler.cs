@@ -14,23 +14,15 @@ namespace Fenrir.Application.Game.Handlers.Social;
 ///     separately send its own CZ_FRIEND_MAKE_SEND (game.CharacterFriends' own header).
 /// </summary>
 /// <remarks>
-///     KNOWN DEVIATION from the strict single-writer invariant, documented rather than hidden: the
-///     durable SQL write happens first, but <see cref="PlayerRuntimeState.Friends" /> is then mutated
-///     DIRECTLY from this request thread rather than via a posted <c>ZoneCommand</c> the zone's own tick
-///     applies. Narrower and lower-risk than it sounds -- always self-directed (a character only ever
-///     touches its OWN <see cref="PlayerRuntimeState" /> here, never another's). CORRECTION (review finding,
-///     Phase C/V6): an earlier draft of this comment claimed "nothing on the zone's tick currently reads
-///     Friends" -- that is FALSE. A zone-transfer handoff (<c>ZoneTransfer.CreateEnterData</c> carries the
-///     SAME <see cref="PlayerRuntimeState.Friends" /> instance across; <c>Zone.HandleEnter</c> enumerates it
-///     on the TARGET zone's own tick thread) is a real concurrent reader, so a request-thread Add/Remove
-///     racing that enumeration was a genuine crash risk on a plain <c>Dictionary</c>. Fixed at the source:
-///     <see cref="PlayerRuntimeState.Friends" /> is now a <see cref="System.Collections.Concurrent.ConcurrentDictionary{TKey,TValue}" />,
-///     which tolerates a concurrent enumerator without throwing (it may simply miss or double-see an
-///     in-flight mutation, an acceptable eventual-consistency gap for a friends list). This is still NOT the
-///     same CAS-style exception pattern <c>MonsterEntity.TakeDamage</c>/<c>Zone.TryClaimGroundItem</c> use --
-///     no atomic compare-and-set decision rides on this data -- just a plain thread-safe collection.
+///     Deviates from the single-writer-via-<c>ZoneCommand</c> pattern: <see cref="PlayerRuntimeState.Friends" />
+///     is mutated directly from this request thread. Safe because it's always self-directed (only the
+///     caller's own state), and because a zone-transfer handoff (<c>Zone.HandleEnter</c>) concurrently
+///     enumerates the same instance on the target zone's tick thread, so <see cref="PlayerRuntimeState.Friends" />
+///     is a <see cref="System.Collections.Concurrent.ConcurrentDictionary{TKey,TValue}" /> rather than a plain
+///     <c>Dictionary</c>. Not the CAS-style pattern <c>MonsterEntity.TakeDamage</c> uses -- no atomic
+///     decision rides on this data, just thread-safety for the enumerator.
 /// </remarks>
-public sealed class FriendAddHandler(ZoneRegistry zones, FriendRegistry friends, FriendRepository repository)
+public sealed class FriendAddHandler(ZoneRegistry zones, FriendRegistry friends, IFriendRepository repository)
     : IAsyncPacketHandler<FriendAddRequest>
 {
     private const int MaxFriends = 10;

@@ -27,7 +27,7 @@ namespace Fenrir.Application.Game.Handlers;
 ///     <see cref="SystemRandomSource" />.
 /// </remarks>
 public sealed class CraftItemHandler(
-    CharacterRepository characters,
+    ICharacterRepository characters,
     ILogger<CraftItemHandler> logger)
     : IAsyncPacketHandler<CraftItemRequest>
 {

@@ -47,7 +47,7 @@ public sealed class SocketConnection : IDuplexPipe, IAsyncDisposable
     ///     already exists (see <see cref="FenrirTcpListener" />). Wiring <c>() =&gt; session.InboundStreamXorKey</c>
     ///     in once, right after the session is created, gives one single source of truth for the key with nothing
     ///     to keep in sync, instead of a second copy that every seed/reset would have to update in two places.
-    ///     Defaults to "unseeded" (key 0 is a no-op per <see cref="LegacyXor.ApplyStreamXor" />).
+    ///     Defaults to "unseeded" (key 0 is a no-op per <see cref="WireXor.ApplyStreamXor" />).
     /// </summary>
     /// <remarks>
     ///     Read once per <see cref="Socket.ReceiveAsync(Memory{byte}, SocketFlags, CancellationToken)" /> chunk and
@@ -106,7 +106,7 @@ public sealed class SocketConnection : IDuplexPipe, IAsyncDisposable
                     break; // graceful FIN from the peer
 
                 // One key snapshot for the whole chunk — see the timing-invariant remark on GetInboundXorKey.
-                LegacyXor.ApplyStreamXor(memory.Span[..bytesRead], GetInboundXorKey());
+                WireXor.ApplyStreamXor(memory.Span[..bytesRead], GetInboundXorKey());
                 writer.Advance(bytesRead);
 
                 var flushResult = await writer.FlushAsync(cancellationToken).ConfigureAwait(false);

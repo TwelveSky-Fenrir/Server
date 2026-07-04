@@ -1,5 +1,6 @@
 using System.Collections.Frozen;
 using System.Collections.Immutable;
+using Fenrir.Application.Game.Commerce;
 using Fenrir.Data.World;
 
 namespace Fenrir.Application.Game.GameData;

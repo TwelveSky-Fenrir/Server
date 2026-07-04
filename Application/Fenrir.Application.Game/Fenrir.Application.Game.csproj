@@ -1,6 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions"/>
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\Core\Fenrir.Contracts\Fenrir.Contracts.csproj"/>
     <ProjectReference Include="..\..\Core\Fenrir.Domain\Fenrir.Domain.csproj"/>
     <ProjectReference Include="..\..\Infrastructure\Fenrir.Network\Fenrir.Network.csproj"/>

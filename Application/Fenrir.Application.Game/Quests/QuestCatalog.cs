@@ -4,11 +4,10 @@ using Fenrir.Application.Game.GameData;
 namespace Fenrir.Application.Game.Quests;
 
 /// <summary>
-///     Indexes <see cref="WorldDataCache.QuestsById" /> by (Category, Step) -- <c>mQUEST.Search(tribe, step)</c>'s
-///     own lookup shape (report 04 §5: "qCategory == tribu+1 &amp;&amp; qStep"), built ONCE at DI
-///     construction time from the already-loaded, immutable <see cref="WorldDataCache" /> (same "cheap
-///     derived index over a process-wide singleton" pattern <see cref="Stats.SetBonusTables" /> uses for
-///     its own lookups). Category = tribe + 1 (world.Quests.Category is a <c>byte</c>, tribe is 0-3).
+///     Indexes <see cref="WorldDataCache.QuestsById" /> by (Category, Step) -- mirrors
+///     <c>mQUEST.Search(tribe, step)</c>'s lookup shape (Category = tribe + 1). Built once at DI
+///     construction from the already-loaded, immutable <see cref="WorldDataCache" />, same "cheap derived
+///     index over a singleton" pattern as <see cref="Stats.SetBonusTables" />.
 /// </summary>
 public sealed class QuestCatalog
 {

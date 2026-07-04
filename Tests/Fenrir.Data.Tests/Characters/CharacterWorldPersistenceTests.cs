@@ -20,8 +20,8 @@ namespace Fenrir.Data.Tests.Characters;
 [Collection("SqlServer")]
 public class CharacterWorldPersistenceTests
 {
-    private readonly AccountRepository _accounts;
-    private readonly CharacterRepository _characters;
+    private readonly IAccountRepository _accounts;
+    private readonly ICharacterRepository _characters;
     private readonly string _connectionString;
 
     public CharacterWorldPersistenceTests(SqlServerFixture fixture)

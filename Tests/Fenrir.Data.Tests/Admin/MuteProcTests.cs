@@ -18,8 +18,8 @@ namespace Fenrir.Data.Tests.Admin;
 [Collection("SqlServer")]
 public class MuteProcTests
 {
-    private readonly AccountRepository _accounts;
-    private readonly CharacterRepository _characters;
+    private readonly IAccountRepository _accounts;
+    private readonly ICharacterRepository _characters;
     private readonly string _connectionString;
 
     public MuteProcTests(SqlServerFixture fixture)

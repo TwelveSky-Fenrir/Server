@@ -12,7 +12,7 @@ namespace Fenrir.Data.Characters;
 ///     game.Characters access (architecture reference §11.1-§11.3). Singleton, injected only with
 ///     ICaeriusNetDbContext -- no SqlDbType or builder ever leaks past this type; callers see typed ValueTasks only.
 /// </summary>
-public sealed record CharacterRepository(ICaeriusNetDbContext Db)
+public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRepository
 {
     /// <summary>Character-select list for the account. Capacity 3 = MAX_USER_AVATAR_NUM, the legacy 3-slot cap.</summary>
     public async ValueTask<ReadOnlyCollection<CharacterSummaryDto>> GetByAccountAsync(int accountId,

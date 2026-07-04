@@ -7,13 +7,11 @@ using Fenrir.Network.Sessions;
 namespace Fenrir.Application.Game.Handlers.Social;
 
 /// <summary>
-///     CZ_PARTY_LEAVE_SEND (opcode 69). Ignored (silent) if the caller isn't partied, OR IS the leader
-///     (the leader must use CZ_PARTY_BREAK_SEND instead, verified). Notifies every member who was present
-///     BEFORE the departure (the leaver included -- matches ts25center's own case 106 loop, which fires
-///     before the leaver's own party name is cleared). Mission brief: if the departure drops membership
-///     to 1, the party auto-disbands (<see cref="PartyRegistry" />'s own remarks on this being a
-///     deliberate, brief-directed rule -- the legacy itself leaves a lone leader "partied" until an
-///     explicit Break).
+///     CZ_PARTY_LEAVE_SEND (opcode 69). Silent no-op if the caller isn't partied or is the leader (leader
+///     must use CZ_PARTY_BREAK_SEND instead). Notifies every member present before the departure, including
+///     the leaver (matches ts25center's case 106 loop, which fires before the leaver's party name clears).
+///     Deliberate deviation: dropping to 1 member auto-disbands here, whereas the legacy leaves a lone
+///     leader "partied" until an explicit Break (see <see cref="PartyRegistry" />).
 /// </summary>
 public sealed class PartyLeaveHandler(ZoneRegistry zones, PartyRegistry parties) : IInlinePacketHandler<PartyLeaveRequest>
 {
@@ -47,7 +45,6 @@ public sealed class PartyLeaveHandler(ZoneRegistry zones, PartyRegistry parties)
             return;
         }
 
-        // Dropped to 1 member -- notify whoever is left that the party dissolved (mission-brief rule).
         var disbandNotice = new PartyDisbandResponse { Sort = 1, AvatarName = "" };
         foreach (var memberId in membersBeforeLeave)
             if (memberId != characterId && zones.TryGetPlayer(memberId, out var member))

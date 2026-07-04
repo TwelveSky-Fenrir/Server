@@ -12,7 +12,7 @@ namespace Fenrir.Application.Login.Handlers;
 ///     <see cref="LoginSessionState.CharSelect" /> (see the packet's <c>AllowedStates</c>), both of which imply
 ///     <c>MarkAuthenticated</c> already ran, so <see cref="LoginClientSession.AccountId" /> is always set here.
 /// </summary>
-public sealed class CreateAvatarHandler(CharacterRepository characters)
+public sealed class CreateAvatarHandler(ICharacterRepository characters)
     : IAsyncPacketHandler<CreateAvatarRequest>
 {
     // M1 has no per-tribe spawn/stat system (gameplay is out of scope for this milestone), so every new character

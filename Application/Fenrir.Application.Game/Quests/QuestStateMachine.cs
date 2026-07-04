@@ -3,29 +3,14 @@ using Fenrir.Application.Game.GameData;
 namespace Fenrir.Application.Game.Quests;
 
 /// <summary>
-///     Pure port of <c>AVATAR_OBJECT::ReturnQuestPresentState</c>/<c>ReturnQuestEndConditionState</c> and
-///     the 5 <c>CZ_PROCESS_QUEST_SEND</c> transitions (report 04 §5, verified against
-///     <c>Server/ts25zone/S07_MyGame04.cpp:1685-2130</c> and <c>S04_MyWork02.cpp:7307-7563</c> byte-for-byte
-///     -- report 04's own summary undercounts the real <c>qSort</c> space: the VERIFIED source has 8
-///     branches, not 6:
-///     <list type="bullet">
-///         <item>1 kill monsters, 2 item acquisition, 3 item delivery, 4 receiving items, 5 kill captain,
-///             6 exchange items (2 phases) -- report 04's documented 6.</item>
-///         <item>7 "meet NPC" -- undocumented by report 04, fully implemented here: uniquely, its own
-///             end-condition is <c>PresentState == 2</c> (not 3), i.e. simply HOLDING the matching
-///             <c>TargetPhase</c> value already satisfies it -- there is no separate "meet" action, the
-///             NPC-proximity check (if any) is entirely client-side.</item>
-///         <item>8 "Waterfall occupation" (zone038 special-event participation) -- state-readable here for
-///             completeness, but its ONLY verified increment hook
-///             (<c>Server/ts25zone/S07_MyGame01.cpp:4236</c> et al.) lives inside the zone038 special-war
-///             tick loop, which report 05 §13 already documents as out of Fenrir's scope -- accepting a
-///             qSort-8 quest is real and correct, but <see cref="QuestProgress.KillCounter" /> can never
-///             advance past 0 until that subsystem exists (open issue, not a fabricated formula).</item>
-///     </list>
-///     No I/O, no <see cref="Fenrir.Application.Game.World.Zone" />/<see cref="Fenrir.Application.Game.World.PlayerRuntimeState" />
-///     dependency -- the inventory-presence check every item-based branch needs is injected as
-///     <paramref name="hasItem" />-shaped delegates so this stays independently unit-testable, same
-///     convention as <see cref="Fenrir.Application.Game.Inventory.ContainerMatrix" />/<see cref="Fenrir.Application.Game.World.Npcs.NpcShopPolicy" />.
+///     Pure port of <c>AVATAR_OBJECT::ReturnQuestPresentState</c>/<c>ReturnQuestEndConditionState</c> and the
+///     5 <c>CZ_PROCESS_QUEST_SEND</c> transitions (verified against <c>S07_MyGame04.cpp:1685-2130</c> and
+///     <c>S04_MyWork02.cpp:7307-7563</c>). CORRECTION: report 04 documents only 6 <c>qSort</c> branches --
+///     the verified source has 8; see cases 7/8 below for the two it misses. No I/O or
+///     <see cref="Fenrir.Application.Game.World.Zone" />/<see cref="Fenrir.Application.Game.World.PlayerRuntimeState" />
+///     dependency: the inventory-presence check every item-based branch needs is injected as
+///     <paramref name="hasItem" />-shaped delegates, same convention as
+///     <see cref="Fenrir.Application.Game.Inventory.ContainerMatrix" />.
 /// </summary>
 public static class QuestStateMachine
 {
@@ -85,10 +70,14 @@ public static class QuestStateMachine
                         return StateInvalid;
                 }
 
-            case 7: // meet NPC -- uniquely satisfied the instant the id matches, see class remarks
+            case 7: // meet NPC, undocumented by report 04. End-condition is PresentState == 2 (not 3): holding
+                // the matching TargetPhase already satisfies it -- no separate "meet" action; NPC-proximity
+                // (if any) is client-side.
                 return progress.TargetPhase == (q.Solution1 ?? 0) ? StateInProgress : StateInvalid;
 
-            case 8: // Waterfall occupation -- state-readable, increment hook out of scope (see class remarks)
+            case 8: // "Waterfall occupation" (zone038 event), undocumented by report 04. Its only increment
+                // hook lives in the zone038 tick loop (out of Fenrir's scope) -- state is real, but
+                // KillCounter can never advance past 0 until that subsystem exists (open issue).
                 if (progress.TargetPhase != (q.Solution1 ?? 0)) return StateInvalid;
                 return progress.KillCounter < 1 ? StateInProgress : StateConditionMet;
 
@@ -115,10 +104,10 @@ public static class QuestStateMachine
     public readonly record struct AcceptResult(bool Success, QuestProgress NewProgress, int? DepositItemId);
 
     /// <summary>
-    ///     tSort 1, "mission issuance" (S04_MyWork02.cpp:7314-7368). Fails (mirrors legacy <c>Quit()</c>) if
-    ///     <see cref="ComputePresentState" /> isn't exactly <see cref="StateCanAccept" />, or the next quest
-    ///     in the chain doesn't exist -- the caller is responsible for the qSort-3/6 slot-occupancy/bounds
-    ///     Quit() guards (this method does not see inventory slots, only whether an item id is present).
+    ///     tSort 1, "mission issuance" (S04_MyWork02.cpp:7314-7368). Fails if <see cref="ComputePresentState" />
+    ///     isn't exactly <see cref="StateCanAccept" />, or the next quest in the chain doesn't exist. Caller
+    ///     owns the qSort-3/6 slot-occupancy/bounds guards -- this method only checks whether an item id is
+    ///     present, not actual inventory slots.
     /// </summary>
     public static AcceptResult Accept(QuestProgress progress, byte tribe, short level, QuestCatalog catalog,
         Func<int, bool> hasItem)
@@ -157,13 +146,12 @@ public static class QuestStateMachine
         int TeacherPointReward = 0);
 
     /// <summary>
-    ///     tSort 2, "mission completed" (S04_MyWork02.cpp:7369-7452). Fails if
-    ///     <see cref="ComputeEndConditionMet" /> is false or the CURRENT quest (StepPermanent, not +1)
-    ///     doesn't resolve. Reward-item resolution (<c>ReturnItemNumberForQuestReward</c>/
-    ///     <c>ReturnItemQuantityForQuestReward</c>, S07_MyGame04.cpp:2132-2191) is folded in here: the
-    ///     FIRST reward slot with RewardType==6 gives the item id; quantity is 0 for item.Sort in [7,29]
-    ///     (equipment-like), else 1 -- <paramref name="itemSort" /> resolves that ONE lookup so this method
-    ///     stays catalog-shaped rather than needing the whole WorldDataCache.
+    ///     tSort 2, "mission completed" (S04_MyWork02.cpp:7369-7452). Fails if <see cref="ComputeEndConditionMet" />
+    ///     is false or the CURRENT quest (StepPermanent, not +1) doesn't resolve. Reward-item resolution
+    ///     mirrors <c>ReturnItemNumberForQuestReward</c>/<c>ReturnItemQuantityForQuestReward</c>
+    ///     (S07_MyGame04.cpp:2132-2191): first RewardType==6 slot gives the item id; quantity is 0 for
+    ///     equipment-like items (Sort 7-29), else 1. <paramref name="itemSort" /> resolves that one lookup so
+    ///     this method stays catalog-shaped, no WorldDataCache needed.
     /// </summary>
     public static CompleteResult Complete(QuestProgress progress, byte tribe, short level, QuestCatalog catalog,
         Func<int, bool> hasItem, Func<int, byte?> itemSort)
@@ -219,9 +207,8 @@ public static class QuestStateMachine
 
     /// <summary>
     ///     tSort 3, "mission receive" (S04_MyWork02.cpp:7453-7504) -- deposits <c>qSolution[0]</c> into a
-    ///     client-chosen empty slot; does NOT mutate <see cref="QuestProgress" /> at all (verified: no
-    ///     <c>wAvatar.aQuestInfo</c> write in this branch). Legal only for qSort 3/4 at present-state 2, or
-    ///     qSort 6 at present-state 2 OR 4.
+    ///     client-chosen empty slot; does NOT mutate <see cref="QuestProgress" /> (verified: no state write
+    ///     in this branch). Legal only for qSort 3/4 at present-state 2, or qSort 6 at present-state 2 or 4.
     /// </summary>
     public static bool TryReceive(QuestProgress progress, byte tribe, short level, QuestCatalog catalog,
         Func<int, bool> hasItem, out int depositItemId)
@@ -248,8 +235,8 @@ public static class QuestStateMachine
 
     /// <summary>
     ///     tSort 4, "mission exchange" (S04_MyWork02.cpp:7505-7528) -- <c>ChangeQuestItem(Solution1 -&gt; Solution2)</c>
-    ///     (swap the ITEM ID in place, same inventory slot) plus <c>[3]=2, [4]=Solution2</c>. Legal only for
-    ///     qSort 6 at present-state 3.
+    ///     (swaps the item id in place) plus <c>[3]=2, [4]=Solution2</c>. Legal only for qSort 6 at
+    ///     present-state 3.
     /// </summary>
     public readonly record struct ExchangeResult(bool Success, QuestProgress NewProgress, int FromItemId, int ToItemId);
 
@@ -270,9 +257,9 @@ public static class QuestStateMachine
     }
 
     /// <summary>
-    ///     tSort 5, "mission abandonment" (S04_MyWork02.cpp:7529-7555). Legal only when NOT idle/can-accept
-    ///     (present-state &gt;= 2), the quest's own <c>qType == 2</c> (abandonable), and the end condition is
-    ///     NOT already met (a satisfiable quest must be completed, not abandoned).
+    ///     tSort 5, "mission abandonment" (S04_MyWork02.cpp:7529-7555). Legal only when not idle/can-accept
+    ///     (present-state &gt;= 2), <c>qType == 2</c> (abandonable), and the end condition isn't already met (a
+    ///     satisfiable quest must be completed, not abandoned).
     /// </summary>
     public static bool TryAbandon(QuestProgress progress, byte tribe, short level, QuestCatalog catalog,
         Func<int, bool> hasItem, out QuestProgress newProgress)

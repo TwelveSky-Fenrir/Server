@@ -9,20 +9,15 @@ public enum FriendAskOutcome
 }
 
 /// <summary>
-///     Process-wide friend-request negotiation authority (Phase C/V6 Social, CZ_FRIEND_* family). The
-///     actual 10-slot friend LIST is NOT owned here -- it is durable, per-character state
-///     (game.CharacterFriends, cached on <c>PlayerRuntimeState.Friends</c>, mutated directly by
-///     <c>FriendAddHandler</c>/<c>FriendRemoveHandler</c> exactly like <c>GenericActionHandler</c> already
-///     mutates <c>PlayerRuntimeState.Inventory</c> from the owning character's own request thread -- see
-///     that handler's own remarks for the established precedent this follows). This registry only tracks
-///     the EPHEMERAL ask/answer handshake: same shape as <c>Party.PartyRegistry</c>'s own negotiation
-///     dictionaries, with one addition -- <see cref="_acceptedFor" /> survives PAST the answer (legacy
-///     state 3, contracts/05_social.md CZ_FRIEND_MAKE_SEND: "Exige état 3 (accepté)"), because unlike
-///     party accept (which performs the join immediately, server-side), a friend accept does NOT
-///     automatically add anything -- EACH side must separately send its OWN CZ_FRIEND_MAKE_SEND
-///     afterwards, at its own pace, into a slot IT chooses. Consumed (cleared) on that character's own
-///     successful add -- a documented, reasonable reading of "état 3" absent a fully re-derived state
-///     machine from the source for this one corner (open issue).
+///     Process-wide friend-request negotiation authority (CZ_FRIEND_* family). The actual 10-slot friend
+///     list is durable, per-character state (game.CharacterFriends, cached on
+///     <c>PlayerRuntimeState.Friends</c>), mutated directly by <c>FriendAddHandler</c>/
+///     <c>FriendRemoveHandler</c> -- this registry only tracks the ephemeral ask/answer handshake, same
+///     shape as <c>Party.PartyRegistry</c>. Unlike party accept (which joins immediately), a friend
+///     accept only unlocks each side to separately send its own CZ_FRIEND_MAKE_SEND at its own pace --
+///     <see cref="_acceptedFor" /> survives past the answer for that reason, cleared on that character's
+///     own successful add (open issue: "état 3" semantics weren't fully re-derived from source for this
+///     corner).
 /// </summary>
 public sealed class FriendRegistry
 {
@@ -86,10 +81,9 @@ public sealed class FriendRegistry
     }
 
     /// <summary>
-    ///     CZ_FRIEND_MAKE_SEND's own precondition ("exige état 3") -- CZ_FRIEND_MAKE_SEND's wire payload
-    ///     carries only a slot INDEX, no name/id, so the "other" character is whichever one
-    ///     <paramref name="characterId" /> most recently had an accepted answer with (at most one at a
-    ///     time in this model -- see class remarks). Consumed (cleared) on success.
+    ///     CZ_FRIEND_MAKE_SEND's precondition ("état 3") -- its wire payload carries only a slot INDEX,
+    ///     no name/id, so "other" is whoever <paramref name="characterId" /> most recently accepted (one
+    ///     at a time in this model). Consumed on success.
     /// </summary>
     public bool TryConsumeAccepted(int characterId, out int otherId)
     {

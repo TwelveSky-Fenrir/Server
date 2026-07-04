@@ -15,7 +15,7 @@ namespace Fenrir.Data.Guilds;
 ///     -- GUILD_WORK, doc 10 §1/contracts/06_guild_tribe.md) plus the two reads GuildActionHandler needs
 ///     that no earlier batch required (one guild's own full row, and its notices).
 /// </summary>
-public sealed record GuildRepository(ICaeriusNetDbContext Db)
+public sealed record GuildRepository(ICaeriusNetDbContext Db) : IGuildRepository
 {
     /// <summary>Loaded once at world entry (same "cache on PlayerRuntimeState, never re-query per chat message" posture as <c>MuteRepository</c>) -- null if the character belongs to no guild.</summary>
     public async ValueTask<CharacterGuildMembershipDto?> GetByCharacterAsync(int characterId, CancellationToken ct)

@@ -7,12 +7,10 @@ using Fenrir.Network.Sessions;
 namespace Fenrir.Application.Game.Handlers.Social;
 
 /// <summary>
-///     CZ_PARTY_ASK_SEND (opcode 65, contracts/05_social.md). Target resolved WITHIN THE INVITER'S OWN
-///     ZONE ONLY (verified: <c>mUTIL.SearchAvatar</c>, same-process-only scope -- see
-///     <see cref="World.ZoneRegistry.TryGetPlayerByName" />'s own remarks on which social asks are
-///     cross-zone vs same-zone). "Cumulative level" uses <see cref="PlayerRuntimeState.Level" /> alone --
-///     Fenrir does not model aLevel2 (a rebirth/martial sub-level the legacy adds in), a documented,
-///     honest input gap (open issue), not an invented substitute formula.
+///     CZ_PARTY_ASK_SEND (opcode 65). Target resolved within the inviter's own zone only (verified:
+///     <c>mUTIL.SearchAvatar</c> is same-process-only). "Cumulative level" uses
+///     <see cref="PlayerRuntimeState.Level" /> alone -- Fenrir does not model aLevel2 (a rebirth/martial
+///     sub-level the legacy adds), a documented open gap, not an invented substitute.
 /// </summary>
 public sealed class PartyInviteHandler(PartyRegistry parties) : IInlinePacketHandler<PartyInviteRequest>
 {

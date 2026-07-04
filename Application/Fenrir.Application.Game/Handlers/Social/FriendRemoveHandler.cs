@@ -7,7 +7,7 @@ using Fenrir.Network.Sessions;
 namespace Fenrir.Application.Game.Handlers.Social;
 
 /// <summary>CZ_FRIEND_DELETE_SEND (opcode 58) -- an empty slot ⇒ Quit() (verified); otherwise clears the slot durably then mirrors <see cref="PlayerRuntimeState.Friends" />.</summary>
-public sealed class FriendRemoveHandler(FriendRepository repository) : IAsyncPacketHandler<FriendRemoveRequest>
+public sealed class FriendRemoveHandler(IFriendRepository repository) : IAsyncPacketHandler<FriendRemoveRequest>
 {
     private const int MaxFriends = 10;
 

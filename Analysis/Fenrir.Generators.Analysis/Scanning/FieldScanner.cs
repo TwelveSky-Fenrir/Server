@@ -121,7 +121,7 @@ internal static class FieldScanner
             fixedArrayCount = count;
         }
 
-        var legacyUidAttribute = propertyAttributes.Find(WellKnownNames.LegacyUidFieldAttribute);
+        var legacyUidAttribute = propertyAttributes.Find(WellKnownNames.ObfuscatedUidFieldAttribute);
         var avatarXorAttribute = propertyAttributes.Find(WellKnownNames.AvatarXorKindAttribute);
         var avatarXor = ReadAvatarXorKind(avatarXorAttribute, out var avatarXorRowLength);
         var isLegacyUidField = legacyUidAttribute is not null;

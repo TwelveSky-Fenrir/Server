@@ -11,7 +11,7 @@ namespace Fenrir.Data.Runtime;
 ///     AccountId, not a generated TicketId (ADR-0005/ADR-0003 A-04): the unmodified legacy client can only prove
 ///     its own account identity, so a live ticket for that AccountId is the proof of a prior successful login.
 /// </summary>
-public sealed record SessionTicketRepository(ICaeriusNetDbContext Db)
+public sealed record SessionTicketRepository(ICaeriusNetDbContext Db) : ISessionTicketRepository
 {
     // In-memory OLTP table, sub-millisecond procs -- a short timeout fails fast instead of masking a stuck request.
     private const int CommandTimeoutSeconds = 5;

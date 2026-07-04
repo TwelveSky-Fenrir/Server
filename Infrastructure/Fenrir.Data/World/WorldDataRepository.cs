@@ -12,7 +12,7 @@ namespace Fenrir.Data.World;
 ///     builder ever leaks past this type; callers see typed ValueTasks only. Capacity hints are the real row
 ///     counts documented in each procedure's contract header.
 /// </summary>
-public sealed record WorldDataRepository(ICaeriusNetDbContext Db)
+public sealed record WorldDataRepository(ICaeriusNetDbContext Db) : IWorldDataRepository
 {
     /// <summary>world.usp_Item_GetAll: RS0 = one row per item (34,353), RS1 = populated bonus-skill slots.</summary>
     public async ValueTask<(ReadOnlyCollection<ItemRowDto> Items, ReadOnlyCollection<ItemBonusSkillRowDto> BonusSkills)>

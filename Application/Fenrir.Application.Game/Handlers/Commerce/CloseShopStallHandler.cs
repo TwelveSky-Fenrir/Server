@@ -8,15 +8,13 @@ namespace Fenrir.Application.Game.Handlers.Commerce;
 
 /// <summary>
 ///     CZ_END_PSHOP_SEND (opcode 32, contracts/04_commerce.md, verified <c>S04_MyWork02.cpp:6351-6383</c>).
-///     <c>Sort</c> 1 = close the live personal shop (replies ONLY if it was actually open, matching the
-///     legacy's own "neither reply nor Quit()" no-op when it wasn't -- verified, not an oversight). <c>Sort</c>
-///     2 = close the offline/deputy shop (<see cref="OfflineShopRepository.SetStateAsync" />, ShopState
-///     only -- items/money stay attached, see that proc's own header): the legacy's own
-///     <c>CloseProxyShop</c> success path sends NO unicast reply at all either (only a world broadcast this
-///     pass does not model, see <see cref="OpenShopStallHandler" />'s own open-issue posture on cosmetic
-///     broadcasts) -- reproduced exactly, not a gap.
+///     <c>Sort</c> 1 closes the live personal shop, replying only if one was actually open (verified legacy
+///     no-op otherwise, not an oversight). <c>Sort</c> 2 closes the offline/deputy shop
+///     (<see cref="OfflineShopRepository.SetStateAsync" />, ShopState only -- items/money stay attached) and
+///     sends no unicast reply either, matching the legacy's own <c>CloseProxyShop</c> (only a world
+///     broadcast, not modeled here -- reproduced exactly, not a gap).
 /// </summary>
-public sealed class CloseShopStallHandler(OfflineShopRepository offlineShops)
+public sealed class CloseShopStallHandler(IOfflineShopRepository offlineShops)
     : IAsyncPacketHandler<CloseShopStallRequest>
 {
     public async ValueTask HandleAsync(CloseShopStallRequest packet, IPacketSession session,

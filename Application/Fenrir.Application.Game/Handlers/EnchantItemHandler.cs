@@ -37,7 +37,7 @@ namespace Fenrir.Application.Game.Handlers;
 ///     consequence of scope, not a fabricated shortcut).
 /// </remarks>
 public sealed class EnchantItemHandler(
-    CharacterRepository characters,
+    ICharacterRepository characters,
     WorldDataCache worldData,
     ILogger<EnchantItemHandler> logger)
     : IAsyncPacketHandler<EnchantItemRequest>

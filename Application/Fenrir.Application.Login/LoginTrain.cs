@@ -136,7 +136,7 @@ public static class LoginTrain
 
     /// <summary>
     ///     The complete failure train: result code, the client's own tID echoed back (the legacy XORs it via
-    ///     USE_XOR_UID even on failure — our [LegacyUidField] does the same at write time), sort=0, loginSort=0,
+    ///     USE_XOR_UID even on failure — our [ObfuscatedUidField] does the same at write time), sort=0, loginSort=0,
     ///     PIN mask "0000", three zeroed avatar slots, then 24/26 (report §4.11.9 "DO_SEND").
     /// </summary>
     public static void SendFailure(IPacketSession session, int result, string requestId)

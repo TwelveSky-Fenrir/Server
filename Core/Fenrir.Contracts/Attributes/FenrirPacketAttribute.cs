@@ -18,7 +18,7 @@ public sealed class FenrirPacketAttribute(FenrirServer server, FenrirDirection d
     public byte Opcode { get; } = opcode;
 
     /// <summary>Whole-packet obfuscation applied by the send layer (none by default).</summary>
-    public LegacyObfuscation Obfuscation { get; init; } = LegacyObfuscation.None;
+    public WireObfuscationMode Obfuscation { get; init; } = WireObfuscationMode.None;
 
     /// <summary>ZPACKET + LZ4 envelope (zone outbound opcodes 12/13 only). §3.5.</summary>
     public bool Compressed { get; init; }

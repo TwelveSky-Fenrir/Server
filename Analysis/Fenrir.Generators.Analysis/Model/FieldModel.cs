@@ -36,7 +36,7 @@ internal sealed class FieldModel
     /// <summary>Resolved <c>WireSize</c> of the nested type (§4: detected via <c>IFenrirWireType&lt;T&gt;</c>).</summary>
     public int NestedSize { get; init; }
 
-    /// <summary>Carries <c>[LegacyUidField]</c> (only <c>LC_LOGIN_RECV.Id</c>, §3.3).</summary>
+    /// <summary>Carries <c>[ObfuscatedUidField]</c> (only <c>LC_LOGIN_RECV.Id</c>, §3.3).</summary>
     public bool IsLegacyUidField { get; init; }
 
     /// <summary><c>[AvatarXorKind]</c> — <c>None</c> if absent (only <c>AvatarRosterResponse</c> uses it, §3.2).</summary>

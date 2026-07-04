@@ -48,7 +48,7 @@ public sealed class SocketConnectionSmokeTests
             await client.ConnectAsync(IPAddress.Loopback, port, ct);
             server = await accepted.Task.WaitAsync(ct);
 
-            // Client -> server: default GetInboundXorKey is "() => 0", a no-op per LegacyXor.ApplyStreamXor, so
+            // Client -> server: default GetInboundXorKey is "() => 0", a no-op per WireXor.ApplyStreamXor, so
             // the bytes reaching SocketConnection.Input must be bit-for-bit what the client wrote.
             byte[] toServer = [0xDE, 0xAD, 0xBE, 0xEF, 0x01, 0x02, 0x03];
             await client.GetStream().WriteAsync(toServer, ct);

@@ -6,7 +6,7 @@ namespace Fenrir.Application.Game.Tests.World;
 /// <summary>
 ///     Covers <see cref="Zone.ApplyDeath" /> and its automatic revive sweep (M1 plan, Phase C/V1 item 3): the
 ///     immediate death effects (Life=0, IsDead, revive scheduled) and the ~5 s ("10 legacy ticks",
-///     <see cref="Simulation.LegacyTime.DeathReviveDelay" />) automatic revive itself. The revive is ALWAYS in
+///     <see cref="Simulation.SimulationClock.DeathReviveDelay" />) automatic revive itself. The revive is ALWAYS in
 ///     place (report 12 §4.2/§4.3: the legacy only auto-clears the death flag locally after the delay -- an
 ///     actual cross-zone "return to town" transfer is client-driven, via CZ_DEMAND_ZONE_SERVER_INFO_2 Sort=3,
 ///     already covered by <c>ZoneMoveHandler</c>, not by this timer). A prior revision of

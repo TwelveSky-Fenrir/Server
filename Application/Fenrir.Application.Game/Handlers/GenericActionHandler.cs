@@ -46,7 +46,7 @@ namespace Fenrir.Application.Game.Handlers;
 ///     <see cref="PlayerRuntimeState.Inventory" />/<see cref="PlayerRuntimeState.Stats" /> directly.
 /// </remarks>
 public sealed class GenericActionHandler(
-    CharacterRepository characters,
+    ICharacterRepository characters,
     WorldDataCache worldData,
     QuestCatalog questCatalog,
     ILogger<GenericActionHandler> logger)

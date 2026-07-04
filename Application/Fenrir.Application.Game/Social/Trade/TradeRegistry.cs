@@ -9,25 +9,18 @@ public enum TradeAskOutcome
 }
 
 /// <summary>
-///     Process-wide secure-trade authority (CZ_TRADE_* family, contracts/05_social.md). Same ask/cancel/
-///     answer shape as <see cref="Duel.DuelRegistry" />; acceptance is SYMMETRIC (verified: "exige état 3
-///     DES DEUX côtés" for CZ_TRADE_START_SEND -- both sides must have reached the accepted state, unlike
-///     Mentor's asymmetric master-only start), so <see cref="TryStart" /> is callable by either accepted
-///     side once both have answered.
+///     Process-wide secure-trade authority (CZ_TRADE_* family). Same ask/cancel/answer shape as
+///     <see cref="Duel.DuelRegistry" />; acceptance is SYMMETRIC (verified: CZ_TRADE_START_SEND requires
+///     "état 3 des deux côtés" -- unlike Mentor's asymmetric master-only start), so <see cref="TryStart" />
+///     is callable by either accepted side once both have answered.
 /// </summary>
 /// <remarks>
-///     OPEN ISSUE, explicit and prominent (mission brief: "document exactly what's real vs out of
-///     scope"): this registry and <see cref="TradeSession" /> implement the FULL negotiation lifecycle
-///     (ask/cancel/answer/start/lock/end) and the atomic two-character commit
-///     (<c>CharacterRepository.ExecuteTradeAsync</c>) faithfully and completely -- but the mechanism that
-///     POPULATES a session's offer slots (the legacy's CZ_PROCESS_DATA_SEND tSort 218-222,
-///     "Inventaire ↔ fenêtre Trade" / "Argent ↔ Trade", report 04 §1 table 2) is NOT wired into
-///     <c>GenericActionHandler</c> in this pass. A trade can be negotiated, started, locked, and
-///     committed end-to-end RIGHT NOW, but with whatever slots/money a caller has set directly on the
-///     <see cref="TradeSession" /> -- there is no live client action that populates them yet. This is a
-///     genuinely large, separately-scoped follow-up (the same container-move family ContainerMatrix's own
-///     remarks already flag as "Trade/Save are NOT modeled here"), not a silent gap: the negotiation/
-///     commit engine itself is real, tested code.
+///     OPEN ISSUE: the negotiation lifecycle (ask/cancel/answer/start/lock/end) and the atomic
+///     two-character commit (<c>CharacterRepository.ExecuteTradeAsync</c>) are fully implemented, but the
+///     mechanism that POPULATES a session's offer slots (legacy CZ_PROCESS_DATA_SEND tSort 218-222) is
+///     NOT wired into <c>GenericActionHandler</c> yet -- a trade can be negotiated and committed
+///     end-to-end right now, but only with whatever slots/money a caller sets directly on
+///     <see cref="TradeSession" />.
 /// </remarks>
 public sealed class TradeRegistry
 {

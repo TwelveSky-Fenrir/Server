@@ -5,7 +5,7 @@ using Fenrir.Contracts.Wire;
 namespace Fenrir.Contracts.Packets.Login;
 
 [FenrirPacket(FenrirServer.Login, FenrirDirection.Outgoing, Opcodes.Login.Outgoing.AvatarRoster,
-    Obfuscation = LegacyObfuscation.XorFieldAvatar, ExpectedSize = 4579)]
+    Obfuscation = WireObfuscationMode.XorFieldAvatar, ExpectedSize = 4579)]
 public readonly partial record struct AvatarRosterResponse : IOutgoingPacket
 {
     [AvatarXorKind(AvatarXorKind.Int)] public required int VisibleState { get; init; }

@@ -10,29 +10,24 @@ namespace Fenrir.Application.Game.Handlers.Progression;
 /// <summary>
 ///     CZ_AUTO_CONFIG_SEND (opcode 99, verified <c>S04_MyWork02.cpp:13466-13614</c>) -- the auto-hunt
 ///     on/off toggle. <see cref="AutoHuntToggleRequest.Sort" /> must be 0 (disable) or 1 (enable), else
-///     Quit(). Enabling is additionally refused (Quit()) in zones 38/319/320/321/322/323 plus the 20
-///     "zone241-type" server numbers (<see cref="DisallowedZones" />'s own remarks), without an
-///     equipped weapon, or without a configured attack skill (<c>AttackType[0]</c>/<c>[2]</c> -- the
-///     flattened <c>attack_type[2][2]</c>'s <c>[0][0]</c>/<c>[1][0]</c> -- EITHER non-zero). OPEN ISSUE: the
-///     report's own text additionally mentions "level-gated battle zones" without enumerating which ones --
-///     NOT guessed here, only the explicitly-numbered zone list above is enforced. On success, the 112-byte
-///     <see cref="Fenrir.Contracts.Packets.Shared.AutoHunt" /> blob is stored VERBATIM (no content
-///     validation at all, verified <c>CopyMemory</c>) -- the autonomous bot LOOP itself (auto-attack/
-///     auto-loot/auto-potion-consumption once enabled) is explicitly OUT OF SCOPE for this pass.
+///     Quit(). Enabling is also refused in <see cref="DisallowedZones" />, without an equipped weapon, or
+///     without a configured attack skill (<c>AttackType[0]</c>/<c>[2]</c> either non-zero). OPEN ISSUE: the
+///     source also mentions unenumerated "level-gated battle zones" -- not guessed here, only the explicit
+///     zone list is enforced. On success the 112-byte <see cref="Fenrir.Contracts.Packets.Shared.AutoHunt" />
+///     blob is stored verbatim with no content validation; the bot loop itself (auto-attack/loot/potion once
+///     enabled) is out of scope for this pass.
 /// </summary>
 /// <remarks>
 ///     Same "own-character, non-economy scalar preference, direct mutation" posture as
 ///     <see cref="AutoPotionThresholdHandler" /> -- see that type's own remarks.
 /// </remarks>
-public sealed class AutoHuntToggleHandler(CharacterRepository characters) : IAsyncPacketHandler<AutoHuntToggleRequest>
+public sealed class AutoHuntToggleHandler(ICharacterRepository characters) : IAsyncPacketHandler<AutoHuntToggleRequest>
 {
     /// <summary>
-    ///     Zones where enabling auto-hunt is refused outright (verified S04_MyWork02.cpp:13508-13520) -- see
-    ///     class remarks for the unenumerated "level-gated battle zones" gap. CORRECTED (review finding):
-    ///     the source's <c>mGAME.mCheckZone241TypeServer</c> flag is not literally "zone 241" -- it's a
-    ///     per-server boolean set TRUE for 20 distinct server numbers (verified
-    ///     <c>Server/ts25zone/S07_MyGame01.cpp:1232-1256</c>: 241-249, 292-294, 311-312, 325-330), all of
-    ///     which this gate must refuse, not just 241 itself.
+    ///     Zones where enabling auto-hunt is refused (verified S04_MyWork02.cpp:13508-13520). CORRECTED: the
+    ///     source's <c>mCheckZone241TypeServer</c> flag is not literally "zone 241" -- it's a per-server
+    ///     boolean true for 20 distinct server numbers (verified <c>S07_MyGame01.cpp:1232-1256</c>: 241-249,
+    ///     292-294, 311-312, 325-330), all of which must be refused, not just 241.
     /// </summary>
     private static readonly HashSet<short> DisallowedZones =
     [
@@ -62,9 +57,8 @@ public sealed class AutoHuntToggleHandler(CharacterRepository characters) : IAsy
         if (packet.Sort == 1)
         {
             var hasWeapon = state.Inventory.GetSlot(ContainerMatrix.Equipment, WeaponSlot) is not null;
-            // CORRECTED (review finding): the source's `!(!A && !B)` (S04_MyWork02.cpp:13548, De Morgan) is
-            // `A || B`, not the AND a prior pass used here -- a character configured with only ONE of the
-            // two attack-type slots (a legitimate, common setup) was wrongly refused.
+            // CORRECTED: source's `!(!A && !B)` (S04_MyWork02.cpp:13548) is `A || B`, not AND -- a character
+            // with only ONE attack-type slot configured (a legitimate setup) was wrongly refused otherwise.
             var hasAttackSkill = packet.AutoHunt.AttackType.Length >= 3 &&
                                  (packet.AutoHunt.AttackType[0] != 0 || packet.AutoHunt.AttackType[2] != 0);
 

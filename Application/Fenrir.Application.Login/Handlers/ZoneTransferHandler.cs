@@ -14,9 +14,9 @@ namespace Fenrir.Application.Login.Handlers;
 ///     itself, the handover identity lives server-side in the ticket row, keyed on AccountId = uUserIdx).
 /// </summary>
 public sealed class ZoneTransferHandler(
-    CharacterRepository characters,
-    GameServerDirectoryRepository directory,
-    SessionTicketRepository tickets,
+    ICharacterRepository characters,
+    IGameServerDirectoryRepository directory,
+    ISessionTicketRepository tickets,
     IOptions<LoginServerOptions> options) : IAsyncPacketHandler<ZoneTransferRequest>
 {
     public async ValueTask HandleAsync(ZoneTransferRequest packet, IPacketSession session,

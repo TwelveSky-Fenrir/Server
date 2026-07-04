@@ -15,24 +15,19 @@ namespace Fenrir.Application.Game.Handlers.Commerce;
 
 /// <summary>
 ///     CZ_BUY_PSHOP_SEND (opcode 35, contracts/04_commerce.md, verified <c>S04_MyWork02.cpp:6925-7124</c>)
-///     -- purchase from a LIVE personal-shop stall. A genuine two-character economy action: the SAME
-///     dual-lock + wait-for-mirror pattern <c>TradeLockHandler</c> established (both participants'
-///     <see cref="PlayerRuntimeState.EconomyActionLock" />, fixed smaller-CharacterId-first order, held
-///     across the whole read-live-inventory/await-SQL/post-mirror sequence). Uses
-///     <see cref="NpcShopPolicy.TownZoneNumbers" /> (verified: this specific action's OWN gate is
-///     <c>IsValidTownAll</c>, asymmetric with the other 4 PShop opcodes' zone-37-only
-///     <c>PPSHOP_V2</c> gate -- verified deliberate, S04_MyWork02.cpp:6935).
+///     -- purchase from a LIVE personal-shop stall. Two-character economy action: same dual-lock +
+///     wait-for-mirror pattern as <c>TradeLockHandler</c> (both participants'
+///     <see cref="PlayerRuntimeState.EconomyActionLock" />, smaller-CharacterId-first order, held across
+///     read-inventory/SQL/mirror). Gated by <see cref="NpcShopPolicy.TownZoneNumbers" /> (<c>IsValidTownAll</c>)
+///     -- deliberately asymmetric with the other 4 PShop opcodes' zone-37-only gate (verified, S04_MyWork02.cpp:6935).
 /// </summary>
 /// <remarks>
-///     SCOPE CUT (documented): the verified source ALSO routes this SAME opcode into the offline/proxy-shop
-///     purchase path when no matching live stall is found for <c>AvatarName</c> (the <c>CHECK_PROXY</c>
-///     label, S04_MyWork02.cpp:7126+). That functionality is fully, separately implemented via
-///     <c>UpdateProxyShopHandler</c>'s own BuySort=PURCHASED branch (CZ_SET_DEPUTY_PSHOP_SEND) -- the
-///     legacy's two endpoints for the same offline-purchase feature are a historical duplication, not two
-///     distinct player-facing capabilities, so this handler does not re-implement it a second time here.
+///     SCOPE CUT: the verified source also routes this opcode into the offline/proxy-shop purchase path
+///     when no live stall matches (<c>CHECK_PROXY</c>, S04_MyWork02.cpp:7126+) -- a historical duplicate of
+///     <c>UpdateProxyShopHandler</c>'s BuySort=PURCHASED branch, so it isn't reimplemented here.
 /// </remarks>
 public sealed class BuyShopItemHandler(
-    CharacterRepository characters,
+    ICharacterRepository characters,
     WorldDataCache worldData,
     ILogger<BuyShopItemHandler> logger)
     : IAsyncPacketHandler<BuyShopItemRequest>
@@ -136,14 +131,10 @@ public sealed class BuyShopItemHandler(
         ZoneClientSession zoneSession, Zone zone, PlayerRuntimeState buyer, PlayerRuntimeState seller,
         PshopPurchasePolicy.SlotView slot, CancellationToken cancellationToken)
     {
-        // Re-validate against the SELLER's LIVE inventory now that both locks are held -- the cached
-        // PshopListing snapshot read before locking is only ever a DISPLAY copy (see
-        // PlayerRuntimeState.PshopOpen's own remarks); this is the actual source-of-truth check, exactly
-        // mirroring the verified source's own re-check (S04_MyWork02.cpp:6998-7009).
-        // NOTE: the verified source ALSO compares the advertised visual X/Y sub-cell position here
-        // (S04_MyWork02.cpp:6999/7000) -- Fenrir's flat-slot ItemStack has no sub-cell field to compare
-        // against (same documented gap as GroundItemPickupPolicy's own remarks), so only (id, quantity,
-        // packed value) are re-validated, which is the part that actually matters for correctness.
+        // Re-validate against the SELLER's LIVE inventory now both locks are held -- the cached PshopListing
+        // snapshot is only a display copy (see PlayerRuntimeState.PshopOpen), mirroring the verified
+        // re-check (S04_MyWork02.cpp:6998-7009). The source also compares a visual X/Y sub-cell position we
+        // don't track (same gap as GroundItemPickupPolicy) -- only id/quantity/packed value are re-validated.
         var liveSellerStack = seller.Inventory.GetSlot((byte)slot.InventoryPage, (byte)slot.InventoryIndex);
         if (liveSellerStack is not { } liveStack || liveStack.ItemId != slot.ItemId ||
             liveStack.Quantity != slot.Quantity || liveStack.Value() != slot.Value)
@@ -163,7 +154,7 @@ public sealed class BuyShopItemHandler(
 
         if (!resolved.Succeeded)
         {
-            // Destination occupied by an incompatible item/would overflow the stack -- verified Quit()-worthy,
+            // Destination occupied by incompatible item / would overflow stack -- verified Quit()-worthy,
             // no clean-fail path (S04_MyWork02.cpp:7023-7039).
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
@@ -182,10 +173,9 @@ public sealed class BuyShopItemHandler(
         }
         catch (Exception ex)
         {
-            // Insufficient buyer funds (verified Quit()-worthy, S04_MyWork02.cpp:7016-7020) OR a seller
-            // money-cap breach (verified a CLEAN Result=5 reply in the source, S04_MyWork02.cpp:7010-7015) --
-            // collapsed to one Abort here, same documented simplification GenericActionHandler's own
-            // HandleNpcShopSellAsync already applies to its analogous dual-guard money proc.
+            // Insufficient buyer funds (verified Quit()-worthy, S04_MyWork02.cpp:7016-7020) or a seller
+            // money-cap breach (verified a clean Result=5 reply, S04_MyWork02.cpp:7010-7015) -- collapsed to
+            // one Abort here, same simplification GenericActionHandler.HandleNpcShopSellAsync already applies.
             logger.LogWarning(ex,
                 "PShop purchase ExecutePshopPurchaseAsync failed for buyer {BuyerId}/seller {SellerId} (treated as insufficient/over-cap)",
                 buyer.CharacterId, seller.CharacterId);
@@ -211,14 +201,14 @@ public sealed class BuyShopItemHandler(
             logger.LogError("Zone {MapId} inventory inbox full: dropped PShop-buy seller mirror for character {CharacterId}",
                 zone.MapId, seller.CharacterId);
 
-        // Cosmetic-only mirror of the SELLER's advertised listing -- see PshopZoneCommand's own remarks for
-        // why this is fire-and-forget, never awaited: the real correctness guard already happened above.
+        // Cosmetic-only mirror of the seller's listing -- fire-and-forget (see PshopZoneCommand); the real
+        // correctness guard already happened above.
         var stillHasItems = HasAnyOtherOccupiedSlot(seller.PshopListing, packet.Page1, packet.Index1);
         zone.PostPshopCommand(new PshopZoneCommand(seller.CharacterId, packet.Page1, packet.Index1,
             CloseShop: !stillHasItems));
 
         if (!stillHasItems)
-            session.Send(new CloseShopStallResponse { Result = 1 }); // best-effort: only reaches the BUYER here, matching this handler's own same-connection posture; the seller's own close mirror rides PshopZoneCommand above.
+            session.Send(new CloseShopStallResponse { Result = 1 }); // best-effort: only reaches the BUYER (same-connection); the seller's own close mirror rides PshopZoneCommand above.
     }
 
     private static bool HasAnyOtherOccupiedSlot(PshopInfo? listing, int soldPage, int soldSlot)
@@ -241,8 +231,8 @@ public sealed class BuyShopItemHandler(
     private static void Reply(IPacketSession session, int result, int cost, int page, int index,
         ItemStack? stack = null)
     {
-        // tValue = [id, x, y, quantity, packedValue, serial] (S04_MyWork02.cpp:7046-7051) -- x/y are the
-        // visual sub-cell position Fenrir does not track (see CommitAsync's own remarks), reported as 0.
+        // tValue = [id, x, y, quantity, packedValue, serial] (S04_MyWork02.cpp:7046-7051); x/y (sub-cell
+        // position) reported as 0 -- not tracked (see CommitAsync).
         int[] value = stack is { } s ? [s.ItemId, 0, 0, s.Quantity, s.Value(), s.Serial] : new int[6];
         int[] socket = stack is { } s2 ? [s2.SocketGem1, s2.SocketGem2, s2.SocketGem3] : new int[3];
 

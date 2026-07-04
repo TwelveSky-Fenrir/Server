@@ -12,7 +12,7 @@ namespace Fenrir.Data.Progression;
 ///     throttled 2.5s per period) and CZ_HEROREWARD_SEND (119, claim). Singleton, same posture as every
 ///     other repository in this project.
 /// </summary>
-public sealed record HeroRankingRepository(ICaeriusNetDbContext Db)
+public sealed record HeroRankingRepository(ICaeriusNetDbContext Db) : IHeroRankingRepository
 {
     /// <summary>PeriodKind 0 (Current) or 1 (Previous), leaderboard-ordered (Points DESC).</summary>
     public async ValueTask<ReadOnlyCollection<HeroRankingRowDto>> GetByPeriodAsync(byte periodKind,

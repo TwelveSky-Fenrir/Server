@@ -87,6 +87,8 @@
 30_tables/admin/FirewallRules.sql
 30_tables/admin/GmAllowlist.sql
 30_tables/admin/MacRestrictions.sql
+30_tables/admin/ShardMapAssignments.sql
+30_tables/admin/GameSettings.sql
 
 20_types/game/tvp_CharacterPosition.sql
 20_types/game/tvp_OfflineShopItemSlot.sql
@@ -264,6 +266,8 @@
 50_procedures/admin/usp_GmAllowlist_GetAll.sql
 50_procedures/admin/usp_MacRestriction_Add.sql
 50_procedures/admin/usp_MacRestriction_GetAll.sql
+50_procedures/admin/usp_ShardMapAssignment_GetForShard.sql
+50_procedures/admin/usp_GameSettings_Get.sql
 
 60_permissions/001_roles.sql
 60_permissions/002_roles_login_gifts.sql
@@ -295,3 +299,5 @@
 70_seed/admin/002_error_catalog_a3.sql
 70_seed/admin/003_error_catalog_social.sql
 70_seed/admin/004_error_catalog_v8_commerce.sql
+70_seed/admin/005_shard_map_assignments.sql
+70_seed/admin/006_game_settings.sql

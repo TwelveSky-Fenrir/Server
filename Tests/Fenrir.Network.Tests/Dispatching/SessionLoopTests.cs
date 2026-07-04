@@ -37,7 +37,7 @@ public sealed class SessionLoopTests
         Assert.Equal(FenrirServer.Zone, records[0].Server);
         Assert.Equal(HeartbeatRequest.Opcode, records[0].Opcode);
         Assert.Equal(session.SessionId, records[0].SessionId);
-        Assert.True(frame.AsSpan(LegacyHeaders.ClientPacketSize).SequenceEqual(records[0].Payload));
+        Assert.True(frame.AsSpan(WireHeaderSizes.ClientPacketSize).SequenceEqual(records[0].Payload));
         Assert.Equal(DisconnectReason.ClientClosed, session.DisconnectReason);
     }
 
@@ -69,7 +69,7 @@ public sealed class SessionLoopTests
         var records = dispatcher.Records;
         Assert.Single(records);
         Assert.Equal(HeartbeatRequest.Opcode, records[0].Opcode);
-        Assert.True(frame.AsSpan(LegacyHeaders.ClientPacketSize).SequenceEqual(records[0].Payload));
+        Assert.True(frame.AsSpan(WireHeaderSizes.ClientPacketSize).SequenceEqual(records[0].Payload));
     }
 
     [Fact]
@@ -100,7 +100,7 @@ public sealed class SessionLoopTests
 
         // Opcode 250 is registered for neither server/direction (see Opcodes.cs) -> FrameDecoder's
         // ProtocolViolationException must be swallowed inside SessionLoop, never escape RunAsync.
-        var header = new byte[LegacyHeaders.ClientPacketSize];
+        var header = new byte[WireHeaderSizes.ClientPacketSize];
         header[8] = 250;
         await pipe.PeerToSession.WriteAsync(header);
 
@@ -158,11 +158,11 @@ public sealed class SessionLoopTests
     /// </summary>
     private static byte[] BuildClientFrame(byte opcode, int payloadSize, byte payloadSeed = 1)
     {
-        var frame = new byte[LegacyHeaders.ClientPacketSize + payloadSize];
+        var frame = new byte[WireHeaderSizes.ClientPacketSize + payloadSize];
         frame[8] = opcode;
 
         for (var i = 0; i < payloadSize; i++)
-            frame[LegacyHeaders.ClientPacketSize + i] = unchecked((byte)(payloadSeed + i));
+            frame[WireHeaderSizes.ClientPacketSize + i] = unchecked((byte)(payloadSeed + i));
 
         return frame;
     }

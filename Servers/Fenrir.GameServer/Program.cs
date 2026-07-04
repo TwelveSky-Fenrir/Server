@@ -1,6 +1,7 @@
 using Fenrir.Application.Game;
 using Fenrir.Application.Game.Dispatching;
 using Fenrir.Application.Game.GameData;
+using Fenrir.Application.Game.Guilds;
 using Fenrir.Application.Game.Movement;
 using Fenrir.Application.Game.Progression;
 using Fenrir.Application.Game.Quests;
@@ -58,6 +59,7 @@ builder.Services.AddSingleton<FriendRegistry>();
 builder.Services.AddSingleton<MentorRegistry>();
 builder.Services.AddSingleton<DuelRegistry>();
 builder.Services.AddSingleton<TradeRegistry>();
+builder.Services.AddSingleton<GuildInviteRegistry>();
 builder.Services.AddSingleton<TowerWarState>();
 
 builder.Services.AddHostedService<ZoneTickHost>();

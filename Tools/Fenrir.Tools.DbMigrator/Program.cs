@@ -31,16 +31,65 @@ var scriptPaths = (await File.ReadAllLinesAsync(manifestPath))
     .Where(line => line.Length > 0 && !line.StartsWith('#'))
     .ToArray();
 
+// No Aspire health-check gate upstream (see AppHost.cs) -- the container may still be
+// finishing its first boot when this process starts, so retry instead of failing immediately.
+// Aspire's own "create the database" step is gated by that same broken health check and never
+// runs either, so this migrator owns database creation instead of assuming it already exists.
+const int maxAttempts = 10;
+
+var targetBuilder = new SqlConnectionStringBuilder(connectionString);
+var databaseName = targetBuilder.InitialCatalog;
+
+if (!string.IsNullOrEmpty(databaseName))
+{
+    var masterBuilder = new SqlConnectionStringBuilder(connectionString) { InitialCatalog = "master" };
+    await using var masterConnection = new SqlConnection(masterBuilder.ConnectionString);
+
+    for (var attempt = 1; ; attempt++)
+    {
+        try
+        {
+            await masterConnection.OpenAsync();
+            break;
+        }
+        catch (SqlException ex) when (attempt < maxAttempts)
+        {
+            Console.WriteLine($"Connection attempt {attempt}/{maxAttempts} failed: {ex.Message}. Retrying in 3s...");
+            await Task.Delay(TimeSpan.FromSeconds(3));
+        }
+        catch (SqlException ex)
+        {
+            Console.Error.WriteLine($"Could not connect after {maxAttempts} attempts: {ex.Message}");
+            return 1;
+        }
+    }
+
+    var quotedName = databaseName.Replace("]", "]]");
+    await using var createDbCommand = new SqlCommand(
+        $"IF DB_ID(N'{databaseName.Replace("'", "''")}') IS NULL CREATE DATABASE [{quotedName}];", masterConnection);
+    await createDbCommand.ExecuteNonQueryAsync();
+    Console.WriteLine($"Database '{databaseName}' ready.");
+}
+
 await using var connection = new SqlConnection(connectionString);
 
-try
+for (var attempt = 1; ; attempt++)
 {
-    await connection.OpenAsync();
-}
-catch (SqlException ex)
-{
-    Console.Error.WriteLine($"Could not connect: {ex.Message}");
-    return 1;
+    try
+    {
+        await connection.OpenAsync();
+        break;
+    }
+    catch (SqlException ex) when (attempt < maxAttempts)
+    {
+        Console.WriteLine($"Connection attempt {attempt}/{maxAttempts} failed: {ex.Message}. Retrying in 3s...");
+        await Task.Delay(TimeSpan.FromSeconds(3));
+    }
+    catch (SqlException ex)
+    {
+        Console.Error.WriteLine($"Could not connect after {maxAttempts} attempts: {ex.Message}");
+        return 1;
+    }
 }
 
 var journalReady = await JournalTableExistsAsync(connection);

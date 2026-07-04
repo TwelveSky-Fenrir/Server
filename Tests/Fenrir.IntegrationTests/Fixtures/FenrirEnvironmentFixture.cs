@@ -44,26 +44,7 @@ public sealed class FenrirEnvironmentFixture : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        var builder = DistributedApplicationTestingBuilder.Create(NoArgs);
-
-        builder.AddSqlServer("sqlserver")
-            .WithImageTag("2025-latest")
-            .AddDatabase("FenrirDbIntegration");
-
-        _app = await builder.BuildAsync();
-        await _app.StartAsync();
-
-        using (var readyCts = new CancellationTokenSource(TimeSpan.FromMinutes(3)))
-            await _app.ResourceNotifications.WaitForResourceHealthyAsync("FenrirDbIntegration", readyCts.Token);
-
-        ConnectionString = await _app.GetConnectionStringAsync("FenrirDbIntegration") ??
-                            throw new InvalidOperationException(
-                                "The \"FenrirDbIntegration\" resource did not produce a connection string even " +
-                                "though it just reported healthy.");
-
-        await ApplyManifestAsync();
-        await SeedSecondShardMapAsync();
-        var accountId = await SeedTestAccountAsync();
+        var accountId = await StartDatabaseWithRetryAsync();
 
         LoginPort = ReserveEphemeralLoopbackPort();
         GamePort = ReserveEphemeralLoopbackPort();
@@ -113,6 +94,47 @@ public sealed class FenrirEnvironmentFixture : IAsyncLifetime
         var connection = new SqlConnection(ConnectionString);
         await connection.OpenAsync();
         return connection;
+    }
+
+    /// <summary>
+    ///     A freshly-"healthy" SQL Server container can still drop the very first heavy burst of DDL
+    ///     (SqlException/transport-level connection reset) before it's genuinely stable -- retries with a whole
+    ///     fresh container rather than resuming mid-manifest, since CREATE TABLE isn't safe to replay.
+    /// </summary>
+    private async Task<int> StartDatabaseWithRetryAsync()
+    {
+        const int maxAttempts = 3;
+
+        for (var attempt = 1;; attempt++)
+        {
+            var builder = DistributedApplicationTestingBuilder.Create(NoArgs);
+            builder.AddSqlServer("sqlserver").WithImageTag("2025-latest").AddDatabase("FenrirDbIntegration");
+            _app = await builder.BuildAsync();
+
+            try
+            {
+                await _app.StartAsync();
+
+                using (var readyCts = new CancellationTokenSource(TimeSpan.FromMinutes(3)))
+                    await _app.ResourceNotifications.WaitForResourceHealthyAsync("FenrirDbIntegration",
+                        readyCts.Token);
+
+                ConnectionString = await _app.GetConnectionStringAsync("FenrirDbIntegration") ??
+                                    throw new InvalidOperationException(
+                                        "The \"FenrirDbIntegration\" resource did not produce a connection " +
+                                        "string even though it just reported healthy.");
+
+                await Task.Delay(TimeSpan.FromSeconds(5));
+                await ApplyManifestAsync();
+                await SeedSecondShardMapAsync();
+                return await SeedTestAccountAsync();
+            }
+            catch (SqlException) when (attempt < maxAttempts)
+            {
+                await _app.DisposeAsync();
+                _app = null;
+            }
+        }
     }
 
     /// <summary>
@@ -219,7 +241,7 @@ public sealed class FenrirEnvironmentFixture : IAsyncLifetime
     private static string OriginalBuildOutputDllPath(Assembly serverAssembly)
     {
         var tfmDir = new DirectoryInfo(AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar));
-        var repoRoot = tfmDir.Parent!.Parent!.Parent!.Parent!.FullName;
+        var repoRoot = tfmDir.Parent!.Parent!.Parent!.Parent!.Parent!.FullName;
         var assemblyName = serverAssembly.GetName().Name!;
         return Path.Combine(repoRoot, "Servers", assemblyName, "bin", tfmDir.Parent.Name, tfmDir.Name,
             assemblyName + ".dll");

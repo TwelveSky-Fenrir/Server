@@ -1,3 +1,4 @@
+using CaeriusNet.Abstractions;
 using CaeriusNet.Builders;
 using Fenrir.Data.Accounts;
 using Fenrir.Data.Admin;
@@ -27,6 +28,13 @@ public static class FenrirDataServiceCollectionExtensions
             .Create(builder)
             .WithAspireSqlServer(connectionName)
             .Build();
+
+        // CaeriusNetBuilder registers ICaeriusNetDbContext as Scoped, which the singleton repositories below
+        // can't consume. CaeriusNetDbContext holds no per-scope state (just a logger and a connection factory --
+        // DbConnectionAsync opens a brand-new SqlConnection every call), so resolving it once from a single
+        // root scope and reusing that instance for the app's lifetime is safe. This registration replaces
+        // CaeriusNet's Scoped one because the last registration for a service type wins.
+        builder.Services.AddSingleton(sp => sp.CreateScope().ServiceProvider.GetRequiredService<ICaeriusNetDbContext>());
 
         builder.Services.AddSingleton<IAccountRepository, AccountRepository>();
         builder.Services.AddSingleton<IAccountPinRepository, AccountPinRepository>();

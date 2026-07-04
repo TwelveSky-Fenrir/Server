@@ -13,9 +13,12 @@ var sql = builder.AddSqlServer("sqlserver", sqlPassword)
 var fenrirDb = sql.AddDatabase("FenrirDb");
 
 // Applies Database/_manifest.txt then exits; every server WaitForCompletion(migrator) below.
+// WaitForStart (not WaitFor) -- the built-in sqlserver/FenrirDb health check never reports a
+// result on this Aspire build (registers but is never invoked), which would otherwise hang
+// the whole app forever. DbMigrator retries its own connection instead.
 var migrator = builder.AddProject<Fenrir_Tools_DbMigrator>("db-migrator")
     .WithReference(fenrirDb)
-    .WaitFor(fenrirDb);
+    .WaitForStart(fenrirDb);
 
 const int loginPort = 29998;
 builder.AddProject<Fenrir_LoginServer>("login-server")

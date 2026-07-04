@@ -2,7 +2,10 @@ using Microsoft.CodeAnalysis;
 
 namespace Fenrir.Generators.Analysis.Model;
 
-/// <summary>Property source declaration order is the binary wire layout; never reorder <see cref="Fields"/> collections built from it.</summary>
+/// <summary>
+///     Property source declaration order is the binary wire layout; never reorder <see cref="Fields" /> collections
+///     built from it.
+/// </summary>
 internal sealed class FieldModel
 {
     public required string PropertyName { get; init; }

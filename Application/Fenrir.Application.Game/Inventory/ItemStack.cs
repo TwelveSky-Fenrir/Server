@@ -2,7 +2,10 @@ using Fenrir.Data.Characters;
 
 namespace Fenrir.Application.Game.Inventory;
 
-/// <summary>One occupied slot's item state in memory (Container/Slot are the dictionary keys in InventoryState, not repeated here).</summary>
+/// <summary>
+///     One occupied slot's item state in memory (Container/Slot are the dictionary keys in InventoryState, not
+///     repeated here).
+/// </summary>
 public readonly record struct ItemStack(
     int ItemId,
     int Quantity,

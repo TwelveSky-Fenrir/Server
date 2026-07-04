@@ -13,10 +13,16 @@ public sealed class LoginClientSession(long sessionId, IDuplexPipe transport, IP
 {
     public LoginSessionState State { get; private set; } = LoginSessionState.Connected;
 
-    /// <summary>Set by <see cref="MarkAuthenticated" /> — the DB identity (legacy <c>uUserIdx</c>, ADR-0005). Null until authenticated.</summary>
+    /// <summary>
+    ///     Set by <see cref="MarkAuthenticated" /> — the DB identity (legacy <c>uUserIdx</c>, ADR-0005). Null until
+    ///     authenticated.
+    /// </summary>
     public int? AccountId { get; private set; }
 
-    /// <summary>Legacy <c>mSecondLoginTryNum</c>: consecutive mouse-PIN mismatches; the third disconnects (S04_MyWork02.cpp l.517-522).</summary>
+    /// <summary>
+    ///     Legacy <c>mSecondLoginTryNum</c>: consecutive mouse-PIN mismatches; the third disconnects (S04_MyWork02.cpp
+    ///     l.517-522).
+    /// </summary>
     public int PinFailureCount { get; private set; }
 
     public override bool IsOpcodeAllowed(byte opcode)
@@ -35,7 +41,10 @@ public sealed class LoginClientSession(long sessionId, IDuplexPipe transport, IP
         State = LoginSessionState.Authenticated;
     }
 
-    /// <summary>Legacy <c>mSecondLoginSort = 1</c> after LOGIN_SEND with P2ndPassword=1: PIN gate closes until op 13/14/15. Also resets the mismatch counter.</summary>
+    /// <summary>
+    ///     Legacy <c>mSecondLoginSort = 1</c> after LOGIN_SEND with P2ndPassword=1: PIN gate closes until op 13/14/15.
+    ///     Also resets the mismatch counter.
+    /// </summary>
     public void MarkPinRequired()
     {
         PinFailureCount = 0;

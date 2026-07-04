@@ -14,6 +14,16 @@ namespace Fenrir.Application.Game.World;
 /// </summary>
 public sealed class PlayerRuntimeState
 {
+    private static readonly ImmutableArray<(int ItemId, int Count)> DefaultBottleSlots =
+    [
+        (0, 0), (0, 0), (0, 0), (0, 0), (0, 0), (0, 0), (0, 0), (0, 0), (0, 0), (0, 0)
+    ];
+
+    private static readonly ImmutableArray<(int SkillId, int Grade)> DefaultAutoBuffSkill =
+    [
+        (0, 0), (0, 0), (0, 0), (0, 0), (0, 0), (0, 0), (0, 0), (0, 0)
+    ];
+
     public required int CharacterId { get; init; }
     public required IPacketSession Session { get; init; }
     public required string Name { get; init; }
@@ -21,7 +31,12 @@ public sealed class PlayerRuntimeState
     public required byte Gender { get; init; }
     public required byte HeadType { get; init; }
     public required byte FaceType { get; init; }
-    public required short Level { get; init; }
+
+    /// <summary>
+    ///     aLevel1. Mutated only by <see cref="Zone.GrantMonsterKillExperience" /> on a level-up -- every other
+    ///     read site treats this as the character's current level.
+    /// </summary>
+    public required short Level { get; set; }
 
     public short MapId { get; set; }
     public float PosX { get; set; }
@@ -64,13 +79,19 @@ public sealed class PlayerRuntimeState
     /// <summary>aTitle (category*100 + rank 1-14) -- read by StatCalculator's title-rank bonus tables.</summary>
     public int Title { get; set; }
 
-    /// <summary>aHalo -- read twice independently by StatCalculator: added directly to all 4 base stats, and again for its own CriticalDefence bonus.</summary>
+    /// <summary>
+    ///     aHalo -- read twice independently by StatCalculator: added directly to all 4 base stats, and again for its own
+    ///     CriticalDefence bonus.
+    /// </summary>
     public int Halo { get; set; }
 
     /// <summary>aKillOtherTribe (CP) -- quest reward type 3 income; not consumed by StatCalculator.</summary>
     public int ContributionPoints { get; set; }
 
-    /// <summary>aTeacherPoint -- quest reward type 5 income. A separate counter from the Mentor system's TeacherCharacterId/StudentCharacterId bond.</summary>
+    /// <summary>
+    ///     aTeacherPoint -- quest reward type 5 income. A separate counter from the Mentor system's
+    ///     TeacherCharacterId/StudentCharacterId bond.
+    /// </summary>
     public int TeacherPoint { get; set; }
 
     /// <summary>
@@ -101,7 +122,10 @@ public sealed class PlayerRuntimeState
     /// </summary>
     public long FlushSequence { get; set; }
 
-    /// <summary>AOI grid bookkeeping -- which cell this player currently occupies, so <see cref="AoiGrid" /> can detect a crossing without a full rescan.</summary>
+    /// <summary>
+    ///     AOI grid bookkeeping -- which cell this player currently occupies, so <see cref="AoiGrid" /> can detect a
+    ///     crossing without a full rescan.
+    /// </summary>
     public (int X, int Z) CurrentCell { get; set; }
 
     /// <summary>
@@ -156,8 +180,10 @@ public sealed class PlayerRuntimeState
     ///     <see cref="Simulation.BuffExpirySystem" /> every legacy tick.
     /// </summary>
     /// <remarks>
-    ///     Deliberately a fresh per-instance array (never <c>Fenrir.Contracts.Packets.Shared.WorldStateTemplates.ZeroedBuffInfo</c>,
-    ///     a shared static instance) -- reusing that template would let every player's buffs alias the same backing <c>int[]</c>.
+    ///     Deliberately a fresh per-instance array (never
+    ///     <c>Fenrir.Contracts.Packets.Shared.WorldStateTemplates.ZeroedBuffInfo</c>,
+    ///     a shared static instance) -- reusing that template would let every player's buffs alias the same backing
+    ///     <c>int[]</c>.
     /// </remarks>
     public BuffInfo Buffs { get; } = new() { Buff = new int[70] };
 
@@ -195,7 +221,10 @@ public sealed class PlayerRuntimeState
 
     public byte GuildRoleDb { get; set; }
 
-    /// <summary>Cosmetic in-guild title (legacy gMemberCall, game.GuildMembers.CallName) -- loaded once at world entry alongside <see cref="GuildId" />.</summary>
+    /// <summary>
+    ///     Cosmetic in-guild title (legacy gMemberCall, game.GuildMembers.CallName) -- loaded once at world entry
+    ///     alongside <see cref="GuildId" />.
+    /// </summary>
     public string GuildCallName { get; set; } = "";
 
     /// <summary>
@@ -204,23 +233,46 @@ public sealed class PlayerRuntimeState
     /// </summary>
     public byte TribeRole { get; set; }
 
-    /// <summary>aUseOrnament. Session-scoped only -- not yet loaded from/flushed to game.Characters (no persisted column exists yet).</summary>
+    /// <summary>
+    ///     aUseOrnament. Session-scoped only -- not yet loaded from/flushed to game.Characters (no persisted column
+    ///     exists yet).
+    /// </summary>
     public bool UseOrnament { get; set; }
 
-    /// <summary>aProtectForHalo -- a consumable charge that absorbs one "halo -1" downgrade. Same open issue as <see cref="UseOrnament" />: session-scoped only.</summary>
+    /// <summary>
+    ///     aProtectForHalo -- a consumable charge that absorbs one "halo -1" downgrade. Same open issue as
+    ///     <see cref="UseOrnament" />: session-scoped only.
+    /// </summary>
     public int ProtectForHalo { get; set; }
 
-    /// <summary>aBonusItemLevel -- which level-up milestone's bonus-item claim is pending. Session-scoped only; always 0 until a leveling-milestone system grants it.</summary>
+    /// <summary>
+    ///     aBonusItemLevel -- which level-up milestone's bonus-item claim is pending. Session-scoped only; always 0 until
+    ///     a leveling-milestone system grants it.
+    /// </summary>
     public int BonusItemLevel { get; set; }
 
     /// <summary>aBonusItemValue -- companion flag to <see cref="BonusItemLevel" />, same open issue.</summary>
     public bool BonusItemValue { get; set; }
 
     /// <summary>
+    ///     aTribeNotifyNum -- remaining CZ_TRIBE_NOTIFY_SEND (opcode 112) "announcement scroll" charges.
+    ///     Session-scoped only; always 0 until the UseInventoryItem scroll-item family (op 23) is implemented,
+    ///     same open issue as <see cref="BonusItemLevel" />.
+    /// </summary>
+    public int TribeNotifyScrollCount { get; set; }
+
+    /// <summary>
     ///     aPreviousTribe. No rebirth/tribe-transition system exists yet to populate this from anything other
     ///     than the character's current <see cref="Tribe" /> -- defaults to <see cref="Tribe" /> at world entry.
     /// </summary>
     public byte PreviousTribe { get; set; }
+
+    /// <summary>
+    ///     aBottle/aBottleCount (10 slots, ItemId 0 = empty). Session-scoped only -- same open issue as
+    ///     <see cref="UseOrnament" />, no persisted column exists yet. Populated by UseInventoryItemHandler's
+    ///     iSort==26 family, consumed/decremented by DrinkBottleHandler.
+    /// </summary>
+    public ImmutableArray<(int ItemId, int Count)> BottleSlots { get; set; } = DefaultBottleSlots;
 
     /// <summary>
     ///     This character's own friend list (slot -&gt; friend CharacterId), mutated directly by friend-add/
@@ -231,16 +283,28 @@ public sealed class PlayerRuntimeState
     /// </summary>
     public ConcurrentDictionary<byte, int> Friends { get; } = new();
 
-    /// <summary>This character's teacher (master), if any -- mutated live by mentor start/end handlers (same request-thread exception as <see cref="Friends" />). Null = no teacher.</summary>
+    /// <summary>
+    ///     This character's teacher (master), if any -- mutated live by mentor start/end handlers (same request-thread
+    ///     exception as <see cref="Friends" />). Null = no teacher.
+    /// </summary>
     public int? TeacherCharacterId { get; set; }
 
-    /// <summary>This character's student, if any (only meaningful for a master) -- same posture as <see cref="TeacherCharacterId" />.</summary>
+    /// <summary>
+    ///     This character's student, if any (only meaningful for a master) -- same posture as
+    ///     <see cref="TeacherCharacterId" />.
+    /// </summary>
     public int? StudentCharacterId { get; set; }
 
-    /// <summary>The linear per-tribe quest chain's permanent progression index (legacy <c>aQuestInfo[0]</c>) -- survives completion/abandon.</summary>
+    /// <summary>
+    ///     The linear per-tribe quest chain's permanent progression index (legacy <c>aQuestInfo[0]</c>) -- survives
+    ///     completion/abandon.
+    /// </summary>
     public int QuestStepPermanent { get; set; }
 
-    /// <summary>Legacy <c>aQuestInfo[1]</c> -- a 0/1 "quest active" flag, NOT a quest id despite the DB column's legacy-derived name.</summary>
+    /// <summary>
+    ///     Legacy <c>aQuestInfo[1]</c> -- a 0/1 "quest active" flag, NOT a quest id despite the DB column's
+    ///     legacy-derived name.
+    /// </summary>
     public int QuestActiveFlag { get; set; }
 
     /// <summary>Legacy <c>aQuestInfo[2]</c> -- the active quest's <c>qSort</c> (1-8). 0 = no active quest.</summary>
@@ -270,10 +334,16 @@ public sealed class PlayerRuntimeState
     /// </summary>
     public int MissionKillOtherTribe { get; set; }
 
-    /// <summary>Legacy <c>aMissionDate.aKillMonster</c> -- tracked (echoed on ZC 163) but its own claim-gate is compiled out in EU33, so it never blocks a claim.</summary>
+    /// <summary>
+    ///     Legacy <c>aMissionDate.aKillMonster</c> -- tracked (echoed on ZC 163) but its own claim-gate is compiled out
+    ///     in EU33, so it never blocks a claim.
+    /// </summary>
     public int MissionKillMonster { get; set; }
 
-    /// <summary>Legacy <c>aMissionDate.aPlayTime</c> -- same "tracked, gate compiled out" posture as <see cref="MissionKillMonster" />.</summary>
+    /// <summary>
+    ///     Legacy <c>aMissionDate.aPlayTime</c> -- same "tracked, gate compiled out" posture as
+    ///     <see cref="MissionKillMonster" />.
+    /// </summary>
     public int MissionPlayTime { get; set; }
 
     /// <summary>Legacy <c>aAutoState</c> (0/1) -- CZ_AUTO_CONFIG_SEND/ZC_AUTO_CONFIG_RECV (opcode 99/123).</summary>
@@ -293,10 +363,16 @@ public sealed class PlayerRuntimeState
     /// <summary>Legacy <c>aAutoManaRatio</c> (0-5) -- same posture as <see cref="AutoLifeRatio" />.</summary>
     public byte AutoManaRatio { get; set; }
 
-    /// <summary>Zone-clock instant of this character's last CZ_HERORANK_INFO_SEND reply for the previous period (ZC 148) -- 2.5s per-user throttle. Null = never queried yet.</summary>
+    /// <summary>
+    ///     Zone-clock instant of this character's last CZ_HERORANK_INFO_SEND reply for the previous period (ZC 148) --
+    ///     2.5s per-user throttle. Null = never queried yet.
+    /// </summary>
     public TimeSpan? LastHeroRankingPreviousQueryAtZoneClock { get; set; }
 
-    /// <summary>Same throttle posture as <see cref="LastHeroRankingPreviousQueryAtZoneClock" />, for the current period (ZC 150).</summary>
+    /// <summary>
+    ///     Same throttle posture as <see cref="LastHeroRankingPreviousQueryAtZoneClock" />, for the current period (ZC
+    ///     150).
+    /// </summary>
     public TimeSpan? LastHeroRankingCurrentQueryAtZoneClock { get; set; }
 
     /// <summary>
@@ -312,10 +388,16 @@ public sealed class PlayerRuntimeState
     /// </summary>
     public byte PetActivity { get; set; }
 
-    /// <summary>The ItemId last seen equipped in the pet slot -- lets <see cref="World.Zone" /> detect a pet swap (not just any equipment change) to reset <see cref="PetGrowth" />/<see cref="PetActivity" />. 0 = no pet equipped.</summary>
+    /// <summary>
+    ///     The ItemId last seen equipped in the pet slot -- lets <see cref="World.Zone" /> detect a pet swap (not just
+    ///     any equipment change) to reset <see cref="PetGrowth" />/<see cref="PetActivity" />. 0 = no pet equipped.
+    /// </summary>
     public int LastSeenPetItemId { get; set; }
 
-    /// <summary>Legacy-tick accumulator for <see cref="Simulation.PetActivitySystem" />'s own 30s decay cadence -- never read by anything else.</summary>
+    /// <summary>
+    ///     Legacy-tick accumulator for <see cref="Simulation.PetActivitySystem" />'s own 30s decay cadence -- never read
+    ///     by anything else.
+    /// </summary>
     public int PetActivityDecayTicks { get; set; }
 
     /// <summary>
@@ -327,6 +409,152 @@ public sealed class PlayerRuntimeState
     /// </summary>
     public bool PshopOpen { get; set; }
 
-    /// <summary>The currently-advertised stall listing while <see cref="PshopOpen" /> is true; stale/meaningless otherwise (not cleared on close).</summary>
+    /// <summary>
+    ///     The currently-advertised stall listing while <see cref="PshopOpen" /> is true; stale/meaningless otherwise
+    ///     (not cleared on close).
+    /// </summary>
     public PshopInfo? PshopListing { get; set; }
+
+    /// <summary>
+    ///     Legacy <c>mDATA.mFishingState</c> (0/1), zone 52 only. Session-only: the legacy itself keeps this on
+    ///     <c>MyUser</c>, not <c>AVATAR_INFO</c>, so no persisted column exists or is needed.
+    /// </summary>
+    public int FishingState { get; set; }
+
+    /// <summary>Legacy <c>mDATA.mFishingStep</c> (0..5). Same session-only posture as <see cref="FishingState" />.</summary>
+    public int FishingStep { get; set; }
+
+    /// <summary>
+    ///     Legacy <c>mFishingTickCount</c> -- gates the ~1-minute poll-bite window (CZ_FISHING_RESULT_SEND Sort=1).
+    ///     Deliberately wall-clock (unlike most other <c>*AtZoneClock</c> fields): the elapsed check is resolved
+    ///     on the request thread reading this field directly, which cannot see Zone's private simulated clock.
+    ///     Null = never cast.
+    /// </summary>
+    public DateTime? FishingCastAtUtc { get; set; }
+
+    /// <summary>
+    ///     Legacy <c>mCatchingFish</c> -- true only after a bite (step 4/5), gates CZ_FISHING_REWARD_SEND. Cleared
+    ///     unconditionally by every CZ_FISHING_STATE_SEND (cast/reel), matching the legacy exactly.
+    /// </summary>
+    public bool CatchingFish { get; set; }
+
+    /// <summary>
+    ///     aAnimal[10] mount garage -- no acquisition path exists yet (only the unimplemented UseInventoryItem
+    ///     mount-item family populates it per S04_MyWork03.cpp), so every slot stays 0 until that lands. A real
+    ///     array, permanently empty for now, same posture as <see cref="MissionJoinWar" />.
+    /// </summary>
+    public ImmutableArray<int> MountGarage { get; set; } = ImmutableArray.Create(0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+
+    /// <summary>
+    ///     aAnimalIndex. -1 = none selected, 0-9 = selected garage slot, 10-19 = actively mounted (slot + 10, legacy's
+    ///     own offset encoding).
+    /// </summary>
+    public int AnimalIndex { get; set; } = -1;
+
+    /// <summary>aAnimalNumber -- the currently-mounted animal id feeding combat stats/broadcast. 0 = not mounted.</summary>
+    public int AnimalNumber { get; set; }
+
+    /// <summary>aAnimalAbsorbState (0/1) -- CZ_ANIMAL_ABSORB_SEND toggle.</summary>
+    public int AnimalAbsorbState { get; set; }
+
+    /// <summary>
+    ///     aAnimalTime -- gates CZ_ANIMAL_STATE_SEND case 3 (mount), &gt;= 1 required. Same "real but currently
+    ///     unreachable" posture as <see cref="MissionJoinWar" />: no acquisition path exists yet, so this stays 0.
+    /// </summary>
+    public int AnimalTime { get; set; }
+
+    /// <summary>
+    ///     aAnimalAbsorbTime -- gates CZ_ANIMAL_ABSORB_SEND case 1 (enable absorb), &gt;= 1 required. Same posture as
+    ///     <see cref="AnimalTime" />.
+    /// </summary>
+    public int AnimalAbsorbTime { get; set; }
+
+    /// <summary>
+    ///     aCostume[10] wardrobe -- same "no acquisition path yet" posture as <see cref="MountGarage" />. A
+    ///     slot's occupancy is simplified here to "non-zero" rather than replicating the legacy's ~300-entry
+    ///     IsValidCostume item-id whitelist (Server/Header/function.h): no code path grants a costume yet, so
+    ///     the simplification never diverges from that table in practice today.
+    /// </summary>
+    public ImmutableArray<int> CostumeWardrobe { get; set; } = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+
+    /// <summary>
+    ///     aCostumeIndex. Same offset-encoding convention as <see cref="AnimalIndex" /> (-1 none, 0-9 selected, 10-19
+    ///     worn).
+    /// </summary>
+    public int CostumeIndex { get; set; } = -1;
+
+    /// <summary>aCostumeNumber -- the currently-worn costume id. 0 = none worn.</summary>
+    public int CostumeNumber { get; set; }
+
+    /// <summary>aCostumeState -- CZ_COSTUME_STATE2_SEND visibility toggle (0/1).</summary>
+    public int CostumeState { get; set; }
+
+    /// <summary>
+    ///     aAction.aPetSort -- last accepted CZ_UPDATE_PET_ACTION_SEND's pet sub-fields. The legacy handler has
+    ///     no reply/broadcast of its own; the update rides along on the next full avatar rebroadcast instead
+    ///     (<see cref="Zone" />'s shared rebroadcast-snapshot builder still needs wiring to surface these --
+    ///     tracked here, not yet plumbed into that shared path).
+    /// </summary>
+    public int PetActionSort { get; set; }
+
+    public float PetActionFront { get; set; }
+    public float PetActionLocationX { get; set; }
+    public float PetActionLocationY { get; set; }
+    public float PetActionLocationZ { get; set; }
+    public float PetActionTargetLocationX { get; set; }
+    public float PetActionTargetLocationY { get; set; }
+    public float PetActionTargetLocationZ { get; set; }
+
+    /// <summary>
+    ///     aAutoBuffSkill[8] -- CZ_CONTINUE_SKILL_STAT_SEND (op94) registered auto-buff (skillId, grade) slots.
+    ///     Session-scoped only, same "no persisted column yet" posture as <see cref="MountGarage" />.
+    /// </summary>
+    public ImmutableArray<(int SkillId, int Grade)> AutoBuffSkill { get; set; } = DefaultAutoBuffSkill;
+
+    /// <summary>
+    ///     aAutoBuffTime (YYYYMMDD, <see cref="Simulation.GameDate" /> encoding) -- gates CZ_CONTINUE_SKILL_USE_SEND
+    ///     Sort=1. Same "real but currently unreachable" posture as <see cref="AnimalAbsorbTime" />: no
+    ///     acquisition path (the unimplemented UseInventoryItem cash-boost family) exists yet, so this stays 0.
+    /// </summary>
+    public int AutoBuffTime { get; set; }
+
+    /// <summary>
+    ///     aStateTimeEffect -- CZ_TIME_EFFECT_SEND (op97) reward tier currently applied (120/180/240/300/360), 0 =
+    ///     none. SetTimeEffect's downstream drop/exp-rate multipliers (mItemDropUpRatio etc.) are not modeled --
+    ///     see <see cref="Handlers.PlaytimeBuffHandler" />'s remarks.
+    /// </summary>
+    public int StateTimeEffect { get; set; }
+
+    /// <summary>
+    ///     aRankBuffType -- CZ_RANK_BUFF_SEND (op111) active buff tier (1-7), 0 = none. MyFactor.cpp's per-tier
+    ///     stat bonuses are not modeled yet -- see <see cref="Handlers.RankBuffHandler" />'s remarks.
+    /// </summary>
+    public int RankBuffType { get; set; }
+
+    /// <summary>
+    ///     aRuneSystem[4] -- ItemId currently socketed per rune slot (93514-93517 family, index-aligned), 0 =
+    ///     empty. Session-only, no persisted column exists yet -- same posture as <see cref="MountGarage" />.
+    /// </summary>
+    public ImmutableArray<int> RuneSystem { get; set; } = [0, 0, 0, 0];
+
+    /// <summary>
+    ///     aRuneSystemStat[4] -- the socketed rune's raw packed enchant/combine/refine/socket int (<c>ItemValueCodec</c>
+    ///     -encoded), paired 1:1 with <see cref="RuneSystem" />.
+    /// </summary>
+    public ImmutableArray<int> RuneSystemStat { get; set; } = [0, 0, 0, 0];
+
+    /// <summary>
+    ///     aStellarCore[10] wardrobe -- same "no acquisition path yet" posture as <see cref="CostumeWardrobe" />:
+    ///     no code path grants a stellar core yet, so every slot stays 0 until that lands.
+    /// </summary>
+    public ImmutableArray<int> StellarCoreWardrobe { get; set; } = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+
+    /// <summary>
+    ///     aStellarCoreIndex. Same offset-encoding convention as <see cref="CostumeIndex" /> (-1 none, 0-9 selected,
+    ///     10-19 worn).
+    /// </summary>
+    public int StellarCoreIndex { get; set; } = -1;
+
+    /// <summary>aStellarCoreNumber -- the currently-worn stellar core id feeding stats/broadcast. 0 = none worn.</summary>
+    public int StellarCoreNumber { get; set; }
 }

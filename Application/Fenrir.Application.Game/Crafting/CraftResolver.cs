@@ -3,8 +3,14 @@ using Fenrir.Application.Game.Inventory;
 
 namespace Fenrir.Application.Game.Crafting;
 
-/// <summary>Pure resolver for the two CZ_MAKE_ITEM_SEND recipes this pass implements (<see cref="CraftRecipeCatalog" />'s own remarks). No I/O, no Zone dependency.</summary>
-/// <remarks>Every other <c>MK_*</c> family (weighted stone tables, mount/wing fusion, dust recycling, skill-book/pet crafting) is out of scope -- needs data Fenrir does not catalog.</remarks>
+/// <summary>
+///     Pure resolver for the two CZ_MAKE_ITEM_SEND recipes this pass implements (<see cref="CraftRecipeCatalog" />'s
+///     own remarks). No I/O, no Zone dependency.
+/// </summary>
+/// <remarks>
+///     Every other <c>MK_*</c> family (weighted stone tables, mount/wing fusion, dust recycling, skill-book/pet
+///     crafting) is out of scope -- needs data Fenrir does not catalog.
+/// </remarks>
 public static class CraftResolver
 {
     public enum ElixirOutcome
@@ -25,8 +31,14 @@ public static class CraftResolver
         Rejected
     }
 
-    /// <summary>2 separate Purple Jades (not one stack of 2) become one Red Jade in the first slot; the second slot is cleared.</summary>
-    /// <remarks>Both slots must hold exactly 1 unit -- without this check a stack of N&gt;1 would upgrade the whole stack for the cost of one, a duplication vector.</remarks>
+    /// <summary>
+    ///     2 separate Purple Jades (not one stack of 2) become one Red Jade in the first slot; the second slot is
+    ///     cleared.
+    /// </summary>
+    /// <remarks>
+    ///     Both slots must hold exactly 1 unit -- without this check a stack of N&gt;1 would upgrade the whole stack for
+    ///     the cost of one, a duplication vector.
+    /// </remarks>
     public static JadeResult ResolveJadeUpgrade(ItemStack material1, ItemStack material2)
     {
         if (material1.ItemId != CraftRecipeCatalog.PurpleJadeItemId ||
@@ -45,7 +57,10 @@ public static class CraftResolver
         return new JadeResult(JadeOutcome.Success, result);
     }
 
-    /// <summary>10 units of any one base item -&gt; 20% chance of one random item in [801,806]. Free-slot check happens before the roll, so it applies regardless of outcome.</summary>
+    /// <summary>
+    ///     10 units of any one base item -&gt; 20% chance of one random item in [801,806]. Free-slot check happens before
+    ///     the roll, so it applies regardless of outcome.
+    /// </summary>
     public static ElixirResult ResolveAdvancedElixir(ItemStack material, bool hasFreeInventorySlot,
         IRandomSource random)
     {

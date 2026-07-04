@@ -1,9 +1,15 @@
 namespace Fenrir.Application.Game.Combat;
 
-/// <summary>Pure attack-resolution arithmetic, verified 1:1 against S07_MyGame02.cpp's AttackPlayer/ProcessAttack03/ProcessAttack04.</summary>
+/// <summary>
+///     Pure attack-resolution arithmetic, verified 1:1 against S07_MyGame02.cpp's
+///     AttackPlayer/ProcessAttack03/ProcessAttack04.
+/// </summary>
 public static class CombatMath
 {
-    /// <summary>Defender block &lt;= 0: legacy skips the roll entirely, so attack always lands -- callers must not call this method in that case.</summary>
+    /// <summary>
+    ///     Defender block &lt;= 0: legacy skips the roll entirely, so attack always lands -- callers must not call this
+    ///     method in that case.
+    /// </summary>
     public const int AlwaysHitPercent = 100;
 
     /// <summary>Base 70% ±25% scaled by success/block ratio, clamped [1,99]. Both args must be &gt;= 1.</summary>

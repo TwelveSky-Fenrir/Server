@@ -1,6 +1,9 @@
 namespace Fenrir.Application.Game.Quests;
 
-/// <summary>The legacy's entire quest state in 5 ints (wAvatar.aQuestInfo[5]), shared by QuestStateMachine/PlayerRuntimeState/game.CharacterQuests.</summary>
+/// <summary>
+///     The legacy's entire quest state in 5 ints (wAvatar.aQuestInfo[5]), shared by
+///     QuestStateMachine/PlayerRuntimeState/game.CharacterQuests.
+/// </summary>
 public readonly record struct QuestProgress(
     int StepPermanent,
     int ActiveFlag,

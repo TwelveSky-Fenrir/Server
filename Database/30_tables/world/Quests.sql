@@ -12,20 +12,20 @@ CREATE TABLE world.Quests
     Step             SMALLINT NOT NULL,
     Level            SMALLINT NOT NULL,
     Type             TINYINT  NOT NULL,
-    Sort             TINYINT  NOT NULL,     -- quest-type discriminator, see header comment mapping
-    SummonZoneNumber SMALLINT NULL,         -- qSummonInfo[0]; NULL unless Sort=5 (boss summon)
-    SummonPosX       INT NULL,              -- qSummonInfo[1]
-    SummonPosY       INT NULL,              -- qSummonInfo[2]
-    SummonPosZ       INT NULL,              -- qSummonInfo[3]
+    Sort             TINYINT  NOT NULL, -- quest-type discriminator, see header comment mapping
+    SummonZoneNumber SMALLINT NULL,     -- qSummonInfo[0]; NULL unless Sort=5 (boss summon)
+    SummonPosX       INT NULL,          -- qSummonInfo[1]
+    SummonPosY       INT NULL,          -- qSummonInfo[2]
+    SummonPosZ       INT NULL,          -- qSummonInfo[3]
     StartNPCNumber   INT      NOT NULL,
-    KeyNpcNumber1    INT NULL,              -- qKeyNPCNumber[0]; the only slot ever populated in this build
+    KeyNpcNumber1    INT NULL,          -- qKeyNPCNumber[0]; the only slot ever populated in this build
     KeyNpcNumber2    INT NULL,
     KeyNpcNumber3    INT NULL,
     KeyNpcNumber4    INT NULL,
     KeyNpcNumber5    INT NULL,
     EndNPCNumber     INT      NOT NULL,
-    Solution1        INT NULL,              -- qSolution[0]; polymorphic on Sort, see header comment -- no FK
-    Solution2        INT NULL,              -- qSolution[1]; polymorphic on Sort, see header comment -- no FK
+    Solution1        INT NULL,          -- qSolution[0]; polymorphic on Sort, see header comment -- no FK
+    Solution2        INT NULL,          -- qSolution[1]; polymorphic on Sort, see header comment -- no FK
     Solution3        INT NULL,
     Solution4        INT NULL,
     NextIndex        INT NULL,

@@ -1,6 +1,5 @@
-## Project-specific: keep the legacy C++ server source and its generated
-## documentation archive out of version control (ServerInfo.ini under
-## Server/BuildEU33 carries a live plaintext DB credential).
+## Project-specific: keep the legacy C++ server source out of version control
+## (ServerInfo.ini under Server/BuildEU33 carries a live plaintext DB credential).
 /Server/
 /ServerDocs/
 /Docs/

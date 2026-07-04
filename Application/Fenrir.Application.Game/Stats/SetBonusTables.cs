@@ -190,7 +190,10 @@ public static class SetBonusTables
         };
     }
 
-    /// <summary>NXT (101-103) if detected (checked first, matching legacy priority), otherwise the caller-supplied legacy set number.</summary>
+    /// <summary>
+    ///     NXT (101-103) if detected (checked first, matching legacy priority), otherwise the caller-supplied legacy set
+    ///     number.
+    /// </summary>
     public static int ResolveEffectiveSetNumber(byte tribe, IReadOnlyList<EquippedItemSlot> equipment,
         int legacySetNumber)
     {

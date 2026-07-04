@@ -5,7 +5,10 @@ using Fenrir.Data.World;
 
 namespace Fenrir.Application.Game.Tests.Skills;
 
-/// <summary>Covers <see cref="SkillCastResolver.TryCast" /> against the skill-ID whitelist in <see cref="SkillEffectCatalog" />, ported from <c>MyUtil::ProcessForCreateBuff</c>.</summary>
+/// <summary>
+///     Covers <see cref="SkillCastResolver.TryCast" /> against the skill-ID whitelist in
+///     <see cref="SkillEffectCatalog" />, ported from <c>MyUtil::ProcessForCreateBuff</c>.
+/// </summary>
 public class SkillCastResolverTests
 {
     private static SkillDefinition BuildSkill(int skillId, byte maxUpgradePoint,

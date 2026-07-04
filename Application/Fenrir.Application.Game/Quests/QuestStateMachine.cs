@@ -62,7 +62,8 @@ public static class QuestStateMachine
                         return StateInvalid;
                 }
 
-            case 7: // meet NPC: end condition is PresentState == 2, holding the matching TargetPhase already satisfies it
+            case 7
+                : // meet NPC: end condition is PresentState == 2, holding the matching TargetPhase already satisfies it
                 return progress.TargetPhase == (q.Solution1 ?? 0) ? StateInProgress : StateInvalid;
 
             case 8: // "Waterfall occupation" (zone038 event): its increment hook lives in the zone038 tick loop

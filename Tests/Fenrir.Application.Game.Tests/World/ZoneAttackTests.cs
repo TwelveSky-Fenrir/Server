@@ -6,7 +6,10 @@ using Fenrir.Contracts.Packets.Shared;
 
 namespace Fenrir.Application.Game.Tests.World;
 
-/// <summary>Covers <c>Zone.ApplyCombatCommand</c> end-to-end (mCase 2, Avatar vs. enemy-tribe Avatar): HP mutated on tick, death wired to <see cref="Zone.ApplyDeath" />.</summary>
+/// <summary>
+///     Covers <c>Zone.ApplyCombatCommand</c> end-to-end (mCase 2, Avatar vs. enemy-tribe Avatar): HP mutated on tick,
+///     death wired to <see cref="Zone.ApplyDeath" />.
+/// </summary>
 public class ZoneAttackTests
 {
     private static readonly EffectiveStats StrongAttacker =

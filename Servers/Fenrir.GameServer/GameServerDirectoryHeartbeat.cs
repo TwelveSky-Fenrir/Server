@@ -5,7 +5,10 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.GameServer;
 
-/// <summary>Keeps this shard's row in <c>runtime.GameServerDirectory</c> warm; without it a booted shard is indistinguishable from "no shard available".</summary>
+/// <summary>
+///     Keeps this shard's row in <c>runtime.GameServerDirectory</c> warm; without it a booted shard is
+///     indistinguishable from "no shard available".
+/// </summary>
 public sealed class GameServerDirectoryHeartbeat(
     IGameServerDirectoryRepository directory,
     ZoneRegistry zones,

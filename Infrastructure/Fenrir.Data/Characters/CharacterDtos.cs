@@ -111,7 +111,10 @@ public sealed partial record CharacterWorldSnapshotDto(
     // wAvatar.aTeacherPoint; appended last to match the proc's column order.
     int TeacherPoint);
 
-/// <summary>RS1 of usp_Character_GetForWorldEntry. ExpireDate: legacy YYYYMMDD int, 0 = not a rental. Container: 0/1 inventory pages, 2 equipment, 3 store.</summary>
+/// <summary>
+///     RS1 of usp_Character_GetForWorldEntry. ExpireDate: legacy YYYYMMDD int, 0 = not a rental. Container: 0/1
+///     inventory pages, 2 equipment, 3 store.
+/// </summary>
 [GenerateDto]
 public sealed partial record CharacterItemSlotDto(
     byte Container,
@@ -151,7 +154,10 @@ public sealed partial record CharacterBuffDto(
     int Value,
     int RemainingLegacyTicks);
 
-/// <summary>All five result sets of usp_Character_GetForWorldEntry, stitched -- not a [GenerateDto] since it spans result sets.</summary>
+/// <summary>
+///     All five result sets of usp_Character_GetForWorldEntry, stitched -- not a [GenerateDto] since it spans result
+///     sets.
+/// </summary>
 public sealed record CharacterWorldEntryBundle(
     CharacterWorldSnapshotDto Character,
     ReadOnlyCollection<CharacterItemSlotDto> Items,

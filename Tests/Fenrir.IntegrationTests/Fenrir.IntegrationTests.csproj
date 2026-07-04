@@ -1,14 +1,35 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Same reasoning as Fenrir.Data.Tests.csproj: FenrirEnvironmentFixture calls
+       DistributedApplicationTestingBuilder.Create(string[]) (Aspire.Hosting.Testing) to boot an ephemeral SQL
+       Server 2025 container. That factory walks the call stack for an assembly carrying the "dcpclipath"
+       AssemblyMetadata attribute, which is only emitted by Aspire.Hosting.AppHost's build targets, so this test
+       project has to import the Aspire.AppHost.Sdk (same version pin as the Aspire.Hosting.* PackageVersions
+       below) to get that attribute, even though it isn't a real AppHost. -->
+  <Sdk Name="Aspire.AppHost.Sdk" Version="13.4.6"/>
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
+    <!-- Directory.Build.props defaults InvariantGlobalization to true; Directory.Build.targets only flips it
+         back for FenrirExecutable projects (ADR-0006). This project isn't one, but the DB fixture opens a real
+         SqlConnection, which hits the same NotSupportedException during collation negotiation, so it needs the
+         same override, scoped here instead of touching the shared props/targets. -->
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <!-- Aspire.AppHost.Sdk (above) defaults every ProjectReference to an orchestrated "Aspire resource"
+         (ReferenceOutputAssembly=false). This project never calls builder.AddProject -- LoginServer/GameServer
+         are launched as plain child processes (see FenrirEnvironmentFixture), and Fenrir.Contracts/Fenrir.Data
+         are compiled against directly -- so that default is wrong here across the board. Documented opt-out. -->
+    <TreatProjectReferencesAsResources>false</TreatProjectReferencesAsResources>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting.Testing"/>
+    <PackageReference Include="Aspire.Hosting.SqlServer"/>
+    <PackageReference Include="Microsoft.Data.SqlClient"/>
+    <PackageReference Include="K4os.Compression.LZ4"/>
     <PackageReference Include="coverlet.collector">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -26,7 +47,19 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Orchestration\Fenrir.AppHost\Fenrir.AppHost.csproj"/>
+    <ProjectReference Include="..\..\Core\Fenrir.Contracts\Fenrir.Contracts.csproj"/>
+    <ProjectReference Include="..\..\Infrastructure\Fenrir.Data\Fenrir.Data.csproj"/>
+    <!-- Only for ExperienceFormulas/LevelProgressionCalculator, to plan "how many kills until a level-up" from
+         whatever monster the DB query below actually picks, instead of a hand-duplicated copy of the same math. -->
+    <ProjectReference Include="..\..\Application\Fenrir.Application.Game\Fenrir.Application.Game.csproj"/>
+    <ProjectReference Include="..\..\Servers\Fenrir.LoginServer\Fenrir.LoginServer.csproj"/>
+    <ProjectReference Include="..\..\Servers\Fenrir.GameServer\Fenrir.GameServer.csproj"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Copied next to the test host so FenrirEnvironmentFixture finds it the same way DbMigrator/SqlServerFixture
+         do (Path.Combine(AppContext.BaseDirectory, "Database")); no repo-root-walking heuristics needed. -->
+    <None Include="..\..\Database\**\*.*" CopyToOutputDirectory="PreserveNewest" LinkBase="Database"/>
   </ItemGroup>
 
 </Project>

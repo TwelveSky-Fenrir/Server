@@ -15,5 +15,6 @@ CREATE TABLE game.AccountVaultItems
     CONSTRAINT PK_AccountVaultItems PRIMARY KEY CLUSTERED (AccountId, SlotIndex),
     CONSTRAINT CK_AccountVaultItems_SlotIndex CHECK (SlotIndex BETWEEN 0 AND 27),
     CONSTRAINT FK_AccountVaultItems_Vault FOREIGN KEY (AccountId) REFERENCES game.AccountVault (AccountId) ON DELETE CASCADE,
-    CONSTRAINT FK_AccountVaultItems_Item FOREIGN KEY (ItemId) REFERENCES world.Items (ItemId)
+    CONSTRAINT FK_AccountVaultItems_Item FOREIGN KEY (ItemId) REFERENCES world.Items (ItemId),
+    INDEX        IX_AccountVaultItems_ItemId NONCLUSTERED (ItemId)
 );

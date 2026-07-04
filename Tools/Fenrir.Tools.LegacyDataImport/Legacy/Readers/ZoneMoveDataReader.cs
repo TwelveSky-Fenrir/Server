@@ -2,7 +2,10 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Records;
 
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Readers;
 
-/// <summary>Parses <c>003.BIN</c> (STRUCT.h:1369-1378, <c>ZONEMOVEDATA</c>): 350 fixed structs, raw memory dump -- no zlib/XOR unlike the <c>.IMG</c> files.</summary>
+/// <summary>
+///     Parses <c>003.BIN</c> (STRUCT.h:1369-1378, <c>ZONEMOVEDATA</c>): 350 fixed structs, raw memory dump -- no
+///     zlib/XOR unlike the <c>.IMG</c> files.
+/// </summary>
 internal static class ZoneMoveDataReader
 {
     private const string FileName = "003.BIN";

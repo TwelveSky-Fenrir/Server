@@ -3,7 +3,10 @@ using Fenrir.Data.World;
 
 namespace Fenrir.Application.Game.Commerce;
 
-/// <summary>Builds the cash shop's two views: an 800-slot cost-info table (a purchase resolves price/item from this, never client-submitted values) and the 4x20x10x4 display grid.</summary>
+/// <summary>
+///     Builds the cash shop's two views: an 800-slot cost-info table (a purchase resolves price/item from this, never
+///     client-submitted values) and the 4x20x10x4 display grid.
+/// </summary>
 public static class CashCatalogBuilder
 {
     public const int MaxCashType = 4;
@@ -67,7 +70,10 @@ public static class CashCatalogBuilder
         return new CashCatalog { CostInfoByIndex = [.. costInfo], DisplayGrid = grid };
     }
 
-    /// <summary>Version is the ItemId of the ProductType=5/ItemMallProductId=100000 sentinel row (repurposed column, not a real item); 0 if absent.</summary>
+    /// <summary>
+    ///     Version is the ItemId of the ProductType=5/ItemMallProductId=100000 sentinel row (repurposed column, not a
+    ///     real item); 0 if absent.
+    /// </summary>
     public static int ResolveVersion(IEnumerable<ItemMallProductRowDto> products)
     {
         foreach (var product in products)
@@ -77,7 +83,10 @@ public static class CashCatalogBuilder
         return 0;
     }
 
-    /// <summary><see cref="ItemMallProductId" /> is a Fenrir-only addition for game.CashLog's audit trail -- never sent on the wire.</summary>
+    /// <summary>
+    ///     <see cref="ItemMallProductId" /> is a Fenrir-only addition for game.CashLog's audit trail -- never sent on the
+    ///     wire.
+    /// </summary>
     public readonly record struct CostInfoEntry(int Cost, int ItemId, int Quantity, int Type, int ItemMallProductId)
     {
         public bool IsAssigned => ItemId >= 1;
@@ -88,7 +97,10 @@ public static class CashCatalogBuilder
         /// <summary>Flat 800-entry master table, index == the wire's CostInfoIndex.</summary>
         public required ImmutableArray<CostInfoEntry> CostInfoByIndex { get; init; }
 
-        /// <summary>-1 marks an unfilled/inactive slot. Built once at boot, never mutated -- safe to share without a defensive copy.</summary>
+        /// <summary>
+        ///     -1 marks an unfilled/inactive slot. Built once at boot, never mutated -- safe to share without a defensive
+        ///     copy.
+        /// </summary>
         public required int[] DisplayGrid { get; init; }
     }
 }

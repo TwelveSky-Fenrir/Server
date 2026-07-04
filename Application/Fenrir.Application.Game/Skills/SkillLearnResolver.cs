@@ -8,7 +8,10 @@ namespace Fenrir.Application.Game.Skills;
 ///     Pure resolver for CZ_PROCESS_DATA_SEND tSort 202/233 (learn a skill from an NPC's offer) and 203 (skill
 ///     upgrade). No I/O, no Zone dependency.
 /// </summary>
-/// <remarks>Every failure branch in the legacy is a Quit(), never a graceful reply -- callers must Abort on any non-success result.</remarks>
+/// <remarks>
+///     Every failure branch in the legacy is a Quit(), never a graceful reply -- callers must Abort on any
+///     non-success result.
+/// </remarks>
 public static class SkillLearnResolver
 {
     public enum LearnFailure

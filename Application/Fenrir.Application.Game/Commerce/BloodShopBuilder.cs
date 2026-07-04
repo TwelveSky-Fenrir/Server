@@ -4,15 +4,24 @@ using Fenrir.Data.World;
 
 namespace Fenrir.Application.Game.Commerce;
 
-/// <summary>Builds the 50-slot <see cref="BloodShop" /> wire snapshot. <c>BloodNum</c> is unconditionally 50, not a count of valid entries (verified against legacy).</summary>
+/// <summary>
+///     Builds the 50-slot <see cref="BloodShop" /> wire snapshot. <c>BloodNum</c> is unconditionally 50, not a count
+///     of valid entries (verified against legacy).
+/// </summary>
 public static class BloodShopBuilder
 {
     public const int MaxBloodSlots = 50;
 
-    /// <summary>Same "coupon" convention as NpcShopPolicy/GroundItemPickupPolicy: a zero Quantity is forced to 1 for a Sort==99 item.</summary>
+    /// <summary>
+    ///     Same "coupon" convention as NpcShopPolicy/GroundItemPickupPolicy: a zero Quantity is forced to 1 for a
+    ///     Sort==99 item.
+    /// </summary>
     private const byte ItemSort99 = 99;
 
-    /// <summary><paramref name="rows" /> need not be pre-sorted or pre-filtered -- the sentinel (slot 100000) is excluded here.</summary>
+    /// <summary>
+    ///     <paramref name="rows" /> need not be pre-sorted or pre-filtered -- the sentinel (slot 100000) is excluded
+    ///     here.
+    /// </summary>
     public static BloodShop Build(IEnumerable<BloodExchangeCatalogRowDto> rows,
         IReadOnlyDictionary<int, ItemDefinition> itemsById)
     {

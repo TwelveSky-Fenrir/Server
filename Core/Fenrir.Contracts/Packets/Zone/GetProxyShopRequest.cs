@@ -4,7 +4,10 @@ using Fenrir.Contracts.Wire;
 
 namespace Fenrir.Contracts.Packets.Zone;
 
-/// <summary>Only zone 37 actually supports the proxy shop under PPSHOP_V2; registration on zones 1/6/11/140 is a disconnect trap.</summary>
+/// <summary>
+///     Only zone 37 actually supports the proxy shop under PPSHOP_V2; registration on zones 1/6/11/140 is a
+///     disconnect trap.
+/// </summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.GetProxyShop,
     ExpectedSize = 30, AllowedStates = [(byte)ZoneSessionState.InWorld])]
 public readonly partial record struct GetProxyShopRequest : IIncomingPacket<GetProxyShopRequest>

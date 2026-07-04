@@ -1,18 +1,26 @@
+using System.Collections.Immutable;
 using Fenrir.Contracts.Abstractions;
 using Fenrir.Contracts.Packets.Login;
+using Fenrir.Data.Admin;
 using Fenrir.Data.Characters;
 using Fenrir.Data.Runtime;
 using Fenrir.Network.Sessions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Login.Handlers;
 
-/// <summary>op22 CL_DEMAND_ZONE_SERVER_INFO_SEND — login-to-zone handover; the handover identity lives server-side in the ticket row, never on the wire.</summary>
+/// <summary>
+///     op22 CL_DEMAND_ZONE_SERVER_INFO_SEND — login-to-zone handover; the handover identity lives server-side in the
+///     ticket row, never on the wire.
+/// </summary>
 public sealed class ZoneTransferHandler(
     ICharacterRepository characters,
     IGameServerDirectoryRepository directory,
+    IShardMapAssignmentRepository shardMapAssignments,
     ISessionTicketRepository tickets,
-    IOptions<LoginServerOptions> options) : IAsyncPacketHandler<ZoneTransferRequest>
+    IOptions<LoginServerOptions> options,
+    ILogger<ZoneTransferHandler> logger) : IAsyncPacketHandler<ZoneTransferRequest>
 {
     public async ValueTask HandleAsync(ZoneTransferRequest packet, IPacketSession session,
         CancellationToken cancellationToken)
@@ -37,9 +45,8 @@ public sealed class ZoneTransferHandler(
             return;
         }
 
-        // M1 ships exactly one GameServer/spawn map, so FirstOrDefault *is* the load-balancing policy.
         var shards = await directory.GetDirectoryAsync(cancellationToken);
-        var shard = shards.FirstOrDefault();
+        var shard = await ResolveShardForMapAsync(shards, character.MapId, character.CharacterId, cancellationToken);
         if (shard is null)
         {
             session.Send(new ZoneTransferResponse { Result = 1, Ip = "", Port = 0, Zone = 0 });
@@ -54,5 +61,21 @@ public sealed class ZoneTransferHandler(
         // Zone = the persisted MapId the character resumes on (same value AvatarInfoFactory writes to LogoutInfo[0]).
         session.Send(new ZoneTransferResponse
             { Result = 0, Ip = shard.Host, Port = shard.Port, Zone = character.MapId });
+    }
+
+    private async ValueTask<ShardDirectoryEntryDto?> ResolveShardForMapAsync(
+        ImmutableArray<ShardDirectoryEntryDto> shards, short mapId, int characterId, CancellationToken ct)
+    {
+        foreach (var candidate in shards)
+        {
+            var hostedMaps = await shardMapAssignments.GetHostedMapsAsync(candidate.ShardId, ct);
+            if (hostedMaps.Contains(mapId))
+                return candidate;
+        }
+
+        logger.LogWarning(
+            "No shard in admin.ShardMapAssignments hosts MapId {MapId} for character {CharacterId}; falling back to first live shard",
+            mapId, characterId);
+        return shards.FirstOrDefault();
     }
 }

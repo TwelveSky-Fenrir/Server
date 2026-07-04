@@ -4,7 +4,10 @@ using Fenrir.Data.WriteBehind;
 
 namespace Fenrir.Application.Game.Tests.World;
 
-/// <summary>Covers the in-process map-transfer mechanism (<see cref="ZoneTransfer" />): live state travels inside the <c>Leave</c>/<c>Enter</c> commands, never observable in two zones at once.</summary>
+/// <summary>
+///     Covers the in-process map-transfer mechanism (<see cref="ZoneTransfer" />): live state travels inside the
+///     <c>Leave</c>/<c>Enter</c> commands, never observable in two zones at once.
+/// </summary>
 public class ZoneHandoffTests
 {
     [Fact]

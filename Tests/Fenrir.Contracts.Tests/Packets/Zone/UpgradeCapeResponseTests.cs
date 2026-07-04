@@ -3,7 +3,10 @@ using Fenrir.Contracts.Packets.Zone;
 
 namespace Fenrir.Contracts.Tests.Packets.Zone;
 
-/// <summary>ZC_UP_LEVEL_ITEM_RECV (ZONE.h:1352-1357): Padding is a real dead byte on the wire (pack(1)); set non-zero here to prove it round-trips.</summary>
+/// <summary>
+///     ZC_UP_LEVEL_ITEM_RECV (ZONE.h:1352-1357): Padding is a real dead byte on the wire (pack(1)); set non-zero here
+///     to prove it round-trips.
+/// </summary>
 public class ZcUpLevelItemRecvTests
 {
     [Fact]

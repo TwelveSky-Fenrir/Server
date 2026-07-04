@@ -3,13 +3,19 @@ using Fenrir.Data.Guilds;
 
 namespace Fenrir.Application.Game.Guilds;
 
-/// <summary>Projects game.Guilds/GuildMembers/GuildNotices onto GUILD_INFO's 50 fixed slots. Normalized storage has no slot index, so slots fill oldest-first by JoinedAtUtc.</summary>
+/// <summary>
+///     Projects game.Guilds/GuildMembers/GuildNotices onto GUILD_INFO's 50 fixed slots. Normalized storage has no
+///     slot index, so slots fill oldest-first by JoinedAtUtc.
+/// </summary>
 public static class GuildInfoProjection
 {
     private const int MaxMembers = 50;
     private const int MaxNotices = 4;
 
-    /// <summary>Zero-filled GUILD_INFO for failure responses -- replaces the legacy's uninitialized-stack-garbage leak on those responses.</summary>
+    /// <summary>
+    ///     Zero-filled GUILD_INFO for failure responses -- replaces the legacy's uninitialized-stack-garbage leak on
+    ///     those responses.
+    /// </summary>
     public static GuildInfo Empty()
     {
         return new GuildInfo

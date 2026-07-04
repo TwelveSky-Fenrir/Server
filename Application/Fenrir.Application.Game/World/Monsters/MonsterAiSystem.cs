@@ -10,9 +10,18 @@ namespace Fenrir.Application.Game.World.Monsters;
 /// <remarks>
 ///     Deliberately not ported:
 ///     <list type="bullet">
-///         <item>Random wander while idle -- no wander radius/timing constant found in source; an idle monster stays at its home point.</item>
-///         <item>The leash bound reuses the monster's own spawn-region radius (<see cref="MonsterEntity.LeashRadius" />) -- no "leash distance from home" constant was found in source, so this is a data-driven stand-in.</item>
-///         <item>Monster-initiated damage fires via <see cref="Zone.ResolveMonsterAttack" /> (<see cref="Combat.MonsterCombatResolver.ResolveMvpAttack" />).</item>
+///         <item>
+///             Random wander while idle -- no wander radius/timing constant found in source; an idle monster stays at
+///             its home point.
+///         </item>
+///         <item>
+///             The leash bound reuses the monster's own spawn-region radius (<see cref="MonsterEntity.LeashRadius" />)
+///             -- no "leash distance from home" constant was found in source, so this is a data-driven stand-in.
+///         </item>
+///         <item>
+///             Monster-initiated damage fires via <see cref="Zone.ResolveMonsterAttack" /> (
+///             <see cref="Combat.MonsterCombatResolver.ResolveMvpAttack" />).
+///         </item>
 ///         <item>Boss/guard/tribe-symbol special AI -- not modeled.</item>
 ///     </list>
 /// </remarks>
@@ -60,7 +69,8 @@ public sealed class MonsterAiSystem : ISimulationSystem
                 }
                 else
                 {
-                    TryAcquireTarget(zone, monster); // re-checked every tick -- a wandering monster can still be aggroed
+                    TryAcquireTarget(zone,
+                        monster); // re-checked every tick -- a wandering monster can still be aggroed
                 }
 
                 break;

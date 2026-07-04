@@ -10,7 +10,8 @@ public enum ZoneCommandKind : byte
 {
     Enter,
     Leave,
-    Move
+    Move,
+    PetAction
 }
 
 /// <summary>
@@ -61,6 +62,12 @@ public readonly struct ZoneCommand
     public static ZoneCommand Move(int characterId, in ActionInfo action)
     {
         return new ZoneCommand { Kind = ZoneCommandKind.Move, CharacterId = characterId, Action = action };
+    }
+
+    /// <summary>op156 CZ_UPDATE_PET_ACTION_SEND -- reuses <see cref="Action" />, only its pet sub-fields are meaningful.</summary>
+    public static ZoneCommand PetAction(int characterId, in ActionInfo action)
+    {
+        return new ZoneCommand { Kind = ZoneCommandKind.PetAction, CharacterId = characterId, Action = action };
     }
 }
 

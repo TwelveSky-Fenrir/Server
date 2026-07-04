@@ -3,7 +3,10 @@ using Fenrir.Application.Game.Tests.TestSupport;
 
 namespace Fenrir.Application.Game.Tests.Combat;
 
-/// <summary>Covers <see cref="CombatMath" />'s primitives against the C++ formulas in <c>Server/ts25zone/S07_MyGame02.cpp</c>, with hand-computed expected values.</summary>
+/// <summary>
+///     Covers <see cref="CombatMath" />'s primitives against the C++ formulas in
+///     <c>Server/ts25zone/S07_MyGame02.cpp</c>, with hand-computed expected values.
+/// </summary>
 public class CombatMathTests
 {
     [Theory]

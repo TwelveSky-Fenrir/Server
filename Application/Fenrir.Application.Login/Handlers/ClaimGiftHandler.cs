@@ -6,7 +6,10 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Login.Handlers;
 
-/// <summary>op21 CL_WANT_GIFT_SEND — GiftInfoIndex is a POSITION in GiftListHandler's oldest-first pending list, not a database key.</summary>
+/// <summary>
+///     op21 CL_WANT_GIFT_SEND — GiftInfoIndex is a POSITION in GiftListHandler's oldest-first pending list, not a
+///     database key.
+/// </summary>
 public sealed class ClaimGiftHandler(IGiftRepository gifts, ILogger<ClaimGiftHandler> logger)
     : IAsyncPacketHandler<ClaimGiftRequest>
 {

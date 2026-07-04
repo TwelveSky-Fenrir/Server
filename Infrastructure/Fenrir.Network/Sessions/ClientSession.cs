@@ -7,26 +7,25 @@ using Fenrir.Network.Framing;
 namespace Fenrir.Network.Sessions;
 
 // Owns the duplex pipe transport and the send-side lock; state-machine specifics live in the subclasses.
-public abstract class ClientSession : IPacketSession
+public abstract class ClientSession(
+    long sessionId,
+    IDuplexPipe transport,
+    FenrirServer server,
+    IPEndPoint? remoteEndPoint = null)
+    : IPacketSession
 {
-    private readonly Lock _sendLock = new();
+    private const int SlowConsumerBackpressureStreakLimit = 5;
+
+    private readonly SemaphoreSlim _sendLock = new(1, 1);
+    private int _backpressureStreak;
     private int _completed;
 
-    protected ClientSession(long sessionId, IDuplexPipe transport, FenrirServer server,
-        IPEndPoint? remoteEndPoint = null)
-    {
-        SessionId = sessionId;
-        Transport = transport;
-        Server = server;
-        RemoteEndPoint = remoteEndPoint;
-    }
+    public IDuplexPipe Transport { get; } = transport;
 
-    public IDuplexPipe Transport { get; }
-
-    public FenrirServer Server { get; }
+    public FenrirServer Server { get; } = server;
 
     /// <summary>The peer's address; null for a transport never backed by a real accepted socket.</summary>
-    public IPEndPoint? RemoteEndPoint { get; }
+    public IPEndPoint? RemoteEndPoint { get; } = remoteEndPoint;
 
     /// <summary>Legacy <c>mPacketEncryptionValue</c> (§3.4): 0 until the greeting packet seeds it.</summary>
     public byte InboundStreamXorKey { get; set; }
@@ -34,55 +33,89 @@ public abstract class ClientSession : IPacketSession
     public DisconnectReason? DisconnectReason { get; private set; }
 
     /// <summary>Process-local, monotonically increasing — never persisted, never sent to the client.</summary>
-    public long SessionId { get; }
+    public long SessionId { get; } = sessionId;
 
     public void Send<TPacket>(in TPacket packet) where TPacket : struct, IOutgoingPacket
     {
         var total = FrameWriter.FrameSizeOf<TPacket>();
 
-        lock (_sendLock)
+        _sendLock.Wait();
+        try
         {
             var span = Transport.Output.GetSpan(total);
             FrameWriter.WriteFrame(in packet, span);
             Transport.Output.Advance(total);
         }
+        catch
+        {
+            _sendLock.Release();
+            throw;
+        }
 
-        FlushOutput();
+        FlushLocked();
     }
 
-    /// <summary>Checked by <see cref="Dispatching.SessionLoop" /> before dispatch against the generated <c>SessionStateGate</c>.</summary>
+    /// <summary>
+    ///     Checked by <see cref="Dispatching.SessionLoop" /> before dispatch against the generated
+    ///     <c>SessionStateGate</c>.
+    /// </summary>
     public abstract bool IsOpcodeAllowed(byte opcode);
 
     // Sends a fully pre-built frame as-is — the LZ4/ZPACKET path for Compressed M1 packets, whose bytes
     // already come out of the generated MessageFactory.Encode.
     public void SendRaw(ReadOnlySpan<byte> rawFrame)
     {
-        lock (_sendLock)
+        _sendLock.Wait();
+        try
         {
             var span = Transport.Output.GetSpan(rawFrame.Length);
             rawFrame.CopyTo(span);
             Transport.Output.Advance(rawFrame.Length);
         }
+        catch
+        {
+            _sendLock.Release();
+            throw;
+        }
 
-        FlushOutput();
+        FlushLocked();
     }
 
-    private void FlushOutput()
+    // Caller must already hold _sendLock; releases it once this call's flush resolves, so no second Send()
+    // can start GetSpan/Advance/FlushAsync while this one is still outstanding (unsafe per PipeWriter's docs).
+    private void FlushLocked()
     {
         var flush = Transport.Output.FlushAsync();
-        if (!flush.IsCompletedSuccessfully)
-            _ = ObserveFlushAsync(flush);
+
+        if (flush.IsCompletedSuccessfully)
+        {
+            _backpressureStreak = 0;
+            _sendLock.Release();
+            return;
+        }
+
+        _ = ObserveFlushAsync(flush);
     }
 
-    private static async ValueTask ObserveFlushAsync(ValueTask<FlushResult> flush)
+    // A ValueTask<FlushResult> that doesn't complete synchronously means this send hit the pipe's
+    // PauseWriterThreshold; FlushResult.IsCompleted/IsCanceled reflect reader completion/CancelPendingFlush,
+    // not backpressure, so the synchronous-completion check above is the only backpressure signal available.
+    private async ValueTask ObserveFlushAsync(ValueTask<FlushResult> flush)
     {
         try
         {
-            await flush.ConfigureAwait(false);
+            var result = await flush.ConfigureAwait(false);
+            if (result is { IsCanceled: false, IsCompleted: false } &&
+                ++_backpressureStreak >= SlowConsumerBackpressureStreakLimit)
+                Abort(Sessions.DisconnectReason.SlowConsumer);
         }
         catch (Exception)
         {
             // Receive loop will independently notice the broken pipe; a failed flush here must not fault the caller's Send<T>.
+        }
+        finally
+        {
+            _sendLock.Release();
         }
     }
 

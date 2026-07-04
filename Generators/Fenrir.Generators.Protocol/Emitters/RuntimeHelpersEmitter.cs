@@ -1,6 +1,9 @@
 namespace Fenrir.Generators.Protocol.Emitters;
 
-/// <summary>Emits <c>LegacyWireCodec</c> once instead of regenerating these conversions inline per field (e.g. AVATAR_INFO's ~190 fields).</summary>
+/// <summary>
+///     Emits <c>LegacyWireCodec</c> once instead of regenerating these conversions inline per field (e.g.
+///     AVATAR_INFO's ~190 fields).
+/// </summary>
 internal static class RuntimeHelpersEmitter
 {
     public const string HintName = "LegacyWireCodec.g.cs";

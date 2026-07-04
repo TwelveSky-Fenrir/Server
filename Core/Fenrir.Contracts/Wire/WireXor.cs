@@ -1,6 +1,9 @@
 namespace Fenrir.Contracts.Wire;
 
-/// <summary>Byte-exact legacy XOR primitives (§3.1-3.3); the historical <c>GetMyXor</c> bug degenerates the key into a CONSTANT keystream {0x10, 0xFE, 0xFE, ...}, not an incrementing one.</summary>
+/// <summary>
+///     Byte-exact legacy XOR primitives (§3.1-3.3); the historical <c>GetMyXor</c> bug degenerates the key into a
+///     CONSTANT keystream {0x10, 0xFE, 0xFE, ...}, not an incrementing one.
+/// </summary>
 public static class WireXor
 {
     private const byte FirstKey = 0x10;
@@ -17,7 +20,10 @@ public static class WireXor
             buffer[i] ^= SteadyKey;
     }
 
-    /// <summary><c>USE_XOR_UID</c>: XORs only the C-string prefix (up to first null); fragile if length differs between send/receive (§3.3) — legacy behavior reproduced as-is.</summary>
+    /// <summary>
+    ///     <c>USE_XOR_UID</c>: XORs only the C-string prefix (up to first null); fragile if length differs between
+    ///     send/receive (§3.3) — legacy behavior reproduced as-is.
+    /// </summary>
     public static void ApplyUidXor(Span<byte> fixedField)
     {
         var length = fixedField.IndexOf((byte)0);
@@ -63,7 +69,10 @@ public static class WireXor
             XorChar(buffer.Slice(offset, rowLength));
     }
 
-    /// <summary><c>mPacketEncryptionValue</c> (§3.4): uniform single-byte XOR, distinct from <see cref="ApplyPacketXor" />'s degenerate keystream; key == 0 means unseeded (plaintext), matching legacy behavior.</summary>
+    /// <summary>
+    ///     <c>mPacketEncryptionValue</c> (§3.4): uniform single-byte XOR, distinct from <see cref="ApplyPacketXor" />'s
+    ///     degenerate keystream; key == 0 means unseeded (plaintext), matching legacy behavior.
+    /// </summary>
     public static void ApplyStreamXor(Span<byte> buffer, byte key)
     {
         if (key == 0)

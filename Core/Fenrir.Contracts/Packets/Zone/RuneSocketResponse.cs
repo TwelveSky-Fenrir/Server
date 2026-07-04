@@ -4,7 +4,7 @@ using Fenrir.Contracts.Wire;
 
 namespace Fenrir.Contracts.Packets.Zone;
 
-// Result: 0 = removal ok, 1 = insertion ok, 2 = inventory full.
+// Result: 0 = insertion ok, 1 = removal ok, 2 = inventory full (removal only).
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.RuneSocket, ExpectedSize = 21)]
 public readonly partial record struct RuneSocketResponse : IOutgoingPacket
 {

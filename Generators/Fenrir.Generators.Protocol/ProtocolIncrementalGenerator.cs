@@ -8,7 +8,10 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Fenrir.Generators.Protocol;
 
-/// <summary>Detects <c>[FenrirPacket]</c>/<c>[FenrirWireType]</c>, emits per-type members, then the aggregated dispatch tables.</summary>
+/// <summary>
+///     Detects <c>[FenrirPacket]</c>/<c>[FenrirWireType]</c>, emits per-type members, then the aggregated dispatch
+///     tables.
+/// </summary>
 [Generator(LanguageNames.CSharp)]
 public sealed class ProtocolIncrementalGenerator : IIncrementalGenerator
 {

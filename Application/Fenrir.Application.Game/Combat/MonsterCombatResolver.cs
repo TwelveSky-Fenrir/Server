@@ -3,8 +3,14 @@ using Fenrir.Contracts.Packets.Shared;
 
 namespace Fenrir.Application.Game.Combat;
 
-/// <summary>PvM/MvP attack resolution -- monster-entity twin of <see cref="CombatResolver" />'s PvP path (ProcessAttack03/04).</summary>
-/// <remarks>Verified divergence, not a bug: neither direction applies PvP's ÷5 division nor <see cref="CombatResolver.MinimumDamageAgainstAvatar" />'s floor.</remarks>
+/// <summary>
+///     PvM/MvP attack resolution -- monster-entity twin of <see cref="CombatResolver" />'s PvP path
+///     (ProcessAttack03/04).
+/// </summary>
+/// <remarks>
+///     Verified divergence, not a bug: neither direction applies PvP's ÷5 division nor
+///     <see cref="CombatResolver.MinimumDamageAgainstAvatar" />'s floor.
+/// </remarks>
 public static class MonsterCombatResolver
 {
     public static AttackOutcome ResolvePvmAttack(
@@ -69,7 +75,10 @@ public static class MonsterCombatResolver
         return new AttackOutcome(false, AttackRejectReason.None, true, critical, damage, elementDamage, chargeConsumed);
     }
 
-    /// <summary>AI-initiated -- intended caller is <see cref="Monsters.MonsterAiSystem" />'s attack-windup state, not <c>Zone.ApplyCombatCommand</c>.</summary>
+    /// <summary>
+    ///     AI-initiated -- intended caller is <see cref="Monsters.MonsterAiSystem" />'s attack-windup state, not
+    ///     <c>Zone.ApplyCombatCommand</c>.
+    /// </summary>
     public static AttackOutcome ResolveMvpAttack(
         MonsterEntity monster,
         CombatantSnapshot defender,

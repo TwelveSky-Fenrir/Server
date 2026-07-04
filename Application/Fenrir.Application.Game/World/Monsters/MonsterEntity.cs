@@ -28,7 +28,10 @@ public sealed class MonsterEntity
     public float PosZ { get; set; }
     public float Heading { get; set; }
 
-    /// <summary>Spawn anchor (legacy <c>mFirstLocation</c>) -- <see cref="MonsterAiState.ReturnToSpawn" />'s destination and leash origin.</summary>
+    /// <summary>
+    ///     Spawn anchor (legacy <c>mFirstLocation</c>) -- <see cref="MonsterAiState.ReturnToSpawn" />'s destination and
+    ///     leash origin.
+    /// </summary>
     public required float HomeX { get; init; }
 
     public required float HomeY { get; init; }

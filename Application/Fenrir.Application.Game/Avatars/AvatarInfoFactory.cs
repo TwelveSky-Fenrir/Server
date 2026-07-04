@@ -6,7 +6,10 @@ using Fenrir.Data.Characters;
 
 namespace Fenrir.Application.Game.Avatars;
 
-/// <summary>Independent copy of Login's AvatarInfoFactory; projects a persisted character onto AVATAR_INFO for ZC_REGISTER_AVATAR_RECV.</summary>
+/// <summary>
+///     Independent copy of Login's AvatarInfoFactory; projects a persisted character onto AVATAR_INFO for
+///     ZC_REGISTER_AVATAR_RECV.
+/// </summary>
 public static class AvatarInfoFactory
 {
     public static AvatarInfo CreateForCharacter(CharacterWorldSnapshotDto character,
@@ -62,7 +65,10 @@ public static class AvatarInfoFactory
         };
     }
 
-    /// <summary>mapId/pos are the just-resolved destination -- <paramref name="state" /> itself still holds the source zone's position at call time.</summary>
+    /// <summary>
+    ///     mapId/pos are the just-resolved destination -- <paramref name="state" /> itself still holds the source zone's
+    ///     position at call time.
+    /// </summary>
     public static AvatarInfo CreateForRuntimeState(PlayerRuntimeState state, short mapId, float posX, float posY,
         float posZ)
     {
@@ -133,14 +139,20 @@ public static class AvatarInfoFactory
         return equip;
     }
 
-    /// <summary>Bit pattern is identical whether read as signed or unsigned, so packing unsigned bytes reproduces the legacy's signed-char wire int.</summary>
+    /// <summary>
+    ///     Bit pattern is identical whether read as signed or unsigned, so packing unsigned bytes reproduces the legacy's
+    ///     signed-char wire int.
+    /// </summary>
     private static int PackUpgradeBytes(byte enchant, byte combine, byte refine, byte socket)
     {
         return enchant | (combine << 8) | (refine << 16) | (socket << 24);
     }
 }
 
-/// <summary>PartyName/DuelState aren't modeled here: neither party membership nor a duel can exist at login time, so both stay blank.</summary>
+/// <summary>
+///     PartyName/DuelState aren't modeled here: neither party membership nor a duel can exist at login time, so both
+///     stay blank.
+/// </summary>
 public sealed record AvatarSocialSnapshot(
     IReadOnlyDictionary<byte, string> FriendNameBySlot,
     string Teacher,

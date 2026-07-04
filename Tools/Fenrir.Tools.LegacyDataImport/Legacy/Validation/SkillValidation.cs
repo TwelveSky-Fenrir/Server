@@ -4,7 +4,10 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Records;
 
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Validation;
 
-/// <summary>Cross-validates <see cref="SkillReader" /> against <c>005_00003TH.csv</c>; the CSV only dumps description lines 0-2 of the char[10][51] field, so only <see cref="SkillRecord.Description" />[0..2] are compared.</summary>
+/// <summary>
+///     Cross-validates <see cref="SkillReader" /> against <c>005_00003TH.csv</c>; the CSV only dumps description
+///     lines 0-2 of the char[10][51] field, so only <see cref="SkillRecord.Description" />[0..2] are compared.
+/// </summary>
 internal static class SkillValidation
 {
     public static void Run(string dataDir)

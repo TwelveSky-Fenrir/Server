@@ -8,7 +8,10 @@ public enum GuildInviteAskOutcome
     TargetBusy // code 5
 }
 
-/// <summary>Process-wide guild-invitation negotiation authority. Mirrors the legacy's <c>mGuildProcessState</c> machine (1=asker waiting, 2=target waiting, 3=accepted), with <see cref="_acceptedFor" /> surviving past the answer.</summary>
+/// <summary>
+///     Process-wide guild-invitation negotiation authority. Mirrors the legacy's <c>mGuildProcessState</c> machine
+///     (1=asker waiting, 2=target waiting, 3=accepted), with <see cref="_acceptedFor" /> surviving past the answer.
+/// </summary>
 public sealed class GuildInviteRegistry
 {
     /// <summary>askerId -&gt; the target it may now finalize the join for (legacy state 3).</summary>
@@ -52,7 +55,10 @@ public sealed class GuildInviteRegistry
         }
     }
 
-    /// <summary>Accept promotes both sides to legacy state 3 and remembers the acceptance for the asker's later finalize; refuse resets both to state 0.</summary>
+    /// <summary>
+    ///     Accept promotes both sides to legacy state 3 and remembers the acceptance for the asker's later finalize;
+    ///     refuse resets both to state 0.
+    /// </summary>
     public bool TryAnswer(int targetId, bool accepted, out int askerId)
     {
         lock (_lock)
@@ -69,7 +75,10 @@ public sealed class GuildInviteRegistry
         }
     }
 
-    /// <summary>The asker consumes this, not the target -- the finalize request's payload carries no name/id, so the target is whoever most recently accepted.</summary>
+    /// <summary>
+    ///     The asker consumes this, not the target -- the finalize request's payload carries no name/id, so the target is
+    ///     whoever most recently accepted.
+    /// </summary>
     public bool TryConsumeAccepted(int askerId, out int targetId)
     {
         lock (_lock)

@@ -30,7 +30,10 @@ public sealed partial record NpcShopItemRowDto(
     byte SlotIndex,
     int? ItemId);
 
-/// <summary>world.usp_NpcSkillOffer_GetAll; ArrayKind/Tier/Dim2/Dim3 encode which legacy nSkillInfo array/dimension the slot came from.</summary>
+/// <summary>
+///     world.usp_NpcSkillOffer_GetAll; ArrayKind/Tier/Dim2/Dim3 encode which legacy nSkillInfo array/dimension the
+///     slot came from.
+/// </summary>
 [GenerateDto]
 public sealed partial record NpcSkillOfferRowDto(
     int NpcSkillOfferId,

@@ -5,7 +5,10 @@ using Fenrir.Generators.Analysis.Support;
 
 namespace Fenrir.Generators.Protocol.Emitters;
 
-/// <summary>Wraps outgoing <c>Compressed = true</c> packets in ZPACKET + LZ4; not emitted for a server with none (e.g. Login).</summary>
+/// <summary>
+///     Wraps outgoing <c>Compressed = true</c> packets in ZPACKET + LZ4; not emitted for a server with none (e.g.
+///     Login).
+/// </summary>
 internal static class MessageFactoryEmitter
 {
     public static string HintNameFor(FenrirServer server)

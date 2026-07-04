@@ -176,7 +176,10 @@ public sealed class GuildActionHandler(
         SendResult(session, 2, await BuildGuildInfoAsync(guildId, ct));
     }
 
-    /// <summary>tSort 3 -- invite finalize. Requires master/sub-master role and a pending accepted invite. Member cap = Grade*10.</summary>
+    /// <summary>
+    ///     tSort 3 -- invite finalize. Requires master/sub-master role and a pending accepted invite. Member cap =
+    ///     Grade*10.
+    /// </summary>
     private async ValueTask HandleInviteFinalizeAsync(GuildActionRequest packet, IPacketSession session,
         ZoneClientSession zoneSession, PlayerRuntimeState state, int characterId, CancellationToken ct)
     {
@@ -354,7 +357,10 @@ public sealed class GuildActionHandler(
         SendResult(session, 7, await BuildGuildInfoAsync(guildId, ct));
     }
 
-    /// <summary>tSort 8 -- kick, master only. Target resolved by name, independent of online state; the master cannot be kicked.</summary>
+    /// <summary>
+    ///     tSort 8 -- kick, master only. Target resolved by name, independent of online state; the master cannot be
+    ///     kicked.
+    /// </summary>
     private async ValueTask HandleKickAsync(GuildActionRequest packet, IPacketSession session,
         ZoneClientSession zoneSession, PlayerRuntimeState state, CancellationToken ct)
     {

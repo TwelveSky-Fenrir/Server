@@ -18,7 +18,10 @@ public sealed record CashRepository(ICaeriusNetDbContext Db) : ICashRepository
         return await Db.ExecuteScalarAsync<int>(sp, ct);
     }
 
-    /// <summary>Atomic cash debit + one container replace. Returns the post-debit balance. Throws SQL 50241 (non-positive amount) or 50240 (insufficient balance).</summary>
+    /// <summary>
+    ///     Atomic cash debit + one container replace. Returns the post-debit balance. Throws SQL 50241 (non-positive
+    ///     amount) or 50240 (insufficient balance).
+    /// </summary>
     public async ValueTask<int> DebitAndGrantItemAsync(int accountId, int amount, byte reason, int productId,
         int characterId, byte container, IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct)
     {

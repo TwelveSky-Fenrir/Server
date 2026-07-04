@@ -13,7 +13,10 @@ public sealed record QuestSeedStats(
     int QuestRewardRowCount,
     int QuestSpeechRowCount);
 
-/// <summary>Generates the idempotent world.Quests / world.QuestRewards / world.QuestSpeeches seed script from 005_00006.IMG.</summary>
+/// <summary>
+///     Generates the idempotent world.Quests / world.QuestRewards / world.QuestSpeeches seed script from
+///     005_00006.IMG.
+/// </summary>
 public static class QuestSeedGenerator
 {
     // qReward[slot][0] is a (RewardType, Value) tagged union, not (itemId, quantity) -- confirmed via the

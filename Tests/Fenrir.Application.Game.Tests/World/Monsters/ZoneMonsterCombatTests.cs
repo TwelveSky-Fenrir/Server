@@ -53,7 +53,7 @@ public class ZoneMonsterCombatTests
         var (session, sessionPipe) = ZoneTestKit.CreateSession(1);
         pipe = sessionPipe;
         zone.Post(ZoneCommand.Enter(characterId,
-            ZoneTestKit.EnterData(session, 1, "Attacker", 100, posZ: 100)));
+            ZoneTestKit.EnterData(session, 1, "Attacker")));
         zone.Tick(SimulationClock.LegacyTick); // enters + pops the monster
 
         Assert.True(zone.TryGetPlayer(characterId, out var attacker));

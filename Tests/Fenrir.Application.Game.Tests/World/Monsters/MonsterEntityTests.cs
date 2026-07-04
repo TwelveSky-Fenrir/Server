@@ -25,7 +25,7 @@ public class MonsterEntityTests
     [Fact]
     public void TakeDamage_ReducesLife_AndNeverGoesBelowZero()
     {
-        var monster = CreateEntity(100);
+        var monster = CreateEntity();
 
         var died = monster.TakeDamage(30, out var remaining);
 
@@ -83,7 +83,7 @@ public class MonsterEntityTests
     public void TakeDamage_ConcurrentAttackers_ExactlyOneClaimsTheKill()
     {
         // Simulates two attackers racing to deliver the killing blow -- only one may ever get died=true.
-        var monster = CreateEntity(100);
+        var monster = CreateEntity();
 
         var results = new bool[50];
         Parallel.For(0, 50, i => results[i] = monster.TakeDamage(2, out _));

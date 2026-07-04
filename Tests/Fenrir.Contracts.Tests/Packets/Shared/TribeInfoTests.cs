@@ -1,3 +1,5 @@
+using System.Buffers.Binary;
+using System.Text;
 using Fenrir.Contracts.Packets.Shared;
 using Fenrir.Contracts.Tests.TestSupport;
 
@@ -34,5 +36,23 @@ public class TribeInfoTests
 
         Assert.True(TribeInfo.TryRead(buffer, out var roundTripped));
         StructuralAssert.DeepEqual(tribeInfo, roundTripped);
+    }
+
+    [Fact]
+    public void TryRead_DecodesGoldenBytes()
+    {
+        var buffer = new byte[TribeInfo.WireSize];
+        Encoding.Latin1.GetBytes("Vote1", buffer.AsSpan(0, 13));
+        BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(520 + 5 * 4, 4), 42);
+        Encoding.Latin1.GetBytes("Chief2", buffer.AsSpan(1000 + 2 * 13, 13));
+        Encoding.Latin1.GetBytes("Last19", buffer.AsSpan(2196 + 19 * 13, 13));
+
+        var ok = TribeInfo.TryRead(buffer, out var packet);
+
+        Assert.True(ok);
+        Assert.Equal("Vote1", packet.TribeVoteName[0]);
+        Assert.Equal(42, packet.TribeVoteLevel[5]);
+        Assert.Equal("Chief2", packet.TribeMaster[2]);
+        Assert.Equal("Last19", packet.HoisundoName3[19]);
     }
 }

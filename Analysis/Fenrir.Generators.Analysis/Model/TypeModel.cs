@@ -3,7 +3,10 @@ using Microsoft.CodeAnalysis;
 
 namespace Fenrir.Generators.Analysis.Model;
 
-/// <summary>Resolved model of a <c>readonly partial record struct</c> carrying <c>[FenrirPacket]</c>/<c>[FenrirWireType]</c>.</summary>
+/// <summary>
+///     Resolved model of a <c>readonly partial record struct</c> carrying <c>[FenrirPacket]</c>/
+///     <c>[FenrirWireType]</c>.
+/// </summary>
 internal sealed class TypeModel
 {
     public required INamedTypeSymbol Symbol { get; init; }
@@ -14,7 +17,10 @@ internal sealed class TypeModel
 
     public required string FullTypeName { get; init; }
 
-    /// <summary><c>true</c> = <c>[FenrirPacket]</c> (emits Opcode/PayloadSize); <c>false</c> = <c>[FenrirWireType]</c> (emits WireSize).</summary>
+    /// <summary>
+    ///     <c>true</c> = <c>[FenrirPacket]</c> (emits Opcode/PayloadSize); <c>false</c> = <c>[FenrirWireType]</c> (emits
+    ///     WireSize).
+    /// </summary>
     public required bool IsPacket { get; init; }
 
     public FenrirServer Server { get; init; }

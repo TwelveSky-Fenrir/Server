@@ -9,7 +9,10 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Login.Handlers;
 
-/// <summary>op11 CL_LOGIN_SEND — IP rate limit, then version, then auth run in that order so an over-budget/incompatible attempt never reaches Argon2id/SQL.</summary>
+/// <summary>
+///     op11 CL_LOGIN_SEND — IP rate limit, then version, then auth run in that order so an over-budget/incompatible
+///     attempt never reaches Argon2id/SQL.
+/// </summary>
 public sealed class LoginHandler(
     IAccountRepository accounts,
     IAccountPinRepository pins,
@@ -25,7 +28,10 @@ public sealed class LoginHandler(
     private const int ResultBlocked = 9; // mDB.Login: uBlockInfo >= today (ban); Fenrir lockout maps here too
     private const int ResultSuccess = 0;
 
-    /// <summary>Fixed reference hash so the "account not found" path pays the same Argon2id cost as a real verify (timing-attack defense).</summary>
+    /// <summary>
+    ///     Fixed reference hash so the "account not found" path pays the same Argon2id cost as a real verify
+    ///     (timing-attack defense).
+    /// </summary>
     private static readonly (byte[] Hash, byte[] Salt) DummyCredential =
         PasswordHasher.Hash("dummy-unused-reference-password");
 
@@ -75,7 +81,10 @@ public sealed class LoginHandler(
             LoginTrain.BuildAvatarSlots(chars));
     }
 
-    /// <summary>Runs Argon2id verify on every branch so wall-clock time doesn't leak which failure occurred; only the returned code differs.</summary>
+    /// <summary>
+    ///     Runs Argon2id verify on every branch so wall-clock time doesn't leak which failure occurred; only the returned
+    ///     code differs.
+    /// </summary>
     private async ValueTask<int> AuthenticateConstantTimeAsync(AuthenticateAccountDto? account, string password,
         CancellationToken ct)
     {

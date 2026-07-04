@@ -1,5 +1,7 @@
 using System.Collections.Concurrent;
 using Fenrir.Application.Game.GameData;
+using Fenrir.Application.Game.Inventory;
+using Fenrir.Application.Game.Quests;
 using Fenrir.Application.Game.Simulation;
 using Fenrir.Application.Game.Social.Party;
 using Fenrir.Application.Game.World.Loot;
@@ -87,7 +89,7 @@ public sealed class MonsterSpawnScheduler(
 
         state.TicksSinceLastScan = 0;
         foreach (var slot in state.Slots)
-            if (!slot.Alive && slot.RespawnTicksRemaining <= 0)
+            if (slot is { Alive: false, RespawnTicksRemaining: <= 0 })
                 Spawn(zone, slot);
     }
 
@@ -129,7 +131,10 @@ public sealed class MonsterSpawnScheduler(
         };
     }
 
-    /// <summary>Random point inside the region's disk, Y resolved via <see cref="Zone.Geometry" /> when available, else the region's own recorded Y.</summary>
+    /// <summary>
+    ///     Random point inside the region's disk, Y resolved via <see cref="Zone.Geometry" /> when available, else the
+    ///     region's own recorded Y.
+    /// </summary>
     private void Spawn(Zone zone, MonsterSpawnSlot slot)
     {
         var state = _stateByZone[zone.MapId];
@@ -201,8 +206,18 @@ public sealed class MonsterSpawnScheduler(
 
         zone.ApplyQuestKillProgress(killer.CharacterId, monster.Template.MonsterId);
 
+        bool KillerHasItem(int itemId)
+        {
+            return killer.Inventory.GetContainer(ContainerMatrix.InventoryPage0).Values.Any(s => s.ItemId == itemId) ||
+                   killer.Inventory.GetContainer(ContainerMatrix.InventoryPage1).Values.Any(s => s.ItemId == itemId);
+        }
+
+        var killerQuest = new QuestProgress(killer.QuestStepPermanent, killer.QuestActiveFlag, killer.QuestSort,
+            killer.QuestTargetPhase, killer.QuestKillCounter);
+
         var luck = (killer.Stats?.Luck ?? 0) * 10;
-        var result = state.DropRoller.Roll(monsterDefinition, killer.Level, killer.Tribe, luck);
+        var result = state.DropRoller.Roll(monsterDefinition, killer.Level, killer.Tribe, luck, killerQuest,
+            KillerHasItem);
 
         if (result.Money is { } amount)
             zone.QueueMoneyGrant(killer.CharacterId, amount);

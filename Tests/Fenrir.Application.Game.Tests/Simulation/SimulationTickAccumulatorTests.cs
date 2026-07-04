@@ -2,7 +2,10 @@ using Fenrir.Application.Game.Simulation;
 
 namespace Fenrir.Application.Game.Tests.Simulation;
 
-/// <summary>Covers the 20 Hz network frame -> 2 Hz legacy tick bridge: the remainder must survive across calls with zero drift.</summary>
+/// <summary>
+///     Covers the 20 Hz network frame -> 2 Hz legacy tick bridge: the remainder must survive across calls with zero
+///     drift.
+/// </summary>
 public class SimulationTickAccumulatorTests
 {
     [Fact]

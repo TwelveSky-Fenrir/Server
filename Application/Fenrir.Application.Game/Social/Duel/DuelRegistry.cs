@@ -8,7 +8,10 @@ public enum DuelAskOutcome
     TargetBusy // 5
 }
 
-/// <summary>Why an active duel ended -- resolved automatically by Zone.ApplyDeath/HandleLeave (no client end opcode exists).</summary>
+/// <summary>
+///     Why an active duel ended -- resolved automatically by Zone.ApplyDeath/HandleLeave (no client end opcode
+///     exists).
+/// </summary>
 public enum DuelEndReason
 {
     Death,
@@ -46,7 +49,10 @@ public sealed class DuelRegistry
 
     private readonly Lock _lock = new();
 
-    /// <summary>The original challenge's no-potions flag, keyed by challenger -- carried unchanged through to start regardless of which side calls it.</summary>
+    /// <summary>
+    ///     The original challenge's no-potions flag, keyed by challenger -- carried unchanged through to start regardless
+    ///     of which side calls it.
+    /// </summary>
     private readonly Dictionary<int, bool> _noPotionsByChallenger = new();
 
     private readonly Dictionary<int, int> _pendingByChallenger = new();
@@ -112,7 +118,10 @@ public sealed class DuelRegistry
         }
     }
 
-    /// <summary>CZ_DUEL_START_SEND -- callable by either accepted side; the original challenger's no-potions flag carries through regardless of who starts.</summary>
+    /// <summary>
+    ///     CZ_DUEL_START_SEND -- callable by either accepted side; the original challenger's no-potions flag carries
+    ///     through regardless of who starts.
+    /// </summary>
     public bool TryStart(int callerId, out ActiveDuel duel)
     {
         lock (_lock)
@@ -142,7 +151,10 @@ public sealed class DuelRegistry
         }
     }
 
-    /// <summary>Ends the active duel characterId is part of. Returns the opponent's characterId so the caller can notify both sides.</summary>
+    /// <summary>
+    ///     Ends the active duel characterId is part of. Returns the opponent's characterId so the caller can notify both
+    ///     sides.
+    /// </summary>
     public bool TryEndActiveDuel(int characterId, out int opponentId)
     {
         lock (_lock)

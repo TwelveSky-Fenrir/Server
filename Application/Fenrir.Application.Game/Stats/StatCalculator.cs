@@ -37,7 +37,10 @@ public static class StatCalculator
 
     private static readonly LevelRowDto ZeroLevelRow = new(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
-    /// <summary>The legacy "pet double" rule: if the running total already meets the pet's own contribution, add it; otherwise double the whole running total instead.</summary>
+    /// <summary>
+    ///     The legacy "pet double" rule: if the running total already meets the pet's own contribution, add it; otherwise
+    ///     double the whole running total instead.
+    /// </summary>
     public static int ApplyPetDoubleRule(int statValue, int petStatValue)
     {
         return statValue >= petStatValue ? statValue + petStatValue : statValue * 2;
@@ -406,7 +409,8 @@ public static class StatCalculator
 
         if (bySlot[8] is { } petAmulet)
         {
-            atk -= petAmulet.Item.AttackPower; // Phoenix removes the item's own AttackPower stat, undoing the flat += above
+            atk -= petAmulet.Item
+                .AttackPower; // Phoenix removes the item's own AttackPower stat, undoing the flat += above
             atk += PhoenixFlatBonus(petAmulet.Item.ItemId, 3000, 4000, 5000);
         }
 
@@ -466,7 +470,10 @@ public static class StatCalculator
         return total;
     }
 
-    /// <summary>ReturnIUEffectValue, effect-sort 1 (weapon attack): uses the weapon item's own Level column, not the character's level.</summary>
+    /// <summary>
+    ///     ReturnIUEffectValue, effect-sort 1 (weapon attack): uses the weapon item's own Level column, not the
+    ///     character's level.
+    /// </summary>
     private static int WeaponAttackEffectValue(ItemRowDto weapon)
     {
         if (weapon.Sort != 4 && weapon.Sort is < 13 or > 21) return 0;

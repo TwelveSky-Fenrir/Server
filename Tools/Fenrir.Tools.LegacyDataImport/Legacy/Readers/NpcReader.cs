@@ -2,7 +2,10 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Records;
 
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Readers;
 
-/// <summary>Parses <c>005_00005.IMG</c> (<c>NPC_INFO</c>, STRUCT.h:213-234, 11736 bytes/record); no known runtime patches, unlike <see cref="ItemReader" />.</summary>
+/// <summary>
+///     Parses <c>005_00005.IMG</c> (<c>NPC_INFO</c>, STRUCT.h:213-234, 11736 bytes/record); no known runtime patches,
+///     unlike <see cref="ItemReader" />.
+/// </summary>
 internal static class NpcReader
 {
     private const string FileName = "005_00005.IMG";

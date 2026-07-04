@@ -2,7 +2,10 @@ using System.Collections.Concurrent;
 
 namespace Fenrir.Data.WriteBehind;
 
-/// <summary>Thread-safe "what changed since the last flush" accumulator. MarkDirty may run concurrently with a DrainAll in progress.</summary>
+/// <summary>
+///     Thread-safe "what changed since the last flush" accumulator. MarkDirty may run concurrently with a DrainAll in
+///     progress.
+/// </summary>
 public sealed class DirtyTracker<TKey> where TKey : notnull
 {
     private readonly ConcurrentDictionary<TKey, DirtyFlags> _entries = new();
@@ -37,7 +40,10 @@ public sealed class DirtyTracker<TKey> where TKey : notnull
     }
 
     /// <summary>Atomically empties the tracker and returns everything it held at the moment of removal.</summary>
-    /// <remarks>Per-key TryRemove, not a dictionary swap: a concurrent MarkDirty either merges in before removal (drained here) or survives to the next drain -- never lost, never double-drained.</remarks>
+    /// <remarks>
+    ///     Per-key TryRemove, not a dictionary swap: a concurrent MarkDirty either merges in before removal (drained
+    ///     here) or survives to the next drain -- never lost, never double-drained.
+    /// </remarks>
     public IReadOnlyDictionary<TKey, DirtyFlags> DrainAll()
     {
         var drained = new Dictionary<TKey, DirtyFlags>(Math.Max(0, Count));

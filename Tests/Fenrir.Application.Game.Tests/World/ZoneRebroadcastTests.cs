@@ -7,8 +7,10 @@ using Fenrir.Network.Framing;
 namespace Fenrir.Application.Game.Tests.World;
 
 /// <summary>
-///     Covers the periodic keep-alive avatar rebroadcast (<see cref="SimulationClock.AvatarRebroadcastInterval" /> = 3.5 s):
-///     an idle avatar is re-announced to its AOI neighbors on this cadence, measured against <see cref="Zone.Tick" /> rather than wall time.
+///     Covers the periodic keep-alive avatar rebroadcast (<see cref="SimulationClock.AvatarRebroadcastInterval" /> = 3.5
+///     s):
+///     an idle avatar is re-announced to its AOI neighbors on this cadence, measured against <see cref="Zone.Tick" />
+///     rather than wall time.
 /// </summary>
 public class ZoneRebroadcastTests
 {

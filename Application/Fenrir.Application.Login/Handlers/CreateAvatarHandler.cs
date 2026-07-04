@@ -6,7 +6,10 @@ using Fenrir.Network.Sessions;
 
 namespace Fenrir.Application.Login.Handlers;
 
-/// <summary>op17 CL_CREATE_AVATAR_SEND2 -- creates a new character in the requested slot and returns its full AVATAR_INFO payload.</summary>
+/// <summary>
+///     op17 CL_CREATE_AVATAR_SEND2 -- creates a new character in the requested slot and returns its full AVATAR_INFO
+///     payload.
+/// </summary>
 public sealed class CreateAvatarHandler(ICharacterRepository characters)
     : IAsyncPacketHandler<CreateAvatarRequest>
 {

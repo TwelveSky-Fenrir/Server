@@ -132,7 +132,10 @@ public sealed class ZoneRegistry
         return false;
     }
 
-    /// <summary>Same as <see cref="TryGetPlayerByName" />, but also returns the hosting <see cref="Zone" /> (needed for the reply's MapId).</summary>
+    /// <summary>
+    ///     Same as <see cref="TryGetPlayerByName" />, but also returns the hosting <see cref="Zone" /> (needed for the
+    ///     reply's MapId).
+    /// </summary>
     public bool TryGetPlayerAndZoneByName(string name, [NotNullWhen(true)] out PlayerRuntimeState? state,
         [NotNullWhen(true)] out Zone? zone)
     {

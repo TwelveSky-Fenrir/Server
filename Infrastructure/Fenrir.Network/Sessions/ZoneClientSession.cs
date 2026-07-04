@@ -16,7 +16,10 @@ public sealed class ZoneClientSession(long sessionId, IDuplexPipe transport, IPE
     /// <summary>Set by <see cref="MarkTicketConsumed" /> — the account the single-use session ticket (ADR-0005) resolved to.</summary>
     public int? AccountId { get; private set; }
 
-    /// <summary>Set by <see cref="MarkTicketConsumed" /> — the character the ticket committed to at login (wire contract §5.3).</summary>
+    /// <summary>
+    ///     Set by <see cref="MarkTicketConsumed" /> — the character the ticket committed to at login (wire contract
+    ///     §5.3).
+    /// </summary>
     public int? CharacterId { get; private set; }
 
     // Re-pointed by the source zone's tick on each in-process map transfer (ADR-0012). Unsynchronized: a reference

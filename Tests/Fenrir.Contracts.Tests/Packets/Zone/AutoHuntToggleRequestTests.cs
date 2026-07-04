@@ -5,7 +5,10 @@ using Fenrir.Contracts.Tests.TestSupport;
 
 namespace Fenrir.Contracts.Tests.Packets.Zone;
 
-/// <summary>CZ_AUTO_CONFIG_SEND (116 = 4 + 112): golden encoder hand-built from C++ layout, independent of generated <c>Write</c>.</summary>
+/// <summary>
+///     CZ_AUTO_CONFIG_SEND (116 = 4 + 112): golden encoder hand-built from C++ layout, independent of generated
+///     <c>Write</c>.
+/// </summary>
 public class CzAutoConfigSendTests
 {
     [Fact]

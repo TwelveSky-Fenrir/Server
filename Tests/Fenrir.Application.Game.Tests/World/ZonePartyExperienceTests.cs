@@ -5,7 +5,8 @@ namespace Fenrir.Application.Game.Tests.World;
 
 /// <summary>
 ///     Covers <see cref="Zone.GrantMonsterKillExperience" />'s flat party bonus: granted to every present (same zone,
-///     not dead) party member, including the killer again on top of their own solo gain (<c>Server/ts25zone/S07_MyGame05.cpp</c>).
+///     not dead) party member, including the killer again on top of their own solo gain (
+///     <c>Server/ts25zone/S07_MyGame05.cpp</c>).
 /// </summary>
 public class ZonePartyExperienceTests
 {

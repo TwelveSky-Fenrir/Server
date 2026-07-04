@@ -1,6 +1,9 @@
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Records;
 
-/// <summary>Legacy <c>ZONEMOVEDATA</c> record (STRUCT.h:1369-1378). <c>003.BIN</c> holds 350 back-to-back with no zone-number field; <see cref="ZoneNumber" /> is the record's 1-based array position.</summary>
+/// <summary>
+///     Legacy <c>ZONEMOVEDATA</c> record (STRUCT.h:1369-1378). <c>003.BIN</c> holds 350 back-to-back with no
+///     zone-number field; <see cref="ZoneNumber" /> is the record's 1-based array position.
+/// </summary>
 /// <param name="ZoneNumber">1-based, derived from array position.</param>
 /// <param name="FirstCoord">Default spawn point for this zone.</param>
 /// <param name="NextZoneNum">Count of live entries in <see cref="Xyz" />/<see cref="NextZone" />.</param>

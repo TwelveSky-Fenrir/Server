@@ -7,7 +7,13 @@ namespace Fenrir.Network.Tests.Sessions;
 internal sealed class FakeDuplexPipe : IDuplexPipe
 {
     private readonly Pipe _inbound = new();
-    private readonly Pipe _outbound = new();
+    private readonly Pipe _outbound;
+
+    // outboundOptions lets a test tune backpressure thresholds (e.g. to simulate a slow-consuming peer).
+    public FakeDuplexPipe(PipeOptions? outboundOptions = null)
+    {
+        _outbound = new Pipe(outboundOptions ?? PipeOptions.Default);
+    }
 
     public PipeWriter PeerToSession => _inbound.Writer;
     public PipeReader SessionToPeer => _outbound.Reader;

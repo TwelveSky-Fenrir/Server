@@ -3,7 +3,10 @@ using CaeriusNet.Attributes.Tvp;
 
 namespace Fenrir.Data.Commerce;
 
-/// <summary>usp_Character_GetRewardClaimState; RewardClaimDay 7 = fully claimed, RewardClaimDate 0 = never claimed (YYYYMMDD int).</summary>
+/// <summary>
+///     usp_Character_GetRewardClaimState; RewardClaimDay 7 = fully claimed, RewardClaimDate 0 = never claimed
+///     (YYYYMMDD int).
+/// </summary>
 [GenerateDto]
 public sealed partial record RewardClaimStateDto(byte RewardClaimDay, int RewardClaimDate);
 
@@ -21,7 +24,10 @@ public sealed partial record OfflineShopRowDto(
     int LocationZ,
     string ShopName);
 
-/// <summary>usp_OfflineShop_GetByCharacter RS1; ItemId nullable only for defensive parity with the column (never actually null in practice).</summary>
+/// <summary>
+///     usp_OfflineShop_GetByCharacter RS1; ItemId nullable only for defensive parity with the column (never actually
+///     null in practice).
+/// </summary>
 [GenerateDto]
 public sealed partial record OfflineShopItemRowDto(
     short SlotIndex,

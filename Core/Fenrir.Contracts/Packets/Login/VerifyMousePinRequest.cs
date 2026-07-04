@@ -10,6 +10,5 @@ namespace Fenrir.Contracts.Packets.Login;
 public readonly partial record struct VerifyMousePinRequest : IIncomingPacket<VerifyMousePinRequest>
 {
     // 3 mismatches disconnect the session instead of replying.
-    [FixedString(5)]
-    public required string MousePasswordInput { get; init; }
+    [FixedString(5)] public required string MousePasswordInput { get; init; }
 }

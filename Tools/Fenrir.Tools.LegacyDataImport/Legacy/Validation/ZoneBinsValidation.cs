@@ -2,7 +2,10 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Readers;
 
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Validation;
 
-/// <summary>Validates <see cref="ZoneNpcPlacementReader" />/<see cref="ZoneMoveDataReader" /> (raw 002.BIN/003.BIN, no zlib/XOR) against expected sizes, and dumps a few live vs. unused zones for eyeballing.</summary>
+/// <summary>
+///     Validates <see cref="ZoneNpcPlacementReader" />/<see cref="ZoneMoveDataReader" /> (raw 002.BIN/003.BIN, no
+///     zlib/XOR) against expected sizes, and dumps a few live vs. unused zones for eyeballing.
+/// </summary>
 internal static class ZoneBinsValidation
 {
     private const int ExpectedZoneCount = 350; // MAX_ZONE_NUMBER_NUM

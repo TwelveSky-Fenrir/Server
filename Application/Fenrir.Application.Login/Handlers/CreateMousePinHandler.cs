@@ -7,7 +7,10 @@ using Fenrir.Network.Sessions;
 
 namespace Fenrir.Application.Login.Handlers;
 
-/// <summary>op13 CL_CREATE_MOUSE_PASSWORD_SEND — first-time PIN creation; stored hashed (never in clear, unlike legacy), then opens char select.</summary>
+/// <summary>
+///     op13 CL_CREATE_MOUSE_PASSWORD_SEND — first-time PIN creation; stored hashed (never in clear, unlike legacy),
+///     then opens char select.
+/// </summary>
 public sealed class CreateMousePinHandler(IAccountPinRepository pins)
     : IAsyncPacketHandler<CreateMousePinRequest>
 {

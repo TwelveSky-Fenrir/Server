@@ -5,7 +5,10 @@ using Fenrir.Data.World;
 
 namespace Fenrir.Application.Game.GameData;
 
-/// <summary>Immutable, whole-world reference-data snapshot loaded once at boot, never mutated afterwards -- every zone actor and handler reads it lock-free.</summary>
+/// <summary>
+///     Immutable, whole-world reference-data snapshot loaded once at boot, never mutated afterwards -- every zone
+///     actor and handler reads it lock-free.
+/// </summary>
 public sealed class WorldDataCache
 {
     /// <summary>Item templates by ItemId, bonus skills re-attached (world.Items + world.ItemBonusSkills).</summary>

@@ -38,7 +38,8 @@ public static class SkillEffectCatalog
         AddSelfBuff(entries, [19, 38, 57],
             [(3, SkillValueKind.AttackBlockUp, false), (7, SkillValueKind.RunSpeedUp, false)], [15, 18, 21]);
 
-        AddSelfBuff(entries, [82], [(9, SkillValueKind.ShieldLifeUp, true)]); // Holy Shield, value = ratio% x MaxLife x 0.01
+        AddSelfBuff(entries, [82],
+            [(9, SkillValueKind.ShieldLifeUp, true)]); // Holy Shield, value = ratio% x MaxLife x 0.01
         AddSelfBuff(entries, [83], [(10, SkillValueKind.CriticalUp, false)]);
         AddSelfBuff(entries, [84], [(11, SkillValueKind.LuckUp, false)]);
 

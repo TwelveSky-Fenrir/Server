@@ -2,7 +2,10 @@ using Fenrir.Application.Game.Stats;
 
 namespace Fenrir.Application.Game.Combat;
 
-/// <summary>Immutable copy of one side of an attack, taken from a live <c>PlayerRuntimeState</c> -- the resolver is pure input-in/outcome-out.</summary>
+/// <summary>
+///     Immutable copy of one side of an attack, taken from a live <c>PlayerRuntimeState</c> -- the resolver is pure
+///     input-in/outcome-out.
+/// </summary>
 public readonly record struct CombatantSnapshot(
     int CharacterId,
     byte Tribe,

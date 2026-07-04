@@ -9,5 +9,6 @@ CREATE TABLE world.NpcShopItems
     CONSTRAINT CK_NpcShopItems_ShopPage CHECK (ShopPage BETWEEN 0 AND 2),
     CONSTRAINT CK_NpcShopItems_SlotIndex CHECK (SlotIndex BETWEEN 0 AND 27),
     CONSTRAINT FK_NpcShopItems_Npcs FOREIGN KEY (NpcId) REFERENCES world.Npcs (NpcId),
-    CONSTRAINT FK_NpcShopItems_Items FOREIGN KEY (ItemId) REFERENCES world.Items (ItemId)
+    CONSTRAINT FK_NpcShopItems_Items FOREIGN KEY (ItemId) REFERENCES world.Items (ItemId),
+    INDEX     IX_NpcShopItems_ItemId NONCLUSTERED (ItemId)
 );

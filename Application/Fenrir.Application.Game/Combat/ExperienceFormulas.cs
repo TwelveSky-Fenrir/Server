@@ -1,6 +1,9 @@
 namespace Fenrir.Application.Game.Combat;
 
-/// <summary>Pure XP-gain (monster kill) and XP-loss (death by monster) formulas -- no I/O or state dependency, independently unit-testable.</summary>
+/// <summary>
+///     Pure XP-gain (monster kill) and XP-loss (death by monster) formulas -- no I/O or state dependency,
+///     independently unit-testable.
+/// </summary>
 /// <remarks>
 ///     Not modeled (each defaults to "feature absent"): last-hit-solo/teacher-student/party bonuses, premium/event XP
 ///     multipliers, pet XP, <c>aProtectForDeath</c>, and the per-account/server loss-reduction ratios.
@@ -41,7 +44,10 @@ public static class ExperienceFormulas
         };
     }
 
-    /// <summary>Raw XP before <see cref="ApplyRebirthDivisor" />: 0 past a 9-level unfavorable gap, x3 past a 20-level favorable gap, else linear ±10%/level.</summary>
+    /// <summary>
+    ///     Raw XP before <see cref="ApplyRebirthDivisor" />: 0 past a 9-level unfavorable gap, x3 past a 20-level
+    ///     favorable gap, else linear ±10%/level.
+    /// </summary>
     public static int ComputeMonsterKillExperience(int killerFixedLevel, int monsterRealLevel,
         int monsterGeneralExperience)
     {
@@ -78,7 +84,10 @@ public static class ExperienceFormulas
         return characterLevel < RebirthDivisorLevelThreshold ? rawGain / 3 : rawGain / 5;
     }
 
-    /// <summary><c>(currentExperience - levelFactor1) * 0.05</c>, clamped to [0, currentExperience]. <paramref name="levelFactor1" /> is the level's XP-range floor.</summary>
+    /// <summary>
+    ///     <c>(currentExperience - levelFactor1) * 0.05</c>, clamped to [0, currentExperience].
+    ///     <paramref name="levelFactor1" /> is the level's XP-range floor.
+    /// </summary>
     public static long ComputeDeathExperienceLoss(long currentExperience, int levelFactor1)
     {
         var loss = (long)((currentExperience - levelFactor1) * 0.05f);
@@ -88,7 +97,8 @@ public static class ExperienceFormulas
 
     /// <summary>
     ///     Flat 10/20/30/50% bonus (party size 2-5) granted to every present member, computed straight from the raw
-    ///     monster XP -- not run through <see cref="ComputeMonsterKillExperience" /> or <see cref="ApplyRebirthDivisor" /> again.
+    ///     monster XP -- not run through <see cref="ComputeMonsterKillExperience" /> or <see cref="ApplyRebirthDivisor" />
+    ///     again.
     /// </summary>
     public static int ComputePartyBonusExperience(int presentPartySize, int monsterGeneralExperience)
     {

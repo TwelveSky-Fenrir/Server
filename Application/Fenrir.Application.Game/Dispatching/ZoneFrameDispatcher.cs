@@ -6,7 +6,10 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Dispatching;
 
-/// <summary>Bridges <see cref="Fenrir.Network.Dispatching.SessionLoop" /> to the generated <c>MessageDispatcher</c> for this assembly's packet handlers.</summary>
+/// <summary>
+///     Bridges <see cref="Fenrir.Network.Dispatching.SessionLoop" /> to the generated <c>MessageDispatcher</c> for
+///     this assembly's packet handlers.
+/// </summary>
 public sealed class ZoneFrameDispatcher(ILogger<ZoneFrameDispatcher> logger) : IFrameDispatcher
 {
     public async ValueTask DispatchAsync(FenrirServer server, byte opcode, ReadOnlySequence<byte> payload,

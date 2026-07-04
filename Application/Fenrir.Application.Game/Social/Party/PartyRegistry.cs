@@ -32,7 +32,10 @@ public enum PartyJoinOutcome
     /// <summary>Joined an existing party.</summary>
     Joined,
 
-    /// <summary>The inviter's party was already full -- the legacy silently drops the join with no error code at all, preserved verbatim.</summary>
+    /// <summary>
+    ///     The inviter's party was already full -- the legacy silently drops the join with no error code at all,
+    ///     preserved verbatim.
+    /// </summary>
     PartyWasFull
 }
 
@@ -185,7 +188,10 @@ public sealed class PartyRegistry
         }
     }
 
-    /// <summary>accepted=true additionally performs the join -- new party if the inviter had none, else adds to the inviter's existing party.</summary>
+    /// <summary>
+    ///     accepted=true additionally performs the join -- new party if the inviter had none, else adds to the inviter's
+    ///     existing party.
+    /// </summary>
     public bool TryAnswer(int inviteeId, bool accepted, out int inviterId, out PartyJoinOutcome joinOutcome)
     {
         joinOutcome = default;
@@ -222,7 +228,10 @@ public sealed class PartyRegistry
         }
     }
 
-    /// <summary>CZ_PARTY_LEAVE_SEND -- a non-leader member leaves voluntarily. Returns the member list from before the departure.</summary>
+    /// <summary>
+    ///     CZ_PARTY_LEAVE_SEND -- a non-leader member leaves voluntarily. Returns the member list from before the
+    ///     departure.
+    /// </summary>
     public bool TryLeave(int characterId, out IReadOnlyList<int> membersBeforeLeave, out bool disbanded)
     {
         return TryRemove(characterId, characterId, false, out membersBeforeLeave, out disbanded);
@@ -283,7 +292,10 @@ public sealed class PartyRegistry
         }
     }
 
-    /// <summary>Also called when a departure/kick shrinks a party below 2 members, so nobody is left in a phantom 1-person "party".</summary>
+    /// <summary>
+    ///     Also called when a departure/kick shrinks a party below 2 members, so nobody is left in a phantom 1-person
+    ///     "party".
+    /// </summary>
     private void DisbandLocked(Party party)
     {
         foreach (var memberId in party.Members)

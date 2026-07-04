@@ -1,7 +1,13 @@
 namespace Fenrir.Application.Game.Enchant;
 
-/// <summary>Static material tables for CZ_IMPROVE_ITEM_SEND's standard equipment regime. Wings and the costume/stellar-core branches are out of scope -- see <see cref="EnchantResolver" />'s remarks.</summary>
-/// <remarks><c>USE_IMPROVE_RATE_100</c> is unconditionally defined, so all materials here are live in every build (not conditional as elsewhere assumed).</remarks>
+/// <summary>
+///     Static material tables for CZ_IMPROVE_ITEM_SEND's standard equipment regime. Wings and the
+///     costume/stellar-core branches are out of scope -- see <see cref="EnchantResolver" />'s remarks.
+/// </summary>
+/// <remarks>
+///     <c>USE_IMPROVE_RATE_100</c> is unconditionally defined, so all materials here are live in every build (not
+///     conditional as elsewhere assumed).
+/// </remarks>
 public static class EnchantMaterialCatalog
 {
     public enum TypeRequirement : byte
@@ -47,7 +53,10 @@ public static class EnchantMaterialCatalog
             [825] = new(825, 10, 0, true)
         };
 
-    /// <summary><see cref="IsFillToValue" />: <see cref="Value" /> is a target absolute level, not a flat increment. <see cref="IgnoresFortyCap" /> (material 825 only): the sole material allowed to jump straight past +40.</summary>
+    /// <summary>
+    ///     <see cref="IsFillToValue" />: <see cref="Value" /> is a target absolute level, not a flat increment.
+    ///     <see cref="IgnoresFortyCap" /> (material 825 only): the sole material allowed to jump straight past +40.
+    /// </summary>
     public readonly record struct StandardMaterial(
         int ItemId,
         int Value,

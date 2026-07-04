@@ -107,7 +107,10 @@ public static class GeneralItemDropResolver
         return null;
     }
 
-    /// <summary>Ports <c>ITEMSYSTEM::Return(level,type,sort)</c>'s "one uniformly random match" semantics over the whole catalog.</summary>
+    /// <summary>
+    ///     Ports <c>ITEMSYSTEM::Return(level,type,sort)</c>'s "one uniformly random match" semantics over the whole
+    ///     catalog.
+    /// </summary>
     private static ItemRowDto? ReturnOne(WorldDataCache worldData, Random random, int level, int type, int sort)
     {
         List<ItemRowDto>? matches = null;

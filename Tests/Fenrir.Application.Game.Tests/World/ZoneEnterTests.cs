@@ -5,7 +5,10 @@ using Fenrir.Network.Framing;
 
 namespace Fenrir.Application.Game.Tests.World;
 
-/// <summary>Covers <see cref="Zone" />'s mutual-visibility step of <c>Enter</c>: new arrival and existing neighbors must each learn about the other exactly once.</summary>
+/// <summary>
+///     Covers <see cref="Zone" />'s mutual-visibility step of <c>Enter</c>: new arrival and existing neighbors must
+///     each learn about the other exactly once.
+/// </summary>
 public class ZoneEnterTests
 {
     private static readonly int OneFrame = FrameWriter.FrameSizeOf<AvatarActionResponse>();

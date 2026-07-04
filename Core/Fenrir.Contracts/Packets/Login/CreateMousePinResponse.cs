@@ -12,6 +12,5 @@ public readonly partial record struct CreateMousePinResponse : IOutgoingPacket
     public required int Result { get; init; }
 
     // Echoed PIN comes from the request, not storage -- server-side the PIN only ever exists hashed.
-    [FixedString(5)]
-    public required string MousePassword { get; init; }
+    [FixedString(5)] public required string MousePassword { get; init; }
 }

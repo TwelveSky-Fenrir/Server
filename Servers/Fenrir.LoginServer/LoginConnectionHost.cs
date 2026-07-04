@@ -11,7 +11,10 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.LoginServer;
 
-/// <summary>Owns the login listen socket; for each accepted connection, greets the client, seeds the stream cipher, then pumps I/O.</summary>
+/// <summary>
+///     Owns the login listen socket; for each accepted connection, greets the client, seeds the stream cipher, then
+///     pumps I/O.
+/// </summary>
 public sealed class LoginConnectionHost(
     IOptions<LoginServerOptions> options,
     IFrameDispatcher dispatcher,

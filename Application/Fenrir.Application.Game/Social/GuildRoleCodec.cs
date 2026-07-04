@@ -21,7 +21,10 @@ public static class GuildRoleCodec
         };
     }
 
-    /// <summary>DbRoleToWire is self-inverting, so this just delegates to it -- kept separate only so call sites read correctly.</summary>
+    /// <summary>
+    ///     DbRoleToWire is self-inverting, so this just delegates to it -- kept separate only so call sites read
+    ///     correctly.
+    /// </summary>
     public static byte WireRoleToDb(int wireRole)
     {
         return (byte)DbRoleToWire((byte)wireRole);

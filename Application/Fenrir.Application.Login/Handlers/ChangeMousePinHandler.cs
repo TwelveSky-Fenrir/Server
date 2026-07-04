@@ -7,7 +7,10 @@ using Fenrir.Network.Sessions;
 
 namespace Fenrir.Application.Login.Handlers;
 
-/// <summary>op14 CL_CHANGE_MOUSE_PASSWORD_SEND — legacy quirk: a successful change also validates the PIN (S04_MyWork02.cpp l.532), so the session goes straight to CharSelect.</summary>
+/// <summary>
+///     op14 CL_CHANGE_MOUSE_PASSWORD_SEND — legacy quirk: a successful change also validates the PIN
+///     (S04_MyWork02.cpp l.532), so the session goes straight to CharSelect.
+/// </summary>
 public sealed class ChangeMousePinHandler(IAccountPinRepository pins)
     : IAsyncPacketHandler<ChangeMousePinRequest>
 {

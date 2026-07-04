@@ -10,7 +10,10 @@ namespace Fenrir.Application.Game.Social.Trade;
 /// </summary>
 public static class TradeCommitPlanner
 {
-    /// <summary>Plan.Overflowed means the receiving side had no free slot for one or more incoming items -- the caller must abort the whole trade, never drop an item silently.</summary>
+    /// <summary>
+    ///     Plan.Overflowed means the receiving side had no free slot for one or more incoming items -- the caller must
+    ///     abort the whole trade, never drop an item silently.
+    /// </summary>
     public static Plan BuildFinalContainers(
         ImmutableDictionary<byte, ItemStack> currentPage0,
         ImmutableDictionary<byte, ItemStack> currentPage1,

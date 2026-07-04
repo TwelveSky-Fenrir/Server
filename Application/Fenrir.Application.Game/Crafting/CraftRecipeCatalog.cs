@@ -1,6 +1,9 @@
 namespace Fenrir.Application.Game.Crafting;
 
-/// <summary>Constants for the two CZ_MAKE_ITEM_SEND recipes this pass implements -- other <c>MK_*</c> families are out of scope, see <see cref="CraftResolver" />'s remarks.</summary>
+/// <summary>
+///     Constants for the two CZ_MAKE_ITEM_SEND recipes this pass implements -- other <c>MK_*</c> families are out of
+///     scope, see <see cref="CraftResolver" />'s remarks.
+/// </summary>
 public static class CraftRecipeCatalog
 {
     public const int JadeUpgradeSort = 1;

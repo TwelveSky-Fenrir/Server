@@ -10,7 +10,10 @@ namespace Fenrir.Data.Social;
 // One-directional by design: a row only says "CharacterId considers FriendCharacterId a friend".
 public sealed record FriendRepository(ICaeriusNetDbContext Db) : IFriendRepository
 {
-    /// <summary>Loaded once at world entry (AVATAR_INFO's Friend[10]), never re-queried; Add/Remove also update the in-memory mirror.</summary>
+    /// <summary>
+    ///     Loaded once at world entry (AVATAR_INFO's Friend[10]), never re-queried; Add/Remove also update the in-memory
+    ///     mirror.
+    /// </summary>
     public async ValueTask<ReadOnlyCollection<CharacterFriendDto>> GetByCharacterAsync(int characterId,
         CancellationToken ct)
     {
@@ -21,7 +24,10 @@ public sealed record FriendRepository(ICaeriusNetDbContext Db) : IFriendReposito
         return await Db.QueryAsReadOnlyCollectionAsync<CharacterFriendDto>(sp, ct);
     }
 
-    /// <summary>CZ_FRIEND_MAKE_SEND (56); writes one slot for characterId only. Throws SQL 50267 if the slot is already occupied (only possible via a race).</summary>
+    /// <summary>
+    ///     CZ_FRIEND_MAKE_SEND (56); writes one slot for characterId only. Throws SQL 50267 if the slot is already
+    ///     occupied (only possible via a race).
+    /// </summary>
     public async ValueTask AddAsync(int characterId, byte slot, int friendCharacterId, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_CharacterFriend_Add", 0)

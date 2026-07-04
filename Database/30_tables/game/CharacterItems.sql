@@ -28,5 +28,6 @@ CREATE TABLE game.CharacterItems
             OR (Container = 2 AND Slot <= 12)         -- equipment, MAX_EQUIP_SLOT_NUM = 13
             OR (Container IN (3, 4) AND Slot <= 27)), -- store pages, MAX_STORE_ITEM_SLOT_NUM = 28
     CONSTRAINT FK_CharacterItems_Character FOREIGN KEY (CharacterId) REFERENCES game.Characters (CharacterId),
-    CONSTRAINT FK_CharacterItems_Item FOREIGN KEY (ItemId) REFERENCES world.Items (ItemId)
+    CONSTRAINT FK_CharacterItems_Item FOREIGN KEY (ItemId) REFERENCES world.Items (ItemId),
+    INDEX       IX_CharacterItems_ItemId NONCLUSTERED (ItemId)
 );

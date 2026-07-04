@@ -3,7 +3,10 @@ using System.Text;
 
 namespace Fenrir.Tools.LegacyDataImport.Legacy;
 
-/// <summary>Cursor over a tightly-packed legacy C struct (natural alignment, no #pragma pack) -- callers must <see cref="Skip" /> compiler padding explicitly.</summary>
+/// <summary>
+///     Cursor over a tightly-packed legacy C struct (natural alignment, no #pragma pack) -- callers must
+///     <see cref="Skip" /> compiler padding explicitly.
+/// </summary>
 internal ref struct LegacySpanReader(ReadOnlySpan<byte> data)
 {
     private readonly ReadOnlySpan<byte> _data = data;

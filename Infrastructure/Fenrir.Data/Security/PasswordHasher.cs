@@ -4,7 +4,10 @@ using Konscious.Security.Cryptography;
 
 namespace Fenrir.Data.Security;
 
-/// <summary>Argon2id hashing; wire stays clear-text for legacy client compat, but nothing server-side stores/compares a plain password.</summary>
+/// <summary>
+///     Argon2id hashing; wire stays clear-text for legacy client compat, but nothing server-side stores/compares a
+///     plain password.
+/// </summary>
 public static class PasswordHasher
 {
     private const int MemorySizeKb = 64 * 1024;
@@ -19,7 +22,10 @@ public static class PasswordHasher
         return (HashWithSalt(password, salt), salt);
     }
 
-    /// <summary>Constant-time: <see cref="CryptographicOperations.FixedTimeEquals" /> never short-circuits on a differing byte.</summary>
+    /// <summary>
+    ///     Constant-time: <see cref="CryptographicOperations.FixedTimeEquals" /> never short-circuits on a differing
+    ///     byte.
+    /// </summary>
     public static bool Verify(string password, byte[] hash, byte[] salt)
     {
         return CryptographicOperations.FixedTimeEquals(HashWithSalt(password, salt), hash);

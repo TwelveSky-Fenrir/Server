@@ -149,7 +149,10 @@ internal static class MonsterValidation
             $"{mismatches} total mismatches ({textMismatches} text, {numericMismatches} numeric).");
     }
 
-    /// <summary>Flattens to the 181 CSV fields in struct declaration order (matches both CSVs; drop CSV starts at <see cref="DropSectionStartIndex" />).</summary>
+    /// <summary>
+    ///     Flattens to the 181 CSV fields in struct declaration order (matches both CSVs; drop CSV starts at
+    ///     <see cref="DropSectionStartIndex" />).
+    /// </summary>
     private static List<string> FlattenToCsvFields(MonsterRecord monster)
     {
         List<string> fields =

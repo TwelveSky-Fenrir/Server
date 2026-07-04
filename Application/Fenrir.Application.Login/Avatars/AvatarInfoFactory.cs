@@ -3,7 +3,10 @@ using Fenrir.Data.Characters;
 
 namespace Fenrir.Application.Login.Avatars;
 
-/// <summary>Builds the AVATAR_INFO wire payload from a persisted character; zero-template shared with GameServer via <see cref="AvatarInfoTemplates" />.</summary>
+/// <summary>
+///     Builds the AVATAR_INFO wire payload from a persisted character; zero-template shared with GameServer via
+///     <see cref="AvatarInfoTemplates" />.
+/// </summary>
 public static class AvatarInfoFactory
 {
     public static AvatarInfo Zeroed => AvatarInfoTemplates.Zeroed;

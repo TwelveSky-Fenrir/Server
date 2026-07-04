@@ -1,6 +1,9 @@
 namespace Fenrir.Contracts;
 
-/// <summary>Real legacy opcodes (§2.4/§2.5/§4.9/§5.10); nested by server and direction since values overlap across both axes. Includes opcodes outside M1 scope to avoid ever reusing an already-taken value.</summary>
+/// <summary>
+///     Real legacy opcodes (§2.4/§2.5/§4.9/§5.10); nested by server and direction since values overlap across both
+///     axes. Includes opcodes outside M1 scope to avoid ever reusing an already-taken value.
+/// </summary>
 public static class Opcodes
 {
     public static class Login
@@ -131,6 +134,8 @@ public static class Opcodes
             public const byte GetCashCatalog = 91;
             public const byte TribePopulation = 92;
             public const byte SkyUpgradeItem = 93;
+            public const byte ContinueSkillStat = 94;
+            public const byte ContinueSkillUse = 95;
             public const byte PlaytimeBuff = 97;
             public const byte AutoHuntToggle = 99;
             public const byte FishingLine = 103;

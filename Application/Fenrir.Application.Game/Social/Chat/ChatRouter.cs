@@ -16,13 +16,19 @@ public static class ChatRouter
     /// <summary>MAX_CHAT_CONTENT_LENGTH (DEFINE.h:608) -- every chat/notice Content field is exactly this many wire bytes.</summary>
     public const int MaxContentLength = 61;
 
-    /// <summary>Anti-fuzzing gate on every chat/notice handler. Party chat doesn't apply this -- it checks membership instead and returns silently, not a Quit.</summary>
+    /// <summary>
+    ///     Anti-fuzzing gate on every chat/notice handler. Party chat doesn't apply this -- it checks membership instead
+    ///     and returns silently, not a Quit.
+    /// </summary>
     public static bool IsContentEmpty(string content)
     {
         return string.IsNullOrEmpty(content);
     }
 
-    /// <summary>mServerNumber in {37, 119, 124, 84} -- Fenrir's Zone.MapId IS the legacy server number (one ts25zone process = one map/server).</summary>
+    /// <summary>
+    ///     mServerNumber in {37, 119, 124, 84} -- Fenrir's Zone.MapId IS the legacy server number (one ts25zone process =
+    ///     one map/server).
+    /// </summary>
     public static bool IsShoutEnabledOnMap(short mapId)
     {
         return mapId is 37 or 119 or 124 or 84;

@@ -36,7 +36,10 @@ public sealed record QuestDefinition(
     ImmutableArray<QuestRewardRowDto> Rewards,
     ImmutableArray<QuestSpeechRowDto> Speeches);
 
-/// <summary>Portals/spawns/NPC placements/monster regions are pre-filtered of legacy orphan rows at cache-build time -- see <see cref="WorldDataFilterStats" />.</summary>
+/// <summary>
+///     Portals/spawns/NPC placements/monster regions are pre-filtered of legacy orphan rows at cache-build time --
+///     see <see cref="WorldDataFilterStats" />.
+/// </summary>
 public sealed record ZoneDefinition(
     ZoneRowDto Zone,
     ImmutableArray<ZonePortalRowDto> Portals,

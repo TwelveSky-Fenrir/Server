@@ -4,12 +4,18 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.GameData;
 
-/// <summary>Boot-time orchestration of the world.* reference-data load. Must complete before the GameServer accepts its first connection -- a load failure is fatal by design.</summary>
+/// <summary>
+///     Boot-time orchestration of the world.* reference-data load. Must complete before the GameServer accepts its
+///     first connection -- a load failure is fatal by design.
+/// </summary>
 public sealed class WorldDataLoader(IWorldDataRepository repository, ILogger<WorldDataLoader> logger)
 {
     private WorldDataCache? _cache;
 
-    /// <summary>Throws until <see cref="InitializeAsync" /> has completed -- resolving early is a Program.cs wiring bug, not a state to limp through.</summary>
+    /// <summary>
+    ///     Throws until <see cref="InitializeAsync" /> has completed -- resolving early is a Program.cs wiring bug, not a
+    ///     state to limp through.
+    /// </summary>
     public WorldDataCache Cache => _cache ?? throw new InvalidOperationException(
         "WorldDataCache is not loaded yet -- call WorldDataLoader.InitializeAsync before accepting connections.");
 

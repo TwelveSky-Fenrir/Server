@@ -11,7 +11,10 @@ public interface IGiftRepository
 {
     public ValueTask<ReadOnlyCollection<PendingGiftDto>> GetPendingByAccountAsync(int accountId, CancellationToken ct);
 
-    /// <summary>Atomically claims the gift into the shared vault. Throws SQL 50220 (not found/not owned/claimed) or 50274 (vault full, 28 slots).</summary>
+    /// <summary>
+    ///     Atomically claims the gift into the shared vault. Throws SQL 50220 (not found/not owned/claimed) or 50274
+    ///     (vault full, 28 slots).
+    /// </summary>
     public ValueTask<short> ClaimIntoVaultAsync(int giftId, int accountId, CancellationToken ct);
 }
 
@@ -28,7 +31,10 @@ public sealed record GiftRepository(ICaeriusNetDbContext Db) : IGiftRepository
         return await Db.QueryAsReadOnlyCollectionAsync<PendingGiftDto>(sp, ct);
     }
 
-    /// <summary>Atomically claims the gift into the shared vault. Throws SQL 50220 (not found/not owned/claimed) or 50274 (vault full, 28 slots).</summary>
+    /// <summary>
+    ///     Atomically claims the gift into the shared vault. Throws SQL 50220 (not found/not owned/claimed) or 50274
+    ///     (vault full, 28 slots).
+    /// </summary>
     public async ValueTask<short> ClaimIntoVaultAsync(int giftId, int accountId, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Gift_ClaimIntoVault", 1)

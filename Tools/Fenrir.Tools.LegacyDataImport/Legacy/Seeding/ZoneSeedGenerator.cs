@@ -13,7 +13,10 @@ internal static class ZoneSeedGenerator
 {
     private const int ChunkSize = 500; // SQL Server hard cap is 1000 rows/VALUES list; 500 gives headroom.
 
-    /// <summary>Reads <paramref name="dataDir" /> (Server/BuildEU33/DATA layout) and writes the five seed .sql files into <paramref name="outputDir" />.</summary>
+    /// <summary>
+    ///     Reads <paramref name="dataDir" /> (Server/BuildEU33/DATA layout) and writes the five seed .sql files into
+    ///     <paramref name="outputDir" />.
+    /// </summary>
     public static string Generate(string dataDir, string outputDir)
     {
         Directory.CreateDirectory(outputDir);

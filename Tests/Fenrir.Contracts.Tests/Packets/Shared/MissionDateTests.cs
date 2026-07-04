@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using Fenrir.Contracts.Packets.Shared;
 using Fenrir.Contracts.Tests.TestSupport;
 
@@ -29,5 +30,23 @@ public class MissionDateTests
 
         Assert.True(MissionDate.TryRead(buffer, out var roundTripped));
         StructuralAssert.DeepEqual(missionDate, roundTripped);
+    }
+
+    [Fact]
+    public void TryRead_DecodesGoldenBytes()
+    {
+        var buffer = new byte[MissionDate.WireSize];
+        BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(0, 4), 1);
+        BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(4, 4), 2);
+        BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(8, 4), 3);
+        BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(12, 4), 4);
+
+        var ok = MissionDate.TryRead(buffer, out var packet);
+
+        Assert.True(ok);
+        Assert.Equal(1, packet.JoinWar);
+        Assert.Equal(2, packet.KillOtherTribe);
+        Assert.Equal(3, packet.KillMonster);
+        Assert.Equal(4, packet.PlayTime);
     }
 }

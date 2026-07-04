@@ -119,7 +119,10 @@ public sealed class HandlerDispatchIncrementalGenerator : IIncrementalGenerator
         context.AddSource("MessageDispatcher.g.cs", writer.ToString());
     }
 
-    /// <summary>Registers every dispatched handler as a DI singleton from the same discovery pass, so dispatch and registration can't drift.</summary>
+    /// <summary>
+    ///     Registers every dispatched handler as a DI singleton from the same discovery pass, so dispatch and
+    ///     registration can't drift.
+    /// </summary>
     private static void EmitRegistration(IndentedWriter writer, ImmutableArray<HandlerModel> handlers)
     {
         var handlerTypes = handlers

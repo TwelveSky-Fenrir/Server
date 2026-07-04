@@ -1,3 +1,5 @@
+using System.Buffers.Binary;
+using System.Text;
 using Fenrir.Contracts.Packets.Shared;
 using Fenrir.Contracts.Tests.TestSupport;
 
@@ -84,5 +86,24 @@ public class WorldInfoTests
 
         Assert.True(WorldInfo.TryRead(buffer, out var roundTripped));
         StructuralAssert.DeepEqual(worldInfo, roundTripped);
+    }
+
+    // GuildScore sits right after GuildName3 (39 bytes, not 4-aligned) plus its 3-byte compiler pad at offset 897.
+    [Fact]
+    public void TryRead_DecodesGoldenBytes()
+    {
+        var buffer = new byte[WorldInfo.WireSize];
+        BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(0, 4), 555);
+        Encoding.Latin1.GetBytes("Quest1", buffer.AsSpan(148, 16));
+        BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(900, 4), 777);
+        BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(1364 + 4 * 4, 4), 999);
+
+        var ok = WorldInfo.TryRead(buffer, out var packet);
+
+        Assert.True(ok);
+        Assert.Equal(555, packet.Zone038WinTribe);
+        Assert.Equal("Quest1", packet.Tribe4QuestName);
+        Assert.Equal(777, packet.GuildScore[0]);
+        Assert.Equal(999, packet.PopUpKillMonster[4]);
     }
 }

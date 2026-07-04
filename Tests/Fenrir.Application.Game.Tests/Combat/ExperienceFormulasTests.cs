@@ -2,7 +2,10 @@ using Fenrir.Application.Game.Combat;
 
 namespace Fenrir.Application.Game.Tests.Combat;
 
-/// <summary>Covers <see cref="ExperienceFormulas" /> against <c>MONSTER_OBJECT::ProcessForExp</c> and the death XP loss path in <c>Server/ts25zone/S07_MyGame05.cpp</c> / <c>S07_MyGame02.cpp</c>.</summary>
+/// <summary>
+///     Covers <see cref="ExperienceFormulas" /> against <c>MONSTER_OBJECT::ProcessForExp</c> and the death XP loss
+///     path in <c>Server/ts25zone/S07_MyGame05.cpp</c> / <c>S07_MyGame02.cpp</c>.
+/// </summary>
 public class ExperienceFormulasTests
 {
     [Theory]

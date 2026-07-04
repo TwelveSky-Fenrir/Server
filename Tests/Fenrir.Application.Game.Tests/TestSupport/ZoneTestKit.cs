@@ -14,7 +14,10 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.TestSupport;
 
-/// <summary>Real <see cref="Zone" /> instances over in-memory pipes; time driven exclusively through <see cref="Zone.Tick" /> -- no <c>RunAsync</c>, timers, or sleeps.</summary>
+/// <summary>
+///     Real <see cref="Zone" /> instances over in-memory pipes; time driven exclusively through
+///     <see cref="Zone.Tick" /> -- no <c>RunAsync</c>, timers, or sleeps.
+/// </summary>
 internal static class ZoneTestKit
 {
     public static GameServerOptions Options()
@@ -104,7 +107,10 @@ internal static class ZoneTestKit
     }
 }
 
-/// <summary>Deterministic <see cref="IRandomSource" />: returns a fixed sequence (wrapping when exhausted), reduced modulo each call's own requested bound.</summary>
+/// <summary>
+///     Deterministic <see cref="IRandomSource" />: returns a fixed sequence (wrapping when exhausted), reduced modulo
+///     each call's own requested bound.
+/// </summary>
 internal sealed class ScriptedRandomSource(params int[] sequence) : IRandomSource
 {
     private int _index;

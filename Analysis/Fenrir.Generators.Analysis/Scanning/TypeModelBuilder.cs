@@ -10,7 +10,10 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Fenrir.Generators.Analysis.Scanning;
 
-/// <summary>Builds a <see cref="TypeModel" /> (+ diagnostics) from the Roslyn context of a <c>[FenrirPacket]</c>/<c>[FenrirWireType]</c>.</summary>
+/// <summary>
+///     Builds a <see cref="TypeModel" /> (+ diagnostics) from the Roslyn context of a <c>[FenrirPacket]</c>/
+///     <c>[FenrirWireType]</c>.
+/// </summary>
 internal static class TypeModelBuilder
 {
     public static GeneratedTypeResult BuildPacket(GeneratorAttributeSyntaxContext context)

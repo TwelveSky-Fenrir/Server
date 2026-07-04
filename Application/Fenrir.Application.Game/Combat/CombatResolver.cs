@@ -5,10 +5,20 @@ using Fenrir.Contracts.Packets.Shared;
 
 namespace Fenrir.Application.Game.Combat;
 
-/// <summary>PvP attack resolution (<c>mCase</c> 2, enemy-tribe) -- pure port of <c>AttackPlayer</c> (S07_MyGame02.cpp:886-1416). Never mutates state itself; caller applies the outcome.</summary>
+/// <summary>
+///     PvP attack resolution (<c>mCase</c> 2, enemy-tribe) -- pure port of <c>AttackPlayer</c>
+///     (S07_MyGame02.cpp:886-1416). Never mutates state itself; caller applies the outcome.
+/// </summary>
 /// <remarks>
-///     Not implemented: duel (<c>mCase</c> 1), PvM/MvP/stun (handled elsewhere or unmodeled), Holy Shield, PvP kill rewards -- a PvP kill here only applies HP death, no CP/XP/drop to the killer.
-///     PRESERVED VERBATIM: after the min-5 floor and crit doubling, damage is divided by <see cref="MinimumDamageAgainstAvatar" /> (5) -- verified at two call sites, absent from PvM. Makes PvP damage ~5x lower than raw ATK-DEF suggests; do not "fix".
+///     Not implemented: duel (<c>mCase</c> 1), PvM/MvP/stun (handled elsewhere or unmodeled), Holy Shield, PvP kill
+///     rewards -- a PvP kill here only applies HP death, no CP/XP/drop to the killer.
+///     Also not implemented: the tribe "Formation Skill" x1.1 ATK/DEF modifier gated on
+///     <c>mWorldInfo->mTribeMasterCallAbility[tribe]</c> (S07_MyGame02.cpp:1071-1079) -- that world-scope buff state isn't
+///     wired up anywhere yet (see <see cref="Fenrir.Application.Game.Handlers.Tribes.TribeActionHandler" /> tSort 5, which
+///     always aborts because its own gating flag is never set).
+///     PRESERVED VERBATIM: after the min-5 floor and crit doubling, damage is divided by
+///     <see cref="MinimumDamageAgainstAvatar" /> (5) -- verified at two call sites, absent from PvM. Makes PvP damage ~5x
+///     lower than raw ATK-DEF suggests; do not "fix".
 /// </remarks>
 public static class CombatResolver
 {
@@ -70,9 +80,9 @@ public static class CombatResolver
         var isSkillAttack = request.AttackActionValue1 == 2;
 
         var attackPower = attacker.Stats.AttackPower;
-        if (isSkillAttack && attackSkill is { } skill)
+        if (isSkillAttack && attackSkill != null)
         {
-            var ratio = SkillCatalog.ReturnSkillValue(skill, request.AttackActionValue3,
+            var ratio = SkillCatalog.ReturnSkillValue(attackSkill, request.AttackActionValue3,
                 SkillValueKind.AttackPowerRatio);
             if (ratio > 0f)
                 attackPower = CombatMath.ApplySkillPowerRatio(attackPower, ratio);
@@ -122,6 +132,6 @@ public static class CombatResolver
         if (request.AttackActionValue2 == SkillNumberExcludedFromCritical)
             return false;
 
-        return attackSkill is { } skill && skill.Skill.AttackType is 2 or 5;
+        return attackSkill is { Skill.AttackType: 2 or 5 };
     }
 }

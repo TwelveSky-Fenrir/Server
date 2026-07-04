@@ -16,5 +16,6 @@ CREATE TABLE game.OfflineShopItems
     CONSTRAINT PK_OfflineShopItems PRIMARY KEY CLUSTERED (CharacterId, SlotIndex),
     CONSTRAINT CK_OfflineShopItems_SlotIndex CHECK (SlotIndex BETWEEN 0 AND 24),
     CONSTRAINT FK_OfflineShopItems_Shop FOREIGN KEY (CharacterId) REFERENCES game.OfflineShops (CharacterId) ON DELETE CASCADE,
-    CONSTRAINT FK_OfflineShopItems_Item FOREIGN KEY (ItemId) REFERENCES world.Items (ItemId)
+    CONSTRAINT FK_OfflineShopItems_Item FOREIGN KEY (ItemId) REFERENCES world.Items (ItemId),
+    INDEX        IX_OfflineShopItems_ItemId NONCLUSTERED (ItemId)
 );

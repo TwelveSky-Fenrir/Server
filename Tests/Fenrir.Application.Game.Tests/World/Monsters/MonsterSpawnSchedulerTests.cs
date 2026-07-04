@@ -66,7 +66,7 @@ public class MonsterSpawnSchedulerTests
     [Fact]
     public void SpawnedMonster_IsPositionedWithinTheRegionRadiusOfItsHome()
     {
-        var zone = CreateZone(CacheWithOneRegion(1));
+        var zone = CreateZone(CacheWithOneRegion());
 
         zone.Tick(SimulationClock.LegacyTick);
 
@@ -101,7 +101,7 @@ public class MonsterSpawnSchedulerTests
     [Fact]
     public void KilledMonster_Respawns_AfterItsTimerAndTheNextScan()
     {
-        var zone = CreateZone(CacheWithOneRegion(1, 2));
+        var zone = CreateZone(CacheWithOneRegion());
         zone.Tick(SimulationClock.LegacyTick);
         Assert.Equal(1, zone.MonsterCount);
 
@@ -117,8 +117,7 @@ public class MonsterSpawnSchedulerTests
     [Fact]
     public void MonsterKill_ByAResolvableKiller_GrantsMoneyAndExperience_AndSpawnsGroundItemsForNonMoneyDrops()
     {
-        var cache = CacheWithOneRegion(1,
-            dropMoney: new MonsterDropMoneyRowDto(500, 1_000_000, 100, 100));
+        var cache = CacheWithOneRegion(dropMoney: new MonsterDropMoneyRowDto(500, 1_000_000, 100, 100));
         var zone = CreateZone(cache);
         var (session, _) = ZoneTestKit.CreateSession(1);
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1, "Killer", level: 1)));
@@ -142,7 +141,7 @@ public class MonsterSpawnSchedulerTests
     [Fact]
     public void MonsterKill_WithNoResolvableKiller_NeverThrows_AndGrantsNothing()
     {
-        var zone = CreateZone(CacheWithOneRegion(1));
+        var zone = CreateZone(CacheWithOneRegion());
         zone.Tick(SimulationClock.LegacyTick);
         Assert.Equal(1, zone.MonsterCount);
 

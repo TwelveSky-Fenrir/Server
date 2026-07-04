@@ -2,7 +2,10 @@ using Fenrir.Contracts.Wire;
 
 namespace Fenrir.Contracts.Attributes;
 
-/// <summary>Marks a legacy wire packet; the generator emits TryRead/Write/PayloadSize/Opcode and registers it in OpcodeRegistry.</summary>
+/// <summary>
+///     Marks a legacy wire packet; the generator emits TryRead/Write/PayloadSize/Opcode and registers it in
+///     OpcodeRegistry.
+/// </summary>
 /// <param name="server">Executable that owns this opcode (values overlap between Login and Zone).</param>
 /// <param name="direction">Packet direction; determines the header (9 bytes inbound / 1 byte outbound).</param>
 /// <param name="opcode">Raw <c>tProtocol</c> value.</param>
@@ -22,6 +25,9 @@ public sealed class FenrirPacketAttribute(FenrirServer server, FenrirDirection d
     /// <summary>Expected total wire size (header included); generator emits FEN-LEGACY-001 if field sizes diverge.</summary>
     public int ExpectedSize { get; init; } = -1;
 
-    /// <summary>Legal session states (<see cref="LoginSessionState" />/<see cref="ZoneSessionState" /> per <see cref="Server" />); empty = any state.</summary>
+    /// <summary>
+    ///     Legal session states (<see cref="LoginSessionState" />/<see cref="ZoneSessionState" /> per
+    ///     <see cref="Server" />); empty = any state.
+    /// </summary>
     public byte[] AllowedStates { get; init; } = [];
 }

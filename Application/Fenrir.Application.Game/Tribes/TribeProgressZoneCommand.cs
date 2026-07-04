@@ -22,7 +22,14 @@ namespace Fenrir.Application.Game.Tribes;
 ///     pool has no capacity limit (unlike the legacy's ProcessForDropItem), so that failure path is
 ///     unreachable here.
 /// </param>
-/// <param name="Applied">Completed once actually mirrored -- see InventoryZoneCommand.Applied for why this matters while EconomyActionLock is held.</param>
+/// <param name="TribeNotifyScrollCount">
+///     CZ_TRIBE_NOTIFY_SEND (opcode 112) -- the sender's remaining scroll count after
+///     this send, mirroring <see cref="Fenrir.Application.Game.World.PlayerRuntimeState.TribeNotifyScrollCount" />.
+/// </param>
+/// <param name="Applied">
+///     Completed once actually mirrored -- see InventoryZoneCommand.Applied for why this matters while
+///     EconomyActionLock is held.
+/// </param>
 public readonly record struct TribeProgressZoneCommand(
     int CharacterId,
     int? ContributionPoints = null,
@@ -42,6 +49,7 @@ public readonly record struct TribeProgressZoneCommand(
     int? Mana = null,
     EffectiveStats? UpdatedStats = null,
     ImmutableArray<TribeGroundItemDrop> DropItems = default,
+    int? TribeNotifyScrollCount = null,
     TaskCompletionSource? Applied = null);
 
 /// <summary>One ground-item drop request -- see TribeProgressZoneCommand.DropItems.</summary>

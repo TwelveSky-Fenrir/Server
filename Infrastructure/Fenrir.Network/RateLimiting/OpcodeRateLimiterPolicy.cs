@@ -15,7 +15,10 @@ public static class OpcodeRateLimiterPolicy
     /// <summary>One expected every few seconds by design; a flood is either a broken or a hostile client.</summary>
     private static readonly (int Capacity, double TokensPerSecond) Heartbeat = (2, 1d / 5d);
 
-    /// <summary>Everything else in M1: §8.5's reference burst of 3 is widened to 5 since one bucket covers several low-frequency opcodes.</summary>
+    /// <summary>
+    ///     Everything else in M1: §8.5's reference burst of 3 is widened to 5 since one bucket covers several
+    ///     low-frequency opcodes.
+    /// </summary>
     private static readonly (int Capacity, double TokensPerSecond) Default = (5, 5d);
 
     // Touches every policy at type-load so a bad hand-edited tuple fails at startup, not mid-session.

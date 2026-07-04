@@ -1,3 +1,5 @@
+using System.Buffers.Binary;
+using System.Text;
 using Fenrir.Contracts.Packets.Shared;
 using Fenrir.Contracts.Tests.TestSupport;
 
@@ -291,5 +293,30 @@ public class AvatarInfoTests
         Assert.Equal(callName, roundTripped.CallName);
         Assert.Equal(partyName, roundTripped.PartyName);
         Assert.Equal(premium, roundTripped.Premium);
+    }
+
+    // Offsets independently computed from the [FixedString]/[Reserved]/[FixedArray] layout in AvatarInfo.cs,
+    // spanning the Name/Tribe padding boundary (offset 33-35), the Premium long-alignment boundary (offset
+    // 10056) and the trailing RuneSystemStat array (tail ends exactly at WireSize).
+    [Fact]
+    public void TryRead_DecodesGoldenBytes()
+    {
+        var buffer = new byte[AvatarInfo.WireSize];
+        BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(0, 4), 11);
+        Encoding.Latin1.GetBytes("Hero1", buffer.AsSpan(20, 13));
+        BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(36, 4), 22);
+        Encoding.Latin1.GetBytes("Cal1", buffer.AsSpan(5452, 5));
+        BinaryPrimitives.WriteInt64LittleEndian(buffer.AsSpan(10056, 8), 123_456_789_012L);
+        BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(11152 + 3 * 4, 4), 33);
+
+        var ok = AvatarInfo.TryRead(buffer, out var packet);
+
+        Assert.True(ok);
+        Assert.Equal(11, packet.VisibleState);
+        Assert.Equal("Hero1", packet.Name);
+        Assert.Equal(22, packet.Tribe);
+        Assert.Equal("Cal1", packet.CallName);
+        Assert.Equal(123_456_789_012L, packet.Premium);
+        Assert.Equal(33, packet.RuneSystemStat[3]);
     }
 }

@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using Fenrir.Contracts.Packets.Shared;
 using Fenrir.Contracts.Tests.TestSupport;
 
@@ -35,5 +36,25 @@ public class AutoHuntTests
 
         Assert.True(AutoHunt.TryRead(buffer, out var roundTripped));
         StructuralAssert.DeepEqual(autoHunt, roundTripped);
+    }
+
+    [Fact]
+    public void TryRead_DecodesGoldenBytes()
+    {
+        var buffer = new byte[AutoHunt.WireSize];
+        BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(0, 4), 1);
+        BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(4 + 5 * 4, 4), 2);
+        BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(68, 4), 3);
+        BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(72 + 2 * 4, 4), 4);
+        BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(108, 4), 5);
+
+        var ok = AutoHunt.TryRead(buffer, out var packet);
+
+        Assert.True(ok);
+        Assert.Equal(1, packet.BuffType);
+        Assert.Equal(2, packet.BuffStore[5]);
+        Assert.Equal(3, packet.HuntType);
+        Assert.Equal(4, packet.AttackType[2]);
+        Assert.Equal(5, packet.AnimalFoodCmd);
     }
 }

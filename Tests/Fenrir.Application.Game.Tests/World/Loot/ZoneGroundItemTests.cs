@@ -9,7 +9,10 @@ using Fenrir.Data.World;
 
 namespace Fenrir.Application.Game.Tests.World.Loot;
 
-/// <summary>Covers ground-item lifecycle end-to-end through <see cref="Zone" />'s public surface: spawning via a guaranteed monster-kill drop, claiming (<see cref="Zone.TryClaimGroundItem" />), and the 60 s expiry sweep.</summary>
+/// <summary>
+///     Covers ground-item lifecycle end-to-end through <see cref="Zone" />'s public surface: spawning via a
+///     guaranteed monster-kill drop, claiming (<see cref="Zone.TryClaimGroundItem" />), and the 60 s expiry sweep.
+/// </summary>
 public class ZoneGroundItemTests
 {
     private const int PotionItemId = 8001;
@@ -186,7 +189,10 @@ public class ZoneGroundItemTests
         Assert.Equal(0, zone.GroundItemCount);
     }
 
-    /// <summary>Always draws the maximum value, so the guaranteed potion drop succeeds and the unconditional item-864 roll (threshold 1000/1,000,000) stays unreachable.</summary>
+    /// <summary>
+    ///     Always draws the maximum value, so the guaranteed potion drop succeeds and the unconditional item-864 roll
+    ///     (threshold 1000/1,000,000) stays unreachable.
+    /// </summary>
     private sealed class MaxValueRandom : Random
     {
         public override int Next(int minValue, int maxValue)

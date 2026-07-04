@@ -62,7 +62,10 @@ public sealed class WriteBehindFlusher<TKey> : IWriteBehindFlusher where TKey : 
     }
 
     /// <summary>Cancels any running RunAsync loop and awaits its exit before disposing _timer/_immediateFlushSignal.</summary>
-    /// <remarks>SemaphoreSlim.Dispose() is unsafe while a WaitAsync is outstanding; _shutdownCts unblocks the loop so it stops before disposal.</remarks>
+    /// <remarks>
+    ///     SemaphoreSlim.Dispose() is unsafe while a WaitAsync is outstanding; _shutdownCts unblocks the loop so it stops
+    ///     before disposal.
+    /// </remarks>
     public async ValueTask DisposeAsync()
     {
         // Idempotent: CancellationTokenSource throws on a second Cancel, unlike PeriodicTimer/SemaphoreSlim.
@@ -79,7 +82,10 @@ public sealed class WriteBehindFlusher<TKey> : IWriteBehindFlusher where TKey : 
         _immediateFlushSignal.Dispose();
     }
 
-    /// <summary>Runs the drain loop until cancelled. Start once -- a second call throws (loops would race the same timer/semaphore).</summary>
+    /// <summary>
+    ///     Runs the drain loop until cancelled. Start once -- a second call throws (loops would race the same
+    ///     timer/semaphore).
+    /// </summary>
     public async Task RunAsync(CancellationToken ct)
     {
         if (Interlocked.Exchange(ref _runStarted, 1) != 0)

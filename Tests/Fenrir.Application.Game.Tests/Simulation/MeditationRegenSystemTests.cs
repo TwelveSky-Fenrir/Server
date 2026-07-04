@@ -10,7 +10,10 @@ using Fenrir.Data.WriteBehind;
 
 namespace Fenrir.Application.Game.Tests.Simulation;
 
-/// <summary>Covers <see cref="MeditationRegenSystem" />: passive HP/MP regen only while <c>aAction.aSort == 31</c> (sitting), driven by the sit-skill riding on the same action.</summary>
+/// <summary>
+///     Covers <see cref="MeditationRegenSystem" />: passive HP/MP regen only while <c>aAction.aSort == 31</c>
+///     (sitting), driven by the sit-skill riding on the same action.
+/// </summary>
 public class MeditationRegenSystemTests
 {
     private static SkillDefinition SitSkill(byte maxUpgradePoint, byte lifeDivisor, byte manaDivisor)

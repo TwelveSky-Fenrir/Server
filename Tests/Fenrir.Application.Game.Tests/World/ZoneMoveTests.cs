@@ -6,7 +6,10 @@ using Fenrir.Network.Framing;
 
 namespace Fenrir.Application.Game.Tests.World;
 
-/// <summary>Covers <see cref="Zone" />'s Move command path: position update, <c>MovementRules</c> plausibility gate, AOI tracking, and broadcast/resync split.</summary>
+/// <summary>
+///     Covers <see cref="Zone" />'s Move command path: position update, <c>MovementRules</c> plausibility gate, AOI
+///     tracking, and broadcast/resync split.
+/// </summary>
 public class ZoneMoveTests
 {
     private static readonly int OneFrame = FrameWriter.FrameSizeOf<AvatarActionResponse>();

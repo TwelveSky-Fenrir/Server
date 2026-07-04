@@ -10,6 +10,5 @@ namespace Fenrir.Contracts.Packets.Login;
 public readonly partial record struct CreateMousePinRequest : IIncomingPacket<CreateMousePinRequest>
 {
     // Exactly 4 ASCII digits + NUL (CheckMousePassword).
-    [FixedString(5)]
-    public required string MousePassword { get; init; }
+    [FixedString(5)] public required string MousePassword { get; init; }
 }

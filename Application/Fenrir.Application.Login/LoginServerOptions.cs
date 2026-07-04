@@ -1,11 +1,17 @@
 namespace Fenrir.Application.Login;
 
-/// <summary>Bound from the <c>Login</c> config section; defaults match legacy <c>BuildEU33/ServerInfo.ini</c>, which the real client requires.</summary>
+/// <summary>
+///     Bound from the <c>Login</c> config section; defaults match legacy <c>BuildEU33/ServerInfo.ini</c>, which the
+///     real client requires.
+/// </summary>
 public sealed class LoginServerOptions
 {
     public int Port { get; init; } = 29998;
 
-    /// <summary>Must match <c>LoginRequest.Version</c> or login fails with Result=4; legacy ini <c>[Server.Info].Version</c> (not the "33" placeholder from wire contract §9.1).</summary>
+    /// <summary>
+    ///     Must match <c>LoginRequest.Version</c> or login fails with Result=4; legacy ini <c>[Server.Info].Version</c>
+    ///     (not the "33" placeholder from wire contract §9.1).
+    /// </summary>
     public int ExpectedClientVersion { get; init; } = 90354;
 
     public int TicketTtlSeconds { get; init; } = 15;

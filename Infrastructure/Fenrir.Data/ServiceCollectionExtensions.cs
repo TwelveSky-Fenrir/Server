@@ -14,7 +14,10 @@ using Microsoft.Extensions.Hosting;
 namespace Fenrir.Data;
 
 // Wires CaeriusNet to the AppHost connection resource, then registers repositories as singletons -- CaeriusNet owns connection pooling, so one instance per repository is correct.
-/// <remarks>Does not register DirtyTracker/WriteBehindFlusher: both are open generics needing a concrete TKey and a flush callback wired to real repositories.</remarks>
+/// <remarks>
+///     Does not register DirtyTracker/WriteBehindFlusher: both are open generics needing a concrete TKey and a flush
+///     callback wired to real repositories.
+/// </remarks>
 public static class FenrirDataServiceCollectionExtensions
 {
     public static IHostApplicationBuilder AddFenrirData(this IHostApplicationBuilder builder,

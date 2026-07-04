@@ -5,7 +5,11 @@ using Fenrir.Contracts.Packets.Shared;
 
 namespace Fenrir.Application.Game.Tests.Combat;
 
-/// <summary>Covers <see cref="CombatResolver.ResolveEnemyTribeAttack" /> (mCase 2, Avatar vs. enemy-tribe Avatar) against <c>AttackPlayer</c> (<c>Server/ts25zone/S07_MyGame02.cpp</c>), including the deliberately-preserved PvP-only "divide final damage by 5" quirk.</summary>
+/// <summary>
+///     Covers <see cref="CombatResolver.ResolveEnemyTribeAttack" /> (mCase 2, Avatar vs. enemy-tribe Avatar) against
+///     <c>AttackPlayer</c> (<c>Server/ts25zone/S07_MyGame02.cpp</c>), including the deliberately-preserved PvP-only
+///     "divide final damage by 5" quirk.
+/// </summary>
 public class CombatResolverTests
 {
     private static CombatantSnapshot Combatant(int characterId, byte tribe, int attackPower = 0,

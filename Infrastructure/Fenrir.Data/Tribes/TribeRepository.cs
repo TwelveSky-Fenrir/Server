@@ -10,7 +10,10 @@ namespace Fenrir.Data.Tribes;
 // ReturnTribeRole (Server/Header/function.h:92-114) gates tribe announcements to master/sub-master; also the sub-master write surface (TRIBE_WORK tSort 2/3).
 public sealed record TribeRepository(ICaeriusNetDbContext Db) : ITribeRepository
 {
-    /// <summary>1 = tribe master, 2 = sub-master, 0 = regular member -- matches ReturnTribeRole's encoding directly, no inversion (unlike the guild role enum).</summary>
+    /// <summary>
+    ///     1 = tribe master, 2 = sub-master, 0 = regular member -- matches ReturnTribeRole's encoding directly, no
+    ///     inversion (unlike the guild role enum).
+    /// </summary>
     public async ValueTask<byte> GetRoleForCharacterAsync(int characterId, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_TribeRole_GetForCharacter", 1)
@@ -20,7 +23,10 @@ public sealed record TribeRepository(ICaeriusNetDbContext Db) : ITribeRepository
         return await Db.ExecuteScalarAsync<byte>(sp, ct);
     }
 
-    /// <summary>All 4 tribes; TRIBE_WORK tSort 5's mWorldInfo-&gt;mTribePoint[i]&gt;100/ReturnSmallTribe gate reads every tribe's Points at once.</summary>
+    /// <summary>
+    ///     All 4 tribes; TRIBE_WORK tSort 5's mWorldInfo-&gt;mTribePoint[i]&gt;100/ReturnSmallTribe gate reads every
+    ///     tribe's Points at once.
+    /// </summary>
     public async ValueTask<ReadOnlyCollection<TribeSummaryDto>> GetAllAsync(CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Tribe_GetAll", 4).Build();
@@ -71,15 +77,15 @@ public sealed record TribeRepository(ICaeriusNetDbContext Db) : ITribeRepository
         return await Db.QueryAsReadOnlyCollectionAsync<TribeBankSlotDto>(sp, ct);
     }
 
-    /// <summary>CZ_TRIBE_BANK_SEND sort 2; throws SQL 50210/50211 if the amount is non-positive or exceeds the slot's balance.</summary>
-    public async ValueTask WithdrawBankAsync(byte tribeId, byte slotIndex, int amount, CancellationToken ct)
+    /// <summary>CZ_TRIBE_BANK_SEND sort 2; throws SQL 50210 (empty slot) or 50261 (would exceed the legacy money cap).</summary>
+    public async ValueTask<long> WithdrawBankAsync(byte tribeId, byte slotIndex, int characterId, CancellationToken ct)
     {
-        var sp = new StoredProcedureParametersBuilder("game", "usp_TribeBank_Withdraw", 0)
+        var sp = new StoredProcedureParametersBuilder("game", "usp_TribeBank_Withdraw", 1)
             .AddParameter("TribeId", tribeId, SqlDbType.TinyInt)
             .AddParameter("SlotIndex", slotIndex, SqlDbType.TinyInt)
-            .AddParameter("Amount", amount, SqlDbType.Int)
+            .AddParameter("CharacterId", characterId, SqlDbType.Int)
             .Build();
 
-        await Db.ExecuteAsync(sp, ct);
+        return await Db.ExecuteScalarAsync<long>(sp, ct);
     }
 }

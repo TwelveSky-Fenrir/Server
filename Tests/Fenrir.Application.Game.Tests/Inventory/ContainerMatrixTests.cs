@@ -3,7 +3,10 @@ using Fenrir.Application.Game.Inventory;
 
 namespace Fenrir.Application.Game.Tests.Inventory;
 
-/// <summary>Bounds and move-mechanics coverage for <see cref="ContainerMatrix" />, the pure policy consumed by <c>GenericActionHandler</c>.</summary>
+/// <summary>
+///     Bounds and move-mechanics coverage for <see cref="ContainerMatrix" />, the pure policy consumed by
+///     <c>GenericActionHandler</c>.
+/// </summary>
 public class ContainerMatrixTests
 {
     [Theory]

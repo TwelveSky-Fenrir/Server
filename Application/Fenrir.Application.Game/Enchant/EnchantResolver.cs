@@ -5,11 +5,17 @@ using Fenrir.Data.World;
 
 namespace Fenrir.Application.Game.Enchant;
 
-/// <summary>Pure resolver for CZ_IMPROVE_ITEM_SEND's standard equipment enchant. Covers both +0..+40 and +41..+50 (<c>MAX_IMPROVE_150</c>, verified active for this build). No I/O, no Zone dependency.</summary>
+/// <summary>
+///     Pure resolver for CZ_IMPROVE_ITEM_SEND's standard equipment enchant. Covers both +0..+40 and +41..+50 (
+///     <c>MAX_IMPROVE_150</c>, verified active for this build). No I/O, no Zone dependency.
+/// </summary>
 /// <remarks>
-///     Wings and the costume/stellar-core branches are out of scope (different item-id ranges Fenrir doesn't catalog) -- a Sort==6 target
-///     returns <see cref="EnchantOutcome.NotSupported" />, a clean failure, NOT the legacy's real <c>Quit()</c> that every other
-///     <see cref="EnchantOutcome.Rejected" /> reproduces (caller must disconnect on Rejected). The "sweet potato" buff and <c>aProtectForDestroy2</c> are not modeled.
+///     Wings and the costume/stellar-core branches are out of scope (different item-id ranges Fenrir doesn't catalog) -- a
+///     Sort==6 target
+///     returns <see cref="EnchantOutcome.NotSupported" />, a clean failure, NOT the legacy's real <c>Quit()</c> that every
+///     other
+///     <see cref="EnchantOutcome.Rejected" /> reproduces (caller must disconnect on Rejected). The "sweet potato" buff and
+///     <c>aProtectForDestroy2</c> are not modeled.
 /// </remarks>
 public static class EnchantResolver
 {

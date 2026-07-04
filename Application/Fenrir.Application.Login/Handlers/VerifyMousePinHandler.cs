@@ -7,7 +7,10 @@ using Fenrir.Network.Sessions;
 
 namespace Fenrir.Application.Login.Handlers;
 
-/// <summary>op15 CL_LOGIN_MOUSE_PASSWORD_SEND — mismatch replies Result=1 and counts a strike; 3rd consecutive strike disconnects (legacy GL_504).</summary>
+/// <summary>
+///     op15 CL_LOGIN_MOUSE_PASSWORD_SEND — mismatch replies Result=1 and counts a strike; 3rd consecutive strike
+///     disconnects (legacy GL_504).
+/// </summary>
 public sealed class VerifyMousePinHandler(IAccountPinRepository pins)
     : IAsyncPacketHandler<VerifyMousePinRequest>
 {

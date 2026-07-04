@@ -4,7 +4,10 @@ using Fenrir.Data.Characters;
 
 namespace Fenrir.Application.Login;
 
-/// <summary>Legacy SEND_LOGIN train (S04_MyWork02.cpp l.42-67): every CL_LOGIN_SEND, success or failure, gets LC_LOGIN_RECV + 3x LC_USER_AVATAR_RECV2 + ops 24 + 26, in that order.</summary>
+/// <summary>
+///     Legacy SEND_LOGIN train (S04_MyWork02.cpp l.42-67): every CL_LOGIN_SEND, success or failure, gets
+///     LC_LOGIN_RECV + 3x LC_USER_AVATAR_RECV2 + ops 24 + 26, in that order.
+/// </summary>
 public static class LoginTrain
 {
     /// <summary>MAX_USER_AVATAR_NUM.</summary>
@@ -121,7 +124,10 @@ public static class LoginTrain
         session.Send(RecommandWorld2);
     }
 
-    /// <summary>The complete failure train: tID echoed back even on failure (legacy XORs it via USE_XOR_UID; [ObfuscatedUidField] does the same here).</summary>
+    /// <summary>
+    ///     The complete failure train: tID echoed back even on failure (legacy XORs it via USE_XOR_UID;
+    ///     [ObfuscatedUidField] does the same here).
+    /// </summary>
     public static void SendFailure(IPacketSession session, int result, string requestId)
     {
         Send(session, BuildLoginRecv(result, requestId, 0, FailurePinMask), BuildEmptyAvatarSlots());

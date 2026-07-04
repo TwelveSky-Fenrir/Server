@@ -30,7 +30,10 @@ public sealed record MentorRepository(ICaeriusNetDbContext Db) : IMentorReposito
         await Db.ExecuteAsync(sp, ct);
     }
 
-    /// <summary>CZ_TEACHER_END_SEND (63); clears both pointers on the caller's own row only -- the partner side is deliberately left untouched (legacy asymmetry).</summary>
+    /// <summary>
+    ///     CZ_TEACHER_END_SEND (63); clears both pointers on the caller's own row only -- the partner side is
+    ///     deliberately left untouched (legacy asymmetry).
+    /// </summary>
     public async ValueTask ClearForCharacterAsync(int characterId, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_CharacterMentor_ClearForCharacter", 0)

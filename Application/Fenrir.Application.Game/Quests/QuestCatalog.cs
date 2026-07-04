@@ -3,7 +3,10 @@ using Fenrir.Application.Game.GameData;
 
 namespace Fenrir.Application.Game.Quests;
 
-/// <summary>Indexes WorldDataCache.QuestsById by (Category, Step) -- mirrors mQUEST.Search(tribe, step) (Category = tribe + 1).</summary>
+/// <summary>
+///     Indexes WorldDataCache.QuestsById by (Category, Step) -- mirrors mQUEST.Search(tribe, step) (Category = tribe
+///     + 1).
+/// </summary>
 public sealed class QuestCatalog
 {
     private readonly FrozenDictionary<(byte Category, short Step), QuestDefinition> _byCategoryStep;

@@ -19,7 +19,10 @@ public static class PshopPurchasePolicy
         PriceOutOfRange,
         InvalidStackQuantity,
 
-        /// <summary>The declared (page,index) inventory slot no longer holds the exact advertised (id,quantity,value) -- stale client state.</summary>
+        /// <summary>
+        ///     The declared (page,index) inventory slot no longer holds the exact advertised (id,quantity,value) -- stale
+        ///     client state.
+        /// </summary>
         InventoryMismatch
     }
 
@@ -27,7 +30,10 @@ public static class PshopPurchasePolicy
     {
         Success,
 
-        /// <summary>Destination occupied by an incompatible item, or a merge would exceed MaxStackQuantity -- Quit()-worthy in the legacy, no clean fail path.</summary>
+        /// <summary>
+        ///     Destination occupied by an incompatible item, or a merge would exceed MaxStackQuantity -- Quit()-worthy in the
+        ///     legacy, no clean fail path.
+        /// </summary>
         DestinationConflict
     }
 
@@ -50,7 +56,10 @@ public static class PshopPurchasePolicy
         return new SlotView(a[i], a[i + 1], a[i + 2], a[i + 3], a[i + 4], a[i + 5], a[i + 6], a[i + 7], a[i + 8]);
     }
 
-    /// <summary>iCheckAvatarShop (item barred from personal-shop sale) is not modeled -- no such field exists on ItemRowDto yet.</summary>
+    /// <summary>
+    ///     iCheckAvatarShop (item barred from personal-shop sale) is not modeled -- no such field exists on ItemRowDto
+    ///     yet.
+    /// </summary>
     public static OpenSlotOutcome ValidateOpenSlot(SlotView slot, ItemDefinition? itemDefinition, ItemStack? liveSlot)
     {
         if (itemDefinition is null)

@@ -2,6 +2,7 @@ using Fenrir.Application.Game;
 using Fenrir.Application.Game.Dispatching;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Movement;
+using Fenrir.Application.Game.Progression;
 using Fenrir.Application.Game.Quests;
 using Fenrir.Application.Game.Simulation;
 using Fenrir.Application.Game.Social.Duel;
@@ -57,6 +58,7 @@ builder.Services.AddSingleton<FriendRegistry>();
 builder.Services.AddSingleton<MentorRegistry>();
 builder.Services.AddSingleton<DuelRegistry>();
 builder.Services.AddSingleton<TradeRegistry>();
+builder.Services.AddSingleton<TowerWarState>();
 
 builder.Services.AddHostedService<ZoneTickHost>();
 builder.Services.AddHostedService<MonsterLootFlushHost>();

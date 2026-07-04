@@ -4,7 +4,10 @@ using Fenrir.Application.Game.World;
 
 namespace Fenrir.Application.Game.Tests.Simulation;
 
-/// <summary>Covers <see cref="Zone" />'s ordered <see cref="ISimulationSystem" /> list: whole-legacy-tick gating, declared order, and per-system fault containment.</summary>
+/// <summary>
+///     Covers <see cref="Zone" />'s ordered <see cref="ISimulationSystem" /> list: whole-legacy-tick gating, declared
+///     order, and per-system fault containment.
+/// </summary>
 public class ZoneSimulationWiringTests
 {
     [Fact]

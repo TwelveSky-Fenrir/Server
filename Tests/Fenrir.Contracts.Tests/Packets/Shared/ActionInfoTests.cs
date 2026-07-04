@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using Fenrir.Contracts.Packets.Shared;
 using Fenrir.Contracts.Tests.TestSupport;
 
@@ -43,5 +44,25 @@ public class ActionInfoTests
 
         Assert.True(ActionInfo.TryRead(buffer, out var roundTripped));
         StructuralAssert.DeepEqual(action, roundTripped);
+    }
+
+    [Fact]
+    public void TryRead_DecodesGoldenBytes()
+    {
+        var buffer = new byte[ActionInfo.WireSize];
+        BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(0, 4), 42);
+        BinaryPrimitives.WriteSingleLittleEndian(buffer.AsSpan(8, 4), 3.5f);
+        BinaryPrimitives.WriteSingleLittleEndian(buffer.AsSpan(28, 4), 9.25f);
+        BinaryPrimitives.WriteSingleLittleEndian(buffer.AsSpan(68, 4), 12.5f);
+        BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(100, 4), 777);
+
+        var ok = ActionInfo.TryRead(buffer, out var packet);
+
+        Assert.True(ok);
+        Assert.Equal(42, packet.Type);
+        Assert.Equal(3.5f, packet.Frame);
+        Assert.Equal(9.25f, packet.TargetLocation[1]);
+        Assert.Equal(12.5f, packet.PetFront);
+        Assert.Equal(777, packet.SkillValue);
     }
 }

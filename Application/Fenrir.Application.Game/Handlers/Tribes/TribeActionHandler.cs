@@ -124,7 +124,10 @@ public sealed class TribeActionHandler(
         }
     }
 
-    /// <summary>tSort 1 -- reset spent base stats back into unspent points. Requires level &lt;=39 and a valid tribe-capital zone.</summary>
+    /// <summary>
+    ///     tSort 1 -- reset spent base stats back into unspent points. Requires level &lt;=39 and a valid tribe-capital
+    ///     zone.
+    /// </summary>
     private async ValueTask HandleStatResetAsync(TribeActionRequest packet, IPacketSession session,
         ZoneClientSession zoneSession, Zone zone, PlayerRuntimeState state, int characterId, CancellationToken ct)
     {
@@ -260,7 +263,10 @@ public sealed class TribeActionHandler(
             targetZone.PostTribeProgressCommand(new TribeProgressZoneCommand(targetId.Value, TribeRole: 0));
     }
 
-    /// <summary>tSort 4 -- tribe weapon, Force Leader/sub-master. Money debited but never notified to the client (matches legacy).</summary>
+    /// <summary>
+    ///     tSort 4 -- tribe weapon, Force Leader/sub-master. Money debited but never notified to the client (matches
+    ///     legacy).
+    /// </summary>
     private async ValueTask HandleTribeWeaponAsync(TribeActionRequest packet, IPacketSession session,
         ZoneClientSession zoneSession, Zone zone, PlayerRuntimeState state, int characterId, CancellationToken ct)
     {
@@ -500,7 +506,10 @@ public sealed class TribeActionHandler(
         zoneSession.Abort(DisconnectReason.Faulted);
     }
 
-    /// <summary>tSort 16 (map/clan scroll, item 591, 1 CP) / tSort 17 (alert charm, item 590, 10 CP) -- Force Leader/sub-master.</summary>
+    /// <summary>
+    ///     tSort 16 (map/clan scroll, item 591, 1 CP) / tSort 17 (alert charm, item 590, 10 CP) -- Force
+    ///     Leader/sub-master.
+    /// </summary>
     private async ValueTask HandleScrollAsync(TribeActionRequest packet, IPacketSession session,
         ZoneClientSession zoneSession, Zone zone, PlayerRuntimeState state, int characterId, int itemId, int cpCost,
         CancellationToken ct)
@@ -518,7 +527,10 @@ public sealed class TribeActionHandler(
             DropItems: [new TribeGroundItemDrop(itemId, 1)]), ct);
     }
 
-    /// <summary>tSort 18 -- tower construction scroll, Force Leader/sub-master. Money debited but never notified (same as tSort 4).</summary>
+    /// <summary>
+    ///     tSort 18 -- tower construction scroll, Force Leader/sub-master. Money debited but never notified (same as
+    ///     tSort 4).
+    /// </summary>
     private async ValueTask HandleTowerScrollAsync(TribeActionRequest packet, IPacketSession session,
         ZoneClientSession zoneSession, Zone zone, PlayerRuntimeState state, int characterId, CancellationToken ct)
     {

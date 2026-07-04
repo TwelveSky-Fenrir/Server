@@ -2,7 +2,10 @@ using CaeriusNet.Attributes.Dto;
 
 namespace Fenrir.Data.Guilds;
 
-/// <summary>game.usp_GuildMember_GetByCharacter. Role is the DB-side enum (0 member, 1 sub-master, 2 master) -- INVERSE of the legacy wire's aGuildRole; use <see cref="GuildRoleCodec" />, never compare raw.</summary>
+/// <summary>
+///     game.usp_GuildMember_GetByCharacter. Role is the DB-side enum (0 member, 1 sub-master, 2 master) -- INVERSE of
+///     the legacy wire's aGuildRole; use <see cref="GuildRoleCodec" />, never compare raw.
+/// </summary>
 [GenerateDto]
 public sealed partial record CharacterGuildMembershipDto(
     int GuildId,

@@ -6,7 +6,10 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Login.Dispatching;
 
-/// <summary>Bridges <see cref="Fenrir.Network.Dispatching.SessionLoop" /> to the generated <c>MessageDispatcher</c> (inline table, then async).</summary>
+/// <summary>
+///     Bridges <see cref="Fenrir.Network.Dispatching.SessionLoop" /> to the generated <c>MessageDispatcher</c>
+///     (inline table, then async).
+/// </summary>
 public sealed class LoginFrameDispatcher(ILogger<LoginFrameDispatcher> logger) : IFrameDispatcher
 {
     public async ValueTask DispatchAsync(FenrirServer server, byte opcode, ReadOnlySequence<byte> payload,

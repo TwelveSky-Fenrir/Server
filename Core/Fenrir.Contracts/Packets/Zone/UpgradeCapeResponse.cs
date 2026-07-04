@@ -4,7 +4,10 @@ using Fenrir.Contracts.Wire;
 
 namespace Fenrir.Contracts.Packets.Zone;
 
-/// <summary>Trailing byte is real wire data (sizeof=30, not 29); modeled as an explicit Padding field since [Reserved] only covers bytes before a field.</summary>
+/// <summary>
+///     Trailing byte is real wire data (sizeof=30, not 29); modeled as an explicit Padding field since [Reserved]
+///     only covers bytes before a field.
+/// </summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.UpgradeCape, ExpectedSize = 30)]
 public readonly partial record struct UpgradeCapeResponse : IOutgoingPacket
 {

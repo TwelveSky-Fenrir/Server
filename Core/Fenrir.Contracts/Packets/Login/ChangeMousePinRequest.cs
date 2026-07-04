@@ -10,9 +10,7 @@ namespace Fenrir.Contracts.Packets.Login;
 public readonly partial record struct ChangeMousePinRequest : IIncomingPacket<ChangeMousePinRequest>
 {
     // 3 mismatches disconnect the session instead of replying.
-    [FixedString(5)]
-    public required string MousePassword { get; init; }
+    [FixedString(5)] public required string MousePassword { get; init; }
 
-    [FixedString(5)]
-    public required string ChangeMousePassword { get; init; }
+    [FixedString(5)] public required string ChangeMousePassword { get; init; }
 }

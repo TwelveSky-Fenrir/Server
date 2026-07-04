@@ -11,6 +11,5 @@ public readonly partial record struct ChangeMasterRequest : IIncomingPacket<Chan
 {
     public required int AvatarPost { get; init; }
 
-    [FixedString(49)]
-    public required string MasterId { get; init; }
+    [FixedString(49)] public required string MasterId { get; init; }
 }

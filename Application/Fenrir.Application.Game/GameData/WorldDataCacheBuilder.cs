@@ -5,10 +5,16 @@ using Fenrir.Data.World;
 
 namespace Fenrir.Application.Game.GameData;
 
-/// <summary>Pure, SQL-free construction of <see cref="WorldDataCache" /> from raw world.* rows -- kept separate from the loader so it's unit-testable on in-memory rows.</summary>
+/// <summary>
+///     Pure, SQL-free construction of <see cref="WorldDataCache" /> from raw world.* rows -- kept separate from the
+///     loader so it's unit-testable on in-memory rows.
+/// </summary>
 public static class WorldDataCacheBuilder
 {
-    /// <summary>Throws when a critical dataset (Items, Monsters, Zones, Levels, Skills) is empty -- an unseeded GameServer must not accept a single connection.</summary>
+    /// <summary>
+    ///     Throws when a critical dataset (Items, Monsters, Zones, Levels, Skills) is empty -- an unseeded GameServer
+    ///     must not accept a single connection.
+    /// </summary>
     public static (WorldDataCache Cache, WorldDataFilterStats Stats) Build(WorldDataRows rows)
     {
         EnsureCriticalDatasetNotEmpty(rows.Items.Count, "world.Items");
@@ -77,7 +83,10 @@ public static class WorldDataCacheBuilder
         return result.ToFrozenDictionary();
     }
 
-    /// <summary>Money/quest-item are at-most-one-per-monster in the legacy data; a duplicate would be a seed bug, so the plain Add throws rather than silently picking one.</summary>
+    /// <summary>
+    ///     Money/quest-item are at-most-one-per-monster in the legacy data; a duplicate would be a seed bug, so the plain
+    ///     Add throws rather than silently picking one.
+    /// </summary>
     public static FrozenDictionary<int, MonsterDefinition> BuildMonsters(
         IReadOnlyList<MonsterRowDto> monsters,
         IReadOnlyList<MonsterDropMoneyRowDto> dropMoney,
@@ -159,8 +168,10 @@ public static class WorldDataCacheBuilder
     }
 
     /// <summary>
-    ///     Filters portals with no destination, spawn regions with no zone/monster, and NPC placements with no NPC -- each discarded
-    ///     row is counted in <see cref="WorldDataFilterStats" />. Landing points are all kept: a NULL FromZoneNumber just means "unrecorded source".
+    ///     Filters portals with no destination, spawn regions with no zone/monster, and NPC placements with no NPC -- each
+    ///     discarded
+    ///     row is counted in <see cref="WorldDataFilterStats" />. Landing points are all kept: a NULL FromZoneNumber just
+    ///     means "unrecorded source".
     /// </summary>
     public static (FrozenDictionary<short, ZoneDefinition> ZonesByNumber, WorldDataFilterStats Stats) BuildZones(
         IReadOnlyList<ZoneRowDto> zones,

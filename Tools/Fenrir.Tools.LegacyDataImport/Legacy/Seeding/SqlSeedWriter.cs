@@ -2,7 +2,10 @@ using System.Text;
 
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Seeding;
 
-/// <summary>Shared helpers for idempotent <c>70_seed/*.sql</c> scripts: one IF NOT EXISTS/BEGIN/END batch of chunked INSERTs (500 rows/statement, under SQL Server's 1000-row cap).</summary>
+/// <summary>
+///     Shared helpers for idempotent <c>70_seed/*.sql</c> scripts: one IF NOT EXISTS/BEGIN/END batch of chunked
+///     INSERTs (500 rows/statement, under SQL Server's 1000-row cap).
+/// </summary>
 public static class SqlSeedWriter
 {
     private const int MaxRowsPerInsert = 500;

@@ -29,7 +29,10 @@ public sealed partial record QuestRowDto(
     int? Solution4,
     int? NextIndex);
 
-/// <summary>world.usp_QuestReward_GetAll (SlotIndex 0-2); ItemId set only for RewardType 6, Amount only for 2-5 (CK_QuestRewards_ItemXorAmount enforces this).</summary>
+/// <summary>
+///     world.usp_QuestReward_GetAll (SlotIndex 0-2); ItemId set only for RewardType 6, Amount only for 2-5
+///     (CK_QuestRewards_ItemXorAmount enforces this).
+/// </summary>
 [GenerateDto]
 public sealed partial record QuestRewardRowDto(
     int QuestId,

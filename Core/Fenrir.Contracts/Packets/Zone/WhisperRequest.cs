@@ -5,7 +5,10 @@ using Fenrir.Contracts.Wire;
 
 namespace Fenrir.Contracts.Packets.Zone;
 
-/// <summary>Whispering yourself is silently ignored; cross-tribe gating is disabled in this fork (inter-tribe whispers pass through).</summary>
+/// <summary>
+///     Whispering yourself is silently ignored; cross-tribe gating is disabled in this fork (inter-tribe whispers
+///     pass through).
+/// </summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.Whisper, ExpectedSize = 107,
     AllowedStates = [(byte)ZoneSessionState.InWorld])]
 public readonly partial record struct WhisperRequest : IIncomingPacket<WhisperRequest>

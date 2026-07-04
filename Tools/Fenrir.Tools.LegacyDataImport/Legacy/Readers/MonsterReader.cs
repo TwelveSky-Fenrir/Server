@@ -2,7 +2,10 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Records;
 
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Readers;
 
-/// <summary>Parses <c>005_00004.IMG</c> (<c>MONSTER_INFO</c>, STRUCT.h:156-204); no known runtime patches, unlike <see cref="ItemReader" />.</summary>
+/// <summary>
+///     Parses <c>005_00004.IMG</c> (<c>MONSTER_INFO</c>, STRUCT.h:156-204); no known runtime patches, unlike
+///     <see cref="ItemReader" />.
+/// </summary>
 internal static class MonsterReader
 {
     private const string FileName = "005_00004.IMG";

@@ -8,7 +8,10 @@ using Fenrir.Data.World;
 
 namespace Fenrir.Application.Game.Tests.World;
 
-/// <summary>Covers <c>Zone.ApplySkillCast</c> end-to-end (<c>AVATAR_ACTION_SEND</c> Sort=30) via the same unified action wire <c>AvatarActionHandler</c> forwards for every action.</summary>
+/// <summary>
+///     Covers <c>Zone.ApplySkillCast</c> end-to-end (<c>AVATAR_ACTION_SEND</c> Sort=30) via the same unified action
+///     wire <c>AvatarActionHandler</c> forwards for every action.
+/// </summary>
 public class ZoneSkillCastTests
 {
     private static SkillDefinition HolyShieldSkill(byte maxUpgradePoint, short manaUse, byte shieldPercent,

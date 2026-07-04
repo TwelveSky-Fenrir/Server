@@ -8,5 +8,6 @@ CREATE TABLE game.CharacterSkills
     CONSTRAINT PK_CharacterSkills PRIMARY KEY CLUSTERED (CharacterId, SlotIndex),
     CONSTRAINT CK_CharacterSkills_SlotIndex CHECK (SlotIndex <= 39), -- aSkill[40]
     CONSTRAINT FK_CharacterSkills_Character FOREIGN KEY (CharacterId) REFERENCES game.Characters (CharacterId),
-    CONSTRAINT FK_CharacterSkills_Skill FOREIGN KEY (SkillId) REFERENCES world.Skills (SkillId)
+    CONSTRAINT FK_CharacterSkills_Skill FOREIGN KEY (SkillId) REFERENCES world.Skills (SkillId),
+    INDEX       IX_CharacterSkills_SkillId NONCLUSTERED (SkillId)
 );

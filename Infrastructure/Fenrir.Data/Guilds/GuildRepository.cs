@@ -50,7 +50,10 @@ public sealed record GuildRepository(ICaeriusNetDbContext Db) : IGuildRepository
         return await Db.QueryAsReadOnlyCollectionAsync<GuildNoticeRowDto>(sp, ct);
     }
 
-    /// <summary>GUILD_WORK tSort 1 -- create a guild and enroll its master (Role=2) in one transaction. Returns the new GuildId.</summary>
+    /// <summary>
+    ///     GUILD_WORK tSort 1 -- create a guild and enroll its master (Role=2) in one transaction. Returns the new
+    ///     GuildId.
+    /// </summary>
     public async ValueTask<int> CreateAsync(string name, int masterCharacterId, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Guild_Create", 1)
@@ -118,7 +121,10 @@ public sealed record GuildRepository(ICaeriusNetDbContext Db) : IGuildRepository
         await Db.ExecuteAsync(sp, ct);
     }
 
-    /// <summary>GUILD_WORK tSort 17 -- transfer leadership: demotes the current master to Role=2, promotes the new one, keeps MasterCharacterId consistent, one transaction.</summary>
+    /// <summary>
+    ///     GUILD_WORK tSort 17 -- transfer leadership: demotes the current master to Role=2, promotes the new one, keeps
+    ///     MasterCharacterId consistent, one transaction.
+    /// </summary>
     public async ValueTask SetMasterAsync(int guildId, int newMasterCharacterId, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Guild_SetMaster", 0)
@@ -151,7 +157,10 @@ public sealed record GuildRepository(ICaeriusNetDbContext Db) : IGuildRepository
         await Db.ExecuteAsync(sp, ct);
     }
 
-    /// <summary>GUILD_WORK tSort 14 (USE_GUILD_BUFF) -- writes the whole buff block at once, matching the legacy's single UPDATE.</summary>
+    /// <summary>
+    ///     GUILD_WORK tSort 14 (USE_GUILD_BUFF) -- writes the whole buff block at once, matching the legacy's single
+    ///     UPDATE.
+    /// </summary>
     public async ValueTask SetBuffAsync(int guildId, int buffType, int buffState, int buffTime,
         long buffTimeForDiff, CancellationToken ct)
     {

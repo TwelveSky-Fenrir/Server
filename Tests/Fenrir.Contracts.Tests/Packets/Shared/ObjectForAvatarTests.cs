@@ -1,3 +1,5 @@
+using System.Buffers.Binary;
+using System.Text;
 using Fenrir.Contracts.Packets.Shared;
 using Fenrir.Contracts.Tests.TestSupport;
 
@@ -99,5 +101,27 @@ public class ObjectForAvatarTests
 
         Assert.True(ObjectForAvatar.TryRead(buffer, out var roundTripped));
         StructuralAssert.DeepEqual(data, roundTripped);
+    }
+
+    // Name (offset 48, char[13]) is followed by a 3-byte compiler pad before Tribe at offset 64;
+    // Action is a nested ACTION_INFO at offset 216.
+    [Fact]
+    public void TryRead_DecodesGoldenBytes()
+    {
+        var buffer = new byte[ObjectForAvatar.WireSize];
+        BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(0, 4), 10);
+        Encoding.Latin1.GetBytes("Hero1", buffer.AsSpan(48, 13));
+        BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(64, 4), 20);
+        BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(216 + 100, 4), 30);
+        BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(628, 4), 40);
+
+        var ok = ObjectForAvatar.TryRead(buffer, out var packet);
+
+        Assert.True(ok);
+        Assert.Equal(10, packet.VisibleState);
+        Assert.Equal("Hero1", packet.Name);
+        Assert.Equal(20, packet.Tribe);
+        Assert.Equal(30, packet.Action.SkillValue);
+        Assert.Equal(40, packet.StellarCoreNumber);
     }
 }

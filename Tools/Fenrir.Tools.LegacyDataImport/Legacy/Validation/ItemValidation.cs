@@ -4,7 +4,10 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Records;
 
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Validation;
 
-/// <summary>Cross-validates <see cref="ItemReader" /> against <c>ITEM_DUMP_CLEAN.csv</c> (ts25ztool export, 34,416 rows) -- 0 stat mismatches; text diffs are raw quote/comma bytes in descriptions, not decode bugs.</summary>
+/// <summary>
+///     Cross-validates <see cref="ItemReader" /> against <c>ITEM_DUMP_CLEAN.csv</c> (ts25ztool export, 34,416 rows)
+///     -- 0 stat mismatches; text diffs are raw quote/comma bytes in descriptions, not decode bugs.
+/// </summary>
 internal static class ItemValidation
 {
     public static void Run(string dataDir)

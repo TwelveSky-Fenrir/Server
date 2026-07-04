@@ -23,7 +23,10 @@ public sealed record OfflineShopRepository(ICaeriusNetDbContext Db) : IOfflineSh
         return (shops.Count > 0 ? shops[0] : null, items);
     }
 
-    /// <summary>Atomically upserts the shop + item slots and removes the items from live inventory; refuses to open over unclaimed value.</summary>
+    /// <summary>
+    ///     Atomically upserts the shop + item slots and removes the items from live inventory; refuses to open over
+    ///     unclaimed value.
+    /// </summary>
     public async ValueTask OpenAndReplaceContainersAsync(
         int characterId, short? zoneNumber, int shopDate, string shopName, int locationX, int locationY, int locationZ,
         IReadOnlyList<OfflineShopItemSlotTvp> items,
@@ -75,7 +78,10 @@ public sealed record OfflineShopRepository(ICaeriusNetDbContext Db) : IOfflineSh
         await Db.ExecuteAsync(builder.Build(), ct);
     }
 
-    /// <summary>Atomic CAS purchase: buyer debit+grant, seller item removal+credit, one transaction. Throws SQL 50272 (stale/not open), 50222 (buyer funds), 50261 (buyer cap), 50273 (seller BigMoney cap).</summary>
+    /// <summary>
+    ///     Atomic CAS purchase: buyer debit+grant, seller item removal+credit, one transaction. Throws SQL 50272
+    ///     (stale/not open), 50222 (buyer funds), 50261 (buyer cap), 50273 (seller BigMoney cap).
+    /// </summary>
     public async ValueTask ExecutePurchaseAsync(int sellerCharacterId, short slotIndex, int expectedItemId,
         int expectedQuantity, int expectedValue, int price, int buyerCharacterId, byte buyerContainer,
         IReadOnlyList<CharacterItemSlotTvp> buyerItems, CancellationToken ct)

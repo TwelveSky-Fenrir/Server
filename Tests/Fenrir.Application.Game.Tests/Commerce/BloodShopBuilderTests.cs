@@ -5,7 +5,10 @@ using Fenrir.Data.World;
 
 namespace Fenrir.Application.Game.Tests.Commerce;
 
-/// <summary>Pure port of <c>MyDB::GetBloodShop</c> (S08_MyDB.cpp): BloodNum is unconditionally 50, and rows land at sequential positions starting at 0 regardless of their own BloodExchangeSlot number.</summary>
+/// <summary>
+///     Pure port of <c>MyDB::GetBloodShop</c> (S08_MyDB.cpp): BloodNum is unconditionally 50, and rows land at
+///     sequential positions starting at 0 regardless of their own BloodExchangeSlot number.
+/// </summary>
 public class BloodShopBuilderTests
 {
     private static ItemDefinition Item(int itemId, byte sort)

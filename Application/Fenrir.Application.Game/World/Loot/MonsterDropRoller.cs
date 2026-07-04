@@ -1,4 +1,5 @@
 using Fenrir.Application.Game.GameData;
+using Fenrir.Application.Game.Quests;
 using Fenrir.Data.World;
 
 namespace Fenrir.Application.Game.World.Loot;
@@ -6,21 +7,28 @@ namespace Fenrir.Application.Game.World.Loot;
 /// <summary>One resolved, ready-to-spawn drop item (never money -- see <see cref="MonsterDropResult.Money" />).</summary>
 public readonly record struct DroppedItem(int ItemId, int Quantity);
 
-/// <summary>Everything one monster's death rolled, in pipeline order: money, potions, general items, extra items, item 864.</summary>
+/// <summary>
+///     Everything one monster's death rolled, in pipeline order: money, potions, general items, quest item, extra
+///     items, item 864.
+/// </summary>
 public sealed record MonsterDropResult(long? Money, IReadOnlyList<DroppedItem> Items);
 
 /// <summary>
 ///     Generic monster death drop pipeline (<c>Server/ts25zone/S07_MyGame05.cpp:2664-2999</c>): money -&gt;
-///     potions -&gt; general items (rare-table search) -&gt; extra items -&gt; unconditional item-864 roll.
-///     Quest-item drops are deliberately not rolled here (no quest-progress system exists yet). ~15
-///     event/boss-specific blocks are also not ported; the reference build itself has them dead-code'd out
-///     behind commented-out <c>#define</c>s.
+///     potions -&gt; general items (rare-table search) -&gt; quest item -&gt; extra items -&gt; unconditional
+///     item-864 roll. The quest-item roll (<c>DROP_QUEST_ITEM</c>) is the one tier NOT gated by
+///     <see cref="IsEligible" /> in the source -- see <see cref="RollQuestItem" />. ~15 event/boss-specific
+///     blocks are also not ported; the reference build itself has them dead-code'd out behind commented-out
+///     <c>#define</c>s.
 /// </summary>
 /// <remarks>
 ///     <c>item_drop</c>/<c>rare_drop</c> default 20.0, from <c>ServerInfo.ini</c>'s <c>ItemDropUpRatio=200</c>
 ///     via <c>CreateRatio0(x) = x * 0.1f</c>. <c>user_drop</c> defaults 1.0; the zone-120 newbie bonus and the
 ///     premium-account +1.0 bonus are not modeled -- constructor params exist so callers can supply the real
-///     values once those systems exist.
+///     values once those systems exist. The per-tribe <c>mTribeItemDropUpRatioInfo</c>/
+///     <c>mTribeItemDropUpRatioForMyoungInfo</c> modifiers (<c>S07_MyGame05.cpp:2713-2714</c>) are not applied
+///     here either -- <c>WorldInfo.TribeItemDropUpRatioInfo</c>/<c>TribeItemDropUpRatioForMyoungInfo</c> have
+///     no persisted source yet (<c>WorldStateTemplates</c> zeroes both), so there is nothing live to read.
 /// </remarks>
 public sealed class MonsterDropRoller(
     WorldDataCache worldData,
@@ -63,7 +71,10 @@ public sealed class MonsterDropRoller(
     ///     Pre-scaled like legacy's <c>tMasterLuck = luck * 10</c> -- pass <c>killer.Stats.Luck * 10</c>, not
     ///     the raw <see cref="Stats.EffectiveStats.Luck" /> value.
     /// </param>
-    public MonsterDropResult Roll(MonsterDefinition monster, short killerLevel, byte killerTribe, int killerLuck)
+    /// <param name="killerQuest">The killer's live quest state, for <see cref="RollQuestItem" />.</param>
+    /// <param name="killerHasItem">Killer inventory lookup, for <see cref="RollQuestItem" />.</param>
+    public MonsterDropResult Roll(MonsterDefinition monster, short killerLevel, byte killerTribe, int killerLuck,
+        QuestProgress killerQuest, Func<int, bool> killerHasItem)
     {
         var eligible = IsEligible(monster.Monster, killerLevel);
 
@@ -74,11 +85,15 @@ public sealed class MonsterDropRoller(
         {
             RollPotions(monster.DropPotions, killerLuck, items);
             RollGeneralItems(monster.Monster, monster.DropCategoryRates, killerTribe, killerLuck, items);
-            RollExtraItems(monster.DropExtraItems, items);
-
-            if (LootRandomSource.RandomNumber(random) <= UnconditionalItem864Threshold)
-                items.Add(new DroppedItem(UnconditionalItem864Id, 1));
         }
+
+        RollQuestItem(monster.DropQuestItem, killerQuest, killerHasItem, items);
+
+        if (!eligible) return new MonsterDropResult(money, items);
+        RollExtraItems(monster.DropExtraItems, items);
+
+        if (LootRandomSource.RandomNumber(random) <= UnconditionalItem864Threshold)
+            items.Add(new DroppedItem(UnconditionalItem864Id, 1));
 
         return new MonsterDropResult(money, items);
     }
@@ -86,13 +101,13 @@ public sealed class MonsterDropRoller(
     /// <summary>Ports <c>DROP_MONEY</c> with the LNW33 adjustment active: a roll over 500 loses 30%, then gains a flat +2000.</summary>
     private long? RollMoney(MonsterDropMoneyRowDto? dropMoney, int killerLuck)
     {
-        if (dropMoney is not { DropRate: > 0 } money)
+        if (dropMoney is not { DropRate: > 0 })
             return null;
 
-        if (LootRandomSource.RandomNumber(random) > (int)((money.DropRate + killerLuck) * itemDropRatio))
+        if (LootRandomSource.RandomNumber(random) > (int)((dropMoney.DropRate + killerLuck) * itemDropRatio))
             return null;
 
-        var size = money.MinAmount + random.Next(money.MaxAmount - money.MinAmount + 1);
+        var size = dropMoney.MinAmount + random.Next(dropMoney.MaxAmount - dropMoney.MinAmount + 1);
 
         if (size > 500)
             size -= (int)(size * 0.3f);
@@ -143,20 +158,20 @@ public sealed class MonsterDropRoller(
 
             int itemType;
             int temp;
-            if (rate.CategoryIndex < 3)
+            switch (rate.CategoryIndex)
             {
-                itemType = 1; // ICOMMON
-                temp = (int)((rate.Value + killerLuck) * commonUniqueRatio);
-            }
-            else if (rate.CategoryIndex < 6)
-            {
-                itemType = 2; // IUNIQUE
-                temp = (int)((rate.Value + killerLuck) * commonUniqueRatio);
-            }
-            else
-            {
-                itemType = 3; // IRARE, no luck term (matches source)
-                temp = (int)(rate.Value * rareRatio);
+                case < 3:
+                    itemType = 1; // ICOMMON
+                    temp = (int)((rate.Value + killerLuck) * commonUniqueRatio);
+                    break;
+                case < 6:
+                    itemType = 2; // IUNIQUE
+                    temp = (int)((rate.Value + killerLuck) * commonUniqueRatio);
+                    break;
+                default:
+                    itemType = 3; // IRARE, no luck term (matches source)
+                    temp = (int)(rate.Value * rareRatio);
+                    break;
             }
 
             if (LootRandomSource.RandomNumber(random) > temp)
@@ -166,6 +181,31 @@ public sealed class MonsterDropRoller(
             if (itemId is { } resolved)
                 items.Add(new DroppedItem(resolved, 1));
         }
+    }
+
+    /// <summary>
+    ///     Ports <c>DROP_QUEST_ITEM</c> (<c>S07_MyGame05.cpp:2875-2884</c>): gate roll first (raw rate, no
+    ///     luck/ratio term, same as <see cref="RollExtraItems" />), then drop only when the killer's active
+    ///     quest is qSort 2 (item acquisition) targeting exactly this item and they don't already hold it --
+    ///     <c>ReturnQuestPresentState() == 2</c> for qSort 2 means "in progress," i.e. item not yet held.
+    /// </summary>
+    private void RollQuestItem(MonsterDropQuestItemRowDto? dropQuestItem, QuestProgress killerQuest,
+        Func<int, bool> killerHasItem, List<DroppedItem> items)
+    {
+        if (dropQuestItem is not { DropRate: > 0 })
+            return;
+
+        if (LootRandomSource.RandomNumber(random) > dropQuestItem.DropRate)
+            return;
+
+        // ActiveFlag==1 is implied by QSort==2 (Accept/Complete/Abandon always set/clear them together) but
+        // checked explicitly to mirror ReturnQuestPresentState's own idle guard.
+        if (killerQuest.ActiveFlag != 1 || killerQuest.QSort != 2 ||
+            killerQuest.TargetPhase != dropQuestItem.QuestItemId)
+            return;
+
+        if (!killerHasItem(dropQuestItem.QuestItemId))
+            items.Add(new DroppedItem(dropQuestItem.QuestItemId, 1));
     }
 
     /// <summary>

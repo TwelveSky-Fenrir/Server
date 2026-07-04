@@ -4,7 +4,10 @@ using Fenrir.Contracts.Wire;
 
 namespace Fenrir.Contracts.Packets.Zone;
 
-/// <summary>ZoneNumber must be 1..349; Sort 2 (GM) requires UserSort >= 1. On success the session enters "moving zone" — model as a session flag, not a <see cref="ZoneSessionState" />.</summary>
+/// <summary>
+///     ZoneNumber must be 1..349; Sort 2 (GM) requires UserSort >= 1. On success the session enters "moving zone" —
+///     model as a session flag, not a <see cref="ZoneSessionState" />.
+/// </summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.ZoneMove,
     ExpectedSize = 21, AllowedStates = [(byte)ZoneSessionState.InWorld])]
 public readonly partial record struct ZoneMoveRequest : IIncomingPacket<ZoneMoveRequest>

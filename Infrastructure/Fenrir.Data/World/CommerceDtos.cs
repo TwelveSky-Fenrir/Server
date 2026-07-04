@@ -20,7 +20,10 @@ public sealed partial record EventDefinitionRowDto(
     short? ZoneNumber,
     string? Message);
 
-/// <summary>world.usp_ItemMallProduct_GetAll; includes inactive rows so lookups can tell "unknown product" from "disabled". ItemId null when unwired.</summary>
+/// <summary>
+///     world.usp_ItemMallProduct_GetAll; includes inactive rows so lookups can tell "unknown product" from
+///     "disabled". ItemId null when unwired.
+/// </summary>
 [GenerateDto]
 public sealed partial record ItemMallProductRowDto(
     int ItemMallProductId,

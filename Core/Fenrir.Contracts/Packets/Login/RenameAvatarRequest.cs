@@ -12,8 +12,7 @@ public readonly partial record struct RenameAvatarRequest : IIncomingPacket<Rena
 {
     public required int AvatarPost { get; init; }
 
-    [FixedString(13)]
-    public required string ChangeAvatarName { get; init; }
+    [FixedString(13)] public required string ChangeAvatarName { get; init; }
 
     // 0..1 (MAX_INVENTORY_PAGE_NUM).
     public required int Page { get; init; }

@@ -2,11 +2,7 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Readers;
 
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Validation;
 
-/// <summary>
-///     Ad-hoc console verification for <see cref="MonsterSpawnRegionReader" />: reports how many
-///     <c>*.WREGION.csv</c> files and rows were found/parsed/skipped, and prints a few sample rows so a human
-///     can eyeball whether the values look plausible.
-/// </summary>
+/// <summary>Ad-hoc console check for <see cref="MonsterSpawnRegionReader" />: file/row counts and a few sample rows.</summary>
 internal static class MonsterSpawnRegionValidation
 {
     public static void Run(string dataDir)

@@ -7,12 +7,7 @@ namespace Fenrir.Data.Characters;
 [GenerateDto]
 public sealed partial record CharacterIdDto(int CharacterId);
 
-/// <summary>
-///     Character-select list row (architecture reference §11.2) -- ordinal contract of
-///     game.usp_Character_GetByAccount's result set: CharacterId, Slot, Name, Tribe, Gender, HeadType, FaceType, Level.
-///     Constructor order must track the SELECT column order exactly (invariant I-04); [GenerateDto] maps by position,
-///     not by name.
-/// </summary>
+// game.usp_Character_GetByAccount; ordinal-mapped, ctor order must match the SELECT.
 [GenerateDto]
 public sealed partial record CharacterSummaryDto(
     int CharacterId,
@@ -24,11 +19,7 @@ public sealed partial record CharacterSummaryDto(
     byte FaceType,
     short Level);
 
-/// <summary>
-///     Full world-entry snapshot (M1 Legacy Wire Contract §4.4/§6.2) -- ordinal contract of
-///     game.usp_Character_GetForWorldEntry's result set. Drives ZC_REGISTER_AVATAR_RECV/AVATAR_INFO; column order
-///     mirrors game.Characters (minus the audit timestamps, which the world path never needs).
-/// </summary>
+// game.usp_Character_GetForWorldEntry; drives ZC_REGISTER_AVATAR_RECV/AVATAR_INFO. Mirrors game.Characters minus audit timestamps.
 [GenerateDto]
 public sealed partial record CharacterWorldEntryDto(
     int CharacterId,
@@ -51,14 +42,7 @@ public sealed partial record CharacterWorldEntryDto(
     int MaxMana,
     long FlushSequence);
 
-/// <summary>
-///     Full RS0 of the A3-extended game.usp_Character_GetForWorldEntry: the M1 columns (the exact
-///     <see cref="CharacterWorldEntryDto" /> prefix, kept UNCHANGED and in the same order) followed by the appended
-///     progression columns and the folded-in quest state (wAvatar.aQuestInfo[5], LEFT JOIN of game.CharacterQuests --
-///     inline avatar state in the legacy, hence RS0 and not a sixth result set). A separate type instead of appending
-///     to CharacterWorldEntryDto: that positional record is constructed by existing callers/tests whose call sites
-///     must not break, while [GenerateDto] mapping the shorter prefix of the same result set keeps both valid.
-/// </summary>
+// RS0 of usp_Character_GetForWorldEntry: CharacterWorldEntryDto's exact prefix (kept stable for existing callers) plus appended progression + quest state (legacy inline avatar state, hence same result set not a 6th).
 [GenerateDto]
 public sealed partial record CharacterWorldSnapshotDto(
     int CharacterId,
@@ -118,24 +102,16 @@ public sealed partial record CharacterWorldSnapshotDto(
     int MissionKillMonster,
     int MissionPlayTime,
     bool AutoHuntEnabled,
-    // Not '?'-annotated: CaeriusNet's [GenerateDto] source generator only recognizes the bare `byte[]`
-    // syntax for its native varbinary mapping (CAERIUS005) -- a nullable-annotated array type still maps
-    // fine at runtime (NULL rows simply populate this with a null reference), this is a compile-time-only
-    // annotation difference, not a behavior change.
+    // Bare byte[] (not byte[]?): [GenerateDto] only recognizes bare byte[] for varbinary mapping; NULL still maps fine at runtime.
     byte[] AutoHuntConfig,
     byte AutoLifeRatio,
     byte AutoManaRatio,
     int PetGrowth,
     byte PetActivity,
-    // Quest reward type 5 (wAvatar.aTeacherPoint) -- appended LAST, matching this proc's ordinal contract;
-    // see Characters_v9_teacherpoint.sql's own ALTER header.
+    // wAvatar.aTeacherPoint; appended last to match the proc's column order.
     int TeacherPoint);
 
-/// <summary>
-///     One occupied item slot (RS1 of usp_Character_GetForWorldEntry) -- ordinal contract: Container, Slot, ItemId,
-///     Quantity, Enchant, Combine, Refine, Socket, SocketGem1..3, ExpireDate (legacy int YYYYMMDD, 0 = not a rental),
-///     Serial. Container enum is documented on game.CharacterItems (0/1 = inventory pages, 2 = equipment, 3 = store).
-/// </summary>
+/// <summary>RS1 of usp_Character_GetForWorldEntry. ExpireDate: legacy YYYYMMDD int, 0 = not a rental. Container: 0/1 inventory pages, 2 equipment, 3 store.</summary>
 [GenerateDto]
 public sealed partial record CharacterItemSlotDto(
     byte Container,
@@ -152,19 +128,14 @@ public sealed partial record CharacterItemSlotDto(
     int ExpireDate,
     int Serial);
 
-/// <summary>
-///     One learned skill slot (RS2) -- legacy aSkill[slot][0..1]: SlotIndex, SkillId, Grade.
-/// </summary>
+/// <summary>RS2 of usp_Character_GetForWorldEntry -- legacy aSkill[slot][0..1].</summary>
 [GenerateDto]
 public sealed partial record CharacterSkillDto(
     byte SlotIndex,
     int SkillId,
     int Grade);
 
-/// <summary>
-///     One assigned hotkey (RS3) -- legacy aHotKey[page][key][0..2] stored verbatim: Page, KeyIndex, Sort, Value1,
-///     Value2 (per-sort semantics belong to the hotkey logic, not the storage layer).
-/// </summary>
+/// <summary>RS3 -- legacy aHotKey[page][key][0..2] stored verbatim; per-sort semantics live in the hotkey logic, not here.</summary>
 [GenerateDto]
 public sealed partial record CharacterHotkeyDto(
     byte Page,
@@ -173,20 +144,14 @@ public sealed partial record CharacterHotkeyDto(
     int Value1,
     int Value2);
 
-/// <summary>
-///     One persisted buff slot (RS4) -- SlotIndex, Value, RemainingLegacyTicks (500 ms legacy ticks, D4: persisted
-///     verbatim so no ms/tick conversion ever happens at the storage boundary).
-/// </summary>
+/// <summary>RS4; RemainingLegacyTicks is 500ms legacy ticks, persisted verbatim (no ms conversion at this boundary).</summary>
 [GenerateDto]
 public sealed partial record CharacterBuffDto(
     byte SlotIndex,
     int Value,
     int RemainingLegacyTicks);
 
-/// <summary>
-///     The five result sets of the A3 usp_Character_GetForWorldEntry stitched together -- everything world entry needs
-///     to rebuild PlayerRuntimeState/AVATAR_INFO in one SQL round trip. Not a [GenerateDto] (it spans result sets).
-/// </summary>
+/// <summary>All five result sets of usp_Character_GetForWorldEntry, stitched -- not a [GenerateDto] since it spans result sets.</summary>
 public sealed record CharacterWorldEntryBundle(
     CharacterWorldSnapshotDto Character,
     ReadOnlyCollection<CharacterItemSlotDto> Items,

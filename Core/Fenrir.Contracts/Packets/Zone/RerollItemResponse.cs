@@ -4,12 +4,7 @@ using Fenrir.Contracts.Wire;
 
 namespace Fenrir.Contracts.Packets.Zone;
 
-/// <summary>
-///     ZC_EXCHANGE_ITEM_RECV (ZONE.h:526-531) — typedef SHARED with <see cref="UpgradeItemRankResponse" /> (30)
-///     and <see cref="DowngradeItemRankResponse" /> (31): identical layout, distinct C# contracts. Reply to
-///     CZ_EXCHANGE_ITEM_SEND (26); unicast. <see cref="Value" /> (6 ints) describes the resulting item
-///     (index, quantity, value, position...).
-/// </summary>
+// Value: 6-int description of the resulting item (index, quantity, value, position...).
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.RerollItem,
     ExpectedSize = 33)]
 public readonly partial record struct RerollItemResponse : IOutgoingPacket

@@ -3,10 +3,7 @@ using Microsoft.CodeAnalysis;
 
 namespace Fenrir.Generators.Analysis.Model;
 
-/// <summary>
-///     Output of a type-analysis pass: the model (null if unrecoverable, e.g. <c>FEN001</c>) plus diagnostics to
-///     report, carried through to <c>RegisterSourceOutput</c>.
-/// </summary>
+/// <summary>Type-analysis result; <see cref="Model"/> is null when unrecoverable (e.g. <c>FEN001</c>).</summary>
 internal sealed class GeneratedTypeResult
 {
     public TypeModel? Model { get; init; }

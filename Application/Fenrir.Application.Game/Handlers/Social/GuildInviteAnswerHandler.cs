@@ -7,9 +7,8 @@ using Fenrir.Network.Sessions;
 namespace Fenrir.Application.Game.Handlers.Social;
 
 /// <summary>
-///     CZ_GUILD_ANSWER_SEND (opcode 74). 0=accept (both sides reach the legacy's state 3; the ASKER must
-///     then send CZ_GUILD_WORK_SEND tSort 3 to finalize -- see <see cref="GuildInviteRegistry.TryConsumeAccepted" />),
-///     1/2=refuse, else ignored. Silent no-op if the target isn't currently negotiating as a target.
+///     CZ_GUILD_ANSWER_SEND (opcode 74) -- accept only reaches negotiation state 3; asker must still send
+///     CZ_GUILD_WORK_SEND tSort 3 to finalize.
 /// </summary>
 public sealed class GuildInviteAnswerHandler(ZoneRegistry zones, GuildInviteRegistry invites)
     : IInlinePacketHandler<GuildInviteAnswerRequest>

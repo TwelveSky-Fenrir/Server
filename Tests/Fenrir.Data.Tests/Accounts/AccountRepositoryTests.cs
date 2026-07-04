@@ -8,9 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Fenrir.Data.Tests.Accounts;
 
-// Exercises auth.usp_Account_* against the real, containerized SQL Server booted by SqlServerFixture (I-04:
-// the database is the contract of truth) -- no mocks, no in-memory provider. The fixture is shared by every
-// class in the "SqlServer" collection (one container for the whole suite), so every test below mints its own
+// Exercises auth.usp_Account_* against the real containerized SQL Server (no mocks). Each test mints its own
 // GUID-suffixed LoginName to stay independent from the seeded devtest account and from each other.
 [Collection("SqlServer")]
 public sealed class AccountRepositoryTests
@@ -30,8 +28,7 @@ public sealed class AccountRepositoryTests
         _repository = new AccountRepository(db);
     }
 
-    // Short prefix + GUID (not the full test name): LoginName is NVARCHAR(64) and a CallerMemberName-based
-    // suffix would overflow it for the longer test method names below.
+    // LoginName is NVARCHAR(64); a full CallerMemberName-based suffix would overflow it.
     private static string NewLoginName()
     {
         return $"acct_{Guid.NewGuid():N}";
@@ -85,10 +82,7 @@ public sealed class AccountRepositoryTests
 
         Assert.NotNull(ex);
 
-        // usp_Account_Create raises THROW 50101 (admin.ErrorCatalog, 501xx = auth range) for a duplicate
-        // LoginName. Whether CaeriusNet surfaces the raw SqlException or wraps it (CaeriusNetSqlException),
-        // the SqlException is either the exception itself or its InnerException -- check both shapes rather
-        // than assume one, and fall back to "an exception was thrown" if neither exposes SqlException.Number.
+        // usp_Account_Create raises THROW 50101 for a duplicate LoginName; CaeriusNet may wrap the SqlException.
         var sqlException = ex as SqlException ?? ex!.InnerException as SqlException;
         if (sqlException is not null)
             Assert.Equal(50101, sqlException.Number);
@@ -101,8 +95,7 @@ public sealed class AccountRepositoryTests
         var (hash, salt) = PasswordHasher.Hash(SamplePassword);
         var accountId = await _repository.CreateAsync(loginName, hash, salt, CancellationToken.None);
 
-        // usp_Account_RecordLoginAttempt escalates to a 1-minute lockout once FailedLoginCount reaches 5
-        // (architecture reference §9.1) -- five failures in a row must trip LockoutUntilUtc.
+        // usp_Account_RecordLoginAttempt escalates to a 1-minute lockout once FailedLoginCount reaches 5.
         for (var i = 0; i < 5; i++)
             await _repository.RecordLoginAttemptAsync(accountId, false, CancellationToken.None);
 

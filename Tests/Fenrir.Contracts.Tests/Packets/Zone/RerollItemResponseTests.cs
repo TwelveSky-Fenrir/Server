@@ -3,10 +3,6 @@ using Fenrir.Contracts.Packets.Zone;
 
 namespace Fenrir.Contracts.Tests.Packets.Zone;
 
-/// <summary>
-///     ZC_EXCHANGE_ITEM_RECV (ZONE.h:526-531, 32-byte payload): Result/Cost/Value[6] — same typedef as
-///     <see cref="UpgradeItemRankResponse" />/<see cref="DowngradeItemRankResponse" />.
-/// </summary>
 public class ZcExchangeItemRecvTests
 {
     [Fact]

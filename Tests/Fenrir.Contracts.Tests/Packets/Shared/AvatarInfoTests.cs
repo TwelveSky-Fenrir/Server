@@ -11,8 +11,7 @@ public class AvatarInfoTests
         Assert.Equal(11168, AvatarInfo.WireSize);
     }
 
-    // 227 properties (§4.1). Values come from a deterministic counter; only property ORDER here
-    // matters for the test, not the values — actual binary offsets are owned by the generator/`[FenrirWireType]`.
+    // Property order matters here, not values; binary offsets are owned by the generator/[FenrirWireType].
     [Fact]
     public void RoundTrip_PreservesAllFields()
     {
@@ -285,8 +284,7 @@ public class AvatarInfoTests
         Assert.True(AvatarInfo.TryRead(buffer, out var roundTripped));
         StructuralAssert.DeepEqual(avatar, roundTripped);
 
-        // Fields called out by name in §4.1 (padding-adjacent, offset 10056) — re-checked
-        // individually beyond the structural comparison above.
+        // Re-checked individually: these fields sit next to padding (offset 10056), most exposed to an offset bug.
         Assert.Equal(name, roundTripped.Name);
         Assert.Equal(tribe, roundTripped.Tribe);
         Assert.Equal(guildName, roundTripped.GuildName);

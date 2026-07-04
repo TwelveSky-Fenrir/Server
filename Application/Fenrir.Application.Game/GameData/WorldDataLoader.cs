@@ -4,24 +4,12 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.GameData;
 
-/// <summary>
-///     Boot-time orchestration of the world.* reference-data load (ADR-0011): awaits every
-///     world.usp_*_GetAll sequentially (simple and safe -- this runs once, before the listener starts, so
-///     there is nothing to contend with), hands the raw rows to <see cref="WorldDataCacheBuilder" />, logs the
-///     per-dataset counts and the discarded orphan rows, and publishes the immutable
-///     <see cref="WorldDataCache" />. Must complete before the GameServer accepts its first connection --
-///     a failure here (unreachable SQL, unseeded database) is fatal by design, exactly like the legacy
-///     refusing to start without its shared-memory .IMG data.
-/// </summary>
+/// <summary>Boot-time orchestration of the world.* reference-data load. Must complete before the GameServer accepts its first connection -- a load failure is fatal by design.</summary>
 public sealed class WorldDataLoader(IWorldDataRepository repository, ILogger<WorldDataLoader> logger)
 {
     private WorldDataCache? _cache;
 
-    /// <summary>
-    ///     The loaded snapshot. Throws until <see cref="InitializeAsync" /> has completed -- resolving the
-    ///     cache before initialization is a Program.cs wiring bug (the init call must sit before the
-    ///     connection listener starts), not a state to limp through.
-    /// </summary>
+    /// <summary>Throws until <see cref="InitializeAsync" /> has completed -- resolving early is a Program.cs wiring bug, not a state to limp through.</summary>
     public WorldDataCache Cache => _cache ?? throw new InvalidOperationException(
         "WorldDataCache is not loaded yet -- call WorldDataLoader.InitializeAsync before accepting connections.");
 

@@ -4,12 +4,9 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Readers;
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Seeding;
 
 /// <summary>
-///     Generates <c>70_seed/world/071_skill_descriptions.sql</c> from the real <c>005_00003.IMG</c> data
-///     (<see cref="SkillReader.ReadAll" />). Normalizes <c>SKILL_INFO</c>'s <c>sDescription[10][51]</c>: one
-///     row per non-empty description line, not 10 mostly-empty columns. Real data check before committing to
-///     this shape: description-line indices 7-9 are populated in 0 of 153 real (Index != 0) skills, and even
-///     indices 0-6 vary from 0 to 7 populated lines per skill (average ~3.9) -- genuinely sparse/variable
-///     length, unlike <c>ITEM_INFO</c>'s always-3-line description (kept as plain columns on world.Items).
+///     Generates <c>70_seed/world/071_skill_descriptions.sql</c> from <see cref="SkillReader.ReadAll" />
+///     (005_00003.IMG): one row per non-empty description line (avg ~3.9 of 10 populated per skill), unlike
+///     <c>ITEM_INFO</c>'s fixed 3-line description.
 /// </summary>
 public static class SkillDescriptionSeedGenerator
 {

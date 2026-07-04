@@ -6,11 +6,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Login.Tests.Handlers;
 
-/// <summary>
-///     op21 CL_WANT_GIFT_SEND — V8 gift claim (login protocol report §4.21, "chantier V8"): now backed by
-///     the real game.Gifts pending queue + usp_Gift_ClaimIntoVault instead of the pre-V8 static
-///     always-"no gift" placeholder.
-/// </summary>
+// op21 CL_WANT_GIFT_SEND -- gift claim backed by the real game.Gifts pending queue + usp_Gift_ClaimIntoVault.
 public class ClWantGiftSendHandlerTests
 {
     [Fact]

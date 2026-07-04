@@ -5,15 +5,9 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Records;
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Seeding;
 
 /// <summary>
-///     Generates <c>70_seed/world/070_skills.sql</c> from the real <c>005_00003.IMG</c> data
-///     (<see cref="SkillReader.ReadAll" />). One row per <see cref="SkillRecord" /> where <c>Index != 0</c>:
-///     unlike items, no runtime patch zeroes retired skill slots, but the raw data still has the same
-///     convention -- 147 of the 300 raw records are fully blank (empty name, all-zero fields) and all share
-///     <c>Index == 0</c> (verified: exactly one duplicate-index group exists across all 300 records, at
-///     index 0, and every one of those rows is completely blank). Since world.Skills.SkillId is a real,
-///     non-IDENTITY primary key another domain's FOREIGN KEY already depends on by exact name/type, keeping
-///     147 rows with the same PK value is not just noise, it's impossible -- so this filter is required,
-///     despite the domain brief assuming "no filtering" for skills.
+///     Generates <c>70_seed/world/070_skills.sql</c> from <see cref="SkillReader.ReadAll" /> (005_00003.IMG),
+///     one row per skill where Index != 0: 147 of 300 raw records are blank placeholders all sharing
+///     Index == 0, which would collide with SkillId's non-IDENTITY primary key if not filtered out.
 /// </summary>
 public static class SkillSeedGenerator
 {

@@ -7,11 +7,7 @@ namespace Fenrir.Application.Game.Tests.World.Loot;
 
 public class MonsterDropRollerTests
 {
-    /// <summary>
-    ///     A cache with the one baseline item <see cref="WorldDataTestRows.MinimalRows" /> already seeds
-    ///     (world.Items must be non-empty, <see cref="WorldDataCacheBuilder.Build" />'s own critical-dataset
-    ///     gate) -- these tests only exercise money/potion rolls, which never look items up by catalog.
-    /// </summary>
+    /// <summary>world.Items must be non-empty for <see cref="WorldDataCacheBuilder.Build" />'s critical-dataset gate; these tests only exercise money/potion rolls.</summary>
     private static WorldDataCache EmptyCache()
     {
         return WorldDataCacheBuilder.Build(WorldDataTestRows.MinimalRows()).Cache;

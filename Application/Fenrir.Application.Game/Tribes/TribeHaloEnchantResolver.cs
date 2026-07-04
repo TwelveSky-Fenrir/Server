@@ -2,39 +2,33 @@ using Fenrir.Application.Game.Combat;
 
 namespace Fenrir.Application.Game.Tribes;
 
-/// <summary>Outcome of one TRIBE_WORK tSort 7 halo-enchant attempt (doc 10 §2, ZC_TRIBE_WORK_RECV tResult 0/1/2).</summary>
+/// <summary>Outcome of one TRIBE_WORK tSort 7 halo-enchant attempt (ZC_TRIBE_WORK_RECV tResult 0/1/2).</summary>
 public enum TribeHaloEnchantOutcome
 {
-    /// <summary>tResult 0 -- <c>aHalo += 1</c> (GL_870_HALO_HEAD issue 1).</summary>
+    /// <summary>tResult 0 -- aHalo += 1.</summary>
     Success,
 
-    /// <summary>tResult 1 -- a consumable <c>aProtectForHalo</c> charge absorbed the downgrade (issue 2).</summary>
+    /// <summary>tResult 1 -- a consumable aProtectForHalo charge absorbed the downgrade.</summary>
     ProtectionConsumed,
 
-    /// <summary>tResult 2 -- <c>aHalo -= 1</c> (issue 3).</summary>
+    /// <summary>tResult 2 -- aHalo -= 1.</summary>
     Downgraded,
 
-    /// <summary>
-    ///     tResult 1 -- neither success nor downgrade (issue 4; also the ONLY outcome possible at aHalo==0, since the
-    ///     source has no explicit "downgrade below 0" branch).
-    /// </summary>
+    /// <summary>tResult 1 -- neither success nor downgrade; also the only outcome possible at aHalo==0.</summary>
     NeutralFail
 }
 
 /// <summary>
-///     Pure port of <c>GetHaloCostumeEnchantRate</c> (verified in full, <c>Server/Header/function.h:2165-2214</c>)
-///     plus the two-roll decision tree around it (<c>Server/ts25zone/S04_MyWork02.cpp:11128-11230</c>, TRIBE_WORK
-///     tSort 7). No I/O or state dependency -- <see cref="Tribes.TribeActionHandler" /> supplies the current
+///     Port of GetHaloCostumeEnchantRate (function.h:2165-2214) plus the two-roll decision tree around it
+///     (S04_MyWork02.cpp:11128-11230, TRIBE_WORK tSort 7). No I/O -- TribeActionHandler supplies the current
 ///     aHalo/aProtectForHalo and reads the result back.
 /// </summary>
 public static class TribeHaloEnchantResolver
 {
     /// <summary>
-    ///     <c>GetHaloCostumeEnchantRate(tCurrentImprove, &amp;tSuccess, &amp;tFail, &amp;tDecrease)</c> --
-    ///     <paramref name="currentHalo" /> is <c>aHalo</c> (the C++ adds 1 internally, "pCurrentImprove").
-    ///     <see cref="SuccessRate" /> is a flat 15 regardless of tier; only <see cref="DecreaseRate" /> varies,
-    ///     +3 per 10-point bracket of <c>pCurrentImprove</c>, up to 30 at 90+. Both are percentage points for
-    ///     a <c>rand() % 100</c> roll.
+    ///     currentHalo is aHalo (the C++ adds 1 internally, "pCurrentImprove"). SuccessRate is a flat 15
+    ///     regardless of tier; only DecreaseRate varies, +3 per 10-point bracket, up to 30 at 90+. Both are
+    ///     percentage points for a rand() % 100 roll.
     /// </summary>
     public static (int SuccessRate, int DecreaseRate) GetRates(int currentHalo)
     {
@@ -58,18 +52,15 @@ public static class TribeHaloEnchantResolver
     }
 
     /// <summary>
-    ///     One full attempt: preconditions (CP/money/halo-cap) are the CALLER's job (<c>TribeActionHandler</c>,
-    ///     which debits the fixed 100 CP / 1,000,000 money cost before calling this, matching the legacy's
-    ///     unconditional debit). Consumes 1 or 2 draws from <paramref name="random" /> in the source's own
-    ///     order (success roll, then -- only on failure -- the downgrade roll), per <see cref="IRandomSource" />'s
-    ///     "one draw per legacy rand_mir() call site" contract.
+    ///     Preconditions (CP/money/halo-cap) are the caller's job (TribeActionHandler debits the fixed cost
+    ///     before calling this). Consumes 1 or 2 draws from <paramref name="random" /> in source order:
+    ///     success roll, then -- only on failure -- the downgrade roll.
     /// </summary>
     public static (TribeHaloEnchantOutcome Outcome, int NewHalo, int NewProtectForHalo) Resolve(
         int currentHalo, int currentProtectForHalo, IRandomSource random)
     {
         var (successRate, decreaseRate) = GetRates(currentHalo);
-        // Quirk (doc 10 §2 tSort 7 / quirk table): +2 flat bonus applied AFTER the table lookup.
-        var successThreshold = successRate + 2;
+        var successThreshold = successRate + 2; // +2 flat bonus applied after the table lookup
 
         if (random.NextInt32(100) < successThreshold)
             return (TribeHaloEnchantOutcome.Success, currentHalo + 1, currentProtectForHalo);

@@ -4,11 +4,7 @@ using Fenrir.Contracts.Tests.TestSupport;
 
 namespace Fenrir.Contracts.Tests.Packets.Shared;
 
-/// <summary>
-///     ITEM_LINK_INFO (24 bytes, STRUCT.h:1009-1014) — Index/Activity/Value/Socket[3], no padding.
-///     The golden encoder below is hand-built from the C++ layout, independent of the generated
-///     <c>Write</c>.
-/// </summary>
+// Golden encoder is hand-built from the C++ ITEM_LINK_INFO layout, independent of the generated Write.
 public class ItemLinkInfoTests
 {
     [Fact]

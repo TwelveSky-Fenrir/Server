@@ -4,10 +4,7 @@ using Fenrir.Contracts.Wire;
 
 namespace Fenrir.Contracts.Packets.Zone;
 
-/// <summary>
-///     CZ_END_PSHOP_SEND (CLIENT.h:311-314) — close a shop stall. <c>Sort</c> 1 = close local personal
-///     shop, 2 = close proxy shop (routed to <c>mProxySystem.Process(..., 21)</c>).
-/// </summary>
+// Sort: 1=close local personal shop, 2=close proxy shop.
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.CloseShopStall, ExpectedSize = 13,
     AllowedStates = [(byte)ZoneSessionState.InWorld])]
 public readonly partial record struct CloseShopStallRequest : IIncomingPacket<CloseShopStallRequest>

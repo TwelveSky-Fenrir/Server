@@ -5,24 +5,9 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Records;
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Validation;
 
 /// <summary>
-///     Cross-validates <see cref="MonsterReader" /> output against two <c>ts25ztool</c> CSV dumps of
-///     <c>005_00004.IMG</c>:
-///     <list type="bullet">
-///         <item>
-///             <c>005_00004DROP.CSV</c> -- no header, 10000 rows of <c>mIndex|mName</c> followed by every
-///             drop-related field in declaration order (<c>mDropMoneyInfo</c> through <c>mDropExtraItemInfo</c>,
-///             127 scalar values) -- i.e. exactly the tail of the full struct starting at <c>mDropMoneyInfo</c>.
-///         </item>
-///         <item>
-///             <c>005_00004.CSV</c> -- a self-describing type-annotated header row (e.g.
-///             <c>i:mIndex|s:25:Name|...</c>) followed by 10000 data rows covering the FULL struct in declaration
-///             order. Note the header row itself is abbreviated for large trailing arrays (it stops spelling out
-///             placeholder columns for <c>mDropExtraItemInfo</c>'s 100 scalars) and so is NOT reliable for counting
-///             columns -- only for confirming field order/names, which was done by inspection before writing this
-///             comparison. Each data row actually carries 181 scalar values (plus a trailing empty field from the
-///             file's trailing '|').
-///         </item>
-///     </list>
+///     Cross-validates <see cref="MonsterReader" /> against two <c>ts25ztool</c> CSV dumps of 005_00004.IMG:
+///     <c>005_00004DROP.CSV</c> (no header, mIndex|mName + the 127 drop-only fields) and <c>005_00004.CSV</c>
+///     (type-annotated header, not reliable for column counts on large arrays; 181 scalar values per row).
 /// </summary>
 internal static class MonsterValidation
 {
@@ -164,11 +149,7 @@ internal static class MonsterValidation
             $"{mismatches} total mismatches ({textMismatches} text, {numericMismatches} numeric).");
     }
 
-    /// <summary>
-    ///     Flattens a <see cref="MonsterRecord" /> into the 181 scalar CSV fields, in exact struct
-    ///     declaration order, matching both the full-struct CSV and (from field index <see cref="DropSectionStartIndex" />
-    ///     onward) the drop-only CSV.
-    /// </summary>
+    /// <summary>Flattens to the 181 CSV fields in struct declaration order (matches both CSVs; drop CSV starts at <see cref="DropSectionStartIndex" />).</summary>
     private static List<string> FlattenToCsvFields(MonsterRecord monster)
     {
         List<string> fields =

@@ -4,8 +4,7 @@ public class GameServerOptionsValidatorTests
 {
     private static readonly GameServerOptionsValidator Validator = new();
 
-    // GameServerOptions is a plain sealed class (not a record), so "with" expressions are not available --
-    // build a fresh, fully-valid instance per call and override only the field under test.
+    // GameServerOptions is a plain sealed class, not a record -- no "with", so build a fresh instance per call
     private static GameServerOptions Options(
         int port = 1100,
         byte shardId = 1,

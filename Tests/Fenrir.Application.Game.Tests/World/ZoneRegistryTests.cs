@@ -38,8 +38,7 @@ public class ZoneRegistryTests
         Assert.Same(zone, registry[2]);
     }
 
-    // The clean-abort registration path (character persisted on a map this shard does not host, ADR-0012)
-    // rides on this returning false rather than throwing.
+    // must return false, not throw -- a character persisted on a map this shard doesn't host relies on this
     [Fact]
     public void TryGet_UnhostedMap_ReturnsFalse()
     {
@@ -64,7 +63,6 @@ public class ZoneRegistryTests
         Assert.Equal(2, registry.TotalPlayerCount);
     }
 
-    // The write-behind flush resolves characters through this without knowing their map -- first (only) hit wins.
     [Fact]
     public void TryGetPlayer_FindsCharacterInWhicheverZoneHostsIt()
     {

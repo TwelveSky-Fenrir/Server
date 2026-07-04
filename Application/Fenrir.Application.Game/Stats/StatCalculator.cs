@@ -5,84 +5,30 @@ using Fenrir.Data.World;
 namespace Fenrir.Application.Game.Stats;
 
 /// <summary>
-///     Pure C# port of the legacy MyFactor stat-calculation engine (report 11, verified against
-///     <c>Server/Header/Protocol/MyFactor.h</c> / <c>MyFactor.cpp</c>, 4824 lines, read in full, config
-///     ReleaseEU33 -&gt; LNW33EU;M33 -&gt; LNW33). No I/O: every input is a plain value the caller already
-///     has in memory (base stats, equipped items + their upgrade bytes, the level table already sitting in
-///     <see cref="Fenrir.Application.Game.GameData.WorldDataCache" />, and an optional buff snapshot).
-///     Two layers, matching the legacy's own split (report §1/§5 vs §6):
-///     <list type="bullet">
-///         <item>
-///             <see cref="ComputeBaseStats" /> -- the SetBasicAbilityFromEquip cache (GetBase* family):
-///             everything that only changes when equipment/level/title/halo change. This is what
-///             <see cref="Fenrir.Application.Game.World.PlayerRuntimeState.Stats" /> should cache.
-///         </item>
-///         <item>
-///             <see cref="ComputeEffectiveStats" /> -- the combat-instant wrappers (Get* family): buffs,
-///             pet-double, a handful of set/title/cape adjustments layered on top of the base snapshot.
-///         </item>
-///     </list>
-///     Every "truncate toward zero via a C++ <c>(int)</c> cast" in the source is preserved as its own
-///     explicit <c>(int)</c> cast HERE, in the SAME relative position, because MyFactor's variables are
-///     genuine C++ <c>int</c> accumulators: each <c>+=</c> statement in the original truncates its own
-///     right-hand side before adding, so <c>(int)(a*x) + (int)(b*y)</c> is NOT the same value as
-///     <c>(int)(a*x + b*y)</c> in general -- getting this wrong is exactly the "1-2 points de désaccord"
-///     the mission brief warns about (see e.g. <see cref="ComputeAttackPower" />'s two separate casts for
-///     Str and Ki).
-///     SCOPE (V2 foundations) -- deliberately NOT implemented, because report 11 either does not fully
-///     transcribe the source for it (marked "lacuna" below, see also report §10) or because it needs a
-///     subsystem/zone-context Fenrir has not built yet. None of these are guessed at; each contributes 0
-///     where a real value would be non-zero, exactly the way an absent legacy feature would if compiled
-///     out:
-///     <list type="bullet">
-///         <item>
-///             Zone-balance stat substitution, zone elixirs, ornaments, HP/DMG boost pills, rank buffs,
-///             the zone038 "DTM" bonus, and the whole FFA (zone 335) flat-override mode -- all need a zone
-///             context this calculator does not take (report §5.1/§0/§9).
-///         </item>
-///         <item>
-///             Costume base stats, costume-enchant "cs" (V2), and the rune system (aRuneSystem) -- no
-///             PlayerRuntimeState fields exist for these yet (report §3).
-///         </item>
-///         <item>
-///             The animal/mount system (grades, absorb buffs, NewPower bonuses) and the whole PETSYSTEM
-///             (report §10.3/§10.7) beyond the generic <see cref="PetStatContribution" /> hook for the
-///             "pet double" rule.
-///         </item>
-///         <item>
-///             ReturnIUEffectValue effect-sorts 2-6 (defense/hit/dodge/eatk/edef): report §10.1 states only
-///             effect-sort 1 (weapon attack) and the start of effect-sort 3 were fully transcribed --
-///             implementing 2/3-full/4/5/6 here would mean inventing tier/pivot constants report 11 itself
-///             does not have. Only effect-sort 1 (<see cref="WeaponAttackEffectValue" />) is implemented;
-///             the non-iCheckSetItem-2 "else" branches of Cape/Armor/Gloves/Boots/Amulet DEF/HIT/DODGE/
-///             EATK/EDEF contributions are the affected omission.
-///         </item>
-///         <item>
-///             ITEMSYSTEM::ReturnNewStat (report §10.4): the sort==2 branch of every deco slot (9-12)
-///             contributes 0 here instead of its real "new stat" value.
-///         </item>
-///         <item>
-///             GetSocketInfo (report §10.5): USE_SOCKET_GEM is inactive in prod except this one call site;
-///             its body was never located, so it is assumed to contribute 0 (documented, unverified).
-///         </item>
-///         <item>
-///             Stellar Core (report §8), Phoenix's Growth/IM pet-amulet layer, GIFT_EVENT amulet attack/
-///             defense values, druk (drunk potions), rage buff, tribe-role bonuses, mix-skill bonus, and
-///             aEventValue2 -- all need account/skill/zone state not modeled on PlayerRuntimeState yet.
-///         </item>
-///         <item>
-///             Legacy set-number DETECTION for sets 1-22/30/50/51 (the 87000-89562 item families) -- see
-///             <see cref="SetBonusTables" />'s remarks; only NXT detection is implemented.
-///         </item>
-///         <item>
-///             Speeds: report §10.10 confirms there is NO GetSpeed anywhere in MyFactor -- speeds are not
-///             part of <see cref="EffectiveStats" /> and must not be invented here.
-///         </item>
-///     </list>
+///     Pure C# port of the legacy MyFactor stat-calculation engine. No I/O: every input is a plain value the
+///     caller already has in memory. Two layers, matching the legacy's own split:
+///     <see cref="ComputeBaseStats" /> (the SetBasicAbilityFromEquip cache -- recompute only on
+///     equipment/level/title/halo change) and <see cref="ComputeEffectiveStats" /> (buffs, pet-double, and
+///     set/title/cape adjustments layered on top).
+///     Every C++ <c>(int)</c> truncation in the source is preserved as its own explicit cast in the same
+///     relative position: MyFactor's variables are real C++ int accumulators, so
+///     <c>(int)(a*x) + (int)(b*y)</c> is not the same value as <c>(int)(a*x + b*y)</c> (see
+///     <see cref="ComputeAttackPower" />'s two separate casts for Str and Ki).
 /// </summary>
+/// <remarks>
+///     Not implemented (each contributes 0, like a compiled-out legacy feature): zone-context bonuses
+///     (elixirs, ornaments, boost pills, rank buffs, zone038/FFA overrides); costumes and the rune system (no
+///     PlayerRuntimeState fields yet); the animal/mount system and full PETSYSTEM beyond
+///     <see cref="PetStatContribution" />; ReturnIUEffectValue effect-sorts 2-6 (only effect-sort 1,
+///     <see cref="WeaponAttackEffectValue" />, is transcribed); ITEMSYSTEM::ReturnNewStat for deco sort==2;
+///     GetSocketInfo (body never located); Stellar Core, Phoenix Growth/IM, GIFT_EVENT amulet values, drunk
+///     potions, rage buff, tribe-role/mix-skill bonuses; legacy set-number detection for sets 1-22/30/50/51
+///     (only NXT detection is implemented, see <see cref="SetBonusTables" />); speeds (no GetSpeed exists in
+///     MyFactor at all).
+/// </remarks>
 public static class StatCalculator
 {
-    // report §4: the 5 title-rank vectors (rank 1..14), reused across the 4 base stats' own tranche tables.
+    // The 5 title-rank vectors (rank 1..14), reused across the 4 base stats' own tranche tables.
     private static readonly int[] TitleTableA = [1, 3, 6, 10, 15, 21, 28, 36, 45, 55, 67, 82, 97, 112];
     private static readonly int[] TitleTableB = [0, 1, 3, 5, 8, 11, 14, 18, 23, 28, 34, 41, 48, 55];
     private static readonly int[] TitleTableC = [2, 6, 12, 20, 30, 42, 56, 72, 90, 110, 134, 164, 194, 224];
@@ -91,34 +37,18 @@ public static class StatCalculator
 
     private static readonly LevelRowDto ZeroLevelRow = new(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
-    /// <summary>
-    ///     The legacy "pet double" rule (report §5.1 step 10, §11): if the running stat total already meets
-    ///     or beats the pet's own contribution, the pet's value is simply added; otherwise the WHOLE running
-    ///     total is doubled instead. Exposed publicly (not just inlined) because it is independently testable
-    ///     and is exactly the kind of easy-to-get-backwards legacy quirk the mission calls out by name.
-    /// </summary>
+    /// <summary>The legacy "pet double" rule: if the running total already meets the pet's own contribution, add it; otherwise double the whole running total instead.</summary>
     public static int ApplyPetDoubleRule(int statValue, int petStatValue)
     {
         return statValue >= petStatValue ? statValue + petStatValue : statValue * 2;
     }
 
-    /// <summary>
-    ///     The cached "base" stat snapshot (SetBasicAbilityFromEquip, report §1/§5): recompute this on
-    ///     equipment/level/title/halo change, never once per tick (mission D-decision on
-    ///     <see cref="Fenrir.Application.Game.World.PlayerRuntimeState.Stats" />'s cache semantics).
-    /// </summary>
-    /// <param name="attributes">The 4 spent base stats + level/tribe/title/halo/rebirth.</param>
-    /// <param name="equipment">Every occupied equipment slot (0-12); an absent slot is simply not in the list.</param>
-    /// <param name="levels">
-    ///     world.Levels, keyed by Level (
-    ///     <see cref="Fenrir.Application.Game.GameData.WorldDataCache.LevelsByLevel" />).
-    /// </param>
+    /// <summary>The cached "base" stat snapshot: recompute on equipment/level/title/halo change, never once per tick.</summary>
     /// <param name="legacySetNumber">
-    ///     A pre-computed mSetNumber for sets 1-22/30/50/51 (0 = none) -- see <see cref="SetBonusTables" />'s
-    ///     remarks on why this calculator does not detect those itself. NXT (77000-77023) is detected
-    ///     internally and takes priority when it matches, exactly like the legacy's own check order.
+    ///     Pre-computed mSetNumber for sets 1-22/30/50/51 (0 = none) -- see <see cref="SetBonusTables" /> for
+    ///     why this calculator does not detect those itself. NXT is detected internally and takes priority
+    ///     when it matches.
     /// </param>
-    /// <param name="pet">The pet's Life/Mana contribution to the "pet double" rule (report §5.1/§5.2); default = no pet.</param>
     public static EffectiveStats ComputeBaseStats(
         CharacterBaseAttributes attributes,
         IReadOnlyList<EquippedItemSlot> equipment,
@@ -151,15 +81,11 @@ public static class StatCalculator
     }
 
     /// <summary>
-    ///     The combat-ready "effective" stats (the Get* wrappers, report §6): layers buffs, the "pet double"
-    ///     rule for ATK/DEF, and a handful of set/title/cape adjustments on top of <see cref="ComputeBaseStats" />.
-    ///     MaxLife/MaxMana/CriticalDefence pass through unchanged -- the legacy wrappers for those are pure
-    ///     cache reads with no buff math (report §6 table).
+    ///     The combat-ready "effective" stats: layers buffs, the "pet double" rule for ATK/DEF, and a handful
+    ///     of set/title/cape adjustments on top of <see cref="ComputeBaseStats" />. MaxLife/MaxMana/CriticalDefence
+    ///     pass through unchanged -- the legacy wrappers for those are pure cache reads with no buff math.
     /// </summary>
-    /// <param name="buffs">
-    ///     The avatar's active buff percentages (BUFF_INFO, 35 slots); null/omitted = no buffs applied (every
-    ///     buff% term becomes a no-op), matching aBuff being all-zero.
-    /// </param>
+    /// <param name="buffs">Null/omitted = no buffs applied, matching aBuff being all-zero.</param>
     public static EffectiveStats ComputeEffectiveStats(
         CharacterBaseAttributes attributes,
         IReadOnlyList<EquippedItemSlot> equipment,
@@ -218,17 +144,12 @@ public static class StatCalculator
         };
     }
 
-    // ---- report §3: GetBaseVitality/Strength/Ki(Intelligence)/Wisdom(Dexterity) ----
+    // ---- GetBaseVitality/Strength/Ki(Intelligence)/Wisdom(Dexterity) ----
 
     /// <summary>
-    ///     report §3: <c>stat = aHalo + rawStat + Σ(13 slots) item stat + titleBonus</c>. The aHalo term is
-    ///     NOT a typo -- report §2/§3 confirm ReturnUpgradeValueWithLevelLimit(aHalo) is a verified
-    ///     pass-through in this build, so aHalo is added to Vitality/Strength/Ki/Wisdom directly, on top of
-    ///     whatever CriticalDefence's own halo/10 bonus does elsewhere (report §5.5) -- both are real,
-    ///     independent uses of the same field.
-    ///     NOT modeled here (report §3 lacunas, no subsystem yet): zone-balance stat substitution, costume
-    ///     base stats, costume-enchant "cs", the rune system, animal absorb bonus, and the custom-deco
-    ///     slots-9-12 bonus.
+    ///     stat = aHalo + rawStat + sum(13 slots) item stat + titleBonus. The aHalo term is not a typo --
+    ///     it's added here on top of CriticalDefence's own separate halo/10 bonus; both are real, independent
+    ///     uses of the same field.
     /// </summary>
     private static int ComputeVitality(CharacterBaseAttributes attributes, EquippedItemSlot?[] bySlot)
     {
@@ -248,7 +169,6 @@ public static class StatCalculator
         return total + TitleStrengthBonus(attributes.Title);
     }
 
-    /// <summary>GetBaseKi -- the report's "Ki" is this Intelligence stat (legacy iIntelligent).</summary>
     private static int ComputeKi(CharacterBaseAttributes attributes, EquippedItemSlot?[] bySlot)
     {
         var total = attributes.Halo + attributes.Intelligence;
@@ -258,7 +178,6 @@ public static class StatCalculator
         return total + TitleKiBonus(attributes.Title);
     }
 
-    /// <summary>GetBaseWisdom -- the report's "Wisdom" is this Dexterity stat (legacy iDexterity).</summary>
     private static int ComputeWisdom(CharacterBaseAttributes attributes, EquippedItemSlot?[] bySlot)
     {
         var total = attributes.Halo + attributes.Dexterity;
@@ -268,7 +187,7 @@ public static class StatCalculator
         return total + TitleWisdomBonus(attributes.Title);
     }
 
-    // ---- report §4: title-rank bonus tranches (deliberately non-uniform if-nesting per stat, confirmed) ----
+    // ---- Title-rank bonus tranches (deliberately non-uniform if-nesting per stat) ----
 
     private static int TitleRankBonus(int[] table, int rank)
     {
@@ -279,7 +198,7 @@ public static class StatCalculator
     {
         if (title <= 0) return 0;
         var rank = title % 100;
-        // No ≤200 test (101-300 both map to B) -- report §4 confirms this gap is real, not an omission.
+        // No <=200 test (101-300 both map to B) -- confirmed gap, not an omission.
         var table = title switch
         {
             <= 100 => TitleTableA,
@@ -324,7 +243,7 @@ public static class StatCalculator
     {
         if (title <= 0) return 0;
         var rank = title % 100;
-        // No ≤400 test (301-400 and >400 both map to D) -- report §4 confirms this gap is real too.
+        // No <=400 test (301-400 and >400 both map to D) -- confirmed gap, not an omission.
         var table = title switch
         {
             <= 100 => TitleTableA,
@@ -335,20 +254,20 @@ public static class StatCalculator
         return TitleRankBonus(table, rank);
     }
 
-    // ---- report §5.1: GetBaseMaxLife ----
+    // ---- GetBaseMaxLife ----
 
     private static int ComputeMaxLife(int vitality, LevelRowDto levelRow, int setNumber, bool isLegendarySet,
         byte tribe, EquippedItemSlot?[] bySlot, int petLife)
     {
-        var hp = (int)(vitality * 20.0f); // steps 1-2
-        hp += levelRow.Life; // step 6 (steps 3-5 ornament/deco/elixir: unmodeled, skipped)
-        hp = ApplyPetDoubleRule(hp, petLife); // step 10 (steps 7-9 HP-boost-pill/animal-grade/mount: unmodeled)
+        var hp = (int)(vitality * 20.0f);
+        hp += levelRow.Life; // ornament/deco/elixir bonuses unmodeled, skipped
+        hp = ApplyPetDoubleRule(hp, petLife); // HP-boost-pill/animal-grade/mount bonuses unmodeled
 
-        hp += SetBonusTables.GetFlatLifeBonus(setNumber); // steps 11-12
-        hp += ComputeG12CustomSetBonus(tribe, bySlot); // step 13
-        if (isLegendarySet) hp += 30000; // steps 14-15
+        hp += SetBonusTables.GetFlatLifeBonus(setNumber);
+        hp += ComputeG12CustomSetBonus(tribe, bySlot);
+        if (isLegendarySet) hp += 30000;
 
-        if (bySlot[0] is { } amulet) // "slot EAMULET(0)" per report -- literal index, see naming-inversion remarks
+        if (bySlot[0] is { } amulet) // slot EAMULET(0) -- literal index, see naming-inversion note on EquippedItemSlot
         {
             var enchant = (int)amulet.Enchant;
             if (enchant > 0)
@@ -358,17 +277,17 @@ public static class StatCalculator
             }
         }
 
-        hp += ComputeIsIuForLifeBonus(bySlot); // step 23
-        hp += ComputeG12LifeUpBonus(bySlot); // step 19 (report §5.6)
-        hp += SetBonusTables.CapeIuBonus(bySlot[1], 3, 200f); // step 21
+        hp += ComputeIsIuForLifeBonus(bySlot);
+        hp += ComputeG12LifeUpBonus(bySlot);
+        hp += SetBonusTables.CapeIuBonus(bySlot[1], 3, 200f);
 
-        if (bySlot[8] is { } petAmulet) // step 28
+        if (bySlot[8] is { } petAmulet)
             hp += PhoenixFlatBonus(petAmulet.Item.ItemId, 2000, 4500, 9500);
 
         return hp;
     }
 
-    /// <summary>report §5.1 step 13: the G12 custom-set bonus, gated on all 6 canonical slots being in-tribe IDs.</summary>
+    /// <summary>G12 custom-set bonus, gated on all 6 canonical slots being in-tribe IDs.</summary>
     private static int ComputeG12CustomSetBonus(byte tribe, EquippedItemSlot?[] bySlot)
     {
         var range = tribe switch
@@ -393,7 +312,7 @@ public static class StatCalculator
         return minCombine switch { >= 12 => 15000, >= 6 => 5000, _ => 0 };
     }
 
-    /// <summary>report §2 IsIUForLife / §5.1 step 23: sort==1 items at slots 0-7 except cape(1)/null(6).</summary>
+    /// <summary>sort==1 items at slots 0-7 except cape(1)/null(6) -- specifically sort==1, not the usual {1,4} legendary set.</summary>
     private static int ComputeIsIuForLifeBonus(EquippedItemSlot?[] bySlot)
     {
         var total = 0;
@@ -402,18 +321,18 @@ public static class StatCalculator
             if (i is 1 or 6) continue;
             if (bySlot[i] is not { } slot) continue;
             if (slot.Item.Sort != 1)
-                continue; // report: "items sort==1" specifically, not the usual {1,4} legendary set
+                continue;
 
             var d = slot.Combine / 10;
             var u = slot.Combine % 10;
-            // Confirmed range is D∈1..5, U∈1..5 (report §10.6: codes ≥55 not confirmed) -- not extrapolated.
+            // Confirmed range D in 1..5, U in 1..5 -- not extrapolated beyond that.
             if (d is >= 1 and <= 5 && u is >= 1 and <= 5) total += d * 1000;
         }
 
         return total;
     }
 
-    /// <summary>report §5.6 ReturnSetItemIUValue_LifeUp: G12 (MartialLevelLimit==12) non-legendary pieces.</summary>
+    /// <summary>ReturnSetItemIUValue_LifeUp: G12 (MartialLevelLimit==12) non-legendary pieces.</summary>
     private static int ComputeG12LifeUpBonus(EquippedItemSlot?[] bySlot)
     {
         var v5 = 0;
@@ -428,16 +347,16 @@ public static class StatCalculator
             if (slot.Combine >= 12) v7++;
         }
 
-        // #ifndef MY_HP branch (report §5.6): v5>=6 -> +5000; v7>=6 -> +15000 MORE (6 CS12 pieces = +20000 total).
+        // v5>=6 -> +5000; v7>=6 -> +15000 more (6 CS12 pieces = +20000 total).
         return (v5 >= 6 ? 5000 : 0) + (v7 >= 6 ? 15000 : 0);
     }
 
-    // ---- report §5.2: GetBaseMaxMana ----
+    // ---- GetBaseMaxMana ----
 
     private static int ComputeMaxMana(int ki, LevelRowDto levelRow, int setNumber, EquippedItemSlot?[] bySlot,
         int petMana)
     {
-        var mp = (int)(ki * 15.3100004196167f); // exact literal from the source, not a rounded 15.31f
+        var mp = (int)(ki * 15.3100004196167f); // exact source literal, not a rounded 15.31f
         mp += levelRow.Mana;
         mp = ApplyPetDoubleRule(mp, petMana);
 
@@ -453,14 +372,14 @@ public static class StatCalculator
         return mp;
     }
 
-    // ---- report §5.3: GetBaseAttackPower ----
+    // ---- GetBaseAttackPower ----
 
     private static int ComputeAttackPower(int strength, int ki, LevelRowDto levelRow, int setNumber,
         EquippedItemSlot?[] bySlot)
     {
         var weaponSlot = bySlot[7];
         var coefficients = ResolveWeaponAttackCoefficients(weaponSlot);
-        // Two SEPARATE truncations for Str and Ki -- report §5.3/§0, NOT (int)(str*fStr + ki*fKi).
+        // Two separate truncations for Str and Ki -- NOT (int)(str*fStr + ki*fKi).
         var atk = (int)(strength * coefficients.Str) + (int)(ki * coefficients.Ki);
         atk += levelRow.AttackPower;
 
@@ -468,7 +387,7 @@ public static class StatCalculator
         {
             if (bySlot[i] is not { } slot) continue;
             atk += slot.Item.AttackPower;
-            if (i != 8) // EPET: the coefSet multiplier bonus is explicitly skipped, but the flat += above still applies
+            if (i != 8) // EPET: coefSet multiplier skipped, flat += above still applies
                 atk += (int)(slot.Item.AttackPower *
                              SetBonusTables.GetCoefficients(setNumber, i, IsLegendary(slot.Item)).AttackPower);
         }
@@ -483,12 +402,11 @@ public static class StatCalculator
 
         if (bySlot[10] is { } deco2)
             atk += ComputeDeco2AttackPowerBonus(deco2);
-        // Deco 9/11/12 (and deco2's own sort==2 branch): ReturnNewStat unread (report §10.4) -- contribute 0,
-        // beyond the generic Σ loop above, which already applies uniformly to every slot.
+        // Deco 9/11/12 (and deco2's own sort==2 branch): ReturnNewStat unread, contributes 0 beyond the generic loop above.
 
         if (bySlot[8] is { } petAmulet)
         {
-            atk -= petAmulet.Item.AttackPower; // Phoenix "retire iAttackPower de l'item" -- undoes the flat += above
+            atk -= petAmulet.Item.AttackPower; // Phoenix removes the item's own AttackPower stat, undoing the flat += above
             atk += PhoenixFlatBonus(petAmulet.Item.ItemId, 3000, 4000, 5000);
         }
 
@@ -499,7 +417,7 @@ public static class StatCalculator
 
     private static (float Str, float Ki) ResolveWeaponAttackCoefficients(EquippedItemSlot? weapon)
     {
-        // Values already include the MY_DMG_CAL +1.0f active under LNW33 (report §5.3 "effectif prod" column).
+        // Values already include the MY_DMG_CAL +1.0f active in prod.
         return (weapon?.Item.Sort ?? 0) switch
         {
             13 or 17 or 19 => (3.65f, 2.43f),
@@ -519,7 +437,7 @@ public static class StatCalculator
         {
             var enchant = (int)weapon.Enchant;
             if (enchant >= 100)
-                enchant -= 100; // report: "IS(>=100 -> -100)" for weapon (differs from the amulet's ">100")
+                enchant -= 100; // weapon uses >=100 (differs from the amulet's >100)
             total += enchant * 1200;
         }
 
@@ -536,7 +454,7 @@ public static class StatCalculator
         }
         else
         {
-            // Only ReturnIUEffectValue effect-sort 1 is faithfully reproducible (report §10.1) -- see class remarks.
+            // Only ReturnIUEffectValue effect-sort 1 is faithfully reproducible -- see class remarks.
             var effect = WeaponAttackEffectValue(item);
             var e = effect * weapon.Combine;
             total += e;
@@ -548,10 +466,7 @@ public static class StatCalculator
         return total;
     }
 
-    /// <summary>
-    ///     ReturnIUEffectValue, effect-sort 1 (weapon attack), report §2: only fully-transcribed case. Uses the
-    ///     WEAPON ITEM's own Level column (its intrinsic power tier), not the character's level.
-    /// </summary>
+    /// <summary>ReturnIUEffectValue, effect-sort 1 (weapon attack): uses the weapon item's own Level column, not the character's level.</summary>
     private static int WeaponAttackEffectValue(ItemRowDto weapon)
     {
         if (weapon.Sort != 4 && weapon.Sort is < 13 or > 21) return 0;
@@ -569,13 +484,13 @@ public static class StatCalculator
 
     private static int ComputeDeco2AttackPowerBonus(EquippedItemSlot deco2)
     {
-        if (deco2.Item.Sort == 2) return 0; // ReturnNewStat unread -- lacuna, report §10.4
+        if (deco2.Item.Sort == 2) return 0; // ReturnNewStat unread
         var isWing =
             deco2.Item.ItemId is 213 or 214 or 215 or 217 or 218 or 2303 or 2304 or 2305; // NOT 216, unlike DEF/EATK
         return (int)(deco2.Enchant * (isWing ? 23.4f : 11.7f));
     }
 
-    // ---- report §5.4: GetBaseDefensePower ----
+    // ---- GetBaseDefensePower ----
 
     private static int ComputeDefensePower(int wisdom, LevelRowDto levelRow, int setNumber, EquippedItemSlot?[] bySlot)
     {
@@ -586,7 +501,7 @@ public static class StatCalculator
         {
             if (bySlot[i] is not { } slot) continue;
             def += slot.Item.DefensePower;
-            if (i != 8) // EPET: report §7.3 "appliqué à chaque slot ≠ EPET" -- coefSet multiplier skipped, flat += above still applies
+            if (i != 8) // EPET: coefSet multiplier skipped, flat += above still applies
                 def += (int)(slot.Item.DefensePower *
                              SetBonusTables.GetCoefficients(setNumber, i, IsLegendary(slot.Item)).DefensePower);
         }
@@ -601,7 +516,7 @@ public static class StatCalculator
 
         if (bySlot[8] is { } petAmulet)
         {
-            def -= petAmulet.Item.DefensePower; // Phoenix REPLACES the item's own DefensePower stat
+            def -= petAmulet.Item.DefensePower; // Phoenix replaces the item's own DefensePower stat
             def += PhoenixFlatBonus(petAmulet.Item.ItemId, 5000, 7500, 12500);
         }
 
@@ -610,8 +525,7 @@ public static class StatCalculator
         if (bySlot[1] is { } capeSlot)
             def += capeSlot.Item.ItemId switch { 1404 => 2200, 1401 => 650, _ => 0 };
 
-        // "Phoenix final" -- report §5.4 lists a SECOND, separate Phoenix add for DEF on top of the replace
-        // above; preserved verbatim rather than de-duplicated (D8 iso-behavior policy).
+        // The legacy has a second, separate Phoenix DEF add on top of the replace above -- preserved verbatim.
         if (bySlot[8] is { } petAmuletFinal)
             def += PhoenixFlatBonus(petAmuletFinal.Item.ItemId, 2000, 4500, 9500);
 
@@ -667,12 +581,12 @@ public static class StatCalculator
 
     private static int ComputeDeco2DefensePowerBonus(EquippedItemSlot deco2)
     {
-        if (deco2.Item.Sort == 2) return 0; // ReturnNewStat unread -- lacuna
+        if (deco2.Item.Sort == 2) return 0; // ReturnNewStat unread
         var isSpecial = deco2.Item.ItemId is 204 or 205 or 206 or 216 or 217 or 218 or 2303 or 2304 or 2305;
         return (int)(deco2.Enchant * (isSpecial ? 48.75f : 24.35f));
     }
 
-    // ---- report §5.5: GetBaseAttackSuccess (HIT) ----
+    // ---- GetBaseAttackSuccess (HIT) ----
 
     private static int ComputeAttackSuccess(int strength, LevelRowDto levelRow, int setNumber,
         EquippedItemSlot?[] bySlot)
@@ -684,7 +598,7 @@ public static class StatCalculator
         {
             if (bySlot[i] is not { } slot) continue;
             hit += slot.Item.AttackSuccess;
-            if (i != 8) // EPET: report §7.3 -- flat contribution above always counts, coefSet term skips slot 8
+            if (i != 8) // EPET: flat contribution above always counts, coefSet term skips slot 8
                 hit += (int)(slot.Item.AttackSuccess *
                              SetBonusTables.GetCoefficients(setNumber, i, IsLegendary(slot.Item)).AttackSuccess);
         }
@@ -712,8 +626,7 @@ public static class StatCalculator
         {
             total += SetBonusTables.LinearByCombine(gloves.Combine, 200);
             var enchant = gloves.Enchant;
-            // Report doesn't restate the 0<IS<=50 clamp for this specific "combo" term; assumed shared with
-            // every other set2 IS-combo term in the file (documented assumption, not an independent source).
+            // 0<IS<=50 clamp assumed shared with every other set2 IS-combo term in this file.
             if (enchant is > 0 and <= 50)
                 total += (int)(item.AttackSuccess * enchant * 0.03f);
         }
@@ -728,7 +641,7 @@ public static class StatCalculator
             : 0;
     }
 
-    // ---- report §5.5: GetBaseAttackBlock (DODGE) ----
+    // ---- GetBaseAttackBlock (DODGE) ----
 
     private static int ComputeAttackBlock(int wisdom, int vitality, LevelRowDto levelRow, int setNumber,
         EquippedItemSlot?[] bySlot)
@@ -747,7 +660,7 @@ public static class StatCalculator
 
         dodge += ComputeArmorAttackBlockBonus(bySlot[2]);
         dodge += ComputeBootsAttackBlockBonus(bySlot[5]);
-        // Deco 9-12 sort2: ReturnNewStat(6) unread -- lacuna, contributes 0 beyond the generic Σ loop above.
+        // Deco 9-12 sort2: ReturnNewStat(6) unread, contributes 0 beyond the generic loop above.
 
         return dodge;
     }
@@ -783,7 +696,7 @@ public static class StatCalculator
         return total;
     }
 
-    // ---- report §5.5: GetBaseCritical ----
+    // ---- GetBaseCritical ----
 
     private static int ComputeCritical(int setNumber, EquippedItemSlot?[] bySlot)
     {
@@ -797,7 +710,7 @@ public static class StatCalculator
                               SetBonusTables.GetCoefficients(setNumber, i, IsLegendary(slot.Item)).Critical);
         }
 
-        if (bySlot[4] is { } ring && !IsLegendary(ring.Item)) // "anneau (slot4)" per report -- literal index
+        if (bySlot[4] is { } ring && !IsLegendary(ring.Item)) // ring, slot 4 -- literal index
             crit += ring.Enchant / 4;
 
         crit += SetBonusTables.GetBaseCriticalFlatBonus(setNumber); // set 103 -> +1
@@ -808,7 +721,7 @@ public static class StatCalculator
         return crit;
     }
 
-    // ---- report §5.5: GetBaseCriticalDefence ----
+    // ---- GetBaseCriticalDefence ----
 
     private static int ComputeCriticalDefence(int setNumber, int rebirthCount, int halo, EquippedItemSlot?[] bySlot)
     {
@@ -837,7 +750,7 @@ public static class StatCalculator
         return critDef;
     }
 
-    // ---- report §5.5: GetBaseLuck ----
+    // ---- GetBaseLuck ----
 
     private static int ComputeLuck(int setNumber, EquippedItemSlot?[] bySlot)
     {
@@ -860,7 +773,7 @@ public static class StatCalculator
         return luck;
     }
 
-    // ---- report §5.5: GetBaseElementAttackPower ----
+    // ---- GetBaseElementAttackPower ----
 
     private static int ComputeElementAttackPower(LevelRowDto levelRow, int setNumber, EquippedItemSlot?[] bySlot)
     {
@@ -881,7 +794,7 @@ public static class StatCalculator
             {
                 var enchant = (int)ring4.Enchant;
                 if (enchant > 100)
-                    enchant -= 100; // report: ">100" here, unlike weapon/armor's ">=100" -- preserved verbatim
+                    enchant -= 100; // >100 here, unlike weapon/armor's >=100 -- preserved verbatim
                 eatk += enchant * 200;
             }
 
@@ -900,7 +813,7 @@ public static class StatCalculator
         return eatk;
     }
 
-    // ---- report §5.5: GetBaseElementDefensePower ----
+    // ---- GetBaseElementDefensePower ----
 
     private static int ComputeElementDefensePower(int setNumber, EquippedItemSlot?[] bySlot)
     {
@@ -926,13 +839,12 @@ public static class StatCalculator
 
         if (bySlot[10] is { } deco2 && deco2.Item.Sort != 2)
         {
-            // Report doesn't restate the wing-ID list for EDEF specifically -- assumed shared with EATK's
-            // (documented assumption, report §5.5 only says "3.9/7.8×IS" without repeating the IDs).
+            // Wing-ID list assumed shared with EATK's (not independently confirmed for EDEF).
             var isWing = deco2.Item.ItemId is 210 or 211 or 212 or 216 or 217 or 218 or 2303 or 2304 or 2305;
             edef += (int)(deco2.Enchant * (isWing ? 7.8f : 3.9f));
         }
 
-        // No LevelFactor for EDEF -- report §5.5 explicitly notes "pas de LevelFactor".
+        // No LevelFactor for EDEF, unlike EATK.
         return edef;
     }
 
@@ -940,7 +852,7 @@ public static class StatCalculator
 
     private static int RebirthCriticalWrapperBonus(int rebirthCount)
     {
-        // report §6 GetCritical: 1-6 -> +n; 7-11 -> +(n-6); 12 -> +8 (a jump, not a continuation of the pattern).
+        // 1-6 -> +n; 7-11 -> +(n-6); 12 -> +8 (a jump, not a continuation of the pattern).
         return rebirthCount switch
         {
             <= 0 => 0,
@@ -978,10 +890,8 @@ public static class StatCalculator
     }
 
     /// <summary>
-    ///     report §0/§2: MAX_LIMIT_LEVEL_NUM=145 + MAX_LIMIT_HIGH_LEVEL_NUM=12 clamps levels 146-157 DOWN to
-    ///     the level-145 row for the level-factor lookup, but any level outside [1,157] entirely is a
-    ///     zero-factor contribution -- NOT a further clamp to 145. (A prior pass here clamped every level
-    ///     &gt;145 to 145 unconditionally, silently applying the level-145 row to levels &gt;157 too.)
+    ///     Levels 146-157 clamp down to the level-145 row; any level outside [1,157] is a zero-factor
+    ///     contribution instead -- not a further clamp to 145.
     /// </summary>
     private static LevelRowDto GetLevelRow(FrozenDictionary<short, LevelRowDto> levels, short level)
     {
@@ -990,13 +900,12 @@ public static class StatCalculator
         return levels.TryGetValue(clamped, out var row) ? row : ZeroLevelRow;
     }
 
-    /// <summary>report §6: <c>v = (int)(v × (buff% + 100) × 0.01)</c>; a null/zero buff percent is a no-op.</summary>
     private static int ApplyBuffPercent(int value, int? buffPercent)
     {
         return buffPercent is not { } pct || pct == 0 ? value : (int)(value * (pct + 100) * 0.01f);
     }
 
-    /// <summary>Reads BUFF_INFO's flattened <c>aBuff[slotIndex][0]</c> (the percentage half of the pair).</summary>
+    /// <summary>Reads BUFF_INFO's flattened aBuff[slotIndex][0] (the percentage half of the pair).</summary>
     private static int? GetBuffPercent(BuffInfo? buffs, int slotIndex)
     {
         if (buffs is not { } b) return null;

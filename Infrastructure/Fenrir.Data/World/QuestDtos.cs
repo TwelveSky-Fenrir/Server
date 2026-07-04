@@ -2,11 +2,7 @@ using CaeriusNet.Attributes.Dto;
 
 namespace Fenrir.Data.World;
 
-/// <summary>
-///     One world.Quests row -- ordinal contract of world.usp_Quest_GetAll's single result set (688 rows,
-///     the legacy QUEST_INFO catalog). Constructor order must track the SELECT column order exactly
-///     (invariant I-04); [GenerateDto] maps by position, not by name.
-/// </summary>
+// world.usp_Quest_GetAll; ordinal-mapped, ctor order must match the SELECT.
 [GenerateDto]
 public sealed partial record QuestRowDto(
     int QuestId,
@@ -33,11 +29,7 @@ public sealed partial record QuestRowDto(
     int? Solution4,
     int? NextIndex);
 
-/// <summary>
-///     One populated world.QuestRewards slot -- world.usp_QuestReward_GetAll (SlotIndex 0-2). ItemId is set
-///     for RewardType 6 (item reward) only; Amount for RewardType 2-5 (scalar reward) only -- the table's
-///     CK_QuestRewards_ItemXorAmount check enforces the exclusivity.
-/// </summary>
+/// <summary>world.usp_QuestReward_GetAll (SlotIndex 0-2); ItemId set only for RewardType 6, Amount only for 2-5 (CK_QuestRewards_ItemXorAmount enforces this).</summary>
 [GenerateDto]
 public sealed partial record QuestRewardRowDto(
     int QuestId,

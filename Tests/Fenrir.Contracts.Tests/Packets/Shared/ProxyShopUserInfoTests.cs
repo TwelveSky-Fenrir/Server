@@ -5,12 +5,7 @@ using Fenrir.Contracts.Tests.TestSupport;
 
 namespace Fenrir.Contracts.Tests.Packets.Shared;
 
-/// <summary>
-///     PROXY_SHOP_USER_INFO (824 bytes, STRUCT.h:1752-1760) — first real consumer of the generator's
-///     nested-struct-array shape (<c>ProxyShopItem[25]</c>). The golden encoder below is hand-built from the
-///     C++ layout (name 0..12, natural padding 13..15, 25×20-byte items at 16, 75 socket ints at 516,
-///     money at 816, big-money at 820), independent of the generated <c>Write</c>.
-/// </summary>
+// Golden encoder is hand-built from the C++ PROXY_SHOP_USER_INFO layout, independent of the generated Write.
 public class ProxyShopUserInfoTests
 {
     [Fact]

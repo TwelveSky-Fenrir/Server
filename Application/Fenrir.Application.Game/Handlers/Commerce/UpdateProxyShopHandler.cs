@@ -13,18 +13,14 @@ using Microsoft.Extensions.Logging;
 namespace Fenrir.Application.Game.Handlers.Commerce;
 
 /// <summary>
-///     CZ_SET_DEPUTY_PSHOP_SEND (opcode 109, contracts/04_commerce.md, verified <c>S07_MyGame09.cpp:557-884</c>).
-///     <c>BuySort</c> 1 = RETRIEVE an unsold item from the CALLER'S OWN closed shop back to their own
-///     inventory; <c>BuySort</c> 2 = PURCHASE from ANOTHER character's OPEN shop (<c>AvatarName</c>
-///     resolves the seller). Only the buyer/retriever is ever a live participant -- the seller's shop
-///     money/items live purely in SQL (game.OfflineShops), so no dual-lock is needed here (unlike
-///     <c>BuyShopItemHandler</c>'s live-PShop twin).
+///     CZ_SET_DEPUTY_PSHOP_SEND (opcode 109). <c>BuySort</c> 1 = RETRIEVE an unsold item from the caller's
+///     own closed shop back to inventory; <c>BuySort</c> 2 = PURCHASE from another character's open shop.
+///     Only the buyer/retriever is ever a live participant -- the seller's shop lives purely in SQL, so no
+///     dual-lock is needed here (unlike <c>BuyShopItemHandler</c>'s live-PShop twin).
 /// </summary>
 /// <remarks>
-///     SCOPE SIMPLIFICATION: the legacy's result-code taxonomy for this action is large
-///     (100/101/102/1/2/4/5/1000...) -- collapsed here to 0 (success) / 1 (mismatch or unknown shop) / 2
-///     (insufficient funds or a cap); every failure still cleanly replies except genuinely
-///     malformed/out-of-range wire fields.
+///     The legacy's larger result-code taxonomy is collapsed here to 0 (success) / 1 (mismatch or unknown
+///     shop) / 2 (insufficient funds or a cap).
 /// </remarks>
 public sealed class UpdateProxyShopHandler(
     IOfflineShopRepository offlineShops,
@@ -146,9 +142,8 @@ public sealed class UpdateProxyShopHandler(
             return;
         }
 
-        // Buying from ONE'S OWN open shop would return the item to live inventory while ShopState stays
-        // OPEN, bypassing RETRIEVE's "must be closed" gate and refunding the price into the shop's own
-        // earnings. No legacy evidence either way; rejected as the safe, conservative choice.
+        // Buying from one's own open shop would bypass RETRIEVE's "must be closed" gate and refund the
+        // price into the shop's own earnings -- rejected as the safe, conservative choice.
         if (sellerId.Value == characterId)
         {
             zoneSession.Abort(DisconnectReason.Faulted);

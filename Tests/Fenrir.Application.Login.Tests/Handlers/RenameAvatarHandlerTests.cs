@@ -5,10 +5,8 @@ using Fenrir.Network.Sessions;
 
 namespace Fenrir.Application.Login.Tests.Handlers;
 
-/// <summary>
-///     op19 CL_CHANGE_AVATAR_NAME_SEND — character rename (login protocol report §4.19). Legacy result codes
-///     (0/2/101/102) are forwarded verbatim from game.usp_Character_Rename; structural bounds violations Quit().
-/// </summary>
+// op19 CL_CHANGE_AVATAR_NAME_SEND -- legacy result codes (0/2/101/102) are forwarded verbatim from
+// game.usp_Character_Rename; structural bounds violations Quit().
 public class ClChangeAvatarNameSendHandlerTests
 {
     private const int AccountId = 42;

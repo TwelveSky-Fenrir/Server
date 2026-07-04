@@ -3,11 +3,7 @@ using Fenrir.Contracts.Wire;
 
 namespace Fenrir.Network.RateLimiting;
 
-/// <summary>
-///     Hand-tuned per-opcode-class token-bucket config (architecture reference §8.5), adapted to the legacy opcode
-///     set actually shipped in M1 — no Chat class yet. Deliberately NOT source-generated: these are operational
-///     knobs a server operator retunes independently of the wire-format generator (Phase 2's <c>OpcodeRegistry</c>).
-/// </summary>
+// Hand-tuned per-opcode-class budgets (§8.5); not source-generated since operators retune these independently of OpcodeRegistry.
 public static class OpcodeRateLimiterPolicy
 {
     /// <summary>Login/character-creation gate — expensive downstream (DB hit, session promotion), so the strictest budget.</summary>
@@ -19,21 +15,10 @@ public static class OpcodeRateLimiterPolicy
     /// <summary>One expected every few seconds by design; a flood is either a broken or a hostile client.</summary>
     private static readonly (int Capacity, double TokensPerSecond) Heartbeat = (2, 1d / 5d);
 
-    /// <summary>
-    ///     Everything else declared for M1 (e.g. <see cref="Opcodes.Login.Incoming.LoginKeepAlive" />,
-    ///     <see cref="Opcodes.Login.Incoming.CreateAvatar" />, <see cref="Opcodes.Login.Incoming.DeleteAvatar" />,
-    ///     <see cref="Opcodes.Login.Incoming.ZoneTransfer" />,
-    ///     <see cref="Opcodes.Zone.Incoming.ZoneReady" />):
-    ///     each fires at most a handful of times per session lifetime, so §8.5's reference burst of 3 is widened to 5
-    ///     here since one bucket now covers several unrelated low-frequency opcodes instead of just one.
-    /// </summary>
+    /// <summary>Everything else in M1: §8.5's reference burst of 3 is widened to 5 since one bucket covers several low-frequency opcodes.</summary>
     private static readonly (int Capacity, double TokensPerSecond) Default = (5, 5d);
 
-    /// <summary>
-    ///     Fails fast at type-load rather than lazily on whichever opcode a live client happens to hit first:
-    ///     <see cref="TokenBucket" />'s own constructor already validates capacity/rate, so touching every policy
-    ///     once here surfaces a bad hand-edit of the tuples above at process startup instead of mid-session.
-    /// </summary>
+    // Touches every policy at type-load so a bad hand-edited tuple fails at startup, not mid-session.
     static OpcodeRateLimiterPolicy()
     {
         _ = new TokenBucket(Auth.Capacity, Auth.TokensPerSecond);
@@ -42,11 +27,8 @@ public static class OpcodeRateLimiterPolicy
         _ = new TokenBucket(Default.Capacity, Default.TokensPerSecond);
     }
 
-    /// <summary>
-    ///     Never throws for an unrecognized (server, opcode) pair — by the time this is consulted,
-    ///     <c>FrameDecoder</c>/<c>OpcodeRegistry</c> have already rejected any opcode outside the real protocol, so
-    ///     "not in an explicit class" just means "falls back to <see cref="Default" />".
-    /// </summary>
+    // Never throws: an unrecognized (server, opcode) just falls back to Default — FrameDecoder already
+    // rejected anything outside the real protocol.
     public static (int Capacity, double TokensPerSecond) PolicyFor(FenrirServer server, byte opcode)
     {
         return (server, opcode) switch

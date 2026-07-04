@@ -1,15 +1,5 @@
--- database/50_procedures/game/usp_CharacterMentor_Bond.sql
--- Contract: CZ_TEACHER_START_SEND (opcode 62) -- establishes a teacher/student bond atomically on BOTH
--- characters' rows in one transaction (the master's StudentCharacterId AND the student's
--- TeacherCharacterId must never be updated as two independent statements -- a fault between them would
--- leave one side bonded and the other not, an inconsistent pair no read path expects). MentorRegistry
--- has already verified every precondition (levels, tribe, neither side already bonded) before calling
--- this -- this proc is the durable write, not the gate.
--- Params:
---   @MasterCharacterId  INT
---   @StudentCharacterId INT
--- Result set: none.
--- Idempotent: yes -- re-bonding the same pair leaves the same end state.
+-- Both sides update in one transaction: a fault between them must never leave one side bonded, the other not.
+-- Preconditions (levels, tribe, not already bonded) are validated by the caller; this proc is the durable write only.
 CREATE PROCEDURE game.usp_CharacterMentor_Bond @MasterCharacterId  INT,
     @StudentCharacterId INT
 AS

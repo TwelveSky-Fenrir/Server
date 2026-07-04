@@ -9,11 +9,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Fenrir.Generators.Analysis.Scanning;
 
-/// <summary>
-///     Scans properties in source order (not symbol order — source order fixes the binary layout) of a
-///     <c>readonly partial record struct</c> into a <see cref="FieldModel" /> list with cumulative offsets, recursively
-///     resolving nested <c>IFenrirWireType&lt;T&gt;</c> sizes (spec §4).
-/// </summary>
+/// <summary>Scans properties in source order (not symbol order — source order is the binary layout) with cumulative offsets.</summary>
 internal static class FieldScanner
 {
     public static ImmutableArray<FieldModel> Scan(
@@ -296,7 +292,6 @@ internal static class FieldScanner
         return null;
     }
 
-    /// <summary>Self-referential <c>IFenrirWireType&lt;T&gt;</c> check shared by the single-nested and nested-array shapes.</summary>
     private static bool ImplementsWireType(INamedTypeSymbol candidateType)
     {
         return candidateType.AllInterfaces.Any(candidate =>
@@ -305,11 +300,7 @@ internal static class FieldScanner
             SymbolEqualityComparer.Default.Equals(candidate.TypeArguments[0], candidateType));
     }
 
-    /// <summary>
-    ///     Wire size of a nested <c>[FenrirWireType]</c>: prefers <c>expectedSize</c> when set (the spec always requires
-    ///     it), else recomputes recursively from its own fields (<paramref name="visiting" /> guards against cycles, though
-    ///     none exist in the real protocol).
-    /// </summary>
+    /// <summary><paramref name="visiting"/> guards recursive resolution against cycles, though none exist in the real protocol.</summary>
     private static int ResolveNestedSize(INamedTypeSymbol nestedType, Compilation compilation,
         HashSet<INamedTypeSymbol> visiting)
     {

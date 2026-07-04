@@ -12,18 +12,10 @@ using Microsoft.Extensions.Logging;
 namespace Fenrir.Application.Game.Handlers.Commerce;
 
 /// <summary>
-///     CZ_CLAIM_REWARD_ITEM_SEND (opcode 155, contracts/04_commerce.md, verified <c>S04_MyWork02.cpp:15648-15699</c>).
-///     "Already claimed today" is modeled as a date comparison (<see cref="GameDate.Today" /> vs.
-///     game.Characters.RewardClaimDate) rather than the legacy's own per-session <c>uRewardClaimState</c>
-///     flag -- no daily-reset call site for that flag was locatable in the available source. Granted
-///     quantity is always 1 (the legacy's own quantity param is really just a Sort==99 coupon display
-///     flag, not a stack size). Claim-day advance and item grant commit atomically
-///     (<see cref="CharacterRepository.ClaimDailyRewardAsync" />).
+///     CZ_CLAIM_REWARD_ITEM_SEND (opcode 155). "Already claimed today" is modeled as a date comparison
+///     against game.Characters.RewardClaimDate rather than a per-session flag. Granted quantity is always
+///     1 -- the legacy's quantity param is really just a Sort==99 coupon display flag, not a stack size.
 /// </summary>
-/// <remarks>
-///     OPEN ISSUE: the wire's <c>InvenX</c>/<c>InvenY</c> sub-cell position has no Fenrir equivalent (same
-///     gap as <see cref="World.Loot.GroundItemPickupPolicy" />) -- reported as (0, 0) on a successful claim.
-/// </remarks>
 public sealed class ClaimDailyRewardHandler(
     ICharacterRepository characters,
     WorldDataCache worldData,

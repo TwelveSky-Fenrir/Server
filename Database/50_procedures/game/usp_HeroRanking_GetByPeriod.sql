@@ -1,10 +1,5 @@
--- database/50_procedures/game/usp_HeroRanking_GetByPeriod.sql
--- Contract: @PeriodKind (0=Current, 1=Previous) -> RS0 { CharacterId, CharacterName, TribeId, Points,
---           Level, RewardClaimed, Description, RecordedAtUtc }, one row per ranked character, ordered by
---           Points descending (leaderboard order).
--- Read-only, safe to retry. Reads game.vw_HeroRankingCurrent for PeriodKind=0 (already joined to
--- game.Characters for the display name); PeriodKind=1 joins game.HeroRankings directly since the view only
--- covers the current period.
+-- PeriodKind=0 reads game.vw_HeroRankingCurrent (already joined for display name); PeriodKind=1
+-- joins game.HeroRankings directly since the view only covers the current period.
 CREATE PROCEDURE game.usp_HeroRanking_GetByPeriod @PeriodKind TINYINT
 AS
 BEGIN

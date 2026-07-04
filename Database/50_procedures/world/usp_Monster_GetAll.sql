@@ -1,11 +1,3 @@
--- Contract: no parameters -> RS0, one row per world.Monsters row (1139 rows), INNER JOINed against
--- world.MonsterAnimationFrames (a 1:1 extension, always exactly one row per monster -- see that table's
--- comment -- so the join can never drop or duplicate a monster row).
--- Called once at GameServer boot to populate an in-memory cache (e.g. FrozenDictionary<int, Monster>
--- keyed by MonsterId) -- world.* is read-mostly reference data, never queried per-game-tick, so a plain
--- full-table SELECT is correct here, not a per-request lookup proc.
--- Ordered by MonsterId (the legacy mIndex) for deterministic, cache-friendly load order.
--- Idempotent: yes (read-only). Errors: none.
 CREATE PROCEDURE world.usp_Monster_GetAll
     AS
 BEGIN

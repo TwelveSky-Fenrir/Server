@@ -3,11 +3,9 @@ using System.Numerics;
 namespace Fenrir.Application.Game.World.Geometry;
 
 /// <summary>
-///     In-memory collision/height query engine for one zone's <c>.WM</c> mesh, loaded once by
-///     <see cref="ZoneGeometryReader" /> at zone startup (never re-parsed per query) -- the direct C# equivalent
-///     of the legacy <c>WORLD_FOR_GXD</c> class (<c>ts25zone/S09_MyWorld.cpp</c>), ported field-for-field including
-///     its exact float comparisons (no epsilon anywhere in the original, so none is introduced here either -- a
-///     tolerance would change which points are considered walkable at triangle edges).
+///     Collision/height queries for one zone's <c>.WM</c> mesh; port of legacy <c>WORLD_FOR_GXD</c>
+///     (<c>ts25zone/S09_MyWorld.cpp</c>). No epsilon in float comparisons, matching the original --
+///     a tolerance would change which points are walkable at triangle edges.
 /// </summary>
 public sealed class ZoneGeometry(WorldTriangle[] triangles, QuadtreeNode[] quadtree)
 {
@@ -15,12 +13,8 @@ public sealed class ZoneGeometry(WorldTriangle[] triangles, QuadtreeNode[] quadt
     public IReadOnlyList<QuadtreeNode> Quadtree => quadtree;
 
     /// <summary>
-    ///     Ground height at (x, z), narrowed via the quadtree to the handful of candidate triangles instead of a
-    ///     linear scan (legacy <c>GetYCoord</c>). Ports the same defaults: triangles whose plane is near-vertical
-    ///     (<c>checkTwoSide: false</c> skips downward/vertical-facing ones) are ignored, candidates above
-    ///     <paramref name="ceiling" /> (defaulting to the zone's overall box ceiling) are rejected, and when several
-    ///     candidates remain the highest wins -- this is what makes multi-level platforms/bridges resolve to the
-    ///     surface actually underfoot rather than whatever the terrain below it would otherwise report.
+    ///     Ground height at (x, z) via quadtree descent (legacy <c>GetYCoord</c>). Among candidates under
+    ///     <paramref name="ceiling" />, the highest wins, so multi-level platforms resolve to the surface underfoot.
     /// </summary>
     public bool TryGetGroundHeight(float x, float z, out float y, float? ceiling = null, bool checkTwoSide = false,
         bool firstHitOnly = false)
@@ -63,10 +57,7 @@ public sealed class ZoneGeometry(WorldTriangle[] triangles, QuadtreeNode[] quadt
     }
 
     /// <summary>
-    ///     Ground-plane walkability at (x, z) -- Y is deliberately not a parameter: the legacy
-    ///     <c>CheckPointInWorldWithoutYCoord</c> takes a 3-float point but never reads its Y component (both the
-    ///     quadtree descent and the leaf triangle test are XZ-projected), so this port drops the unused parameter
-    ///     rather than carrying it along for appearances.
+    ///     Walkability at (x, z); no Y parameter since legacy <c>CheckPointInWorldWithoutYCoord</c> never reads it either.
     /// </summary>
     public bool IsWalkable(float x, float z)
     {
@@ -102,7 +93,7 @@ public sealed class ZoneGeometry(WorldTriangle[] triangles, QuadtreeNode[] quadt
 
     private static bool TryGetHeightFromPlane(in WorldTriangle triangle, float x, float z, out float y)
     {
-        // Plane equation A*x + B*y + C*z = D solved for y; B == 0 is a vertical (wall) triangle, no Y to solve for.
+        // B == 0 -> vertical (wall) triangle, no Y to solve for.
         if (triangle.PlaneInfo.Y == 0f)
         {
             y = 0f;

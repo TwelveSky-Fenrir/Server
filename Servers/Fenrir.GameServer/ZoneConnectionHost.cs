@@ -13,13 +13,7 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.GameServer;
 
-/// <summary>
-///     Owns the zone listen socket for the process lifetime — the GameServer-side twin of
-///     <c>Fenrir.LoginServer.LoginConnectionHost</c> (Phase 5). Binds <see cref="FenrirTcpListener" /> to
-///     <see cref="GameServerOptions.Port" />, greets each accepted connection (<c>ZC_CONNECT_OK_RECV</c>, wire
-///     contract §5.1) and seeds the inbound stream cipher (§3.4) before the connection's I/O pump and
-///     <see cref="Fenrir.Network.Dispatching.SessionLoop" /> start.
-/// </summary>
+/// <summary>Owns the zone listen socket; the GameServer-side twin of <c>Fenrir.LoginServer.LoginConnectionHost</c>.</summary>
 public sealed class ZoneConnectionHost(
     IOptions<GameServerOptions> options,
     ZoneRegistry zones,
@@ -48,7 +42,6 @@ public sealed class ZoneConnectionHost(
         }
         catch (OperationCanceledException)
         {
-            // Normal shutdown path.
         }
     }
 
@@ -72,22 +65,17 @@ public sealed class ZoneConnectionHost(
         }
         finally
         {
-            // A session that never completed world registration has no CurrentZone (and possibly no
-            // CharacterId) -- nothing to remove, nothing to flush. The session's own zone reference is the
-            // authoritative "where does this character live" (kept fresh across handoffs, ADR-0012).
+            // A session that never completed world registration has no CurrentZone -- nothing to remove, nothing to flush.
             if (zoneSession is { CharacterId: { } characterId, CurrentZone: Zone zone })
             {
-                // The connection is being torn down either way, so a dropped Leave (full inbox) cannot be
-                // retried here -- but it WOULD otherwise leave the character as a permanent phantom in the
-                // zone's _players (never removed from the AOI grid, still counted by CCU/write-behind), so
-                // this is logged loudly rather than silently discarded.
+                // A dropped Leave (full inbox) can't be retried here, and would otherwise leave a permanent phantom
+                // in the zone's player list -- log loudly rather than silently discard.
                 if (!zone.Post(ZoneCommand.Leave(characterId)))
                     logger.LogError(
                         "Zone {MapId} inbox full: dropped Leave for character {CharacterId} on disconnect -- character remains a phantom in the zone until its next Move/handoff",
                         zone.MapId, characterId);
 
-                // Targeted, immediate flush on disconnect (architecture reference §10.5) -- the periodic
-                // 5 s/512-entity flush would otherwise leave up to ~5 s of this player's last position unpersisted.
+                // Immediate flush: the periodic 5 s/512-entity flush would otherwise leave this player's last position unpersisted.
                 writeBehindFlusher.RequestImmediateFlush();
             }
 
@@ -97,11 +85,7 @@ public sealed class ZoneConnectionHost(
         }
     }
 
-    /// <summary>
-    ///     Op 0 greeting: unlike Login's op 0, <c>ZC_CONNECT_OK_RECV</c> carries NO packet-level XOR (wire
-    ///     contract §3.6: "aucune (clair) ; porte la graine flux") — only the stream cipher it seeds is XORed
-    ///     obfuscation, and only on the way IN. Seeded BEFORE the I/O pump starts, same ordering reason as Login.
-    /// </summary>
+    /// <summary>Unlike Login's op 0, <c>ZC_CONNECT_OK_RECV</c> carries no packet-level XOR, only the stream cipher it seeds.</summary>
     private static void Greet(ZoneClientSession session, SocketConnection connection)
     {
         var randomNumber = RandomNumberGenerator.GetInt32(int.MinValue, int.MaxValue);

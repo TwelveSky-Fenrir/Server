@@ -6,11 +6,7 @@ using CaeriusNet.Commands.Writes;
 
 namespace Fenrir.Data.Runtime;
 
-/// <summary>
-///     Access to runtime.SessionTickets (architecture reference §12.4). Tickets are single-use and keyed on
-///     AccountId, not a generated TicketId (ADR-0005/ADR-0003 A-04): the unmodified legacy client can only prove
-///     its own account identity, so a live ticket for that AccountId is the proof of a prior successful login.
-/// </summary>
+// Tickets are keyed on AccountId, not a generated TicketId -- the unmodified legacy client can only prove its own account identity.
 public sealed record SessionTicketRepository(ICaeriusNetDbContext Db) : ISessionTicketRepository
 {
     // In-memory OLTP table, sub-millisecond procs -- a short timeout fails fast instead of masking a stuck request.
@@ -39,7 +35,6 @@ public sealed record SessionTicketRepository(ICaeriusNetDbContext Db) : ISession
         return Db.FirstQueryAsync<ConsumedTicketDto>(parameters, ct);
     }
 
-    /// <summary>Sweeps every row past ExpiresAtUtc -- no parameters, so no AddParameter call on the builder.</summary>
     public ValueTask PurgeExpiredAsync(CancellationToken ct)
     {
         var parameters =

@@ -5,13 +5,7 @@ using Fenrir.Data.World;
 
 namespace Fenrir.Application.Game.GameData;
 
-/// <summary>
-///     The immutable, whole-world reference-data snapshot loaded once at GameServer boot (ADR-0011: the clean
-///     equivalent of the legacy shared-memory .IMG/.BIN caches). Built exclusively by
-///     <see cref="WorldDataCacheBuilder" />, published by <see cref="WorldDataLoader.InitializeAsync" /> before
-///     the server accepts connections, and never mutated afterwards -- every zone actor and handler reads it
-///     lock-free.
-/// </summary>
+/// <summary>Immutable, whole-world reference-data snapshot loaded once at boot, never mutated afterwards -- every zone actor and handler reads it lock-free.</summary>
 public sealed class WorldDataCache
 {
     /// <summary>Item templates by ItemId, bonus skills re-attached (world.Items + world.ItemBonusSkills).</summary>
@@ -57,15 +51,9 @@ public sealed class WorldDataCache
         init;
     }
 
-    /// <summary>
-    ///     The cash-shop's two derived views (<see cref="CashCatalogBuilder" />), computed ONCE from
-    ///     <see cref="ItemMallProductsById" /> at boot -- see that builder's own remarks.
-    /// </summary>
+    /// <summary>Computed once from <see cref="ItemMallProductsById" /> at boot -- see <see cref="CashCatalogBuilder" />.</summary>
     public required CashCatalogBuilder.CashCatalog CashCatalog { get; init; }
 
-    /// <summary>
-    ///     The cash-shop catalog's version stamp (<see cref="CashCatalogBuilder.ResolveVersion" />) --
-    ///     ZC_GET_CASH_ITEM_INFO_RECV.Version.
-    /// </summary>
+    /// <summary>ZC_GET_CASH_ITEM_INFO_RECV.Version.</summary>
     public required int CashCatalogVersion { get; init; }
 }

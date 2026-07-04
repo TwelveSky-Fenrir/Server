@@ -4,7 +4,7 @@ using Fenrir.Contracts.Tests.TestSupport;
 
 namespace Fenrir.Contracts.Tests.Packets.Shared;
 
-/// <summary>GUILD_KICK_CRECV (13 bytes, STRUCT.h:1158-1161) -- CZ_GUILD_WORK_SEND tSort 8.</summary>
+// CZ_GUILD_WORK_SEND tSort 8.
 public class GuildWorkKickPayloadTests
 {
     [Fact]

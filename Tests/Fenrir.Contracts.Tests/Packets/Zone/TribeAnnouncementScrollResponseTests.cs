@@ -3,10 +3,7 @@ using Fenrir.Contracts.Packets.Zone;
 
 namespace Fenrir.Contracts.Tests.Packets.Zone;
 
-/// <summary>
-///     <see cref="TribeAnnouncementScrollResponse.TribeRole" /> actually carries the sender's tribe NUMBER (not a role)
-///     per the relay trap documented on the contract; the test only exercises the wire shape.
-/// </summary>
+// TribeRole actually carries the sender's tribe NUMBER, not a role.
 public class ZcTribeNotifyRecvTests
 {
     [Fact]

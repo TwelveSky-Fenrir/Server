@@ -1,20 +1,5 @@
--- database/50_procedures/game/usp_GuildMember_Add.sql
--- Contract: enroll one character into a guild (replaces ts25extra's guild-join tSort -- report 06 §3.1).
--- Params:
---   @GuildId     INT
---   @CharacterId INT
---   @Role        TINYINT = 0 -- game.GuildMembers role enum (0 member, 1 sub-master, 2 master);
---                              CK_GuildMembers_Role is the validity backstop
--- Result set: none.
--- Idempotent: no (a repeat call throws 50231 -- the character is then already in a guild).
--- The member-count gate (MAX_GUILD_AVATAR_NUM = 50, the legacy gMember blob's fixed capacity) is read
--- WITH (UPDLOCK, HOLDLOCK) inside the transaction so two concurrent joins into a 49-member guild
--- serialize instead of both passing the count check -- the one place a pre-check cannot be left as a
--- racy courtesy, because no table constraint backstops a per-guild cardinality.
--- Errors:
---   THROW 50235 -- guild not found (admin.ErrorCatalog, 502xx = game range).
---   THROW 50231 -- character already belongs to a guild.
---   THROW 50232 -- guild is full (50 members).
+-- Member-count check runs WITH (UPDLOCK, HOLDLOCK) so concurrent joins into a nearly-full guild
+-- serialize instead of both passing -- no table constraint backstops this 50-member cap.
 CREATE PROCEDURE game.usp_GuildMember_Add @GuildId     INT,
     @CharacterId INT,
     @Role        TINYINT = 0

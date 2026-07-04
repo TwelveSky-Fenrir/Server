@@ -4,12 +4,7 @@ using Fenrir.Contracts.Wire;
 
 namespace Fenrir.Contracts.Packets.Zone;
 
-/// <summary>
-///     ZC_COSTUME_STATE_RECV (ZONE.h:1004-1016) — unicast response to CZ 90, builder
-///     <c>B_COSTUME_STATE_RECV(tValue00..tValue07)</c> (S05_MyTransfer.cpp:1320-1333). BUILD-DEPENDENT
-///     SIZE: the 8th int <see cref="CostumeDate" /> is under <c>USE_ENCHANT_COSTUME</c>, ACTIVE in EU33
-///     → 33 bytes total (29 bytes in builds without that flag — do not omit this field for EU33).
-/// </summary>
+// USE_ENCHANT_COSTUME is active: CostumeDate is present (33-byte payload, not 29).
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.CostumeState, ExpectedSize = 33)]
 public readonly partial record struct CostumeStateResponse : IOutgoingPacket
 {

@@ -7,11 +7,6 @@ using Fenrir.Contracts.Packets.Shared;
 
 namespace Fenrir.Contracts.Tests.Packets.Zone;
 
-/// <summary>
-///     Shared Zone packet test helpers: reflection-based population of wire structs (avoids hand-copying
-///     the ~190 properties of AVATAR_INFO/WORLD_INFO/TRIBE_INFO in every test), deep field-by-field
-///     comparison, and a manual "golden" encoder for ACTION_INFO/OBJECT_FOR_AVATAR independent of the generator.
-/// </summary>
 internal static class WireTestKit
 {
     public static void WriteFixedString(Span<byte> destination, string value)
@@ -20,11 +15,7 @@ internal static class WireTestKit
         Encoding.Latin1.GetBytes(value, destination);
     }
 
-    /// <summary>
-    ///     Manual decoder mirroring <see cref="FixedStringAttribute" />'s contract (null-terminated,
-    ///     Latin1) — used by golden-bytes tests to read back a fixed-width <c>char[N]</c> field from a
-    ///     hand-built buffer without depending on the generated <c>TryRead</c>.
-    /// </summary>
+    // Mirrors FixedStringAttribute's contract: null-terminated Latin1.
     public static string ReadFixedString(ReadOnlySpan<byte> source)
     {
         var nul = source.IndexOf((byte)0);
@@ -112,7 +103,7 @@ internal static class WireTestKit
             return values;
         }
 
-        // Arrays of nested wire structs (FieldShape.NestedArray): populate each element recursively.
+        // FieldShape.NestedArray: recurse per element.
         if (type.IsArray && type.GetElementType() is { IsValueType: true, IsPrimitive: false } structElementType)
         {
             var count = property.GetCustomAttribute<FixedArrayAttribute>()!.ElementCount;
@@ -180,7 +171,7 @@ internal static class WireTestKit
                 case string[] a:
                     Assert.True(a.SequenceEqual((string[])actualValue!), propertyPath);
                     break;
-                // Arrays of nested wire structs (FieldShape.NestedArray): element-wise deep comparison.
+                // FieldShape.NestedArray comparison.
                 case Array a:
                 {
                     var actualArray = (Array)actualValue!;
@@ -203,10 +194,7 @@ internal static class WireTestKit
         }
     }
 
-    /// <summary>
-    ///     Manual encoder for ACTION_INFO (104 bytes, no padding) per wire contract §4.2; independent
-    ///     of <c>ActionInfo.Write</c> so it can serve as a golden reference.
-    /// </summary>
+    // ACTION_INFO: 104 bytes, no padding (wire contract §4.2).
     public static int EncodeActionInfo(Span<byte> destination, ActionInfo action)
     {
         var offset = 0;
@@ -231,10 +219,7 @@ internal static class WireTestKit
         return offset;
     }
 
-    /// <summary>
-    ///     Manual encoder for OBJECT_FOR_AVATAR (632 bytes) per wire contract §5.9/§7.3: 5 padding
-    ///     zones of 3 bytes each (offsets 29, 41, 61, 489, 533); independent of <c>ObjectForAvatar.Write</c>.
-    /// </summary>
+    // OBJECT_FOR_AVATAR: 632 bytes; 3-byte padding at offsets 29,41,61,489,533 (§5.9/§7.3).
     public static int EncodeObjectForAvatar(Span<byte> destination, ObjectForAvatar data)
     {
         var offset = 0;
@@ -298,11 +283,7 @@ internal static class WireTestKit
         return offset;
     }
 
-    /// <summary>
-    ///     Manual encoder for ITEM_LINK_INFO (24 bytes, STRUCT.h:1009-1014) per the chat/notice wire
-    ///     contract (§ Lot 02): Index/Activity/Value/Socket[3], no padding; independent of
-    ///     <c>ItemLinkInfo.Write</c>.
-    /// </summary>
+    // ITEM_LINK_INFO: 24 bytes, no padding (STRUCT.h:1009-1014).
     public static int EncodeItemLinkInfo(Span<byte> destination, ItemLinkInfo link)
     {
         var offset = 0;
@@ -313,11 +294,7 @@ internal static class WireTestKit
         return offset;
     }
 
-    /// <summary>
-    ///     Manual encoder for OBJECT_FOR_MONSTER (112 bytes, STRUCT.h:933-938) per the replication+combat
-    ///     wire contract (§ Lot 01): a leading int, the 104-byte ACTION_INFO block, a trailing int — zero
-    ///     padding (every member already 4-byte aligned); independent of <c>ObjectForMonster.Write</c>.
-    /// </summary>
+    // OBJECT_FOR_MONSTER: 112 bytes, no padding — int, ACTION_INFO, int (STRUCT.h:933-938).
     public static int EncodeObjectForMonster(Span<byte> destination, ObjectForMonster data)
     {
         var offset = 0;
@@ -327,11 +304,7 @@ internal static class WireTestKit
         return offset;
     }
 
-    /// <summary>
-    ///     Manual encoder for OBJECT_FOR_ITEM (84 bytes, STRUCT.h:941-955) per the replication+combat wire
-    ///     contract (§ Lot 01): a 2-byte natural padding zone after <c>PartyName</c> (offset 54) so that
-    ///     <c>DropSort</c> lands on a 4-byte boundary (offset 56); independent of <c>ObjectForItem.Write</c>.
-    /// </summary>
+    // OBJECT_FOR_ITEM: 84 bytes; 2-byte pad after PartyName (offset 54) aligns DropSort to offset 56 (STRUCT.h:941-955).
     public static int EncodeObjectForItem(Span<byte> destination, ObjectForItem data)
     {
         var offset = 0;
@@ -351,11 +324,7 @@ internal static class WireTestKit
         return offset;
     }
 
-    /// <summary>
-    ///     Manual encoder for ATTACK_FOR_PROTOCOL (68 bytes, STRUCT.h:958-978) per the replication+combat
-    ///     wire contract (§ Lot 01): 17 four-byte fields, no padding (the <c>#ifdef GXCW</c> tail member is
-    ///     not compiled in EU33); independent of <c>AttackForProtocol.Write</c>.
-    /// </summary>
+    // ATTACK_FOR_PROTOCOL: 68 bytes, no padding; GXCW-only tail member not compiled in EU33 (STRUCT.h:958-978).
     public static int EncodeAttackForProtocol(Span<byte> destination, AttackForProtocol data)
     {
         var offset = 0;
@@ -377,12 +346,7 @@ internal static class WireTestKit
         return offset;
     }
 
-    /// <summary>
-    ///     Manual encoder for PSHOP_INFO (1232 bytes, STRUCT.h:703-709) per the commerce wire contract
-    ///     (§ Lot 04): a 3-byte natural padding zone after <c>Name</c> (char[25], offset 4..28) so the
-    ///     following <c>int[5][5][9]</c> array lands on a 4-byte boundary (offset 32); independent of
-    ///     <c>PshopInfo.Write</c>.
-    /// </summary>
+    // PSHOP_INFO: 1232 bytes; 3-byte pad after Name (offset 4..28) aligns ItemInfo array to offset 32 (STRUCT.h:703-709).
     public static int EncodePshopInfo(Span<byte> destination, PshopInfo data)
     {
         var offset = 0;
@@ -394,12 +358,7 @@ internal static class WireTestKit
         return offset;
     }
 
-    /// <summary>
-    ///     Manual encoder for the 50-byte real-field portion of PROXY_STATE_INFO (STRUCT.h:1734-1740) per
-    ///     the commerce wire contract (§ Lot 04): Location/Name/PshopName, no internal padding (the C++
-    ///     struct's 2 trailing padding bytes are NOT part of this wire type — see
-    ///     <see cref="ProxyStateInfo" />'s remarks); independent of <c>ProxyStateInfo.Write</c>.
-    /// </summary>
+    // PROXY_STATE_INFO real fields: 50 bytes, no internal padding; struct's 2 trailing pad bytes excluded (STRUCT.h:1734-1740).
     public static int EncodeProxyStateInfo(Span<byte> destination, ProxyStateInfo data)
     {
         var offset = 0;
@@ -409,10 +368,7 @@ internal static class WireTestKit
         return offset;
     }
 
-    /// <summary>
-    ///     Manual encoder for BLOOD_ITEM (12 bytes, STRUCT.h:1423-1428) per the commerce wire contract
-    ///     (§ Lot 04): ItemId/Price/Quantity, no padding; independent of <c>BloodItem.Write</c>.
-    /// </summary>
+    // BLOOD_ITEM: 12 bytes, no padding (STRUCT.h:1423-1428).
     public static int EncodeBloodItem(Span<byte> destination, BloodItem data)
     {
         var offset = 0;
@@ -422,11 +378,7 @@ internal static class WireTestKit
         return offset;
     }
 
-    /// <summary>
-    ///     Manual encoder for BLOOD_SHOP (604 bytes, STRUCT.h:1429-1433) per the commerce wire contract
-    ///     (§ Lot 04): BloodNum followed by 50 nested <see cref="BloodItem" /> slots, no padding;
-    ///     independent of <c>BloodShop.Write</c>.
-    /// </summary>
+    // BLOOD_SHOP: 604 bytes, no padding — BloodNum + 50 BloodItem slots (STRUCT.h:1429-1433).
     public static int EncodeBloodShop(Span<byte> destination, BloodShop data)
     {
         var offset = 0;
@@ -436,11 +388,7 @@ internal static class WireTestKit
         return offset;
     }
 
-    /// <summary>
-    ///     Manual encoder for PROXY_SHOP_ITEM (20 bytes, STRUCT.h:1742-1749) per the commerce wire
-    ///     contract (§ Lot 04): Id/Quantity/Value/Serial/Price, no padding; independent of
-    ///     <c>ProxyShopItem.Write</c>.
-    /// </summary>
+    // PROXY_SHOP_ITEM: 20 bytes, no padding (STRUCT.h:1742-1749).
     public static int EncodeProxyShopItem(Span<byte> destination, ProxyShopItem data)
     {
         var offset = 0;
@@ -452,12 +400,7 @@ internal static class WireTestKit
         return offset;
     }
 
-    /// <summary>
-    ///     Manual encoder for PROXY_SHOP_USER_INFO (824 bytes, STRUCT.h:1752-1760) per the commerce wire
-    ///     contract (§ Lot 04): a 3-byte natural padding zone after <c>AvatarName</c> (offset 13..15)
-    ///     before the 25 nested <see cref="ProxyShopItem" /> slots; independent of
-    ///     <c>ProxyShopUserInfo.Write</c>.
-    /// </summary>
+    // PROXY_SHOP_USER_INFO: 824 bytes; 3-byte pad after AvatarName (offset 13..15) before 25 ProxyShopItem slots (STRUCT.h:1752-1760).
     public static int EncodeProxyShopUserInfo(Span<byte> destination, ProxyShopUserInfo data)
     {
         var offset = 0;

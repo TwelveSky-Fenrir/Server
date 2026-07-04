@@ -3,15 +3,8 @@ using Fenrir.Contracts.Wire;
 
 namespace Fenrir.Network.Framing;
 
-/// <summary>
-///     Lays out one outgoing legacy frame (<c>DEFALUT_PACKET</c>: 1-byte opcode header + payload) and applies
-///     whole-frame obfuscation (§3.1) where the packet declares it. Field-level obfuscation
-///     (<see cref="WireObfuscationMode.XorFieldAvatar" />) and the <c>tID</c> double-XOR
-///     (<c>[ObfuscatedUidField]</c>) are already baked into the generated <c>Write</c> itself — nothing extra to do
-///     here for those. LZ4-compressed packets (<see cref="IOutgoingPacket" /> types with <c>Compressed = true</c>
-///     on their <c>[FenrirPacket]</c>) bypass this entirely: callers send the pre-built ZPACKET-enveloped frame
-///     from the generated <c>{Login|Zone}MessageFactory.Encode</c> via <see cref="Sessions.ClientSession.SendRaw" />.
-/// </summary>
+// 1-byte opcode header + payload, whole-frame obfuscation (§3.1) if declared. Field-level XOR is already
+// baked into the generated Write. Compressed packets bypass this entirely via SendRaw.
 public static class FrameWriter
 {
     public static int FrameSizeOf<TPacket>() where TPacket : struct, IOutgoingPacket

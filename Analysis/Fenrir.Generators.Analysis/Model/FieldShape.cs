@@ -1,6 +1,6 @@
 namespace Fenrir.Generators.Analysis.Model;
 
-/// <summary>Resolved wire shape of a property, derived from its C# type + attributes (spec §1.3).</summary>
+/// <summary>Resolved wire shape of a property, derived from its C# type + attributes.</summary>
 internal enum FieldShape
 {
     Int32,

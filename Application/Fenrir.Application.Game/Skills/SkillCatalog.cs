@@ -4,20 +4,12 @@ using Fenrir.Data.World;
 namespace Fenrir.Application.Game.Skills;
 
 /// <summary>
-///     Pure C# port of <c>SKILLSYSTEM::ReturnSkillValue</c> (verified in full,
-///     <c>Server/ts25zone/GameSystem/GameSystem_03_Skill.cpp:60-196</c>): linear interpolation between a
-///     skill's two <c>world.SkillGrades</c> rows (GradeIndex 0 = min, 1 = max) by the caster's invested grade
-///     points, out of the skill's own <c>MaxUpgradePoint</c> ceiling. No I/O -- every input is already-resolved
-///     <see cref="SkillDefinition" /> data from <see cref="WorldDataCache" />.
+///     Port of SKILLSYSTEM::ReturnSkillValue: linear interpolation between a skill's two SkillGrades rows
+///     (GradeIndex 0 = min, 1 = max) by the caster's invested grade points, out of MaxUpgradePoint.
 /// </summary>
 public static class SkillCatalog
 {
-    /// <summary>
-    ///     <c>gradePoints</c> is the legacy's <c>sPoint</c> -- ALWAYS <c>aSkillGradeNum1 + aSkillGradeNum2</c> at
-    ///     every real call site (report 04/05/12), never one alone. Returns 0 for <c>gradePoints &lt; 1</c> (the
-    ///     source's own guard) and for an unresolvable grade pair (missing catalog data -- a defensive addition:
-    ///     the C++ has no such guard because <c>Search()</c> can only ever return a fully-populated row).
-    /// </summary>
+    /// <summary>gradePoints is always aSkillGradeNum1 + aSkillGradeNum2 at every real call site, never one alone.</summary>
     public static float ReturnSkillValue(SkillDefinition skill, int gradePoints, SkillValueKind kind)
     {
         if (gradePoints < 1)
@@ -28,7 +20,7 @@ public static class SkillCatalog
 
         var maxUpgradePoint = skill.Skill.MaxUpgradePoint;
         if (maxUpgradePoint <= 0)
-            return 0f; // defensive: the C++ divides unconditionally (UB on 0), never observed in real data.
+            return 0f; // defensive: the C++ divides unconditionally here (UB on 0), never observed in real data.
 
         var minValue = ReadField(grade0, kind);
         var maxValue = ReadField(grade1, kind);

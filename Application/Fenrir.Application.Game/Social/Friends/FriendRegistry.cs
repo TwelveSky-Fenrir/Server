@@ -1,9 +1,6 @@
 namespace Fenrir.Application.Game.Social.Friends;
 
-/// <summary>
-///     Soft outcomes of CZ_FRIEND_ASK_SEND -- mirrors ZC_FRIEND_ANSWER_RECV's pre-check codes
-///     (contracts/05_social.md).
-/// </summary>
+/// <summary>Soft outcomes of CZ_FRIEND_ASK_SEND -- mirrors ZC_FRIEND_ANSWER_RECV's pre-check codes.</summary>
 public enum FriendAskOutcome
 {
     Sent,
@@ -12,19 +9,16 @@ public enum FriendAskOutcome
 }
 
 /// <summary>
-///     Process-wide friend-request negotiation authority (CZ_FRIEND_* family). The actual 10-slot friend
-///     list is durable, per-character state (game.CharacterFriends, cached on
-///     <c>PlayerRuntimeState.Friends</c>), mutated directly by <c>FriendAddHandler</c>/
-///     <c>FriendRemoveHandler</c> -- this registry only tracks the ephemeral ask/answer handshake, same
-///     shape as <c>Party.PartyRegistry</c>. Unlike party accept (which joins immediately), a friend
-///     accept only unlocks each side to separately send its own CZ_FRIEND_MAKE_SEND at its own pace --
-///     <see cref="_acceptedFor" /> survives past the answer for that reason, cleared on that character's
-///     own successful add (open issue: "état 3" semantics weren't fully re-derived from source for this
-///     corner).
+///     Process-wide friend-request negotiation authority. The actual 10-slot friend list is durable,
+///     per-character state (game.CharacterFriends, cached on PlayerRuntimeState.Friends), mutated directly
+///     by FriendAddHandler/FriendRemoveHandler -- this registry only tracks the ephemeral ask/answer
+///     handshake. Unlike party accept (which joins immediately), a friend accept only unlocks each side to
+///     separately send its own CZ_FRIEND_MAKE_SEND at its own pace, so <see cref="_acceptedFor" /> survives
+///     past the answer, cleared only on that character's own successful add.
 /// </summary>
 public sealed class FriendRegistry
 {
-    /// <summary>characterId -&gt; the OTHER character it may now add via its own FriendMake (legacy state 3).</summary>
+    /// <summary>characterId -> the other character it may now add via its own FriendMake.</summary>
     private readonly Dictionary<int, int> _acceptedFor = new();
 
     private readonly Lock _lock = new();
@@ -63,10 +57,6 @@ public sealed class FriendRegistry
         }
     }
 
-    /// <summary>
-    ///     CZ_FRIEND_ANSWER_SEND. On accept, BOTH sides become eligible to call their own FriendMake (
-    ///     <see cref="TryConsumeAccepted" />).
-    /// </summary>
     public bool TryAnswer(int targetId, bool accepted, out int askerId)
     {
         lock (_lock)
@@ -87,9 +77,8 @@ public sealed class FriendRegistry
     }
 
     /// <summary>
-    ///     CZ_FRIEND_MAKE_SEND's precondition ("état 3") -- its wire payload carries only a slot INDEX,
-    ///     no name/id, so "other" is whoever <paramref name="characterId" /> most recently accepted (one
-    ///     at a time in this model). Consumed on success.
+    ///     CZ_FRIEND_MAKE_SEND's precondition -- its wire payload carries only a slot index, no name/id, so
+    ///     "other" is whoever characterId most recently accepted (one at a time in this model).
     /// </summary>
     public bool TryConsumeAccepted(int characterId, out int otherId)
     {

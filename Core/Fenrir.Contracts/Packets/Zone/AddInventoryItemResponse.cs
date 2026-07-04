@@ -4,11 +4,6 @@ using Fenrir.Contracts.Wire;
 
 namespace Fenrir.Contracts.Packets.Zone;
 
-/// <summary>
-///     ZC_ADD_USER_INVENTORY_ITEM_RECV (ZONE.h:1326-1338) — generic add of an item to the client
-///     inventory; the builder itself reads <c>wAvatar.aInventory[tPage][tIndex]</c> + sockets +
-///     expiration and sends. Very many emitters (purchases, rewards, transfers); unicast.
-/// </summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.AddInventoryItem,
     ExpectedSize = 49)]
 public readonly partial record struct AddInventoryItemResponse : IOutgoingPacket

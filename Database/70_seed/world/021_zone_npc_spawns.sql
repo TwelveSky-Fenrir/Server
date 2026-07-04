@@ -1,6 +1,5 @@
--- Seeds world.ZoneNpcSpawns from 002.BIN: one row per populated NPC-placement slot (291 of a
--- 11700-slot ceiling across the 117 live zones) -- see 30_tables/world/ZoneNpcSpawns.sql.
--- MUST run after both the world.Zones and world.Npcs seed scripts (FK dependency).
+-- Seeds world.ZoneNpcSpawns from 002.BIN. MUST run after both the world.Zones and world.Npcs seed
+-- scripts (FK dependency).
 IF
 NOT EXISTS (SELECT 1 FROM world.ZoneNpcSpawns)
 BEGIN

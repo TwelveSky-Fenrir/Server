@@ -1,11 +1,6 @@
 namespace Fenrir.Contracts.Wire;
 
-/// <summary>
-///     Byte-exact legacy XOR primitives. §3.1/§3.2/§3.3.
-///     The historical bug generator (<c>GetMyXor</c>) degenerates the key into a CONSTANT
-///     keystream {0x10, 0xFE, 0xFE, ...} — NOT an incrementing sequence with wraparound.
-///     Each primitive resets its own state on every call (matches the original C code).
-/// </summary>
+/// <summary>Byte-exact legacy XOR primitives (§3.1-3.3); the historical <c>GetMyXor</c> bug degenerates the key into a CONSTANT keystream {0x10, 0xFE, 0xFE, ...}, not an incrementing one.</summary>
 public static class WireXor
 {
     private const byte FirstKey = 0x10;
@@ -22,11 +17,7 @@ public static class WireXor
             buffer[i] ^= SteadyKey;
     }
 
-    /// <summary>
-    ///     <c>USE_XOR_UID</c>: computes a C-string length (first null byte, capped at <paramref name="fixedField" />)
-    ///     then applies <see cref="ApplyPacketXor" /> to that prefix only. Involutive but fragile if the
-    ///     length differs between send and receive (§3.3, §11) — legacy behavior reproduced as-is.
-    /// </summary>
+    /// <summary><c>USE_XOR_UID</c>: XORs only the C-string prefix (up to first null); fragile if length differs between send/receive (§3.3) — legacy behavior reproduced as-is.</summary>
     public static void ApplyUidXor(Span<byte> fixedField)
     {
         var length = fixedField.IndexOf((byte)0);
@@ -55,10 +46,7 @@ public static class WireXor
             buffer[i] ^= SteadyKey;
     }
 
-    /// <summary>
-    ///     <c>scopyAvtXorChar</c>: same bounds as <see cref="XorIntArray" />, then the last byte is forced to 0
-    ///     (terminator).
-    /// </summary>
+    /// <summary><c>scopyAvtXorChar</c>: same bounds as <see cref="XorIntArray" />, then forces the last byte to 0.</summary>
     public static void XorChar(Span<byte> buffer)
     {
         if (buffer.Length == 0)
@@ -75,12 +63,7 @@ public static class WireXor
             XorChar(buffer.Slice(offset, rowLength));
     }
 
-    /// <summary>
-    ///     <c>mPacketEncryptionValue</c> (§3.4): constant single-byte XOR applied to every inbound byte at the
-    ///     transport level, upstream of frame parsing. Distinct from <see cref="ApplyPacketXor" />'s degenerate
-    ///     keystream — this one really is <c>byte ^= key</c> uniformly. <paramref name="key" /> == 0 means the
-    ///     stream cipher is not yet seeded (plaintext), matching legacy behavior before the seed is sent.
-    /// </summary>
+    /// <summary><c>mPacketEncryptionValue</c> (§3.4): uniform single-byte XOR, distinct from <see cref="ApplyPacketXor" />'s degenerate keystream; key == 0 means unseeded (plaintext), matching legacy behavior.</summary>
     public static void ApplyStreamXor(Span<byte> buffer, byte key)
     {
         if (key == 0)

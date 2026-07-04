@@ -4,11 +4,7 @@ using Fenrir.Contracts.Wire;
 
 namespace Fenrir.Contracts.Packets.Zone;
 
-/// <summary>
-///     ZC_DESTROY_ITEM_RECV (ZONE.h:991-996) — reply to CZ_DESTROY_ITEM_SEND (89); unicast.
-///     <see cref="Money" /> is the refund (dissolution); <see cref="Value" /> is the emptied slot /
-///     compensation stone.
-/// </summary>
+// Money is the dissolution refund; Value is the emptied slot / compensation stone.
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.DestroyItem, ExpectedSize = 33)]
 public readonly partial record struct DestroyItemResponse : IOutgoingPacket
 {

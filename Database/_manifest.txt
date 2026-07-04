@@ -62,11 +62,8 @@
 30_tables/game/AccountVault.sql
 30_tables/game/AccountVaultItems.sql
 
-30_tables/game/Characters_progression.sql
 30_tables/game/CharacterItems.sql
 
-30_tables/game/Characters_social.sql
-30_tables/game/GuildMembers_callname.sql
 30_tables/game/CharacterFriends.sql
 30_tables/game/CharacterSkills.sql
 30_tables/game/CharacterQuests.sql
@@ -74,12 +71,6 @@
 30_tables/game/CharacterBuffs.sql
 30_tables/game/AccountCash.sql
 30_tables/game/CashLog.sql
-
-30_tables/game/Characters_commerce.sql
-
-30_tables/game/Characters_v9_progression.sql
-
-30_tables/game/Characters_v9_teacherpoint.sql
 
 30_tables/admin/Bans.sql
 30_tables/admin/Mutes.sql

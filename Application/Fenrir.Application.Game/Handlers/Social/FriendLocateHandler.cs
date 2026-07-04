@@ -5,13 +5,7 @@ using Fenrir.Network.Sessions;
 
 namespace Fenrir.Application.Game.Handlers.Social;
 
-/// <summary>
-///     CZ_FRIEND_FIND_SEND (opcode 57). Out-of-bounds index ⇒ silent return; an EMPTY slot ⇒ Quit()
-///     (verified, contract's own distinction from the out-of-bounds case). Resolved process-wide (this
-///     IS one of the two directory-backed lookups, alongside whisper -- see
-///     <see cref="World.ZoneRegistry.TryGetPlayerByName" />'s own remarks); <c>ZoneNumber = -1</c> if the
-///     friend is offline OR its tribe no longer matches the caller's own (S04_MyWork02.cpp:9277-9280).
-/// </summary>
+/// <summary>CZ_FRIEND_FIND_SEND (opcode 57) -- friend lookup is process-wide (unlike FriendAsk's own-zone-only search).</summary>
 public sealed class FriendLocateHandler(ZoneRegistry zones) : IInlinePacketHandler<FriendLocateRequest>
 {
     private const int MaxFriends = 10;

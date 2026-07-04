@@ -8,20 +8,13 @@ using Fenrir.Application.Game.World.Monsters;
 namespace Fenrir.Application.Game.Tests.World.Monsters;
 
 /// <summary>
-///     Covers the simplified monster FSM (report 05 §3) end-to-end: spawn-wait, proximity aggro, pursuit,
-///     attack-windup timing, leash, and forced return-to-spawn. <see cref="MonsterSpawnScheduler" /> and
-///     <see cref="MonsterAiSystem" /> run TOGETHER (as they would in production, via <see cref="ZoneRegistry" />)
+///     Covers the monster FSM end-to-end: spawn-wait, proximity aggro, pursuit, attack-windup timing, leash, and
+///     forced return-to-spawn. <see cref="MonsterSpawnScheduler" /> and <see cref="MonsterAiSystem" /> run together
 ///     so these tests exercise the real spawn -&gt; live -&gt; AI pipeline, not a hand-injected monster.
 /// </summary>
 /// <remarks>
-///     A generously large <see cref="GameServerOptions.AoiCellSize" /> is used for every test that needs a
-///     non-zero spawn-region radius: <see cref="Monsters.MonsterSpawnScheduler" /> scatters the monster's
-///     actual home point randomly within that radius (report 05 §1), so with the default 75-unit AOI cell a
-///     large-enough scatter can occasionally push the monster's home into a DIFFERENT AOI cell than a
-///     fixed-position test target, making detection flaky. One huge cell sidesteps that without weakening
-///     anything this suite actually asserts (detection here is deliberately tested via
-///     <c>RadiusInfo1</c>/leash values, not the AOI partitioning itself, which <c>AoiGridTests</c> covers
-///     separately).
+///     A generously large <see cref="GameServerOptions.AoiCellSize" /> avoids spurious detection flakiness: spawn
+///     scatter could otherwise occasionally push a monster's home into a different AOI cell than the test target.
 /// </remarks>
 public class MonsterAiSystemTests
 {
@@ -41,11 +34,7 @@ public class MonsterAiSystemTests
             RadiusInfo2 = radiusInfo2,
             WalkSpeed = walkSpeed,
             RunSpeed = runSpeed,
-            // Proactive aggro is gated to AttackType ∈ {1,3,6} (MonsterAiSystem.TryAcquireTarget's own remarks,
-            // verified against SelectAvatarIndexForPossibleAttack, S07_MyGame05.cpp:123) -- every test in this
-            // suite exercises the detect/chase/attack pipeline, so it defaults to a qualifying type; the
-            // default (0, WorldDataTestRows.Monster's own baseline) would never detect anything -- see
-            // Monster_NonAggressiveAttackType_NeverDetectsEvenAnAdjacentPlayer for the opposite case.
+            // proactive aggro is gated to AttackType in {1,3,6} (SelectAvatarIndexForPossibleAttack, S07_MyGame05.cpp)
             AttackType = attackType
         };
         var region = WorldDataTestRows.SpawnRegion(1, 1, 600) with
@@ -65,7 +54,6 @@ public class MonsterAiSystemTests
     {
         var scheduler = new MonsterSpawnScheduler(cache, static () => new ZeroScatterRandom());
         var ai = new MonsterAiSystem();
-        // See class remarks: one huge AOI cell removes spawn-scatter-vs-AOI-cell flakiness from these tests.
         var options = new GameServerOptions { AoiCellSize = 100_000f };
         return ZoneTestKit.CreateZone(1, options, simulationSystems: [scheduler, ai], worldData: cache);
     }
@@ -105,11 +93,7 @@ public class MonsterAiSystemTests
     [Fact]
     public void Monster_NonAggressiveAttackType_NeverDetectsEvenAnAdjacentPlayer()
     {
-        // SelectAvatarIndexForPossibleAttack (S07_MyGame05.cpp:123): proactive aggro is gated to
-        // mAttackType ∈ {1,3,6} -- a prior pass here had NO such gate at all, so every monster (regardless of
-        // type) hunted any player within its detection radius. AttackType=2 (a real, common value -- e.g. the
-        // Kobold seed data cited in review) must NEVER trigger detection, even for a player standing right on
-        // top of the monster with a huge detection radius.
+        // AttackType=2 (a real, common value) must never trigger detection, even at point-blank range
         var zone = CreateZone(CacheWithOneRegion(1, 1, 1000, 1000,
             10, 1000, 50, 2));
         var (session, _) = ZoneTestKit.CreateSession(1);
@@ -126,11 +110,8 @@ public class MonsterAiSystemTests
     [Fact]
     public void Monster_DetectsNearbyPlayer_ChasesAndEventuallyAttacks()
     {
-        // Detection uses RadiusInfo2 (must comfortably exceed the target's distance, 10, or the monster never
-        // notices it at all); the attack-range transition inside Chase uses RadiusInfo1 (kept small so the
-        // monster actually has to close the gap first, exercising the chase step, not just an instant attack).
-        // regionRadius (=leash) must comfortably exceed the target's distance (10) so the leash never
-        // interrupts the chase before the monster is close enough to attack -- see LeashRadius's own remarks.
+        // detection uses RadiusInfo2; the attack-range transition inside Chase uses RadiusInfo1 (kept small
+        // so the monster must close the gap first); regionRadius (leash) must exceed target distance too
         var zone = CreateZone(CacheWithOneRegion(1, 1, 2, 1000,
             10, 1000, 50));
         var (session, _) = ZoneTestKit.CreateSession(1);
@@ -173,24 +154,19 @@ public class MonsterAiSystemTests
     [Fact]
     public void Monster_ChasingFarBeyondItsLeash_GivesUpAndReturnsHome()
     {
-        // Detection (RadiusInfo2) must reach the far target (distance 500) for the monster to ever start
-        // chasing it in the first place; the small attack-range (RadiusInfo1) is irrelevant here since the
-        // leash (region radius, 50) gives up the chase long before the monster could ever close to it.
+        // detection (RadiusInfo2) must reach the far target (500) so the leash (50) gives up before it ever closes in
         var zone = CreateZone(CacheWithOneRegion(1, 1, 5, 1000,
             10, 1000, 50)); // leash = region radius = 50
         var (session, _) = ZoneTestKit.CreateSession(1);
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1, "FarTarget", 500, posZ: 0)));
 
-        // The spawn scatter (report 05 §1) means "home" is NOT necessarily (0,0,0) -- read it once the
-        // monster exists rather than assuming the region's own nominal location.
+        // spawn scatter means "home" is not necessarily (0,0,0) -- read it once the monster exists
         zone.Tick(SimulationClock.LegacyTick);
         Assert.True(zone.TryGetMonster(1, out var spawned));
         var homeX = spawned!.HomeX;
         var homeZ = spawned.HomeZ;
 
-        // Arrival is an EPSILON check in production (MonsterAiSystem.ArrivalEpsilon = 1f, matching a legitimate
-        // partial final step whose remaining distance rounds to just over/under the step length) -- exact
-        // float equality against home is too strict here and would be flaky by construction.
+        // arrival is an epsilon check in production (MonsterAiSystem.ArrivalEpsilon) -- exact equality would be flaky
         const float arrivalEpsilon = 1f;
 
         var monster = spawned;

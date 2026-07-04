@@ -2,7 +2,6 @@ using System.Collections.ObjectModel;
 
 namespace Fenrir.Data.Tribes;
 
-/// <summary>Abstraction over Fenrir.Data.Tribes.TribeRepository for DI/testability.</summary>
 public interface ITribeRepository
 {
     public ValueTask<byte> GetRoleForCharacterAsync(int characterId, CancellationToken ct);

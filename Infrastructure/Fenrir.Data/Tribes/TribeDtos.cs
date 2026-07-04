@@ -2,7 +2,7 @@ using CaeriusNet.Attributes.Dto;
 
 namespace Fenrir.Data.Tribes;
 
-/// <summary>One tribe's own row (game.usp_Tribe_GetAll) -- ordinal contract (Phase C/V7 Guilds &amp; Tribes).</summary>
+/// <summary>game.usp_Tribe_GetAll.</summary>
 [GenerateDto]
 public sealed partial record TribeSummaryDto(
     byte TribeId,

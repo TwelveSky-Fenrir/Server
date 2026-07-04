@@ -5,11 +5,7 @@ using Fenrir.Generators.Analysis.Support;
 
 namespace Fenrir.Generators.Protocol.Emitters;
 
-/// <summary>
-///     Emits <c>Fenrir.Contracts.Wire.{Login|Zone}MessageFactory</c> (spec §5.6): wraps outgoing
-///     <c>Compressed = true</c> packets (only 2 in the whole M1 protocol) in ZPACKET + LZ4. Only emitted if the
-///     server has at least one compressed packet — no empty class for Login (no compressed packet there yet).
-/// </summary>
+/// <summary>Wraps outgoing <c>Compressed = true</c> packets in ZPACKET + LZ4; not emitted for a server with none (e.g. Login).</summary>
 internal static class MessageFactoryEmitter
 {
     public static string HintNameFor(FenrirServer server)

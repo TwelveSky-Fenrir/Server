@@ -6,13 +6,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Dispatching;
 
-/// <summary>
-///     Bridges <see cref="Fenrir.Network.Dispatching.SessionLoop" /> to the <c>MessageDispatcher</c> generated
-///     from every <c>IInlinePacketHandler{T}</c>/<c>IAsyncPacketHandler{T}</c> declared in this assembly — same
-///     pattern as <c>Fenrir.Application.Login.Dispatching.LoginFrameDispatcher</c> (Phase 5), mirrored here since
-///     each executable's handlers live in a separate compilation (Fenrir.Generators.Dispatch wired as an
-///     analyzer on this project, not on Login's).
-/// </summary>
+/// <summary>Bridges <see cref="Fenrir.Network.Dispatching.SessionLoop" /> to the generated <c>MessageDispatcher</c> for this assembly's packet handlers.</summary>
 public sealed class ZoneFrameDispatcher(ILogger<ZoneFrameDispatcher> logger) : IFrameDispatcher
 {
     public async ValueTask DispatchAsync(FenrirServer server, byte opcode, ReadOnlySequence<byte> payload,

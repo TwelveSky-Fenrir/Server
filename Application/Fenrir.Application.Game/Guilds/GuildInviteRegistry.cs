@@ -1,9 +1,6 @@
 namespace Fenrir.Application.Game.Guilds;
 
-/// <summary>
-///     Soft outcomes of CZ_GUILD_ASK_SEND -- mirrors ZC_GUILD_ANSWER_RECV's pre-check codes
-///     (contracts/06_guild_tribe.md, doc 10 §1).
-/// </summary>
+/// <summary>Soft outcomes of CZ_GUILD_ASK_SEND -- mirrors ZC_GUILD_ANSWER_RECV's pre-check codes.</summary>
 public enum GuildInviteAskOutcome
 {
     Sent,
@@ -11,17 +8,10 @@ public enum GuildInviteAskOutcome
     TargetBusy // code 5
 }
 
-/// <summary>
-///     Process-wide guild-invitation negotiation authority (Phase C/V7 Guilds &amp; Tribes, CZ_GUILD_ASK/
-///     CANCEL/ANSWER family, opcodes 72-74 -- doc 10 §0/§1, verified against
-///     Server/ts25zone/S04_MyWork02.cpp:9827-9967). Mirrors the legacy's <c>mGuildProcessState</c> machine
-///     (1=asker waiting, 2=target waiting to answer, 3=accepted), same shape as
-///     <see cref="Social.Friends.FriendRegistry" />'s negotiation but with <see cref="_acceptedFor" />
-///     surviving past the answer -- see <see cref="TryConsumeAccepted" /> for why.
-/// </summary>
+/// <summary>Process-wide guild-invitation negotiation authority. Mirrors the legacy's <c>mGuildProcessState</c> machine (1=asker waiting, 2=target waiting, 3=accepted), with <see cref="_acceptedFor" /> surviving past the answer.</summary>
 public sealed class GuildInviteRegistry
 {
-    /// <summary>askerId -&gt; the target it may now finalize the join for via GUILD_WORK tSort 3 (legacy state 3).</summary>
+    /// <summary>askerId -&gt; the target it may now finalize the join for (legacy state 3).</summary>
     private readonly Dictionary<int, int> _acceptedFor = new();
 
     private readonly Lock _lock = new();
@@ -33,10 +23,7 @@ public sealed class GuildInviteRegistry
         return _pendingByAsker.ContainsKey(characterId) || _pendingByTarget.ContainsKey(characterId);
     }
 
-    /// <summary>
-    ///     CZ_GUILD_ASK_SEND (opcode 72). Caller has already verified the asker's own role/guild membership and the tribe
-    ///     match.
-    /// </summary>
+    /// <summary>Caller has already verified the asker's own role/guild membership and the tribe match.</summary>
     public GuildInviteAskOutcome TryAsk(int askerId, int targetId)
     {
         lock (_lock)
@@ -52,10 +39,7 @@ public sealed class GuildInviteRegistry
         }
     }
 
-    /// <summary>
-    ///     CZ_GUILD_CANCEL_SEND (opcode 73) -- withdraws the caller's own still-pending ask (legacy: silent no-op if not
-    ///     in state 1).
-    /// </summary>
+    /// <summary>Withdraws the caller's own still-pending ask -- silent no-op if not currently pending.</summary>
     public bool TryCancel(int askerId, out int targetId)
     {
         lock (_lock)
@@ -68,10 +52,7 @@ public sealed class GuildInviteRegistry
         }
     }
 
-    /// <summary>
-    ///     CZ_GUILD_ANSWER_SEND (opcode 74). 0=accept promotes both sides to legacy state 3 (and remembers
-    ///     <paramref name="targetId" />'s acceptance for the ASKER's own later finalize); 1/2=refuse resets both to state 0.
-    /// </summary>
+    /// <summary>Accept promotes both sides to legacy state 3 and remembers the acceptance for the asker's later finalize; refuse resets both to state 0.</summary>
     public bool TryAnswer(int targetId, bool accepted, out int askerId)
     {
         lock (_lock)
@@ -88,13 +69,7 @@ public sealed class GuildInviteRegistry
         }
     }
 
-    /// <summary>
-    ///     GUILD_WORK tSort 3 (invite finalize)'s precondition ("both sides in state 3") -- the ASKER
-    ///     consumes this, not the target (doc 10 §1 tSort 3: "l'inviteur devra envoyer CZ 75 tSort 3"). No
-    ///     name/id travels on that request's payload, so the target is whichever character
-    ///     <paramref name="askerId" /> most recently had an accepted answer with. Cleared on success, so a
-    ///     repeat call with nothing pending correctly fails.
-    /// </summary>
+    /// <summary>The asker consumes this, not the target -- the finalize request's payload carries no name/id, so the target is whoever most recently accepted.</summary>
     public bool TryConsumeAccepted(int askerId, out int targetId)
     {
         lock (_lock)

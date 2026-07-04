@@ -5,13 +5,7 @@ using Fenrir.Contracts.Tests.TestSupport;
 
 namespace Fenrir.Contracts.Tests.Packets.Shared;
 
-/// <summary>
-///     PSHOP_INFO (1232 bytes, STRUCT.h:703-709) — UniqueNumber/Name[25]/(3-byte natural padding)/
-///     ItemInfo[225]/SocketInfo[75]. The golden encoder below is hand-built from the C++ layout
-///     (UniqueNumber 0..3, Name 4..28, padding 29..31, ItemInfo 32..931, SocketInfo 932..1231),
-///     independent of the generated <c>Write</c>, and explicitly asserts the 3 padding bytes after
-///     <c>Name</c> are zero.
-/// </summary>
+// Golden encoder is hand-built from the C++ PSHOP_INFO layout, independent of the generated Write.
 public class PshopInfoTests
 {
     [Fact]

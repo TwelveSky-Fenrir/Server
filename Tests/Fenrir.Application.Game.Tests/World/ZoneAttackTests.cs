@@ -6,11 +6,7 @@ using Fenrir.Contracts.Packets.Shared;
 
 namespace Fenrir.Application.Game.Tests.World;
 
-/// <summary>
-///     Covers <c>Zone.ApplyCombatCommand</c> end-to-end (report 05 §4 mCase 2, "Avatar -&gt; Avatar (difference
-///     clan)"): a raw <see cref="CombatCommand" /> posted exactly like <c>AttackHandler</c> would, resolved on
-///     the zone's own tick, HP mutated, death wired to <see cref="Zone.ApplyDeath" />.
-/// </summary>
+/// <summary>Covers <c>Zone.ApplyCombatCommand</c> end-to-end (mCase 2, Avatar vs. enemy-tribe Avatar): HP mutated on tick, death wired to <see cref="Zone.ApplyDeath" />.</summary>
 public class ZoneAttackTests
 {
     private static readonly EffectiveStats StrongAttacker =
@@ -59,9 +55,7 @@ public class ZoneAttackTests
         attacker!.Stats = StrongAttacker;
         defender!.Stats = WeakDefender;
 
-        // Past both sides' zone-entry protect window (Zone.HandleEnter now stamps ZoneEntryAtZoneClock on
-        // arrival, CombatResolver.ProtectDuration = 10s) -- otherwise every attack below would be rejected as
-        // AttackerProtected/DefenderProtected regardless of what the test is actually trying to exercise.
+        // past both sides' zone-entry protect window, else every attack below is rejected as Attacker/DefenderProtected
         zone.Tick(CombatResolver.ProtectDuration + TimeSpan.FromSeconds(1));
 
         return zone;

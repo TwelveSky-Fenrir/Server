@@ -4,16 +4,12 @@ using Fenrir.Contracts.Wire;
 
 namespace Fenrir.Contracts.Packets.Login;
 
-/// <summary>
-///     CL_LOGIN_MOUSE_PASSWORD_SEND (CLIENT.h l.58-61): mouse-PIN verification for an account that already has
-///     one (login protocol report §4.15). Legal ONLY in <see cref="LoginSessionState.PinRequired" /> — the
-///     legacy handler Quit()s when the session is not validated or when the PIN was already validated.
-/// </summary>
+// Legal only at PinRequired: legacy handler Quit()s if the session is unvalidated or already PIN-verified.
 [FenrirPacket(FenrirServer.Login, FenrirDirection.Incoming, Opcodes.Login.Incoming.VerifyMousePin,
     ExpectedSize = 14, AllowedStates = [(byte)LoginSessionState.PinRequired])]
 public readonly partial record struct VerifyMousePinRequest : IIncomingPacket<VerifyMousePinRequest>
 {
-    /// <summary>The PIN attempt (3 mismatches disconnect, GL_504 in the legacy log, §4.15).</summary>
+    // 3 mismatches disconnect the session instead of replying.
     [FixedString(5)]
     public required string MousePasswordInput { get; init; }
 }

@@ -2,12 +2,7 @@ using CaeriusNet.Attributes.Tvp;
 
 namespace Fenrir.Data.Characters;
 
-/// <summary>
-///     One occupied slot of ONE container for usp_CharacterItems_ReplaceContainer -- mirrors
-///     game.tvp_CharacterItemSlot's column order 1:1 (CharacterId/Container are proc scalars, not TVP columns: the
-///     replace unit is a whole container, the way the legacy saves each avatar item array as a block). Same
-///     [GenerateTvp] streaming rationale as <see cref="CharacterPositionTvp" />.
-/// </summary>
+// Mirrors game.tvp_CharacterItemSlot order; CharacterId/Container are proc scalars, not TVP columns -- replace unit is a whole container (legacy per-array save block).
 [GenerateTvp(Schema = "game", TvpName = "tvp_CharacterItemSlot")]
 public sealed partial record CharacterItemSlotTvp(
     byte Slot,

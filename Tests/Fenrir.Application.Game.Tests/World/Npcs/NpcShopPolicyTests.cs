@@ -39,8 +39,6 @@ public class NpcShopPolicyTests
         return new NpcDefinition(WorldDataTestRows.Npc(npcId) with { Type = npcType }, [], shopItems, [], [], []);
     }
 
-    // ---- Sell ----
-
     [Fact]
     public void Sell_NonStackable_CreditsFlatSellCost_ClearsSlot()
     {
@@ -109,8 +107,6 @@ public class NpcShopPolicyTests
 
         Assert.Equal(NpcShopPolicy.SellOutcome.InvalidQuantity, result.Outcome);
     }
-
-    // ---- Buy ----
 
     [Fact]
     public void Buy_ItemNotInNpcCatalog_IsRejected()

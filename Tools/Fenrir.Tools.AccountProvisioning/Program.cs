@@ -4,8 +4,7 @@ using Fenrir.Data.Accounts;
 using Fenrir.Domain.Security;
 using Microsoft.Extensions.DependencyInjection;
 
-// Seeds a login account. The legacy client (BuildEU33) has no sign-up screen, so this CLI is the only
-// way to provision an account for M1 -- it never embeds a real credential, it only accepts one as an argument.
+// The legacy client (BuildEU33) has no sign-up screen, so this CLI is the only way to provision an account.
 
 if (args.Length != 3 || !string.Equals(args[0], "create", StringComparison.OrdinalIgnoreCase))
 {
@@ -22,10 +21,7 @@ if (string.IsNullOrWhiteSpace(password))
     return 1;
 }
 
-// LoginRequest.Password is [FixedString(33)] on the wire: a null-terminated Latin1 char[33], so the real
-// BuildEU33 client can physically send at most 32 usable characters. Anything longer hashes and stores fine
-// here but produces an account the legacy client can never authenticate -- fail loudly now instead of leaving
-// a silently unusable account to be discovered later at login.
+// LoginRequest.Password is [FixedString(33)] on the wire (null-terminated Latin1 char[33]): 32 usable characters max.
 const int maxPasswordLength = 32;
 if (password.Length > maxPasswordLength)
 {
@@ -63,8 +59,7 @@ try
 }
 catch (Exception ex)
 {
-    // usp_Account_Create raises THROW 50101 (admin.ErrorCatalog, duplicate LoginName) -- report it as a
-    // clear message rather than letting the raw SqlException stack trace reach the operator's console.
+    // usp_Account_Create raises THROW 50101 on duplicate LoginName.
     Console.Error.WriteLine($"Could not create account '{loginName}': {ex.Message}");
     return 1;
 }

@@ -6,25 +6,14 @@ namespace Fenrir.Tools.LegacyDataImport.Legacy.Seeding;
 
 /// <summary>
 ///     Generates the five <c>world.*</c> zone-topology seed scripts (Zones, ZoneNpcSpawns, ZonePortals,
-///     ZoneSpawnPoints, MonsterSpawnRegions) from the raw <c>002.BIN</c>/<c>003.BIN</c>/<c>*.WREGION.csv</c>
-///     legacy data. Normalizes the legacy fixed-size 100-slot arrays down to one row per actually-populated
-///     slot, and restricts everything to the ~117 zone numbers that are "live" in this build (have a matching
-///     <c>DATA/WORLD/Z0NN.WM</c> file) -- see <see cref="Validation.ZoneBinsValidation" /> for the same
-///     live-zone discovery approach (duplicated here rather than reused since that method is private there).
-///     Not wired into <c>Program.cs</c> on purpose (multi-agent edit-conflict avoidance) -- invoked from a
-///     throwaway scratch console project during development instead.
+///     ZoneSpawnPoints, MonsterSpawnRegions) from <c>002.BIN</c>/<c>003.BIN</c>/<c>*.WREGION.csv</c>, restricted
+///     to the ~117 zone numbers "live" in this build (have a matching <c>DATA/WORLD/Z0NN.WM</c> file).
 /// </summary>
 internal static class ZoneSeedGenerator
 {
     private const int ChunkSize = 500; // SQL Server hard cap is 1000 rows/VALUES list; 500 gives headroom.
 
-    /// <summary>
-    ///     Reads <paramref name="dataDir" /> (expects <c>002.BIN</c>/<c>003.BIN</c> directly inside it, a
-    ///     <c>WORLD\</c> subfolder of <c>Z0NN.WM</c> files, and a <c>SUMMON\</c> subfolder of
-    ///     <c>*.WREGION.csv</c> files -- i.e. point it at <c>Server/BuildEU33/DATA</c>) and writes the five
-    ///     seed .sql files into <paramref name="outputDir" /> (created if missing). Returns a human-readable
-    ///     summary (row counts, sparse-array savings) for the caller to print/log.
-    /// </summary>
+    /// <summary>Reads <paramref name="dataDir" /> (Server/BuildEU33/DATA layout) and writes the five seed .sql files into <paramref name="outputDir" />.</summary>
     public static string Generate(string dataDir, string outputDir)
     {
         Directory.CreateDirectory(outputDir);
@@ -41,7 +30,6 @@ internal static class ZoneSeedGenerator
         report.AppendLine("=== ZoneSeedGenerator ===");
         report.AppendLine($"Live zones (have DATA/WORLD/Z0NN.WM): {liveZoneNumbers.Count} / 350 array slots.");
 
-        // ---- world.Zones ------------------------------------------------------------------------------
         var zoneRows = new List<string[]>();
         foreach (var zoneNumber in liveZoneNumbers)
         {
@@ -64,7 +52,6 @@ internal static class ZoneSeedGenerator
             zoneRows);
         report.AppendLine($"world.Zones: {zoneRows.Count} rows (theoretical max 350).");
 
-        // ---- world.ZoneNpcSpawns -----------------------------------------------------------------------
         var npcSpawnRows = new List<string[]>();
         long npcTheoreticalMax = 0;
         foreach (var zoneNumber in liveZoneNumbers)
@@ -101,7 +88,6 @@ internal static class ZoneSeedGenerator
             $"world.ZoneNpcSpawns: {npcSpawnRows.Count} rows (theoretical max {npcTheoreticalMax} = {liveZoneNumbers.Count} live zones * 100 slots; " +
             $"full legacy array would be 350 * 100 = 35000).");
 
-        // ---- world.ZonePortals / world.ZoneSpawnPoints -------------------------------------------------
         var portalRows = new List<string[]>();
         var spawnPointRows = new List<string[]>();
         long portalTheoreticalMax = 0;
@@ -194,14 +180,8 @@ internal static class ZoneSeedGenerator
             $"world.ZoneSpawnPoints: {spawnPointRows.Count} rows (theoretical max {spawnPointTheoreticalMax}; full legacy array 35000). " +
             $"FromZoneNumber nulled for out-of-live-set reference: {spawnPointSourcesOutsideLiveSet}.");
 
-        // ---- world.MonsterSpawnRegions ------------------------------------------------------------------
-        // IMPORTANT DEVIATION (discovered against real data, see final report): of the 132 distinct zone
-        // numbers referenced by *.WREGION.csv file names, 91 (~69%) are NOT in the 117-zone live set (no
-        // DATA/WORLD/Z0NN.WM) -- that is ~49% of all region rows. A strict NOT NULL FK to world.Zones would
-        // reject roughly half the table. Rather than silently dropping that data, ZoneNumber is NULLable
-        // here too (same idiom as ZonePortals.TargetZoneNumber/ZoneSpawnPoints.FromZoneNumber): out-of-live-
-        // set zone numbers are translated to NULL, and SourceFileName (which always embeds the raw "Z0NN"
-        // zone number as text) is the lossless fallback for recovering it if ever needed.
+        // ~49% of *.WREGION.csv region rows reference a non-live zone -- ZoneNumber is nullable (not a
+        // NOT NULL FK) so SourceFileName preserves the raw zone number as a lossless fallback.
         var regionRows = new List<string[]>();
         var regionZonesOutsideLiveSet = 0;
         foreach (var region in spawnRegions)
@@ -256,7 +236,6 @@ internal static class ZoneSeedGenerator
         return report.ToString();
     }
 
-    /// <summary>Sorted 1-based zone numbers that have a corresponding <c>DATA/WORLD/Z0NN.WM</c> file in this build.</summary>
     private static List<int> DiscoverLiveZoneNumbers(string dataDir)
     {
         var worldDir = Path.Combine(dataDir, "WORLD");
@@ -265,7 +244,7 @@ internal static class ZoneSeedGenerator
 
         foreach (var path in Directory.EnumerateFiles(worldDir, "Z*.WM"))
         {
-            var name = Path.GetFileNameWithoutExtension(path); // e.g. "Z001"
+            var name = Path.GetFileNameWithoutExtension(path);
             if (name.Length > 1 && int.TryParse(name.AsSpan(1), out var zoneNumber))
                 zoneNumbers.Add(zoneNumber);
         }

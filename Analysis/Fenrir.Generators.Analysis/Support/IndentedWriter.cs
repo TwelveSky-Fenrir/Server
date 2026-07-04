@@ -2,10 +2,7 @@ using System.Text;
 
 namespace Fenrir.Generators.Analysis.Support;
 
-/// <summary>
-///     Small indented text-source assembler (4 spaces/level) — avoids scattering indentation literals across the
-///     emitters.
-/// </summary>
+/// <summary>Indented text-source assembler (4 spaces/level).</summary>
 internal sealed class IndentedWriter
 {
     private readonly StringBuilder _builder = new();
@@ -34,7 +31,6 @@ internal sealed class IndentedWriter
         Line("}");
     }
 
-    /// <summary>Closes a block initialized as an expression (e.g. <c>new T { ... }</c>): emits <c>};</c>.</summary>
     public void CloseBraceSemicolon()
     {
         _indent--;

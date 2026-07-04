@@ -5,7 +5,7 @@ using Fenrir.Generators.Analysis.Support;
 
 namespace Fenrir.Generators.Protocol.Emitters;
 
-/// <summary>Emits <c>Fenrir.Contracts.Wire.OpcodeRegistry</c> (spec §5.3) from all discovered <c>[FenrirPacket]</c>.</summary>
+/// <summary>Emits <c>Fenrir.Contracts.Wire.OpcodeRegistry</c> from all discovered <c>[FenrirPacket]</c>.</summary>
 internal static class OpcodeRegistryEmitter
 {
     public const string HintName = "OpcodeRegistry.g.cs";

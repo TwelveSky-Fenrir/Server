@@ -1,7 +1,4 @@
--- Documents the THROW codes introduced by the phase C/V8 Player Commerce & Cash procedures (daily reward,
--- blood mark, offline/proxy shop, live PShop purchase, gift-into-vault), per admin.ErrorCatalog's
--- "documentation as data" contract (architecture reference §12.3). New file, not an edit to
--- 002_error_catalog_a3.sql/003_error_catalog_social.sql -- same "never edit an applied script" rule.
+-- New file rather than an edit to an earlier error-catalog script: applied scripts are never edited.
 IF
 NOT EXISTS (SELECT 1 FROM admin.ErrorCatalog WHERE ErrorNumber = 50270)
     INSERT INTO admin.ErrorCatalog (ErrorNumber, SchemaName, Description)

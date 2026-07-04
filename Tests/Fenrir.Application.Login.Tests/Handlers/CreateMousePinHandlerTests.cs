@@ -6,11 +6,8 @@ using Fenrir.Network.Sessions;
 
 namespace Fenrir.Application.Login.Tests.Handlers;
 
-/// <summary>
-///     op13 CL_CREATE_MOUSE_PASSWORD_SEND — first-time PIN creation (login protocol report §4.13).
-///     <see cref="CreateMousePinHandler" /> preconditions all Quit() with no reply in the legacy;
-///     Fenrir maps every one to <see cref="ClientSession.Abort" />.
-/// </summary>
+// op13 CL_CREATE_MOUSE_PASSWORD_SEND -- legacy precondition failures all Quit() with no reply; Fenrir maps
+// every one to ClientSession.Abort.
 public class ClCreateMousePasswordSendHandlerTests
 {
     private const int AccountId = 42;

@@ -8,18 +8,12 @@ using Fenrir.Network.Sessions;
 namespace Fenrir.Application.Game.Handlers.Social;
 
 /// <summary>
-///     CZ_GUILD_ASK_SEND (opcode 72, doc 10 §0/§1, verified S04_MyWork02.cpp:9827-9878). Emitter must
-///     already be in a guild with role 0 (master) or 1 (sub-master, wire encoding --
-///     <see cref="GuildRoleCodec.IsMasterOrSubMaster" />
-///     against the DB-side role) else <c>Quit()</c>. Target resolved WITHIN THE ASKER'S OWN ZONE ONLY
-///     (<c>SearchAvatar</c> scope, doc 10 quirk 13) -- not found ⇒ ZC_GUILD_ANSWER_RECV Answer=4 to the
-///     asker; already guilded or different tribe ⇒ <c>Quit()</c>; busy (already negotiating) ⇒ Answer=3/5.
-///     Success ⇒ ZC_GUILD_ASK_RECV to the target.
+///     CZ_GUILD_ASK_SEND (opcode 72) -- emitter must be guild master or sub-master (DB-side role, see
+///     <see cref="GuildRoleCodec.IsMasterOrSubMaster" />).
 /// </summary>
 /// <remarks>
-///     OPEN ISSUE: the legacy also gates on <c>CheckCommunityWork()</c>/action-sort 11-12 (stunned/dead)
-///     and <c>IsMovingZone()</c> (target) -- neither has a <see cref="PlayerRuntimeState" /> equivalent, so
-///     this is a documented gap, not a fabricated substitute.
+///     OPEN ISSUE: legacy also gates on CheckCommunityWork()/stunned-dead and target IsMovingZone(); neither
+///     has a <see cref="PlayerRuntimeState" /> equivalent here.
 /// </remarks>
 public sealed class GuildInviteHandler(GuildInviteRegistry invites) : IInlinePacketHandler<GuildInviteRequest>
 {

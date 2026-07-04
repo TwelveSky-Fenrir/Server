@@ -4,19 +4,13 @@ using Fenrir.Application.Game.Inventory;
 namespace Fenrir.Application.Game.Social.Trade;
 
 /// <summary>
-///     Pure logic (no I/O, no <c>Zone</c> dependency, same posture as <c>ContainerMatrix</c>) that
-///     projects a completed <see cref="TradeSession" /> onto the final InventoryPage0/Page1 contents:
-///     this side's offered slots are removed, the other side's offered items fill the first free slots
-///     (page 0 then page 1). See <see cref="TradeRegistry" /> remarks for why offer slots are currently
-///     always empty in production.
+///     Pure logic that projects a completed TradeSession onto the final InventoryPage0/Page1 contents: this
+///     side's offered slots are removed, the other side's offered items fill the first free slots (page 0
+///     then page 1).
 /// </summary>
 public static class TradeCommitPlanner
 {
-    /// <summary>
-    ///     <see cref="Plan.Overflowed" /> signals the receiving side had no free slot for one or more
-    ///     incoming items -- the caller MUST treat this as a commit-time failure and abort the WHOLE
-    ///     trade (D7 "no partial commit"); silently dropping an item would be a value loss.
-    /// </summary>
+    /// <summary>Plan.Overflowed means the receiving side had no free slot for one or more incoming items -- the caller must abort the whole trade, never drop an item silently.</summary>
     public static Plan BuildFinalContainers(
         ImmutableDictionary<byte, ItemStack> currentPage0,
         ImmutableDictionary<byte, ItemStack> currentPage1,

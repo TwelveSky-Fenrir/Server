@@ -3,22 +3,13 @@ using Fenrir.Data.Guilds;
 
 namespace Fenrir.Application.Game.Guilds;
 
-/// <summary>
-///     Pure projection from the normalized game.Guilds/GuildMembers/GuildNotices rows onto the wire's
-///     GUILD_INFO struct (ZC_GUILD_WORK_RECV, Core/Fenrir.Contracts/Packets/Shared/GuildInfo.cs -- 50
-///     fixed member slots, contracts/06_guild_tribe.md). Normalized storage has no slot index, so slots
-///     are filled in <see cref="GuildRosterRowDto.JoinedAtUtc" /> order (oldest first); nothing in the
-///     wire contract depends on which slot a name occupies, only on presence/role/call-name.
-/// </summary>
+/// <summary>Projects game.Guilds/GuildMembers/GuildNotices onto GUILD_INFO's 50 fixed slots. Normalized storage has no slot index, so slots fill oldest-first by JoinedAtUtc.</summary>
 public static class GuildInfoProjection
 {
     private const int MaxMembers = 50;
     private const int MaxNotices = 4;
 
-    /// <summary>
-    ///     Zero-filled GUILD_INFO for every failure response (and the legacy's tSort 1001 success quirk,
-    ///     doc 10 §1 quirk 4) -- replaces the legacy's uninitialized-stack-garbage leak on those responses.
-    /// </summary>
+    /// <summary>Zero-filled GUILD_INFO for failure responses -- replaces the legacy's uninitialized-stack-garbage leak on those responses.</summary>
     public static GuildInfo Empty()
     {
         return new GuildInfo
@@ -53,8 +44,7 @@ public static class GuildInfoProjection
         var subMaster1 = "";
         var subMaster2 = "";
 
-        // Oldest-first slot order (see class remarks); sorted here rather than trusted from the caller's
-        // query, since slot 0 must be deterministic across callers.
+        // Sorted here, not trusted from the caller's query -- slot 0 must be deterministic across callers.
         var ordered = roster.OrderBy(r => r.JoinedAtUtc).ToArray();
         for (var i = 0; i < ordered.Length && i < MaxMembers; i++)
         {

@@ -5,36 +5,14 @@ using Fenrir.Application.Game.Stats;
 namespace Fenrir.Application.Game.Pets;
 
 /// <summary>
-///     Pure port of the ACTIVE (non-<c>USE_OLD_PET</c> -- that define is never set anywhere in DEFINE.h, so
-///     the whole <c>#ifdef USE_OLD_PET</c> block of <c>GameSystem_07_Pet.cpp</c> lines 27-333 is dead code)
-///     <c>PETSYSTEM::ReturnLifeValue/ReturnManaValue/ReturnAttackPower/ReturnDefensePower</c>
-///     (<c>Server/ts25zone/GameSystem/GameSystem_07_Pet.cpp:532-694,1578-1720</c>, read in full and verified
-///     byte-for-byte -- <c>GIFT_EVENT</c> is unconditionally <c>#define</c>d, DEFINE.h:117, so its extra
-///     item ids are always live). Populates <see cref="PetStatContribution" /> from
-///     <see cref="Fenrir.Application.Game.World.PlayerRuntimeState.PetGrowth" />/
-///     <see cref="Fenrir.Application.Game.World.PlayerRuntimeState.PetActivity" />
-///     -- see <see cref="Stats.StatCalculator" />'s own class remarks for why populating this parameter
-///     (not modifying <see cref="StatCalculator" /> itself) is the whole job here.
+///     Port of PETSYSTEM::ReturnLifeValue/ReturnManaValue/ReturnAttackPower/ReturnDefensePower
+///     (GameSystem_07_Pet.cpp:532-694,1578-1720). Populates <see cref="PetStatContribution" /> from the
+///     player's pet growth/activity state.
 /// </summary>
-/// <remarks>
-///     IMPORTANT, source-verified nuance: activity gates ONLY <see cref="ComputeAttackPower" /> (the
-///     legacy explicitly checks <c>pActivityValue &lt; 1</c>) -- Life/Mana/Defense do NOT reference the
-///     activity parameter at all in their active bodies. A prior draft of this pass assumed activity gated
-///     all four uniformly; corrected against the actual source read.
-///     <para>
-///         Each of the 4 functions has ITS OWN item-id-&gt;family membership (verified: the 4 switch-case
-///         blocks differ from each other, not just one shared table reused 4 times) -- kept as 4 separate
-///         frozen sets rather than one merged table to avoid inventing a false "these must be the same"
-///         simplification.
-///     </para>
-/// </remarks>
+/// <remarks>Activity gates only AttackPower (source-verified); Life/Mana/Defense ignore it.</remarks>
 public static class PetGrowthCalculator
 {
-    /// <summary>
-    ///     <c>mMaxRangeValue[0..3]</c> (PETSYSTEM constructor) -- the only 4 indices these 4 functions ever select
-    ///     (indices 4-7 are new-pet variants of <see cref="Quests.QuestStateMachine" />-unrelated systems this pass does not
-    ///     touch).
-    /// </summary>
+    /// <summary>mMaxRangeValue[0..3] from the PETSYSTEM constructor.</summary>
     private static readonly int[] MaxRangeValue = [40_000_000, 80_000_000, 160_000_000, 320_000_000];
 
     private static readonly FrozenDictionary<int, int> LifeFamily = BuildFamily(
@@ -70,12 +48,7 @@ public static class PetGrowthCalculator
 
     private static readonly FrozenSet<int> DefensePremium = new HashSet<int> { 1311, 17056 }.ToFrozenSet();
 
-    /// <summary>
-    ///     Resolves the live <see cref="PetStatContribution" /> for whatever is currently equipped in the
-    ///     pet slot (<see cref="PetSlots.EquipmentSlot" />) -- returns <c>default</c> (all zeros, the
-    ///     "no pet"/"not a growable pet"/"no growth yet" case) for anything that isn't a real <c>iSort==22</c>
-    ///     pet item, exactly like an absent legacy feature would.
-    /// </summary>
+    /// <summary>Returns default (all zeros) for anything that isn't a real iSort==22 pet item.</summary>
     public static PetStatContribution Compute(int petItemId, int growth, int activity,
         FrozenDictionary<int, ItemDefinition> itemsById)
     {

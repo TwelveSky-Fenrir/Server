@@ -8,11 +8,9 @@ using Microsoft.Extensions.Logging;
 namespace Fenrir.Application.Game.Handlers.Commerce;
 
 /// <summary>
-///     CZ_SET_DEPUTY_PSHOP_MONEY_SEND (opcode 110, contracts/04_commerce.md, verified <c>S07_MyGame09.cpp:886-957</c>)
-///     -- withdraw accumulated offline-shop earnings into the character's live money. Requires the shop
-///     CLOSED (ShopState=0) and the submitted amounts to still match current earnings (anti-race
-///     double-check, <see cref="OfflineShopRepository.WithdrawMoneyAsync" />'s own CAS guard). Shop
-///     zero-out and money credit commit atomically.
+///     CZ_SET_DEPUTY_PSHOP_MONEY_SEND (opcode 110) -- withdraw accumulated offline-shop earnings into the
+///     character's live money. Requires the shop closed and the submitted amounts to still match current
+///     earnings (CAS guard in <see cref="OfflineShopRepository.WithdrawMoneyAsync" />).
 /// </summary>
 public sealed class WithdrawProxyShopEarningsHandler(
     IOfflineShopRepository offlineShops,
@@ -44,9 +42,7 @@ public sealed class WithdrawProxyShopEarningsHandler(
                 return;
             }
 
-            // Money/BigMoney echo the WITHDRAWN amounts (verified wire contract), not a running total --
-            // not cached on PlayerRuntimeState (same posture as other money handlers, except Cash); no
-            // mirror needed.
+            // Money/BigMoney echo the withdrawn amounts, not a running total.
             session.Send(new WithdrawProxyShopEarningsResponse
                 { Result = 0, Money = packet.Money, BigMoney = packet.BigMoney });
         }

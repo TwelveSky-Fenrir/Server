@@ -4,12 +4,7 @@ using Fenrir.Contracts.Wire;
 
 namespace Fenrir.Contracts.Packets.Zone;
 
-/// <summary>
-///     ZC_AVATAR_CHANGE_INFO_2 (ZONE.h:453-460, 12-byte payload) — the self personal-stat update packet
-///     (~180 live call sites: HP, MP, money, pet exp, hero point, ...). <c>USE_PREMIUM_LONGTIME</c> is ON in EU33
-///     (DEFINE.h:63), so <c>tValue2</c> IS present (a build without it/<c>MANGOT5</c> would be 8 bytes payload,
-///     not 12 — locked here). Unicast to self.
-/// </summary>
+// USE_PREMIUM_LONGTIME is on, so Value2 is present (12-byte payload, not 8).
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.AvatarStatUpdate, ExpectedSize = 13)]
 public readonly partial record struct AvatarStatUpdateResponse : IOutgoingPacket
 {

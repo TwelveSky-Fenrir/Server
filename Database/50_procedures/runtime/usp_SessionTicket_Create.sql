@@ -1,10 +1,5 @@
--- Contract: @AccountId INT, @CharacterId INT, @ShardId TINYINT, @TtlSeconds INT -> no result set.
--- Idempotent: a single active ticket exists per AccountId at any time (ADR-0005) -- a second Login
--- for the same account before the previous ticket is consumed simply supersedes it. DELETE-then-
--- INSERT, never MERGE (architecture reference §12.3); the DELETE is a no-op when nothing is there.
--- Natively compiled against runtime.SessionTickets (memory-optimized, SCHEMA_ONLY, §12.4): this is
--- the hottest write on the LoginServer handover path (§8.2), so it runs with zero locks/latches and
--- zero T-SQL interpretation.
+-- Idempotent: only one active ticket exists per AccountId at any time -- a second login for the same
+-- account before the previous ticket is consumed simply supersedes it (DELETE-then-INSERT).
 CREATE PROCEDURE runtime.usp_SessionTicket_Create @AccountId   INT,
     @CharacterId INT,
     @ShardId     TINYINT,

@@ -5,14 +5,8 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Records;
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Seeding;
 
 /// <summary>
-///     Generates <c>70_seed/world/072_skill_grades.sql</c> from the real <c>005_00003.IMG</c> data
-///     (<see cref="SkillReader.ReadAll" />). Normalizes <c>SKILL_INFO</c>'s
-///     <c>
-///         GRADE_INFO_FOR_SKILL
-///         gGradeInfo[2]
-///     </c>
-///     : exactly 2 rows per real (Index != 0) skill (grade 0 and 1), never sparse, so this
-///     is a plain one-row-per-grade child table, not 22 fields x 2 doubled onto world.Skills.
+///     Generates <c>70_seed/world/072_skill_grades.sql</c> from <see cref="SkillReader.ReadAll" />
+///     (005_00003.IMG): exactly 2 rows (grade 0/1) per real (Index != 0) skill, never sparse.
 /// </summary>
 public static class SkillGradeSeedGenerator
 {

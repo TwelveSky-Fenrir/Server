@@ -3,15 +3,7 @@ using Fenrir.Contracts.Packets.Zone;
 
 namespace Fenrir.Contracts.Tests.Packets.Zone;
 
-/// <summary>
-///     ZC_GET_CASH_ITEM_INFO_RECV (ZONE.h:1036-1041, 12 809 bytes) — the largest packet in the protocol.
-///     <c>CashItemInfo</c> flattens
-///     <c>
-///         int[MAX_CASH_TYPE=4][MAX_CASH_PAGE=20][MAX_CASH_ITEM_PER_PAGE=10]
-///         [MAX_CASH_ITEM_DETIAL=4]
-///     </c>
-///     row-major into 3200 ints (STRUCT.h:1436-1446, CASH_INFO_SIZE).
-/// </summary>
+// CashItemInfo flattens int[4][20][10][4] row-major into 3200 ints (STRUCT.h:1436-1446).
 public class ZcGetCashItemInfoRecvTests
 {
     [Fact]

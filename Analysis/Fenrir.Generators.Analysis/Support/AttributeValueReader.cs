@@ -4,7 +4,6 @@ using Microsoft.CodeAnalysis;
 
 namespace Fenrir.Generators.Analysis.Support;
 
-/// <summary>Reads positional/named argument values from <see cref="AttributeData" />.</summary>
 internal static class AttributeValueReader
 {
     public static AttributeData? Find(this ImmutableArray<AttributeData> attributes, string fullyQualifiedMetadataName)

@@ -6,36 +6,23 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Records;
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Readers;
 
 /// <summary>
-///     Parses every <c>*.WREGION.csv</c> file (Header/Protocol/STRUCT.h:1327-1335's <c>WORLD_REGION_INFO</c>,
-///     pipe-delimited, no header row) found under a <c>DATA/SUMMON</c> directory tree. Confirmed by prior
-///     investigation that the legacy server (Server/ts25zone/S10_MySummon.cpp) reads only these <c>.csv</c> text
-///     files at runtime; the sibling extensionless <c>.WREGION</c> binaries (found under a <c>WRegion/</c>
-///     subfolder in this build) are dead/unused code and are never opened by the reader. Real data has every
-///     file directly under <c>DATA/SUMMON/</c> (none under <c>DATA/SUMMON/WRegion/</c>), but this reader searches
-///     the whole subtree rather than hardcoding that so it stays correct if that ever changes.
+///     Parses every <c>*.WREGION.csv</c> under DATA/SUMMON (STRUCT.h:1327-1335, <c>WORLD_REGION_INFO</c>) --
+///     the live format (S10_MySummon.cpp); sibling <c>.WREGION</c> binaries are dead code, never read.
 /// </summary>
 internal static class MonsterSpawnRegionReader
 {
     private const string SearchPattern = "*.WREGION.csv";
     private const int ExpectedFieldCount = 8;
 
-    // Filenames look like "Z001_SUMMONMONSTER.WREGION.csv", "Z019_SUMMONMONSTER_3.WREGION.csv", or
-    // "Z040_SUMMONBOSSMONSTER.WREGION.csv" -- only the leading zone number is parsed into its own field here;
-    // the rest (normal/boss/numbered-variant/"_FIX"/"_M") is left embedded in SourceFileName for a later,
-    // SQL-schema-design phase to normalize, per instructions not to make normalization decisions yet.
+    // Only the leading "Z0NN_" zone number is parsed; the rest of the filename (kind/variant) stays in SourceFileName.
     private static readonly Regex ZoneNumberPattern = new(@"^Z(\d+)_", RegexOptions.Compiled);
 
-    /// <summary>Raw parse of every row in every matching file -- no per-load patches applied.</summary>
     public static IReadOnlyList<MonsterSpawnRegionRecord> ReadAllRaw(string summonDirectory)
     {
         return ReadAllRaw(summonDirectory, out _, out _);
     }
 
-    /// <summary>
-    ///     Same as <see cref="ReadAllRaw(string)" />, plus diagnostics: <paramref name="fileCount" /> is how many
-    ///     <c>*.WREGION.csv</c> files were found, and <paramref name="skippedLineCount" /> is how many lines
-    ///     across all of them failed to parse as exactly 8 int columns and were skipped (logged to stderr).
-    /// </summary>
+    /// <summary>Same as <see cref="ReadAllRaw(string)" />, plus file/skipped-line diagnostics.</summary>
     public static IReadOnlyList<MonsterSpawnRegionRecord> ReadAllRaw(string summonDirectory, out int fileCount,
         out int skippedLineCount)
     {
@@ -66,7 +53,7 @@ internal static class MonsterSpawnRegionReader
                 lineNumber++;
 
                 if (string.IsNullOrWhiteSpace(line))
-                    continue; // blank trailing line -- not a malformed data row, just nothing to parse
+                    continue;
 
                 if (!TryParseLine(line, out var values))
                 {
@@ -92,40 +79,27 @@ internal static class MonsterSpawnRegionReader
         return records;
     }
 
-    /// <summary>
-    ///     No per-load patches are known to apply to <c>WORLD_REGION_INFO</c> rows (unlike e.g. item data --
-    ///     see <c>ItemReader</c> -- <c>S10_MySummon.cpp</c> reads these CSV rows directly into the runtime spawn
-    ///     list with no further transform), so this is identical to <see cref="ReadAllRaw(string)" />.
-    /// </summary>
+    /// <summary>No per-load patches for this dataset -- identical to <see cref="ReadAllRaw(string)" />.</summary>
     public static IReadOnlyList<MonsterSpawnRegionRecord> ReadAll(string summonDirectory)
     {
         return ReadAllRaw(summonDirectory);
     }
 
-    /// <summary>
-    ///     Diagnostics-returning overload of <see cref="ReadAll(string)" />; see
-    ///     <see cref="ReadAllRaw(string, out int, out int)" />.
-    /// </summary>
+    /// <summary>Diagnostics-returning overload of <see cref="ReadAll(string)" />.</summary>
     public static IReadOnlyList<MonsterSpawnRegionRecord> ReadAll(string summonDirectory, out int fileCount,
         out int skippedLineCount)
     {
         return ReadAllRaw(summonDirectory, out fileCount, out skippedLineCount);
     }
 
-    /// <summary>
-    ///     Splits a line on '|' into exactly 8 int columns. Real files terminate every data line with a trailing
-    ///     '|' before the CRLF (an artifact of the legacy writer, <c>MySummonToFile</c>), which produces a 9th,
-    ///     empty trailing field on split -- that specific shape is tolerated; anything else (wrong field count,
-    ///     non-numeric field, e.g. from an embedded pipe character corrupting the split) is rejected defensively
-    ///     rather than crashing.
-    /// </summary>
+    /// <summary>Splits into 8 int columns; tolerates the writer's (MySummonToFile) trailing '|' producing an empty 9th field.</summary>
     private static bool TryParseLine(string line, out int[] values)
     {
         values = [];
         var fields = line.Split('|');
 
         if (fields.Length == ExpectedFieldCount + 1 && fields[ExpectedFieldCount].Length == 0)
-            fields = fields[..ExpectedFieldCount]; // drop the trailing empty field from the writer's trailing '|'
+            fields = fields[..ExpectedFieldCount];
 
         if (fields.Length != ExpectedFieldCount)
             return false;

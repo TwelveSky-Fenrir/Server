@@ -1,14 +1,4 @@
--- Normalized from nGambleCostInfo[145][15] (Header/Protocol/STRUCT.h:213-234): only nonzero cells kept.
--- Sparse BY NPC as expected -- only 6 of the 131 real NPCs (all named "Beggar ...", a dedicated
--- gambling-minigame NPC type) use this feature at all -- but a surprising finding surfaced while
--- generating the real seed data (flagged here rather than silently seeding a huge block unremarked):
--- 0 filtering removes NOTHING once a given NPC uses the feature. Every one of the 145*15=2175 cells is
--- populated for each of those 6 NPCs (13050 rows == 6 * 145 * 15 exactly), unlike NpcShopItems/
--- NpcSkillOffers where sparsity holds at both the NPC level and the within-NPC slot level.
--- GambleTier/CostIndex keep the original 0-based row/column position for traceability even though their
--- exact real-world meaning (145 prize tiers? 15 currency/bet-amount variants?) is not confirmed by prior
--- investigation. Value is a plain legacy int (observed range in the hundreds to hundreds-of-thousands,
--- consistent with an in-game currency cost), not an FK to any other domain.
+-- Normalized from nGambleCostInfo[145][15]; sparse only at the NPC level (used by 6 "Beggar" NPCs) -- once an NPC uses it, all 2175 cells are populated, unlike NpcShopItems/NpcSkillOffers which are also sparse within-NPC.
 CREATE TABLE world.NpcGambleCosts
 (
     NpcId      INT      NOT NULL,

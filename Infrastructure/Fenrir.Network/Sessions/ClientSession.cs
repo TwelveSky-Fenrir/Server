@@ -6,10 +6,7 @@ using Fenrir.Network.Framing;
 
 namespace Fenrir.Network.Sessions;
 
-/// <summary>
-///     The one mutable thing on the network side of a connection. Owns the duplex pipe transport and the
-///     send-side lock; state-machine specifics live in <see cref="LoginClientSession" />/<see cref="ZoneClientSession" />.
-/// </summary>
+// Owns the duplex pipe transport and the send-side lock; state-machine specifics live in the subclasses.
 public abstract class ClientSession : IPacketSession
 {
     private readonly Lock _sendLock = new();
@@ -28,16 +25,10 @@ public abstract class ClientSession : IPacketSession
 
     public FenrirServer Server { get; }
 
-    /// <summary>
-    ///     The peer's address (see <see cref="Transport.SocketConnection.RemoteEndPoint" />); null for a transport never
-    ///     backed by a real accepted socket.
-    /// </summary>
+    /// <summary>The peer's address; null for a transport never backed by a real accepted socket.</summary>
     public IPEndPoint? RemoteEndPoint { get; }
 
-    /// <summary>
-    ///     <c>mPacketEncryptionValue</c> (§3.4): 0 until the greeting packet seeds it, then applied to every inbound byte
-    ///     by the receive loop.
-    /// </summary>
+    /// <summary>Legacy <c>mPacketEncryptionValue</c> (§3.4): 0 until the greeting packet seeds it.</summary>
     public byte InboundStreamXorKey { get; set; }
 
     public DisconnectReason? DisconnectReason { get; private set; }
@@ -59,16 +50,11 @@ public abstract class ClientSession : IPacketSession
         FlushOutput();
     }
 
-    /// <summary>
-    ///     Checked by <see cref="Dispatching.SessionLoop" /> before dispatch: is this opcode legal in the session's
-    ///     current state (generated <c>SessionStateGate</c>)?
-    /// </summary>
+    /// <summary>Checked by <see cref="Dispatching.SessionLoop" /> before dispatch against the generated <c>SessionStateGate</c>.</summary>
     public abstract bool IsOpcodeAllowed(byte opcode);
 
-    /// <summary>
-    ///     Sends a fully pre-built frame as-is (opcode byte included) — the LZ4/ZPACKET path for the two
-    ///     <c>Compressed</c> M1 packets, whose bytes already come out of the generated <c>MessageFactory.Encode</c>.
-    /// </summary>
+    // Sends a fully pre-built frame as-is — the LZ4/ZPACKET path for Compressed M1 packets, whose bytes
+    // already come out of the generated MessageFactory.Encode.
     public void SendRaw(ReadOnlySpan<byte> rawFrame)
     {
         lock (_sendLock)
@@ -96,8 +82,7 @@ public abstract class ClientSession : IPacketSession
         }
         catch (Exception)
         {
-            // The receive/session loop will independently notice the broken pipe and tear the session down;
-            // a failed flush here must never fault an unrelated caller's synchronous Send<T>.
+            // Receive loop will independently notice the broken pipe; a failed flush here must not fault the caller's Send<T>.
         }
     }
 

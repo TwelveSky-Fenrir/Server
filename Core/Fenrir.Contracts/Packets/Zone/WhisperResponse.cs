@@ -5,14 +5,7 @@ using Fenrir.Contracts.Wire;
 
 namespace Fenrir.Contracts.Packets.Zone;
 
-/// <summary>
-///     ZC_SECRET_CHAT_RECV (ZONE.h:603-613, <c>ZCS_SECRET_CHAT_RECV</c>) — whisper AND this fork's
-///     system-message channel ("[-Server-]", "[-GM-]", AFK-checker: 25+ call sites with
-///     <see cref="Result" />=3). Builder <c>B_SECRET_CHAT_RECV</c> (S05_MyTransfer.cpp:736, multi-buffer
-///     <c>CreateZ</c>). The meaning of <see cref="AvatarName" /> depends on <see cref="Result" />: for
-///     0/1 it names the whisper TARGET (echo to the sender); for 3 it names the SENDER (delivery to the
-///     recipient / system message).
-/// </summary>
+/// <summary>Also used as this fork's system-message channel ("[-Server-]", "[-GM-]", AFK checker) via Result=3.</summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.Whisper, ExpectedSize = 111)]
 public readonly partial record struct WhisperResponse : IOutgoingPacket
 {

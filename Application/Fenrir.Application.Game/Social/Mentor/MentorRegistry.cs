@@ -1,10 +1,6 @@
 namespace Fenrir.Application.Game.Social.Mentor;
 
-/// <summary>
-///     Soft outcomes of CZ_TEACHER_ASK_SEND -- mirrors ZC_TEACHER_ANSWER_RECV's pre-check codes
-///     (contracts/05_social.md: 3 soi occupé, 4 introuvable [handler-resolved], 5 cible occupée, 6 cible a déjà un maître,
-///     7 cible a déjà un élève).
-/// </summary>
+/// <summary>Soft outcomes of CZ_TEACHER_ASK_SEND -- mirrors ZC_TEACHER_ANSWER_RECV's pre-check codes.</summary>
 public enum MentorAskOutcome
 {
     Sent,
@@ -15,17 +11,15 @@ public enum MentorAskOutcome
 }
 
 /// <summary>
-///     Process-wide teacher/student ("mentor") negotiation authority (CZ_TEACHER_* family -- named
-///     <c>Mentor</c> here to avoid colliding with the wire's own <c>Teacher</c>/<c>Student</c> AvatarInfo
-///     properties). The durable bond lives in game.Characters.TeacherCharacterId/StudentCharacterId
-///     (<c>MentorRepository</c>); this registry only tracks the ask/cancel/answer handshake, like
-///     <c>Friends.FriendRegistry</c>. Unlike Friend, CZ_TEACHER_START_SEND is a single action taken by
-///     the MASTER that bonds both sides at once, so the accepted state is remembered keyed by master
-///     only.
+///     Process-wide teacher/student ("mentor") negotiation authority (named Mentor to avoid colliding with
+///     the wire's own Teacher/Student AvatarInfo properties). The durable bond lives in
+///     game.Characters.TeacherCharacterId/StudentCharacterId; this registry only tracks the
+///     ask/cancel/answer handshake. Unlike Friend, CZ_TEACHER_START_SEND is a single action taken by the
+///     master that bonds both sides at once, so the accepted state is remembered keyed by master only.
 /// </summary>
 public sealed class MentorRegistry
 {
-    /// <summary>master characterId -&gt; accepted student characterId, awaiting CZ_TEACHER_START_SEND (legacy state 3).</summary>
+    /// <summary>master characterId -> accepted student characterId, awaiting CZ_TEACHER_START_SEND.</summary>
     private readonly Dictionary<int, int> _acceptedByMaster = new();
 
     private readonly Lock _lock = new();

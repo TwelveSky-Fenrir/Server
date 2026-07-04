@@ -7,11 +7,9 @@ using Fenrir.Network.Sessions;
 namespace Fenrir.Application.Game.Handlers.Social;
 
 /// <summary>
-///     CZ_PARTY_LEAVE_SEND (opcode 69). Silent no-op if the caller isn't partied or is the leader (leader
-///     must use CZ_PARTY_BREAK_SEND instead). Notifies every member present before the departure, including
-///     the leaver (matches ts25center's case 106 loop, which fires before the leaver's party name clears).
-///     Deliberate deviation: dropping to 1 member auto-disbands here, whereas the legacy leaves a lone
-///     leader "partied" until an explicit Break (see <see cref="PartyRegistry" />).
+///     CZ_PARTY_LEAVE_SEND (opcode 69) -- no-op if not partied or is the leader (leader must use
+///     CZ_PARTY_BREAK_SEND). Deviation: dropping to 1 member auto-disbands here; legacy leaves a lone
+///     leader "partied" until an explicit Break.
 /// </summary>
 public sealed class PartyLeaveHandler(ZoneRegistry zones, PartyRegistry parties)
     : IInlinePacketHandler<PartyLeaveRequest>

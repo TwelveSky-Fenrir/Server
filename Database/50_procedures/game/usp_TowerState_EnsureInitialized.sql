@@ -1,9 +1,6 @@
 -- database/50_procedures/game/usp_TowerState_EnsureInitialized.sql
--- Contract: idempotent bootstrap -- creates the 12 tower rows (TowerIndex 0-11, uncontrolled) the first
--- time it is ever called; a no-op on every later call. Meant to be called once by GameServer at world
--- startup, since this table starts empty (no seed script -- see game.TowerState) and the application can
--- only ever reach it through a procedure (no direct table grants).
--- Result set: none. Idempotent: yes.
+-- Idempotent bootstrap: seeds 12 uncontrolled tower rows on first call only. Call once at GameServer
+-- startup.
 CREATE PROCEDURE game.usp_TowerState_EnsureInitialized
     AS
 BEGIN

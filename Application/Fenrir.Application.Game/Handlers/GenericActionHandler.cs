@@ -18,33 +18,17 @@ using Microsoft.Extensions.Logging;
 namespace Fenrir.Application.Game.Handlers;
 
 /// <summary>
-///     op19, CZ_PROCESS_DATA_SEND (contracts/03_inventory_craft.md, report 04_mega_switches.md §1) -- the
-///     catch-all level-2 dispatch on <c>tSort</c>. Phase C/V1 implemented the "most fundamental" container
-///     moves: 208 (inventory&lt;-&gt;inventory), 210 (inventory-&gt;equipment), 213 (equipment-&gt;inventory)
-///     -- via <see cref="ContainerMatrix" />'s pure policy. Phase C/V5 (NPC &amp; Economy) adds: 201 (ground
-///     pickup, <see cref="HandlePickupAsync" />), 207 (paying-NPC teleport toll,
-///     <see cref="HandleTeleportTollAsync" />), 202/233 (learn skill, <see cref="HandleSkillLearnAsync" />),
-///     203 (upgrade skill, <see cref="HandleSkillUpgradeAsync" />), 212/252 (sell to NPC,
-///     <see cref="HandleNpcShopSellAsync" />), 215 (buy from NPC, <see cref="HandleNpcShopBuyAsync" />). Every
-///     OTHER tSort the legacy switch itself recognizes (container-move families this pass doesn't cover --
-///     Store/Trade/Bank/Hotkey-assign/1B-money/pet-bag/rune, GM 501-528, scripted duel 598-603, pet/maintenance
-///     700-701, progression 204-206/235-237/239) gets a clean <c>tResult</c> FAILURE reply instead of a
-///     disconnect -- see <see cref="ContainerMatrix.IsImplementedContainerMoveSort" />'s own remarks and this
-///     task's openIssues for the full unimplemented list. A tSort absent from EVERY legacy family at all is the
-///     only case that still gets <see cref="ClientSession.Abort" /> (anti-fuzzing, matching the legacy's own
-///     <c>default:</c> branch).
+///     op19, CZ_PROCESS_DATA_SEND -- catch-all dispatch on tSort: container moves (inventory&lt;-&gt;inventory,
+///     inventory&lt;-&gt;equipment), ground pickup, NPC teleport toll, skill learn/upgrade, and NPC shop buy/sell.
+///     A tSort the legacy switch recognizes but this handler doesn't implement replies with a clean failure; a
+///     tSort absent from every legacy family gets <see cref="ClientSession.Abort" /> (anti-fuzzing).
 /// </summary>
 /// <remarks>
-///     D7 regime (b): the affected container(s) are persisted SYNCHRONOUSLY -- via
-///     <see cref="CharacterRepository.ReplaceContainerAsync" /> for a same-container move, or
-///     <see cref="CharacterRepository.ReplaceTwoContainersAsync" /> (ONE transaction covering both) for a
-///     cross-container move -- BEFORE the client ever sees a success reply: item state is a value object,
-///     never write-behind (mission brief, "comme l'argent"), and a cross-container move must never be able to
-///     durably remove an item from its source without also durably adding it to its destination. Once durable,
-///     the ALREADY-COMPUTED result (containers + recomputed stats if Equipment was touched) is posted to
-///     <see cref="Zone" /> via <see cref="Zone.PostInventoryCommand" /> so the zone's own tick -- the single
-///     mutator of <see cref="PlayerRuntimeState" /> -- can mirror it; this handler never touches
-///     <see cref="PlayerRuntimeState.Inventory" />/<see cref="PlayerRuntimeState.Stats" /> directly.
+///     Affected containers are persisted synchronously, before the client ever sees success. A cross-container
+///     move commits both containers in one transaction so a mid-sequence fault can never durably remove an item
+///     from its source without also adding it to its destination. Once durable, the result is posted to
+///     <see cref="Zone" /> so the zone's own tick -- the sole mutator of <see cref="PlayerRuntimeState" /> --
+///     can mirror it.
 /// </remarks>
 public sealed class GenericActionHandler(
     ICharacterRepository characters,
@@ -59,15 +43,12 @@ public sealed class GenericActionHandler(
         var zoneSession = (ZoneClientSession)session;
         var characterId = zoneSession.CharacterId!.Value;
 
-        // Benign staleness (mid-handoff/disconnect) -- same defensive posture as every other InWorld handler.
         if (zoneSession.CurrentZone is not Zone zone || !zone.TryGetPlayer(characterId, out var state) ||
             state is null)
             return;
 
-        // PlayerRuntimeState.EconomyActionLock's own remarks: serializes this WHOLE dispatch (every sort this
-        // handler covers, not just the money-bearing ones -- SkillPoints/Inventory are shared, racy state
-        // across ALL of them) per character, closing the item/money duplication window a burst of concurrent
-        // requests for the same character could otherwise open.
+        // Serializes this whole dispatch per character -- SkillPoints/Inventory/money are shared racy state
+        // across every sort this handler covers, not just the money-bearing ones.
         await state.EconomyActionLock.WaitAsync(cancellationToken);
         try
         {
@@ -87,47 +68,39 @@ public sealed class GenericActionHandler(
 
         if (!ContainerMatrix.IsKnownSort(sort))
         {
-            // Anti-fuzzing default case (report 04 §PROCESS_DATA switch): a tSort that exists in NO legacy
-            // family at all, not merely one Fenrir hasn't wired up yet.
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }
 
-        // tSort 201 (ground -> inventory pickup, report 04 line 40 / 05 §5) does not fit the container-move
-        // (from,to) shape the rest of this handler implements -- its "from" is the zone's ground-item pool,
-        // not a player container. Handled by a dedicated branch/policy (GroundItemPickupPolicy) instead.
+        // tSort 201 (ground pickup) doesn't fit the container-move (from,to) shape below -- its "from" is the
+        // zone's ground-item pool, not a player container.
         if (sort == 201)
         {
             await HandlePickupAsync(packet, session, zoneSession, zone, state, characterId, cancellationToken);
             return;
         }
 
-        // V5 NPC & Economy -- tSort 207: paying-NPC instant teleport toll (money-only, no container touched).
         if (sort == 207)
         {
             await HandleTeleportTollAsync(packet, session, zoneSession, characterId, cancellationToken);
             return;
         }
 
-        // V5 NPC & Economy -- tSort 202/233: learn a new skill from an NPC's skill-tree offer.
         if (sort is 202 or 233)
         {
             await HandleSkillLearnAsync(packet, session, zoneSession, zone, state, characterId, cancellationToken);
             return;
         }
 
-        // V5 NPC & Economy -- tSort 203: upgrade an already-learned skill (no NPC-proximity gate, verified).
         if (sort == 203)
         {
             await HandleSkillUpgradeAsync(packet, session, zoneSession, zone, state, characterId, cancellationToken);
             return;
         }
 
-        // V5 NPC & Economy -- tSort 212/252/215: NPC-shop sell/buy. Same DEFAULT_PDATA_RECV wire shape as the
-        // container-move family below, but NEITHER side is a ContainerMatrix container (sell's destination is
-        // the NPC's own catalog; buy's "from" (Page1=NpcId, Index1=ItemId) isn't an inventory slot at all --
-        // see NpcShopPolicy's own remarks), so this is handled as its own branch rather than folded into
-        // ContainerMatrix.TryResolveContainers.
+        // tSort 212/252/215: NPC-shop sell/buy. Neither side is a ContainerMatrix container (sell's destination
+        // is the NPC's own catalog; buy's Page1/Index1 repurpose the wire shape as NpcId/ItemId), so these are
+        // handled as their own branch rather than folded into ContainerMatrix.TryResolveContainers.
         if (sort is 212 or 252 or 215)
         {
             if (!DefaultPData.TryRead(packet.Data, out var shopMove))
@@ -151,8 +124,6 @@ public sealed class GenericActionHandler(
             return;
         }
 
-        // Structurally always 28 bytes available (Data is a fixed 130-byte array) -- defensive nonetheless,
-        // mirroring the legacy's own "recast tData, bail on incoherence" contract.
         if (!DefaultPData.TryRead(packet.Data, out var move))
         {
             zoneSession.Abort(DisconnectReason.Faulted);
@@ -166,8 +137,8 @@ public sealed class GenericActionHandler(
             return;
         }
 
-        // Bounds-checked BEFORE any byte cast/dictionary lookup -- a client-controlled Index1/Index2 outside
-        // [0, container max] must never be truncated into a byte that could accidentally alias a real slot.
+        // Bounds-checked before any byte cast: an out-of-range Index must never be truncated into a byte that
+        // could accidentally alias a real slot.
         var sourceStack = ContainerMatrix.IsValidSlot(fromContainer, move.Index1)
             ? state.Inventory.GetSlot(fromContainer, (byte)move.Index1)
             : null;
@@ -190,7 +161,6 @@ public sealed class GenericActionHandler(
 
         if (resolved.Outcome == ContainerMatrix.MoveOutcome.NoOp)
         {
-            // Same slot to itself -- nothing actually changed, no SQL, no zone command needed.
             SendResult(session, sort, packet.Data, true);
             return;
         }
@@ -206,12 +176,9 @@ public sealed class GenericActionHandler(
             var attributes = new CharacterBaseAttributes(state.StatVit, state.StatStr, state.StatInt,
                 state.StatDex, state.Level, state.Tribe, state.Title, state.Halo, state.RebirthCount);
 
-            // Server Logic V9 Progression: pet stat contribution, computed against the PROJECTED equipment
-            // (so unequipping the pet immediately zeroes it) but the STILL-CURRENT growth/activity -- a pet
-            // SWAP (unequip pet A, equip pet B in the SAME session) sees the reset only once Zone's own
-            // tick mirrors this move (Zone.ApplyInventoryCommand), so this ONE recompute can transiently use
-            // pet A's leftover growth for pet B until the NEXT stat-affecting event self-corrects it --
-            // documented, minor, non-observable-outside-that-one-window open issue.
+            // Pet stat contribution uses the PROJECTED equipment but the still-current growth/activity -- a pet
+            // swap within one request can transiently keep the old pet's growth for the new one until the next
+            // stat-affecting event self-corrects it (documented, minor, non-observable window).
             var petItemId = equipmentContainer.TryGetValue(PetSlots.EquipmentSlot, out var petStack)
                 ? petStack.ItemId
                 : 0;
@@ -222,12 +189,6 @@ public sealed class GenericActionHandler(
                 pet: petContribution);
         }
 
-        // D7 regime (b): synchronous, awaited, BEFORE the client ever sees success -- see class remarks. A
-        // cross-container move commits BOTH containers in ONE transaction (usp_CharacterItems_ReplaceTwoContainers):
-        // two independent ReplaceContainerAsync calls here would let a fault between them durably remove an
-        // item from its source without ever durably adding it to its destination -- a silent, permanent item
-        // loss (review finding, Phase C/V2 integration). A same-container move (toContainer == fromContainer)
-        // never had that risk -- projected.To already reflects fromContainer's own final state in that case.
         if (toContainer == fromContainer)
             await characters.ReplaceContainerAsync(characterId, fromContainer, ToTvps(projected.From),
                 cancellationToken);
@@ -251,37 +212,16 @@ public sealed class GenericActionHandler(
                 zone.MapId, characterId);
     }
 
-    /// <summary>
-    ///     tSort 201 -- ground-item pickup (report 04 line 40 / 05 §5, verified against
-    ///     <c>MyWork::ProcessForGetItem</c>, <c>Server/ts25zone/S04_MyWork05.cpp:250-373</c>). D7 regime (b):
-    ///     the destination container (or the money balance) is persisted SYNCHRONOUSLY, exactly like
-    ///     <see cref="HandleAsync" />'s own container-move path, BEFORE the client ever sees success.
-    /// </summary>
-    /// <remarks>
-    ///     OPEN ISSUE: if the SQL write (or the <see cref="WorldDataCache.ItemsById" /> lookup, which should
-    ///     never actually miss for an item this pass's own drop pipeline created) fails AFTER
-    ///     <see cref="Zone.TryClaimGroundItem" /> already atomically removed the item from the zone's ground
-    ///     pool, the item is lost rather than restored -- a deliberate, safe (never duplicates) simplification
-    ///     for what should be an exceedingly rare fault window; see <see cref="Inventory.GroundItemPickupPolicy" />'s
-    ///     own remarks for the analogous, more likely "destination occupied" case.
-    /// </remarks>
     private async ValueTask HandlePickupAsync(GenericActionRequest packet, IPacketSession session,
         ZoneClientSession zoneSession, Zone zone, PlayerRuntimeState state, int characterId,
         CancellationToken cancellationToken)
     {
-        // Structurally always 28 bytes available (Data is a fixed 130-byte array) -- defensive nonetheless,
-        // mirroring the legacy's own "recast tData, bail on incoherence" contract (same guard the
-        // container-move path above already applies).
         if (!DefaultPData.TryRead(packet.Data, out var move))
         {
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }
 
-        // Structural bounds the legacy Quit()s on (S04_MyWork05.cpp:265-276): tPage2/tIndex2 must address a
-        // real inventory slot, tXPost2/tYPost2 must be a legal 0-7 sub-grid coordinate. Fenrir's flat-slot
-        // ContainerMatrix does not use the sub-grid for addressing (see GroundItemPickupPolicy's own class
-        // remarks), but the range check is still reproduced here for anti-fuzzing parity with the source.
         if (move.Page2 is not (ContainerMatrix.InventoryPage0 or ContainerMatrix.InventoryPage1) ||
             !ContainerMatrix.IsValidSlot((byte)move.Page2, move.Index2) ||
             move.XPost2 is < 0 or > 7 || move.YPost2 is < 0 or > 7)
@@ -295,16 +235,12 @@ public sealed class GenericActionHandler(
 
         if (claimOutcome != GroundItemClaimOutcome.Success || groundItem is null)
         {
-            // Matches the legacy's own soft-fail contract exactly: CheckPossibleGetItem/unique-number
-            // mismatch/distance all just leave tResult at 1 (return TRUE), never Quit().
             SendResult(session, packet.Sort, packet.Data, false);
             return;
         }
 
         if (!worldData.ItemsById.TryGetValue(groundItem.ItemId, out var itemDefinition))
         {
-            // Cannot happen from this pass's own drop pipeline (it only ever rolls real catalog ids) -- mirrors
-            // the legacy's own "mITEM.Search returns NULL" Quit() guard rather than silently failing.
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }
@@ -328,12 +264,6 @@ public sealed class GenericActionHandler(
             }
             catch (Exception ex)
             {
-                // Money-cap breach (unlikely for a ground-drop amount, but possible near the cap) or a transient
-                // SQL fault -- review finding: this call previously had NO try/catch at all, unlike every other
-                // money-touching branch in this handler, so an exception here would propagate unhandled instead
-                // of failing this one pickup cleanly. The ground item was already atomically claimed/removed
-                // from the zone's pool before this point (Zone.TryClaimGroundItem) -- matches this method's own
-                // documented "lost rather than restored" open issue for a post-claim fault, not a new gap.
                 logger.LogWarning(ex,
                     "Character {CharacterId} ground-item money pickup AdjustMoneyAsync failed", characterId);
                 zoneSession.Abort(DisconnectReason.Faulted);
@@ -360,12 +290,9 @@ public sealed class GenericActionHandler(
                 "Zone {MapId} inventory inbox full: dropped pickup mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
                 zone.MapId, characterId);
 
-        // Server Logic V9 Progression -- quest pickup hook (report 04 line 40, verified S04_MyWork04.cpp:370):
-        // a PURE notification (no quest-state mutation at all -- the actual qSort-2 completion condition is
-        // the inventory-presence scan CZ_PROCESS_QUEST_SEND tSort=2 itself performs), sent only when the
-        // picked-up item matches the active qSort-2 quest's target AND ReturnQuestPresentState() still
-        // reports 2 (in-progress) at this exact instant -- reads state.Inventory AFTER the mirror above so
-        // it observes the just-picked-up item, matching legacy's own post-SetInventory ordering.
+        // Quest pickup hook: a pure notification (no quest-state mutation), sent only when the picked-up item
+        // matches the active qSort-2 quest's target and the quest is still in-progress at this instant. Reads
+        // state.Inventory AFTER the mirror above so it observes the just-picked-up item.
         if (state.QuestActiveFlag == 1 && state.QuestSort == 2 && state.QuestTargetPhase == groundItem.ItemId)
         {
             bool HasItem(int itemId)
@@ -384,18 +311,10 @@ public sealed class GenericActionHandler(
     }
 
     /// <summary>
-    ///     tSort 207 -- paying-NPC instant teleport toll (report 04 line 46 / 05 §... "Argent → NPC
-    ///     téléportation", verified inline at <c>S04_MyWork04.cpp:429-440</c>). Carries ONLY the toll amount;
-    ///     the actual zone transfer is a SEPARATE, ALREADY-WIRED client action -- CZ_DEMAND_ZONE_SERVER_INFO_2
-    ///     (opcode 20) <c>Sort=5</c> "paying NPC", which <c>ZoneMoveHandler</c> already accepts generically
-    ///     (see that handler's own class remarks: Sort 2-12 all share the same wire-level validation). This
-    ///     action's entire job is gating the transfer on a successful synchronous money debit FIRST.
+    ///     tSort 207 -- paying-NPC instant teleport toll. Carries only the toll amount; the actual zone transfer
+    ///     is the separate CZ_DEMAND_ZONE_SERVER_INFO_2 (opcode 20, Sort=5) which <c>ZoneMoveHandler</c> already
+    ///     accepts generically. This action's job is gating the transfer on a successful money debit first.
     /// </summary>
-    /// <remarks>
-    ///     D7 regime (b): <c>AdjustMoneyAsync</c> is synchronous and awaited BEFORE the client ever sees
-    ///     success. No NPC-proximity gate exists for this specific tSort in the verified source (unlike its
-    ///     202/212/215/233 siblings) -- preserved as found, not a modeling gap.
-    /// </remarks>
     private async ValueTask HandleTeleportTollAsync(GenericActionRequest packet, IPacketSession session,
         ZoneClientSession zoneSession, int characterId, CancellationToken cancellationToken)
     {
@@ -405,7 +324,6 @@ public sealed class GenericActionHandler(
             return;
         }
 
-        // S04_MyWork04.cpp:432 -- bounds [0,100000000]; Quit() on violation (no clean-fail path).
         if (toll.Money is < 0 or > 100_000_000)
         {
             zoneSession.Abort(DisconnectReason.Faulted);
@@ -418,10 +336,6 @@ public sealed class GenericActionHandler(
         }
         catch (Exception ex)
         {
-            // Insufficient balance -- matches the legacy's own Quit() (S04_MyWork04.cpp:432: wAvatar.aMoney <
-            // r->tMoney), NOT a clean failure. Logged (review finding: this used to swallow every exception,
-            // including a transient/unrelated SQL fault, silently as "insufficient balance") so an operator can
-            // tell the two apart after the fact -- the client-facing Abort is unchanged either way.
             logger.LogWarning(ex,
                 "Character {CharacterId} teleport-toll AdjustMoneyAsync failed (treated as insufficient balance)",
                 characterId);
@@ -432,11 +346,7 @@ public sealed class GenericActionHandler(
         SendResult(session, packet.Sort, packet.Data, true);
     }
 
-    /// <summary>
-    ///     tSort 202/233 -- learn a new skill from an NPC's skill-tree offer (<c>ProcessForLearnSkill1</c>/
-    ///     <c>ProcessForLearnSkill2</c>, verified <c>S04_MyWork05.cpp:375/3343</c>). EVERY failure in the
-    ///     source is a <c>Quit()</c> -- there is no clean <c>tResult=1</c> path for this action at all.
-    /// </summary>
+    /// <summary>tSort 202/233 -- learn a new skill from an NPC's skill-tree offer.</summary>
     private async ValueTask HandleSkillLearnAsync(GenericActionRequest packet, IPacketSession session,
         ZoneClientSession zoneSession, Zone zone, PlayerRuntimeState state, int characterId,
         CancellationToken cancellationToken)
@@ -469,7 +379,6 @@ public sealed class GenericActionHandler(
             return;
         }
 
-        // Grade at learn time == the cost spent (legacy: skill1->sPoint = tSKILL_INFO->sLearnSkillPoint).
         var learned = new LearnedSkill(request.SkillId, result.Cost);
         var newSkillPoints = state.SkillPoints - result.Cost;
 
@@ -484,11 +393,7 @@ public sealed class GenericActionHandler(
                 zone.MapId, characterId);
     }
 
-    /// <summary>
-    ///     tSort 203 -- upgrade an already-learned skill's Grade (<c>ProcessForSkillUpgrade</c>, verified
-    ///     <c>S04_MyWork05.cpp:555</c>). No <c>CheckNPCFunction</c> call site exists for this action (unlike
-    ///     202/233) -- no NPC-proximity gate applies here, verified not a modeling gap.
-    /// </summary>
+    /// <summary>tSort 203 -- upgrade an already-learned skill's grade. No NPC-proximity gate applies here.</summary>
     private async ValueTask HandleSkillUpgradeAsync(GenericActionRequest packet, IPacketSession session,
         ZoneClientSession zoneSession, Zone zone, PlayerRuntimeState state, int characterId,
         CancellationToken cancellationToken)
@@ -529,11 +434,7 @@ public sealed class GenericActionHandler(
                 zone.MapId, characterId);
     }
 
-    /// <summary>
-    ///     tSort 212/252 -- sell to an NPC shop (<c>ProcessForInventoryToNPCShop</c>, verified
-    ///     <c>S04_MyWork05.cpp:1398</c>). EVERY rejection in the source is a <c>Quit()</c> -- no clean
-    ///     <c>tResult=1</c> path exists for this action at all (see <see cref="NpcShopPolicy" />'s own remarks).
-    /// </summary>
+    /// <summary>tSort 212/252 -- sell to an NPC shop.</summary>
     private async ValueTask HandleNpcShopSellAsync(GenericActionRequest packet, IPacketSession session,
         ZoneClientSession zoneSession, Zone zone, PlayerRuntimeState state, int characterId, DefaultPData move,
         CancellationToken cancellationToken)
@@ -583,8 +484,6 @@ public sealed class GenericActionHandler(
         }
         catch (Exception ex)
         {
-            // Money-cap breach (CheckOverMaximum) -- Quit()-worthy, verified (S04_MyWork05.cpp:1469/1489). Logged
-            // (review finding) so a transient/unrelated SQL fault is distinguishable from a real cap breach.
             logger.LogWarning(ex,
                 "Character {CharacterId} NPC-shop-sell AdjustMoneyAndReplaceContainerAsync failed (treated as money-cap breach)",
                 characterId);
@@ -603,9 +502,8 @@ public sealed class GenericActionHandler(
     }
 
     /// <summary>
-    ///     tSort 215 -- buy from an NPC shop (<c>ProcessForNPCShopToInventory</c>, verified
-    ///     <c>S04_MyWork05.cpp:1716</c>). <paramref name="move" />.Page1/Index1 repurpose the generic wire
-    ///     shape as (NpcId, ItemId) -- NOT an inventory slot (see <see cref="NpcShopPolicy" />'s own remarks).
+    ///     tSort 215 -- buy from an NPC shop. <paramref name="move" />.Page1/Index1 repurpose the wire shape as
+    ///     (NpcId, ItemId), not an inventory slot.
     /// </summary>
     private async ValueTask HandleNpcShopBuyAsync(GenericActionRequest packet, IPacketSession session,
         ZoneClientSession zoneSession, Zone zone, PlayerRuntimeState state, int characterId, DefaultPData move,
@@ -663,8 +561,6 @@ public sealed class GenericActionHandler(
         }
         catch (Exception ex)
         {
-            // Insufficient funds -- Quit()-worthy, verified (S04_MyWork05.cpp:1905-1910/1997-2002). Logged
-            // (review finding) so a transient/unrelated SQL fault is distinguishable from real insufficient funds.
             logger.LogWarning(ex,
                 "Character {CharacterId} NPC-shop-buy AdjustMoneyAndReplaceContainerAsync failed (treated as insufficient funds)",
                 characterId);
@@ -682,11 +578,6 @@ public sealed class GenericActionHandler(
                 zone.MapId, characterId);
     }
 
-    /// <summary>
-    ///     ZC_PROCESS_DATA_RECV echoes the request's own <c>tData</c> blob back verbatim (report 04/contract
-    ///     doc do not fully specify the response payload for this generic channel) -- a documented, reasonable
-    ///     inference, not independently verified byte-for-bit (open issue).
-    /// </summary>
     private static void SendResult(IPacketSession session, int sort, byte[] data, bool success)
     {
         session.Send(new GenericActionResponse { Result = success ? 0 : 1, Sort = sort, Data = data, RuneValue = 0 });

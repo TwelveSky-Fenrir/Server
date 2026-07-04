@@ -1,12 +1,4 @@
--- Normalizes the legacy learned-skill array wAvatar.aSkill[40][2] (wire AvatarInfo.Skill[80] = 40 slots
--- x 2 ints: [slot][0] = skill number, [slot][1] = invested grade/upgrade value) into one row per
--- actually-learned slot -- a row simply not existing IS "slot empty", same normalization rule as
--- game.CharacterItems/GuildMembers.
--- SlotIndex is kept as an explicit column (not derived from insertion order): the wire re-emits skills
--- in slot order and the client addresses skills by slot in CZ packets, so the slot IS protocol state.
--- SkillId is a real FK to world.Skills (the legacy "0 = empty slot" sentinel translates to row-absence);
--- Grade is stored verbatim as the legacy int -- its semantics (grade points vs. levels) belong to
--- StatCalculator/skill logic (Phase C), not to storage.
+-- Legacy: wAvatar.aSkill[40][2] ([slot][0]=SkillId, [slot][1]=Grade); row absence = empty slot (0 sentinel).
 CREATE TABLE game.CharacterSkills
 (
     CharacterId INT     NOT NULL,

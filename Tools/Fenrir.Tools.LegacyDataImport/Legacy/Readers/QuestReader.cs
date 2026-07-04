@@ -14,7 +14,6 @@ internal static class QuestReader
     private const int RecordCount = 1000;
     private const int RecordSize = 8444;
 
-    /// <summary>Raw parse, exactly as bytes on disk -- no runtime patches applied.</summary>
     public static IReadOnlyList<QuestRecord> ReadAllRaw(string dataDirectory)
     {
         var recordBytes = ImgUnpacker.UnpackRecordArray(
@@ -27,7 +26,6 @@ internal static class QuestReader
         return quests;
     }
 
-    /// <summary>No known runtime patches for this dataset -- identical to <see cref="ReadAllRaw" />.</summary>
     public static IReadOnlyList<QuestRecord> ReadAll(string dataDirectory)
     {
         return ReadAllRaw(dataDirectory);
@@ -81,10 +79,7 @@ internal static class QuestReader
             callSpeech, callSpeechColor);
     }
 
-    /// <summary>
-    ///     Reads one <c>char[15][51]</c> dialogue-line block followed by 3 bytes of compiler padding and its
-    ///     matching <c>int[15]</c> per-line color array.
-    /// </summary>
+    /// <summary>Reads a <c>char[15][51]</c> speech block + 3-byte pad + <c>int[15]</c> colors.</summary>
     private static (string[] Lines, int[] Colors) ReadSpeechBlock(ref LegacySpanReader reader)
     {
         var lines = new string[15];

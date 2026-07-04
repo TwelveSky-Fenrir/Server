@@ -4,11 +4,7 @@ using Fenrir.Application.Game.World;
 
 namespace Fenrir.Application.Game.Tests.Simulation;
 
-/// <summary>
-///     Covers <see cref="Zone" />'s wiring of its ordered <see cref="ISimulationSystem" /> list (plan decision
-///     D4 / A5): the per-zone list is empty until Phase C, but the extension point itself -- whole-legacy-tick
-///     gating, declared order, and per-system fault containment -- must already work.
-/// </summary>
+/// <summary>Covers <see cref="Zone" />'s ordered <see cref="ISimulationSystem" /> list: whole-legacy-tick gating, declared order, and per-system fault containment.</summary>
 public class ZoneSimulationWiringTests
 {
     [Fact]

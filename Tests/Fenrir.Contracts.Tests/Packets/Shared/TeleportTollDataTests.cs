@@ -4,7 +4,6 @@ using Fenrir.Contracts.Tests.TestSupport;
 
 namespace Fenrir.Contracts.Tests.Packets.Shared;
 
-/// <summary>MONEY_NO_TELEPORT_RECV (4 bytes, STRUCT.h:1266-1269) — 1 int.</summary>
 public class TeleportTollDataTests
 {
     [Fact]

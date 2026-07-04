@@ -1,33 +1,7 @@
 -- database/50_procedures/game/usp_PshopPurchase_Execute.sql
--- Contract: the atomic two-character LIVE personal-shop-stall purchase commit -- CZ_BUY_PSHOP_SEND
--- (contracts/04_commerce.md, verified S04_MyWork02.cpp:6925-7124). Unlike an offline/proxy shop, a live
--- PShop's advertised item never leaves the seller's own inventory container until the moment of sale (the
--- PSHOP_INFO listing only ever POINTS at a live inventory slot) -- so both sides' containers are touched
--- here, the seller's, one-container twin of usp_CharacterTrade_Execute's own two-container/two-character
--- shape. D7 regime (b): both sides' money AND item container commit in ONE transaction, or neither does.
--- Params:
---   @SellerCharacterId      INT
---   @SellerContainer        TINYINT
---   @SellerItems            game.tvp_CharacterItemSlot READONLY -- seller's FULL new container (sold slot removed/decremented)
---   @BuyerCharacterId       INT
---   @BuyerContainer         TINYINT
---   @BuyerItems             game.tvp_CharacterItemSlot READONLY -- buyer's FULL new container (item added)
---   @Price                  INT -- buyer pays, seller receives (both plain Money, never BigMoney -- verified
---                                  S04_MyWork02.cpp:7056/7073, live PShop trades never touch aBigMoney)
--- Result set: none.
--- Idempotent: no.
--- No item-slot CAS guard here (unlike the offline-shop procs): the CALLER (BuyShopItemHandler) has
--- already re-validated the seller's LIVE PlayerRuntimeState.Inventory slot against the advertised listing
--- under BOTH participants' EconomyActionLock (held across this whole call), the same posture
--- TradeLockHandler's own commit already uses -- by the time this proc runs, the projected containers are
--- already known-correct, not merely assumed.
--- Errors:
---   THROW 50222 -- the buyer's money balance is insufficient, or @BuyerCharacterId is unknown (shared with
---                  usp_Character_AdjustMoney).
---   THROW 50261 -- either side's money adjustment would exceed the legacy money cap (shared with
---                  usp_Character_AdjustMoney).
---   THROW 50275 -- @SellerCharacterId is unknown (defensive -- should not happen given the caller's own
---                  live-state check immediately before calling).
+-- Live PShop trades never touch BigMoney (verified S04_MyWork02.cpp:7056/7073). No item-slot CAS guard
+-- here: the caller already re-validated the seller's live inventory under both participants'
+-- EconomyActionLock before calling.
 CREATE PROCEDURE game.usp_PshopPurchase_Execute @SellerCharacterId INT,
     @SellerContainer   TINYINT,
     @SellerItems       game.tvp_CharacterItemSlot READONLY,

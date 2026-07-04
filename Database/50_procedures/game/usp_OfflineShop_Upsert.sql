@@ -1,21 +1,6 @@
 -- database/50_procedures/game/usp_OfflineShop_Upsert.sql
--- Contract: open a new offline shop or update an existing one's location/state/money/name (item slots are
--- set separately via game.usp_OfflineShop_SetItems, since the client submits its whole shop layout as one
--- batch, not per-slot -- see game.tvp_OfflineShopItemSlot).
--- Params:
---   @CharacterId INT           -- game.Characters.CharacterId
---   @ZoneNumber  SMALLINT NULL -- world.Zones.ZoneNumber
---   @ShopState   TINYINT
---   @ShopDate    INT           -- kept as the legacy raw YYYYMMDD-style int (see game.OfflineShops)
---   @Money       INT
---   @BigMoney    INT
---   @LocationX   INT
---   @LocationY   INT
---   @LocationZ   INT
---   @ShopName    NVARCHAR(48)  -- legacy-fidelity only; game.ProxyShopNames is the authoritative display name
--- Result set: none.
--- Idempotent: yes -- re-running with the same inputs leaves the row in the same state.
--- No MERGE (forbidden, architecture reference §12.3): a single guarded UPDATE, falling back to INSERT.
+-- ShopName here is legacy-fidelity only; game.ProxyShopNames holds the authoritative display name.
+-- Guarded UPDATE-then-INSERT, no MERGE (architecture reference §12.3).
 CREATE PROCEDURE game.usp_OfflineShop_Upsert @CharacterId INT,
     @ZoneNumber  SMALLINT = NULL,
     @ShopState   TINYINT,

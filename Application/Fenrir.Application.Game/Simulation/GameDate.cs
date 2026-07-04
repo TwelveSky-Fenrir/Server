@@ -1,11 +1,6 @@
 namespace Fenrir.Application.Game.Simulation;
 
-/// <summary>
-///     The legacy's own "raw YYYYMMDD int" date encoding (<c>datetime.h::ReturnNowDate</c>, used verbatim
-///     across <c>ShopDate</c>/<c>InventoryDate</c>/<c>StoreDate</c>/daily-reward-claim gates) -- an
-///     absolute calendar date, never a duration, always UTC-based here (Fenrir has no per-shard local
-///     timezone concept).
-/// </summary>
+/// <summary>Legacy's raw YYYYMMDD int date encoding (datetime.h::ReturnNowDate), always UTC here.</summary>
 public static class GameDate
 {
     public static int Today()

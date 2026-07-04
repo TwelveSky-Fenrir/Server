@@ -3,7 +3,6 @@ using Fenrir.Data.Commerce;
 
 namespace Fenrir.Data.Characters;
 
-/// <summary>Abstraction over Fenrir.Data.Characters.CharacterRepository for DI/testability.</summary>
 public interface ICharacterRepository
 {
     public ValueTask<ReadOnlyCollection<CharacterSummaryDto>> GetByAccountAsync(int accountId, CancellationToken ct);

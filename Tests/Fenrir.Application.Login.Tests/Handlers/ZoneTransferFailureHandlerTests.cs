@@ -6,10 +6,8 @@ using Fenrir.Network.Sessions;
 
 namespace Fenrir.Application.Login.Tests.Handlers;
 
-/// <summary>
-///     op23 CL_FAIL_MOVE_ZONE_1_SEND — rollback to CharSelect when the client couldn't reach the zone it was
-///     redirected to (login protocol report §4.23). Legacy: no reply at all.
-/// </summary>
+// op23 CL_FAIL_MOVE_ZONE_1_SEND -- rollback to CharSelect when the client couldn't reach the zone it was
+// redirected to. Legacy: no reply at all.
 public class ClFailMoveZone1SendHandlerTests
 {
     [Fact]

@@ -63,8 +63,7 @@ public class TribeHaloEnchantResolverTests
     [Fact]
     public void Resolve_AtZeroHalo_SecondRollBelowDecrease_IsANeutralFail_NeverGoesNegative()
     {
-        // The source has no explicit "halo==0" downgrade branch -- it falls straight through to the
-        // neutral-fail path (doc 10 §2 tSort 7 / TribeHaloEnchantResolver's own remarks).
+        // no explicit halo==0 downgrade branch -- falls straight through to the neutral-fail path
         var random = new ScriptedRandomSource([50, 1]);
 
         var (outcome, newHalo, newProtect) = TribeHaloEnchantResolver.Resolve(0, 5, random);

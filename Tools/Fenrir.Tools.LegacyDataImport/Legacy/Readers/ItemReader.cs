@@ -3,15 +3,9 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Records;
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Readers;
 
 /// <summary>
-///     Parses <c>005_00002.IMG</c> (Header/Header/S15_MyShare.cpp:422-514, <c>MyShm::Load_Item</c>) and applies
-///     the same per-load patches the legacy server itself applies after unpacking (not baked into the file):
-///     zeroing retired item slots, the "custom create" sell-lock range, and the elite-exchange-lock rule.
-///     <c>Header/lnw33item.h</c>'s much larger <c>SetInw33Item</c> transform is NOT re-applied here -- it only
-///     ever runs inside the offline <c>ts25ztool</c> build tool (its one caller), so it is already baked into
-///     this IMG file on disk.
-///     Known gap: the hardcoded <c>ChangeItemSort</c> remaps (Header/itemsort99.h) that adjust
-///     <c>iSort</c>/<c>iDataNumber3D</c> for a small, specific set of item IDs are not replicated -- they only
-///     affect shop/inventory sort-category display, not core item stats.
+///     Parses <c>005_00002.IMG</c> and replays <c>MyShm::Load_Item</c>'s per-load patches (S15_MyShare.cpp:422-514):
+///     zeroed retired slots, the sell-lock range, elite-exchange-lock. Does NOT replay <c>SetInw33Item</c>
+///     (already baked into the file) or <c>ChangeItemSort</c> remaps (itemsort99.h; display-only, not core stats).
 /// </summary>
 internal static class ItemReader
 {
@@ -24,10 +18,7 @@ internal static class ItemReader
     private const int Ielite = 4;
     private static readonly int[] ElitesExchangeLockSorts = [13, 14, 15, 9, 12, 10, 11, 7];
 
-    /// <summary>
-    ///     Raw parse, exactly as bytes on disk -- no runtime patches applied. Use this to cross-validate
-    ///     against a <c>ts25ztool export item</c> CSV dump, which itself reads the file directly with no patching.
-    /// </summary>
+    /// <summary>Raw parse, no patches -- matches a raw <c>ts25ztool export item</c> CSV dump.</summary>
     public static IReadOnlyList<ItemRecord> ReadAllRaw(string dataDirectory)
     {
         var recordBytes = ImgUnpacker.UnpackRecordArray(
@@ -40,10 +31,7 @@ internal static class ItemReader
         return items;
     }
 
-    /// <summary>
-    ///     Raw records with the same per-load patches <c>MyShm::Load_Item</c> applies every server boot --
-    ///     this is what item data actually looks like at runtime, and what should be seeded into SQL Server.
-    /// </summary>
+    /// <summary>Patched records -- what item data looks like at runtime; seed this into SQL Server.</summary>
     public static IReadOnlyList<ItemRecord> ReadAll(string dataDirectory)
     {
         return ReadAllRaw(dataDirectory).Select(ApplyRuntimePatches).ToList();

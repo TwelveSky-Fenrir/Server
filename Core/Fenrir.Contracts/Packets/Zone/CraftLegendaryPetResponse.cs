@@ -4,11 +4,7 @@ using Fenrir.Contracts.Wire;
 
 namespace Fenrir.Contracts.Packets.Zone;
 
-/// <summary>
-///     ZC_MAKE_ITEM2_RECV (ZONE.h:1357) — same typedef as <see cref="UpgradeCapeResponse" /> (164),
-///     including the dead trailing <see cref="Padding" /> byte (wire size 30, not 29 — see that type's
-///     remarks). Reply to CZ_MAKE_ITEM2_SEND (131) + <c>MakeNotice</c> announcement on success; unicast.
-/// </summary>
+// Wire size is 30 (dead trailing Padding byte), not 29.
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.CraftLegendaryPet, ExpectedSize = 30)]
 public readonly partial record struct CraftLegendaryPetResponse : IOutgoingPacket
 {

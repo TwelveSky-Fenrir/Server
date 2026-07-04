@@ -1,14 +1,7 @@
--- Append-only audit trail of every cash balance movement (replaces the legacy GL_001_BUY_CASH line sent
--- over fire-and-forget UDP to ts25gamelog -- report 06 §4.3: real-money events deserve a SQL row written
--- IN THE SAME TRANSACTION as the debit/credit, not a text file that can silently drop). Modeled on
--- game.GiftLog: free-standing history (own IDENTITY, no FK back to a live row), no unique constraint on
--- AccountId -- an account legitimately accumulates many rows.
--- Delta is signed (positive = credit, negative = debit); BalanceAfter snapshots the post-movement
--- balance so the ledger is self-checking without replaying it. Reason is an app-defined TINYINT
--- category (same store-as-given convention as admin.Bans.Reason; Fenrir's C# enum owns the taxonomy,
--- e.g. item-mall purchase / GM grant / refund). ProductId optionally records the world.ItemMallProducts
--- row a purchase debit paid for -- an unenforced reference (not a FK) for the same reason as
--- game.Gifts.ProductId: the catalog row may be retired while its purchase history must survive.
+-- Append-only audit trail of every cash balance movement, written in the same transaction as the
+-- debit/credit (replaces the legacy fire-and-forget UDP GL_001_BUY_CASH line to ts25gamelog).
+-- Delta is signed (credit/debit); BalanceAfter snapshots the post-movement balance. ProductId is an
+-- unenforced reference (not a FK), same reasoning as game.Gifts.ProductId.
 CREATE TABLE game.CashLog
 (
     CashLogId    INT IDENTITY(1,1) NOT NULL,

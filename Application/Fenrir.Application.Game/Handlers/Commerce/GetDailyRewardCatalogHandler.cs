@@ -8,11 +8,9 @@ using Fenrir.Network.Sessions;
 namespace Fenrir.Application.Game.Handlers.Commerce;
 
 /// <summary>
-///     CZ_GET_REWARD_ITEM_SEND (opcode 154, contracts/04_commerce.md) -- the 7-day login-reward catalog
-///     plus this character's own claim cursor. world.RewardBundles has exactly 1 row in this build
-///     (verified), hardcoded here rather than resolved dynamically. Unlike the legacy's aggressive
-///     <c>Quit()</c> on any IPC/lookup failure, an unknown character here just returns the neutral
-///     all-day-7 answer (Fenrir has no IPC hop to fail in the first place).
+///     CZ_GET_REWARD_ITEM_SEND (opcode 154) -- the 7-day login-reward catalog plus this character's claim
+///     cursor. world.RewardBundles has exactly 1 row in this build, hardcoded here rather than resolved
+///     dynamically.
 /// </summary>
 public sealed class GetDailyRewardCatalogHandler(ICharacterRepository characters, WorldDataCache worldData)
     : IAsyncPacketHandler<GetDailyRewardCatalogRequest>

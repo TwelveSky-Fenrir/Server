@@ -1,36 +1,86 @@
--- Minimal M1 columns only -- just enough to drive LC_USER_AVATAR_RECV2 (char-select list) and the
--- ZC_REGISTER_AVATAR_RECV/AVATAR_INFO subset the M1 world-entry path actually reads
--- (M1_Legacy_Wire_Contract.md §4.4/§6.2). NOT a full AVATAR_INFO mirror: M1 is foundation +
--- minimal playable path, not gameplay or data migration (see plan's "hors périmètre M1").
--- Slot is the legacy 3-slot model (MAX_USER_AVATAR_NUM=3): CL_CREATE_AVATAR_SEND2/CL_DELETE_AVATAR_SEND
--- target tAvatarPost directly, so it must be an explicit column, not derived from insertion order.
+-- Legacy: wAvatar/AVATAR_INFO. Money/BigMoney and StoreMoney/BigStoreMoney mirror the legacy sub-billion
+-- int + billions-overflow-counter split (aMoney/aBigMoney) -- kept as BIGINT here for headroom, but the
+-- legacy per-pool caps still apply app-side.
+-- BloodCoin: no earn path exists in the available legacy source, only spend/decrement -- starts at 0.
+-- RewardClaimDay/RewardClaimDate: Fenrir computes the legacy's weekly reset lazily from RewardClaimDate
+-- instead of a background job -- see usp_Character_GetRewardClaimState/ClaimDailyReward.
+-- PetGrowth/PetActivity: one counter per character (legacy tracks growth per equipped pet item instance),
+-- reset on pet-item swap. TeacherPoint is unrelated to the TeacherCharacterId/StudentCharacterId mentor bond.
 CREATE TABLE game.Characters
 (
-    CharacterId   INT IDENTITY(1,1) NOT NULL,
-    AccountId     INT      NOT NULL,
-    Slot          TINYINT  NOT NULL,
-    Name          NVARCHAR(13)  NOT NULL,                                             -- MAX_AVATAR_NAME_LENGTH=13, a real wire truncation limit
-    Tribe         TINYINT  NOT NULL,
-    Gender        TINYINT  NOT NULL,
-    HeadType      TINYINT  NOT NULL,
-    FaceType      TINYINT  NOT NULL,
-    Level         SMALLINT NOT NULL CONSTRAINT DF_Characters_Level DEFAULT 1,
-    MapId         SMALLINT NOT NULL,
-    PosX          REAL     NOT NULL,
-    PosY          REAL     NOT NULL,
-    PosZ          REAL     NOT NULL,
-    Heading       REAL     NOT NULL CONSTRAINT DF_Characters_Heading DEFAULT 0,       -- ACTION_INFO.aFront, orientation
-    Life          INT      NOT NULL,
-    MaxLife       INT      NOT NULL,
-    Mana          INT      NOT NULL,
-    MaxMana       INT      NOT NULL,
-    FlushSequence BIGINT   NOT NULL CONSTRAINT DF_Characters_FlushSequence DEFAULT 0, -- §12.6 idempotent write-behind
-    CreatedAtUtc  DATETIME2(3)  NOT NULL CONSTRAINT DF_Characters_CreatedAtUtc DEFAULT SYSUTCDATETIME(),
-    UpdatedAtUtc  DATETIME2(3)  NOT NULL CONSTRAINT DF_Characters_UpdatedAtUtc DEFAULT SYSUTCDATETIME(),
+    CharacterId           INT IDENTITY(1,1) NOT NULL,
+    AccountId             INT           NOT NULL,
+    Slot                  TINYINT       NOT NULL,
+    Name                  NVARCHAR(13)  NOT NULL, -- MAX_AVATAR_NAME_LENGTH=13, a real wire truncation limit
+    Tribe                 TINYINT       NOT NULL,
+    Gender                TINYINT       NOT NULL,
+    HeadType              TINYINT       NOT NULL,
+    FaceType              TINYINT       NOT NULL,
+    Level                 SMALLINT      NOT NULL CONSTRAINT DF_Characters_Level DEFAULT 1,
+    Level2                SMALLINT      NOT NULL CONSTRAINT DF_Characters_Level2 DEFAULT 1, -- aLevel2, martial/battle level
+    MapId                 SMALLINT      NOT NULL,
+    PosX                  REAL          NOT NULL,
+    PosY                  REAL          NOT NULL,
+    PosZ                  REAL          NOT NULL,
+    Heading               REAL          NOT NULL CONSTRAINT DF_Characters_Heading DEFAULT 0, -- ACTION_INFO.aFront
+    Life                  INT           NOT NULL,
+    MaxLife               INT           NOT NULL,
+    Mana                  INT           NOT NULL,
+    MaxMana               INT           NOT NULL,
+    Experience            BIGINT        NOT NULL CONSTRAINT DF_Characters_Experience DEFAULT 0 CONSTRAINT CK_Characters_Experience CHECK (Experience >= 0), -- aExp1+aExp2 combined
+    StatVit               INT           NOT NULL CONSTRAINT DF_Characters_StatVit DEFAULT 0,
+    StatStr               INT           NOT NULL CONSTRAINT DF_Characters_StatStr DEFAULT 0,
+    StatInt               INT           NOT NULL CONSTRAINT DF_Characters_StatInt DEFAULT 0,
+    StatDex               INT           NOT NULL CONSTRAINT DF_Characters_StatDex DEFAULT 0,
+    StatPoints            INT           NOT NULL CONSTRAINT DF_Characters_StatPoints DEFAULT 0,
+    SkillPoints           INT           NOT NULL CONSTRAINT DF_Characters_SkillPoints DEFAULT 0,
+    Money                 BIGINT        NOT NULL CONSTRAINT DF_Characters_Money DEFAULT 0 CONSTRAINT CK_Characters_Money CHECK (Money >= 0),
+    BigMoney              INT           NOT NULL CONSTRAINT DF_Characters_BigMoney DEFAULT 0 CONSTRAINT CK_Characters_BigMoney CHECK (BigMoney >= 0),
+    StoreMoney            BIGINT        NOT NULL CONSTRAINT DF_Characters_StoreMoney DEFAULT 0 CONSTRAINT CK_Characters_StoreMoney CHECK (StoreMoney >= 0),
+    BigStoreMoney         INT           NOT NULL CONSTRAINT DF_Characters_BigStoreMoney DEFAULT 0 CONSTRAINT CK_Characters_BigStoreMoney CHECK (BigStoreMoney >= 0),
+    RebirthCount          INT           NOT NULL CONSTRAINT DF_Characters_RebirthCount DEFAULT 0, -- MAX_REBIRTH_LIMIT=12, app-enforced
+    Title                 INT           NOT NULL CONSTRAINT DF_Characters_Title DEFAULT 0,
+    Halo                  INT           NOT NULL CONSTRAINT DF_Characters_Halo DEFAULT 0,
+    ContributionPoints    INT           NOT NULL CONSTRAINT DF_Characters_ContributionPoints DEFAULT 0, -- aKillOtherTribe (CP)
+    TeacherPoint          INT           NOT NULL CONSTRAINT DF_Characters_TeacherPoint DEFAULT 0 CONSTRAINT CK_Characters_TeacherPoint CHECK (TeacherPoint >= 0), -- quest reward type 5
+    EatLifePotion         INT           NOT NULL CONSTRAINT DF_Characters_EatLifePotion DEFAULT 0 CONSTRAINT CK_Characters_EatLifePotion CHECK (EatLifePotion BETWEEN 0 AND 400),
+    EatManaPotion         INT           NOT NULL CONSTRAINT DF_Characters_EatManaPotion DEFAULT 0 CONSTRAINT CK_Characters_EatManaPotion CHECK (EatManaPotion BETWEEN 0 AND 400),
+    EatStrPotion          INT           NOT NULL CONSTRAINT DF_Characters_EatStrPotion DEFAULT 0 CONSTRAINT CK_Characters_EatStrPotion CHECK (EatStrPotion BETWEEN 0 AND 400),
+    EatDexPotion          INT           NOT NULL CONSTRAINT DF_Characters_EatDexPotion DEFAULT 0 CONSTRAINT CK_Characters_EatDexPotion CHECK (EatDexPotion BETWEEN 0 AND 400),
+    EatElePotion          INT           NOT NULL CONSTRAINT DF_Characters_EatElePotion DEFAULT 0 CONSTRAINT CK_Characters_EatElePotion CHECK (EatElePotion BETWEEN 0 AND 400),
+    ProtectForDeath       INT           NOT NULL CONSTRAINT DF_Characters_ProtectForDeath DEFAULT 0 CONSTRAINT CK_Characters_ProtectForDeath CHECK (ProtectForDeath >= 0),
+    ProtectForDestroy     INT           NOT NULL CONSTRAINT DF_Characters_ProtectForDestroy DEFAULT 0 CONSTRAINT CK_Characters_ProtectForDestroy CHECK (ProtectForDestroy >= 0),
+    DoubleExpTime1        INT           NOT NULL CONSTRAINT DF_Characters_DoubleExpTime1 DEFAULT 0, -- YYYYMMDD, 0 = no boost
+    DoubleExpTime2        INT           NOT NULL CONSTRAINT DF_Characters_DoubleExpTime2 DEFAULT 0,
+    DropItemTime          INT           NOT NULL CONSTRAINT DF_Characters_DropItemTime DEFAULT 0,
+    InventoryDate         INT           NOT NULL CONSTRAINT DF_Characters_InventoryDate DEFAULT 0, -- bonus inventory page rental
+    StoreDate             INT           NOT NULL CONSTRAINT DF_Characters_StoreDate DEFAULT 0,
+    BloodCoin             INT           NOT NULL CONSTRAINT DF_Characters_BloodCoin DEFAULT 0 CONSTRAINT CK_Characters_BloodCoin CHECK (BloodCoin >= 0),
+    RewardClaimDay        TINYINT       NOT NULL CONSTRAINT DF_Characters_RewardClaimDay DEFAULT 0 CONSTRAINT CK_Characters_RewardClaimDay CHECK (RewardClaimDay BETWEEN 0 AND 7),
+    RewardClaimDate       INT           NOT NULL CONSTRAINT DF_Characters_RewardClaimDate DEFAULT 0,
+    TeacherCharacterId    INT NULL,
+    StudentCharacterId    INT NULL,
+    JoinWar               INT           NOT NULL CONSTRAINT DF_Characters_JoinWar DEFAULT 0 CONSTRAINT CK_Characters_JoinWar CHECK (JoinWar >= 0),
+    MissionKillOtherTribe INT           NOT NULL CONSTRAINT DF_Characters_MissionKillOtherTribe DEFAULT 0 CONSTRAINT CK_Characters_MissionKillOtherTribe CHECK (MissionKillOtherTribe >= 0), -- aMissionDate.aKillOtherTribe, distinct from ContributionPoints
+    MissionKillMonster    INT           NOT NULL CONSTRAINT DF_Characters_MissionKillMonster DEFAULT 0 CONSTRAINT CK_Characters_MissionKillMonster CHECK (MissionKillMonster >= 0),
+    MissionPlayTime       INT           NOT NULL CONSTRAINT DF_Characters_MissionPlayTime DEFAULT 0 CONSTRAINT CK_Characters_MissionPlayTime CHECK (MissionPlayTime >= 0),
+    AutoHuntEnabled       BIT           NOT NULL CONSTRAINT DF_Characters_AutoHuntEnabled DEFAULT 0,
+    AutoHuntConfig        VARBINARY(112) NOT NULL CONSTRAINT DF_Characters_AutoHuntConfig DEFAULT 0x,
+    AutoLifeRatio         TINYINT       NOT NULL CONSTRAINT DF_Characters_AutoLifeRatio DEFAULT 0 CONSTRAINT CK_Characters_AutoLifeRatio CHECK (AutoLifeRatio BETWEEN 0 AND 5),
+    AutoManaRatio         TINYINT       NOT NULL CONSTRAINT DF_Characters_AutoManaRatio DEFAULT 0 CONSTRAINT CK_Characters_AutoManaRatio CHECK (AutoManaRatio BETWEEN 0 AND 5),
+    PetGrowth             INT           NOT NULL CONSTRAINT DF_Characters_PetGrowth DEFAULT 0 CONSTRAINT CK_Characters_PetGrowth CHECK (PetGrowth >= 0),
+    PetActivity           TINYINT       NOT NULL CONSTRAINT DF_Characters_PetActivity DEFAULT 0 CONSTRAINT CK_Characters_PetActivity CHECK (PetActivity BETWEEN 0 AND 100),
+    FlushSequence         BIGINT        NOT NULL CONSTRAINT DF_Characters_FlushSequence DEFAULT 0, -- idempotent write-behind
+    CreatedAtUtc          DATETIME2(3)  NOT NULL CONSTRAINT DF_Characters_CreatedAtUtc DEFAULT SYSUTCDATETIME(),
+    UpdatedAtUtc          DATETIME2(3)  NOT NULL CONSTRAINT DF_Characters_UpdatedAtUtc DEFAULT SYSUTCDATETIME(),
     CONSTRAINT PK_Characters PRIMARY KEY CLUSTERED (CharacterId),
     CONSTRAINT UQ_Characters_Name UNIQUE (Name),
     CONSTRAINT UQ_Characters_Account_Slot UNIQUE (AccountId, Slot),
     CONSTRAINT CK_Characters_Slot CHECK (Slot BETWEEN 0 AND 2),
     CONSTRAINT FK_Characters_Account FOREIGN KEY (AccountId) REFERENCES auth.Accounts (AccountId),
-    INDEX         IX_Characters_Account NONCLUSTERED (AccountId) INCLUDE (Slot, Name, Tribe, Level)
+    CONSTRAINT FK_Characters_TeacherCharacter FOREIGN KEY (TeacherCharacterId) REFERENCES game.Characters (CharacterId),
+    CONSTRAINT FK_Characters_StudentCharacter FOREIGN KEY (StudentCharacterId) REFERENCES game.Characters (CharacterId),
+    CONSTRAINT CK_Characters_TeacherNotSelf CHECK (TeacherCharacterId IS NULL OR TeacherCharacterId <> CharacterId),
+    CONSTRAINT CK_Characters_StudentNotSelf CHECK (StudentCharacterId IS NULL OR StudentCharacterId <> CharacterId),
+    INDEX IX_Characters_Account NONCLUSTERED (AccountId) INCLUDE (Slot, Name, Tribe, Level)
 );

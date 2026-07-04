@@ -4,11 +4,7 @@ using Konscious.Security.Cryptography;
 
 namespace Fenrir.Domain.Security;
 
-/// <summary>
-///     Argon2id account password hashing (architecture reference §9.1: m=64 MiB, t=3, p=1, recalibrated by an
-///     annual benchmark). Pure — no SQL, no network — so it belongs in Core: the wire stays clear-text for legacy
-///     client compatibility (ADR-0003 A-05), but nothing server-side ever stores or compares a plain password.
-/// </summary>
+/// <summary>Argon2id hashing; wire stays clear-text for legacy client compat, but nothing server-side stores/compares a plain password.</summary>
 public static class PasswordHasher
 {
     private const int MemorySizeKb = 64 * 1024;
@@ -23,10 +19,7 @@ public static class PasswordHasher
         return (HashWithSalt(password, salt), salt);
     }
 
-    /// <summary>
-    ///     Constant-time by construction: <see cref="CryptographicOperations.FixedTimeEquals" /> never short-circuits on
-    ///     the first differing byte.
-    /// </summary>
+    /// <summary>Constant-time: <see cref="CryptographicOperations.FixedTimeEquals" /> never short-circuits on a differing byte.</summary>
     public static bool Verify(string password, byte[] hash, byte[] salt)
     {
         return CryptographicOperations.FixedTimeEquals(HashWithSalt(password, salt), hash);

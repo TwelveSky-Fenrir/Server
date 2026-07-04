@@ -5,7 +5,7 @@ using Fenrir.Contracts.Tests.TestSupport;
 
 namespace Fenrir.Contracts.Tests.Packets.Shared;
 
-/// <summary>GUILD_MAKE_AGM_CRECV (17 bytes, STRUCT.h:1182-1186, NO padding) -- CZ_GUILD_WORK_SEND tSort 9.</summary>
+// CZ_GUILD_WORK_SEND tSort 9.
 public class GuildWorkAgmPayloadTests
 {
     [Fact]

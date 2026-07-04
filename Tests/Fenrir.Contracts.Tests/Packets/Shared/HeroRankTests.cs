@@ -5,11 +5,7 @@ using Fenrir.Contracts.Tests.TestSupport;
 
 namespace Fenrir.Contracts.Tests.Packets.Shared;
 
-/// <summary>
-///     HERO_RANK (680 bytes, STRUCT.h:678-682) — Name[40][13] (520 bytes, already 4-byte aligned) then
-///     Point[40] (160 bytes), zero padding. The golden encoder below is hand-built from the C++
-///     layout, independent of the generated <c>Write</c>.
-/// </summary>
+// Golden encoder is hand-built from the C++ HERO_RANK layout, independent of the generated Write.
 public class HeroRankTests
 {
     [Fact]

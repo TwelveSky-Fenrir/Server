@@ -1,9 +1,6 @@
 namespace Fenrir.Generators.Analysis.Support;
 
-/// <summary>
-///     Local mirror of <c>Fenrir.Contracts.Wire.WireHeaderSizes</c> — the generator can't reference the assembly it
-///     analyzes, so frame sizes are hardcoded here for codegen.
-/// </summary>
+/// <summary>Mirrors <c>Fenrir.Contracts.Wire.WireHeaderSizes</c>; frame sizes hardcoded since codegen can't reference that assembly.</summary>
 internal static class WireHeaderSizes
 {
     public const int ClientPacketSize = 9;

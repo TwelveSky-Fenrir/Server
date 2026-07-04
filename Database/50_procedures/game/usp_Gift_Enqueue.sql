@@ -1,15 +1,4 @@
--- database/50_procedures/game/usp_Gift_Enqueue.sql
--- Contract: create a new pending gift for an account (e.g. a cash-shop purchase or GM delivery).
--- Params:
---   @AccountId INT      -- auth.Accounts.AccountId
---   @ProductId INT NULL -- see game.Gifts for why this is an unenforced reference, not a real FK; NULL for
---                           "no product reference" (translate legacy 0 -> NULL before calling)
---   @Quantity  INT
---   @Value     INT
--- Result set (RS0, single row/column -- ExecuteScalarAsync<int>): 1. GiftId INT (identity of the new row).
--- Idempotent: no (each call creates one new gift). Also appends a GiftLog row capturing this Pending state,
--- so the log has an entry for every state a gift ever passed through, not just its terminal claim.
--- Errors: none.
+-- Also appends a GiftLog row for this Pending state, so the log covers every state a gift passes through.
 CREATE PROCEDURE game.usp_Gift_Enqueue @AccountId INT,
     @ProductId INT = NULL,
     @Quantity  INT,

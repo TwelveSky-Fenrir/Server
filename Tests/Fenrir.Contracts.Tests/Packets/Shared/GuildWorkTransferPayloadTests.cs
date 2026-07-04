@@ -4,7 +4,7 @@ using Fenrir.Contracts.Tests.TestSupport;
 
 namespace Fenrir.Contracts.Tests.Packets.Shared;
 
-/// <summary>GUILD_TRANSFER_LEADER_CRECV (26 bytes, STRUCT.h:1203-1207) -- CZ_GUILD_WORK_SEND tSort 17.</summary>
+// CZ_GUILD_WORK_SEND tSort 17.
 public class GuildWorkTransferPayloadTests
 {
     [Fact]

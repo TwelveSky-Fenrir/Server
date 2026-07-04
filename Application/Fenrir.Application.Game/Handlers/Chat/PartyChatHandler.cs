@@ -9,11 +9,8 @@ using Fenrir.Network.Sessions;
 namespace Fenrir.Application.Game.Handlers.Chat;
 
 /// <summary>
-///     CZ_PARTY_CHAT_SEND (opcode 68). Empty content ⇒ Quit(); no party ⇒ silent return. TRAP,
-///     preserved verbatim (see <see cref="PartyChatRequest.Link" />'s own remarks): the item link is DEAD
-///     server-side in the legacy -- the outgoing ZC_PARTY_CHAT_RECV ALWAYS carries a zeroed link, even
-///     though the incoming wire field is decoded (Fenrir decodes it too, then deliberately discards it).
-///     Fan-out to every party member across every zone.
+///     CZ_PARTY_CHAT_SEND (opcode 68). The outgoing link is always zeroed -- the legacy decodes the
+///     incoming item link but never relays it, so it is decoded here and then deliberately discarded.
 /// </summary>
 public sealed class PartyChatHandler(ZoneRegistry zones, PartyRegistry parties) : IInlinePacketHandler<PartyChatRequest>
 {
@@ -38,7 +35,7 @@ public sealed class PartyChatHandler(ZoneRegistry zones, PartyRegistry parties) 
 
         var members = parties.GetMembers(characterId);
         if (members.Count == 0)
-            return; // "pas de groupe" -- silent return, not a Quit
+            return;
 
         var response = new PartyChatResponse
             { AvatarName = sender.Name, Content = packet.Content, Link = EmptyLink };

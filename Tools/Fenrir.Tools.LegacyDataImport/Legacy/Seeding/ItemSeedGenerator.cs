@@ -5,14 +5,9 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Records;
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Seeding;
 
 /// <summary>
-///     Generates <c>70_seed/world/080_items.sql</c> from the real <c>005_00002.IMG</c> data
-///     (<see cref="ItemReader.ReadAll" /> -- post-runtime-patch, i.e. what the live legacy server actually
-///     serves). One row per <see cref="ItemRecord" /> where <c>Index != 0</c>: the runtime patch's
-///     retired-slot zeroing (89501-89562, 99001) is the legacy "deleted item" convention, so those slots
-///     carry no real data and are skipped rather than seeded as ~65,600 empty placeholder rows.
-///     <c>GainSkillNumber</c> keeps its legacy name but is a nullable FK to world.Skills (every one of its
-///     78 distinct non-zero values in the real data is a valid SkillId); the legacy "0 = no skill" sentinel
-///     translates to NULL.
+///     Generates <c>70_seed/world/080_items.sql</c> from <see cref="ItemReader.ReadAll" /> (005_00002.IMG,
+///     post-runtime-patch), one row per item where Index != 0 (retired slots 89501-89562/99001 are the
+///     legacy "deleted item" convention). GainSkillNumber's legacy "0 = no skill" sentinel becomes NULL.
 /// </summary>
 public static class ItemSeedGenerator
 {

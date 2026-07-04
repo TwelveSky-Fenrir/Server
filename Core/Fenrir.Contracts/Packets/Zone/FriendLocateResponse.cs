@@ -4,10 +4,7 @@ using Fenrir.Contracts.Wire;
 
 namespace Fenrir.Contracts.Packets.Zone;
 
-/// <summary>
-///     ZC_FRIEND_FIND_RECV (ZONE.h:732-736). <c>ZoneNumber=-1</c> when the friend is offline OR its tribe no longer
-///     matches (S04_MyWork02.cpp:9277-9280).
-/// </summary>
+// ZoneNumber=-1 when the friend is offline or its tribe no longer matches.
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.FriendLocate, ExpectedSize = 9)]
 public readonly partial record struct FriendLocateResponse : IOutgoingPacket
 {

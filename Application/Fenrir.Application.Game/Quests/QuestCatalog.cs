@@ -3,12 +3,7 @@ using Fenrir.Application.Game.GameData;
 
 namespace Fenrir.Application.Game.Quests;
 
-/// <summary>
-///     Indexes <see cref="WorldDataCache.QuestsById" /> by (Category, Step) -- mirrors
-///     <c>mQUEST.Search(tribe, step)</c>'s lookup shape (Category = tribe + 1). Built once at DI
-///     construction from the already-loaded, immutable <see cref="WorldDataCache" />, same "cheap derived
-///     index over a singleton" pattern as <see cref="Stats.SetBonusTables" />.
-/// </summary>
+/// <summary>Indexes WorldDataCache.QuestsById by (Category, Step) -- mirrors mQUEST.Search(tribe, step) (Category = tribe + 1).</summary>
 public sealed class QuestCatalog
 {
     private readonly FrozenDictionary<(byte Category, short Step), QuestDefinition> _byCategoryStep;
@@ -19,10 +14,7 @@ public sealed class QuestCatalog
             .ToFrozenDictionary(q => (q.Quest.Category, q.Quest.Step));
     }
 
-    /// <summary>
-    ///     Resolves <c>mQUEST.Search(tribe, step)</c> -- null (not found) is a normal, expected outcome (e.g. the tribe's
-    ///     chain ends at this step).
-    /// </summary>
+    /// <summary>Null (not found) is expected -- e.g. the tribe's chain ends at this step.</summary>
     public QuestDefinition? TryGet(byte tribe, int step)
     {
         if (step is < 0 or > short.MaxValue)

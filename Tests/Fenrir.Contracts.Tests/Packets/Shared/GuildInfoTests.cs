@@ -5,14 +5,7 @@ using Fenrir.Contracts.Tests.TestSupport;
 
 namespace Fenrir.Contracts.Tests.Packets.Shared;
 
-/// <summary>
-///     GUILD_INFO (1388 bytes, STRUCT.h:684-700) — full guild snapshot with THREE natural-alignment
-///     padding zones: 3 bytes after <c>Name</c> (offset 13..15, before the int <c>Grade</c>), 3 bytes
-///     after <c>MemberNames[50][13]</c> (offset 709..711, before the int array <c>MemberRoles</c>),
-///     and 2 bytes after <c>Notices[4][51]</c> (offset 1366..1367, before the int <c>Point</c>). The
-///     golden encoder below is hand-built from the C++ layout, independent of the generated
-///     <c>Write</c>, and explicitly asserts all three padding zones are zero.
-/// </summary>
+// Golden encoder is hand-built from the C++ GUILD_INFO layout (3 natural-alignment padding zones), independent of the generated Write.
 public class GuildInfoTests
 {
     [Fact]

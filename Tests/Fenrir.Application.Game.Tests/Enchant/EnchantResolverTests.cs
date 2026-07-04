@@ -24,8 +24,6 @@ public class EnchantResolverTests
         return new ItemStack(1, 1, enchant, 0, 0, 0, 0, 0, 0, 0, 0);
     }
 
-    // ---- Structural rejections ----
-
     [Fact]
     public void EquipSortOutOfRange_IsRejected()
     {
@@ -76,8 +74,6 @@ public class EnchantResolverTests
 
         Assert.Equal(EnchantResolver.EnchantOutcome.Rejected, result.Outcome);
     }
-
-    // ---- Standard regime (+0..+40), stone materials -- real probabilistic path ----
 
     [Fact]
     public void StoneMaterial_SuccessRoll_IncrementsEnchantByBaseValue()
@@ -145,10 +141,7 @@ public class EnchantResolverTests
     [Fact]
     public void StoneMaterial_FailureAtZero_NeverGoesNegative()
     {
-        // current=0, material 1023 (+5) -> newImprove=5, p1=103-15+0=88 (NOT the guaranteed-success 100 a
-        // +1 stone would give at this level) -- roll 90 (>= 88) fails; current+value=5 <= SAFE_IMPROVE_VALUE
-        // so no destroy roll is even reachable, straight to plain failure. Enchant was already 0, so it must
-        // floor there rather than go negative.
+        // current=0, material 1023 (+5): p1=103-15+0=88, roll 90 fails -- must floor at 0, not go negative
         var target = Equip(1);
         var result = EnchantResolver.Resolve(target, Target(0), Material(1023), 0, 0,
             new ScriptedRandomSource(90));
@@ -168,8 +161,6 @@ public class EnchantResolverTests
         Assert.Equal(EnchantResolver.EnchantOutcome.Success, result.Outcome);
         Assert.Equal(40, result.NewEnchant);
     }
-
-    // ---- Forced-100% scrolls (633/619/540/538/551/565/825) ----
 
     [Fact]
     public void ForcedScroll633_AlwaysSucceeds_EvenOnWorstRoll_NoTypeRequirement()
@@ -225,8 +216,6 @@ public class EnchantResolverTests
         Assert.Equal(50, result.NewEnchant);
         Assert.Equal(0, result.Cost);
     }
-
-    // ---- Advanced regime (+41..+50) ----
 
     [Fact]
     public void AtExactlyForty_RequiresUnsealMaterial()

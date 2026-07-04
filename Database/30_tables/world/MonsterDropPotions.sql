@@ -1,11 +1,4 @@
--- legacy mDropPotionInfo[5][2] -- normalized to one row per POPULATED slot (rate/id pair both non-zero;
--- a full-population scan of all 1139 monsters x 5 slots found zero cases of a partial pair, so "both
--- non-zero" and "either non-zero" give an identical row set here -- unlike MonsterDropExtraItems).
--- Pair order confirmed [rate, itemId] by cross-referencing decoded values against
--- Server/BuildEU33/005_00004DROP.CSV (e.g. monster 1 "Kobold": pairs (200000,2) and (20000,26) match
--- the CSV's field-for-field dump exactly) -- consistent with the DropExtraItemInfo convention.
--- PotionItemId is NOT NULL: every populated slot's item half is provably non-zero (see above), so no
--- 0->NULL translation is needed for this table (contrast MonsterDropExtraItems).
+-- Legacy mDropPotionInfo[5][2]; one row per populated slot (rate/id pairs are always both-zero or both-non-zero here, unlike MonsterDropExtraItems).
 CREATE TABLE world.MonsterDropPotions
 (
     MonsterId    INT     NOT NULL,

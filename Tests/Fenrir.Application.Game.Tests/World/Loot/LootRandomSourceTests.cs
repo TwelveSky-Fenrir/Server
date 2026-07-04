@@ -25,9 +25,7 @@ public class LootRandomSourceTests
     [Fact]
     public void RandomNumber_IsAProductOfTwoDrawsNotASingleUniformDraw()
     {
-        // Verified against source (MyUtil::RandomNumber, S07_MyGame03.cpp:993-998): (1+r1)*(1+r2), NOT a
-        // single uniform draw over some fixed range -- this pins the exact, source-verified shape rather than
-        // the report's own flagged "0-9999 ?" uncertainty (see LootRandomSource's class remarks).
+        // MyUtil::RandomNumber (S07_MyGame03.cpp): (1+r1)*(1+r2), not a single uniform draw
         var random = new ScriptedRandom(9, 4);
 
         Assert.Equal(50, LootRandomSource.RandomNumber(random)); // (1+9) * (1+4) = 50

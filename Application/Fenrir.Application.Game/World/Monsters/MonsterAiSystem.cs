@@ -3,40 +3,17 @@ using Fenrir.Application.Game.Simulation;
 namespace Fenrir.Application.Game.World.Monsters;
 
 /// <summary>
-///     Per-tick monster AI (report ServerDocs/30_Fenrir_ServerLogic/05_game_mechanics.md §3, verified against
-///     <c>Server/ts25zone/S07_MyGame05.cpp</c>'s <c>MONSTER_OBJECT::Update</c>): a SIMPLIFIED FSM covering
-///     spawn-wait, proximity aggro detection, pursuit with a spawn-anchored leash, a windup-timed attack
-///     state, and a forced return-to-spawn -- the "simple FSM is fine for this pass" scope this task's brief
-///     explicitly allows. One instance per <see cref="Zone" />.
+///     Per-tick monster AI (<c>Server/ts25zone/S07_MyGame05.cpp</c>'s <c>MONSTER_OBJECT::Update</c>): a
+///     simplified FSM covering spawn-wait, proximity aggro detection, pursuit with a spawn-anchored leash, a
+///     windup-timed attack state, and forced return-to-spawn. One instance per <see cref="Zone" />.
 /// </summary>
 /// <remarks>
-///     Deliberately NOT ported (open issues, not oversights):
+///     Deliberately not ported:
 ///     <list type="bullet">
-///         <item>
-///             Random wander while idle (legacy: "patrouille aléatoire") -- no wander radius/timing constant was
-///             found in the source within this task's scope, so an idle monster simply stays at its home point
-///             instead of inventing one; it still walks home if displaced (<see cref="MonsterAiState.Patrol" />).
-///         </item>
-///         <item>
-///             The leash bound reuses the monster's OWN spawn region <c>Radius</c> (
-///             <see cref="MonsterEntity.LeashRadius" />)
-///             -- the one concrete <c>PathForMonsterAttack</c> call site read during this investigation actually
-///             bounds pursuit against the TARGET's position with <c>mRadiusInfo[0]</c> (closing to attack range), not
-///             a distance-from-spawn leash; no hardcoded "leash distance from home" constant was located in the
-///             source. Using the region's own configured scatter radius as the leash is a documented, reasonable,
-///             data-driven stand-in, not a verified constant.
-///         </item>
-///         <item>
-///             Monster-initiated damage to a player (legacy: <c>ProcessAttack04</c> -- NEVER reached via the wire
-///             dispatch in practice, only ever called directly from the monster's own AI, <c>S07_MyGame05.cpp:3961</c>)
-///             fires once per attack-windup entry via <see cref="Zone.ResolveMonsterAttack" />
-///             (<see cref="Combat.MonsterCombatResolver.ResolveMvpAttack" /> -- verified formula, see that type's own
-///             remarks for exactly what is/isn't reproduced).
-///         </item>
-///         <item>
-///             Boss/guard/tribe-symbol special AI (aSort 7/8/12 in the full legacy table) -- no such content in this
-///             batch.
-///         </item>
+///         <item>Random wander while idle -- no wander radius/timing constant found in source; an idle monster stays at its home point.</item>
+///         <item>The leash bound reuses the monster's own spawn-region radius (<see cref="MonsterEntity.LeashRadius" />) -- no "leash distance from home" constant was found in source, so this is a data-driven stand-in.</item>
+///         <item>Monster-initiated damage fires via <see cref="Zone.ResolveMonsterAttack" /> (<see cref="Combat.MonsterCombatResolver.ResolveMvpAttack" />).</item>
+///         <item>Boss/guard/tribe-symbol special AI -- not modeled.</item>
 ///     </list>
 /// </remarks>
 public sealed class MonsterAiSystem : ISimulationSystem
@@ -83,8 +60,7 @@ public sealed class MonsterAiSystem : ISimulationSystem
                 }
                 else
                 {
-                    TryAcquireTarget(zone,
-                        monster); // re-checked every tick, same as Decision -- a wandering monster can still be aggroed
+                    TryAcquireTarget(zone, monster); // re-checked every tick -- a wandering monster can still be aggroed
                 }
 
                 break;
@@ -112,7 +88,7 @@ public sealed class MonsterAiSystem : ISimulationSystem
                     ArrivalEpsilon * ArrivalEpsilon)
                 {
                     monster.TargetCharacterId = null;
-                    monster.AiState = MonsterAiState.Spawning; // report 05 §3: aSort 19 -> teleport home -> aSort 0
+                    monster.AiState = MonsterAiState.Spawning; // aSort 19 -> teleport home -> aSort 0
                     monster.StateTicks = 0;
                 }
 
@@ -135,13 +111,10 @@ public sealed class MonsterAiSystem : ISimulationSystem
     }
 
     /// <summary>
-    ///     <c>SelectAvatarIndexForPossibleAttack</c> (<c>S07_MyGame05.cpp:113-216</c>): proactive aggro is gated
-    ///     to <c>mAttackType ∈ {1,3,6}</c> (l.123 -- a prior pass here had NO such gate, so passive/reactive-only
-    ///     monster types incorrectly hunted players on sight) and detection radius is <c>mRadiusInfo[1]</c>
-    ///     (l.132/182 -- i.e. <see cref="Fenrir.Data.World.MonsterRowDto.RadiusInfo2" />, NOT
-    ///     <see cref="Fenrir.Data.World.MonsterRowDto.RadiusInfo1" />, which is the SMALLER melee-range radius
-    ///     <see cref="RunChase" /> uses to decide when to transition into <see cref="MonsterAiState.AttackWindup" />
-    ///     -- a prior pass here had the two radii swapped between these two call sites).
+    ///     <c>SelectAvatarIndexForPossibleAttack</c> (<c>S07_MyGame05.cpp:113-216</c>): proactive aggro gated to
+    ///     <c>mAttackType ∈ {1,3,6}</c>; detection radius is <see cref="Fenrir.Data.World.MonsterRowDto.RadiusInfo2" />,
+    ///     not <see cref="Fenrir.Data.World.MonsterRowDto.RadiusInfo1" /> (the smaller melee-range radius
+    ///     <see cref="RunChase" /> uses for the attack-windup transition) -- do not swap these two.
     /// </summary>
     private bool TryAcquireTarget(Zone zone, MonsterEntity monster)
     {
@@ -169,7 +142,7 @@ public sealed class MonsterAiSystem : ISimulationSystem
         return false;
     }
 
-    /// <summary>Bounded FIFO, oldest purged first (report 05 §3: <c>MAX_MONSTER_OBJECT_ATTACK_NUM = 50</c>).</summary>
+    /// <summary>Bounded FIFO, oldest purged first (legacy cap 50).</summary>
     private static void RecordAggro(MonsterEntity monster, int characterId)
     {
         var list = monster.AggroCharacterIds;
@@ -194,8 +167,7 @@ public sealed class MonsterAiSystem : ISimulationSystem
         }
 
         // Leash: once pursuit would carry the monster further from home than its region's own radius, give up
-        // and head back instead of closing the remaining distance (see class remarks on this being a
-        // documented stand-in, not a verified constant).
+        // and head back instead of closing the remaining distance.
         if (DistanceSquared(monster.PosX, monster.PosZ, monster.HomeX, monster.HomeZ) >
             monster.LeashRadius * monster.LeashRadius)
         {
@@ -205,11 +177,8 @@ public sealed class MonsterAiSystem : ISimulationSystem
             return;
         }
 
-        // A005's own "close enough to transition into an attack" threshold uses mRadiusInfo[0] (RadiusInfo1,
-        // the SMALLER melee-range radius, S07_MyGame05.cpp:1393) -- distinct from ProcessAttack04's own, more
-        // lenient mRadiusInfo[1] (RadiusInfo2) validation at actual attack-execution time
-        // (MonsterCombatResolver.ResolveMvpAttack's own remarks), which tolerates a bit of target movement
-        // during the windup delay. A prior pass here used RadiusInfo2, swapped with TryAcquireTarget's own bug.
+        // Attack-windup transition threshold uses RadiusInfo1 (melee range), distinct from the more lenient
+        // RadiusInfo2 validation at actual attack-execution time -- do not swap these two.
         var attackRadiusSq = (float)monster.Template.RadiusInfo1 * monster.Template.RadiusInfo1;
         if (DistanceSquared(monster.PosX, monster.PosZ, target.PosX, target.PosZ) <= attackRadiusSq)
         {
@@ -223,9 +192,8 @@ public sealed class MonsterAiSystem : ISimulationSystem
 
     /// <summary>
     ///     Straight-line step of <c>speed * dt</c> toward (targetX, targetZ). Validated against
-    ///     <see cref="Zone.Geometry" /> when loaded (walkability of the PROPOSED point, height snapped to
-    ///     terrain); when no <c>.WM</c> is loaded, the step is applied unconditionally -- the SAME documented
-    ///     M1 placeholder posture <see cref="Movement.MovementRules" /> already uses for players.
+    ///     <see cref="Zone.Geometry" /> when loaded; when no <c>.WM</c> is loaded, the step is applied
+    ///     unconditionally, same posture as <see cref="Movement.MovementRules" /> for players.
     /// </summary>
     private static void MoveToward(Zone zone, MonsterEntity monster, float targetX, float targetZ, float speed,
         float dt)

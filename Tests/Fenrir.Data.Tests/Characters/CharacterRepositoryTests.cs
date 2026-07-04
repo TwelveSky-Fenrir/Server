@@ -9,12 +9,8 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Fenrir.Data.Tests.Characters;
 
-/// <summary>
-///     game.usp_Character_* against real SQL Server 2025 (architecture reference §14.1/§14.3): every proc is
-///     exercised end to end and every [GenerateDto] column checked (I-04 -- the result set is the contract).
-///     Each test creates its own auth.Accounts row so tests never depend on execution order or on each
-///     other's rows; the "SqlServer" collection (see <see cref="SqlServerFixture" />) keeps them from racing.
-/// </summary>
+// game.usp_Character_* against real SQL Server 2025: every [GenerateDto] column is checked since the result
+// set is the contract. Each test creates its own auth.Accounts row so tests never depend on each other.
 [Collection("SqlServer")]
 public class CharacterRepositoryTests
 {
@@ -66,13 +62,10 @@ public class CharacterRepositoryTests
 
         Assert.NotNull(ex);
 
-        // usp_Character_Create raises THROW 50201 (admin.ErrorCatalog, 502xx = game range) for an
-        // occupied slot. Whether CaeriusNet surfaces the raw SqlException or wraps it
-        // (CaeriusNetSqlException), the SqlException is either the exception itself or its
-        // InnerException, so check both shapes rather than assume one.
+        // usp_Character_Create raises THROW 50201 for an occupied slot; CaeriusNet may wrap the SqlException.
         var sqlException = ex as SqlException ?? ex!.InnerException as SqlException;
         if (sqlException is not null)
-            Assert.Equal(50201, sqlException.Number); // usp_Character_Create's slot-occupied guard
+            Assert.Equal(50201, sqlException.Number);
 
         var secondCharacterId = await CreateCharacterAsync(accountId, 1);
         Assert.True(secondCharacterId > 0);
@@ -91,13 +84,10 @@ public class CharacterRepositoryTests
 
         Assert.NotNull(ex);
 
-        // usp_Character_Create raises THROW 50202 (admin.ErrorCatalog, 502xx = game range) for a
-        // duplicate Name. Whether CaeriusNet surfaces the raw SqlException or wraps it
-        // (CaeriusNetSqlException), the SqlException is either the exception itself or its
-        // InnerException, so check both shapes rather than assume one.
+        // usp_Character_Create raises THROW 50202 for a duplicate Name; CaeriusNet may wrap the SqlException.
         var sqlException = ex as SqlException ?? ex!.InnerException as SqlException;
         if (sqlException is not null)
-            Assert.Equal(50202, sqlException.Number); // usp_Character_Create's name-taken guard
+            Assert.Equal(50202, sqlException.Number);
     }
 
     [Fact]
@@ -111,7 +101,7 @@ public class CharacterRepositoryTests
         var roster = await _characters.GetByAccountAsync(accountId, CancellationToken.None);
         Assert.Empty(roster);
 
-        // Slot 0 is now empty -- a second delete must be a silent no-op, never an exception (§12.3 contract).
+        // Slot 0 is now empty -- a second delete must be a silent no-op, never an exception.
         var ex = await Record.ExceptionAsync(() =>
             _characters.DeleteAsync(accountId, 0, CancellationToken.None).AsTask());
         Assert.Null(ex);
@@ -163,8 +153,7 @@ public class CharacterRepositoryTests
         var accountId = await CreateTestAccountAsync();
         var characterId = await CreateCharacterAsync(accountId, 0);
 
-        // FlushSequence starts at the DF_Characters_FlushSequence default (0); 5 is strictly greater, so
-        // this first flush must be applied.
+        // FlushSequence starts at 0; 5 is strictly greater, so this first flush must be applied.
         await _characters.PersistPositionsAsync(
             [new CharacterPositionTvp(characterId, 5, 9, 111f, 222f, 333f, 1.5f)],
             CancellationToken.None);
@@ -178,9 +167,8 @@ public class CharacterRepositoryTests
         Assert.Equal(333f, afterFirstFlush.PosZ);
         Assert.Equal(1.5f, afterFirstFlush.Heading);
 
-        // Replay the SAME FlushSequence with DIFFERENT coordinates -- this is exactly what a network retry
-        // looks like. The idempotence guard (§12.6, "s.FlushSequence > c.FlushSequence") must discard it
-        // silently: nothing below may change.
+        // Replay the same FlushSequence with different coordinates (a network retry) -- the
+        // "FlushSequence > current" guard must discard it silently: nothing below may change.
         await _characters.PersistPositionsAsync(
             [new CharacterPositionTvp(characterId, 5, 99, 999f, 999f, 999f, 9f)],
             CancellationToken.None);
@@ -194,8 +182,7 @@ public class CharacterRepositoryTests
         Assert.Equal(333f, afterReplay.PosZ);
         Assert.Equal(1.5f, afterReplay.Heading);
 
-        // CharacterRepository.PersistPositionsAsync short-circuits on an empty list before ever building a
-        // TVP call -- SQL Server would otherwise reject an empty table-valued parameter outright.
+        // Short-circuits on an empty list -- SQL Server would otherwise reject an empty TVP outright.
         var ex = await Record.ExceptionAsync(() =>
             _characters.PersistPositionsAsync(Array.Empty<CharacterPositionTvp>(), CancellationToken.None).AsTask());
         Assert.Null(ex);
@@ -218,8 +205,7 @@ public class CharacterRepositoryTests
             CancellationToken.None).AsTask();
     }
 
-    // NVARCHAR(13) and globally UNIQUE (UQ_Characters_Name) -- an 8-char slice of a fresh guid fits easily
-    // and collides only astronomically rarely across concurrent test runs.
+    // Name is NVARCHAR(13) and globally unique (UQ_Characters_Name); an 8-char guid slice fits and won't collide.
     private static string NewCharacterName()
     {
         return $"T{Guid.NewGuid():N}"[..8];

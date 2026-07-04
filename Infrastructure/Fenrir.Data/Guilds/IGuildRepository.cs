@@ -2,7 +2,6 @@ using System.Collections.ObjectModel;
 
 namespace Fenrir.Data.Guilds;
 
-/// <summary>Abstraction over Fenrir.Data.Guilds.GuildRepository for DI/testability.</summary>
 public interface IGuildRepository
 {
     public ValueTask<CharacterGuildMembershipDto?> GetByCharacterAsync(int characterId, CancellationToken ct);

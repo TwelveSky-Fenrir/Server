@@ -4,11 +4,7 @@ using Fenrir.Contracts.Wire;
 
 namespace Fenrir.Contracts.Packets.Login;
 
-/// <summary>
-///     LC_CHANGE_MOUSE_PASSWORD_RECV (LOGIN.h l.176-181, shared struct with op 13): result of a PIN change
-///     (login protocol report §4.14). 0 = changed (new PIN echoed in clear from the request), 1 = current PIN
-///     mismatch ("0000"), 2 = storage failure ("0000"). No XOR.
-/// </summary>
+// Result: 0=changed (new PIN echoed in clear), 1=current PIN mismatch, 2=storage failure. No XOR.
 [FenrirPacket(FenrirServer.Login, FenrirDirection.Outgoing, Opcodes.Login.Outgoing.ChangeMousePin,
     ExpectedSize = 10)]
 public readonly partial record struct ChangeMousePinResponse : IOutgoingPacket

@@ -6,11 +6,9 @@ using Fenrir.Data.WriteBehind;
 namespace Fenrir.Application.Game.Simulation;
 
 /// <summary>
-///     Pet activity decay (report 12 §2.1, verified <c>S07_MyGame04.cpp:835-861</c>): -1 every 60 legacy
-///     ticks (<see cref="SimulationClock.PetActivityDecayLegacyTicks" />) while a growable pet (iSort 22) is
-///     equipped and activity hasn't already reached 0. A no-op for anyone with no pet equipped, or whose
-///     equipped pet-slot item isn't a growable pet at all (a Phoenix amulet, iSort 28) -- see
-///     <see cref="PetSlots" />'s own remarks on the two mutually-exclusive occupants of that slot.
+///     Pet activity decay (S07_MyGame04.cpp:835-861): -1 every 60 legacy ticks while a growable pet (iSort 22)
+///     is equipped and activity hasn't reached 0. No-op if no pet, or the pet slot holds a Phoenix amulet
+///     (iSort 28) instead -- see PetSlots.
 /// </summary>
 public sealed class PetActivitySystem(DirtyTracker<int> dirtyTracker) : ISimulationSystem
 {

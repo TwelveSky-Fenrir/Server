@@ -1,8 +1,4 @@
--- database/50_procedures/game/usp_AccountVault_EnsureInitialized.sql
--- Contract: idempotent bootstrap -- creates an all-zero game.AccountVault row for @AccountId the first time
--- it is ever called (e.g. on first login/first vault access for that account); a no-op on every later call.
--- Params: @AccountId INT.
--- Result set: none. Idempotent: yes.
+-- Idempotent bootstrap: creates an all-zero AccountVault row on first call; a no-op thereafter.
 CREATE PROCEDURE game.usp_AccountVault_EnsureInitialized @AccountId INT
 AS
 BEGIN

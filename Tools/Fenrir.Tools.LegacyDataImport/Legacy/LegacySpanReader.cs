@@ -3,11 +3,7 @@ using System.Text;
 
 namespace Fenrir.Tools.LegacyDataImport.Legacy;
 
-/// <summary>
-///     Cursor-based reader over a tightly-packed legacy C struct record (no <c>#pragma pack</c> in effect --
-///     natural alignment applies, so callers must <see cref="Skip" /> any compiler-inserted padding explicitly;
-///     see Docs/legacy/ for the byte-offset maps this was built against).
-/// </summary>
+/// <summary>Cursor over a tightly-packed legacy C struct (natural alignment, no #pragma pack) -- callers must <see cref="Skip" /> compiler padding explicitly.</summary>
 internal ref struct LegacySpanReader(ReadOnlySpan<byte> data)
 {
     private readonly ReadOnlySpan<byte> _data = data;
@@ -42,10 +38,7 @@ internal ref struct LegacySpanReader(ReadOnlySpan<byte> data)
         return values;
     }
 
-    /// <summary>
-    ///     Reads a fixed-width legacy char buffer and decodes it as Latin-1, trimmed at the first NUL byte
-    ///     (the legacy tool zero-pads unused tail bytes rather than filling them with spaces).
-    /// </summary>
+    /// <summary>Reads a fixed-width buffer as Latin-1, trimmed at the first NUL (legacy zero-pads, not space-pads).</summary>
     public string ReadFixedString(int length)
     {
         var slice = _data.Slice(Position, length);

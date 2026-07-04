@@ -11,11 +11,9 @@ public class AvatarInfoFactoryTests
     {
         var avatar = AvatarInfoFactory.Zeroed;
 
-        // Pin every [FixedArray] length to its declared attribute value (AvatarInfo.cs), one property at a time.
-        // Write()/TryRead() alone only catch an OVERSIZED array (IndexOutOfRangeException while slicing the
-        // fixed-offset destination); an UNDERSIZED one silently leaves trailing bytes as the buffer's pre-existing
-        // zeros and round-trips fine byte-for-byte (Zeroed is all zero anyway), so it would never throw. These
-        // explicit length assertions are what actually proves all ~30 arrays are sized correctly.
+        // Write()/TryRead() alone only catch an oversized array (IndexOutOfRangeException); an undersized one
+        // round-trips fine since Zeroed is all zeros anyway and would never throw, so these explicit length
+        // assertions are what actually proves all arrays are sized correctly.
         Assert.Equal(52, avatar.Equip.Length);
         Assert.Equal(768, avatar.Inventory.Length);
         Assert.Equal(32, avatar.Trade.Length);
@@ -62,12 +60,9 @@ public class AvatarInfoFactoryTests
         var buffer = new byte[AvatarInfo.WireSize];
         var written = avatar.Write(buffer);
 
-        // A wrong (oversized) array length throws IndexOutOfRangeException inside Write() before reaching here.
         Assert.Equal(AvatarInfo.WireSize, written);
         Assert.True(AvatarInfo.TryRead(buffer, out var read));
 
-        // The round-tripped value must itself still be a fully well-formed AvatarInfo (re-serializes to the same
-        // total size); this is only reachable if TryRead's own array reconstruction didn't already blow up.
         Assert.Equal(AvatarInfo.WireSize, read.Write(new byte[AvatarInfo.WireSize]));
     }
 
@@ -105,8 +100,7 @@ public class AvatarInfoFactoryTests
         Assert.Equal(12, avatar.Level1);
         Assert.Equal(new[] { 101, 1500, -200, 30, 850, 320 }, avatar.LogoutInfo);
 
-        // A field NOT covered by CreateForCharacter must stay at Zeroed's value -- proof the `with` expression
-        // started from the shared Zeroed baseline rather than a freshly (half-)initialized AvatarInfo.
+        // A field not covered by CreateForCharacter must stay at Zeroed's value.
         Assert.Equal(0, avatar.Money);
     }
 }

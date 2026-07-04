@@ -5,25 +5,14 @@ using Fenrir.Network.RateLimiting;
 
 namespace Fenrir.Application.Login.RateLimiting;
 
-/// <summary>
-///     IP-keyed anti-bruteforce gate for op11 <c>CL_LOGIN_SEND</c>. Complements (does not replace)
-///     <c>Fenrir.Network.RateLimiting.SessionRateLimiter</c>: that one buckets per <c>SessionId</c>, so a
-///     bruteforcer that simply reconnects TCP before every attempt gets a brand-new bucket each time and never
-///     feels the limit. This bucket is keyed on the client's IP address instead, which a reconnect does not change.
-/// </summary>
+/// <summary>Per-IP bucket for CL_LOGIN_SEND; catches bruteforce that reconnects to dodge the per-session bucket.</summary>
 public sealed class LoginIpRateLimiter
 {
-    // Wider/slower than OpcodeRateLimiterPolicy's Auth class (3 capacity, 1 token/5s): that budget is per-session
-    // and this one is per-IP, and a single IP can legitimately host several concurrent LoginClientSessions (NAT,
-    // a shared connection at a cybercafe, a household behind one router). Squeezing the IP-wide budget down to
-    // the session-wide one would false-positive those real players; 5 capacity / 1 token per 10s still caps a
-    // reconnect-and-retry loop at a few attempts a minute, which is what this class exists to stop.
+    // Looser than the per-session Auth policy (3/5s): one IP can host several legit sessions (NAT/shared connection).
     private const int Capacity = 5;
     private const double TokensPerSecond = 1d / 10d;
 
-    // Opportunistic purge instead of a dedicated Timer/BackgroundService: cheapest way to bound the dictionary's
-    // size under an IP-scanning attacker without a second thread to start/stop alongside the server lifecycle.
-    // Checked via an atomic counter rather than "on every call" so the scan itself doesn't run on every request.
+    // Opportunistic purge (every Nth call) instead of a background timer, to bound dictionary size cheaply.
     private const int PurgeIntervalCalls = 500;
 
     private static readonly long IdleTicksBeforePurge =
@@ -32,11 +21,7 @@ public sealed class LoginIpRateLimiter
     private readonly ConcurrentDictionary<string, Entry> _buckets = new();
     private long _callCounter;
 
-    /// <summary>
-    ///     Fail-open on <see langword="null" />: a session whose transport was never a real accepted socket (unit
-    ///     tests, or any future non-TCP transport) has no IP to key on. IP throttling is defense-in-depth on top of
-    ///     the state machine and the per-session bucket, not the sole guard, so "no IP known" must not block it.
-    /// </summary>
+    /// <summary>Fail-open when no IP is known (unit tests, non-TCP transport): this is defense-in-depth, not the sole guard.</summary>
     public bool TryConsume(IPEndPoint? remoteEndPoint)
     {
         if (remoteEndPoint is null)
@@ -45,7 +30,7 @@ public sealed class LoginIpRateLimiter
         if (Interlocked.Increment(ref _callCounter) % PurgeIntervalCalls == 0)
             PurgeStaleEntries();
 
-        // Port only, not the address, changes across reconnects, so the address alone must be the key.
+        // Keyed on address only: the port changes across reconnects, the address doesn't.
         var key = remoteEndPoint.Address.ToString();
         var entry = _buckets.GetOrAdd(key, static _ => new Entry(new TokenBucket(Capacity, TokensPerSecond)));
         entry.Touch();
@@ -53,12 +38,7 @@ public sealed class LoginIpRateLimiter
         return entry.Bucket.TryConsume();
     }
 
-    /// <summary>
-    ///     Drops buckets idle for longer than <see cref="IdleTicksBeforePurge" />. Benign race with a concurrent
-    ///     <see cref="TryConsume" /> for the same key: at worst a bucket gets removed right after being touched and
-    ///     the next attempt starts a fresh, fully-topped-up one — a rare, harmless reset, not a leak or a bypass
-    ///     worth synchronizing against (an attacker would need to land in exactly that window every single time).
-    /// </summary>
+    /// <summary>Drops idle buckets; racing a concurrent <see cref="TryConsume" /> just resets that bucket, harmlessly.</summary>
     private void PurgeStaleEntries()
     {
         var now = Stopwatch.GetTimestamp();

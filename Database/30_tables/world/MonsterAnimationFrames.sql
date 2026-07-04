@@ -1,9 +1,5 @@
--- Client animation/rendering data split out of world.Monsters (mFrameInfo[6]/mHitFrame[3]/
--- mSkillHitFrame[3]/mBulletInfo[2], Header/Protocol/STRUCT.h:156-204): a 1:1 extension, always exactly
--- one row per monster (frame indices are dense, not sparse, so this is a physical decluttering of the
--- parent table, not a normalization of a sparse array like the drop tables). GameServer has no server-
--- authoritative use for these -- they exist purely so the migrated data stays complete/lossless for any
--- future client-facing tooling that wants to replay legacy animation timings.
+-- Client animation/rendering fields split out of world.Monsters (mFrameInfo/mHitFrame/mSkillHitFrame/mBulletInfo), 1:1 per monster.
+-- No server-authoritative use; kept only so migrated data stays lossless for future client-facing tooling.
 CREATE TABLE world.MonsterAnimationFrames
 (
     MonsterId      INT      NOT NULL,

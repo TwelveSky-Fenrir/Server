@@ -4,11 +4,7 @@ using Fenrir.Data.WriteBehind;
 
 namespace Fenrir.Application.Game.Tests.World;
 
-/// <summary>
-///     Covers the in-process map-transfer mechanism (ADR-0012, <see cref="ZoneTransfer" />): the live state
-///     travels INSIDE the <c>Leave</c>/<c>Enter</c> commands, never referenced by two zones at once, so the
-///     character must never be observable in both simultaneously.
-/// </summary>
+/// <summary>Covers the in-process map-transfer mechanism (<see cref="ZoneTransfer" />): live state travels inside the <c>Leave</c>/<c>Enter</c> commands, never observable in two zones at once.</summary>
 public class ZoneHandoffTests
 {
     [Fact]
@@ -27,12 +23,9 @@ public class ZoneHandoffTests
         source.Post(ZoneCommand.Leave(10, target));
         source.Tick(TimeSpan.FromMilliseconds(50));
 
-        // Gone from the source the instant its own tick drains the Leave -- never lingers there.
         Assert.False(source.TryGetPlayer(10, out _));
 
-        // The Enter was only POSTED to the target, not yet drained by ITS tick: the state travels inside the
-        // command and belongs to no zone in between -- exactly the transient gap ZoneRegistry.TryGetPlayer's
-        // doc describes, never a state shared by two zones.
+        // Enter was posted to the target but not yet drained -- the state belongs to no zone in between
         Assert.False(target.TryGetPlayer(10, out _));
 
         target.Tick(TimeSpan.FromMilliseconds(50));
@@ -76,8 +69,7 @@ public class ZoneHandoffTests
         Assert.Equal(before.Level, after.Level);
         Assert.Same(session, after.Session);
 
-        // FlushSequence is bumped by exactly one so the map change wins usp_Character_PersistBatch's
-        // strictly-greater idempotence guard even if the player never moves again (ZoneTransfer's own doc).
+        // bumped by exactly one so the map change wins usp_Character_PersistBatch's strictly-greater idempotence guard
         Assert.Equal(before.FlushSequence + 1, after.FlushSequence);
     }
 
@@ -121,9 +113,7 @@ public class ZoneHandoffTests
     [Fact]
     public void Leave_WithHandoffPosition_LandsAtTheOverriddenPosition_NotWhereverThePlayerWasStanding()
     {
-        // The mechanism ZoneMoveHandler (portal/NPC transfer) and Zone.ApplyDeath
-        // (cross-zone revive) both rely on: the resolved ARRIVAL point travels inside the Leave command
-        // itself, never by mutating PlayerRuntimeState directly (single-writer invariant).
+        // arrival point travels inside the Leave command itself, never by mutating PlayerRuntimeState directly
         var dirtyTracker = new DirtyTracker<int>();
         var source = ZoneTestKit.CreateZone(1, dirtyTracker: dirtyTracker);
         var target = ZoneTestKit.CreateZone(2, dirtyTracker: dirtyTracker);

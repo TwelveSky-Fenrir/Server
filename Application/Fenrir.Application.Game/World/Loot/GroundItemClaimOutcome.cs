@@ -9,10 +9,7 @@ public enum GroundItemClaimOutcome
     /// <summary>No such item (unique-number mismatch, already gone, or lost the race to a concurrent claimant).</summary>
     NotFound,
 
-    /// <summary>
-    ///     Ownership window not yet open for this claimant (report 05 §5: exclusive to the killer, then party, then
-    ///     free-for-all).
-    /// </summary>
+    /// <summary>Ownership window not yet open for this claimant (killer first, then party, then free-for-all).</summary>
     NotOwned,
 
     /// <summary>Farther than <see cref="Inventory.GroundItemPickupPolicy.MaxPickupDistance" /> from the item.</summary>

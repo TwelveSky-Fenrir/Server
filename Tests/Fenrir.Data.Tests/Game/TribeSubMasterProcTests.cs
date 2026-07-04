@@ -10,12 +10,9 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Fenrir.Data.Tests.Game;
 
-/// <summary>
-///     game.usp_TribeSubMaster_Set/Clear (Phase C/V7 Guilds &amp; Tribes -- TRIBE_WORK tSort 2/3, doc 10 §2)
-///     against real SQL Server 2025. game.Tribes has no seed script (only 4 fixed rows an application would
-///     normally create via usp_WorldState_EnsureInitialized's own sibling bootstrap) -- each test seeds its
-///     OWN throwaway TribeId row directly to stay independent of that bootstrap ordering.
-/// </summary>
+// game.usp_TribeSubMaster_Set/Clear against real SQL Server 2025. game.Tribes has no seed script (only 4
+// fixed rows normally created via usp_WorldState_EnsureInitialized) -- each test seeds its own TribeId row
+// directly to stay independent of that bootstrap ordering.
 [Collection("SqlServer")]
 public class TribeSubMasterProcTests
 {
@@ -60,7 +57,6 @@ public class TribeSubMasterProcTests
             ("TribeId", tribeId), ("SlotIndex", (byte)1), ("CharacterId", characterId)));
         Assert.Equal(50311, alreadySubMaster.Number);
 
-        // Clear is idempotent.
         await ExecProcAsync("game.usp_TribeSubMaster_Clear", ("TribeId", tribeId), ("CharacterId", characterId));
         Assert.Equal(0, await ScalarAsync<int>(
             $"SELECT COUNT(*) FROM game.TribeSubMasters WHERE TribeId = {tribeId};"));
@@ -78,9 +74,7 @@ public class TribeSubMasterProcTests
 
     private async Task<byte> CreateTribeAsync()
     {
-        // TribeId is a real 0-3 domain value (CK_Tribes_TribeId) -- deterministic per test via a fresh
-        // throwaway id is not possible (only 4 ever exist), so each test run picks one of the 4 and cleans
-        // up nothing afterward; concurrent test classes never touch game.Tribes, so this is safe as written.
+        // TribeId is a fixed 0-3 domain value (CK_Tribes_TribeId); no throwaway ids are possible here.
         const byte tribeId = 0;
 
         await using var connection = new SqlConnection(_connectionString);

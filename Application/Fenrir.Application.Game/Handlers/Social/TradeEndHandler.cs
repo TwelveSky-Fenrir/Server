@@ -6,10 +6,7 @@ using Fenrir.Network.Sessions;
 
 namespace Fenrir.Application.Game.Handlers.Social;
 
-/// <summary>
-///     CZ_TRADE_END_SEND (opcode 52) -- abandons an in-progress trade (state 4→0 both sides, verified). No SQL, no
-///     item movement -- nothing was ever committed. ZC_TRADE_END_RECV Result=1 (cancelled) to both.
-/// </summary>
+/// <summary>CZ_TRADE_END_SEND (opcode 52) -- abandons an in-progress trade; nothing was ever committed, so no rollback is needed.</summary>
 public sealed class TradeEndHandler(ZoneRegistry zones, TradeRegistry trades) : IInlinePacketHandler<TradeEndRequest>
 {
     public void Handle(in TradeEndRequest packet, IPacketSession session)

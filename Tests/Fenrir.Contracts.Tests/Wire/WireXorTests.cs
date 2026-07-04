@@ -4,8 +4,7 @@ namespace Fenrir.Contracts.Tests.Wire;
 
 public class WireXorTests
 {
-    // §11: uUserIdx=1000000042 -> tID="MG1000000042" (12 bytes) after XOR_PACKET.
-    // Keystream is {0x10,0xFE,0xFE,...} — NOT "+1 with wrap" (a historical misreading).
+    // Keystream is {0x10,0xFE,0xFE,...}, not "+1 with wrap" as sometimes assumed.
     [Fact]
     public void ApplyPacketXor_UsesConstantKeystream_MatchesLoginIdWorkedExample()
     {
@@ -44,8 +43,7 @@ public class WireXorTests
         Assert.Empty(empty);
     }
 
-    // XOR_PACKET resets its state on every call, so two consecutive passes on the same buffer
-    // restore the original — relied on elsewhere since client and server apply it symmetrically.
+    // XOR_PACKET resets state each call, so two passes restore the original (client/server apply it symmetrically).
     [Fact]
     public void ApplyPacketXor_AppliedTwice_IsInvolution()
     {
@@ -59,8 +57,7 @@ public class WireXorTests
         Assert.Equal(original, buffer);
     }
 
-    // USE_XOR_UID: length = position of first null byte, capped to field size.
-    // tID="MG12" in a zero-padded char[16] -> length 4; the rest (padding) is untouched.
+    // USE_XOR_UID: length = first null byte position (capped to field size); the rest is left untouched.
     [Fact]
     public void ApplyUidXor_StopsAtFirstNullByte_LeavesRemainderOfFieldUntouched()
     {
@@ -132,8 +129,7 @@ public class WireXorTests
         Assert.Equal(expected, buffer);
     }
 
-    // Each row resets its own state (like scopyAvtXorChar2 in C): row 2 must match XorChar
-    // being called on it alone.
+    // Each row resets its own state (like scopyAvtXorChar2 in C), independent of other rows.
     [Fact]
     public void XorChar2Rows_AppliesXorCharIndependentlyPerRow()
     {

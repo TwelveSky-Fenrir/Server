@@ -2,11 +2,7 @@ using System.Diagnostics;
 
 namespace Fenrir.Network.RateLimiting;
 
-/// <summary>
-///     Classic token bucket: <see cref="Capacity" /> tokens max, refilled continuously at
-///     <see cref="TokensPerSecond" />. Refill is computed lazily from elapsed <see cref="Stopwatch" /> ticks inside
-///     <see cref="TryConsume" /> rather than via a background timer, so a bucket nobody touches costs nothing.
-/// </summary>
+// Token bucket refilled lazily from elapsed Stopwatch ticks in TryConsume, not a timer, so an idle bucket costs nothing.
 public sealed class TokenBucket
 {
     private readonly Lock _gate = new();
@@ -20,7 +16,7 @@ public sealed class TokenBucket
 
         Capacity = capacity;
         TokensPerSecond = tokensPerSecond;
-        _tokens = capacity; // starts full: a session's first packet of a class must not be penalized for buckets it never touched before
+        _tokens = capacity; // starts full so a session's first packet of a class isn't penalized
         _lastRefillTimestamp = Stopwatch.GetTimestamp();
     }
 
@@ -28,16 +24,8 @@ public sealed class TokenBucket
 
     public double TokensPerSecond { get; }
 
-    /// <summary>
-    ///     Refills from elapsed wall-clock time, then withdraws <paramref name="count" /> tokens if enough are
-    ///     available. The refill computation and the withdrawal must observe one consistent
-    ///     (tokens, lastRefillTimestamp) snapshot, so both happen under <see cref="_gate" /> rather than via separate
-    ///     Interlocked ops on each field (which could race: thread A refills using a timestamp thread B is about to
-    ///     overwrite, double-crediting tokens). Contention is expected to be near-zero — a session's own read loop is
-    ///     normally the sole caller for its buckets — so a lightweight <see cref="Lock" /> (same primitive already
-    ///     used by <see cref="Sessions.ClientSession" /> for its send path) beats a hand-rolled CAS retry loop on
-    ///     both simplicity and correctness risk, for no measurable throughput cost.
-    /// </summary>
+    // Refill and withdrawal share one lock so (tokens, lastRefillTimestamp) stays a consistent snapshot;
+    // separate Interlocked ops on each field could race and double-credit tokens.
     public bool TryConsume(int count = 1)
     {
         var now = Stopwatch.GetTimestamp();

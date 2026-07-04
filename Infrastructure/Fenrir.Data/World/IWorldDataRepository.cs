@@ -2,7 +2,6 @@ using System.Collections.ObjectModel;
 
 namespace Fenrir.Data.World;
 
-/// <summary>Abstraction over Fenrir.Data.World.WorldDataRepository for DI/testability.</summary>
 public interface IWorldDataRepository
 {
     public ValueTask<(ReadOnlyCollection<ItemRowDto> Items, ReadOnlyCollection<ItemBonusSkillRowDto> BonusSkills)>

@@ -4,11 +4,7 @@ using Fenrir.Contracts.Tests.TestSupport;
 
 namespace Fenrir.Contracts.Tests.Packets.Shared;
 
-/// <summary>
-///     ATTACK_FOR_PROTOCOL (68 bytes, STRUCT.h:958-978) — 17 four-byte fields (14 scalars + a 3-float
-///     location block), no padding. The golden encoder below is hand-built from the C++ layout,
-///     independent of the generated <c>Write</c>.
-/// </summary>
+// Golden encoder is hand-built from the C++ ATTACK_FOR_PROTOCOL layout, independent of the generated Write.
 public class AttackForProtocolTests
 {
     [Fact]

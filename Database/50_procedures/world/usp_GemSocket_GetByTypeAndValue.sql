@@ -1,10 +1,4 @@
--- Contract: @Type INT, @Value02 INT -> RS0 zero or one row.
--- Tooling/debugging helper mirroring the actual legacy lookup shape: GSOCKET::Search(int tType, int tValue)
--- in ts25zone/GameSystem/GameSystem_08_Socket.cpp matches on exactly (mType, mValue02), which real data
--- confirms is a genuine unique key (UQ_GemSockets_Type_Value02) -- not GemSocketId, which is just the array
--- slot position and has no gameplay meaning of its own. GameServer's own boot-time cache load always uses
--- world.usp_GemSocket_GetAll, never this per-lookup proc.
--- Read-only, safe to retry.
+-- Mirrors legacy GSOCKET::Search(tType, tValue): lookup key is (Type, Value02), not GemSocketId (which is just array slot position).
 CREATE PROCEDURE world.usp_GemSocket_GetByTypeAndValue @Type INT, @Value02 INT
 AS
 BEGIN

@@ -5,11 +5,7 @@ using Fenrir.Contracts.Wire;
 
 namespace Fenrir.Contracts.Packets.Zone;
 
-/// <summary>
-///     ZC_TRIBE_CHAT_RECV (ZONE.h:888-895, <c>ZCS_TRIBE_CHAT_RECV</c>) — layout identical to ZC 41.
-///     Local to the zone (handler for CZ 81, l.11544-11556): recipients are the same tribe or an allied
-///     tribe. No inter-zone relay.
-/// </summary>
+/// <summary>Local to the zone only, no inter-zone relay; recipients are same/allied tribe members.</summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.TribeChat, ExpectedSize = 99)]
 public readonly partial record struct TribeChatResponse : IOutgoingPacket
 {

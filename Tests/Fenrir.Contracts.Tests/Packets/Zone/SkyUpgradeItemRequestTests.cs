@@ -3,10 +3,6 @@ using Fenrir.Contracts.Packets.Zone;
 
 namespace Fenrir.Contracts.Tests.Packets.Zone;
 
-/// <summary>
-///     CZ_SKY_UP_ITEM_SEND (CLIENT.h:265-272, 16-byte payload): Page1/Index1/Page2/Index2 — same typedef
-///     as <see cref="UpgradeCapeRequest" />.
-/// </summary>
 public class CzSkyUpItemSendTests
 {
     [Fact]

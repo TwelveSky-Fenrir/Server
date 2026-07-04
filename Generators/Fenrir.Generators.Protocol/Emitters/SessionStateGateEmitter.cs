@@ -5,12 +5,7 @@ using Fenrir.Generators.Analysis.Support;
 
 namespace Fenrir.Generators.Protocol.Emitters;
 
-/// <summary>
-///     Emits <c>Fenrir.Contracts.Wire.SessionStateGate</c> (spec §5.4) from discovered
-///     <c>[FenrirPacket(..., AllowedStates = [...])]</c>. Restricted to INCOMING packets: gating protects RECEIVING
-///     a client opcode against an inconsistent session state — an outgoing packet never needs to be "allowed",
-///     the server decides whether to send it.
-/// </summary>
+/// <summary>Restricted to incoming packets: an outgoing packet never needs gating, the server decides whether to send it.</summary>
 internal static class SessionStateGateEmitter
 {
     public const string HintName = "SessionStateGate.g.cs";

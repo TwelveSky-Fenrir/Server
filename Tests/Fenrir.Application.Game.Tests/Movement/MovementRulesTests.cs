@@ -9,20 +9,15 @@ using Microsoft.Extensions.Options;
 namespace Fenrir.Application.Game.Tests.Movement;
 
 /// <summary>
-///     Covers <see cref="MovementRules.IsPlausible" />'s terrain-aware branch (M1 plan, Phase C/V1 item 1):
-///     when a zone's <c>.WM</c> geometry is loaded, a target that is off the navmesh ("hors-monde") or claims a
-///     Y meaningfully below the resolved ground height ("sous le terrain") is rejected exactly like a
-///     speed-implausible move, and — critically — a zone with NO geometry (the M1 default, no <c>.WM</c> file
-///     on disk) keeps validating speed only, with zero behavior change from before this item.
+///     Covers <see cref="MovementRules.IsPlausible" />'s terrain-aware branch: when a zone's <c>.WM</c> geometry is
+///     loaded, a target off the navmesh or below the resolved ground height is rejected like a speed-implausible
+///     move; a zone with no geometry keeps validating speed only.
 /// </summary>
 public class MovementRulesTests
 {
     /// <summary>
-    ///     A flat 100x100 ground square (Y=10) split into two triangles along its diagonal — together they tile
-    ///     the whole square, so any XZ point strictly inside is walkable and resolves to Y=10; anything outside
-    ///     resolves to neither. The quadtree is a single LEAF root: <see cref="ZoneGeometry" />'s descent never
-    ///     box-tests the root itself (only children), so "out of the mesh" is correctly modeled by the PER
-    ///     TRIANGLE containment test, not by quadtree box culling — exactly like the real engine's
+    ///     A flat 100x100 ground square (Y=10) split into two triangles; the quadtree root is a single leaf, so
+    ///     "out of the mesh" is modeled by per-triangle containment, not quadtree box culling -- matching
     ///     <c>CheckPointInWorldWithoutYCoord</c>.
     /// </summary>
     private static ZoneGeometry FlatSquareGeometry()

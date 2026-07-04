@@ -5,11 +5,7 @@ using Fenrir.Data.World;
 
 namespace Fenrir.Application.Game.Tests.Skills;
 
-/// <summary>
-///     Covers <see cref="SkillCastResolver.TryCast" /> against the verified skill-ID whitelist
-///     (<see cref="SkillEffectCatalog" />, ported from <c>MyUtil::ProcessForCreateBuff</c>,
-///     <c>S07_MyGame03.cpp:9315-9631</c>).
-/// </summary>
+/// <summary>Covers <see cref="SkillCastResolver.TryCast" /> against the skill-ID whitelist in <see cref="SkillEffectCatalog" />, ported from <c>MyUtil::ProcessForCreateBuff</c>.</summary>
 public class SkillCastResolverTests
 {
     private static SkillDefinition BuildSkill(int skillId, byte maxUpgradePoint,
@@ -18,10 +14,6 @@ public class SkillCastResolverTests
         (int Grade0, int Grade1) recoverLife = default, (int Grade0, int Grade1) recoverMana = default)
     {
         var row = new SkillRowDto(skillId, "Test", 0, 0, 0, 0, 0, 1, maxUpgradePoint, 1, 0);
-        // Positional order: SkillId, GradeIndex, ManaUse, RecoverInfo1, RecoverInfo2, StunAttack, StunDefense,
-        // FastRunSpeed, AttackInfo1, AttackInfo2, AttackInfo3, RunTime, ChargingDamageUp, AttackPowerUp,
-        // DefensePowerUp, AttackSuccessUp, AttackBlockUp, ElementAttackUp, ElementDefenseUp, AttackSpeedUp,
-        // RunSpeedUp, ShieldLifeUp, LuckUp, CriticalUp, ReturnSuccessUp, StunDefenseUp, DestroySuccessUp.
         var grade0 = new SkillGradeRowDto(skillId, 0, (short)manaUse.Grade0, (byte)recoverLife.Grade0,
             (byte)recoverMana.Grade0, 0, 0, 0, 0, 0, 0, (short)runTime.Grade0, (byte)chargingUp.Grade0,
             (byte)attackPowerUp.Grade0, 0, 0, 0, 0, 0, 0, 0, (byte)shieldLifeUp.Grade0, 0, 0, 0, 0, 0);

@@ -7,9 +7,8 @@ using Fenrir.Network.Sessions;
 namespace Fenrir.Application.Game.Handlers.Social;
 
 /// <summary>
-///     CZ_DUEL_START_SEND (opcode 46) -- callable by EITHER accepted side (see <see cref="DuelRegistry" />).
-///     Scope cut: does not broadcast the legacy's ZC_AVATAR_CHANGE_INFO_1 (tSort=7) to nearby players, and
-///     the 180 s countdown itself (ZC_DUEL_TIME_INFO ticks + auto-end) is not implemented.
+///     CZ_DUEL_START_SEND (opcode 46) -- callable by either accepted side. Scope cut: no
+///     ZC_AVATAR_CHANGE_INFO_1 broadcast, no countdown auto-end tick.
 /// </summary>
 public sealed class DuelStartHandler(ZoneRegistry zones, DuelRegistry duels) : IInlinePacketHandler<DuelStartRequest>
 {

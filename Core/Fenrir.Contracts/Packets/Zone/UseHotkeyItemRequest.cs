@@ -4,10 +4,6 @@ using Fenrir.Contracts.Wire;
 
 namespace Fenrir.Contracts.Packets.Zone;
 
-/// <summary>
-///     CZ_USE_HOTKEY_ITEM_SEND (CLIENT.h:227-231) — typedef SHARED with <see cref="DestroyItemRequest" />
-///     (op 89): identical layout, distinct C# contracts. Response: ZC 25.
-/// </summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.UseHotkeyItem, ExpectedSize = 17,
     AllowedStates = [(byte)ZoneSessionState.InWorld])]
 public readonly partial record struct UseHotkeyItemRequest : IIncomingPacket<UseHotkeyItemRequest>

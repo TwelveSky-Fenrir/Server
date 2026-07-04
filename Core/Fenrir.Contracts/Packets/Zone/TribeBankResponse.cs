@@ -4,13 +4,7 @@ using Fenrir.Contracts.Wire;
 
 namespace Fenrir.Contracts.Packets.Zone;
 
-/// <summary>
-///     ZC_TRIBE_BANK_RECV (ZONE.h:897-903, builder <c>B_TRIBE_BANK_RECV</c> :1107-1114) — unicast
-///     response to CZ_TRIBE_BANK_SEND. <see cref="Sort" /> echoes 1 (view, <see cref="Money" />=0) or 2
-///     (withdraw, <see cref="Money" /> = the player's new gold, already applied server-side).
-///     <see cref="TribeBankInfo" /> holds the per-slot amounts (source of truth: ts25playuser, table
-///     <c>game.TribeBank</c> in Fenrir).
-/// </summary>
+/// <summary>Sort echoes request: view has Money=0; withdraw has Money=player's new gold (already applied).</summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.TribeBank, ExpectedSize = 213)]
 public readonly partial record struct TribeBankResponse : IOutgoingPacket
 {

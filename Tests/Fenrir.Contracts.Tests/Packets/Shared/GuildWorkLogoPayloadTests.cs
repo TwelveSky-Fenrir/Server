@@ -4,7 +4,7 @@ using Fenrir.Contracts.Tests.TestSupport;
 
 namespace Fenrir.Contracts.Tests.Packets.Shared;
 
-/// <summary>GUILD_LOGO_CRECV (4 bytes, STRUCT.h:1214-1217) -- CZ_GUILD_WORK_SEND tSort 1001.</summary>
+// CZ_GUILD_WORK_SEND tSort 1001.
 public class GuildWorkLogoPayloadTests
 {
     [Fact]

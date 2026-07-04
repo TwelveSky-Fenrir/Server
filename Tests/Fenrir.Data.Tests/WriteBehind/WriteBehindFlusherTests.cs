@@ -2,12 +2,7 @@ using Fenrir.Data.WriteBehind;
 
 namespace Fenrir.Data.Tests.WriteBehind;
 
-/// <summary>
-///     Pure in-memory unit tests for <see cref="WriteBehindFlusher{TKey}" />: the mechanism needs no database
-///     (the flush callback is faked), so its timing/threshold/failure semantics are covered here instead of
-///     against SQL Server. Every bounded wait below uses a generous timeout so the test fails loudly on a
-///     real regression instead of hanging.
-/// </summary>
+// Pure in-memory unit tests for WriteBehindFlusher<TKey>: the flush callback is faked, no database needed.
 public sealed class WriteBehindFlusherTests
 {
     private static readonly TimeSpan BoundedWait = TimeSpan.FromSeconds(5);
@@ -139,13 +134,9 @@ public sealed class WriteBehindFlusherTests
         var observedFailure = await firstAttemptFailed.Task.WaitAsync(BoundedWait);
         Assert.IsType<InvalidOperationException>(observedFailure);
 
-        // The failed batch must have been re-merged back into the tracker -- nothing lost -- and by the time
-        // onFlushError fires the re-merge has already happened (it runs before the error hook), so this read
-        // is not racing FlushBatchAsync's catch block.
+        // Re-merge happens before onFlushError fires, so this read isn't racing FlushBatchAsync's catch block.
         Assert.Equal(1, tracker.Count);
 
-        // A second immediate flush, now that the callback is "fixed" (attempt 2), must succeed and pick up
-        // exactly the re-merged entry -- proving the drain loop survived the first failure instead of dying.
         flusher.RequestImmediateFlush();
         var batch = await secondAttemptSucceeded.Task.WaitAsync(BoundedWait);
 
@@ -167,15 +158,13 @@ public sealed class WriteBehindFlusherTests
             TimeSpan.FromMilliseconds(20),
             1_000);
 
-        // CancellationToken.None: RunAsync's own token is never cancelled, so only DisposeAsync's internal
-        // shutdown signal (linked into the loop) can stop it -- exactly the race the fix coordinates.
+        // Token is never cancelled -- only DisposeAsync's internal shutdown signal can stop the loop.
         var runTask = flusher.RunAsync(CancellationToken.None);
 
         await Task.Delay(TimeSpan.FromMilliseconds(100)); // let a few loop iterations actually happen first
 
         await flusher.DisposeAsync().AsTask().WaitAsync(BoundedWait);
 
-        // DisposeAsync only returns after the loop has actually exited, so this must already be done.
         await runTask.WaitAsync(BoundedWait);
         Assert.True(runTask.IsCompletedSuccessfully);
     }

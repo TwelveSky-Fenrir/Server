@@ -1,16 +1,10 @@
 namespace Fenrir.Contracts;
 
-/// <summary>
-///     Real legacy opcodes (§2.4/§2.5/§4.9/§5.10). Values overlap between <see cref="Login" />/<see cref="Zone" />
-///     and between <c>Incoming</c>/<c>Outgoing</c>, hence two nesting axes instead of one flat table.
-///     Includes opcodes outside M1 scope (no <c>[FenrirPacket]</c> yet) to avoid ever reusing a value
-///     already taken by the real protocol.
-/// </summary>
+/// <summary>Real legacy opcodes (§2.4/§2.5/§4.9/§5.10); nested by server and direction since values overlap across both axes. Includes opcodes outside M1 scope to avoid ever reusing an already-taken value.</summary>
 public static class Opcodes
 {
     public static class Login
     {
-        /// <summary>Client → LoginServer.</summary>
         public static class Incoming
         {
             public const byte Login = 11;
@@ -28,7 +22,6 @@ public static class Opcodes
             public const byte GiftList = 25;
         }
 
-        /// <summary>LoginServer → client.</summary>
         public static class Outgoing
         {
             public const byte LoginGreeting = 0;
@@ -43,10 +36,7 @@ public static class Opcodes
             public const byte ClaimGift = 21;
             public const byte ZoneTransfer = 22;
 
-            /// <summary>
-            ///     Layout resolved against LOGIN.h l.216-222 (login protocol report §5.24): 3 ints, always zero,
-            ///     no XOR. Emitted at the end of every login train (success AND failure), see SEND_LOGIN.
-            /// </summary>
+            /// <summary>LOGIN.h l.216-222: 3 ints, always zero, no XOR; emitted at the end of every login train (success or failure).</summary>
             public const byte WorldRecommendation = 24;
 
             public const byte GiftList = 25;
@@ -54,14 +44,12 @@ public static class Opcodes
             /// <summary>Same layout and behaviour as <see cref="WorldRecommendation" /> (LOGIN.h shares the struct).</summary>
             public const byte WorldRecommendationFinal = 26;
 
-            // 27 (LCP_CHANGE_MASTER_RECV) is deliberately NOT declared: dead on the legacy side too — defined in
-            // LOGIN.h l.229-233 but never emitted (W_CHANGE_MASTER_SEND has an empty body, S04_MyWork02.cpp l.1655).
+            // 27 (LCP_CHANGE_MASTER_RECV) deliberately omitted: dead in the legacy client too (W_CHANGE_MASTER_SEND has an empty body).
         }
     }
 
     public static class Zone
     {
-        /// <summary>Client → GameServer/Zone.</summary>
         public static class Incoming
         {
             public const byte ZoneHandshake = 11;
@@ -173,7 +161,6 @@ public static class Opcodes
             public const byte RuneSocket = 157;
         }
 
-        /// <summary>GameServer/Zone → client.</summary>
         public static class Outgoing
         {
             public const byte ZoneGreeting = 0;

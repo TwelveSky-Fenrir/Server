@@ -1,24 +1,11 @@
 namespace Fenrir.Contracts.Packets.Shared;
 
-/// <summary>
-///     Shared wire-zero <see cref="AvatarInfo" /> template, used by both LoginServer (LC_CREATE_AVATAR_RECV)
-///     and GameServer (ZC_REGISTER_AVATAR_RECV) — the two servers each project a persisted character onto this
-///     same struct, but neither Application project references the other (architecture reference §3.3: each
-///     executable's application layer is independent), so the ~190-field zero template lives here in Contracts,
-///     the one layer both already depend on. Progression/inventory/quest state is entirely M1-out-of-scope, so
-///     every field starts at its wire-zero value; callers only ever override the handful of fields the DB
-///     actually tracks, via a `with` expression.
-/// </summary>
+// Shared wire-zero AvatarInfo template used by both LoginServer and GameServer; callers override
+// the handful of fields the DB tracks via a `with` expression.
 public static class AvatarInfoTemplates
 {
-    /// <summary>
-    ///     Every <see cref="AvatarInfo" /> field at its wire-zero value: 0 for scalars, "" for
-    ///     <c>[FixedString]</c> (the codec zero-fills up to the declared length itself — never hand-pad), a
-    ///     same-length-N array of zeros for <c>[FixedArray]</c> int arrays (N must match this exact property's
-    ///     attribute, not a neighbor's), and a same-length-N array of "" for <c>[FixedArray] [FixedString]</c> string
-    ///     rows (never a bare <c>new string[N]</c>, which would leave <see langword="null" /> entries the codec
-    ///     cannot write).
-    /// </summary>
+    // Array lengths must match each property's own [FixedArray] attribute; string arrays must be
+    // filled with "" not left as bare `new string[N]`, or the codec hits null entries.
     public static readonly AvatarInfo Zeroed = new()
     {
         VisibleState = 0,
@@ -268,8 +255,6 @@ public static class AvatarInfoTemplates
         RuneSystemStat = new int[4]
     };
 
-    // Enumerable.Repeat(...).ToArray() would also work but allocates a LINQ iterator per call for what is really
-    // just a fixed-size fill; a plain loop keeps this on the same footing as the int[] literals above.
     private static string[] ZeroStrings(int count)
     {
         var result = new string[count];

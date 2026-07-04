@@ -4,7 +4,6 @@ using Fenrir.Contracts.Wire;
 
 namespace Fenrir.Contracts.Packets.Zone;
 
-/// <summary>ZC_USE_HOTKEY_ITEM_RECV (ZONE.h:477-482) — reply to CZ_USE_HOTKEY_ITEM_SEND (22); unicast.</summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.UseHotkeyItem,
     ExpectedSize = 13)]
 public readonly partial record struct UseHotkeyItemResponse : IOutgoingPacket

@@ -1,5 +1,5 @@
--- AccountId IS the legacy user index (ADR-0005, ADR-0003 A-04): the wire's tID = "MG" + decimal(AccountId)
--- (MG5ORIGIN, M1_Legacy_Wire_Contract.md §0.4/§4.3). Never renumber/reseed this identity column.
+-- AccountId is the legacy user index -- wire tID = "MG" + decimal(AccountId). Never renumber/reseed
+-- this identity column.
 CREATE TABLE auth.Accounts
 (
     AccountId        INT IDENTITY(1,1) NOT NULL,

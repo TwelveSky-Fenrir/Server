@@ -3,12 +3,8 @@ using Fenrir.Contracts.Attributes;
 
 namespace Fenrir.Contracts.Packets.Shared;
 
-/// <summary>
-///     ATTACK_FOR_PROTOCOL (STRUCT.h:958-978, 68 bytes) — 17 four-byte fields, no padding. The
-///     <c>#ifdef GXCW int aEmTI</c> tail member is NOT compiled in EU33 (<c>GXCW</c> off). Reused as-is
-///     by both CZ_PROCESS_ATTACK_SEND (client proposal) and ZC_PROCESS_ATTACK_RECV (server-recomputed
-///     echo) — same wire shape, different fill semantics for the result fields.
-/// </summary>
+// Reused as-is by CZ_PROCESS_ATTACK_SEND (client proposal) and ZC_PROCESS_ATTACK_RECV (server echo);
+// same shape, different fill semantics for the result fields. GXCW tail member not compiled in EU33.
 [FenrirWireType(68)]
 public readonly partial record struct AttackForProtocol : IFenrirWireType<AttackForProtocol>
 {

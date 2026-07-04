@@ -5,38 +5,20 @@ using Fenrir.Data.World;
 
 namespace Fenrir.Application.Game.Enchant;
 
-/// <summary>
-///     Pure resolver for CZ_IMPROVE_ITEM_SEND's STANDARD equipment enchant (report 04_mega_switches.md §4,
-///     verified against <c>Server/ts25zone/S04_MyWork02.cpp:2500-3450</c>). Covers both the +0..+40 regime
-///     and the +41..+50 regime (<c>MAX_IMPROVE_150</c> -- verified ACTIVE for this build, DEFINE.h:56/110-114:
-///     the <c>#undef</c> is guarded by <c>#ifndef LNW33EU</c>, and <c>LNW33EU</c> IS defined for the EU33
-///     reference build). No I/O, no <see cref="World.Zone" /> dependency.
-/// </summary>
+/// <summary>Pure resolver for CZ_IMPROVE_ITEM_SEND's standard equipment enchant. Covers both +0..+40 and +41..+50 (<c>MAX_IMPROVE_150</c>, verified active for this build). No I/O, no Zone dependency.</summary>
 /// <remarks>
-///     OUT OF SCOPE (documented, not guessed): wings (<c>eq.iSort == 6</c>, CP-costed via
-///     <c>ContributionPoints</c> instead of Money, different material table) and the costume/stellar-core
-///     branches (<c>USE_ENCHANT_COSTUME(_V2)</c>/<c>USE_STELLAR_CORE</c>, both verified active but a
-///     COMPLETELY separate mechanic keyed off item-id ranges Fenrir does not catalog) -- a target item whose
-///     <c>Sort</c> is 6 returns the DEDICATED <see cref="EnchantOutcome.NotSupported" /> (a Fenrir-side scope
-///     cut, NOT a legacy Quit(): the caller should reply with a clean failure, not disconnect a player doing
-///     nothing wrong). EVERY OTHER <see cref="EnchantOutcome.Rejected" /> reproduces a REAL <c>Quit()</c> in
-///     the verified source (including an unrecognized material -- the source's own <c>default: Quit()</c> in
-///     both material-lookup switches) and the caller must disconnect on it. The "sweet potato" buff (
-///     <c>aImproveItemValue</c>, +5%
-///     success, one-shot consumed) and <c>aProtectForDestroy2</c> (a SEPARATE, more generous protect charge
-///     only relevant in the +41..+50 regime) are not modeled -- Fenrir tracks neither counter yet.
+///     Wings and the costume/stellar-core branches are out of scope (different item-id ranges Fenrir doesn't catalog) -- a Sort==6 target
+///     returns <see cref="EnchantOutcome.NotSupported" />, a clean failure, NOT the legacy's real <c>Quit()</c> that every other
+///     <see cref="EnchantOutcome.Rejected" /> reproduces (caller must disconnect on Rejected). The "sweet potato" buff and <c>aProtectForDestroy2</c> are not modeled.
 /// </remarks>
 public static class EnchantResolver
 {
     public enum EnchantOutcome
     {
-        /// <summary>A REAL verified <c>Quit()</c> condition -- the caller must disconnect, never send a clean failure.</summary>
+        /// <summary>A real Quit() condition -- the caller must disconnect, never send a clean failure.</summary>
         Rejected,
 
-        /// <summary>
-        ///     Target is a wing (<c>Sort == 6</c>) -- Fenrir scope cut, NOT a legacy Quit(); reply with a clean failure (see
-        ///     class remarks).
-        /// </summary>
+        /// <summary>Target is a wing -- Fenrir scope cut, not a legacy Quit(); reply with a clean failure.</summary>
         NotSupported,
 
         /// <summary>+40 -&gt; +41, no roll (ZC result 0).</summary>
@@ -58,25 +40,16 @@ public static class EnchantResolver
         ResetToForty
     }
 
-    /// <summary><c>MAX_IMPROVE_ITEM_NUM</c> (DEFINE.h:613).</summary>
     public const int RegimeBoundary = 40;
 
-    /// <summary><c>MAX_IMPROVE_ITEM_NUM2</c> (DEFINE.h:614).</summary>
     public const int MaxImprove = 50;
 
-    /// <summary><c>SAFE_IMPROVE_VALUE</c> for LNW33 (S04_MyWork02.cpp:2497) -- destroy risk only above this level.</summary>
+    /// <summary>Destroy risk only above this level.</summary>
     public const int SafeImproveValue = 20;
 
     private const byte RareItemType = 3;
     private const byte EliteItemType = 4;
 
-    /// <summary>
-    ///     <paramref name="luck" /> is the caster's <c>MyFactor::GetLuck()</c> value (already resolved by the
-    ///     caller from <see cref="Stats.EffectiveStats" />); <paramref name="protectForDestroyCharges" /> is
-    ///     the character's current <c>ProtectForDestroy</c> count. <paramref name="random" /> supplies ONE
-    ///     <c>rand_mir() % 100</c> draw per legacy call site, in the SAME order, matching every other resolver
-    ///     in this codebase (<see cref="IRandomSource" />'s own remarks).
-    /// </summary>
     public static EnchantResult Resolve(
         ItemDefinition targetItemDefinition,
         ItemStack targetStack,
@@ -95,8 +68,6 @@ public static class EnchantResolver
             return Rejected();
 
         if (targetItem.Sort == 6)
-            // Wings -- CP-costed, separate material table, NOT modeled (class remarks). Not the player's
-            // fault, so a clean failure rather than a disconnect.
             return new EnchantResult(EnchantOutcome.NotSupported, 0, 0, false);
 
         return currentImprove >= RegimeBoundary
@@ -137,7 +108,7 @@ public static class EnchantResolver
         {
             var p2 = -57 + newImprove * 3 - luck / 100;
             if (p2 <= 5)
-                p2 -= 5; // LNW33 (S04_MyWork02.cpp:3210-3213).
+                p2 -= 5;
             p2 = Math.Max(0, p2);
 
             if (random.NextInt32(100) < p2)
@@ -160,9 +131,7 @@ public static class EnchantResolver
         ItemRowDto materialItem, byte currentImprove, int luck, int protectForDestroyCharges,
         IRandomSource random)
     {
-        // eq.iType must be Rare/Elite once past +40 (CheckEquipType1(eq.iInfo) is the base-equip-sort guard
-        // already applied above; the RARE/ELITE requirement only kicks in when USE_ENCHANT_COSTUME is active,
-        // which it is -- S04_MyWork02.cpp:2846-2859).
+        // Item must be Rare/Elite once past +40.
         if (targetItem.Type != RareItemType && targetItem.Type != EliteItemType)
             return Rejected();
 
@@ -182,8 +151,7 @@ public static class EnchantResolver
 
         var p1 = material.ForcesGuaranteedSuccess ? 100 : TierProbability(newImprove);
         if (p1 < 0)
-            return
-                Rejected(); // newImprove landed outside 41..50 -- structurally impossible given the clamp above, defensive only.
+            return Rejected(); // defensive only -- newImprove outside 41..50 is impossible given the clamp above
 
         if (random.NextInt32(100) < p1)
             return new EnchantResult(EnchantOutcome.Success, newImprove, material.MoneyCost, false);
@@ -191,18 +159,13 @@ public static class EnchantResolver
         if (currentImprove == RegimeBoundary + 1)
             return new EnchantResult(EnchantOutcome.ResetToForty, RegimeBoundary, material.MoneyCost, false);
 
-        // aProtectForDestroy2 (a separate, more generous charge only relevant here) is NOT modeled -- see
-        // class remarks; only the ORDINARY ProtectForDestroy charge is checked, exactly like the +0..+40 regime.
         if (protectForDestroyCharges > 0)
             return new EnchantResult(EnchantOutcome.Protected, currentImprove - 1, material.MoneyCost, true);
 
         return new EnchantResult(EnchantOutcome.ResetToForty, RegimeBoundary, material.MoneyCost, false);
     }
 
-    /// <summary>
-    ///     +41-43: 20% · +44-46: 15% · +47-49: 10% · +50: 5% (S04_MyWork02.cpp:2926-2949), keyed by the NEW
-    ///     (post-attempt) improve value.
-    /// </summary>
+    /// <summary>+41-43: 20% · +44-46: 15% · +47-49: 10% · +50: 5%, keyed by the new (post-attempt) improve value.</summary>
     private static int TierProbability(int newImprove)
     {
         return newImprove switch
@@ -238,10 +201,6 @@ public static class EnchantResolver
         int Cost,
         bool ConsumesProtectCharge)
     {
-        /// <summary>
-        ///     Every terminal outcome consumes the material exactly once (<c>DecreaseMaterial</c>) -- neither
-        ///     <see cref="EnchantOutcome.Rejected" /> nor <see cref="EnchantOutcome.NotSupported" /> does.
-        /// </summary>
         public bool ConsumesMaterial => Outcome is not (EnchantOutcome.Rejected or EnchantOutcome.NotSupported);
     }
 }

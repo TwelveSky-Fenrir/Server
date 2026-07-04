@@ -24,8 +24,6 @@ public class SkillLearnResolverTests
             .ToImmutableArray();
     }
 
-    // ---- Learn ----
-
     [Fact]
     public void Learn_NotOfferedByThisNpc_Fails()
     {
@@ -131,8 +129,6 @@ public class SkillLearnResolverTests
 
         Assert.Equal(SkillLearnResolver.LearnFailure.NotOfferedByThisNpc, result.Failure);
     }
-
-    // ---- Upgrade ----
 
     [Fact]
     public void Upgrade_SlotEmpty_Fails()

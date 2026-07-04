@@ -7,12 +7,8 @@ using Fenrir.Network.Sessions;
 namespace Fenrir.Application.Game.Handlers.Chat;
 
 /// <summary>
-///     CZ_GENERAL_CHAT_SEND (opcode 38, contracts/02_chat_notices.md). Empty content ⇒ anti-fuzzing
-///     Quit(); a muted sender is silently dropped (no reply -- report 06 §1.7's own cached-flag posture,
-///     mirrors the legacy's synchronous mute check with no distinct wire error). The GM inline-command
-///     interception ("where"/"ygdrop"/"lab"/"boss" when <c>uUserSort &gt; 0</c>) is NOT modeled -- no
-///     GM-rank concept exists in <see cref="PlayerRuntimeState" /> yet (open issue, same gap
-///     <c>GlobalAnnouncementHandler</c> documents).
+///     CZ_GENERAL_CHAT_SEND (opcode 38). A muted sender is silently dropped, not disconnected. GM
+///     inline-command interception is not modeled -- no GM-rank concept exists yet.
 /// </summary>
 public sealed class LocalChatHandler : IInlinePacketHandler<LocalChatRequest>
 {

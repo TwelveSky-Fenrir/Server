@@ -6,9 +6,6 @@ using Fenrir.Contracts.Tests.TestSupport;
 
 namespace Fenrir.Contracts.Tests.Packets.Zone;
 
-/// <summary>
-///     ZC_LASTHERORANK_INFO_RECV — same layout as ZC 148 (Result @0, HeroRank @4), distinct opcode.
-/// </summary>
 public class ZcLastHeroRankInfoRecvTests
 {
     [Fact]

@@ -9,12 +9,7 @@ using Fenrir.Data.World;
 
 namespace Fenrir.Application.Game.Tests.World.Loot;
 
-/// <summary>
-///     Covers ground-item lifecycle end-to-end through <see cref="Zone" />'s public surface: spawning (via a
-///     guaranteed monster-kill drop, report 05 §5), claiming (<see cref="Zone.TryClaimGroundItem" />), and the
-///     60 s expiry sweep. No internal accessors -- same "public surface only" testing convention the rest of
-///     this suite already follows (<c>ZoneAttackTests</c>, <c>ZoneDeathTests</c>).
-/// </summary>
+/// <summary>Covers ground-item lifecycle end-to-end through <see cref="Zone" />'s public surface: spawning via a guaranteed monster-kill drop, claiming (<see cref="Zone.TryClaimGroundItem" />), and the 60 s expiry sweep.</summary>
 public class ZoneGroundItemTests
 {
     private const int PotionItemId = 8001;
@@ -157,10 +152,7 @@ public class ZoneGroundItemTests
     {
         var zone = CreateZoneWithGuaranteedPotionDrop(out _);
 
-        // Dedicated OS threads released simultaneously via a barrier (not Parallel.For/the thread pool, which
-        // would contend with every OTHER concurrently-running test collection for pool threads and could
-        // stagger start times enough to never actually race) -- this is the closest a unit test gets to
-        // reproducing "two players click the same loot at the exact same instant".
+        // dedicated OS threads released via a barrier, not Parallel.For -- the thread pool could stagger starts enough to never actually race
         const int attempts = 20;
         var outcomes = new GroundItemClaimOutcome[attempts];
         var exceptions = new Exception?[attempts];
@@ -194,13 +186,7 @@ public class ZoneGroundItemTests
         Assert.Equal(0, zone.GroundItemCount);
     }
 
-    /// <summary>
-    ///     Always draws the maximum possible value -- makes the guaranteed potion drop (DropRate at the
-    ///     <see cref="Loot.LootRandomSource.RandomNumber" /> ceiling) succeed deterministically while making the
-    ///     UNCONDITIONAL item-864 roll (report 05 §5, threshold 1000 out of a possible 1,000,000) as
-    ///     unreachable as possible, so these tests only ever see the ONE potion they configured, never a
-    ///     stray second item.
-    /// </summary>
+    /// <summary>Always draws the maximum value, so the guaranteed potion drop succeeds and the unconditional item-864 roll (threshold 1000/1,000,000) stays unreachable.</summary>
     private sealed class MaxValueRandom : Random
     {
         public override int Next(int minValue, int maxValue)

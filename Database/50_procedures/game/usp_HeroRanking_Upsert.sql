@@ -1,18 +1,4 @@
--- database/50_procedures/game/usp_HeroRanking_Upsert.sql
--- Contract: create or update one character's ranking row for a given period.
--- Params:
---   @CharacterId   INT
---   @PeriodKind    TINYINT       -- 0 = Current, 1 = Previous
---   @Points        INT
---   @TribeId       TINYINT NULL  -- game.Tribes.TribeId
---   @Level         INT     NULL
---   @RewardClaimed BIT     NULL
---   @Description   NVARCHAR(255) NULL
--- Result set: none.
--- Idempotent: yes -- re-running with the same inputs leaves the row in the same state (RecordedAtUtc is
--- refreshed each call, same as game.usp_GuildNotice_Set's own idiom).
--- No MERGE (forbidden, architecture reference §12.3): a single guarded UPDATE, falling back to INSERT only
--- when no row was touched.
+-- PeriodKind: 0 = Current, 1 = Previous.
 CREATE PROCEDURE game.usp_HeroRanking_Upsert @CharacterId   INT,
     @PeriodKind    TINYINT,
     @Points        INT,

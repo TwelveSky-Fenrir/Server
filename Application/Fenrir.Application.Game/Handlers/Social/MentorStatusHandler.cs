@@ -6,10 +6,8 @@ using Fenrir.Network.Sessions;
 namespace Fenrir.Application.Game.Handlers.Social;
 
 /// <summary>
-///     CZ_TEACHER_STATE_SEND (opcode 64) -- neither teacher nor student ⇒ Quit(). Checks reciprocity with
-///     the online partner in the same zone only; an offline/other-zone partner gets no reply (contract's
-///     own "partenaire hors zone = pas de réponse"). Open issue: a character with both a teacher and a
-///     student prefers the teacher-side check here, not fully re-verified against source.
+///     CZ_TEACHER_STATE_SEND (opcode 64) -- open issue: a character with both a teacher and a student
+///     prefers the teacher-side check here, not fully re-verified against source.
 /// </summary>
 public sealed class MentorStatusHandler : IInlinePacketHandler<MentorStatusRequest>
 {
@@ -34,9 +32,8 @@ public sealed class MentorStatusHandler : IInlinePacketHandler<MentorStatusReque
         }
 
         if (!zone.TryGetPlayer(partnerId.Value, out var partner) || partner is null)
-            return; // partner not in this same zone -- no reply at all (verified)
+            return; // partner not in this same zone -- no reply
 
-        // Reciprocal: if I consider PARTNER my teacher, they must consider ME their student, and vice versa.
         var reciprocal = iAmTheStudent
             ? partner.StudentCharacterId == characterId
             : partner.TeacherCharacterId == characterId;

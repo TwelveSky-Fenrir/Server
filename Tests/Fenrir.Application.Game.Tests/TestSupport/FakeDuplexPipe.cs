@@ -2,12 +2,7 @@ using System.IO.Pipelines;
 
 namespace Fenrir.Application.Game.Tests.TestSupport;
 
-/// <summary>
-///     Two independent <see cref="Pipe" />s wired together as one <see cref="IDuplexPipe" /> — enough to construct a
-///     <c>ClientSession</c> in tests without a real socket (same shape as Fenrir.Network.Tests' internal helper,
-///     duplicated here because it is deliberately not public API). The test plays the role of the remote peer:
-///     read from <see cref="SessionToPeer" /> to observe what the session sent.
-/// </summary>
+/// <summary>Two <see cref="Pipe" />s wired as one <see cref="IDuplexPipe" />, letting a test build a <c>ClientSession</c> without a real socket.</summary>
 internal sealed class FakeDuplexPipe : IDuplexPipe
 {
     private readonly Pipe _inbound = new();

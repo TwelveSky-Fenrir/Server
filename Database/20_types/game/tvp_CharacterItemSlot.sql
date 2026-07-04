@@ -1,8 +1,5 @@
--- Read-only shape for usp_CharacterItems_ReplaceContainer's TVP parameter: one row per OCCUPIED slot of
--- ONE container (CharacterId/Container are proc scalars, not TVP columns -- the replace unit is a whole
--- container, mirroring how the legacy saves each avatar array as a block, never slot-by-slot; same
--- whole-block rationale as game.tvp_AccountVaultItemSlot). Column order/types mirror
--- game.CharacterItems 1:1 minus the key prefix. No PK/index: passed by value per call, never stored.
+-- TVP for usp_CharacterItems_ReplaceContainer: one row per occupied slot of a single container
+-- (whole-container replace, mirroring legacy whole-array saves).
 CREATE TYPE game.tvp_CharacterItemSlot AS TABLE
     (
     Slot TINYINT NOT NULL,

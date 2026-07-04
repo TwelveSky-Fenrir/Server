@@ -4,15 +4,9 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Readers;
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Seeding;
 
 /// <summary>
-///     Generates <c>70_seed/world/081_item_bonus_skills.sql</c> from the real <c>005_00002.IMG</c> data
-///     (<see cref="ItemReader.ReadAll" />). Normalizes <c>ITEM_INFO</c>'s <c>iBonusSkillInfo[8][2]</c>: one
-///     row per populated slot (pair[0] != 0 OR pair[1] != 0), not 16 mostly-empty columns -- only 15,417 of
-///     34,353 real items use any of the 8 slots at all. Pair-order interpretation was verified against real
-///     data, not assumed from the field name alone: every non-zero pair[0] value is a valid world.Skills
-///     SkillId; pair[1] is never 0 when pair[0] is non-zero (0 of 20,763 such slots); and the reverse --
-///     pair[0] == 0 but pair[1] != 0 -- does occur (1,407 slots). That confirms pair[0] = SkillId (nullable,
-///     legacy "0 = no skill" sentinel translated to NULL) and pair[1] = Value (always present whenever the
-///     slot is populated at all, so it stays NOT NULL).
+///     Generates <c>70_seed/world/081_item_bonus_skills.sql</c> from <see cref="ItemReader.ReadAll" />
+///     (005_00002.IMG): one row per populated <c>BonusSkillInfo[8][2]</c> slot. Verified pair semantics:
+///     pair[0] is SkillId (nullable, "0 = no skill"), pair[1] is Value (always present when populated).
 /// </summary>
 public static class ItemBonusSkillSeedGenerator
 {

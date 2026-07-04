@@ -3,10 +3,7 @@ using Fenrir.Contracts.Packets.Zone;
 
 namespace Fenrir.Contracts.Tests.Packets.Zone;
 
-/// <summary>
-///     CZ_EXCHANGE_ITEM_SEND (CLIENT.h:232-242, 20-byte payload): Sort/Page1/Index1/Value1/Value2. No
-///     <c>tTribe</c> field (USE_EXCHANGE_ITEM_V2 not compiled in EU33) — locking the 20-byte payload.
-/// </summary>
+// No tTribe field: USE_EXCHANGE_ITEM_V2 wasn't compiled in EU33, so payload stays 20 bytes.
 public class CzExchangeItemSendTests
 {
     [Fact]

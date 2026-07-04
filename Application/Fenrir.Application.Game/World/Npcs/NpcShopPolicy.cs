@@ -5,26 +5,17 @@ using Fenrir.Data.World;
 namespace Fenrir.Application.Game.World.Npcs;
 
 /// <summary>
-///     Pure, Zone-independent policy for NPC-shop buy/sell (report 04_mega_switches.md §1, tSort 212/252 =
-///     sell = <c>ProcessForInventoryToNPCShop</c>, tSort 215 = buy = <c>ProcessForNPCShopToInventory</c>,
-///     both verified against <c>Server/ts25zone/S04_MyWork05.cpp:1398/1716</c>). No I/O, no
-///     <see cref="Zone" /> dependency -- money-balance sufficiency and the upper money CAP are deliberately
-///     NOT checked here: both are enforced atomically by the SQL layer
-///     (<c>usp_Character_AdjustMoneyAndReplaceContainer</c>'s own guards), and the legacy itself Quit()s
-///     (disconnects) on either condition for THIS specific pair of actions -- unlike most
-///     <c>ProcessForXXX</c> siblings, neither function has a graceful "clean tResult failure" path for
-///     insufficient funds, so letting the SQL guard's exception propagate to an <c>Abort</c> at the call
-///     site reproduces that exactly, without this policy needing to know the player's current balance.
+///     Pure, Zone-independent policy for NPC-shop buy/sell (<c>ProcessForInventoryToNPCShop</c>/
+///     <c>ProcessForNPCShopToInventory</c>, <c>Server/ts25zone/S04_MyWork05.cpp:1398/1716</c>). Money-balance
+///     sufficiency and the upper money cap are deliberately not checked here -- both are enforced atomically
+///     by the SQL layer, and the legacy itself Quit()s (disconnects) on either condition for this action pair,
+///     so letting the SQL guard's exception propagate to an Abort reproduces that without this policy needing
+///     to know the player's current balance.
 /// </summary>
 /// <remarks>
-///     OPEN ISSUES (documented, not guessed): (1) <c>IsRentItem</c>'s hardcoded legacy ID list (rentable
-///     items excluded from ordinary buy/sell) has no verified equivalent in Fenrir's <c>world.Items</c>
-///     schema (<c>CheckDateItem</c> is a rental-duration day-count, not the same predicate) -- NOT modeled;
-///     a rentable item present in an NPC's catalog is bought/sold like any other item. (2) The WarPoint-shop
-///     branch (<c>USE_WAR_POINT_SYSTEM</c>, verified ACTIVE for this build) and the Contribution-Point cost
-///     (<c>iBuyCost2</c>/<c>aKillOtherTribe</c>) are NOT supported -- an item whose <c>BuyCost2 &gt; 0</c> is
-///     rejected as a clean failure rather than silently charging 0 CP. (3) <c>IsValidCostume</c> exclusion on
-///     sell is NOT modeled (no costume-id table in Fenrir yet).
+///     Not modeled: (1) <c>IsRentItem</c>'s rentable-item exclusion (no equivalent in Fenrir's
+///     <c>world.Items</c> schema); (2) the WarPoint-shop branch and Contribution-Point cost (an item with
+///     <c>BuyCost2 &gt; 0</c> is rejected as a clean failure instead); (3) <c>IsValidCostume</c> exclusion on sell.
 /// </remarks>
 public static class NpcShopPolicy
 {
@@ -90,8 +81,7 @@ public static class NpcShopPolicy
 
     /// <summary>
     ///     Ports <c>ProcessForInventoryToNPCShop</c>'s branch on <c>iSort</c> (stackable vs. not) exactly.
-    ///     EVERY rejection in the legacy function is a <c>Quit()</c> (no clean <c>*tResult=1</c> path exists
-    ///     for this action at all) -- the caller must therefore treat ANY non-<see cref="SellOutcome.Success" />
+    ///     Every rejection in the legacy function is a <c>Quit()</c> -- treat any non-<see cref="SellOutcome.Success" />
     ///     result as disconnect-worthy, not a soft failure.
     /// </summary>
     public static SellResult ResolveSell(ItemDefinition itemDefinition, ItemStack sourceStack, int requestedQuantity)
@@ -117,9 +107,8 @@ public static class NpcShopPolicy
             return new SellResult(SellOutcome.Success, gained, remaining);
         }
 
-        // iType >= IRARE && iValue != 0 (S04_MyWork05.cpp:1508-1513): Fenrir never reassembles the legacy's
-        // packed iValue int -- "any of its 4 decomposed bytes nonzero" is this port's documented, closest
-        // faithful reading (D8 modeling note), not independently verified byte-for-bit.
+        // iType >= IRARE && iValue != 0 (S04_MyWork05.cpp:1508-1513): Fenrir never reassembles the packed
+        // iValue int -- "any of its 4 decomposed bytes nonzero" is the closest faithful reading here.
         if (item.Type >= RareItemType &&
             (sourceStack.Enchant != 0 || sourceStack.Combine != 0 || sourceStack.Refine != 0 ||
              sourceStack.Socket != 0))
@@ -129,12 +118,8 @@ public static class NpcShopPolicy
     }
 
     /// <summary>
-    ///     Ports <c>ProcessForNPCShopToInventory</c>'s dispatch exactly (WarPoint-shop branch excluded, see
-    ///     class remarks). <paramref name="requestedQuantity" /> is only meaningful for a stackable item.
-    ///     <paramref name="currentZoneNumber" /> is the player's CURRENT zone (<c>mSERVER_INFO.mServerNumber</c>,
-    ///     <see cref="PlayerRuntimeState.MapId" />) -- feeds <c>CheckBuyCostFree</c>'s 10% discount, which
-    ///     applies only on zone 291 (verified dead/unreachable for THIS action, since 291 is not one of
-    ///     <see cref="TownZoneNumbers" /> the caller already requires -- kept for source fidelity).
+    ///     Ports <c>ProcessForNPCShopToInventory</c>'s dispatch (WarPoint-shop branch excluded, see class
+    ///     remarks). <paramref name="requestedQuantity" /> is only meaningful for a stackable item.
     /// </summary>
     public static BuyResult ResolveBuy(NpcDefinition npc, ItemDefinition itemDefinition, int requestedQuantity,
         ItemStack? destinationSlot, short playerLevel, short currentZoneNumber)
@@ -194,9 +179,8 @@ public static class NpcShopPolicy
     }
 
     /// <summary>
-    ///     <c>CheckBuyCostFree</c> (function.h:162-187): a 10% discount applies ONLY on zone 291 (not one of
-    ///     the 5 town zones this action itself requires -- verified as dead/unreachable code in THIS call
-    ///     path, kept for source fidelity rather than silently dropped).
+    ///     <c>CheckBuyCostFree</c>: a 10% discount applies only on zone 291, which isn't one of the town zones
+    ///     this action requires -- dead/unreachable in this call path, kept for source fidelity.
     /// </summary>
     private static int ResolveBuyCost(ItemRowDto item, int quantity, short currentZoneNumber)
     {

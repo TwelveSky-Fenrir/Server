@@ -3,10 +3,7 @@ using Fenrir.Contracts.Packets.Zone;
 
 namespace Fenrir.Contracts.Tests.Packets.Zone;
 
-/// <summary>
-///     ZC_SKY_UP_ITEM_RECV (ZONE.h:1053-1058, 32-byte payload): Result/Cost/Value[6]. Distinct C++ struct
-///     from ZC 29/30/31 despite the identical layout.
-/// </summary>
+// Distinct C++ struct from ZC 29/30/31 despite the identical 32-byte layout.
 public class ZcSkyUpItemRecvTests
 {
     [Fact]

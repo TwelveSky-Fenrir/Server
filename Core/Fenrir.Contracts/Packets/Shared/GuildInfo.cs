@@ -3,16 +3,6 @@ using Fenrir.Contracts.Attributes;
 
 namespace Fenrir.Contracts.Packets.Shared;
 
-/// <summary>
-///     GUILD_INFO (STRUCT.h:684-700, 1388 bytes) — full guild snapshot carried whole (padding included,
-///     <c>memcpy</c> via <c>write2_dst_ptr</c>) by ZC_GUILD_WORK_RECV (ZC 83). Declared outside
-///     STRUCT.h's <c>pack(1)</c> regions → natural MSVC x86 alignment inserts THREE padding zones that
-///     are part of the wire layout: 3 bytes after <see cref="Name" /> (char[13], before the int
-///     <see cref="Grade" />), 3 bytes after <see cref="MemberNames" /> (char[50][13], before the int
-///     array <see cref="MemberRoles" />), and 2 bytes after <see cref="Notices" /> (char[4][51], before
-///     the int <see cref="Point" />). <c>sizeof</c> = 1388, a multiple of 4, so there is no trailing
-///     padding after <see cref="ChangeLeader" />.
-/// </summary>
 [FenrirWireType(1388)]
 public readonly partial record struct GuildInfo : IFenrirWireType<GuildInfo>
 {

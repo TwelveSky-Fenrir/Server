@@ -34,9 +34,7 @@ public class LcCreateAvatarRecvTests
         AssertAvatarInfoEqual(avatar, decodedAvatar);
     }
 
-    // Every scalar gets a unique, increasing value and every array a distinct sequence, so an
-    // offset bug reading/writing the wrong region would shift values detectably (unlike an
-    // all-zero fixture).
+    // Unique increasing values (not all-zero) so an offset bug shifts values detectably.
     private static AvatarInfo CreateSampleAvatarInfo()
     {
         var n = 0;
@@ -312,9 +310,7 @@ public class LcCreateAvatarRecvTests
         };
     }
 
-    // Deliberately explicit field-by-field comparison: default record equality compares array/
-    // string[] members BY REFERENCE (never equal after a Write/TryRead round trip), so no
-    // assertion below may use expected.Equals(actual)/== on a struct holding an array.
+    // Field-by-field: record equality compares arrays by reference, so Equals/== would fail here.
     private static void AssertAvatarInfoEqual(AvatarInfo expected, AvatarInfo actual)
     {
         Assert.Equal(expected.VisibleState, actual.VisibleState);

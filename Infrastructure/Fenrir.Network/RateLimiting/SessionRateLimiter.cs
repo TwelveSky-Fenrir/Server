@@ -3,15 +3,10 @@ using Fenrir.Contracts.Wire;
 
 namespace Fenrir.Network.RateLimiting;
 
-/// <summary>
-///     Per-session table of <see cref="TokenBucket" />s, one per (server, opcode) pair the session has actually hit
-///     — buckets are created lazily via <see cref="OpcodeRateLimiterPolicy.PolicyFor" /> rather than pre-populated
-///     for every declared opcode, since a given session typically exercises only a handful of them.
-/// </summary>
+// Per-session table of TokenBuckets, created lazily per (server, opcode) actually hit rather than pre-populated.
 public sealed class SessionRateLimiter : ISessionRateLimiter
 {
-    // Nested rather than a single dictionary keyed on (sessionId, server, opcode): Remove(sessionId) then drops one
-    // entry instead of scanning/filtering the whole table, which matters once thousands of sessions have churned.
+    // Nested so Remove(sessionId) drops one entry instead of scanning the whole table.
     private readonly ConcurrentDictionary<long, ConcurrentDictionary<(FenrirServer Server, byte Opcode), TokenBucket>>
         _buckets = new();
 
@@ -29,11 +24,7 @@ public sealed class SessionRateLimiter : ISessionRateLimiter
         return bucket.TryConsume();
     }
 
-    /// <summary>
-    ///     Benign race with a concurrent <see cref="TryConsume" /> for the same (already-disconnecting) session: at
-    ///     worst a fresh, fully-topped-up bucket gets created right after removal and is then never looked at again
-    ///     — no leak, since the session is torn down either way and nothing re-adds it after this call.
-    /// </summary>
+    // Benign race with a concurrent TryConsume: a fresh bucket may get created right after removal but is never touched again.
     public void Remove(long sessionId)
     {
         _buckets.TryRemove(sessionId, out _);

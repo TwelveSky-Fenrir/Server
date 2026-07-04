@@ -6,11 +6,7 @@ using CaeriusNet.Commands.Writes;
 
 namespace Fenrir.Data.Accounts;
 
-/// <summary>
-///     Singleton facade over auth.usp_Account_* (§11.1 of the architecture reference): no SqlDbType/builder ever
-///     leaks past this type. AccountId is the legacy uUserIdx (ADR-0005) -- usp_Account_Create hands back the new
-///     IDENTITY value directly, so callers never mint account ids client-side.
-/// </summary>
+// Facade over auth.usp_Account_*. AccountId is the legacy uUserIdx; usp_Account_Create returns the new IDENTITY value, callers never mint ids.
 public sealed record AccountRepository(ICaeriusNetDbContext Db) : IAccountRepository
 {
     public async ValueTask<AuthenticateAccountDto?> AuthenticateAsync(string loginName, CancellationToken ct)

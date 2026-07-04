@@ -6,12 +6,8 @@ using Fenrir.Network.Transport;
 
 namespace Fenrir.Network.Tests.Transport;
 
-/// <summary>
-///     One end-to-end pass over a real loopback TCP socket. FrameDecoder/SessionLoop already exercise framing and
-///     fragmentation exhaustively against in-memory pipes, so this only needs to prove the wiring underneath them:
-///     <see cref="FenrirTcpListener" /> actually accepts a live connection, and raw bytes cross the resulting
-///     <see cref="SocketConnection" />'s Input/Output pipes unchanged in both directions.
-/// </summary>
+// One end-to-end pass over a real loopback TCP socket, proving FenrirTcpListener accepts a live connection
+// and bytes cross SocketConnection's pipes unchanged; FrameDecoder/SessionLoop cover framing elsewhere.
 public sealed class SocketConnectionSmokeTests
 {
     private static readonly TimeSpan TestTimeout = TimeSpan.FromSeconds(5);
@@ -30,8 +26,7 @@ public sealed class SocketConnectionSmokeTests
             static (sessionId, transport, remoteEndPoint) =>
                 new LoginClientSession(sessionId, transport, remoteEndPoint));
 
-        // Detached by design (FenrirTcpListener.AcceptLoopAsync's own contract): drive it in the background and
-        // only reconcile with it in the finally block below.
+        // Detached by design -- drive it in the background, reconcile in the finally block below.
         var acceptLoop = listener.AcceptLoopAsync(
             (_, connection, acceptCt) =>
             {
@@ -48,8 +43,7 @@ public sealed class SocketConnectionSmokeTests
             await client.ConnectAsync(IPAddress.Loopback, port, ct);
             server = await accepted.Task.WaitAsync(ct);
 
-            // Client -> server: default GetInboundXorKey is "() => 0", a no-op per WireXor.ApplyStreamXor, so
-            // the bytes reaching SocketConnection.Input must be bit-for-bit what the client wrote.
+            // Default GetInboundXorKey is "() => 0", a no-op, so bytes must arrive bit-for-bit unchanged.
             byte[] toServer = [0xDE, 0xAD, 0xBE, 0xEF, 0x01, 0x02, 0x03];
             await client.GetStream().WriteAsync(toServer, ct);
 
@@ -57,8 +51,7 @@ public sealed class SocketConnectionSmokeTests
             Assert.Equal(toServer, readResult.Buffer.Slice(0, toServer.Length).ToArray());
             server.Input.AdvanceTo(readResult.Buffer.GetPosition(toServer.Length));
 
-            // Server -> client: the send loop never touches the bytes (no XOR on the way out), so this must
-            // arrive at the client exactly as written to SocketConnection.Output.
+            // No XOR on the way out either.
             byte[] toClient = [0xFE, 0xED, 0xFA, 0xCE, 0x99];
             var destination = server.Output.GetSpan(toClient.Length);
             toClient.CopyTo(destination);
@@ -86,11 +79,8 @@ public sealed class SocketConnectionSmokeTests
         }
     }
 
-    /// <summary>
-    ///     Binds to port 0 to let the OS pick a free loopback port, then releases it immediately so
-    ///     <see cref="FenrirTcpListener" /> — which only ever binds the endpoint it is given, never reports back
-    ///     what it bound to — can bind that same number itself.
-    /// </summary>
+    // Binds to port 0 to let the OS pick a free port, then releases it so FenrirTcpListener (which never
+    // reports back what it bound to) can bind that same number itself.
     private static int ReserveEphemeralLoopbackPort()
     {
         using var probe = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
@@ -98,10 +88,6 @@ public sealed class SocketConnectionSmokeTests
         return ((IPEndPoint)probe.LocalEndPoint!).Port;
     }
 
-    /// <summary>
-    ///     AcceptLoopAsync only ever exits via cancellation or listen-socket disposal, both of which it already swallows
-    ///     internally, but this guards the test against that contract changing underneath it.
-    /// </summary>
     private static async Task Swallow(Task task)
     {
         try

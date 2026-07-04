@@ -11,9 +11,7 @@ public class WorldInfoTests
         Assert.Equal(1384, WorldInfo.WireSize);
     }
 
-    // C# names derived from the WORLD_INFO wire table (§5.10, "m" prefix stripped, as with
-    // AVATAR_INFO/"a"). TribeGuardState and Zone038DTMValue are sized from the actual offset
-    // gap between table rows, not the raw C++ type column.
+    // TribeGuardState/Zone038DTMValue sizes come from the offset gap between table rows, not the raw C++ type column.
     [Fact]
     public void RoundTrip_PreservesAllFields()
     {

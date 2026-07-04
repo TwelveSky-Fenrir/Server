@@ -2,11 +2,7 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Records;
 
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Readers;
 
-/// <summary>
-///     Parses <c>005_00003.IMG</c> (<c>SKILL_INFO</c>, Header/Protocol/STRUCT.h:123-146). Unlike
-///     <see cref="ItemReader" />, no known runtime per-load patches apply to skill data -- <see cref="ReadAll" />
-///     simply delegates to <see cref="ReadAllRaw" />.
-/// </summary>
+/// <summary>Parses <c>005_00003.IMG</c> (<c>SKILL_INFO</c>, STRUCT.h:123-146); no known runtime patches, unlike <see cref="ItemReader" />.</summary>
 internal static class SkillReader
 {
     private const string FileName = "005_00003.IMG";
@@ -15,7 +11,6 @@ internal static class SkillReader
     private const int RecordCount = 300;
     private const int RecordSize = 776;
 
-    /// <summary>Raw parse, exactly as bytes on disk -- no runtime patches applied.</summary>
     public static IReadOnlyList<SkillRecord> ReadAllRaw(string dataDirectory)
     {
         var recordBytes = ImgUnpacker.UnpackRecordArray(
@@ -28,7 +23,6 @@ internal static class SkillReader
         return skills;
     }
 
-    /// <summary>No known runtime patches apply to skill data, so this is identical to <see cref="ReadAllRaw" />.</summary>
     public static IReadOnlyList<SkillRecord> ReadAll(string dataDirectory)
     {
         return ReadAllRaw(dataDirectory);

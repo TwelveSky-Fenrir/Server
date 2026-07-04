@@ -12,29 +12,15 @@ using Microsoft.Extensions.Logging;
 namespace Fenrir.Application.Game.Handlers;
 
 /// <summary>
-///     op29, CZ_MAKE_ITEM_SEND (contracts/03_inventory_craft.md, report 04_mega_switches.md §3, V5 NPC &amp;
-///     Economy) -- implements the two recipes <see cref="CraftRecipeCatalog" />/<see cref="CraftResolver" />
-///     cover (<c>MK_MATS_01024</c> Jade upgrade, <c>MK_ELIXIR_NEW</c> advanced elixir); every OTHER
-///     <c>MK_*</c> family is unrecognized here and Aborts, matching the verified source's own
-///     <c>default: Quit()</c> (no clean-fail path exists for an unknown <c>tSort</c> in
-///     <c>W_MAKE_ITEM_SEND</c> either).
+///     op29, CZ_MAKE_ITEM_SEND -- implements the two recipes <see cref="CraftRecipeCatalog" />/
+///     <see cref="CraftResolver" /> cover (Jade upgrade, advanced elixir); every other MK_* sort aborts,
+///     matching the legacy's own <c>default: Quit()</c>.
 /// </summary>
-/// <remarks>
-///     D7 regime (b): neither recipe touches Money (verified -- no <c>wAvatar.aMoney</c> write in either
-///     branch), so this reuses the EXISTING <c>ReplaceContainerAsync</c>/<c>ReplaceTwoContainersAsync</c>
-///     rather than the money-combined procs V5's NPC-shop/enchant actions need. The elixir roll happens
-///     off-tick (same rationale as <see cref="EnchantItemHandler" />'s own remarks) via
-///     <see cref="SystemRandomSource" />.
-/// </remarks>
 public sealed class CraftItemHandler(
     ICharacterRepository characters,
     ILogger<CraftItemHandler> logger)
     : IAsyncPacketHandler<CraftItemRequest>
 {
-    /// <summary>
-    ///     First empty slot across both inventory pages, page 0 before page 1, slot 0 upward -- a reasonable, documented
-    ///     scan order (not independently verified against <c>FindEmptyInvenForItem</c>'s own internal order).
-    /// </summary>
     private static readonly byte[] InventoryPagesInScanOrder =
         [ContainerMatrix.InventoryPage0, ContainerMatrix.InventoryPage1];
 
@@ -44,14 +30,11 @@ public sealed class CraftItemHandler(
         var zoneSession = (ZoneClientSession)session;
         var characterId = zoneSession.CharacterId!.Value;
 
-        // Benign staleness (mid-handoff/disconnect) -- same defensive posture as every other InWorld handler.
         if (zoneSession.CurrentZone is not Zone zone || !zone.TryGetPlayer(characterId, out var state) ||
             state is null)
             return;
 
-        // PlayerRuntimeState.EconomyActionLock's own remarks: serializes this whole read-snapshot/await-SQL/
-        // post-mirror sequence per character, closing the item duplication window a burst of concurrent
-        // economy requests for the same character could otherwise open (review finding, Phase C/V5).
+        // Serializes the read/SQL/mirror sequence per character to close an item-duplication window.
         await state.EconomyActionLock.WaitAsync(cancellationToken);
         try
         {
@@ -66,8 +49,6 @@ public sealed class CraftItemHandler(
                         cancellationToken);
                     return;
                 default:
-                    // Every unrecognized MK_* -- Quit() (verified, S04_MyWork02.cpp:5861 "console.error(...tSort =
-                    // %d), no clean-fail reply exists for this case).
                     zoneSession.Abort(DisconnectReason.Faulted);
                     return;
             }
@@ -133,9 +114,7 @@ public sealed class CraftItemHandler(
                 ToTvps(projected2), cancellationToken);
         }
 
-        // Result=0 always (MK_MATS_01024 never fails); Value describes the NEWLY CREATED item (verified,
-        // S04_MyWork02.cpp:4481-4486). X/Y sub-grid position (wInventory[..][1]/[2]) has no Fenrir-side
-        // backing (ContainerMatrix is flat-slot, see its own remarks) -- left 0, cosmetic-only.
+        // X/Y sub-grid position has no Fenrir-side backing (ContainerMatrix is flat-slot) -- left 0, cosmetic only.
         session.Send(new CraftItemResponse
         {
             Result = 0, Value = [result.ItemId, 0, 0, 0, 0, result.Serial]
@@ -174,8 +153,8 @@ public sealed class CraftItemHandler(
             return;
         }
 
-        // The legacy checks space BEFORE rolling (S04_MyWork02.cpp:4419-4424) -- the material's OWN slot is
-        // still occupied at scan time, so it can never itself be picked as the destination.
+        // Free-slot scan happens before rolling, while the material's own slot is still occupied, so it can
+        // never be picked as its own destination.
         var hasFreeSlot = TryFindEmptySlot(state, out var resultPage, out var resultIndex);
 
         var resolved = CraftResolver.ResolveAdvancedElixir(material, hasFreeSlot, SystemRandomSource.Instance);
@@ -194,8 +173,6 @@ public sealed class CraftItemHandler(
 
         if (resolved.Outcome == CraftResolver.ElixirOutcome.Success)
         {
-            // hasFreeSlot was true (Success requires it, CraftResolver's own gate), so resultPage/resultIndex
-            // are populated from the TryFindEmptySlot call above.
             var newItemStack = new ItemStack(resolved.ResultItemId!.Value, 1, 0, 0, 0, 0, 0, 0, 0, 0,
                 unchecked((int)DateTime.UtcNow.Ticks));
 
@@ -219,9 +196,8 @@ public sealed class CraftItemHandler(
                     new InventoryContainerSnapshot(resultPage, projectedResultContainer));
             }
 
-            // B_MAKE_ITEM_RECV describes the CONSUMED material slot's post-consumption state, NOT the new item
-            // (verified, S04_MyWork02.cpp:4453-4465) -- the new item's own info rides the SEPARATE
-            // ZC_ADD_USER_INVENTORY_ITEM_RECV below (mTRANSFER.B_ADD_USER_INVENTORY_ITEM_RECV).
+            // B_MAKE_ITEM_RECV describes the CONSUMED material slot, not the new item -- the new item rides the
+            // separate ZC_ADD_USER_INVENTORY_ITEM_RECV below.
             session.Send(new CraftItemResponse
             {
                 Result = MaterialResultCode(resolved.RemainingMaterial),
@@ -261,16 +237,12 @@ public sealed class CraftItemHandler(
                 zone.MapId, characterId);
     }
 
-    /// <summary>1001 if the material slot emptied out, 10001 if some quantity remains (S04_MyWork02.cpp:4293/4465).</summary>
+    /// <summary>1001 if the material slot emptied out, 10001 if some quantity remains.</summary>
     private static int MaterialResultCode(ItemStack? remainingMaterial)
     {
         return remainingMaterial is null ? 1001 : 10001;
     }
 
-    /// <summary>
-    ///     [0]=itemId,[1]=X,[2]=Y,[3]=Quantity,[4]=0,[5]=serial (S04_MyWork02.cpp:4453-4458) -- X/Y have no Fenrir-side
-    ///     backing (see class remarks), left 0.
-    /// </summary>
     private static int[] MaterialValue(ItemStack? remainingMaterial)
     {
         return remainingMaterial is { } m ? [m.ItemId, 0, 0, m.Quantity, 0, m.Serial] : [0, 0, 0, 0, 0, 0];

@@ -3,12 +3,7 @@ using Fenrir.Data.WriteBehind;
 
 namespace Fenrir.Data.Tests.WriteBehind;
 
-/// <summary>
-///     Pure in-memory unit tests for <see cref="DirtyTracker{TKey}" /> -- unlike every repository under
-///     Fenrir.Data.Tests, this type touches no database, so its concurrency claims (nothing lost, nothing
-///     drained twice, <see cref="DirtyTracker{TKey}.Count" /> stays exact) can and should be verified without
-///     a SQL Server fixture.
-/// </summary>
+// Pure in-memory unit tests for DirtyTracker<TKey> -- no database needed.
 public sealed class DirtyTrackerTests
 {
     [Fact]
@@ -75,15 +70,14 @@ public sealed class DirtyTrackerTests
 
         Assert.Equal(2, drained.Count);
         Assert.Equal(0, tracker.Count);
-        Assert.Empty(tracker.DrainAll()); // a second drain finds nothing left over
+        Assert.Empty(tracker.DrainAll());
     }
 
     [Fact]
     public void DrainAll_ThenMarkDirtyAgain_CountTracksTheNewCycleCorrectly()
     {
-        // Guards against a counter that only ever increments, or that goes stale after a full drain cycle --
-        // exactly the kind of regression an Interlocked-maintained Count (instead of forwarding to
-        // ConcurrentDictionary.Count) could introduce if increments/decrements ever drifted out of sync.
+        // Guards Count staying exact if it were ever Interlocked-maintained instead of forwarding to
+        // ConcurrentDictionary.Count.
         var tracker = new DirtyTracker<int>();
         tracker.MarkDirty(1, DirtyFlags.Position);
         tracker.DrainAll();
@@ -97,10 +91,7 @@ public sealed class DirtyTrackerTests
     [Fact]
     public async Task MarkDirty_And_DrainAll_UnderConcurrency_NeverLosesAKey_AndCountNeverGoesNegative()
     {
-        // Exercises the exact invariant documented on DrainAll's remarks: a MarkDirty racing a DrainAll must
-        // never be silently dropped, and must never be drained twice as part of the same drain. Many writer
-        // tasks continuously mark a small key space dirty while a concurrent drainer repeatedly drains and
-        // records every key it ever sees; every key that was ever marked must show up in at least one drain.
+        // Invariant: a MarkDirty racing a DrainAll must never be silently dropped or drained twice.
         const int keyCount = 32;
         const int writerTaskCount = 8;
         const int markCallsPerWriter = 4_000;
@@ -120,7 +111,7 @@ public sealed class DirtyTrackerTests
                 await Task.Yield();
             }
 
-            // Final sweep once writers are done, so anything marked after the last in-loop drain is still counted.
+            // Final sweep: anything marked after the last in-loop drain must still be counted.
             foreach (var key in tracker.DrainAll().Keys)
                 everDrained[key] = 0;
         });

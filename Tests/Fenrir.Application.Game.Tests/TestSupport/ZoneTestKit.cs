@@ -14,11 +14,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.TestSupport;
 
-/// <summary>
-///     Deterministic zone construction for tests: real <see cref="Zone" /> instances (no fakes of the unit
-///     under test), real <see cref="ZoneClientSession" />s over in-memory pipes, and time driven exclusively
-///     through <see cref="Zone.Tick" /> — no <c>RunAsync</c>, no timers, no sleeps.
-/// </summary>
+/// <summary>Real <see cref="Zone" /> instances over in-memory pipes; time driven exclusively through <see cref="Zone.Tick" /> -- no <c>RunAsync</c>, timers, or sleeps.</summary>
 internal static class ZoneTestKit
 {
     public static GameServerOptions Options()
@@ -77,10 +73,7 @@ internal static class ZoneTestKit
         return bytes;
     }
 
-    /// <summary>
-    ///     An entirely empty (but structurally valid) <see cref="WorldDataCache" /> -- every catalog lookup misses,
-    ///     matching an un-seeded/irrelevant world for tests that don't care about item/skill/level data.
-    /// </summary>
+    /// <summary>A structurally valid but empty <see cref="WorldDataCache" /> -- every catalog lookup misses.</summary>
     public static WorldDataCache EmptyWorldData(
         FrozenDictionary<int, ItemDefinition>? itemsById = null,
         FrozenDictionary<int, SkillDefinition>? skillsById = null,
@@ -111,12 +104,7 @@ internal static class ZoneTestKit
     }
 }
 
-/// <summary>
-///     A trivial, fully deterministic <see cref="IRandomSource" /> -- returns a fixed sequence (wrapping back to
-///     the start once exhausted), reduced modulo the CALLER'S requested bound so a test can name the intended
-///     semantic value (e.g. "50" for a %100 hit-chance roll) without worrying about a smaller bound elsewhere in
-///     the same sequence (e.g. a %2 variance-direction roll) silently taking an out-of-range raw value.
-/// </summary>
+/// <summary>Deterministic <see cref="IRandomSource" />: returns a fixed sequence (wrapping when exhausted), reduced modulo each call's own requested bound.</summary>
 internal sealed class ScriptedRandomSource(params int[] sequence) : IRandomSource
 {
     private int _index;

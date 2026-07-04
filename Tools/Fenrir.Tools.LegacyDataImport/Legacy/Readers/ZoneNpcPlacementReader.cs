@@ -2,12 +2,7 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Records;
 
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Readers;
 
-/// <summary>
-///     Parses <c>002.BIN</c> (Header/Protocol/STRUCT.h:1380-1386, <c>ZONENPCINFODATA</c>): a raw array of
-///     <c>MAX_ZONE_NUMBER_NUM</c> (350) fixed-size structs written back-to-back with no header, no zlib, and no
-///     XOR obfuscation -- unlike the <c>.IMG</c> datasets, this is a plain memory dump straight to disk.
-///     No per-load patches are known to apply to this file, so there is only one read method.
-/// </summary>
+/// <summary>Parses <c>002.BIN</c> (STRUCT.h:1380-1386, <c>ZONENPCINFODATA</c>): 350 fixed structs, raw memory dump -- no zlib/XOR unlike the <c>.IMG</c> files.</summary>
 internal static class ZoneNpcPlacementReader
 {
     private const string FileName = "002.BIN";

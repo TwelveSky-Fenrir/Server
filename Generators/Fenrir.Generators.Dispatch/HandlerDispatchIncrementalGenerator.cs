@@ -9,12 +9,8 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 namespace Fenrir.Generators.Dispatch;
 
 /// <summary>
-///     Discovers <c>IInlinePacketHandler&lt;T&gt;</c>/<c>IAsyncPacketHandler&lt;T&gt;</c> present in the
-///     CURRENT COMPILATION and emits <c>MessageDispatcher</c> (opcode dispatch table) + <c>PacketHandlerHub</c>
-///     (spec §5.7). Wired as an analyzer on the application-layer projects that actually declare handlers
-///     (Fenrir.Application.Login/Game, Phase 5/6) — deliberately NOT on Fenrir.Contracts, which never
-///     declares a handler itself: two assemblies both emitting `Fenrir.Contracts.Dispatch.MessageDispatcher`
-///     would collide the moment an executable referenced both.
+///     Discovers handlers in the current compilation and emits <c>MessageDispatcher</c>/<c>PacketHandlerHub</c>.
+///     Not wired on Fenrir.Contracts itself: two assemblies both emitting the same dispatch type would collide.
 /// </summary>
 [Generator(LanguageNames.CSharp)]
 public sealed class HandlerDispatchIncrementalGenerator : IIncrementalGenerator
@@ -123,12 +119,7 @@ public sealed class HandlerDispatchIncrementalGenerator : IIncrementalGenerator
         context.AddSource("MessageDispatcher.g.cs", writer.ToString());
     }
 
-    /// <summary>
-    ///     Emits <c>AddGeneratedPacketHandlers</c>: every handler type wired into <c>MessageDispatcher</c> is
-    ///     registered as a DI singleton from the SAME discovery pass, so "handler dispatched but never
-    ///     registered" (a runtime <c>GetRequiredService</c> crash on the first packet) cannot exist by
-    ///     construction — the failure mode the manual Add*Handlers lists used to allow.
-    /// </summary>
+    /// <summary>Registers every dispatched handler as a DI singleton from the same discovery pass, so dispatch and registration can't drift.</summary>
     private static void EmitRegistration(IndentedWriter writer, ImmutableArray<HandlerModel> handlers)
     {
         var handlerTypes = handlers

@@ -4,13 +4,7 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Records;
 
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Validation;
 
-/// <summary>
-///     Ad-hoc cross-validation of <see cref="SkillReader" /> against the <c>005_00003TH.csv</c> ts25ztool dump.
-///     Mirrors the item validator's approach in Program.cs (Latin1 line reading, naive '|' split, quote-trimming).
-///     Note: although <c>SKILL_INFO.sDescription</c> is a <c>char[10][51]</c> in memory, the CSV export only ever
-///     dumps the first 3 description lines (columns 2-4) -- the remaining 7 slots are parsed faithfully from the
-///     binary but are not present in the CSV, so only <see cref="SkillRecord.Description" />[0..2] are compared.
-/// </summary>
+/// <summary>Cross-validates <see cref="SkillReader" /> against <c>005_00003TH.csv</c>; the CSV only dumps description lines 0-2 of the char[10][51] field, so only <see cref="SkillRecord.Description" />[0..2] are compared.</summary>
 internal static class SkillValidation
 {
     public static void Run(string dataDir)
@@ -20,8 +14,7 @@ internal static class SkillValidation
 
         var csvPath = Path.Combine(dataDir, "..", "005_00003TH.csv");
         if (!File.Exists(csvPath))
-            // Fall back to a path passed in as the data directory's sibling, in case dataDir already points
-            // at the BuildEU33 root rather than BuildEU33/DATA.
+            // fallback: dataDir may already be the BuildEU33 root, not BuildEU33/DATA.
             csvPath = Path.Combine(dataDir, "005_00003TH.csv");
 
         if (!File.Exists(csvPath))
@@ -36,8 +29,7 @@ internal static class SkillValidation
 
     private static void VerifyAgainstCsv(IReadOnlyList<SkillRecord> skills, string csvPath)
     {
-        // Latin1: the legacy CSV export (like our own IMG parse) is a raw byte dump, not UTF-8 -- reading it as
-        // UTF-8 would corrupt every non-ASCII byte sequence into U+FFFD before comparison even starts.
+        // Latin1: raw byte dump, not UTF-8 (UTF-8 would corrupt non-ASCII bytes to U+FFFD).
         var mismatches = 0;
         var numericMismatches = 0;
         var checkedRows = 0;

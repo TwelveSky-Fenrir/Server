@@ -4,13 +4,9 @@ using Fenrir.Application.Game.GameData;
 namespace Fenrir.Application.Game.Skills;
 
 /// <summary>
-///     Pure resolution of one non-attack skill cast (<c>AVATAR_ACTION_SEND</c> Sort=30, report 12 §4.2) --
-///     MP-cost check, weapon-class gate, and buff-value/heal-amount computation via
-///     <see cref="SkillCatalog" />/<see cref="SkillEffectCatalog" />. Never touches
-///     <c>PlayerRuntimeState</c> directly (mirrors <see cref="Fenrir.Application.Game.Combat.CombatResolver" />'s
-///     own pure input-in/outcome-out shape) -- <c>Zone.ApplySkillCast</c> applies the result, including
-///     resolving/clamping a targeted heal against the LIVE target's current HP/MP, which this resolver has no
-///     access to by design.
+///     Pure resolution of one non-attack skill cast (AVATAR_ACTION_SEND Sort=30): MP-cost check, weapon-class
+///     gate, and buff-value/heal-amount computation. Never touches PlayerRuntimeState directly -- Zone.ApplySkillCast
+///     applies the result, including clamping a targeted heal against the live target's current HP/MP.
 /// </summary>
 public static class SkillCastResolver
 {
@@ -23,11 +19,7 @@ public static class SkillCastResolver
         WrongWeaponClass
     }
 
-    /// <summary>
-    ///     <paramref name="equippedWeaponSort" /> is the caster's current EWEAPON slot's <c>world.Items.Sort</c>,
-    ///     or null if no weapon is equipped -- resolved by the caller (Zone already has
-    ///     <see cref="WorldDataCache" /> + the caster's live Equipment container).
-    /// </summary>
+    /// <summary><paramref name="equippedWeaponSort" /> is the caster's current EWEAPON slot's Sort, or null if unequipped.</summary>
     public static Result TryCast(SkillDefinition? skill, int gradePoints, int casterMana, int casterMaxLife,
         int? equippedWeaponSort)
     {
@@ -43,7 +35,6 @@ public static class SkillCastResolver
 
         if (effect.Kind != SkillEffectKind.SelfBuff)
         {
-            // Targeted heal (skills 106-111, report S07_MyGame03.cpp:9449-9576): flat amount from RecoverInfo1/2.
             var healKind = effect.Kind == SkillEffectKind.HealLife
                 ? SkillValueKind.RecoverInfo1
                 : SkillValueKind.RecoverInfo2;
@@ -76,7 +67,7 @@ public static class SkillCastResolver
         int ManaCost,
         ImmutableArray<BuffWrite> BuffWrites,
         SkillEffectKind Kind,
-        /// <summary>Meaningful only for <see cref="SkillEffectKind.HealLife" />/<see cref="SkillEffectKind.HealMana" /> -- the RAW (unclamped) flat amount; the caller clamps to the target's remaining capacity, exactly like the legacy does at its own call site.</summary>
+        /// <summary>Meaningful only for HealLife/HealMana -- the raw, unclamped amount; the caller clamps to the target's remaining capacity.</summary>
         int HealAmount)
     {
         public static Result Fail(FailureReason reason)

@@ -1,7 +1,5 @@
 #if NETSTANDARD2_0
-// Lets this netstandard2.0 generator use `init`/`required` internally: the compiler only checks
-// these types' presence/shape, not their origin. Never affects emitted code (targets net10.0,
-// where they exist natively).
+// Polyfill so this netstandard2.0 generator can use `init`/`required`; compiler only checks type shape, not origin.
 namespace System.Runtime.CompilerServices
 {
     internal static class IsExternalInit;

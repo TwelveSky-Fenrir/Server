@@ -4,11 +4,7 @@ using Fenrir.Application.Game.World;
 
 namespace Fenrir.Application.Game.Tests.Simulation;
 
-/// <summary>
-///     Covers <see cref="BuffExpirySystem" /> (report 05 §7 point 4: buff durations count down ONE per legacy
-///     tick, a slot reaching zero is fully cleared) via real <see cref="Zone" /> ticks -- no fakes of the
-///     system under test.
-/// </summary>
+/// <summary>Covers <see cref="BuffExpirySystem" />: buff durations count down one per legacy tick, and a slot reaching zero is fully cleared.</summary>
 public class BuffExpirySystemTests
 {
     [Fact]

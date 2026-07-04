@@ -7,12 +7,8 @@ using Fenrir.Network.Sessions;
 
 namespace Fenrir.Network.Dispatching;
 
-/// <summary>
-///     Drains a session's inbound pipe, decodes legacy frames, and dispatches them strictly in order. Any
-///     malformed frame, unknown opcode, illegal state, or rate-limit breach ends the session cleanly — there is no
-///     partial/undefined state to recover from, matching the legacy server's own "any violation closes the
-///     socket" posture.
-/// </summary>
+// Any malformed frame/unknown opcode/illegal state/rate-limit breach ends the session — matches the
+// legacy server's own "any violation closes the socket" posture.
 public static class SessionLoop
 {
     public static async Task RunAsync(
@@ -63,9 +59,7 @@ public static class SessionLoop
         ReadOnlySequence<byte> buffer,
         CancellationToken cancellationToken)
     {
-        // Copied into a plain local (not the async method's own parameter): the ref-safety analysis for
-        // an `out ref struct` alongside a `ref` argument is stricter for a parameter of an async method
-        // than for a local declared in its body.
+        // Copied to a local: ref-safety for a ref struct out-param is stricter on an async method's parameter than a local.
         var remaining = buffer;
 
         while (true)

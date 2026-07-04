@@ -5,12 +5,8 @@ using Fenrir.Contracts.Wire;
 namespace Fenrir.Contracts.Packets.Zone;
 
 /// <summary>
-///     ZC_CHUGSOUNG_WAR_UP_RECV (ZONE.h:1220-1226) — builder <c>B_CHUGSOUNG_WAR_UP_RECV</c>
-///     (S05_MyTransfer.cpp:1543); reply to CZ 120 (S04_MyWork02.cpp:14427).
-///     <see cref="Result" />: 0 = OK, 1 = missing Mystic Bronze Herb (item 666), 2 = missing Silver Bar
-///     (item 1073). On success: <c>Page[0] = herbPage + 10000 + barPage*100</c>, <c>Index[0]</c> mirrors
-///     it, <c>Page[1] = Index[1] = 0</c> (S04_MyWork02.cpp:14416-14420) — two inventory consumptions
-///     compacted into slot 0.
+///     Result: 0=OK, 1=missing herb(666), 2=missing bar(1073). On success both consumptions are packed
+///     into slot 0: Page[0] = herbPage + 10000 + barPage*100, Index[0] mirrors it; slot 1 unused.
 /// </summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.TowerUpgrade,
     ExpectedSize = 25)]

@@ -2,10 +2,7 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Records;
 
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Readers;
 
-/// <summary>
-///     Parses <c>005_00010.IMG</c> (legacy <c>SOCKET_INFO</c> table, i.e. gem socket definitions). No known
-///     runtime per-load patches -- <see cref="ReadAll" /> simply delegates to <see cref="ReadAllRaw" />.
-/// </summary>
+/// <summary>Parses <c>005_00010.IMG</c> (<c>SOCKET_INFO</c>, gem socket definitions); no known runtime patches.</summary>
 internal static class SocketReader
 {
     private const string FileName = "005_00010.IMG";
@@ -14,7 +11,6 @@ internal static class SocketReader
     private const int RecordCount = 2891;
     private const int RecordSize = 20;
 
-    /// <summary>Raw parse, exactly as bytes on disk -- no runtime patches applied.</summary>
     public static IReadOnlyList<SocketRecord> ReadAllRaw(string dataDirectory)
     {
         var recordBytes = ImgUnpacker.UnpackRecordArray(
@@ -27,7 +23,6 @@ internal static class SocketReader
         return sockets;
     }
 
-    /// <summary>No known runtime patches for this dataset -- identical to <see cref="ReadAllRaw" />.</summary>
     public static IReadOnlyList<SocketRecord> ReadAll(string dataDirectory)
     {
         return ReadAllRaw(dataDirectory);

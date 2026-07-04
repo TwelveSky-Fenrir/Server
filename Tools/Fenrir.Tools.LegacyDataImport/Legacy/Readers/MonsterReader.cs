@@ -2,11 +2,7 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Records;
 
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Readers;
 
-/// <summary>
-///     Parses <c>005_00004.IMG</c> (Header/Protocol/STRUCT.h:156-204, <c>MONSTER_INFO</c>). No known runtime
-///     per-load patches are applied to monster data by the legacy server, unlike items (<see cref="ItemReader" />)
-///     -- so <see cref="ReadAll" /> simply delegates to <see cref="ReadAllRaw" />.
-/// </summary>
+/// <summary>Parses <c>005_00004.IMG</c> (<c>MONSTER_INFO</c>, STRUCT.h:156-204); no known runtime patches, unlike <see cref="ItemReader" />.</summary>
 internal static class MonsterReader
 {
     private const string FileName = "005_00004.IMG";
@@ -15,10 +11,7 @@ internal static class MonsterReader
     private const int RecordCount = 10000;
     private const int RecordSize = 940;
 
-    /// <summary>
-    ///     Raw parse, exactly as bytes on disk -- no runtime patches applied. Use this to cross-validate
-    ///     against a <c>ts25ztool export monster</c> CSV dump, which itself reads the file directly with no patching.
-    /// </summary>
+    /// <summary>Raw parse, no patches -- matches a raw <c>ts25ztool export monster</c> CSV dump.</summary>
     public static IReadOnlyList<MonsterRecord> ReadAllRaw(string dataDirectory)
     {
         var recordBytes = ImgUnpacker.UnpackRecordArray(
@@ -31,7 +24,6 @@ internal static class MonsterReader
         return monsters;
     }
 
-    /// <summary>No known runtime per-load patches apply to monster data, so this is identical to <see cref="ReadAllRaw" />.</summary>
     public static IReadOnlyList<MonsterRecord> ReadAll(string dataDirectory)
     {
         return ReadAllRaw(dataDirectory);

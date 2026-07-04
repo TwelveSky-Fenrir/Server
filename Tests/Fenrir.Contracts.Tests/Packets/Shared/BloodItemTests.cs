@@ -4,12 +4,7 @@ using Fenrir.Contracts.Tests.TestSupport;
 
 namespace Fenrir.Contracts.Tests.Packets.Shared;
 
-/// <summary>
-///     BLOOD_ITEM (12 bytes, STRUCT.h:1423-1428) — ItemId/Price/Quantity, no padding. Field ORDER is
-///     the load-bearing part of this test: Price comes before Quantity (unlike <see cref="ProxyShopItem" />).
-///     The golden encoder below is hand-built from the C++ layout, independent of the generated
-///     <c>Write</c>.
-/// </summary>
+// Field order matters: Price comes before Quantity here, unlike ProxyShopItem.
 public class BloodItemTests
 {
     [Fact]

@@ -14,10 +14,8 @@ public enum ZoneCommandKind : byte
 }
 
 /// <summary>
-///     <c>Zone</c>'s internal ABI (architecture reference §10.2): a hand-discriminated union, not a class
-///     hierarchy — no allocation per command, only <see cref="Kind" /> decides which of the remaining fields is
-///     meaningful. <see cref="Enter" />/<see cref="Leave" />/<see cref="Move" /> are the only producers; nothing
-///     outside this file should construct one directly.
+///     <c>Zone</c>'s internal ABI: a hand-discriminated union, not a class hierarchy -- no allocation per
+///     command, only <see cref="Kind" /> decides which field is meaningful.
 /// </summary>
 public readonly struct ZoneCommand
 {
@@ -32,21 +30,16 @@ public readonly struct ZoneCommand
 
     /// <summary>
     ///     Meaningful only when <see cref="Kind" /> is <see cref="ZoneCommandKind.Leave" />: null for a plain
-    ///     leave (disconnect), or the zone the player is transferring to (in-process handoff, ADR-0012) — the
-    ///     source tick snapshots the live state and posts the matching Enter there itself.
+    ///     leave, or the target zone for an in-process handoff -- the source tick snapshots state and posts
+    ///     the matching Enter there itself.
     /// </summary>
     public Zone? HandoffTarget { get; init; }
 
     /// <summary>
-    ///     Meaningful only when <see cref="Kind" /> is <see cref="ZoneCommandKind.Leave" /> AND
-    ///     <see cref="HandoffTarget" /> is not null: overrides the position <see cref="ZoneTransfer.CreateEnterData" />
-    ///     snapshots into the target's <c>Enter</c>, instead of the player's current in-zone position. Null means
-    ///     "keep the current position" (a plain zone-boundary handoff, unaffected). Non-null is how a resolved
-    ///     portal/NPC-transfer arrival point (<c>ZoneMoveHandler</c>) or a resolved
-    ///     death-respawn spot (<see cref="Zone.ApplyDeath" />) reaches the target zone's <c>Enter</c> WITHOUT the
-    ///     poster ever touching <see cref="PlayerRuntimeState" /> directly (single-writer invariant, architecture
-    ///     reference §10.1) — the override travels as plain data inside this command and is applied by the
-    ///     SOURCE zone's own tick, exactly like every other field here.
+    ///     Meaningful only when <see cref="Kind" /> is <see cref="ZoneCommandKind.Leave" /> with a
+    ///     <see cref="HandoffTarget" />: overrides the position snapshotted into the target's Enter. Null keeps
+    ///     the player's current position. Lets a resolved portal/respawn arrival point reach the target zone
+    ///     without the poster touching <see cref="PlayerRuntimeState" /> directly.
     /// </summary>
     public (float X, float Y, float Z)? HandoffPosition { get; init; }
 
@@ -72,15 +65,10 @@ public readonly struct ZoneCommand
 }
 
 /// <summary>
-///     Snapshot handed to <see cref="Zone" /> when a player finishes registration (CZ_REGISTER_AVATAR_SEND,
-///     wire contract §5.3) and is ready to be simulated. Everything the tick needs to seed a
-///     <see cref="PlayerRuntimeState" /> without querying <c>Fenrir.Data</c> itself — the zone tick never touches
-///     SQL directly (architecture reference §10.5: "SQL est un journal de durabilité, pas un participant au
-///     gameplay"). This is also why <see cref="Items" />/<see cref="Stats" /> below are the caller's
-///     ALREADY-COMPUTED equipment rows and effective stats (<c>EnterWorldHandler</c> resolves these
-///     against <c>WorldDataCache</c> before ever posting this command) rather than raw catalog lookups Zone
-///     itself would have to perform — <c>Zone.HandleEnter</c> only ever copies them onto the new
-///     <see cref="PlayerRuntimeState" />, never computes them.
+///     Snapshot handed to <see cref="Zone" /> when a player finishes registration and is ready to be simulated
+///     -- everything the tick needs to seed a <see cref="PlayerRuntimeState" /> without touching SQL itself.
+///     <see cref="Items" />/<see cref="Stats" /> are the caller's already-computed rows; <c>Zone.HandleEnter</c>
+///     only ever copies them, never computes them.
 /// </summary>
 public sealed record PlayerEnterData(
     IPacketSession Session,
@@ -124,19 +112,11 @@ public sealed record PlayerEnterData(
     byte AutoManaRatio = 0,
     int PetGrowth = 0,
     byte PetActivity = 0,
-    // Phase C/V7 Guilds & Tribes: cosmetic in-guild title (game.GuildMembers.CallName) -- "" when none
-    // set or when guildless, same posture as GuildName/GuildRoleDb.
+    // Cosmetic in-guild title (game.GuildMembers.CallName); "" when none set or guildless.
     string GuildCallName = "",
-    // CORRECTION (review finding, Phase C/V7): these raw progression fields are read from the DB into
-    // EnterWorldHandler's own `character` DTO and used ONCE to compute the world-entry EffectiveStats
-    // snapshot (see Stats above), but were never themselves carried into PlayerRuntimeState -- so
-    // PlayerRuntimeState.StatVit/StatStr/StatInt/StatDex/Title/Halo/RebirthCount/Experience/
-    // ContributionPoints/StatPoints silently reset to 0/default on EVERY world entry AND zone transfer,
-    // regardless of the real persisted value. Harmless for the FIRST stat computation (EnterWorldHandler
-    // computes EffectiveStats directly from the DB row, bypassing PlayerRuntimeState entirely), but any
-    // LATER recompute that reads these raw fields off PlayerRuntimeState directly (equip/unequip, enchant,
-    // halo purchase, stat-point reset, any V7 feature gated on Title/Halo/ContributionPoints) would then
-    // wrongly operate on zero instead of the persisted value.
+    // These raw progression fields must travel here or PlayerRuntimeState.StatVit/StatStr/StatInt/StatDex/
+    // Title/Halo/RebirthCount/Experience/ContributionPoints/StatPoints silently reset to 0 on every world
+    // entry and zone transfer.
     int StatVit = 0,
     int StatStr = 0,
     int StatInt = 0,

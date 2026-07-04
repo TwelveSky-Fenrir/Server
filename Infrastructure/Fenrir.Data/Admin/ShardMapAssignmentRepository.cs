@@ -5,12 +5,7 @@ using CaeriusNet.Commands.Reads;
 
 namespace Fenrir.Data.Admin;
 
-/// <summary>
-///     admin.ShardMapAssignments access -- the DB-backed replacement for the Game:Maps config list
-///     (GameServerOptions' own remarks): GameServer resolves its hosted maps here once at boot, the
-///     same way WorldDataLoader resolves world.* reference data, before ZoneRegistry.Initialize builds
-///     one Zone actor per returned map id.
-/// </summary>
+// DB-backed replacement for the Game:Maps config list; GameServer resolves hosted maps here at boot, before ZoneRegistry.Initialize builds one Zone actor per map id.
 public sealed record ShardMapAssignmentRepository(ICaeriusNetDbContext Db) : IShardMapAssignmentRepository
 {
     public async ValueTask<IReadOnlyList<short>> GetHostedMapsAsync(byte shardId, CancellationToken ct)

@@ -5,20 +5,10 @@ using Fenrir.Data.World;
 
 namespace Fenrir.Application.Game.GameData;
 
-/// <summary>
-///     Pure, SQL-free construction of <see cref="WorldDataCache" /> from raw world.* rows: re-groups every
-///     fan-out child table under its parent id, filters the legacy orphan rows (counted in
-///     <see cref="WorldDataFilterStats" />, logged by <see cref="WorldDataLoader" />) and fails fast when a
-///     dataset the simulation cannot run without came back empty. Kept separate from the loader so index
-///     construction and filtering are unit-testable on in-memory rows.
-/// </summary>
+/// <summary>Pure, SQL-free construction of <see cref="WorldDataCache" /> from raw world.* rows -- kept separate from the loader so it's unit-testable on in-memory rows.</summary>
 public static class WorldDataCacheBuilder
 {
-    /// <summary>
-    ///     Builds the full cache. Throws <see cref="InvalidOperationException" /> when a critical dataset
-    ///     (Items, Monsters, Zones, Levels, Skills) is empty -- an empty reference catalog means the database
-    ///     was not seeded, and a GameServer without item/monster/zone data must not accept a single connection.
-    /// </summary>
+    /// <summary>Throws when a critical dataset (Items, Monsters, Zones, Levels, Skills) is empty -- an unseeded GameServer must not accept a single connection.</summary>
     public static (WorldDataCache Cache, WorldDataFilterStats Stats) Build(WorldDataRows rows)
     {
         EnsureCriticalDatasetNotEmpty(rows.Items.Count, "world.Items");
@@ -87,11 +77,7 @@ public static class WorldDataCacheBuilder
         return result.ToFrozenDictionary();
     }
 
-    /// <summary>
-    ///     Groups the 5 drop child tables back per MonsterId (world.usp_Monster_GetDrops RS0-RS4). Money and
-    ///     quest-item are at-most-one-per-monster in the legacy data; a duplicate would be a seed bug, so the
-    ///     plain Add throws instead of silently keeping one of the two.
-    /// </summary>
+    /// <summary>Money/quest-item are at-most-one-per-monster in the legacy data; a duplicate would be a seed bug, so the plain Add throws rather than silently picking one.</summary>
     public static FrozenDictionary<int, MonsterDefinition> BuildMonsters(
         IReadOnlyList<MonsterRowDto> monsters,
         IReadOnlyList<MonsterDropMoneyRowDto> dropMoney,
@@ -173,12 +159,8 @@ public static class WorldDataCacheBuilder
     }
 
     /// <summary>
-    ///     Builds the per-zone index and applies the explicit orphan filtering (rapport 05, risques):
-    ///     a portal with no TargetZoneNumber (~54% of rows) cannot transfer anyone, a spawn region with no
-    ///     ZoneNumber (~49%) or no MonsterId can never summon, and an NPC placement with no NpcId places
-    ///     nothing. Each discarded row is counted in <see cref="WorldDataFilterStats" /> so the loader can log
-    ///     exactly how much dead legacy data was set aside. Inbound landing points are all kept -- a NULL
-    ///     FromZoneNumber just means "unrecorded source", the coordinates are still valid.
+    ///     Filters portals with no destination, spawn regions with no zone/monster, and NPC placements with no NPC -- each discarded
+    ///     row is counted in <see cref="WorldDataFilterStats" />. Landing points are all kept: a NULL FromZoneNumber just means "unrecorded source".
     /// </summary>
     public static (FrozenDictionary<short, ZoneDefinition> ZonesByNumber, WorldDataFilterStats Stats) BuildZones(
         IReadOnlyList<ZoneRowDto> zones,

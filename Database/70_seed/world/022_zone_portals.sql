@@ -1,6 +1,4 @@
--- Seeds world.ZonePortals from 003.BIN: one row per populated outbound-portal slot (413 of a
--- 11700-slot ceiling) -- see 30_tables/world/ZonePortals.sql for the TargetZoneNumber NULL rules.
--- MUST run after the world.Zones seed script (FK dependency).
+-- Seeds world.ZonePortals from 003.BIN. MUST run after the world.Zones seed script (FK dependency).
 IF
 NOT EXISTS (SELECT 1 FROM world.ZonePortals)
 BEGIN

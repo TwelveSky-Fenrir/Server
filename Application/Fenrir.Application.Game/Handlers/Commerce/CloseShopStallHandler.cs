@@ -7,12 +7,9 @@ using Fenrir.Network.Sessions;
 namespace Fenrir.Application.Game.Handlers.Commerce;
 
 /// <summary>
-///     CZ_END_PSHOP_SEND (opcode 32, contracts/04_commerce.md, verified <c>S04_MyWork02.cpp:6351-6383</c>).
-///     <c>Sort</c> 1 closes the live personal shop, replying only if one was actually open (verified legacy
-///     no-op otherwise, not an oversight). <c>Sort</c> 2 closes the offline/deputy shop
-///     (<see cref="OfflineShopRepository.SetStateAsync" />, ShopState only -- items/money stay attached) and
-///     sends no unicast reply either, matching the legacy's own <c>CloseProxyShop</c> (only a world
-///     broadcast, not modeled here -- reproduced exactly, not a gap).
+///     CZ_END_PSHOP_SEND (opcode 32). <c>Sort</c> 1 closes the live personal shop, replying only if one was
+///     actually open. <c>Sort</c> 2 closes the offline/deputy shop (ShopState only, items/money stay
+///     attached) and sends no unicast reply, matching the legacy.
 /// </summary>
 public sealed class CloseShopStallHandler(IOfflineShopRepository offlineShops)
     : IAsyncPacketHandler<CloseShopStallRequest>

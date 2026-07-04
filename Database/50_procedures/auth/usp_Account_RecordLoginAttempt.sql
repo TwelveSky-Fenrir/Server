@@ -1,13 +1,5 @@
--- Contract: @AccountId INT, @Success BIT -> no result set.
--- Idempotent when @Success = 1 (always resets to the same clean state, replay-safe). NOT idempotent
--- when @Success = 0: each call increments FailedLoginCount, so a retried/duplicated failure report
--- would over-count -- callers must report each real attempt exactly once.
--- Progressive lockout escalation (architecture reference §9.1), expressed as a single UPDATE/CASE so
--- the thresholds live in one place instead of duplicated IF/ELSE branches:
---   @Success = 1             -> FailedLoginCount = 0,          LockoutUntilUtc = NULL
---   @Success = 0, count >=10 -> FailedLoginCount = count + 1,  LockoutUntilUtc = now + 15 minutes
---   @Success = 0, count >= 5 -> FailedLoginCount = count + 1,  LockoutUntilUtc = now + 1 minute
---   @Success = 0, count < 5  -> FailedLoginCount = count + 1,  LockoutUntilUtc unchanged
+-- NOT idempotent when @Success = 0: each call increments FailedLoginCount, so callers must report
+-- each real attempt exactly once. Progressive lockout: >=10 failures -> 15 min, >=5 -> 1 min.
 CREATE PROCEDURE auth.usp_Account_RecordLoginAttempt @AccountId INT,
     @Success   BIT
 AS

@@ -7,12 +7,8 @@ using Fenrir.Network.Sessions;
 namespace Fenrir.Application.Game.Handlers.Social;
 
 /// <summary>
-///     CZ_PARTY_ANSWER_SEND (opcode 67). 0 = accept, 1/2 = refuse, else ignored (legacy's own
-///     <c>default: return</c>). On accept, echoes ZC 73 to the inviter, then broadcasts
-///     ZC_PARTY_JOIN_INFO (75) + a full roster refresh (74) to every member -- unless the party was
-///     already full (<see cref="PartyJoinOutcome.PartyWasFull" />, silent legacy no-op; see
-///     <see cref="PartyRegistry" />). Collapses ts25center's separate PARTY_JOIN/PARTY_INFO emissions
-///     into one fan-out.
+///     CZ_PARTY_ANSWER_SEND (opcode 67) -- on accept, collapses legacy's separate PARTY_JOIN/PARTY_INFO
+///     emissions into one fan-out; a full party (<see cref="PartyJoinOutcome.PartyWasFull" />) is a silent no-op.
 /// </summary>
 public sealed class PartyAnswerHandler(ZoneRegistry zones, PartyRegistry parties)
     : IInlinePacketHandler<PartyAnswerRequest>

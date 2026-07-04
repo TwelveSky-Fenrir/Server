@@ -4,7 +4,7 @@ using Fenrir.Contracts.Tests.TestSupport;
 
 namespace Fenrir.Contracts.Tests.Packets.Shared;
 
-/// <summary>GUILD_NOTICE_INFO_CRECV (204 bytes, STRUCT.h:1167-1170) -- CZ_GUILD_WORK_SEND tSort 5.</summary>
+// CZ_GUILD_WORK_SEND tSort 5.
 public class GuildWorkNoticePayloadTests
 {
     [Fact]

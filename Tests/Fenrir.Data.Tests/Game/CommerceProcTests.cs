@@ -11,12 +11,8 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Fenrir.Data.Tests.Game;
 
-/// <summary>
-///     Server Logic V8 Player Commerce &amp; Cash procedures against real SQL Server 2025: the combined
-///     cash-shop debit+grant, blood-coin spend, daily-reward claim, gift-into-vault claim, the full
-///     offline/proxy-shop lifecycle (open/close/retrieve/purchase/withdraw), and the live-PShop purchase
-///     commit. Each test creates its own account/character(s) so tests never depend on execution order.
-/// </summary>
+// Commerce and cash procs against real SQL Server 2025. Each test creates its own account/character(s) so
+// tests never depend on execution order.
 [Collection("SqlServer")]
 public class CommerceProcTests
 {
@@ -71,7 +67,7 @@ public class CommerceProcTests
 
         Assert.NotNull(ex);
         Assert.Equal(40, await _cash.GetBalanceAsync(accountId, CancellationToken.None));
-        // The failed debit must NOT have granted the second item either -- item state stays exactly as before.
+        // Failed debit must not have granted the second item either.
         Assert.Single(await GetItemsAsync(characterId, 0));
     }
 
@@ -116,7 +112,6 @@ public class CommerceProcTests
             .ClaimDailyRewardAsync(characterId, today, 0, [], CancellationToken.None).AsTask());
         Assert.NotNull(ex);
 
-        // A later day succeeds and advances the cursor again.
         await _characters.ClaimDailyRewardAsync(characterId, today + 1, 0,
             [new CharacterItemSlotTvp(0, itemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1)], CancellationToken.None);
         state = await _characters.GetRewardClaimStateAsync(characterId, today + 1, CancellationToken.None);
@@ -126,12 +121,9 @@ public class CommerceProcTests
     [Fact]
     public async Task Character_ClaimDailyReward_FullyClaimedWeek_ResetsOnTheFollowingMonday()
     {
-        // Regression test (review finding, Phase C/V8): a prior pass only ever incremented RewardClaimDay,
-        // capped 0-7, with no weekly recurrence at all -- the legacy resets it to 0 every Monday
-        // (Server/ts25center/S07_MyGame01.cpp:218-238). 2024-01-01 is a Monday; claiming once a day through
-        // 2024-01-07 (Sunday) exhausts the 7-day cycle (day 7 = fully claimed). 2024-01-08 is the FOLLOWING
-        // Monday -- a claim attempt there must succeed (day resets to 1) instead of being rejected as
-        // "fully claimed".
+        // Legacy resets RewardClaimDay to 0 every Monday (Server/ts25center/S07_MyGame01.cpp:218-238).
+        // 2024-01-01 is a Monday, so day 7 (Sun 01-07) is fully claimed and 01-08 (next Monday) must
+        // succeed with a reset instead of being rejected as "fully claimed".
         var accountId = await CreateAccountAsync();
         var characterId = await CreateCharacterAsync(accountId);
         var itemId = await MinItemIdAsync();
@@ -143,7 +135,7 @@ public class CommerceProcTests
         var fullyClaimed = await _characters.GetRewardClaimStateAsync(characterId, 20240107, CancellationToken.None);
         Assert.Equal((byte)7, fullyClaimed!.RewardClaimDay);
 
-        // Merely READING the state on the new week already reports the reset, before any claim runs.
+        // Merely reading the state on the new week already reports the reset, before any claim runs.
         var readOnNewWeek = await _characters.GetRewardClaimStateAsync(characterId, 20240108, CancellationToken.None);
         Assert.Equal((byte)0, readOnNewWeek!.RewardClaimDay);
 
@@ -210,7 +202,6 @@ public class CommerceProcTests
 
         await ExecAsync($"UPDATE game.Characters SET Money = 1000 WHERE CharacterId = {buyerId};");
 
-        // Open: the listed item leaves the seller's live inventory (container 0) into the shop.
         await _offlineShops.OpenAndReplaceContainersAsync(sellerId, 37, 20260710,
             "MyShop", 1, 1, 1,
             [new OfflineShopItemSlotTvp(0, itemId, 1, 0, 0, 500, null)],
@@ -221,13 +212,12 @@ public class CommerceProcTests
         Assert.Single(items);
         Assert.Empty(await GetItemsAsync(sellerId, 0));
 
-        // Re-opening while the shop still holds the item is refused (unclaimed value guard).
+        // Re-opening while the shop still holds unclaimed value is refused.
         var reopenEx = await Record.ExceptionAsync(() => _offlineShops.OpenAndReplaceContainersAsync(sellerId, 37,
             20260710, "MyShop", 1, 1, 1, [new OfflineShopItemSlotTvp(0, itemId, 1, 0, 0, 500, null)], [], [],
             CancellationToken.None).AsTask());
         Assert.NotNull(reopenEx);
 
-        // Purchase: buyer pays 500, receives the item; seller's shop earns 500.
         await _offlineShops.ExecutePurchaseAsync(sellerId, 0, itemId, 1,
             0, 500, buyerId, 0,
             [new CharacterItemSlotTvp(0, itemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1)], CancellationToken.None);
@@ -237,12 +227,11 @@ public class CommerceProcTests
         Assert.Equal(500, shopAfterSale!.Money);
         Assert.Empty(itemsAfterSale);
 
-        // Buying the SAME (now-gone) slot again fails cleanly (CAS).
+        // Buying the same now-gone slot again fails cleanly (CAS).
         var staleEx = await Record.ExceptionAsync(() => _offlineShops.ExecutePurchaseAsync(sellerId, 0, itemId, 1, 0,
             500, buyerId, 0, [], CancellationToken.None).AsTask());
         Assert.NotNull(staleEx);
 
-        // Close, then withdraw the earnings into the seller's own live money.
         await _offlineShops.SetStateAsync(sellerId, 0, CancellationToken.None);
         await _offlineShops.WithdrawMoneyAsync(sellerId, 500, 0, CancellationToken.None);
 
@@ -261,7 +250,6 @@ public class CommerceProcTests
         await _offlineShops.OpenAndReplaceContainersAsync(sellerId, 37, 20260710, "MyShop", 1, 1, 1,
             [new OfflineShopItemSlotTvp(0, itemId, 2, 0, 0, 500, null)], [], [], CancellationToken.None);
 
-        // Cannot retrieve while still open.
         var openEx = await Record.ExceptionAsync(() => _offlineShops.RetrieveItemAndReplaceContainerAsync(sellerId,
             0, itemId, 2, 0, 1, [new CharacterItemSlotTvp(0, itemId, 2, 0, 0, 0, 0, 0, 0, 0, 0, 1)],
             CancellationToken.None).AsTask());

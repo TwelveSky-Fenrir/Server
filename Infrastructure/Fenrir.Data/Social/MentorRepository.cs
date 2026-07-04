@@ -6,12 +6,7 @@ using CaeriusNet.Commands.Writes;
 
 namespace Fenrir.Data.Social;
 
-/// <summary>
-///     game.Characters.TeacherCharacterId/StudentCharacterId access (Phase C/V6 Social --
-///     CZ_TEACHER_* family, contracts/05_social.md). "Mentor" here means the legacy's "teacher/student"
-///     relationship -- named to avoid colliding with the already-established <c>Mentor*</c> wire/opcode
-///     naming (Opcodes.Zone.Incoming/Outgoing.Mentor*) this batch's handlers implement against.
-/// </summary>
+// "Mentor" = legacy teacher/student relationship; named to avoid colliding with the existing Mentor* wire/opcode naming.
 public sealed record MentorRepository(ICaeriusNetDbContext Db) : IMentorRepository
 {
     /// <summary>Loaded once at world entry (AVATAR_INFO's Teacher/Student fields).</summary>
@@ -35,10 +30,7 @@ public sealed record MentorRepository(ICaeriusNetDbContext Db) : IMentorReposito
         await Db.ExecuteAsync(sp, ct);
     }
 
-    /// <summary>
-    ///     CZ_TEACHER_END_SEND (opcode 63) -- clears BOTH pointers on the calling character's own row only; the partner
-    ///     side is deliberately left untouched (preserved legacy asymmetry, see the proc's own header).
-    /// </summary>
+    /// <summary>CZ_TEACHER_END_SEND (63); clears both pointers on the caller's own row only -- the partner side is deliberately left untouched (legacy asymmetry).</summary>
     public async ValueTask ClearForCharacterAsync(int characterId, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_CharacterMentor_ClearForCharacter", 0)

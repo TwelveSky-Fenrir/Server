@@ -1,6 +1,5 @@
--- Contract: @IpAddress VARCHAR(45), @RuleType TINYINT -> RS0 { FirewallRuleId INT }.
--- Errors: THROW 50303 if @IpAddress already has a rule (checked before insert;
--- UQ_FirewallRules_IpAddress is the last-resort backstop under a race).
+-- THROW 50303 if @IpAddress already has a rule (checked before insert; UQ_FirewallRules_IpAddress
+-- is the last-resort backstop under a race).
 CREATE PROCEDURE admin.usp_FirewallRule_Add @IpAddress VARCHAR(45),
     @RuleType  TINYINT
 AS

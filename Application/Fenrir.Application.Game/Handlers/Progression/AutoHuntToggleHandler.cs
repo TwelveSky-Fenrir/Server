@@ -9,29 +9,18 @@ using Fenrir.Network.Sessions;
 namespace Fenrir.Application.Game.Handlers.Progression;
 
 /// <summary>
-///     CZ_AUTO_CONFIG_SEND (opcode 99, verified <c>S04_MyWork02.cpp:13466-13614</c>) -- the auto-hunt
-///     on/off toggle. <see cref="AutoHuntToggleRequest.Sort" /> must be 0 (disable) or 1 (enable), else
-///     Quit(). Enabling is also refused in <see cref="DisallowedZones" />, without an equipped weapon, or
-///     without a configured attack skill (<c>AttackType[0]</c>/<c>[2]</c> either non-zero). OPEN ISSUE: the
-///     source also mentions unenumerated "level-gated battle zones" -- not guessed here, only the explicit
-///     zone list is enforced. On success the 112-byte <see cref="Fenrir.Contracts.Packets.Shared.AutoHunt" />
-///     blob is stored verbatim with no content validation; the bot loop itself (auto-attack/loot/potion once
-///     enabled) is out of scope for this pass.
+///     CZ_AUTO_CONFIG_SEND (opcode 99) -- auto-hunt on/off toggle. Enabling requires an equipped weapon and a
+///     configured attack skill. OPEN ISSUE: legacy also mentions unenumerated "level-gated battle zones", not
+///     modeled here.
 /// </summary>
-/// <remarks>
-///     Same "own-character, non-economy scalar preference, direct mutation" posture as
-///     <see cref="AutoPotionThresholdHandler" /> -- see that type's own remarks.
-/// </remarks>
 public sealed class AutoHuntToggleHandler(ICharacterRepository characters) : IAsyncPacketHandler<AutoHuntToggleRequest>
 {
-    /// <summary><c>FEQUIP_TYPE::EWEAPON</c> (STRUCT.h:1662-1676).</summary>
+    /// <summary>FEQUIP_TYPE::EWEAPON slot index.</summary>
     private const byte WeaponSlot = 7;
 
     /// <summary>
-    ///     Zones where enabling auto-hunt is refused (verified S04_MyWork02.cpp:13508-13520). CORRECTED: the
-    ///     source's <c>mCheckZone241TypeServer</c> flag is not literally "zone 241" -- it's a per-server
-    ///     boolean true for 20 distinct server numbers (verified <c>S07_MyGame01.cpp:1232-1256</c>: 241-249,
-    ///     292-294, 311-312, 325-330), all of which must be refused, not just 241.
+    ///     Zones where enabling auto-hunt is refused. Legacy's "zone 241" flag is actually 20 distinct server
+    ///     numbers (241-249, 292-294, 311-312, 325-330), all refused here, not just 241.
     /// </summary>
     private static readonly HashSet<short> DisallowedZones =
     [
@@ -61,8 +50,7 @@ public sealed class AutoHuntToggleHandler(ICharacterRepository characters) : IAs
         if (packet.Sort == 1)
         {
             var hasWeapon = state.Inventory.GetSlot(ContainerMatrix.Equipment, WeaponSlot) is not null;
-            // CORRECTED: source's `!(!A && !B)` (S04_MyWork02.cpp:13548) is `A || B`, not AND -- a character
-            // with only ONE attack-type slot configured (a legitimate setup) was wrongly refused otherwise.
+            // Legacy's `!(!A && !B)` is `A || B`: either attack-type slot alone is a valid setup.
             var hasAttackSkill = packet.AutoHunt.AttackType.Length >= 3 &&
                                  (packet.AutoHunt.AttackType[0] != 0 || packet.AutoHunt.AttackType[2] != 0);
 

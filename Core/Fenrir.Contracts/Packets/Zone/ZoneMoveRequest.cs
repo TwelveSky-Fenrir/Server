@@ -4,16 +4,7 @@ using Fenrir.Contracts.Wire;
 
 namespace Fenrir.Contracts.Packets.Zone;
 
-/// <summary>
-///     CZ_DEMAND_ZONE_SERVER_INFO_2 (CLIENT.h:221-226, 12-byte payload) — zone-transfer request, handled by
-///     <c>W_DEMAND_ZONE_SERVER_INFO_2</c>. Legacy validation (S04_MyWork02.cpp:2065-2114): <c>tZoneNumber</c> equal
-///     to the current zone is ignored; <c>tZoneNumber &lt; 1 || &gt;= 350</c> or <c>tPresentZoneNumber</c>
-///     mismatching the current zone -&gt; <c>Quit()</c>; <c>tSort == 2</c> (GM transfer) requires
-///     <c>uUserSort &gt;= 1</c> else <c>Quit()</c>; <c>tSort</c> outside 2..12 -&gt; <c>Quit()</c>. Replies with
-///     ZC_DEMAND_ZONE_SERVER_INFO_2_RESULT; on success the session enters "moving zone"
-///     (<c>mMoveZoneResult = 1</c>, <c>mRegisterTime</c> re-stamped) — model as a Fenrir session flag, not a
-///     <see cref="ZoneSessionState" />.
-/// </summary>
+/// <summary>ZoneNumber must be 1..349; Sort 2 (GM) requires UserSort >= 1. On success the session enters "moving zone" — model as a session flag, not a <see cref="ZoneSessionState" />.</summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.ZoneMove,
     ExpectedSize = 21, AllowedStates = [(byte)ZoneSessionState.InWorld])]
 public readonly partial record struct ZoneMoveRequest : IIncomingPacket<ZoneMoveRequest>

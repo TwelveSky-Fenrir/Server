@@ -3,10 +3,6 @@ using Fenrir.Contracts.Packets.Zone;
 
 namespace Fenrir.Contracts.Tests.Packets.Zone;
 
-/// <summary>
-///     CZ_PROCESS_DATA_SEND (CLIENT.h:203-207, 134-byte payload). Golden encoder built by hand,
-///     independent of the generated <c>Write</c>.
-/// </summary>
 public class CzProcessDataSendTests
 {
     [Fact]

@@ -7,9 +7,8 @@ using Fenrir.Network.Sessions;
 namespace Fenrir.Application.Game.Handlers.Chat;
 
 /// <summary>
-///     CZ_GENERAL_SHOUT_SEND (opcode 40). Registered unconditionally but the legacy handler silently
-///     IGNORES the packet (no reply, no Quit) unless <c>mServerNumber ∈ {37,119,124,84}</c>
-///     (<see cref="ChatRouter.IsShoutEnabledOnMap" />) -- reproduced here as an early, silent return.
+///     CZ_GENERAL_SHOUT_SEND (opcode 40). Silently ignored outside shout-enabled maps
+///     (<see cref="ChatRouter.IsShoutEnabledOnMap" />) -- matches the legacy's silent ignore, not a Quit.
 /// </summary>
 public sealed class ShoutHandler : IInlinePacketHandler<ShoutRequest>
 {

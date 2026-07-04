@@ -5,12 +5,7 @@ using Fenrir.Contracts.Tests.TestSupport;
 
 namespace Fenrir.Contracts.Tests.Packets.Shared;
 
-/// <summary>
-///     OBJECT_FOR_ITEM (84 bytes, STRUCT.h:941-955) — Index/Quantity/Value/SerialNumber/Location[3]/
-///     Master[13]/PartyName[13]/(2-byte natural padding)/DropSort/CreateTime/PresentTime/CreateState/
-///     SocketGem[3]. The golden encoder below is hand-built from the C++ layout, independent of the
-///     generated <c>Write</c>, and explicitly asserts the 2 padding bytes at offset 54..55 are zero.
-/// </summary>
+// Golden encoder is hand-built from the C++ OBJECT_FOR_ITEM layout, independent of the generated Write.
 public class ObjectForItemTests
 {
     [Fact]

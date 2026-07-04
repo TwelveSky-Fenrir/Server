@@ -36,8 +36,7 @@ public readonly partial record struct WorldInfo : IFenrirWireType<WorldInfo>
     // Flattened row-major int[4][8] (32 total).
     [FixedArray(32)] public required int[] Zone175TypeState { get; init; }
 
-    // offsetof confirms 64 bytes = 16 ints here, not int[4][16] (256 bytes) as label suggests;
-    // offset delta 588-524=64 makes 16 the only value byte-exact with the client.
+    // Confirmed 16 ints, not int[4][16]=256 bytes as the name suggests (offsetof delta = 64).
     [FixedArray(16)] public required int[] TribeGuardState { get; init; }
 
     public required int Zone194TypeState { get; init; }
@@ -58,8 +57,7 @@ public readonly partial record struct WorldInfo : IFenrirWireType<WorldInfo>
 
     [FixedArray(3)] [FixedString(13)] public required string[] GuildName3 { get; init; }
 
-    // GuildName3 is 39 bytes (not 4-aligned); compiler inserts 3 bytes padding before the next
-    // int field to realign to offset 900.
+    // GuildName3 (39 bytes) isn't 4-aligned; compiler pads 3 bytes before GuildScore.
     [Reserved(3)] [FixedArray(3)] public required int[] GuildScore { get; init; }
 
     public required int Zone088WinTribe { get; init; }

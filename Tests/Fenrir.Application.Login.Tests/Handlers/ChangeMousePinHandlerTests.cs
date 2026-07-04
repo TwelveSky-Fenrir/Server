@@ -6,10 +6,8 @@ using Fenrir.Network.Sessions;
 
 namespace Fenrir.Application.Login.Tests.Handlers;
 
-/// <summary>
-///     op14 CL_CHANGE_MOUSE_PASSWORD_SEND — PIN change (login protocol report §4.14). Success also validates the
-///     PIN (legacy quirk, S04_MyWork02.cpp l.532): the session proceeds straight to CharSelect.
-/// </summary>
+// op14 CL_CHANGE_MOUSE_PASSWORD_SEND -- legacy quirk (S04_MyWork02.cpp l.532): success proceeds straight
+// to CharSelect.
 public class ClChangeMousePasswordSendHandlerTests
 {
     private const int AccountId = 42;

@@ -3,10 +3,7 @@ using Fenrir.Contracts.Packets.Zone;
 
 namespace Fenrir.Contracts.Tests.Packets.Zone;
 
-/// <summary>
-///     ZC_RUNE_SYSTEM_RECV (ZONE.h:495-502, 20-byte payload): Result/Page/Index/ItemIndex/RuneIndex. NOTE:
-///     field order differs from the CZ 157 request — verified independently here.
-/// </summary>
+// Field order differs from the CZ 157 request - do not assume symmetry.
 public class ZcRuneSystemRecvTests
 {
     [Fact]

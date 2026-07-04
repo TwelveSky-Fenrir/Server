@@ -8,19 +8,13 @@ using Fenrir.Network.Sessions;
 namespace Fenrir.Application.Game.Handlers.Social;
 
 /// <summary>
-///     CZ_FRIEND_MAKE_SEND (opcode 56). Out-of-bounds slot or an already-occupied one ⇒ Quit(); requires
-///     an accepted-but-not-yet-consumed answer (<see cref="FriendRegistry.TryConsumeAccepted" />).
-///     ONE-DIRECTIONAL: only the calling character's own list gains an entry -- the other side must
-///     separately send its own CZ_FRIEND_MAKE_SEND (game.CharacterFriends' own header).
+///     CZ_FRIEND_MAKE_SEND (opcode 56) -- one-directional: only the caller's own list gains an entry; the
+///     other side must separately send its own CZ_FRIEND_MAKE_SEND.
 /// </summary>
 /// <remarks>
-///     Deviates from the single-writer-via-<c>ZoneCommand</c> pattern: <see cref="PlayerRuntimeState.Friends" />
-///     is mutated directly from this request thread. Safe because it's always self-directed (only the
-///     caller's own state), and because a zone-transfer handoff (<c>Zone.HandleEnter</c>) concurrently
-///     enumerates the same instance on the target zone's tick thread, so <see cref="PlayerRuntimeState.Friends" />
-///     is a <see cref="System.Collections.Concurrent.ConcurrentDictionary{TKey,TValue}" /> rather than a plain
-///     <c>Dictionary</c>. Not the CAS-style pattern <c>MonsterEntity.TakeDamage</c> uses -- no atomic
-///     decision rides on this data, just thread-safety for the enumerator.
+///     <see cref="PlayerRuntimeState.Friends" /> is mutated directly (not via ZoneCommand): safe since
+///     self-directed, but must stay a <see cref="System.Collections.Concurrent.ConcurrentDictionary{TKey,TValue}" />
+///     since <c>Zone.HandleEnter</c> enumerates it concurrently during zone transfer.
 /// </remarks>
 public sealed class FriendAddHandler(ZoneRegistry zones, FriendRegistry friends, IFriendRepository repository)
     : IAsyncPacketHandler<FriendAddRequest>

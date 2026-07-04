@@ -1,8 +1,4 @@
--- Normalizes SKILL_INFO's sDescription[10][51] (Header/Protocol/STRUCT.h:123-146): one row per
--- non-empty description line, not 10 mostly-empty NVARCHAR columns. Real data check before committing
--- to this shape: description-line indices 7-9 are populated in 0 of 153 real skills, and even indices
--- 0-6 vary from 0 to 7 populated lines per skill (average ~3.9) -- genuinely sparse/variable-length,
--- unlike ITEM_INFO's always-3-line description (kept as plain columns on world.Items).
+-- Normalizes SKILL_INFO's sDescription[10][51]: one row per non-empty line (0-7 lines/skill, variable), unlike ITEM_INFO's fixed 3-line description kept as plain columns on world.Items.
 CREATE TABLE world.SkillDescriptions
 (
     SkillId   INT     NOT NULL,

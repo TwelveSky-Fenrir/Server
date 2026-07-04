@@ -4,7 +4,7 @@ using Fenrir.Contracts.Tests.TestSupport;
 
 namespace Fenrir.Contracts.Tests.Packets.Shared;
 
-/// <summary>GUILD_MAKE_TITLE_CRECV (18 bytes, STRUCT.h:1187-1191) -- CZ_GUILD_WORK_SEND tSort 10.</summary>
+// CZ_GUILD_WORK_SEND tSort 10.
 public class GuildWorkTitlePayloadTests
 {
     [Fact]

@@ -4,10 +4,7 @@ using Fenrir.Contracts.Wire;
 
 namespace Fenrir.Contracts.Packets.Zone;
 
-/// <summary>
-///     CZ_HIGH_ITEM_SEND (CLIENT.h:264) — same typedef as <see cref="EnchantItemRequest" /> (24). Rank
-///     upgrade (requires +4 / combine >= 1); Warlord variant under <c>__REBIRTH__</c> (active). Response: ZC 30.
-/// </summary>
+/// <summary>Rank upgrade requires the item to be +4 already (combine ≥ 1).</summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.UpgradeItemRank, ExpectedSize = 29,
     AllowedStates = [(byte)ZoneSessionState.InWorld])]
 public readonly partial record struct UpgradeItemRankRequest : IIncomingPacket<UpgradeItemRankRequest>

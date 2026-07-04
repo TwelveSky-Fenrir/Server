@@ -3,11 +3,8 @@ using Fenrir.Domain.Security;
 
 namespace Fenrir.Application.Login.Tests.TestSupport;
 
-/// <summary>
-///     In-memory stand-in for <see cref="IAccountPinRepository" /> — the seam the type doc of
-///     <c>AccountPinRepository</c> calls out explicitly so the PIN handlers (ops 13/14/15) are unit-testable
-///     without a SQL container. Single-account: every PIN handler only ever touches its own session's account.
-/// </summary>
+// In-memory stand-in for IAccountPinRepository so the PIN handlers are unit-testable without a SQL
+// container. Single-account: every PIN handler only ever touches its own session's account.
 internal sealed class FakeAccountPinRepository : IAccountPinRepository
 {
     private AccountPinDto? _stored;

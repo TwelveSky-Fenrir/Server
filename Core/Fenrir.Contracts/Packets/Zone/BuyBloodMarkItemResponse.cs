@@ -4,10 +4,7 @@ using Fenrir.Contracts.Wire;
 
 namespace Fenrir.Contracts.Packets.Zone;
 
-/// <summary>
-///     ZC_BUY_BLOOD_MARK_RECV (ZONE.h:1371-1378) — reply to CZ_BUY_BLOOD_MARK_SEND. <c>Result</c> 0 = ok,
-///     1 = catalog unavailable (<c>mCashInfo</c> null), 2/3 = funds/inventory errors. Unicast.
-/// </summary>
+// Result: 0=ok, 1=catalog unavailable, 2/3=funds/inventory errors.
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.BuyBloodMarkItem, ExpectedSize = 41)]
 public readonly partial record struct BuyBloodMarkItemResponse : IOutgoingPacket
 {

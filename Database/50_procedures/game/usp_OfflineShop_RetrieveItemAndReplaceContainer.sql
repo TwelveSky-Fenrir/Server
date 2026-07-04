@@ -1,23 +1,6 @@
 -- database/50_procedures/game/usp_OfflineShop_RetrieveItemAndReplaceContainer.sql
--- Contract: atomically pull ONE unsold item out of the owner's OWN closed offline shop back into their
--- live inventory -- CZ_SET_DEPUTY_PSHOP_SEND BuySort=RETRIEVED (contracts/04_commerce.md; verified
--- S07_MyGame09.cpp:627-844: retrieval requires ShopState=0/closed, the mirror image of a purchase which
--- requires ShopState=1/open). D7 regime (b).
--- Params:
---   @CharacterId      INT
---   @SlotIndex        SMALLINT -- 0-24, the offline-shop slot being retrieved
---   @ExpectedItemId   INT
---   @ExpectedQuantity INT
---   @ExpectedValue    INT      -- CAS guard: the slot must still hold exactly this (id, quantity, value)
---   @Container        TINYINT  -- the owner's OWN inventory container the item lands in
---   @Items            game.tvp_CharacterItemSlot READONLY -- that container's FULL new content
--- Result set: none.
--- Idempotent: no.
--- Single guarded DELETE ... OUTPUT (CAS): the shop must be closed (ShopState=0) AND the slot must still
--- match every expected value, checked in the SAME statement that removes it -- no read/write race window.
--- Errors:
---   THROW 50272 -- the shop is not closed, or the slot no longer matches (already retrieved/sold, or
---                  stale client state).
+-- Single guarded DELETE (CAS): the shop must be closed AND the slot must still match every expected
+-- value, checked in the same statement that removes it -- no read/write race window.
 CREATE PROCEDURE game.usp_OfflineShop_RetrieveItemAndReplaceContainer @CharacterId      INT,
     @SlotIndex        SMALLINT,
     @ExpectedItemId   INT,

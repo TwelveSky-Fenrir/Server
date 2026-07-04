@@ -4,17 +4,12 @@ using Fenrir.Contracts.Wire;
 
 namespace Fenrir.Contracts.Packets.Login;
 
-/// <summary>
-///     CL_CREATE_MOUSE_PASSWORD_SEND (CLIENT.h l.47-50): first-time mouse-PIN creation, sent by an account that
-///     has no PIN yet while the second-login gate is closed (login protocol report §4.13). Legal ONLY in
-///     <see cref="LoginSessionState.PinRequired" /> — the legacy handler Quit()s both when the session is not
-///     validated and when <c>IsSecondLogin()</c> is already true.
-/// </summary>
+// Legal only at PinRequired: legacy handler Quit()s if a PIN already exists for the account.
 [FenrirPacket(FenrirServer.Login, FenrirDirection.Incoming, Opcodes.Login.Incoming.CreateMousePin,
     ExpectedSize = 14, AllowedStates = [(byte)LoginSessionState.PinRequired])]
 public readonly partial record struct CreateMousePinRequest : IIncomingPacket<CreateMousePinRequest>
 {
-    /// <summary>MAX_MOUSE_PASSWORD_LENGTH=5: exactly 4 ASCII digits + NUL (CheckMousePassword, function.h l.56-71).</summary>
+    // Exactly 4 ASCII digits + NUL (CheckMousePassword).
     [FixedString(5)]
     public required string MousePassword { get; init; }
 }

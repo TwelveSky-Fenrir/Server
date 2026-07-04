@@ -2,11 +2,7 @@ using CaeriusNet.Attributes.Dto;
 
 namespace Fenrir.Data.World;
 
-/// <summary>
-///     One world.Items row -- ordinal contract of world.usp_Item_GetAll's RS0 (the legacy ITEM_INFO catalog,
-///     34,353 rows). Constructor order must track the SELECT column order exactly (invariant I-04);
-///     [GenerateDto] maps by position, not by name.
-/// </summary>
+// world.usp_Item_GetAll RS0; ctor order must match the SELECT exactly (ordinal mapping).
 [GenerateDto]
 public sealed partial record ItemRowDto(
     int ItemId,
@@ -62,11 +58,7 @@ public sealed partial record ItemRowDto(
     byte CapeInfo2,
     byte CapeInfo3);
 
-/// <summary>
-///     One populated world.ItemBonusSkills slot -- ordinal contract of world.usp_Item_GetAll's RS1
-///     (ItemId, SlotIndex 0-7, SkillId, Value). SkillId is NULL when the legacy slot carried a value with
-///     no skill wired up.
-/// </summary>
+/// <summary>world.usp_Item_GetAll RS1 (SlotIndex 0-7); SkillId null when the slot had no skill wired up.</summary>
 [GenerateDto]
 public sealed partial record ItemBonusSkillRowDto(
     int ItemId,

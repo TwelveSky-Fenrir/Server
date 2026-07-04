@@ -7,15 +7,7 @@ using Fenrir.Network.Sessions;
 
 namespace Fenrir.Application.Login.Handlers;
 
-/// <summary>
-///     op14 CL_CHANGE_MOUSE_PASSWORD_SEND — change the PIN by presenting the current one (login protocol report
-///     §4.14). Only reachable at the PIN screen (legacy Quit()s once <c>IsSecondLogin()</c> is true, hence
-///     <c>AllowedStates=[PinRequired]</c>). Legacy: no PIN in storage or invalid formats ⇒ Quit(); wrong current
-///     PIN ⇒ reply <c>Result=1, "0000"</c> + strike (3rd disconnects — same counter as op 15); storage failure ⇒
-///     reply <c>Result=2, "0000"</c> WITHOUT disconnecting; success ⇒ reply <c>Result=0</c> with the NEW PIN
-///     echoed in clear from the request, and — legacy quirk worth keeping — the change also VALIDATES the PIN
-///     (<c>mSecondLoginSort=0</c>, S04_MyWork02.cpp l.532), so the session proceeds to CharSelect directly.
-/// </summary>
+/// <summary>op14 CL_CHANGE_MOUSE_PASSWORD_SEND — legacy quirk: a successful change also validates the PIN (S04_MyWork02.cpp l.532), so the session goes straight to CharSelect.</summary>
 public sealed class ChangeMousePinHandler(IAccountPinRepository pins)
     : IAsyncPacketHandler<ChangeMousePinRequest>
 {
@@ -30,7 +22,7 @@ public sealed class ChangeMousePinHandler(IAccountPinRepository pins)
         var loginSession = (LoginClientSession)session;
         var accountId = loginSession.AccountId!.Value;
 
-        // Legacy: IsEmptyString(uMousePassword) => Quit — nothing to change yet, the client must create (op 13).
+        // No stored PIN => Quit; client must create one first (op13).
         var storedPin = await pins.GetAsync(accountId, cancellationToken);
         if (storedPin is null)
         {
@@ -59,13 +51,11 @@ public sealed class ChangeMousePinHandler(IAccountPinRepository pins)
         }
         catch (Exception)
         {
-            // Legacy: UpdateMousePassword failure replies 2 and keeps the connection alive (l.525-530).
+            // Legacy: storage failure replies 2 without disconnecting (S04_MyWork02.cpp l.525-530).
             session.Send(new ChangeMousePinResponse { Result = 2, MousePassword = ZeroPin });
             return;
         }
 
-        // The legacy GL_503 UDP log shipped both PINs in clear to ts25gamelog; deliberately not reproduced
-        // (plan D9: structured logs, and never a clear PIN anywhere server-side).
         loginSession.MarkCharSelect();
         session.Send(new ChangeMousePinResponse { Result = 0, MousePassword = packet.ChangeMousePassword });
     }

@@ -3,10 +3,7 @@ using Fenrir.Contracts.Packets.Zone;
 
 namespace Fenrir.Contracts.Tests.Packets.Zone;
 
-/// <summary>
-///     CZ_RUNE_SYSTEM_SEND (CLIENT.h:249-256, 20-byte payload): Sort/RuneIndex/ItemIndex/Page/Index. NOTE:
-///     field order differs from the ZC 199 response — verified independently here.
-/// </summary>
+// Field order differs from the ZC 199 response - do not assume symmetry.
 public class CzRuneSystemSendTests
 {
     [Fact]

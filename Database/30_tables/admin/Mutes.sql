@@ -1,12 +1,6 @@
--- Chat mute ledger (legacy MemberInfo.uMuteState, checked by playuser ZPP 45 with a SELECT per chat
--- message -- report 06 §1.7). Modeled on admin.Bans (same target model, same reasoning): account-level
--- OR character-level target, both NULL-able with the CHECK as the "at least one target" guard;
--- ExpiresAtUtc NULL = permanent; Reason is a store-as-given TINYINT category for future GM tooling.
--- LiftedAtUtc is the one column Bans does not have: a mute is routinely lifted early by a GM
--- (usp_Mute_Lift), and lifting must not destroy the audit row -- NULL = still in force (subject to
--- expiry). Fenrir does NOT re-query this table per message like the legacy did: the active mute is
--- loaded once at world entry (usp_Mute_GetActiveForCharacter) into PlayerRuntimeState as a hidden flag.
--- Not memory-optimized for the same FK reason as admin.Bans.
+-- Legacy MemberInfo.uMuteState. LiftedAtUtc NULL = still in force (subject to ExpiresAtUtc); GM lift
+-- (usp_Mute_Lift) sets it without deleting the audit row. Unlike legacy (re-checked per chat message),
+-- Fenrir loads the active mute once at world entry into PlayerRuntimeState.
 CREATE TABLE admin.Mutes
 (
     MuteId       INT IDENTITY(1,1) NOT NULL,

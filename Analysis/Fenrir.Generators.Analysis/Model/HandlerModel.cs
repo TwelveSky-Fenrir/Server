@@ -1,9 +1,6 @@
 namespace Fenrir.Generators.Analysis.Model;
 
-/// <summary>
-///     Discovered <c>IInlinePacketHandler&lt;T&gt;</c>/<c>IAsyncPacketHandler&lt;T&gt;</c> handler (dispatch
-///     generator, spec §5.7).
-/// </summary>
+/// <summary>Discovered <c>IInlinePacketHandler&lt;T&gt;</c>/<c>IAsyncPacketHandler&lt;T&gt;</c> handler.</summary>
 internal sealed class HandlerModel
 {
     public required string HandlerTypeFullName { get; init; }

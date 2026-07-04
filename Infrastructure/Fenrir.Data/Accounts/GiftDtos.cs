@@ -2,11 +2,7 @@ using CaeriusNet.Attributes.Dto;
 
 namespace Fenrir.Data.Accounts;
 
-/// <summary>
-///     One pending (Status=0) game.Gifts row -- ordinal contract of usp_Gift_GetPendingByAccount, oldest
-///     first (delivery order -- the SAME order CL_GIFT_INFO_SEND's page index and CL_WANT_GIFT_SEND's
-///     GiftInfoIndex both assume, login protocol report §4.21/§4.25).
-/// </summary>
+// usp_Gift_GetPendingByAccount, oldest first -- CL_GIFT_INFO_SEND/CL_WANT_GIFT_SEND index into this order.
 [GenerateDto]
 public sealed partial record PendingGiftDto(int GiftId, int? ProductId, int Quantity, int Value, DateTime CreatedAtUtc);
 

@@ -2,11 +2,7 @@ using Fenrir.Application.Game.Combat;
 
 namespace Fenrir.Application.Game.Tests.Combat;
 
-/// <summary>
-///     Covers <see cref="ExperienceFormulas" /> -- both the monster-kill XP GAIN path
-///     (<c>MONSTER_OBJECT::ProcessForExp</c>, report 05 §5) and the MvP death XP LOSS path (report 05 §4),
-///     verified against <c>Server/ts25zone/S07_MyGame05.cpp</c> / <c>S07_MyGame02.cpp</c> / <c>function.h</c>.
-/// </summary>
+/// <summary>Covers <see cref="ExperienceFormulas" /> against <c>MONSTER_OBJECT::ProcessForExp</c> and the death XP loss path in <c>Server/ts25zone/S07_MyGame05.cpp</c> / <c>S07_MyGame02.cpp</c>.</summary>
 public class ExperienceFormulasTests
 {
     [Theory]
@@ -72,10 +68,7 @@ public class ExperienceFormulasTests
     [Fact]
     public void MonsterKillExperience_UnfavorableGapNeverGoesNegative()
     {
-        // killer(59) > monster(50): gap=9 (still allowed, not > 9) -> 1000*(1-9*0.1f). Float precision means
-        // 9*0.1f is a hair under 0.9f, so the exact result is a hair under 100 -- (int) truncates to 99, NOT
-        // 100 (this exact truncation-of-a-near-integer is the same float math the legacy's own C++ performs,
-        // not a bug in this port). Never negative either way.
+        // 9*0.1f floats a hair under 0.9f, so truncation gives 99 not 100 -- matches legacy C++ float math
         Assert.Equal(99, ExperienceFormulas.ComputeMonsterKillExperience(59, 50, 1000));
     }
 
@@ -111,8 +104,7 @@ public class ExperienceFormulasTests
     [Fact]
     public void DeathExperienceLoss_NeverExceedsCurrentExperience()
     {
-        // A pathologically low levelFactor1 would compute a loss far bigger than the character even has --
-        // clamped down to currentExperience itself, never going negative.
+        // clamped to currentExperience itself, never negative
         Assert.Equal(100, ExperienceFormulas.ComputeDeathExperienceLoss(100, -100_000));
     }
 

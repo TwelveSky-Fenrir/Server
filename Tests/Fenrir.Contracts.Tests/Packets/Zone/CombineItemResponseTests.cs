@@ -3,10 +3,7 @@ using Fenrir.Contracts.Packets.Zone;
 
 namespace Fenrir.Contracts.Tests.Packets.Zone;
 
-/// <summary>
-///     ZC_ADD_ITEM_RECV (ZONE.h:520-524, 8-byte payload): Result/Cost — the only forge response with no
-///     trailing <c>tValue[6]</c>.
-/// </summary>
+/// <summary>ZC_ADD_ITEM_RECV (ZONE.h:520-524, 8-byte payload) — only forge response with no trailing <c>tValue[6]</c>.</summary>
 public class ZcAddItemRecvTests
 {
     [Fact]

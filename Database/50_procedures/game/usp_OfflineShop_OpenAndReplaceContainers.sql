@@ -1,27 +1,6 @@
 -- database/50_procedures/game/usp_OfflineShop_OpenAndReplaceContainers.sql
--- Contract: atomically open a character's offline (deputy/proxy) shop -- CZ_START_PSHOP_SEND Sort=2
--- (contracts/04_commerce.md) -- by (1) upserting the game.OfflineShops row + its game.OfflineShopItems
--- slots and (2) whole-container replacing BOTH inventory containers (the listed items physically leave
--- the owner's live inventory at open time and live in game.OfflineShopItems instead -- verified
--- S07_MyGame09.cpp:487-495, "delete inventory item&socket" on every listed slot). D7 regime (b): one
--- transaction, never a lossy multi-step sequence.
--- Params:
---   @CharacterId      INT
---   @ZoneNumber       SMALLINT
---   @ShopDate         INT     -- YYYYMMDD expiration (see game.OfflineShops)
---   @ShopName         NVARCHAR(48)
---   @LocationX/Y/Z    INT
---   @Items            game.tvp_OfflineShopItemSlot READONLY -- the shop's full slot layout
---   @InventoryPage0   game.tvp_CharacterItemSlot READONLY -- owner's FULL new InventoryPage0 (item(s) sold removed)
---   @InventoryPage1   game.tvp_CharacterItemSlot READONLY -- owner's FULL new InventoryPage1
--- Result set: none.
--- Idempotent: no.
--- Guard: refuses to open over an EXISTING shop that is still open (ShopState=1) OR still holds unclaimed
--- value (leftover items or a nonzero Money/BigMoney) -- opening would otherwise silently overwrite/destroy
--- that unclaimed value. The owner must fully retrieve items and withdraw earnings from a previous closed
--- shop before opening a new one.
--- Errors:
---   THROW 50272 -- an existing offline shop for this character is open or still holds unclaimed items/money.
+-- Refuses to open over an existing shop that is still open or still holds unclaimed items/money -- the
+-- owner must fully retrieve/withdraw the previous shop first.
 CREATE PROCEDURE game.usp_OfflineShop_OpenAndReplaceContainers @CharacterId    INT,
     @ZoneNumber     SMALLINT,
     @ShopDate       INT,

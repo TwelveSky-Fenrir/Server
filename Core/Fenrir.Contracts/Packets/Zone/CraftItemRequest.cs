@@ -4,12 +4,7 @@ using Fenrir.Contracts.Wire;
 
 namespace Fenrir.Contracts.Packets.Zone;
 
-/// <summary>
-///     CZ_MAKE_ITEM_SEND (CLIENT.h:278-289) — typedef SHARED with <see cref="CraftSkillBookRequest" /> (30),
-///     <see cref="CraftPetRequest" /> (88), <see cref="CraftLegendaryPetRequest" /> (131): identical layout, distinct
-///     C# contracts. 4-ingredient craft; <see cref="Sort" /> is an <c>MK_*</c> constant (make_item.cfg.h,
-///     values differ per LNW33 build); unknown <c>tSort</c> → Quit. Response: ZC 32.
-/// </summary>
+// Sort is an MK_* recipe constant; unknown Sort -> Quit().
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.CraftItem, ExpectedSize = 45,
     AllowedStates = [(byte)ZoneSessionState.InWorld])]
 public readonly partial record struct CraftItemRequest : IIncomingPacket<CraftItemRequest>

@@ -3,10 +3,7 @@ using Fenrir.Contracts.Packets.Zone;
 
 namespace Fenrir.Contracts.Tests.Packets.Zone;
 
-/// <summary>
-///     ZC_MAKE_ITEM2_RECV (ZONE.h:1357, 29-byte payload) — same typedef as <see cref="UpgradeCapeResponse" />
-///     (164), including the dead trailing <see cref="UpgradeCapeResponse.Padding" /> byte.
-/// </summary>
+/// <summary>ZC_MAKE_ITEM2_RECV (ZONE.h:1357, 29-byte payload) — same typedef as <see cref="UpgradeCapeResponse" />, including the dead trailing <see cref="UpgradeCapeResponse.Padding" /> byte.</summary>
 public class ZcMakeItem2RecvTests
 {
     [Fact]

@@ -4,28 +4,20 @@ using Fenrir.Data.World;
 namespace Fenrir.Application.Game.World.Loot;
 
 /// <summary>
-///     Ports <c>ITEMSYSTEM::ReturnDropRareItem</c> + its <c>Return(level,type,sort)</c> helper (verified
-///     against source, <c>Server/ts25zone/GameSystem/GameSystem_02_Item.cpp:299-1023</c>): picks ONE random
-///     equipment item matching a rolled (Level, Type, Sort) triple, out of the whole <c>world.Items</c>
-///     catalog, subject to the same eligibility gates the legacy checks. Used only by the "general item"
-///     drop-category tier (report ServerDocs/30_Fenrir_ServerLogic/05_game_mechanics.md §5, the
-///     <c>DROP_GENERAL_ITEM</c> block) -- money/potion/quest/extra items are plain id lookups, not this
+///     Ports <c>ITEMSYSTEM::ReturnDropRareItem</c> + its <c>Return(level,type,sort)</c> helper
+///     (<c>Server/ts25zone/GameSystem/GameSystem_02_Item.cpp:299-1023</c>): picks one random equipment item
+///     matching a rolled (Level, Type, Sort) triple out of the whole <c>world.Items</c> catalog. Used only by
+///     the "general item" drop-category tier -- money/potion/quest/extra items are plain id lookups, not this
 ///     random-catalog-search.
 /// </summary>
 /// <remarks>
 ///     Legacy indexes items via a prebuilt <c>mPART[level][type][sort]</c> bucket for O(1) random pick;
-///     Fenrir has no such prebuilt index (out of this pass's scope -- <see cref="WorldDataCache.ItemsById" />
-///     is keyed by ItemId, not by (Level,Type,Sort)), so this filters <see cref="WorldDataCache.ItemsById" />
-///     linearly per attempt instead. Monster deaths are not a per-network-frame hot path (report 05 §0: the
-///     whole legacy simulation is 2 Hz), so a linear scan over the item catalog (a few thousand rows) per
-///     roll is an acceptable, documented simplification -- a precomputed (Level,Type,Sort) index would be the
-///     natural follow-up if profiling ever shows otherwise.
+///     Fenrir has no such prebuilt index, so this filters <see cref="WorldDataCache.ItemsById" /> linearly per
+///     attempt instead -- acceptable since monster deaths are not a per-network-frame hot path.
 ///     <para>
-///         The level==145 (<c>MAX_LIMIT_LEVEL_NUM</c>) "high level"/rebirth item bucket (legacy's own special
-///         <c>iMartialLevel</c>-keyed search past that boundary) is NOT ported -- Fenrir has no rebirth/high-level
-///         item system modeled yet; a roll that lands on level 145 is resolved with the SAME plain
-///         Level-equality filter as any other level, which under-serves that one boundary level but invents
-///         nothing (open issue, not silently guessed).
+///         The level==145 (<c>MAX_LIMIT_LEVEL_NUM</c>) high-level/rebirth item bucket is not ported -- Fenrir
+///         has no rebirth/high-level item system yet, so a roll landing on level 145 uses the same plain
+///         level-equality filter as any other level.
 ///     </para>
 /// </remarks>
 public static class GeneralItemDropResolver
@@ -48,16 +40,15 @@ public static class GeneralItemDropResolver
     private const int SkillBook = 5;
 
     private const int
-        Pet = 22; // ports the legacy's "iSort >= IPET" reject -- never actually reachable via the pool below, kept for parity
+        Pet = 22; // ports the legacy's "iSort >= IPET" reject -- unreachable via the pool below, kept for parity
 
     private const int MaxAttempts = 10;
 
     /// <summary>
-    ///     <paramref name="killerTribe" /> stands in for the legacy's <c>tPreviousTribe</c> (report 05 §4/§12:
-    ///     "aPreviousTribe", the tribe a character belonged to before its last faction change) -- Fenrir does
-    ///     not track faction-change history, so a character's CURRENT tribe is used, which is exact for any
-    ///     character that has never changed faction (the common case) and a documented approximation
-    ///     otherwise (open issue).
+    ///     <paramref name="killerTribe" /> stands in for the legacy's <c>tPreviousTribe</c> (the tribe a
+    ///     character belonged to before its last faction change) -- Fenrir does not track faction-change
+    ///     history, so the character's current tribe is used instead, exact unless the character has
+    ///     transferred factions.
     /// </summary>
     public static int? Resolve(WorldDataCache worldData, Random random, byte killerTribe, int itemType,
         int levelLow, int levelHigh)
@@ -92,7 +83,7 @@ public static class GeneralItemDropResolver
 
         if (sortPool[5] < 0)
             return
-                null; // unknown tribe -- legacy's own ReturnDropRareItem returns NULL for tPreviousTribe outside 0..2
+                null; // unknown tribe -- legacy returns null for tPreviousTribe outside 0..2
 
         var chosenSort = sortPool[random.Next(sortPool.Length)];
 
@@ -116,10 +107,7 @@ public static class GeneralItemDropResolver
         return null;
     }
 
-    /// <summary>
-    ///     Ports <c>ITEMSYSTEM::Return(level,type,sort)</c>'s "one uniformly random match" semantics over the whole
-    ///     catalog (see class remarks on why this is a linear scan here).
-    /// </summary>
+    /// <summary>Ports <c>ITEMSYSTEM::Return(level,type,sort)</c>'s "one uniformly random match" semantics over the whole catalog.</summary>
     private static ItemRowDto? ReturnOne(WorldDataCache worldData, Random random, int level, int type, int sort)
     {
         List<ItemRowDto>? matches = null;

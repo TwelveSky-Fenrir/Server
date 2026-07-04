@@ -1,10 +1,8 @@
 using Fenrir.Tools.LegacyDataImport.Legacy.Validation;
 
-// One-off migration/verification tool (not part of any deployed runtime): decodes every legacy BuildEU33
-// static-data source (item/skill/monster/npc/quest/level/gemsocket .IMG tables, 002.BIN/003.BIN zone reference
-// data, and the .WREGION.csv monster-spawn-region files) and cross-validates each against whatever legacy CSV
-// exports/invariants exist, as ground truth before the SQL Server schema/seed phase consumes this same reader
-// code. Usage: dotnet run --project Tools/Fenrir.Tools.LegacyDataImport -- <path-to-BuildEU33-DATA-dir>
+// One-off migration/verification tool: decodes every legacy BuildEU33 static-data source and cross-validates
+// each against legacy CSV exports, as ground truth before the SQL Server schema/seed phase.
+// Usage: dotnet run --project Tools/Fenrir.Tools.LegacyDataImport -- <path-to-BuildEU33-DATA-dir>
 
 if (args.Length < 1)
 {

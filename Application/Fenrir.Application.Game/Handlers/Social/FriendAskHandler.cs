@@ -7,10 +7,8 @@ using Fenrir.Network.Sessions;
 namespace Fenrir.Application.Game.Handlers.Social;
 
 /// <summary>
-///     CZ_FRIEND_ASK_SEND (opcode 53, contracts/05_social.md). Map 124: silently ignored entirely (no
-///     reply at all -- the scripted-duel server carve-out). Full list (MAX_FRIEND_NUM=10) or already a
-///     friend ⇒ Quit(); tribe mismatch ⇒ Quit() (no alliance branch documented for this one, unlike
-///     duel/trade/party). Target resolved WITHIN THE ASKER'S OWN ZONE ONLY (<c>SearchAvatar</c> scope).
+///     CZ_FRIEND_ASK_SEND (opcode 53) -- map 124 silently ignored (scripted-duel server). Tribe mismatch
+///     always refuses; no inter-tribe exception here unlike duel/trade/party.
 /// </summary>
 public sealed class FriendAskHandler(FriendRegistry friends) : IInlinePacketHandler<FriendRequest>
 {

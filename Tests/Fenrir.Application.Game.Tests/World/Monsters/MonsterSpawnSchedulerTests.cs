@@ -129,15 +129,14 @@ public class MonsterSpawnSchedulerTests
 
         zone.Tick(SimulationClock.LegacyTick);
 
-        // Money is queued for the background flush host, not applied to PlayerRuntimeState directly (Money is
-        // deliberately not modeled there -- see CharacterProgressTvp's own remarks).
+        // money is queued for the background flush host, not applied to PlayerRuntimeState directly
         var grants = zone.DrainPendingMoneyGrants();
         var grant = Assert.Single(grants);
         Assert.Equal(10, grant.CharacterId);
         Assert.True(grant.Amount > 0);
 
         Assert.True(zone.TryGetPlayer(10, out var killer));
-        Assert.True(killer!.Experience > 0); // Zone.GrantMonsterKillExperience fired
+        Assert.True(killer!.Experience > 0);
     }
 
     [Fact]

@@ -9,11 +9,8 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Fenrir.Data.Tests.Game;
 
-/// <summary>
-///     game.usp_Cash_* against real SQL Server 2025 (phase A3, report 06 §3.2/§4.3). The debit test is the
-///     load-bearing one: the legacy cash-shop v2 shipped with the overdraft guard COMMENTED OUT; D9 reactivates
-///     it, and this suite pins it. Raw ADO.NET on purpose -- the cash repository is deferred to Phase C V8.
-/// </summary>
+// game.usp_Cash_* against real SQL Server 2025. The debit test matters: legacy cash-shop v2 shipped with the
+// overdraft guard commented out; this pins the reactivated guard.
 [Collection("SqlServer")]
 public class CashProcTests
 {
@@ -75,7 +72,7 @@ public class CashProcTests
         Assert.Equal(12809, await ScalarAsync<int>(
             $"SELECT ProductId FROM game.CashLog WHERE AccountId = {accountId} AND Delta < 0;"));
 
-        // The reactivated D9 guard: overdraft -> THROW 50240, balance untouched, no audit row leaked.
+        // Overdraft -> THROW 50240, balance untouched, no audit row leaked.
         var overdraft = await Assert.ThrowsAsync<SqlException>(() => ExecProcAsync("game.usp_Cash_Debit",
             ("AccountId", accountId), ("Amount", 181), ("Reason", (byte)2)));
         Assert.Equal(50240, overdraft.Number);

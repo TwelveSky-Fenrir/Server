@@ -1,8 +1,5 @@
--- Contract: @AccountId INT, @PinHash VARBINARY(32), @PinSalt VARBINARY(16) -> no result set.
--- Upsert: serves both W_CREATE_MOUSE_PASSWORD_SEND (first PIN) and W_CHANGE_MOUSE_PASSWORD_SEND (replacement) --
--- the legacy mDB.UpdateMousePassword is a single write path for both too. Idempotent for identical inputs
--- (replay-safe); "PIN already exists" / "no PIN to change" preconditions are enforced by the HANDLERS (they
--- Quit/abort the session, mirroring the legacy guards) -- by the time this proc runs, the write is legitimate.
+-- Upsert: serves both first-PIN creation and PIN replacement. "PIN already exists" / "no PIN to
+-- change" preconditions are enforced by the caller before this proc runs.
 CREATE PROCEDURE auth.usp_AccountPin_Set @AccountId INT,
     @PinHash VARBINARY(32),
     @PinSalt VARBINARY(16)

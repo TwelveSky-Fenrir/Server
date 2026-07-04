@@ -7,9 +7,8 @@ namespace Fenrir.Application.Game.Social.Pshop;
 
 /// <summary>
 ///     Pure, Zone-independent policy for the live personal-shop-stall family (CZ_START/BUY_PSHOP_SEND,
-///     verified <c>S04_MyWork02.cpp:6021-7124</c>). <see cref="PshopInfo.ItemInfo" /> is a flat
-///     <c>int[225]</c> = <c>[5 pages][5 slots][9 fields]</c> row-major (field layout on that type's own
-///     remarks) -- <see cref="FlatIndex" /> is the one place indexing math lives.
+///     S04_MyWork02.cpp:6021-7124). PshopInfo.ItemInfo is a flat int[225] = [5 pages][5 slots][9 fields]
+///     row-major; <see cref="FlatIndex" /> is the one place indexing math lives.
 /// </summary>
 public static class PshopPurchasePolicy
 {
@@ -20,10 +19,7 @@ public static class PshopPurchasePolicy
         PriceOutOfRange,
         InvalidStackQuantity,
 
-        /// <summary>
-        ///     The declared (page,index) inventory slot no longer holds the exact advertised (id,quantity,value) -- stale
-        ///     client state.
-        /// </summary>
+        /// <summary>The declared (page,index) inventory slot no longer holds the exact advertised (id,quantity,value) -- stale client state.</summary>
         InventoryMismatch
     }
 
@@ -31,11 +27,7 @@ public static class PshopPurchasePolicy
     {
         Success,
 
-        /// <summary>
-        ///     Destination occupied by an incompatible item, or a stack merge would exceed
-        ///     <see cref="GroundItemPickupPolicy.MaxStackQuantity" /> -- Quit()-worthy per the verified source (no clean fail path
-        ///     for this specific case).
-        /// </summary>
+        /// <summary>Destination occupied by an incompatible item, or a merge would exceed MaxStackQuantity -- Quit()-worthy in the legacy, no clean fail path.</summary>
         DestinationConflict
     }
 
@@ -43,7 +35,7 @@ public static class PshopPurchasePolicy
     public const int MaxSlots = 5;
     public const int FieldsPerSlot = 9;
 
-    /// <summary><c>(sell.price &lt; 1) || (sell.price &gt; ((MAX_NUMBER_SIZE / 2) - 1))</c> (S04_MyWork02.cpp:6170).</summary>
+    /// <summary>(sell.price &lt; 1) || (sell.price &gt; ((MAX_NUMBER_SIZE / 2) - 1)) (S04_MyWork02.cpp:6170).</summary>
     public const int MaxSellPrice = 999_999_999;
 
     public static int FlatIndex(int page, int slot)
@@ -58,13 +50,7 @@ public static class PshopPurchasePolicy
         return new SlotView(a[i], a[i + 1], a[i + 2], a[i + 3], a[i + 4], a[i + 5], a[i + 6], a[i + 7], a[i + 8]);
     }
 
-    /// <summary>
-    ///     Validates ONE occupied PSHOP_INFO slot at open time against the seller's live inventory
-    ///     (S04_MyWork02.cpp:6140-6305 "else" branch -- Fenrir's non-preloading proxy flow means the
-    ///     <c>sell.page==-1</c> preload branch never applies, see <see cref="PlayerRuntimeState.PshopOpen" />).
-    ///     <c>iCheckAvatarShop</c> (item barred from personal-shop sale) is NOT modeled -- no such field
-    ///     exists on <see cref="ItemRowDto" /> yet (documented open issue).
-    /// </summary>
+    /// <summary>iCheckAvatarShop (item barred from personal-shop sale) is not modeled -- no such field exists on ItemRowDto yet.</summary>
     public static OpenSlotOutcome ValidateOpenSlot(SlotView slot, ItemDefinition? itemDefinition, ItemStack? liveSlot)
     {
         if (itemDefinition is null)
@@ -85,10 +71,9 @@ public static class PshopPurchasePolicy
     }
 
     /// <summary>
-    ///     Ports the buyer-destination half of <c>BUY_PSHOP_SEND</c> (S04_MyWork02.cpp:7021-7051) --
-    ///     merges into a same-item stackable destination (bounded <see cref="GroundItemPickupPolicy.MaxStackQuantity" />)
-    ///     or fills an empty slot; a non-stackable/mismatched occupied destination is a hard reject (the
-    ///     verified source Quit()s here, no swap fallback).
+    ///     Buyer-destination half of BUY_PSHOP_SEND (S04_MyWork02.cpp:7021-7051): merges into a same-item
+    ///     stackable destination or fills an empty slot; a non-stackable/mismatched occupied destination is a
+    ///     hard reject (the source Quit()s here, no swap fallback).
     /// </summary>
     public static PurchaseResult ResolvePurchase(SlotView listing, ItemDefinition itemDefinition,
         ItemStack? destinationSlot)
@@ -112,7 +97,6 @@ public static class PshopPurchasePolicy
         return new PurchaseResult(PurchaseOutcome.Success, newStack);
     }
 
-    /// <summary>One decoded PSHOP_INFO slot -- see <see cref="PshopInfo" />'s own field-layout remarks.</summary>
     public readonly record struct SlotView(
         int ItemId,
         int Quantity,
@@ -133,11 +117,7 @@ public static class PshopPurchasePolicy
     }
 }
 
-/// <summary>
-///     Small helper: <see cref="ItemStack" /> has no single packed "Value" field of its own (it already decoded
-///     enchant/combine/refine/socket) -- PSHOP_INFO's own <c>Value</c> field is that SAME packed encoding, so this
-///     re-encodes for the open-time comparison.
-/// </summary>
+/// <summary>ItemStack has no single packed Value field of its own; PSHOP_INFO's Value field is that same packed encoding.</summary>
 internal static class ItemStackValueExtensions
 {
     public static int Value(this ItemStack stack)

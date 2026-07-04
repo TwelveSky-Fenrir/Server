@@ -4,7 +4,6 @@ using Fenrir.Contracts.Tests.TestSupport;
 
 namespace Fenrir.Contracts.Tests.Packets.Shared;
 
-/// <summary>SKILL_UP_RECV (4 bytes, STRUCT.h:1244-1247) — 1 int.</summary>
 public class SkillUpgradeDataTests
 {
     [Fact]

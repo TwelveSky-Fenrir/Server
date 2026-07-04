@@ -1,10 +1,6 @@
--- Contract: @IpAddress VARCHAR(45) -> RS0 { BlockedIpId INT }.
--- Interpreted (not native): memory-optimized tables are readable/writable from ordinary T-SQL too (only
--- *natively compiled procedures* are restricted to memory-optimized-only access) -- adding a blocked IP
--- is an infrequent moderation action, not the hot path, so it doesn't need native compilation the way
--- admin.usp_BlockedIp_Exists does.
--- Errors: THROW 50302 if @IpAddress is already blocked (checked before insert; UQ_BlockedIps_IpAddress
--- is the last-resort backstop under a race).
+-- Interpreted, not native: an infrequent moderation action, unlike the hot-path usp_BlockedIp_Exists.
+-- THROW 50302 if @IpAddress is already blocked (checked before insert; UQ_BlockedIps_IpAddress is the
+-- last-resort backstop under a race).
 CREATE PROCEDURE admin.usp_BlockedIp_Add @IpAddress VARCHAR(45)
 AS
 BEGIN

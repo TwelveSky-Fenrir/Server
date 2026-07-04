@@ -4,10 +4,7 @@ using Fenrir.Contracts.Tests.TestSupport;
 
 namespace Fenrir.Contracts.Tests.Packets.Shared;
 
-/// <summary>
-///     DEFAULT_PDATA_RECV (28 bytes, STRUCT.h:1229-1238) — 7 ints, no padding. The golden encoder
-///     below is hand-built from the C++ layout, independent of the generated <c>Write</c>.
-/// </summary>
+// Golden encoder is hand-built from the C++ DEFAULT_PDATA_RECV layout, independent of the generated Write.
 public class DefaultPDataTests
 {
     [Fact]

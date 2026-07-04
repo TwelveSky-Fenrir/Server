@@ -3,10 +3,6 @@ using Fenrir.Contracts.Packets.Zone;
 
 namespace Fenrir.Contracts.Tests.Packets.Zone;
 
-/// <summary>
-///     ZC_MULTI_ITEM_CREATE_RECV (ZONE.h:1096-1106, 72-byte payload): Num/Page/Index1/Index2/Xy1/Xy2/
-///     ItemIndex[8]/Value[4]. The contract carries the raw bit-packed ints; unpacking stays in the handler.
-/// </summary>
 public class ZcMultiItemCreateRecvTests
 {
     [Fact]

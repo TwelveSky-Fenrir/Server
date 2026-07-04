@@ -1,17 +1,5 @@
--- Normalized from nMenu[100] (Header/Protocol/STRUCT.h:213-234): only nonzero slots are kept, per the
--- standard sparse-fixed-array rule -- BUT a surprising finding surfaced while generating the real seed
--- data (flagged here rather than silently seeding a huge block unremarked): 0 filtering removes NOTHING.
--- Every one of the 100 slots is populated for every one of the 131 real NPCs (13100/13100), and the only
--- two raw values ever observed anywhere in this build are 1 and 2 (97.6% are 1). That shape -- a fixed-
--- width, always-fully-populated, near-boolean array -- reads far more like a per-slot enable/state flag
--- over a fixed 100-entry menu-command catalog (e.g. "does this NPC show command #37 in its right-click
--- menu, and if so which of two variants") than a sparse list of distinct referenced ids. The exact
--- catalog (what command #0..#99 each mean) is not confirmed by prior investigation, so OptionId stores
--- the raw legacy value verbatim rather than guessing at a friendlier column/table shape; a child table is
--- still the right call over 100 columns since GameServer only ever needs "the handful of slots this NPC's
--- UI actually cares about", not the full row.
--- No FK on OptionId: unlike ShopItems/SkillOffers, nMenu is not documented anywhere as referencing another
--- world.* domain's id space.
+-- Normalized from nMenu[100]; unlike the other sparse arrays here, all 100 slots are populated for every NPC (values only ever 1 or 2) --
+-- reads as per-slot enable/state flags over a fixed menu-command catalog, not a list of referenced ids. OptionId stores the raw legacy value verbatim (no FK: not documented as referencing another world.* domain).
 CREATE TABLE world.NpcMenuOptions
 (
     NpcId     INT      NOT NULL,

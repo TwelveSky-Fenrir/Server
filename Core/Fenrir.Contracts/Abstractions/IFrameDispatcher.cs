@@ -3,11 +3,7 @@ using Fenrir.Contracts.Wire;
 
 namespace Fenrir.Contracts.Abstractions;
 
-/// <summary>
-///     Routes a decoded frame to whatever handles it. Defined in Core so Fenrir.Network (Infrastructure) never
-///     depends on the Application-layer handler wiring for a specific executable — each exe's Program.cs supplies
-///     its own concrete implementation (bridging to its generated MessageDispatcher) via DI.
-/// </summary>
+/// <summary>Routes a decoded frame; kept in Core so Network never depends on per-exe Application handler wiring.</summary>
 public interface IFrameDispatcher
 {
     public ValueTask DispatchAsync(FenrirServer server, byte opcode, ReadOnlySequence<byte> payload,

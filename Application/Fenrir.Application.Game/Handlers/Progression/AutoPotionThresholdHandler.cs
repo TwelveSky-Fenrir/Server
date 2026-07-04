@@ -6,19 +6,7 @@ using Fenrir.Network.Sessions;
 
 namespace Fenrir.Application.Game.Handlers.Progression;
 
-/// <summary>
-///     CZ_CHANGE_AUTO_INFO (opcode 86, verified <c>S04_MyWork02.cpp:11792</c>) -- persists the auto-potion
-///     HP/MP thresholds. Any value outside 0..5 on either field is Quit()-worthy; a valid pair is a
-///     completely silent handler (no ZC reply at all, verified).
-/// </summary>
-/// <remarks>
-///     <see cref="PlayerRuntimeState.AutoLifeRatio" />/<see cref="PlayerRuntimeState.AutoManaRatio" /> are
-///     written directly from this request thread, not via a <c>Zone</c>-mirrored command -- same
-///     "own-character, non-economy scalar" exception as <see cref="PlayerRuntimeState.Friends" />/
-///     <c>TeacherCharacterId</c>: nothing else touches these fields for another character, and no item/money
-///     value is involved, so <see cref="PlayerRuntimeState.EconomyActionLock" />'s single-writer posture
-///     doesn't apply.
-/// </remarks>
+/// <summary>CZ_CHANGE_AUTO_INFO (opcode 86) -- persists auto-potion HP/MP thresholds; silent on success (verified).</summary>
 public sealed class AutoPotionThresholdHandler(ICharacterRepository characters)
     : IAsyncPacketHandler<AutoPotionThresholdRequest>
 {
@@ -43,6 +31,7 @@ public sealed class AutoPotionThresholdHandler(ICharacterRepository characters)
 
         await characters.SetAutoPotionThresholdAsync(characterId, lifeRatio, manaRatio, cancellationToken);
 
+        // Written directly, not EconomyActionLock-guarded: own-character scalar, no item/money involved.
         state.AutoLifeRatio = lifeRatio;
         state.AutoManaRatio = manaRatio;
     }

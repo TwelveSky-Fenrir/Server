@@ -6,11 +6,7 @@ using Fenrir.Network.Sessions;
 
 namespace Fenrir.Application.Game.Handlers.Social;
 
-/// <summary>
-///     CZ_TEACHER_ASK_SEND (opcode 59). Sender becomes the future MASTER: requires level ≥ 113 and not
-///     already a teacher/student (else Quit()). Target must be same tribe and strictly lower level (else
-///     Quit() -- the MG5ORIGIN branch, active in this build), resolved within the asker's own zone only.
-/// </summary>
+/// <summary>CZ_TEACHER_ASK_SEND (opcode 59) -- sender becomes master (MG5ORIGIN branch, active in this build).</summary>
 public sealed class MentorAskHandler(MentorRegistry mentors) : IInlinePacketHandler<MentorRequest>
 {
     private const int MinimumMasterLevel = 113;

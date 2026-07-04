@@ -7,17 +7,10 @@ using CaeriusNet.Commands.Writes;
 
 namespace Fenrir.Data.Social;
 
-/// <summary>
-///     game.CharacterFriends access (Phase C/V6 Social -- CZ_FRIEND_* family, contracts/05_social.md).
-///     One-directional by design (see game.CharacterFriends' own header): a row here only ever says
-///     "CharacterId considers FriendCharacterId a friend".
-/// </summary>
+// One-directional by design: a row only says "CharacterId considers FriendCharacterId a friend".
 public sealed record FriendRepository(ICaeriusNetDbContext Db) : IFriendRepository
 {
-    /// <summary>
-    ///     Loaded once at world entry (AVATAR_INFO's <c>Friend[10]</c> field) -- never re-queried afterwards; live
-    ///     mutations (Add/Remove) go through the same call sites that update the in-memory mirror.
-    /// </summary>
+    /// <summary>Loaded once at world entry (AVATAR_INFO's Friend[10]), never re-queried; Add/Remove also update the in-memory mirror.</summary>
     public async ValueTask<ReadOnlyCollection<CharacterFriendDto>> GetByCharacterAsync(int characterId,
         CancellationToken ct)
     {
@@ -28,11 +21,7 @@ public sealed record FriendRepository(ICaeriusNetDbContext Db) : IFriendReposito
         return await Db.QueryAsReadOnlyCollectionAsync<CharacterFriendDto>(sp, ct);
     }
 
-    /// <summary>
-    ///     CZ_FRIEND_MAKE_SEND (opcode 56) -- writes ONE slot for <paramref name="characterId" /> only. Throws SQL error
-    ///     50267 if the slot is already occupied (FriendRegistry has already verified this cannot happen under normal play; a
-    ///     race is the only way to hit it).
-    /// </summary>
+    /// <summary>CZ_FRIEND_MAKE_SEND (56); writes one slot for characterId only. Throws SQL 50267 if the slot is already occupied (only possible via a race).</summary>
     public async ValueTask AddAsync(int characterId, byte slot, int friendCharacterId, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_CharacterFriend_Add", 0)

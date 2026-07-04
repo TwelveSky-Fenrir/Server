@@ -5,13 +5,7 @@ using Fenrir.Contracts.Wire;
 
 namespace Fenrir.Contracts.Packets.Zone;
 
-/// <summary>
-///     CZ_SET_DEPUTY_PSHOP_SEND (CLIENT.h:453-469) — edit the caller's deputy shop
-///     (<c>mProxySystem.Process(..., 1)</c>): add a listing (<c>Sell*</c>), withdraw to self
-///     (<c>Self*</c>), or buy (<c>BuySort</c>). No padding after <c>AvatarName[13]</c>: this packet is
-///     pack(1) (unlike <see cref="ProxyShopUserInfo" />). Reply: ZC_SET_DEPUTY_PSHOP_RECV (plus
-///     ZC 138/194 on the inventory side).
-/// </summary>
+/// <summary>Pack(1): no padding after AvatarName[13] (unlike <see cref="ProxyShopUserInfo" />).</summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.UpdateProxyShop,
     ExpectedSize = 82, AllowedStates = [(byte)ZoneSessionState.InWorld])]
 public readonly partial record struct UpdateProxyShopRequest : IIncomingPacket<UpdateProxyShopRequest>

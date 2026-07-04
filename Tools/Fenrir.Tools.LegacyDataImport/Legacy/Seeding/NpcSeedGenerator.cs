@@ -4,18 +4,10 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Readers;
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Seeding;
 
 /// <summary>
-///     Generates <c>70_seed/world/Npcs.sql</c> from the real <c>005_00005.IMG</c> data
-///     (<see cref="NpcReader.ReadAll" />). One row per NPC_INFO record whose legacy Index is nonzero --
-///     369 of the 500 array slots are unused placeholders (Index==0 AND Name=="" for every single one,
-///     confirmed 1:1 equivalent by inspecting the real decoded data, not assumed) -- leaving 131 real NPCs.
-///     Every fixed-size sub-array (Speech, Menu, ShopInfo, SkillInfo1, SkillInfo2, GambleCostInfo) is
-///     normalized into its own child table, one row per populated slot, per "normalize, don't
-///     transliterate" -- except Size[3], a small always-meaningful triple kept as three plain columns
-///     (see world.Npcs.sql). Two sub-arrays turned out surprising on inspection: Menu (nMenu[100]) and
-///     GambleCostInfo (nGambleCostInfo[145][15]) are both 100% dense wherever they're used at all (0
-///     filtering removes nothing), unlike ShopInfo/SkillInfo1/SkillInfo2 which are genuinely sparse even
-///     within the NPCs that use them -- see world.NpcMenuOptions.sql/world.NpcGambleCosts.sql for the
-///     detailed findings.
+///     Generates <c>70_seed/world/Npcs.sql</c> from <see cref="NpcReader.ReadAll" /> (005_00005.IMG): one row
+///     per NPC with Index != 0 (131 of 500 slots; the rest are confirmed all-blank placeholders). Each
+///     fixed-size sub-array is normalized into its own child table, one row per populated slot -- except
+///     Menu/GambleCostInfo, which are 100% dense (no filtering removes anything), unlike ShopInfo/SkillInfo*.
 /// </summary>
 public static class NpcSeedGenerator
 {
@@ -78,9 +70,8 @@ public static class NpcSeedGenerator
                     SqlSeedWriter.Number(n.Index), page.ToString(), slot.ToString(), itemId.ToString()));
             }
 
-            // ArrayKind 1 = nSkillInfo1[tier][slot] (Dim2/Dim3 NULL). ArrayKind 2 = nSkillInfo2[a][b][c][slot],
-            // flattened by NpcReader as a*72+b*24+c*8+slot -- see world.NpcSkillOffers.sql for the full
-            // rationale (both stored dimension-for-dimension; the 4-D indexing's real meaning isn't confirmed).
+            // ArrayKind 1 = SkillInfo1[tier][slot]; ArrayKind 2 = SkillInfo2[a][b][c][slot] (flattened as
+            // a*72+b*24+c*8+slot); the 4-D indexing's real meaning is unconfirmed.
             for (var tier = 0; tier < n.SkillInfo1.Length; tier++)
             for (var slot = 0; slot < n.SkillInfo1[tier].Length; slot++)
             {

@@ -5,12 +5,7 @@ using Fenrir.Contracts.Wire;
 
 namespace Fenrir.Contracts.Packets.Zone;
 
-/// <summary>
-///     ZC_SET_DEPUTY_PSHOP_RECV (ZONE.h:1309-1317) — reply to CZ_SET_DEPUTY_PSHOP_SEND. The builder
-///     merges <c>tValue[6]</c> (item) + <c>tSocket[3]</c> into <see cref="Value1" /> (9 ints: 6 item
-///     values then 3 sockets). <c>Page</c>/<c>Index</c> = the affected player inventory slot. Unicast;
-///     same zone restriction as ZC_GET_DEPUTY_PSHOP_RECV.
-/// </summary>
+/// <summary>Value1 packs 6 item values + 3 sockets (9 ints), in that order.</summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.UpdateProxyShop,
     ExpectedSize = 877)]
 public readonly partial record struct UpdateProxyShopResponse : IOutgoingPacket

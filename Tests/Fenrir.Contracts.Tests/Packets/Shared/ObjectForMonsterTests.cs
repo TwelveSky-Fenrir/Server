@@ -4,12 +4,7 @@ using Fenrir.Contracts.Tests.TestSupport;
 
 namespace Fenrir.Contracts.Tests.Packets.Shared;
 
-/// <summary>
-///     OBJECT_FOR_MONSTER (112 bytes, STRUCT.h:933-938) — Index/ActionInfo(104)/LifeValue, no padding.
-///     The golden encoder below is hand-built from the C++ layout, independent of the generated
-///     <c>Write</c> (the nested <see cref="ActionInfo" /> block is also encoded by hand, field by
-///     field, rather than delegated to <c>ActionInfo.Write</c>).
-/// </summary>
+// Golden encoder (incl. nested ActionInfo) is hand-built from the C++ OBJECT_FOR_MONSTER layout, independent of the generated Write.
 public class ObjectForMonsterTests
 {
     [Fact]

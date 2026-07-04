@@ -17,21 +17,11 @@ using Microsoft.Extensions.Logging;
 namespace Fenrir.Application.Game.Handlers.Tribes;
 
 /// <summary>
-///     CZ_TRIBE_WORK_SEND (opcode 79) -- the generic tribe sub-command channel (doc 10 §2, verified in full
-///     against <c>Server/ts25zone/S04_MyWork02.cpp:10800-11484</c>). All 14 alive EU33 tSorts are
-///     dispatched: 1 stat reset, 2/3 sub-master appoint/remove, 4 tribe weapon, 5 tribe skill, 6 title tier
-///     (USE_TITLE), 7 halo enchant (USE_HALO), 8 level-milestone bonus, 9/10 ornament on/off, 11 rebirth
-///     (__REBIRTH__), 16 map/clan scroll, 17 alert charm, 18 tower scroll (USE_TOWER). Dead sub-commands
-///     12/13/14/15 all abort (<c>Quit()</c> unconditional in the source); anything else falls to the
-///     legacy's own <c>default:</c>, which also aborts. Unlike GUILD_WORK, TRIBE_WORK never leaves the zone
-///     process at all in the legacy (no ts25extra RPC) -- every mutation here is either this character's
-///     OWN progression state (write-behind, same D7(a) posture as Title/Halo/RebirthCount already have) or
-///     a synchronous money debit (D7(b), <see cref="CharacterRepository.AdjustMoneyAsync" />).
+///     CZ_TRIBE_WORK_SEND (opcode 79) -- the generic tribe sub-command channel. Sub-commands 12-15 always
+///     abort; unrecognized sorts also abort. Unlike GUILD_WORK, every mutation here is either this
+///     character's own progression state (write-behind) or a synchronous money debit.
 /// </summary>
-/// <remarks>
-///     ZC_TRIBE_WORK_RECV always echoes the client's raw 100-byte <c>tData</c> back verbatim (doc 10 §3) --
-///     never server-computed content -- so every response here carries <c>packet.Data</c> unchanged.
-/// </remarks>
+/// <remarks>ZC_TRIBE_WORK_RECV always echoes the client's raw tData back verbatim, never server-computed content.</remarks>
 public sealed class TribeActionHandler(
     ZoneRegistry zones,
     ITribeRepository tribes,
@@ -39,18 +29,14 @@ public sealed class TribeActionHandler(
     WorldDataCache worldData,
     ILogger<TribeActionHandler> logger) : IAsyncPacketHandler<TribeActionRequest>
 {
-    private const int TribeWeaponMoneyCost = 100_000_000; // mTribeWeaponMoneyCost, LNW33 (DEFINE.h:238)
-    private const int TowerScrollMoneyCost = 500_000_000; // USE_TOWER, S04_MyWork02.cpp:11463
+    private const int TribeWeaponMoneyCost = 100_000_000;
+    private const int TowerScrollMoneyCost = 500_000_000;
     private const int HaloEnchantMoneyCost = 1_000_000;
     private const int HaloEnchantCpCost = 100;
     private const int MapScrollCpCost = 1;
     private const int AlertCharmCpCost = 10;
 
-    /// <summary>
-    ///     <c>mTitleCostCP</c> (S07_MyGame03.cpp:25, doc 10 §2 tSort 6) -- indexed by the CURRENT rank
-    ///     (0-11) before the purchase; the 13th (index 12) legacy entry is dead (the source's own bound
-    ///     check never allows <c>tCurrentTitle</c> to reach 12) but kept here for exact table fidelity.
-    /// </summary>
+    // Indexed by current title rank (0-11) before purchase; the 13th entry is dead but kept for table fidelity.
     private static readonly int[] TitleCostCp =
         [800, 1700, 2500, 3400, 4200, 5100, 5900, 6800, 7600, 8500, 9300, 10000, 10000];
 
@@ -66,8 +52,6 @@ public sealed class TribeActionHandler(
         if (!zone.TryGetPlayer(characterId, out var state) || state is null)
             return;
 
-        // Same blanket posture as GenericActionHandler/GuildActionHandler: every tSort here shares the same
-        // per-character economy-adjacent state (CP, money, stats) -- see EconomyActionLock's own remarks.
         await state.EconomyActionLock.WaitAsync(cancellationToken);
         try
         {
@@ -121,7 +105,6 @@ public sealed class TribeActionHandler(
             case 13:
             case 14:
             case 15:
-                // register/enter ultimate war, "guild?", quest ui -- all unconditional Quit() in the source.
                 zoneSession.Abort(DisconnectReason.Faulted);
                 return;
             case 16:
@@ -141,10 +124,7 @@ public sealed class TribeActionHandler(
         }
     }
 
-    /// <summary>
-    ///     tSort 1 -- reset spent base stats back into unspent points (S04_MyWork02.cpp:10835-10858). Level &lt;=39 and a
-    ///     valid tribe-capital zone, else <c>Quit()</c>.
-    /// </summary>
+    /// <summary>tSort 1 -- reset spent base stats back into unspent points. Requires level &lt;=39 and a valid tribe-capital zone.</summary>
     private async ValueTask HandleStatResetAsync(TribeActionRequest packet, IPacketSession session,
         ZoneClientSession zoneSession, Zone zone, PlayerRuntimeState state, int characterId, CancellationToken ct)
     {
@@ -170,12 +150,7 @@ public sealed class TribeActionHandler(
             Life: 1, Mana: 0, UpdatedStats: updatedStats), ct);
     }
 
-    /// <summary>
-    ///     tSort 2 -- appoint a sub-master, Force Leader only (S04_MyWork02.cpp:10859-10953). Target resolved
-    ///     WITHIN THE ACTOR'S OWN ZONE ONLY (<c>SearchAvatar</c> scope). Zone-number gate uses the legacy's
-    ///     OWN (documented, inconsistent-with-<see cref="IsValidTown" />) 71/72/73/140 mapping -- doc 10
-    ///     quirk 10.
-    /// </summary>
+    /// <summary>tSort 2 -- appoint a sub-master, Force Leader only. Target must be in the actor's own zone.</summary>
     private async ValueTask HandleAppointSubMasterAsync(TribeActionRequest packet, IPacketSession session,
         ZoneClientSession zoneSession, Zone zone, PlayerRuntimeState state, CancellationToken ct)
     {
@@ -193,9 +168,8 @@ public sealed class TribeActionHandler(
             return;
         }
 
-        // Legacy checks "already a sub-master" by NAME against the raw client string, before resolving an
-        // online target -- resolved here via name->id (independent of online state) rather than a
-        // same-zone-only lookup, since most sub-masters won't be online in this zone.
+        // "Already a sub-master" is resolved by name->id (independent of online state), since most
+        // sub-masters won't be online in this zone.
         var targetIdByName = await characters.GetIdByNameAsync(targetName, ct);
         var subMasters = await tribes.GetSubMastersAsync(state.Tribe, ct);
         if (targetIdByName is { } knownId && subMasters.Any(s => s.CharacterId == knownId))
@@ -257,7 +231,7 @@ public sealed class TribeActionHandler(
         zone.PostTribeProgressCommand(new TribeProgressZoneCommand(target.CharacterId, TribeRole: 2));
     }
 
-    /// <summary>tSort 3 -- remove a sub-master, Force Leader only (S04_MyWork02.cpp:10955-10997). Target need not be online.</summary>
+    /// <summary>tSort 3 -- remove a sub-master, Force Leader only. Target need not be online.</summary>
     private async ValueTask HandleRemoveSubMasterAsync(TribeActionRequest packet, IPacketSession session,
         ZoneClientSession zoneSession, Zone zone, PlayerRuntimeState state, CancellationToken ct)
     {
@@ -286,10 +260,7 @@ public sealed class TribeActionHandler(
             targetZone.PostTribeProgressCommand(new TribeProgressZoneCommand(targetId.Value, TribeRole: 0));
     }
 
-    /// <summary>
-    ///     tSort 4 -- tribe weapon, Force Leader/sub-master (S04_MyWork02.cpp:10999-11053). Money debited but NEVER
-    ///     notified to the client (doc 10 quirk 8) -- matches the legacy's own missing B_AVATAR_CHANGE_INFO_2 call.
-    /// </summary>
+    /// <summary>tSort 4 -- tribe weapon, Force Leader/sub-master. Money debited but never notified to the client (matches legacy).</summary>
     private async ValueTask HandleTribeWeaponAsync(TribeActionRequest packet, IPacketSession session,
         ZoneClientSession zoneSession, Zone zone, PlayerRuntimeState state, int characterId, CancellationToken ct)
     {
@@ -320,18 +291,10 @@ public sealed class TribeActionHandler(
     }
 
     /// <summary>
-    ///     tSort 5 -- tribe skill call ability, Force Leader only (S04_MyWork02.cpp:11054-11093).
+    ///     tSort 5 -- tribe skill call ability, Force Leader only. The full gate also requires a
+    ///     world-scope "tribe symbol battle" flag that no scheduled job ever sets (that world event is a
+    ///     separate, unimplemented system), so this always aborts today by design, not by omission.
     /// </summary>
-    /// <remarks>
-    ///     DEFERRED (documented, not fabricated): the full gate also requires every tribe's world point total
-    ///     &gt;100, the requester's tribe being the current minimum (<c>ReturnSmallTribe</c>), that tribe's
-    ///     share &lt;20% of the realm total, AND a world-scope <c>mTribeSymbolBattle==1</c> flag
-    ///     (game.WorldState.TribeSymbolBattle) that no scheduled job ever sets (the "tribe symbol battle"
-    ///     world event that would flip it is a separate, unimplemented system). Since that flag is always
-    ///     false, the gate is unconditionally unreachable, so only the always-decisive role check plus an
-    ///     honest abort are implemented; a future tribe-symbol-battle event should complete the point-share
-    ///     logic too.
-    /// </remarks>
     private void HandleTribeSkill(TribeActionRequest packet, IPacketSession session, ZoneClientSession zoneSession,
         PlayerRuntimeState state)
     {
@@ -350,10 +313,7 @@ public sealed class TribeActionHandler(
         zoneSession.Abort(DisconnectReason.Faulted);
     }
 
-    /// <summary>
-    ///     tSort 6 -- title tier purchase, USE_TITLE, no role gate at all (S04_MyWork02.cpp:11095-11126, verified -- any
-    ///     tribe member may buy, CP-gated only).
-    /// </summary>
+    /// <summary>tSort 6 -- title tier purchase, no role gate at all; any tribe member may buy, CP-gated only.</summary>
     private async ValueTask HandleTitleAsync(TribeActionRequest packet, IPacketSession session,
         ZoneClientSession zoneSession, Zone zone, PlayerRuntimeState state, int characterId, CancellationToken ct)
     {
@@ -387,16 +347,15 @@ public sealed class TribeActionHandler(
 
         SendEcho(session, packet);
 
-        // SetIntegerUp(aLifeValue, aMaxLifeValue, aMaxLifeValue) / SetIntegerUp(aManaValue, ...) -- both
-        // target args are the SAME value, so this is an unconditional full heal to the new max, not a clamp.
+        // Unconditional full heal to the new max, not a clamp (legacy SetIntegerUp idiom).
         await zone.PostTribeProgressCommandAndWaitAsync(new TribeProgressZoneCommand(characterId,
             state.ContributionPoints - cost, Title: newTitle,
             Life: updatedStats.MaxLife, Mana: updatedStats.MaxMana, UpdatedStats: updatedStats), ct);
     }
 
     /// <summary>
-    ///     tSort 7 -- halo enchant, USE_HALO, no role gate at all (S04_MyWork02.cpp:11128-11231, verified).
-    ///     Anti-double-click-per-tick is NOT reproduced (open issue -- no per-zone-tick counter is exposed to this handler).
+    ///     tSort 7 -- halo enchant, no role gate at all. Anti-double-click-per-tick is not reproduced (open
+    ///     issue -- no per-zone-tick counter is exposed to this handler).
     /// </summary>
     private async ValueTask HandleHaloEnchantAsync(TribeActionRequest packet, IPacketSession session,
         ZoneClientSession zoneSession, Zone zone, PlayerRuntimeState state, int characterId, CancellationToken ct)
@@ -451,17 +410,11 @@ public sealed class TribeActionHandler(
     }
 
     /// <summary>
-    ///     tSort 8 -- level-milestone bonus claim (S04_MyWork02.cpp:11233-11326). <c>aBonusItemLevel</c> is
-    ///     session-scoped and never populated by any batch to date (see
-    ///     <see cref="PlayerRuntimeState.BonusItemLevel" />), so this always aborts today -- matching the
-    ///     legacy's own <c>Quit()</c> for the same zero case.
+    ///     tSort 8 -- level-milestone bonus claim. <see cref="PlayerRuntimeState.BonusItemLevel" /> is
+    ///     session-scoped and never populated by any batch to date, so this always aborts today, matching
+    ///     the legacy's own behavior for the same zero case. Only tiers 45/65/85/105/145 are matched; other
+    ///     legacy tiers' level values aren't resolved by any available report and fall to the default abort.
     /// </summary>
-    /// <remarks>
-    ///     DEFERRED: only tiers 45/65/85/105 and LV_M33 (=145, contracts/06_guild_tribe.md) are matched --
-    ///     LV_M2/M8/M14/M20/M26/M32's exact level values aren't resolved by any available report (not
-    ///     guessed). An unmatched value falls to the same default-abort branch the source uses for
-    ///     unrecognized values, so this is under-coverage, not incorrect acceptance.
-    /// </remarks>
     private async ValueTask HandleLevelBonusAsync(TribeActionRequest packet, IPacketSession session,
         ZoneClientSession zoneSession, Zone zone, PlayerRuntimeState state, int characterId, CancellationToken ct)
     {
@@ -486,7 +439,7 @@ public sealed class TribeActionHandler(
             case 105:
                 drops = [new TribeGroundItemDrop(845, 1), new TribeGroundItemDrop(539, 2)];
                 break;
-            case 145: // LV_M33
+            case 145:
                 var tribeItemId = state.PreviousTribe switch
                 {
                     0 => 83809,
@@ -514,7 +467,7 @@ public sealed class TribeActionHandler(
             BonusItemLevel: 0, BonusItemValue: false, DropItems: drops), ct);
     }
 
-    /// <summary>tSort 9/10 -- ornament on/off, no gate at all (S04_MyWork02.cpp:11327-11341).</summary>
+    /// <summary>tSort 9/10 -- ornament on/off, no gate at all.</summary>
     private async ValueTask HandleOrnamentAsync(TribeActionRequest packet, IPacketSession session,
         ZoneClientSession zoneSession, Zone zone, PlayerRuntimeState state, int characterId, bool on,
         CancellationToken ct)
@@ -527,8 +480,7 @@ public sealed class TribeActionHandler(
 
         SendEcho(session, packet);
 
-        // tSort 10 (OFF) additionally full-heals to the new max (SetIntegerUp, same idiom as tSort 6's own
-        // title purchase); tSort 9 (ON) does not touch Life/Mana at all in the source.
+        // tSort 10 (OFF) additionally full-heals to the new max; tSort 9 (ON) does not touch Life/Mana.
         var command = on
             ? new TribeProgressZoneCommand(characterId, UseOrnament: true, UpdatedStats: updatedStats)
             : new TribeProgressZoneCommand(characterId, UseOrnament: false, Life: updatedStats.MaxLife,
@@ -538,31 +490,17 @@ public sealed class TribeActionHandler(
     }
 
     /// <summary>
-    ///     tSort 11 -- Max Rebirth (S04_MyWork02.cpp:11342-11389, __REBIRTH__).
+    ///     tSort 11 -- Max Rebirth. The real gate requires a "high level"/rebirth track (Level2/Exp2) Fenrir
+    ///     doesn't have -- Experience is one merged value here -- so completing it would mean fabricating a
+    ///     system this domain doesn't own. This always aborts, matching what the legacy would also do since
+    ///     no current character can satisfy that gate.
     /// </summary>
-    /// <remarks>
-    ///     DEFERRED (documented, not fabricated): the real gate is
-    ///     <c>
-    ///         aRebirthNum &lt; MAX_REBIRTH_LIMIT(12)
-    ///         &amp;&amp; (aLevel1+aLevel2)==(MAX_LIMIT_LEVEL_NUM+MAX_LIMIT_HIGH_LEVEL_NUM) &amp;&amp; aExp2&gt;=
-    ///         ReturnHighExpValue(aLevel2) &amp;&amp; aKillOtherTribe&gt;=10000
-    ///     </c>
-    ///     . Fenrir has no Level2/Exp2
-    ///     ("high level"/rebirth martial track) -- Experience is one merged BIGINT
-    ///     (game.Characters_progression.sql) and <c>AvatarInfoFactory</c> leaves Exp1/Exp2 at 0 -- so the
-    ///     Level1+Level2==157 gate would require fabricating a Level2 system this domain doesn't own (a
-    ///     Combat/leveling concern). This always aborts, matching what the real source would also do for
-    ///     every current character today (none can satisfy the Level2 gate).
-    /// </remarks>
     private void HandleRebirth(ZoneClientSession zoneSession)
     {
         zoneSession.Abort(DisconnectReason.Faulted);
     }
 
-    /// <summary>
-    ///     tSort 16 (map/clan scroll, item 591, 1 CP) / tSort 17 (alert charm, item 590, 10 CP) -- Force
-    ///     Leader/sub-master (S04_MyWork02.cpp:11403-11452).
-    /// </summary>
+    /// <summary>tSort 16 (map/clan scroll, item 591, 1 CP) / tSort 17 (alert charm, item 590, 10 CP) -- Force Leader/sub-master.</summary>
     private async ValueTask HandleScrollAsync(TribeActionRequest packet, IPacketSession session,
         ZoneClientSession zoneSession, Zone zone, PlayerRuntimeState state, int characterId, int itemId, int cpCost,
         CancellationToken ct)
@@ -580,10 +518,7 @@ public sealed class TribeActionHandler(
             DropItems: [new TribeGroundItemDrop(itemId, 1)]), ct);
     }
 
-    /// <summary>
-    ///     tSort 18 -- tower construction scroll, USE_TOWER, Force Leader/sub-master (S04_MyWork02.cpp:11453-11478).
-    ///     Money debited but NEVER notified (same doc 10 quirk 8 as tSort 4).
-    /// </summary>
+    /// <summary>tSort 18 -- tower construction scroll, Force Leader/sub-master. Money debited but never notified (same as tSort 4).</summary>
     private async ValueTask HandleTowerScrollAsync(TribeActionRequest packet, IPacketSession session,
         ZoneClientSession zoneSession, Zone zone, PlayerRuntimeState state, int characterId, CancellationToken ct)
     {
@@ -611,10 +546,7 @@ public sealed class TribeActionHandler(
             DropItems: [new TribeGroundItemDrop(665, 1)]), ct);
     }
 
-    /// <summary>
-    ///     <c>IsValidTown</c> (mapcheck.h:83, verified via report 10 §0): tribe 0-2 map to zones 1/6/11, tribe 3 to zone
-    ///     140.
-    /// </summary>
+    /// <summary>Tribe 0-2 map to zones 1/6/11, tribe 3 to zone 140.</summary>
     private static bool IsValidTown(byte tribe, short mapId)
     {
         return tribe switch
@@ -628,10 +560,9 @@ public sealed class TribeActionHandler(
     }
 
     /// <summary>
-    ///     TRIBE_WORK tSort 2/3's OWN zone-number gate (S04_MyWork02.cpp:10873-10891) -- 71+tribe for
-    ///     tribes 0-2, 140 for tribe 3. Doc 10 quirk 10: this is a DIFFERENT mapping than
-    ///     <see cref="IsValidTown" /> (which tSort 1/4 use) -- a genuine, verified legacy inconsistency, not
-    ///     a transcription error; both are reproduced exactly as found.
+    ///     tSort 2/3's own zone-number gate: 71+tribe for tribes 0-2, 140 for tribe 3 -- a different mapping
+    ///     than <see cref="IsValidTown" /> (used by tSort 1/4). A genuine, verified legacy inconsistency,
+    ///     reproduced exactly as found.
     /// </summary>
     private static bool IsSubMasterCapitalZone(byte tribe, short mapId)
     {
@@ -648,12 +579,6 @@ public sealed class TribeActionHandler(
         session.Send(new TribeActionResponse { Result = result, Sort = packet.Sort, Data = packet.Data });
     }
 
-    /// <summary>
-    ///     Pet stat contribution (same pattern as <c>GenericActionHandler</c>'s equipment-move recompute) --
-    ///     none of this handler's actions touch equipment, so the current container/growth/activity are
-    ///     always the right inputs (unlike GenericActionHandler's projected-container nuance for an
-    ///     in-flight equip/unequip).
-    /// </summary>
     private PetStatContribution ComputePetContribution(PlayerRuntimeState state,
         IReadOnlyDictionary<byte, ItemStack> equipmentContainer)
     {

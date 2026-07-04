@@ -9,11 +9,7 @@ public class WorldStateTemplatesTests
     {
         var worldInfo = WorldStateTemplates.ZeroedWorldInfo;
 
-        // Pin every [FixedArray] length to its declared attribute value (WorldInfo.cs), one property at a time.
-        // Write()/TryRead() alone only catch an OVERSIZED array (IndexOutOfRangeException while slicing the
-        // fixed-offset destination); an UNDERSIZED one silently leaves trailing bytes as the buffer's pre-existing
-        // zeros and round-trips fine byte-for-byte (Zeroed is all zero anyway), so it would never throw. These
-        // explicit length assertions are what actually proves all the arrays are sized correctly.
+        // Write()/TryRead() alone can't catch an undersized array (it'd round-trip zero-for-zero without throwing), so length is asserted explicitly.
         Assert.Equal(4, worldInfo.TribeSymbol.Length);
         Assert.Equal(4, worldInfo.TribePoint.Length);
         Assert.Equal(2, worldInfo.TribeCloseInfo.Length);
@@ -54,7 +50,6 @@ public class WorldStateTemplatesTests
         Assert.Equal(5, worldInfo.PopUpKillAvt.Length);
         Assert.Equal(5, worldInfo.PopUpKillMonster.Length);
 
-        // No entry may be null: WriteFixedStringRows indexes every slot of the array unconditionally.
         Assert.All(worldInfo.GuildName3, Assert.NotNull);
         Assert.All(worldInfo.FourGuildName, Assert.NotNull);
         Assert.All(worldInfo.DecideChallengeFourGuildName, Assert.NotNull);
@@ -62,12 +57,8 @@ public class WorldStateTemplatesTests
         var buffer = new byte[WorldInfo.WireSize];
         var written = worldInfo.Write(buffer);
 
-        // A wrong (oversized) array length throws IndexOutOfRangeException inside Write() before reaching here.
         Assert.Equal(WorldInfo.WireSize, written);
         Assert.True(WorldInfo.TryRead(buffer, out var read));
-
-        // The round-tripped value must itself still be a fully well-formed WorldInfo (re-serializes to the same
-        // total size); this is only reachable if TryRead's own array reconstruction didn't already blow up.
         Assert.Equal(WorldInfo.WireSize, read.Write(new byte[WorldInfo.WireSize]));
     }
 

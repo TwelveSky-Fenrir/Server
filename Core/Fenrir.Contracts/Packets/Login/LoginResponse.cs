@@ -10,8 +10,7 @@ public readonly partial record struct LoginResponse : IOutgoingPacket
 {
     public required int Result { get; init; }
 
-    // Id: "MG"+decimal(uUserIdx), pre-XORed over its strlen (USE_XOR_UID) before the packet-wide XOR
-    // is applied on top -> double-XOR, see wire contract §3.3.
+    // Pre-XORed (USE_XOR_UID) before the packet-wide XOR is applied on top -> double-XOR.
     [FixedString(255)]
     [ObfuscatedUidField]
     public required string Id { get; init; }

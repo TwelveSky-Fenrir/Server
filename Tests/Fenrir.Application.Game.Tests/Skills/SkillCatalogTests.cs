@@ -5,10 +5,7 @@ using Fenrir.Data.World;
 
 namespace Fenrir.Application.Game.Tests.Skills;
 
-/// <summary>
-///     Covers <see cref="SkillCatalog.ReturnSkillValue" /> against the verified C++ interpolation
-///     (<c>SKILLSYSTEM::ReturnSkillValue</c>, <c>GameSystem_03_Skill.cpp:60-196</c>).
-/// </summary>
+/// <summary>Covers <see cref="SkillCatalog.ReturnSkillValue" /> against <c>SKILLSYSTEM::ReturnSkillValue</c> (<c>GameSystem_03_Skill.cpp</c>).</summary>
 public class SkillCatalogTests
 {
     private static SkillDefinition Skill(byte maxUpgradePoint, short manaUseMin, short manaUseMax,

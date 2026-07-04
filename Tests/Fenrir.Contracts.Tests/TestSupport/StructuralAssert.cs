@@ -3,12 +3,7 @@ using System.Reflection;
 
 namespace Fenrir.Contracts.Tests.TestSupport;
 
-/// <summary>
-///     Égalité structurale profonde pour les sous-structs Fenrir.Contracts.Packets.Shared : l'égalité
-///     de <c>record struct</c> générée par le compilateur compare les champs <c>int[]</c>/<c>float[]</c>/
-///     <c>byte[]</c>/<c>string[]</c> par référence, pas par valeur — inutilisable telle quelle pour un
-///     test de round-trip (deux tableaux distincts avec le même contenu ne sont jamais "égaux").
-/// </summary>
+// Needed because record struct equality compares array fields (int[]/float[]/byte[]/string[]) by reference, not value.
 internal static class StructuralAssert
 {
     public static void DeepEqual<T>(T expected, T actual)
@@ -36,8 +31,7 @@ internal static class StructuralAssert
             case string[] expectedStrings:
                 Assert.Equal(expectedStrings, (string[])actual!);
                 return;
-            // Arrays of nested wire structs (FieldShape.NestedArray) — element-wise deep comparison, since
-            // the elements may themselves hold arrays whose record-struct equality is reference-based.
+            // Nested struct arrays need element-wise deep comparison too, for the same reference-equality reason.
             case Array expectedArray:
             {
                 var actualArray = (Array)actual!;

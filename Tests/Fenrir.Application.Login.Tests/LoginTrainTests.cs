@@ -7,11 +7,9 @@ using Fenrir.Network.Sessions;
 
 namespace Fenrir.Application.Login.Tests;
 
-/// <summary>
-///     The legacy SEND_LOGIN train (S04_MyWork02.cpp l.42-67, login protocol report §4.11.9): every CL_LOGIN_SEND —
-///     success AND failure — must produce exactly LC_LOGIN_RECV + 3× LC_USER_AVATAR_RECV2 + LC_RECOMMAND_WORLD_RECV
-///     (24) + LC_RECOMMAND_WORLD2_RECV (26), byte-for-byte, in that order.
-/// </summary>
+// Legacy SEND_LOGIN train (S04_MyWork02.cpp l.42-67): every CL_LOGIN_SEND, success or failure, must produce
+// exactly LC_LOGIN_RECV + 3x LC_USER_AVATAR_RECV2 + LC_RECOMMAND_WORLD_RECV + LC_RECOMMAND_WORLD2_RECV,
+// byte-for-byte, in that order.
 public class LoginTrainTests
 {
     [Fact]
@@ -99,7 +97,6 @@ public class LoginTrainTests
         Assert.Equal(4, slots[0].FaceType);
         Assert.Equal(12, slots[0].Level1);
 
-        // Slot 1 has no character -> the zeroed template, unmodified.
         Assert.Equal("", slots[1].Name);
         Assert.Equal(0, slots[1].Tribe);
         Assert.Equal(0, slots[1].Level1);

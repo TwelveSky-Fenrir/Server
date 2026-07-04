@@ -1,5 +1,4 @@
--- Seeds world.Zones from 002.BIN/003.BIN: one row per zone number with a DATA/WORLD/Z0NN.WM file
--- in this build (117 of the legacy 350-slot array) -- see 30_tables/world/Zones.sql for why.
+-- Seeds world.Zones from 002.BIN/003.BIN: one row per zone number with a DATA/WORLD/Z0NN.WM file in this build.
 IF
 NOT EXISTS (SELECT 1 FROM world.Zones)
 BEGIN

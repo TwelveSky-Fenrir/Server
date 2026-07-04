@@ -15,7 +15,7 @@ public class LcChangeAvatarNameRecvTests
     [Fact]
     public void RoundTrip_PreservesAllFields()
     {
-        // 102 = the legacy "update failure" code — proves the full legacy code range survives the int.
+        // 102 is the legacy "update failure" result code.
         var packet = new RenameAvatarResponse { Result = 102 };
 
         var buffer = new byte[RenameAvatarResponse.PayloadSize];

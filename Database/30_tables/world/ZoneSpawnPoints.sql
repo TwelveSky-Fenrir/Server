@@ -1,12 +1,5 @@
--- Normalized from ZONEMOVEDATA.StartCoord/StartCoordZone (003.BIN, Header/Protocol/STRUCT.h:1369-1378):
--- only the first StartCoordNum of each zone's 100-slot arrays are populated (117 live zones collapse to
--- 413 real rows out of a 11700-slot ceiling -- see 70_seed/world/023_zone_spawn_points.sql).
--- ZoneNumber is the zone you LAND in; FromZoneNumber is which zone you arrived FROM (StartCoordZone).
--- FromZoneNumber is NULL, never 0, for the same two legacy-data reasons as world.ZonePortals.TargetZoneNumber,
--- but the split skews the other way here: of 413 populated slots, ~41% name a zone number this build
--- has no DATA/WORLD/Z0NN.WM for (a source zone that exists in the legacy data but was never shipped in
--- this build) and a further ~7% are a literal StartCoordZone of 0 (no recorded source). Both fold to
--- NULL (cross-domain FK convention: 0/dangling -> NULL).
+-- Normalized from ZONEMOVEDATA.StartCoord/StartCoordZone: only the first StartCoordNum of each zone's 100-slot arrays are populated.
+-- ZoneNumber is the zone landed IN; FromZoneNumber is the zone arrived FROM, NULL (never 0) per the same convention as world.ZonePortals.TargetZoneNumber.
 CREATE TABLE world.ZoneSpawnPoints
 (
     ZoneNumber     SMALLINT NOT NULL,

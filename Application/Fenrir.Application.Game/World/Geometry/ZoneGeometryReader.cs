@@ -5,12 +5,9 @@ using System.Numerics;
 namespace Fenrir.Application.Game.World.Geometry;
 
 /// <summary>
-///     Decodes a legacy <c>Z0NN.WM</c> zone-geometry file (reverse-engineered from <c>ts25zone/S09_MyWorld.cpp</c>'s
-///     <c>WORLD_FOR_GXD::LoadWM</c>): the same <c>[int32 originalSize][int32 compressedSize][zlib stream]</c>
-///     container used by the legacy <c>.IMG</c> data tables, inflating to a triangle count, that many fixed-size
-///     triangle records, a quadtree node count, and that many variable-length quadtree node records (each node's
-///     length depends on its own embedded "has triangle index list" flag, so nodes cannot be random-accessed by
-///     index -- must be read sequentially in file order, which conveniently matches array index order).
+///     Decodes legacy <c>Z0NN.WM</c> (<c>ts25zone/S09_MyWorld.cpp</c> <c>WORLD_FOR_GXD::LoadWM</c>):
+///     <c>[int32 originalSize][int32 compressedSize][zlib stream]</c>, then triangle records, then quadtree
+///     node records. Node records are variable-length, so must be read sequentially, not by index.
 /// </summary>
 public static class ZoneGeometryReader
 {
@@ -39,8 +36,7 @@ public static class ZoneGeometryReader
         for (var i = 0; i < triangleCount; i++) triangles[i] = ReadTriangle(inflated, ref position);
 
         var quadtreeNodeCount = ReadInt32(inflated, ref position);
-        _ = ReadInt32(inflated,
-            ref position); // mMaxQuadtreeNodeLeafNum -- an allocation hint in the original, not needed for queries
+        _ = ReadInt32(inflated, ref position); // mMaxQuadtreeNodeLeafNum: allocation hint only, unused here
 
         var quadtree = new QuadtreeNode[quadtreeNodeCount];
         for (var i = 0; i < quadtreeNodeCount; i++) quadtree[i] = ReadQuadtreeNode(inflated, ref position);
@@ -50,19 +46,19 @@ public static class ZoneGeometryReader
 
     private static WorldTriangle ReadTriangle(byte[] data, ref int position)
     {
-        _ = ReadInt32(data, ref position); // mTextureIndex -- rendering-only, discarded
+        _ = ReadInt32(data, ref position); // mTextureIndex: rendering-only, discarded
         var vertex0 = ReadVertexPosition(data, ref position);
         var vertex1 = ReadVertexPosition(data, ref position);
         var vertex2 = ReadVertexPosition(data, ref position);
         var planeInfo = ReadVector4(data, ref position);
-        position += 16; // mSphereInfo -- rendering-only, discarded
+        position += 16; // mSphereInfo: rendering-only, discarded
         return new WorldTriangle(vertex0, vertex1, vertex2, planeInfo);
     }
 
     private static Vector3 ReadVertexPosition(byte[] data, ref int position)
     {
         var position3D = ReadVector3(data, ref position);
-        position += 12 + 8 + 8; // mN (normal), mT1, mT2 (UVs) -- rendering-only, discarded
+        position += 12 + 8 + 8; // mN (normal), mT1, mT2 (UVs): rendering-only, discarded
         return position3D;
     }
 

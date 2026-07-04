@@ -9,8 +9,7 @@ public class ClChangeMasterSendTests
     [Fact]
     public void PayloadSize_MatchesContractConstant()
     {
-        // ExpectedSize=62 (9-byte inbound header) -> 53-byte payload (int + char[49]). Dead opcode, but the
-        // size MUST be registered or a legacy client sending it desynchronizes the frame decoder (report §7.2).
+        // Dead opcode; PayloadSize=53 (62-byte frame - 9-byte header) must stay registered or legacy clients desync.
         Assert.Equal(53, ChangeMasterRequest.PayloadSize);
     }
 

@@ -11,8 +11,6 @@ public class CraftResolverTests
         return new ItemStack(itemId, quantity, 3, 2, 1, 4, 0, 0, 0, 0, 777);
     }
 
-    // ---- Jade upgrade (MK_MATS_01024) ----
-
     [Fact]
     public void Jade_BothSlotsPurpleJade_AlwaysSucceeds_ProducesRedJade()
     {
@@ -34,9 +32,7 @@ public class CraftResolverTests
         Assert.Equal(0, result.ResultStack.Value.Combine);
         Assert.Equal(0, result.ResultStack.Value.Refine);
         Assert.Equal(0, result.ResultStack.Value.Socket);
-        // tValue[3]=0 (S04_MyWork02.cpp:4483) -- the quantity column, explicitly zeroed, NOT inherited from
-        // material1 -- a prior pass here left this at material1's own quantity (always 1 in practice given the
-        // sibling InvQuantityGreater guard, but still a real divergence from the verified source).
+        // tValue[3]=0 (S04_MyWork02.cpp): quantity column is explicitly zeroed, not inherited from material1
         Assert.Equal(0, result.ResultStack.Value.Quantity);
         Assert.Equal(m1.Serial, result.ResultStack.Value.Serial);
     }
@@ -57,18 +53,13 @@ public class CraftResolverTests
     [InlineData(5, 5)]
     public void Jade_EitherSlotQuantityAboveOne_IsRejected(int quantity1, int quantity2)
     {
-        // InvQuantityGreater(1,1)/InvQuantityGreater(2,1), active under USE_MATS_999, verified
-        // S04_MyWork02.cpp:4476-4478 -- Quits if either slot's quantity exceeds 1. A prior pass here didn't
-        // enforce this at all, so a stack of N>1 Purple Jades in either slot would upgrade the WHOLE stack
-        // into N Red Jades for the cost of consuming only the second slot -- a real duplication vector.
+        // legacy quits if either slot's quantity exceeds 1 (S04_MyWork02.cpp) -- else a stack could dupe on upgrade
         var result = CraftResolver.ResolveJadeUpgrade(
             Stack(CraftRecipeCatalog.PurpleJadeItemId, quantity1),
             Stack(CraftRecipeCatalog.PurpleJadeItemId, quantity2));
 
         Assert.False(result.Succeeded);
     }
-
-    // ---- Advanced elixir (MK_ELIXIR_NEW) ----
 
     [Theory]
     [InlineData(506)]

@@ -3,14 +3,7 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Readers;
 
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Validation;
 
-/// <summary>
-///     Ad-hoc sanity check for <see cref="NpcReader" />: parses <c>005_00005.IMG</c> and prints a handful of
-///     values so a human can eyeball them. There is no full-struct CSV dump of this exact build to
-///     cross-validate NPC records against; <c>DATA/NpcMenu.CSV</c> and <c>DATA/NpcShop.CSV</c> in this repo are
-///     believed to be from a different locale/version snapshot (their name text is Thai, not the EN names this
-///     build's IMG produces), so any comparison against them below is a low-confidence "does the shape/order
-///     look plausible" spot-check only, not a source of truth.
-/// </summary>
+/// <summary>Ad-hoc sanity check for <see cref="NpcReader" />; NpcMenu.CSV/NpcShop.CSV appear to be a different locale/version (Thai names vs. this build's EN), so comparisons below are low-confidence spot-checks only.</summary>
 internal static class NpcValidation
 {
     public static void Run(string dataDir)

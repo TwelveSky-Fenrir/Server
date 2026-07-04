@@ -2,11 +2,7 @@ using CaeriusNet.Attributes.Dto;
 
 namespace Fenrir.Data.World;
 
-/// <summary>
-///     One world.Levels row -- ordinal contract of world.usp_Level_GetAll (145 rows, the legacy per-level
-///     progression curve). Constructor order must track the SELECT column order exactly (invariant I-04);
-///     [GenerateDto] maps by position, not by name.
-/// </summary>
+// world.usp_Level_GetAll; ordinal-mapped, ctor order must match the SELECT.
 [GenerateDto]
 public sealed partial record LevelRowDto(
     short Level,

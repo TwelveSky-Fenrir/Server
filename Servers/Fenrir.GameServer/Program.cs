@@ -39,27 +39,19 @@ builder.Services.AddSingleton<IFrameDispatcher, ZoneFrameDispatcher>();
 builder.Services.AddSingleton<MovementRules>();
 builder.Services.AddSingleton<DirtyTracker<int>>();
 
-// Server Logic V9 Progression -- one process-wide (Category, Step) index over WorldDataCache.QuestsById,
-// shared by every Zone actor (ZoneRegistry) and every handler that needs mQUEST.Search's own lookup shape.
 builder.Services.AddSingleton<QuestCatalog>();
 
-// Registration order IS simulation order within a zone's tick (report 05 §0 / ZoneRegistry's own remarks):
-// buffs must expire before meditation regen reads a (possibly just-cleared) sit-skill for the frame; monster
-// AI (report 05 §0 item 7, "boucle monstres") runs before that same tick's respawn scan (item 12, "boucle
-// spawns", ~10 s cadence) -- MonsterSpawnScheduler's own Simulate() call also drains that tick's kills before
-// scanning, so the ordering here only affects freshly-spawned monsters getting one extra tick of AI sooner.
+// Registration order IS simulation order within a zone's tick: buffs must expire before meditation regen reads
+// a (possibly just-cleared) sit-skill; monster AI runs before that tick's respawn scan.
 builder.Services.AddSingleton<ISimulationSystem, BuffExpirySystem>();
 builder.Services.AddSingleton<ISimulationSystem, MeditationRegenSystem>();
 builder.Services.AddSingleton<ISimulationSystem, MonsterAiSystem>();
 builder.Services.AddSingleton<ISimulationSystem, MonsterSpawnScheduler>();
-// Server Logic V9 Progression -- order-independent (touches only PlayerRuntimeState.PetActivity/PetActivityDecayTicks).
 builder.Services.AddSingleton<ISimulationSystem, PetActivitySystem>();
 
 builder.Services.AddSingleton<ZoneRegistry>();
 
-// Phase C/V6 Social: process-wide singletons (a party/duel/trade/friend-ask/mentor-ask negotiation can
-// span multiple Zone actors -- report 04's own note on the legacy's "center" relay collapsing into a
-// single in-process authority in a mono-GameServer topology).
+// Process-wide singletons: a party/duel/trade/friend-ask/mentor-ask negotiation can span multiple Zone actors.
 builder.Services.AddSingleton<PartyRegistry>();
 builder.Services.AddSingleton<FriendRegistry>();
 builder.Services.AddSingleton<MentorRegistry>();
@@ -79,19 +71,14 @@ builder.Services.AddHostedService<ZoneConnectionHost>();
 
 var host = builder.Build();
 
-// Must run before ZoneConnectionHost starts accepting connections -- see Fenrir.LoginServer/Program.cs's
-// identical PacketHandlerHub.Initialize call for the same reason.
+// Must run before ZoneConnectionHost starts accepting connections: MessageDispatcher resolves handlers through this provider.
 PacketHandlerHub.Initialize(host.Services);
 
-// Hosted services (including ZoneConnectionHost) only start inside host.Run(), so awaiting this here
-// guarantees the world.* reference-data cache is fully populated before the first connection is accepted --
-// a SQL failure or an unseeded database aborts startup instead of silently serving an empty world.
-// ZoneRegistry's constructor depends on WorldDataCache, so this must complete before anything below resolves it.
+// Hosted services only start inside host.Run(), so awaiting this here guarantees the world.* reference-data
+// cache is populated before the first connection -- a SQL failure aborts startup instead of serving an empty world.
 await host.Services.GetRequiredService<WorldDataLoader>().InitializeAsync(CancellationToken.None);
 
-// Resolves this shard's hosted maps from admin.ShardMapAssignments (replaces the old Game:Maps config list)
-// and builds one Zone actor per map -- must run before ZoneTickHost/ZoneConnectionHost start accepting ticks
-// or connections.
+// Must run before ZoneTickHost/ZoneConnectionHost start accepting ticks or connections.
 var shardId = host.Services.GetRequiredService<IOptions<GameServerOptions>>().Value.ShardId;
 var hostedMaps = await host.Services.GetRequiredService<IShardMapAssignmentRepository>()
     .GetHostedMapsAsync(shardId, CancellationToken.None);

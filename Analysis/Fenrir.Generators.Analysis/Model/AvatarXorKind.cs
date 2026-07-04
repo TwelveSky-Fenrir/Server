@@ -1,10 +1,6 @@
 namespace Fenrir.Generators.Analysis.Model;
 
-/// <summary>
-///     Local mirror of <c>Fenrir.Contracts.Attributes.AvatarXorKind</c> — the analyzer can't reference the
-///     assembly it analyzes, so it reads the raw value via <c>TypedConstant</c>. Names/order must stay in
-///     sync with the source attribute.
-/// </summary>
+/// <summary>Mirrors <c>Fenrir.Contracts.Attributes.AvatarXorKind</c>; names/order must stay in sync.</summary>
 internal enum AvatarXorKind : byte
 {
     None,

@@ -1,6 +1,4 @@
--- Documents the THROW codes introduced by the phase A3 procedures (character persistence, guild writes,
--- cash, mutes), per admin.ErrorCatalog's "documentation as data" contract (architecture reference
--- §12.3). Guarded per-row for the same shared-table reason as 001_error_catalog_admin.sql.
+-- Guarded per-row for the same shared-table reason as 001_error_catalog_admin.sql.
 IF
 NOT EXISTS (SELECT 1 FROM admin.ErrorCatalog WHERE ErrorNumber = 50222)
     INSERT INTO admin.ErrorCatalog (ErrorNumber, SchemaName, Description)

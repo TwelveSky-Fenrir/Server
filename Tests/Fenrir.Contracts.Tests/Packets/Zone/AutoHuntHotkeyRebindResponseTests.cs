@@ -3,10 +3,7 @@ using Fenrir.Contracts.Packets.Zone;
 
 namespace Fenrir.Contracts.Tests.Packets.Zone;
 
-/// <summary>
-///     ZC_SET_HOTKEY_INVENTORY_RECV (ZONE.h:1129-1138, 28-byte payload): Page1/Index1/Page2/Index2/
-///     Value0/Value1/Value2, no padding.
-/// </summary>
+/// <summary>ZC_SET_HOTKEY_INVENTORY_RECV (ZONE.h:1129-1138, 28-byte payload), no padding.</summary>
 public class ZcSetHotkeyInventoryRecvTests
 {
     [Fact]

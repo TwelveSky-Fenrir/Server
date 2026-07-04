@@ -1,10 +1,5 @@
--- Contract: no parameters -> RS0 rows { ShardId TINYINT, Host NVARCHAR(64), Port INT, Ccu INT,
---           Capacity INT, TickP99Ms REAL }, one row per shard whose LastHeartbeatUtc falls within
--- the last 15 seconds -- older rows are silently excluded (architecture reference §9.2: "un shard
--- sans heartbeat depuis 15 s disparait de l'offre").
--- Read-only, safe to retry; the caller (LoginServer) wraps this call with a 2 s InMemoryCache
--- (architecture reference §11.4), so this proc executes at most once every 2 s regardless of login
--- throughput.
+-- Rows older than 15s (no recent heartbeat) are silently excluded from the shard offer. Caller
+-- (LoginServer) wraps this with a 2s in-memory cache, so it executes at most once every 2s.
 CREATE PROCEDURE runtime.usp_GameServer_GetDirectory
 WITH NATIVE_COMPILATION,
      SCHEMABINDING

@@ -3,11 +3,7 @@ using Fenrir.Contracts.Packets.Zone;
 
 namespace Fenrir.Contracts.Tests.Packets.Zone;
 
-/// <summary>
-///     <see cref="PartyChatRequest.Link" /> is on the wire but dead server-side (see contract remarks) —
-///     the contract still decodes it faithfully; it is the Phase C handler's responsibility not to
-///     propagate it downstream.
-/// </summary>
+// Link rides the wire but is dead server-side; still decoded faithfully here.
 public class CzPartyChatSendTests
 {
     [Fact]

@@ -4,12 +4,7 @@ using Fenrir.Contracts.Wire;
 
 namespace Fenrir.Contracts.Packets.Zone;
 
-/// <summary>
-///     CZ_BUY_PSHOP_SEND (CLIENT.h:325-336) — buy from an open shop stall. <c>Page1</c>/<c>Index1</c> is
-///     the seller's stall slot; <c>Page2</c>/<c>Index2</c>/<c>XPost2</c>/<c>YPost2</c> is the buyer's
-///     destination inventory slot. No <c>PPSHOP_V2</c> guard here (asymmetric with 31-34): uses
-///     <c>IsValidTownAll</c> instead.
-/// </summary>
+// Page1/Index1 = seller's stall slot; Page2/Index2/XPost2/YPost2 = buyer's destination slot.
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.BuyShopItem, ExpectedSize = 54,
     AllowedStates = [(byte)ZoneSessionState.InWorld])]
 public readonly partial record struct BuyShopItemRequest : IIncomingPacket<BuyShopItemRequest>

@@ -3,15 +3,9 @@ using Fenrir.Application.Game.Inventory;
 
 namespace Fenrir.Application.Game.Tests.Inventory;
 
-/// <summary>
-///     Bounds and move-mechanics coverage for <see cref="ContainerMatrix" /> -- the pure, Zone-independent
-///     policy consumed by <c>GenericActionHandler</c>. Every case here is constructed by hand (plain
-///     values, no Zone/PlayerRuntimeState) per the mission brief's "policy pure/testable" requirement.
-/// </summary>
+/// <summary>Bounds and move-mechanics coverage for <see cref="ContainerMatrix" />, the pure policy consumed by <c>GenericActionHandler</c>.</summary>
 public class ContainerMatrixTests
 {
-    // ---- tSort catalog: known-but-unimplemented vs genuinely unknown (report 04's full switch table) ----
-
     [Theory]
     [InlineData(208)] // inventory<->inventory -- implemented
     [InlineData(210)] // inventory->equipment -- implemented
@@ -51,8 +45,6 @@ public class ContainerMatrixTests
         Assert.False(ContainerMatrix.IsImplementedContainerMoveSort(sort));
     }
 
-    // ---- Slot bounds per container kind ----
-
     [Theory]
     [InlineData(ContainerMatrix.InventoryPage0, 0, true)]
     [InlineData(ContainerMatrix.InventoryPage0, 63, true)]
@@ -75,8 +67,6 @@ public class ContainerMatrixTests
         Assert.False(ContainerMatrix.IsValidSlot(ContainerMatrix.InventoryPage0, -1));
     }
 
-    // ---- tSort -> (from,to) container resolution ----
-
     [Fact]
     public void TryResolveContainers_Sort208_BothPagesValid_ResolvesInventoryToInventory()
     {
@@ -91,7 +81,7 @@ public class ContainerMatrixTests
     [Fact]
     public void TryResolveContainers_Sort210_IgnoresPage2_AlwaysTargetsEquipment()
     {
-        // Page2 is irrelevant for 210 (Equipment has no pages) -- 0 here is just a placeholder value.
+        // page2 arg is a placeholder -- Equipment has no pages
         var ok = ContainerMatrix.TryResolveContainers(210, ContainerMatrix.InventoryPage1, 0, out var from,
             out var to);
 
@@ -103,7 +93,7 @@ public class ContainerMatrixTests
     [Fact]
     public void TryResolveContainers_Sort213_SourceIsAlwaysEquipment()
     {
-        // Page1 is irrelevant for 213 (Equipment has no pages) -- 0 here is just a placeholder value.
+        // page1 arg is a placeholder -- Equipment has no pages
         var ok = ContainerMatrix.TryResolveContainers(213, 0, ContainerMatrix.InventoryPage0, out var from,
             out var to);
 
@@ -128,8 +118,6 @@ public class ContainerMatrixTests
         Assert.False(ok);
     }
 
-    // ---- ResolveMove: the generic move/merge/swap mechanics ----
-
     private static ItemStack Stack(int itemId, int quantity = 1, byte enchant = 0)
     {
         return new ItemStack(itemId, quantity, enchant, 0, 0, 0, 0, 0, 0, 0, 0);
@@ -144,20 +132,20 @@ public class ContainerMatrixTests
             ContainerMatrix.InventoryPage0, 1, source, null, false);
 
         Assert.Equal(ContainerMatrix.MoveOutcome.Success, result.Outcome);
-        Assert.Null(result.NewSource); // source slot emptied
+        Assert.Null(result.NewSource);
         Assert.Equal(source, result.NewDestination);
     }
 
     [Fact]
     public void ResolveMove_EmptyDestination_PartialQuantity_SplitsTheStack()
     {
-        var source = Stack(2, 10); // itemId 2 = legacy stackable sort, but stackability isn't needed to split
+        var source = Stack(2, 10);
 
         var result = ContainerMatrix.ResolveMove(ContainerMatrix.InventoryPage0, 0, 4,
             ContainerMatrix.InventoryPage0, 1, source, null, true);
 
         Assert.Equal(ContainerMatrix.MoveOutcome.Success, result.Outcome);
-        Assert.Equal(6, result.NewSource!.Value.Quantity); // 10 - 4 remains behind
+        Assert.Equal(6, result.NewSource!.Value.Quantity);
         Assert.Equal(4, result.NewDestination!.Value.Quantity);
         Assert.Equal(2, result.NewDestination!.Value.ItemId);
     }
@@ -172,7 +160,7 @@ public class ContainerMatrixTests
             ContainerMatrix.InventoryPage0, 1, source, destination, true);
 
         Assert.Equal(ContainerMatrix.MoveOutcome.Success, result.Outcome);
-        Assert.Null(result.NewSource); // whole source stack consumed by the merge
+        Assert.Null(result.NewSource);
         Assert.Equal(10, result.NewDestination!.Value.Quantity);
     }
 
@@ -193,8 +181,7 @@ public class ContainerMatrixTests
     [Fact]
     public void ResolveMove_SameItemIdButNotStackable_SwapsInsteadOfMerging()
     {
-        // Two distinct enchanted weapon instances that happen to share an ItemId (e.g. two +5 swords) must
-        // never be treated as one pile -- sourceIsStackable=false forces the swap branch even though ItemId matches.
+        // sourceIsStackable=false forces swap even with matching ItemId -- two enchanted items aren't one pile
         var source = Stack(999, 1, 5);
         var destination = Stack(999, 1, 12);
 
@@ -257,8 +244,6 @@ public class ContainerMatrixTests
         Assert.Equal(ContainerMatrix.MoveOutcome.DestinationOutOfRange, result.Outcome);
     }
 
-    // ---- ApplyMove: projecting a resolved move onto the current full container content ----
-
     [Fact]
     public void ApplyMove_SameContainer_BothSlotsUpdatedInOneProjection()
     {
@@ -270,9 +255,9 @@ public class ContainerMatrixTests
         var projected = ContainerMatrix.ApplyMove(move, ContainerMatrix.InventoryPage0, 0, current,
             ContainerMatrix.InventoryPage0, 1, current);
 
-        Assert.False(projected.From.ContainsKey(0)); // vacated
+        Assert.False(projected.From.ContainsKey(0));
         Assert.Equal(source, projected.From[1]);
-        Assert.Same(projected.From, projected.To); // same container -> same projected dictionary instance
+        Assert.Same(projected.From, projected.To);
     }
 
     [Fact]
@@ -282,7 +267,7 @@ public class ContainerMatrixTests
         var untouchedInInventory = Stack(2);
         var fromCurrent = ImmutableDictionary<byte, ItemStack>.Empty
             .Add(0, moved)
-            .Add(5, untouchedInInventory); // must survive the move untouched
+            .Add(5, untouchedInInventory);
         var toCurrent = ImmutableDictionary<byte, ItemStack>.Empty;
 
         var move = ContainerMatrix.ResolveMove(ContainerMatrix.InventoryPage0, 0, 0, ContainerMatrix.Equipment, 7,

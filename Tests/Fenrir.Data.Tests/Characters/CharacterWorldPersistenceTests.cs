@@ -9,14 +9,9 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Fenrir.Data.Tests.Characters;
 
-/// <summary>
-///     Phase A3 character persistence against real SQL Server 2025: the extended
-///     game.usp_Character_GetForWorldEntry (five result sets via GetWorldEntryBundleAsync),
-///     usp_CharacterItems_ReplaceContainer, usp_Character_PersistProgressBatch and usp_Character_AdjustMoney.
-///     Rows for the tables that have no write proc yet (skills/hotkeys/buffs/quests -- their writers land with
-///     their Phase C verticals) are arranged with direct INSERTs: the point here is the READ contract of the
-///     five result sets, and the fixture connection is not bound by the EXECUTE-only application roles.
-/// </summary>
+// Exercises the extended game.usp_Character_GetForWorldEntry (five result sets via GetWorldEntryBundleAsync)
+// and its write procs; tables with no write proc yet are seeded via direct INSERT since the fixture
+// connection isn't bound by the EXECUTE-only application roles.
 [Collection("SqlServer")]
 public class CharacterWorldPersistenceTests
 {
@@ -46,12 +41,10 @@ public class CharacterWorldPersistenceTests
 
         Assert.NotNull(bundle);
 
-        // The M1 prefix still comes through the same ordinals...
         Assert.Equal(characterId, bundle.Character.CharacterId);
         Assert.Equal(1, bundle.Character.Level);
         Assert.Equal(0L, bundle.Character.FlushSequence);
 
-        // ...and the appended A3 progression columns land on their table defaults.
         Assert.Equal(0L, bundle.Character.Experience);
         Assert.Equal(1, bundle.Character.Level2); // DF_Characters_Level2
         Assert.Equal(0, bundle.Character.StatPoints);
@@ -61,7 +54,7 @@ public class CharacterWorldPersistenceTests
         Assert.Equal(0, bundle.Character.EatLifePotion);
         Assert.Equal(0, bundle.Character.InventoryDate);
 
-        // No game.CharacterQuests row = the all-zeros aQuestInfo of a fresh character (LEFT JOIN + ISNULL).
+        // No game.CharacterQuests row = all-zeros aQuestInfo (LEFT JOIN + ISNULL).
         Assert.Equal(0, bundle.Character.QuestStepPermanent);
         Assert.Equal(0, bundle.Character.QuestActiveId);
         Assert.Equal(0, bundle.Character.QuestKillCounter);
@@ -100,14 +93,13 @@ public class CharacterWorldPersistenceTests
 
         Assert.NotNull(bundle);
 
-        // RS0's folded quest state (wAvatar.aQuestInfo[5]).
+        // Folded quest state (wAvatar.aQuestInfo[5]).
         Assert.Equal(7, bundle.Character.QuestStepPermanent);
         Assert.Equal(1, bundle.Character.QuestActiveId);
         Assert.Equal(2, bundle.Character.QuestSort);
         Assert.Equal(itemId, bundle.Character.QuestTargetPhase);
         Assert.Equal(4, bundle.Character.QuestKillCounter);
 
-        // RS1: every column of the equipment slot round-trips.
         var item = Assert.Single(bundle.Items);
         Assert.Equal(2, item.Container);
         Assert.Equal(12, item.Slot);
@@ -123,7 +115,6 @@ public class CharacterWorldPersistenceTests
         Assert.Equal(20260101, item.ExpireDate);
         Assert.Equal(777, item.Serial);
 
-        // RS2/RS3/RS4.
         var skill = Assert.Single(bundle.Skills);
         Assert.Equal(3, skill.SlotIndex);
         Assert.Equal(skillId, skill.SkillId);
@@ -147,12 +138,11 @@ public class CharacterWorldPersistenceTests
         var characterId = await CreateCharacterAsync();
         var itemId = await ScalarAsync<int>("SELECT MIN(ItemId) FROM world.Items;");
 
-        // Arrange one row in Equipment (container 2) that inventory operations must never touch.
+        // Equipment (container 2) row that inventory operations must never touch.
         await _characters.ReplaceContainerAsync(characterId, 2,
             [new CharacterItemSlotTvp(0, itemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0)],
             CancellationToken.None);
 
-        // Fill InventoryPage0 (container 0) with two slots...
         await _characters.ReplaceContainerAsync(characterId, 0,
             [
                 new CharacterItemSlotTvp(0, itemId, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0),
@@ -160,7 +150,7 @@ public class CharacterWorldPersistenceTests
             ],
             CancellationToken.None);
 
-        // ...then replace the whole container with a single different slot: old rows must be gone.
+        // Replace the whole container with a single different slot: old rows must be gone.
         await _characters.ReplaceContainerAsync(characterId, 0,
             [new CharacterItemSlotTvp(7, itemId, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0)],
             CancellationToken.None);
@@ -172,7 +162,7 @@ public class CharacterWorldPersistenceTests
         Assert.Equal(7, inventory.Slot);
         Assert.Single(afterReplace.Items, i => i.Container == 2); // equipment untouched
 
-        // Empty list = clear the container (the TVP parameter is omitted, defaulting to empty server-side).
+        // Empty list = clear the container (TVP parameter omitted, defaults to empty server-side).
         await _characters.ReplaceContainerAsync(characterId, 0, [], CancellationToken.None);
 
         var afterClear = await _characters.GetWorldEntryBundleAsync(characterId, CancellationToken.None);
@@ -187,13 +177,11 @@ public class CharacterWorldPersistenceTests
         var characterId = await CreateCharacterAsync();
         var itemId = await ScalarAsync<int>("SELECT MIN(ItemId) FROM world.Items;");
 
-        // Arrange: item sitting in inventory slot 0 (container 0).
         await _characters.ReplaceContainerAsync(characterId, 0,
             [new CharacterItemSlotTvp(0, itemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 42)],
             CancellationToken.None);
 
-        // Equip it: container 0 loses the slot, container 2 (Equipment) gains it -- ONE call, one transaction
-        // (the cross-container twin of ReplaceContainerAsync; see usp_CharacterItems_ReplaceTwoContainers).
+        // Equip: one atomic call moves the slot from container 0 to container 2 (usp_CharacterItems_ReplaceTwoContainers).
         await _characters.ReplaceTwoContainersAsync(
             characterId, 0, [], 2,
             [new CharacterItemSlotTvp(5, itemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 42)],
@@ -227,7 +215,7 @@ public class CharacterWorldPersistenceTests
         if (sqlException is not null)
             Assert.Equal(50260, sqlException.Number);
 
-        // The guard fires BEFORE either DELETE/INSERT pair runs -- the original slot 0 row must be untouched.
+        // Guard fires before either DELETE/INSERT pair runs -- original slot 0 row must be untouched.
         var afterFailedCall = await _characters.GetWorldEntryBundleAsync(characterId, CancellationToken.None);
         Assert.NotNull(afterFailedCall);
         var survivor = Assert.Single(afterFailedCall.Items);
@@ -258,8 +246,7 @@ public class CharacterWorldPersistenceTests
         Assert.Equal(8, afterFirstFlush.Character.SkillPoints);
         Assert.Equal(9, afterFirstFlush.Character.ContributionPoints);
 
-        // A stale replay (same FlushSequence, different values) must be discarded silently -- the shared
-        // strictly-greater guard, exactly like the position batch.
+        // Stale replay (same FlushSequence, different values) must be discarded silently.
         await _characters.PersistProgressAsync(
             [new CharacterProgressTvp(characterId, 5, 99, 9, 999L, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0)],
             CancellationToken.None);
@@ -287,7 +274,7 @@ public class CharacterWorldPersistenceTests
         Assert.Equal(600L, afterSpend.Character.Money);
         Assert.Equal(1, afterSpend.Character.BigMoney);
 
-        // Overdraft: rejected with THROW 50222, never clamped -- and the balance must be untouched.
+        // Overdraft: rejected with THROW 50222, never clamped.
         var ex = await Record.ExceptionAsync(() =>
             _characters.AdjustMoneyAsync(characterId, -601L, 0, CancellationToken.None).AsTask());
 
@@ -305,10 +292,8 @@ public class CharacterWorldPersistenceTests
     [Fact]
     public async Task AdjustMoneyAsync_CreditAboveTheLegacyCap_IsRejected_AndLeavesBalanceUntouched()
     {
-        // Review finding (Phase C/V5): the MAX_NUMBER_SIZE (2,000,000,000) upper-cap guard used to be a
-        // separate `IF EXISTS` pre-check ahead of the atomic UPDATE...WHERE, a real TOCTOU window under
-        // concurrent credits -- now folded into the SAME guarded UPDATE as the lower (>=0) bound. This proves
-        // the guard itself still rejects (never clamps) a single over-cap credit, with zero prior coverage.
+        // MAX_NUMBER_SIZE (2,000,000,000) upper-cap guard is folded into the same atomic UPDATE as the lower
+        // (>=0) bound, closing a TOCTOU window a separate pre-check would have under concurrent credits.
         var characterId = await CreateCharacterAsync();
 
         await _characters.AdjustMoneyAsync(characterId, 1_999_999_999L, 0, CancellationToken.None);
@@ -325,7 +310,7 @@ public class CharacterWorldPersistenceTests
         Assert.NotNull(afterRejectedCredit);
         Assert.Equal(1_999_999_999L, afterRejectedCredit.Character.Money);
 
-        // Landing EXACTLY on the cap is legal (BETWEEN is inclusive) -- only exceeding it is rejected.
+        // Landing exactly on the cap is legal (BETWEEN is inclusive); only exceeding it is rejected.
         await _characters.AdjustMoneyAsync(characterId, 1L, 0, CancellationToken.None);
         var atExactCap = await _characters.GetWorldEntryBundleAsync(characterId, CancellationToken.None);
         Assert.NotNull(atExactCap);
@@ -337,8 +322,7 @@ public class CharacterWorldPersistenceTests
     {
         var characterId = await CreateCharacterAsync();
 
-        // The legacy single-DTO read maps the unchanged 19-column prefix of RS0 and ignores the four
-        // extra result sets -- existing callers must not have broken.
+        // Legacy single-DTO read maps only the unchanged 19-column prefix of RS0, ignoring the extra result sets.
         var entry = await _characters.GetForWorldEntryAsync(characterId, CancellationToken.None);
 
         Assert.NotNull(entry);

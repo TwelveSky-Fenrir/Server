@@ -2,11 +2,7 @@ using Microsoft.CodeAnalysis;
 
 namespace Fenrir.Generators.Analysis.Support;
 
-/// <summary>
-///     Compares symbol names structurally (namespace + <c>MetadataName</c>) instead of via <c>ToDisplayString()</c>,
-///     avoiding ambiguity from the default <c>SymbolDisplayFormat</c> (<c>global::</c> prefix, minimal qualification,
-///     etc.).
-/// </summary>
+/// <summary>Compares symbol names structurally instead of via <c>ToDisplayString()</c>, which is format-ambiguous.</summary>
 internal static class SymbolNameHelpers
 {
     public static string GetFullNamespace(INamespaceSymbol? ns)
@@ -18,10 +14,6 @@ internal static class SymbolNameHelpers
         return parent.Length == 0 ? ns.Name : parent + "." + ns.Name;
     }
 
-    /// <summary>
-    ///     <paramref name="fullyQualifiedMetadataName" /> e.g. "Fenrir.Contracts.Attributes.FixedArrayAttribute"
-    ///     (non-generic).
-    /// </summary>
     public static bool Is(INamedTypeSymbol? type, string fullyQualifiedMetadataName)
     {
         if (type is null)
@@ -37,11 +29,6 @@ internal static class SymbolNameHelpers
         return Is(attribute.AttributeClass, fullyQualifiedMetadataName);
     }
 
-    /// <summary>
-    ///     Checks whether a closed interface (from <c>AllInterfaces</c>) is an instantiation of the open generic
-    ///     interface named by <paramref name="openGenericMetadataName" /> (e.g.
-    ///     "Fenrir.Contracts.Abstractions.IFenrirWireType`1").
-    /// </summary>
     public static bool IsClosedGenericOf(INamedTypeSymbol closedInterface, string openGenericMetadataName)
     {
         var definition = closedInterface.OriginalDefinition;

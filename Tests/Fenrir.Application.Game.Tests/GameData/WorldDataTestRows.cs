@@ -3,11 +3,7 @@ using Fenrir.Data.World;
 
 namespace Fenrir.Application.Game.Tests.GameData;
 
-/// <summary>
-///     In-memory row factories for the WorldDataCacheBuilder tests: every non-essential column is zeroed so a
-///     test only ever spells out the ids/links it is actually asserting on. No SQL anywhere -- the builder is
-///     pure and these are plain positional records.
-/// </summary>
+/// <summary>In-memory row factories for the WorldDataCacheBuilder tests; non-essential columns are zeroed.</summary>
 internal static class WorldDataTestRows
 {
     internal static ItemRowDto Item(int itemId)
@@ -113,11 +109,7 @@ internal static class WorldDataTestRows
             0, monsterId, 0, 1, 0, 0, 0, 10);
     }
 
-    /// <summary>
-    ///     The smallest WorldDataRows that passes Build's critical-dataset gate: one row in each of Items,
-    ///     Monsters, Zones, Levels, Skills and nothing anywhere else. Tests override the slices they exercise
-    ///     via a <c>with</c> expression.
-    /// </summary>
+    /// <summary>Smallest WorldDataRows that passes Build's critical-dataset gate; tests override slices via <c>with</c>.</summary>
     internal static WorldDataRows MinimalRows()
     {
         return new WorldDataRows

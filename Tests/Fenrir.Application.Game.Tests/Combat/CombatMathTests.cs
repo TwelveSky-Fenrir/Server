@@ -3,10 +3,7 @@ using Fenrir.Application.Game.Tests.TestSupport;
 
 namespace Fenrir.Application.Game.Tests.Combat;
 
-/// <summary>
-///     Covers <see cref="CombatMath" />'s primitives against the verified C++ formulas (report 05 §4,
-///     <c>Server/ts25zone/S07_MyGame02.cpp</c>) with hand-computed expected values, not fuzzed ranges.
-/// </summary>
+/// <summary>Covers <see cref="CombatMath" />'s primitives against the C++ formulas in <c>Server/ts25zone/S07_MyGame02.cpp</c>, with hand-computed expected values.</summary>
 public class CombatMathTests
 {
     [Theory]
@@ -37,8 +34,7 @@ public class CombatMathTests
     [Fact]
     public void RollCritical_ZeroOrNegativeChance_NeverRolls()
     {
-        // A roll of 0 would satisfy "0 < 0"? No -- but this pins that a non-positive chance short-circuits
-        // WITHOUT even consuming a random draw (matching the legacy's own `if (critical > criticalDefense)` guard).
+        // non-positive chance must short-circuit without consuming a random draw
         var rng = new ScriptedRandomSource(0);
         Assert.False(CombatMath.RollCritical(0, rng));
         Assert.False(CombatMath.RollCritical(-5, rng));

@@ -1,11 +1,4 @@
--- Legacy MySQL `bloodinfo` (nxtserver.sql): a "blood exchange" trade-in catalog (spend a currency
--- to obtain an item), loaded once at boot the same way as the rest of world.*. BloodExchangeSlot is
--- the legacy `Number` -- stored as-given, never IDENTITY, including the special slot 100000 (bloodinfo
--- breaks its own 1..50 sequence for one extra row, the same outlier-row pattern itemmallinfo uses).
--- Only 3 of the dump's 51 rows carry real data (slots 1, 2, 100000); slots 3-50 are ItemID=0/Cost=0/
--- Quantity=0 filler with no meaning, so they are not represented as rows at all -- normalizing, not
--- transliterating, the legacy administrative padding (see 70_seed/world/011_blood_exchange_catalog.sql).
--- ItemId is NULL, never 0, for the same reason as world.ItemMallProducts (shared FK convention).
+-- Legacy MySQL `bloodinfo` (a "blood exchange" trade-in catalog); BloodExchangeSlot is the legacy `Number`, stored as-given (including outlier slot 100000, same pattern as ItemMallProducts). Empty filler slots are not represented as rows.
 CREATE TABLE world.BloodExchangeCatalog
 (
     BloodExchangeSlot INT NOT NULL,

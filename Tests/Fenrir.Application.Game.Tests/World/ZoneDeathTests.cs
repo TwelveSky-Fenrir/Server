@@ -4,16 +4,9 @@ using Fenrir.Application.Game.World;
 namespace Fenrir.Application.Game.Tests.World;
 
 /// <summary>
-///     Covers <see cref="Zone.ApplyDeath" /> and its automatic revive sweep (M1 plan, Phase C/V1 item 3): the
-///     immediate death effects (Life=0, IsDead, revive scheduled) and the ~5 s ("10 legacy ticks",
-///     <see cref="Simulation.SimulationClock.DeathReviveDelay" />) automatic revive itself. The revive is ALWAYS in
-///     place (report 12 §4.2/§4.3: the legacy only auto-clears the death flag locally after the delay -- an
-///     actual cross-zone "return to town" transfer is client-driven, via CZ_DEMAND_ZONE_SERVER_INFO_2 Sort=3,
-///     already covered by <c>ZoneMoveHandler</c>, not by this timer). A prior revision of
-///     this suite tested a since-removed cross-zone auto-teleport-to-capital mechanism (review finding: it
-///     both diverged from the documented legacy behavior and lost a pending revive's destination across a
-///     zone handoff, since IsDead traveled but the destination fields did not) -- those tests are replaced
-///     below by ones pinning the corrected, strictly-in-place behavior.
+///     Covers <see cref="Zone.ApplyDeath" /> and its automatic revive: revive is always in place -- the legacy only
+///     auto-clears the death flag locally after the delay, and cross-zone "return to town" is a separate,
+///     client-driven transfer (<c>ZoneMoveHandler</c>), not this timer.
 /// </summary>
 public class ZoneDeathTests
 {
@@ -74,7 +67,6 @@ public class ZoneDeathTests
 
         zone.ApplyDeath(10);
 
-        // Not yet due.
         zone.Tick(TimeSpan.FromSeconds(4));
         Assert.True(zone.TryGetPlayer(10, out var stillDead));
         Assert.True(stillDead!.IsDead);
@@ -95,9 +87,7 @@ public class ZoneDeathTests
     [Fact]
     public void Revive_NeverInitiatesACrossZoneHandoff()
     {
-        // Regression guard for the removed auto-teleport-to-capital mechanism: dying in a zone that is nobody's
-        // capital must still revive the player IN THAT SAME ZONE, never hand them off anywhere -- a bare Zone
-        // (no ZoneRegistry backref) proves no cross-zone resolution is even attempted.
+        // a bare Zone (no ZoneRegistry backref) proves no cross-zone resolution is even attempted
         var zone = ZoneTestKit.CreateZone(2);
         var (session, _) = ZoneTestKit.CreateSession(1);
 
@@ -116,9 +106,6 @@ public class ZoneDeathTests
     [Fact]
     public void DeadPlayer_HandedOffToAnotherZone_ArrivesStillDead_NotSilentlyRevivedOrLost()
     {
-        // The critical bug this pins against: PlayerEnterData/HandleEnter must carry IsDead (already did)
-        // through an in-process handoff without losing/misinterpreting any death-related state on arrival --
-        // there is no longer any Revive* destination data to lose, since revive is always in place now.
         var source = ZoneTestKit.CreateZone(2);
         var target = ZoneTestKit.CreateZone(3);
         var (session, _) = ZoneTestKit.CreateSession(1);
@@ -136,8 +123,6 @@ public class ZoneDeathTests
 
         Assert.True(target.TryGetPlayer(10, out var arrived));
         Assert.Equal(3, arrived!.MapId);
-        // IsDead survived the handoff intact (it may since revive shortly after on the target zone's own
-        // schedule, but it must never arrive silently "alive" nor throw/misbehave on arrival).
         Assert.True(arrived.IsDead);
     }
 }

@@ -8,16 +8,9 @@ using Fenrir.Data.Commerce;
 
 namespace Fenrir.Data.Characters;
 
-/// <summary>
-///     game.Characters access (architecture reference §11.1-§11.3). Singleton, injected only with
-///     ICaeriusNetDbContext -- no SqlDbType or builder ever leaks past this type; callers see typed ValueTasks only.
-/// </summary>
 public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRepository
 {
-    /// <summary>
-    ///     Sentinel for <see cref="ApplyQuestTransitionAsync" />/<see cref="ApplyDailyMissionClaimAsync" />'s
-    ///     <c>@ContainerN</c> -- no valid container id ever uses 255.
-    /// </summary>
+    /// <summary>Sentinel for ApplyQuestTransitionAsync/ApplyDailyMissionClaimAsync's @ContainerN; no valid container id is 255.</summary>
     public const byte NoContainer = 255;
 
     /// <summary>Character-select list for the account. Capacity 3 = MAX_USER_AVATAR_NUM, the legacy 3-slot cap.</summary>
@@ -71,7 +64,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         return await Db.ExecuteScalarAsync<int>(sp, ct);
     }
 
-    /// <summary>Deletes the character occupying (AccountId, Slot) -- CL_DELETE_AVATAR_SEND's target (wire contract §4.4).</summary>
+    /// <summary>Deletes the character occupying (AccountId, Slot) -- CL_DELETE_AVATAR_SEND's target.</summary>
     public async ValueTask DeleteAsync(int accountId, byte slot, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_Delete", 0)
@@ -82,10 +75,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(sp, ct);
     }
 
-    /// <summary>
-    ///     Full world-entry snapshot for the ZC_REGISTER_AVATAR_RECV/AVATAR_INFO path (wire contract §6.2); null if the
-    ///     character vanished mid-flight.
-    /// </summary>
+    /// <summary>Full world-entry snapshot for ZC_REGISTER_AVATAR_RECV/AVATAR_INFO; null if the character vanished mid-flight.</summary>
     public async ValueTask<CharacterWorldEntryDto?> GetForWorldEntryAsync(int characterId, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_GetForWorldEntry", 1)
@@ -95,10 +85,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         return await Db.FirstQueryAsync<CharacterWorldEntryDto>(sp, ct);
     }
 
-    /// <summary>
-    ///     Write-behind position flush (architecture reference §10.5/§11.3); usp_Character_PersistBatch is idempotent on
-    ///     FlushSequence, so a network retry never regresses a position.
-    /// </summary>
+    /// <summary>Write-behind position flush; usp_Character_PersistBatch is idempotent on FlushSequence, so a retry never regresses a position.</summary>
     public async ValueTask PersistPositionsAsync(IReadOnlyList<CharacterPositionTvp> rows, CancellationToken ct)
     {
         if (rows.Count == 0)
@@ -111,12 +98,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(sp, ct);
     }
 
-    /// <summary>
-    ///     Everything world entry needs in ONE round trip: the five result sets of the A3-extended
-    ///     usp_Character_GetForWorldEntry (character+progression+quest state, items, skills, hotkeys, buffs).
-    ///     Null if the character vanished mid-flight (empty RS0). <see cref="GetForWorldEntryAsync" /> stays as the
-    ///     cheap M1-prefix read; this is the full snapshot the AVATAR_INFO/PlayerRuntimeState build consumes.
-    /// </summary>
+    /// <summary>All 5 result sets of usp_Character_GetForWorldEntry in one round trip; null if the character vanished mid-flight. <see cref="GetForWorldEntryAsync" /> stays the cheap prefix read -- this is the full snapshot.</summary>
     public async ValueTask<CharacterWorldEntryBundle?> GetWorldEntryBundleAsync(int characterId, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_GetForWorldEntry", 64)
@@ -132,12 +114,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
             : new CharacterWorldEntryBundle(characters[0], items, skills, hotkeys, buffs);
     }
 
-    /// <summary>
-    ///     Whole-container replace of one character's item slots (usp_CharacterItems_ReplaceContainer, transactional
-    ///     DELETE+INSERT -- D7 regime (b): item state never rides the lossy write-behind path). An EMPTY list is a
-    ///     legal, deliberate "clear the container": the TVP parameter is simply omitted (a READONLY TVP defaults to an
-    ///     empty table server-side), because ADO.NET rejects streaming a zero-row TVP outright.
-    /// </summary>
+    /// <summary>Transactional DELETE+INSERT replace of one container (not write-behind). Empty list = deliberate clear -- the TVP param is omitted since ADO.NET rejects a zero-row TVP.</summary>
     public async ValueTask ReplaceContainerAsync(int characterId, byte container,
         IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct)
     {
@@ -151,15 +128,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(builder.Build(), ct);
     }
 
-    /// <summary>
-    ///     Whole-container replace of TWO containers in ONE transaction (usp_CharacterItems_ReplaceTwoContainers,
-    ///     D7 regime (b)) -- the cross-container twin of <see cref="ReplaceContainerAsync" />, for a single client
-    ///     move whose FROM and TO slots live in different containers (e.g. equip: inventory -&gt; equipment).
-    ///     Calling <see cref="ReplaceContainerAsync" /> twice for such a move would commit each container in its
-    ///     OWN transaction -- a fault between the two calls could durably remove an item from its source without
-    ///     ever durably adding it to its destination. This method closes that window: both containers commit or
-    ///     roll back together.
-    /// </summary>
+    /// <summary>Replaces TWO containers in one transaction -- e.g. equip (inventory -&gt; equipment). Calling <see cref="ReplaceContainerAsync" /> twice could durably remove an item from one container without adding it to the other; this closes that window.</summary>
     public async ValueTask ReplaceTwoContainersAsync(int characterId, byte containerA,
         IReadOnlyList<CharacterItemSlotTvp> itemsA, byte containerB, IReadOnlyList<CharacterItemSlotTvp> itemsB,
         CancellationToken ct)
@@ -179,11 +148,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(builder.Build(), ct);
     }
 
-    /// <summary>
-    ///     Write-behind progression flush (D7 regime (a)) -- the progression twin of
-    ///     <see cref="PersistPositionsAsync" />, idempotent on the same per-character FlushSequence, so replays of
-    ///     either batch flavor never regress state.
-    /// </summary>
+    /// <summary>Write-behind progression flush, idempotent on the same per-character FlushSequence as <see cref="PersistPositionsAsync" /> -- replays never regress state.</summary>
     public async ValueTask PersistProgressAsync(IReadOnlyList<CharacterProgressTvp> rows, CancellationToken ct)
     {
         if (rows.Count == 0)
@@ -196,11 +161,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(sp, ct);
     }
 
-    /// <summary>
-    ///     Atomic money adjustment with an overdraft guard (usp_Character_AdjustMoney, D7 regime (b)): throws
-    ///     SQL error 50222 instead of clamping when either pool would go negative -- a caller relying on "the debit
-    ///     happened" without checking must never silently under-pay.
-    /// </summary>
+    /// <summary>Atomic money adjustment; throws SQL 50222 instead of clamping when either pool would go negative.</summary>
     public async ValueTask AdjustMoneyAsync(int characterId, long deltaMoney, int deltaBigMoney, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_AdjustMoney", 0)
@@ -212,13 +173,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(sp, ct);
     }
 
-    /// <summary>
-    ///     Atomic money adjustment + ONE container replace (usp_Character_AdjustMoneyAndReplaceContainer, D7
-    ///     regime (b)) -- the single-character, one-container twin of <see cref="ReplaceTwoContainersAsync" />,
-    ///     for an NPC-shop buy/sell (V5 NPC &amp; Economy): a mid-sequence failure must never let a character
-    ///     pay without receiving the item (or vice versa). Same empty-TVP-omission rule as
-    ///     <see cref="ReplaceContainerAsync" />.
-    /// </summary>
+    /// <summary>Atomic money adjustment + one container replace, e.g. NPC-shop buy/sell -- a mid-sequence failure must never pay without granting the item (or vice versa). Same empty-TVP-omission rule as <see cref="ReplaceContainerAsync" />.</summary>
     public async ValueTask AdjustMoneyAndReplaceContainerAsync(int characterId, long deltaMoney, int deltaBigMoney,
         byte container, IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct)
     {
@@ -234,11 +189,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(builder.Build(), ct);
     }
 
-    /// <summary>
-    ///     Atomic money adjustment + TWO container replaces (usp_Character_AdjustMoneyAndReplaceTwoContainers,
-    ///     D7 regime (b)) -- used when an IMPROVE_ITEM (enchant) attempt's target and material slots land on
-    ///     DIFFERENT inventory pages. See <see cref="AdjustMoneyAndReplaceContainerAsync" />'s own remarks.
-    /// </summary>
+    /// <summary>Atomic money adjustment + two container replaces -- e.g. an enchant whose target and material slots land on different inventory pages.</summary>
     public async ValueTask AdjustMoneyAndReplaceTwoContainersAsync(int characterId, long deltaMoney,
         int deltaBigMoney, byte containerA, IReadOnlyList<CharacterItemSlotTvp> itemsA, byte containerB,
         IReadOnlyList<CharacterItemSlotTvp> itemsB, CancellationToken ct)
@@ -261,12 +212,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(builder.Build(), ct);
     }
 
-    /// <summary>
-    ///     Durable single-slot write to game.CharacterSkills (usp_CharacterSkills_UpsertSlot, D7 regime (b) --
-    ///     see that proc's own header comment for why SkillPoints itself is deliberately NOT touched here).
-    ///     Covers both "learn a new skill" (tSort 202/233) and "upgrade an already-learned skill" (tSort 203):
-    ///     both are just this slot's final (SkillId, Grade).
-    /// </summary>
+    /// <summary>Durable single-slot write to game.CharacterSkills; SkillPoints itself is deliberately not touched here. Covers both learn (tSort 202/233) and upgrade (tSort 203) -- both are just this slot's final (SkillId, Grade).</summary>
     public async ValueTask UpsertSkillSlotAsync(int characterId, byte slotIndex, int skillId, int grade,
         CancellationToken ct)
     {
@@ -280,14 +226,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(sp, ct);
     }
 
-    /// <summary>
-    ///     The atomic two-character trade commit (usp_CharacterTrade_Execute, Phase C/V6 Social -- D7
-    ///     regime (b), extended past <see cref="ReplaceTwoContainersAsync" />'s one-character shape):
-    ///     both sides' FINAL InventoryPage0/InventoryPage1 contents and both sides' money deltas commit
-    ///     in ONE transaction, or none of them do. The sole caller (<c>TradeSession</c>,
-    ///     Fenrir.Application.Game.Social.Trade) has already computed every projected container and delta
-    ///     before calling this -- this method is the durable commit, not the negotiation.
-    /// </summary>
+    /// <summary>Atomic two-character trade commit -- both sides' final inventory contents and money deltas commit in one transaction or none do. TradeSession has already computed every value; this is the durable commit, not the negotiation.</summary>
     public async ValueTask ExecuteTradeAsync(
         int characterA, IReadOnlyList<CharacterItemSlotTvp> itemsA0, IReadOnlyList<CharacterItemSlotTvp> itemsA1,
         long deltaMoneyA, int deltaBigMoneyA,
@@ -314,16 +253,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(builder.Build(), ct);
     }
 
-    /// <summary>
-    ///     Server Logic V9 Progression: atomically upserts the quest-state row (game.CharacterQuests) plus
-    ///     OPTIONAL money credit and OPTIONAL up-to-TWO-container item replace, in ONE transaction
-    ///     (usp_CharacterQuest_ApplyTransition -- see that proc's own header for why a money-cap breach is
-    ///     SILENTLY skipped here rather than thrown, unlike every other money proc in this repository, and
-    ///     for why TWO containers: a quest Complete's reward-item deposit and its quest-item deletion can
-    ///     legitimately land on different inventory pages). Each (container, items) pair is ignored unless
-    ///     its container is non-null; passing the SAME container twice is a caller error (merge the two
-    ///     edits into one dictionary/one call site first).
-    /// </summary>
+    /// <summary>Atomically upserts quest state plus optional money credit and up to two container replaces, in one transaction. Unlike every other money proc here, a money-cap breach is silently skipped, not thrown. A (container, items) pair is ignored unless container is non-null; passing the same container twice is a caller error.</summary>
     public async ValueTask ApplyQuestTransitionAsync(int characterId, int stepPermanent, int activeQuestId,
         int qSort, int targetPhase, int killCounter, long deltaMoney,
         byte? container1, IReadOnlyList<CharacterItemSlotTvp> items1,
@@ -351,10 +281,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(builder.Build(), ct);
     }
 
-    /// <summary>
-    ///     Server Logic V9 Progression: atomically writes the 4 daily-mission counters (AFTER deduction)
-    ///     plus an OPTIONAL one-container reward-item deposit (usp_Character_ApplyDailyMissionClaim).
-    /// </summary>
+    /// <summary>Atomically writes the 4 daily-mission counters (after deduction) plus an optional one-container reward deposit.</summary>
     public async ValueTask ApplyDailyMissionClaimAsync(int characterId, int joinWar, int killOtherTribe,
         int killMonster, int playTime, byte? container, IReadOnlyList<CharacterItemSlotTvp> items,
         CancellationToken ct)
@@ -373,7 +300,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(builder.Build(), ct);
     }
 
-    /// <summary>Server Logic V9 Progression: silent persistence of CZ_CHANGE_AUTO_INFO's two auto-potion thresholds.</summary>
+    /// <summary>Persists CZ_CHANGE_AUTO_INFO's two auto-potion thresholds.</summary>
     public async ValueTask SetAutoPotionThresholdAsync(int characterId, byte autoLifeRatio, byte autoManaRatio,
         CancellationToken ct)
     {
@@ -386,11 +313,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(sp, ct);
     }
 
-    /// <summary>
-    ///     Server Logic V9 Progression: persists the auto-hunt on/off flag and the raw 112-byte AUTO_HUNT
-    ///     blob verbatim (usp_Character_SetAutoHunt) -- no content validation, matching the verified legacy
-    ///     <c>CopyMemory</c>.
-    /// </summary>
+    /// <summary>Persists the auto-hunt flag and the raw 112-byte AUTO_HUNT blob verbatim, no validation -- matches the legacy CopyMemory.</summary>
     public async ValueTask SetAutoHuntAsync(int characterId, bool enabled, byte[] config, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_SetAutoHunt", 0)
@@ -402,7 +325,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(sp, ct);
     }
 
-    /// <summary>Server Logic V9 Progression: persists the active pet's growth/activity counters (usp_Character_SetPetGrowth).</summary>
+    /// <summary>Persists the active pet's growth/activity counters.</summary>
     public async ValueTask SetPetGrowthAsync(int characterId, int petGrowth, byte petActivity, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_SetPetGrowth", 0)
@@ -414,10 +337,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(sp, ct);
     }
 
-    /// <summary>
-    ///     Resolves an avatar NAME to its CharacterId regardless of online state (usp_Character_GetIdByName) -- V8's own
-    ///     need: an offline-shop "view another character's stall" lookup where the target need not be online.
-    /// </summary>
+    /// <summary>Resolves an avatar name to its CharacterId regardless of online state -- used to view another (possibly offline) character's shop stall.</summary>
     public async ValueTask<int?> GetIdByNameAsync(string name, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_GetIdByName", 1)
@@ -428,12 +348,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         return row?.CharacterId;
     }
 
-    /// <summary>
-    ///     CZ_GET_REWARD_ITEM_SEND's own read (usp_Character_GetRewardClaimState) -- null only if the
-    ///     character does not exist. <paramref name="todayDate" /> (caller's app-clock YYYYMMDD, same
-    ///     convention as <see cref="ClaimDailyRewardAsync" />) drives the proc's own lazy weekly reset of
-    ///     the reported RewardClaimDay -- see that proc's header comment.
-    /// </summary>
+    /// <summary>CZ_GET_REWARD_ITEM_SEND's read; null only if the character doesn't exist. todayDate (app-clock YYYYMMDD) drives the proc's lazy weekly reset of RewardClaimDay.</summary>
     public async ValueTask<RewardClaimStateDto?> GetRewardClaimStateAsync(int characterId, int todayDate,
         CancellationToken ct)
     {
@@ -445,10 +360,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         return await Db.FirstQueryAsync<RewardClaimStateDto>(sp, ct);
     }
 
-    /// <summary>
-    ///     Atomically advances the 7-day login-reward cursor and grants the day's item (usp_Character_ClaimDailyReward,
-    ///     D7 regime (b)). Throws SQL 50270 if already claimed today / fully claimed / unknown character.
-    /// </summary>
+    /// <summary>Atomically advances the 7-day login-reward cursor and grants the day's item. Throws SQL 50270 if already claimed today, fully claimed, or unknown character.</summary>
     public async ValueTask ClaimDailyRewardAsync(int characterId, int todayDate, byte container,
         IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct)
     {
@@ -463,11 +375,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(builder.Build(), ct);
     }
 
-    /// <summary>
-    ///     Atomic BloodCoin spend + ONE container replace (usp_Character_SpendBloodCoinAndReplaceContainer,
-    ///     CZ_BUY_BLOOD_MARK_SEND, D7 regime (b)). Returns the post-debit balance. Throws SQL 50271 on an
-    ///     insufficient balance.
-    /// </summary>
+    /// <summary>Atomic BloodCoin spend + one container replace (CZ_BUY_BLOOD_MARK_SEND). Returns the post-debit balance. Throws SQL 50271 on insufficient balance.</summary>
     public async ValueTask<int> SpendBloodCoinAndReplaceContainerAsync(int characterId, int deltaBloodCoin,
         byte container, IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct)
     {
@@ -482,11 +390,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         return await Db.ExecuteScalarAsync<int>(builder.Build(), ct);
     }
 
-    /// <summary>
-    ///     The atomic two-character LIVE personal-shop-stall purchase commit (usp_PshopPurchase_Execute,
-    ///     CZ_BUY_PSHOP_SEND, D7 regime (b)) -- see that proc's own header for why no item-slot CAS guard is
-    ///     needed here (the caller already re-validated under both participants' EconomyActionLock).
-    /// </summary>
+    /// <summary>Atomic two-character live personal-shop-stall purchase (CZ_BUY_PSHOP_SEND). No item-slot CAS guard needed -- caller already re-validated under both participants' EconomyActionLock.</summary>
     public async ValueTask ExecutePshopPurchaseAsync(int sellerCharacterId, byte sellerContainer,
         IReadOnlyList<CharacterItemSlotTvp> sellerItems, int buyerCharacterId, byte buyerContainer,
         IReadOnlyList<CharacterItemSlotTvp> buyerItems, int price, CancellationToken ct)

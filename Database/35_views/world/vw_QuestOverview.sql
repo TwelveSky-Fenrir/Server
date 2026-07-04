@@ -1,13 +1,5 @@
--- Quest-with-child-rows-aggregated shape, meant to be read from inside a retrieval procedure (security model:
--- views are never granted/called directly by app code -- see 60_permissions/001_roles.sql). Tooling/debugging
--- aid (e.g. "which quests actually pay gold", "which quests have barely any dialogue") -- GameServer's own
--- boot-time cache load uses world.usp_Quest_GetAll / world.usp_QuestReward_GetAll / world.usp_QuestSpeech_GetAll
--- directly, never this view.
--- Reward figures are SUMmed per-quest rather than picked from an arbitrary row: RewardType is not unique per
--- quest (a quest can have both a Money and an Experience reward across its up to 3 slots), so a naive join
--- would either duplicate the base quest row (one per reward slot) or arbitrarily pick one -- aggregating in a
--- derived table first (one row per QuestId) avoids both. ItemRewardCount is a COUNT, not the ItemId itself,
--- for the same reason (a quest could carry an Item reward in more than one slot).
+-- Tooling/debugging view. Reward figures are SUMmed per-quest in a derived table before joining, since
+-- RewardType is not unique per quest (up to 3 reward slots) and a naive join would duplicate quest rows.
 CREATE VIEW world.vw_QuestOverview
 AS
 SELECT q.QuestId,

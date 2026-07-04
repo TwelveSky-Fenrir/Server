@@ -5,12 +5,7 @@ using Fenrir.Network.Sessions;
 
 namespace Fenrir.Network.Transport;
 
-/// <summary>
-///     Owns the listening socket for one server (Login or Zone) and turns each accepted TCP connection into a
-///     (<see cref="ClientSession" />, <see cref="SocketConnection" />) pair. Deliberately unaware of
-///     <see cref="Dispatching.SessionLoop" /> or any session registry — wiring those together (and tearing them
-///     down together) is <c>onAccepted</c>'s job, supplied per-server by the Application layer.
-/// </summary>
+// Turns accepted TCP connections into (ClientSession, SocketConnection) pairs; wiring/teardown is onAccepted's job.
 public sealed class FenrirTcpListener : IAsyncDisposable
 {
     private const int Backlog = 512;
@@ -34,12 +29,7 @@ public sealed class FenrirTcpListener : IAsyncDisposable
         return ValueTask.CompletedTask;
     }
 
-    /// <summary>
-    ///     Accepts connections until <paramref name="cancellationToken" /> fires or the listen socket is disposed.
-    ///     Each acceptance is handed to <paramref name="onAccepted" /> as a detached task: a connection whose
-    ///     handling runs for the connection's whole lifetime (<c>RunIOAsync</c> + <c>SessionLoop.RunAsync</c>) must
-    ///     never stall accepting the next one, and any exception it throws must never bring the accept loop down.
-    /// </summary>
+    // Each acceptance runs as a detached task so a connection's whole lifetime never stalls the next accept.
     public async Task AcceptLoopAsync(
         Func<ClientSession, SocketConnection, CancellationToken, Task> onAccepted,
         CancellationToken cancellationToken)
@@ -57,9 +47,8 @@ public sealed class FenrirTcpListener : IAsyncDisposable
             }
             catch (SocketException)
             {
-                // Per Socket.AcceptAsync's own docs, a half-open port-scan (SYN -> SYN-ACK -> RST) can surface as a
-                // per-accept SocketException with no connection ever accepted; only the listen socket itself being
-                // torn down (ObjectDisposedException, above) should stop this loop.
+                // A half-open port-scan can surface as a per-accept SocketException with nothing accepted; only
+                // the listen socket being torn down (ObjectDisposedException, above) should stop this loop.
                 continue;
             }
 
@@ -74,9 +63,7 @@ public sealed class FenrirTcpListener : IAsyncDisposable
             }
             catch (Exception)
             {
-                // sessionFactory (or the SocketConnection construction above it) failing must not take the whole
-                // accept loop down with it, nor leak the socket it was about to own — same never-goes-down
-                // contract as onAccepted's, enforced the same way (swallow here, nothing else to do with it).
+                // Must not crash the accept loop or leak the socket; same never-goes-down contract as onAccepted's.
                 if (connection is not null)
                     await connection.DisposeAsync().ConfigureAwait(false);
                 else
@@ -97,8 +84,7 @@ public sealed class FenrirTcpListener : IAsyncDisposable
         }
         catch (Exception)
         {
-            // Swallowed by design (see AcceptLoopAsync's doc): onAccepted owns this connection's teardown and
-            // logging end to end, so there is nothing more actionable to do with its exception here.
+            // Swallowed by design: onAccepted owns this connection's teardown/logging end to end.
         }
     }
 }

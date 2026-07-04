@@ -1,16 +1,5 @@
--- Seeds world.ItemMallProducts from the legacy MySQL dump's `itemmallinfo` table (561 rows total).
--- Filtering decision: 402 of those 561 rows are pure administrative padding -- ItemID=0, Quantity=0,
--- Cost=0, Active=0, with no distinguishing data whatsoever (five long contiguous runs: Numbers
--- 25-140, 152-280, 320-325, 365-370, 410-420, 429-560, plus two isolated rows 10 and 13). Per the
--- "normalize, don't transliterate" rule those are dropped entirely rather than stored as 402
--- meaningless rows. Rows that DO carry an ItemID but happen to have Active=0 (e.g. Numbers 282, 284,
--- 327...) are real, configured-but-currently-disabled products and are kept as-is (IsActive=0).
--- The result is 159 rows: Numbers 1-9, 11-12, 14-24, 141-151, 281-319, 326-364, 371-409, 421-428, and
--- the one outlier row 100000 (same "one extra row past the sequential block" pattern documented on
--- world.BloodExchangeCatalog).
--- ItemID=0 never appears among the kept rows (all were filtered out above), so no ItemId -> NULL
--- translation is actually exercised in this particular seed, but the column stays NULLable per the
--- shared cross-domain FK convention for any future manual edit.
+-- Seeds world.ItemMallProducts from the legacy `itemmallinfo` table; 402 of 561 rows are all-zero
+-- padding and are dropped. Rows with a real ItemID but Active=0 are kept as-is (IsActive=0).
 IF
 NOT EXISTS (SELECT 1 FROM world.ItemMallProducts)
 BEGIN
@@ -154,8 +143,7 @@ VALUES (1, 1, 1211, 0, 20, 1),
        (396, 3, 93309, 0, 0, 0),
        (397, 3, 93312, 0, 0, 0),
        (398, 3, 93315, 0, 0, 0),
-       (399, 3, 93315, 0, 0,
-        0), -- duplicate ItemId vs. Number 398 exists as-given in the legacy dump; not a decode error, kept verbatim
+       (399, 3, 93315, 0, 0, 0), -- duplicate ItemId vs. Number 398 exists as-given in the legacy dump; not a decode error, kept verbatim
        (400, 3, 93321, 0, 0, 0),
        (401, 3, 93324, 0, 0, 0),
        (402, 3, 93327, 0, 0, 0),

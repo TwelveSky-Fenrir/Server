@@ -5,12 +5,7 @@ using Fenrir.Contracts.Tests.TestSupport;
 
 namespace Fenrir.Contracts.Tests.Packets.Zone;
 
-/// <summary>
-///     CZ_AUTO_CONFIG_SEND (116 bytes = 4 + 112). The golden encoder below is hand-built from the C++
-///     layout (Sort @0, AUTO_HUNT @4: BuffType, BuffStore[16], HuntType, AttackType[4], MonNum,
-///     ItemType, InvenCmd, DeathCmd, AnimalPreyCmd, AnimalFoodCmd), independent of the generated
-///     <c>Write</c>.
-/// </summary>
+/// <summary>CZ_AUTO_CONFIG_SEND (116 = 4 + 112): golden encoder hand-built from C++ layout, independent of generated <c>Write</c>.</summary>
 public class CzAutoConfigSendTests
 {
     [Fact]

@@ -1,8 +1,5 @@
--- Additive grant for the login-side gift claim/list flow (CL_GIFT_INFO_SEND/CL_WANT_GIFT_SEND, "chantier
--- V8"): LoginServer's ClaimGiftHandler/GiftListHandler need object-level access to these three procs,
--- same narrow "everything else in game stays off-limits" posture 001_roles.sql's own header documents for
--- the character-select flow -- gifts are read/claimed at character select, before a world entry, so this
--- runs on LoginServer, not GameServer.
+-- Gifts are read/claimed at character select (before world entry), so LoginServer needs these object-level
+-- grants, same narrow posture as 001_roles.sql's character-select slice.
 GRANT
 EXECUTE
 ON

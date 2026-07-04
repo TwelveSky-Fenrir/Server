@@ -7,11 +7,7 @@ using CaeriusNet.Commands.Writes;
 
 namespace Fenrir.Data.Progression;
 
-/// <summary>
-///     game.HeroRankings access (Server Logic chapter, V9 Progression) -- CZ_HERORANK_INFO_SEND (118, read,
-///     throttled 2.5s per period) and CZ_HEROREWARD_SEND (119, claim). Singleton, same posture as every
-///     other repository in this project.
-/// </summary>
+// CZ_HERORANK_INFO_SEND (118, read, throttled 2.5s/period) and CZ_HEROREWARD_SEND (119, claim).
 public sealed record HeroRankingRepository(ICaeriusNetDbContext Db) : IHeroRankingRepository
 {
     /// <summary>PeriodKind 0 (Current) or 1 (Previous), leaderboard-ordered (Points DESC).</summary>
@@ -25,12 +21,7 @@ public sealed record HeroRankingRepository(ICaeriusNetDbContext Db) : IHeroRanki
         return await Db.QueryAsReadOnlyCollectionAsync<HeroRankingRowDto>(sp, ct);
     }
 
-    /// <summary>
-    ///     Marks a character's CURRENT-period row as reward-claimed (usp_HeroRanking_Upsert) -- the caller
-    ///     re-supplies the row's own Points/TribeId/Level (already known from the immediately-preceding
-    ///     <see cref="GetByPeriodAsync" /> read) since the upsert proc replaces the whole row, not a
-    ///     partial patch.
-    /// </summary>
+    /// <summary>usp_HeroRanking_Upsert replaces the whole row, not a partial patch -- caller resupplies Points/TribeId/Level from the prior read.</summary>
     public async ValueTask MarkRewardClaimedAsync(int characterId, int points, byte? tribeId, int? level,
         CancellationToken ct)
     {

@@ -2,11 +2,7 @@ using CaeriusNet.Attributes.Dto;
 
 namespace Fenrir.Data.World;
 
-/// <summary>
-///     One world.Npcs row -- ordinal contract of world.usp_Npc_GetAll's single result set (131 rows).
-///     Constructor order must track the SELECT column order exactly (invariant I-04); [GenerateDto] maps by
-///     position, not by name.
-/// </summary>
+// world.usp_Npc_GetAll; ordinal-mapped, ctor order must match the SELECT.
 [GenerateDto]
 public sealed partial record NpcRowDto(
     int NpcId,
@@ -26,10 +22,7 @@ public sealed partial record NpcMenuOptionRowDto(
     short SlotIndex,
     int OptionId);
 
-/// <summary>
-///     One populated world.NpcShopItems slot -- world.usp_NpcShopItem_GetAll (ShopPage 0-2, SlotIndex 0-27).
-///     ItemId is NULL for a populated slot whose legacy item half was 0.
-/// </summary>
+/// <summary>world.usp_NpcShopItem_GetAll (ShopPage 0-2, SlotIndex 0-27); ItemId null when the slot had no item.</summary>
 [GenerateDto]
 public sealed partial record NpcShopItemRowDto(
     int NpcId,
@@ -37,11 +30,7 @@ public sealed partial record NpcShopItemRowDto(
     byte SlotIndex,
     int? ItemId);
 
-/// <summary>
-///     One populated world.NpcSkillOffers slot -- world.usp_NpcSkillOffer_GetAll. ArrayKind/Tier/Dim2/Dim3
-///     encode which of the two legacy nSkillInfo arrays (and which dimension of it) the slot came from --
-///     see world.NpcSkillOffers' table header for the mapping.
-/// </summary>
+/// <summary>world.usp_NpcSkillOffer_GetAll; ArrayKind/Tier/Dim2/Dim3 encode which legacy nSkillInfo array/dimension the slot came from.</summary>
 [GenerateDto]
 public sealed partial record NpcSkillOfferRowDto(
     int NpcSkillOfferId,

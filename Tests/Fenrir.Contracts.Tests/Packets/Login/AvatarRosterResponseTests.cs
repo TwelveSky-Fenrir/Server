@@ -14,9 +14,7 @@ public class LcUserAvatarRecv2Tests
         Assert.Equal(4578, AvatarRosterResponse.PayloadSize);
     }
 
-    // Per-field obfuscation (scopyAvtXor*, §3.2): each Write() field comes out XORed with the
-    // primitive named by [AvatarXorKind] on that property. Unlike USE_XOR_UID, none of these
-    // primitives depend on buffer content, so re-applying them recovers the plaintext.
+    // Each field is XORed per its [AvatarXorKind]; unlike USE_XOR_UID these keys aren't content-dependent, so re-applying recovers plaintext.
     [Fact]
     public void RoundTrip_PreservesAllFields_ThroughPerFieldAvatarXor()
     {

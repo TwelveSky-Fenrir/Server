@@ -2,10 +2,7 @@ using CaeriusNet.Attributes.Dto;
 
 namespace Fenrir.Data.World;
 
-/// <summary>
-///     One world.BloodExchangeCatalog row -- ordinal contract of world.usp_BloodExchangeCatalog_GetAll
-///     (3 real rows). ItemId is NULL for a slot with no item wired up.
-/// </summary>
+/// <summary>world.usp_BloodExchangeCatalog_GetAll; ItemId null for a slot with no item wired up.</summary>
 [GenerateDto]
 public sealed partial record BloodExchangeCatalogRowDto(
     int BloodExchangeSlot,
@@ -13,10 +10,7 @@ public sealed partial record BloodExchangeCatalogRowDto(
     int Cost,
     int Quantity);
 
-/// <summary>
-///     One world.EventDefinitions row -- ordinal contract of world.usp_EventDefinition_GetAll (0 rows in the
-///     legacy dump; loaded anyway so future GM tooling has a stable boot-time read path from day one).
-/// </summary>
+/// <summary>world.usp_EventDefinition_GetAll; 0 rows today but loaded so future GM tooling has a stable read path.</summary>
 [GenerateDto]
 public sealed partial record EventDefinitionRowDto(
     int EventDefinitionId,
@@ -26,11 +20,7 @@ public sealed partial record EventDefinitionRowDto(
     short? ZoneNumber,
     string? Message);
 
-/// <summary>
-///     One world.ItemMallProducts row -- ordinal contract of world.usp_ItemMallProduct_GetAll (active AND
-///     inactive; the cache keeps both so cash-shop lookups can distinguish "unknown product" from "disabled
-///     product"). ItemId is NULL for a product with no item wired up.
-/// </summary>
+/// <summary>world.usp_ItemMallProduct_GetAll; includes inactive rows so lookups can tell "unknown product" from "disabled". ItemId null when unwired.</summary>
 [GenerateDto]
 public sealed partial record ItemMallProductRowDto(
     int ItemMallProductId,
@@ -40,15 +30,12 @@ public sealed partial record ItemMallProductRowDto(
     int Cost,
     bool IsActive);
 
-/// <summary>One world.RewardBundles row -- ordinal contract of world.usp_RewardBundle_GetAll (1 row in this build).</summary>
+/// <summary>world.usp_RewardBundle_GetAll (1 row in this build).</summary>
 [GenerateDto]
 public sealed partial record RewardBundleRowDto(
     int RewardBundleId);
 
-/// <summary>
-///     One populated world.RewardBundleItems slot -- ordinal contract of world.usp_RewardBundleItem_GetAll
-///     (SlotIndex 1-7). ItemId is NULL for a populated slot with no item wired up.
-/// </summary>
+/// <summary>world.usp_RewardBundleItem_GetAll (SlotIndex 1-7); ItemId null for a slot with no item wired up.</summary>
 [GenerateDto]
 public sealed partial record RewardBundleItemRowDto(
     int RewardBundleId,

@@ -1,12 +1,6 @@
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Records;
 
-/// <summary>
-///     Faithful in-memory shape of a legacy <c>QUEST_INFO</c> record (Header/Protocol/STRUCT.h:237-274), 8444
-///     bytes total. The struct's tail is ten repetitions of a "speech block" pattern -- a <c>char[15][51]</c>
-///     block of dialogue lines immediately followed (after 3 bytes of compiler padding) by a matching
-///     <c>int[15]</c> per-line text-color array -- for, in exact declaration order: qStartSpeech, qHurrySpeech,
-///     qProcessSpeech1..5, qSuccessSpeech, qFailureSpeech, qCallSpeech.
-/// </summary>
+/// <summary>Legacy <c>QUEST_INFO</c> (STRUCT.h:237-274): tail is 10 speech blocks (lines[15][51] + 3-byte pad + colors[15]) in declaration order.</summary>
 internal sealed record QuestRecord(
     int Index,
     string Subject,

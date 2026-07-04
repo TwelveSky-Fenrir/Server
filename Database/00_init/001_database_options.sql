@@ -1,5 +1,4 @@
--- Base options for the current database (architecture reference §12.1). None of these are the
--- SQL Server 2025 defaults on a "box" instance: every one is an explicit, reviewed choice.
+-- Explicit non-default database options (none of these are SQL Server 2025 defaults).
 
 ALTER
 DATABASE CURRENT SET ACCELERATED_DATABASE_RECOVERY = ON;
@@ -10,9 +9,8 @@ DATABASE CURRENT SET READ_COMMITTED_SNAPSHOT ON;
 ALTER
 DATABASE CURRENT SET QUERY_STORE = ON (OPERATION_MODE = READ_WRITE);
 
--- Memory-optimized filegroup for the `runtime` schema (SCHEMA_ONLY tables, §12.4). Guarded: ADD
--- FILEGROUP/ADD FILE fail hard if re-run, and this script may be re-parsed (never re-applied once
--- journaled, but keep it safe to hand-run too).
+-- Memory-optimized filegroup for `runtime` (SCHEMA_ONLY tables). Guarded: ADD FILEGROUP/ADD FILE
+-- fail hard if re-run.
 IF
 NOT EXISTS (SELECT 1 FROM sys.filegroups WHERE name = N'fenrir_mod')
 BEGIN

@@ -8,18 +8,11 @@ using Fenrir.Network.Sessions;
 namespace Fenrir.Application.Game.Handlers.Commerce;
 
 /// <summary>
-///     CZ_GET_DEPUTY_PSHOP_SEND (opcode 108, contracts/04_commerce.md, verified <c>S07_MyGame09.cpp:96-193/506-555</c>)
-///     -- fetch a deputy (offline/proxy) shop's contents. Gated to zone 37 under <c>PPSHOP_V2</c> (verified,
-///     same gate every proxy-shop opcode shares).
+///     CZ_GET_DEPUTY_PSHOP_SEND (opcode 108) -- fetch a deputy (offline/proxy) shop's contents. Gated to
+///     zone 37. <c>Sort</c> 1/2 resolve the CALLER's own shop regardless of ShopState (so a closed shop's
+///     owner can still inspect/withdraw); <c>Sort</c> 3 resolves <c>AvatarName</c> and requires the
+///     target's shop to be OPEN.
 /// </summary>
-/// <remarks>
-///     The legacy's three sorts exist only because of the ts25extra IPC round trip's own caching model
-///     (Sort 1 preloads into that cache for a later open call to read) -- Fenrir talks to SQL directly, so
-///     all three are answered uniformly: <c>Sort</c> 1/2 resolve the CALLER's own shop by CharacterId
-///     regardless of ShopState (so a closed shop's owner can still inspect/withdraw); <c>Sort</c> 3
-///     resolves <c>AvatarName</c> via <see cref="CharacterRepository.GetIdByNameAsync" /> and requires the
-///     target's shop to be OPEN (ShopState=1, matching the verified source's gate for "get other").
-/// </remarks>
 public sealed class GetProxyShopHandler(IOfflineShopRepository offlineShops, ICharacterRepository characters)
     : IAsyncPacketHandler<GetProxyShopRequest>
 {

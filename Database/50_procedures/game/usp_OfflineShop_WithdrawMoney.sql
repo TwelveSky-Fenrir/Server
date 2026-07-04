@@ -1,16 +1,6 @@
 -- database/50_procedures/game/usp_OfflineShop_WithdrawMoney.sql
--- Contract: atomically withdraw accumulated offline-shop sale proceeds into the owner's own live money --
--- CZ_SET_DEPUTY_PSHOP_MONEY_SEND (contracts/04_commerce.md, verified S07_MyGame09.cpp:886-957: requires
--- the shop closed (ShopState=0), the caller's expected amounts to still match [anti-race double-check],
--- and not both zero). D7 regime (b).
--- Params: @CharacterId INT, @ExpectedMoney INT, @ExpectedBigMoney INT.
--- Result set: none.
--- Idempotent: no.
--- Errors:
---   THROW 50276 -- both expected amounts are zero (nothing to withdraw), the shop is not closed, or its
---                  earnings no longer match the expected amounts.
---   THROW 50261 -- crediting the character's own money would exceed the legacy money cap (shared with
---                  usp_Character_AdjustMoney).
+-- CAS guard: requires the shop closed and @ExpectedMoney/@ExpectedBigMoney to still match (anti-race
+-- double-check).
 CREATE PROCEDURE game.usp_OfflineShop_WithdrawMoney @CharacterId      INT,
     @ExpectedMoney    INT,
     @ExpectedBigMoney INT

@@ -1,21 +1,11 @@
 namespace Fenrir.Contracts.Packets.Shared;
 
-/// <summary>
-///     Wire-zero templates for the world-state structs embedded in ZC_BROADCAST_WORLD_INFO (<see cref="WorldInfo" />
-///     + <see cref="TribeInfo" />) and ZC_REGISTER_AVATAR_RECV (<see cref="BuffInfo" />) — both packets are sent by
-///     GameServer only. Guild wars, tribe votes, hoisundo elections, and zone-event state are entirely
-///     M1-out-of-scope (no gameplay/data migration, M1 plan), so every field starts at its wire-zero value; there
-///     is no persisted source to project from yet.
-/// </summary>
+// Wire-zero templates for world-state structs embedded in ZC_BROADCAST_WORLD_INFO/ZC_REGISTER_AVATAR_RECV;
+// no persisted source to project from yet, so every field starts zeroed.
 public static class WorldStateTemplates
 {
-    /// <summary>
-    ///     Every <see cref="WorldInfo" /> field at its wire-zero value: 0 for scalars, "" for <c>[FixedString]</c>
-    ///     (the codec zero-fills up to the declared length itself — never hand-pad), a same-length-N array of
-    ///     zeros for <c>[FixedArray]</c> int/float arrays (N must match this exact property's attribute, not a
-    ///     neighbor's), and a same-length-N array of "" for <c>[FixedArray] [FixedString]</c> string rows (never a
-    ///     bare <c>new string[N]</c>, which would leave <see langword="null" /> entries the codec cannot write).
-    /// </summary>
+    // Array lengths must match each property's own [FixedArray] attribute; string arrays must be
+    // filled with "" not left as bare `new string[N]`, or the codec hits null entries.
     public static readonly WorldInfo ZeroedWorldInfo = new()
     {
         Zone038WinTribe = 0,
@@ -78,10 +68,6 @@ public static class WorldStateTemplates
         PopUpKillMonster = new int[5]
     };
 
-    /// <summary>
-    ///     Every <see cref="TribeInfo" /> field at its wire-zero value — same conventions as
-    ///     <see cref="ZeroedWorldInfo" />.
-    /// </summary>
     public static readonly TribeInfo ZeroedTribeInfo = new()
     {
         TribeVoteName = ZeroStrings(40),
@@ -95,11 +81,8 @@ public static class WorldStateTemplates
         HoisundoName3 = ZeroStrings(20)
     };
 
-    /// <summary>Every <see cref="BuffInfo" /> field at its wire-zero value.</summary>
     public static readonly BuffInfo ZeroedBuffInfo = new() { Buff = new int[70] };
 
-    // Enumerable.Repeat(...).ToArray() would also work but allocates a LINQ iterator per call for what is really
-    // just a fixed-size fill; a plain loop keeps this on the same footing as the int[] literals above.
     private static string[] ZeroStrings(int count)
     {
         var result = new string[count];

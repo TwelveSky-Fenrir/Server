@@ -2,12 +2,7 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Records;
 
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Readers;
 
-/// <summary>
-///     Parses <c>005_00005.IMG</c> into <see cref="NpcRecord" /> instances (Header/Protocol/STRUCT.h:213-234,
-///     <c>NPC_INFO</c>, 11736 bytes/record). No known runtime per-load patches are applied to NPC data after
-///     unpacking -- unlike items, there is no equivalent of <c>MyShm::Load_Item</c>'s post-load fixups for NPCs,
-///     so <see cref="ReadAll" /> simply delegates to <see cref="ReadAllRaw" />.
-/// </summary>
+/// <summary>Parses <c>005_00005.IMG</c> (<c>NPC_INFO</c>, STRUCT.h:213-234, 11736 bytes/record); no known runtime patches, unlike <see cref="ItemReader" />.</summary>
 internal static class NpcReader
 {
     private const string FileName = "005_00005.IMG";
@@ -16,7 +11,6 @@ internal static class NpcReader
     private const int RecordCount = 500;
     private const int RecordSize = 11736;
 
-    /// <summary>Raw parse, exactly as bytes on disk -- no runtime patches applied (there are none known for NPCs).</summary>
     public static IReadOnlyList<NpcRecord> ReadAllRaw(string dataDirectory)
     {
         var recordBytes = ImgUnpacker.UnpackRecordArray(
@@ -29,7 +23,6 @@ internal static class NpcReader
         return npcs;
     }
 
-    /// <summary>No known runtime patches apply to NPC data, so this is identical to <see cref="ReadAllRaw" />.</summary>
     public static IReadOnlyList<NpcRecord> ReadAll(string dataDirectory)
     {
         return ReadAllRaw(dataDirectory);
@@ -43,8 +36,7 @@ internal static class NpcReader
         var name = reader.ReadFixedString(28);
         var speechNum = reader.ReadInt32();
 
-        // nSpeech[MAX_NPC_SPEECH_NUM1=5][MAX_NPC_SPEECH_NUM2=5][MAX_NPC_SPEECH_LENGTH=51] -- read as 25 separate
-        // fixed strings in declaration order; Speech[outer][inner] mirrors the C array indexing exactly.
+        // nSpeech[5][5][51] -> Speech[outer][inner], declaration order.
         var speech = new string[5][];
         for (var outer = 0; outer < 5; outer++)
         {
@@ -62,7 +54,7 @@ internal static class NpcReader
         var size = reader.ReadInt32Array(3);
         var menu = reader.ReadInt32Array(100);
 
-        // nShopInfo[MAX_NPC_SHOP_PAGE_NUM=3][MAX_NPC_SHOP_SLOT_NUM=28] -- ShopInfo[page][slot].
+        // nShopInfo[3][28] -> ShopInfo[page][slot].
         var shopInfo = new int[3][];
         for (var page = 0; page < 3; page++) shopInfo[page] = reader.ReadInt32Array(28);
 

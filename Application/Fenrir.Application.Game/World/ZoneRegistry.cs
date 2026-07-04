@@ -12,13 +12,8 @@ using Microsoft.Extensions.Options;
 namespace Fenrir.Application.Game.World;
 
 /// <summary>
-///     The process's fixed set of zone actors — one <see cref="Zone" /> per hosted map id (ADR-0012: a shard
-///     hosts a DISJOINT partition of maps), built once at startup (<see cref="Initialize" />) into a
-///     <see cref="FrozenDictionary{TKey,TValue}" /> and never mutated after. Everything that used to inject
-///     the single M1 <c>Zone</c> singleton injects this instead: routing (<c>EnterWorldHandler</c>) resolves
-///     <c>character.MapId</c> here, the tick host runs one task per <see cref="Zones" /> entry, and the
-///     process-wide readers (write-behind flush, heartbeat CCU) go through
-///     <see cref="TryGetPlayer" />/<see cref="TotalPlayerCount" />.
+///     The process's fixed set of zone actors -- one <see cref="Zone" /> per hosted map id, built once at
+///     startup into a <see cref="FrozenDictionary{TKey,TValue}" /> and never mutated after.
 /// </summary>
 public sealed class ZoneRegistry
 {
@@ -41,25 +36,17 @@ public sealed class ZoneRegistry
         _zoneLogger = zoneLogger;
         _worldData = worldData;
 
-        // DI registration order IS simulation order (report 05 §0's deterministic legacy sequence) -- every
-        // zone shares the exact same ordered list of systems, resolved once here rather than per-zone, since
-        // ISimulationSystem instances are stateless singletons that operate on whichever Zone they're handed.
+        // DI registration order is simulation order -- resolved once here since systems are stateless singletons.
         _systems = simulationSystems.ToImmutableArray();
 
-        // Server Logic V9 Progression: one process-wide QuestCatalog shared by every zone this registry
-        // builds -- optional (falls back to Zone's own per-zone-built default, see Zone's own remarks) so
-        // pre-existing test call sites (ZoneRegistryTests) that construct this directly keep compiling.
+        // Optional: falls back to Zone's own per-zone default so existing test call sites keep compiling.
         _questCatalog = questCatalog ?? new QuestCatalog(worldData);
     }
 
     /// <summary>Every hosted zone, in no particular order — the tick host launches one loop per entry.</summary>
     public ImmutableArray<Zone> Zones => _zones.Values;
 
-    /// <summary>
-    ///     Direct lookup for a map this process is KNOWN to host — throws for a foreign map, so routing paths
-    ///     that must degrade gracefully (world-entry for a character persisted on an unhosted map) use
-    ///     <see cref="TryGet" /> instead.
-    /// </summary>
+    /// <summary>Throws for a foreign map; use <see cref="TryGet" /> when the caller must degrade gracefully.</summary>
     public Zone this[short mapId] => _zones[mapId];
 
     /// <summary>Sum of every zone's live player count — the directory heartbeat's CCU figure for this shard.</summary>
@@ -76,9 +63,7 @@ public sealed class ZoneRegistry
 
     /// <summary>
     ///     Builds one Zone actor per hosted map id. Must run exactly once at boot, before ZoneTickHost starts
-    ///     or any handler resolves a map through this registry -- GameServer's Program.cs calls this right
-    ///     after resolving the shard's map list from admin.ShardMapAssignments, the same "explicit async
-    ///     warm-up before host.RunAsync" shape WorldDataLoader.InitializeAsync already uses for world.* data.
+    ///     or any handler resolves a map through this registry.
     /// </summary>
     public void Initialize(IReadOnlyCollection<short> maps)
     {
@@ -94,11 +79,9 @@ public sealed class ZoneRegistry
     }
 
     /// <summary>
-    ///     Cross-zone player lookup for the process-wide readers (write-behind flush). A character lives in AT
-    ///     MOST one zone (Enter/Leave/handoff all preserve that, see <see cref="ZoneTransfer" />), so first hit
-    ///     wins. False for a player mid-handoff (already left the source, not yet drained by the target) — the
-    ///     caller treats that like the logged-out case: skip now, the next flush finds them in the target zone,
-    ///     whose Enter re-marks them dirty.
+    ///     Cross-zone player lookup. A character lives in at most one zone, so first hit wins. False for a
+    ///     player mid-handoff -- the caller treats that like logged-out: the next flush finds them in the
+    ///     target zone.
     /// </summary>
     public bool TryGetPlayer(int characterId, [NotNullWhen(true)] out PlayerRuntimeState? state)
     {
@@ -111,9 +94,8 @@ public sealed class ZoneRegistry
     }
 
     /// <summary>
-    ///     Same scope as <see cref="TryGetPlayer" />, but also returns the hosting <see cref="Zone" /> -- needed by
-    ///     callers that must post a <c>ZoneCommand</c>/<c>InventoryZoneCommand</c> back onto that player's OWN zone
-    ///     (single-writer invariant) rather than mutate <see cref="PlayerRuntimeState" /> directly.
+    ///     Same as <see cref="TryGetPlayer" />, but also returns the hosting <see cref="Zone" /> so callers can
+    ///     post a command back onto that player's own zone instead of mutating state directly.
     /// </summary>
     public bool TryGetPlayerAndZone(int characterId, [NotNullWhen(true)] out PlayerRuntimeState? state,
         [NotNullWhen(true)] out Zone? zone)
@@ -131,15 +113,10 @@ public sealed class ZoneRegistry
     }
 
     /// <summary>
-    ///     Cross-zone lookup by avatar NAME (case-insensitive -- character names are unique under SQL
-    ///     Server's default case-insensitive collation, <c>UQ_Characters_Name</c>). Phase C/V6 Social:
-    ///     the whisper (CZ_SECRET_CHAT_SEND) and friend-locate (CZ_FRIEND_FIND_SEND) channels are the ONLY
-    ///     two social features verified to resolve their target process-wide (via ts25playuser, a
-    ///     cross-zone directory service) -- every OTHER social ask (duel/trade/friend/mentor/party) uses
-    ///     <c>mUTIL.SearchAvatar</c>, which only ever searches the ASKER's OWN zone process
-    ///     (<c>Server/ts25zone/S04_MyWork02.cpp:8276</c> et al.) -- so those features resolve their target
-    ///     via <see cref="Zone.Players" /> directly, never through this method. O(total connected players);
-    ///     acceptable for these two low-frequency, human-paced actions, not a per-tick hot path.
+    ///     Cross-zone lookup by avatar name (case-insensitive). Only whisper and friend-locate resolve
+    ///     process-wide like this; every other social feature (duel/trade/friend/mentor/party) searches the
+    ///     asker's own zone only, via <see cref="Zone.Players" /> directly. O(total connected players) -- fine
+    ///     for these low-frequency actions, not a per-tick hot path.
     /// </summary>
     public bool TryGetPlayerByName(string name, [NotNullWhen(true)] out PlayerRuntimeState? state)
     {
@@ -155,10 +132,7 @@ public sealed class ZoneRegistry
         return false;
     }
 
-    /// <summary>
-    ///     Same scope as <see cref="TryGetPlayerByName" />, but also returns the hosting <see cref="Zone" /> (the whisper
-    ///     reply's own <c>ZoneNumber</c> field needs the target's <c>MapId</c>).
-    /// </summary>
+    /// <summary>Same as <see cref="TryGetPlayerByName" />, but also returns the hosting <see cref="Zone" /> (needed for the reply's MapId).</summary>
     public bool TryGetPlayerAndZoneByName(string name, [NotNullWhen(true)] out PlayerRuntimeState? state,
         [NotNullWhen(true)] out Zone? zone)
     {

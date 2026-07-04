@@ -7,9 +7,8 @@ using Fenrir.Network.Sessions;
 namespace Fenrir.Application.Game.Handlers.Chat;
 
 /// <summary>
-///     CZ_GUILD_CHAT_SEND (opcode 77). Empty content ⇒ Quit(); guildless sender ⇒ silent return; muted ⇒
-///     silent drop. Fan-out to every guild member across every zone -- the item link IS transported
-///     (contrast with party chat, whose link is dead server-side).
+///     CZ_GUILD_CHAT_SEND (opcode 77). Guildless/muted senders are silently dropped, not disconnected.
+///     Unlike party chat, the item link here is genuinely relayed to every guild member.
 /// </summary>
 public sealed class GuildChatHandler(ZoneRegistry zones) : IInlinePacketHandler<GuildChatRequest>
 {
@@ -31,7 +30,7 @@ public sealed class GuildChatHandler(ZoneRegistry zones) : IInlinePacketHandler<
             return;
 
         if (sender.GuildId is not { } guildId)
-            return; // "no guild" -- silent return, not a Quit
+            return;
 
         if (sender.IsMuted)
             return;

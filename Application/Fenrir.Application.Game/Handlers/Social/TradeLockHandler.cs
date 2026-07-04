@@ -10,21 +10,14 @@ using Fenrir.Network.Sessions;
 namespace Fenrir.Application.Game.Handlers.Social;
 
 /// <summary>
-///     CZ_TRADE_MENU_SEND (opcode 51) -- the 2-notch confirm machine: first call locks (menu 0→1,
-///     ZC_TRADE_MENU_RECV CheckMe=0 to self/1 to other), second call confirms (1→2, same echo shape --
-///     an inference, since the contract only spells out the first transition's echo; open issue). Once
-///     both sides reach menu==2, performs the atomic two-character commit
-///     (<see cref="CharacterRepository.ExecuteTradeAsync" />, D7 regime (b)), then mirrors each side's new
-///     container back onto their own zone (single-writer invariant, see remarks) and ends with
-///     ZC_TRADE_END_RECV Result=0. An overflow (<see cref="TradeCommitPlanner.Plan.Overflowed" />) aborts
-///     the whole commit -- no partial state (D7 "no partial commit").
+///     CZ_TRADE_MENU_SEND (opcode 51) -- 2-notch confirm: first call locks (menu 0→1), second confirms
+///     (1→2). At menu==2 on both sides, commits atomically
+///     (<see cref="CharacterRepository.ExecuteTradeAsync" />) and mirrors each side's new container back to
+///     their own zone. An overflow aborts the whole commit -- no partial state.
 /// </summary>
 /// <remarks>
-///     Both players' <see cref="PlayerRuntimeState.EconomyActionLock" /> are acquired, in a fixed order
-///     (smaller CharacterId first, regardless of which side's request triggers the commit) to rule out a
-///     lock-ordering deadlock, around the entire plan/commit/mirror-wait sequence -- same pattern as
-///     <c>GenericActionHandler</c>/<c>EnchantItemHandler</c>/<c>CraftItemHandler</c> use for their own
-///     single-character version of this race.
+///     Both players' <see cref="PlayerRuntimeState.EconomyActionLock" /> are acquired in a fixed order
+///     (smaller CharacterId first) to rule out lock-ordering deadlock.
 /// </remarks>
 public sealed class TradeLockHandler(ZoneRegistry zones, TradeRegistry trades, ICharacterRepository characters)
     : IAsyncPacketHandler<TradeLockRequest>
@@ -54,7 +47,6 @@ public sealed class TradeLockHandler(ZoneRegistry zones, TradeRegistry trades, I
         if (trade.SideA.MenuState < 2 || trade.SideB.MenuState < 2)
             return;
 
-        // Fixed order (smaller CharacterId first) -- see class remarks on why this rules out deadlock.
         var (first, second) = playerA.CharacterId < playerB.CharacterId ? (playerA, playerB) : (playerB, playerA);
 
         await first.EconomyActionLock.WaitAsync(cancellationToken);
@@ -91,8 +83,7 @@ public sealed class TradeLockHandler(ZoneRegistry zones, TradeRegistry trades, I
 
         if (planA.Overflowed || planB.Overflowed)
         {
-            // D7 "no partial commit": abort rather than drop/partially apply an item. No wire error code
-            // exists for this case, so reset both menus to locked (1) so players can free space and retry.
+            // No wire error code for overflow: reset both menus to locked (not cleared) so players can retry.
             trade.SideA.MenuState = 1;
             trade.SideB.MenuState = 1;
             return;
@@ -115,10 +106,6 @@ public sealed class TradeLockHandler(ZoneRegistry zones, TradeRegistry trades, I
         playerB.Session.Send(result);
     }
 
-    /// <summary>
-    ///     Mirrors the already-committed SQL result into the player's own zone and waits for it to apply (single-writer
-    ///     invariant, see class summary).
-    /// </summary>
     private static async Task PostMirrorAndWaitAsync(Zone zone, int characterId, TradeCommitPlanner.Plan plan,
         CancellationToken cancellationToken)
     {

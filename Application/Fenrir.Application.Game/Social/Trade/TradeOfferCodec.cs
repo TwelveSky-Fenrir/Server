@@ -2,16 +2,10 @@ using Fenrir.Contracts.Packets.Zone;
 
 namespace Fenrir.Application.Game.Social.Trade;
 
-/// <summary>
-///     Projects a <see cref="TradeOfferSide" /> onto ZC_TRADE_START_RECV/ZC_TRADE_STATE_RECV's flattened
-///     wire arrays (contracts/05_social.md: <c>Trade[8][4]</c>, <c>TradeSocket[8][3]</c>).
-/// </summary>
+/// <summary>Projects a TradeOfferSide onto ZC_TRADE_START_RECV/ZC_TRADE_STATE_RECV's flattened wire arrays.</summary>
 /// <remarks>
-///     OPEN ISSUE: contracts/05_social.md does not break down each slot's 4 ints field-by-field (unlike
-///     AvatarInfo.Equip), and this pass did not re-derive the layout from the raw C++ TRADE struct.
-///     Modeled here as [0]=ItemId, [1]=Quantity, [2]=packed upgrade bytes (same packing as
-///     <c>AvatarInfoFactory.PackUpgradeBytes</c>), [3]=ExpireDate -- a documented inference by analogy,
-///     not a verified layout.
+///     Slot layout ([0]=ItemId, [1]=Quantity, [2]=packed upgrade bytes, [3]=ExpireDate) is a documented
+///     inference by analogy with AvatarInfoFactory.PackUpgradeBytes, not an independently verified layout.
 /// </remarks>
 public static class TradeOfferCodec
 {

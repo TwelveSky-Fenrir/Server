@@ -2,17 +2,10 @@ using Fenrir.Contracts.Wire;
 
 namespace Fenrir.Contracts.Abstractions;
 
-/// <summary>
-///     Server → client packet. <c>destination</c> starts after the <c>DEFALUT_PACKET</c> header (the 1-byte opcode is
-///     written by the send layer via <see cref="IFenrirPacket.Opcode" />).
-/// </summary>
+/// <summary><c>destination</c> starts after the header; the opcode byte is written by the send layer.</summary>
 public interface IOutgoingPacket : IFenrirPacket
 {
-    /// <summary>
-    ///     Whole-frame obfuscation the send layer must apply after writing header+payload (§3.1). Field-level obfuscation
-    ///     (<see cref="WireObfuscationMode.XorFieldAvatar" />) is already baked into <see cref="Write" /> itself and needs no
-    ///     extra step here.
-    /// </summary>
+    /// <summary>Whole-frame obfuscation applied after writing header+payload; field-level XOR is already baked into <see cref="Write" />.</summary>
     public static abstract WireObfuscationMode Obfuscation { get; }
 
     public int Write(Span<byte> destination);

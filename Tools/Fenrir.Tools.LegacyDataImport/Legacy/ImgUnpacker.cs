@@ -4,12 +4,10 @@ using System.IO.Compression;
 namespace Fenrir.Tools.LegacyDataImport.Legacy;
 
 /// <summary>
-///     Decodes the legacy <c>ts25sharemem</c> "005_0000N.IMG" container format (reverse-engineered from
-///     <c>Header/Scope/ZlibScope.h</c>'s <c>Unpack005Copy</c>/<c>GetZData</c>): a 4-byte decompressed size,
-///     a 4-byte compressed size, then a zlib (RFC 1950) stream. The first 4 bytes of the inflated payload are
-///     a record count XOR'd with a per-dataset key (used here as an integrity check, matching the legacy
-///     loader's own validation); the actual record array starts at <paramref name="recordArrayOffset" /> and
-///     is never itself obfuscated.
+///     Decodes the legacy <c>ts25sharemem</c> "005_0000N.IMG" container (reverse-engineered from
+///     ZlibScope.h's Unpack005Copy/GetZData): 4-byte size + 4-byte compressed size + zlib stream. The
+///     inflated payload's first 4 bytes are a record count XOR'd with a per-dataset key (integrity check);
+///     the record array at <paramref name="recordArrayOffset" /> is never itself obfuscated.
 /// </summary>
 internal static class ImgUnpacker
 {

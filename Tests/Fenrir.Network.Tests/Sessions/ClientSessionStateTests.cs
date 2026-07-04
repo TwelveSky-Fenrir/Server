@@ -3,15 +3,11 @@ using Fenrir.Network.Sessions;
 
 namespace Fenrir.Network.Tests.Sessions;
 
-/// <summary>
-///     <c>IsOpcodeAllowed</c> must reflect the generated <c>SessionStateGate</c> table exactly (built from each
-///     packet's <c>[FenrirPacket(AllowedStates = [...])]</c>) — this is the sole gate the session loop relies on to
-///     reject out-of-sequence packets before dispatch.
-/// </summary>
+// IsOpcodeAllowed must reflect the generated SessionStateGate table exactly -- the sole gate the session
+// loop relies on to reject out-of-sequence packets before dispatch.
 public class ClientSessionStateTests
 {
-    // LoginRequest: AllowedStates = [Connected, VersionOk] — legal at the start of the login flow, no longer legal
-    // once the account is authenticated further down the flow.
+    // LoginRequest: AllowedStates = [Connected, VersionOk].
     [Fact]
     public void Login_LoginSend_AllowedWhileConnected_ForbiddenAfterCharSelect()
     {
@@ -24,7 +20,7 @@ public class ClientSessionStateTests
         Assert.False(session.IsOpcodeAllowed(Opcodes.Login.Incoming.Login));
     }
 
-    // CreateAvatarRequest: AllowedStates = [Authenticated, CharSelect] — illegal before credentials are verified.
+    // CreateAvatarRequest: AllowedStates = [Authenticated, CharSelect].
     [Fact]
     public void Login_CreateAvatarSend2_ForbiddenWhileConnected_AllowedAfterAuthenticated()
     {
@@ -37,7 +33,7 @@ public class ClientSessionStateTests
         Assert.True(session.IsOpcodeAllowed(Opcodes.Login.Incoming.CreateAvatar));
     }
 
-    // ZoneHandshakeRequest: AllowedStates = [Connected] only — the ticket hand-off packet is one-shot.
+    // ZoneHandshakeRequest: AllowedStates = [Connected] only.
     [Fact]
     public void Zone_TempRegisterSend_AllowedOnlyWhileConnected()
     {

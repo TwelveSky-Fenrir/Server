@@ -6,10 +6,8 @@ using Fenrir.Network.Sessions;
 namespace Fenrir.Application.Game.Handlers.Commerce;
 
 /// <summary>
-///     CZ_GET_CASH_SIZE_SEND (opcode 41, contracts/04_commerce.md) -- reads the account's real-money cash
-///     balance (game.AccountCash). <c>Sort</c> is a pure client-side UI routing echo, never inspected
-///     server-side (verified). No SQL failure path is modeled: a never-credited account already reads as
-///     balance 0, the same "IPC failure -&gt; balance 0" answer the legacy's own round trip gave.
+///     CZ_GET_CASH_SIZE_SEND (opcode 41) -- reads the account's cash balance. <c>Sort</c> is a pure
+///     client-side UI routing echo, never inspected server-side.
 /// </summary>
 public sealed class GetCashBalanceHandler(ICashRepository cash) : IAsyncPacketHandler<GetCashBalanceRequest>
 {

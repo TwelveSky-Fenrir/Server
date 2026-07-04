@@ -3,10 +3,7 @@ using Fenrir.Contracts.Wire;
 
 namespace Fenrir.Application.Game.Handlers;
 
-/// <summary>
-///     Decodes the USE_XOR_UID-obfuscated tID the legacy client relays (wire contract §3.3/§8.1:
-///     "MG"+decimal(AccountId), XORed).
-/// </summary>
+/// <summary>Decodes the USE_XOR_UID-obfuscated tID the legacy client relays ("MG"+decimal(AccountId), XORed).</summary>
 internal static class ObfuscatedUidCodec
 {
     public static bool TryDecodeAccountId(string obfuscatedId, out int accountId)

@@ -22,21 +22,9 @@ using Microsoft.Extensions.Logging;
 namespace Fenrir.Application.Game.Handlers;
 
 /// <summary>
-///     op12, world-entry handler (wire contract §5.3/§5.4/§5.9) -- the single most sensitive handler in the zone
-///     flow. ZC_REGISTER_AVATAR_RECV carries no Result field, so an anti-tamper failure here has no "clean" wire
-///     response; the legacy posture ("any violation closes the socket") is reproduced via
-///     <see cref="ClientSession.Abort" />. On success this sends both compressed world-entry packets, the
-///     non-compressed self-spawn (§5.9 step 3), then hands the player off to <see cref="Zone" /> for tick-driven
-///     visibility with everyone else already present.
+///     op12, world-entry handler. ZC_REGISTER_AVATAR_RECV carries no Result field, so any anti-tamper failure
+///     here closes the socket rather than replying with a clean failure.
 /// </summary>
-/// <remarks>
-///     V2 Inventory &amp; Equipment: migrated from the M1-prefix <c>GetForWorldEntryAsync</c> to the A3-extended
-///     <see cref="CharacterRepository.GetWorldEntryBundleAsync" /> so the item result set (RS1) is available to
-///     seed <see cref="PlayerRuntimeState.Inventory" /> and to compute the world-entry
-///     <see cref="EffectiveStats" /> snapshot (<see cref="EquipmentService.RecomputeStats" />) BEFORE the
-///     player is even handed to <see cref="Zone" /> -- see <see cref="PlayerEnterData" />'s own remarks on why
-///     this is computed here rather than inside <c>Zone.HandleEnter</c>.
-/// </remarks>
 public sealed class EnterWorldHandler(
     ICharacterRepository characters,
     WorldDataCache worldData,
@@ -56,8 +44,7 @@ public sealed class EnterWorldHandler(
         var accountId = zoneSession.AccountId!.Value;
         var characterId = zoneSession.CharacterId!.Value;
 
-        // Anti-tamper #1 (§5.3): re-verify atoi(tID+2)==uUserIdx -- tID must still name the account this socket
-        // was ticketed for (CZ_TEMP_REGISTER_SEND already checked this once, at op11).
+        // tID must still name the account this socket was ticketed for.
         if (!ObfuscatedUidCodec.TryDecodeAccountId(packet.Id, out var decodedAccountId) ||
             decodedAccountId != accountId)
         {
@@ -65,8 +52,7 @@ public sealed class EnterWorldHandler(
             return;
         }
 
-        // Anti-tamper #2 (§5.3): the legacy handler requires tAction.aType==0 and aSort in {0,1} at world-entry
-        // time -- a client cannot enter the world already mid-action (move/skill/etc). Same posture: Quit().
+        // A client cannot enter the world already mid-action (move/skill/etc).
         if (packet.Action.Type != 0 || packet.Action.Sort is not (0 or 1))
         {
             zoneSession.Abort(DisconnectReason.Faulted);
@@ -82,18 +68,14 @@ public sealed class EnterWorldHandler(
 
         var character = bundle.Character;
 
-        // Anti-tamper #3 (ADR-0005, Fenrir-specific -- not in the legacy sequence above): resolve against the
-        // ticket-committed CharacterId, only re-checking that AvatarName still names that same character --
-        // never trust AvatarName to pick the character itself.
+        // Resolve against the ticket-committed CharacterId; AvatarName only re-confirms it, never picks it.
         if (packet.AvatarName != character.Name)
         {
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }
 
-        // Routing (ADR-0012): the character's persisted map must be one this shard hosts. Reaching this branch
-        // means the LoginServer's shard pick and reality disagree (mis-routed ticket, stale directory) -- same
-        // clean-abort posture as an invalid ticket, and crucially BEFORE any world-entry packet is sent.
+        // The character's persisted map must be one this shard hosts (ADR-0012).
         if (!zones.TryGet(character.MapId, out var zone))
         {
             logger.LogWarning(
@@ -103,17 +85,11 @@ public sealed class EnterWorldHandler(
             return;
         }
 
-        // World-entry stats (V2 Inventory & Equipment): the Equipment container (RS1, Container==2) projected
-        // onto StatCalculator's input shape, computed HERE (this handler already has WorldDataCache) rather
-        // than inside Zone.HandleEnter, which deliberately stays a plain data copy -- see PlayerEnterData's
-        // remarks and Zone.HandleEnter's own comment.
         var equipmentContainer = BuildEquipmentContainer(bundle.Items);
         var attributes = new CharacterBaseAttributes(character.StatVit, character.StatStr, character.StatInt,
             character.StatDex, character.Level, character.Tribe, character.Title, character.Halo,
             character.RebirthCount);
 
-        // Server Logic V9 Progression: the equipped pet's stat contribution, resolved from the SAME item
-        // bundle BuildEquipmentContainer already scanned -- see PetGrowthCalculator's own remarks.
         var petItemId = PetSlots.ResolveEquippedPetItemId(bundle.Items);
         var petContribution = PetGrowthCalculator.Compute(petItemId, character.PetGrowth, character.PetActivity,
             worldData.ItemsById);
@@ -121,11 +97,7 @@ public sealed class EnterWorldHandler(
         var stats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData,
             pet: petContribution);
 
-        // Phase C/V6 Social: mute/guild/tribe-role/friends/mentor are all loaded ONCE here, alongside the
-        // rest of the world-entry snapshot -- never re-queried per chat message afterwards (report 06
-        // §1.7's "hidden flag" posture, now extended to every other social facet this batch caches on
-        // PlayerRuntimeState). Five independent reads, fired concurrently rather than five sequential
-        // round trips on the login-critical path.
+        // Loaded once here and cached on PlayerRuntimeState -- never re-queried per chat message afterwards.
         var isMutedTask = mutes.IsActiveForCharacterAsync(characterId, cancellationToken);
         var guildTask = guilds.GetByCharacterAsync(characterId, cancellationToken);
         var tribeRoleTask = tribes.GetRoleForCharacterAsync(characterId, cancellationToken);
@@ -165,8 +137,7 @@ public sealed class EnterWorldHandler(
         };
         zoneSession.SendRaw(ZoneMessageFactory.Encode(in broadcastWorldInfo));
 
-        // Self-spawn (§5.9 step 3): the player's own view of themselves, non-compressed, sent directly -- Zone
-        // doesn't know this player exists yet (ZoneCommand.Enter below is only posted, not yet ticked).
+        // Self-spawn: Zone doesn't know this player exists yet (ZoneCommand.Enter below is only posted, not ticked).
         zoneSession.Send(new AvatarActionResponse
         {
             ServerIndex = characterId,
@@ -189,8 +160,6 @@ public sealed class EnterWorldHandler(
                 FaceType = character.FaceType,
                 Level1 = character.Level,
                 Level2 = 0,
-                // Reflects the real Equipment container instead of a hardcoded blank -- see
-                // EquipmentViewCodec's own remarks (shared with Zone.BuildAvatarActionRecv's broadcast path).
                 EquipForView = EquipmentViewCodec.BuildEquipForView(bundle.Items),
                 AnimalNumber = 0,
                 Title = character.Title,
@@ -307,12 +276,8 @@ public sealed class EnterWorldHandler(
             ContributionPoints: character.ContributionPoints,
             TeacherPoint: character.TeacherPoint)));
 
-        // Unlike a dropped Move (superseded by the client's next one, Zone.Post's documented rationale), a
-        // dropped Enter is NOT replayed by anything -- the character would never be added to _players, staying
-        // permanently invisible to AOI/broadcast/write-behind persistence while the two packets already sent
-        // above lead the client to believe registration succeeded. Bounded inbox (8192) is only expected to
-        // fill under a real overload, so treat it like any other fatal condition for this handshake: log it
-        // (it should page someone) and close the socket rather than leave a silent phantom player.
+        // A dropped Enter is never replayed -- the character would stay permanently invisible despite the two
+        // packets above already telling the client registration succeeded, so treat it as fatal.
         if (!entered)
         {
             logger.LogError("Zone {MapId} inbox full: dropped Enter for character {CharacterId} -- aborting session",
@@ -321,18 +286,10 @@ public sealed class EnterWorldHandler(
             return;
         }
 
-        // The session carries its zone from here on (movement handlers post to it; handoffs re-point it) --
-        // set before the state transition so no InWorld packet can ever observe a null CurrentZone.
         zoneSession.CurrentZone = zone;
-
-        // Not InWorld yet -- ZoneReadyHandler (op13) makes that transition once the client acks.
         zoneSession.MarkRegistering();
     }
 
-    /// <summary>
-    ///     Projects RS1's Equipment rows (Container==2) onto the dictionary shape <see cref="EquipmentService" />
-    ///     expects.
-    /// </summary>
     private static ImmutableDictionary<byte, ItemStack> BuildEquipmentContainer(
         IReadOnlyList<CharacterItemSlotDto> items)
     {

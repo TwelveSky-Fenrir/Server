@@ -7,19 +7,12 @@ namespace Fenrir.Tools.LegacyDataImport.Legacy.Seeding;
 /// <summary>Row count produced by <see cref="GemSocketSeedGenerator.Generate" />.</summary>
 public sealed record GemSocketSeedStats(int RowCount);
 
-/// <summary>
-///     Generates the idempotent world.GemSockets seed script from the real 005_00010.IMG data. Not runtime
-///     code -- invoked once (by a throwaway scratch console project) to produce the checked-in
-///     Database/70_seed/world_gem_sockets.sql file.
-/// </summary>
+/// <summary>Generates the idempotent world.GemSockets seed script from 005_00010.IMG.</summary>
 public static class GemSocketSeedGenerator
 {
     private const int MaxRowsPerInsert = 500;
 
-    /// <summary>
-    ///     Writes 060_gem_sockets.sql into <paramref name="outputDir" /> (matching the convention already
-    ///     established by the other world.* domains' seed files under Database/70_seed/world/).
-    /// </summary>
+    /// <summary>Writes 060_gem_sockets.sql into <paramref name="outputDir" />.</summary>
     public static GemSocketSeedStats Generate(string dataDir, string outputDir)
     {
         Directory.CreateDirectory(outputDir);

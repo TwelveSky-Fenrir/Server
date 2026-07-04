@@ -7,8 +7,8 @@ using Fenrir.Network.Sessions;
 namespace Fenrir.Application.Game.Handlers.Social;
 
 /// <summary>
-///     CZ_PARTY_BREAK_SEND (opcode 71) -- leader-only, unconditional full disband. USE_PARTY_V3 is off in this build,
-///     so <c>Sort</c> is always 1 and <c>AvatarName</c> is always blank (verified, contracts/05_social.md).
+///     CZ_PARTY_BREAK_SEND (opcode 71) -- leader-only, unconditional full disband. USE_PARTY_V3 is off in
+///     this build, so <c>Sort</c> is always 1 and <c>AvatarName</c> always blank.
 /// </summary>
 public sealed class PartyDisbandHandler(ZoneRegistry zones, PartyRegistry parties)
     : IInlinePacketHandler<PartyDisbandRequest>

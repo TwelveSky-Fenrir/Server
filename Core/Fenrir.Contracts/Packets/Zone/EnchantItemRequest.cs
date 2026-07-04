@@ -4,13 +4,7 @@ using Fenrir.Contracts.Wire;
 
 namespace Fenrir.Contracts.Packets.Zone;
 
-/// <summary>
-///     CZ_IMPROVE_ITEM_SEND (CLIENT.h:257-264) — typedef SHARED with <see cref="CombineItemRequest" /> (25),
-///     <see cref="UpgradeItemRankRequest" /> (27), <see cref="DowngradeItemRankRequest" /> (28): identical layout,
-///     distinct
-///     C# contracts. (Page1,Index1) = target, (Page2,Index2) = material, <see cref="Luck" /> = lucky-item
-///     flag. Response: ZC 27.
-/// </summary>
+// Page1/Index1 = target slot, Page2/Index2 = material slot, Luck = lucky-item flag.
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.EnchantItem, ExpectedSize = 29,
     AllowedStates = [(byte)ZoneSessionState.InWorld])]
 public readonly partial record struct EnchantItemRequest : IIncomingPacket<EnchantItemRequest>

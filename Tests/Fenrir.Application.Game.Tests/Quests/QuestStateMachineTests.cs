@@ -32,12 +32,10 @@ public class QuestStateMachineTests
         return false;
     }
 
-    // ---- ComputePresentState: idle / acceptability ----
-
     [Fact]
     public void PresentState_Idle_NoNextQuest_IsInvalid()
     {
-        var catalog = Catalog(); // no quests at all
+        var catalog = Catalog();
         var state = QuestStateMachine.ComputePresentState(QuestProgress.None, Tribe, 100, catalog, NoItems);
 
         Assert.Equal(QuestStateMachine.StateInvalid, state);
@@ -64,8 +62,6 @@ public class QuestStateMachineTests
 
         Assert.Equal(QuestStateMachine.StateCanAccept, state);
     }
-
-    // ---- qSort 1: kill monsters ----
 
     [Fact]
     public void PresentState_KillQuest_BelowThreshold_IsInProgress()
@@ -111,8 +107,6 @@ public class QuestStateMachineTests
             QuestStateMachine.ComputePresentState(progress, Tribe, 10, catalog, NoItems));
     }
 
-    // ---- qSort 2/3/4: item-based (presence scan, not a counter) ----
-
     [Theory]
     [InlineData(2)]
     [InlineData(3)]
@@ -147,8 +141,6 @@ public class QuestStateMachineTests
             QuestStateMachine.ComputePresentState(progress, Tribe, 10, catalog, id => id == 7000));
     }
 
-    // ---- qSort 5: kill the captain (boolean-ish counter) ----
-
     [Fact]
     public void PresentState_CaptainQuest_ZeroKills_IsInProgress_OneKill_IsConditionMet()
     {
@@ -163,8 +155,6 @@ public class QuestStateMachineTests
         Assert.Equal(QuestStateMachine.StateConditionMet,
             QuestStateMachine.ComputePresentState(done, Tribe, 10, catalog, NoItems));
     }
-
-    // ---- qSort 6: exchange, 2 phases ----
 
     [Fact]
     public void PresentState_ExchangeQuest_Phase1_ItemPresent_IsConditionMet()
@@ -195,8 +185,7 @@ public class QuestStateMachineTests
         Assert.True(QuestStateMachine.ComputeEndConditionMet(progress, Tribe, 10, catalog, id => id == 200));
     }
 
-    // ---- qSort 7: "meet NPC" -- the verified quirk: end condition is PresentState==2, not 3 ----
-
+    // qSort 7 "meet NPC" quirk: end condition is PresentState==2, not 3
     [Fact]
     public void PresentState_MeetNpcQuest_MatchingId_IsInProgress_AndImmediatelyCompletable()
     {
@@ -208,8 +197,6 @@ public class QuestStateMachineTests
             QuestStateMachine.ComputePresentState(progress, Tribe, 10, catalog, NoItems));
         Assert.True(QuestStateMachine.ComputeEndConditionMet(progress, Tribe, 10, catalog, NoItems));
     }
-
-    // ---- Accept ----
 
     [Fact]
     public void Accept_KillQuest_AdvancesStepPermanent_AndSeedsTargetFromSolution1()
@@ -258,21 +245,19 @@ public class QuestStateMachineTests
         var result = QuestStateMachine.Accept(QuestProgress.None, Tribe, 10, catalog, NoItems);
 
         Assert.True(result.Success);
-        Assert.Equal(100, result.DepositItemId); // qSort 6 also deposits Solution1
-        Assert.Equal(1, result.NewProgress.TargetPhase); // phase 1
-        Assert.Equal(100, result.NewProgress.KillCounter); // Solution1 echo
+        Assert.Equal(100, result.DepositItemId);
+        Assert.Equal(1, result.NewProgress.TargetPhase);
+        Assert.Equal(100, result.NewProgress.KillCounter);
     }
 
     [Fact]
     public void Accept_NotInCanAcceptState_Fails()
     {
-        var catalog = Catalog(); // nothing to accept
+        var catalog = Catalog();
         var result = QuestStateMachine.Accept(QuestProgress.None, Tribe, 10, catalog, NoItems);
 
         Assert.False(result.Success);
     }
-
-    // ---- Complete ----
 
     [Fact]
     public void Complete_KillQuest_ResetsProgress_ButKeepsStepPermanent_AndSumsRewardsByType()
@@ -288,7 +273,7 @@ public class QuestStateMachineTests
             new QuestRewardRowDto(1, 2, 4, null, 200) // XP
         };
         var catalog = CatalogWithRewards(quest, rewards);
-        var progress = new QuestProgress(3, 1, 1, 5001, 1); // condition already met
+        var progress = new QuestProgress(3, 1, 1, 5001, 1);
 
         var result = QuestStateMachine.Complete(progress, Tribe, 10, catalog, NoItems, _ => null);
 
@@ -303,9 +288,7 @@ public class QuestStateMachineTests
     [Fact]
     public void Complete_RewardType5_GrantsTeacherPoint()
     {
-        // Regression test (review finding, Phase C/V9): reward type 5 (aTeacherPoint,
-        // GL_614_QUEST_TEACHER_POINT, S04_MyWork02.cpp:7420-7423) was previously unhandled by this switch --
-        // silently dropped despite real world.QuestRewards seed rows using it.
+        // reward type 5 = aTeacherPoint (GL_614_QUEST_TEACHER_POINT, S04_MyWork02.cpp)
         var quest = WorldDataTestRows.Quest(1) with
         {
             Category = Category, Step = 3, Sort = 1, Solution1 = 5001, Solution2 = 1
@@ -371,14 +354,12 @@ public class QuestStateMachineTests
             Category = Category, Step = 3, Sort = 1, Solution1 = 5001, Solution2 = 5
         };
         var catalog = Catalog(quest);
-        var progress = new QuestProgress(3, 1, 1, 5001, 1); // 1 of 5 kills -- not done
+        var progress = new QuestProgress(3, 1, 1, 5001, 1);
 
         var result = QuestStateMachine.Complete(progress, Tribe, 10, catalog, NoItems, _ => null);
 
         Assert.False(result.Success);
     }
-
-    // ---- Receive (tSort 3) -- never mutates quest state ----
 
     [Fact]
     public void TryReceive_ItemDeliveryQuest_InProgress_ReturnsDepositItem_WithoutChangingProgress()
@@ -408,8 +389,6 @@ public class QuestStateMachineTests
         Assert.False(ok);
     }
 
-    // ---- Exchange (tSort 4) ----
-
     [Fact]
     public void TryExchange_ConditionMet_SwapsItemId_AndAdvancesToPhase2()
     {
@@ -418,7 +397,7 @@ public class QuestStateMachineTests
             Category = Category, Step = 5, Sort = 6, Solution1 = 100, Solution2 = 200
         };
         var catalog = Catalog(quest);
-        var progress = new QuestProgress(5, 1, 6, 1, 100); // phase 1, condition met (item present)
+        var progress = new QuestProgress(5, 1, 6, 1, 100);
 
         var result = QuestStateMachine.TryExchange(progress, Tribe, 10, catalog, id => id == 100);
 
@@ -439,12 +418,10 @@ public class QuestStateMachineTests
         var catalog = Catalog(quest);
         var progress = new QuestProgress(5, 1, 6, 1, 100);
 
-        var result = QuestStateMachine.TryExchange(progress, Tribe, 10, catalog, NoItems); // item absent
+        var result = QuestStateMachine.TryExchange(progress, Tribe, 10, catalog, NoItems);
 
         Assert.False(result.Success);
     }
-
-    // ---- Abandon (tSort 5) ----
 
     [Fact]
     public void TryAbandon_AbandonableQuest_NotYetComplete_Succeeds_AndResetsButKeepsStep()
@@ -485,7 +462,7 @@ public class QuestStateMachineTests
             Category = Category, Step = 3, Sort = 1, Type = 2, Solution1 = 5001, Solution2 = 1
         };
         var catalog = Catalog(quest);
-        var progress = new QuestProgress(3, 1, 1, 5001, 1); // condition already met
+        var progress = new QuestProgress(3, 1, 1, 5001, 1);
 
         var ok = QuestStateMachine.TryAbandon(progress, Tribe, 10, catalog, NoItems, out _);
 

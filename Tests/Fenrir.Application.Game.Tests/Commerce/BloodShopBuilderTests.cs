@@ -5,19 +5,12 @@ using Fenrir.Data.World;
 
 namespace Fenrir.Application.Game.Tests.Commerce;
 
-/// <summary>
-///     Pure port of <c>MyDB::GetBloodShop</c> (S08_MyDB.cpp:269-299) -- pins the two corrections to the
-///     contract doc's own (verified wrong) paraphrase: BloodNum is unconditionally 50, and real rows land
-///     at sequential array positions starting at 0 regardless of their own BloodExchangeSlot number.
-/// </summary>
+/// <summary>Pure port of <c>MyDB::GetBloodShop</c> (S08_MyDB.cpp): BloodNum is unconditionally 50, and rows land at sequential positions starting at 0 regardless of their own BloodExchangeSlot number.</summary>
 public class BloodShopBuilderTests
 {
     private static ItemDefinition Item(int itemId, byte sort)
     {
-        // Positional ItemRowDto(ItemId,Name,Desc1,Desc2,Desc3, Type,Sort,DataNumber2D,DataNumber3D,
-        // AddDataNumber3D, Level,MartialLevel,EquipInfo1,EquipInfo2, BuyCost,SellCost,BuyCost2,LevelLimit,
-        // MartialLevelLimit, ...) -- Sort is param index 6 (0-based), NOT wherever a copy-pasted helper's
-        // own "vitality" slot happened to sit (a review-caught bug in an earlier draft of this exact file).
+        // Sort is ItemRowDto's param index 6 (0-based)
         var row = new ItemRowDto(
             itemId, $"Item{itemId}", null, null, null,
             0, sort, 0, 0, 0,

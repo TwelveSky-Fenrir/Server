@@ -3,10 +3,7 @@ using Fenrir.Contracts.Attributes;
 
 namespace Fenrir.Contracts.Packets.Shared;
 
-/// <summary>
-///     PROXY_SHOP_ITEM (STRUCT.h:1742-1749, 20 bytes, five ints, no padding) — one sale slot of an
-///     offline/deputy personal shop, nested 25× inside <see cref="ProxyShopUserInfo" />.
-/// </summary>
+// One sale slot of an offline/deputy personal shop; nested 25x inside ProxyShopUserInfo.
 [FenrirWireType(20)]
 public readonly partial record struct ProxyShopItem : IFenrirWireType<ProxyShopItem>
 {

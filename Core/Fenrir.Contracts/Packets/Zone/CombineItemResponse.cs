@@ -4,10 +4,7 @@ using Fenrir.Contracts.Wire;
 
 namespace Fenrir.Contracts.Packets.Zone;
 
-/// <summary>
-///     ZC_ADD_ITEM_RECV (ZONE.h:520-524) — reply to CZ_ADD_ITEM_SEND (25); unicast. The ONLY forge
-///     response without a trailing <c>tValue[6]</c> (9 bytes total) — do not confuse with ZC 29/30/31 (33 bytes).
-/// </summary>
+// The only forge response without a trailing Value[6] (9 bytes, not 33 like the other forge ZCs).
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.CombineItem, ExpectedSize = 9)]
 public readonly partial record struct CombineItemResponse : IOutgoingPacket
 {

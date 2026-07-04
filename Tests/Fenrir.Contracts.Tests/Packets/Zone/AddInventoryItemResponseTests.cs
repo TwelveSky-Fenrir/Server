@@ -3,10 +3,7 @@ using Fenrir.Contracts.Packets.Zone;
 
 namespace Fenrir.Contracts.Tests.Packets.Zone;
 
-/// <summary>
-///     ZC_ADD_USER_INVENTORY_ITEM_RECV (ZONE.h:1326-1338, 48-byte payload): Result/ItemIndex/Page/Index/
-///     Xy/Quantity/Value/Serial/Socket[3]/Expire.
-/// </summary>
+/// <summary>ZC_ADD_USER_INVENTORY_ITEM_RECV (ZONE.h:1326-1338, 48-byte payload).</summary>
 public class ZcAddUserInventoryItemRecvTests
 {
     [Fact]

@@ -5,16 +5,9 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Records;
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Seeding;
 
 /// <summary>
-///     Generates <c>70_seed/world/060_levels.sql</c> from the real <c>005_00001.IMG</c> data
-///     (<see cref="LevelReader.ReadAll" />). One row per <see cref="LevelRecord" />, all 145, no filtering --
-///     verified the Index set is exactly {1..145} with no gaps/duplicates, so every row is real.
-///     <c>RangeInfo[0]</c>/<c>[1]</c> are a contiguous EXP-threshold band per level (verified: every level's
-///     RangeInfo[0] equals the previous level's RangeInfo[1] + 1, with zero exceptions across all 145 rows),
-///     named ExpRangeMin/ExpRangeMax accordingly. <c>RangeInfo[2]</c> is NOT part of that band (it ranges
-///     0-50 while the other two run into the billions) -- it climbs roughly every 5-19 levels up to 50 at
-///     level 113, then drops to 0 for the remaining 114-145, an unrelated third value the legacy struct just
-///     bundled into the same array. Its exact game-mechanic meaning isn't independently confirmed, so it
-///     keeps a neutral, positional column name (RangeInfo3) rather than a guessed one.
+///     Generates <c>70_seed/world/060_levels.sql</c> from <see cref="LevelReader.ReadAll" /> (005_00001.IMG),
+///     one row per level (all 145, verified no gaps/duplicates). RangeInfo[0..1] is a verified contiguous
+///     EXP-threshold band; RangeInfo[2] is an unrelated 0-50 value with unconfirmed meaning, kept as RangeInfo3.
 /// </summary>
 public static class LevelSeedGenerator
 {

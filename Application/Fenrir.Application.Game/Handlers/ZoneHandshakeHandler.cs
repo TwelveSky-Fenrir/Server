@@ -7,13 +7,8 @@ using Microsoft.Extensions.Options;
 namespace Fenrir.Application.Game.Handlers;
 
 /// <summary>
-///     op11, the first packet the legacy client sends after ZC_CONNECT_OK_RECV (wire contract §5.2). Performs the
-///     ticket→session handover (ADR-0005): the LoginServer minted a single-use session ticket for this AccountId
-///     immediately after authenticating the player and handed the account-shard pair to the client via
-///     CL_DEMAND_ZONE_SERVER_INFO_SEND. The GameServer never re-checks credentials -- consuming a live ticket for
-///     the AccountId embedded in tID (once de-obfuscated, see <see cref="ObfuscatedUidCodec" />) IS the proof of
-///     identity. A missing/expired/already-consumed ticket, or one minted for a different shard, is refused
-///     identically (Result=1) to avoid leaking which failure mode occurred to an unauthenticated peer.
+///     op11, first packet after ZC_CONNECT_OK_RECV. Consumes the single-use session ticket the LoginServer minted
+///     for this AccountId (ADR-0005) -- the GameServer never re-checks credentials itself.
 /// </summary>
 public sealed class ZoneHandshakeHandler(ISessionTicketRepository tickets, IOptions<GameServerOptions> options)
     : IAsyncPacketHandler<ZoneHandshakeRequest>
@@ -29,8 +24,7 @@ public sealed class ZoneHandshakeHandler(ISessionTicketRepository tickets, IOpti
 
         var consumed = await tickets.ConsumeAsync(accountId, cancellationToken);
 
-        // Ticket absent/expired/already consumed (ADR-0005, usage unique), or minted for another shard
-        // (defense in depth -- M1 has a single shard, so this branch should never trigger in practice).
+        // Refuse absent/expired/wrong-shard tickets identically (Result=1) so we don't leak which failure occurred.
         if (consumed is null || consumed.ShardId != options.Value.ShardId)
         {
             session.Send(new ZoneHandshakeResponse { Result = 1 });

@@ -4,12 +4,7 @@ using Fenrir.Contracts.Wire;
 
 namespace Fenrir.Contracts.Packets.Zone;
 
-/// <summary>
-///     ZC_RUNE_SYSTEM_RECV (ZONE.h:495-502) — reply to CZ_RUNE_SYSTEM_SEND (157); unicast.
-///     <see cref="Result" />: 0 = removal ok, 1 = insertion ok, 2 = error (inventory full). Same layout
-///     as <c>ZC_RUNE_PROCESSDATA_RECV</c> (201, DEAD — see the dead-opcodes section). NOTE: field order
-///     DIFFERS from CZ 157 (see <see cref="RuneSocketRequest" /> remarks).
-/// </summary>
+// Result: 0 = removal ok, 1 = insertion ok, 2 = inventory full.
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.RuneSocket, ExpectedSize = 21)]
 public readonly partial record struct RuneSocketResponse : IOutgoingPacket
 {

@@ -5,10 +5,7 @@ using Fenrir.Contracts.Wire;
 
 namespace Fenrir.Contracts.Packets.Zone;
 
-/// <summary>
-///     ZC_PARTY_CHAT_RECV (ZONE.h:791-798, USE_ITEM_LINK_V2 ON in EU33 ⇒ <c>tLink</c> present). Same layout family as ZC
-///     41/43/85/90 (chat lot). <see cref="ItemLinkInfo" /> is zeroed when no item is linked.
-/// </summary>
+// Link is zeroed when no item is linked.
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.PartyChat, ExpectedSize = 99)]
 public readonly partial record struct PartyChatResponse : IOutgoingPacket
 {

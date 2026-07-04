@@ -5,8 +5,7 @@ namespace Fenrir.Application.Login.Tests.RateLimiting;
 
 public class LoginIpRateLimiterTests
 {
-    // Must track LoginIpRateLimiter's private Capacity (5): the class does not expose its budget, so the test
-    // pins the number of attempts to what the implementation currently grants an idle IP.
+    // Must track LoginIpRateLimiter's private Capacity (5), which the class does not expose.
     private const int ExpectedCapacity = 5;
 
     [Fact]
@@ -25,8 +24,7 @@ public class LoginIpRateLimiterTests
     [Fact]
     public void TryConsume_SameIpDifferentPort_SharesTheSameBudget()
     {
-        // A reconnect keeps the IP but always gets a new ephemeral port -- the whole point of this limiter is
-        // that the port must NOT be part of the key, or a bruteforcer reconnecting each time would never be caught.
+        // Port must NOT be part of the key, or a bruteforcer reconnecting each time would never be caught.
         var limiter = new LoginIpRateLimiter();
         var address = IPAddress.Parse("203.0.113.10");
 
@@ -47,15 +45,13 @@ public class LoginIpRateLimiterTests
             Assert.True(limiter.TryConsume(attacker));
         Assert.False(limiter.TryConsume(attacker));
 
-        // otherPlayer's own bucket must be untouched by attacker's exhausted one.
         Assert.True(limiter.TryConsume(otherPlayer));
     }
 
     [Fact]
     public void TryConsume_NullEndPoint_AlwaysSucceeds()
     {
-        // No real accepted socket behind the session (e.g. an in-memory transport in another test) -- must
-        // fail open rather than block a caller that has no IP to throttle on.
+        // No IP to throttle on (e.g. an in-memory transport) must fail open, not block the caller.
         var limiter = new LoginIpRateLimiter();
 
         for (var i = 0; i < ExpectedCapacity + 5; i++)

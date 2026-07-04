@@ -6,14 +6,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Login.Handlers;
 
-/// <summary>
-///     op21 CL_WANT_GIFT_SEND — claim a gift page into the shared account vault (login protocol report
-///     §4.21, "chantier V8"). Now wired to the REAL delivery queue: <see cref="GiftInfoIndex" /> is
-///     resolved against the SAME oldest-first pending list <c>GiftListHandler</c> builds (the legacy's own
-///     <c>uGiftInfo</c> array convention -- an index is a POSITION in that list, not a database key), then
-///     claimed atomically (<c>usp_Gift_ClaimIntoVault</c>, D7 regime (b): Gifts.Status flip + AccountVaultItems
-///     insert commit together).
-/// </summary>
+/// <summary>op21 CL_WANT_GIFT_SEND — GiftInfoIndex is a POSITION in GiftListHandler's oldest-first pending list, not a database key.</summary>
 public sealed class ClaimGiftHandler(IGiftRepository gifts, ILogger<ClaimGiftHandler> logger)
     : IAsyncPacketHandler<ClaimGiftRequest>
 {
@@ -44,10 +37,7 @@ public sealed class ClaimGiftHandler(IGiftRepository gifts, ILogger<ClaimGiftHan
         }
         catch (Exception ex)
         {
-            // Most likely the account vault is full (usp_Gift_ClaimIntoVault SQL 50274) -- a genuine race
-            // where a concurrent claim already consumed this exact gift (SQL 50220) is rare and, either
-            // way, this layer's established convention is a broad catch, never SQL-error-number
-            // inspection (no Microsoft.Data.SqlClient dependency exists in this project, by design).
+            // Broad catch by design: this project has no SqlClient dependency, so SQL error codes aren't inspected.
             logger.LogWarning(ex,
                 "Account {AccountId} gift claim ClaimIntoVaultAsync failed (treated as vault full)", accountId);
             session.Send(new ClaimGiftResponse { Result = 2 });

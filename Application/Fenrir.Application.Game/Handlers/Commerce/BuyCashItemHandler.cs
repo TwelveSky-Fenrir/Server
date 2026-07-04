@@ -12,26 +12,17 @@ using Microsoft.Extensions.Logging;
 namespace Fenrir.Application.Game.Handlers.Commerce;
 
 /// <summary>
-///     CZ_BUY_CASH_ITEM_SEND (opcode 42, contracts/04_commerce.md) -- purchase a cash-shop item. ANTI-CHEAT:
-///     price and granted item/quantity are resolved entirely from <see cref="WorldDataCache.CashCatalog" />'s
-///     <c>CostInfoIndex</c> lookup -- the client's submitted <c>Value[6]</c> is never trusted, only echoed
-///     back. Cash debit and item grant commit in one transaction
-///     (<see cref="CashRepository.DebitAndGrantItemAsync" />).
+///     CZ_BUY_CASH_ITEM_SEND (opcode 42) -- purchase a cash-shop item. Price and granted item/quantity are
+///     resolved entirely from <see cref="WorldDataCache.CashCatalog" />'s <c>CostInfoIndex</c> lookup --
+///     the client's submitted <c>Value[6]</c> is never trusted, only echoed back.
 /// </summary>
-/// <remarks>
-///     Not modeled: the 200ms anti-spam gate (<c>mTickBuyCash</c>) and the <c>Version</c> mismatch branch --
-///     verified largely dead code in the legacy source, so not reproduced.
-/// </remarks>
 public sealed class BuyCashItemHandler(
     ICashRepository cash,
     WorldDataCache worldData,
     ILogger<BuyCashItemHandler> logger)
     : IAsyncPacketHandler<BuyCashItemRequest>
 {
-    /// <summary>
-    ///     <c>60704</c> -- the legacy's shared "shop-specific" error code, reused verbatim across cash-shop-family
-    ///     rejects (e.g. blood-mark purchase).
-    /// </summary>
+    // Shared "shop-specific" error code, reused across cash-shop-family rejects.
     private const int ShopSpecificError = 60704;
 
     public async ValueTask HandleAsync(BuyCashItemRequest packet, IPacketSession session,
@@ -118,8 +109,6 @@ public sealed class BuyCashItemHandler(
         }
         catch (Exception ex)
         {
-            // Insufficient cash balance (usp_Cash_DebitAndGrantItem's guard) -- logged to distinguish
-            // from a transient/unrelated SQL fault.
             logger.LogWarning(ex,
                 "Account {AccountId} cash-shop purchase DebitAndGrantItemAsync failed (treated as insufficient cash)",
                 accountId);

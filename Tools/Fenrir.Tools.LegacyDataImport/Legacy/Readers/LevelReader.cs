@@ -2,10 +2,7 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Records;
 
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Readers;
 
-/// <summary>
-///     Parses <c>005_00001.IMG</c> (legacy <c>LEVEL_INFO</c> table). No known runtime per-load patches --
-///     <see cref="ReadAll" /> simply delegates to <see cref="ReadAllRaw" />.
-/// </summary>
+/// <summary>Parses <c>005_00001.IMG</c> (<c>LEVEL_INFO</c>); no known runtime patches.</summary>
 internal static class LevelReader
 {
     private const string FileName = "005_00001.IMG";
@@ -14,7 +11,6 @@ internal static class LevelReader
     private const int RecordCount = 145;
     private const int RecordSize = 44;
 
-    /// <summary>Raw parse, exactly as bytes on disk -- no runtime patches applied.</summary>
     public static IReadOnlyList<LevelRecord> ReadAllRaw(string dataDirectory)
     {
         var recordBytes = ImgUnpacker.UnpackRecordArray(
@@ -27,7 +23,6 @@ internal static class LevelReader
         return levels;
     }
 
-    /// <summary>No known runtime patches for this dataset -- identical to <see cref="ReadAllRaw" />.</summary>
     public static IReadOnlyList<LevelRecord> ReadAll(string dataDirectory)
     {
         return ReadAllRaw(dataDirectory);

@@ -4,18 +4,12 @@ using static Fenrir.Application.Game.Tests.GameData.WorldDataTestRows;
 
 namespace Fenrir.Application.Game.Tests.GameData;
 
-/// <summary>
-///     Index construction and orphan filtering of <see cref="WorldDataCacheBuilder" /> on in-memory rows --
-///     the pure half of the A2 WorldDataCache work; the SQL half (procs' ordinal contracts) is covered by the
-///     database container suite, not here.
-/// </summary>
+/// <summary>Index construction and orphan filtering of <see cref="WorldDataCacheBuilder" /> on in-memory rows.</summary>
 public class WorldDataCacheBuilderTests
 {
     [Fact]
     public void BuildZones_FiltersPortalsWithoutDestination_AndCountsThem()
     {
-        // 2 real portals on zone 1, plus the two legacy orphan shapes: raw NextZone 0 and an unshipped
-        // destination -- both arrive as TargetZoneNumber NULL (54% of the real seed, rapport 05).
         var (zones, stats) = WorldDataCacheBuilder.BuildZones(
             [Zone(1), Zone(2)],
             [
@@ -43,10 +37,10 @@ public class WorldDataCacheBuilderTests
             [],
             [
                 SpawnRegion(10, 1, 100),
-                SpawnRegion(11, null, 100), // dead zone reference (~49% of the real seed)
-                SpawnRegion(12, 1, null), // legacy mIndex 0 -- no monster wired up
+                SpawnRegion(11, null, 100),
+                SpawnRegion(12, 1, null),
                 SpawnRegion(13, 2, 200),
-                SpawnRegion(14, null, null) // counted once, as zoneless -- the zone check comes first
+                SpawnRegion(14, null, null) // zone check runs first, so a null-zone+null-monster row counts only once
             ]);
 
         Assert.Equal(2, stats.SpawnRegionsWithoutZone);
@@ -76,8 +70,7 @@ public class WorldDataCacheBuilderTests
     [Fact]
     public void BuildZones_KeepsAllSpawnPoints_AndFindsLandingByFromZone()
     {
-        // A NULL FromZoneNumber is an unrecorded source, not an orphan: the landing coordinates stay valid,
-        // so unlike portals/regions these rows are never discarded.
+        // unlike portals/regions, a null FromZoneNumber isn't an orphan here -- the row is never discarded
         var (zones, stats) = WorldDataCacheBuilder.BuildZones(
             [Zone(1), Zone(2)],
             [],
@@ -96,7 +89,6 @@ public class WorldDataCacheBuilderTests
         Assert.NotNull(landing);
         Assert.Equal(0, landing.SlotIndex);
 
-        // No slot names zone 99 -> null, and the caller falls back to the zone's default spawn.
         Assert.Null(zones[1].FindSpawnPointFrom(99));
     }
 
@@ -164,7 +156,6 @@ public class WorldDataCacheBuilderTests
         Assert.NotNull(withDrops.DropQuestItem);
         Assert.Equal(9001, withDrops.DropQuestItem.QuestItemId);
 
-        // A monster with no child rows still materializes, with empty/absent drops -- never a KeyNotFound.
         var bare = monsters[2];
         Assert.Null(bare.DropMoney);
         Assert.Empty(bare.DropPotions);

@@ -1,8 +1,4 @@
--- Normalizes SKILL_INFO's GRADE_INFO_FOR_SKILL gGradeInfo[2] (Header/Protocol/STRUCT.h:95-121): exactly
--- 2 rows per skill (grade 0 and 1), never sparse, so this is a plain one-row-per-grade child table, not
--- 22 fields x 2 doubled onto world.Skills. Column order mirrors GRADE_INFO_FOR_SKILL field-for-field;
--- RecoverInfo[2] and AttackInfo[3] are small, always-meaningful fixed pairs/triples (like ITEM_INFO's
--- EquipInfo/CapeInfo) so they get numbered columns rather than further normalization.
+-- Normalizes SKILL_INFO's gGradeInfo[2]: exactly 2 rows per skill (grade 0/1), never sparse.
 CREATE TABLE world.SkillGrades
 (
     SkillId          INT      NOT NULL,

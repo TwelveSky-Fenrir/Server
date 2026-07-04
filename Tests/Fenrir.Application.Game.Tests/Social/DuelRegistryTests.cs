@@ -30,7 +30,7 @@ public class DuelRegistryTests
         registry.TryAsk(1, 2, false);
         registry.TryAnswer(2, true, out _);
 
-        // The CHALLENGER (not the accepter) calls start -- still succeeds (symmetric acceptance).
+        // challenger (not the accepter) calls start -- still succeeds
         Assert.True(registry.TryStart(1, out var duel));
         Assert.False(duel.NoPotions);
     }

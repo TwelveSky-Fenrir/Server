@@ -3,10 +3,7 @@ using Fenrir.Contracts.Packets.Zone;
 
 namespace Fenrir.Contracts.Tests.Packets.Zone;
 
-/// <summary>
-///     ZC_MAKE_ITEM_RECV (ZONE.h:533-537, 28-byte payload): Result/Value[6] — same typedef as
-///     <see cref="CraftSkillBookResponse" />.
-/// </summary>
+/// <summary>ZC_MAKE_ITEM_RECV (ZONE.h:533-537, 28-byte payload) — same typedef as <see cref="CraftSkillBookResponse" />.</summary>
 public class ZcMakeItemRecvTests
 {
     [Fact]

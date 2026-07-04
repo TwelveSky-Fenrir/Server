@@ -1,13 +1,6 @@
--- Contract: @CharacterId INT -> RS0, 0..n rows { MuteId INT, AccountId INT NULL, CharacterId INT NULL,
--- Reason TINYINT, ExpiresAtUtc DATETIME2(3) NULL, CreatedAtUtc DATETIME2(3) }.
--- Called ONCE at world entry (alongside game.usp_Character_GetForWorldEntry) to set the hidden mute
--- flag in PlayerRuntimeState -- report 06 §1.7: Fenrir does NOT re-query per chat message like the
--- legacy ZPP 45 SELECT did. Covers BOTH targeting modes in one call: mutes pinned to this character AND
--- mutes pinned to its owning account (at world entry both are known, and a character must not dodge an
--- account-level mute by being an alt).
--- Active = not lifted AND (no expiry OR expiry in the future).
--- Idempotent: yes (read-only).
--- Errors: none.
+-- Called once at world entry to set the hidden mute flag in PlayerRuntimeState (not re-queried per
+-- chat message). Covers mutes pinned to this character AND to its owning account, so an alt can't
+-- dodge an account-level mute.
 CREATE PROCEDURE admin.usp_Mute_GetActiveForCharacter @CharacterId INT
 AS
 BEGIN

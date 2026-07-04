@@ -2,14 +2,7 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Readers;
 
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Validation;
 
-/// <summary>
-///     Ad-hoc console verification for <see cref="ZoneNpcPlacementReader" /> and <see cref="ZoneMoveDataReader" />
-///     (the raw <c>002.BIN</c>/<c>003.BIN</c> struct-array files -- no zlib, no XOR). Confirms record counts and
-///     file sizes match the expected fixed layout, then prints a human-eyeball dump for a handful of zones that
-///     are actually populated in this build (have a matching <c>DATA/WORLD/Z0NN.WM</c> file) alongside a couple
-///     of known-unused slots, so it's easy to see the difference between plausible game-world data and an
-///     all-zero record for a zone number nothing ever wrote to.
-/// </summary>
+/// <summary>Validates <see cref="ZoneNpcPlacementReader" />/<see cref="ZoneMoveDataReader" /> (raw 002.BIN/003.BIN, no zlib/XOR) against expected sizes, and dumps a few live vs. unused zones for eyeballing.</summary>
 internal static class ZoneBinsValidation
 {
     private const int ExpectedZoneCount = 350; // MAX_ZONE_NUMBER_NUM
@@ -74,7 +67,6 @@ internal static class ZoneBinsValidation
         Console.WriteLine($"{label}: {actualBytes} bytes (expected {expectedBytes}) -- {status}");
     }
 
-    /// <summary>Sorted 1-based zone numbers that have a corresponding <c>DATA/WORLD/Z0NN.WM</c> file in this build.</summary>
     private static List<int> DiscoverPopulatedZoneNumbers(string dataDir)
     {
         var worldDir = Path.Combine(dataDir, "WORLD");
@@ -83,7 +75,7 @@ internal static class ZoneBinsValidation
 
         foreach (var path in Directory.EnumerateFiles(worldDir, "Z*.WM"))
         {
-            var name = Path.GetFileNameWithoutExtension(path); // e.g. "Z001"
+            var name = Path.GetFileNameWithoutExtension(path);
             if (name.Length > 1 && int.TryParse(name.AsSpan(1), out var zoneNumber))
                 zoneNumbers.Add(zoneNumber);
         }

@@ -1,8 +1,5 @@
--- DEV/TEST-ONLY fixture, not a production credential (docker-compose-style seed data, deliberately
--- public: password "FenrirDev123!"). Hash/salt precomputed with Fenrir.Domain.Security.PasswordHasher
--- (Argon2id, m=64 MiB, t=3, p=1) -- SQL itself cannot compute Argon2id. Idempotent: skipped if the
--- account already exists (matters if this script is ever re-run by hand outside the migrator's own
--- journal, e.g. against a restored backup).
+-- DEV/TEST-ONLY fixture, not a production credential (password "FenrirDev123!"). Hash/salt precomputed
+-- via Fenrir.Domain.Security.PasswordHasher (Argon2id) since SQL itself cannot compute it.
 IF
 NOT EXISTS (SELECT 1 FROM auth.Accounts WHERE LoginName = N'devtest')
 BEGIN

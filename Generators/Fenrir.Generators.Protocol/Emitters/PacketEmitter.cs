@@ -4,11 +4,7 @@ using Fenrir.Generators.Analysis.Support;
 
 namespace Fenrir.Generators.Protocol.Emitters;
 
-/// <summary>
-///     Emits the missing <c>partial</c> part of a <c>[FenrirPacket]</c>/<c>[FenrirWireType]</c>:
-///     <c>Opcode</c>/<c>PayloadSize</c>|<c>WireSize</c>/<c>TryRead</c>/<c>Write</c>, plus <c>ApplyGlobalXor</c>
-///     for packets with global obfuscation (spec §5.1).
-/// </summary>
+/// <summary>Emits the missing <c>partial</c> part of a <c>[FenrirPacket]</c>/<c>[FenrirWireType]</c>.</summary>
 internal static class PacketEmitter
 {
     public static string Emit(TypeModel model)

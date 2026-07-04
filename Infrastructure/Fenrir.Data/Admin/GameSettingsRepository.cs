@@ -4,13 +4,7 @@ using CaeriusNet.Commands.Reads;
 
 namespace Fenrir.Data.Admin;
 
-/// <summary>
-///     admin.GameSettings access -- the one settings row an admin can retune without a redeploy (see that
-///     table's own header for why almost every other numeric constant in this codebase stays a C# const
-///     instead: verified byte-exact ports of a legacy value must not silently drift from their source).
-///     In-memory cached for 5 minutes (CaeriusNet's AddInMemoryCache) rather than boot-time Frozen: unlike
-///     world.* reference data, an admin edit here should propagate without a server restart.
-/// </summary>
+// The one settings row an admin can retune without a redeploy; cached 5 min (not boot-time Frozen) so edits propagate without a restart.
 public sealed record GameSettingsRepository(ICaeriusNetDbContext Db) : IGameSettingsRepository
 {
     public async ValueTask<GameSettingsDto> GetAsync(CancellationToken ct)

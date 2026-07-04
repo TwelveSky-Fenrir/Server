@@ -5,8 +5,7 @@ namespace Fenrir.Application.Game.Handlers.Commerce;
 
 /// <summary>
 ///     Shared PROXY_SHOP_USER_INFO builder for <see cref="GetProxyShopHandler" />/
-///     <see cref="UpdateProxyShopHandler" /> -- maps game.OfflineShops/OfflineShopItems rows onto the 25-slot wire shape
-///     (unlisted slots are zero).
+///     <see cref="UpdateProxyShopHandler" /> -- maps offline-shop rows onto the 25-slot wire shape.
 /// </summary>
 internal static class ProxyShopWireMapper
 {
@@ -18,7 +17,6 @@ internal static class ProxyShopWireMapper
         var wireItems = new ProxyShopItem[MaxSlots];
         var sockets = new int[MaxSlots * 3];
 
-        // new ProxyShopItem[MaxSlots] already zero-initializes unlisted slots -- no second fill pass needed.
         foreach (var item in items)
         {
             if (item.SlotIndex is < 0 or >= MaxSlots || item.ItemId is not { } itemId)

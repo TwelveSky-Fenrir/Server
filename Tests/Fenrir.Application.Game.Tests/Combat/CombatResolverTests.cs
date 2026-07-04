@@ -5,12 +5,7 @@ using Fenrir.Contracts.Packets.Shared;
 
 namespace Fenrir.Application.Game.Tests.Combat;
 
-/// <summary>
-///     Covers <see cref="CombatResolver.ResolveEnemyTribeAttack" /> (mCase 2, "Avatar -&gt; Avatar (difference
-///     clan)") against hand-computed values, verified directly against <c>AttackPlayer</c>
-///     (<c>Server/ts25zone/S07_MyGame02.cpp:886-1416</c>) -- including the verified, deliberately-preserved
-///     PvP-only "divide final damage by 5" quirk (class remarks on <see cref="CombatResolver" />).
-/// </summary>
+/// <summary>Covers <see cref="CombatResolver.ResolveEnemyTribeAttack" /> (mCase 2, Avatar vs. enemy-tribe Avatar) against <c>AttackPlayer</c> (<c>Server/ts25zone/S07_MyGame02.cpp</c>), including the deliberately-preserved PvP-only "divide final damage by 5" quirk.</summary>
 public class CombatResolverTests
 {
     private static CombatantSnapshot Combatant(int characterId, byte tribe, int attackPower = 0,
@@ -91,9 +86,7 @@ public class CombatResolverTests
     [Fact]
     public void DefenderWithinZoneEntryGracePeriod_IsRejected()
     {
-        // PlayerRuntimeState.ZoneEntryAtZoneClock's own remarks: PROTECT_TICK is a one-shot spawn/arrival grace
-        // period (Server/ts25zone/S04_MyWork02.cpp:838,1783 are its only two write sites), NOT a rolling
-        // "recently damaged" cooldown -- this test's name/setup reflects that corrected semantics.
+        // PROTECT_TICK is a one-shot spawn/arrival grace period, not a rolling "recently damaged" cooldown
         var attacker = Combatant(1, 0);
         var defender = Combatant(2, 1, zoneEntryAt: TimeSpan.FromSeconds(5));
         var outcome = CombatResolver.ResolveEnemyTribeAttack(attacker, defender, MeleeRequest(1, 2),
@@ -104,12 +97,7 @@ public class CombatResolverTests
     [Fact]
     public void BothSidesPastTheirGracePeriod_AttackProceedsNormally()
     {
-        // Regression guard: a prior pass refreshed this field on every hit taken, which meant landing (or
-        // receiving) a single blow relocked BOTH combatants out of all combat for another 10s. Simulating two
-        // consecutive hits here (each still comfortably past its own one-shot zone-entry grace period) must
-        // never itself re-trigger AttackerProtected/DefenderProtected -- there is nothing left in this pure
-        // resolver that could even do so (CombatantSnapshot is an immutable snapshot the caller re-builds fresh
-        // each call), which is exactly the point: the bug lived in Zone.cs re-stamping the field, not here.
+        // regression guard: landing/receiving a hit must never re-stamp the zone-entry protect window
         var attacker = Combatant(1, 0, 1000, zoneEntryAt: TimeSpan.Zero);
         var defender = Combatant(2, 1, defensePower: 200, zoneEntryAt: TimeSpan.Zero);
 
@@ -118,8 +106,6 @@ public class CombatResolverTests
         Assert.False(first.Rejected);
         Assert.True(first.Hit);
 
-        // A second attack one legacy tick later -- still must not be rejected as protected, unlike the bug this
-        // guards against (which would have stamped a fresh "protect" instant on the first hit above).
         var second = CombatResolver.ResolveEnemyTribeAttack(attacker, defender, MeleeRequest(1, 2),
             TimeSpan.FromSeconds(20.5), null, new ScriptedRandomSource(0, 0));
         Assert.False(second.Rejected);
@@ -199,10 +185,7 @@ public class CombatResolverTests
     [Fact]
     public void Charge_IsConsumedOnAMissToo_NotOnlyOnAHit()
     {
-        // AttackOutcome.Miss's own remarks: AttackPlayer spends the charge buff the moment an attack is
-        // ATTEMPTED (S07_MyGame02.cpp:995-999, unconditional DecreaseBuff(8,...) BEFORE the hit-chance roll at
-        // :1043-1051) -- a prior pass here only marked ChargeConsumed on a hit, letting a charge survive
-        // repeated misses against a high-AttackBlock defender indefinitely.
+        // AttackPlayer spends the charge buff the moment an attack is attempted, before the hit-chance roll
         var attacker = Combatant(1, 0, 1000, attackSuccess: 1, chargeBuffPercent: 50);
         var defender = Combatant(2, 1, defensePower: 200, attackBlock: 100_000); // hit chance clamps to 1%
         var outcome = CombatResolver.ResolveEnemyTribeAttack(attacker, defender, MeleeRequest(1, 2), TimeSpan.Zero,

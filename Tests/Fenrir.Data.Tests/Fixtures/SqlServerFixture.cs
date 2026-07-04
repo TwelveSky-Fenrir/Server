@@ -4,16 +4,13 @@ using Microsoft.Data.SqlClient;
 
 namespace Fenrir.Data.Tests.Fixtures;
 
-// Boots exactly one SQL Server 2025 container for the whole test suite -- shared via SqlServerCollection,
-// since starting a fresh container per test class would dominate the suite's running time. Applies every
-// script in Database/_manifest.txt once, in order, reproducing Fenrir.Tools.DbMigrator's batch-splitting
-// logic locally (no journaling: this database is thrown away with the container at the end of the run).
+// Boots one shared SQL Server 2025 container for the whole test suite, applying every script in
+// Database/_manifest.txt (mirrors Fenrir.Tools.DbMigrator's batch-splitting; no journaling needed since the
+// container is thrown away afterward).
 public sealed class SqlServerFixture : IAsyncLifetime
 {
-    // DistributedApplicationTestingBuilder.CreateAsync<TEntryPoint>/CreateAsync(Type) both require an actual
-    // AppHost entry point, which this suite doesn't have and shouldn't need for a single ephemeral resource.
-    // Create(string[]) is the one factory that builds a standalone IDistributedApplicationTestingBuilder
-    // (still an IDistributedApplicationBuilder) without targeting any AppHost project.
+    // CreateAsync<TEntryPoint>/CreateAsync(Type) require an actual AppHost entry point; Create(string[]) is
+    // the only factory that builds a standalone builder without one.
     private static readonly string[] NoArgs = [];
 
     private DistributedApplication? _app;
@@ -31,10 +28,8 @@ public sealed class SqlServerFixture : IAsyncLifetime
         _app = await builder.BuildAsync();
         await _app.StartAsync();
 
-        // Wait on the *database* resource, not just the server: AddDatabase's creation script only runs once
-        // the server is ready, and the database resource only reports Running/healthy once that completes --
-        // waiting on "sqlserver" alone would race against "FenrirDbTest" not existing yet.
-        // Bounded wait: a wedged/failed container should fail the test run instead of hanging it forever.
+        // Wait on the database resource, not just "sqlserver": it only reports healthy once its creation
+        // script has actually run, avoiding a race against FenrirDbTest not existing yet.
         using var readyCts = new CancellationTokenSource(TimeSpan.FromMinutes(3));
         await _app.ResourceNotifications.WaitForResourceHealthyAsync("FenrirDbTest", readyCts.Token);
 
@@ -81,9 +76,8 @@ public sealed class SqlServerFixture : IAsyncLifetime
         }
     }
 
-    // Mirrors Fenrir.Tools.DbMigrator.Program.SplitBatches: SQL Server requires some statements (CREATE
-    // SCHEMA, CREATE/ALTER PROCEDURE...) to be alone in their batch; a lone "GO" line is the classic
-    // SSMS/sqlcmd batch separator used by every script under Database/.
+    // Mirrors Fenrir.Tools.DbMigrator.Program.SplitBatches: splits on a lone "GO" line since some statements
+    // (CREATE SCHEMA, CREATE/ALTER PROCEDURE...) must be alone in their batch.
     private static IEnumerable<string> SplitBatches(string script)
     {
         var batch = new StringBuilder();

@@ -5,13 +5,6 @@ using Fenrir.Contracts.Packets.Zone;
 
 namespace Fenrir.Contracts.Tests.Packets.Zone;
 
-/// <summary>
-///     ZC_GUILD_WORK_RECV (1396-byte payload = Result + Sort + <see cref="GuildInfo" />, ZONE.h:842-847).
-///     The golden encoder below is hand-built from the C++ layout (int, int, then GUILD_INFO's own three
-///     natural-alignment padding zones at 13/709/1366 within the nested struct), independent of the
-///     generated <c>Write</c>; GUILD_INFO's own byte-exact layout is separately covered by
-///     <c>GuildInfoTests</c>.
-/// </summary>
 public class ZcGuildWorkRecvTests
 {
     [Fact]
@@ -62,8 +55,7 @@ public class ZcGuildWorkRecvTests
     [Fact]
     public void Write_ZeroFillsGuildInfo_OnFailureResponse()
     {
-        // Legacy leak: mEXTRA.mRecv_GuildInfo may hold uninitialized stack garbage on failure responses
-        // and on the tSort 1001 success; Fenrir must send an all-zero GuildInfo in those cases instead.
+        // Legacy: mRecv_GuildInfo held stack garbage on failure/tSort 1001; Fenrir zero-fills instead.
         var zeroGuildInfo = new GuildInfo
         {
             Name = string.Empty,

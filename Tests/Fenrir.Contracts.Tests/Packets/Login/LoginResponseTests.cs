@@ -41,9 +41,7 @@ public class LcLoginRecvTests
 
         Assert.Equal(packet.Result, BinaryPrimitives.ReadInt32LittleEndian(buffer.AsSpan(0, 4)));
 
-        // Id is obfuscated via ApplyUidXor, independent of the packet-wide XOR applied later at
-        // the send layer (§3.3). ApplyUidXor is involutive as long as the content has no 0x10/0xFE
-        // byte, so re-applying it to Write's output recovers the plaintext.
+        // ApplyUidXor is involutive only if content has no 0x10/0xFE byte; re-applying it recovers plaintext.
         var idBytes = buffer.AsSpan(4, 255).ToArray();
         WireXor.ApplyUidXor(idBytes);
         Assert.Equal(packet.Id, DecodeFixedString(idBytes));

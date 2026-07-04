@@ -1,8 +1,5 @@
--- Seeds world.RewardBundles/world.RewardBundleItems from the legacy MySQL dump's `rewardinfo` table.
--- LOW-CONFIDENCE / POSSIBLY-STALE (per the prior analysis pass): rewardinfo is the only latin1-charset
--- table in the entire dump and has no PRIMARY KEY of its own, both signs of a neglected/abandoned
--- feature. It also contains exactly 1 row (rIndex=1, rItem01..rItem07 all = 12) -- seeded verbatim
--- below, but this should not be read as a vetted, actively-used reward table.
+-- Seeds world.RewardBundles/world.RewardBundleItems from the legacy `rewardinfo` table. LOW-CONFIDENCE:
+-- rewardinfo has no PK and is the dump's only latin1-charset table -- signs of an abandoned feature.
 IF
 NOT EXISTS (SELECT 1 FROM world.RewardBundles)
 BEGIN

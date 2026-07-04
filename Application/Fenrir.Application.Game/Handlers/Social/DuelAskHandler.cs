@@ -6,13 +6,7 @@ using Fenrir.Network.Sessions;
 
 namespace Fenrir.Application.Game.Handlers.Social;
 
-/// <summary>
-///     CZ_DUEL_ASK_SEND (opcode 43, contracts/05_social.md). Map 124 (the scripted-duel server, out of
-///     scope -- see <see cref="DuelRegistry" />'s class remarks) always refuses immediately (Answer=3).
-///     Inter-tribe duels are refused (Quit()) EXCEPT on maps 37/119/124 -- verified, same map-number-as-
-///     legacy-server-number identification as <see cref="Chat.ChatRouter.IsShoutEnabledOnMap" />. Already
-///     dueling/negotiating ⇒ Quit(). Target resolved WITHIN THE CHALLENGER'S OWN ZONE ONLY.
-/// </summary>
+/// <summary>CZ_DUEL_ASK_SEND (opcode 43) -- map 124 (scripted-duel server) always refuses immediately.</summary>
 public sealed class DuelAskHandler(DuelRegistry duels) : IInlinePacketHandler<DuelChallengeRequest>
 {
     public void Handle(in DuelChallengeRequest packet, IPacketSession session)

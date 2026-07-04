@@ -12,25 +12,13 @@ using Microsoft.Extensions.Logging;
 namespace Fenrir.Application.Game.Handlers.Guilds;
 
 /// <summary>
-///     CZ_GUILD_WORK_SEND (opcode 75) -- the generic guild sub-command channel (doc 10 §1, verified in
-///     full against <c>Server/ts25zone/S04_MyWork02.cpp:9969-10703</c>). Every tSort that is still alive in
-///     EU33 is dispatched here: 1 create, 2 info/roster, 3 invite finalize, 4 exit, 5 notice, 6 disband,
-///     7 upgrade grade, 8 kick, 9 AGM promote/demote, 10 member title, 14 buff type (USE_GUILD_BUFF), 17
-///     transfer leadership, 1001 logo (USE_GUILD_LOGO). Dead sub-commands reproduce their exact legacy
-///     shape: 11 aborts the connection (<c>Quit()</c> is unconditional, dead code follows it); 12/13 are a
-///     SILENT no-op (no abort, no response -- the legacy's own <c>Quit()</c> call is commented out); 15/16
-///     and anything else fall to the legacy's own <c>default:</c>, which aborts.
+///     CZ_GUILD_WORK_SEND (opcode 75) -- the generic guild sub-command channel. Dead sub-commands reproduce
+///     their exact legacy shape: 11 always aborts; 12/13 are a silent no-op (the legacy's own abort call is
+///     commented out); anything else falls to the default abort.
 /// </summary>
 /// <remarks>
-///     Legacy architecture collapsed here: every tSort used to be a blocking RPC to ts25extra, which owned
-///     the DB calls and trusted the zone's own role/state checks (doc 10 §1 intro) -- Fenrir keeps that
-///     same validate-before-DB-call order but folds both halves into one handler, replacing ts25extra's
-///     manual UpdateGuildInfo/UpdateAvatarGuild-with-rollback dance with a single <see cref="GuildRepository" />
-///     stored-procedure transaction. Cross-zone propagation matches doc 10 quirk 6 exactly: create/exit/
-///     disband/upgrade/transfer(17) propagate nothing, only notice/kick/AGM/title/buff/logo mirror
-///     <see cref="PlayerRuntimeState" /> for the character(s) whose own membership changed (never a
-///     guild-wide broadcast) -- the notice/buff/logo live push itself rides a separate broadcast channel
-///     not reproduced here.
+///     Cross-zone mirrors only update the character(s) whose own membership changed, never a guild-wide
+///     broadcast -- other members' cached guild fields go stale until their next info query.
 /// </remarks>
 public sealed class GuildActionHandler(
     ZoneRegistry zones,
@@ -54,9 +42,7 @@ public sealed class GuildActionHandler(
         if (!zone.TryGetPlayer(characterId, out var state) || state is null)
             return;
 
-        // Same blanket posture as GenericActionHandler: every tSort this handler covers shares the same
-        // per-character economy-adjacent state (guild membership, money for create/upgrade) -- see
-        // PlayerRuntimeState.EconomyActionLock's own remarks.
+        // Every tSort here shares the same per-character economy-adjacent state (guild membership, money).
         await state.EconomyActionLock.WaitAsync(cancellationToken);
         try
         {
@@ -104,13 +90,10 @@ public sealed class GuildActionHandler(
                 await HandleTitleAsync(packet, session, zoneSession, state, ct);
                 return;
             case 11:
-                // GuildMark -- Quit() is unconditional in the source, everything after it is dead code.
                 zoneSession.Abort(DisconnectReason.Faulted);
                 return;
             case 12:
             case 13:
-                // Mark effect ON/OFF -- Quit() is COMMENTED OUT in the source; a bare `return;` follows,
-                // so the legacy neither disconnects nor responds. Reproduced exactly: do nothing.
                 return;
             case 14:
                 await HandleBuffAsync(packet, session, zoneSession, state, ct);
@@ -127,10 +110,7 @@ public sealed class GuildActionHandler(
         }
     }
 
-    /// <summary>
-    ///     tSort 1 -- create a guild (S04_MyWork02.cpp:9985-10038). Level &gt;=30 and Money &gt;=10M, else <c>Quit()</c>;
-    ///     name non-empty and not already in a guild.
-    /// </summary>
+    /// <summary>tSort 1 -- create a guild. Requires level &gt;=30, sufficient money, a non-empty name, and no existing guild.</summary>
     private async ValueTask HandleCreateAsync(GuildActionRequest packet, IPacketSession session,
         ZoneClientSession zoneSession, Zone zone, PlayerRuntimeState state, int characterId, CancellationToken ct)
     {
@@ -150,18 +130,12 @@ public sealed class GuildActionHandler(
         int guildId;
         try
         {
-            // Legacy ORDER preserved (S04_MyWork02.cpp:10008-10025): guild created FIRST, money debited after.
-            // CORRECTION (review finding): the legacy is only safe because it pre-verifies aMoney >=
-            // tCreateGuildMoney (S04_MyWork02.cpp:9999-10003) and Quit()s before creating if insufficient.
-            // Fenrir has no cached Money field to run that pre-check, so a failed debit now rolls the guild
-            // back instead of merely logging -- same "no guild without sufficient funds" guarantee via
-            // rollback instead of pre-check.
+            // Guild created before money is debited; a failed debit below rolls it back rather than
+            // leaving an unpaid guild (Fenrir has no cached Money field to pre-check against).
             guildId = await guilds.CreateAsync(name, characterId, ct);
         }
         catch (Exception ex)
         {
-            // Name already taken (THROW 50230) or already in a guild (50231, a benign race against this
-            // same lock's own state.GuildId check above).
             logger.LogInformation(ex, "Character {CharacterId} guild create failed for name {GuildName}",
                 characterId, name);
             SendResult(session, 1, GuildInfoProjection.Empty(), 1);
@@ -174,8 +148,6 @@ public sealed class GuildActionHandler(
         }
         catch (Exception ex)
         {
-            // Insufficient funds -- roll back (disband) the just-created guild rather than leave a paid-for
-            // feature the character never actually paid for, then Quit() like the legacy's own upfront check.
             logger.LogWarning(ex,
                 "Character {CharacterId} guild create money debit failed -- rolling back guild {GuildId}",
                 characterId, guildId);
@@ -191,7 +163,7 @@ public sealed class GuildActionHandler(
             new GuildMembershipZoneCommand(characterId, guildId, name, GuildRoleCodec.WireRoleToDb(0), ""), ct);
     }
 
-    /// <summary>tSort 2 -- info/roster refresh (S04_MyWork02.cpp:10040-10065). Must already be in a guild.</summary>
+    /// <summary>tSort 2 -- info/roster refresh; must already be in a guild.</summary>
     private async ValueTask HandleInfoAsync(IPacketSession session, ZoneClientSession zoneSession,
         PlayerRuntimeState state, CancellationToken ct)
     {
@@ -204,11 +176,7 @@ public sealed class GuildActionHandler(
         SendResult(session, 2, await BuildGuildInfoAsync(guildId, ct));
     }
 
-    /// <summary>
-    ///     tSort 3 -- invite finalize (S04_MyWork02.cpp:10066-10161). Requires role 0/1 (master/sub-master)
-    ///     and a pending accepted invite (<see cref="GuildInviteRegistry.TryConsumeAccepted" /> -- legacy
-    ///     state 3 on both sides). Member cap = Grade*10 (tResult=2 if reached).
-    /// </summary>
+    /// <summary>tSort 3 -- invite finalize. Requires master/sub-master role and a pending accepted invite. Member cap = Grade*10.</summary>
     private async ValueTask HandleInviteFinalizeAsync(GuildActionRequest packet, IPacketSession session,
         ZoneClientSession zoneSession, PlayerRuntimeState state, int characterId, CancellationToken ct)
     {
@@ -258,10 +226,7 @@ public sealed class GuildActionHandler(
                 GuildRoleCodec.WireRoleToDb(2), ""));
     }
 
-    /// <summary>
-    ///     tSort 4 -- voluntary exit (S04_MyWork02.cpp:10162-10199). The master cannot leave (must transfer/disband
-    ///     instead).
-    /// </summary>
+    /// <summary>tSort 4 -- voluntary exit. The master cannot leave (must transfer/disband instead).</summary>
     private async ValueTask HandleExitAsync(GuildActionRequest packet, IPacketSession session,
         ZoneClientSession zoneSession, Zone zone, PlayerRuntimeState state, int characterId, CancellationToken ct)
     {
@@ -278,7 +243,7 @@ public sealed class GuildActionHandler(
         await zone.PostGuildCommandAndWaitAsync(new GuildMembershipZoneCommand(characterId, null, "", 0, ""), ct);
     }
 
-    /// <summary>tSort 5 -- guild notice, master only (S04_MyWork02.cpp:10200-10236, GUILD_NOTICE_V2).</summary>
+    /// <summary>tSort 5 -- guild notice, master only.</summary>
     private async ValueTask HandleNoticeAsync(GuildActionRequest packet, IPacketSession session,
         ZoneClientSession zoneSession, PlayerRuntimeState state, CancellationToken ct)
     {
@@ -295,7 +260,7 @@ public sealed class GuildActionHandler(
         SendResult(session, 5, await BuildGuildInfoAsync(guildId, ct));
     }
 
-    /// <summary>tSort 6 -- disband, master only, requires exactly 1 remaining member (S04_MyWork02.cpp:10237-10302).</summary>
+    /// <summary>tSort 6 -- disband, master only, requires exactly 1 remaining member.</summary>
     private async ValueTask HandleDisbandAsync(GuildActionRequest packet, IPacketSession session,
         ZoneClientSession zoneSession, Zone zone, PlayerRuntimeState state, int characterId, CancellationToken ct)
     {
@@ -314,19 +279,12 @@ public sealed class GuildActionHandler(
 
         await guilds.DisbandAsync(guildId, ct);
 
-        // Post-delete, nothing left to re-fetch, so Empty() (matches the legacy's own uninitialized-stack
-        // quirk here regardless, see GuildActionResponse's remarks).
         SendResult(session, 6, GuildInfoProjection.Empty());
 
-        // No cross-zone propagation for the other cascade-removed members (doc 10 quirk 6, see class
-        // remarks) -- their cached guild fields go stale until their next tSort-2 query.
         await zone.PostGuildCommandAndWaitAsync(new GuildMembershipZoneCommand(characterId, null, "", 0, ""), ct);
     }
 
-    /// <summary>
-    ///     tSort 7 -- grade upgrade, master only (S04_MyWork02.cpp:10303-10418). Member count must already be at cap;
-    ///     level/cost thresholds per grade.
-    /// </summary>
+    /// <summary>tSort 7 -- grade upgrade, master only; member count must already be at cap, level/cost thresholds per grade.</summary>
     private async ValueTask HandleUpgradeAsync(GuildActionRequest packet, IPacketSession session,
         ZoneClientSession zoneSession, PlayerRuntimeState state, int characterId, CancellationToken ct)
     {
@@ -356,7 +314,7 @@ public sealed class GuildActionHandler(
             2 => (70, 30_000_000),
             3 => (90, 40_000_000),
             4 => (113, 50_000_000),
-            _ => (-1, -1) // grade >= 5 -- Quit()
+            _ => (-1, -1)
         };
 
         if (requiredLevel < 0 || state.Level < requiredLevel)
@@ -368,11 +326,7 @@ public sealed class GuildActionHandler(
         var previousGrade = guild.Grade;
         try
         {
-            // Legacy ORDER preserved: grade increments FIRST, money debited after (S04_MyWork02.cpp:10396-10414).
-            // CORRECTION (review finding): the legacy pre-verifies aMoney >= tCost per-grade
-            // (S04_MyWork02.cpp:10339-10382) and Quit()s before upgrading if insufficient -- Fenrir has no
-            // cached Money field for that pre-check, so a failed debit now rolls the grade increment back
-            // instead of merely logging.
+            // Grade incremented before money is debited; a failed debit below rolls it back.
             await guilds.SetGradeAsync(guildId, previousGrade + 1, ct);
         }
         catch (Exception ex)
@@ -389,8 +343,6 @@ public sealed class GuildActionHandler(
         }
         catch (Exception ex)
         {
-            // Insufficient funds -- roll the grade increment back rather than leave a paid-for upgrade the
-            // character never actually paid for, then Quit() like the legacy's own upfront check.
             logger.LogWarning(ex,
                 "Character {CharacterId} guild upgrade money debit failed -- rolling back guild {GuildId} to grade {PreviousGrade}",
                 characterId, guildId, previousGrade);
@@ -402,10 +354,7 @@ public sealed class GuildActionHandler(
         SendResult(session, 7, await BuildGuildInfoAsync(guildId, ct));
     }
 
-    /// <summary>
-    ///     tSort 8 -- kick, master only (S04_MyWork02.cpp:10419-10448). Target resolved by name, independent of online
-    ///     state; the master cannot be kicked.
-    /// </summary>
+    /// <summary>tSort 8 -- kick, master only. Target resolved by name, independent of online state; the master cannot be kicked.</summary>
     private async ValueTask HandleKickAsync(GuildActionRequest packet, IPacketSession session,
         ZoneClientSession zoneSession, PlayerRuntimeState state, CancellationToken ct)
     {
@@ -427,8 +376,6 @@ public sealed class GuildActionHandler(
         var target = FindMember(roster, targetName);
         if (target is null || GuildRoleCodec.IsMaster(target.Role))
         {
-            // Not a member, or IS the master (doc 10 §1 tSort 8: "vérifie que ce n'est pas gMaster01") --
-            // clean fail, not a Quit (the legacy's own extra-side validation has no Quit path here either).
             SendResult(session, 8, GuildInfoProjection.Empty(), 1);
             return;
         }
@@ -442,9 +389,9 @@ public sealed class GuildActionHandler(
     }
 
     /// <summary>
-    ///     tSort 9 -- AGM promote (1)/demote (2), master only (S04_MyWork02.cpp:10449-10479). Promote:
-    ///     refused if the guild already has <see cref="MaxSubMasters" /> sub-masters, or the target isn't
-    ///     currently a plain member. Demote: target must currently be a sub-master.
+    ///     tSort 9 -- AGM promote (1)/demote (2), master only. Promote refused if already at
+    ///     <see cref="MaxSubMasters" /> or the target isn't a plain member; demote requires the target
+    ///     currently be a sub-master.
     /// </summary>
     private async ValueTask HandleAgmAsync(GuildActionRequest packet, IPacketSession session,
         ZoneClientSession zoneSession, PlayerRuntimeState state, CancellationToken ct)
@@ -503,10 +450,7 @@ public sealed class GuildActionHandler(
                 targetState.GuildName, newRole, ""));
     }
 
-    /// <summary>
-    ///     tSort 10 -- member title/CallName, master only (S04_MyWork02.cpp:10480-10511). Target must be a member, not
-    ///     the master.
-    /// </summary>
+    /// <summary>tSort 10 -- member title/CallName, master only. Target must be a member, not the master.</summary>
     private async ValueTask HandleTitleAsync(GuildActionRequest packet, IPacketSession session,
         ZoneClientSession zoneSession, PlayerRuntimeState state, CancellationToken ct)
     {
@@ -543,17 +487,11 @@ public sealed class GuildActionHandler(
     }
 
     /// <summary>
-    ///     tSort 14 -- buff type choice, master/sub-master only (S04_MyWork02.cpp:10551-10611,
-    ///     USE_GUILD_BUFF). Member (wire role 2) gets a CLEAN tResult=4, not a Quit. Requires at least 1
-    ///     minute of buff-time reserve (only ever recharged by tSort 15's guild scrolls -- doc 10 quirk 12).
+    ///     tSort 14 -- buff type choice, master/sub-master only. A plain member gets a clean tResult=4, not
+    ///     an abort. Requires at least 1 minute of buff-time reserve (only ever recharged by tSort 15's
+    ///     guild scrolls). The buff's actual gameplay stat effect is undocumented, so only the state machine
+    ///     (choose a type, track remaining reserve) is implemented -- no stat bonus is invented.
     /// </summary>
-    /// <remarks>
-    ///     OPEN ISSUE: the guild buff's actual gameplay stat effect is undocumented anywhere (gBuffType/
-    ///     gBuffState never appear in report 11's StatCalculator catalog) -- only the state machine (choose
-    ///     a type, track remaining reserve minutes) is implemented, no stat bonus is invented. The legacy's
-    ///     cross-zone live push (center opcodes 112/113) rides the separate broadcast channel and isn't
-    ///     reproduced here either (see class remarks).
-    /// </remarks>
     private async ValueTask HandleBuffAsync(GuildActionRequest packet, IPacketSession session,
         ZoneClientSession zoneSession, PlayerRuntimeState state, CancellationToken ct)
     {
@@ -603,9 +541,8 @@ public sealed class GuildActionHandler(
     }
 
     /// <summary>
-    ///     tSort 17 -- transfer leadership, master only (S04_MyWork02.cpp:10613-10665). Target resolved
-    ///     WITHIN THE ACTOR'S OWN ZONE ONLY (<c>SearchAvatar</c> scope, doc 10 quirk 13). Success responds
-    ///     tResult=2 (NOT 0 -- a verified legacy quirk the EU33 client expects, doc 10 quirk 1).
+    ///     tSort 17 -- transfer leadership, master only. Target must be in the actor's own zone. Success
+    ///     replies tResult=2, not 0 -- a verified legacy quirk the client expects.
     /// </summary>
     private async ValueTask HandleTransferAsync(GuildActionRequest packet, IPacketSession session,
         ZoneClientSession zoneSession, Zone zone, PlayerRuntimeState state, int characterId, CancellationToken ct)
@@ -660,19 +597,10 @@ public sealed class GuildActionHandler(
     }
 
     /// <summary>
-    ///     tSort 1001 -- logo, master only (S04_MyWork02.cpp:10666-10696, USE_GUILD_LOGO). ALWAYS responds
-    ///     with an empty GUILD_INFO, even on success -- doc 10 quirk 4 (the legacy's own uninitialized-stack
-    ///     response for this one specific success case).
+    ///     tSort 1001 -- logo, master only. Always replies with an empty GuildInfo, even on success (matches
+    ///     a legacy quirk). Deliberately stricter than legacy here: the legacy's own role check accidentally
+    ///     also passes guildless characters (a zero-effect legacy accident); Fenrir correctly rejects them.
     /// </summary>
-    /// <remarks>
-    ///     DELIBERATE DEVIATION: the legacy checks only <c>wAvatar.aGuildRole != 0</c>, never
-    ///     <c>IsEmptyString(wAvatar.aGuildName)</c> -- doc 10 quirk notes this accidentally lets a guildless
-    ///     character through too (their <c>aGuildRole</c> also defaults to 0, same as "master"), landing on
-    ///     a harmless 0-row UPDATE. Fenrir's <see cref="PlayerRuntimeState.GuildRoleDb" /> defaults to 0 =
-    ///     DB "member" (wire role 2) via <see cref="GuildRoleCodec" />, so a guildless character is correctly
-    ///     rejected here instead -- a documented, zero-effect divergence from a legacy accident, not a
-    ///     designed mechanic.
-    /// </remarks>
     private async ValueTask HandleLogoAsync(GuildActionRequest packet, IPacketSession session,
         ZoneClientSession zoneSession, PlayerRuntimeState state, CancellationToken ct)
     {

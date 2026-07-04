@@ -4,16 +4,6 @@ using Fenrir.Contracts.Wire;
 
 namespace Fenrir.Contracts.Packets.Zone;
 
-/// <summary>
-///     ZC_FISHING_STATE_RECV (ZONE.h:1174-1181, typedef DOUBLE with ZC 128) — unicast response to CZ 103.
-///     Alive only on the fishing zone (52), builder
-///     <c>
-///         B_FISHING_STATE_RECV(MyUser*, tServerIndex,
-///         tUniqueNumber, tResult, tFishingState, tFishingStep)
-///     </c>
-///     with USEND baked in
-///     (S05_MyTransfer.cpp:1472-1481).
-/// </summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.FishingLine, ExpectedSize = 21)]
 public readonly partial record struct FishingLineResponse : IOutgoingPacket
 {

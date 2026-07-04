@@ -7,8 +7,7 @@ namespace Fenrir.Network.Tests.Sessions;
 /// <summary>Confirms <c>ClientSession</c>'s two send paths put the exact expected bytes on the wire.</summary>
 public class ClientSessionSendTests
 {
-    // ZoneGreetingResponse declares no Obfuscation (defaults to None): frame is just [opcode byte][4-byte little-endian
-    // RandomNumber], nothing more — the case FrameWriter takes with no XorPacketGlobal step.
+    // ZoneGreetingResponse declares no Obfuscation, so FrameWriter takes the no-XOR path.
     [Fact]
     public async Task Send_WritesOpcodeAndPayload_ForPacketWithoutObfuscation()
     {
@@ -25,8 +24,7 @@ public class ClientSessionSendTests
         Assert.Equal(new byte[] { 0x00, 0x78, 0x56, 0x34, 0x12 }, bytes);
     }
 
-    // SendRaw is the pre-built-frame path (LZ4/ZPACKET compressed packets) — it must never reinterpret or
-    // re-frame the caller's bytes.
+    // SendRaw is the pre-built-frame path (LZ4/ZPACKET) -- it must never reinterpret the caller's bytes.
     [Fact]
     public async Task SendRaw_WritesSuppliedBytesUnchanged()
     {

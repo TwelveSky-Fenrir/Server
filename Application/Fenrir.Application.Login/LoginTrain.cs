@@ -4,15 +4,7 @@ using Fenrir.Data.Characters;
 
 namespace Fenrir.Application.Login;
 
-/// <summary>
-///     The legacy <c>SEND_LOGIN</c> train (S04_MyWork02.cpp l.42-67), byte-order faithful: every CL_LOGIN_SEND —
-///     success AND failure — is answered by exactly <c>LC_LOGIN_RECV</c> + 3× <c>LC_USER_AVATAR_RECV2</c> (one per
-///     slot, zeroed when empty) + <c>LC_RECOMMAND_WORLD_RECV</c> (24) + <c>LC_RECOMMAND_WORLD2_RECV</c> (26), in
-///     that order. The single legacy exception (playuser result 4 with a local session found: kick + <c>return</c>
-///     with no reply at all) maps to Fenrir's SessionRegistry eviction, see <c>LoginHandler</c>.
-///     Static and side-effect-free apart from <see cref="Send" /> so the exact wire sequence is unit-testable
-///     without a database (Tests/Fenrir.Application.Login.Tests/LoginTrainTests).
-/// </summary>
+/// <summary>Legacy SEND_LOGIN train (S04_MyWork02.cpp l.42-67): every CL_LOGIN_SEND, success or failure, gets LC_LOGIN_RECV + 3x LC_USER_AVATAR_RECV2 + ops 24 + 26, in that order.</summary>
 public static class LoginTrain
 {
     /// <summary>MAX_USER_AVATAR_NUM.</summary>
@@ -31,9 +23,7 @@ public static class LoginTrain
     private static readonly WorldRecommendationFinalResponse RecommandWorld2 = new()
         { AddKillOtherTribe0 = 0, AddKillOtherTribe1 = 0, AddKillOtherTribe2 = 0 };
 
-    // Template for an empty character-select slot: every LC_USER_AVATAR_RECV2 field at its wire-zero value
-    // (mirrors Avatars/AvatarInfoFactory.Zeroed's convention). A populated slot overrides only the handful of
-    // DB-backed fields via a `with` expression, instead of repeating the other ~20 zeroed fields twice.
+    // Wire-zero template for an empty character-select slot; a populated slot overrides only the DB-backed fields via `with`.
     private static readonly AvatarRosterResponse EmptyAvatarSlot = new()
     {
         VisibleState = 0,
@@ -68,10 +58,7 @@ public static class LoginTrain
         Costume = new int[10]
     };
 
-    /// <summary>
-    ///     Every LC_LOGIN_RECV field at its "nothing to report" value. The legacy always-zero fields
-    ///     (tGoodFellow/tLoginPlace/tLoginPremium/tSecretCard*/tGiftInfo, report §5.11) are pinned here in one place.
-    /// </summary>
+    /// <summary>Every LC_LOGIN_RECV field at its "nothing to report" value (legacy always-zero fields, report §5.11).</summary>
     public static LoginResponse BuildLoginRecv(int result, string id, int secondLoginSort, string mousePassword)
     {
         return new LoginResponse
@@ -134,11 +121,7 @@ public static class LoginTrain
         session.Send(RecommandWorld2);
     }
 
-    /// <summary>
-    ///     The complete failure train: result code, the client's own tID echoed back (the legacy XORs it via
-    ///     USE_XOR_UID even on failure — our [ObfuscatedUidField] does the same at write time), sort=0, loginSort=0,
-    ///     PIN mask "0000", three zeroed avatar slots, then 24/26 (report §4.11.9 "DO_SEND").
-    /// </summary>
+    /// <summary>The complete failure train: tID echoed back even on failure (legacy XORs it via USE_XOR_UID; [ObfuscatedUidField] does the same here).</summary>
     public static void SendFailure(IPacketSession session, int result, string requestId)
     {
         Send(session, BuildLoginRecv(result, requestId, 0, FailurePinMask), BuildEmptyAvatarSlots());

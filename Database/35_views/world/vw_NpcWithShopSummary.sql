@@ -1,16 +1,5 @@
--- Npc-with-child-row-counts shape, meant to be read from inside a retrieval procedure (security model:
--- views are never granted/called directly by app code -- see 60_permissions/001_roles.sql). Tooling/
--- debugging aid (e.g. "which NPCs actually sell something", "which NPCs teach skills") -- GameServer's
--- own boot-time cache load uses the six per-table usp_Npc*_GetAll procedures directly, never this view.
--- LEFT JOINs throughout (an NPC with zero shop slots, say, must still appear with ShopItemCount = 0, not
--- be dropped) aggregated in derived tables before joining to world.Npcs, rather than one single GROUP BY
--- over a wide multi-table join, so each child table's row multiplication can't inflate another child
--- table's count (an NPC with 25 speech lines and 84 shop slots joined naively would multiply to 2100 rows
--- before aggregation).
--- ShopItemCount/SkillOfferCount only count rows with a non-NULL ItemId/SkillId respectively (this
--- generator never actually emits a NULL row today, but the view stays correct if a future manual edit
--- ever adds one). GambleCostRowCount and MenuOptionCount have no such NULL case (see those tables' own
--- header comments for why: OptionId is NOT NULL, and a gamble cell simply isn't a row when its value is 0).
+-- Tooling/debugging view. Each child table's counts are pre-aggregated in derived tables before joining
+-- to world.Npcs so one child table's row multiplication can't inflate another's count.
 CREATE VIEW world.vw_NpcWithShopSummary
 AS
 SELECT n.NpcId,

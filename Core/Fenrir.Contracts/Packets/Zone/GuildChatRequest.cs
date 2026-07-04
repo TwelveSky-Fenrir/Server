@@ -5,12 +5,7 @@ using Fenrir.Contracts.Wire;
 
 namespace Fenrir.Contracts.Packets.Zone;
 
-/// <summary>
-///     CZ_GUILD_CHAT_SEND — same typedef as CZ 38 (CLIENT.h:193). Handler l.10736: empty content ⇒
-///     <c>Quit()</c>; no guild ⇒ silent return; filtered by <c>CheckChat(GUILD_CHAT)</c> and mute.
-///     Relayed via center tSort=112 — unlike <see cref="PartyChatRequest" />, <see cref="Link" /> IS
-///     transported — producing ZC 85 for guild members across every zone.
-/// </summary>
+/// <summary>Unlike PartyChatRequest, Link is relayed here rather than dropped.</summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.GuildChat, ExpectedSize = 94,
     AllowedStates = [(byte)ZoneSessionState.InWorld])]
 public readonly partial record struct GuildChatRequest : IIncomingPacket<GuildChatRequest>

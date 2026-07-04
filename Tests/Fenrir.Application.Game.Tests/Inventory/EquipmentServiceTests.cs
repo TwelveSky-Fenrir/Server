@@ -9,11 +9,8 @@ using Fenrir.Data.World;
 namespace Fenrir.Application.Game.Tests.Inventory;
 
 /// <summary>
-///     Covers <see cref="EquipmentService" />'s bridge between the raw <see cref="ItemStack" /> Equipment
-///     container and <see cref="StatCalculator" />'s input shape -- verifying the WIRING (right item resolved
-///     into the right slot with the right upgrade bytes, missing catalog entries skipped, stats actually
-///     change when equipment does), not re-deriving MyFactor's own formulas (already covered exhaustively by
-///     <c>StatCalculatorTests</c>).
+///     Covers <see cref="EquipmentService" />'s bridge between the raw <see cref="ItemStack" /> Equipment container
+///     and <see cref="StatCalculator" />'s input shape: the wiring, not MyFactor's formulas (covered by <c>StatCalculatorTests</c>).
 /// </summary>
 public class EquipmentServiceTests
 {

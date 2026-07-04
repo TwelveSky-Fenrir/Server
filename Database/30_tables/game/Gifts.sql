@@ -1,16 +1,8 @@
--- Legacy `giftinfo` (nxtserver.sql): a delivery queue -- a pending row here is claimable in-game, then
--- flipped to Claimed. `gift_event_info` (same dump) is an older, simpler predecessor with the identical
--- id/uUserIdx/iIndex/iQuantity/iValue shape but no aStatus/date column at all -- it is a strict subset of
--- giftinfo's own shape, already covered by this table, so it is not modeled as its own table.
--- ProductId (legacy iIndex) is named/typed to loosely reference world.ItemMallProducts.ItemMallProductId
--- (designed in a parallel domain) per this pass's brief, but is deliberately left an UNENFORCED plain INT,
--- not a real FK: Protocol/STRUCT.h's own GIFT_INFO_V2 struct comments this exact field as "item id", i.e.
--- it may actually be a raw world.Items.ItemId rather than an item-mall product number -- a hard FK to the
--- wrong table would silently reject legitimate gift rows, so referential integrity here is left to the
--- application layer until that ambiguity is resolved. 0 is not a meaningful ProductId either way -- the
--- app must translate 0 -> NULL the same as every other cross-domain FK-shaped column in this schema.
--- Status: 0 = Pending (not yet claimed), 1 = Claimed. Matches legacy aStatus tinyint(1) exactly.
--- Starts empty (no existing players yet) -- schema only, no seed, per this domain's brief.
+-- Legacy `giftinfo`: a delivery queue -- a pending row is claimable in-game, then flipped to Claimed
+-- (Status: 0=Pending, 1=Claimed).
+-- ProductId (legacy iIndex) is deliberately an unenforced plain INT, not a FK: GIFT_INFO_V2 comments this
+-- field as "item id", so it may reference world.Items rather than world.ItemMallProducts -- a hard FK to
+-- the wrong table would silently reject legitimate rows.
 CREATE TABLE game.Gifts
 (
     GiftId       INT IDENTITY(1,1) NOT NULL,

@@ -1,36 +1,6 @@
 -- database/50_procedures/game/usp_OfflineShop_ExecutePurchase.sql
--- Contract: the atomic offline-shop purchase commit -- CZ_SET_DEPUTY_PSHOP_SEND BuySort=PURCHASED
--- (contracts/04_commerce.md, verified S07_MyGame09.cpp:604-857). The buyer is necessarily online (D7
--- regime (b): their money debit + item grant commit synchronously here); the SELLER need not be --
--- proceeds accumulate on game.OfflineShops.Money/BigMoney for later withdrawal
--- (usp_OfflineShop_WithdrawMoney), never touching the seller's live game.Characters.Money directly, so no
--- seller PlayerRuntimeState mirror is ever required by this action.
--- Params:
---   @SellerCharacterId INT
---   @SlotIndex         SMALLINT
---   @ExpectedItemId    INT
---   @ExpectedQuantity  INT
---   @ExpectedValue     INT
---   @Price             INT      -- CAS guard: the slot must still match every one of these AND the shop
---                                   must still be open (ShopState=1)
---   @BuyerCharacterId  INT
---   @BuyerContainer    TINYINT
---   @BuyerItems        game.tvp_CharacterItemSlot READONLY -- buyer's FULL new container content
--- Result set: none.
--- Idempotent: no.
--- Money-overflow quirk verified byte-for-bit (S07_MyGame09.cpp:805-816): crediting the seller's shop
--- Money past MAX_NUMBER_SIZE (2,000,000,000) rolls 2,000,000,000 off into +2 BigMoney rather than capping
--- -- reproduced exactly, not "corrected", per D8 (preserve exact legacy behavior for anything
--- client-observable). BigMoney itself is capped at MAX_NUMBER_SIZE2 (999, verified DEFINE.h) -- a would-be
--- breach aborts the WHOLE purchase (no partial commit), same as every other guarded UPDATE in this schema.
--- Errors:
---   THROW 50272 -- the seller's slot no longer matches (already sold/retrieved, or stale client state), or
---                  the shop is not open.
---   THROW 50222 -- the buyer's money balance is insufficient, or @BuyerCharacterId is unknown (shared with
---                  usp_Character_AdjustMoney).
---   THROW 50261 -- the buyer's money adjustment would exceed the legacy money cap (shared with
---                  usp_Character_AdjustMoney).
---   THROW 50273 -- crediting the seller's shop earnings would exceed the BigMoney cap (MAX_NUMBER_SIZE2 = 999).
+-- Money-overflow quirk reproduced exactly (verified S07_MyGame09.cpp:805-816): crediting the seller's shop
+-- Money past 2,000,000,000 rolls the excess into +2 BigMoney rather than capping -- not "corrected", per D8.
 CREATE PROCEDURE game.usp_OfflineShop_ExecutePurchase @SellerCharacterId INT,
     @SlotIndex         SMALLINT,
     @ExpectedItemId    INT,

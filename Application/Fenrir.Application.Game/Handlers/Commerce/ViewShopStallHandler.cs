@@ -6,19 +6,11 @@ using Fenrir.Network.Sessions;
 
 namespace Fenrir.Application.Game.Handlers.Commerce;
 
-/// <summary>
-///     CZ_DEMAND_PSHOP_SEND (opcode 33, contracts/04_commerce.md, verified <c>S04_MyWork02.cpp:6385-6423</c>)
-///     -- inspect another LIVE personal shop stall. <c>SearchAvatar</c>-scoped (same-zone only, verified) --
-///     resolved via THIS zone's own <see cref="Zone.Players" /> (never process-wide), matching every other
-///     PShop action's zone-37-only reach.
-/// </summary>
+/// <summary>CZ_DEMAND_PSHOP_SEND (opcode 33) -- inspect another live personal shop stall, same-zone only.</summary>
 public sealed class ViewShopStallHandler : IInlinePacketHandler<ViewShopStallRequest>
 {
-    /// <summary>
-    ///     Placeholder for "requester never opened a stall" (client-ignored). Must be a real FixedString/FixedArray
-    ///     shape, never <c>default(PshopInfo)</c> -- its null <see cref="PshopInfo.Name" />/arrays can't serialize on the
-    ///     wire.
-    /// </summary>
+    // Placeholder for "requester never opened a stall" -- must not be default(PshopInfo): its null
+    // Name/arrays can't serialize on the wire.
     internal static readonly PshopInfo EmptyPshopInfo = new()
         { UniqueNumber = 0, Name = string.Empty, ItemInfo = new int[225], SocketInfo = new int[75] };
 
@@ -45,8 +37,7 @@ public sealed class ViewShopStallHandler : IInlinePacketHandler<ViewShopStallReq
                 break;
             }
 
-        // Legacy trap (verified): on either error path the PshopInfo carries the REQUESTER's own stall,
-        // not the target's -- content the client is documented to ignore.
+        // Legacy trap: on either error path the PshopInfo carries the REQUESTER's own stall, not the target's.
         var ownListing = requester.PshopListing ?? EmptyPshopInfo;
 
         if (target is null)

@@ -1,10 +1,5 @@
--- Append-only audit trail of every state a game.Gifts row has passed through (legacy `giftinfo_log`, an
--- exact column-for-column mirror of `giftinfo` maintained by the legacy app layer purely as history).
--- Deliberately NOT a child table of game.Gifts (no FK/cascade back to GiftId, own IDENTITY space): a
--- claimed/expired Gifts row may later be purged from the live queue while its log entries must survive, so
--- this is a free-standing copy written on every state transition (enqueue, claim), not derived data.
--- No unique constraint on (AccountId, ...): the same account legitimately accumulates many historical rows.
--- Starts empty (no existing players yet) -- schema only, no seed, per this domain's brief.
+-- Legacy: `giftinfo_log`, a column-for-column mirror of `giftinfo` kept purely as history. Deliberately
+-- not a child table of game.Gifts (no FK back to GiftId): a purged Gifts row must not take its log with it.
 CREATE TABLE game.GiftLog
 (
     GiftLogId    INT IDENTITY(1,1) NOT NULL,

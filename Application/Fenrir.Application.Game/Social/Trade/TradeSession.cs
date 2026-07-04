@@ -2,19 +2,16 @@ using Fenrir.Application.Game.Inventory;
 
 namespace Fenrir.Application.Game.Social.Trade;
 
-/// <summary>
-///     MAX_TRADE_SLOT_NUM/MAX_TRADE_VALUE_NUM/MAX_TRADE_GEM_NUM (DEFINE.h:291-293), verified against
-///     contracts/05_social.md's own ZC_TRADE_START_RECV table.
-/// </summary>
+/// <summary>MAX_TRADE_SLOT_NUM/MAX_TRADE_VALUE_NUM/MAX_TRADE_GEM_NUM (DEFINE.h:291-293).</summary>
 public static class TradeLimits
 {
     public const int SlotCount = 8;
 }
 
 /// <summary>
-///     One side's offer -- 8 item slots (each a reference to where in inventory the offered stack
-///     currently lives, so commit can remove it from there) plus the two money pools.
-///     <see cref="MenuState" /> is CZ_TRADE_MENU_SEND's own state machine: 0 open, 1 locked, 2 confirmed.
+///     One side's offer -- 8 item slots (each a reference to where in inventory the offered stack currently
+///     lives, so commit can remove it from there) plus the two money pools. MenuState is CZ_TRADE_MENU_SEND's
+///     own state machine: 0 open, 1 locked, 2 confirmed.
 /// </summary>
 public sealed class TradeOfferSide
 {
@@ -27,10 +24,8 @@ public sealed class TradeOfferSide
 }
 
 /// <summary>
-///     One active trade negotiation's shared state -- allocated at CZ_TRADE_START_SEND, both
-///     participants' handlers resolve the SAME instance via <c>TradeRegistry</c>. Deliberately NOT
-///     persisted, matching the legacy (verified: game.Characters_progression.sql's header lists
-///     transient trade state as intentionally excluded).
+///     One active trade negotiation's shared state -- allocated at CZ_TRADE_START_SEND, both participants'
+///     handlers resolve the same instance via TradeRegistry. Deliberately not persisted, matching the legacy.
 /// </summary>
 public sealed class TradeSession
 {

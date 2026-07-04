@@ -4,11 +4,7 @@ using Fenrir.Contracts.Wire;
 
 namespace Fenrir.Contracts.Packets.Zone;
 
-/// <summary>
-///     CZ_BUY_BLOOD_MARK_SEND (CLIENT.h:361-367) — purchase a blood-mark catalog item. <c>BloodIndex</c>
-///     must be within <c>[0, mBloodShop.aBloodNum)</c>. Registered under <c>USE_BLOOD</c> (on in EU33).
-///     Reply: ZC_BUY_BLOOD_MARK_RECV.
-/// </summary>
+// BloodIndex must be within [0, aBloodNum).
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.BuyBloodMarkItem, ExpectedSize = 45,
     AllowedStates = [(byte)ZoneSessionState.InWorld])]
 public readonly partial record struct BuyBloodMarkItemRequest : IIncomingPacket<BuyBloodMarkItemRequest>

@@ -4,11 +4,7 @@ using Fenrir.Contracts.Wire;
 
 namespace Fenrir.Contracts.Packets.Zone;
 
-/// <summary>
-///     CZ_BUY_CASH_ITEM_SEND (CLIENT.h:349-356) — purchase a cash-shop item. <c>CostInfoIndex</c> indexes
-///     <c>mCostInfoValue[MAX_CASH_NUM]</c>; <c>Version</c> must match <c>mCashInfo-&gt;mVersion</c>.
-///     Runtime anti-spam: <c>Quit()</c> on two purchases &lt; 200 ms apart.
-/// </summary>
+// Version must match the server's cash catalog version; Quit() if two purchases arrive < 200ms apart.
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.BuyCashItem, ExpectedSize = 49,
     AllowedStates = [(byte)ZoneSessionState.InWorld])]
 public readonly partial record struct BuyCashItemRequest : IIncomingPacket<BuyCashItemRequest>

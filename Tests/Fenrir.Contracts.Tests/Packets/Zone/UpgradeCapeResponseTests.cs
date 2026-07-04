@@ -3,11 +3,7 @@ using Fenrir.Contracts.Packets.Zone;
 
 namespace Fenrir.Contracts.Tests.Packets.Zone;
 
-/// <summary>
-///     ZC_UP_LEVEL_ITEM_RECV (ZONE.h:1352-1357, 29-byte payload): Result/Value[6]/Padding(1 dead byte on
-///     the wire, pack(1)). <see cref="Padding" /> is intentionally set to a non-zero value here to prove
-///     the trailing byte truly round-trips through the wire and is not silently dropped by the generator.
-/// </summary>
+/// <summary>ZC_UP_LEVEL_ITEM_RECV (ZONE.h:1352-1357): Padding is a real dead byte on the wire (pack(1)); set non-zero here to prove it round-trips.</summary>
 public class ZcUpLevelItemRecvTests
 {
     [Fact]

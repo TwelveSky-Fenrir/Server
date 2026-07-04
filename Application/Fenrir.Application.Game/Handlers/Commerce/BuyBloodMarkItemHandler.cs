@@ -12,11 +12,8 @@ using Microsoft.Extensions.Logging;
 namespace Fenrir.Application.Game.Handlers.Commerce;
 
 /// <summary>
-///     CZ_BUY_BLOOD_MARK_SEND (opcode 141, contracts/04_commerce.md, verified <c>S04_MyWork02.cpp:15235-15372</c>).
-///     ANTI-CHEAT: the client's submitted quantity (<c>tValue[3]</c>) is only a plausibility bound
-///     ([1, 999]) -- the quantity actually granted always comes from the catalog's own fixed
-///     <c>Quantity</c>, never the client. BloodCoin debit and the container commit atomically
-///     (<see cref="CharacterRepository.SpendBloodCoinAndReplaceContainerAsync" />).
+///     CZ_BUY_BLOOD_MARK_SEND (opcode 141). The client's submitted quantity is only a plausibility bound --
+///     the quantity actually granted always comes from the catalog's own fixed <c>Quantity</c>.
 /// </summary>
 public sealed class BuyBloodMarkItemHandler(
     ICharacterRepository characters,
@@ -94,7 +91,6 @@ public sealed class BuyBloodMarkItemHandler(
         var entry = bloodShop.Data[packet.BloodIndex];
         if (entry.ItemId != packet.Value[0])
         {
-            // S04_MyWork02.cpp:15347 -- a stale client catalog view, a CLEAN reply (not a Quit()).
             session.Send(new BuyBloodMarkItemResponse
                 { Result = 2, BloodCoin = 0, Page1 = page, Index1 = slot, Value = packet.Value });
             return;
@@ -131,7 +127,7 @@ public sealed class BuyBloodMarkItemHandler(
             }
         }
 
-        // Blood-mark items never carry sockets (verified wSetInvSock(...,0,0,0) unconditionally).
+        // Blood-mark items never carry sockets.
         var finalQuantity = mergesIntoExisting ? destination!.Value.Quantity + entry.Quantity : entry.Quantity;
         var newStack = new ItemStack(entry.ItemId, finalQuantity, 0, 0, 0, 0, 0, 0, 0, 0, 0);
         var projectedContainer = state.Inventory.GetContainer((byte)page).SetItem((byte)slot, newStack);
@@ -144,7 +140,6 @@ public sealed class BuyBloodMarkItemHandler(
         }
         catch (Exception ex)
         {
-            // wAvatar.aBloodCoin < tPrice -- verified Quit()-worthy (S04_MyWork02.cpp:15321/15335), no clean-fail path.
             logger.LogWarning(ex,
                 "Character {CharacterId} blood-mark purchase SpendBloodCoinAndReplaceContainerAsync failed (treated as insufficient BloodCoin)",
                 characterId);

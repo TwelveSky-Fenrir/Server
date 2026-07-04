@@ -7,13 +7,9 @@ using Fenrir.Network.Sessions;
 namespace Fenrir.Application.Game.Handlers.Chat;
 
 /// <summary>
-///     CZ_WORLD_CHAT_SEND (opcode 152). Level &lt; 10 ⇒ anti-fuzzing Quit() (anti-spam-bot gate, verified);
-///     muted ⇒ silent drop. Relay tSort=115 -&gt; ZC_WORLD_CHAT_RECV (opcode 192) to EVERY ready player of
-///     EVERY zone, unfiltered (contracts/02_chat_notices.md) -- collapsed here into a direct process-wide
-///     fan-out (<see cref="ChatRouter" />'s own remarks on the relay-to-direct-fanout topology change).
-///     The wire's <c>TribeRole</c> field for this opcode is actually the sender's TRIBE NUMBER, not a role
-///     (contract's own documented "piège") -- passed through as <see cref="PlayerRuntimeState.Tribe" />
-///     verbatim, with no +1/other offset (no evidence found for one -- see this task's open issues).
+///     CZ_WORLD_CHAT_SEND (opcode 152). Level &lt; 10 aborts (anti-spam-bot gate); muted senders are
+///     silently dropped. Broadcasts to every zone, unfiltered. The wire's <c>TribeRole</c> field for this
+///     opcode is actually the sender's tribe number, not a role -- passed through verbatim.
 /// </summary>
 public sealed class WorldChatHandler(ZoneRegistry zones) : IInlinePacketHandler<WorldChatRequest>
 {

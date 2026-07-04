@@ -6,10 +6,8 @@ using Fenrir.Network.Sessions;
 
 namespace Fenrir.Application.Login.Tests.Handlers;
 
-/// <summary>
-///     op24 CL_CHANGE_MASTER_SEND — faithfully dead: the legacy body is 100% empty (S04_MyWork02.cpp l.1655-1658),
-///     no read, no reply, no Quit, no state change of any kind.
-/// </summary>
+// op24 CL_CHANGE_MASTER_SEND -- legacy body is empty (S04_MyWork02.cpp l.1655-1658): no read, no reply, no
+// Quit, no state change.
 public class ClChangeMasterSendHandlerTests
 {
     [Fact]

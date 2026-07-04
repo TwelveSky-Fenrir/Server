@@ -67,17 +67,12 @@ public class PartyRegistryTests
     [Fact]
     public void TryInvite_TargetAlreadyPartiedAndTribeMismatch_PrefersTargetAlreadyPartied()
     {
-        // Check order verified against PARTY_ASK_SEND (S04_MyWork02.cpp:9563-9614): target-already-partied
-        // (reply code 6, a soft/clean outcome) is checked BEFORE the tribe-mismatch Quit() -- a prior pass
-        // here checked tribe/level first, so an input where both conditions held simultaneously would
-        // incorrectly disconnect the inviter instead of sending the soft "already partied" reply the legacy
-        // sends in that exact situation.
+        // PARTY_ASK_SEND (S04_MyWork02.cpp): target-already-partied is checked before the tribe-mismatch Quit()
         var registry = new PartyRegistry();
         registry.TryInvite(1, 10, 0, 2, 10, 0);
-        registry.TryAnswer(2, true, out _, out _); // character 2 is now partied, tribe 0
+        registry.TryAnswer(2, true, out _, out _);
 
-        // Character 3 (a DIFFERENT tribe, 1) invites character 2 (already partied, tribe 0) -- both
-        // "target already partied" and "tribe mismatch" are simultaneously true.
+        // character 3 (different tribe) invites character 2 (already partied) -- both conditions hold at once
         var outcome = registry.TryInvite(3, 10, 1, 2, 10, 0);
 
         Assert.Equal(PartyInviteOutcome.TargetAlreadyPartied, outcome);

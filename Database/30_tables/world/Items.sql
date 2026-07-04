@@ -1,20 +1,5 @@
--- Source: legacy ITEM_INFO (005_00002.IMG via ItemReader.ReadAll -- post-runtime-patch data, i.e. what
--- the live legacy server actually serves, not the raw on-disk bytes). One row per ItemRecord where
--- Index != 0: the runtime patch (retired-slot zeroing at item ids 89501-89562 and 99001, applied every
--- server boot by the legacy MyShm::Load_Item) is the legacy "deleted item" convention, so those ~65,600
--- slots carry no real data and are not seeded as empty placeholder rows.
--- Column order mirrors ITEM_INFO (Header/Protocol/STRUCT.h:44-93) field-for-field so this stays
--- diffable against the source struct. EquipInfo[2]/PotionType[2]/LastAttackBonusInfo[2]/CapeInfo[3] are
--- small, always-meaningful fixed pairs/triples (2-3 slots, never sparse) so they get numbered columns;
--- BonusSkillInfo[8][2] is normalized out to world.ItemBonusSkills (see that file) since most of its 8
--- slots are empty per item (only 15,417 of 34,353 real items use any slot at all).
--- GainSkillNumber keeps its legacy name (iGainSkillNumber) but is modeled as a nullable FK to
--- world.Skills: every one of its 78 distinct non-zero values in the real data is a valid SkillId, so
--- despite the "Number" in its name this is a skill reference, not a quantity. The legacy "0 = no skill"
--- sentinel translates to NULL, since SkillId 0 is not a real row in world.Skills.
--- Level/LevelLimit are modeled as FKs into world.Levels(Level): both fields' observed range (1-145,
--- never 0) exactly matches world.Levels' full, gapless 1-145 span, so the FK can never fail on real
--- data and catches typos in any future hand-authored item row.
+-- Legacy ITEM_INFO (post-runtime-patch data, i.e. what the live legacy server actually serves); one row per record where Index != 0.
+-- GainSkillNumber is a nullable FK to world.Skills despite the "Number" name -- it's a skill reference, not a quantity (0 -> NULL). BonusSkillInfo[8][2] normalizes into world.ItemBonusSkills.
 CREATE TABLE world.Items
 (
     ItemId               INT      NOT NULL,

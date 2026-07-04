@@ -6,11 +6,7 @@ using Fenrir.Network.Framing;
 
 namespace Fenrir.Application.Game.Tests.World;
 
-/// <summary>
-///     Covers <see cref="Zone" />'s Move command path (position update, <c>MovementRules</c> plausibility
-///     gate, AOI cell tracking, and the broadcast/resync split) -- previously untested despite being one of
-///     the three command kinds the mission brief called out for regression coverage (report review 08).
-/// </summary>
+/// <summary>Covers <see cref="Zone" />'s Move command path: position update, <c>MovementRules</c> plausibility gate, AOI tracking, and broadcast/resync split.</summary>
 public class ZoneMoveTests
 {
     private static readonly int OneFrame = FrameWriter.FrameSizeOf<AvatarActionResponse>();
@@ -53,8 +49,7 @@ public class ZoneMoveTests
         ZoneTestKit.DrainOutbound(moverPipe);
         ZoneTestKit.DrainOutbound(neighborPipe);
 
-        // A tiny step: plausible regardless of the real wall-clock elapsed since Enter (MovementRules
-        // measures DateTime.UtcNow, not the zone's simulated clock -- SlackUnits=1 alone covers this).
+        // MovementRules measures DateTime.UtcNow, not the zone's simulated clock -- SlackUnits=1 covers this tiny step regardless
         zone.Post(ZoneCommand.Move(10, MoveTo(10.5f, 10f)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
@@ -62,10 +57,9 @@ public class ZoneMoveTests
         Assert.Equal(10.5f, mover10!.PosX);
         Assert.Equal(10f, mover10.PosZ);
 
-        // Self is excluded (client-side prediction already applied it) -- the mover gets nothing.
+        // self excluded: client-side prediction already applied the move
         Assert.Empty(ZoneTestKit.DrainOutbound(moverPipe));
 
-        // The neighbor learns of the move via the shared broadcast.
         var neighborInbox = ZoneTestKit.DrainOutbound(neighborPipe);
         Assert.Equal(OneFrame, neighborInbox.Length);
     }
@@ -80,17 +74,14 @@ public class ZoneMoveTests
         zone.Tick(TimeSpan.FromMilliseconds(50));
         ZoneTestKit.DrainOutbound(moverPipe);
 
-        // A teleport far beyond any plausible speed budget, however much real wall-clock time elapsed.
         zone.Post(ZoneCommand.Move(10, MoveTo(999_999f, 999_999f)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
-        // Rejected: position is untouched.
         Assert.True(zone.TryGetPlayer(10, out var mover10));
         Assert.Equal(10f, mover10!.PosX);
         Assert.Equal(10f, mover10.PosZ);
 
-        // The mover -- and only the mover -- receives a direct resync frame carrying its own last-known-good
-        // state (architecture reference §6.5's ForcePositionSync, reused on the existing wire packet).
+        // only the mover gets a direct resync frame with its last-known-good position
         var moverInbox = ZoneTestKit.DrainOutbound(moverPipe);
         Assert.Equal(OneFrame, moverInbox.Length);
     }
@@ -100,8 +91,6 @@ public class ZoneMoveTests
     {
         var zone = ZoneTestKit.CreateZone(1);
 
-        // No Enter was ever posted for character 999 -- HandleMove must no-op, not throw (a stray/late Move
-        // for an already-departed player is routine, not a bug).
         zone.Post(ZoneCommand.Move(999, MoveTo(1f, 1f)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
 

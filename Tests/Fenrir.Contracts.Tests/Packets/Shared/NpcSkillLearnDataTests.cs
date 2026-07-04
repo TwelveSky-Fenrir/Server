@@ -4,7 +4,6 @@ using Fenrir.Contracts.Tests.TestSupport;
 
 namespace Fenrir.Contracts.Tests.Packets.Shared;
 
-/// <summary>NPC_SKILL_RECV (8 bytes, STRUCT.h:1240-1243) — 2 ints, no padding.</summary>
 public class NpcSkillLearnDataTests
 {
     [Fact]

@@ -11,13 +11,7 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.LoginServer;
 
-/// <summary>
-///     Owns the login listen socket for the process lifetime: binds <see cref="FenrirTcpListener" /> to
-///     <see cref="LoginServerOptions.Port" />, and for each accepted connection greets the client
-///     (<c>LC_LOGIN_CONNECT_OK_RECV</c>, wire contract §4.1), seeds the inbound stream cipher (§3.4), then runs
-///     the connection's I/O pump and <see cref="Fenrir.Network.Dispatching.SessionLoop" /> side by side until
-///     either ends.
-/// </summary>
+/// <summary>Owns the login listen socket; for each accepted connection, greets the client, seeds the stream cipher, then pumps I/O.</summary>
 public sealed class LoginConnectionHost(
     IOptions<LoginServerOptions> options,
     IFrameDispatcher dispatcher,
@@ -43,7 +37,6 @@ public sealed class LoginConnectionHost(
         }
         catch (OperationCanceledException)
         {
-            // Normal shutdown path.
         }
     }
 
@@ -73,16 +66,10 @@ public sealed class LoginConnectionHost(
         }
     }
 
-    /// <summary>
-    ///     Sends the op 0 greeting and seeds <c>mPacketEncryptionValue</c> (§3.4) BEFORE the connection's I/O pump
-    ///     starts, so no inbound byte is ever decoded with the wrong (unseeded) key. The greeting itself is safe to
-    ///     write before <see cref="SocketConnection.RunIOAsync" /> starts: <see cref="ClientSession.Send{TPacket}" />
-    ///     only buffers into the in-memory TX pipe, which the (not-yet-started) send loop drains once running.
-    /// </summary>
+    /// <summary>Seeds the stream cipher key BEFORE the I/O pump starts, so no inbound byte is decoded with the wrong key.</summary>
     private void Greet(LoginClientSession session, SocketConnection connection)
     {
-        // rand_nor()%1001 * rand_nor()%1001 (legacy) is not reproducible/needed byte-for-byte — only the
-        // low byte (the stream-cipher key) and the full int (sent to the client) need to look random.
+        // Legacy rand_nor()%1001 * rand_nor()%1001 need not be reproduced byte-for-byte, only "look random".
         var randomNumber = RandomNumberGenerator.GetInt32(int.MinValue, int.MaxValue);
 
         session.InboundStreamXorKey = unchecked((byte)randomNumber);

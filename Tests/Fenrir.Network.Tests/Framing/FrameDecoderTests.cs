@@ -7,12 +7,9 @@ namespace Fenrir.Network.Tests.Framing;
 
 public class FrameDecoderTests
 {
-    // HeartbeatRequest/ZoneHandshakeRequest are both Zone-owned [FenrirPacket]s — the server value only
-    // matters for opcode-table selection, so a single constant keeps the frame-shaped tests focused.
     private const FenrirServer Server = FenrirServer.Zone;
 
-    // Login Incoming tops out at 25, Zone Incoming at 151 (see Opcodes.cs) — 250 is registered nowhere,
-    // for either server, in either direction.
+    // Login Incoming tops out at 25, Zone Incoming at 151 -- 250 is registered nowhere.
     private const byte UnregisteredOpcode = 250;
 
     [Fact]
@@ -27,7 +24,7 @@ public class FrameDecoderTests
         Assert.Equal(Server, frame.Server);
         Assert.Equal(HeartbeatRequest.Opcode, frame.Opcode);
         Assert.Equal(frameBytes[WireHeaderSizes.ClientPacketSize..], frame.Payload.ToArray());
-        Assert.Equal(0, buffer.Length); // the whole frame — and nothing more — was consumed
+        Assert.Equal(0, buffer.Length);
     }
 
     [Fact]
@@ -87,7 +84,7 @@ public class FrameDecoderTests
     public void TryReadFrame_BufferShorterThanHeader_ReturnsFalse_NeverThrows_NeverConsumes(int length)
     {
         var bytes = new byte[length];
-        Array.Fill(bytes, (byte)0xFF); // hostile filler — must never be inspected before 9 bytes exist
+        Array.Fill(bytes, (byte)0xFF); // must never be inspected before 9 bytes exist
         var buffer = new ReadOnlySequence<byte>(bytes);
         var originalLength = buffer.Length;
 
@@ -108,11 +105,9 @@ public class FrameDecoderTests
         Assert.Equal(0, buffer.Length);
     }
 
-    // The gate criterion for this phase: fragmentation at every single byte boundary must never corrupt or
-    // drop a frame, and must never be mistaken for a complete one. ZoneHandshakeRequest (272 bytes total) is
-    // built as an explicit two-segment ReadOnlySequenceSegment chain, re-cut at every position from 1 to 271 —
-    // a flat byte[]-backed ReadOnlySequence can never exercise the header/payload-straddles-segment case that
-    // a real Pipe delivers in production.
+    // Fragmentation at every byte boundary must never corrupt or drop a frame. A flat byte[]-backed
+    // ReadOnlySequence is always single-segment, so this builds an explicit two-segment chain, re-cut at
+    // every position, to reproduce the header/payload-straddles-segment case a real Pipe delivers.
     [Fact]
     public void TryReadFrame_CzTempRegisterSend_FragmentedAtEveryByteBoundary_NeverCorruptsNeverMisfires()
     {
@@ -123,8 +118,6 @@ public class FrameDecoderTests
         var fragmentationCases = 0;
         for (var cut = 1; cut < frameSize; cut++)
         {
-            // Incomplete: only the first `cut` of 272 bytes have arrived, split across two segments.
-            // Must report "not enough yet" and leave the caller's buffer completely untouched.
             var incomplete = TwoSegments(fullFrame, cut, cut / 2);
             var incompleteLength = incomplete.Length;
 
@@ -133,9 +126,6 @@ public class FrameDecoderTests
             Assert.False(decodedIncomplete);
             Assert.Equal(incompleteLength, incomplete.Length);
 
-            // Complete: all 272 bytes are present, but the two-segment junction sits at this exact
-            // boundary — sweeping `cut` through the whole frame forces the junction through the header,
-            // through the payload, and through every point in between.
             var complete = TwoSegments(fullFrame, frameSize, cut);
 
             var decodedComplete = FrameDecoder.TryReadFrame(ref complete, Server, out var frame);
@@ -151,17 +141,12 @@ public class FrameDecoderTests
         Assert.Equal(frameSize - 1, fragmentationCases);
     }
 
-    /// <summary>
-    ///     Builds a raw <c>CLIENT_PACKET</c> frame: 9-byte header (opcode at offset 8) + a
-    ///     deterministic, seed-derived payload — content is irrelevant to FrameDecoder, only distinct enough
-    ///     to catch accidental byte-copy bugs.
-    /// </summary>
     private static byte[] BuildFrame(byte opcode, int payloadSize, int seed)
     {
         var frame = new byte[WireHeaderSizes.ClientPacketSize + payloadSize];
 
-        // tPacket1/tPacket2 (offsets 0..7) carry no framing information in BuildEU33 — filled with
-        // non-zero noise to prove FrameDecoder never looks at them.
+        // tPacket1/tPacket2 (offsets 0..7) carry no framing info in BuildEU33 -- noise proves FrameDecoder
+        // never looks at them.
         Array.Fill(frame, (byte)(seed | 0x80), 0, 8);
         frame[8] = opcode;
 
@@ -171,16 +156,7 @@ public class FrameDecoderTests
         return frame;
     }
 
-    /// <summary>
-    ///     Splits <paramref name="data" />[0..<paramref name="length" />) into a genuine two-segment
-    ///     <see cref="ReadOnlySequence{T}" /> at <paramref name="splitAt" /> — a plain
-    ///     <c>
-    ///         new
-    ///         ReadOnlySequence&lt;byte&gt;(array)
-    ///     </c>
-    ///     is always single-segment and can never reproduce a
-    ///     header/payload that straddles a pipe's segment boundary.
-    /// </summary>
+    // Splits data[0..length) into a genuine two-segment ReadOnlySequence at splitAt.
     private static ReadOnlySequence<byte> TwoSegments(byte[] data, int length, int splitAt)
     {
         var first = new Segment(data.AsMemory(0, splitAt));

@@ -2,12 +2,7 @@ using CaeriusNet.Attributes.Dto;
 
 namespace Fenrir.Data.World;
 
-/// <summary>
-///     One world.Monsters row joined 1:1 with world.MonsterAnimationFrames -- ordinal contract of
-///     world.usp_Monster_GetAll's single result set (1,139 rows: 40 monster columns then 14 frame columns).
-///     Constructor order must track the SELECT column order exactly (invariant I-04); [GenerateDto] maps by
-///     position, not by name.
-/// </summary>
+// world.usp_Monster_GetAll: monster columns then MonsterAnimationFrames columns, in that order; ordinal-mapped.
 [GenerateDto]
 public sealed partial record MonsterRowDto(
     int MonsterId,
@@ -81,10 +76,7 @@ public sealed partial record MonsterDropPotionRowDto(
     int DropRate,
     int PotionItemId);
 
-/// <summary>
-///     world.MonsterDropExtraItems row -- world.usp_Monster_GetDrops RS2 (populated slots only, SlotIndex 0-49).
-///     ItemId is NULL when the legacy slot's item half was 0 (rate set, no item wired up).
-/// </summary>
+/// <summary>world.usp_Monster_GetDrops RS2 (SlotIndex 0-49); ItemId null when the slot had no item wired up.</summary>
 [GenerateDto]
 public sealed partial record MonsterDropExtraItemRowDto(
     int MonsterId,

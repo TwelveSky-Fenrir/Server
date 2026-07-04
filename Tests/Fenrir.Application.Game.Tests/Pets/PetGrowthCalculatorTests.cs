@@ -84,8 +84,7 @@ public class PetGrowthCalculatorTests
     [Fact]
     public void Compute_LifeAndDefense_NotGatedByActivity_VerifiedSourceNuance()
     {
-        // Verified against GameSystem_07_Pet.cpp: ReturnLifeValue/ReturnDefensePower never reference their
-        // own pActivityValue parameter at all -- only ReturnAttackPower does.
+        // GameSystem_07_Pet.cpp: ReturnLifeValue/ReturnDefensePower never reference pActivityValue -- only ReturnAttackPower does
         var items = Items((1004, 22), (542, 22));
 
         var lifeInactive = PetGrowthCalculator.Compute(1004, 20_000_000, 0, items);

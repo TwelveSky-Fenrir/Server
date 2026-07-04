@@ -17,9 +17,6 @@ public sealed class LoginServerOptionsValidator : IValidateOptions<LoginServerOp
             errors.Add($"Login:TicketTtlSeconds must be positive (was {options.TicketTtlSeconds}).");
         if (options.MaxPlayerNum <= 0) errors.Add($"Login:MaxPlayerNum must be positive (was {options.MaxPlayerNum}).");
 
-        // RequireSecondPassword needs no range rule (a bool has no invalid value); listed here so the validator
-        // stays the single inventory of every Login:* knob. Prod EU33 runs with it true (P2ndPassword=1).
-
         return errors.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(errors);
     }
 }

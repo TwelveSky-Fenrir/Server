@@ -10,20 +10,12 @@ using Fenrir.Data.WriteBehind;
 
 namespace Fenrir.Application.Game.Tests.Simulation;
 
-/// <summary>
-///     Covers <see cref="MeditationRegenSystem" /> (report 05 §7 point 3, <c>AVATAR_OBJECT::Update</c>,
-///     S07_MyGame04.cpp:461-518): passive HP/MP regen ONLY while <c>aAction.aSort == 31</c> (sitting), driven
-///     by the sit-skill riding on the same action.
-/// </summary>
+/// <summary>Covers <see cref="MeditationRegenSystem" />: passive HP/MP regen only while <c>aAction.aSort == 31</c> (sitting), driven by the sit-skill riding on the same action.</summary>
 public class MeditationRegenSystemTests
 {
     private static SkillDefinition SitSkill(byte maxUpgradePoint, byte lifeDivisor, byte manaDivisor)
     {
         var row = new SkillRowDto(7, "Sit", 0, 0, 0, 0, 0, 1, maxUpgradePoint, 1, 0);
-        // 27 positional args: SkillId, GradeIndex, ManaUse, RecoverInfo1, RecoverInfo2, StunAttack, StunDefense,
-        // FastRunSpeed, AttackInfo1-3, RunTime, ChargingDamageUp, AttackPowerUp, DefensePowerUp,
-        // AttackSuccessUp, AttackBlockUp, ElementAttackUp, ElementDefenseUp, AttackSpeedUp, RunSpeedUp,
-        // ShieldLifeUp, LuckUp, CriticalUp, ReturnSuccessUp, StunDefenseUp, DestroySuccessUp.
         var grade0 = new SkillGradeRowDto(7, 0, 0, lifeDivisor, manaDivisor, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             0, 0, 0, 0, 0, 0, 0, 0);
         var grade1 = new SkillGradeRowDto(7, 1, 0, lifeDivisor, manaDivisor, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -65,8 +57,8 @@ public class MeditationRegenSystemTests
     public void Sitting_RegeneratesHpAndMpEveryLegacyTick()
     {
         var (zone, state) = SetUp(84, 32); // MaxLife=840 -> 10/tick, MaxMana=320 -> 10/tick
-        var startLife = state.Life; // 800
-        var startMana = state.Mana; // 300
+        var startLife = state.Life;
+        var startMana = state.Mana;
 
         zone.Post(ZoneCommand.Move(10, SitAction(7, 5)));
         zone.Tick(SimulationClock.LegacyTick);

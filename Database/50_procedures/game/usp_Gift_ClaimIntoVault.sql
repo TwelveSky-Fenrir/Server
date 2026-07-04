@@ -1,23 +1,5 @@
--- database/50_procedures/game/usp_Gift_ClaimIntoVault.sql
--- Contract: atomically claim a pending gift (same Status 0->1 guard as usp_Gift_Claim, GiftLog row in the
--- SAME transaction) AND place its item into the account's shared vault (CL_WANT_GIFT_SEND, login protocol
--- report §4.21 -- "moved to the shared chest"). game.AccountVaultItems has a hard FK to game.AccountVault
--- (AccountId), so this ensures that parent row exists first (an account's vault is otherwise only created
--- lazily via usp_AccountVault_EnsureInitialized on vault-panel open -- a gift claim must not require the
--- player to have opened the vault panel first).
--- Params:
---   @GiftId    INT -- game.Gifts.GiftId
---   @AccountId INT -- must own @GiftId (same defense as usp_Gift_Claim)
--- Result set (RS0, single row): SlotIndex SMALLINT -- the vault slot the item landed in (so the caller can
--- report a real inventory position, matching ZC_WANT_GIFT... — no, LC_WANT_GIFT_RECV has no position field
--- today, but callers may still want it for logging).
--- Idempotent: no (same posture as usp_Gift_Claim).
--- Errors:
---   THROW 50220 -- @GiftId does not exist, does not belong to @AccountId, or is not Pending (shared with
---                  usp_Gift_Claim).
---   THROW 50274 -- the account's vault is full (28 slots, MAX_SAVE_ITEM_SLOT_NUM) -- admin.ErrorCatalog,
---                  502xx = game range. The gift stays Pending (not consumed) so the player can free a slot
---                  and retry -- the whole transaction rolls back under XACT_ABORT.
+-- Creates the account's AccountVault row if missing (a gift claim must not require the vault panel to
+-- have been opened first). On a full vault (50274), the transaction rolls back and the gift stays Pending.
 CREATE PROCEDURE game.usp_Gift_ClaimIntoVault @GiftId    INT,
     @AccountId INT
 AS

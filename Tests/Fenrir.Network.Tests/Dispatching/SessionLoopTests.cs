@@ -7,13 +7,8 @@ using Fenrir.Network.Tests.TestSupport;
 
 namespace Fenrir.Network.Tests.Dispatching;
 
-/// <summary>
-///     Integration-level coverage of <see cref="SessionLoop" />: the full read → decode → state-gate →
-///     rate-limit → dispatch pipeline against a real <see cref="System.IO.Pipelines.Pipe" /> pair
-///     (<see cref="FakeDuplexPipe" />), not just <see cref="Fenrir.Network.Framing.FrameDecoder" /> in isolation.
-///     All scenarios use <see cref="ZoneClientSession" /> since the Zone opcodes (§4.9) already used elsewhere in
-///     this suite exercise both a state-gated and an ungated case.
-/// </summary>
+// Integration-level coverage of SessionLoop: the full read -> decode -> state-gate -> rate-limit -> dispatch
+// pipeline against a real Pipe pair, not just FrameDecoder in isolation.
 public sealed class SessionLoopTests
 {
     private static readonly TimeSpan LoopTimeout = TimeSpan.FromSeconds(5);
@@ -28,7 +23,7 @@ public sealed class SessionLoopTests
 
         var frame = BuildClientFrame(HeartbeatRequest.Opcode, HeartbeatRequest.PayloadSize);
         await pipe.PeerToSession.WriteAsync(frame);
-        await pipe.PeerToSession.CompleteAsync(); // closes the client side so the loop terminates deterministically
+        await pipe.PeerToSession.CompleteAsync();
 
         await AwaitLoopAsync(loopTask);
 
@@ -53,13 +48,13 @@ public sealed class SessionLoopTests
 
         for (var i = 0; i < frame.Length; i++)
         {
-            await pipe.PeerToSession.WriteAsync(frame.AsMemory(i,
-                1)); // WriteAsync flushes -> one real, separate segment per byte
+            // WriteAsync flushes -> one real, separate segment per byte.
+            await pipe.PeerToSession.WriteAsync(frame.AsMemory(i, 1));
 
             if (i < frame.Length - 1)
             {
                 await Task.Yield();
-                Assert.Empty(dispatcher.Records); // decode cannot succeed on a partial frame regardless of scheduling
+                Assert.Empty(dispatcher.Records);
             }
         }
 
@@ -80,11 +75,11 @@ public sealed class SessionLoopTests
         var dispatcher = new RecordingFrameDispatcher();
         var loopTask = SessionLoop.RunAsync(session, dispatcher, null, CancellationToken.None);
 
-        // EnterWorld is only allowed once TicketConsumed (§8.1) -> illegal here.
+        // EnterWorld is only allowed once TicketConsumed -> illegal here.
         var frame = BuildClientFrame(EnterWorldRequest.Opcode, EnterWorldRequest.PayloadSize);
         await pipe.PeerToSession.WriteAsync(frame);
 
-        await AwaitLoopAsync(loopTask); // session.Abort() ends the current iteration itself, no client-close needed
+        await AwaitLoopAsync(loopTask);
 
         Assert.Empty(dispatcher.Records);
         Assert.Equal(DisconnectReason.StateViolation, session.DisconnectReason);
@@ -98,8 +93,7 @@ public sealed class SessionLoopTests
         var dispatcher = new RecordingFrameDispatcher();
         var loopTask = SessionLoop.RunAsync(session, dispatcher, null, CancellationToken.None);
 
-        // Opcode 250 is registered for neither server/direction (see Opcodes.cs) -> FrameDecoder's
-        // ProtocolViolationException must be swallowed inside SessionLoop, never escape RunAsync.
+        // Opcode 250 is unregistered -> FrameDecoder's ProtocolViolationException must be swallowed here.
         var header = new byte[WireHeaderSizes.ClientPacketSize];
         header[8] = 250;
         await pipe.PeerToSession.WriteAsync(header);
@@ -135,7 +129,7 @@ public sealed class SessionLoopTests
         var dispatcher = new RecordingFrameDispatcher();
         var loopTask = SessionLoop.RunAsync(session, dispatcher, null, CancellationToken.None);
 
-        await pipe.PeerToSession.CompleteAsync(); // simulates the client closing the socket
+        await pipe.PeerToSession.CompleteAsync();
 
         await AwaitLoopAsync(loopTask);
 
@@ -152,10 +146,7 @@ public sealed class SessionLoopTests
         return session;
     }
 
-    /// <summary>
-    ///     Builds a raw <c>CLIENT_PACKET</c> frame (9-byte header, opcode at offset 8) with a distinct, checkable payload
-    ///     pattern; content is never parsed by SessionLoop, only sliced.
-    /// </summary>
+    // Raw CLIENT_PACKET frame (9-byte header, opcode at offset 8); content is never parsed by SessionLoop.
     private static byte[] BuildClientFrame(byte opcode, int payloadSize, byte payloadSeed = 1)
     {
         var frame = new byte[WireHeaderSizes.ClientPacketSize + payloadSize];
@@ -167,14 +158,10 @@ public sealed class SessionLoopTests
         return frame;
     }
 
-    /// <summary>
-    ///     Awaits with a hard timeout so a regression that hangs RunAsync fails fast with a clear message instead of
-    ///     blocking the run indefinitely.
-    /// </summary>
     private static async Task AwaitLoopAsync(Task loopTask)
     {
         var completed = await Task.WhenAny(loopTask, Task.Delay(LoopTimeout));
         Assert.Same(loopTask, completed);
-        await loopTask; // rethrows if RunAsync itself faulted, which the "no exception escapes" scenarios must catch
+        await loopTask;
     }
 }

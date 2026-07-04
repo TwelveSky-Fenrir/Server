@@ -5,20 +5,10 @@ using Fenrir.Data.World;
 namespace Fenrir.Application.Game.Skills;
 
 /// <summary>
-///     Pure resolver for CZ_PROCESS_DATA_SEND tSort 202/233 (learn a new skill from an NPC's skill-tree
-///     offer -- <c>ProcessForLearnSkill1</c>/<c>ProcessForLearnSkill2</c>, verified against
-///     <c>Server/ts25zone/S04_MyWork05.cpp:375/3343</c>: two DIFFERENT legacy arrays,
-///     <c>nSkillInfo1[3][8]</c>/<c>nSkillInfo2[3][3][3][8]</c> -- <c>world.NpcSkillOffers.ArrayKind</c>
-///     distinguishes them -- but otherwise IDENTICAL slot-finding logic) and tSort 203
-///     (<c>ProcessForSkillUpgrade</c>, S04_MyWork05.cpp:555). No I/O, no <see cref="World.Zone" />
-///     dependency.
+///     Pure resolver for CZ_PROCESS_DATA_SEND tSort 202/233 (learn a skill from an NPC's offer) and 203 (skill
+///     upgrade). No I/O, no Zone dependency.
 /// </summary>
-/// <remarks>
-///     EVERY failure branch in all three legacy functions is a <c>Quit()</c> -- neither has a graceful
-///     <c>*tResult=1</c> path at all (unlike, say, <c>ProcessForNPCShopToInventory</c>'s buy side). The
-///     caller must therefore <c>Abort</c> on ANY non-success result from this type, never send a clean
-///     failure reply.
-/// </remarks>
+/// <remarks>Every failure branch in the legacy is a Quit(), never a graceful reply -- callers must Abort on any non-success result.</remarks>
 public static class SkillLearnResolver
 {
     public enum LearnFailure
@@ -41,21 +31,15 @@ public static class SkillLearnResolver
         AlreadyMaxed
     }
 
-    /// <summary><c>MAX_SKILL_SLOT_NUM</c> (<c>aSkill[40]</c>, <c>CK_CharacterSkills_SlotIndex</c>).</summary>
+    /// <summary>MAX_SKILL_SLOT_NUM (aSkill[40]).</summary>
     public const int MaxSlots = 40;
 
-    /// <summary><c>NpcSkillOfferRowDto.ArrayKind</c> -- tSort 202, <c>nSkillInfo1</c>.</summary>
+    /// <summary>NpcSkillOfferRowDto.ArrayKind -- tSort 202, nSkillInfo1.</summary>
     public const byte SkillTree1 = 1;
 
-    /// <summary><c>NpcSkillOfferRowDto.ArrayKind</c> -- tSort 233, <c>nSkillInfo2</c>.</summary>
+    /// <summary>NpcSkillOfferRowDto.ArrayKind -- tSort 233, nSkillInfo2.</summary>
     public const byte SkillTree2 = 2;
 
-    /// <summary>
-    ///     <paramref name="arrayKind" /> selects which of the NPC's two offer arrays to search
-    ///     (<see cref="SkillTree1" />/<see cref="SkillTree2" />) -- everything else is identical between
-    ///     tSort 202 and 233. Order of checks mirrors the verified source EXACTLY (offered-by-this-NPC,
-    ///     unknown-skill, insufficient-points, already-learned-anywhere, no-free-slot-for-this-skill-type).
-    /// </summary>
     public static LearnResult ResolveLearn(
         ImmutableArray<NpcSkillOfferRowDto> npcSkillOffers,
         byte arrayKind,
@@ -90,10 +74,6 @@ public static class SkillLearnResolver
             : LearnResult.Fail(LearnFailure.NoFreeSlot);
     }
 
-    /// <summary>
-    ///     tSort 203 -- verified: NO <c>CheckNPCFunction</c> call site exists for this action, unlike its 202/233
-    ///     siblings.
-    /// </summary>
     public static UpgradeResult ResolveUpgrade(int slot, IReadOnlyDictionary<byte, LearnedSkill> learnedSkills,
         SkillDefinition? skillDefinition, int currentSkillPoints)
     {
@@ -115,12 +95,7 @@ public static class SkillLearnResolver
         return new UpgradeResult(true, UpgradeFailure.None, learned.Grade + 1);
     }
 
-    /// <summary>
-    ///     Per-<c>sType</c> slot ranges, verified IDENTICAL for both offer arrays: 1 -&gt; [0,10),
-    ///     2 -&gt; [20,30), 3/4 -&gt; try [10,20) then [30,40) (S04_MyWork05.cpp:436-544/3409-3501). Returns
-    ///     the FIRST empty slot found in range, matching the legacy's own linear scan; any other
-    ///     <c>sType</c> value has no valid range (legacy <c>default: Quit()</c>).
-    /// </summary>
+    /// <summary>Per-sType slot ranges: 1 -> [0,10), 2 -> [20,30), 3/4 -> try [10,20) then [30,40).</summary>
     private static bool TryFindFreeSlotForType(byte skillType, IReadOnlyDictionary<byte, LearnedSkill> learnedSkills,
         out byte slot)
     {

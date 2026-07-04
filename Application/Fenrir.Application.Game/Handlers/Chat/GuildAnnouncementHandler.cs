@@ -7,11 +7,8 @@ using Fenrir.Network.Sessions;
 namespace Fenrir.Application.Game.Handlers.Chat;
 
 /// <summary>
-///     CZ_GUILD_NOTICE_SEND (opcode 76). Empty content ⇒ Quit(); restricted to the guild MASTER
-///     (<c>GuildRoleCodec.IsMaster</c>, DB role 2 -- the wire's own <c>aGuildRole != 0</c> gate, verified
-///     against the actual write sites, see <c>GuildRoleCodec</c>'s own remarks) -- a non-master sender is
-///     silently ignored, no Quit. No CheckChat/mute gate is documented for this channel. Fan-out to every
-///     guild member across every zone, no ItemLinkInfo (a notice, not a chat message).
+///     CZ_GUILD_NOTICE_SEND (opcode 76). Restricted to the guild master (<c>GuildRoleCodec.IsMaster</c>);
+///     a non-master sender is silently ignored, not disconnected. No mute gate applies to this channel.
 /// </summary>
 public sealed class GuildAnnouncementHandler(ZoneRegistry zones) : IInlinePacketHandler<GuildAnnouncementRequest>
 {

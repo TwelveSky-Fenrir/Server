@@ -12,18 +12,14 @@ using Microsoft.Extensions.Logging;
 namespace Fenrir.Application.Game.Handlers.Quests;
 
 /// <summary>
-///     CZ_PROCESS_QUEST_SEND (opcode 36, verified byte-for-byte against
-///     <c>Server/ts25zone/S04_MyWork02.cpp:7307-7563</c>) -- the 5-action quest state machine
-///     (<see cref="QuestStateMachine" />). Every rejection in the legacy source is a <c>Quit()</c>; there is
-///     no clean <c>tResult</c> failure path for this opcode.
+///     CZ_PROCESS_QUEST_SEND (opcode 36) -- the 5-action quest state machine (<see cref="QuestStateMachine" />).
+///     Every rejection aborts; there is no clean <c>tResult</c> failure path for this opcode.
 /// </summary>
 /// <remarks>
-///     Reward money and any touched container are persisted synchronously in ONE transaction with the
-///     quest-state row (<c>usp_CharacterQuest_ApplyTransition</c>) before the client sees success -- same
-///     posture as <c>GenericActionHandler</c>'s NPC-shop buy/sell. CP/XP/TeacherPoint rewards are
-///     write-behind, mirrored via <see cref="QuestZoneCommand" /> after the SQL commit and awaited before
-///     <see cref="PlayerRuntimeState.EconomyActionLock" /> releases -- a duplication race requires both the
-///     read and the mirror to happen while holding the lock.
+///     Reward money and any touched container are persisted synchronously in the same transaction as the
+///     quest-state row. CP/XP/TeacherPoint rewards are write-behind, mirrored via <see cref="QuestZoneCommand" />
+///     after the SQL commit and awaited before <see cref="PlayerRuntimeState.EconomyActionLock" /> releases --
+///     both the read and the mirror must happen while holding the lock to avoid a duplication race.
 /// </remarks>
 public sealed class QuestProgressHandler(
     ICharacterRepository characters,
@@ -92,7 +88,7 @@ public sealed class QuestProgressHandler(
         }
     }
 
-    /// <summary>tSort 1, "mission issuance" (S04_MyWork02.cpp:7314-7368).</summary>
+    /// <summary>tSort 1, "mission issuance".</summary>
     private async ValueTask HandleAcceptAsync(QuestProgressRequest packet, ZoneClientSession zoneSession, Zone zone,
         PlayerRuntimeState state, int characterId, QuestProgress progress, ContainerEdits edits,
         Func<int, bool> hasItem, CancellationToken ct)
@@ -122,7 +118,7 @@ public sealed class QuestProgressHandler(
         SendEcho(zoneSession, packet);
     }
 
-    /// <summary>tSort 2, "mission completed" (S04_MyWork02.cpp:7369-7452).</summary>
+    /// <summary>tSort 2, "mission completed".</summary>
     private async ValueTask HandleCompleteAsync(QuestProgressRequest packet, ZoneClientSession zoneSession,
         Zone zone, PlayerRuntimeState state, int characterId, QuestProgress progress, ContainerEdits edits,
         Func<int, bool> hasItem, CancellationToken ct)
@@ -148,9 +144,8 @@ public sealed class QuestProgressHandler(
                 return;
             }
 
-            // Skip the deposit when no type-6 reward item is configured (still keep the slot check above).
-            // Legacy would write ItemId 0 here, which Fenrir's presence-keyed container model would misread
-            // as empty -- a documented, safe adaptation.
+            // Skip the deposit when no reward item is configured: an ItemId of 0 would be misread as an
+            // empty slot by Fenrir's presence-keyed container model.
             if (result.RewardItemId > 0)
                 edits.Deposit(container, slot,
                     new ItemStack(result.RewardItemId, result.RewardItemQuantity, 0, 0, 0, 0, 0, 0, 0, 0, 0));
@@ -166,8 +161,8 @@ public sealed class QuestProgressHandler(
     }
 
     /// <summary>
-    ///     tSort 3, "mission receive" (S04_MyWork02.cpp:7453-7504) -- does NOT mutate quest state at all, only deposits
-    ///     an item; reuses the plain InventoryZoneCommand channel rather than QuestZoneCommand.
+    ///     tSort 3, "mission receive" -- does not mutate quest state at all, only deposits an item; reuses
+    ///     the plain InventoryZoneCommand channel rather than QuestZoneCommand.
     /// </summary>
     private async ValueTask HandleReceiveAsync(QuestProgressRequest packet, ZoneClientSession zoneSession, Zone zone,
         PlayerRuntimeState state, int characterId, QuestProgress progress, ContainerEdits edits,
@@ -201,7 +196,7 @@ public sealed class QuestProgressHandler(
                 zone.MapId, characterId);
     }
 
-    /// <summary>tSort 4, "mission exchange" (S04_MyWork02.cpp:7505-7528).</summary>
+    /// <summary>tSort 4, "mission exchange".</summary>
     private async ValueTask HandleExchangeAsync(QuestProgressRequest packet, ZoneClientSession zoneSession,
         Zone zone, PlayerRuntimeState state, int characterId, QuestProgress progress, ContainerEdits edits,
         Func<int, bool> hasItem, CancellationToken ct)
@@ -213,8 +208,6 @@ public sealed class QuestProgressHandler(
             return;
         }
 
-        // A missing source item can't happen here (present-state already required it via hasItem), but
-        // TryReplaceFirstMatch (below) handles it defensively rather than assuming success.
         if (!edits.TryReplaceFirstMatch(result.FromItemId, _ =>
                 new ItemStack(result.ToItemId, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)))
         {
@@ -228,7 +221,7 @@ public sealed class QuestProgressHandler(
         SendEcho(zoneSession, packet);
     }
 
-    /// <summary>tSort 5, "mission abandonment" (S04_MyWork02.cpp:7529-7555) -- no container touched.</summary>
+    /// <summary>tSort 5, "mission abandonment" -- no container touched.</summary>
     private async ValueTask HandleAbandonAsync(QuestProgressRequest packet, ZoneClientSession zoneSession, Zone zone,
         PlayerRuntimeState state, int characterId, QuestProgress progress, Func<int, bool> hasItem,
         CancellationToken ct)
@@ -282,10 +275,7 @@ public sealed class QuestProgressHandler(
             state.QuestTargetPhase, state.QuestKillCounter);
     }
 
-    /// <summary>
-    ///     Bounds/occupancy validation shared by Accept(3/6)/Complete/Receive -- CheckInv(1) + 0..7 XPost/YPost +
-    ///     empty-slot, all Quit()-worthy on violation (verified S04_MyWork02.cpp:7331-7346 et al.).
-    /// </summary>
+    /// <summary>Bounds/occupancy validation shared by Accept/Complete/Receive.</summary>
     private static bool TryValidateDepositSlot(int page, int index, int xPost, int yPost, ContainerEdits edits,
         out byte container, out byte slot)
     {
@@ -320,9 +310,8 @@ public sealed class QuestProgressHandler(
     }
 
     /// <summary>
-    ///     Accumulates projected container edits (only inventory pages 0/1 are ever touched by a quest
-    ///     action) over the live <see cref="PlayerRuntimeState.Inventory" /> snapshot, so a delete-then-deposit
-    ///     sequence on the SAME container merges into one final projection instead of racing itself.
+    ///     Accumulates projected container edits over the live inventory snapshot, so a delete-then-deposit
+    ///     sequence on the same container merges into one final projection instead of racing itself.
     /// </summary>
     private sealed class ContainerEdits(PlayerRuntimeState state)
     {
@@ -341,10 +330,7 @@ public sealed class QuestProgressHandler(
             _edits[container] = Get(container).SetItem(slot, stack);
         }
 
-        /// <summary>
-        ///     Mirrors DeleteQuestItem (S07_MyGame04.cpp:2246-2269): scans page 0 then page 1, wipes the FIRST matching slot,
-        ///     a no-op if not found anywhere.
-        /// </summary>
+        /// <summary>Scans page 0 then page 1, wipes the first matching slot; a no-op if not found anywhere.</summary>
         public void DeleteFirstMatch(int itemId)
         {
             foreach (var container in InventoryContainers)
@@ -359,10 +345,7 @@ public sealed class QuestProgressHandler(
             }
         }
 
-        /// <summary>
-        ///     Mirrors ChangeQuestItem (S07_MyGame04.cpp:2223-2244): scans page 0 then page 1, replaces the FIRST matching
-        ///     slot's content via <paramref name="transform" />. False if not found anywhere.
-        /// </summary>
+        /// <summary>Scans page 0 then page 1, replaces the first matching slot via <paramref name="transform" />.</summary>
         public bool TryReplaceFirstMatch(int itemId, Func<ItemStack, ItemStack> transform)
         {
             foreach (var container in InventoryContainers)
@@ -390,10 +373,7 @@ public sealed class QuestProgressHandler(
             return builder.ToImmutable();
         }
 
-        /// <summary>
-        ///     Splits the (at most 2) touched containers into the (Container, Items) parameter pairs
-        ///     <see cref="CharacterRepository.ApplyQuestTransitionAsync" /> expects -- null container = "not touched".
-        /// </summary>
+        /// <summary>Splits the (at most 2) touched containers into parameter pairs; null container = "not touched".</summary>
         public (byte? Container1, List<CharacterItemSlotTvp> Items1, byte? Container2, List<CharacterItemSlotTvp> Items2
             )
             ToTvpPairs()

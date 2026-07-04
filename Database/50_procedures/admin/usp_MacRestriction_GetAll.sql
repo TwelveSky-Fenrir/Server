@@ -1,6 +1,4 @@
--- Contract: no parameters -> RS0, every row. Loaded once at LoginServer boot (see
--- admin.MacRestrictions's table comment) -- checked at account creation / MAC registration time, not
--- on every packet.
+-- Loaded once at LoginServer boot; checked at account creation / MAC registration time, not per packet.
 CREATE PROCEDURE admin.usp_MacRestriction_GetAll
     AS
 BEGIN

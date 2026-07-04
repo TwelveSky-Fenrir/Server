@@ -3,10 +3,6 @@ using Fenrir.Contracts.Packets.Zone;
 
 namespace Fenrir.Contracts.Tests.Packets.Zone;
 
-/// <summary>
-///     ZC_SET_INVENTORY_ITEM_RECV (ZONE.h:1029-1034, 32-byte payload): Page/Index/Value[6] — pure state
-///     push, no <c>Result</c> field.
-/// </summary>
 public class ZcSetInventoryItemRecvTests
 {
     [Fact]

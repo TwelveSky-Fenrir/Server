@@ -25,8 +25,7 @@ builder.Services.AddHostedService<LoginConnectionHost>();
 
 var host = builder.Build();
 
-// Must run before LoginConnectionHost starts accepting connections: the generated MessageDispatcher resolves
-// every handler through this provider (Fenrir.Generators.Dispatch.HandlerDispatchIncrementalGenerator).
+// Must run before LoginConnectionHost starts accepting connections: MessageDispatcher resolves handlers through this provider.
 PacketHandlerHub.Initialize(host.Services);
 
 host.Run();

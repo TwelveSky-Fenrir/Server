@@ -1,12 +1,4 @@
--- Contract: @NpcId INT -> six result sets for a single NPC, in this order: RS0 zero or one row (the
---           world.Npcs row itself); RS1 its world.NpcSpeeches rows; RS2 its world.NpcMenuOptions rows;
---           RS3 its world.NpcShopItems rows; RS4 its world.NpcSkillOffers rows; RS5 its
---           world.NpcGambleCosts rows.
--- Tooling/debugging helper only -- GameServer itself always loads the full set via world.usp_Npc_GetAll
--- plus the five per-child-table usp_Npc*_GetAll procedures once at boot, never a single NPC (with its
--- children) per request. Bundled as one multi-result-set call rather than six separate procedures purely
--- because "show me everything about this one NPC" is the actual tooling use case.
--- Read-only, safe to retry.
+-- Returns 6 result sets in fixed order: Npc, NpcSpeeches, NpcMenuOptions, NpcShopItems, NpcSkillOffers, NpcGambleCosts.
 CREATE PROCEDURE world.usp_Npc_GetById @NpcId INT
 AS
 BEGIN

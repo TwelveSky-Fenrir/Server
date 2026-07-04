@@ -10,11 +10,8 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Fenrir.Data.Tests.Admin;
 
-/// <summary>
-///     admin.usp_Mute_* against real SQL Server 2025 (phase A3, report 06 §1.7: loaded once at world entry,
-///     never re-queried per chat message). Raw ADO.NET on purpose -- the mute repository lands with the
-///     Phase C chat vertical.
-/// </summary>
+// admin.usp_Mute_* against real SQL Server 2025; mutes are loaded once at world entry, never re-queried per
+// chat message. Raw ADO.NET since the mute repository isn't wired up yet.
 [Collection("SqlServer")]
 public class MuteProcTests
 {
@@ -50,7 +47,6 @@ public class MuteProcTests
         await CreateMuteAsync(accountId, null, 2, DateTime.UtcNow.AddHours(1));
         Assert.Equal(2, await CountActiveAsync(characterId));
 
-        // An already-expired mute is not active.
         await CreateMuteAsync(null, characterId, 3, DateTime.UtcNow.AddHours(-1));
         Assert.Equal(2, await CountActiveAsync(characterId));
     }
@@ -67,10 +63,9 @@ public class MuteProcTests
 
         Assert.Equal(0, await CountActiveAsync(characterId));
 
-        // The audit row survives the lift...
+        // The audit row survives the lift, and a replayed (or unknown-id) lift never rewrites the first stamp.
         Assert.Equal(1, await ScalarAsync<int>($"SELECT COUNT(*) FROM admin.Mutes WHERE MuteId = {muteId};"));
 
-        // ...and a replayed (or unknown-id) lift is a silent no-op that never rewrites the first stamp.
         var firstLift = await ScalarAsync<DateTime>($"SELECT LiftedAtUtc FROM admin.Mutes WHERE MuteId = {muteId};");
         var replay = await Record.ExceptionAsync(() => ExecProcAsync("admin.usp_Mute_Lift", ("MuteId", muteId)));
         Assert.Null(replay);

@@ -1,10 +1,6 @@
 -- database/50_procedures/game/usp_WorldState_EnsureInitialized.sql
--- Contract: idempotent bootstrap -- creates the game.WorldState singleton row (Id=1, all-defaults) and the
--- 4 game.WorldStateTribes rows (TribeId 0-3, HasSymbol=1/identity-mapped per legacy default) the first time
--- it is ever called; a no-op on every later call. Meant to be called once by GameServer at world startup,
--- since these tables start empty (no seed script -- see game.WorldState) and the application can only ever
--- reach them through a procedure.
--- Result set: none. Idempotent: yes.
+-- Idempotent bootstrap: seeds the WorldState singleton + 4 WorldStateTribes rows on first call only. Call
+-- once at GameServer startup.
 CREATE PROCEDURE game.usp_WorldState_EnsureInitialized
     AS
 BEGIN

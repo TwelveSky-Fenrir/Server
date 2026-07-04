@@ -1,6 +1,4 @@
--- Seeds world.ZoneSpawnPoints from 003.BIN: one row per populated inbound-landing slot (413 of a
--- 11700-slot ceiling) -- see 30_tables/world/ZoneSpawnPoints.sql for the FromZoneNumber NULL rules.
--- MUST run after the world.Zones seed script (FK dependency).
+-- Seeds world.ZoneSpawnPoints from 003.BIN. MUST run after the world.Zones seed script (FK dependency).
 IF
 NOT EXISTS (SELECT 1 FROM world.ZoneSpawnPoints)
 BEGIN

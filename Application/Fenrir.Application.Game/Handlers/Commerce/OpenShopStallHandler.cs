@@ -16,22 +16,13 @@ using Microsoft.Extensions.Logging;
 namespace Fenrir.Application.Game.Handlers.Commerce;
 
 /// <summary>
-///     CZ_START_PSHOP_SEND (opcode 31, contracts/04_commerce.md, verified <c>S04_MyWork02.cpp:6021-6348</c>).
-///     <c>Sort</c> 1 = live personal shop (a pure display overlay -- items never leave
-///     <see cref="PlayerRuntimeState.Inventory" />), 2 = offline/deputy shop (items physically leave into
-///     game.OfflineShopItems). Both sorts gated to zone 37 under <c>PPSHOP_V2</c> (verified, checked before
-///     the sort switch).
+///     CZ_START_PSHOP_SEND (opcode 31). <c>Sort</c> 1 = live personal shop (a pure display overlay -- items
+///     never leave <see cref="PlayerRuntimeState.Inventory" />), 2 = offline/deputy shop (items physically
+///     leave into game.OfflineShopItems). Both sorts gated to zone 37.
 /// </summary>
 /// <remarks>
-///     OPEN ISSUES (documented, not guessed): <c>CheckPossiblePShopRegion</c> (per-tribe/zone sub-region
-///     gate) not modeled -- treated as "anywhere in zone 37" (a safe superset). <c>aAction.aSort != 1</c>
-///     ("must be standing") not modeled -- its semantics conflict with
-///     <see cref="PlayerRuntimeState.ActionSort" />'s established 0-idle convention and weren't verified,
-///     so it's not enforced on a guess. <c>iCheckAvatarShop</c> (item barred from personal-shop sale) not
-///     modeled -- no such field exists on <c>ItemRowDto</c> yet. The proxy shop's rental expiration
-///     (<c>aProxyShopDate</c>) has no Fenrir column -- a Fenrir-invented window is used instead,
-///     admin-tunable via <c>ProxyShopDurationDays</c> (<see cref="IGameSettingsRepository" />) since
-///     there's no legacy value to stay iso to.
+///     The legacy's rental expiration column has no Fenrir equivalent -- a Fenrir-invented window is used
+///     instead, admin-tunable via <c>ProxyShopDurationDays</c>.
 /// </remarks>
 public sealed class OpenShopStallHandler(
     IOfflineShopRepository offlineShops,
@@ -40,7 +31,6 @@ public sealed class OpenShopStallHandler(
     ILogger<OpenShopStallHandler> logger)
     : IAsyncPacketHandler<OpenShopStallRequest>
 {
-    /// <summary>Zone 37 only, verified for BOTH sorts under PPSHOP_V2 (S04_MyWork02.cpp:6040).</summary>
     public const short PshopZoneNumber = 37;
 
     public async ValueTask HandleAsync(OpenShopStallRequest packet, IPacketSession session,
@@ -126,8 +116,6 @@ public sealed class OpenShopStallHandler(
                     view.ItemId, view.Quantity, view.Value, view.Serial, view.Price, null));
         }
 
-        // Fresh server-assigned UniqueNumber (legacy: mGAME.mAvatarPShopUniqueNumber++); CharacterId-derived
-        // is a documented stand-in, same posture as PlayerRuntimeState.UniqueNumber.
         var uniqueNumber = unchecked((uint)(characterId * 2 + (isProxy ? 1 : 0)));
         var listing = packet.PshopInfo with { UniqueNumber = uniqueNumber };
 
@@ -172,9 +160,7 @@ public sealed class OpenShopStallHandler(
         }
 
         var settings = await gameSettings.GetAsync(cancellationToken);
-        var shopDate =
-            GameDate.Today() +
-            settings.ProxyShopDurationDays; // not real calendar-add arithmetic -- shopDate is only ever compared for equality/staleness elsewhere, never added-to again.
+        var shopDate = GameDate.Today() + settings.ProxyShopDurationDays;
 
         try
         {

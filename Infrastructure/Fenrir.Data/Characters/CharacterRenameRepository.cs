@@ -5,18 +5,10 @@ using CaeriusNet.Commands.Writes;
 
 namespace Fenrir.Data.Characters;
 
-/// <summary>
-///     Rename surface for CL_CHANGE_AVATAR_NAME_SEND (op 19), deliberately split from
-///     <see cref="CharacterRepository" /> (a parallel workstream owns that file) and expressed as an interface so
-///     <c>RenameAvatarHandler</c> is unit-testable without a SQL container.
-/// </summary>
+// Split from CharacterRepository (parallel workstream); interface so RenameAvatarHandler is unit-testable without SQL.
 public interface ICharacterRenameRepository
 {
-    /// <summary>
-    ///     game.usp_Character_Rename's scalar result — the LEGACY mDB.ChangeCharacterName codes, forwarded verbatim
-    ///     to the client: 0 = renamed, 2 = name already taken (incl. "new == current"), 102 = no character at that
-    ///     (account, slot). Engine errors surface as exceptions (the caller maps them to the legacy 101).
-    /// </summary>
+    /// <summary>Legacy mDB.ChangeCharacterName codes, forwarded verbatim: 0 renamed, 2 name taken, 102 no character at that slot. Exceptions map to legacy 101 by the caller.</summary>
     public ValueTask<int> RenameAsync(int accountId, byte slot, string newName, CancellationToken ct);
 }
 

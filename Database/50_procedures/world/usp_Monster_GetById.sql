@@ -1,9 +1,3 @@
--- Contract: @MonsterId INT -> RS0, 0 or 1 row (the monster + its animation-frame extension row).
--- NOT part of the boot-time cache path (GameServer always loads the full catalog via
--- usp_Monster_GetAll) -- this is a tooling/debugging lookup (e.g. an admin console or ad-hoc data
--- inspection) so a single monster can be pulled without the app ever touching world.Monsters directly
--- (security model: no table/view grants exist, every access is via a procedure).
--- Idempotent: yes (read-only). Errors: none (empty result set if MonsterId does not exist).
 CREATE PROCEDURE world.usp_Monster_GetById @MonsterId INT
 AS
 BEGIN

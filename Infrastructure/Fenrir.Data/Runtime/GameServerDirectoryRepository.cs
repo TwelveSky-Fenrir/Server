@@ -7,10 +7,7 @@ using CaeriusNet.Commands.Writes;
 
 namespace Fenrir.Data.Runtime;
 
-/// <summary>
-///     Access to runtime.GameServerDirectory (architecture reference §12.4): one warm row per live shard, kept
-///     fresh by each shard's own heartbeat so Login can pick a destination without fanning out to every shard.
-/// </summary>
+// One warm row per live shard, kept fresh by each shard's own heartbeat -- Login picks a destination without fanning out to every shard.
 public sealed record GameServerDirectoryRepository(ICaeriusNetDbContext Db) : IGameServerDirectoryRepository
 {
     // In-memory OLTP table, sub-millisecond procs -- a short timeout fails fast instead of masking a stuck request.
@@ -32,10 +29,7 @@ public sealed record GameServerDirectoryRepository(ICaeriusNetDbContext Db) : IG
         return Db.ExecuteAsync(parameters, ct);
     }
 
-    /// <summary>
-    ///     2s in-memory cache (architecture reference §11.4): the directory only needs to be fresh enough for a
-    ///     login decision, so this spares a round-trip to runtime.GameServerDirectory on every single login.
-    /// </summary>
+    /// <summary>2s in-memory cache -- the directory only needs to be fresh enough for a login decision.</summary>
     public ValueTask<ImmutableArray<ShardDirectoryEntryDto>> GetDirectoryAsync(CancellationToken ct)
     {
         var parameters =

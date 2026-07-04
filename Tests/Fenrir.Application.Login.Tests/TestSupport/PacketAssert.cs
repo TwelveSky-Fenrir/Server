@@ -4,12 +4,8 @@ using Fenrir.Network.Framing;
 
 namespace Fenrir.Application.Login.Tests.TestSupport;
 
-/// <summary>
-///     Reads what a handler actually put on the wire and compares it against the EXACT frame the same
-///     <see cref="FrameWriter" /> the production <c>ClientSession.Send</c> path uses would produce for a hand-built
-///     expected packet — same idea as Fenrir.Network.Tests' <c>ClientSessionSendTests</c>, lifted to the handler
-///     level so each handler test asserts on values, not on manually recomputed offsets.
-/// </summary>
+// Compares what a handler put on the wire against the exact frame FrameWriter would produce for a
+// hand-built expected packet, so handler tests assert on values, not manually recomputed offsets.
 internal static class PacketAssert
 {
     /// <summary>Drains exactly one pending read from the pipe (fails loudly if nothing was written at all).</summary>

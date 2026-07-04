@@ -8,12 +8,9 @@ using Fenrir.Data.World;
 namespace Fenrir.Application.Game.World.Monsters;
 
 /// <summary>
-///     One pool slot for the Nth copy of one <c>world.MonsterSpawnRegions</c> row (report
-///     ServerDocs/30_Fenrir_ServerLogic/05_game_mechanics.md §1: "parcourt à plat région × mNumber"). The
-///     <see cref="ServerIndex" /> is assigned ONCE and stays stable for the zone's whole lifetime (Fenrir has
-///     no fixed-size shared-memory pool to recycle slots out of, unlike the legacy's
-///     <c>shmMONSTER_OBJECT[MAX_MONSTER_OBJECT_NUM]</c> -- a documented simplification, not client-observable
-///     since the wire's <c>ServerIndex</c> field carries no range constraint of its own).
+///     One pool slot for the Nth copy of one <c>world.MonsterSpawnRegions</c> row. <see cref="ServerIndex" />
+///     is assigned once and stays stable for the zone's whole lifetime -- Fenrir has no fixed-size
+///     shared-memory pool to recycle slots out of, unlike the legacy's <c>shmMONSTER_OBJECT[MAX_MONSTER_OBJECT_NUM]</c>.
 /// </summary>
 internal sealed class MonsterSpawnSlot
 {
@@ -24,10 +21,7 @@ internal sealed class MonsterSpawnSlot
     public int RespawnTicksRemaining { get; set; }
 }
 
-/// <summary>
-///     Everything this scheduler needs to remember for ONE zone -- see <see cref="MonsterSpawnScheduler" />'s remarks
-///     on why this lives keyed by zone rather than as the system's own instance fields.
-/// </summary>
+/// <summary>Everything this scheduler needs to remember for one zone.</summary>
 internal sealed class MonsterZoneSpawnState
 {
     public required List<MonsterSpawnSlot> Slots { get; init; }
@@ -38,26 +32,20 @@ internal sealed class MonsterZoneSpawnState
 }
 
 /// <summary>
-///     Owns every zone's monster spawn-region pool: initial pop, the ~10 s respawn scan (report 05 §1/§11:
-///     "SummonMonster() toutes les ~10 s, tick %20"), and the fallout of a kill (loot roll + ground-item
-///     spawn + <see cref="Zone.GrantMonsterKillExperience" /> + arming that slot's own respawn timer).
+///     Owns every zone's monster spawn-region pool: initial pop, the ~10 s respawn scan, and the fallout of a
+///     kill (loot roll + ground-item spawn + <see cref="Zone.GrantMonsterKillExperience" /> + arming that
+///     slot's own respawn timer).
 /// </summary>
 /// <remarks>
-///     A single DI SINGLETON shared across every <see cref="Zone" /> (<see cref="ZoneRegistry" />'s own
-///     documented convention: "<c>ISimulationSystem</c> instances are stateless singletons that operate on
-///     whichever Zone they're handed") -- so the actual per-zone mutable state (spawn slots, timers, that
-///     zone's own drop-roll RNG) lives in a <see cref="MonsterZoneSpawnState" /> keyed by
-///     <see cref="Zone.MapId" /> in <see cref="_stateByZone" />, built lazily on that zone's own FIRST
-///     <see cref="Simulate" /> call (never racy across zones: each zone's tick is its own single thread, and a
-///     <see cref="ConcurrentDictionary{TKey,TValue}" /> key is only ever first-built by that SAME zone's own
-///     thread).
+///     A single DI singleton shared across every <see cref="Zone" />, so the actual per-zone mutable state
+///     lives in a <see cref="MonsterZoneSpawnState" /> keyed by <see cref="Zone.MapId" /> in
+///     <see cref="_stateByZone" />, built lazily on that zone's own first <see cref="Simulate" /> call (never
+///     racy: each zone's tick is its own single thread).
 ///     <para>
-///         NOT ported from report 05 §1 (explicit open issues, not silently dropped): <c>SummonBossMonster</c>
-///         (boss-table state machine, ~3 h cooldown), <c>SummonGuard</c>/<c>SummonTribeSymbol</c> (200+ lines of
-///         hardcoded per-server coordinates -- report 05 itself flags these as needing a NEW table that "n'existe
-///         pas encore"), the dungeon <c>mNumber</c>-forced-to-20 override, the monster-746 fixed 240 s cooldown,
-///         and the disk-persisted Yanggok boss timers (564-568). This system covers ONLY the generic per-region
-///         "normal monster" population report 05 calls the cruising regime.
+///         Not ported: <c>SummonBossMonster</c> (boss-table state machine), <c>SummonGuard</c>/
+///         <c>SummonTribeSymbol</c> (hardcoded per-server coordinates), the dungeon <c>mNumber</c>-forced-to-20
+///         override, the monster-746 fixed cooldown, and the disk-persisted Yanggok boss timers. This system
+///         covers only the generic per-region "normal monster" population.
 ///     </para>
 /// </remarks>
 public sealed class MonsterSpawnScheduler(
@@ -67,11 +55,9 @@ public sealed class MonsterSpawnScheduler(
     : ISimulationSystem
 {
     /// <summary>
-    ///     Production default: a FRESH <see cref="System.Random" /> per zone (unseeded) -- never one instance
-    ///     shared across zones, since different zones tick concurrently on their own threads and
-    ///     <see cref="System.Random" /> is not safe for concurrent use from multiple threads. Tests may inject
-    ///     a factory that returns a seeded <see cref="Random" /> for deterministic spawn scatter/respawn-timer
-    ///     rolls (same rationale as <see cref="Combat.IRandomSource" />'s own injectability on <see cref="Zone" />).
+    ///     A fresh <see cref="System.Random" /> per zone -- never shared across zones, since different zones
+    ///     tick concurrently and <see cref="System.Random" /> is not thread-safe. Tests may inject a factory
+    ///     returning a seeded <see cref="Random" /> for deterministic rolls.
     /// </summary>
     private readonly Func<Random> _randomFactory = randomFactory ?? (static () => new Random());
 
@@ -83,9 +69,7 @@ public sealed class MonsterSpawnScheduler(
 
         if (!state.InitialPopDone)
         {
-            // Report 05 §1: "Pop initial au boot ... premier passage de SummonMonster() = pop immédiat" --
-            // every configured slot pops on the very first tick, unconditionally, before any respawn timer
-            // logic applies at all.
+            // Every configured slot pops on the very first tick, unconditionally, before any respawn timer logic applies.
             state.InitialPopDone = true;
             foreach (var slot in state.Slots)
                 Spawn(zone, slot);
@@ -107,10 +91,6 @@ public sealed class MonsterSpawnScheduler(
                 Spawn(zone, slot);
     }
 
-    /// <summary>
-    ///     Slot count for a zone that has already ticked at least once (0 if it hasn't, or hosts no monster spawn
-    ///     regions) -- test/inspection surface.
-    /// </summary>
     public int SlotCountFor(short mapId)
     {
         return _stateByZone.TryGetValue(mapId, out var state) ? state.Slots.Count : 0;
@@ -149,12 +129,7 @@ public sealed class MonsterSpawnScheduler(
         };
     }
 
-    /// <summary>
-    ///     Random point inside the region's disk (report 05 §1: "position aléatoire dans le disque mRADIUS
-    ///     validée contre le navmesh"), Y resolved via <see cref="Zone.Geometry" /> when available -- falls
-    ///     back to the region's own recorded Y (documented M1-consistent placeholder, matching
-    ///     <see cref="Movement.MovementRules" />'s own posture when no <c>.WM</c> is loaded).
-    /// </summary>
+    /// <summary>Random point inside the region's disk, Y resolved via <see cref="Zone.Geometry" /> when available, else the region's own recorded Y.</summary>
     private void Spawn(Zone zone, MonsterSpawnSlot slot)
     {
         var state = _stateByZone[zone.MapId];
@@ -191,11 +166,7 @@ public sealed class MonsterSpawnScheduler(
         }
     }
 
-    /// <summary>
-    ///     <c>mSummonTime[0..1]</c> is in SECONDS (verified: <c>S10_MySummon.cpp:1845</c> divides a
-    ///     millisecond tick delta by 1000.0f before comparing against it directly) -- converted to legacy
-    ///     ticks (÷0.5 s) for this scheduler's own tick-counted countdown.
-    /// </summary>
+    /// <summary><c>mSummonTime[0..1]</c> is in seconds (<c>S10_MySummon.cpp:1845</c>) -- converted to legacy ticks here.</summary>
     private static int RollRespawnTicks(MonsterRowDto monster, Random random)
     {
         var minSeconds = monster.SummonTime1;
@@ -205,11 +176,9 @@ public sealed class MonsterSpawnScheduler(
     }
 
     /// <summary>
-    ///     Loot pipeline + XP-grant seam for one kill (report 05 §5). Runs entirely on the zone's own tick
-    ///     thread (single-writer invariant) -- money grants are handed to <see cref="Zone.QueueMoneyGrant" />
-    ///     (a fire-and-forget-safe queue a dedicated background flusher drains, see
-    ///     <see cref="MonsterLootFlushHost" />) rather than awaited here, since <see cref="Zone.Tick" />
-    ///     is fully synchronous and must never block on SQL I/O.
+    ///     Loot pipeline + XP-grant seam for one kill. Runs entirely on the zone's own tick thread; money
+    ///     grants go to <see cref="Zone.QueueMoneyGrant" /> rather than being awaited here, since
+    ///     <see cref="Zone.Tick" /> is fully synchronous and must never block on SQL I/O.
     /// </summary>
     private void ProcessDeath(Zone zone, MonsterZoneSpawnState state, DeadMonsterEvent death)
     {
@@ -224,19 +193,12 @@ public sealed class MonsterSpawnScheduler(
             zone.TryGetPlayer(killerId, out killer);
 
         if (killer is null)
-            return; // no resolvable killer -- report 04/05's own drop/XP pipeline both key off the killer, nothing to roll
+            return; // no resolvable killer -- nothing to roll
 
-        // Already-built V3 seam (Zone.GrantMonsterKillExperience, report 05 §5 ProcessForExp/§6 ProcessForExperience) --
-        // this pass just supplies the two plain template values it needs, plus (Phase C/V6 Social) the
-        // killer's full party roster so Zone can pay the flat present-member bonus -- see that method's
-        // own remarks for why party membership never changes the killer's OWN base gain above.
         var partyMemberIds = partyRegistry?.GetMembers(killer.CharacterId);
         zone.GrantMonsterKillExperience(killer.CharacterId, monster.Template.RealLevel,
             monster.Template.GeneralExperience, partyMemberIds);
 
-        // Server Logic V9 Progression: the SAME kill-death seam as the XP grant above (report 04 §5's own
-        // hook, verified S07_MyGame02.cpp:2493-2564) -- a no-op unless the killer's active quest is a
-        // kill-type (qSort 1/5) targeting THIS monster id.
         zone.ApplyQuestKillProgress(killer.CharacterId, monster.Template.MonsterId);
 
         var luck = (killer.Stats?.Luck ?? 0) * 10;
@@ -248,11 +210,8 @@ public sealed class MonsterSpawnScheduler(
         if (result.Items.Count == 0)
             return;
 
-        // DropSort always 0 (exclusive to the killer's own name until the universal 30 s free-for-all window)
-        // -- PlayerRuntimeState has no party/group membership field yet (a different, not-yet-built domain),
-        // so the legacy's DropSort==1 "killer was in a party" branch can never trigger here. See
-        // GroundItemEntity.IsClaimableBy's own remarks: the 10 s party-share rule is still implemented
-        // correctly and activates automatically the day party membership is threaded through.
+        // DropSort always 0 (exclusive to the killer until the free-for-all window) -- see
+        // GroundItemEntity.IsClaimableBy's remarks on the not-yet-triggerable party-share branch.
         foreach (var item in result.Items)
             zone.SpawnGroundItem(item.ItemId, item.Quantity, monster.PosX, monster.PosY, monster.PosZ,
                 killer.Name, "", 0);

@@ -6,11 +6,6 @@ using Fenrir.Contracts.Tests.TestSupport;
 
 namespace Fenrir.Contracts.Tests.Packets.Zone;
 
-/// <summary>
-///     ZC_HERORANK_INFO_RECV (685 bytes = 1 + 4 + 680). The golden encoder below is hand-built from the
-///     C++ layout (Result @0, HeroRank @4: Name[40][13] then Point[40]), independent of the generated
-///     <c>Write</c>.
-/// </summary>
 public class ZcHeroRankInfoRecvTests
 {
     [Fact]

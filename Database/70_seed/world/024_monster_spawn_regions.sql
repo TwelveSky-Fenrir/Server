@@ -1,7 +1,5 @@
--- Seeds world.MonsterSpawnRegions from every DATA/SUMMON/*.WREGION.csv row (21960 rows, already
--- one row per source line) -- see 30_tables/world/MonsterSpawnRegions.sql for the ZoneNumber NULL
--- deviation (~49% of rows name a zone this build never shipped).
--- MUST run after both the world.Zones and world.Monsters seed scripts (FK dependency).
+-- Seeds world.MonsterSpawnRegions from every DATA/SUMMON/*.WREGION.csv row. MUST run after both the
+-- world.Zones and world.Monsters seed scripts (FK dependency).
 IF
 NOT EXISTS (SELECT 1 FROM world.MonsterSpawnRegions)
 BEGIN

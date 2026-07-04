@@ -6,30 +6,9 @@ using Fenrir.Data.Characters;
 
 namespace Fenrir.Application.Game.Avatars;
 
-/// <summary>
-///     GameServer's counterpart to <c>Fenrir.Application.Login.Avatars.AvatarInfoFactory</c> -- same mapping from a
-///     persisted character onto the shared <see cref="AvatarInfoTemplates.Zeroed" /> template, kept as a small
-///     independent copy rather than a cross-Application-project reference (architecture reference §3.3: each
-///     executable's application layer is independent). Feeds ZC_REGISTER_AVATAR_RECV's AVATAR_INFO payload.
-/// </summary>
+/// <summary>Independent copy of Login's AvatarInfoFactory; projects a persisted character onto AVATAR_INFO for ZC_REGISTER_AVATAR_RECV.</summary>
 public static class AvatarInfoFactory
 {
-    /// <summary>
-    ///     Projects a persisted character (the A3-extended world-entry snapshot, RS0 of
-    ///     usp_Character_GetForWorldEntry) plus its item rows (RS1) onto the wire struct for
-    ///     ZC_REGISTER_AVATAR_RECV / world entry. Unlike the earlier M1-prefix
-    ///     <see cref="CharacterWorldEntryDto" /> overload this replaces, this also carries progression
-    ///     (stats/money/title/halo/rebirth) and the real Equipment container -- see
-    ///     <see cref="BuildEquipArrayFromRows" />'s own remarks for exactly which of <c>AvatarInfo.Equip</c>'s
-    ///     4 ints/slot are populated.
-    /// </summary>
-    /// <param name="social">
-    ///     Phase C/V6 Social: the friend list / teacher-student bond / guild membership loaded alongside
-    ///     the rest of the world-entry snapshot (<c>EnterWorldHandler</c>'s own remarks) -- null keeps
-    ///     every one of those AVATAR_INFO fields at the shared zeroed template's blank default (a
-    ///     guildless, friendless, un-bonded fresh character, the common case for a test/tool caller that
-    ///     does not care about this facet).
-    /// </param>
     public static AvatarInfo CreateForCharacter(CharacterWorldSnapshotDto character,
         IReadOnlyList<CharacterItemSlotDto> items, AvatarSocialSnapshot? social = null)
     {
@@ -66,8 +45,6 @@ public static class AvatarInfoFactory
             GuildName = s.GuildName,
             GuildRole = s.GuildRoleWire,
             CallName = s.CallName,
-            // Server Logic V9 Progression: wAvatar.aQuestInfo[5] (report 04 §5) -- previously left at the
-            // shared zeroed template's all-zero default (an open issue this pass closes).
             QuestInfo =
             [
                 character.QuestStepPermanent, character.QuestActiveId, character.QuestSort,
@@ -85,13 +62,7 @@ public static class AvatarInfoFactory
         };
     }
 
-    /// <summary>
-    ///     Same projection, but from a LIVE <see cref="PlayerRuntimeState" /> instead of a fresh SQL read --
-    ///     used mid-session (in-process zone transfer, <c>ZoneMoveHandler</c>) where the
-    ///     source of truth is the zone's own in-memory state, and the destination map/position must be the
-    ///     JUST-RESOLVED arrival point, not whatever is still on <paramref name="state" /> (still the source
-    ///     zone's own position at the point this is called -- the transfer hasn't happened yet).
-    /// </summary>
+    /// <summary>mapId/pos are the just-resolved destination -- <paramref name="state" /> itself still holds the source zone's position at call time.</summary>
     public static AvatarInfo CreateForRuntimeState(PlayerRuntimeState state, short mapId, float posX, float posY,
         float posZ)
     {
@@ -125,12 +96,7 @@ public static class AvatarInfoFactory
         };
     }
 
-    /// <summary>
-    ///     <c>AvatarInfo.Equip</c> (52 ints = <c>aEquip[13][4]</c>, report 11 §2): per occupied slot, ints
-    ///     [0]=ItemId, [1]=ExpireDate ("durée/état" per the report), [2]=the packed IS/IU/IM/IZ upgrade bytes
-    ///     (<see cref="PackUpgradeBytes" />). OPEN ISSUE: the 4th int's role (<c>aEquip[slot][3]</c>) was never
-    ///     located in the source pass -- left at its wire-zero default rather than guessed.
-    /// </summary>
+    /// <summary><c>aEquip[13][4]</c>'s 4th int per slot is unknown/unmapped -- left at wire-zero rather than guessed.</summary>
     private static int[] BuildEquipArrayFromRows(IReadOnlyList<CharacterItemSlotDto> items)
     {
         var equip = new int[52];
@@ -149,7 +115,6 @@ public static class AvatarInfoFactory
         return equip;
     }
 
-    /// <summary>Same projection as <see cref="BuildEquipArrayFromRows" />, from the live in-memory Equipment container.</summary>
     private static int[] BuildEquipArrayFromContainer(IReadOnlyDictionary<byte, ItemStack> equipmentContainer)
     {
         var equip = new int[52];
@@ -168,25 +133,14 @@ public static class AvatarInfoFactory
         return equip;
     }
 
-    /// <summary>
-    ///     <c>SetISIUIMValue(IS,IU,IM,IZ)</c> (report 11 §2): 4 bytes packed little-endian into one int, each
-    ///     read back as a signed char by the legacy -- the bit PATTERN is identical whether read as signed or
-    ///     unsigned, so packing our unsigned TINYINT columns this way reproduces the same wire int.
-    /// </summary>
+    /// <summary>Bit pattern is identical whether read as signed or unsigned, so packing unsigned bytes reproduces the legacy's signed-char wire int.</summary>
     private static int PackUpgradeBytes(byte enchant, byte combine, byte refine, byte socket)
     {
         return enchant | (combine << 8) | (refine << 16) | (socket << 24);
     }
 }
 
-/// <summary>
-///     The Phase C/V6 Social facet of AVATAR_INFO, loaded by <c>EnterWorldHandler</c> from
-///     <c>FriendRepository</c>/<c>MentorRepository</c>/<c>GuildRepository</c> alongside the rest of the
-///     world-entry snapshot. <see cref="AvatarInfo.PartyName" />/<see cref="AvatarInfo.DuelState" /> are
-///     deliberately NOT modeled here: party membership is never persisted (fresh login = no party,
-///     PartyRegistry's own remarks) and a duel cannot possibly be in progress at login time either, so
-///     both are correctly already blank on <c>AvatarInfoTemplates.Zeroed</c>.
-/// </summary>
+/// <summary>PartyName/DuelState aren't modeled here: neither party membership nor a duel can exist at login time, so both stay blank.</summary>
 public sealed record AvatarSocialSnapshot(
     IReadOnlyDictionary<byte, string> FriendNameBySlot,
     string Teacher,
@@ -198,10 +152,7 @@ public sealed record AvatarSocialSnapshot(
     public static readonly AvatarSocialSnapshot Empty =
         new(new Dictionary<byte, string>(), "", "", "", 0);
 
-    /// <summary>
-    ///     Expands the sparse (slot -&gt; name) map into AVATAR_INFO's fixed 10-slot <c>Friend</c> array, empty string
-    ///     for every unfilled slot -- slots are client-chosen (contracts/05_social.md), so gaps are normal.
-    /// </summary>
+    /// <summary>Slots are client-chosen, so gaps in the sparse map are normal -- unfilled slots stay empty string.</summary>
     public string[] BuildFriendArray()
     {
         var friends = new string[10];

@@ -1,10 +1,6 @@
 namespace Fenrir.Generators.Protocol.Emitters;
 
-/// <summary>
-///     Source for the single static helper <c>Fenrir.Contracts.Wire.LegacyWireCodec</c>, emitted once via
-///     <c>RegisterPostInitializationOutput</c>. Factors out fixed-width byte/array/string conversions repeated
-///     across dozens of fields (e.g. AVATAR_INFO's ~190 fields) instead of regenerating them inline per field.
-/// </summary>
+/// <summary>Emits <c>LegacyWireCodec</c> once instead of regenerating these conversions inline per field (e.g. AVATAR_INFO's ~190 fields).</summary>
 internal static class RuntimeHelpersEmitter
 {
     public const string HintName = "LegacyWireCodec.g.cs";

@@ -3,21 +3,13 @@ using Fenrir.Application.Game.GameData;
 namespace Fenrir.Application.Game.World.Npcs;
 
 /// <summary>
-///     Ports <c>ZONENPCINFO::CheckNPCFunction</c> EXACTLY (verified against source,
-///     <c>Server/ts25zone/S07_MyGame07.cpp:230-257</c>) -- the proximity gate report 04_mega_switches.md §1
-///     shows guarding NPC-menu-driven tSort actions (202 function 1, 212/215/252 function 4, 233 function
-///     37...) BEFORE the caller does its own per-NPC data validation (e.g. <c>ProcessForLearnSkill1</c>
-///     re-searching that SAME NPC's own skill offers by the client-supplied NpcId). This is NOT "is the
-///     player standing next to the specific NPC it named" -- it is "does ANY NPC placed in THIS zone, within
-///     <see cref="ProximityRadius" /> legacy units of the player, advertise this numbered function at all"
-///     (<c>nMenu[functionId] == 2</c>). Pure/Zone-independent: no I/O, unit-testable.
+///     Ports <c>ZONENPCINFO::CheckNPCFunction</c> (<c>Server/ts25zone/S07_MyGame07.cpp:230-257</c>): true when
+///     ANY NPC placed in this zone, within <see cref="ProximityRadius" /> of the player, advertises this
+///     numbered function (<c>nMenu[functionId] == 2</c>) -- not "is the player next to the specific NPC it named".
 /// </summary>
 public static class NpcFunctionGate
 {
-    /// <summary>
-    ///     <c>GetDoubleXYZ(...) &lt; 10000.0f</c> (mapcheck.h) is a SQUARED-distance compare -- the real radius
-    ///     is sqrt(10000) = 100 legacy units, not 10000 itself.
-    /// </summary>
+    /// <summary><c>GetDoubleXYZ(...) &lt; 10000.0f</c> is a squared-distance compare; real radius is sqrt(10000) = 100.</summary>
     public const float ProximityRadius = 100f;
 
     private const float ProximityRadiusSquared = ProximityRadius * ProximityRadius;
@@ -35,11 +27,9 @@ public static class NpcFunctionGate
     public const int LearnSkillTree2 = 37;
 
     /// <summary>
-    ///     True when at least one NPC placed in <paramref name="zone" /> advertises
-    ///     <paramref name="functionId" /> (<c>nMenu[functionId] == 2</c>, world.NpcMenuOptions) AND is within
-    ///     <see cref="ProximityRadius" /> legacy units of (<paramref name="posX" />, <paramref name="posY" />,
-    ///     <paramref name="posZ" />). <paramref name="functionId" /> outside [0,100] (the legacy's own
-    ///     <c>nMenu[100]</c> bound) always returns false, matching <c>CheckNPCFunction</c>'s own guard.
+    ///     True when at least one NPC in <paramref name="zone" /> advertises <paramref name="functionId" /> and is
+    ///     within <see cref="ProximityRadius" /> of the player. <paramref name="functionId" /> outside [0,100]
+    ///     always returns false, matching the legacy's own bound.
     /// </summary>
     public static bool IsAvailable(ZoneDefinition zone, WorldDataCache worldData, int functionId, float posX,
         float posY, float posZ)
@@ -49,8 +39,7 @@ public static class NpcFunctionGate
 
         foreach (var spawn in zone.NpcSpawns)
         {
-            // ZoneDefinition.NpcSpawns is pre-filtered at cache-build time: NpcId is never null here (see
-            // WorldDataCacheBuilder.BuildZones's own remarks) -- .Value is safe, not a defensive guess.
+            // NpcSpawns is pre-filtered at cache-build time -- NpcId is never null here.
             if (!worldData.NpcsById.TryGetValue(spawn.NpcId!.Value, out var npc))
                 continue;
 

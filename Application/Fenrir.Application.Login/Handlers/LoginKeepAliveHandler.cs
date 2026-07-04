@@ -5,13 +5,7 @@ using Fenrir.Network.Sessions;
 
 namespace Fenrir.Application.Login.Handlers;
 
-/// <summary>
-///     CL_CLIENT_OK_FOR_LOGIN_SEND (op12): client ack after receiving the login train — in the legacy a pure
-///     keepalive (<c>UpdateUseTime()</c>, no reply, S04_MyWork02.cpp l.437-447). No I/O, no reply — stays inline
-///     (D-04 microsecond budget). The CharSelect promotion only happens from <c>Authenticated</c>: when the
-///     session is parked in <c>PinRequired</c> (P2ndPassword=1) this ack must NOT open the PIN gate — only
-///     ops 13/14/15 can — so there it degrades to the legacy keepalive no-op.
-/// </summary>
+/// <summary>op12 CL_CLIENT_OK_FOR_LOGIN_SEND — only promotes Authenticated to CharSelect; must not bypass the PinRequired gate (only ops 13/14/15 may open it).</summary>
 public sealed class LoginKeepAliveHandler : IInlinePacketHandler<LoginKeepAliveRequest>
 {
     public void Handle(in LoginKeepAliveRequest packet, IPacketSession session)

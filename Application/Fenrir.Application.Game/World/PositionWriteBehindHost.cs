@@ -6,14 +6,10 @@ using Microsoft.Extensions.Logging;
 namespace Fenrir.Application.Game.World;
 
 /// <summary>
-///     Wires the zones' per-move <c>DirtyTracker&lt;int&gt;.MarkDirty</c> calls (architecture reference
-///     §10.5) to <see cref="CharacterRepository.PersistPositionsAsync" />. The flush callback reads CURRENT
-///     position from <see cref="ZoneRegistry.TryGetPlayer" /> (a character lives in at most one zone,
-///     ADR-0012) rather than from the dirty-tracker itself — the tracker only ever holds flags, never values,
-///     by design (Fenrir.Data.WriteBehind.DirtyTracker's own doc comment).
-///     Exposed as <see cref="IWriteBehindFlusher" /> so a disconnecting session (GameServer's
-///     <c>ZoneConnectionHost</c>) can request an immediate, targeted flush (§10.5: "Flush immediat... sur
-///     deconnexion") without depending on the closed generic <see cref="WriteBehindFlusher{TKey}" /> type.
+///     Flushes dirty-tracked character positions to <see cref="CharacterRepository.PersistPositionsAsync" />.
+///     Reads CURRENT position from <see cref="ZoneRegistry.TryGetPlayer" /> since the dirty tracker only holds
+///     flags, never values. Exposed as <see cref="IWriteBehindFlusher" /> so a disconnecting session can
+///     request an immediate, targeted flush.
 /// </summary>
 public sealed class PositionWriteBehindHost : BackgroundService, IWriteBehindFlusher
 {
@@ -33,11 +29,9 @@ public sealed class PositionWriteBehindHost : BackgroundService, IWriteBehindFlu
                         rows.Add(new CharacterPositionTvp(characterId, state.FlushSequence, state.MapId, state.PosX,
                             state.PosY, state.PosZ, state.Heading));
 
-                // A player who logged out (or is mid-handoff) between MarkDirty and this flush is simply absent
-                // from every zone now -- dropping their row here is correct, not a bug: a logout's last position
-                // was already flushed by the immediate, targeted flush the disconnect path itself requests (see
-                // this type's class doc), and a handoff re-marks the character dirty when the target zone's
-                // Enter lands, so the next periodic flush picks the new map up (ZoneRegistry.TryGetPlayer's doc).
+                // A player absent from every zone (logged out, or mid-handoff) is correctly dropped here --
+                // their last position was already flushed by the disconnect path, and a handoff re-marks
+                // them dirty on arrival.
                 await characters.PersistPositionsAsync(rows, ct).ConfigureAwait(false);
             },
             onFlushError: ex => logger.LogError(ex, "Position write-behind flush failed"));
@@ -48,11 +42,7 @@ public sealed class PositionWriteBehindHost : BackgroundService, IWriteBehindFlu
         _flusher.RequestImmediateFlush();
     }
 
-    /// <summary>
-    ///     Satisfies <see cref="IWriteBehindFlusher" />'s <see cref="IAsyncDisposable" /> requirement.
-    ///     <see cref="WriteBehindFlusher{TKey}.DisposeAsync" /> is idempotent, so this is safe to run whether or
-    ///     not <see cref="StopAsync" /> already disposed it during a graceful host shutdown.
-    /// </summary>
+    /// <summary>Idempotent -- safe whether or not <see cref="StopAsync" /> already disposed the flusher.</summary>
     public async ValueTask DisposeAsync()
     {
         await _flusher.DisposeAsync().ConfigureAwait(false);

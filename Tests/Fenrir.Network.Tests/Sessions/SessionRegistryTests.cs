@@ -2,11 +2,8 @@ using Fenrir.Network.Sessions;
 
 namespace Fenrir.Network.Tests.Sessions;
 
-/// <summary>
-///     <c>SessionRegistry</c> (§8.1): a per-server <c>SessionId → ClientSession</c> map plus a secondary
-///     <c>AccountId → SessionId</c> index enforcing one live connection per account — the new connection wins,
-///     the old one is torn down with <see cref="DisconnectReason.Evicted" />.
-/// </summary>
+// SessionRegistry enforces one live connection per account: the new connection wins, the old one is torn
+// down with DisconnectReason.Evicted.
 public class SessionRegistryTests
 {
     [Fact]
@@ -42,7 +39,6 @@ public class SessionRegistryTests
         Assert.False(registry.TryGet(1, out _));
     }
 
-    // New connection for an already-associated account evicts the old one — "one connection per account".
     [Fact]
     public void AssociateAccount_NewConnectionEvictsThePreviousSessionOfTheSameAccount()
     {

@@ -1,9 +1,6 @@
 namespace Fenrir.Contracts.Abstractions;
 
-/// <summary>
-///     Embeddable wire sub-struct with no opcode of its own (e.g. AVATAR_INFO, ACTION_INFO, WORLD_INFO); unlike
-///     <see cref="IFenrirPacket" />, it never travels alone on the wire.
-/// </summary>
+/// <summary>Embeddable wire sub-struct with no opcode (e.g. AVATAR_INFO); never travels alone on the wire.</summary>
 public interface IFenrirWireType<TSelf>
     where TSelf : struct, IFenrirWireType<TSelf>
 {

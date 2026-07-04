@@ -3,10 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Data.SqlClient;
 
-// Reads Database/_manifest.txt (explicit order: 00_init -> 10_schemas -> ... -> 70_seed), applies every
-// script not yet journaled in admin.SchemaVersions (ScriptName, Sha256, AppliedAtUtc), and refuses to
-// re-apply a journaled script whose hash has changed -- history is never rewritten, only corrected forward
-// with a new script (architecture reference §12.7). Exit code is what Aspire's WaitForCompletion waits on.
+// Refuses to re-apply a journaled script whose hash changed -- history is never rewritten, only corrected forward.
 
 var connectionString =
     Environment.GetEnvironmentVariable("ConnectionStrings__FenrirDb") ??
@@ -51,10 +48,7 @@ var applied = journalReady
     ? await LoadAppliedScriptsAsync(connection)
     : new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
 
-// Bootstrap problem: admin.SchemaVersions can't journal scripts that run before IT was created
-// (00_init, 10_schemas, and its own creating script). Buffer those and flush them the moment the
-// table exists -- checked again after every apply, since the table's own creating script is itself
-// one of the buffered entries.
+// admin.SchemaVersions can't journal scripts that run before it exists; buffer those and flush once it does.
 var pendingJournal = new List<(string RelativePath, byte[] Hash)>();
 
 foreach (var relativePath in scriptPaths)
@@ -160,8 +154,7 @@ static async Task JournalAsync(SqlConnection connection, string scriptName, byte
     await command.ExecuteNonQueryAsync();
 }
 
-// SQL Server requires some statements (CREATE SCHEMA, CREATE/ALTER PROCEDURE...) to be alone in their
-// batch; scripts that need more than one use a lone "GO" line as the classic SSMS/sqlcmd separator.
+// SQL Server requires some statements (CREATE SCHEMA, CREATE/ALTER PROCEDURE...) to be alone in their batch.
 static IEnumerable<string> SplitBatches(string script)
 {
     var batch = new StringBuilder();

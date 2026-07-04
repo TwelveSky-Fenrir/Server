@@ -3,10 +3,7 @@ using Fenrir.Contracts.Packets.Zone;
 
 namespace Fenrir.Contracts.Tests.Packets.Zone;
 
-/// <summary>
-///     ZC_USE_INVENTORY_ITEM_RECV (ZONE.h:484-493, 20-byte payload): Result/Page/Index/Value/Value2
-///     (USE_PREMIUM_LONGTIME active in EU33 — 5 ints, not 4).
-/// </summary>
+/// <summary>ZC_USE_INVENTORY_ITEM_RECV (ZONE.h:484-493): 5 ints, not 4 — USE_PREMIUM_LONGTIME is active in EU33.</summary>
 public class ZcUseInventoryItemRecvTests
 {
     [Fact]

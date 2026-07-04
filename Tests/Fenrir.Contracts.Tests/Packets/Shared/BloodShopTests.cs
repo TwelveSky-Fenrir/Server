@@ -4,11 +4,7 @@ using Fenrir.Contracts.Tests.TestSupport;
 
 namespace Fenrir.Contracts.Tests.Packets.Shared;
 
-/// <summary>
-///     BLOOD_SHOP (604 bytes, STRUCT.h:1429-1433) — BloodNum + 50 nested <see cref="BloodItem" />
-///     slots (12 bytes each). The golden encoder below is hand-built from the C++ layout (BloodNum
-///     0..3, items at 4 + i*12), independent of the generated <c>Write</c>.
-/// </summary>
+// Golden encoder is hand-built from the C++ BLOOD_SHOP layout, independent of the generated Write.
 public class BloodShopTests
 {
     [Fact]

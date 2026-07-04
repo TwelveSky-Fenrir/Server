@@ -4,10 +4,8 @@ using Fenrir.Application.Game.World;
 namespace Fenrir.Application.Game.Tests.World;
 
 /// <summary>
-///     Covers the Phase C/V6 Social extension of <see cref="Zone.GrantMonsterKillExperience" />: the flat
-///     party bonus, granted to every PRESENT (in this same zone, not dead) party member -- INCLUDING the
-///     killer again, on top of their own already-applied solo gain (verified,
-///     <c>Server/ts25zone/S07_MyGame05.cpp:3899-3918</c>).
+///     Covers <see cref="Zone.GrantMonsterKillExperience" />'s flat party bonus: granted to every present (same zone,
+///     not dead) party member, including the killer again on top of their own solo gain (<c>Server/ts25zone/S07_MyGame05.cpp</c>).
 /// </summary>
 public class ZonePartyExperienceTests
 {
@@ -81,8 +79,7 @@ public class ZonePartyExperienceTests
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1, "Killer", level: 50)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
-        // characterId 20 is a party member per the roster, but never entered THIS zone -- matches the
-        // legacy's own per-process mUSER[] scope (report 05 §5 verified remarks on GrantMonsterKillExperience).
+        // characterId 20 is a party member per the roster, but never entered this zone
         zone.GrantMonsterKillExperience(10, 50, 1000,
             [10, 20]);
 

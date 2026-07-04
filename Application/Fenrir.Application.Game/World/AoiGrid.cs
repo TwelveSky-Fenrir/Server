@@ -1,12 +1,8 @@
 namespace Fenrir.Application.Game.World;
 
 /// <summary>
-///     Interest management (architecture reference §10.3): uniform square partition of the map, cell side =
-///     view radius. A player is visible only from its own cell and the 8 neighbors — O(entities in a 3x3 block),
-///     never O(n²) over the whole zone. Horizontal plane is (X, Z): the legacy wire's <c>ACTION_INFO.aLocation</c>
-///     is <c>[x, y, z]</c> with Y as vertical height (wire contract §7.1 golden example), so cells partition X/Z,
-///     not X/Y. Not thread-safe by design — touched only from <see cref="Zone.RunAsync" />, same as every other
-///     piece of zone state (§10.1: "un seul écrivain").
+///     Interest-management grid; cells partition X/Z since the wire's <c>ACTION_INFO.aLocation</c> uses Y as height.
+///     Not thread-safe -- touched only from <see cref="Zone.RunAsync" />.
 /// </summary>
 public sealed class AoiGrid(float cellSize)
 {
@@ -35,10 +31,6 @@ public sealed class AoiGrid(float cellSize)
             _cells.Remove(cell);
     }
 
-    /// <summary>
-    ///     No-ops when <paramref name="from" /> and <paramref name="to" /> are the same cell — the common case every tick
-    ///     a player doesn't cross a boundary.
-    /// </summary>
     public void Move(int characterId, (int X, int Z) from, (int X, int Z) to)
     {
         if (from == to)
@@ -48,11 +40,7 @@ public sealed class AoiGrid(float cellSize)
         Add(characterId, to);
     }
 
-    /// <summary>
-    ///     Every character id in <paramref name="cell" /> and its 8 neighbors. Includes whichever id occupies
-    ///     <paramref name="cell" /> itself — callers that need to exclude self (e.g. a broadcast audience) filter it out at
-    ///     the call site.
-    /// </summary>
+    /// <summary>Includes <paramref name="cell" /> itself; callers filter out self if needed.</summary>
     public IEnumerable<int> Neighbors((int X, int Z) cell)
     {
         for (var dx = -1; dx <= 1; dx++)

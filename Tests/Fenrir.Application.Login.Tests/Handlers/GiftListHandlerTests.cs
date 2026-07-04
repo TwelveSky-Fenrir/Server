@@ -5,10 +5,7 @@ using Fenrir.Network.Sessions;
 
 namespace Fenrir.Application.Login.Tests.Handlers;
 
-/// <summary>
-///     op25 CL_GIFT_INFO_SEND — the 10-page gift list (login protocol report §4.25, "chantier V8"): now
-///     backed by the real game.Gifts pending queue instead of the pre-V8 static all-zero placeholder.
-/// </summary>
+// op25 CL_GIFT_INFO_SEND -- the 10-page gift list, backed by the real game.Gifts pending queue.
 public class ClGiftInfoSendHandlerTests
 {
     private const int AccountId = 42;

@@ -1,6 +1,5 @@
 namespace Fenrir.Data.Social;
 
-/// <summary>Abstraction over Fenrir.Data.Social.MentorRepository for DI/testability.</summary>
 public interface IMentorRepository
 {
     public ValueTask<CharacterMentorDto?> GetForCharacterAsync(int characterId, CancellationToken ct);

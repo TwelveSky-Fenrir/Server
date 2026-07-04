@@ -4,14 +4,10 @@ using Fenrir.Contracts.Wire;
 
 namespace Fenrir.Network.Tests.TestSupport;
 
-/// <summary>
-///     One recorded <see cref="IFrameDispatcher.DispatchAsync" /> call. <see cref="Payload" /> is materialized
-///     (copied out of the <see cref="ReadOnlySequence{T}" />) because that sequence is only valid for the
-///     duration of the call — assertions run well after it returns.
-/// </summary>
+// Payload is copied out of the ReadOnlySequence<byte> because that sequence is only valid for the
+// duration of the DispatchAsync call, and assertions run after it returns.
 internal readonly record struct DispatchRecord(FenrirServer Server, byte Opcode, byte[] Payload, long SessionId);
 
-/// <summary>Test double for <see cref="IFrameDispatcher" />: records every call instead of routing to a real handler.</summary>
 internal sealed class RecordingFrameDispatcher : IFrameDispatcher
 {
     private readonly Lock _gate = new();

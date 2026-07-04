@@ -3,10 +3,7 @@ using Fenrir.Data.World;
 
 namespace Fenrir.Application.Game.Tests.Commerce;
 
-/// <summary>
-///     Pure port of <c>MyDB::GetItemMall</c> (S08_MyDB.cpp:137-235) -- <see cref="CashCatalogBuilder" />'s
-///     own remarks document the exact source lines each assertion below pins.
-/// </summary>
+/// <summary>Pure port of <c>MyDB::GetItemMall</c> (S08_MyDB.cpp).</summary>
 public class CashCatalogBuilderTests
 {
     private static ItemMallProductRowDto Product(int id, byte type, int itemId, int quantity, int cost, bool active)
@@ -34,8 +31,8 @@ public class CashCatalogBuilderTests
     public void
         Build_InactiveProduct_StillConsumesACostInfoIndexAndADisplayCursorPosition_ButLeavesTheGridSlotAtMinusOne()
     {
-        // Verified quirk (S08_MyDB.cpp:213-226): itemCount/pageCount advance for EVERY qualifying row
-        // regardless of Active, but tDbCash (the display grid) is only written `if (tDBActive[...])`.
+        // S08_MyDB.cpp: itemCount/pageCount advance for every qualifying row regardless of Active, but the
+        // display grid is only written if active
         var catalog = CashCatalogBuilder.Build([
             Product(1, 1, 100, 0, 20, false), // display slot 0 -- inactive, stays -1
             Product(2, 1, 101, 0, 30, true) // display slot 1 -- active
@@ -75,11 +72,8 @@ public class CashCatalogBuilderTests
     [Fact]
     public void Build_OutOfRangeItemId_ConsumesACostInfoIndex_ButNotADisplayCursorPosition()
     {
-        // Regression test (review finding): the legacy's SECOND pass (S08_MyDB.cpp:182-185) `continue`s on
-        // an ItemID outside [1,99999] BEFORE the itemCount++/pageCount++ that follows -- the row still
-        // consumed a costInfoIndex slot (the legacy's FIRST pass wrote it unconditionally), but must NOT
-        // consume a display-grid cursor position, so the FOLLOWING valid row lands on the SAME display slot
-        // the out-of-range row would have occupied, not the next one.
+        // S08_MyDB.cpp: an out-of-[1,99999] ItemID still consumes a costInfoIndex slot (first pass writes it
+        // unconditionally) but must not consume a display-grid cursor position
         var catalog = CashCatalogBuilder.Build([
             Product(1, 1, 100_000, 0, 20, true), // out of [1,99999] -- costInfoIndex 0
             Product(2, 1, 101, 0, 30, true) // in range -- costInfoIndex 1

@@ -12,11 +12,9 @@ public sealed class DeleteAvatarHandler(ICharacterRepository characters) : IAsyn
         CancellationToken cancellationToken)
     {
         var loginSession = (LoginClientSession)session;
-
-        // AllowedStates on DeleteAvatarRequest already gate this to Authenticated/CharSelect, both reachable only past MarkAuthenticated.
         var accountId = loginSession.AccountId!.Value;
 
-        // Idempotent by design (Fenrir.Data phase, usp_Character_Delete): an already-empty slot is not an error, so there is nothing to branch on here.
+        // Idempotent (usp_Character_Delete): an already-empty slot is not an error.
         await characters.DeleteAsync(accountId, (byte)packet.AvatarPost, cancellationToken);
 
         session.Send(new DeleteAvatarResponse { Result = 0 });

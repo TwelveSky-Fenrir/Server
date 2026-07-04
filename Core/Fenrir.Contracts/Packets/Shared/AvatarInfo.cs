@@ -14,7 +14,7 @@ public readonly partial record struct AvatarInfo : IFenrirWireType<AvatarInfo>
 
     [FixedString(13)] public required string Name { get; init; }
 
-    // 3-byte padding after Name (char[13], not 4-aligned) at offsets 33-35, absorbed by Tribe.
+    // 3-byte pad after Name (char[13]) absorbed by Tribe.
     [Reserved(3)] public required int Tribe { get; init; }
     public required int PreviousTribe { get; init; }
     public required int Gender { get; init; }
@@ -53,19 +53,18 @@ public readonly partial record struct AvatarInfo : IFenrirWireType<AvatarInfo>
 
     [FixedString(13)] public required string Teacher { get; init; }
 
-    // Teacher/Student are two consecutive char[13] (26 bytes); no padding needed, both offsets
-    // (5415, 5428) already land on a 4-byte boundary.
+    // Teacher/Student are consecutive char[13]; already 4-byte aligned, no padding.
     [FixedString(13)] public required string Student { get; init; }
     public required int TeacherPoint { get; init; }
 
     [FixedString(13)] public required string GuildName { get; init; }
 
-    // 3-byte padding after GuildName (char[13]) at offsets 5445-5447, absorbed by GuildRole.
+    // 3-byte pad after GuildName absorbed by GuildRole.
     [Reserved(3)] public required int GuildRole { get; init; }
 
     [FixedString(5)] public required string CallName { get; init; }
 
-    // 3-byte padding after CallName (char[5]) at offsets 5457-5459, absorbed by GuildMarkNum.
+    // 3-byte pad after CallName absorbed by GuildMarkNum.
     [Reserved(3)] public required int GuildMarkNum { get; init; }
     public required int GuildMarkEffect { get; init; }
 
@@ -137,7 +136,7 @@ public readonly partial record struct AvatarInfo : IFenrirWireType<AvatarInfo>
 
     [FixedArray(5)] [FixedString(13)] public required string[] PartyName { get; init; }
 
-    // 3-byte padding after PartyName (char[5][13]) at offsets 6285-6287, absorbed by Costume.
+    // 3-byte pad after PartyName absorbed by Costume.
     [FixedArray(10)] [Reserved(3)] public required int[] Costume { get; init; }
     [FixedArray(10)] public required int[] CostumeDate { get; init; }
     [FixedArray(10)] public required int[] CostumeExpireDate { get; init; }
@@ -239,7 +238,7 @@ public readonly partial record struct AvatarInfo : IFenrirWireType<AvatarInfo>
     public required int UniqueSkillBuffTime { get; init; }
     public required int BackSoul { get; init; }
 
-    // Premium (long long, 8 bytes) sits at offset 10056, already 8-aligned after BackSoul, so no padding is needed.
+    // Premium (8 bytes) already 8-aligned after BackSoul; no padding needed.
     public required long Premium { get; init; }
     public required int ProtectForCombine { get; init; }
     public required int PlayOnlineTime { get; init; }

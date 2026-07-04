@@ -4,12 +4,7 @@ using Fenrir.Contracts.Wire;
 
 namespace Fenrir.Contracts.Packets.Zone;
 
-/// <summary>
-///     CZ_TRIBE_VOTE_SEND (CLIENT.h:381-385, same struct as CZ_TRIBE_BANK_SEND) — tribe leader election
-///     (S04_MyWork02.cpp:11610, <c>TRIBE_VOTE_V2</c> local define). <c>Sort</c> 1 = candidacy at slot
-///     <see cref="Value" /> (0-9), 3 = vote for slot <see cref="Value" />. <c>Sort</c> 2 (withdrawal) is
-///     dead in EU33 (case compiled out under <c>#ifndef MG5ORIGIN</c>) — default → Quit.
-/// </summary>
+/// <summary>Sort: 1=candidacy (Value=slot 0-9), 3=vote for slot; Sort 2 (withdrawal) is compiled out.</summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.TribeVote, ExpectedSize = 17,
     AllowedStates = [(byte)ZoneSessionState.InWorld])]
 public readonly partial record struct TribeVoteRequest : IIncomingPacket<TribeVoteRequest>

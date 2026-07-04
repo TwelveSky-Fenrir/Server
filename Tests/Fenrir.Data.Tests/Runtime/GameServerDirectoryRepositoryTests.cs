@@ -6,19 +6,11 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Fenrir.Data.Tests.Runtime;
 
-/// <summary>
-///     Exercises <see cref="GameServerDirectoryRepository" /> against a real SQL Server 2025 instance running
-///     the Database/ migrations (architecture reference §14.1). <c>GetDirectoryAsync</c> wraps its query in
-///     <c>AddInMemoryCache("shards:directory", TimeSpan.FromSeconds(2))</c>, and CaeriusNet's in-memory cache
-///     is process-wide static storage keyed by that string (not scoped to a single <see cref="ICaeriusNetDbContext" />
-///     or test instance) -- so every test here waits comfortably past the 2 s TTL before reading back through
-///     <c>GetDirectoryAsync</c>, rather than risk observing another call's (including its own prior call's)
-///     cached snapshot instead of the row it just wrote.
-/// </summary>
+// GetDirectoryAsync caches via AddInMemoryCache("shards:directory", 2s TTL) -- CaeriusNet's cache is
+// process-wide static storage, not scoped per test, so every test here waits past the TTL before reading.
 [Collection("SqlServer")]
 public sealed class GameServerDirectoryRepositoryTests : IDisposable
 {
-    // Comfortably above the repository's 2 s cache TTL -- see class remarks.
     private static readonly TimeSpan CacheBypassDelay = TimeSpan.FromMilliseconds(2500);
 
     private readonly ServiceProvider _provider;
@@ -70,8 +62,6 @@ public sealed class GameServerDirectoryRepositoryTests : IDisposable
         await Task.Delay(CacheBypassDelay);
 
         var directory = await _repository.GetDirectoryAsync(CancellationToken.None);
-        // Assert.Single with a predicate is itself the upsert assertion: it fails if the second Heartbeat
-        // inserted a duplicate row instead of overwriting the first.
         var entry = Assert.Single(directory, e => e.ShardId == shardId);
 
         Assert.Equal("shard-251-new.internal", entry.Host);

@@ -4,7 +4,7 @@ using Fenrir.Contracts.Tests.TestSupport;
 
 namespace Fenrir.Contracts.Tests.Packets.Shared;
 
-/// <summary>TRIBE_WORK_CASE2/CASE3 (13 bytes, S04_MyWork02.cpp:10817-10821) -- CZ_TRIBE_WORK_SEND tSort 2/3.</summary>
+// CZ_TRIBE_WORK_SEND tSort 2/3.
 public class TribeWorkNamePayloadTests
 {
     [Fact]

@@ -1,6 +1,5 @@
--- Contract: @IpAddress VARCHAR(45) -> RS0 { GmAllowlistId INT }.
--- Errors: THROW 50304 if @IpAddress is already allowlisted (checked before insert;
--- UQ_GmAllowlist_IpAddress is the last-resort backstop under a race).
+-- THROW 50304 if @IpAddress is already allowlisted (checked before insert; UQ_GmAllowlist_IpAddress
+-- is the last-resort backstop under a race).
 CREATE PROCEDURE admin.usp_GmAllowlist_Add @IpAddress VARCHAR(45)
 AS
 BEGIN

@@ -4,11 +4,7 @@ using Fenrir.Contracts.Wire;
 
 namespace Fenrir.Contracts.Packets.Zone;
 
-/// <summary>
-///     ZC_SET_DEPUTY_PSHOP_MONEY_RECV (ZONE.h:1319-1324) — reply to CZ_SET_DEPUTY_PSHOP_MONEY_SEND.
-///     <c>Result</c> 0 = ok (amounts withdrawn), 1-4 = error codes (proxy state, currency caps, IPC).
-///     Unicast; same zone restriction as ZC_GET_DEPUTY_PSHOP_RECV.
-/// </summary>
+/// <summary>Result: 0=ok, 1-4=error (proxy state, currency caps, IPC).</summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.WithdrawProxyShopEarnings,
     ExpectedSize = 13)]
 public readonly partial record struct WithdrawProxyShopEarningsResponse : IOutgoingPacket

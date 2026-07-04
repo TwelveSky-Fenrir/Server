@@ -1,9 +1,5 @@
--- Internal readability view: one row per monster with its loot-table richness summarized as counts,
--- for tooling/debugging (e.g. "which monsters actually have a loot table worth tuning") rather than a
--- GameServer hot path. Plain view, not indexed -- world.* is boot-time-only reference data with no
--- per-tick read pressure, so materializing this aggregate would be pure cost with no benefit.
--- Child-table counts are pre-aggregated in derived tables before joining to world.Monsters so a monster
--- with, say, both potion and extra-item rows doesn't get double-counted by a naive multi-table JOIN.
+-- Loot-table summary per monster for tooling. Child-table counts are pre-aggregated in derived tables
+-- before joining so a monster with rows in multiple drop tables isn't double-counted by a naive JOIN.
 CREATE VIEW world.vw_MonsterWithDropSummary
 AS
 SELECT m.MonsterId,

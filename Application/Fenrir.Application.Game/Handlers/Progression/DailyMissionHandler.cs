@@ -14,21 +14,13 @@ using Microsoft.Extensions.Logging;
 namespace Fenrir.Application.Game.Handlers.Progression;
 
 /// <summary>
-///     CZ_MISSION_COMPLETE_SEND (opcode 126, verified <c>S04_MyWork02.cpp:14521-14618</c>) -- daily mission
-///     view/claim action. <see cref="DailyMissionRequest.Sort" /> must be 1 (view, no gate) or 2 (claim),
-///     else <c>Quit()</c>. Claim gates on level &gt;= LV_M1 (113) AND
-///     <see cref="PlayerRuntimeState.MissionJoinWar" /> &gt;= 1 AND
-///     <see cref="PlayerRuntimeState.MissionKillOtherTribe" /> &gt;= 10 (Quit()-worthy) -- the
-///     <c>aKillMonster</c>/<c>aPlayTime</c> gates are compiled out in EU33 (<c>USE_DAILY_UI_MONSTER_KILL</c>
-///     OFF) so they never block a claim. A full inventory on claim is a clean failure (<c>Result = 3</c>),
-///     the only soft-fail path here.
+///     CZ_MISSION_COMPLETE_SEND (opcode 126) -- daily mission view/claim. Claim gates on level &gt;= LV_M1 and
+///     war/kill-tribe thresholds; <c>aKillMonster</c>/<c>aPlayTime</c> gates are compiled out in EU33 so they
+///     never block a claim. A full inventory on claim is a clean failure (<c>Result = 3</c>).
 /// </summary>
 /// <remarks>
-///     OPEN ISSUE: <see cref="PlayerRuntimeState.MissionJoinWar" />/
-///     <see cref="PlayerRuntimeState.MissionKillOtherTribe" />'s
-///     only increment hooks (war participation / PvP-kill tracking) are out of Fenrir's scope, so both stay
-///     0 for every character -- tSort=2 is correctly gated but currently unreachable end to end. The reward
-///     pool (<see cref="DailyMissionRewardTable" />) is the verified LNW33 <c>GetDailyMissionReward</c> table.
+///     <see cref="PlayerRuntimeState.MissionJoinWar" />/<see cref="PlayerRuntimeState.MissionKillOtherTribe" />
+///     have no increment hooks in Fenrir (war/PvP tracking out of scope), so claim is currently unreachable end to end.
 /// </remarks>
 public sealed class DailyMissionHandler(
     ICharacterRepository characters,
@@ -36,10 +28,7 @@ public sealed class DailyMissionHandler(
     ILogger<DailyMissionHandler> logger)
     : IAsyncPacketHandler<DailyMissionRequest>
 {
-    /// <summary>
-    ///     <c>LV_M1</c> -- shared with <see cref="ExperienceFormulas.RebirthDivisorLevelThreshold" /> (both verified 113,
-    ///     DEFINE.h), reused rather than re-declared.
-    /// </summary>
+    /// <summary><c>LV_M1</c> -- shared with <see cref="ExperienceFormulas.RebirthDivisorLevelThreshold" />.</summary>
     private const int MinimumClaimLevel = ExperienceFormulas.RebirthDivisorLevelThreshold;
 
     private const int RequiredJoinWar = 1;
@@ -94,7 +83,7 @@ public sealed class DailyMissionHandler(
         var itemId = DailyMissionRewardTable.Roll(Random.Shared.NextDouble);
         if (!worldData.ItemsById.TryGetValue(itemId, out var itemDefinition))
         {
-            // Cannot happen against a fully-seeded catalog -- mirrors legacy's "mITEM.Search returns NULL" Quit() guard.
+            // Can't happen against a fully-seeded catalog; mirrors legacy's mITEM.Search-NULL guard.
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }
@@ -127,10 +116,7 @@ public sealed class DailyMissionHandler(
                 zone.MapId, characterId);
     }
 
-    /// <summary>
-    ///     First empty slot across BOTH inventory pages (SendItemToInventory's own linear scan order, page 0 then page 1)
-    ///     -- false if the whole inventory is full.
-    /// </summary>
+    /// <summary>First empty slot across both inventory pages, page 0 then page 1 (legacy scan order).</summary>
     private static bool TryFindEmptySlot(PlayerRuntimeState state, out byte container, out byte slot)
     {
         foreach (var page in InventoryPages)

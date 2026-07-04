@@ -5,14 +5,7 @@ using Fenrir.Contracts.Tests.TestSupport;
 
 namespace Fenrir.Contracts.Tests.Packets.Shared;
 
-/// <summary>
-///     PROXY_STATE_INFO (STRUCT.h:1734-1740) — C++ <c>sizeof</c> is 52 bytes, but this wire type only
-///     covers the 3 real fields (50 bytes): Location[3]/Name[13]/PshopName[25]. The trailing 2-byte
-///     queue padding is NOT part of this type — it is the responsibility of the parent packet's
-///     <c>[Reserved(2)]</c> attribute on the field that follows the embedded struct (documented on the
-///     type itself). The golden encoder below is hand-built from the C++ layout, independent of the
-///     generated <c>Write</c>.
-/// </summary>
+// C++ sizeof is 52, but WireSize=50: the trailing 2-byte padding belongs to the parent packet's [Reserved(2)], not this type.
 public class ProxyStateInfoTests
 {
     [Fact]

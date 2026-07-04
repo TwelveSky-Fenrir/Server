@@ -7,10 +7,8 @@ using Fenrir.Network.Sessions;
 namespace Fenrir.Application.Game.Handlers.Social;
 
 /// <summary>
-///     CZ_TRADE_ASK_SEND (opcode 47). Same server exceptions as duel: inter-tribe trade is refused
-///     (Quit()) except on maps 37/119/124. Target resolved within the asker's own zone only. Level uses
-///     <see cref="PlayerRuntimeState.Level" /> alone (aLevel2 not modeled -- same gap as party's
-///     cumulative-level check).
+///     CZ_TRADE_ASK_SEND (opcode 47) -- level uses <see cref="PlayerRuntimeState.Level" /> alone; aLevel2
+///     isn't modeled, same gap as party's invite check.
 /// </summary>
 public sealed class TradeInviteHandler(TradeRegistry trades) : IInlinePacketHandler<TradeInviteRequest>
 {

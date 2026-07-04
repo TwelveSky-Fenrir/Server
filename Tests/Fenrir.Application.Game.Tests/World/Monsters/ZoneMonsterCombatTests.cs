@@ -10,10 +10,7 @@ using Fenrir.Contracts.Packets.Shared;
 
 namespace Fenrir.Application.Game.Tests.World.Monsters;
 
-/// <summary>
-///     Covers <c>Zone.ApplyCombatCommand</c>'s mCase 3 branch (Avatar -&gt; Monster, <c>ProcessAttack03</c>) --
-///     the V4 counterpart of <c>ZoneAttackTests</c>' own mCase 2 coverage.
-/// </summary>
+/// <summary>Covers <c>Zone.ApplyCombatCommand</c>'s mCase 3 branch: Avatar -&gt; Monster, <c>ProcessAttack03</c>.</summary>
 public class ZoneMonsterCombatTests
 {
     private static readonly EffectiveStats StrongAttacker = new(1000, 1000, 500, 0, 1000, 0, 0, 0, 0, 0, 0);
@@ -62,9 +59,7 @@ public class ZoneMonsterCombatTests
         Assert.True(zone.TryGetPlayer(characterId, out var attacker));
         attacker!.Stats = StrongAttacker;
 
-        // Past the attacker's own zone-entry protect window (Zone.HandleEnter stamps ZoneEntryAtZoneClock on
-        // arrival, CombatResolver.ProtectDuration = 10s) -- ResolvePvmAttack checks the ATTACKER's own window
-        // even against a monster, which has none of its own.
+        // ResolvePvmAttack checks the attacker's own zone-entry protect window, even against a monster
         zone.Tick(CombatResolver.ProtectDuration + TimeSpan.FromSeconds(1));
 
         return zone;
@@ -130,8 +125,6 @@ public class ZoneMonsterCombatTests
         var zone = CreateZoneWithSpawnedMonster(CacheWithOneRegion(), 10, out _);
         Assert.True(zone.TryGetMonster(1, out var monster));
 
-        // Repeatedly attack until the monster is dead -- the exact hit count doesn't matter, only that it
-        // eventually dies and is removed, never lingering at <= 0 life.
         for (var i = 0; i < 50 && zone.MonsterCount > 0; i++)
         {
             zone.PostCombatCommand(new CombatCommand

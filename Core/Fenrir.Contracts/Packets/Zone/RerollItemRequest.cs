@@ -4,11 +4,7 @@ using Fenrir.Contracts.Wire;
 
 namespace Fenrir.Contracts.Packets.Zone;
 
-/// <summary>
-///     CZ_EXCHANGE_ITEM_SEND (CLIENT.h:232-242) — random re-roll of a Rare/Elite item (same level/tribe),
-///     paid. <c>USE_EXCHANGE_ITEM_V2</c> is NOT compiled in EU33 (commented at DEFINE.h:75): no
-///     <c>tTribe</c> field, 20-byte payload only. Response: ZC 29.
-/// </summary>
+// USE_EXCHANGE_ITEM_V2 is off in EU33: no Tribe field (20-byte payload only).
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.RerollItem, ExpectedSize = 29,
     AllowedStates = [(byte)ZoneSessionState.InWorld])]
 public readonly partial record struct RerollItemRequest : IIncomingPacket<RerollItemRequest>

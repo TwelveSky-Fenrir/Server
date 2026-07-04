@@ -2,7 +2,6 @@ using Fenrir.Data.Characters;
 
 namespace Fenrir.Data.Commerce;
 
-/// <summary>Abstraction over Fenrir.Data.Commerce.OfflineShopRepository for DI/testability.</summary>
 public interface IOfflineShopRepository
 {
     public ValueTask<(OfflineShopRowDto? Shop, IReadOnlyList<OfflineShopItemRowDto> Items)> GetByCharacterAsync(

@@ -8,11 +8,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Fenrir.Generators.Protocol;
 
-/// <summary>
-///     Entry point of the legacy protocol generator (spec §5). Detects <c>[FenrirPacket]</c>/<c>[FenrirWireType]</c>,
-///     emits per-type <c>Opcode</c>/<c>PayloadSize</c>|<c>WireSize</c>/<c>TryRead</c>/<c>Write</c>, then the aggregated
-///     <c>OpcodeRegistry</c>/<c>SessionStateGate</c>/<c>*MessageFactory</c> tables.
-/// </summary>
+/// <summary>Detects <c>[FenrirPacket]</c>/<c>[FenrirWireType]</c>, emits per-type members, then the aggregated dispatch tables.</summary>
 [Generator(LanguageNames.CSharp)]
 public sealed class ProtocolIncrementalGenerator : IIncrementalGenerator
 {

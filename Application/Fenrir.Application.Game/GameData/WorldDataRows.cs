@@ -2,11 +2,7 @@ using Fenrir.Data.World;
 
 namespace Fenrir.Application.Game.GameData;
 
-/// <summary>
-///     The raw, un-indexed result of every world.usp_*_GetAll call, exactly as it came off the wire.
-///     <see cref="WorldDataLoader" /> fills this from <see cref="WorldDataRepository" />; tests fill it with
-///     in-memory rows -- <see cref="WorldDataCacheBuilder.Build" /> only ever sees this shape, never SQL.
-/// </summary>
+/// <summary>Raw, un-indexed rows from every world.usp_*_GetAll call -- <see cref="WorldDataCacheBuilder.Build" /> only ever sees this shape, never SQL.</summary>
 public sealed record WorldDataRows
 {
     public required IReadOnlyList<ItemRowDto> Items { get; init; }

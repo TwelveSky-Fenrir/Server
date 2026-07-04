@@ -7,7 +7,6 @@ public class CzGetCashItemInfoSendTests
     [Fact]
     public void PayloadSize_MatchesContract()
     {
-        // ExpectedSize=9 (inbound header only) -> 0-byte payload: empty struct.
         Assert.Equal(0, GetCashCatalogRequest.PayloadSize);
         Assert.Equal(Opcodes.Zone.Incoming.GetCashCatalog, GetCashCatalogRequest.Opcode);
     }

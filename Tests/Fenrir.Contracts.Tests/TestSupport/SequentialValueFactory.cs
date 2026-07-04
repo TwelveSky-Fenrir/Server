@@ -1,11 +1,6 @@
 namespace Fenrir.Contracts.Tests.TestSupport;
 
-/// <summary>
-///     Produit des valeurs distinctes et déterministes (index croissant) pour peupler des structs à
-///     grand nombre de champs (ex. AvatarInfo, 227 propriétés) sans avoir à inventer une valeur par
-///     champ à la main : un bug d'offset qui lit/écrit la mauvaise zone reste détectable puisque deux
-///     champs voisins n'ont jamais la même valeur.
-/// </summary>
+// Deterministic increasing values (never repeating) so an offset bug reading/writing the wrong field is detectable.
 internal sealed class SequentialValueFactory
 {
     private int _counter;
@@ -35,10 +30,7 @@ internal sealed class SequentialValueFactory
         return (byte)(NextInt() & 0xFF);
     }
 
-    /// <summary>
-    ///     Chaîne courte et unique, tronquée à <paramref name="fixedLength" /> - 1 pour garantir au
-    ///     moins un octet de bourrage à zéro (donc un `\0` terminal) même si le compteur grossit.
-    /// </summary>
+    // Truncated to fixedLength-1 so there's always room for a trailing zero byte, even as the counter grows.
     public string NextString(int fixedLength)
     {
         var value = "S" + NextInt();

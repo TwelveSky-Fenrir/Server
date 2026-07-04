@@ -1,9 +1,6 @@
 namespace Fenrir.Application.Game.Social.Trade;
 
-/// <summary>
-///     Soft outcomes of CZ_TRADE_ASK_SEND -- mirrors ZC_TRADE_ANSWER_RECV's pre-check codes (contracts/05_social.md:
-///     3 soi occupé, 4 introuvable [handler-resolved], 5 cible occupée).
-/// </summary>
+/// <summary>Soft outcomes of CZ_TRADE_ASK_SEND -- mirrors ZC_TRADE_ANSWER_RECV's pre-check codes.</summary>
 public enum TradeAskOutcome
 {
     Sent,
@@ -12,18 +9,16 @@ public enum TradeAskOutcome
 }
 
 /// <summary>
-///     Process-wide secure-trade authority (CZ_TRADE_* family). Same ask/cancel/answer shape as
-///     <see cref="Duel.DuelRegistry" />; acceptance is SYMMETRIC (verified: CZ_TRADE_START_SEND requires
-///     "état 3 des deux côtés" -- unlike Mentor's asymmetric master-only start), so <see cref="TryStart" />
-///     is callable by either accepted side once both have answered.
+///     Process-wide secure-trade authority. Same ask/cancel/answer shape as DuelRegistry, but acceptance is
+///     symmetric (CZ_TRADE_START_SEND requires "state 3" on both sides, unlike Mentor's asymmetric
+///     master-only start), so <see cref="TryStart" /> is callable by either accepted side once both have
+///     answered.
 /// </summary>
 /// <remarks>
-///     OPEN ISSUE: the negotiation lifecycle (ask/cancel/answer/start/lock/end) and the atomic
-///     two-character commit (<c>CharacterRepository.ExecuteTradeAsync</c>) are fully implemented, but the
-///     mechanism that POPULATES a session's offer slots (legacy CZ_PROCESS_DATA_SEND tSort 218-222) is
-///     NOT wired into <c>GenericActionHandler</c> yet -- a trade can be negotiated and committed
-///     end-to-end right now, but only with whatever slots/money a caller sets directly on
-///     <see cref="TradeSession" />.
+///     The negotiation lifecycle and the atomic two-character commit are fully implemented, but the
+///     mechanism that populates a session's offer slots (legacy tSort 218-222) is not wired into
+///     GenericActionHandler yet -- a trade can be negotiated and committed end-to-end, but only with
+///     whatever slots/money a caller sets directly on TradeSession.
 /// </remarks>
 public sealed class TradeRegistry
 {
@@ -85,10 +80,7 @@ public sealed class TradeRegistry
         }
     }
 
-    /// <summary>
-    ///     CZ_TRADE_START_SEND -- callable by either accepted side; allocates a fresh, EMPTY <see cref="TradeSession" />
-    ///     for both.
-    /// </summary>
+    /// <summary>CZ_TRADE_START_SEND -- callable by either accepted side; allocates a fresh, empty TradeSession for both.</summary>
     public bool TryStart(int callerId, out TradeSession session)
     {
         lock (_lock)
@@ -115,10 +107,7 @@ public sealed class TradeRegistry
         }
     }
 
-    /// <summary>
-    ///     Ends (aborts OR completes) the session either participant is in -- called by CZ_TRADE_END_SEND (abort) or
-    ///     after a successful atomic commit (completion). Removes BOTH participants' index entries.
-    /// </summary>
+    /// <summary>Ends (aborts or completes) the session either participant is in. Removes both participants' index entries.</summary>
     public bool TryEnd(int characterId, out TradeSession? session)
     {
         lock (_lock)

@@ -6,11 +6,8 @@ using Fenrir.Network.Sessions;
 
 namespace Fenrir.Application.Login.Tests.Handlers;
 
-/// <summary>
-///     op15 CL_LOGIN_MOUSE_PASSWORD_SEND — PIN verification (login protocol report §4.15): match opens
-///     CharSelect, mismatch replies Result=1 and strikes the counter, the THIRD strike disconnects
-///     (<see cref="VerifyMousePinHandler" />'s <c>MaxPinFailures</c>).
-/// </summary>
+// op15 CL_LOGIN_MOUSE_PASSWORD_SEND -- match opens CharSelect, mismatch replies Result=1 and strikes the
+// counter, the third strike disconnects (VerifyMousePinHandler.MaxPinFailures).
 public class ClLoginMousePasswordSendHandlerTests
 {
     private const int AccountId = 42;
@@ -65,7 +62,6 @@ public class ClLoginMousePasswordSendHandlerTests
         var handler = new VerifyMousePinHandler(pins);
         var (session, pipe) = CreateSessionInPinRequired();
 
-        // Strikes 1 and 2: replied Result=1, session stays alive and still parked in PinRequired.
         await handler.HandleAsync(new VerifyMousePinRequest { MousePasswordInput = "0000" }, session,
             CancellationToken.None);
         await PacketAssert.AssertSentAsync(pipe, new VerifyMousePinResponse { Result = 1 });
@@ -77,7 +73,7 @@ public class ClLoginMousePasswordSendHandlerTests
         await PacketAssert.AssertSentAsync(pipe, new VerifyMousePinResponse { Result = 1 });
         Assert.Null(session.DisconnectReason);
 
-        // Strike 3: legacy GL_504 -> Quit(), still replies Result=1 THEN disconnects (S04_MyWork02.cpp l.567-573).
+        // Strike 3: legacy GL_504 -> Quit() (S04_MyWork02.cpp l.567-573), still replies Result=1 then disconnects.
         await handler.HandleAsync(new VerifyMousePinRequest { MousePasswordInput = "0000" }, session,
             CancellationToken.None);
         await PacketAssert.AssertSentAsync(pipe, new VerifyMousePinResponse { Result = 1 });

@@ -10,12 +10,8 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Fenrir.Data.Tests.Game;
 
-/// <summary>
-///     game.usp_Guild_* / usp_GuildMember_* write procs against real SQL Server 2025 (phase A3 -- the missing
-///     write half of the guild fold-in, report 06 §3.1). Exercised through raw ADO.NET on purpose: their C#
-///     repository is deliberately deferred to the Phase C guild vertical (no dead code), but the proc contracts
-///     -- including every documented THROW -- still need coverage now.
-/// </summary>
+// game.usp_Guild_* / usp_GuildMember_* write procs against real SQL Server 2025, exercised via raw ADO.NET
+// since the C# repository isn't wired up yet -- every documented THROW still needs coverage.
 [Collection("SqlServer")]
 public class GuildProcTests
 {
@@ -157,8 +153,7 @@ public class GuildProcTests
         var masterId = await CreateCharacterAsync();
         var guildId = await CreateGuildAsync(NewGuildName(), masterId);
 
-        // A notice row proves the memory-optimized child is swept too (usp_GuildNotice_Set is the sanctioned
-        // writer and exists since the previous chapter).
+        // Notice row proves the memory-optimized child table is swept too.
         await ExecProcAsync("game.usp_GuildNotice_Set",
             ("GuildId", guildId), ("NoticeIndex", (byte)0), ("Text", "farewell"));
 
@@ -217,9 +212,8 @@ public class GuildProcTests
         await using var reader = await command.ExecuteReaderAsync();
         Assert.True(await reader.ReadAsync());
         Assert.Equal(guildId, reader.GetInt32(reader.GetOrdinal("GuildId")));
-        Assert.Equal(1,
-            reader.GetInt32(reader.GetOrdinal("Grade"))); // [CORRIGÉ-REVUE] fresh guilds now start at grade 1
-        // MemberCount is INT (plain COUNT(*)), not BIGINT -- see GuildSummaryDto's own remarks.
+        Assert.Equal(1, reader.GetInt32(reader.GetOrdinal("Grade"))); // fresh guilds start at grade 1
+        // MemberCount is INT (plain COUNT(*)), not BIGINT.
         Assert.Equal(2, reader.GetInt32(reader.GetOrdinal("MemberCount")));
         Assert.False(await reader.ReadAsync());
         await reader.CloseAsync();

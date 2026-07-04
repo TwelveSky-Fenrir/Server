@@ -9,15 +9,12 @@ using Microsoft.Extensions.Logging;
 namespace Fenrir.Application.Game.Handlers.Social;
 
 /// <summary>
-///     CZ_TEACHER_START_SEND (opcode 62) -- MASTER-only (the original asker), consumes the accepted
-///     negotiation and durably bonds both sides in one transaction (<see cref="MentorRepository.BondAsync" />)
-///     before mirroring onto both live <see cref="PlayerRuntimeState" />s. Sort=1 to master, Sort=2 to
-///     student (verified against source).
+///     CZ_TEACHER_START_SEND (opcode 62) -- master-only; consumes the accepted negotiation and bonds both
+///     sides in one transaction.
 /// </summary>
 /// <remarks>
-///     Master and student can be hosted by different zones/tick threads, so only this handler's own
-///     master-side field is mutated directly; the student's side is mirrored via a zone command instead
-///     (see inline comments below).
+///     Master/student may be hosted by different zones/tick threads: only the master-side field is mutated
+///     directly here; the student's side is mirrored via a zone command.
 /// </remarks>
 public sealed class MentorStartHandler(
     ZoneRegistry zones,
@@ -41,10 +38,8 @@ public sealed class MentorStartHandler(
 
         await repository.BondAsync(masterId, studentId, cancellationToken);
 
-        // Self-only mutation -- same narrow, accepted posture as FriendAddHandler's own write.
         master.StudentCharacterId = studentId;
 
-        // Cross-character: routed through the STUDENT's own hosting zone, never mutated directly here.
         if (!studentZone.PostMentorCommand(new MentorZoneCommand(studentId, masterId)))
             logger.LogError(
                 "Zone {MapId} mentor inbox full: dropped TeacherCharacterId mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",

@@ -4,10 +4,6 @@ using Fenrir.Contracts.Wire;
 
 namespace Fenrir.Contracts.Packets.Zone;
 
-/// <summary>
-///     ZC_LOW_ITEM_RECV (ZONE.h:531) — same typedef as <see cref="RerollItemResponse" /> (29). Reply to
-///     CZ_LOW_ITEM_SEND (28); unicast.
-/// </summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.DowngradeItemRank, ExpectedSize = 33)]
 public readonly partial record struct DowngradeItemRankResponse : IOutgoingPacket
 {

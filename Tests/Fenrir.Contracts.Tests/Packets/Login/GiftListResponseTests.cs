@@ -15,7 +15,7 @@ public class LcDemandGiftRecvTests
     [Fact]
     public void RoundTrip_PreservesAllFields()
     {
-        // V1 shape: [page*2+0]=itemId, [page*2+1]=0 (GIFT_V2 off in EU33, report §4.25).
+        // V1 shape: [page*2+0]=itemId, [page*2+1]=0 (GIFT_V2 disabled in EU33).
         var giftItem = new int[20];
         for (var page = 0; page < 10; page++)
             giftItem[page * 2] = 1000 + page;

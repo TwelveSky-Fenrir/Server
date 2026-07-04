@@ -7,10 +7,8 @@ using Fenrir.Network.Sessions;
 namespace Fenrir.Application.Game.Handlers.Social;
 
 /// <summary>
-///     CZ_PARTY_ASK_SEND (opcode 65). Target resolved within the inviter's own zone only (verified:
-///     <c>mUTIL.SearchAvatar</c> is same-process-only). "Cumulative level" uses
-///     <see cref="PlayerRuntimeState.Level" /> alone -- Fenrir does not model aLevel2 (a rebirth/martial
-///     sub-level the legacy adds), a documented open gap, not an invented substitute.
+///     CZ_PARTY_ASK_SEND (opcode 65) -- level check uses <see cref="PlayerRuntimeState.Level" /> alone;
+///     aLevel2 (legacy's rebirth sub-level) isn't modeled.
 /// </summary>
 public sealed class PartyInviteHandler(PartyRegistry parties) : IInlinePacketHandler<PartyInviteRequest>
 {

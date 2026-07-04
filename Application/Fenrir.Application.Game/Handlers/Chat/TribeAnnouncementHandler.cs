@@ -6,11 +6,9 @@ using Fenrir.Network.Sessions;
 namespace Fenrir.Application.Game.Handlers.Chat;
 
 /// <summary>
-///     CZ_TRIBE_NOTICE_SEND (opcode 80). Empty content ⇒ Quit(); restricted to the tribe master or
-///     sub-master (<see cref="PlayerRuntimeState.TribeRole" /> 1 or 2, matching <c>ReturnTribeRole</c>
-///     directly -- no DB/wire inversion here, unlike guild) -- a regular member (role 0) is silently
-///     ignored, no Quit. No CheckChat/mute gate documented. Fan-out to every same-tribe player across
-///     every zone (strict tribe match, no alliance -- verified, ProcessForRelay case 113).
+///     CZ_TRIBE_NOTICE_SEND (opcode 80). Restricted to tribe master/sub-master
+///     (<see cref="PlayerRuntimeState.TribeRole" /> 1 or 2); a regular member is silently ignored, not
+///     disconnected. Strict tribe match only, no alliance.
 /// </summary>
 public sealed class TribeAnnouncementHandler(ZoneRegistry zones) : IInlinePacketHandler<TribeAnnouncementRequest>
 {

@@ -1,9 +1,5 @@
--- Contract: @LoginName NVARCHAR(64), @PasswordHash VARBINARY(32), @PasswordSalt VARBINARY(16)
---           -> RS0 { AccountId INT } (scalar, SCOPE_IDENTITY of the newly created row).
--- Not idempotent: a second call with the same @LoginName raises 50101 instead of creating a duplicate.
--- Errors: THROW 50101 if @LoginName is already taken (admin.ErrorCatalog, 501xx = auth range). The
--- check is an explicit SELECT BEFORE the INSERT -- no try/catch around the UNIQUE constraint
--- (architecture reference §12.3: constraint violations are not control flow).
+-- Not idempotent: a second call with the same @LoginName raises 50101 instead of creating a duplicate
+-- (checked explicitly before the insert; UQ constraint is the last-resort backstop under a race).
 CREATE PROCEDURE auth.usp_Account_Create @LoginName    NVARCHAR(64),
     @PasswordHash VARBINARY(32),
     @PasswordSalt VARBINARY(16)

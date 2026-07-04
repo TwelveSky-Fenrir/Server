@@ -1,9 +1,5 @@
--- Legacy `gmip` (rowID, uGMIP varchar(15)) -- the GM-console connection allowlist. Small and
--- rarely-changing (the dump's only row was a dev-loopback 127.0.0.1 entry, deliberately not ported as
--- seed data -- not meaningful production data), so it is loaded whole at boot (usp_GmAllowlist_GetAll)
--- rather than checked per-row like admin.BlockedIps -- GM connections are a vanishingly small fraction
--- of total connection attempts compared to the player login path, so the native-compilation case that
--- justifies admin.BlockedIps doesn't apply here.
+-- Legacy `gmip`: GM-console connection allowlist. The dump's only row (127.0.0.1 dev-loopback) was
+-- deliberately not ported as seed data.
 CREATE TABLE admin.GmAllowlist
 (
     GmAllowlistId INT IDENTITY(1,1) NOT NULL,

@@ -3,13 +3,8 @@ using Fenrir.Contracts.Attributes;
 
 namespace Fenrir.Contracts.Packets.Shared;
 
-/// <summary>
-///     DEFAULT_PDATA_RECV (STRUCT.h:1229-1238, 28 bytes) — declared INSIDE STRUCT.h's <c>pack(1)</c>
-///     region (l.1016-1325); 7 ints, no padding possible regardless. Not a packet of its own: it is the
-///     re-read layer <c>MyWork::ProcessForData</c> applies over the <c>tData</c> blob of
-///     CZ_PROCESS_DATA_SEND (payload offset 4) for every "container move" <c>tSort</c> value
-///     (208-232, 240-256, 3000, 250-253...). Exposed here as a plain deserializable wire type.
-/// </summary>
+// Not a packet of its own: re-read layer over CZ_PROCESS_DATA_SEND's tData blob (offset 4) for
+// "container move" tSort values (208-232, 240-256, 3000, 250-253...).
 [FenrirWireType(28)]
 public readonly partial record struct DefaultPData : IFenrirWireType<DefaultPData>
 {

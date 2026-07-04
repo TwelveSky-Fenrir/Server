@@ -8,10 +8,19 @@ namespace Fenrir.Application.Game.Guilds;
 ///     may be hosted by a different <see cref="World.Zone" />/tick thread than the actor whose request
 ///     triggered the change.
 /// </summary>
-/// <param name="CharacterId">Whose <see cref="World.PlayerRuntimeState" /> this mirrors onto -- a no-op if they already left this zone.</param>
-/// <param name="GuildId">Null = "no longer in a guild" (also clears <paramref name="GuildName" />/<paramref name="GuildRoleDb" />/<paramref name="GuildCallName" />).</param>
+/// <param name="CharacterId">
+///     Whose <see cref="World.PlayerRuntimeState" /> this mirrors onto -- a no-op if they already
+///     left this zone.
+/// </param>
+/// <param name="GuildId">
+///     Null = "no longer in a guild" (also clears <paramref name="GuildName" />/
+///     <paramref name="GuildRoleDb" />/<paramref name="GuildCallName" />).
+/// </param>
 /// <param name="GuildName">The guild's display name -- "" when <paramref name="GuildId" /> is null.</param>
-/// <param name="GuildRoleDb">DB-side role enum (0 member, 1 sub-master, 2 master) -- see <see cref="Social.GuildRoleCodec" />.</param>
+/// <param name="GuildRoleDb">
+///     DB-side role enum (0 member, 1 sub-master, 2 master) -- see
+///     <see cref="Social.GuildRoleCodec" />.
+/// </param>
 /// <param name="GuildCallName">Cosmetic in-guild title (GuildMembers.CallName) -- "" when none set or when leaving.</param>
 /// <param name="Applied">
 ///     Completed by <see cref="World.Zone.ApplyGuildMembershipCommand" /> once the tick actually mirrors

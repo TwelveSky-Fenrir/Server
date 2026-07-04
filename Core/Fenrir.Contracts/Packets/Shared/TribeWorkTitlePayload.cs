@@ -14,6 +14,9 @@ public readonly partial record struct TribeWorkTitlePayload : IFenrirWireType<Tr
     /// <summary>1-14, the new title CATEGORY (combined with the current rank to form the new aTitle).</summary>
     public required int TitleSort { get; init; }
 
-    /// <summary>Wire field carried but unused by the legacy formula (the new rank is derived from the CURRENT title's own rank, not this value) -- see doc 10 §2 tSort 6.</summary>
+    /// <summary>
+    ///     Wire field carried but unused by the legacy formula (the new rank is derived from the CURRENT title's own
+    ///     rank, not this value) -- see doc 10 §2 tSort 6.
+    /// </summary>
     public required int TitleLv { get; init; }
 }

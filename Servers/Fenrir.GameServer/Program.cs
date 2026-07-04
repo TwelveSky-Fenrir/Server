@@ -1,6 +1,5 @@
 using Fenrir.Application.Game;
 using Fenrir.Application.Game.Dispatching;
-using Fenrir.Data.Admin;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Movement;
 using Fenrir.Application.Game.Quests;
@@ -15,6 +14,7 @@ using Fenrir.Application.Game.World.Monsters;
 using Fenrir.Contracts.Abstractions;
 using Fenrir.Contracts.Dispatch;
 using Fenrir.Data;
+using Fenrir.Data.Admin;
 using Fenrir.Data.WriteBehind;
 using Fenrir.GameServer;
 using Fenrir.Network.RateLimiting;

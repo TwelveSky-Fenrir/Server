@@ -24,7 +24,8 @@ namespace Fenrir.Application.Game.Handlers.Progression;
 ///     the only soft-fail path here.
 /// </summary>
 /// <remarks>
-///     OPEN ISSUE: <see cref="PlayerRuntimeState.MissionJoinWar" />/<see cref="PlayerRuntimeState.MissionKillOtherTribe" />'s
+///     OPEN ISSUE: <see cref="PlayerRuntimeState.MissionJoinWar" />/
+///     <see cref="PlayerRuntimeState.MissionKillOtherTribe" />'s
 ///     only increment hooks (war participation / PvP-kill tracking) are out of Fenrir's scope, so both stay
 ///     0 for every character -- tSort=2 is correctly gated but currently unreachable end to end. The reward
 ///     pool (<see cref="DailyMissionRewardTable" />) is the verified LNW33 <c>GetDailyMissionReward</c> table.
@@ -35,11 +36,16 @@ public sealed class DailyMissionHandler(
     ILogger<DailyMissionHandler> logger)
     : IAsyncPacketHandler<DailyMissionRequest>
 {
-    /// <summary><c>LV_M1</c> -- shared with <see cref="ExperienceFormulas.RebirthDivisorLevelThreshold" /> (both verified 113, DEFINE.h), reused rather than re-declared.</summary>
+    /// <summary>
+    ///     <c>LV_M1</c> -- shared with <see cref="ExperienceFormulas.RebirthDivisorLevelThreshold" /> (both verified 113,
+    ///     DEFINE.h), reused rather than re-declared.
+    /// </summary>
     private const int MinimumClaimLevel = ExperienceFormulas.RebirthDivisorLevelThreshold;
 
     private const int RequiredJoinWar = 1;
     private const int RequiredKillOtherTribe = 10;
+
+    private static readonly byte[] InventoryPages = [ContainerMatrix.InventoryPage0, ContainerMatrix.InventoryPage1];
 
     public async ValueTask HandleAsync(DailyMissionRequest packet, IPacketSession session,
         CancellationToken cancellationToken)
@@ -121,9 +127,10 @@ public sealed class DailyMissionHandler(
                 zone.MapId, characterId);
     }
 
-    private static readonly byte[] InventoryPages = [ContainerMatrix.InventoryPage0, ContainerMatrix.InventoryPage1];
-
-    /// <summary>First empty slot across BOTH inventory pages (SendItemToInventory's own linear scan order, page 0 then page 1) -- false if the whole inventory is full.</summary>
+    /// <summary>
+    ///     First empty slot across BOTH inventory pages (SendItemToInventory's own linear scan order, page 0 then page 1)
+    ///     -- false if the whole inventory is full.
+    /// </summary>
     private static bool TryFindEmptySlot(PlayerRuntimeState state, out byte container, out byte slot)
     {
         foreach (var page in InventoryPages)

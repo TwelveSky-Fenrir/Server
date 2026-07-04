@@ -9,9 +9,9 @@ public class GroundItemPickupPolicyTests
 {
     private static GroundItemEntity Item(int itemId, int quantity, int value = 0)
     {
-        return new GroundItemEntity(1, 1u, itemId, quantity, value, SerialNumber: 0, PosX: 0, PosY: 0, PosZ: 0,
-            Master: "Killer", PartyName: "", DropSort: 0, CreatedAtZoneClock: TimeSpan.Zero,
-            SocketGem1: 0, SocketGem2: 0, SocketGem3: 0);
+        return new GroundItemEntity(1, 1u, itemId, quantity, value, 0, 0, 0, 0,
+            "Killer", "", 0, TimeSpan.Zero,
+            0, 0, 0);
     }
 
     private static ItemDefinition MoneyItem(int itemId)
@@ -32,7 +32,7 @@ public class GroundItemPickupPolicyTests
     [Fact]
     public void MoneyItem_ResolvesToMoneyOutcome_RegardlessOfDestinationSlot()
     {
-        var result = GroundItemPickupPolicy.Resolve(MoneyItem(1), Item(1, quantity: 5000), destinationSlot: null);
+        var result = GroundItemPickupPolicy.Resolve(MoneyItem(1), Item(1, 5000), null);
 
         Assert.Equal(GroundItemPickupPolicy.Outcome.Money, result.Outcome);
         Assert.Equal(5000, result.MoneyAmount);
@@ -42,7 +42,7 @@ public class GroundItemPickupPolicyTests
     [Fact]
     public void StackableItem_EmptyDestination_IsPlaced()
     {
-        var result = GroundItemPickupPolicy.Resolve(StackableItem(50), Item(50, quantity: 10), destinationSlot: null);
+        var result = GroundItemPickupPolicy.Resolve(StackableItem(50), Item(50, 10), null);
 
         Assert.Equal(GroundItemPickupPolicy.Outcome.Placed, result.Outcome);
         Assert.Equal(50, result.NewSlot!.Value.ItemId);
@@ -54,7 +54,7 @@ public class GroundItemPickupPolicyTests
     {
         var existing = new ItemStack(50, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
-        var result = GroundItemPickupPolicy.Resolve(StackableItem(50), Item(50, quantity: 10), existing);
+        var result = GroundItemPickupPolicy.Resolve(StackableItem(50), Item(50, 10), existing);
 
         Assert.Equal(GroundItemPickupPolicy.Outcome.Stacked, result.Outcome);
         Assert.Equal(30, result.NewSlot!.Value.Quantity);
@@ -65,7 +65,7 @@ public class GroundItemPickupPolicyTests
     {
         var existing = new ItemStack(50, 995, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
-        var result = GroundItemPickupPolicy.Resolve(StackableItem(50), Item(50, quantity: 10), existing);
+        var result = GroundItemPickupPolicy.Resolve(StackableItem(50), Item(50, 10), existing);
 
         Assert.Equal(GroundItemPickupPolicy.Outcome.Rejected, result.Outcome);
         Assert.False(result.Succeeded);
@@ -76,7 +76,7 @@ public class GroundItemPickupPolicyTests
     {
         var existing = new ItemStack(999, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
-        var result = GroundItemPickupPolicy.Resolve(StackableItem(50), Item(50, quantity: 10), existing);
+        var result = GroundItemPickupPolicy.Resolve(StackableItem(50), Item(50, 10), existing);
 
         Assert.Equal(GroundItemPickupPolicy.Outcome.Rejected, result.Outcome);
     }
@@ -84,7 +84,7 @@ public class GroundItemPickupPolicyTests
     [Fact]
     public void EquipmentItem_EmptyDestination_IsPlacedWithQuantityOne()
     {
-        var result = GroundItemPickupPolicy.Resolve(EquipmentItem(700), Item(700, quantity: 0), destinationSlot: null);
+        var result = GroundItemPickupPolicy.Resolve(EquipmentItem(700), Item(700, 0), null);
 
         Assert.Equal(GroundItemPickupPolicy.Outcome.Placed, result.Outcome);
         Assert.Equal(1, result.NewSlot!.Value.Quantity);
@@ -95,7 +95,7 @@ public class GroundItemPickupPolicyTests
     {
         var existing = new ItemStack(1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
-        var result = GroundItemPickupPolicy.Resolve(EquipmentItem(700), Item(700, quantity: 0), existing);
+        var result = GroundItemPickupPolicy.Resolve(EquipmentItem(700), Item(700, 0), existing);
 
         Assert.Equal(GroundItemPickupPolicy.Outcome.Rejected, result.Outcome);
     }
@@ -103,9 +103,9 @@ public class GroundItemPickupPolicyTests
     [Fact]
     public void EquipmentItem_PreservesEnchantCombineRefineSocketFromPackedValue()
     {
-        var packed = ItemValueCodec.Encode(enchant: 12, combine: 3, refine: 1, socket: 2);
+        var packed = ItemValueCodec.Encode(12, 3, 1, 2);
 
-        var result = GroundItemPickupPolicy.Resolve(EquipmentItem(700), Item(700, quantity: 0, value: packed), null);
+        var result = GroundItemPickupPolicy.Resolve(EquipmentItem(700), Item(700, 0, packed), null);
 
         Assert.Equal(12, result.NewSlot!.Value.Enchant);
         Assert.Equal(3, result.NewSlot.Value.Combine);

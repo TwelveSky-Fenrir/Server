@@ -28,7 +28,7 @@ public class MonsterSpawnSchedulerTests
             WalkSpeed = 10,
             RunSpeed = 50
         };
-        var region = WorldDataTestRows.SpawnRegion(1, zoneNumber: 1, monsterId: 500) with
+        var region = WorldDataTestRows.SpawnRegion(1, 1, 500) with
         {
             Number = number,
             LocationX = 100,
@@ -56,7 +56,7 @@ public class MonsterSpawnSchedulerTests
     [Fact]
     public void FirstTick_PopsEveryConfiguredSlot_Immediately()
     {
-        var zone = CreateZone(CacheWithOneRegion(number: 3));
+        var zone = CreateZone(CacheWithOneRegion(3));
 
         zone.Tick(SimulationClock.LegacyTick);
 
@@ -66,7 +66,7 @@ public class MonsterSpawnSchedulerTests
     [Fact]
     public void SpawnedMonster_IsPositionedWithinTheRegionRadiusOfItsHome()
     {
-        var zone = CreateZone(CacheWithOneRegion(number: 1));
+        var zone = CreateZone(CacheWithOneRegion(1));
 
         zone.Tick(SimulationClock.LegacyTick);
 
@@ -79,11 +79,11 @@ public class MonsterSpawnSchedulerTests
     [Fact]
     public void KilledMonster_IsRemovedImmediately_AndDoesNotRespawnBeforeItsTimer()
     {
-        var zone = CreateZone(CacheWithOneRegion(number: 1, summonTimeSeconds: 100));
+        var zone = CreateZone(CacheWithOneRegion(1, 100));
         zone.Tick(SimulationClock.LegacyTick);
         Assert.Equal(1, zone.MonsterCount);
 
-        zone.TryDamageMonster(1, 10_000, attackerCharacterId: null, out var died, out _);
+        zone.TryDamageMonster(1, 10_000, null, out var died, out _);
         Assert.True(died);
 
         // Drain the death (loot/respawn arming) on the next tick.
@@ -101,11 +101,11 @@ public class MonsterSpawnSchedulerTests
     [Fact]
     public void KilledMonster_Respawns_AfterItsTimerAndTheNextScan()
     {
-        var zone = CreateZone(CacheWithOneRegion(number: 1, summonTimeSeconds: 2));
+        var zone = CreateZone(CacheWithOneRegion(1, 2));
         zone.Tick(SimulationClock.LegacyTick);
         Assert.Equal(1, zone.MonsterCount);
 
-        zone.TryDamageMonster(1, 10_000, attackerCharacterId: null, out _, out _);
+        zone.TryDamageMonster(1, 10_000, null, out _, out _);
 
         // 2 s respawn timer + up to 10 s until the next scan boundary -- well past both.
         for (var i = 0; i < 40; i++) // 40 * 500ms = 20 s
@@ -117,15 +117,15 @@ public class MonsterSpawnSchedulerTests
     [Fact]
     public void MonsterKill_ByAResolvableKiller_GrantsMoneyAndExperience_AndSpawnsGroundItemsForNonMoneyDrops()
     {
-        var cache = CacheWithOneRegion(number: 1,
-            dropMoney: new MonsterDropMoneyRowDto(500, DropRate: 1_000_000, MinAmount: 100, MaxAmount: 100));
+        var cache = CacheWithOneRegion(1,
+            dropMoney: new MonsterDropMoneyRowDto(500, 1_000_000, 100, 100));
         var zone = CreateZone(cache);
         var (session, _) = ZoneTestKit.CreateSession(1);
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1, "Killer", level: 1)));
         zone.Tick(SimulationClock.LegacyTick);
         Assert.Equal(1, zone.MonsterCount);
 
-        zone.TryDamageMonster(1, 10_000, attackerCharacterId: 10, out _, out _);
+        zone.TryDamageMonster(1, 10_000, 10, out _, out _);
 
         zone.Tick(SimulationClock.LegacyTick);
 
@@ -143,11 +143,11 @@ public class MonsterSpawnSchedulerTests
     [Fact]
     public void MonsterKill_WithNoResolvableKiller_NeverThrows_AndGrantsNothing()
     {
-        var zone = CreateZone(CacheWithOneRegion(number: 1));
+        var zone = CreateZone(CacheWithOneRegion(1));
         zone.Tick(SimulationClock.LegacyTick);
         Assert.Equal(1, zone.MonsterCount);
 
-        zone.TryDamageMonster(1, 10_000, attackerCharacterId: 999, out _, out _);
+        zone.TryDamageMonster(1, 10_000, 999, out _, out _);
 
         zone.Tick(SimulationClock.LegacyTick); // must not throw
 

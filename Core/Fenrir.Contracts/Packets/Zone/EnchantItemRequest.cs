@@ -6,7 +6,8 @@ namespace Fenrir.Contracts.Packets.Zone;
 
 /// <summary>
 ///     CZ_IMPROVE_ITEM_SEND (CLIENT.h:257-264) — typedef SHARED with <see cref="CombineItemRequest" /> (25),
-///     <see cref="UpgradeItemRankRequest" /> (27), <see cref="DowngradeItemRankRequest" /> (28): identical layout, distinct
+///     <see cref="UpgradeItemRankRequest" /> (27), <see cref="DowngradeItemRankRequest" /> (28): identical layout,
+///     distinct
 ///     C# contracts. (Page1,Index1) = target, (Page2,Index2) = material, <see cref="Luck" /> = lucky-item
 ///     flag. Response: ZC 27.
 /// </summary>

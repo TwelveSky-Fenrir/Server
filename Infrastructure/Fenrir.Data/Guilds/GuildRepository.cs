@@ -17,7 +17,10 @@ namespace Fenrir.Data.Guilds;
 /// </summary>
 public sealed record GuildRepository(ICaeriusNetDbContext Db) : IGuildRepository
 {
-    /// <summary>Loaded once at world entry (same "cache on PlayerRuntimeState, never re-query per chat message" posture as <c>MuteRepository</c>) -- null if the character belongs to no guild.</summary>
+    /// <summary>
+    ///     Loaded once at world entry (same "cache on PlayerRuntimeState, never re-query per chat message" posture as
+    ///     <c>MuteRepository</c>) -- null if the character belongs to no guild.
+    /// </summary>
     public async ValueTask<CharacterGuildMembershipDto?> GetByCharacterAsync(int characterId, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_GuildMember_GetByCharacter", 1)
@@ -27,7 +30,10 @@ public sealed record GuildRepository(ICaeriusNetDbContext Db) : IGuildRepository
         return await Db.FirstQueryAsync<CharacterGuildMembershipDto>(sp, ct);
     }
 
-    /// <summary>One guild's own row (GUILD_WORK tSort 2 and every other successful response's GUILD_INFO) -- null if the guild no longer exists (e.g. raced with a concurrent disband).</summary>
+    /// <summary>
+    ///     One guild's own row (GUILD_WORK tSort 2 and every other successful response's GUILD_INFO) -- null if the guild
+    ///     no longer exists (e.g. raced with a concurrent disband).
+    /// </summary>
     public async ValueTask<GuildSummaryDto?> GetByIdAsync(int guildId, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Guild_GetById", 1)
@@ -57,7 +63,10 @@ public sealed record GuildRepository(ICaeriusNetDbContext Db) : IGuildRepository
         return await Db.QueryAsReadOnlyCollectionAsync<GuildNoticeRowDto>(sp, ct);
     }
 
-    /// <summary>GUILD_WORK tSort 1 -- create a guild and enroll its master (Role=2) in one transaction. Returns the new GuildId.</summary>
+    /// <summary>
+    ///     GUILD_WORK tSort 1 -- create a guild and enroll its master (Role=2) in one transaction. Returns the new
+    ///     GuildId.
+    /// </summary>
     public async ValueTask<int> CreateAsync(string name, int masterCharacterId, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Guild_Create", 1)
@@ -101,7 +110,10 @@ public sealed record GuildRepository(ICaeriusNetDbContext Db) : IGuildRepository
         await Db.ExecuteAsync(sp, ct);
     }
 
-    /// <summary>GUILD_WORK tSort 9 (AGM promote 1 / demote 2, DB-side role 0/1 -- never 2, that is <see cref="SetMasterAsync" />'s job).</summary>
+    /// <summary>
+    ///     GUILD_WORK tSort 9 (AGM promote 1 / demote 2, DB-side role 0/1 -- never 2, that is
+    ///     <see cref="SetMasterAsync" />'s job).
+    /// </summary>
     public async ValueTask SetRoleAsync(int guildId, int characterId, byte role, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_GuildMember_SetRole", 0)
@@ -125,7 +137,10 @@ public sealed record GuildRepository(ICaeriusNetDbContext Db) : IGuildRepository
         await Db.ExecuteAsync(sp, ct);
     }
 
-    /// <summary>GUILD_WORK tSort 17 -- transfer leadership: demotes the current master to Role=2 (member) and promotes the new one, keeping Guilds.MasterCharacterId consistent, all in one transaction.</summary>
+    /// <summary>
+    ///     GUILD_WORK tSort 17 -- transfer leadership: demotes the current master to Role=2 (member) and promotes the new
+    ///     one, keeping Guilds.MasterCharacterId consistent, all in one transaction.
+    /// </summary>
     public async ValueTask SetMasterAsync(int guildId, int newMasterCharacterId, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Guild_SetMaster", 0)
@@ -158,7 +173,10 @@ public sealed record GuildRepository(ICaeriusNetDbContext Db) : IGuildRepository
         await Db.ExecuteAsync(sp, ct);
     }
 
-    /// <summary>GUILD_WORK tSort 14 (buff type choice, USE_GUILD_BUFF) -- writes the whole BuffType/BuffState/BuffTime/BuffTimeForDiff block at once, matching the legacy's single UPDATE.</summary>
+    /// <summary>
+    ///     GUILD_WORK tSort 14 (buff type choice, USE_GUILD_BUFF) -- writes the whole
+    ///     BuffType/BuffState/BuffTime/BuffTimeForDiff block at once, matching the legacy's single UPDATE.
+    /// </summary>
     public async ValueTask SetBuffAsync(int guildId, int buffType, int buffState, int buffTime,
         long buffTimeForDiff, CancellationToken ct)
     {

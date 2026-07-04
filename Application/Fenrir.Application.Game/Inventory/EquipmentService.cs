@@ -3,7 +3,6 @@ using System.Collections.Immutable;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Stats;
 using Fenrir.Contracts.Packets.Shared;
-using Fenrir.Data.World;
 
 namespace Fenrir.Application.Game.Inventory;
 

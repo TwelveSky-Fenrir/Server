@@ -14,7 +14,10 @@ namespace Fenrir.Application.Game.Progression;
 /// </remarks>
 public static class DailyMissionRewardTable
 {
-    /// <summary>The 8 <c>ANIMAL_NUM_*TIER2</c> ids <c>GetRandomAnimal10</c> picks uniformly from (DEFINE.h:157-183, column index 1 of the 8x3 <c>mAnimalInfo</c> table).</summary>
+    /// <summary>
+    ///     The 8 <c>ANIMAL_NUM_*TIER2</c> ids <c>GetRandomAnimal10</c> picks uniformly from (DEFINE.h:157-183, column
+    ///     index 1 of the 8x3 <c>mAnimalInfo</c> table).
+    /// </summary>
     private static readonly int[] TierTwoMounts = [1304, 1305, 1306, 1314, 1318, 1321, 1324, 1327];
 
     /// <summary>

@@ -40,7 +40,7 @@ public sealed class CloseShopStallHandler(IOfflineShopRepository offlineShops)
                 session.Send(new CloseShopStallResponse { Result = 1 });
                 break;
             case 2:
-                await offlineShops.SetStateAsync(characterId, shopState: 0, cancellationToken);
+                await offlineShops.SetStateAsync(characterId, 0, cancellationToken);
                 break;
         }
     }

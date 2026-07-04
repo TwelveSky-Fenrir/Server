@@ -7,7 +7,8 @@ using Fenrir.Network.Sessions;
 namespace Fenrir.Application.Game.Handlers.Social;
 
 /// <summary>CZ_TRADE_CANCEL_SEND (opcode 48) -- the asker withdraws their own still-pending ask.</summary>
-public sealed class TradeCancelHandler(ZoneRegistry zones, TradeRegistry trades) : IInlinePacketHandler<TradeCancelRequest>
+public sealed class TradeCancelHandler(ZoneRegistry zones, TradeRegistry trades)
+    : IInlinePacketHandler<TradeCancelRequest>
 {
     public void Handle(in TradeCancelRequest packet, IPacketSession session)
     {

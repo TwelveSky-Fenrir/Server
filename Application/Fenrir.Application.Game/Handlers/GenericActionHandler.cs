@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Inventory;
+using Fenrir.Application.Game.Pets;
 using Fenrir.Application.Game.Quests;
 using Fenrir.Application.Game.Skills;
 using Fenrir.Application.Game.Stats;
@@ -146,7 +147,7 @@ public sealed class GenericActionHandler(
 
         if (!ContainerMatrix.IsImplementedContainerMoveSort(sort))
         {
-            SendResult(session, sort, packet.Data, success: false);
+            SendResult(session, sort, packet.Data, false);
             return;
         }
 
@@ -161,7 +162,7 @@ public sealed class GenericActionHandler(
         if (!ContainerMatrix.TryResolveContainers(sort, move.Page1, move.Page2, out var fromContainer,
                 out var toContainer))
         {
-            SendResult(session, sort, packet.Data, success: false);
+            SendResult(session, sort, packet.Data, false);
             return;
         }
 
@@ -175,22 +176,22 @@ public sealed class GenericActionHandler(
             : null;
 
         var sourceIsStackable = sourceStack is { } source &&
-                                 worldData.ItemsById.TryGetValue(source.ItemId, out var sourceDefinition) &&
-                                 ContainerMatrix.IsStackableSort(sourceDefinition.Item.Sort);
+                                worldData.ItemsById.TryGetValue(source.ItemId, out var sourceDefinition) &&
+                                ContainerMatrix.IsStackableSort(sourceDefinition.Item.Sort);
 
         var resolved = ContainerMatrix.ResolveMove(fromContainer, move.Index1, move.Quantity1, toContainer,
             move.Index2, sourceStack, destinationStack, sourceIsStackable);
 
         if (!resolved.Succeeded)
         {
-            SendResult(session, sort, packet.Data, success: false);
+            SendResult(session, sort, packet.Data, false);
             return;
         }
 
         if (resolved.Outcome == ContainerMatrix.MoveOutcome.NoOp)
         {
             // Same slot to itself -- nothing actually changed, no SQL, no zone command needed.
-            SendResult(session, sort, packet.Data, success: true);
+            SendResult(session, sort, packet.Data, true);
             return;
         }
 
@@ -211,10 +212,10 @@ public sealed class GenericActionHandler(
             // tick mirrors this move (Zone.ApplyInventoryCommand), so this ONE recompute can transiently use
             // pet A's leftover growth for pet B until the NEXT stat-affecting event self-corrects it --
             // documented, minor, non-observable-outside-that-one-window open issue.
-            var petItemId = equipmentContainer.TryGetValue(Pets.PetSlots.EquipmentSlot, out var petStack)
+            var petItemId = equipmentContainer.TryGetValue(PetSlots.EquipmentSlot, out var petStack)
                 ? petStack.ItemId
                 : 0;
-            var petContribution = Pets.PetGrowthCalculator.Compute(petItemId, state.PetGrowth, state.PetActivity,
+            var petContribution = PetGrowthCalculator.Compute(petItemId, state.PetGrowth, state.PetActivity,
                 worldData.ItemsById);
 
             updatedStats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData,
@@ -234,7 +235,7 @@ public sealed class GenericActionHandler(
             await characters.ReplaceTwoContainersAsync(characterId, fromContainer, ToTvps(projected.From),
                 toContainer, ToTvps(projected.To), cancellationToken);
 
-        SendResult(session, sort, packet.Data, success: true);
+        SendResult(session, sort, packet.Data, true);
 
         var containers = toContainer == fromContainer
             ? ImmutableArray.Create(new InventoryContainerSnapshot(fromContainer, projected.From))
@@ -242,7 +243,8 @@ public sealed class GenericActionHandler(
                 new InventoryContainerSnapshot(fromContainer, projected.From),
                 new InventoryContainerSnapshot(toContainer, projected.To));
 
-        if (!await zone.PostInventoryCommandAndWaitAsync(new InventoryZoneCommand(characterId, containers, updatedStats),
+        if (!await zone.PostInventoryCommandAndWaitAsync(
+                new InventoryZoneCommand(characterId, containers, updatedStats),
                 cancellationToken))
             logger.LogError(
                 "Zone {MapId} inventory inbox full: dropped container-move mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
@@ -289,13 +291,13 @@ public sealed class GenericActionHandler(
         }
 
         var claimOutcome = zone.TryClaimGroundItem(move.Page1, unchecked((uint)move.Index1), state.Name,
-            claimantPartyName: null, state.PosX, state.PosY, state.PosZ, out var groundItem);
+            null, state.PosX, state.PosY, state.PosZ, out var groundItem);
 
         if (claimOutcome != GroundItemClaimOutcome.Success || groundItem is null)
         {
             // Matches the legacy's own soft-fail contract exactly: CheckPossibleGetItem/unique-number
             // mismatch/distance all just leave tResult at 1 (return TRUE), never Quit().
-            SendResult(session, packet.Sort, packet.Data, success: false);
+            SendResult(session, packet.Sort, packet.Data, false);
             return;
         }
 
@@ -314,7 +316,7 @@ public sealed class GenericActionHandler(
         var resolved = GroundItemPickupPolicy.Resolve(itemDefinition, groundItem, existingStack);
         if (!resolved.Succeeded)
         {
-            SendResult(session, packet.Sort, packet.Data, success: false);
+            SendResult(session, packet.Sort, packet.Data, false);
             return;
         }
 
@@ -338,7 +340,7 @@ public sealed class GenericActionHandler(
                 return;
             }
 
-            SendResult(session, packet.Sort, packet.Data, success: true);
+            SendResult(session, packet.Sort, packet.Data, true);
             return;
         }
 
@@ -348,9 +350,10 @@ public sealed class GenericActionHandler(
         await characters.ReplaceContainerAsync(characterId, destinationContainer, ToTvps(projectedContainer),
             cancellationToken);
 
-        SendResult(session, packet.Sort, packet.Data, success: true);
+        SendResult(session, packet.Sort, packet.Data, true);
 
-        var containers = ImmutableArray.Create(new InventoryContainerSnapshot(destinationContainer, projectedContainer));
+        var containers =
+            ImmutableArray.Create(new InventoryContainerSnapshot(destinationContainer, projectedContainer));
         if (!await zone.PostInventoryCommandAndWaitAsync(new InventoryZoneCommand(characterId, containers, null),
                 cancellationToken))
             logger.LogError(
@@ -367,7 +370,8 @@ public sealed class GenericActionHandler(
         {
             bool HasItem(int itemId)
             {
-                return state.Inventory.GetContainer(ContainerMatrix.InventoryPage0).Values.Any(s => s.ItemId == itemId) ||
+                return state.Inventory.GetContainer(ContainerMatrix.InventoryPage0).Values
+                           .Any(s => s.ItemId == itemId) ||
                        state.Inventory.GetContainer(ContainerMatrix.InventoryPage1).Values.Any(s => s.ItemId == itemId);
             }
 
@@ -425,7 +429,7 @@ public sealed class GenericActionHandler(
             return;
         }
 
-        SendResult(session, packet.Sort, packet.Data, success: true);
+        SendResult(session, packet.Sort, packet.Data, true);
     }
 
     /// <summary>
@@ -472,7 +476,7 @@ public sealed class GenericActionHandler(
         await characters.UpsertSkillSlotAsync(characterId, result.Slot, request.SkillId, result.Cost,
             cancellationToken);
 
-        SendResult(session, packet.Sort, packet.Data, success: true);
+        SendResult(session, packet.Sort, packet.Data, true);
 
         if (!zone.PostSkillCommand(new SkillZoneCommand(characterId, result.Slot, learned, newSkillPoints)))
             logger.LogError(
@@ -517,7 +521,7 @@ public sealed class GenericActionHandler(
         await characters.UpsertSkillSlotAsync(characterId, slot, learned.SkillId, result.NewGrade,
             cancellationToken);
 
-        SendResult(session, packet.Sort, packet.Data, success: true);
+        SendResult(session, packet.Sort, packet.Data, true);
 
         if (!zone.PostSkillCommand(new SkillZoneCommand(characterId, slot, upgraded, newSkillPoints)))
             logger.LogError(
@@ -588,7 +592,7 @@ public sealed class GenericActionHandler(
             return;
         }
 
-        SendResult(session, packet.Sort, packet.Data, success: true);
+        SendResult(session, packet.Sort, packet.Data, true);
 
         var containers = ImmutableArray.Create(new InventoryContainerSnapshot((byte)page1, projectedContainer));
         if (!await zone.PostInventoryCommandAndWaitAsync(new InventoryZoneCommand(characterId, containers, null),
@@ -641,7 +645,7 @@ public sealed class GenericActionHandler(
         {
             if (resolved.IsCleanFailure)
             {
-                SendResult(session, packet.Sort, packet.Data, success: false);
+                SendResult(session, packet.Sort, packet.Data, false);
                 return;
             }
 
@@ -668,7 +672,7 @@ public sealed class GenericActionHandler(
             return;
         }
 
-        SendResult(session, packet.Sort, packet.Data, success: true);
+        SendResult(session, packet.Sort, packet.Data, true);
 
         var containers = ImmutableArray.Create(new InventoryContainerSnapshot((byte)page2, projectedContainer));
         if (!await zone.PostInventoryCommandAndWaitAsync(new InventoryZoneCommand(characterId, containers, null),

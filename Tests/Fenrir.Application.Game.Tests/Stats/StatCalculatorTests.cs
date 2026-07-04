@@ -18,6 +18,8 @@ namespace Fenrir.Application.Game.Tests.Stats;
 /// </summary>
 public class StatCalculatorTests
 {
+    private static readonly EquippedItemSlot[] NoEquipment = [];
+
     private static CharacterBaseAttributes Attributes(
         int vitality = 0, int strength = 0, int intelligence = 0, int dexterity = 0,
         short level = 1, byte tribe = 0, int title = 0, int halo = 0, int rebirthCount = 0)
@@ -81,14 +83,12 @@ public class StatCalculatorTests
         return new EquippedItemSlot(slotIndex, item, enchant, combine, refine, socket);
     }
 
-    private static readonly EquippedItemSlot[] NoEquipment = [];
-
     // ---- MaxLife (report §5.1): HP = (int)(Vit*20) + LevelFactor, pet-double applied right after ----
 
     [Fact]
     public void ComputeBaseStats_NoEquipment_MaxLifeIsVitalityTimesTwentyPlusLevelFactor()
     {
-        var attributes = Attributes(vitality: 100, level: 1);
+        var attributes = Attributes(100, level: 1);
         var levels = Levels(LevelRow(1, 50));
 
         var stats = StatCalculator.ComputeBaseStats(attributes, NoEquipment, levels);
@@ -102,7 +102,7 @@ public class StatCalculatorTests
     {
         // report §0/§2: MAX_LIMIT_LEVEL_NUM=145 + MAX_LIMIT_HIGH_LEVEL_NUM=12 -- levels 146-157 clamp DOWN
         // to the level-145 row (NOT a zero factor); 150 is squarely inside that band.
-        var attributes = Attributes(vitality: 10, level: 150);
+        var attributes = Attributes(10, level: 150);
         var levels = Levels(LevelRow(145, 999)); // only 145 is seeded -- level 150 must resolve to it
 
         var stats = StatCalculator.ComputeBaseStats(attributes, NoEquipment, levels);
@@ -116,7 +116,7 @@ public class StatCalculatorTests
         // report §0/§2: "0 hors [1, 157]" -- a level past the high band is NOT clamped to 145 either;
         // it must read as a zero level-factor contribution instead (the bug this test guards against
         // silently reused the level-145 row for any level > 145, including e.g. 200).
-        var attributes = Attributes(vitality: 10, level: 200);
+        var attributes = Attributes(10, level: 200);
         var levels = Levels(LevelRow(145, 999)); // must NOT be consulted for level 200
 
         var stats = StatCalculator.ComputeBaseStats(attributes, NoEquipment, levels);
@@ -159,7 +159,7 @@ public class StatCalculatorTests
         // a safe 0.4 away from the 201/202 boundary regardless of 3.80f's tiny binary representation error.
         var attributes = Attributes(strength: 53, level: 1);
         var levels = Levels(LevelRow(1));
-        var weapon = Item(90001, sort: 14, level: 50); // item Level 50 only feeds the (unrelated) IU-effect branch
+        var weapon = Item(90001, 14, 50); // item Level 50 only feeds the (unrelated) IU-effect branch
         IReadOnlyList<EquippedItemSlot> equipment = [Equip(7, weapon)];
 
         var stats = StatCalculator.ComputeBaseStats(attributes, equipment, levels);
@@ -173,7 +173,7 @@ public class StatCalculatorTests
         // Weapon Sort 13 (sword/db-blade/l-sword "def" class): fStr=3.65. 53*3.65=193.45 (decimal), safe.
         var attributes = Attributes(strength: 53, level: 1);
         var levels = Levels(LevelRow(1));
-        var weapon = Item(90002, sort: 13, level: 50);
+        var weapon = Item(90002, 13, 50);
         IReadOnlyList<EquippedItemSlot> equipment = [Equip(7, weapon)];
 
         var stats = StatCalculator.ComputeBaseStats(attributes, equipment, levels);
@@ -201,8 +201,8 @@ public class StatCalculatorTests
         // Armor Sort 1 (legendary/type-6, report §5.4): += Enchant*1000 (pure int math, no float ambiguity).
         var attributes = Attributes(dexterity: 50, level: 1);
         var levels = Levels(LevelRow(1));
-        var armor = Item(90003, sort: 1);
-        IReadOnlyList<EquippedItemSlot> equipment = [Equip(2, armor, enchant: 10)];
+        var armor = Item(90003, 1);
+        IReadOnlyList<EquippedItemSlot> equipment = [Equip(2, armor, 10)];
 
         var stats = StatCalculator.ComputeBaseStats(attributes, equipment, levels);
 
@@ -232,9 +232,9 @@ public class StatCalculatorTests
     [Fact]
     public void ComputeBaseStats_PetLifeAboveRunningTotal_DoublesMaxLifeInsteadOfAdding()
     {
-        var attributes = Attributes(vitality: 10, level: 1); // (int)(10*20)=200, no level factor
+        var attributes = Attributes(10, level: 1); // (int)(10*20)=200, no level factor
         var levels = Levels(LevelRow(1));
-        var pet = new PetStatContribution(Life: 500); // 200 < 500 -> double
+        var pet = new PetStatContribution(500); // 200 < 500 -> double
 
         var stats = StatCalculator.ComputeBaseStats(attributes, NoEquipment, levels, pet: pet);
 
@@ -244,9 +244,9 @@ public class StatCalculatorTests
     [Fact]
     public void ComputeBaseStats_PetLifeAtOrBelowRunningTotal_AddsPetLifeToMaxLife()
     {
-        var attributes = Attributes(vitality: 100, level: 1); // (int)(100*20)=2000
+        var attributes = Attributes(100, level: 1); // (int)(100*20)=2000
         var levels = Levels(LevelRow(1));
-        var pet = new PetStatContribution(Life: 100); // 2000 >= 100 -> add
+        var pet = new PetStatContribution(100); // 2000 >= 100 -> add
 
         var stats = StatCalculator.ComputeBaseStats(attributes, NoEquipment, levels, pet: pet);
 
@@ -333,11 +333,11 @@ public class StatCalculatorTests
         var levels = Levels(LevelRow(1));
         IReadOnlyList<EquippedItemSlot> equipment =
         [
-            Equip(0, Item(1, sort: 2, attackSuccess: 100)), // set-5 member elsewhere is assumed via legacySetNumber
-            Equip(8, Item(2, sort: 2, attackSuccess: 100)) // pet slot (EPET=8)
+            Equip(0, Item(1, 2, attackSuccess: 100)), // set-5 member elsewhere is assumed via legacySetNumber
+            Equip(8, Item(2, 2, attackSuccess: 100)) // pet slot (EPET=8)
         ];
 
-        var stats = StatCalculator.ComputeBaseStats(attributes, equipment, levels, legacySetNumber: 5);
+        var stats = StatCalculator.ComputeBaseStats(attributes, equipment, levels, 5);
 
         // slot0: 100 flat + 100*1.0 coef = 200; slot8 (EPET): 100 flat ONLY, no coef bonus = 100. Total 300.
         Assert.Equal(300, stats.AttackSuccess);
@@ -349,9 +349,9 @@ public class StatCalculatorTests
         // Set 20 grants a x0.10 Luck coefficient (report §7.3) -- same EPET guard, different stat/table.
         var attributes = Attributes(level: 1);
         var levels = Levels(LevelRow(1));
-        IReadOnlyList<EquippedItemSlot> equipment = [Equip(8, Item(3, sort: 2, luck: 100))];
+        IReadOnlyList<EquippedItemSlot> equipment = [Equip(8, Item(3, 2, luck: 100))];
 
-        var stats = StatCalculator.ComputeBaseStats(attributes, equipment, levels, legacySetNumber: 20);
+        var stats = StatCalculator.ComputeBaseStats(attributes, equipment, levels, 20);
 
         Assert.Equal(100, stats.Luck); // flat only -- 110 would mean the coefficient leaked onto EPET
     }

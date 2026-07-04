@@ -28,7 +28,7 @@ public class TribeHaloEnchantResolverTests
         // successThreshold = 15 + 2 = 17 -- a roll of 16 is a success.
         var random = new ScriptedRandomSource([16]);
 
-        var (outcome, newHalo, newProtect) = TribeHaloEnchantResolver.Resolve(10, currentProtectForHalo: 2, random);
+        var (outcome, newHalo, newProtect) = TribeHaloEnchantResolver.Resolve(10, 2, random);
 
         Assert.Equal(TribeHaloEnchantOutcome.Success, outcome);
         Assert.Equal(11, newHalo);
@@ -41,7 +41,7 @@ public class TribeHaloEnchantResolverTests
         // successThreshold at halo=10 is 17; decreaseRate is 3 (bracket 1-9 for pCurrentImprove=11).
         var random = new ScriptedRandomSource([50, 1]);
 
-        var (outcome, newHalo, newProtect) = TribeHaloEnchantResolver.Resolve(10, currentProtectForHalo: 2, random);
+        var (outcome, newHalo, newProtect) = TribeHaloEnchantResolver.Resolve(10, 2, random);
 
         Assert.Equal(TribeHaloEnchantOutcome.ProtectionConsumed, outcome);
         Assert.Equal(10, newHalo); // unchanged -- protection absorbed the downgrade
@@ -53,7 +53,7 @@ public class TribeHaloEnchantResolverTests
     {
         var random = new ScriptedRandomSource([50, 1]);
 
-        var (outcome, newHalo, newProtect) = TribeHaloEnchantResolver.Resolve(10, currentProtectForHalo: 0, random);
+        var (outcome, newHalo, newProtect) = TribeHaloEnchantResolver.Resolve(10, 0, random);
 
         Assert.Equal(TribeHaloEnchantOutcome.Downgraded, outcome);
         Assert.Equal(9, newHalo);
@@ -67,7 +67,7 @@ public class TribeHaloEnchantResolverTests
         // neutral-fail path (doc 10 §2 tSort 7 / TribeHaloEnchantResolver's own remarks).
         var random = new ScriptedRandomSource([50, 1]);
 
-        var (outcome, newHalo, newProtect) = TribeHaloEnchantResolver.Resolve(0, currentProtectForHalo: 5, random);
+        var (outcome, newHalo, newProtect) = TribeHaloEnchantResolver.Resolve(0, 5, random);
 
         Assert.Equal(TribeHaloEnchantOutcome.NeutralFail, outcome);
         Assert.Equal(0, newHalo);
@@ -79,7 +79,7 @@ public class TribeHaloEnchantResolverTests
     {
         var random = new ScriptedRandomSource([99, 99]);
 
-        var (outcome, newHalo, newProtect) = TribeHaloEnchantResolver.Resolve(10, currentProtectForHalo: 2, random);
+        var (outcome, newHalo, newProtect) = TribeHaloEnchantResolver.Resolve(10, 2, random);
 
         Assert.Equal(TribeHaloEnchantOutcome.NeutralFail, outcome);
         Assert.Equal(10, newHalo);

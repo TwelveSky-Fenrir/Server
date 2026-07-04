@@ -6,7 +6,10 @@ using Fenrir.Network.Sessions;
 
 namespace Fenrir.Application.Game.Handlers.Chat;
 
-/// <summary>CZ_TRIBE_CHAT_SEND (opcode 81) -- zone-local (no inter-zone relay, contracts/02_chat_notices.md), filtered by tribe (alliance not modeled, see <see cref="Zone" />'s ApplyChatCommand remarks).</summary>
+/// <summary>
+///     CZ_TRIBE_CHAT_SEND (opcode 81) -- zone-local (no inter-zone relay, contracts/02_chat_notices.md), filtered by
+///     tribe (alliance not modeled, see <see cref="Zone" />'s ApplyChatCommand remarks).
+/// </summary>
 public sealed class TribeChatHandler : IInlinePacketHandler<TribeChatRequest>
 {
     public void Handle(in TribeChatRequest packet, IPacketSession session)

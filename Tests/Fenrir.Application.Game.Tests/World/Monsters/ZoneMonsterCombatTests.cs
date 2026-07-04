@@ -33,7 +33,7 @@ public class ZoneMonsterCombatTests
             AttackBlock = monsterAttackBlock,
             DefensePower = monsterDefensePower
         };
-        var region = WorldDataTestRows.SpawnRegion(1, zoneNumber: 1, monsterId: 700) with
+        var region = WorldDataTestRows.SpawnRegion(1, 1, 700) with
         {
             Number = 1,
             LocationX = 100,
@@ -56,7 +56,7 @@ public class ZoneMonsterCombatTests
         var (session, sessionPipe) = ZoneTestKit.CreateSession(1);
         pipe = sessionPipe;
         zone.Post(ZoneCommand.Enter(characterId,
-            ZoneTestKit.EnterData(session, 1, "Attacker", posX: 100, posZ: 100)));
+            ZoneTestKit.EnterData(session, 1, "Attacker", 100, posZ: 100)));
         zone.Tick(SimulationClock.LegacyTick); // enters + pops the monster
 
         Assert.True(zone.TryGetPlayer(characterId, out var attacker));
@@ -95,7 +95,7 @@ public class ZoneMonsterCombatTests
     [Fact]
     public void PvmAttack_UnknownUniqueNumber_IsIgnored_NoDamageApplied()
     {
-        var zone = CreateZoneWithSpawnedMonster(CacheWithOneRegion(), characterId: 10, out _);
+        var zone = CreateZoneWithSpawnedMonster(CacheWithOneRegion(), 10, out _);
         Assert.True(zone.TryGetMonster(1, out var monster));
 
         var forged = MeleeAgainstMonster(10, monster!) with { UniqueNumber2 = monster!.UniqueNumber + 999 };
@@ -109,7 +109,7 @@ public class ZoneMonsterCombatTests
     [Fact]
     public void PvmAttack_ValidHit_DamagesTheMonster()
     {
-        var zone = CreateZoneWithSpawnedMonster(CacheWithOneRegion(monsterDefensePower: 100), characterId: 10, out _);
+        var zone = CreateZoneWithSpawnedMonster(CacheWithOneRegion(100), 10, out _);
         Assert.True(zone.TryGetMonster(1, out var monster));
         var startingLife = monster!.Life;
 
@@ -127,7 +127,7 @@ public class ZoneMonsterCombatTests
     [Fact]
     public void PvmAttack_KillingBlow_RemovesTheMonster_AndEventuallyRespawnsIt()
     {
-        var zone = CreateZoneWithSpawnedMonster(CacheWithOneRegion(), characterId: 10, out _);
+        var zone = CreateZoneWithSpawnedMonster(CacheWithOneRegion(), 10, out _);
         Assert.True(zone.TryGetMonster(1, out var monster));
 
         // Repeatedly attack until the monster is dead -- the exact hit count doesn't matter, only that it

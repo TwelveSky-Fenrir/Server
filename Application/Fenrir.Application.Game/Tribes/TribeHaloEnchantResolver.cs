@@ -14,7 +14,10 @@ public enum TribeHaloEnchantOutcome
     /// <summary>tResult 2 -- <c>aHalo -= 1</c> (issue 3).</summary>
     Downgraded,
 
-    /// <summary>tResult 1 -- neither success nor downgrade (issue 4; also the ONLY outcome possible at aHalo==0, since the source has no explicit "downgrade below 0" branch).</summary>
+    /// <summary>
+    ///     tResult 1 -- neither success nor downgrade (issue 4; also the ONLY outcome possible at aHalo==0, since the
+    ///     source has no explicit "downgrade below 0" branch).
+    /// </summary>
     NeutralFail
 }
 

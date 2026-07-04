@@ -18,13 +18,22 @@ namespace Fenrir.Application.Game.Combat;
 /// </remarks>
 public static class ExperienceFormulas
 {
-    /// <summary><c>LV_M1</c> (DEFINE.h:451) -- the LNW33 XP-gain final-divisor threshold (report 05 §5: "÷3 avant renaissance, ÷5 après").</summary>
+    /// <summary>
+    ///     <c>LV_M1</c> (DEFINE.h:451) -- the LNW33 XP-gain final-divisor threshold (report 05 §5: "÷3 avant renaissance,
+    ///     ÷5 après").
+    /// </summary>
     public const int RebirthDivisorLevelThreshold = 113;
 
-    /// <summary><c>MAX_LIMIT_LEVEL_NUM</c> (DEFINE.h) -- at/above this on an MvP death, the victim loses CP instead of XP (report 05 §4).</summary>
+    /// <summary>
+    ///     <c>MAX_LIMIT_LEVEL_NUM</c> (DEFINE.h) -- at/above this on an MvP death, the victim loses CP instead of XP
+    ///     (report 05 §4).
+    /// </summary>
     public const int MaxLimitLevel = 145;
 
-    /// <summary>The flat CP loss applied instead of XP loss once <see cref="MaxLimitLevel" /> is reached (S07_MyGame02.cpp:3462).</summary>
+    /// <summary>
+    ///     The flat CP loss applied instead of XP loss once <see cref="MaxLimitLevel" /> is reached
+    ///     (S07_MyGame02.cpp:3462).
+    /// </summary>
     public const int CpLossAtLevelCap = 10;
 
     /// <summary>The minimum character level an MvP death's XP-loss branch even applies to (S07_MyGame02.cpp:3446).</summary>
@@ -95,7 +104,8 @@ public static class ExperienceFormulas
     }
 
     /// <summary>
-    ///     The LNW33 final split (report 05 §5: "gain final ÷3 avant renaissance, ÷5 après") -- <paramref name="characterLevel" />
+    ///     The LNW33 final split (report 05 §5: "gain final ÷3 avant renaissance, ÷5 après") --
+    ///     <paramref name="characterLevel" />
     ///     below <see cref="RebirthDivisorLevelThreshold" /> (LV_M1=113) divides by 3, at/above divides by 5.
     ///     Integer division, matching the source's own <c>int /= int</c>.
     /// </summary>
@@ -108,8 +118,12 @@ public static class ExperienceFormulas
     }
 
     /// <summary>
-    ///     XP lost on an MvP death (report 05 §4, S07_MyGame02.cpp:3466-3479): <c>(currentExperience -
-    ///     levelFactor1) × 0.05</c>, clamped to <c>[0, currentExperience]</c>. <paramref name="levelFactor1" /> is
+    ///     XP lost on an MvP death (report 05 §4, S07_MyGame02.cpp:3466-3479):
+    ///     <c>
+    ///         (currentExperience -
+    ///         levelFactor1) × 0.05
+    ///     </c>
+    ///     , clamped to <c>[0, currentExperience]</c>. <paramref name="levelFactor1" /> is
     ///     <c>ReturnLevelFactor1(level)</c> = <c>world.Levels[level].ExpRangeMin</c> (the level's own XP-range
     ///     floor) -- the caller resolves that lookup (this method takes the plain int, no catalog dependency).
     /// </summary>

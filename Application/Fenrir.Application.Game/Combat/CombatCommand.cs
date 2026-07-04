@@ -11,11 +11,12 @@ namespace Fenrir.Application.Game.Combat;
 ///     already-durable result: combat is zero-SQL, purely in-memory, so (like movement) it belongs entirely on
 ///     the tick thread rather than split between an async handler and a mirror-only drain.
 ///     <para>
-///     A SEPARATE channel/drain from <see cref="Fenrir.Application.Game.World.ZoneCommand" />'s own
-///     <c>DrainInbox</c> switch on purpose: this task (V3 Combat) runs alongside a parallel monster-entity
-///     workstream (V4) that may also need to extend <c>Zone</c> -- keeping combat's wiring purely additive
-///     (own channel, own drain method, same posture <see cref="Fenrir.Application.Game.Inventory.InventoryZoneCommand" />
-///     already established for Inventory) avoids both workstreams needing to touch the same switch statement.
+///         A SEPARATE channel/drain from <see cref="Fenrir.Application.Game.World.ZoneCommand" />'s own
+///         <c>DrainInbox</c> switch on purpose: this task (V3 Combat) runs alongside a parallel monster-entity
+///         workstream (V4) that may also need to extend <c>Zone</c> -- keeping combat's wiring purely additive
+///         (own channel, own drain method, same posture
+///         <see cref="Fenrir.Application.Game.Inventory.InventoryZoneCommand" />
+///         already established for Inventory) avoids both workstreams needing to touch the same switch statement.
 ///     </para>
 /// </summary>
 public readonly struct CombatCommand

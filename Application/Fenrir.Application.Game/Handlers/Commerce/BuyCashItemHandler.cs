@@ -1,9 +1,7 @@
 using System.Collections.Immutable;
-using Fenrir.Application.Game.Commerce;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Inventory;
 using Fenrir.Application.Game.World;
-using Fenrir.Application.Game.World.Loot;
 using Fenrir.Contracts.Abstractions;
 using Fenrir.Contracts.Packets.Zone;
 using Fenrir.Data.Characters;
@@ -30,7 +28,10 @@ public sealed class BuyCashItemHandler(
     ILogger<BuyCashItemHandler> logger)
     : IAsyncPacketHandler<BuyCashItemRequest>
 {
-    /// <summary><c>60704</c> -- the legacy's shared "shop-specific" error code, reused verbatim across cash-shop-family rejects (e.g. blood-mark purchase).</summary>
+    /// <summary>
+    ///     <c>60704</c> -- the legacy's shared "shop-specific" error code, reused verbatim across cash-shop-family
+    ///     rejects (e.g. blood-mark purchase).
+    /// </summary>
     private const int ShopSpecificError = 60704;
 
     public async ValueTask HandleAsync(BuyCashItemRequest packet, IPacketSession session,
@@ -112,7 +113,7 @@ public sealed class BuyCashItemHandler(
         int newBalance;
         try
         {
-            newBalance = await cash.DebitAndGrantItemAsync(accountId, entry.Cost, reason: 1,
+            newBalance = await cash.DebitAndGrantItemAsync(accountId, entry.Cost, 1,
                 entry.ItemMallProductId, characterId, (byte)page, ToTvps(projectedContainer), cancellationToken);
         }
         catch (Exception ex)

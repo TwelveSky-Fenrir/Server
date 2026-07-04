@@ -6,7 +6,10 @@ namespace Fenrir.Application.Game.World.Loot;
 /// <summary>One resolved, ready-to-spawn drop item (never money -- see <see cref="MonsterDropResult.Money" />).</summary>
 public readonly record struct DroppedItem(int ItemId, int Quantity);
 
-/// <summary>Everything one monster's death rolled, in pipeline order (report 05 §5): money, potions, general items, extra items, the unconditional item 864.</summary>
+/// <summary>
+///     Everything one monster's death rolled, in pipeline order (report 05 §5): money, potions, general items, extra
+///     items, the unconditional item 864.
+/// </summary>
 public sealed record MonsterDropResult(long? Money, IReadOnlyList<DroppedItem> Items);
 
 /// <summary>
@@ -39,16 +42,26 @@ public sealed class MonsterDropRoller(
     float rareDropRatio = MonsterDropRoller.DefaultRareDropRatio,
     float userDropRatio = MonsterDropRoller.DefaultUserDropRatio)
 {
-    /// <summary>Verified from Server/BuildEU33/ServerInfo.ini's ItemDropUpRatio=200 via CreateRatio0 (x*0.1f) -- see class remarks.</summary>
+    /// <summary>
+    ///     Verified from Server/BuildEU33/ServerInfo.ini's ItemDropUpRatio=200 via CreateRatio0 (x*0.1f) -- see class
+    ///     remarks.
+    /// </summary>
     public const float DefaultItemDropRatio = 20.0f;
 
-    /// <summary>Verified from Server/BuildEU33/ServerInfo.ini's ItemDropUpRatioForRare=200 via CreateRatio0 -- see class remarks.</summary>
+    /// <summary>
+    ///     Verified from Server/BuildEU33/ServerInfo.ini's ItemDropUpRatioForRare=200 via CreateRatio0 -- see class
+    ///     remarks.
+    /// </summary>
     public const float DefaultRareDropRatio = 20.0f;
 
     /// <summary>tUserInfo-&gt;mItemDropUpRatio's own default (S04_MyWork02.cpp:527) -- see class remarks.</summary>
     public const float DefaultUserDropRatio = 1.0f;
 
-    /// <summary>Item 864 ("Fist Scroll Box") unconditional roll threshold -- <c>RandomNumber() &lt;= 1000</c> (S07_MyGame05.cpp:2995-2998), NOT gated by <see cref="IsEligible" /> in the source... actually it IS: both live inside the same <c>if (tCheckPossibleDrop)</c> block.</summary>
+    /// <summary>
+    ///     Item 864 ("Fist Scroll Box") unconditional roll threshold -- <c>RandomNumber() &lt;= 1000</c>
+    ///     (S07_MyGame05.cpp:2995-2998), NOT gated by <see cref="IsEligible" /> in the source... actually it IS: both live
+    ///     inside the same <c>if (tCheckPossibleDrop)</c> block.
+    /// </summary>
     private const int UnconditionalItem864Id = 864;
 
     private const int UnconditionalItem864Threshold = 1000;
@@ -120,7 +133,10 @@ public sealed class MonsterDropRoller(
         return size > 0 ? size : null;
     }
 
-    /// <summary>Ports <c>DROP_POTION</c> (S07_MyGame05.cpp:2697-2706) -- 5 independent slots, each item id always drops quantity 1.</summary>
+    /// <summary>
+    ///     Ports <c>DROP_POTION</c> (S07_MyGame05.cpp:2697-2706) -- 5 independent slots, each item id always drops
+    ///     quantity 1.
+    /// </summary>
     private void RollPotions(IReadOnlyList<MonsterDropPotionRowDto> potions, int killerLuck, List<DroppedItem> items)
     {
         foreach (var potion in potions)
@@ -190,7 +206,10 @@ public sealed class MonsterDropRoller(
         }
     }
 
-    /// <summary>Ports <c>DROP_EXTRA_ITEM</c> (S07_MyGame05.cpp:2888-2965): 50 slots, RAW rate (no luck/ratio multiplier), gated by <c>iCheckMonsterDrop == 2</c> and the LNW33 blacklist below.</summary>
+    /// <summary>
+    ///     Ports <c>DROP_EXTRA_ITEM</c> (S07_MyGame05.cpp:2888-2965): 50 slots, RAW rate (no luck/ratio multiplier),
+    ///     gated by <c>iCheckMonsterDrop == 2</c> and the LNW33 blacklist below.
+    /// </summary>
     private void RollExtraItems(IReadOnlyList<MonsterDropExtraItemRowDto> extraItems, List<DroppedItem> items)
     {
         foreach (var extra in extraItems)

@@ -14,7 +14,10 @@ namespace Fenrir.Application.Game.Inventory;
 ///     business logic happens on the receiving end, which is what lets this run on the zone's own tick thread
 ///     without blocking every other player in the zone on a SQL round trip.
 /// </summary>
-/// <param name="CharacterId">Which player this command applies to -- a no-op if they already left the zone by the time the tick drains this.</param>
+/// <param name="CharacterId">
+///     Which player this command applies to -- a no-op if they already left the zone by the time the
+///     tick drains this.
+/// </param>
 /// <param name="Containers">
 ///     One entry per container touched by the move (in practice always 1 -- same-container moves -- or 2 for
 ///     this task's implemented tSort families): the FULL new content of that container, mirroring the same

@@ -18,7 +18,10 @@ namespace Fenrir.Application.Game.Tribes;
 ///     <see cref="Guilds.GuildMembershipZoneCommand" />, reused here rather than adding a second command
 ///     type for a single field.
 /// </param>
-/// <param name="ContributionPoints">New CP balance (aKillOtherTribe) -- tSort 5/6/7/11/16/17 debit this (report 04 §5's existing field).</param>
+/// <param name="ContributionPoints">
+///     New CP balance (aKillOtherTribe) -- tSort 5/6/7/11/16/17 debit this (report 04 §5's
+///     existing field).
+/// </param>
 /// <param name="TribeRole">
 ///     New <c>ReturnTribeRole</c> encoding (0 member, 1 master, 2 sub-master -- see
 ///     <see cref="World.PlayerRuntimeState.TribeRole" />). TRIBE_WORK tSort 2 (appoint, -&gt; 2) / tSort 3
@@ -27,10 +30,22 @@ namespace Fenrir.Application.Game.Tribes;
 /// </param>
 /// <param name="Title">New aTitle (tSort 6, USE_TITLE tier purchase).</param>
 /// <param name="Halo">New aHalo (tSort 7, USE_HALO enchant success/failure).</param>
-/// <param name="ProtectForHalo">New aProtectForHalo charge count (tSort 7's protection-consumed branch) -- session-scoped only, see <see cref="World.PlayerRuntimeState.ProtectForHalo" />'s own remarks.</param>
-/// <param name="UseOrnament">New aUseOrnament flag (tSort 9/10) -- session-scoped only, see <see cref="World.PlayerRuntimeState.UseOrnament" />'s own remarks.</param>
-/// <param name="BonusItemLevel">New aBonusItemLevel (tSort 8, always reset to 0 after a successful claim) -- session-scoped only.</param>
-/// <param name="BonusItemValue">New aBonusItemValue (tSort 8's companion flag, always reset to false after a successful claim) -- session-scoped only.</param>
+/// <param name="ProtectForHalo">
+///     New aProtectForHalo charge count (tSort 7's protection-consumed branch) -- session-scoped
+///     only, see <see cref="World.PlayerRuntimeState.ProtectForHalo" />'s own remarks.
+/// </param>
+/// <param name="UseOrnament">
+///     New aUseOrnament flag (tSort 9/10) -- session-scoped only, see
+///     <see cref="World.PlayerRuntimeState.UseOrnament" />'s own remarks.
+/// </param>
+/// <param name="BonusItemLevel">
+///     New aBonusItemLevel (tSort 8, always reset to 0 after a successful claim) --
+///     session-scoped only.
+/// </param>
+/// <param name="BonusItemValue">
+///     New aBonusItemValue (tSort 8's companion flag, always reset to false after a successful
+///     claim) -- session-scoped only.
+/// </param>
 /// <param name="StatVit">New spent Vitality (tSort 1 stat reset).</param>
 /// <param name="StatStr">New spent Strength (tSort 1 stat reset).</param>
 /// <param name="StatInt">New spent Intelligence/Ki (tSort 1 stat reset).</param>
@@ -38,7 +53,10 @@ namespace Fenrir.Application.Game.Tribes;
 /// <param name="StatPoints">New unspent stat points (tSort 1 refunds the 4 spent stats back into this pool).</param>
 /// <param name="Life">New current Life (tSort 1 forces this to 1, matching the legacy's own <c>aLifeValue=1</c>).</param>
 /// <param name="Mana">New current Mana (tSort 1 forces this to 0, matching the legacy's own <c>aManaValue=0</c>).</param>
-/// <param name="UpdatedStats">Freshly recomputed <see cref="EffectiveStats" /> whenever a stat-affecting field above changed (<see cref="Inventory.EquipmentService.RecomputeStats" />) -- null otherwise.</param>
+/// <param name="UpdatedStats">
+///     Freshly recomputed <see cref="EffectiveStats" /> whenever a stat-affecting field above
+///     changed (<see cref="Inventory.EquipmentService.RecomputeStats" />) -- null otherwise.
+/// </param>
 /// <param name="DropItems">
 ///     Ground-item drop(s) to spawn at the character's CURRENT (tick-thread-fresh) position when applied --
 ///     tSort 4/8/16/17/18's <c>ProcessForDropItem</c> calls (doc 10 §2). Spawning mutates
@@ -47,7 +65,11 @@ namespace Fenrir.Application.Game.Tribes;
 ///     request a drop. Fenrir's ground-item pool has no capacity limit (unlike the legacy's
 ///     <c>ProcessForDropItem</c>, which could fail), so that failure path is unreachable here.
 /// </param>
-/// <param name="Applied">Completed by <see cref="World.Zone.ApplyTribeProgressCommand" /> once actually mirrored -- see <see cref="Inventory.InventoryZoneCommand.Applied" />'s own remarks for why this matters while <see cref="World.PlayerRuntimeState.EconomyActionLock" /> is held.</param>
+/// <param name="Applied">
+///     Completed by <see cref="World.Zone.ApplyTribeProgressCommand" /> once actually mirrored -- see
+///     <see cref="Inventory.InventoryZoneCommand.Applied" />'s own remarks for why this matters while
+///     <see cref="World.PlayerRuntimeState.EconomyActionLock" /> is held.
+/// </param>
 public readonly record struct TribeProgressZoneCommand(
     int CharacterId,
     int? ContributionPoints = null,

@@ -102,7 +102,8 @@ public sealed class ClaimDailyRewardHandler(
         }
 
         var newStack = new ItemStack(itemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-        var projectedContainer = state.Inventory.GetContainer(destination.Container).SetItem(destination.Slot, newStack);
+        var projectedContainer =
+            state.Inventory.GetContainer(destination.Container).SetItem(destination.Slot, newStack);
 
         try
         {
@@ -129,7 +130,8 @@ public sealed class ClaimDailyRewardHandler(
             InvenY = 0
         });
 
-        var containers = ImmutableArray.Create(new InventoryContainerSnapshot(destination.Container, projectedContainer));
+        var containers =
+            ImmutableArray.Create(new InventoryContainerSnapshot(destination.Container, projectedContainer));
         if (!await zone.PostInventoryCommandAndWaitAsync(new InventoryZoneCommand(characterId, containers, null),
                 cancellationToken))
             logger.LogError(

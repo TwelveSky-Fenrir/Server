@@ -217,7 +217,8 @@ public class GuildProcTests
         await using var reader = await command.ExecuteReaderAsync();
         Assert.True(await reader.ReadAsync());
         Assert.Equal(guildId, reader.GetInt32(reader.GetOrdinal("GuildId")));
-        Assert.Equal(1, reader.GetInt32(reader.GetOrdinal("Grade"))); // [CORRIGÉ-REVUE] fresh guilds now start at grade 1
+        Assert.Equal(1,
+            reader.GetInt32(reader.GetOrdinal("Grade"))); // [CORRIGÉ-REVUE] fresh guilds now start at grade 1
         // MemberCount is INT (plain COUNT(*)), not BIGINT -- see GuildSummaryDto's own remarks.
         Assert.Equal(2, reader.GetInt32(reader.GetOrdinal("MemberCount")));
         Assert.False(await reader.ReadAsync());

@@ -20,6 +20,22 @@ public static class SimulationClock
     /// <summary>One legacy simulation tick: 500 ms (<c>TimeLogic=500</c>, ServerInfo.ini line 143 — 2 Hz).</summary>
     public const int LegacyTickMilliseconds = 500;
 
+    /// <summary>
+    ///     Monster respawn-scan cadence: every 20 legacy ticks (~10 s, <c>mTickCount %20 == 0</c>,
+    ///     report 05 §0 item 12 / §1: "SummonMonster() toutes les ~10 s (tick %20)"). The per-slot respawn
+    ///     COUNTDOWN itself still decrements every legacy tick for accuracy; only the ATTEMPT to actually pop
+    ///     a due slot is gated to this cadence, matching the legacy scan-pass semantics exactly (a slot whose
+    ///     timer elapses between two scans still waits for the next scan boundary before it visibly repops).
+    ///     Consumed by <see cref="World.Monsters.MonsterSpawnScheduler" />.
+    /// </summary>
+    public const int MonsterRespawnScanLegacyTicks = 20;
+
+    /// <summary>
+    ///     Pet activity decay cadence: -1 every 60 legacy ticks (30 s, report 12 §2.1: "Décroissance
+    ///     d'activité : −1 toutes les 60 ticks (30 s)"). Consumed by <see cref="PetActivitySystem" />.
+    /// </summary>
+    public const int PetActivityDecayLegacyTicks = 60;
+
     /// <summary><see cref="LegacyTickMilliseconds" /> as a <see cref="TimeSpan" />.</summary>
     public static readonly TimeSpan LegacyTick = TimeSpan.FromMilliseconds(LegacyTickMilliseconds);
 
@@ -51,16 +67,6 @@ public static class SimulationClock
     public static readonly TimeSpan DeathReviveDelay = ToTimeSpan(10);
 
     /// <summary>
-    ///     Monster respawn-scan cadence: every 20 legacy ticks (~10 s, <c>mTickCount %20 == 0</c>,
-    ///     report 05 §0 item 12 / §1: "SummonMonster() toutes les ~10 s (tick %20)"). The per-slot respawn
-    ///     COUNTDOWN itself still decrements every legacy tick for accuracy; only the ATTEMPT to actually pop
-    ///     a due slot is gated to this cadence, matching the legacy scan-pass semantics exactly (a slot whose
-    ///     timer elapses between two scans still waits for the next scan boundary before it visibly repops).
-    ///     Consumed by <see cref="World.Monsters.MonsterSpawnScheduler" />.
-    /// </summary>
-    public const int MonsterRespawnScanLegacyTicks = 20;
-
-    /// <summary>
     ///     Ground item lifetime: 60 000 ms from creation (report 05 §5 "ITEM_OBJECT" lifecycle:
     ///     "expiration à 60 000 ms ⇒ B_ITEM_ACTION_RECV(...,3) (disparition) + Free()"). Consumed by the
     ///     ground-item expiry sweep in <see cref="World.Zone" />.
@@ -79,12 +85,6 @@ public static class SimulationClock
     ///     window (report 05 §5: "iDropSort==1 ⇒ le groupe (iPartyName) peut ramasser après 10 s").
     /// </summary>
     public static readonly TimeSpan GroundItemPartyShareDelay = TimeSpan.FromSeconds(10);
-
-    /// <summary>
-    ///     Pet activity decay cadence: -1 every 60 legacy ticks (30 s, report 12 §2.1: "Décroissance
-    ///     d'activité : −1 toutes les 60 ticks (30 s)"). Consumed by <see cref="PetActivitySystem" />.
-    /// </summary>
-    public const int PetActivityDecayLegacyTicks = 60;
 
     /// <summary>
     ///     Real duration of <paramref name="legacyTicks" /> legacy ticks (e.g. a 20-legacy-tick buff = 10 s,

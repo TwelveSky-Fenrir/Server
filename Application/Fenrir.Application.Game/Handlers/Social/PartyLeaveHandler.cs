@@ -13,7 +13,8 @@ namespace Fenrir.Application.Game.Handlers.Social;
 ///     Deliberate deviation: dropping to 1 member auto-disbands here, whereas the legacy leaves a lone
 ///     leader "partied" until an explicit Break (see <see cref="PartyRegistry" />).
 /// </summary>
-public sealed class PartyLeaveHandler(ZoneRegistry zones, PartyRegistry parties) : IInlinePacketHandler<PartyLeaveRequest>
+public sealed class PartyLeaveHandler(ZoneRegistry zones, PartyRegistry parties)
+    : IInlinePacketHandler<PartyLeaveRequest>
 {
     public void Handle(in PartyLeaveRequest packet, IPacketSession session)
     {

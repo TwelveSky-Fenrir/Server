@@ -10,7 +10,7 @@ public class TradeRegistryTests
         var registry = new TradeRegistry();
 
         Assert.Equal(TradeAskOutcome.Sent, registry.TryAsk(1, 2));
-        Assert.True(registry.TryAnswer(2, accepted: true, out var askerId));
+        Assert.True(registry.TryAnswer(2, true, out var askerId));
         Assert.Equal(1, askerId);
 
         Assert.True(registry.TryStart(1, out var session));

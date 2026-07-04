@@ -1,5 +1,3 @@
-using Fenrir.Application.Game.GameData;
-
 namespace Fenrir.Application.Game.Quests;
 
 /// <summary>
@@ -86,7 +84,10 @@ public static class QuestStateMachine
         }
     }
 
-    /// <summary><c>ReturnQuestEndConditionState</c> -- verified S07_MyGame04.cpp:1880-1935. 1 = the completion action (tSort 2) is legal right now.</summary>
+    /// <summary>
+    ///     <c>ReturnQuestEndConditionState</c> -- verified S07_MyGame04.cpp:1880-1935. 1 = the completion action (tSort
+    ///     2) is legal right now.
+    /// </summary>
     public static bool ComputeEndConditionMet(QuestProgress progress, byte tribe, short level, QuestCatalog catalog,
         Func<int, bool> hasItem)
     {
@@ -99,9 +100,6 @@ public static class QuestStateMachine
             _ => false
         };
     }
-
-    /// <summary>tSort 1 result: an item deposit is required for qSort 3/6 (into a client-chosen EMPTY slot), null for every other qSort.</summary>
-    public readonly record struct AcceptResult(bool Success, QuestProgress NewProgress, int? DepositItemId);
 
     /// <summary>
     ///     tSort 1, "mission issuance" (S04_MyWork02.cpp:7314-7368). Fails if <see cref="ComputePresentState" />
@@ -132,18 +130,6 @@ public static class QuestStateMachine
 
         return new AcceptResult(true, newProgress, depositItemId);
     }
-
-    /// <summary>tSort 2 result: reward money/CP/XP/TeacherPoint deltas (report 04 §5's qReward loop), the item id to delete from inventory (0 = none), and the optional reward-item id/quantity to deposit.</summary>
-    public readonly record struct CompleteResult(
-        bool Success,
-        QuestProgress NewProgress,
-        long MoneyReward,
-        int ContributionPointsReward,
-        int ExperienceReward,
-        int DeleteItemId,
-        int RewardItemId,
-        int RewardItemQuantity,
-        int TeacherPointReward = 0);
 
     /// <summary>
     ///     tSort 2, "mission completed" (S04_MyWork02.cpp:7369-7452). Fails if <see cref="ComputeEndConditionMet" />
@@ -233,13 +219,6 @@ public static class QuestStateMachine
         return true;
     }
 
-    /// <summary>
-    ///     tSort 4, "mission exchange" (S04_MyWork02.cpp:7505-7528) -- <c>ChangeQuestItem(Solution1 -&gt; Solution2)</c>
-    ///     (swaps the item id in place) plus <c>[3]=2, [4]=Solution2</c>. Legal only for qSort 6 at
-    ///     present-state 3.
-    /// </summary>
-    public readonly record struct ExchangeResult(bool Success, QuestProgress NewProgress, int FromItemId, int ToItemId);
-
     public static ExchangeResult TryExchange(QuestProgress progress, byte tribe, short level, QuestCatalog catalog,
         Func<int, bool> hasItem)
     {
@@ -279,4 +258,32 @@ public static class QuestStateMachine
         newProgress = progress with { ActiveFlag = 0, QSort = 0, TargetPhase = 0, KillCounter = 0 };
         return true;
     }
+
+    /// <summary>
+    ///     tSort 1 result: an item deposit is required for qSort 3/6 (into a client-chosen EMPTY slot), null for every
+    ///     other qSort.
+    /// </summary>
+    public readonly record struct AcceptResult(bool Success, QuestProgress NewProgress, int? DepositItemId);
+
+    /// <summary>
+    ///     tSort 2 result: reward money/CP/XP/TeacherPoint deltas (report 04 §5's qReward loop), the item id to delete
+    ///     from inventory (0 = none), and the optional reward-item id/quantity to deposit.
+    /// </summary>
+    public readonly record struct CompleteResult(
+        bool Success,
+        QuestProgress NewProgress,
+        long MoneyReward,
+        int ContributionPointsReward,
+        int ExperienceReward,
+        int DeleteItemId,
+        int RewardItemId,
+        int RewardItemQuantity,
+        int TeacherPointReward = 0);
+
+    /// <summary>
+    ///     tSort 4, "mission exchange" (S04_MyWork02.cpp:7505-7528) -- <c>ChangeQuestItem(Solution1 -&gt; Solution2)</c>
+    ///     (swaps the item id in place) plus <c>[3]=2, [4]=Solution2</c>. Legal only for qSort 6 at
+    ///     present-state 3.
+    /// </summary>
+    public readonly record struct ExchangeResult(bool Success, QuestProgress NewProgress, int FromItemId, int ToItemId);
 }

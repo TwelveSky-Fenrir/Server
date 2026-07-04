@@ -1,6 +1,10 @@
 namespace Fenrir.Application.Game.Social.Mentor;
 
-/// <summary>Soft outcomes of CZ_TEACHER_ASK_SEND -- mirrors ZC_TEACHER_ANSWER_RECV's pre-check codes (contracts/05_social.md: 3 soi occupé, 4 introuvable [handler-resolved], 5 cible occupée, 6 cible a déjà un maître, 7 cible a déjà un élève).</summary>
+/// <summary>
+///     Soft outcomes of CZ_TEACHER_ASK_SEND -- mirrors ZC_TEACHER_ANSWER_RECV's pre-check codes
+///     (contracts/05_social.md: 3 soi occupé, 4 introuvable [handler-resolved], 5 cible occupée, 6 cible a déjà un maître,
+///     7 cible a déjà un élève).
+/// </summary>
 public enum MentorAskOutcome
 {
     Sent,
@@ -21,12 +25,12 @@ public enum MentorAskOutcome
 /// </summary>
 public sealed class MentorRegistry
 {
+    /// <summary>master characterId -&gt; accepted student characterId, awaiting CZ_TEACHER_START_SEND (legacy state 3).</summary>
+    private readonly Dictionary<int, int> _acceptedByMaster = new();
+
     private readonly Lock _lock = new();
     private readonly Dictionary<int, int> _pendingByMaster = new();
     private readonly Dictionary<int, int> _pendingByStudent = new();
-
-    /// <summary>master characterId -&gt; accepted student characterId, awaiting CZ_TEACHER_START_SEND (legacy state 3).</summary>
-    private readonly Dictionary<int, int> _acceptedByMaster = new();
 
     private bool IsNegotiating(int characterId)
     {

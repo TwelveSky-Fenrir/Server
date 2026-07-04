@@ -6,8 +6,12 @@ using Fenrir.Network.Sessions;
 
 namespace Fenrir.Application.Game.Handlers.Social;
 
-/// <summary>CZ_TEACHER_ANSWER_SEND (opcode 61). 0 = accept, 1/2 = refuse, else ignored. On accept, the MASTER (not the student) later consumes the acceptance via CZ_TEACHER_START_SEND.</summary>
-public sealed class MentorAnswerHandler(ZoneRegistry zones, MentorRegistry mentors) : IInlinePacketHandler<MentorAnswerRequest>
+/// <summary>
+///     CZ_TEACHER_ANSWER_SEND (opcode 61). 0 = accept, 1/2 = refuse, else ignored. On accept, the MASTER (not the
+///     student) later consumes the acceptance via CZ_TEACHER_START_SEND.
+/// </summary>
+public sealed class MentorAnswerHandler(ZoneRegistry zones, MentorRegistry mentors)
+    : IInlinePacketHandler<MentorAnswerRequest>
 {
     public void Handle(in MentorAnswerRequest packet, IPacketSession session)
     {

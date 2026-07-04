@@ -6,18 +6,19 @@
 -- already knows how to serialize/deserialize this exact 112-byte shape).
 -- Params: @CharacterId INT, @Enabled BIT, @Config VARBINARY(112).
 -- Result set: none. Idempotent: yes.
-CREATE PROCEDURE game.usp_Character_SetAutoHunt
-    @CharacterId INT,
+CREATE PROCEDURE game.usp_Character_SetAutoHunt @CharacterId INT,
     @Enabled     BIT,
     @Config      VARBINARY(112)
 AS
 BEGIN
-    SET NOCOUNT ON;
-    SET XACT_ABORT ON;
+    SET
+NOCOUNT ON;
+    SET
+XACT_ABORT ON;
 
-    UPDATE game.Characters
-    SET AutoHuntEnabled = @Enabled,
-        AutoHuntConfig  = @Config,
-        UpdatedAtUtc    = SYSUTCDATETIME()
-    WHERE CharacterId = @CharacterId;
+UPDATE game.Characters
+SET AutoHuntEnabled = @Enabled,
+    AutoHuntConfig  = @Config,
+    UpdatedAtUtc    = SYSUTCDATETIME()
+WHERE CharacterId = @CharacterId;
 END;

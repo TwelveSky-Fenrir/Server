@@ -120,7 +120,7 @@ public class ZoneAttackTests
     [Fact]
     public void SameTribe_NoDamageApplied()
     {
-        var zone = TwoPlayerZone(out _, out _, attackerTribe: 0, defenderTribe: 0);
+        var zone = TwoPlayerZone(out _, out _, 0, 0);
         Assert.True(zone.TryGetPlayer(2, out var defender));
         var lifeBefore = defender!.Life;
 

@@ -72,16 +72,16 @@ public class SkillCastResolverTests
     [Fact]
     public void Skill15AttackPowerUp_RequiresAtkClassWeapon_RejectsWithoutIt()
     {
-        var skill = BuildSkill(15, 10, (10, 10), (5, 5), default, attackPowerUp: (10, 50));
-        var result = SkillCastResolver.TryCast(skill, 10, 100, 1000, equippedWeaponSort: 13 /* "def" class, not atk */);
+        var skill = BuildSkill(15, 10, (10, 10), (5, 5), default, (10, 50));
+        var result = SkillCastResolver.TryCast(skill, 10, 100, 1000, 13 /* "def" class, not atk */);
         Assert.Equal(SkillCastResolver.FailureReason.WrongWeaponClass, result.Failure);
     }
 
     [Fact]
     public void Skill15AttackPowerUp_WithAtkClassWeapon_Succeeds()
     {
-        var skill = BuildSkill(15, 10, (10, 10), (5, 5), default, attackPowerUp: (10, 50));
-        var result = SkillCastResolver.TryCast(skill, 10, 100, 1000, equippedWeaponSort: 14 /* "atk" class */);
+        var skill = BuildSkill(15, 10, (10, 10), (5, 5), default, (10, 50));
+        var result = SkillCastResolver.TryCast(skill, 10, 100, 1000, 14 /* "atk" class */);
         Assert.True(result.Success);
         var write = Assert.Single(result.BuffWrites);
         Assert.Equal(0, write.Slot);
@@ -91,8 +91,8 @@ public class SkillCastResolverTests
     [Fact]
     public void Skill15AttackPowerUp_NoWeaponEquipped_Rejects()
     {
-        var skill = BuildSkill(15, 10, (10, 10), (5, 5), default, attackPowerUp: (10, 50));
-        var result = SkillCastResolver.TryCast(skill, 10, 100, 1000, equippedWeaponSort: null);
+        var skill = BuildSkill(15, 10, (10, 10), (5, 5), default, (10, 50));
+        var result = SkillCastResolver.TryCast(skill, 10, 100, 1000, null);
         Assert.Equal(SkillCastResolver.FailureReason.WrongWeaponClass, result.Failure);
     }
 
@@ -100,7 +100,7 @@ public class SkillCastResolverTests
     public void Skill82HolyShield_ValueIsPercentOfCasterMaxLife()
     {
         var skill = BuildSkill(82, 10, (10, 10), (5, 5), default, shieldLifeUp: (10, 20)); // 20% of MaxLife
-        var result = SkillCastResolver.TryCast(skill, 10, 100, casterMaxLife: 5000, equippedWeaponSort: null);
+        var result = SkillCastResolver.TryCast(skill, 10, 100, 5000, null);
         Assert.True(result.Success);
         var write = Assert.Single(result.BuffWrites);
         Assert.Equal(9, write.Slot);

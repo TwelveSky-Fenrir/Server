@@ -115,7 +115,10 @@ public sealed class TradeLockHandler(ZoneRegistry zones, TradeRegistry trades, I
         playerB.Session.Send(result);
     }
 
-    /// <summary>Mirrors the already-committed SQL result into the player's own zone and waits for it to apply (single-writer invariant, see class summary).</summary>
+    /// <summary>
+    ///     Mirrors the already-committed SQL result into the player's own zone and waits for it to apply (single-writer
+    ///     invariant, see class summary).
+    /// </summary>
     private static async Task PostMirrorAndWaitAsync(Zone zone, int characterId, TradeCommitPlanner.Plan plan,
         CancellationToken cancellationToken)
     {

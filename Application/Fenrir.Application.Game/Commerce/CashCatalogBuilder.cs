@@ -22,31 +22,6 @@ public static class CashCatalogBuilder
     public const int MaxCashNum = MaxCashType * MaxCashItemPerPage * MaxCashPage;
 
     /// <summary>
-    ///     One <c>mCostInfoValue[costInfoIndex]</c> row: [Cost, ItemId, Quantity, Type]; all-zero when
-    ///     unassigned. <see cref="ItemMallProductId" /> is a Fenrir-only addition (not in the legacy row) so
-    ///     game.CashLog's audit trail can reference the real catalog row -- never sent on the wire.
-    /// </summary>
-    public readonly record struct CostInfoEntry(int Cost, int ItemId, int Quantity, int Type, int ItemMallProductId)
-    {
-        public bool IsAssigned => ItemId >= 1;
-    }
-
-    public sealed class CashCatalog
-    {
-        /// <summary>Flat 800-entry master table, index == the wire's CostInfoIndex.</summary>
-        public required ImmutableArray<CostInfoEntry> CostInfoByIndex { get; init; }
-
-        /// <summary>
-        ///     Flattened [type][page][item][detail] (row-major), length 3200 -- ZC_GET_CASH_ITEM_INFO_RECV.CashItemInfo
-        ///     verbatim. -1 marks an unfilled/inactive slot (matches the legacy's FillMemory(...,-1) init). A
-        ///     plain <c>int[]</c>, safe to hand out and reuse without a defensive copy: built once at boot
-        ///     and never mutated afterwards (same read-mostly trust every <see cref="WorldDataCache" /> field
-        ///     carries).
-        /// </summary>
-        public required int[] DisplayGrid { get; init; }
-    }
-
-    /// <summary>
     ///     <paramref name="products" /> need not be pre-sorted -- orders by ItemMallProductId ascending
     ///     within each ProductType (the legacy's "ORDER BY Number ASC, Cost ASC", where Number/ItemMallProductId
     ///     is already unique, so "Cost ASC" never actually applies). Only ProductType 1..4 participate (5 is
@@ -73,7 +48,7 @@ public static class CashCatalogBuilder
         foreach (var product in ordered)
         {
             var typeIndex = product.ProductType - 1;
-            var costInfoIndex = typeIndex * (MaxCashPage * MaxCashItemPerPage) + rowCount[typeIndex];
+            var costInfoIndex = typeIndex * MaxCashPage * MaxCashItemPerPage + rowCount[typeIndex];
             rowCount[typeIndex]++;
 
             if (costInfoIndex >= MaxCashNum)
@@ -87,7 +62,9 @@ public static class CashCatalogBuilder
 
             if (product.IsActive && pageCount[typeIndex] < MaxCashPage)
             {
-                var baseIndex = ((typeIndex * MaxCashPage + pageCount[typeIndex]) * MaxCashItemPerPage + itemCount[typeIndex]) * MaxCashItemDetail;
+                var baseIndex =
+                    ((typeIndex * MaxCashPage + pageCount[typeIndex]) * MaxCashItemPerPage + itemCount[typeIndex]) *
+                    MaxCashItemDetail;
                 grid[baseIndex + 0] = costInfoIndex;
                 grid[baseIndex + 1] = product.ItemId!.Value;
                 grid[baseIndex + 2] = product.Quantity;
@@ -117,5 +94,30 @@ public static class CashCatalogBuilder
                 return product.ItemId ?? 0;
 
         return 0;
+    }
+
+    /// <summary>
+    ///     One <c>mCostInfoValue[costInfoIndex]</c> row: [Cost, ItemId, Quantity, Type]; all-zero when
+    ///     unassigned. <see cref="ItemMallProductId" /> is a Fenrir-only addition (not in the legacy row) so
+    ///     game.CashLog's audit trail can reference the real catalog row -- never sent on the wire.
+    /// </summary>
+    public readonly record struct CostInfoEntry(int Cost, int ItemId, int Quantity, int Type, int ItemMallProductId)
+    {
+        public bool IsAssigned => ItemId >= 1;
+    }
+
+    public sealed class CashCatalog
+    {
+        /// <summary>Flat 800-entry master table, index == the wire's CostInfoIndex.</summary>
+        public required ImmutableArray<CostInfoEntry> CostInfoByIndex { get; init; }
+
+        /// <summary>
+        ///     Flattened [type][page][item][detail] (row-major), length 3200 -- ZC_GET_CASH_ITEM_INFO_RECV.CashItemInfo
+        ///     verbatim. -1 marks an unfilled/inactive slot (matches the legacy's FillMemory(...,-1) init). A
+        ///     plain <c>int[]</c>, safe to hand out and reuse without a defensive copy: built once at boot
+        ///     and never mutated afterwards (same read-mostly trust every <see cref="WorldDataCache" /> field
+        ///     carries).
+        /// </summary>
+        public required int[] DisplayGrid { get; init; }
     }
 }

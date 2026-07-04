@@ -48,8 +48,8 @@ foreach (var shardId in shardIds)
         .WithEndpoint(name: "game-tcp", scheme: "tcp", port: gamePort, targetPort: gamePort, isProxied: false)
         .WithEnvironment("Game__ShardId", shardId.ToString())
         .WithEnvironment("Game__Port", gamePort.ToString());
-        // Hosted maps come from admin.ShardMapAssignments (seeded 1:1 for shard 1 -> map 1), not config --
-        // across shards the assigned sets MUST stay disjoint (ADR-0012, enforced by that table's own UQ).
+    // Hosted maps come from admin.ShardMapAssignments (seeded 1:1 for shard 1 -> map 1), not config --
+    // across shards the assigned sets MUST stay disjoint (ADR-0012, enforced by that table's own UQ).
 }
 
 builder.Build().Run();

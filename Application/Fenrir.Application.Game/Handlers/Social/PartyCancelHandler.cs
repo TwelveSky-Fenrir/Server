@@ -6,8 +6,12 @@ using Fenrir.Network.Sessions;
 
 namespace Fenrir.Application.Game.Handlers.Social;
 
-/// <summary>CZ_PARTY_CANCEL_SEND (opcode 66) -- withdraws the caller's own still-pending ask. Silent no-op if there is none.</summary>
-public sealed class PartyCancelHandler(ZoneRegistry zones, PartyRegistry parties) : IInlinePacketHandler<PartyCancelRequest>
+/// <summary>
+///     CZ_PARTY_CANCEL_SEND (opcode 66) -- withdraws the caller's own still-pending ask. Silent no-op if there is
+///     none.
+/// </summary>
+public sealed class PartyCancelHandler(ZoneRegistry zones, PartyRegistry parties)
+    : IInlinePacketHandler<PartyCancelRequest>
 {
     public void Handle(in PartyCancelRequest packet, IPacketSession session)
     {

@@ -1,3 +1,4 @@
+using Fenrir.Application.Game.Quests;
 using Fenrir.Application.Game.Stats;
 using Fenrir.Contracts.Abstractions;
 using Fenrir.Contracts.Packets.Shared;
@@ -112,13 +113,13 @@ public sealed record PlayerEnterData(
     IReadOnlyList<CharacterSkillDto>? Skills = null,
     int? TeacherCharacterId = null,
     int? StudentCharacterId = null,
-    Quests.QuestProgress QuestProgress = default,
+    QuestProgress QuestProgress = default,
     int MissionJoinWar = 0,
     int MissionKillOtherTribe = 0,
     int MissionKillMonster = 0,
     int MissionPlayTime = 0,
     bool AutoHuntEnabled = false,
-    Contracts.Packets.Shared.AutoHunt? AutoHuntConfig = null,
+    AutoHunt? AutoHuntConfig = null,
     byte AutoLifeRatio = 0,
     byte AutoManaRatio = 0,
     int PetGrowth = 0,

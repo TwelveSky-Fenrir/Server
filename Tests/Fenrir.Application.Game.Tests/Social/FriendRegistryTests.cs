@@ -10,7 +10,7 @@ public class FriendRegistryTests
         var registry = new FriendRegistry();
 
         Assert.Equal(FriendAskOutcome.Sent, registry.TryAsk(1, 2));
-        Assert.True(registry.TryAnswer(2, accepted: true, out var askerId));
+        Assert.True(registry.TryAnswer(2, true, out var askerId));
         Assert.Equal(1, askerId);
 
         // ONE-DIRECTIONAL: each side independently consumes its own accepted flag.
@@ -47,7 +47,7 @@ public class FriendRegistryTests
         var registry = new FriendRegistry();
         registry.TryAsk(1, 2);
 
-        Assert.True(registry.TryAnswer(2, accepted: false, out _));
+        Assert.True(registry.TryAnswer(2, false, out _));
         Assert.False(registry.TryConsumeAccepted(1, out _));
         Assert.False(registry.TryConsumeAccepted(2, out _));
     }

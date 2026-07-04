@@ -48,7 +48,7 @@ public class MonsterAiSystemTests
             // Monster_NonAggressiveAttackType_NeverDetectsEvenAnAdjacentPlayer for the opposite case.
             AttackType = attackType
         };
-        var region = WorldDataTestRows.SpawnRegion(1, zoneNumber: 1, monsterId: 600) with
+        var region = WorldDataTestRows.SpawnRegion(1, 1, 600) with
         {
             Number = 1,
             LocationX = 0,
@@ -61,29 +61,20 @@ public class MonsterAiSystemTests
         return WorldDataCacheBuilder.Build(rows).Cache;
     }
 
-    /// <summary>Forces the spawn scheduler's random scatter radius to exactly 0 (<c>NextDouble</c> always 0) -- every monster in these tests spawns deterministically AT its region's own location, never offset.</summary>
-    private sealed class ZeroScatterRandom : Random
-    {
-        public override double NextDouble()
-        {
-            return 0;
-        }
-    }
-
     private static Zone CreateZone(WorldDataCache cache)
     {
-        var scheduler = new MonsterSpawnScheduler(cache, randomFactory: static () => new ZeroScatterRandom());
+        var scheduler = new MonsterSpawnScheduler(cache, static () => new ZeroScatterRandom());
         var ai = new MonsterAiSystem();
         // See class remarks: one huge AOI cell removes spawn-scatter-vs-AOI-cell flakiness from these tests.
         var options = new GameServerOptions { AoiCellSize = 100_000f };
-        return ZoneTestKit.CreateZone(1, options: options, simulationSystems: [scheduler, ai], worldData: cache);
+        return ZoneTestKit.CreateZone(1, options, simulationSystems: [scheduler, ai], worldData: cache);
     }
 
     [Fact]
     public void Monster_StaysInSpawningState_UntilFrameInfo1TicksElapse()
     {
-        var zone = CreateZone(CacheWithOneRegion(frameInfo1: 3, frameInfo3: 1, radiusInfo1: 0, radiusInfo2: 0,
-            walkSpeed: 0, runSpeed: 0, regionRadius: 0));
+        var zone = CreateZone(CacheWithOneRegion(3, 1, 0, 0,
+            0, 0, 0));
 
         zone.Tick(SimulationClock.LegacyTick); // tick 1: spawns, StateTicks 0 -> 1
         Assert.True(zone.TryGetMonster(1, out var monster));
@@ -99,8 +90,8 @@ public class MonsterAiSystemTests
     [Fact]
     public void Monster_WithNoNearbyPlayer_StaysIdleAtHome()
     {
-        var zone = CreateZone(CacheWithOneRegion(frameInfo1: 1, frameInfo3: 1, radiusInfo1: 50, radiusInfo2: 5,
-            walkSpeed: 10, runSpeed: 10, regionRadius: 0));
+        var zone = CreateZone(CacheWithOneRegion(1, 1, 50, 5,
+            10, 10, 0));
 
         for (var i = 0; i < 5; i++)
             zone.Tick(SimulationClock.LegacyTick);
@@ -119,10 +110,10 @@ public class MonsterAiSystemTests
         // type) hunted any player within its detection radius. AttackType=2 (a real, common value -- e.g. the
         // Kobold seed data cited in review) must NEVER trigger detection, even for a player standing right on
         // top of the monster with a huge detection radius.
-        var zone = CreateZone(CacheWithOneRegion(frameInfo1: 1, frameInfo3: 1, radiusInfo1: 1000, radiusInfo2: 1000,
-            walkSpeed: 10, runSpeed: 1000, regionRadius: 50, attackType: 2));
+        var zone = CreateZone(CacheWithOneRegion(1, 1, 1000, 1000,
+            10, 1000, 50, 2));
         var (session, _) = ZoneTestKit.CreateSession(1);
-        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1, "Target", posX: 1, posZ: 0)));
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1, "Target", 1, posZ: 0)));
 
         for (var i = 0; i < 10; i++)
             zone.Tick(SimulationClock.LegacyTick);
@@ -140,10 +131,10 @@ public class MonsterAiSystemTests
         // monster actually has to close the gap first, exercising the chase step, not just an instant attack).
         // regionRadius (=leash) must comfortably exceed the target's distance (10) so the leash never
         // interrupts the chase before the monster is close enough to attack -- see LeashRadius's own remarks.
-        var zone = CreateZone(CacheWithOneRegion(frameInfo1: 1, frameInfo3: 1, radiusInfo1: 2, radiusInfo2: 1000,
-            walkSpeed: 10, runSpeed: 1000, regionRadius: 50));
+        var zone = CreateZone(CacheWithOneRegion(1, 1, 2, 1000,
+            10, 1000, 50));
         var (session, _) = ZoneTestKit.CreateSession(1);
-        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1, "Target", posX: 10, posZ: 0)));
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1, "Target", 10, posZ: 0)));
 
         var reachedAttackWindup = false;
         for (var i = 0; i < 10 && !reachedAttackWindup; i++)
@@ -160,11 +151,11 @@ public class MonsterAiSystemTests
     [Fact]
     public void Monster_AttackWindup_ReturnsToDecision_AfterFrameInfo3Ticks()
     {
-        var zone = CreateZone(CacheWithOneRegion(frameInfo1: 1, frameInfo3: 2, radiusInfo1: 1000, radiusInfo2: 1000,
-            walkSpeed: 10, runSpeed: 1000, regionRadius: 0));
+        var zone = CreateZone(CacheWithOneRegion(1, 2, 1000, 1000,
+            10, 1000, 0));
         var (session, _) = ZoneTestKit.CreateSession(1);
         // Attack range covers the whole map (radiusInfo2=1000) so the monster attacks in place, no chase movement.
-        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1, "Target", posX: 10, posZ: 0)));
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1, "Target", 10, posZ: 0)));
 
         zone.Tick(SimulationClock.LegacyTick); // spawn (FrameInfo1=1 -> Decision already this same tick's next pass)
         zone.Tick(SimulationClock.LegacyTick); // Decision detects -> Chase
@@ -185,10 +176,10 @@ public class MonsterAiSystemTests
         // Detection (RadiusInfo2) must reach the far target (distance 500) for the monster to ever start
         // chasing it in the first place; the small attack-range (RadiusInfo1) is irrelevant here since the
         // leash (region radius, 50) gives up the chase long before the monster could ever close to it.
-        var zone = CreateZone(CacheWithOneRegion(frameInfo1: 1, frameInfo3: 1, radiusInfo1: 5, radiusInfo2: 1000,
-            walkSpeed: 10, runSpeed: 1000, regionRadius: 50)); // leash = region radius = 50
+        var zone = CreateZone(CacheWithOneRegion(1, 1, 5, 1000,
+            10, 1000, 50)); // leash = region radius = 50
         var (session, _) = ZoneTestKit.CreateSession(1);
-        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1, "FarTarget", posX: 500, posZ: 0)));
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1, "FarTarget", 500, posZ: 0)));
 
         // The spawn scatter (report 05 §1) means "home" is NOT necessarily (0,0,0) -- read it once the
         // monster exists rather than assuming the region's own nominal location.
@@ -202,7 +193,7 @@ public class MonsterAiSystemTests
         // float equality against home is too strict here and would be flaky by construction.
         const float arrivalEpsilon = 1f;
 
-        MonsterEntity? monster = spawned;
+        var monster = spawned;
         var returnedHome = false;
         for (var i = 0; i < 10 && !returnedHome; i++)
         {
@@ -217,5 +208,17 @@ public class MonsterAiSystemTests
         Assert.True(returnedHome, "monster never gave up chasing an out-of-leash target and returned home");
         Assert.True(MathF.Abs(monster!.PosX - homeX) <= arrivalEpsilon);
         Assert.True(MathF.Abs(monster.PosZ - homeZ) <= arrivalEpsilon);
+    }
+
+    /// <summary>
+    ///     Forces the spawn scheduler's random scatter radius to exactly 0 (<c>NextDouble</c> always 0) -- every monster
+    ///     in these tests spawns deterministically AT its region's own location, never offset.
+    /// </summary>
+    private sealed class ZeroScatterRandom : Random
+    {
+        public override double NextDouble()
+        {
+            return 0;
+        }
     }
 }

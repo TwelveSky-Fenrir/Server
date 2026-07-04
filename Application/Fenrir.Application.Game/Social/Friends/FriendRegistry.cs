@@ -1,6 +1,9 @@
 namespace Fenrir.Application.Game.Social.Friends;
 
-/// <summary>Soft outcomes of CZ_FRIEND_ASK_SEND -- mirrors ZC_FRIEND_ANSWER_RECV's pre-check codes (contracts/05_social.md).</summary>
+/// <summary>
+///     Soft outcomes of CZ_FRIEND_ASK_SEND -- mirrors ZC_FRIEND_ANSWER_RECV's pre-check codes
+///     (contracts/05_social.md).
+/// </summary>
 public enum FriendAskOutcome
 {
     Sent,
@@ -21,12 +24,12 @@ public enum FriendAskOutcome
 /// </summary>
 public sealed class FriendRegistry
 {
+    /// <summary>characterId -&gt; the OTHER character it may now add via its own FriendMake (legacy state 3).</summary>
+    private readonly Dictionary<int, int> _acceptedFor = new();
+
     private readonly Lock _lock = new();
     private readonly Dictionary<int, int> _pendingByAsker = new();
     private readonly Dictionary<int, int> _pendingByTarget = new();
-
-    /// <summary>characterId -&gt; the OTHER character it may now add via its own FriendMake (legacy state 3).</summary>
-    private readonly Dictionary<int, int> _acceptedFor = new();
 
     private bool IsNegotiating(int characterId)
     {
@@ -60,7 +63,10 @@ public sealed class FriendRegistry
         }
     }
 
-    /// <summary>CZ_FRIEND_ANSWER_SEND. On accept, BOTH sides become eligible to call their own FriendMake (<see cref="TryConsumeAccepted" />).</summary>
+    /// <summary>
+    ///     CZ_FRIEND_ANSWER_SEND. On accept, BOTH sides become eligible to call their own FriendMake (
+    ///     <see cref="TryConsumeAccepted" />).
+    /// </summary>
     public bool TryAnswer(int targetId, bool accepted, out int askerId)
     {
         lock (_lock)

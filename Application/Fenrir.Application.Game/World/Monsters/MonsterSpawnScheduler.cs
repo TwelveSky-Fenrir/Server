@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Simulation;
+using Fenrir.Application.Game.Social.Party;
 using Fenrir.Application.Game.World.Loot;
 using Fenrir.Data.World;
 
@@ -23,7 +24,10 @@ internal sealed class MonsterSpawnSlot
     public int RespawnTicksRemaining { get; set; }
 }
 
-/// <summary>Everything this scheduler needs to remember for ONE zone -- see <see cref="MonsterSpawnScheduler" />'s remarks on why this lives keyed by zone rather than as the system's own instance fields.</summary>
+/// <summary>
+///     Everything this scheduler needs to remember for ONE zone -- see <see cref="MonsterSpawnScheduler" />'s remarks
+///     on why this lives keyed by zone rather than as the system's own instance fields.
+/// </summary>
 internal sealed class MonsterZoneSpawnState
 {
     public required List<MonsterSpawnSlot> Slots { get; init; }
@@ -48,22 +52,20 @@ internal sealed class MonsterZoneSpawnState
 ///     <see cref="ConcurrentDictionary{TKey,TValue}" /> key is only ever first-built by that SAME zone's own
 ///     thread).
 ///     <para>
-///     NOT ported from report 05 §1 (explicit open issues, not silently dropped): <c>SummonBossMonster</c>
-///     (boss-table state machine, ~3 h cooldown), <c>SummonGuard</c>/<c>SummonTribeSymbol</c> (200+ lines of
-///     hardcoded per-server coordinates -- report 05 itself flags these as needing a NEW table that "n'existe
-///     pas encore"), the dungeon <c>mNumber</c>-forced-to-20 override, the monster-746 fixed 240 s cooldown,
-///     and the disk-persisted Yanggok boss timers (564-568). This system covers ONLY the generic per-region
-///     "normal monster" population report 05 calls the cruising regime.
+///         NOT ported from report 05 §1 (explicit open issues, not silently dropped): <c>SummonBossMonster</c>
+///         (boss-table state machine, ~3 h cooldown), <c>SummonGuard</c>/<c>SummonTribeSymbol</c> (200+ lines of
+///         hardcoded per-server coordinates -- report 05 itself flags these as needing a NEW table that "n'existe
+///         pas encore"), the dungeon <c>mNumber</c>-forced-to-20 override, the monster-746 fixed 240 s cooldown,
+///         and the disk-persisted Yanggok boss timers (564-568). This system covers ONLY the generic per-region
+///         "normal monster" population report 05 calls the cruising regime.
 ///     </para>
 /// </remarks>
 public sealed class MonsterSpawnScheduler(
     WorldDataCache worldData,
     Func<Random>? randomFactory = null,
-    Social.Party.PartyRegistry? partyRegistry = null)
+    PartyRegistry? partyRegistry = null)
     : ISimulationSystem
 {
-    private readonly ConcurrentDictionary<short, MonsterZoneSpawnState> _stateByZone = new();
-
     /// <summary>
     ///     Production default: a FRESH <see cref="System.Random" /> per zone (unseeded) -- never one instance
     ///     shared across zones, since different zones tick concurrently on their own threads and
@@ -72,6 +74,8 @@ public sealed class MonsterSpawnScheduler(
     ///     rolls (same rationale as <see cref="Combat.IRandomSource" />'s own injectability on <see cref="Zone" />).
     /// </summary>
     private readonly Func<Random> _randomFactory = randomFactory ?? (static () => new Random());
+
+    private readonly ConcurrentDictionary<short, MonsterZoneSpawnState> _stateByZone = new();
 
     public void Simulate(Zone zone, int legacyTicksElapsed)
     {
@@ -103,7 +107,10 @@ public sealed class MonsterSpawnScheduler(
                 Spawn(zone, slot);
     }
 
-    /// <summary>Slot count for a zone that has already ticked at least once (0 if it hasn't, or hosts no monster spawn regions) -- test/inspection surface.</summary>
+    /// <summary>
+    ///     Slot count for a zone that has already ticked at least once (0 if it hasn't, or hosts no monster spawn
+    ///     regions) -- test/inspection surface.
+    /// </summary>
     public int SlotCountFor(short mapId)
     {
         return _stateByZone.TryGetValue(mapId, out var state) ? state.Slots.Count : 0;
@@ -248,6 +255,6 @@ public sealed class MonsterSpawnScheduler(
         // correctly and activates automatically the day party membership is threaded through.
         foreach (var item in result.Items)
             zone.SpawnGroundItem(item.ItemId, item.Quantity, monster.PosX, monster.PosY, monster.PosZ,
-                killer.Name, partyName: "", dropSort: 0);
+                killer.Name, "", 0);
     }
 }

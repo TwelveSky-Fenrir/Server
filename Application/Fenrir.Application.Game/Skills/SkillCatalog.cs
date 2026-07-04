@@ -45,10 +45,8 @@ public static class SkillCatalog
         grade1 = null;
 
         foreach (var grade in skill.Grades)
-        {
             if (grade.GradeIndex == 0) grade0 = grade;
             else if (grade.GradeIndex == 1) grade1 = grade;
-        }
 
         return grade0 is not null && grade1 is not null;
     }

@@ -3,7 +3,6 @@ using Fenrir.Application.Game.Commerce;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Inventory;
 using Fenrir.Application.Game.World;
-using Fenrir.Application.Game.World.Loot;
 using Fenrir.Contracts.Abstractions;
 using Fenrir.Contracts.Packets.Zone;
 using Fenrir.Data.Characters;
@@ -115,7 +114,8 @@ public sealed class BuyBloodMarkItemHandler(
 
             price = entry.Price * entry.Quantity;
 
-            if (mergesIntoExisting && destination!.Value.Quantity + entry.Quantity > GroundItemPickupPolicy.MaxStackQuantity)
+            if (mergesIntoExisting &&
+                destination!.Value.Quantity + entry.Quantity > GroundItemPickupPolicy.MaxStackQuantity)
             {
                 zoneSession.Abort(DisconnectReason.Faulted);
                 return;

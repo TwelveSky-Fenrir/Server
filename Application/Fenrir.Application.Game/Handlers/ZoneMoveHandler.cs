@@ -31,11 +31,11 @@ namespace Fenrir.Application.Game.Handlers;
 ///     connected to it), push a fresh world-state snapshot mirroring <see cref="EnterWorldHandler" />'s
 ///     own three packets directly on this session, then hand the character off to the target zone actor.
 ///     <para>
-///     HYPOTHESIS TO VALIDATE AGAINST A REAL CLIENT (flagged, not silently assumed): the legacy client, upon
-///     receiving ip:port in <see cref="ZoneMoveResponse" />, may attempt its own disconnect/reconnect
-///     regardless of whether ip:port name the socket it is already on. If so, this simplification breaks the
-///     transfer flow and the handler needs revisiting (e.g. an actual reconnect-friendly path) -- see this
-///     task's StructuredOutput openIssues.
+///         HYPOTHESIS TO VALIDATE AGAINST A REAL CLIENT (flagged, not silently assumed): the legacy client, upon
+///         receiving ip:port in <see cref="ZoneMoveResponse" />, may attempt its own disconnect/reconnect
+///         regardless of whether ip:port name the socket it is already on. If so, this simplification breaks the
+///         transfer flow and the handler needs revisiting (e.g. an actual reconnect-friendly path) -- see this
+///         task's StructuredOutput openIssues.
 ///     </para>
 /// </remarks>
 public sealed class ZoneMoveHandler(

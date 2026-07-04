@@ -191,24 +191,31 @@ public sealed class BuyShopItemHandler(
         var buyerContainers =
             ImmutableArray.Create(new InventoryContainerSnapshot((byte)packet.Page2, projectedBuyerContainer));
 
-        if (!await zone.PostInventoryCommandAndWaitAsync(new InventoryZoneCommand(buyer.CharacterId, buyerContainers, null),
+        if (!await zone.PostInventoryCommandAndWaitAsync(
+                new InventoryZoneCommand(buyer.CharacterId, buyerContainers, null),
                 cancellationToken))
-            logger.LogError("Zone {MapId} inventory inbox full: dropped PShop-buy buyer mirror for character {CharacterId}",
+            logger.LogError(
+                "Zone {MapId} inventory inbox full: dropped PShop-buy buyer mirror for character {CharacterId}",
                 zone.MapId, buyer.CharacterId);
 
-        if (!await zone.PostInventoryCommandAndWaitAsync(new InventoryZoneCommand(seller.CharacterId, sellerContainers, null),
+        if (!await zone.PostInventoryCommandAndWaitAsync(
+                new InventoryZoneCommand(seller.CharacterId, sellerContainers, null),
                 cancellationToken))
-            logger.LogError("Zone {MapId} inventory inbox full: dropped PShop-buy seller mirror for character {CharacterId}",
+            logger.LogError(
+                "Zone {MapId} inventory inbox full: dropped PShop-buy seller mirror for character {CharacterId}",
                 zone.MapId, seller.CharacterId);
 
         // Cosmetic-only mirror of the seller's listing -- fire-and-forget (see PshopZoneCommand); the real
         // correctness guard already happened above.
         var stillHasItems = HasAnyOtherOccupiedSlot(seller.PshopListing, packet.Page1, packet.Index1);
         zone.PostPshopCommand(new PshopZoneCommand(seller.CharacterId, packet.Page1, packet.Index1,
-            CloseShop: !stillHasItems));
+            !stillHasItems));
 
         if (!stillHasItems)
-            session.Send(new CloseShopStallResponse { Result = 1 }); // best-effort: only reaches the BUYER (same-connection); the seller's own close mirror rides PshopZoneCommand above.
+            session.Send(new CloseShopStallResponse
+            {
+                Result = 1
+            }); // best-effort: only reaches the BUYER (same-connection); the seller's own close mirror rides PshopZoneCommand above.
     }
 
     private static bool HasAnyOtherOccupiedSlot(PshopInfo? listing, int soldPage, int soldSlot)
@@ -233,8 +240,8 @@ public sealed class BuyShopItemHandler(
     {
         // tValue = [id, x, y, quantity, packedValue, serial] (S04_MyWork02.cpp:7046-7051); x/y (sub-cell
         // position) reported as 0 -- not tracked (see CommitAsync).
-        int[] value = stack is { } s ? [s.ItemId, 0, 0, s.Quantity, s.Value(), s.Serial] : new int[6];
-        int[] socket = stack is { } s2 ? [s2.SocketGem1, s2.SocketGem2, s2.SocketGem3] : new int[3];
+        var value = stack is { } s ? [s.ItemId, 0, 0, s.Quantity, s.Value(), s.Serial] : new int[6];
+        var socket = stack is { } s2 ? [s2.SocketGem1, s2.SocketGem2, s2.SocketGem3] : new int[3];
 
         session.Send(new BuyShopItemResponse
         {

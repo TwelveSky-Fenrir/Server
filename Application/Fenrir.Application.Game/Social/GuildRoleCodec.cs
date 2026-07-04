@@ -9,7 +9,10 @@ namespace Fenrir.Application.Game.Social;
 /// </summary>
 public static class GuildRoleCodec
 {
-    /// <summary>DB role (0/1/2) -&gt; wire <c>aGuildRole</c> (2/1/0). Self-inverting: master/member swap, sub-master (1) is unchanged.</summary>
+    /// <summary>
+    ///     DB role (0/1/2) -&gt; wire <c>aGuildRole</c> (2/1/0). Self-inverting: master/member swap, sub-master (1) is
+    ///     unchanged.
+    /// </summary>
     public static int DbRoleToWire(byte dbRole)
     {
         return dbRole switch
@@ -31,13 +34,19 @@ public static class GuildRoleCodec
         return (byte)DbRoleToWire((byte)wireRole);
     }
 
-    /// <summary>True when <paramref name="dbRole" /> is the guild's master (DB role 2) -- the legacy's <c>aGuildRole != 0</c> master-only gate, expressed against the DB encoding.</summary>
+    /// <summary>
+    ///     True when <paramref name="dbRole" /> is the guild's master (DB role 2) -- the legacy's <c>aGuildRole != 0</c>
+    ///     master-only gate, expressed against the DB encoding.
+    /// </summary>
     public static bool IsMaster(byte dbRole)
     {
         return dbRole == 2;
     }
 
-    /// <summary>True when <paramref name="dbRole" /> is master OR sub-master (DB role 1 or 2) -- the legacy's <c>aGuildRole != 0 &amp;&amp; != 1</c> management gate, expressed against the DB encoding.</summary>
+    /// <summary>
+    ///     True when <paramref name="dbRole" /> is master OR sub-master (DB role 1 or 2) -- the legacy's
+    ///     <c>aGuildRole != 0 &amp;&amp; != 1</c> management gate, expressed against the DB encoding.
+    /// </summary>
     public static bool IsMasterOrSubMaster(byte dbRole)
     {
         return dbRole is 1 or 2;

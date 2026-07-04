@@ -4,18 +4,19 @@
 -- models). Written whenever a pet feeds/grows, its activity decays, or a newly-equipped pet resets both.
 -- Params: @CharacterId INT, @PetGrowth INT (>=0), @PetActivity TINYINT (0-100).
 -- Result set: none. Idempotent: yes.
-CREATE PROCEDURE game.usp_Character_SetPetGrowth
-    @CharacterId INT,
+CREATE PROCEDURE game.usp_Character_SetPetGrowth @CharacterId INT,
     @PetGrowth   INT,
     @PetActivity TINYINT
 AS
 BEGIN
-    SET NOCOUNT ON;
-    SET XACT_ABORT ON;
+    SET
+NOCOUNT ON;
+    SET
+XACT_ABORT ON;
 
-    UPDATE game.Characters
-    SET PetGrowth   = @PetGrowth,
-        PetActivity = @PetActivity,
-        UpdatedAtUtc = SYSUTCDATETIME()
-    WHERE CharacterId = @CharacterId;
+UPDATE game.Characters
+SET PetGrowth    = @PetGrowth,
+    PetActivity  = @PetActivity,
+    UpdatedAtUtc = SYSUTCDATETIME()
+WHERE CharacterId = @CharacterId;
 END;

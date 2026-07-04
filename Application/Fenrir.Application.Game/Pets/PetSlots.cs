@@ -15,7 +15,10 @@ public static class PetSlots
 {
     public const byte EquipmentSlot = 8;
 
-    /// <summary>Item id currently equipped in the pet slot (0 = none) -- scans a flat item-row list (world-entry bundle shape), not a live container.</summary>
+    /// <summary>
+    ///     Item id currently equipped in the pet slot (0 = none) -- scans a flat item-row list (world-entry bundle
+    ///     shape), not a live container.
+    /// </summary>
     public static int ResolveEquippedPetItemId(IReadOnlyList<CharacterItemSlotDto> items)
     {
         foreach (var item in items)

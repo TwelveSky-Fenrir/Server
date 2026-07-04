@@ -20,17 +20,32 @@ namespace Fenrir.Application.Game.Crafting;
 /// </remarks>
 public static class CraftResolver
 {
-    public enum JadeOutcome
+    public enum ElixirOutcome
     {
-        /// <summary>Both material slots hold <see cref="CraftRecipeCatalog.PurpleJadeItemId" /> -- ALWAYS succeeds, no roll (report 04's own "Taux RÉEL" column is empty for this family: verified, not omitted).</summary>
+        /// <summary>
+        ///     20% real roll succeeded -- a new item (801-806) was created; <see cref="ElixirResult.ResultItemId" /> names
+        ///     it.
+        /// </summary>
         Success,
+
+        /// <summary>
+        ///     The 80% case -- material is STILL consumed (verified: <c>wConsumeInv</c> runs unconditionally, before the
+        ///     roll's outcome is even known), nothing is created.
+        /// </summary>
+        Failed,
 
         Rejected
     }
 
-    public readonly record struct JadeResult(JadeOutcome Outcome, ItemStack? ResultStack)
+    public enum JadeOutcome
     {
-        public bool Succeeded => Outcome == JadeOutcome.Success;
+        /// <summary>
+        ///     Both material slots hold <see cref="CraftRecipeCatalog.PurpleJadeItemId" /> -- ALWAYS succeeds, no roll
+        ///     (report 04's own "Taux RÉEL" column is empty for this family: verified, not omitted).
+        /// </summary>
+        Success,
+
+        Rejected
     }
 
     /// <summary>
@@ -68,22 +83,6 @@ public static class CraftResolver
         return new JadeResult(JadeOutcome.Success, result);
     }
 
-    public enum ElixirOutcome
-    {
-        /// <summary>20% real roll succeeded -- a new item (801-806) was created; <see cref="ElixirResult.ResultItemId" /> names it.</summary>
-        Success,
-
-        /// <summary>The 80% case -- material is STILL consumed (verified: <c>wConsumeInv</c> runs unconditionally, before the roll's outcome is even known), nothing is created.</summary>
-        Failed,
-
-        Rejected
-    }
-
-    public readonly record struct ElixirResult(ElixirOutcome Outcome, ItemStack? RemainingMaterial, int? ResultItemId)
-    {
-        public bool Succeeded => Outcome is ElixirOutcome.Success or ElixirOutcome.Failed;
-    }
-
     /// <summary>
     ///     MK_ELIXIR_NEW: 10 units of ANY ONE of <see cref="CraftRecipeCatalog.AdvancedElixirBaseItemIds" />
     ///     -&gt; 20% chance of one random item in [801,806]. <paramref name="hasFreeInventorySlot" /> mirrors
@@ -110,10 +109,20 @@ public static class CraftResolver
         if (random.NextInt32(100) < CraftRecipeCatalog.AdvancedElixirSuccessRatePercent)
         {
             var resultItemId = CraftRecipeCatalog.AdvancedElixirResultBaseItemId +
-                                random.NextInt32(CraftRecipeCatalog.AdvancedElixirResultRange);
+                               random.NextInt32(CraftRecipeCatalog.AdvancedElixirResultRange);
             return new ElixirResult(ElixirOutcome.Success, remaining, resultItemId);
         }
 
         return new ElixirResult(ElixirOutcome.Failed, remaining, null);
+    }
+
+    public readonly record struct JadeResult(JadeOutcome Outcome, ItemStack? ResultStack)
+    {
+        public bool Succeeded => Outcome == JadeOutcome.Success;
+    }
+
+    public readonly record struct ElixirResult(ElixirOutcome Outcome, ItemStack? RemainingMaterial, int? ResultItemId)
+    {
+        public bool Succeeded => Outcome is ElixirOutcome.Success or ElixirOutcome.Failed;
     }
 }

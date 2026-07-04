@@ -18,7 +18,10 @@ namespace Fenrir.Application.Game.Handlers.Chat;
 /// </summary>
 public sealed class WhisperHandler(ZoneRegistry zones) : IInlinePacketHandler<WhisperRequest>
 {
-    /// <summary>"Zeroed when the builder is called with NULL" (WhisperResponse.Link's own remarks) -- <c>Socket</c> is a reference-type array, so a bare <c>default</c> would leave it null and crash the wire writer.</summary>
+    /// <summary>
+    ///     "Zeroed when the builder is called with NULL" (WhisperResponse.Link's own remarks) -- <c>Socket</c> is a
+    ///     reference-type array, so a bare <c>default</c> would leave it null and crash the wire writer.
+    /// </summary>
     private static readonly ItemLinkInfo EmptyLink = new() { Index = 0, Activity = 0, Value = 0, Socket = new int[3] };
 
     public void Handle(in WhisperRequest packet, IPacketSession session)

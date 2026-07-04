@@ -15,7 +15,10 @@ namespace Fenrir.Data.Commerce;
 /// </summary>
 public sealed record OfflineShopRepository(ICaeriusNetDbContext Db) : IOfflineShopRepository
 {
-    /// <summary>Own-view read (CZ_GET_DEPUTY_PSHOP_SEND sort 1/2) -- the shop row (null if never opened) plus every occupied slot.</summary>
+    /// <summary>
+    ///     Own-view read (CZ_GET_DEPUTY_PSHOP_SEND sort 1/2) -- the shop row (null if never opened) plus every occupied
+    ///     slot.
+    /// </summary>
     public async ValueTask<(OfflineShopRowDto? Shop, IReadOnlyList<OfflineShopItemRowDto> Items)> GetByCharacterAsync(
         int characterId, CancellationToken ct)
     {
@@ -23,7 +26,8 @@ public sealed record OfflineShopRepository(ICaeriusNetDbContext Db) : IOfflineSh
             .AddParameter("CharacterId", characterId, SqlDbType.Int)
             .Build();
 
-        var (shops, items) = await Db.QueryMultipleReadOnlyCollectionAsync<OfflineShopRowDto, OfflineShopItemRowDto>(sp, ct);
+        var (shops, items) =
+            await Db.QueryMultipleReadOnlyCollectionAsync<OfflineShopRowDto, OfflineShopItemRowDto>(sp, ct);
         return (shops.Count > 0 ? shops[0] : null, items);
     }
 
@@ -65,7 +69,10 @@ public sealed record OfflineShopRepository(ICaeriusNetDbContext Db) : IOfflineSh
         await Db.ExecuteAsync(sp, ct);
     }
 
-    /// <summary>Atomic CAS retrieve-one-item-back-to-inventory (usp_OfflineShop_RetrieveItemAndReplaceContainer). Throws SQL 50272 if the slot no longer matches or the shop is not closed.</summary>
+    /// <summary>
+    ///     Atomic CAS retrieve-one-item-back-to-inventory (usp_OfflineShop_RetrieveItemAndReplaceContainer). Throws SQL
+    ///     50272 if the slot no longer matches or the shop is not closed.
+    /// </summary>
     public async ValueTask RetrieveItemAndReplaceContainerAsync(int characterId, short slotIndex, int expectedItemId,
         int expectedQuantity, int expectedValue, byte container, IReadOnlyList<CharacterItemSlotTvp> items,
         CancellationToken ct)
@@ -107,8 +114,12 @@ public sealed record OfflineShopRepository(ICaeriusNetDbContext Db) : IOfflineSh
         await Db.ExecuteAsync(builder.Build(), ct);
     }
 
-    /// <summary>Atomic earnings withdrawal (usp_OfflineShop_WithdrawMoney) -- throws SQL 50276 (stale/not closed/nothing to withdraw) or 50261 (owner's own money cap).</summary>
-    public async ValueTask WithdrawMoneyAsync(int characterId, int expectedMoney, int expectedBigMoney, CancellationToken ct)
+    /// <summary>
+    ///     Atomic earnings withdrawal (usp_OfflineShop_WithdrawMoney) -- throws SQL 50276 (stale/not closed/nothing to
+    ///     withdraw) or 50261 (owner's own money cap).
+    /// </summary>
+    public async ValueTask WithdrawMoneyAsync(int characterId, int expectedMoney, int expectedBigMoney,
+        CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_OfflineShop_WithdrawMoney", 0)
             .AddParameter("CharacterId", characterId, SqlDbType.Int)

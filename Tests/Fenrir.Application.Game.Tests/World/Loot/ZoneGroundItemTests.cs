@@ -19,21 +19,6 @@ public class ZoneGroundItemTests
 {
     private const int PotionItemId = 8001;
 
-    /// <summary>
-    ///     Always draws the maximum possible value -- makes the guaranteed potion drop (DropRate at the
-    ///     <see cref="Loot.LootRandomSource.RandomNumber" /> ceiling) succeed deterministically while making the
-    ///     UNCONDITIONAL item-864 roll (report 05 §5, threshold 1000 out of a possible 1,000,000) as
-    ///     unreachable as possible, so these tests only ever see the ONE potion they configured, never a
-    ///     stray second item.
-    /// </summary>
-    private sealed class MaxValueRandom : Random
-    {
-        public override int Next(int minValue, int maxValue)
-        {
-            return Math.Max(minValue, maxValue - 1);
-        }
-    }
-
     private static Zone CreateZoneWithGuaranteedPotionDrop(out int killerCharacterId)
     {
         var monster = WorldDataTestRows.Monster(800) with
@@ -46,7 +31,7 @@ public class ZoneGroundItemTests
             FrameInfo1 = 1,
             FrameInfo3 = 1
         };
-        var region = WorldDataTestRows.SpawnRegion(1, zoneNumber: 1, monsterId: 800) with
+        var region = WorldDataTestRows.SpawnRegion(1, 1, 800) with
         {
             Number = 1,
             LocationX = 50,
@@ -59,17 +44,18 @@ public class ZoneGroundItemTests
         {
             Monsters = [monster],
             MonsterSpawnRegions = [region],
-            MonsterDropPotions = [new MonsterDropPotionRowDto(800, 0, DropRate: 1_000_000, PotionItemId)]
+            MonsterDropPotions = [new MonsterDropPotionRowDto(800, 0, 1_000_000, PotionItemId)]
         };
         var cache = WorldDataCacheBuilder.Build(rows).Cache;
 
-        var scheduler = new MonsterSpawnScheduler(cache, randomFactory: static () => new MaxValueRandom());
+        var scheduler = new MonsterSpawnScheduler(cache, static () => new MaxValueRandom());
         var zone = ZoneTestKit.CreateZone(1, simulationSystems: [scheduler], worldData: cache);
 
         var (session, _) = ZoneTestKit.CreateSession(1);
         killerCharacterId = 20;
         zone.Post(ZoneCommand.Enter(killerCharacterId,
-            ZoneTestKit.EnterData(session, 1, "Looter", posX: 50, posZ: 50, level: 1))); // matches monster.ItemLevel (drop eligibility gap <= 9)
+            ZoneTestKit.EnterData(session, 1, "Looter", 50, posZ: 50,
+                level: 1))); // matches monster.ItemLevel (drop eligibility gap <= 9)
         zone.Tick(SimulationClock.LegacyTick); // enters + pops the monster
 
         Assert.True(zone.TryGetMonster(1, out var monster1));
@@ -206,5 +192,20 @@ public class ZoneGroundItemTests
 
         Assert.Equal(1, outcomes.Count(o => o == GroundItemClaimOutcome.Success));
         Assert.Equal(0, zone.GroundItemCount);
+    }
+
+    /// <summary>
+    ///     Always draws the maximum possible value -- makes the guaranteed potion drop (DropRate at the
+    ///     <see cref="Loot.LootRandomSource.RandomNumber" /> ceiling) succeed deterministically while making the
+    ///     UNCONDITIONAL item-864 roll (report 05 §5, threshold 1000 out of a possible 1,000,000) as
+    ///     unreachable as possible, so these tests only ever see the ONE potion they configured, never a
+    ///     stray second item.
+    /// </summary>
+    private sealed class MaxValueRandom : Random
+    {
+        public override int Next(int minValue, int maxValue)
+        {
+            return Math.Max(minValue, maxValue - 1);
+        }
     }
 }

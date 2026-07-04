@@ -14,7 +14,8 @@ namespace Fenrir.Application.Game.Handlers.Social;
 ///     <see cref="PartyRegistry" />). Collapses ts25center's separate PARTY_JOIN/PARTY_INFO emissions
 ///     into one fan-out.
 /// </summary>
-public sealed class PartyAnswerHandler(ZoneRegistry zones, PartyRegistry parties) : IInlinePacketHandler<PartyAnswerRequest>
+public sealed class PartyAnswerHandler(ZoneRegistry zones, PartyRegistry parties)
+    : IInlinePacketHandler<PartyAnswerRequest>
 {
     public void Handle(in PartyAnswerRequest packet, IPacketSession session)
     {

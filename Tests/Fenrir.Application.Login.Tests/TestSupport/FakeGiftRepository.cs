@@ -10,8 +10,8 @@ namespace Fenrir.Application.Login.Tests.TestSupport;
 /// </summary>
 internal sealed class FakeGiftRepository : IGiftRepository
 {
-    private readonly List<PendingGiftDto> _pending;
     private readonly Exception? _claimFault;
+    private readonly List<PendingGiftDto> _pending;
 
     public FakeGiftRepository(IEnumerable<PendingGiftDto> pending, Exception? claimFault = null)
     {

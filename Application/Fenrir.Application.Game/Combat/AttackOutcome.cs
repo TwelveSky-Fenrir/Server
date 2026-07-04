@@ -1,6 +1,9 @@
 namespace Fenrir.Application.Game.Combat;
 
-/// <summary>Why <see cref="CombatResolver" /> refused to even roll an attack -- every value is a silent, packet-less <c>return;</c> in the legacy (report 05 §4 point 1's guard list).</summary>
+/// <summary>
+///     Why <see cref="CombatResolver" /> refused to even roll an attack -- every value is a silent, packet-less
+///     <c>return;</c> in the legacy (report 05 §4 point 1's guard list).
+/// </summary>
 public enum AttackRejectReason
 {
     None,

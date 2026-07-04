@@ -12,7 +12,8 @@ namespace Fenrir.Application.Game.Handlers.Social;
 ///     <see cref="TradeSession" /> and sends ZC_TRADE_START_RECV crossed (each player receives the OTHER's
 ///     offer) -- both start empty, so it's a zeroed payload either way.
 /// </summary>
-public sealed class TradeStartHandler(ZoneRegistry zones, TradeRegistry trades) : IInlinePacketHandler<TradeStartRequest>
+public sealed class TradeStartHandler(ZoneRegistry zones, TradeRegistry trades)
+    : IInlinePacketHandler<TradeStartRequest>
 {
     public void Handle(in TradeStartRequest packet, IPacketSession session)
     {

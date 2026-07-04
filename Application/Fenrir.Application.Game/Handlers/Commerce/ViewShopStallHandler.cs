@@ -14,7 +14,11 @@ namespace Fenrir.Application.Game.Handlers.Commerce;
 /// </summary>
 public sealed class ViewShopStallHandler : IInlinePacketHandler<ViewShopStallRequest>
 {
-    /// <summary>Placeholder for "requester never opened a stall" (client-ignored). Must be a real FixedString/FixedArray shape, never <c>default(PshopInfo)</c> -- its null <see cref="PshopInfo.Name"/>/arrays can't serialize on the wire.</summary>
+    /// <summary>
+    ///     Placeholder for "requester never opened a stall" (client-ignored). Must be a real FixedString/FixedArray
+    ///     shape, never <c>default(PshopInfo)</c> -- its null <see cref="PshopInfo.Name" />/arrays can't serialize on the
+    ///     wire.
+    /// </summary>
     internal static readonly PshopInfo EmptyPshopInfo = new()
         { UniqueNumber = 0, Name = string.Empty, ItemInfo = new int[225], SocketInfo = new int[75] };
 

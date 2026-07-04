@@ -19,9 +19,9 @@ namespace Fenrir.Application.Game.World.Loot;
 ///     much-lower probability) rather than the report's own flagged-uncertain annotation (D8: prefer the
 ///     verified source over a report's own caveat-carrying guess).
 ///     <para>
-///     The underlying <c>rand_mir()</c> generator's exact bit-stream does not matter (report §13.3: "la
-///     distribution exacte importe peu, mais les seuils ... supposent une plage précise à vérifier") -- only
-///     this product SHAPE does -- so a standard PRNG stands in for it here.
+///         The underlying <c>rand_mir()</c> generator's exact bit-stream does not matter (report §13.3: "la
+///         distribution exacte importe peu, mais les seuils ... supposent une plage précise à vérifier") -- only
+///         this product SHAPE does -- so a standard PRNG stands in for it here.
 ///     </para>
 /// </remarks>
 public static class LootRandomSource

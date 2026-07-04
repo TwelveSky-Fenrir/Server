@@ -12,11 +12,6 @@ namespace Fenrir.Application.Game.Social.Trade;
 /// </summary>
 public static class TradeCommitPlanner
 {
-    public readonly record struct Plan(
-        ImmutableDictionary<byte, ItemStack> Page0,
-        ImmutableDictionary<byte, ItemStack> Page1,
-        bool Overflowed);
-
     /// <summary>
     ///     <see cref="Plan.Overflowed" /> signals the receiving side had no free slot for one or more
     ///     incoming items -- the caller MUST treat this as a commit-time failure and abort the WHOLE
@@ -73,4 +68,9 @@ public static class TradeCommitPlanner
         freeSlot = 0;
         return false;
     }
+
+    public readonly record struct Plan(
+        ImmutableDictionary<byte, ItemStack> Page0,
+        ImmutableDictionary<byte, ItemStack> Page1,
+        bool Overflowed);
 }

@@ -1,6 +1,9 @@
 namespace Fenrir.Application.Game.Guilds;
 
-/// <summary>Soft outcomes of CZ_GUILD_ASK_SEND -- mirrors ZC_GUILD_ANSWER_RECV's pre-check codes (contracts/06_guild_tribe.md, doc 10 §1).</summary>
+/// <summary>
+///     Soft outcomes of CZ_GUILD_ASK_SEND -- mirrors ZC_GUILD_ANSWER_RECV's pre-check codes
+///     (contracts/06_guild_tribe.md, doc 10 §1).
+/// </summary>
 public enum GuildInviteAskOutcome
 {
     Sent,
@@ -18,19 +21,22 @@ public enum GuildInviteAskOutcome
 /// </summary>
 public sealed class GuildInviteRegistry
 {
+    /// <summary>askerId -&gt; the target it may now finalize the join for via GUILD_WORK tSort 3 (legacy state 3).</summary>
+    private readonly Dictionary<int, int> _acceptedFor = new();
+
     private readonly Lock _lock = new();
     private readonly Dictionary<int, int> _pendingByAsker = new();
     private readonly Dictionary<int, int> _pendingByTarget = new();
-
-    /// <summary>askerId -&gt; the target it may now finalize the join for via GUILD_WORK tSort 3 (legacy state 3).</summary>
-    private readonly Dictionary<int, int> _acceptedFor = new();
 
     private bool IsNegotiating(int characterId)
     {
         return _pendingByAsker.ContainsKey(characterId) || _pendingByTarget.ContainsKey(characterId);
     }
 
-    /// <summary>CZ_GUILD_ASK_SEND (opcode 72). Caller has already verified the asker's own role/guild membership and the tribe match.</summary>
+    /// <summary>
+    ///     CZ_GUILD_ASK_SEND (opcode 72). Caller has already verified the asker's own role/guild membership and the tribe
+    ///     match.
+    /// </summary>
     public GuildInviteAskOutcome TryAsk(int askerId, int targetId)
     {
         lock (_lock)
@@ -46,7 +52,10 @@ public sealed class GuildInviteRegistry
         }
     }
 
-    /// <summary>CZ_GUILD_CANCEL_SEND (opcode 73) -- withdraws the caller's own still-pending ask (legacy: silent no-op if not in state 1).</summary>
+    /// <summary>
+    ///     CZ_GUILD_CANCEL_SEND (opcode 73) -- withdraws the caller's own still-pending ask (legacy: silent no-op if not
+    ///     in state 1).
+    /// </summary>
     public bool TryCancel(int askerId, out int targetId)
     {
         lock (_lock)
@@ -59,7 +68,10 @@ public sealed class GuildInviteRegistry
         }
     }
 
-    /// <summary>CZ_GUILD_ANSWER_SEND (opcode 74). 0=accept promotes both sides to legacy state 3 (and remembers <paramref name="targetId" />'s acceptance for the ASKER's own later finalize); 1/2=refuse resets both to state 0.</summary>
+    /// <summary>
+    ///     CZ_GUILD_ANSWER_SEND (opcode 74). 0=accept promotes both sides to legacy state 3 (and remembers
+    ///     <paramref name="targetId" />'s acceptance for the ASKER's own later finalize); 1/2=refuse resets both to state 0.
+    /// </summary>
     public bool TryAnswer(int targetId, bool accepted, out int askerId)
     {
         lock (_lock)

@@ -18,10 +18,17 @@ public static class BloodShopBuilder
 {
     public const int MaxBloodSlots = 50;
 
-    /// <summary><c>ItemSort99</c> (verified referenced, USE_MATS_999): a zero Quantity is forced to 1 for a Sort==99 item -- the exact same "coupon" convention <see cref="World.Npcs.NpcShopPolicy" /> and <see cref="World.Loot.GroundItemPickupPolicy" /> already special-case.</summary>
+    /// <summary>
+    ///     <c>ItemSort99</c> (verified referenced, USE_MATS_999): a zero Quantity is forced to 1 for a Sort==99 item --
+    ///     the exact same "coupon" convention <see cref="World.Npcs.NpcShopPolicy" /> and
+    ///     <see cref="World.Loot.GroundItemPickupPolicy" /> already special-case.
+    /// </summary>
     private const byte ItemSort99 = 99;
 
-    /// <summary><paramref name="rows" /> need not be pre-sorted or pre-filtered -- the sentinel (BloodExchangeSlot 100000) is excluded here.</summary>
+    /// <summary>
+    ///     <paramref name="rows" /> need not be pre-sorted or pre-filtered -- the sentinel (BloodExchangeSlot 100000) is
+    ///     excluded here.
+    /// </summary>
     public static BloodShop Build(IEnumerable<BloodExchangeCatalogRowDto> rows,
         IReadOnlyDictionary<int, ItemDefinition> itemsById)
     {

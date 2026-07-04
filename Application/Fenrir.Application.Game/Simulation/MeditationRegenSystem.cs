@@ -9,8 +9,12 @@ namespace Fenrir.Application.Game.Simulation;
 ///     Passive HP/MP regeneration WHILE MEDITATING (report 05 §7 point 3, verified
 ///     <c>AVATAR_OBJECT::Update</c>, <c>Server/ts25zone/S07_MyGame04.cpp:461-518</c>): <c>aAction.aSort == 31</c>
 ///     (sitting) is the ONLY passive-regen state in this codebase -- there is NO passive regen while standing
-///     (report's own explicit callout: "Aucune régène passive debout"). Per legacy tick: <c>regen = MaxLife /
-///     ReturnSkillValue(sitSkill, sitGradePoints, factor 2)</c> (mana: factor 3), floor 1, clamped to the
+///     (report's own explicit callout: "Aucune régène passive debout"). Per legacy tick:
+///     <c>
+///         regen = MaxLife /
+///         ReturnSkillValue(sitSkill, sitGradePoints, factor 2)
+///     </c>
+///     (mana: factor 3), floor 1, clamped to the
 ///     remaining capacity -- both driven by the CURRENT sit-skill riding on <c>PlayerRuntimeState.ActionSort</c>
 ///     (<see cref="PlayerRuntimeState.ActionSkillNumber" />/<c>ActionSkillGradeNum1/2</c>, set by
 ///     <c>Zone.HandleMove</c> from the same unified avatar-action wire every other action already uses).

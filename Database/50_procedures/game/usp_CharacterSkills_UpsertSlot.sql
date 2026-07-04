@@ -20,20 +20,22 @@
 --   @Grade       INT     -- legacy sPoint (invested grade/upgrade value)
 -- Result set: none.
 -- Idempotent: yes -- replaying the same (@SlotIndex, @SkillId, @Grade) is a no-op in effect.
-CREATE PROCEDURE game.usp_CharacterSkills_UpsertSlot
-    @CharacterId INT,
+CREATE PROCEDURE game.usp_CharacterSkills_UpsertSlot @CharacterId INT,
     @SlotIndex   TINYINT,
     @SkillId     INT,
     @Grade       INT
 AS
 BEGIN
-    SET NOCOUNT ON;
-    SET XACT_ABORT ON;
+    SET
+NOCOUNT ON;
+    SET
+XACT_ABORT ON;
 
-    DELETE FROM game.CharacterSkills
-    WHERE CharacterId = @CharacterId
-      AND SlotIndex = @SlotIndex;
+DELETE
+FROM game.CharacterSkills
+WHERE CharacterId = @CharacterId
+  AND SlotIndex = @SlotIndex;
 
-    INSERT INTO game.CharacterSkills (CharacterId, SlotIndex, SkillId, Grade)
-    VALUES (@CharacterId, @SlotIndex, @SkillId, @Grade);
+INSERT INTO game.CharacterSkills (CharacterId, SlotIndex, SkillId, Grade)
+VALUES (@CharacterId, @SlotIndex, @SkillId, @Grade);
 END;

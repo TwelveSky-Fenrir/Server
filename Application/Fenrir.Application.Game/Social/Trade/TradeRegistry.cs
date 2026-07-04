@@ -1,6 +1,9 @@
 namespace Fenrir.Application.Game.Social.Trade;
 
-/// <summary>Soft outcomes of CZ_TRADE_ASK_SEND -- mirrors ZC_TRADE_ANSWER_RECV's pre-check codes (contracts/05_social.md: 3 soi occupé, 4 introuvable [handler-resolved], 5 cible occupée).</summary>
+/// <summary>
+///     Soft outcomes of CZ_TRADE_ASK_SEND -- mirrors ZC_TRADE_ANSWER_RECV's pre-check codes (contracts/05_social.md:
+///     3 soi occupé, 4 introuvable [handler-resolved], 5 cible occupée).
+/// </summary>
 public enum TradeAskOutcome
 {
     Sent,
@@ -24,10 +27,10 @@ public enum TradeAskOutcome
 /// </remarks>
 public sealed class TradeRegistry
 {
+    private readonly Dictionary<int, int> _acceptedPairs = new();
     private readonly Lock _lock = new();
     private readonly Dictionary<int, int> _pendingByAsker = new();
     private readonly Dictionary<int, int> _pendingByTarget = new();
-    private readonly Dictionary<int, int> _acceptedPairs = new();
     private readonly Dictionary<int, TradeSession> _sessionByCharacter = new();
 
     private bool IsBusy(int characterId)
@@ -82,7 +85,10 @@ public sealed class TradeRegistry
         }
     }
 
-    /// <summary>CZ_TRADE_START_SEND -- callable by either accepted side; allocates a fresh, EMPTY <see cref="TradeSession" /> for both.</summary>
+    /// <summary>
+    ///     CZ_TRADE_START_SEND -- callable by either accepted side; allocates a fresh, EMPTY <see cref="TradeSession" />
+    ///     for both.
+    /// </summary>
     public bool TryStart(int callerId, out TradeSession session)
     {
         lock (_lock)
@@ -109,7 +115,10 @@ public sealed class TradeRegistry
         }
     }
 
-    /// <summary>Ends (aborts OR completes) the session either participant is in -- called by CZ_TRADE_END_SEND (abort) or after a successful atomic commit (completion). Removes BOTH participants' index entries.</summary>
+    /// <summary>
+    ///     Ends (aborts OR completes) the session either participant is in -- called by CZ_TRADE_END_SEND (abort) or
+    ///     after a successful atomic commit (completion). Removes BOTH participants' index entries.
+    /// </summary>
     public bool TryEnd(int characterId, out TradeSession? session)
     {
         lock (_lock)

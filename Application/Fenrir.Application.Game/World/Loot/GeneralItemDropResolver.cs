@@ -21,11 +21,11 @@ namespace Fenrir.Application.Game.World.Loot;
 ///     roll is an acceptable, documented simplification -- a precomputed (Level,Type,Sort) index would be the
 ///     natural follow-up if profiling ever shows otherwise.
 ///     <para>
-///     The level==145 (<c>MAX_LIMIT_LEVEL_NUM</c>) "high level"/rebirth item bucket (legacy's own special
-///     <c>iMartialLevel</c>-keyed search past that boundary) is NOT ported -- Fenrir has no rebirth/high-level
-///     item system modeled yet; a roll that lands on level 145 is resolved with the SAME plain
-///     Level-equality filter as any other level, which under-serves that one boundary level but invents
-///     nothing (open issue, not silently guessed).
+///         The level==145 (<c>MAX_LIMIT_LEVEL_NUM</c>) "high level"/rebirth item bucket (legacy's own special
+///         <c>iMartialLevel</c>-keyed search past that boundary) is NOT ported -- Fenrir has no rebirth/high-level
+///         item system modeled yet; a roll that lands on level 145 is resolved with the SAME plain
+///         Level-equality filter as any other level, which under-serves that one boundary level but invents
+///         nothing (open issue, not silently guessed).
 ///     </para>
 /// </remarks>
 public static class GeneralItemDropResolver
@@ -46,7 +46,9 @@ public static class GeneralItemDropResolver
     private const int Spear = 20;
     private const int Scepter = 21;
     private const int SkillBook = 5;
-    private const int Pet = 22; // ports the legacy's "iSort >= IPET" reject -- never actually reachable via the pool below, kept for parity
+
+    private const int
+        Pet = 22; // ports the legacy's "iSort >= IPET" reject -- never actually reachable via the pool below, kept for parity
 
     private const int MaxAttempts = 10;
 
@@ -89,7 +91,8 @@ public static class GeneralItemDropResolver
         ];
 
         if (sortPool[5] < 0)
-            return null; // unknown tribe -- legacy's own ReturnDropRareItem returns NULL for tPreviousTribe outside 0..2
+            return
+                null; // unknown tribe -- legacy's own ReturnDropRareItem returns NULL for tPreviousTribe outside 0..2
 
         var chosenSort = sortPool[random.Next(sortPool.Length)];
 
@@ -113,7 +116,10 @@ public static class GeneralItemDropResolver
         return null;
     }
 
-    /// <summary>Ports <c>ITEMSYSTEM::Return(level,type,sort)</c>'s "one uniformly random match" semantics over the whole catalog (see class remarks on why this is a linear scan here).</summary>
+    /// <summary>
+    ///     Ports <c>ITEMSYSTEM::Return(level,type,sort)</c>'s "one uniformly random match" semantics over the whole
+    ///     catalog (see class remarks on why this is a linear scan here).
+    /// </summary>
     private static ItemRowDto? ReturnOne(WorldDataCache worldData, Random random, int level, int type, int sort)
     {
         List<ItemRowDto>? matches = null;

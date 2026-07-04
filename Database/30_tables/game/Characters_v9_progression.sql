@@ -31,7 +31,7 @@
 --       from the previously equipped one (Fenrir.Application.Game.Pets, Zone's own equip-change hook).
 --       Documented simplification (StructuredOutput open issue), not a guess.
 ALTER TABLE game.Characters
-    ADD JoinWar               INT     NOT NULL CONSTRAINT DF_Characters_JoinWar DEFAULT 0,
+    ADD JoinWar INT NOT NULL CONSTRAINT DF_Characters_JoinWar DEFAULT 0,
         MissionKillOtherTribe INT     NOT NULL CONSTRAINT DF_Characters_MissionKillOtherTribe DEFAULT 0,
         MissionKillMonster    INT     NOT NULL CONSTRAINT DF_Characters_MissionKillMonster DEFAULT 0,
         MissionPlayTime       INT     NOT NULL CONSTRAINT DF_Characters_MissionPlayTime DEFAULT 0,

@@ -46,7 +46,7 @@ public class BloodShopBuilderTests
     [Fact]
     public void Build_RealRowsLandAtSequentialIndexesStartingAtZero_NotAtTheirOwnSlotNumber()
     {
-        var items = new Dictionary<int, ItemDefinition> { [12] = Item(12, sort: 3), [1019] = Item(1019, sort: 3) }
+        var items = new Dictionary<int, ItemDefinition> { [12] = Item(12, 3), [1019] = Item(1019, 3) }
             .ToFrozenDictionary();
 
         var shop = BloodShopBuilder.Build(
@@ -62,7 +62,7 @@ public class BloodShopBuilderTests
     [Fact]
     public void Build_ZeroQuantitySort99Item_IsForcedToOne()
     {
-        var items = new Dictionary<int, ItemDefinition> { [12] = Item(12, sort: 99) }.ToFrozenDictionary();
+        var items = new Dictionary<int, ItemDefinition> { [12] = Item(12, 99) }.ToFrozenDictionary();
 
         var shop = BloodShopBuilder.Build([new BloodExchangeCatalogRowDto(1, 12, 5, 0)], items);
 

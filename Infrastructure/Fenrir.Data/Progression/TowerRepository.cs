@@ -15,7 +15,10 @@ namespace Fenrir.Data.Progression;
 /// </summary>
 public sealed record TowerRepository(ICaeriusNetDbContext Db) : ITowerRepository
 {
-    /// <summary>Idempotent bootstrap (usp_TowerState_EnsureInitialized) -- creates the 12 uncontrolled tower rows on the very first call, a no-op afterwards.</summary>
+    /// <summary>
+    ///     Idempotent bootstrap (usp_TowerState_EnsureInitialized) -- creates the 12 uncontrolled tower rows on the very
+    ///     first call, a no-op afterwards.
+    /// </summary>
     public async ValueTask EnsureInitializedAsync(CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_TowerState_EnsureInitialized", 0).Build();

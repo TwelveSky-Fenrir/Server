@@ -12,11 +12,15 @@ namespace Fenrir.Application.Game.Stats;
 ///     <see cref="Fenrir.Application.Game.GameData.WorldDataCache" />, and an optional buff snapshot).
 ///     Two layers, matching the legacy's own split (report §1/§5 vs §6):
 ///     <list type="bullet">
-///         <item><see cref="ComputeBaseStats" /> -- the SetBasicAbilityFromEquip cache (GetBase* family):
+///         <item>
+///             <see cref="ComputeBaseStats" /> -- the SetBasicAbilityFromEquip cache (GetBase* family):
 ///             everything that only changes when equipment/level/title/halo change. This is what
-///             <see cref="Fenrir.Application.Game.World.PlayerRuntimeState.Stats" /> should cache.</item>
-///         <item><see cref="ComputeEffectiveStats" /> -- the combat-instant wrappers (Get* family): buffs,
-///             pet-double, a handful of set/title/cape adjustments layered on top of the base snapshot.</item>
+///             <see cref="Fenrir.Application.Game.World.PlayerRuntimeState.Stats" /> should cache.
+///         </item>
+///         <item>
+///             <see cref="ComputeEffectiveStats" /> -- the combat-instant wrappers (Get* family): buffs,
+///             pet-double, a handful of set/title/cape adjustments layered on top of the base snapshot.
+///         </item>
 ///     </list>
 ///     Every "truncate toward zero via a C++ <c>(int)</c> cast" in the source is preserved as its own
 ///     explicit <c>(int)</c> cast HERE, in the SAME relative position, because MyFactor's variables are
@@ -31,31 +35,49 @@ namespace Fenrir.Application.Game.Stats;
 ///     where a real value would be non-zero, exactly the way an absent legacy feature would if compiled
 ///     out:
 ///     <list type="bullet">
-///         <item>Zone-balance stat substitution, zone elixirs, ornaments, HP/DMG boost pills, rank buffs,
+///         <item>
+///             Zone-balance stat substitution, zone elixirs, ornaments, HP/DMG boost pills, rank buffs,
 ///             the zone038 "DTM" bonus, and the whole FFA (zone 335) flat-override mode -- all need a zone
-///             context this calculator does not take (report §5.1/§0/§9).</item>
-///         <item>Costume base stats, costume-enchant "cs" (V2), and the rune system (aRuneSystem) -- no
-///             PlayerRuntimeState fields exist for these yet (report §3).</item>
-///         <item>The animal/mount system (grades, absorb buffs, NewPower bonuses) and the whole PETSYSTEM
+///             context this calculator does not take (report §5.1/§0/§9).
+///         </item>
+///         <item>
+///             Costume base stats, costume-enchant "cs" (V2), and the rune system (aRuneSystem) -- no
+///             PlayerRuntimeState fields exist for these yet (report §3).
+///         </item>
+///         <item>
+///             The animal/mount system (grades, absorb buffs, NewPower bonuses) and the whole PETSYSTEM
 ///             (report §10.3/§10.7) beyond the generic <see cref="PetStatContribution" /> hook for the
-///             "pet double" rule.</item>
-///         <item>ReturnIUEffectValue effect-sorts 2-6 (defense/hit/dodge/eatk/edef): report §10.1 states only
+///             "pet double" rule.
+///         </item>
+///         <item>
+///             ReturnIUEffectValue effect-sorts 2-6 (defense/hit/dodge/eatk/edef): report §10.1 states only
 ///             effect-sort 1 (weapon attack) and the start of effect-sort 3 were fully transcribed --
 ///             implementing 2/3-full/4/5/6 here would mean inventing tier/pivot constants report 11 itself
 ///             does not have. Only effect-sort 1 (<see cref="WeaponAttackEffectValue" />) is implemented;
 ///             the non-iCheckSetItem-2 "else" branches of Cape/Armor/Gloves/Boots/Amulet DEF/HIT/DODGE/
-///             EATK/EDEF contributions are the affected omission.</item>
-///         <item>ITEMSYSTEM::ReturnNewStat (report §10.4): the sort==2 branch of every deco slot (9-12)
-///             contributes 0 here instead of its real "new stat" value.</item>
-///         <item>GetSocketInfo (report §10.5): USE_SOCKET_GEM is inactive in prod except this one call site;
-///             its body was never located, so it is assumed to contribute 0 (documented, unverified).</item>
-///         <item>Stellar Core (report §8), Phoenix's Growth/IM pet-amulet layer, GIFT_EVENT amulet attack/
+///             EATK/EDEF contributions are the affected omission.
+///         </item>
+///         <item>
+///             ITEMSYSTEM::ReturnNewStat (report §10.4): the sort==2 branch of every deco slot (9-12)
+///             contributes 0 here instead of its real "new stat" value.
+///         </item>
+///         <item>
+///             GetSocketInfo (report §10.5): USE_SOCKET_GEM is inactive in prod except this one call site;
+///             its body was never located, so it is assumed to contribute 0 (documented, unverified).
+///         </item>
+///         <item>
+///             Stellar Core (report §8), Phoenix's Growth/IM pet-amulet layer, GIFT_EVENT amulet attack/
 ///             defense values, druk (drunk potions), rage buff, tribe-role bonuses, mix-skill bonus, and
-///             aEventValue2 -- all need account/skill/zone state not modeled on PlayerRuntimeState yet.</item>
-///         <item>Legacy set-number DETECTION for sets 1-22/30/50/51 (the 87000-89562 item families) -- see
-///             <see cref="SetBonusTables" />'s remarks; only NXT detection is implemented.</item>
-///         <item>Speeds: report §10.10 confirms there is NO GetSpeed anywhere in MyFactor -- speeds are not
-///             part of <see cref="EffectiveStats" /> and must not be invented here.</item>
+///             aEventValue2 -- all need account/skill/zone state not modeled on PlayerRuntimeState yet.
+///         </item>
+///         <item>
+///             Legacy set-number DETECTION for sets 1-22/30/50/51 (the 87000-89562 item families) -- see
+///             <see cref="SetBonusTables" />'s remarks; only NXT detection is implemented.
+///         </item>
+///         <item>
+///             Speeds: report §10.10 confirms there is NO GetSpeed anywhere in MyFactor -- speeds are not
+///             part of <see cref="EffectiveStats" /> and must not be invented here.
+///         </item>
 ///     </list>
 /// </summary>
 public static class StatCalculator
@@ -87,7 +109,10 @@ public static class StatCalculator
     /// </summary>
     /// <param name="attributes">The 4 spent base stats + level/tribe/title/halo/rebirth.</param>
     /// <param name="equipment">Every occupied equipment slot (0-12); an absent slot is simply not in the list.</param>
-    /// <param name="levels">world.Levels, keyed by Level (<see cref="Fenrir.Application.Game.GameData.WorldDataCache.LevelsByLevel" />).</param>
+    /// <param name="levels">
+    ///     world.Levels, keyed by Level (
+    ///     <see cref="Fenrir.Application.Game.GameData.WorldDataCache.LevelsByLevel" />).
+    /// </param>
     /// <param name="legacySetNumber">
     ///     A pre-computed mSetNumber for sets 1-22/30/50/51 (0 = none) -- see <see cref="SetBonusTables" />'s
     ///     remarks on why this calculator does not detect those itself. NXT (77000-77023) is detected
@@ -376,7 +401,8 @@ public static class StatCalculator
         {
             if (i is 1 or 6) continue;
             if (bySlot[i] is not { } slot) continue;
-            if (slot.Item.Sort != 1) continue; // report: "items sort==1" specifically, not the usual {1,4} legendary set
+            if (slot.Item.Sort != 1)
+                continue; // report: "items sort==1" specifically, not the usual {1,4} legendary set
 
             var d = slot.Combine / 10;
             var u = slot.Combine % 10;
@@ -492,7 +518,8 @@ public static class StatCalculator
         if (IsLegendary(item))
         {
             var enchant = (int)weapon.Enchant;
-            if (enchant >= 100) enchant -= 100; // report: "IS(>=100 -> -100)" for weapon (differs from the amulet's ">100")
+            if (enchant >= 100)
+                enchant -= 100; // report: "IS(>=100 -> -100)" for weapon (differs from the amulet's ">100")
             total += enchant * 1200;
         }
 
@@ -543,7 +570,8 @@ public static class StatCalculator
     private static int ComputeDeco2AttackPowerBonus(EquippedItemSlot deco2)
     {
         if (deco2.Item.Sort == 2) return 0; // ReturnNewStat unread -- lacuna, report §10.4
-        var isWing = deco2.Item.ItemId is 213 or 214 or 215 or 217 or 218 or 2303 or 2304 or 2305; // NOT 216, unlike DEF/EATK
+        var isWing =
+            deco2.Item.ItemId is 213 or 214 or 215 or 217 or 218 or 2303 or 2304 or 2305; // NOT 216, unlike DEF/EATK
         return (int)(deco2.Enchant * (isWing ? 23.4f : 11.7f));
     }
 
@@ -820,7 +848,7 @@ public static class StatCalculator
             luck += slot.Item.Luck;
             if (i != 8) // EPET
                 luck += (int)(slot.Item.Luck *
-                             SetBonusTables.GetCoefficients(setNumber, i, IsLegendary(slot.Item)).Luck);
+                              SetBonusTables.GetCoefficients(setNumber, i, IsLegendary(slot.Item)).Luck);
         }
 
         if (bySlot[0] is { } ring0 && !IsLegendary(ring0.Item))
@@ -843,7 +871,7 @@ public static class StatCalculator
             eatk += slot.Item.ElementAttackPower;
             if (i != 8) // EPET
                 eatk += (int)(slot.Item.ElementAttackPower *
-                             SetBonusTables.GetCoefficients(setNumber, i, IsLegendary(slot.Item)).ElementAttackPower);
+                              SetBonusTables.GetCoefficients(setNumber, i, IsLegendary(slot.Item)).ElementAttackPower);
         }
 
         if (bySlot[4] is { } ring4)
@@ -852,7 +880,8 @@ public static class StatCalculator
             if (IsLegendary(item))
             {
                 var enchant = (int)ring4.Enchant;
-                if (enchant > 100) enchant -= 100; // report: ">100" here, unlike weapon/armor's ">=100" -- preserved verbatim
+                if (enchant > 100)
+                    enchant -= 100; // report: ">100" here, unlike weapon/armor's ">=100" -- preserved verbatim
                 eatk += enchant * 200;
             }
 
@@ -882,7 +911,7 @@ public static class StatCalculator
             edef += slot.Item.ElementDefensePower;
             if (i != 8) // EPET
                 edef += (int)(slot.Item.ElementDefensePower *
-                             SetBonusTables.GetCoefficients(setNumber, i, IsLegendary(slot.Item)).ElementDefensePower);
+                              SetBonusTables.GetCoefficients(setNumber, i, IsLegendary(slot.Item)).ElementDefensePower);
         }
 
         if (bySlot[0] is { } ring0 && !IsLegendary(ring0.Item) && ring0.Item.CheckSetItem == 2)

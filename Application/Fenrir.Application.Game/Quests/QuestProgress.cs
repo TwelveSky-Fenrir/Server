@@ -15,6 +15,9 @@ public readonly record struct QuestProgress(
 {
     public static readonly QuestProgress None = default;
 
-    /// <summary>Legacy's own idle test: <c>[1]==0 &amp;&amp; [2]==0 &amp;&amp; [3]==0 &amp;&amp; [4]==0</c> -- deliberately NOT checking <see cref="StepPermanent" />, which survives idle.</summary>
+    /// <summary>
+    ///     Legacy's own idle test: <c>[1]==0 &amp;&amp; [2]==0 &amp;&amp; [3]==0 &amp;&amp; [4]==0</c> -- deliberately
+    ///     NOT checking <see cref="StepPermanent" />, which survives idle.
+    /// </summary>
     public bool IsIdle => ActiveFlag == 0 && QSort == 0 && TargetPhase == 0 && KillCounter == 0;
 }

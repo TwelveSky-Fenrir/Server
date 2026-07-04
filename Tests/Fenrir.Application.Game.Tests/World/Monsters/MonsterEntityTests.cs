@@ -8,13 +8,13 @@ public class MonsterEntityTests
     private static MonsterEntity CreateEntity(int life = 100)
     {
         var template = WorldDataTestRows.Monster(500) with { Life = life };
-        return MonsterEntity.Create(1, 1u, template, spawnSlotId: 1, homeX: 0, homeY: 0, homeZ: 0, leashRadius: 50);
+        return MonsterEntity.Create(1, 1u, template, 1, 0, 0, 0, 50);
     }
 
     [Fact]
     public void Create_SeedsLifeAndPositionFromHome()
     {
-        var monster = CreateEntity(life: 250);
+        var monster = CreateEntity(250);
 
         Assert.Equal(250, monster.Life);
         Assert.Equal(250, monster.MaxLife);
@@ -25,7 +25,7 @@ public class MonsterEntityTests
     [Fact]
     public void TakeDamage_ReducesLife_AndNeverGoesBelowZero()
     {
-        var monster = CreateEntity(life: 100);
+        var monster = CreateEntity(100);
 
         var died = monster.TakeDamage(30, out var remaining);
 
@@ -37,7 +37,7 @@ public class MonsterEntityTests
     [Fact]
     public void TakeDamage_OverkillClampsToZero_NeverNegative()
     {
-        var monster = CreateEntity(life: 20);
+        var monster = CreateEntity(20);
 
         monster.TakeDamage(500, out var remaining);
 
@@ -48,7 +48,7 @@ public class MonsterEntityTests
     [Fact]
     public void TakeDamage_ExactlyLethal_ReturnsTrueOnce()
     {
-        var monster = CreateEntity(life: 50);
+        var monster = CreateEntity(50);
 
         var died = monster.TakeDamage(50, out var remaining);
 
@@ -59,7 +59,7 @@ public class MonsterEntityTests
     [Fact]
     public void TakeDamage_AfterDeath_IsANoOp_NeverReturnsTrueTwice()
     {
-        var monster = CreateEntity(life: 10);
+        var monster = CreateEntity(10);
 
         var firstKill = monster.TakeDamage(10, out _);
         var secondHit = monster.TakeDamage(10, out var remaining);
@@ -72,7 +72,7 @@ public class MonsterEntityTests
     [Fact]
     public void TakeDamage_NegativeAmount_ContributesNoDamage()
     {
-        var monster = CreateEntity(life: 40);
+        var monster = CreateEntity(40);
 
         monster.TakeDamage(-100, out var remaining);
 
@@ -83,7 +83,7 @@ public class MonsterEntityTests
     public void TakeDamage_ConcurrentAttackers_ExactlyOneClaimsTheKill()
     {
         // Simulates two attackers racing to deliver the killing blow -- only one may ever get died=true.
-        var monster = CreateEntity(life: 100);
+        var monster = CreateEntity(100);
 
         var results = new bool[50];
         Parallel.For(0, 50, i => results[i] = monster.TakeDamage(2, out _));

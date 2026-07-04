@@ -60,8 +60,8 @@ public class CombatResolverTests
     [Fact]
     public void SameTribe_IsRejected()
     {
-        var attacker = Combatant(1, tribe: 0);
-        var defender = Combatant(2, tribe: 0);
+        var attacker = Combatant(1, 0);
+        var defender = Combatant(2, 0);
         var outcome = CombatResolver.ResolveEnemyTribeAttack(attacker, defender, MeleeRequest(1, 2), TimeSpan.Zero,
             null, new ScriptedRandomSource(0));
         Assert.True(outcome.Rejected);
@@ -110,7 +110,7 @@ public class CombatResolverTests
         // never itself re-trigger AttackerProtected/DefenderProtected -- there is nothing left in this pure
         // resolver that could even do so (CombatantSnapshot is an immutable snapshot the caller re-builds fresh
         // each call), which is exactly the point: the bug lived in Zone.cs re-stamping the field, not here.
-        var attacker = Combatant(1, 0, attackPower: 1000, zoneEntryAt: TimeSpan.Zero);
+        var attacker = Combatant(1, 0, 1000, zoneEntryAt: TimeSpan.Zero);
         var defender = Combatant(2, 1, defensePower: 200, zoneEntryAt: TimeSpan.Zero);
 
         var first = CombatResolver.ResolveEnemyTribeAttack(attacker, defender, MeleeRequest(1, 2),
@@ -151,7 +151,7 @@ public class CombatResolverTests
     [Fact]
     public void NoBlock_AlwaysHits_NoRollConsumed()
     {
-        var attacker = Combatant(1, 0, attackPower: 1000);
+        var attacker = Combatant(1, 0, 1000);
         var defender = Combatant(2, 1, defensePower: 200, attackBlock: 0);
         // Only 2 draws available (variance dir/mag) -- if a hit-chance roll were (wrongly) consumed here, the
         // variance draws would shift and this test's exact-value assertion below would fail.
@@ -165,7 +165,7 @@ public class CombatResolverTests
     [Fact]
     public void Damage_IsAtkMinusDefWithVarianceThenDividedByFive_PvpOnlyQuirk()
     {
-        var attacker = Combatant(1, 0, attackPower: 1000);
+        var attacker = Combatant(1, 0, 1000);
         var defender = Combatant(2, 1, defensePower: 200);
         var outcome = CombatResolver.ResolveEnemyTribeAttack(attacker, defender, MeleeRequest(1, 2), TimeSpan.Zero,
             null, new ScriptedRandomSource(0, 0));
@@ -176,7 +176,7 @@ public class CombatResolverTests
     [Fact]
     public void Damage_BelowFloor_ClampsToMinimumBeforeDivision()
     {
-        var attacker = Combatant(1, 0, attackPower: 105);
+        var attacker = Combatant(1, 0, 105);
         var defender = Combatant(2, 1, defensePower: 100); // raw damage = 5, no floor needed either way
         var outcome = CombatResolver.ResolveEnemyTribeAttack(attacker, defender, MeleeRequest(1, 2), TimeSpan.Zero,
             null, new ScriptedRandomSource(0, 0));
@@ -187,7 +187,7 @@ public class CombatResolverTests
     [Fact]
     public void Charge_IsAppliedBeforeVarianceAndConsumed()
     {
-        var attacker = Combatant(1, 0, attackPower: 1000, chargeBuffPercent: 50);
+        var attacker = Combatant(1, 0, 1000, chargeBuffPercent: 50);
         var defender = Combatant(2, 1, defensePower: 200);
         var outcome = CombatResolver.ResolveEnemyTribeAttack(attacker, defender, MeleeRequest(1, 2), TimeSpan.Zero,
             null, new ScriptedRandomSource(0, 0));
@@ -203,7 +203,7 @@ public class CombatResolverTests
         // ATTEMPTED (S07_MyGame02.cpp:995-999, unconditional DecreaseBuff(8,...) BEFORE the hit-chance roll at
         // :1043-1051) -- a prior pass here only marked ChargeConsumed on a hit, letting a charge survive
         // repeated misses against a high-AttackBlock defender indefinitely.
-        var attacker = Combatant(1, 0, attackPower: 1000, attackSuccess: 1, chargeBuffPercent: 50);
+        var attacker = Combatant(1, 0, 1000, attackSuccess: 1, chargeBuffPercent: 50);
         var defender = Combatant(2, 1, defensePower: 200, attackBlock: 100_000); // hit chance clamps to 1%
         var outcome = CombatResolver.ResolveEnemyTribeAttack(attacker, defender, MeleeRequest(1, 2), TimeSpan.Zero,
             null, new ScriptedRandomSource(50)); // roll 50 >= 1% chance -> miss
@@ -214,7 +214,7 @@ public class CombatResolverTests
     [Fact]
     public void Critical_DoublesDamageBeforeTheFinalDivision()
     {
-        var attacker = Combatant(1, 0, attackPower: 1000, critical: 100);
+        var attacker = Combatant(1, 0, 1000, critical: 100);
         var defender = Combatant(2, 1, defensePower: 200, criticalDefence: 0);
         // variance dir=0, variance mag=0, then a crit roll of 50 (< 100% chance) -> crits.
         var outcome = CombatResolver.ResolveEnemyTribeAttack(attacker, defender, MeleeRequest(1, 2), TimeSpan.Zero,
@@ -227,7 +227,7 @@ public class CombatResolverTests
     [Fact]
     public void ElementDamage_AddsAfterTheFinalDivision_AndIsNotItselfDivided()
     {
-        var attacker = Combatant(1, 0, attackPower: 1000, elementAttack: 300);
+        var attacker = Combatant(1, 0, 1000, elementAttack: 300);
         var defender = Combatant(2, 1, defensePower: 200, elementDefense: 100);
         var outcome = CombatResolver.ResolveEnemyTribeAttack(attacker, defender, MeleeRequest(1, 2), TimeSpan.Zero,
             null, new ScriptedRandomSource(0, 0));
@@ -239,7 +239,7 @@ public class CombatResolverTests
     [Fact]
     public void DamageNeverExceedsDefenderRemainingLife()
     {
-        var attacker = Combatant(1, 0, attackPower: 1_000_000);
+        var attacker = Combatant(1, 0, 1_000_000);
         var defender = Combatant(2, 1, defensePower: 0, life: 50);
         var outcome = CombatResolver.ResolveEnemyTribeAttack(attacker, defender, MeleeRequest(1, 2), TimeSpan.Zero,
             null, new ScriptedRandomSource(0, 0));

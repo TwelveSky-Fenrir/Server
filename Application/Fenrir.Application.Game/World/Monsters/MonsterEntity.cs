@@ -34,20 +34,29 @@ public sealed class MonsterEntity
     public float PosZ { get; set; }
     public float Heading { get; set; }
 
-    /// <summary>The spawn anchor (report 05 §3: <c>mFirstLocation</c>) -- <see cref="MonsterAiState.ReturnToSpawn" />'s destination and the leash origin.</summary>
+    /// <summary>
+    ///     The spawn anchor (report 05 §3: <c>mFirstLocation</c>) -- <see cref="MonsterAiState.ReturnToSpawn" />'s
+    ///     destination and the leash origin.
+    /// </summary>
     public required float HomeX { get; init; }
 
     public required float HomeY { get; init; }
     public required float HomeZ { get; init; }
 
-    /// <summary>The spawn region's own scatter radius, reused as this monster's leash bound (see <see cref="MonsterAiSystem" />'s remarks for why).</summary>
+    /// <summary>
+    ///     The spawn region's own scatter radius, reused as this monster's leash bound (see
+    ///     <see cref="MonsterAiSystem" />'s remarks for why).
+    /// </summary>
     public required float LeashRadius { get; init; }
 
     public int MaxLife { get; init; }
 
     public MonsterAiState AiState { get; set; } = MonsterAiState.Spawning;
 
-    /// <summary>Legacy ticks spent in the CURRENT <see cref="AiState" /> -- compared against the template's own <c>mFrameInfo</c> thresholds.</summary>
+    /// <summary>
+    ///     Legacy ticks spent in the CURRENT <see cref="AiState" /> -- compared against the template's own
+    ///     <c>mFrameInfo</c> thresholds.
+    /// </summary>
     public int StateTicks { get; set; }
 
     /// <summary>The currently-locked pursuit target, or null when idle/patrolling/returning.</summary>
@@ -93,8 +102,14 @@ public sealed class MonsterEntity
     ///     Applies damage, clamped to never go below 0. Thread-safe (see class remarks): callable directly
     ///     from a combat packet handler's own async thread, concurrently with this monster's zone tick.
     /// </summary>
-    /// <param name="amount">Negative/zero contributes no damage (defensive -- a malformed caller must never HEAL a monster through this path).</param>
-    /// <param name="remainingLife">The life value immediately after this call (may already be stale by the time the caller reads it under concurrent damage, same benign race <see cref="PlayerRuntimeState" /> accepts elsewhere).</param>
+    /// <param name="amount">
+    ///     Negative/zero contributes no damage (defensive -- a malformed caller must never HEAL a monster
+    ///     through this path).
+    /// </param>
+    /// <param name="remainingLife">
+    ///     The life value immediately after this call (may already be stale by the time the caller
+    ///     reads it under concurrent damage, same benign race <see cref="PlayerRuntimeState" /> accepts elsewhere).
+    /// </param>
     /// <returns>
     ///     True ONLY for the single caller whose damage brought this monster to exactly 0 for the first time --
     ///     every other caller (including one that also reduces an already-dead monster's life, a no-op) gets

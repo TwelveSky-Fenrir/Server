@@ -1,7 +1,6 @@
 using System.Data;
 using CaeriusNet.Abstractions;
 using CaeriusNet.Builders;
-using CaeriusNet.Commands.Reads;
 using CaeriusNet.Commands.Writes;
 using Fenrir.Data.Characters;
 

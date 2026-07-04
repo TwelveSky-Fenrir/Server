@@ -49,7 +49,7 @@ public class ZoneHandoffTests
         var (session, _) = ZoneTestKit.CreateSession(1);
 
         source.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1,
-            "Hero", 123f, 4f, 456f, 7)));
+            "Hero", 123f, 4f, 456f)));
         source.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.True(source.TryGetPlayer(10, out var before));

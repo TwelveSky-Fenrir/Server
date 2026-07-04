@@ -1,5 +1,5 @@
-using System.Data;
 using System.Collections.ObjectModel;
+using System.Data;
 using CaeriusNet.Abstractions;
 using CaeriusNet.Builders;
 using CaeriusNet.Commands.Reads;
@@ -14,7 +14,10 @@ namespace Fenrir.Data.Social;
 /// </summary>
 public sealed record FriendRepository(ICaeriusNetDbContext Db) : IFriendRepository
 {
-    /// <summary>Loaded once at world entry (AVATAR_INFO's <c>Friend[10]</c> field) -- never re-queried afterwards; live mutations (Add/Remove) go through the same call sites that update the in-memory mirror.</summary>
+    /// <summary>
+    ///     Loaded once at world entry (AVATAR_INFO's <c>Friend[10]</c> field) -- never re-queried afterwards; live
+    ///     mutations (Add/Remove) go through the same call sites that update the in-memory mirror.
+    /// </summary>
     public async ValueTask<ReadOnlyCollection<CharacterFriendDto>> GetByCharacterAsync(int characterId,
         CancellationToken ct)
     {
@@ -25,7 +28,11 @@ public sealed record FriendRepository(ICaeriusNetDbContext Db) : IFriendReposito
         return await Db.QueryAsReadOnlyCollectionAsync<CharacterFriendDto>(sp, ct);
     }
 
-    /// <summary>CZ_FRIEND_MAKE_SEND (opcode 56) -- writes ONE slot for <paramref name="characterId" /> only. Throws SQL error 50267 if the slot is already occupied (FriendRegistry has already verified this cannot happen under normal play; a race is the only way to hit it).</summary>
+    /// <summary>
+    ///     CZ_FRIEND_MAKE_SEND (opcode 56) -- writes ONE slot for <paramref name="characterId" /> only. Throws SQL error
+    ///     50267 if the slot is already occupied (FriendRegistry has already verified this cannot happen under normal play; a
+    ///     race is the only way to hit it).
+    /// </summary>
     public async ValueTask AddAsync(int characterId, byte slot, int friendCharacterId, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_CharacterFriend_Add", 0)

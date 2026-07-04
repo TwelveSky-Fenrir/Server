@@ -12,27 +12,31 @@ namespace Fenrir.Application.Game.World.Monsters;
 /// <remarks>
 ///     Deliberately NOT ported (open issues, not oversights):
 ///     <list type="bullet">
-///     <item>
-///     Random wander while idle (legacy: "patrouille aléatoire") -- no wander radius/timing constant was
-///     found in the source within this task's scope, so an idle monster simply stays at its home point
-///     instead of inventing one; it still walks home if displaced (<see cref="MonsterAiState.Patrol" />).
-///     </item>
-///     <item>
-///     The leash bound reuses the monster's OWN spawn region <c>Radius</c> (<see cref="MonsterEntity.LeashRadius" />)
-///     -- the one concrete <c>PathForMonsterAttack</c> call site read during this investigation actually
-///     bounds pursuit against the TARGET's position with <c>mRadiusInfo[0]</c> (closing to attack range), not
-///     a distance-from-spawn leash; no hardcoded "leash distance from home" constant was located in the
-///     source. Using the region's own configured scatter radius as the leash is a documented, reasonable,
-///     data-driven stand-in, not a verified constant.
-///     </item>
-///     <item>
-///     Monster-initiated damage to a player (legacy: <c>ProcessAttack04</c> -- NEVER reached via the wire
-///     dispatch in practice, only ever called directly from the monster's own AI, <c>S07_MyGame05.cpp:3961</c>)
-///     fires once per attack-windup entry via <see cref="Zone.ResolveMonsterAttack" />
-///     (<see cref="Combat.MonsterCombatResolver.ResolveMvpAttack" /> -- verified formula, see that type's own
-///     remarks for exactly what is/isn't reproduced).
-///     </item>
-///     <item>Boss/guard/tribe-symbol special AI (aSort 7/8/12 in the full legacy table) -- no such content in this batch.</item>
+///         <item>
+///             Random wander while idle (legacy: "patrouille aléatoire") -- no wander radius/timing constant was
+///             found in the source within this task's scope, so an idle monster simply stays at its home point
+///             instead of inventing one; it still walks home if displaced (<see cref="MonsterAiState.Patrol" />).
+///         </item>
+///         <item>
+///             The leash bound reuses the monster's OWN spawn region <c>Radius</c> (
+///             <see cref="MonsterEntity.LeashRadius" />)
+///             -- the one concrete <c>PathForMonsterAttack</c> call site read during this investigation actually
+///             bounds pursuit against the TARGET's position with <c>mRadiusInfo[0]</c> (closing to attack range), not
+///             a distance-from-spawn leash; no hardcoded "leash distance from home" constant was located in the
+///             source. Using the region's own configured scatter radius as the leash is a documented, reasonable,
+///             data-driven stand-in, not a verified constant.
+///         </item>
+///         <item>
+///             Monster-initiated damage to a player (legacy: <c>ProcessAttack04</c> -- NEVER reached via the wire
+///             dispatch in practice, only ever called directly from the monster's own AI, <c>S07_MyGame05.cpp:3961</c>)
+///             fires once per attack-windup entry via <see cref="Zone.ResolveMonsterAttack" />
+///             (<see cref="Combat.MonsterCombatResolver.ResolveMvpAttack" /> -- verified formula, see that type's own
+///             remarks for exactly what is/isn't reproduced).
+///         </item>
+///         <item>
+///             Boss/guard/tribe-symbol special AI (aSort 7/8/12 in the full legacy table) -- no such content in this
+///             batch.
+///         </item>
 ///     </list>
 /// </remarks>
 public sealed class MonsterAiSystem : ISimulationSystem
@@ -79,7 +83,8 @@ public sealed class MonsterAiSystem : ISimulationSystem
                 }
                 else
                 {
-                    TryAcquireTarget(zone, monster); // re-checked every tick, same as Decision -- a wandering monster can still be aggroed
+                    TryAcquireTarget(zone,
+                        monster); // re-checked every tick, same as Decision -- a wandering monster can still be aggroed
                 }
 
                 break;

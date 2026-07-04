@@ -14,6 +14,12 @@ namespace Fenrir.Data.Characters;
 /// </summary>
 public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRepository
 {
+    /// <summary>
+    ///     Sentinel for <see cref="ApplyQuestTransitionAsync" />/<see cref="ApplyDailyMissionClaimAsync" />'s
+    ///     <c>@ContainerN</c> -- no valid container id ever uses 255.
+    /// </summary>
+    public const byte NoContainer = 255;
+
     /// <summary>Character-select list for the account. Capacity 3 = MAX_USER_AVATAR_NUM, the legacy 3-slot cap.</summary>
     public async ValueTask<ReadOnlyCollection<CharacterSummaryDto>> GetByAccountAsync(int accountId,
         CancellationToken ct)
@@ -308,9 +314,6 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(builder.Build(), ct);
     }
 
-    /// <summary>Sentinel for <see cref="ApplyQuestTransitionAsync" />/<see cref="ApplyDailyMissionClaimAsync" />'s <c>@ContainerN</c> -- no valid container id ever uses 255.</summary>
-    public const byte NoContainer = 255;
-
     /// <summary>
     ///     Server Logic V9 Progression: atomically upserts the quest-state row (game.CharacterQuests) plus
     ///     OPTIONAL money credit and OPTIONAL up-to-TWO-container item replace, in ONE transaction
@@ -411,7 +414,10 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(sp, ct);
     }
 
-    /// <summary>Resolves an avatar NAME to its CharacterId regardless of online state (usp_Character_GetIdByName) -- V8's own need: an offline-shop "view another character's stall" lookup where the target need not be online.</summary>
+    /// <summary>
+    ///     Resolves an avatar NAME to its CharacterId regardless of online state (usp_Character_GetIdByName) -- V8's own
+    ///     need: an offline-shop "view another character's stall" lookup where the target need not be online.
+    /// </summary>
     public async ValueTask<int?> GetIdByNameAsync(string name, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_GetIdByName", 1)

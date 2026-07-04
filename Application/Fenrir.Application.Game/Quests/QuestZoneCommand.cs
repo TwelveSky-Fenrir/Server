@@ -16,15 +16,24 @@ namespace Fenrir.Application.Game.Quests;
 ///     <see cref="Fenrir.Application.Game.World.Zone.GrantMonsterKillExperience" /> -- pre-existing, not
 ///     introduced here.
 /// </param>
-/// <param name="ContributionPointsDelta">Flat add to ContributionPoints (reward type 3) -- write-behind, same regime as <see cref="ExperienceDelta" />.</param>
-/// <param name="Containers">Populated only when this transition touched an inventory container (quest-item deposit/reward-item deposit/exchange swap); empty otherwise.</param>
+/// <param name="ContributionPointsDelta">
+///     Flat add to ContributionPoints (reward type 3) -- write-behind, same regime as
+///     <see cref="ExperienceDelta" />.
+/// </param>
+/// <param name="Containers">
+///     Populated only when this transition touched an inventory container (quest-item
+///     deposit/reward-item deposit/exchange swap); empty otherwise.
+/// </param>
 /// <param name="Applied">
 ///     Completed by <c>Zone.ApplyQuestCommand</c> the instant the tick mirrors this -- same
 ///     await-before-releasing-<see cref="PlayerRuntimeState.EconomyActionLock" /> contract as
 ///     <see cref="Inventory.InventoryZoneCommand.Applied" />, so a back-to-back action for this character
 ///     never reads a stale pre-mirror snapshot.
 /// </param>
-/// <param name="TeacherPointDelta">Flat add to TeacherPoint (reward type 5, GL_614_QUEST_TEACHER_POINT) -- write-behind, same regime as <see cref="ContributionPointsDelta" />.</param>
+/// <param name="TeacherPointDelta">
+///     Flat add to TeacherPoint (reward type 5, GL_614_QUEST_TEACHER_POINT) -- write-behind,
+///     same regime as <see cref="ContributionPointsDelta" />.
+/// </param>
 public readonly record struct QuestZoneCommand(
     int CharacterId,
     QuestProgress Progress,

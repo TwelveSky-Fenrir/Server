@@ -22,13 +22,13 @@ namespace Fenrir.Application.Game.World;
 /// </summary>
 public sealed class ZoneRegistry
 {
-    private readonly GameServerOptions _options;
-    private readonly MovementRules _movementRules;
     private readonly DirtyTracker<int> _dirtyTracker;
-    private readonly ILogger<Zone> _zoneLogger;
-    private readonly WorldDataCache _worldData;
-    private readonly ImmutableArray<ISimulationSystem> _systems;
+    private readonly MovementRules _movementRules;
+    private readonly GameServerOptions _options;
     private readonly QuestCatalog _questCatalog;
+    private readonly ImmutableArray<ISimulationSystem> _systems;
+    private readonly WorldDataCache _worldData;
+    private readonly ILogger<Zone> _zoneLogger;
     private FrozenDictionary<short, Zone> _zones = FrozenDictionary<short, Zone>.Empty;
 
     public ZoneRegistry(IOptions<GameServerOptions> options, MovementRules movementRules,
@@ -50,20 +50,6 @@ public sealed class ZoneRegistry
         // builds -- optional (falls back to Zone's own per-zone-built default, see Zone's own remarks) so
         // pre-existing test call sites (ZoneRegistryTests) that construct this directly keep compiling.
         _questCatalog = questCatalog ?? new QuestCatalog(worldData);
-    }
-
-    /// <summary>
-    ///     Builds one Zone actor per hosted map id. Must run exactly once at boot, before ZoneTickHost starts
-    ///     or any handler resolves a map through this registry -- GameServer's Program.cs calls this right
-    ///     after resolving the shard's map list from admin.ShardMapAssignments, the same "explicit async
-    ///     warm-up before host.RunAsync" shape WorldDataLoader.InitializeAsync already uses for world.* data.
-    /// </summary>
-    public void Initialize(IReadOnlyCollection<short> maps)
-    {
-        _zones = maps.ToFrozenDictionary(
-            mapId => mapId,
-            mapId => new Zone(mapId, _options, _movementRules, _dirtyTracker, _systems, _zoneLogger, _worldData,
-                questCatalog: _questCatalog));
     }
 
     /// <summary>Every hosted zone, in no particular order — the tick host launches one loop per entry.</summary>
@@ -88,6 +74,20 @@ public sealed class ZoneRegistry
         }
     }
 
+    /// <summary>
+    ///     Builds one Zone actor per hosted map id. Must run exactly once at boot, before ZoneTickHost starts
+    ///     or any handler resolves a map through this registry -- GameServer's Program.cs calls this right
+    ///     after resolving the shard's map list from admin.ShardMapAssignments, the same "explicit async
+    ///     warm-up before host.RunAsync" shape WorldDataLoader.InitializeAsync already uses for world.* data.
+    /// </summary>
+    public void Initialize(IReadOnlyCollection<short> maps)
+    {
+        _zones = maps.ToFrozenDictionary(
+            mapId => mapId,
+            mapId => new Zone(mapId, _options, _movementRules, _dirtyTracker, _systems, _zoneLogger, _worldData,
+                questCatalog: _questCatalog));
+    }
+
     public bool TryGet(short mapId, [NotNullWhen(true)] out Zone? zone)
     {
         return _zones.TryGetValue(mapId, out zone);
@@ -110,7 +110,11 @@ public sealed class ZoneRegistry
         return false;
     }
 
-    /// <summary>Same scope as <see cref="TryGetPlayer" />, but also returns the hosting <see cref="Zone" /> -- needed by callers that must post a <c>ZoneCommand</c>/<c>InventoryZoneCommand</c> back onto that player's OWN zone (single-writer invariant) rather than mutate <see cref="PlayerRuntimeState" /> directly.</summary>
+    /// <summary>
+    ///     Same scope as <see cref="TryGetPlayer" />, but also returns the hosting <see cref="Zone" /> -- needed by
+    ///     callers that must post a <c>ZoneCommand</c>/<c>InventoryZoneCommand</c> back onto that player's OWN zone
+    ///     (single-writer invariant) rather than mutate <see cref="PlayerRuntimeState" /> directly.
+    /// </summary>
     public bool TryGetPlayerAndZone(int characterId, [NotNullWhen(true)] out PlayerRuntimeState? state,
         [NotNullWhen(true)] out Zone? zone)
     {
@@ -151,7 +155,10 @@ public sealed class ZoneRegistry
         return false;
     }
 
-    /// <summary>Same scope as <see cref="TryGetPlayerByName" />, but also returns the hosting <see cref="Zone" /> (the whisper reply's own <c>ZoneNumber</c> field needs the target's <c>MapId</c>).</summary>
+    /// <summary>
+    ///     Same scope as <see cref="TryGetPlayerByName" />, but also returns the hosting <see cref="Zone" /> (the whisper
+    ///     reply's own <c>ZoneNumber</c> field needs the target's <c>MapId</c>).
+    /// </summary>
     public bool TryGetPlayerAndZoneByName(string name, [NotNullWhen(true)] out PlayerRuntimeState? state,
         [NotNullWhen(true)] out Zone? zone)
     {

@@ -6,7 +6,8 @@ namespace Fenrir.Contracts.Packets.Zone;
 
 /// <summary>
 ///     ZC_TRADE_STATE_RECV (ZONE.h:694-700) — distinct C++ struct, byte-identical layout to
-///     <see cref="TradeStartResponse" />; emitted on slot refresh during an active trade (S07_MyGame04). Not to be confused
+///     <see cref="TradeStartResponse" />; emitted on slot refresh during an active trade (S07_MyGame04). Not to be
+///     confused
 ///     with the dead local
 ///     ZC_TRADE_START_RECV2/STATE_RECV2 (ST_TRADE_INFO) variant declared at S05_MyTransfer.cpp:858-878 — no call-site,
 ///     never implemented.

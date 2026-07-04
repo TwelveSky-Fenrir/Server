@@ -11,14 +11,24 @@ namespace Fenrir.Application.Game.Inventory;
 ///     (<c>GenericActionHandler</c>) already has in hand, which is what makes this independently
 ///     unit-testable (mission brief).
 ///     <para>
-///     Container ids match <c>game.CharacterItems.Container</c>'s documented enum 1:1 (see that table's own
-///     header comment): 0/1 = the two Inventory pages (8x8, slots 0-63 each), 2 = Equipment (slots 0-12,
-///     MAX_EQUIP_SLOT_NUM=13), 3/4 = the two Store pages (slots 0-27, MAX_STORE_ITEM_SLOT_NUM=28). Trade/Save
-///     are NOT modeled here -- see game.CharacterItems' own header comment for why.
+///         Container ids match <c>game.CharacterItems.Container</c>'s documented enum 1:1 (see that table's own
+///         header comment): 0/1 = the two Inventory pages (8x8, slots 0-63 each), 2 = Equipment (slots 0-12,
+///         MAX_EQUIP_SLOT_NUM=13), 3/4 = the two Store pages (slots 0-27, MAX_STORE_ITEM_SLOT_NUM=28). Trade/Save
+///         are NOT modeled here -- see game.CharacterItems' own header comment for why.
 ///     </para>
 /// </summary>
 public static class ContainerMatrix
 {
+    public enum MoveOutcome
+    {
+        Success,
+        NoOp,
+        SourceOutOfRange,
+        DestinationOutOfRange,
+        SourceEmpty,
+        InsufficientQuantity
+    }
+
     public const byte InventoryPage0 = 0;
     public const byte InventoryPage1 = 1;
     public const byte Equipment = 2;
@@ -83,7 +93,10 @@ public static class ContainerMatrix
         return itemSort is 2 or 99;
     }
 
-    /// <summary>Highest legal slot index (inclusive) for <paramref name="container" />, or false if the container id itself is unknown.</summary>
+    /// <summary>
+    ///     Highest legal slot index (inclusive) for <paramref name="container" />, or false if the container id itself is
+    ///     unknown.
+    /// </summary>
     public static bool TryGetMaxSlot(byte container, out int maxSlotInclusive)
     {
         switch (container)
@@ -150,22 +163,6 @@ public static class ContainerMatrix
         return page is InventoryPage0 or InventoryPage1;
     }
 
-    public enum MoveOutcome
-    {
-        Success,
-        NoOp,
-        SourceOutOfRange,
-        DestinationOutOfRange,
-        SourceEmpty,
-        InsufficientQuantity
-    }
-
-    /// <summary><see cref="NewSource" />/<see cref="NewDestination" /> are the values to WRITE back; null means "slot becomes empty".</summary>
-    public readonly record struct MoveOutcomeResult(MoveOutcome Outcome, ItemStack? NewSource, ItemStack? NewDestination)
-    {
-        public bool Succeeded => Outcome is MoveOutcome.Success or MoveOutcome.NoOp;
-    }
-
     /// <summary>
     ///     The generic move/merge/swap mechanics shared by the ~50 legacy <c>ProcessForXXX</c> container-move
     ///     methods (report 04 §1): move into an empty destination (splitting the source stack when
@@ -220,11 +217,6 @@ public static class ContainerMatrix
         return new MoveOutcomeResult(MoveOutcome.Success, destination, source);
     }
 
-    /// <summary>One touched container's projected full new content -- see <see cref="ApplyMove" />.</summary>
-    public readonly record struct ProjectedContainers(
-        ImmutableDictionary<byte, ItemStack> From,
-        ImmutableDictionary<byte, ItemStack> To);
-
     /// <summary>
     ///     Projects a <see cref="MoveOutcomeResult" /> onto the CURRENT full content of the touched
     ///     container(s), producing the NEW full content each side must be replaced with (whole-container
@@ -254,4 +246,21 @@ public static class ContainerMatrix
     {
         return newValue is { } value ? current.SetItem(slot, value) : current.Remove(slot);
     }
+
+    /// <summary>
+    ///     <see cref="NewSource" />/<see cref="NewDestination" /> are the values to WRITE back; null means "slot becomes
+    ///     empty".
+    /// </summary>
+    public readonly record struct MoveOutcomeResult(
+        MoveOutcome Outcome,
+        ItemStack? NewSource,
+        ItemStack? NewDestination)
+    {
+        public bool Succeeded => Outcome is MoveOutcome.Success or MoveOutcome.NoOp;
+    }
+
+    /// <summary>One touched container's projected full new content -- see <see cref="ApplyMove" />.</summary>
+    public readonly record struct ProjectedContainers(
+        ImmutableDictionary<byte, ItemStack> From,
+        ImmutableDictionary<byte, ItemStack> To);
 }

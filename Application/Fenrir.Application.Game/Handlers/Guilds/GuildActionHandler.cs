@@ -127,7 +127,10 @@ public sealed class GuildActionHandler(
         }
     }
 
-    /// <summary>tSort 1 -- create a guild (S04_MyWork02.cpp:9985-10038). Level &gt;=30 and Money &gt;=10M, else <c>Quit()</c>; name non-empty and not already in a guild.</summary>
+    /// <summary>
+    ///     tSort 1 -- create a guild (S04_MyWork02.cpp:9985-10038). Level &gt;=30 and Money &gt;=10M, else <c>Quit()</c>;
+    ///     name non-empty and not already in a guild.
+    /// </summary>
     private async ValueTask HandleCreateAsync(GuildActionRequest packet, IPacketSession session,
         ZoneClientSession zoneSession, Zone zone, PlayerRuntimeState state, int characterId, CancellationToken ct)
     {
@@ -161,7 +164,7 @@ public sealed class GuildActionHandler(
             // same lock's own state.GuildId check above).
             logger.LogInformation(ex, "Character {CharacterId} guild create failed for name {GuildName}",
                 characterId, name);
-            SendResult(session, 1, GuildInfoProjection.Empty(), result: 1);
+            SendResult(session, 1, GuildInfoProjection.Empty(), 1);
             return;
         }
 
@@ -217,21 +220,21 @@ public sealed class GuildActionHandler(
 
         if (!invites.TryConsumeAccepted(characterId, out var inviteeId))
         {
-            SendResult(session, 3, GuildInfoProjection.Empty(), result: 1);
+            SendResult(session, 3, GuildInfoProjection.Empty(), 1);
             return;
         }
 
         var guild = await guilds.GetByIdAsync(guildId, ct);
         if (guild is null)
         {
-            SendResult(session, 3, GuildInfoProjection.Empty(), result: 1);
+            SendResult(session, 3, GuildInfoProjection.Empty(), 1);
             return;
         }
 
         var roster = await guilds.GetRosterAsync(guildId, ct);
         if (roster.Count >= guild.Grade * 10)
         {
-            SendResult(session, 3, GuildInfoProjection.Empty(), result: 2);
+            SendResult(session, 3, GuildInfoProjection.Empty(), 2);
             return;
         }
 
@@ -241,9 +244,10 @@ public sealed class GuildActionHandler(
         }
         catch (Exception ex)
         {
-            logger.LogInformation(ex, "Character {CharacterId} guild invite-finalize add failed for invitee {InviteeId}",
+            logger.LogInformation(ex,
+                "Character {CharacterId} guild invite-finalize add failed for invitee {InviteeId}",
                 characterId, inviteeId);
-            SendResult(session, 3, GuildInfoProjection.Empty(), result: 1);
+            SendResult(session, 3, GuildInfoProjection.Empty(), 1);
             return;
         }
 
@@ -254,7 +258,10 @@ public sealed class GuildActionHandler(
                 GuildRoleCodec.WireRoleToDb(2), ""));
     }
 
-    /// <summary>tSort 4 -- voluntary exit (S04_MyWork02.cpp:10162-10199). The master cannot leave (must transfer/disband instead).</summary>
+    /// <summary>
+    ///     tSort 4 -- voluntary exit (S04_MyWork02.cpp:10162-10199). The master cannot leave (must transfer/disband
+    ///     instead).
+    /// </summary>
     private async ValueTask HandleExitAsync(GuildActionRequest packet, IPacketSession session,
         ZoneClientSession zoneSession, Zone zone, PlayerRuntimeState state, int characterId, CancellationToken ct)
     {
@@ -301,7 +308,7 @@ public sealed class GuildActionHandler(
         var roster = await guilds.GetRosterAsync(guildId, ct);
         if (roster.Count != 1)
         {
-            SendResult(session, 6, GuildInfoProjection.Empty(), result: 2);
+            SendResult(session, 6, GuildInfoProjection.Empty(), 2);
             return;
         }
 
@@ -316,7 +323,10 @@ public sealed class GuildActionHandler(
         await zone.PostGuildCommandAndWaitAsync(new GuildMembershipZoneCommand(characterId, null, "", 0, ""), ct);
     }
 
-    /// <summary>tSort 7 -- grade upgrade, master only (S04_MyWork02.cpp:10303-10418). Member count must already be at cap; level/cost thresholds per grade.</summary>
+    /// <summary>
+    ///     tSort 7 -- grade upgrade, master only (S04_MyWork02.cpp:10303-10418). Member count must already be at cap;
+    ///     level/cost thresholds per grade.
+    /// </summary>
     private async ValueTask HandleUpgradeAsync(GuildActionRequest packet, IPacketSession session,
         ZoneClientSession zoneSession, PlayerRuntimeState state, int characterId, CancellationToken ct)
     {
@@ -369,7 +379,7 @@ public sealed class GuildActionHandler(
         {
             logger.LogInformation(ex, "Character {CharacterId} guild upgrade failed for guild {GuildId}",
                 characterId, guildId);
-            SendResult(session, 7, GuildInfoProjection.Empty(), result: 1);
+            SendResult(session, 7, GuildInfoProjection.Empty(), 1);
             return;
         }
 
@@ -392,7 +402,10 @@ public sealed class GuildActionHandler(
         SendResult(session, 7, await BuildGuildInfoAsync(guildId, ct));
     }
 
-    /// <summary>tSort 8 -- kick, master only (S04_MyWork02.cpp:10419-10448). Target resolved by name, independent of online state; the master cannot be kicked.</summary>
+    /// <summary>
+    ///     tSort 8 -- kick, master only (S04_MyWork02.cpp:10419-10448). Target resolved by name, independent of online
+    ///     state; the master cannot be kicked.
+    /// </summary>
     private async ValueTask HandleKickAsync(GuildActionRequest packet, IPacketSession session,
         ZoneClientSession zoneSession, PlayerRuntimeState state, CancellationToken ct)
     {
@@ -416,7 +429,7 @@ public sealed class GuildActionHandler(
         {
             // Not a member, or IS the master (doc 10 §1 tSort 8: "vérifie que ce n'est pas gMaster01") --
             // clean fail, not a Quit (the legacy's own extra-side validation has no Quit path here either).
-            SendResult(session, 8, GuildInfoProjection.Empty(), result: 1);
+            SendResult(session, 8, GuildInfoProjection.Empty(), 1);
             return;
         }
 
@@ -454,7 +467,7 @@ public sealed class GuildActionHandler(
         var target = FindMember(roster, targetName);
         if (target is null)
         {
-            SendResult(session, 9, GuildInfoProjection.Empty(), result: 1);
+            SendResult(session, 9, GuildInfoProjection.Empty(), 1);
             return;
         }
 
@@ -466,7 +479,7 @@ public sealed class GuildActionHandler(
             var subMasterCount = roster.Count(r => r.Role == dbSubMaster);
             if (subMasterCount >= MaxSubMasters || target.Role != dbMember)
             {
-                SendResult(session, 9, GuildInfoProjection.Empty(), result: 1);
+                SendResult(session, 9, GuildInfoProjection.Empty(), 1);
                 return;
             }
         }
@@ -474,7 +487,7 @@ public sealed class GuildActionHandler(
         {
             if (target.Role != dbSubMaster)
             {
-                SendResult(session, 9, GuildInfoProjection.Empty(), result: 1);
+                SendResult(session, 9, GuildInfoProjection.Empty(), 1);
                 return;
             }
         }
@@ -490,7 +503,10 @@ public sealed class GuildActionHandler(
                 targetState.GuildName, newRole, ""));
     }
 
-    /// <summary>tSort 10 -- member title/CallName, master only (S04_MyWork02.cpp:10480-10511). Target must be a member, not the master.</summary>
+    /// <summary>
+    ///     tSort 10 -- member title/CallName, master only (S04_MyWork02.cpp:10480-10511). Target must be a member, not
+    ///     the master.
+    /// </summary>
     private async ValueTask HandleTitleAsync(GuildActionRequest packet, IPacketSession session,
         ZoneClientSession zoneSession, PlayerRuntimeState state, CancellationToken ct)
     {
@@ -512,7 +528,7 @@ public sealed class GuildActionHandler(
         var target = FindMember(roster, targetName);
         if (target is null || GuildRoleCodec.IsMaster(target.Role))
         {
-            SendResult(session, 10, GuildInfoProjection.Empty(), result: 1);
+            SendResult(session, 10, GuildInfoProjection.Empty(), 1);
             return;
         }
 
@@ -549,7 +565,7 @@ public sealed class GuildActionHandler(
 
         if (!GuildRoleCodec.IsMasterOrSubMaster(state.GuildRoleDb))
         {
-            SendResult(session, 14, GuildInfoProjection.Empty(), result: 4);
+            SendResult(session, 14, GuildInfoProjection.Empty(), 4);
             return;
         }
 
@@ -568,7 +584,7 @@ public sealed class GuildActionHandler(
 
         if (guild.BuffTime < 1)
         {
-            SendResult(session, 14, GuildInfoProjection.Empty(), result: 2);
+            SendResult(session, 14, GuildInfoProjection.Empty(), 2);
             return;
         }
 
@@ -579,7 +595,7 @@ public sealed class GuildActionHandler(
         catch (Exception ex)
         {
             logger.LogInformation(ex, "Guild {GuildId} buff type update failed", guildId);
-            SendResult(session, 14, GuildInfoProjection.Empty(), result: 5);
+            SendResult(session, 14, GuildInfoProjection.Empty(), 5);
             return;
         }
 
@@ -618,7 +634,7 @@ public sealed class GuildActionHandler(
 
         if (newMaster is null)
         {
-            SendResult(session, 17, GuildInfoProjection.Empty(), result: 1);
+            SendResult(session, 17, GuildInfoProjection.Empty(), 1);
             return;
         }
 
@@ -630,11 +646,11 @@ public sealed class GuildActionHandler(
         {
             logger.LogInformation(ex, "Character {CharacterId} guild leadership transfer to {NewMasterId} failed",
                 characterId, newMaster.CharacterId);
-            SendResult(session, 17, GuildInfoProjection.Empty(), result: 1);
+            SendResult(session, 17, GuildInfoProjection.Empty(), 1);
             return;
         }
 
-        SendResult(session, 17, await BuildGuildInfoAsync(guildId, ct), result: 2);
+        SendResult(session, 17, await BuildGuildInfoAsync(guildId, ct), 2);
 
         await zone.PostGuildCommandAndWaitAsync(
             new GuildMembershipZoneCommand(characterId, guildId, state.GuildName, GuildRoleCodec.WireRoleToDb(2), ""),

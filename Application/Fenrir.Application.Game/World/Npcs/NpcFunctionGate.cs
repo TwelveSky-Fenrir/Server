@@ -25,7 +25,10 @@ public static class NpcFunctionGate
     /// <summary>Function id 1 -- <c>ProcessForLearnSkill1</c> (tSort 202), skill tree 1.</summary>
     public const int LearnSkillTree1 = 1;
 
-    /// <summary>Function id 4 -- NPC shop buy/sell (tSort 212/215/252, <c>ProcessForInventoryToNPCShop</c>/<c>ProcessForNPCShopToInventory</c>).</summary>
+    /// <summary>
+    ///     Function id 4 -- NPC shop buy/sell (tSort 212/215/252, <c>ProcessForInventoryToNPCShop</c>/
+    ///     <c>ProcessForNPCShopToInventory</c>).
+    /// </summary>
     public const int NpcShop = 4;
 
     /// <summary>Function id 37 -- <c>ProcessForLearnSkill2</c> (tSort 233), tribe-4 skill tree 2.</summary>

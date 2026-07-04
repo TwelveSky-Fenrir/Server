@@ -14,22 +14,29 @@ public static class CraftRecipeCatalog
     /// <summary><c>make_item.cfg.h</c>'s <c>MK_MATS_01024</c> -- active in EVERY build (not gated by LNW33).</summary>
     public const int JadeUpgradeSort = 1;
 
-    /// <summary><c>make_item.cfg.h</c>'s <c>MK_ELIXIR_NEW</c> -- LNW33-only value (verified active for the EU33 reference build).</summary>
+    /// <summary>
+    ///     <c>make_item.cfg.h</c>'s <c>MK_ELIXIR_NEW</c> -- LNW33-only value (verified active for the EU33 reference
+    ///     build).
+    /// </summary>
     public const int AdvancedElixirSort = 4;
 
     public const int PurpleJadeItemId = 1024;
     public const int RedJadeItemId = 1025;
 
-    /// <summary>The 6 base elixirs MK_ELIXIR_NEW accepts (S04_MyWork02.cpp:4408-4413).</summary>
-    public static readonly IReadOnlySet<int> AdvancedElixirBaseItemIds = new HashSet<int> { 506, 507, 508, 578, 579, 509 };
-
     public const int AdvancedElixirRequiredQuantity = 10;
 
-    /// <summary>Verified REAL rate (report 04 flags this exact family as "20% (commented 5%)" -- the comment lies, the code rolls 20).</summary>
+    /// <summary>
+    ///     Verified REAL rate (report 04 flags this exact family as "20% (commented 5%)" -- the comment lies, the code
+    ///     rolls 20).
+    /// </summary>
     public const int AdvancedElixirSuccessRatePercent = 20;
 
     /// <summary>Result is uniform over item ids 801..806 inclusive (<c>801 + rand_mir()%6</c>).</summary>
     public const int AdvancedElixirResultBaseItemId = 801;
 
     public const int AdvancedElixirResultRange = 6;
+
+    /// <summary>The 6 base elixirs MK_ELIXIR_NEW accepts (S04_MyWork02.cpp:4408-4413).</summary>
+    public static readonly IReadOnlySet<int> AdvancedElixirBaseItemIds =
+        new HashSet<int> { 506, 507, 508, 578, 579, 509 };
 }

@@ -9,7 +9,8 @@ namespace Fenrir.Contracts.Packets.Zone;
 ///     the broadcast relay handler case 110 (S04_MyWork04.cpp:221-224): notifies every guild member
 ///     present in the zone that <see cref="AvatarName" /> just connected.
 /// </summary>
-[FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.GuildMemberConnected, ExpectedSize = 14)]
+[FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.GuildMemberConnected,
+    ExpectedSize = 14)]
 public readonly partial record struct GuildMemberConnectedResponse : IOutgoingPacket
 {
     [FixedString(13)] public required string AvatarName { get; init; }

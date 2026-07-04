@@ -58,7 +58,8 @@ public sealed class EnterWorldHandler(
 
         // Anti-tamper #1 (§5.3): re-verify atoi(tID+2)==uUserIdx -- tID must still name the account this socket
         // was ticketed for (CZ_TEMP_REGISTER_SEND already checked this once, at op11).
-        if (!ObfuscatedUidCodec.TryDecodeAccountId(packet.Id, out var decodedAccountId) || decodedAccountId != accountId)
+        if (!ObfuscatedUidCodec.TryDecodeAccountId(packet.Id, out var decodedAccountId) ||
+            decodedAccountId != accountId)
         {
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
@@ -287,7 +288,7 @@ public sealed class EnterWorldHandler(
             MissionPlayTime: character.MissionPlayTime,
             AutoHuntEnabled: character.AutoHuntEnabled,
             AutoHuntConfig: character.AutoHuntConfig is { } configBytes &&
-                            Fenrir.Contracts.Packets.Shared.AutoHunt.TryRead(configBytes, out var autoHunt)
+                            AutoHunt.TryRead(configBytes, out var autoHunt)
                 ? autoHunt
                 : null,
             AutoLifeRatio: character.AutoLifeRatio,
@@ -328,8 +329,12 @@ public sealed class EnterWorldHandler(
         zoneSession.MarkRegistering();
     }
 
-    /// <summary>Projects RS1's Equipment rows (Container==2) onto the dictionary shape <see cref="EquipmentService" /> expects.</summary>
-    private static ImmutableDictionary<byte, ItemStack> BuildEquipmentContainer(IReadOnlyList<CharacterItemSlotDto> items)
+    /// <summary>
+    ///     Projects RS1's Equipment rows (Container==2) onto the dictionary shape <see cref="EquipmentService" />
+    ///     expects.
+    /// </summary>
+    private static ImmutableDictionary<byte, ItemStack> BuildEquipmentContainer(
+        IReadOnlyList<CharacterItemSlotDto> items)
     {
         var builder = ImmutableDictionary.CreateBuilder<byte, ItemStack>();
 

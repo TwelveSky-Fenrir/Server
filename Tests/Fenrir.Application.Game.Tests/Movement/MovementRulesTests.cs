@@ -101,7 +101,7 @@ public class MovementRulesTests
         var intent = MoveTo(35f, -500f, 25f);
 
         Assert.True(rules.IsPlausible(state, in intent, now));
-        Assert.True(rules.IsPlausible(state, in intent, now, geometry: null));
+        Assert.True(rules.IsPlausible(state, in intent, now, null));
     }
 
     [Fact]

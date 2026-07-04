@@ -5,7 +5,8 @@ namespace Fenrir.Contracts.Tests.Packets.Zone;
 
 /// <summary>
 ///     CZ_IMPROVE_ITEM_SEND (CLIENT.h:257-264, 20-byte payload): Page1/Index1/Page2/Index2/Luck, no
-///     padding — same typedef as <see cref="CombineItemRequest" />/<see cref="UpgradeItemRankRequest" />/<see cref="DowngradeItemRankRequest" />.
+///     padding — same typedef as <see cref="CombineItemRequest" />/<see cref="UpgradeItemRankRequest" />/
+///     <see cref="DowngradeItemRankRequest" />.
 /// </summary>
 public class CzImproveItemSendTests
 {

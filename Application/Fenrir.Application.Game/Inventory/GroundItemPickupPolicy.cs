@@ -28,12 +28,6 @@ namespace Fenrir.Application.Game.Inventory;
 /// </remarks>
 public static class GroundItemPickupPolicy
 {
-    /// <summary><c>CheckPossibleGetItem</c>'s pickup radius (report 05 §5: "distance max 100.0f").</summary>
-    public const float MaxPickupDistance = 100f;
-
-    /// <summary><c>MAX_ITEM_DUPLICATION_NUM</c> (DEFINE.h:611) -- the stack cap a merge must not exceed.</summary>
-    public const int MaxStackQuantity = 999;
-
     public enum Outcome
     {
         /// <summary>iSort == 1 -- credit <see cref="Result.MoneyAmount" /> to the killer's balance; no container slot touched.</summary>
@@ -45,14 +39,18 @@ public static class GroundItemPickupPolicy
         /// <summary>Placed into a previously-empty destination slot.</summary>
         Placed,
 
-        /// <summary>Destination occupied by an incompatible item, or a stack merge would exceed <see cref="MaxStackQuantity" /> -- see class remarks.</summary>
+        /// <summary>
+        ///     Destination occupied by an incompatible item, or a stack merge would exceed <see cref="MaxStackQuantity" /> --
+        ///     see class remarks.
+        /// </summary>
         Rejected
     }
 
-    public readonly record struct Result(Outcome Outcome, ItemStack? NewSlot, long MoneyAmount)
-    {
-        public bool Succeeded => Outcome is Outcome.Money or Outcome.Stacked or Outcome.Placed;
-    }
+    /// <summary><c>CheckPossibleGetItem</c>'s pickup radius (report 05 §5: "distance max 100.0f").</summary>
+    public const float MaxPickupDistance = 100f;
+
+    /// <summary><c>MAX_ITEM_DUPLICATION_NUM</c> (DEFINE.h:611) -- the stack cap a merge must not exceed.</summary>
+    public const int MaxStackQuantity = 999;
 
     public static Result Resolve(ItemDefinition itemDefinition, GroundItemEntity groundItem, ItemStack? destinationSlot)
     {
@@ -76,7 +74,8 @@ public static class GroundItemPickupPolicy
                     : new Result(Outcome.Stacked, existingStack with { Quantity = merged }, 0);
             }
 
-            return new Result(Outcome.Placed, BuildStack(groundItem, groundItem.Quantity, enchant, combine, refine, socket), 0);
+            return new Result(Outcome.Placed,
+                BuildStack(groundItem, groundItem.Quantity, enchant, combine, refine, socket), 0);
         }
 
         // Non-stackable (equipment/unique): destination MUST already be empty -- no swap fallback (see class remarks).
@@ -89,6 +88,11 @@ public static class GroundItemPickupPolicy
         byte refine, byte socket)
     {
         return new ItemStack(groundItem.ItemId, quantity, enchant, combine, refine, socket, groundItem.SocketGem1,
-            groundItem.SocketGem2, groundItem.SocketGem3, ExpireDate: 0, groundItem.SerialNumber);
+            groundItem.SocketGem2, groundItem.SocketGem3, 0, groundItem.SerialNumber);
+    }
+
+    public readonly record struct Result(Outcome Outcome, ItemStack? NewSlot, long MoneyAmount)
+    {
+        public bool Succeeded => Outcome is Outcome.Money or Outcome.Stacked or Outcome.Placed;
     }
 }

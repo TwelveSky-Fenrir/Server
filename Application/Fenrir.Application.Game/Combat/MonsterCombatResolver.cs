@@ -21,15 +21,15 @@ namespace Fenrir.Application.Game.Combat;
 ///     the legacy still rolls a FLAT 1% critical chance (<c>ProcessAttack04</c> l.3315-3321) instead of simply
 ///     skipping the roll the way PvP/PvM do -- preserved exactly in <see cref="ResolveMvpAttack" />.
 ///     <para>
-///     NOT ported (explicit scope cut, same posture as <see cref="CombatResolver" />): tribe-symbol damage
-///     up/down, the server-wide PvM ratio (<c>mServerPVM</c>), zone-specific special-type bonuses (catapult
-///     +15000 attack power, Yanggok/Zone175/Zone195 hooks), Holy Shield absorption/removal, and the ~12
-///     magic-monster-ID special cases report 05 §4/§5 themselves document as mostly dead/disabled in this
-///     build. Skill-based attacks (<c>AttackActionValue1 == 2</c>) against/from a monster are simplified to
-///     PLAIN melee power (no skill attack-power-ratio bonus) and an UNCONDITIONAL critical-roll eligibility
-///     (the legacy's skill-78-exclusion/attack-type-2-or-5 gate is not reproduced for this direction) --
-///     documented open issue, not silently dropped: melee (<c>ActionActionValue1 == 1</c>) is the common case
-///     and is fully faithful.
+///         NOT ported (explicit scope cut, same posture as <see cref="CombatResolver" />): tribe-symbol damage
+///         up/down, the server-wide PvM ratio (<c>mServerPVM</c>), zone-specific special-type bonuses (catapult
+///         +15000 attack power, Yanggok/Zone175/Zone195 hooks), Holy Shield absorption/removal, and the ~12
+///         magic-monster-ID special cases report 05 §4/§5 themselves document as mostly dead/disabled in this
+///         build. Skill-based attacks (<c>AttackActionValue1 == 2</c>) against/from a monster are simplified to
+///         PLAIN melee power (no skill attack-power-ratio bonus) and an UNCONDITIONAL critical-roll eligibility
+///         (the legacy's skill-78-exclusion/attack-type-2-or-5 gate is not reproduced for this direction) --
+///         documented open issue, not silently dropped: melee (<c>ActionActionValue1 == 1</c>) is the common case
+///         and is fully faithful.
 ///     </para>
 /// </remarks>
 public static class MonsterCombatResolver
@@ -82,7 +82,8 @@ public static class MonsterCombatResolver
         if (damage < 1) damage = 1;
 
         var critical = false;
-        if (CombatMath.RollCritical(attacker.Stats.Critical, rng)) // no monster CriticalDefence stat -- see class remarks
+        if (CombatMath.RollCritical(attacker.Stats.Critical,
+                rng)) // no monster CriticalDefence stat -- see class remarks
         {
             damage *= 2;
             critical = true;

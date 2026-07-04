@@ -63,6 +63,9 @@ public sealed class WorldDataCache
     /// </summary>
     public required CashCatalogBuilder.CashCatalog CashCatalog { get; init; }
 
-    /// <summary>The cash-shop catalog's version stamp (<see cref="CashCatalogBuilder.ResolveVersion" />) -- ZC_GET_CASH_ITEM_INFO_RECV.Version.</summary>
+    /// <summary>
+    ///     The cash-shop catalog's version stamp (<see cref="CashCatalogBuilder.ResolveVersion" />) --
+    ///     ZC_GET_CASH_ITEM_INFO_RECV.Version.
+    /// </summary>
     public required int CashCatalogVersion { get; init; }
 }

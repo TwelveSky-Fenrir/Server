@@ -9,7 +9,8 @@ namespace Fenrir.Application.Game.Handlers.Social;
 
 /// <summary>
 ///     CZ_GUILD_ASK_SEND (opcode 72, doc 10 §0/§1, verified S04_MyWork02.cpp:9827-9878). Emitter must
-///     already be in a guild with role 0 (master) or 1 (sub-master, wire encoding -- <see cref="GuildRoleCodec.IsMasterOrSubMaster" />
+///     already be in a guild with role 0 (master) or 1 (sub-master, wire encoding --
+///     <see cref="GuildRoleCodec.IsMasterOrSubMaster" />
 ///     against the DB-side role) else <c>Quit()</c>. Target resolved WITHIN THE ASKER'S OWN ZONE ONLY
 ///     (<c>SearchAvatar</c> scope, doc 10 quirk 13) -- not found ⇒ ZC_GUILD_ANSWER_RECV Answer=4 to the
 ///     asker; already guilded or different tribe ⇒ <c>Quit()</c>; busy (already negotiating) ⇒ Answer=3/5.

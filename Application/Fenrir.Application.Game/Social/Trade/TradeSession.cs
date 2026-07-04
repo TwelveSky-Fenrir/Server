@@ -2,7 +2,10 @@ using Fenrir.Application.Game.Inventory;
 
 namespace Fenrir.Application.Game.Social.Trade;
 
-/// <summary>MAX_TRADE_SLOT_NUM/MAX_TRADE_VALUE_NUM/MAX_TRADE_GEM_NUM (DEFINE.h:291-293), verified against contracts/05_social.md's own ZC_TRADE_START_RECV table.</summary>
+/// <summary>
+///     MAX_TRADE_SLOT_NUM/MAX_TRADE_VALUE_NUM/MAX_TRADE_GEM_NUM (DEFINE.h:291-293), verified against
+///     contracts/05_social.md's own ZC_TRADE_START_RECV table.
+/// </summary>
 public static class TradeLimits
 {
     public const int SlotCount = 8;

@@ -6,7 +6,10 @@ using Fenrir.Network.Sessions;
 
 namespace Fenrir.Application.Game.Handlers.Social;
 
-/// <summary>CZ_GUILD_CANCEL_SEND (opcode 73) -- withdraws the caller's own still-pending guild invitation ask (legacy: silent no-op if not currently negotiating as the asker).</summary>
+/// <summary>
+///     CZ_GUILD_CANCEL_SEND (opcode 73) -- withdraws the caller's own still-pending guild invitation ask (legacy:
+///     silent no-op if not currently negotiating as the asker).
+/// </summary>
 public sealed class GuildInviteCancelHandler(ZoneRegistry zones, GuildInviteRegistry invites)
     : IInlinePacketHandler<GuildInviteCancelRequest>
 {

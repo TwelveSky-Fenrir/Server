@@ -2,10 +2,17 @@ using Fenrir.Contracts.Packets.Shared;
 
 namespace Fenrir.Application.Game.Social.Chat;
 
-/// <summary>The two chat channels that need <see cref="Zone" />'s own tick-owned AOI grid/player set to resolve their audience -- every other channel (whisper/party/guild/tribe/world/notices) is a plain cross-zone or same-zone fan-out a handler can do directly (see <c>Social.Chat.ChatRouter</c>'s own remarks).</summary>
+/// <summary>
+///     The two chat channels that need <see cref="Zone" />'s own tick-owned AOI grid/player set to resolve their
+///     audience -- every other channel (whisper/party/guild/tribe/world/notices) is a plain cross-zone or same-zone
+///     fan-out a handler can do directly (see <c>Social.Chat.ChatRouter</c>'s own remarks).
+/// </summary>
 public enum ChatBroadcastKind : byte
 {
-    /// <summary>CZ_GENERAL_CHAT_SEND (38) -- AOI-neighbor broadcast, filtered by sender's tribe (alliance not modeled -- see class remarks).</summary>
+    /// <summary>
+    ///     CZ_GENERAL_CHAT_SEND (38) -- AOI-neighbor broadcast, filtered by sender's tribe (alliance not modeled -- see
+    ///     class remarks).
+    /// </summary>
     Local,
 
     /// <summary>CZ_GENERAL_SHOUT_SEND (40) -- whole-zone broadcast, no tribe filter.</summary>

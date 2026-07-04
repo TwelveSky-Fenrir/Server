@@ -80,7 +80,7 @@ public static class ZoneTransfer
         // zone would misread a negative remaining as "already overdue by that much", which is harmless in
         // effect (ProcessPendingRevives only compares clock >= due) but not the intent.
         TimeSpan? reviveRemaining = state.IsDead
-            ? (state.ReviveAtZoneClock - sourceClock) is var remaining && remaining > TimeSpan.Zero
+            ? state.ReviveAtZoneClock - sourceClock is var remaining && remaining > TimeSpan.Zero
                 ? remaining
                 : TimeSpan.Zero
             : null;

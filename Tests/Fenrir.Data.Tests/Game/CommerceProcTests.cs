@@ -21,11 +21,11 @@ namespace Fenrir.Data.Tests.Game;
 public class CommerceProcTests
 {
     private readonly IAccountRepository _accounts;
-    private readonly ICharacterRepository _characters;
     private readonly ICashRepository _cash;
-    private readonly IOfflineShopRepository _offlineShops;
-    private readonly GiftRepository _gifts;
+    private readonly ICharacterRepository _characters;
     private readonly string _connectionString;
+    private readonly GiftRepository _gifts;
+    private readonly IOfflineShopRepository _offlineShops;
 
     public CommerceProcTests(SqlServerFixture fixture)
     {
@@ -53,24 +53,26 @@ public class CommerceProcTests
         await ExecProcAsync("game.usp_Cash_Credit",
             ("AccountId", accountId), ("Amount", 100), ("Reason", (byte)1));
 
-        var newBalance = await _cash.DebitAndGrantItemAsync(accountId, 60, reason: 1, productId: itemId,
-            characterId, container: 0, [new CharacterItemSlotTvp(0, itemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1)],
+        var newBalance = await _cash.DebitAndGrantItemAsync(accountId, 60, 1, itemId,
+            characterId, 0, [new CharacterItemSlotTvp(0, itemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1)],
             CancellationToken.None);
 
         Assert.Equal(40, newBalance);
-        var items = await GetItemsAsync(characterId, container: 0);
+        var items = await GetItemsAsync(characterId, 0);
         Assert.Single(items);
 
-        var ex = await Record.ExceptionAsync(() => _cash.DebitAndGrantItemAsync(accountId, 1000, reason: 1,
-            productId: itemId, characterId, container: 0,
-            [new CharacterItemSlotTvp(0, itemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1),
-                new CharacterItemSlotTvp(1, itemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 2)],
+        var ex = await Record.ExceptionAsync(() => _cash.DebitAndGrantItemAsync(accountId, 1000, 1,
+            itemId, characterId, 0,
+            [
+                new CharacterItemSlotTvp(0, itemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1),
+                new CharacterItemSlotTvp(1, itemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 2)
+            ],
             CancellationToken.None).AsTask());
 
         Assert.NotNull(ex);
         Assert.Equal(40, await _cash.GetBalanceAsync(accountId, CancellationToken.None));
         // The failed debit must NOT have granted the second item either -- item state stays exactly as before.
-        Assert.Single(await GetItemsAsync(characterId, container: 0));
+        Assert.Single(await GetItemsAsync(characterId, 0));
     }
 
     [Fact]
@@ -82,16 +84,17 @@ public class CommerceProcTests
 
         await ExecAsync($"UPDATE game.Characters SET BloodCoin = 10 WHERE CharacterId = {characterId};");
 
-        var newBloodCoin = await _characters.SpendBloodCoinAndReplaceContainerAsync(characterId, -5, container: 0,
+        var newBloodCoin = await _characters.SpendBloodCoinAndReplaceContainerAsync(characterId, -5, 0,
             [new CharacterItemSlotTvp(0, itemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1)], CancellationToken.None);
 
         Assert.Equal(5, newBloodCoin);
 
         var ex = await Record.ExceptionAsync(() => _characters
-            .SpendBloodCoinAndReplaceContainerAsync(characterId, -6, container: 0, [], CancellationToken.None)
+            .SpendBloodCoinAndReplaceContainerAsync(characterId, -6, 0, [], CancellationToken.None)
             .AsTask());
         Assert.NotNull(ex);
-        Assert.Equal(5, await ScalarAsync<int>($"SELECT BloodCoin FROM game.Characters WHERE CharacterId={characterId};"));
+        Assert.Equal(5,
+            await ScalarAsync<int>($"SELECT BloodCoin FROM game.Characters WHERE CharacterId={characterId};"));
     }
 
     [Fact]
@@ -102,7 +105,7 @@ public class CommerceProcTests
         var itemId = await MinItemIdAsync();
         const int today = 20260703;
 
-        await _characters.ClaimDailyRewardAsync(characterId, today, container: 0,
+        await _characters.ClaimDailyRewardAsync(characterId, today, 0,
             [new CharacterItemSlotTvp(0, itemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1)], CancellationToken.None);
 
         var state = await _characters.GetRewardClaimStateAsync(characterId, today, CancellationToken.None);
@@ -110,11 +113,11 @@ public class CommerceProcTests
         Assert.Equal(today, state.RewardClaimDate);
 
         var ex = await Record.ExceptionAsync(() => _characters
-            .ClaimDailyRewardAsync(characterId, today, container: 0, [], CancellationToken.None).AsTask());
+            .ClaimDailyRewardAsync(characterId, today, 0, [], CancellationToken.None).AsTask());
         Assert.NotNull(ex);
 
         // A later day succeeds and advances the cursor again.
-        await _characters.ClaimDailyRewardAsync(characterId, today + 1, container: 0,
+        await _characters.ClaimDailyRewardAsync(characterId, today + 1, 0,
             [new CharacterItemSlotTvp(0, itemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1)], CancellationToken.None);
         state = await _characters.GetRewardClaimStateAsync(characterId, today + 1, CancellationToken.None);
         Assert.Equal((byte)2, state!.RewardClaimDay);
@@ -134,7 +137,7 @@ public class CommerceProcTests
         var itemId = await MinItemIdAsync();
 
         for (var day = 0; day < 7; day++)
-            await _characters.ClaimDailyRewardAsync(characterId, 20240101 + day, container: 0,
+            await _characters.ClaimDailyRewardAsync(characterId, 20240101 + day, 0,
                 [new CharacterItemSlotTvp(0, itemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1)], CancellationToken.None);
 
         var fullyClaimed = await _characters.GetRewardClaimStateAsync(characterId, 20240107, CancellationToken.None);
@@ -144,7 +147,7 @@ public class CommerceProcTests
         var readOnNewWeek = await _characters.GetRewardClaimStateAsync(characterId, 20240108, CancellationToken.None);
         Assert.Equal((byte)0, readOnNewWeek!.RewardClaimDay);
 
-        await _characters.ClaimDailyRewardAsync(characterId, 20240108, container: 0,
+        await _characters.ClaimDailyRewardAsync(characterId, 20240108, 0,
             [new CharacterItemSlotTvp(0, itemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1)], CancellationToken.None);
 
         var afterReset = await _characters.GetRewardClaimStateAsync(characterId, 20240108, CancellationToken.None);
@@ -169,7 +172,8 @@ public class CommerceProcTests
             $"SELECT ItemId FROM game.AccountVaultItems WHERE AccountId={accountId} AND SlotIndex=0;");
         Assert.Equal(itemId, vaultItemId);
 
-        var ex = await Record.ExceptionAsync(() => _gifts.ClaimIntoVaultAsync(giftId, accountId, CancellationToken.None).AsTask());
+        var ex = await Record.ExceptionAsync(() =>
+            _gifts.ClaimIntoVaultAsync(giftId, accountId, CancellationToken.None).AsTask());
         Assert.NotNull(ex);
     }
 
@@ -188,13 +192,15 @@ public class CommerceProcTests
             $"DECLARE @g TABLE(Id INT); INSERT INTO game.Gifts (AccountId, ProductId, Quantity, Value, Status) " +
             $"OUTPUT INSERTED.GiftId INTO @g VALUES ({accountId}, {itemId}, 1, 0, 0); SELECT Id FROM @g;");
 
-        var ex = await Record.ExceptionAsync(() => _gifts.ClaimIntoVaultAsync(giftId, accountId, CancellationToken.None).AsTask());
+        var ex = await Record.ExceptionAsync(() =>
+            _gifts.ClaimIntoVaultAsync(giftId, accountId, CancellationToken.None).AsTask());
         Assert.NotNull(ex);
         Assert.Equal((byte)0, await ScalarAsync<byte>($"SELECT Status FROM game.Gifts WHERE GiftId={giftId};"));
     }
 
     [Fact]
-    public async Task OfflineShop_FullLifecycle_OpenRemovesItemsFromInventory_PurchaseCreditsSeller_WithdrawCreditsCharacter()
+    public async Task
+        OfflineShop_FullLifecycle_OpenRemovesItemsFromInventory_PurchaseCreditsSeller_WithdrawCreditsCharacter()
     {
         var sellerAccount = await CreateAccountAsync();
         var sellerId = await CreateCharacterAsync(sellerAccount);
@@ -205,15 +211,15 @@ public class CommerceProcTests
         await ExecAsync($"UPDATE game.Characters SET Money = 1000 WHERE CharacterId = {buyerId};");
 
         // Open: the listed item leaves the seller's live inventory (container 0) into the shop.
-        await _offlineShops.OpenAndReplaceContainersAsync(sellerId, zoneNumber: 37, shopDate: 20260710,
-            "MyShop", locationX: 1, locationY: 1, locationZ: 1,
-            [new OfflineShopItemSlotTvp(0, itemId, 1, 0, 0, Price: 500, null)],
-            inventoryPage0: [], inventoryPage1: [], CancellationToken.None);
+        await _offlineShops.OpenAndReplaceContainersAsync(sellerId, 37, 20260710,
+            "MyShop", 1, 1, 1,
+            [new OfflineShopItemSlotTvp(0, itemId, 1, 0, 0, 500, null)],
+            [], [], CancellationToken.None);
 
         var (shop, items) = await _offlineShops.GetByCharacterAsync(sellerId, CancellationToken.None);
         Assert.Equal((byte)1, shop!.ShopState);
         Assert.Single(items);
-        Assert.Empty(await GetItemsAsync(sellerId, container: 0));
+        Assert.Empty(await GetItemsAsync(sellerId, 0));
 
         // Re-opening while the shop still holds the item is refused (unclaimed value guard).
         var reopenEx = await Record.ExceptionAsync(() => _offlineShops.OpenAndReplaceContainersAsync(sellerId, 37,
@@ -222,11 +228,11 @@ public class CommerceProcTests
         Assert.NotNull(reopenEx);
 
         // Purchase: buyer pays 500, receives the item; seller's shop earns 500.
-        await _offlineShops.ExecutePurchaseAsync(sellerId, slotIndex: 0, expectedItemId: itemId, expectedQuantity: 1,
-            expectedValue: 0, price: 500, buyerId, buyerContainer: 0,
+        await _offlineShops.ExecutePurchaseAsync(sellerId, 0, itemId, 1,
+            0, 500, buyerId, 0,
             [new CharacterItemSlotTvp(0, itemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1)], CancellationToken.None);
 
-        Assert.Single(await GetItemsAsync(buyerId, container: 0));
+        Assert.Single(await GetItemsAsync(buyerId, 0));
         var (shopAfterSale, itemsAfterSale) = await _offlineShops.GetByCharacterAsync(sellerId, CancellationToken.None);
         Assert.Equal(500, shopAfterSale!.Money);
         Assert.Empty(itemsAfterSale);
@@ -237,8 +243,8 @@ public class CommerceProcTests
         Assert.NotNull(staleEx);
 
         // Close, then withdraw the earnings into the seller's own live money.
-        await _offlineShops.SetStateAsync(sellerId, shopState: 0, CancellationToken.None);
-        await _offlineShops.WithdrawMoneyAsync(sellerId, expectedMoney: 500, expectedBigMoney: 0, CancellationToken.None);
+        await _offlineShops.SetStateAsync(sellerId, 0, CancellationToken.None);
+        await _offlineShops.WithdrawMoneyAsync(sellerId, 500, 0, CancellationToken.None);
 
         Assert.Equal(500L, await ScalarAsync<long>($"SELECT Money FROM game.Characters WHERE CharacterId={sellerId};"));
         var (shopAfterWithdraw, _) = await _offlineShops.GetByCharacterAsync(sellerId, CancellationToken.None);
@@ -257,16 +263,16 @@ public class CommerceProcTests
 
         // Cannot retrieve while still open.
         var openEx = await Record.ExceptionAsync(() => _offlineShops.RetrieveItemAndReplaceContainerAsync(sellerId,
-            0, itemId, 2, 0, container: 1, [new CharacterItemSlotTvp(0, itemId, 2, 0, 0, 0, 0, 0, 0, 0, 0, 1)],
+            0, itemId, 2, 0, 1, [new CharacterItemSlotTvp(0, itemId, 2, 0, 0, 0, 0, 0, 0, 0, 0, 1)],
             CancellationToken.None).AsTask());
         Assert.NotNull(openEx);
 
         await _offlineShops.SetStateAsync(sellerId, 0, CancellationToken.None);
 
-        await _offlineShops.RetrieveItemAndReplaceContainerAsync(sellerId, 0, itemId, 2, 0, container: 1,
+        await _offlineShops.RetrieveItemAndReplaceContainerAsync(sellerId, 0, itemId, 2, 0, 1,
             [new CharacterItemSlotTvp(0, itemId, 2, 0, 0, 0, 0, 0, 0, 0, 0, 1)], CancellationToken.None);
 
-        Assert.Single(await GetItemsAsync(sellerId, container: 1));
+        Assert.Single(await GetItemsAsync(sellerId, 1));
         var (_, itemsAfter) = await _offlineShops.GetByCharacterAsync(sellerId, CancellationToken.None);
         Assert.Empty(itemsAfter);
     }
@@ -282,16 +288,16 @@ public class CommerceProcTests
 
         await ExecAsync($"UPDATE game.Characters SET Money = 1000 WHERE CharacterId = {buyerId};");
 
-        await _characters.ExecutePshopPurchaseAsync(sellerId, sellerContainer: 0, sellerItems: [],
-            buyerId, buyerContainer: 0, [new CharacterItemSlotTvp(0, itemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1)],
-            price: 400, CancellationToken.None);
+        await _characters.ExecutePshopPurchaseAsync(sellerId, 0, [],
+            buyerId, 0, [new CharacterItemSlotTvp(0, itemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1)],
+            400, CancellationToken.None);
 
         Assert.Equal(600L, await ScalarAsync<long>($"SELECT Money FROM game.Characters WHERE CharacterId={buyerId};"));
         Assert.Equal(400L, await ScalarAsync<long>($"SELECT Money FROM game.Characters WHERE CharacterId={sellerId};"));
-        Assert.Single(await GetItemsAsync(buyerId, container: 0));
+        Assert.Single(await GetItemsAsync(buyerId, 0));
 
         var ex = await Record.ExceptionAsync(() => _characters.ExecutePshopPurchaseAsync(sellerId, 0, [], buyerId, 0,
-            [], price: 1000, CancellationToken.None).AsTask());
+            [], 1000, CancellationToken.None).AsTask());
         Assert.NotNull(ex);
         Assert.Equal(600L, await ScalarAsync<long>($"SELECT Money FROM game.Characters WHERE CharacterId={buyerId};"));
     }

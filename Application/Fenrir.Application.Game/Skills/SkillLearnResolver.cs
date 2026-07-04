@@ -21,15 +21,6 @@ namespace Fenrir.Application.Game.Skills;
 /// </remarks>
 public static class SkillLearnResolver
 {
-    /// <summary><c>MAX_SKILL_SLOT_NUM</c> (<c>aSkill[40]</c>, <c>CK_CharacterSkills_SlotIndex</c>).</summary>
-    public const int MaxSlots = 40;
-
-    /// <summary><c>NpcSkillOfferRowDto.ArrayKind</c> -- tSort 202, <c>nSkillInfo1</c>.</summary>
-    public const byte SkillTree1 = 1;
-
-    /// <summary><c>NpcSkillOfferRowDto.ArrayKind</c> -- tSort 233, <c>nSkillInfo2</c>.</summary>
-    public const byte SkillTree2 = 2;
-
     public enum LearnFailure
     {
         None,
@@ -40,13 +31,24 @@ public static class SkillLearnResolver
         NoFreeSlot
     }
 
-    public readonly record struct LearnResult(bool Success, LearnFailure Failure, byte Slot, int Cost)
+    public enum UpgradeFailure
     {
-        public static LearnResult Fail(LearnFailure failure)
-        {
-            return new LearnResult(false, failure, 0, 0);
-        }
+        None,
+        InvalidSlot,
+        SlotEmpty,
+        UnknownSkill,
+        InsufficientSkillPoints,
+        AlreadyMaxed
     }
+
+    /// <summary><c>MAX_SKILL_SLOT_NUM</c> (<c>aSkill[40]</c>, <c>CK_CharacterSkills_SlotIndex</c>).</summary>
+    public const int MaxSlots = 40;
+
+    /// <summary><c>NpcSkillOfferRowDto.ArrayKind</c> -- tSort 202, <c>nSkillInfo1</c>.</summary>
+    public const byte SkillTree1 = 1;
+
+    /// <summary><c>NpcSkillOfferRowDto.ArrayKind</c> -- tSort 233, <c>nSkillInfo2</c>.</summary>
+    public const byte SkillTree2 = 2;
 
     /// <summary>
     ///     <paramref name="arrayKind" /> selects which of the NPC's two offer arrays to search
@@ -88,25 +90,10 @@ public static class SkillLearnResolver
             : LearnResult.Fail(LearnFailure.NoFreeSlot);
     }
 
-    public enum UpgradeFailure
-    {
-        None,
-        InvalidSlot,
-        SlotEmpty,
-        UnknownSkill,
-        InsufficientSkillPoints,
-        AlreadyMaxed
-    }
-
-    public readonly record struct UpgradeResult(bool Success, UpgradeFailure Failure, int NewGrade)
-    {
-        public static UpgradeResult Fail(UpgradeFailure failure)
-        {
-            return new UpgradeResult(false, failure, 0);
-        }
-    }
-
-    /// <summary>tSort 203 -- verified: NO <c>CheckNPCFunction</c> call site exists for this action, unlike its 202/233 siblings.</summary>
+    /// <summary>
+    ///     tSort 203 -- verified: NO <c>CheckNPCFunction</c> call site exists for this action, unlike its 202/233
+    ///     siblings.
+    /// </summary>
     public static UpgradeResult ResolveUpgrade(int slot, IReadOnlyDictionary<byte, LearnedSkill> learnedSkills,
         SkillDefinition? skillDefinition, int currentSkillPoints)
     {
@@ -165,5 +152,21 @@ public static class SkillLearnResolver
 
         slot = 0;
         return false;
+    }
+
+    public readonly record struct LearnResult(bool Success, LearnFailure Failure, byte Slot, int Cost)
+    {
+        public static LearnResult Fail(LearnFailure failure)
+        {
+            return new LearnResult(false, failure, 0, 0);
+        }
+    }
+
+    public readonly record struct UpgradeResult(bool Success, UpgradeFailure Failure, int NewGrade)
+    {
+        public static UpgradeResult Fail(UpgradeFailure failure)
+        {
+            return new UpgradeResult(false, failure, 0);
+        }
     }
 }

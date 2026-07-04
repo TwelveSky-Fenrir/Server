@@ -18,9 +18,9 @@ public class CashCatalogBuilderTests
     public void Build_AssignsSequentialCostInfoIndexes_PerTypeBlockOf200()
     {
         var catalog = CashCatalogBuilder.Build([
-            Product(1, 1, itemId: 100, quantity: 0, cost: 20, active: true),
-            Product(2, 1, itemId: 101, quantity: 0, cost: 30, active: true),
-            Product(3, 2, itemId: 200, quantity: 5, cost: 40, active: true)
+            Product(1, 1, 100, 0, 20, true),
+            Product(2, 1, 101, 0, 30, true),
+            Product(3, 2, 200, 5, 40, true)
         ]);
 
         Assert.Equal(100, catalog.CostInfoByIndex[0].ItemId);
@@ -31,13 +31,14 @@ public class CashCatalogBuilderTests
     }
 
     [Fact]
-    public void Build_InactiveProduct_StillConsumesACostInfoIndexAndADisplayCursorPosition_ButLeavesTheGridSlotAtMinusOne()
+    public void
+        Build_InactiveProduct_StillConsumesACostInfoIndexAndADisplayCursorPosition_ButLeavesTheGridSlotAtMinusOne()
     {
         // Verified quirk (S08_MyDB.cpp:213-226): itemCount/pageCount advance for EVERY qualifying row
         // regardless of Active, but tDbCash (the display grid) is only written `if (tDBActive[...])`.
         var catalog = CashCatalogBuilder.Build([
-            Product(1, 1, itemId: 100, quantity: 0, cost: 20, active: false), // display slot 0 -- inactive, stays -1
-            Product(2, 1, itemId: 101, quantity: 0, cost: 30, active: true) // display slot 1 -- active
+            Product(1, 1, 100, 0, 20, false), // display slot 0 -- inactive, stays -1
+            Product(2, 1, 101, 0, 30, true) // display slot 1 -- active
         ]);
 
         // Slot 0 (type 0, page 0, item 0): still -1 (never written).
@@ -60,14 +61,14 @@ public class CashCatalogBuilderTests
     public void Build_TenthItemOnAPage_RollsOverToTheNextPage()
     {
         var products = Enumerable.Range(1, 11)
-            .Select(i => Product(i, 1, itemId: 1000 + i, quantity: 0, cost: 10, active: true))
+            .Select(i => Product(i, 1, 1000 + i, 0, 10, true))
             .ToArray();
 
         var catalog = CashCatalogBuilder.Build(products);
 
         // Item 11 (the 11th, index 10) lands on page 1, item-slot 0.
         var baseIndex = ((0 * CashCatalogBuilder.MaxCashPage + 1) * CashCatalogBuilder.MaxCashItemPerPage + 0) *
-                         CashCatalogBuilder.MaxCashItemDetail;
+                        CashCatalogBuilder.MaxCashItemDetail;
         Assert.Equal(1011, catalog.DisplayGrid[baseIndex + 1]);
     }
 
@@ -80,8 +81,8 @@ public class CashCatalogBuilderTests
         // consume a display-grid cursor position, so the FOLLOWING valid row lands on the SAME display slot
         // the out-of-range row would have occupied, not the next one.
         var catalog = CashCatalogBuilder.Build([
-            Product(1, 1, itemId: 100_000, quantity: 0, cost: 20, active: true), // out of [1,99999] -- costInfoIndex 0
-            Product(2, 1, itemId: 101, quantity: 0, cost: 30, active: true) // in range -- costInfoIndex 1
+            Product(1, 1, 100_000, 0, 20, true), // out of [1,99999] -- costInfoIndex 0
+            Product(2, 1, 101, 0, 30, true) // in range -- costInfoIndex 1
         ]);
 
         // Both rows still get their own master cost-info slot.
@@ -95,7 +96,8 @@ public class CashCatalogBuilderTests
         Assert.Equal(101, catalog.DisplayGrid[baseIndex + 1]);
 
         // No second display slot was consumed by the out-of-range row -- slot 1 stays untouched (-1).
-        var secondSlotBaseIndex = (0 * CashCatalogBuilder.MaxCashItemPerPage + 1) * CashCatalogBuilder.MaxCashItemDetail;
+        var secondSlotBaseIndex =
+            (0 * CashCatalogBuilder.MaxCashItemPerPage + 1) * CashCatalogBuilder.MaxCashItemDetail;
         Assert.Equal(-1, catalog.DisplayGrid[secondSlotBaseIndex + 0]);
     }
 
@@ -103,7 +105,7 @@ public class CashCatalogBuilderTests
     public void Build_IgnoresProductType5AndNullItemId()
     {
         var catalog = CashCatalogBuilder.Build([
-            Product(100000, 5, itemId: 6, quantity: 0, cost: 0, active: true), // version sentinel, excluded
+            Product(100000, 5, 6, 0, 0, true), // version sentinel, excluded
             new ItemMallProductRowDto(2, 1, null, 0, 0, false) // ItemID=0 -> NULL, excluded (ItemID != 0 filter)
         ]);
 
@@ -115,8 +117,8 @@ public class CashCatalogBuilderTests
     public void ResolveVersion_ReturnsTheSentinelRowsItemId()
     {
         var version = CashCatalogBuilder.ResolveVersion([
-            Product(1, 1, itemId: 100, quantity: 0, cost: 20, active: true),
-            Product(100000, 5, itemId: 6, quantity: 0, cost: 0, active: true)
+            Product(1, 1, 100, 0, 20, true),
+            Product(100000, 5, 6, 0, 0, true)
         ]);
 
         Assert.Equal(6, version);
@@ -125,7 +127,7 @@ public class CashCatalogBuilderTests
     [Fact]
     public void ResolveVersion_NoSentinelRow_ReturnsZero()
     {
-        var version = CashCatalogBuilder.ResolveVersion([Product(1, 1, itemId: 100, quantity: 0, cost: 20, active: true)]);
+        var version = CashCatalogBuilder.ResolveVersion([Product(1, 1, 100, 0, 20, true)]);
 
         Assert.Equal(0, version);
     }

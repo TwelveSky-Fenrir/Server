@@ -64,7 +64,7 @@ public class MeditationRegenSystemTests
     [Fact]
     public void Sitting_RegeneratesHpAndMpEveryLegacyTick()
     {
-        var (zone, state) = SetUp(lifeDivisor: 84, manaDivisor: 32); // MaxLife=840 -> 10/tick, MaxMana=320 -> 10/tick
+        var (zone, state) = SetUp(84, 32); // MaxLife=840 -> 10/tick, MaxMana=320 -> 10/tick
         var startLife = state.Life; // 800
         var startMana = state.Mana; // 300
 
@@ -78,7 +78,7 @@ public class MeditationRegenSystemTests
     [Fact]
     public void NotSitting_NeverRegenerates()
     {
-        var (zone, state) = SetUp(lifeDivisor: 84, manaDivisor: 32);
+        var (zone, state) = SetUp(84, 32);
         var startLife = state.Life;
 
         zone.Tick(SimulationClock.LegacyTick); // ActionSort stays 0 (idle) -- no Move posted.
@@ -89,7 +89,7 @@ public class MeditationRegenSystemTests
     [Fact]
     public void Regen_NeverExceedsMaxLife()
     {
-        var (zone, state) = SetUp(lifeDivisor: 1, manaDivisor: 1); // regen = MaxLife/1 = MaxLife -> huge overshoot
+        var (zone, state) = SetUp(1, 1); // regen = MaxLife/1 = MaxLife -> huge overshoot
         zone.Post(ZoneCommand.Move(10, SitAction(7, 5)));
 
         zone.Tick(SimulationClock.LegacyTick);
@@ -102,7 +102,7 @@ public class MeditationRegenSystemTests
     public void Regen_BurstOfMultipleLegacyTicks_AppliesTheWholeAmount()
     {
         // MaxLife=840, divisor=255 (byte max) -> perTick = (int)(840/255) = 3.
-        var (zone, state) = SetUp(lifeDivisor: 255, manaDivisor: 255);
+        var (zone, state) = SetUp(255, 255);
         var startLife = state.Life;
         zone.Post(ZoneCommand.Move(10, SitAction(7, 5)));
         zone.Tick(TimeSpan.FromMilliseconds(50)); // apply the Move first (sets ActionSort)

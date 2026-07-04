@@ -9,8 +9,8 @@ public class DuelRegistryTests
     {
         var registry = new DuelRegistry();
 
-        Assert.Equal(DuelAskOutcome.Sent, registry.TryAsk(1, 2, noPotions: true));
-        Assert.True(registry.TryAnswer(2, accepted: true, out var challengerId));
+        Assert.Equal(DuelAskOutcome.Sent, registry.TryAsk(1, 2, true));
+        Assert.True(registry.TryAnswer(2, true, out var challengerId));
         Assert.Equal(1, challengerId);
 
         Assert.True(registry.TryStart(1, out var duel));
@@ -27,7 +27,7 @@ public class DuelRegistryTests
     public void TryStart_CallableByEitherAcceptedSide()
     {
         var registry = new DuelRegistry();
-        registry.TryAsk(1, 2, noPotions: false);
+        registry.TryAsk(1, 2, false);
         registry.TryAnswer(2, true, out _);
 
         // The CHALLENGER (not the accepter) calls start -- still succeeds (symmetric acceptance).
@@ -81,7 +81,7 @@ public class DuelRegistryTests
         var registry = new DuelRegistry();
         registry.TryAsk(1, 2, false);
 
-        Assert.True(registry.TryAnswer(2, accepted: false, out _));
+        Assert.True(registry.TryAnswer(2, false, out _));
         Assert.False(registry.TryStart(1, out _));
         Assert.False(registry.TryStart(2, out _));
     }

@@ -30,8 +30,7 @@
 -- No MERGE (forbidden, architecture reference §12.3): guarded UPDATE, falling back to INSERT only when no
 -- row was touched, for the quest-state upsert; DELETE-then-INSERT for each container, same as
 -- usp_CharacterItems_ReplaceContainer.
-CREATE PROCEDURE game.usp_CharacterQuest_ApplyTransition
-    @CharacterId   INT,
+CREATE PROCEDURE game.usp_CharacterQuest_ApplyTransition @CharacterId   INT,
     @StepPermanent INT,
     @ActiveQuestId INT,
     @QSort         INT,
@@ -44,60 +43,93 @@ CREATE PROCEDURE game.usp_CharacterQuest_ApplyTransition
     @Items2        game.tvp_CharacterItemSlot READONLY
 AS
 BEGIN
-    SET NOCOUNT ON;
-    SET XACT_ABORT ON;
+    SET
+NOCOUNT ON;
+    SET
+XACT_ABORT ON;
 
-    BEGIN TRANSACTION;
+BEGIN
+TRANSACTION;
 
-    UPDATE game.CharacterQuests
-    SET StepPermanent = @StepPermanent,
-        ActiveQuestId = @ActiveQuestId,
-        QSort         = @QSort,
-        TargetPhase   = @TargetPhase,
-        KillCounter   = @KillCounter
-    WHERE CharacterId = @CharacterId;
+UPDATE game.CharacterQuests
+SET StepPermanent = @StepPermanent,
+    ActiveQuestId = @ActiveQuestId,
+    QSort         = @QSort,
+    TargetPhase   = @TargetPhase,
+    KillCounter   = @KillCounter
+WHERE CharacterId = @CharacterId;
 
-    IF @@ROWCOUNT = 0
+IF
+@@ROWCOUNT = 0
         INSERT INTO game.CharacterQuests (CharacterId, StepPermanent, ActiveQuestId, QSort, TargetPhase, KillCounter)
         VALUES (@CharacterId, @StepPermanent, @ActiveQuestId, @QSort, @TargetPhase, @KillCounter);
 
-    IF @DeltaMoney <> 0
-        UPDATE game.Characters
-        SET Money        = Money + @DeltaMoney,
-            UpdatedAtUtc  = SYSUTCDATETIME()
-        WHERE CharacterId = @CharacterId
-          AND Money + @DeltaMoney BETWEEN 0 AND 2000000000;
-        -- Deliberately NO error branch here -- see header comment: a cap breach (or a vanished character,
-        -- which cannot really happen mid-session) silently leaves Money untouched rather than aborting the
-        -- transaction, matching the verified legacy `break;` semantics exactly.
+    IF
+@DeltaMoney <> 0
+UPDATE game.Characters
+SET Money        = Money + @DeltaMoney,
+    UpdatedAtUtc = SYSUTCDATETIME()
+WHERE CharacterId = @CharacterId
+  AND Money + @DeltaMoney BETWEEN 0 AND 2000000000;
+-- Deliberately NO error branch here -- see header comment: a cap breach (or a vanished character,
+-- which cannot really happen mid-session) silently leaves Money untouched rather than aborting the
+-- transaction, matching the verified legacy `break;` semantics exactly.
 
-    IF @Container1 <> 255
-    BEGIN
-        DELETE FROM game.CharacterItems
-        WHERE CharacterId = @CharacterId
-          AND Container = @Container1;
+IF
+@Container1 <> 255
+BEGIN
+DELETE
+FROM game.CharacterItems
+WHERE CharacterId = @CharacterId
+  AND Container = @Container1;
 
-        INSERT INTO game.CharacterItems (CharacterId, Container, Slot, ItemId, Quantity,
-                                          Enchant, Combine, Refine, Socket,
-                                          SocketGem1, SocketGem2, SocketGem3, ExpireDate, Serial)
-        SELECT @CharacterId, @Container1, Slot, ItemId, Quantity, Enchant, Combine, Refine, Socket,
-               SocketGem1, SocketGem2, SocketGem3, ExpireDate, Serial
-        FROM @Items1;
-    END;
+INSERT INTO game.CharacterItems (CharacterId, Container, Slot, ItemId, Quantity,
+                                 Enchant, Combine, Refine, Socket,
+                                 SocketGem1, SocketGem2, SocketGem3, ExpireDate, Serial)
+SELECT @CharacterId,
+       @Container1,
+       Slot,
+       ItemId,
+       Quantity,
+       Enchant,
+       Combine,
+       Refine,
+       Socket,
+       SocketGem1,
+       SocketGem2,
+       SocketGem3,
+       ExpireDate,
+       Serial
+FROM @Items1;
+END;
 
-    IF @Container2 <> 255
-    BEGIN
-        DELETE FROM game.CharacterItems
-        WHERE CharacterId = @CharacterId
-          AND Container = @Container2;
+    IF
+@Container2 <> 255
+BEGIN
+DELETE
+FROM game.CharacterItems
+WHERE CharacterId = @CharacterId
+  AND Container = @Container2;
 
-        INSERT INTO game.CharacterItems (CharacterId, Container, Slot, ItemId, Quantity,
-                                          Enchant, Combine, Refine, Socket,
-                                          SocketGem1, SocketGem2, SocketGem3, ExpireDate, Serial)
-        SELECT @CharacterId, @Container2, Slot, ItemId, Quantity, Enchant, Combine, Refine, Socket,
-               SocketGem1, SocketGem2, SocketGem3, ExpireDate, Serial
-        FROM @Items2;
-    END;
+INSERT INTO game.CharacterItems (CharacterId, Container, Slot, ItemId, Quantity,
+                                 Enchant, Combine, Refine, Socket,
+                                 SocketGem1, SocketGem2, SocketGem3, ExpireDate, Serial)
+SELECT @CharacterId,
+       @Container2,
+       Slot,
+       ItemId,
+       Quantity,
+       Enchant,
+       Combine,
+       Refine,
+       Socket,
+       SocketGem1,
+       SocketGem2,
+       SocketGem3,
+       ExpireDate,
+       Serial
+FROM @Items2;
+END;
 
-    COMMIT TRANSACTION;
+COMMIT TRANSACTION;
 END;

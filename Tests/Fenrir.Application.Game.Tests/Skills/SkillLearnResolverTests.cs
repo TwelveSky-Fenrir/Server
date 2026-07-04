@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using System.Linq;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Skills;
 using Fenrir.Application.Game.Tests.GameData;
@@ -11,7 +10,10 @@ public class SkillLearnResolverTests
 {
     private static SkillDefinition Skill(int skillId, byte type, byte learnCost = 1, byte maxUpgrade = 10)
     {
-        var row = WorldDataTestRows.Skill(skillId) with { Type = type, LearnSkillPoint = learnCost, MaxUpgradePoint = maxUpgrade };
+        var row = WorldDataTestRows.Skill(skillId) with
+        {
+            Type = type, LearnSkillPoint = learnCost, MaxUpgradePoint = maxUpgrade
+        };
         return new SkillDefinition(row, [], []);
     }
 
@@ -28,10 +30,10 @@ public class SkillLearnResolverTests
     public void Learn_NotOfferedByThisNpc_Fails()
     {
         var offers = Offers(SkillLearnResolver.SkillTree1, 100);
-        var skill = Skill(200, type: 1);
+        var skill = Skill(200, 1);
 
         var result = SkillLearnResolver.ResolveLearn(offers, SkillLearnResolver.SkillTree1, 200, skill,
-            ImmutableDictionary<byte, LearnedSkill>.Empty, currentSkillPoints: 10);
+            ImmutableDictionary<byte, LearnedSkill>.Empty, 10);
 
         Assert.False(result.Success);
         Assert.Equal(SkillLearnResolver.LearnFailure.NotOfferedByThisNpc, result.Failure);
@@ -43,7 +45,7 @@ public class SkillLearnResolverTests
         var offers = Offers(SkillLearnResolver.SkillTree1, 100);
 
         var result = SkillLearnResolver.ResolveLearn(offers, SkillLearnResolver.SkillTree1, 100, null,
-            ImmutableDictionary<byte, LearnedSkill>.Empty, currentSkillPoints: 10);
+            ImmutableDictionary<byte, LearnedSkill>.Empty, 10);
 
         Assert.Equal(SkillLearnResolver.LearnFailure.UnknownSkill, result.Failure);
     }
@@ -52,10 +54,10 @@ public class SkillLearnResolverTests
     public void Learn_InsufficientSkillPoints_Fails()
     {
         var offers = Offers(SkillLearnResolver.SkillTree1, 100);
-        var skill = Skill(100, type: 1, learnCost: 5);
+        var skill = Skill(100, 1, 5);
 
         var result = SkillLearnResolver.ResolveLearn(offers, SkillLearnResolver.SkillTree1, 100, skill,
-            ImmutableDictionary<byte, LearnedSkill>.Empty, currentSkillPoints: 4);
+            ImmutableDictionary<byte, LearnedSkill>.Empty, 4);
 
         Assert.Equal(SkillLearnResolver.LearnFailure.InsufficientSkillPoints, result.Failure);
     }
@@ -64,7 +66,7 @@ public class SkillLearnResolverTests
     public void Learn_AlreadyLearnedInAnySlot_Fails()
     {
         var offers = Offers(SkillLearnResolver.SkillTree1, 100);
-        var skill = Skill(100, type: 1);
+        var skill = Skill(100, 1);
         var learned = ImmutableDictionary<byte, LearnedSkill>.Empty.Add(25, new LearnedSkill(100, 1));
 
         var result = SkillLearnResolver.ResolveLearn(offers, SkillLearnResolver.SkillTree1, 100, skill, learned, 10);
@@ -91,7 +93,7 @@ public class SkillLearnResolverTests
     public void Learn_SimpleType_RangeFull_NoFreeSlot_Fails()
     {
         var offers = Offers(SkillLearnResolver.SkillTree1, 100);
-        var skill = Skill(100, type: 1);
+        var skill = Skill(100, 1);
         var builder = ImmutableDictionary.CreateBuilder<byte, LearnedSkill>();
         for (byte i = 0; i < 10; i++)
             builder[i] = new LearnedSkill(900 + i, 1);
@@ -106,7 +108,7 @@ public class SkillLearnResolverTests
     public void Learn_Type3_FallsBackToSecondRange_WhenFirstIsFull()
     {
         var offers = Offers(SkillLearnResolver.SkillTree1, 100);
-        var skill = Skill(100, type: 3);
+        var skill = Skill(100, 3);
         var builder = ImmutableDictionary.CreateBuilder<byte, LearnedSkill>();
         for (byte i = 10; i < 20; i++)
             builder[i] = new LearnedSkill(900 + i, 1);
@@ -122,7 +124,7 @@ public class SkillLearnResolverTests
     public void Learn_ArrayKindMismatch_TreatedAsNotOffered()
     {
         var offers = Offers(SkillLearnResolver.SkillTree1, 100);
-        var skill = Skill(100, type: 1);
+        var skill = Skill(100, 1);
 
         var result = SkillLearnResolver.ResolveLearn(offers, SkillLearnResolver.SkillTree2, 100, skill,
             ImmutableDictionary<byte, LearnedSkill>.Empty, 10);
@@ -152,9 +154,9 @@ public class SkillLearnResolverTests
     public void Upgrade_InsufficientSkillPoints_Fails()
     {
         var learned = ImmutableDictionary<byte, LearnedSkill>.Empty.Add(5, new LearnedSkill(100, 3));
-        var skill = Skill(100, type: 1, maxUpgrade: 10);
+        var skill = Skill(100, 1, maxUpgrade: 10);
 
-        var result = SkillLearnResolver.ResolveUpgrade(5, learned, skill, currentSkillPoints: 0);
+        var result = SkillLearnResolver.ResolveUpgrade(5, learned, skill, 0);
 
         Assert.Equal(SkillLearnResolver.UpgradeFailure.InsufficientSkillPoints, result.Failure);
     }
@@ -163,9 +165,9 @@ public class SkillLearnResolverTests
     public void Upgrade_AlreadyAtMax_Fails()
     {
         var learned = ImmutableDictionary<byte, LearnedSkill>.Empty.Add(5, new LearnedSkill(100, 10));
-        var skill = Skill(100, type: 1, maxUpgrade: 10);
+        var skill = Skill(100, 1, maxUpgrade: 10);
 
-        var result = SkillLearnResolver.ResolveUpgrade(5, learned, skill, currentSkillPoints: 5);
+        var result = SkillLearnResolver.ResolveUpgrade(5, learned, skill, 5);
 
         Assert.Equal(SkillLearnResolver.UpgradeFailure.AlreadyMaxed, result.Failure);
     }
@@ -174,9 +176,9 @@ public class SkillLearnResolverTests
     public void Upgrade_Valid_IncrementsGradeByOne_CostsOnePoint()
     {
         var learned = ImmutableDictionary<byte, LearnedSkill>.Empty.Add(5, new LearnedSkill(100, 3));
-        var skill = Skill(100, type: 1, maxUpgrade: 10);
+        var skill = Skill(100, 1, maxUpgrade: 10);
 
-        var result = SkillLearnResolver.ResolveUpgrade(5, learned, skill, currentSkillPoints: 5);
+        var result = SkillLearnResolver.ResolveUpgrade(5, learned, skill, 5);
 
         Assert.True(result.Success);
         Assert.Equal(4, result.NewGrade);

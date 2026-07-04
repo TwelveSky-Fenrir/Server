@@ -6,7 +6,10 @@ using Fenrir.Network.Sessions;
 
 namespace Fenrir.Application.Game.Handlers.Social;
 
-/// <summary>CZ_DUEL_ANSWER_SEND (opcode 45). 0 = accept, 1/2 = refuse, else ignored. On accept EITHER side may now send CZ_DUEL_START_SEND (<see cref="DuelRegistry" />'s own remarks on symmetric acceptance).</summary>
+/// <summary>
+///     CZ_DUEL_ANSWER_SEND (opcode 45). 0 = accept, 1/2 = refuse, else ignored. On accept EITHER side may now send
+///     CZ_DUEL_START_SEND (<see cref="DuelRegistry" />'s own remarks on symmetric acceptance).
+/// </summary>
 public sealed class DuelAnswerHandler(ZoneRegistry zones, DuelRegistry duels) : IInlinePacketHandler<DuelAnswerRequest>
 {
     public void Handle(in DuelAnswerRequest packet, IPacketSession session)

@@ -12,7 +12,7 @@ public class PartyRegistryTests
         var outcome = registry.TryInvite(1, 10, 0, 2, 10, 0);
         Assert.Equal(PartyInviteOutcome.Sent, outcome);
 
-        var accepted = registry.TryAnswer(2, accepted: true, out var inviterId, out var joinOutcome);
+        var accepted = registry.TryAnswer(2, true, out var inviterId, out var joinOutcome);
 
         Assert.True(accepted);
         Assert.Equal(1, inviterId);
@@ -177,7 +177,7 @@ public class PartyRegistryTests
         var registry = new PartyRegistry();
         registry.TryInvite(1, 10, 0, 2, 10, 0);
 
-        var answered = registry.TryAnswer(2, accepted: false, out var inviterId, out _);
+        var answered = registry.TryAnswer(2, false, out var inviterId, out _);
 
         Assert.True(answered);
         Assert.Equal(1, inviterId);

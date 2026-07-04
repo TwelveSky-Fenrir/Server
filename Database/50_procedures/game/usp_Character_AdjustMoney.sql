@@ -53,12 +53,14 @@ IF
 BEGIN
     -- The atomic guard above already decided nothing was written -- this is a purely diagnostic re-read
     -- (no TOCTOU risk: it never gates a write) to pick which of the two error codes callers rely on.
-    IF EXISTS (SELECT 1
+    IF
+EXISTS (SELECT 1
                FROM game.Characters
                WHERE CharacterId = @CharacterId
                  AND Money + @DeltaMoney > 2000000000)
         THROW 50261, N'Adjustment would exceed the legacy money cap (MAX_NUMBER_SIZE = 2,000,000,000).', 1;
 
-    THROW 50222, N'Unknown character or insufficient money balance for this adjustment.', 1;
+    THROW
+50222, N'Unknown character or insufficient money balance for this adjustment.', 1;
 END;
 END;

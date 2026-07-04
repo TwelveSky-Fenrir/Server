@@ -79,7 +79,7 @@ public class CraftResolverTests
     [InlineData(509)]
     public void Elixir_AnyOfTheSixBaseElixirs_IsAccepted(int baseElixirId)
     {
-        var result = CraftResolver.ResolveAdvancedElixir(Stack(baseElixirId, 10), hasFreeInventorySlot: true,
+        var result = CraftResolver.ResolveAdvancedElixir(Stack(baseElixirId, 10), true,
             new ScriptedRandomSource(0));
 
         Assert.NotEqual(CraftResolver.ElixirOutcome.Rejected, result.Outcome);
@@ -104,7 +104,7 @@ public class CraftResolverTests
     [Fact]
     public void Elixir_NoFreeInventorySlot_IsRejected()
     {
-        var result = CraftResolver.ResolveAdvancedElixir(Stack(506, 10), hasFreeInventorySlot: false,
+        var result = CraftResolver.ResolveAdvancedElixir(Stack(506, 10), false,
             new ScriptedRandomSource(0));
 
         Assert.Equal(CraftResolver.ElixirOutcome.Rejected, result.Outcome);

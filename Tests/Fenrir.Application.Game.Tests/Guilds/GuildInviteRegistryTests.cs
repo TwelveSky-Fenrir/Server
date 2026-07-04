@@ -10,7 +10,7 @@ public class GuildInviteRegistryTests
         var registry = new GuildInviteRegistry();
 
         Assert.Equal(GuildInviteAskOutcome.Sent, registry.TryAsk(1, 2));
-        Assert.True(registry.TryAnswer(2, accepted: true, out var askerId));
+        Assert.True(registry.TryAnswer(2, true, out var askerId));
         Assert.Equal(1, askerId);
 
         Assert.True(registry.TryConsumeAccepted(1, out var targetId));
@@ -22,7 +22,7 @@ public class GuildInviteRegistryTests
     {
         var registry = new GuildInviteRegistry();
         registry.TryAsk(1, 2);
-        registry.TryAnswer(2, accepted: true, out _);
+        registry.TryAnswer(2, true, out _);
 
         Assert.True(registry.TryConsumeAccepted(1, out _));
         Assert.False(registry.TryConsumeAccepted(1, out _));
@@ -33,7 +33,7 @@ public class GuildInviteRegistryTests
     {
         var registry = new GuildInviteRegistry();
         registry.TryAsk(1, 2);
-        registry.TryAnswer(2, accepted: true, out _);
+        registry.TryAnswer(2, true, out _);
 
         // GUILD_WORK tSort 3 is finalized by the ASKER, never the target (doc 10 §1 tSort 3).
         Assert.False(registry.TryConsumeAccepted(2, out _));
@@ -55,7 +55,7 @@ public class GuildInviteRegistryTests
         var registry = new GuildInviteRegistry();
         registry.TryAsk(1, 2);
 
-        Assert.True(registry.TryAnswer(2, accepted: false, out _));
+        Assert.True(registry.TryAnswer(2, false, out _));
         Assert.False(registry.TryConsumeAccepted(1, out _));
     }
 
@@ -83,6 +83,6 @@ public class GuildInviteRegistryTests
     {
         var registry = new GuildInviteRegistry();
 
-        Assert.False(registry.TryAnswer(2, accepted: true, out _));
+        Assert.False(registry.TryAnswer(2, true, out _));
     }
 }

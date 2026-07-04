@@ -1,7 +1,6 @@
 using System.Collections.Frozen;
 using System.Collections.Immutable;
 using Fenrir.Application.Game.GameData;
-using Fenrir.Application.Game.Simulation;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Application.Game.World;
 using Fenrir.Contracts.Packets.Shared;
@@ -55,7 +54,7 @@ public class ZoneSkillCastTests
     {
         var skillsById = new Dictionary<int, SkillDefinition>
         {
-            [82] = HolyShieldSkill(maxUpgradePoint: 10, manaUse: 30, shieldPercent: 20, runTime: 40)
+            [82] = HolyShieldSkill(10, 30, 20, 40)
         }.ToFrozenDictionary();
         var worldData = ZoneTestKit.EmptyWorldData(skillsById: skillsById);
         var zone = ZoneTestKit.CreateZone(1, worldData: worldData);
@@ -79,7 +78,7 @@ public class ZoneSkillCastTests
     {
         var skillsById = new Dictionary<int, SkillDefinition>
         {
-            [82] = HolyShieldSkill(maxUpgradePoint: 10, manaUse: 9999, shieldPercent: 20, runTime: 40)
+            [82] = HolyShieldSkill(10, 9999, 20, 40)
         }.ToFrozenDictionary();
         var worldData = ZoneTestKit.EmptyWorldData(skillsById: skillsById);
         var zone = ZoneTestKit.CreateZone(1, worldData: worldData);
@@ -102,7 +101,7 @@ public class ZoneSkillCastTests
     {
         var skillsById = new Dictionary<int, SkillDefinition>
         {
-            [82] = HolyShieldSkill(maxUpgradePoint: 10, manaUse: 10, shieldPercent: 20, runTime: 40)
+            [82] = HolyShieldSkill(10, 10, 20, 40)
         }.ToFrozenDictionary();
         var worldData = ZoneTestKit.EmptyWorldData(skillsById: skillsById);
         var zone = ZoneTestKit.CreateZone(1, worldData: worldData);
@@ -127,7 +126,7 @@ public class ZoneSkillCastTests
     {
         var skillsById = new Dictionary<int, SkillDefinition>
         {
-            [106] = HealLifeSkill(maxUpgradePoint: 10, manaUse: 5, healAmount: 100)
+            [106] = HealLifeSkill(10, 5, 100)
         }.ToFrozenDictionary();
         var worldData = ZoneTestKit.EmptyWorldData(skillsById: skillsById);
         var zone = ZoneTestKit.CreateZone(1, worldData: worldData);
@@ -140,7 +139,7 @@ public class ZoneSkillCastTests
         Assert.True(zone.TryGetPlayer(20, out var target));
         target!.Life = 700; // MaxLife=840 -> 140 of headroom, less than the 100 flat heal
 
-        zone.Post(ZoneCommand.Move(10, SkillCastAction(106, 10, targetCharacterId: 20)));
+        zone.Post(ZoneCommand.Move(10, SkillCastAction(106, 10, 20)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.Equal(800, target.Life);
@@ -151,7 +150,7 @@ public class ZoneSkillCastTests
     {
         var skillsById = new Dictionary<int, SkillDefinition>
         {
-            [106] = HealLifeSkill(maxUpgradePoint: 10, manaUse: 5, healAmount: 200)
+            [106] = HealLifeSkill(10, 5, 200)
         }.ToFrozenDictionary();
         var worldData = ZoneTestKit.EmptyWorldData(skillsById: skillsById);
         var zone = ZoneTestKit.CreateZone(1, worldData: worldData);
@@ -164,7 +163,7 @@ public class ZoneSkillCastTests
         Assert.True(zone.TryGetPlayer(20, out var target));
         target!.Life = 800; // MaxLife=840 -> only 40 of headroom, less than the 200 flat heal
 
-        zone.Post(ZoneCommand.Move(10, SkillCastAction(106, 10, targetCharacterId: 20)));
+        zone.Post(ZoneCommand.Move(10, SkillCastAction(106, 10, 20)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.Equal(840, target.Life);

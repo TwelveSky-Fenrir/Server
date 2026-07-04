@@ -18,7 +18,7 @@ public class PetGrowthCalculatorTests
     [Fact]
     public void Compute_NoPetEquipped_ReturnsDefault()
     {
-        var result = PetGrowthCalculator.Compute(0, growth: 1000, activity: 100, Items());
+        var result = PetGrowthCalculator.Compute(0, 1000, 100, Items());
 
         Assert.Equal(default, result);
     }
@@ -26,7 +26,7 @@ public class PetGrowthCalculatorTests
     [Fact]
     public void Compute_ZeroGrowth_ReturnsDefault()
     {
-        var result = PetGrowthCalculator.Compute(1004, growth: 0, activity: 100, Items((1004, 22)));
+        var result = PetGrowthCalculator.Compute(1004, 0, 100, Items((1004, 22)));
 
         Assert.Equal(default, result);
     }
@@ -35,7 +35,7 @@ public class PetGrowthCalculatorTests
     public void Compute_NotAGrowablePetSort_ReturnsDefault()
     {
         // item 1004 is a pet-family Life id, but here it is catalogued as sort 28 (Phoenix amulet), not 22.
-        var result = PetGrowthCalculator.Compute(1004, growth: 1000, activity: 100, Items((1004, 28)));
+        var result = PetGrowthCalculator.Compute(1004, 1000, 100, Items((1004, 28)));
 
         Assert.Equal(default, result);
     }
@@ -45,7 +45,7 @@ public class PetGrowthCalculatorTests
     {
         // item 1004 -> Life family 0, max 40,000,000. Half-max growth -> half of the K=2000 cap.
         var items = Items((1004, 22));
-        var result = PetGrowthCalculator.Compute(1004, growth: 20_000_000, activity: 100, items);
+        var result = PetGrowthCalculator.Compute(1004, 20_000_000, 100, items);
 
         Assert.Equal(1000, result.Life); // 20_000_000 * 2000 / 40_000_000
     }
@@ -54,7 +54,7 @@ public class PetGrowthCalculatorTests
     public void Compute_LifeFamily0_AtOrAboveMax_ClampsToCap()
     {
         var items = Items((1004, 22));
-        var result = PetGrowthCalculator.Compute(1004, growth: 100_000_000, activity: 100, items);
+        var result = PetGrowthCalculator.Compute(1004, 100_000_000, 100, items);
 
         Assert.Equal(2200, result.Life); // normal cap
     }
@@ -64,7 +64,7 @@ public class PetGrowthCalculatorTests
     {
         // 1310 is both a Life-family-3 member AND the verified Life premium id (K=4000, cap=4400).
         var items = Items((1310, 22));
-        var result = PetGrowthCalculator.Compute(1310, growth: 320_000_000, activity: 100, items); // == family-3 max
+        var result = PetGrowthCalculator.Compute(1310, 320_000_000, 100, items); // == family-3 max
 
         Assert.Equal(4400, result.Life);
     }
@@ -74,8 +74,8 @@ public class PetGrowthCalculatorTests
     {
         var items = Items((541, 22)); // Attack family 0
 
-        var active = PetGrowthCalculator.Compute(541, growth: 20_000_000, activity: 1, items);
-        var inactive = PetGrowthCalculator.Compute(541, growth: 20_000_000, activity: 0, items);
+        var active = PetGrowthCalculator.Compute(541, 20_000_000, 1, items);
+        var inactive = PetGrowthCalculator.Compute(541, 20_000_000, 0, items);
 
         Assert.True(active.AttackPower > 0);
         Assert.Equal(0, inactive.AttackPower);
@@ -88,8 +88,8 @@ public class PetGrowthCalculatorTests
         // own pActivityValue parameter at all -- only ReturnAttackPower does.
         var items = Items((1004, 22), (542, 22));
 
-        var lifeInactive = PetGrowthCalculator.Compute(1004, growth: 20_000_000, activity: 0, items);
-        var defenseInactive = PetGrowthCalculator.Compute(542, growth: 20_000_000, activity: 0, items);
+        var lifeInactive = PetGrowthCalculator.Compute(1004, 20_000_000, 0, items);
+        var defenseInactive = PetGrowthCalculator.Compute(542, 20_000_000, 0, items);
 
         Assert.True(lifeInactive.Life > 0);
         Assert.True(defenseInactive.DefensePower > 0);
@@ -99,7 +99,7 @@ public class PetGrowthCalculatorTests
     public void Compute_AttackPremiumId1312_UsesDoubleKAndCap()
     {
         var items = Items((1312, 22));
-        var result = PetGrowthCalculator.Compute(1312, growth: 320_000_000, activity: 1, items);
+        var result = PetGrowthCalculator.Compute(1312, 320_000_000, 1, items);
 
         Assert.Equal(2200, result.AttackPower); // premium cap, family 3 max = 320,000,000
     }
@@ -108,7 +108,7 @@ public class PetGrowthCalculatorTests
     public void Compute_DefensePremiumId1311_UsesQuadrupleKAndCap()
     {
         var items = Items((1311, 22));
-        var result = PetGrowthCalculator.Compute(1311, growth: 320_000_000, activity: 1, items);
+        var result = PetGrowthCalculator.Compute(1311, 320_000_000, 1, items);
 
         Assert.Equal(4400, result.DefensePower); // 1311's own premium cap (K=4000/cap4400)
     }

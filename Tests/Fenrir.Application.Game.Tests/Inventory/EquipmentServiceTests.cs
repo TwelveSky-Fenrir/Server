@@ -74,7 +74,7 @@ public class EquipmentServiceTests
         }.ToFrozenDictionary();
 
         var container = ImmutableDictionary<byte, ItemStack>.Empty
-            .Add((byte)7, new ItemStack(100, 1, 5, 3, 0, 0, 0, 0, 0, 0, 0));
+            .Add(7, new ItemStack(100, 1, 5, 3, 0, 0, 0, 0, 0, 0, 0));
 
         var slots = EquipmentService.BuildEquippedSlots(container, itemsById);
 
@@ -90,7 +90,7 @@ public class EquipmentServiceTests
     {
         var itemsById = EmptyFrozen<int, ItemDefinition>();
         var container = ImmutableDictionary<byte, ItemStack>.Empty
-            .Add((byte)0, new ItemStack(999999, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0));
+            .Add(0, new ItemStack(999999, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0));
 
         var slots = EquipmentService.BuildEquippedSlots(container, itemsById);
 
@@ -111,7 +111,7 @@ public class EquipmentServiceTests
             worldData);
 
         var equipped = ImmutableDictionary<byte, ItemStack>.Empty
-            .Add((byte)2, new ItemStack(200, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0)); // slot 2 = armor
+            .Add(2, new ItemStack(200, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0)); // slot 2 = armor
         var withEquipment = EquipmentService.RecomputeStats(attributes, equipped, worldData);
 
         Assert.True(withEquipment.MaxLife > withoutEquipment.MaxLife);

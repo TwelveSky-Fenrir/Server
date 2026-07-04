@@ -27,7 +27,7 @@
 --                      NOT the DATEFIRST-dependent DATEDIFF(WEEK, 0, x) -- see usp_Character_
 --                      GetRewardClaimState's own header). 0 = never claimed (a real date is always > 0).
 ALTER TABLE game.Characters
-    ADD BloodCoin       INT     NOT NULL CONSTRAINT DF_Characters_BloodCoin DEFAULT 0,
+    ADD BloodCoin INT NOT NULL CONSTRAINT DF_Characters_BloodCoin DEFAULT 0,
         RewardClaimDay  TINYINT NOT NULL CONSTRAINT DF_Characters_RewardClaimDay DEFAULT 0,
         RewardClaimDate INT     NOT NULL CONSTRAINT DF_Characters_RewardClaimDate DEFAULT 0;
 GO

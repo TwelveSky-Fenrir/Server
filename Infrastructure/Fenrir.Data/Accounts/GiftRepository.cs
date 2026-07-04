@@ -3,7 +3,6 @@ using System.Data;
 using CaeriusNet.Abstractions;
 using CaeriusNet.Builders;
 using CaeriusNet.Commands.Reads;
-using CaeriusNet.Commands.Writes;
 
 namespace Fenrir.Data.Accounts;
 
@@ -15,14 +14,14 @@ namespace Fenrir.Data.Accounts;
 /// </summary>
 public interface IGiftRepository
 {
-    ValueTask<ReadOnlyCollection<PendingGiftDto>> GetPendingByAccountAsync(int accountId, CancellationToken ct);
+    public ValueTask<ReadOnlyCollection<PendingGiftDto>> GetPendingByAccountAsync(int accountId, CancellationToken ct);
 
     /// <summary>
     ///     Atomically claims the gift and places its item into the account's shared vault
     ///     (usp_Gift_ClaimIntoVault). Throws SQL 50220 (not found/not owned/already claimed) or 50274
     ///     (vault full, 28 slots).
     /// </summary>
-    ValueTask<short> ClaimIntoVaultAsync(int giftId, int accountId, CancellationToken ct);
+    public ValueTask<short> ClaimIntoVaultAsync(int giftId, int accountId, CancellationToken ct);
 }
 
 /// <summary>
@@ -34,7 +33,8 @@ public interface IGiftRepository
 /// </summary>
 public sealed record GiftRepository(ICaeriusNetDbContext Db) : IGiftRepository
 {
-    public async ValueTask<ReadOnlyCollection<PendingGiftDto>> GetPendingByAccountAsync(int accountId, CancellationToken ct)
+    public async ValueTask<ReadOnlyCollection<PendingGiftDto>> GetPendingByAccountAsync(int accountId,
+        CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Gift_GetPendingByAccount", 10)
             .AddParameter("AccountId", accountId, SqlDbType.Int)

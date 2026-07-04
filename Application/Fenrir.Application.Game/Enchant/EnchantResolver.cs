@@ -21,30 +21,22 @@ namespace Fenrir.Application.Game.Enchant;
 ///     cut, NOT a legacy Quit(): the caller should reply with a clean failure, not disconnect a player doing
 ///     nothing wrong). EVERY OTHER <see cref="EnchantOutcome.Rejected" /> reproduces a REAL <c>Quit()</c> in
 ///     the verified source (including an unrecognized material -- the source's own <c>default: Quit()</c> in
-///     both material-lookup switches) and the caller must disconnect on it. The "sweet potato" buff (<c>aImproveItemValue</c>, +5%
+///     both material-lookup switches) and the caller must disconnect on it. The "sweet potato" buff (
+///     <c>aImproveItemValue</c>, +5%
 ///     success, one-shot consumed) and <c>aProtectForDestroy2</c> (a SEPARATE, more generous protect charge
 ///     only relevant in the +41..+50 regime) are not modeled -- Fenrir tracks neither counter yet.
 /// </remarks>
 public static class EnchantResolver
 {
-    /// <summary><c>MAX_IMPROVE_ITEM_NUM</c> (DEFINE.h:613).</summary>
-    public const int RegimeBoundary = 40;
-
-    /// <summary><c>MAX_IMPROVE_ITEM_NUM2</c> (DEFINE.h:614).</summary>
-    public const int MaxImprove = 50;
-
-    /// <summary><c>SAFE_IMPROVE_VALUE</c> for LNW33 (S04_MyWork02.cpp:2497) -- destroy risk only above this level.</summary>
-    public const int SafeImproveValue = 20;
-
-    private const byte RareItemType = 3;
-    private const byte EliteItemType = 4;
-
     public enum EnchantOutcome
     {
         /// <summary>A REAL verified <c>Quit()</c> condition -- the caller must disconnect, never send a clean failure.</summary>
         Rejected,
 
-        /// <summary>Target is a wing (<c>Sort == 6</c>) -- Fenrir scope cut, NOT a legacy Quit(); reply with a clean failure (see class remarks).</summary>
+        /// <summary>
+        ///     Target is a wing (<c>Sort == 6</c>) -- Fenrir scope cut, NOT a legacy Quit(); reply with a clean failure (see
+        ///     class remarks).
+        /// </summary>
         NotSupported,
 
         /// <summary>+40 -&gt; +41, no roll (ZC result 0).</summary>
@@ -66,11 +58,17 @@ public static class EnchantResolver
         ResetToForty
     }
 
-    public readonly record struct EnchantResult(EnchantOutcome Outcome, int NewEnchant, int Cost, bool ConsumesProtectCharge)
-    {
-        /// <summary>Every terminal outcome consumes the material exactly once (<c>DecreaseMaterial</c>) -- neither <see cref="EnchantOutcome.Rejected" /> nor <see cref="EnchantOutcome.NotSupported" /> does.</summary>
-        public bool ConsumesMaterial => Outcome is not (EnchantOutcome.Rejected or EnchantOutcome.NotSupported);
-    }
+    /// <summary><c>MAX_IMPROVE_ITEM_NUM</c> (DEFINE.h:613).</summary>
+    public const int RegimeBoundary = 40;
+
+    /// <summary><c>MAX_IMPROVE_ITEM_NUM2</c> (DEFINE.h:614).</summary>
+    public const int MaxImprove = 50;
+
+    /// <summary><c>SAFE_IMPROVE_VALUE</c> for LNW33 (S04_MyWork02.cpp:2497) -- destroy risk only above this level.</summary>
+    public const int SafeImproveValue = 20;
+
+    private const byte RareItemType = 3;
+    private const byte EliteItemType = 4;
 
     /// <summary>
     ///     <paramref name="luck" /> is the caster's <c>MyFactor::GetLuck()</c> value (already resolved by the
@@ -184,7 +182,8 @@ public static class EnchantResolver
 
         var p1 = material.ForcesGuaranteedSuccess ? 100 : TierProbability(newImprove);
         if (p1 < 0)
-            return Rejected(); // newImprove landed outside 41..50 -- structurally impossible given the clamp above, defensive only.
+            return
+                Rejected(); // newImprove landed outside 41..50 -- structurally impossible given the clamp above, defensive only.
 
         if (random.NextInt32(100) < p1)
             return new EnchantResult(EnchantOutcome.Success, newImprove, material.MoneyCost, false);
@@ -200,7 +199,10 @@ public static class EnchantResolver
         return new EnchantResult(EnchantOutcome.ResetToForty, RegimeBoundary, material.MoneyCost, false);
     }
 
-    /// <summary>+41-43: 20% · +44-46: 15% · +47-49: 10% · +50: 5% (S04_MyWork02.cpp:2926-2949), keyed by the NEW (post-attempt) improve value.</summary>
+    /// <summary>
+    ///     +41-43: 20% · +44-46: 15% · +47-49: 10% · +50: 5% (S04_MyWork02.cpp:2926-2949), keyed by the NEW
+    ///     (post-attempt) improve value.
+    /// </summary>
     private static int TierProbability(int newImprove)
     {
         return newImprove switch
@@ -228,5 +230,18 @@ public static class EnchantResolver
     private static EnchantResult Rejected()
     {
         return new EnchantResult(EnchantOutcome.Rejected, 0, 0, false);
+    }
+
+    public readonly record struct EnchantResult(
+        EnchantOutcome Outcome,
+        int NewEnchant,
+        int Cost,
+        bool ConsumesProtectCharge)
+    {
+        /// <summary>
+        ///     Every terminal outcome consumes the material exactly once (<c>DecreaseMaterial</c>) -- neither
+        ///     <see cref="EnchantOutcome.Rejected" /> nor <see cref="EnchantOutcome.NotSupported" /> does.
+        /// </summary>
+        public bool ConsumesMaterial => Outcome is not (EnchantOutcome.Rejected or EnchantOutcome.NotSupported);
     }
 }

@@ -29,7 +29,7 @@ public sealed class GetProxyShopHandler(IOfflineShopRepository offlineShops, ICh
         var zoneSession = (ZoneClientSession)session;
         var characterId = zoneSession.CharacterId!.Value;
 
-        if (zoneSession.CurrentZone is not Fenrir.Application.Game.World.Zone zone)
+        if (zoneSession.CurrentZone is not Zone zone)
             return;
 
         if (zone.MapId != OpenShopStallHandler.PshopZoneNumber)
@@ -55,7 +55,9 @@ public sealed class GetProxyShopHandler(IOfflineShopRepository offlineShops, ICh
         if (targetId is null)
         {
             session.Send(new GetProxyShopResponse
-                { Result = 101, Sort = packet.Sort, ProxyUser = ProxyShopWireMapper.Build(packet.AvatarName, null, []) });
+            {
+                Result = 101, Sort = packet.Sort, ProxyUser = ProxyShopWireMapper.Build(packet.AvatarName, null, [])
+            });
             return;
         }
 
@@ -63,13 +65,16 @@ public sealed class GetProxyShopHandler(IOfflineShopRepository offlineShops, ICh
         if (targetShop is not { ShopState: 1 })
         {
             session.Send(new GetProxyShopResponse
-                { Result = 101, Sort = packet.Sort, ProxyUser = ProxyShopWireMapper.Build(packet.AvatarName, null, []) });
+            {
+                Result = 101, Sort = packet.Sort, ProxyUser = ProxyShopWireMapper.Build(packet.AvatarName, null, [])
+            });
             return;
         }
 
         session.Send(new GetProxyShopResponse
         {
-            Result = 0, Sort = packet.Sort, ProxyUser = ProxyShopWireMapper.Build(packet.AvatarName, targetShop, targetItems)
+            Result = 0, Sort = packet.Sort,
+            ProxyUser = ProxyShopWireMapper.Build(packet.AvatarName, targetShop, targetItems)
         });
     }
 }

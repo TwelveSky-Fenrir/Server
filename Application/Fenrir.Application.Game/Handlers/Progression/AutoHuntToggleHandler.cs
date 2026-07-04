@@ -1,6 +1,7 @@
 using Fenrir.Application.Game.Inventory;
 using Fenrir.Application.Game.World;
 using Fenrir.Contracts.Abstractions;
+using Fenrir.Contracts.Packets.Shared;
 using Fenrir.Contracts.Packets.Zone;
 using Fenrir.Data.Characters;
 using Fenrir.Network.Sessions;
@@ -23,6 +24,9 @@ namespace Fenrir.Application.Game.Handlers.Progression;
 /// </remarks>
 public sealed class AutoHuntToggleHandler(ICharacterRepository characters) : IAsyncPacketHandler<AutoHuntToggleRequest>
 {
+    /// <summary><c>FEQUIP_TYPE::EWEAPON</c> (STRUCT.h:1662-1676).</summary>
+    private const byte WeaponSlot = 7;
+
     /// <summary>
     ///     Zones where enabling auto-hunt is refused (verified S04_MyWork02.cpp:13508-13520). CORRECTED: the
     ///     source's <c>mCheckZone241TypeServer</c> flag is not literally "zone 241" -- it's a per-server
@@ -70,7 +74,7 @@ public sealed class AutoHuntToggleHandler(ICharacterRepository characters) : IAs
         }
 
         var enabled = packet.Sort == 1;
-        var configBytes = new byte[Fenrir.Contracts.Packets.Shared.AutoHunt.WireSize];
+        var configBytes = new byte[AutoHunt.WireSize];
         packet.AutoHunt.Write(configBytes);
 
         await characters.SetAutoHuntAsync(characterId, enabled, configBytes, cancellationToken);
@@ -83,7 +87,4 @@ public sealed class AutoHuntToggleHandler(ICharacterRepository characters) : IAs
             ServerIndex = characterId, UniqueNumber = state.UniqueNumber, AutoState = packet.Sort
         });
     }
-
-    /// <summary><c>FEQUIP_TYPE::EWEAPON</c> (STRUCT.h:1662-1676).</summary>
-    private const byte WeaponSlot = 7;
 }

@@ -1,4 +1,5 @@
 using Fenrir.Application.Game.Inventory;
+using Fenrir.Application.Game.Social;
 using Fenrir.Application.Game.World;
 using Fenrir.Contracts.Packets.Shared;
 using Fenrir.Data.Characters;
@@ -112,7 +113,7 @@ public static class AvatarInfoFactory
             Halo = state.Halo,
             RebirthNum = state.RebirthCount,
             GuildName = state.GuildName,
-            GuildRole = Social.GuildRoleCodec.DbRoleToWire(state.GuildRoleDb),
+            GuildRole = GuildRoleCodec.DbRoleToWire(state.GuildRoleDb),
             CallName = state.GuildCallName,
             Equip = BuildEquipArrayFromContainer(state.Inventory.GetContainer(ContainerMatrix.Equipment)),
             QuestInfo =
@@ -197,7 +198,10 @@ public sealed record AvatarSocialSnapshot(
     public static readonly AvatarSocialSnapshot Empty =
         new(new Dictionary<byte, string>(), "", "", "", 0);
 
-    /// <summary>Expands the sparse (slot -&gt; name) map into AVATAR_INFO's fixed 10-slot <c>Friend</c> array, empty string for every unfilled slot -- slots are client-chosen (contracts/05_social.md), so gaps are normal.</summary>
+    /// <summary>
+    ///     Expands the sparse (slot -&gt; name) map into AVATAR_INFO's fixed 10-slot <c>Friend</c> array, empty string
+    ///     for every unfilled slot -- slots are client-chosen (contracts/05_social.md), so gaps are normal.
+    /// </summary>
     public string[] BuildFriendArray()
     {
         var friends = new string[10];

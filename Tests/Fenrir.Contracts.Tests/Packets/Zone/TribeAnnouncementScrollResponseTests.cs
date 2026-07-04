@@ -20,7 +20,8 @@ public class ZcTribeNotifyRecvTests
     [Fact]
     public void Write_ProducesGoldenBytes()
     {
-        var packet = new TribeAnnouncementScrollResponse { TribeRole = 3, AvatarName = "Odin", Content = "Scroll used!" };
+        var packet = new TribeAnnouncementScrollResponse
+            { TribeRole = 3, AvatarName = "Odin", Content = "Scroll used!" };
 
         Span<byte> buffer = new byte[TribeAnnouncementScrollResponse.PayloadSize];
         var written = packet.Write(buffer);
@@ -38,7 +39,8 @@ public class ZcTribeNotifyRecvTests
     [Fact]
     public void Write_RoundTrips_ViaManualDecode()
     {
-        var packet = new TribeAnnouncementScrollResponse { TribeRole = 4, AvatarName = "Freya", Content = "Tribe number 4" };
+        var packet = new TribeAnnouncementScrollResponse
+            { TribeRole = 4, AvatarName = "Freya", Content = "Tribe number 4" };
 
         Span<byte> buffer = new byte[TribeAnnouncementScrollResponse.PayloadSize];
         packet.Write(buffer);

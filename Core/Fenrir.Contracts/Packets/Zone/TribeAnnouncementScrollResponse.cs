@@ -12,7 +12,8 @@ namespace Fenrir.Contracts.Packets.Zone;
 ///     <see cref="TribeRole" /> (presumably used client-side for the tribe color/label). Recipient
 ///     filter: same tribe only (LNW33 branch active).
 /// </summary>
-[FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.TribeAnnouncementScroll, ExpectedSize = 79)]
+[FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.TribeAnnouncementScroll,
+    ExpectedSize = 79)]
 public readonly partial record struct TribeAnnouncementScrollResponse : IOutgoingPacket
 {
     /// <summary>TRAP: actually carries the sender's TRIBE NUMBER (1-4), not a role, despite the field name.</summary>

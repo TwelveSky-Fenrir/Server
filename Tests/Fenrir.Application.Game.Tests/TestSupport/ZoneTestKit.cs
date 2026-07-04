@@ -77,7 +77,10 @@ internal static class ZoneTestKit
         return bytes;
     }
 
-    /// <summary>An entirely empty (but structurally valid) <see cref="WorldDataCache" /> -- every catalog lookup misses, matching an un-seeded/irrelevant world for tests that don't care about item/skill/level data.</summary>
+    /// <summary>
+    ///     An entirely empty (but structurally valid) <see cref="WorldDataCache" /> -- every catalog lookup misses,
+    ///     matching an un-seeded/irrelevant world for tests that don't care about item/skill/level data.
+    /// </summary>
     public static WorldDataCache EmptyWorldData(
         FrozenDictionary<int, ItemDefinition>? itemsById = null,
         FrozenDictionary<int, SkillDefinition>? skillsById = null,

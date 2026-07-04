@@ -1,7 +1,6 @@
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Inventory;
 using Fenrir.Application.Game.Social.Pshop;
-using Fenrir.Application.Game.World.Loot;
 using Fenrir.Contracts.Packets.Shared;
 using Fenrir.Data.World;
 
@@ -52,8 +51,8 @@ public class PshopPurchasePolicyTests
     [Fact]
     public void ReadSlot_DecodesTheNineFieldFlatLayout()
     {
-        var info = WithSlot(1, 2, itemId: 100, quantity: 5, value: 0, serial: 7, price: 999, invPage: 0, invIndex: 3,
-            posX: 1, posY: 2);
+        var info = WithSlot(1, 2, 100, 5, 0, 7, 999, 0, 3,
+            1, 2);
 
         var slot = PshopPurchasePolicy.ReadSlot(info, 1, 2);
 
@@ -77,9 +76,9 @@ public class PshopPurchasePolicyTests
     [Fact]
     public void ValidateOpenSlot_LiveInventoryMatchesAdvertisedValues_Succeeds()
     {
-        var itemDefinition = Item(100, sort: 3); // non-stackable
+        var itemDefinition = Item(100, 3); // non-stackable
         var slot = PshopPurchasePolicy.ReadSlot(
-            WithSlot(0, 0, 100, quantity: 1, value: 0, serial: 5, price: 500, invPage: 0, invIndex: 0, posX: 0, posY: 0),
+            WithSlot(0, 0, 100, 1, 0, 5, 500, 0, 0, 0, 0),
             0, 0);
         var liveStack = new ItemStack(100, 1, 0, 0, 0, 0, 0, 0, 0, 0, 5);
 
@@ -90,9 +89,9 @@ public class PshopPurchasePolicyTests
     [Fact]
     public void ValidateOpenSlot_PriceOutOfRange_IsRejected()
     {
-        var itemDefinition = Item(100, sort: 3);
+        var itemDefinition = Item(100, 3);
         var slot = PshopPurchasePolicy.ReadSlot(
-            WithSlot(0, 0, 100, 1, 0, 5, price: 0, invPage: 0, invIndex: 0, posX: 0, posY: 0), 0, 0);
+            WithSlot(0, 0, 100, 1, 0, 5, 0, 0, 0, 0, 0), 0, 0);
         var liveStack = new ItemStack(100, 1, 0, 0, 0, 0, 0, 0, 0, 0, 5);
 
         Assert.Equal(PshopPurchasePolicy.OpenSlotOutcome.PriceOutOfRange,
@@ -102,9 +101,9 @@ public class PshopPurchasePolicyTests
     [Fact]
     public void ValidateOpenSlot_LiveInventoryDoesNotMatch_IsRejected()
     {
-        var itemDefinition = Item(100, sort: 3);
+        var itemDefinition = Item(100, 3);
         var slot = PshopPurchasePolicy.ReadSlot(
-            WithSlot(0, 0, 100, 1, 0, 5, price: 500, invPage: 0, invIndex: 0, posX: 0, posY: 0), 0, 0);
+            WithSlot(0, 0, 100, 1, 0, 5, 500, 0, 0, 0, 0), 0, 0);
         var staleLiveStack = new ItemStack(100, 2, 0, 0, 0, 0, 0, 0, 0, 0, 5); // quantity drifted
 
         Assert.Equal(PshopPurchasePolicy.OpenSlotOutcome.InventoryMismatch,
@@ -124,7 +123,7 @@ public class PshopPurchasePolicyTests
     [Fact]
     public void ResolvePurchase_EmptyDestination_PlacesTheFullListedStack()
     {
-        var itemDefinition = Item(100, sort: 3);
+        var itemDefinition = Item(100, 3);
         var slot = PshopPurchasePolicy.ReadSlot(
             WithSlot(0, 0, 100, 1, 0, 5, 500, 0, 0, 0, 0), 0, 0);
 
@@ -138,9 +137,9 @@ public class PshopPurchasePolicyTests
     [Fact]
     public void ResolvePurchase_StackableMergeIntoSameItem_Succeeds()
     {
-        var itemDefinition = Item(1019, sort: 2); // stackable
+        var itemDefinition = Item(1019, 2); // stackable
         var slot = PshopPurchasePolicy.ReadSlot(
-            WithSlot(0, 0, 1019, quantity: 10, value: 0, serial: 0, price: 100, invPage: 0, invIndex: 0, posX: 0, posY: 0),
+            WithSlot(0, 0, 1019, 10, 0, 0, 100, 0, 0, 0, 0),
             0, 0);
         var destination = new ItemStack(1019, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
@@ -153,7 +152,7 @@ public class PshopPurchasePolicyTests
     [Fact]
     public void ResolvePurchase_DestinationHoldsADifferentItem_IsRejected()
     {
-        var itemDefinition = Item(100, sort: 3);
+        var itemDefinition = Item(100, 3);
         var slot = PshopPurchasePolicy.ReadSlot(
             WithSlot(0, 0, 100, 1, 0, 5, 500, 0, 0, 0, 0), 0, 0);
         var destination = new ItemStack(999, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0);
@@ -166,9 +165,9 @@ public class PshopPurchasePolicyTests
     [Fact]
     public void ResolvePurchase_StackableMergeExceedingCap_IsRejected()
     {
-        var itemDefinition = Item(1019, sort: 2);
+        var itemDefinition = Item(1019, 2);
         var slot = PshopPurchasePolicy.ReadSlot(
-            WithSlot(0, 0, 1019, quantity: 500, value: 0, serial: 0, price: 100, invPage: 0, invIndex: 0, posX: 0, posY: 0),
+            WithSlot(0, 0, 1019, 500, 0, 0, 100, 0, 0, 0, 0),
             0, 0);
         var destination = new ItemStack(1019, GroundItemPickupPolicy.MaxStackQuantity - 100, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 

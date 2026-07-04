@@ -34,7 +34,8 @@ public class ZcTribeNoticeRecvTests
     [Fact]
     public void Write_RoundTrips_ViaManualDecode()
     {
-        var packet = new TribeAnnouncementResponse { TribeRole = 2, AvatarName = "Freya", Content = "Vice-master notice" };
+        var packet = new TribeAnnouncementResponse
+            { TribeRole = 2, AvatarName = "Freya", Content = "Vice-master notice" };
 
         Span<byte> buffer = new byte[TribeAnnouncementResponse.PayloadSize];
         packet.Write(buffer);

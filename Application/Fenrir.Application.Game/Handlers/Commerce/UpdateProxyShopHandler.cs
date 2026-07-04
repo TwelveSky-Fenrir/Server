@@ -120,13 +120,14 @@ public sealed class UpdateProxyShopHandler(
             logger.LogWarning(ex,
                 "Character {CharacterId} offline-shop retrieve RetrieveItemAndReplaceContainerAsync failed",
                 characterId);
-            Reply(session, 1, packet.SelfPage, packet.SelfIndex, newStack, packet.Socket, money: 0);
+            Reply(session, 1, packet.SelfPage, packet.SelfIndex, newStack, packet.Socket, 0);
             return;
         }
 
-        Reply(session, 0, packet.SelfPage, packet.SelfIndex, newStack, packet.Socket, money: 0);
+        Reply(session, 0, packet.SelfPage, packet.SelfIndex, newStack, packet.Socket, 0);
 
-        var containers = ImmutableArray.Create(new InventoryContainerSnapshot((byte)packet.SelfPage, projectedContainer));
+        var containers =
+            ImmutableArray.Create(new InventoryContainerSnapshot((byte)packet.SelfPage, projectedContainer));
         if (!await zone.PostInventoryCommandAndWaitAsync(new InventoryZoneCommand(characterId, containers, null),
                 cancellationToken))
             logger.LogError(
@@ -141,7 +142,7 @@ public sealed class UpdateProxyShopHandler(
         var sellerId = await characters.GetIdByNameAsync(packet.AvatarName, cancellationToken);
         if (sellerId is null)
         {
-            Reply(session, 1, packet.SelfPage, packet.SelfIndex, null, packet.Socket, money: 0);
+            Reply(session, 1, packet.SelfPage, packet.SelfIndex, null, packet.Socket, 0);
             return;
         }
 
@@ -183,13 +184,14 @@ public sealed class UpdateProxyShopHandler(
         {
             logger.LogWarning(ex, "Character {CharacterId} offline-shop purchase ExecutePurchaseAsync failed",
                 characterId);
-            Reply(session, 2, packet.SelfPage, packet.SelfIndex, null, packet.Socket, money: 0);
+            Reply(session, 2, packet.SelfPage, packet.SelfIndex, null, packet.Socket, 0);
             return;
         }
 
         Reply(session, 0, packet.SelfPage, packet.SelfIndex, newStack, packet.Socket, packet.Price);
 
-        var containers = ImmutableArray.Create(new InventoryContainerSnapshot((byte)packet.SelfPage, projectedContainer));
+        var containers =
+            ImmutableArray.Create(new InventoryContainerSnapshot((byte)packet.SelfPage, projectedContainer));
         if (!await zone.PostInventoryCommandAndWaitAsync(new InventoryZoneCommand(characterId, containers, null),
                 cancellationToken))
             logger.LogError(
@@ -200,9 +202,12 @@ public sealed class UpdateProxyShopHandler(
     private static void Reply(IPacketSession session, int result, int page, int index, ItemStack? stack,
         int[] requestSocket, int money)
     {
-        int[] value1 = stack is { } s
-            ? [s.ItemId, 0, 0, s.Quantity, ItemValueCodec.Encode(s.Enchant, s.Combine, s.Refine, s.Socket), s.Serial,
-                requestSocket[0], requestSocket[1], requestSocket[2]]
+        var value1 = stack is { } s
+            ?
+            [
+                s.ItemId, 0, 0, s.Quantity, ItemValueCodec.Encode(s.Enchant, s.Combine, s.Refine, s.Socket), s.Serial,
+                requestSocket[0], requestSocket[1], requestSocket[2]
+            ]
             : new int[9];
 
         session.Send(new UpdateProxyShopResponse

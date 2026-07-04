@@ -14,18 +14,21 @@ CREATE PROCEDURE game.usp_CharacterMentor_Bond @MasterCharacterId  INT,
     @StudentCharacterId INT
 AS
 BEGIN
-    SET NOCOUNT ON;
-    SET XACT_ABORT ON;
+    SET
+NOCOUNT ON;
+    SET
+XACT_ABORT ON;
 
-    BEGIN TRANSACTION;
+BEGIN
+TRANSACTION;
 
-    UPDATE game.Characters
-    SET StudentCharacterId = @StudentCharacterId
-    WHERE CharacterId = @MasterCharacterId;
+UPDATE game.Characters
+SET StudentCharacterId = @StudentCharacterId
+WHERE CharacterId = @MasterCharacterId;
 
-    UPDATE game.Characters
-    SET TeacherCharacterId = @MasterCharacterId
-    WHERE CharacterId = @StudentCharacterId;
+UPDATE game.Characters
+SET TeacherCharacterId = @MasterCharacterId
+WHERE CharacterId = @StudentCharacterId;
 
-    COMMIT TRANSACTION;
+COMMIT TRANSACTION;
 END;

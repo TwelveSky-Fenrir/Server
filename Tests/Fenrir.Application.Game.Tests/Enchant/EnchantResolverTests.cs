@@ -29,7 +29,7 @@ public class EnchantResolverTests
     [Fact]
     public void EquipSortOutOfRange_IsRejected()
     {
-        var target = Equip(1, sort: 5);
+        var target = Equip(1, 5);
         var result = EnchantResolver.Resolve(target, Target(0), Material(1019), 0, 0,
             new ScriptedRandomSource(0));
 
@@ -59,7 +59,7 @@ public class EnchantResolverTests
     [Fact]
     public void WingTarget_IsNotSupported_NotRejected()
     {
-        var target = Equip(1, sort: 6);
+        var target = Equip(1, 6);
         var result = EnchantResolver.Resolve(target, Target(0), Material(1019), 0, 0,
             new ScriptedRandomSource(0));
 
@@ -84,7 +84,7 @@ public class EnchantResolverTests
     {
         var target = Equip(1);
         // p1 = 103 - 3*1 + 0 = 100 -- rolling 0 (< 100) always succeeds at +0 -> +1.
-        var result = EnchantResolver.Resolve(target, Target(0), Material(1019), luck: 0, 0,
+        var result = EnchantResolver.Resolve(target, Target(0), Material(1019), 0, 0,
             new ScriptedRandomSource(0));
 
         Assert.Equal(EnchantResolver.EnchantOutcome.Success, result.Outcome);
@@ -99,8 +99,9 @@ public class EnchantResolverTests
         // current=10, +1019(+1) => new=11 <= SAFE_IMPROVE_VALUE(20): destroy roll never happens even on
         // a guaranteed-fail first roll.
         var target = Equip(1);
-        var result = EnchantResolver.Resolve(target, Target(10), Material(1019), luck: 0, 0,
-            new ScriptedRandomSource(99, 0)); // fail the success roll (99 >= p1), then would-be destroy roll unreachable
+        var result = EnchantResolver.Resolve(target, Target(10), Material(1019), 0, 0,
+            new ScriptedRandomSource(99,
+                0)); // fail the success roll (99 >= p1), then would-be destroy roll unreachable
 
         Assert.Equal(EnchantResolver.EnchantOutcome.Failed, result.Outcome);
         Assert.Equal(9, result.NewEnchant);
@@ -112,7 +113,7 @@ public class EnchantResolverTests
         // current=25, +1 => new=26 > 20: destroy roll happens. p2 = -57+26*3-0 = 21. Roll 50 (>=21) misses
         // the destroy, falls through to plain failure.
         var target = Equip(1);
-        var result = EnchantResolver.Resolve(target, Target(25), Material(1019), luck: 0, 0,
+        var result = EnchantResolver.Resolve(target, Target(25), Material(1019), 0, 0,
             new ScriptedRandomSource(99, 50));
 
         Assert.Equal(EnchantResolver.EnchantOutcome.Failed, result.Outcome);
@@ -123,7 +124,7 @@ public class EnchantResolverTests
     public void StoneMaterial_HighEnchant_DestroyRollHits_NoProtection_ItemDestroyed()
     {
         var target = Equip(1);
-        var result = EnchantResolver.Resolve(target, Target(25), Material(1019), luck: 0, protectForDestroyCharges: 0,
+        var result = EnchantResolver.Resolve(target, Target(25), Material(1019), 0, 0,
             new ScriptedRandomSource(99, 0));
 
         Assert.Equal(EnchantResolver.EnchantOutcome.Destroyed, result.Outcome);
@@ -133,7 +134,7 @@ public class EnchantResolverTests
     public void StoneMaterial_HighEnchant_DestroyRollHits_ProtectionConsumed_EnchantOnlyDecrements()
     {
         var target = Equip(1);
-        var result = EnchantResolver.Resolve(target, Target(25), Material(1019), luck: 0, protectForDestroyCharges: 1,
+        var result = EnchantResolver.Resolve(target, Target(25), Material(1019), 0, 1,
             new ScriptedRandomSource(99, 0));
 
         Assert.Equal(EnchantResolver.EnchantOutcome.Protected, result.Outcome);
@@ -149,7 +150,7 @@ public class EnchantResolverTests
         // so no destroy roll is even reachable, straight to plain failure. Enchant was already 0, so it must
         // floor there rather than go negative.
         var target = Equip(1);
-        var result = EnchantResolver.Resolve(target, Target(0), Material(1023), luck: 0, 0,
+        var result = EnchantResolver.Resolve(target, Target(0), Material(1023), 0, 0,
             new ScriptedRandomSource(90));
 
         Assert.Equal(EnchantResolver.EnchantOutcome.Failed, result.Outcome);
@@ -161,7 +162,7 @@ public class EnchantResolverTests
     {
         // current=38, material 1023 (+5) would reach 43 -- clamped to 40.
         var target = Equip(1);
-        var result = EnchantResolver.Resolve(target, Target(38), Material(1023), luck: 0, 0,
+        var result = EnchantResolver.Resolve(target, Target(38), Material(1023), 0, 0,
             new ScriptedRandomSource(0));
 
         Assert.Equal(EnchantResolver.EnchantOutcome.Success, result.Outcome);
@@ -174,7 +175,7 @@ public class EnchantResolverTests
     public void ForcedScroll633_AlwaysSucceeds_EvenOnWorstRoll_NoTypeRequirement()
     {
         var target = Equip(1, type: 0);
-        var result = EnchantResolver.Resolve(target, Target(5), Material(633), luck: 0, 0,
+        var result = EnchantResolver.Resolve(target, Target(5), Material(633), 0, 0,
             new ScriptedRandomSource(99));
 
         Assert.Equal(EnchantResolver.EnchantOutcome.Success, result.Outcome);
@@ -186,7 +187,7 @@ public class EnchantResolverTests
     public void FillToValueScroll619_RequiresRareOrElite_RejectsOtherwise()
     {
         var target = Equip(1, type: 0); // neither Rare(3) nor Elite(4)
-        var result = EnchantResolver.Resolve(target, Target(5), Material(619), luck: 0, 0,
+        var result = EnchantResolver.Resolve(target, Target(5), Material(619), 0, 0,
             new ScriptedRandomSource(0));
 
         Assert.Equal(EnchantResolver.EnchantOutcome.Rejected, result.Outcome);
@@ -196,7 +197,7 @@ public class EnchantResolverTests
     public void FillToValueScroll619_JumpsStraightToFortyFromAnyLevel()
     {
         var target = Equip(1, type: 3); // IRARE
-        var result = EnchantResolver.Resolve(target, Target(12), Material(619), luck: 0, 0,
+        var result = EnchantResolver.Resolve(target, Target(12), Material(619), 0, 0,
             new ScriptedRandomSource(0));
 
         Assert.Equal(EnchantResolver.EnchantOutcome.Success, result.Outcome);
@@ -207,7 +208,7 @@ public class EnchantResolverTests
     public void FillToValueScroll540_RequiresBelowThirty()
     {
         var target = Equip(1, type: 3);
-        var result = EnchantResolver.Resolve(target, Target(30), Material(540), luck: 0, 0,
+        var result = EnchantResolver.Resolve(target, Target(30), Material(540), 0, 0,
             new ScriptedRandomSource(0));
 
         Assert.Equal(EnchantResolver.EnchantOutcome.Rejected, result.Outcome);
@@ -217,7 +218,7 @@ public class EnchantResolverTests
     public void Scroll825_IgnoresFortyCap_JumpsStraightToFiftyFromBelowForty()
     {
         var target = Equip(1, type: 4); // IELITE
-        var result = EnchantResolver.Resolve(target, Target(3), Material(825), luck: 0, 0,
+        var result = EnchantResolver.Resolve(target, Target(3), Material(825), 0, 0,
             new ScriptedRandomSource(0));
 
         Assert.Equal(EnchantResolver.EnchantOutcome.Success, result.Outcome);
@@ -231,7 +232,7 @@ public class EnchantResolverTests
     public void AtExactlyForty_RequiresUnsealMaterial()
     {
         var target = Equip(1, type: 3);
-        var result = EnchantResolver.Resolve(target, Target(40), Material(1019), luck: 0, 0,
+        var result = EnchantResolver.Resolve(target, Target(40), Material(1019), 0, 0,
             new ScriptedRandomSource(0));
 
         Assert.Equal(EnchantResolver.EnchantOutcome.Rejected, result.Outcome);
@@ -242,7 +243,7 @@ public class EnchantResolverTests
     {
         var target = Equip(1, type: 3);
         var result = EnchantResolver.Resolve(target, Target(40), Material(EnchantMaterialCatalog.UnsealItemId),
-            luck: 0, 0, new ScriptedRandomSource(99));
+            0, 0, new ScriptedRandomSource(99));
 
         Assert.Equal(EnchantResolver.EnchantOutcome.Unsealed, result.Outcome);
         Assert.Equal(41, result.NewEnchant);
@@ -253,7 +254,7 @@ public class EnchantResolverTests
     public void AdvancedRegime_RequiresRareOrElite()
     {
         var target = Equip(1, type: 0);
-        var result = EnchantResolver.Resolve(target, Target(41), Material(1023), luck: 0, 0,
+        var result = EnchantResolver.Resolve(target, Target(41), Material(1023), 0, 0,
             new ScriptedRandomSource(0));
 
         Assert.Equal(EnchantResolver.EnchantOutcome.Rejected, result.Outcome);
@@ -263,7 +264,7 @@ public class EnchantResolverTests
     public void AdvancedRegime_Tier41To43_20PercentRate_SuccessBelowThreshold()
     {
         var target = Equip(1, type: 3);
-        var result = EnchantResolver.Resolve(target, Target(41), Material(1023), luck: 0, 0,
+        var result = EnchantResolver.Resolve(target, Target(41), Material(1023), 0, 0,
             new ScriptedRandomSource(19));
 
         Assert.Equal(EnchantResolver.EnchantOutcome.Success, result.Outcome);
@@ -274,7 +275,7 @@ public class EnchantResolverTests
     public void AdvancedRegime_Tier41To43_FailAtExactly41_ResetsToForty()
     {
         var target = Equip(1, type: 3);
-        var result = EnchantResolver.Resolve(target, Target(41), Material(1023), luck: 0, 0,
+        var result = EnchantResolver.Resolve(target, Target(41), Material(1023), 0, 0,
             new ScriptedRandomSource(20));
 
         Assert.Equal(EnchantResolver.EnchantOutcome.ResetToForty, result.Outcome);
@@ -285,7 +286,7 @@ public class EnchantResolverTests
     public void AdvancedRegime_FailAbove41_NoProtection_ResetsToForty()
     {
         var target = Equip(1, type: 3);
-        var result = EnchantResolver.Resolve(target, Target(45), Material(1023), luck: 0, protectForDestroyCharges: 0,
+        var result = EnchantResolver.Resolve(target, Target(45), Material(1023), 0, 0,
             new ScriptedRandomSource(99));
 
         Assert.Equal(EnchantResolver.EnchantOutcome.ResetToForty, result.Outcome);
@@ -296,7 +297,7 @@ public class EnchantResolverTests
     public void AdvancedRegime_FailAbove41_WithProtection_OnlyDecrementsByOne()
     {
         var target = Equip(1, type: 3);
-        var result = EnchantResolver.Resolve(target, Target(45), Material(1023), luck: 0, protectForDestroyCharges: 1,
+        var result = EnchantResolver.Resolve(target, Target(45), Material(1023), 0, 1,
             new ScriptedRandomSource(99));
 
         Assert.Equal(EnchantResolver.EnchantOutcome.Protected, result.Outcome);
@@ -307,7 +308,7 @@ public class EnchantResolverTests
     public void AdvancedRegime_NeverDestroysTheItem()
     {
         var target = Equip(1, type: 3);
-        var result = EnchantResolver.Resolve(target, Target(49), Material(1023), luck: 0, 0,
+        var result = EnchantResolver.Resolve(target, Target(49), Material(1023), 0, 0,
             new ScriptedRandomSource(99));
 
         Assert.NotEqual(EnchantResolver.EnchantOutcome.Destroyed, result.Outcome);
@@ -317,7 +318,7 @@ public class EnchantResolverTests
     public void AdvancedRegime_ForcedScroll825_TenPointJump_ClampedToFifty()
     {
         var target = Equip(1, type: 3);
-        var result = EnchantResolver.Resolve(target, Target(45), Material(825), luck: 0, 0,
+        var result = EnchantResolver.Resolve(target, Target(45), Material(825), 0, 0,
             new ScriptedRandomSource(99));
 
         Assert.Equal(EnchantResolver.EnchantOutcome.Success, result.Outcome);

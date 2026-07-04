@@ -10,8 +10,8 @@ public class MentorRegistryTests
         var registry = new MentorRegistry();
 
         Assert.Equal(MentorAskOutcome.Sent,
-            registry.TryAsk(masterId: 1, studentId: 2, targetAlreadyHasTeacher: false, targetAlreadyHasStudent: false));
-        Assert.True(registry.TryAnswer(2, accepted: true, out var masterId));
+            registry.TryAsk(1, 2, false, false));
+        Assert.True(registry.TryAnswer(2, true, out var masterId));
         Assert.Equal(1, masterId);
 
         Assert.True(registry.TryConsumeStart(1, out var studentId));
@@ -34,9 +34,9 @@ public class MentorRegistryTests
         var registry = new MentorRegistry();
 
         Assert.Equal(MentorAskOutcome.TargetAlreadyHasTeacher,
-            registry.TryAsk(1, 2, targetAlreadyHasTeacher: true, targetAlreadyHasStudent: false));
+            registry.TryAsk(1, 2, true, false));
         Assert.Equal(MentorAskOutcome.TargetAlreadyHasStudent,
-            registry.TryAsk(1, 3, targetAlreadyHasTeacher: false, targetAlreadyHasStudent: true));
+            registry.TryAsk(1, 3, false, true));
     }
 
     [Fact]

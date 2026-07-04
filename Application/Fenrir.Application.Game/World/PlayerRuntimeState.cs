@@ -61,7 +61,8 @@ public sealed class PlayerRuntimeState
     ///     accepted learn (tSort 202/233) or upgrade (tSort 203). A plain field-initialized empty dictionary
     ///     (not <c>required</c>): a brand-new character with no skills yet is a perfectly valid starting state.
     /// </summary>
-    public ImmutableDictionary<byte, LearnedSkill> LearnedSkills { get; set; } = ImmutableDictionary<byte, LearnedSkill>.Empty;
+    public ImmutableDictionary<byte, LearnedSkill> LearnedSkills { get; set; } =
+        ImmutableDictionary<byte, LearnedSkill>.Empty;
 
     /// <summary>Total XP (aExp1/aExp2 combined, game.Characters.Experience — see that column's migration comment).</summary>
     public long Experience { get; set; }
@@ -103,7 +104,8 @@ public sealed class PlayerRuntimeState
     ///     other <see cref="PlayerRuntimeState" /> field pays.
     ///     Refreshed by <see cref="Zone" />'s own tick: seeded from the world-entry snapshot at
     ///     <c>Zone.HandleEnter</c> (computed by <c>EnterWorldHandler</c> from the persisted
-    ///     equipment, per <see cref="Fenrir.Application.Game.Inventory.EquipmentService.RecomputeStats" />), and replaced wholesale by
+    ///     equipment, per <see cref="Fenrir.Application.Game.Inventory.EquipmentService.RecomputeStats" />), and replaced
+    ///     wholesale by
     ///     <c>Zone.ApplyInventoryCommand</c> whenever an accepted move touches
     ///     <see cref="Fenrir.Application.Game.Inventory.ContainerMatrix.Equipment" /> (<c>GenericActionHandler</c>'s own
     ///     precomputed <see cref="Fenrir.Application.Game.Inventory.InventoryZoneCommand.UpdatedStats" />).
@@ -112,7 +114,8 @@ public sealed class PlayerRuntimeState
 
     /// <summary>
     ///     This character's item containers (inventory pages, equipment, store pages) while <c>InWorld</c> --
-    ///     see <see cref="Fenrir.Application.Game.Inventory.InventoryState" />'s own remarks for the single-writer contract (identical
+    ///     see <see cref="Fenrir.Application.Game.Inventory.InventoryState" />'s own remarks for the single-writer contract
+    ///     (identical
     ///     to every other field on this type: mutated ONLY by <see cref="Zone" />'s own tick). Seeded at world
     ///     entry from the A3 world-entry bundle's item result set (<c>Zone.HandleEnter</c>), kept current by
     ///     <c>Zone.ApplyInventoryCommand</c> for every later accepted container move/equip/unequip
@@ -220,7 +223,8 @@ public sealed class PlayerRuntimeState
     ///     decremented/expired by <see cref="Simulation.BuffExpirySystem" /> every legacy tick.
     /// </summary>
     /// <remarks>
-    ///     Deliberately a FRESH per-instance array (never <c>Fenrir.Contracts.Packets.Shared.WorldStateTemplates.ZeroedBuffInfo</c>,
+    ///     Deliberately a FRESH per-instance array (never
+    ///     <c>Fenrir.Contracts.Packets.Shared.WorldStateTemplates.ZeroedBuffInfo</c>,
     ///     which is one process-wide SHARED static instance) -- reusing that template here would let every
     ///     player's buffs alias the same backing <c>int[]</c> and corrupt each other.
     /// </remarks>
@@ -356,7 +360,10 @@ public sealed class PlayerRuntimeState
     /// </summary>
     public int? TeacherCharacterId { get; set; }
 
-    /// <summary>This character's student, if any (only meaningful for a master) -- game.Characters.StudentCharacterId, same posture as <see cref="TeacherCharacterId" />.</summary>
+    /// <summary>
+    ///     This character's student, if any (only meaningful for a master) -- game.Characters.StudentCharacterId, same
+    ///     posture as <see cref="TeacherCharacterId" />.
+    /// </summary>
     public int? StudentCharacterId { get; set; }
 
     // ---- Server Logic V9 Progression ----
@@ -368,16 +375,26 @@ public sealed class PlayerRuntimeState
     /// </summary>
     public int QuestStepPermanent { get; set; }
 
-    /// <summary>Legacy <c>aQuestInfo[1]</c> -- 0/1 "a quest is currently active" flag (NOT a quest id despite the DB column's legacy-derived name, game.CharacterQuests.ActiveQuestId).</summary>
+    /// <summary>
+    ///     Legacy <c>aQuestInfo[1]</c> -- 0/1 "a quest is currently active" flag (NOT a quest id despite the DB column's
+    ///     legacy-derived name, game.CharacterQuests.ActiveQuestId).
+    /// </summary>
     public int QuestActiveFlag { get; set; }
 
-    /// <summary>Legacy <c>aQuestInfo[2]</c> -- the active quest's <c>qSort</c> (1-8, see <see cref="Quests.QuestStateMachine" />'s remarks for the verified 8, not 6, real types). 0 = no active quest.</summary>
+    /// <summary>
+    ///     Legacy <c>aQuestInfo[2]</c> -- the active quest's <c>qSort</c> (1-8, see
+    ///     <see cref="Quests.QuestStateMachine" />'s remarks for the verified 8, not 6, real types). 0 = no active quest.
+    /// </summary>
     public int QuestSort { get; set; }
 
     /// <summary>Legacy <c>aQuestInfo[3]</c> -- target item id / exchange phase, meaning depends on <see cref="QuestSort" />.</summary>
     public int QuestTargetPhase { get; set; }
 
-    /// <summary>Legacy <c>aQuestInfo[4]</c> -- kill counter / second exchange item, meaning depends on <see cref="QuestSort" />. Incremented by the monster-kill hook (qSort 1/5) -- see <see cref="Monsters.MonsterSpawnScheduler" />'s ProcessDeath.</summary>
+    /// <summary>
+    ///     Legacy <c>aQuestInfo[4]</c> -- kill counter / second exchange item, meaning depends on
+    ///     <see cref="QuestSort" />. Incremented by the monster-kill hook (qSort 1/5) -- see
+    ///     <see cref="Monsters.MonsterSpawnScheduler" />'s ProcessDeath.
+    /// </summary>
     public int QuestKillCounter { get; set; }
 
     /// <summary>
@@ -399,10 +416,16 @@ public sealed class PlayerRuntimeState
     /// </summary>
     public int MissionKillOtherTribe { get; set; }
 
-    /// <summary>Legacy <c>aMissionDate.aKillMonster</c> -- tracked (echoed on ZC 163) but its own claim-gate is compiled OUT in EU33 (USE_DAILY_UI_MONSTER_KILL is OFF, verified) so it never blocks a claim.</summary>
+    /// <summary>
+    ///     Legacy <c>aMissionDate.aKillMonster</c> -- tracked (echoed on ZC 163) but its own claim-gate is compiled OUT
+    ///     in EU33 (USE_DAILY_UI_MONSTER_KILL is OFF, verified) so it never blocks a claim.
+    /// </summary>
     public int MissionKillMonster { get; set; }
 
-    /// <summary>Legacy <c>aMissionDate.aPlayTime</c> -- same "tracked, gate compiled out" posture as <see cref="MissionKillMonster" />.</summary>
+    /// <summary>
+    ///     Legacy <c>aMissionDate.aPlayTime</c> -- same "tracked, gate compiled out" posture as
+    ///     <see cref="MissionKillMonster" />.
+    /// </summary>
     public int MissionPlayTime { get; set; }
 
     /// <summary>Legacy <c>aAutoState</c> (0/1) -- CZ_AUTO_CONFIG_SEND/ZC_AUTO_CONFIG_RECV (opcode 99/123).</summary>
@@ -431,7 +454,10 @@ public sealed class PlayerRuntimeState
     /// </summary>
     public TimeSpan? LastHeroRankingPreviousQueryAtZoneClock { get; set; }
 
-    /// <summary>Same throttle posture as <see cref="LastHeroRankingPreviousQueryAtZoneClock" />, for the CURRENT period (ZC 150, <c>mTickForRankingCur</c>).</summary>
+    /// <summary>
+    ///     Same throttle posture as <see cref="LastHeroRankingPreviousQueryAtZoneClock" />, for the CURRENT period (ZC
+    ///     150, <c>mTickForRankingCur</c>).
+    /// </summary>
     public TimeSpan? LastHeroRankingCurrentQueryAtZoneClock { get; set; }
 
     /// <summary>
@@ -453,10 +479,16 @@ public sealed class PlayerRuntimeState
     /// </summary>
     public byte PetActivity { get; set; }
 
-    /// <summary>The ItemId last seen equipped in the pet slot -- lets <see cref="World.Zone" /> detect a pet SWAP (not just any equipment change) to reset <see cref="PetGrowth" />/<see cref="PetActivity" />. 0 = no pet equipped.</summary>
+    /// <summary>
+    ///     The ItemId last seen equipped in the pet slot -- lets <see cref="World.Zone" /> detect a pet SWAP (not just
+    ///     any equipment change) to reset <see cref="PetGrowth" />/<see cref="PetActivity" />. 0 = no pet equipped.
+    /// </summary>
     public int LastSeenPetItemId { get; set; }
 
-    /// <summary>Legacy-tick accumulator for <see cref="Simulation.PetActivitySystem" />'s own 60-tick (30 s) decay cadence -- never read by anything else.</summary>
+    /// <summary>
+    ///     Legacy-tick accumulator for <see cref="Simulation.PetActivitySystem" />'s own 60-tick (30 s) decay cadence --
+    ///     never read by anything else.
+    /// </summary>
     public int PetActivityDecayTicks { get; set; }
 
     // ---- Server Logic V8 Player Commerce & Cash ----
@@ -481,6 +513,10 @@ public sealed class PlayerRuntimeState
     /// </summary>
     public bool PshopOpen { get; set; }
 
-    /// <summary>The currently-advertised stall listing while <see cref="PshopOpen" /> is true; stale/meaningless otherwise (not cleared on close, matching the legacy's own "don't bother zeroing it" posture -- callers must always gate on <see cref="PshopOpen" /> first).</summary>
+    /// <summary>
+    ///     The currently-advertised stall listing while <see cref="PshopOpen" /> is true; stale/meaningless otherwise
+    ///     (not cleared on close, matching the legacy's own "don't bother zeroing it" posture -- callers must always gate on
+    ///     <see cref="PshopOpen" /> first).
+    /// </summary>
     public PshopInfo? PshopListing { get; set; }
 }

@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using Fenrir.Application.Game.Combat;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Inventory;
+using Fenrir.Application.Game.Pets;
 using Fenrir.Application.Game.Stats;
 using Fenrir.Application.Game.Tribes;
 using Fenrir.Application.Game.World;
@@ -44,6 +45,14 @@ public sealed class TribeActionHandler(
     private const int HaloEnchantCpCost = 100;
     private const int MapScrollCpCost = 1;
     private const int AlertCharmCpCost = 10;
+
+    /// <summary>
+    ///     <c>mTitleCostCP</c> (S07_MyGame03.cpp:25, doc 10 §2 tSort 6) -- indexed by the CURRENT rank
+    ///     (0-11) before the purchase; the 13th (index 12) legacy entry is dead (the source's own bound
+    ///     check never allows <c>tCurrentTitle</c> to reach 12) but kept here for exact table fidelity.
+    /// </summary>
+    private static readonly int[] TitleCostCp =
+        [800, 1700, 2500, 3400, 4200, 5100, 5900, 6800, 7600, 8500, 9300, 10000, 10000];
 
     public async ValueTask HandleAsync(TribeActionRequest packet, IPacketSession session,
         CancellationToken cancellationToken)
@@ -100,10 +109,10 @@ public sealed class TribeActionHandler(
                 await HandleLevelBonusAsync(packet, session, zoneSession, zone, state, characterId, ct);
                 return;
             case 9:
-                await HandleOrnamentAsync(packet, session, zoneSession, zone, state, characterId, on: true, ct);
+                await HandleOrnamentAsync(packet, session, zoneSession, zone, state, characterId, true, ct);
                 return;
             case 10:
-                await HandleOrnamentAsync(packet, session, zoneSession, zone, state, characterId, on: false, ct);
+                await HandleOrnamentAsync(packet, session, zoneSession, zone, state, characterId, false, ct);
                 return;
             case 11:
                 HandleRebirth(zoneSession);
@@ -116,12 +125,12 @@ public sealed class TribeActionHandler(
                 zoneSession.Abort(DisconnectReason.Faulted);
                 return;
             case 16:
-                await HandleScrollAsync(packet, session, zoneSession, zone, state, characterId, itemId: 591,
-                    cpCost: MapScrollCpCost, ct);
+                await HandleScrollAsync(packet, session, zoneSession, zone, state, characterId, 591,
+                    MapScrollCpCost, ct);
                 return;
             case 17:
-                await HandleScrollAsync(packet, session, zoneSession, zone, state, characterId, itemId: 590,
-                    cpCost: AlertCharmCpCost, ct);
+                await HandleScrollAsync(packet, session, zoneSession, zone, state, characterId, 590,
+                    AlertCharmCpCost, ct);
                 return;
             case 18:
                 await HandleTowerScrollAsync(packet, session, zoneSession, zone, state, characterId, ct);
@@ -132,7 +141,10 @@ public sealed class TribeActionHandler(
         }
     }
 
-    /// <summary>tSort 1 -- reset spent base stats back into unspent points (S04_MyWork02.cpp:10835-10858). Level &lt;=39 and a valid tribe-capital zone, else <c>Quit()</c>.</summary>
+    /// <summary>
+    ///     tSort 1 -- reset spent base stats back into unspent points (S04_MyWork02.cpp:10835-10858). Level &lt;=39 and a
+    ///     valid tribe-capital zone, else <c>Quit()</c>.
+    /// </summary>
     private async ValueTask HandleStatResetAsync(TribeActionRequest packet, IPacketSession session,
         ZoneClientSession zoneSession, Zone zone, PlayerRuntimeState state, int characterId, CancellationToken ct)
     {
@@ -216,25 +228,25 @@ public sealed class TribeActionHandler(
 
         if (target is null)
         {
-            SendEcho(session, packet, result: 1);
+            SendEcho(session, packet, 1);
             return;
         }
 
         if (target.Level < 113)
         {
-            SendEcho(session, packet, result: 2);
+            SendEcho(session, packet, 2);
             return;
         }
 
         if (target.ContributionPoints < 1000)
         {
-            SendEcho(session, packet, result: 3);
+            SendEcho(session, packet, 3);
             return;
         }
 
         if (subMasters.Any(s => s.CharacterId == target.CharacterId))
         {
-            SendEcho(session, packet, result: 4);
+            SendEcho(session, packet, 4);
             return;
         }
 
@@ -274,7 +286,10 @@ public sealed class TribeActionHandler(
             targetZone.PostTribeProgressCommand(new TribeProgressZoneCommand(targetId.Value, TribeRole: 0));
     }
 
-    /// <summary>tSort 4 -- tribe weapon, Force Leader/sub-master (S04_MyWork02.cpp:10999-11053). Money debited but NEVER notified to the client (doc 10 quirk 8) -- matches the legacy's own missing B_AVATAR_CHANGE_INFO_2 call.</summary>
+    /// <summary>
+    ///     tSort 4 -- tribe weapon, Force Leader/sub-master (S04_MyWork02.cpp:10999-11053). Money debited but NEVER
+    ///     notified to the client (doc 10 quirk 8) -- matches the legacy's own missing B_AVATAR_CHANGE_INFO_2 call.
+    /// </summary>
     private async ValueTask HandleTribeWeaponAsync(TribeActionRequest packet, IPacketSession session,
         ZoneClientSession zoneSession, Zone zone, PlayerRuntimeState state, int characterId, CancellationToken ct)
     {
@@ -335,7 +350,10 @@ public sealed class TribeActionHandler(
         zoneSession.Abort(DisconnectReason.Faulted);
     }
 
-    /// <summary>tSort 6 -- title tier purchase, USE_TITLE, no role gate at all (S04_MyWork02.cpp:11095-11126, verified -- any tribe member may buy, CP-gated only).</summary>
+    /// <summary>
+    ///     tSort 6 -- title tier purchase, USE_TITLE, no role gate at all (S04_MyWork02.cpp:11095-11126, verified -- any
+    ///     tribe member may buy, CP-gated only).
+    /// </summary>
     private async ValueTask HandleTitleAsync(TribeActionRequest packet, IPacketSession session,
         ZoneClientSession zoneSession, Zone zone, PlayerRuntimeState state, int characterId, CancellationToken ct)
     {
@@ -359,7 +377,7 @@ public sealed class TribeActionHandler(
             return;
         }
 
-        var newTitle = (payload.TitleSort - 1) * 100 + (currentRank + 1);
+        var newTitle = (payload.TitleSort - 1) * 100 + currentRank + 1;
 
         var attributes = new CharacterBaseAttributes(state.StatVit, state.StatStr, state.StatInt, state.StatDex,
             state.Level, state.Tribe, newTitle, state.Halo, state.RebirthCount);
@@ -372,11 +390,14 @@ public sealed class TribeActionHandler(
         // SetIntegerUp(aLifeValue, aMaxLifeValue, aMaxLifeValue) / SetIntegerUp(aManaValue, ...) -- both
         // target args are the SAME value, so this is an unconditional full heal to the new max, not a clamp.
         await zone.PostTribeProgressCommandAndWaitAsync(new TribeProgressZoneCommand(characterId,
-            ContributionPoints: state.ContributionPoints - cost, Title: newTitle,
+            state.ContributionPoints - cost, Title: newTitle,
             Life: updatedStats.MaxLife, Mana: updatedStats.MaxMana, UpdatedStats: updatedStats), ct);
     }
 
-    /// <summary>tSort 7 -- halo enchant, USE_HALO, no role gate at all (S04_MyWork02.cpp:11128-11231, verified). Anti-double-click-per-tick is NOT reproduced (open issue -- no per-zone-tick counter is exposed to this handler).</summary>
+    /// <summary>
+    ///     tSort 7 -- halo enchant, USE_HALO, no role gate at all (S04_MyWork02.cpp:11128-11231, verified).
+    ///     Anti-double-click-per-tick is NOT reproduced (open issue -- no per-zone-tick counter is exposed to this handler).
+    /// </summary>
     private async ValueTask HandleHaloEnchantAsync(TribeActionRequest packet, IPacketSession session,
         ZoneClientSession zoneSession, Zone zone, PlayerRuntimeState state, int characterId, CancellationToken ct)
     {
@@ -419,13 +440,13 @@ public sealed class TribeActionHandler(
                 pet: ComputePetContribution(state, equipmentContainer));
 
             await zone.PostTribeProgressCommandAndWaitAsync(new TribeProgressZoneCommand(characterId,
-                ContributionPoints: state.ContributionPoints - HaloEnchantCpCost, Halo: newHalo,
+                state.ContributionPoints - HaloEnchantCpCost, Halo: newHalo,
                 ProtectForHalo: newProtect, UpdatedStats: updatedStats), ct);
         }
         else
         {
             await zone.PostTribeProgressCommandAndWaitAsync(new TribeProgressZoneCommand(characterId,
-                ContributionPoints: state.ContributionPoints - HaloEnchantCpCost, ProtectForHalo: newProtect), ct);
+                state.ContributionPoints - HaloEnchantCpCost, ProtectForHalo: newProtect), ct);
         }
     }
 
@@ -520,9 +541,13 @@ public sealed class TribeActionHandler(
     ///     tSort 11 -- Max Rebirth (S04_MyWork02.cpp:11342-11389, __REBIRTH__).
     /// </summary>
     /// <remarks>
-    ///     DEFERRED (documented, not fabricated): the real gate is <c>aRebirthNum &lt; MAX_REBIRTH_LIMIT(12)
-    ///     &amp;&amp; (aLevel1+aLevel2)==(MAX_LIMIT_LEVEL_NUM+MAX_LIMIT_HIGH_LEVEL_NUM) &amp;&amp; aExp2&gt;=
-    ///     ReturnHighExpValue(aLevel2) &amp;&amp; aKillOtherTribe&gt;=10000</c>. Fenrir has no Level2/Exp2
+    ///     DEFERRED (documented, not fabricated): the real gate is
+    ///     <c>
+    ///         aRebirthNum &lt; MAX_REBIRTH_LIMIT(12)
+    ///         &amp;&amp; (aLevel1+aLevel2)==(MAX_LIMIT_LEVEL_NUM+MAX_LIMIT_HIGH_LEVEL_NUM) &amp;&amp; aExp2&gt;=
+    ///         ReturnHighExpValue(aLevel2) &amp;&amp; aKillOtherTribe&gt;=10000
+    ///     </c>
+    ///     . Fenrir has no Level2/Exp2
     ///     ("high level"/rebirth martial track) -- Experience is one merged BIGINT
     ///     (game.Characters_progression.sql) and <c>AvatarInfoFactory</c> leaves Exp1/Exp2 at 0 -- so the
     ///     Level1+Level2==157 gate would require fabricating a Level2 system this domain doesn't own (a
@@ -534,7 +559,10 @@ public sealed class TribeActionHandler(
         zoneSession.Abort(DisconnectReason.Faulted);
     }
 
-    /// <summary>tSort 16 (map/clan scroll, item 591, 1 CP) / tSort 17 (alert charm, item 590, 10 CP) -- Force Leader/sub-master (S04_MyWork02.cpp:11403-11452).</summary>
+    /// <summary>
+    ///     tSort 16 (map/clan scroll, item 591, 1 CP) / tSort 17 (alert charm, item 590, 10 CP) -- Force
+    ///     Leader/sub-master (S04_MyWork02.cpp:11403-11452).
+    /// </summary>
     private async ValueTask HandleScrollAsync(TribeActionRequest packet, IPacketSession session,
         ZoneClientSession zoneSession, Zone zone, PlayerRuntimeState state, int characterId, int itemId, int cpCost,
         CancellationToken ct)
@@ -548,11 +576,14 @@ public sealed class TribeActionHandler(
         SendEcho(session, packet);
 
         await zone.PostTribeProgressCommandAndWaitAsync(new TribeProgressZoneCommand(characterId,
-            ContributionPoints: state.ContributionPoints - cpCost,
+            state.ContributionPoints - cpCost,
             DropItems: [new TribeGroundItemDrop(itemId, 1)]), ct);
     }
 
-    /// <summary>tSort 18 -- tower construction scroll, USE_TOWER, Force Leader/sub-master (S04_MyWork02.cpp:11453-11478). Money debited but NEVER notified (same doc 10 quirk 8 as tSort 4).</summary>
+    /// <summary>
+    ///     tSort 18 -- tower construction scroll, USE_TOWER, Force Leader/sub-master (S04_MyWork02.cpp:11453-11478).
+    ///     Money debited but NEVER notified (same doc 10 quirk 8 as tSort 4).
+    /// </summary>
     private async ValueTask HandleTowerScrollAsync(TribeActionRequest packet, IPacketSession session,
         ZoneClientSession zoneSession, Zone zone, PlayerRuntimeState state, int characterId, CancellationToken ct)
     {
@@ -581,14 +612,9 @@ public sealed class TribeActionHandler(
     }
 
     /// <summary>
-    ///     <c>mTitleCostCP</c> (S07_MyGame03.cpp:25, doc 10 §2 tSort 6) -- indexed by the CURRENT rank
-    ///     (0-11) before the purchase; the 13th (index 12) legacy entry is dead (the source's own bound
-    ///     check never allows <c>tCurrentTitle</c> to reach 12) but kept here for exact table fidelity.
+    ///     <c>IsValidTown</c> (mapcheck.h:83, verified via report 10 §0): tribe 0-2 map to zones 1/6/11, tribe 3 to zone
+    ///     140.
     /// </summary>
-    private static readonly int[] TitleCostCp =
-        [800, 1700, 2500, 3400, 4200, 5100, 5900, 6800, 7600, 8500, 9300, 10000, 10000];
-
-    /// <summary><c>IsValidTown</c> (mapcheck.h:83, verified via report 10 §0): tribe 0-2 map to zones 1/6/11, tribe 3 to zone 140.</summary>
     private static bool IsValidTown(byte tribe, short mapId)
     {
         return tribe switch
@@ -628,13 +654,13 @@ public sealed class TribeActionHandler(
     ///     always the right inputs (unlike GenericActionHandler's projected-container nuance for an
     ///     in-flight equip/unequip).
     /// </summary>
-    private Stats.PetStatContribution ComputePetContribution(PlayerRuntimeState state,
+    private PetStatContribution ComputePetContribution(PlayerRuntimeState state,
         IReadOnlyDictionary<byte, ItemStack> equipmentContainer)
     {
-        var petItemId = equipmentContainer.TryGetValue(Pets.PetSlots.EquipmentSlot, out var petStack)
+        var petItemId = equipmentContainer.TryGetValue(PetSlots.EquipmentSlot, out var petStack)
             ? petStack.ItemId
             : 0;
 
-        return Pets.PetGrowthCalculator.Compute(petItemId, state.PetGrowth, state.PetActivity, worldData.ItemsById);
+        return PetGrowthCalculator.Compute(petItemId, state.PetGrowth, state.PetActivity, worldData.ItemsById);
     }
 }

@@ -19,7 +19,10 @@ public sealed class QuestCatalog
             .ToFrozenDictionary(q => (q.Quest.Category, q.Quest.Step));
     }
 
-    /// <summary>Resolves <c>mQUEST.Search(tribe, step)</c> -- null (not found) is a normal, expected outcome (e.g. the tribe's chain ends at this step).</summary>
+    /// <summary>
+    ///     Resolves <c>mQUEST.Search(tribe, step)</c> -- null (not found) is a normal, expected outcome (e.g. the tribe's
+    ///     chain ends at this step).
+    /// </summary>
     public QuestDefinition? TryGet(byte tribe, int step)
     {
         if (step is < 0 or > short.MaxValue)

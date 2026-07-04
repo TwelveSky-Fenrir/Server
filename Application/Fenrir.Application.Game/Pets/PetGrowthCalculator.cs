@@ -11,7 +11,8 @@ namespace Fenrir.Application.Game.Pets;
 ///     (<c>Server/ts25zone/GameSystem/GameSystem_07_Pet.cpp:532-694,1578-1720</c>, read in full and verified
 ///     byte-for-byte -- <c>GIFT_EVENT</c> is unconditionally <c>#define</c>d, DEFINE.h:117, so its extra
 ///     item ids are always live). Populates <see cref="PetStatContribution" /> from
-///     <see cref="Fenrir.Application.Game.World.PlayerRuntimeState.PetGrowth" />/<see cref="Fenrir.Application.Game.World.PlayerRuntimeState.PetActivity" />
+///     <see cref="Fenrir.Application.Game.World.PlayerRuntimeState.PetGrowth" />/
+///     <see cref="Fenrir.Application.Game.World.PlayerRuntimeState.PetActivity" />
 ///     -- see <see cref="Stats.StatCalculator" />'s own class remarks for why populating this parameter
 ///     (not modifying <see cref="StatCalculator" /> itself) is the whole job here.
 /// </summary>
@@ -21,15 +22,19 @@ namespace Fenrir.Application.Game.Pets;
 ///     activity parameter at all in their active bodies. A prior draft of this pass assumed activity gated
 ///     all four uniformly; corrected against the actual source read.
 ///     <para>
-///     Each of the 4 functions has ITS OWN item-id-&gt;family membership (verified: the 4 switch-case
-///     blocks differ from each other, not just one shared table reused 4 times) -- kept as 4 separate
-///     frozen sets rather than one merged table to avoid inventing a false "these must be the same"
-///     simplification.
+///         Each of the 4 functions has ITS OWN item-id-&gt;family membership (verified: the 4 switch-case
+///         blocks differ from each other, not just one shared table reused 4 times) -- kept as 4 separate
+///         frozen sets rather than one merged table to avoid inventing a false "these must be the same"
+///         simplification.
 ///     </para>
 /// </remarks>
 public static class PetGrowthCalculator
 {
-    /// <summary><c>mMaxRangeValue[0..3]</c> (PETSYSTEM constructor) -- the only 4 indices these 4 functions ever select (indices 4-7 are new-pet variants of <see cref="Quests.QuestStateMachine" />-unrelated systems this pass does not touch).</summary>
+    /// <summary>
+    ///     <c>mMaxRangeValue[0..3]</c> (PETSYSTEM constructor) -- the only 4 indices these 4 functions ever select
+    ///     (indices 4-7 are new-pet variants of <see cref="Quests.QuestStateMachine" />-unrelated systems this pass does not
+    ///     touch).
+    /// </summary>
     private static readonly int[] MaxRangeValue = [40_000_000, 80_000_000, 160_000_000, 320_000_000];
 
     private static readonly FrozenDictionary<int, int> LifeFamily = BuildFamily(
@@ -83,7 +88,9 @@ public static class PetGrowthCalculator
         return new PetStatContribution(
             ComputeTiered(petItemId, growth, LifeFamily, LifePremium, 2000f, 2200f, 4000f, 4400f),
             ComputeTiered(petItemId, growth, ManaFamily, ManaPremium, 1800f, 2000f, 3600f, 4000f),
-            activity < 1 ? 0 : ComputeTiered(petItemId, growth, AttackFamily, AttackPremium, 1000f, 1100f, 2000f, 2200f),
+            activity < 1
+                ? 0
+                : ComputeTiered(petItemId, growth, AttackFamily, AttackPremium, 1000f, 1100f, 2000f, 2200f),
             ComputeTiered(petItemId, growth, DefenseFamily, DefensePremium, 2000f, 2200f, 4000f, 4400f));
     }
 

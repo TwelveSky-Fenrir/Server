@@ -31,6 +31,13 @@ public sealed class CraftItemHandler(
     ILogger<CraftItemHandler> logger)
     : IAsyncPacketHandler<CraftItemRequest>
 {
+    /// <summary>
+    ///     First empty slot across both inventory pages, page 0 before page 1, slot 0 upward -- a reasonable, documented
+    ///     scan order (not independently verified against <c>FindEmptyInvenForItem</c>'s own internal order).
+    /// </summary>
+    private static readonly byte[] InventoryPagesInScanOrder =
+        [ContainerMatrix.InventoryPage0, ContainerMatrix.InventoryPage1];
+
     public async ValueTask HandleAsync(CraftItemRequest packet, IPacketSession session,
         CancellationToken cancellationToken)
     {
@@ -217,7 +224,8 @@ public sealed class CraftItemHandler(
             // ZC_ADD_USER_INVENTORY_ITEM_RECV below (mTRANSFER.B_ADD_USER_INVENTORY_ITEM_RECV).
             session.Send(new CraftItemResponse
             {
-                Result = MaterialResultCode(resolved.RemainingMaterial), Value = MaterialValue(resolved.RemainingMaterial)
+                Result = MaterialResultCode(resolved.RemainingMaterial),
+                Value = MaterialValue(resolved.RemainingMaterial)
             });
             session.Send(new AddInventoryItemResponse
             {
@@ -239,7 +247,8 @@ public sealed class CraftItemHandler(
                 cancellationToken);
             session.Send(new CraftItemResponse
             {
-                Result = MaterialResultCode(resolved.RemainingMaterial), Value = MaterialValue(resolved.RemainingMaterial)
+                Result = MaterialResultCode(resolved.RemainingMaterial),
+                Value = MaterialValue(resolved.RemainingMaterial)
             });
             containers = ImmutableArray.Create(new InventoryContainerSnapshot((byte)page1,
                 projectedMaterialContainer));
@@ -258,7 +267,10 @@ public sealed class CraftItemHandler(
         return remainingMaterial is null ? 1001 : 10001;
     }
 
-    /// <summary>[0]=itemId,[1]=X,[2]=Y,[3]=Quantity,[4]=0,[5]=serial (S04_MyWork02.cpp:4453-4458) -- X/Y have no Fenrir-side backing (see class remarks), left 0.</summary>
+    /// <summary>
+    ///     [0]=itemId,[1]=X,[2]=Y,[3]=Quantity,[4]=0,[5]=serial (S04_MyWork02.cpp:4453-4458) -- X/Y have no Fenrir-side
+    ///     backing (see class remarks), left 0.
+    /// </summary>
     private static int[] MaterialValue(ItemStack? remainingMaterial)
     {
         return remainingMaterial is { } m ? [m.ItemId, 0, 0, m.Quantity, 0, m.Serial] : [0, 0, 0, 0, 0, 0];
@@ -269,10 +281,6 @@ public sealed class CraftItemHandler(
         return page is ContainerMatrix.InventoryPage0 or ContainerMatrix.InventoryPage1 &&
                ContainerMatrix.IsValidSlot((byte)page, index);
     }
-
-    /// <summary>First empty slot across both inventory pages, page 0 before page 1, slot 0 upward -- a reasonable, documented scan order (not independently verified against <c>FindEmptyInvenForItem</c>'s own internal order).</summary>
-    private static readonly byte[] InventoryPagesInScanOrder =
-        [ContainerMatrix.InventoryPage0, ContainerMatrix.InventoryPage1];
 
     private static bool TryFindEmptySlot(PlayerRuntimeState state, out byte page, out byte index)
     {

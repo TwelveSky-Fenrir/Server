@@ -10,7 +10,7 @@ namespace Fenrir.Application.Game.Combat;
 public interface IRandomSource
 {
     /// <summary>A non-negative integer in <c>[0, exclusiveUpperBound)</c> -- the C# analog of <c>rand_mir() % N</c>.</summary>
-    int NextInt32(int exclusiveUpperBound);
+    public int NextInt32(int exclusiveUpperBound);
 }
 
 /// <summary>Production default: <see cref="System.Random.Shared" />, safe to call from any thread.</summary>

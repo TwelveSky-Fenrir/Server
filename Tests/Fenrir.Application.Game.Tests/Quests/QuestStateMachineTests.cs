@@ -19,7 +19,10 @@ public class QuestStateMachineTests
 
     private static QuestCatalog CatalogWithRewards(QuestRowDto quest, params QuestRewardRowDto[] rewards)
     {
-        var rows = WorldDataTestRows.MinimalRows() with { Quests = [quest], QuestRewards = rewards, QuestSpeeches = [] };
+        var rows = WorldDataTestRows.MinimalRows() with
+        {
+            Quests = [quest], QuestRewards = rewards, QuestSpeeches = []
+        };
         var (cache, _) = WorldDataCacheBuilder.Build(rows);
         return new QuestCatalog(cache);
     }
@@ -35,7 +38,7 @@ public class QuestStateMachineTests
     public void PresentState_Idle_NoNextQuest_IsInvalid()
     {
         var catalog = Catalog(); // no quests at all
-        var state = QuestStateMachine.ComputePresentState(QuestProgress.None, Tribe, level: 100, catalog, NoItems);
+        var state = QuestStateMachine.ComputePresentState(QuestProgress.None, Tribe, 100, catalog, NoItems);
 
         Assert.Equal(QuestStateMachine.StateInvalid, state);
     }
@@ -46,7 +49,7 @@ public class QuestStateMachineTests
         var next = WorldDataTestRows.Quest(1) with { Category = Category, Step = 1, Level = 50, Sort = 1 };
         var catalog = Catalog(next);
 
-        var state = QuestStateMachine.ComputePresentState(QuestProgress.None, Tribe, level: 10, catalog, NoItems);
+        var state = QuestStateMachine.ComputePresentState(QuestProgress.None, Tribe, 10, catalog, NoItems);
 
         Assert.Equal(QuestStateMachine.StateInvalid, state);
     }
@@ -57,7 +60,7 @@ public class QuestStateMachineTests
         var next = WorldDataTestRows.Quest(1) with { Category = Category, Step = 1, Level = 5, Sort = 1 };
         var catalog = Catalog(next);
 
-        var state = QuestStateMachine.ComputePresentState(QuestProgress.None, Tribe, level: 10, catalog, NoItems);
+        var state = QuestStateMachine.ComputePresentState(QuestProgress.None, Tribe, 10, catalog, NoItems);
 
         Assert.Equal(QuestStateMachine.StateCanAccept, state);
     }
@@ -74,7 +77,7 @@ public class QuestStateMachineTests
         var catalog = Catalog(quest);
         var progress = new QuestProgress(3, 1, 1, 5001, 2); // 2 kills of 3 required
 
-        var state = QuestStateMachine.ComputePresentState(progress, Tribe, level: 10, catalog, NoItems);
+        var state = QuestStateMachine.ComputePresentState(progress, Tribe, 10, catalog, NoItems);
 
         Assert.Equal(QuestStateMachine.StateInProgress, state);
     }
@@ -116,7 +119,10 @@ public class QuestStateMachineTests
     [InlineData(4)]
     public void PresentState_ItemQuest_NotInInventory_IsInProgress(int qSort)
     {
-        var quest = WorldDataTestRows.Quest(1) with { Category = Category, Step = 2, Sort = (byte)qSort, Solution1 = 7000 };
+        var quest = WorldDataTestRows.Quest(1) with
+        {
+            Category = Category, Step = 2, Sort = (byte)qSort, Solution1 = 7000
+        };
         var catalog = Catalog(quest);
         var progress = new QuestProgress(2, 1, qSort, 7000, 0);
 
@@ -130,7 +136,10 @@ public class QuestStateMachineTests
     [InlineData(4)]
     public void PresentState_ItemQuest_InInventory_IsConditionMet(int qSort)
     {
-        var quest = WorldDataTestRows.Quest(1) with { Category = Category, Step = 2, Sort = (byte)qSort, Solution1 = 7000 };
+        var quest = WorldDataTestRows.Quest(1) with
+        {
+            Category = Category, Step = 2, Sort = (byte)qSort, Solution1 = 7000
+        };
         var catalog = Catalog(quest);
         var progress = new QuestProgress(2, 1, qSort, 7000, 0);
 
@@ -297,7 +306,10 @@ public class QuestStateMachineTests
         // Regression test (review finding, Phase C/V9): reward type 5 (aTeacherPoint,
         // GL_614_QUEST_TEACHER_POINT, S04_MyWork02.cpp:7420-7423) was previously unhandled by this switch --
         // silently dropped despite real world.QuestRewards seed rows using it.
-        var quest = WorldDataTestRows.Quest(1) with { Category = Category, Step = 3, Sort = 1, Solution1 = 5001, Solution2 = 1 };
+        var quest = WorldDataTestRows.Quest(1) with
+        {
+            Category = Category, Step = 3, Sort = 1, Solution1 = 5001, Solution2 = 1
+        };
         var rewards = new[] { new QuestRewardRowDto(1, 0, 5, null, 100_000) };
         var catalog = CatalogWithRewards(quest, rewards);
         var progress = new QuestProgress(3, 1, 1, 5001, 1);
@@ -330,7 +342,7 @@ public class QuestStateMachineTests
         var progress = new QuestProgress(2, 1, 2, 7000, 0);
 
         var result = QuestStateMachine.Complete(progress, Tribe, 10, catalog, id => id == 7000,
-            itemId => itemId == 9500 ? (byte)9 : null); // sort 9 -> in [7,29] -> quantity 0
+            itemId => itemId == 9500 ? 9 : null); // sort 9 -> in [7,29] -> quantity 0
 
         Assert.True(result.Success);
         Assert.Equal(9500, result.RewardItemId);
@@ -346,7 +358,7 @@ public class QuestStateMachineTests
         var progress = new QuestProgress(2, 1, 2, 7000, 0);
 
         var result = QuestStateMachine.Complete(progress, Tribe, 10, catalog, id => id == 7000,
-            itemId => itemId == 9501 ? (byte)99 : null);
+            itemId => itemId == 9501 ? 99 : null);
 
         Assert.Equal(1, result.RewardItemQuantity);
     }
@@ -384,7 +396,10 @@ public class QuestStateMachineTests
     [Fact]
     public void TryReceive_WrongQSort_Fails()
     {
-        var quest = WorldDataTestRows.Quest(1) with { Category = Category, Step = 2, Sort = 1, Solution1 = 700, Solution2 = 1 };
+        var quest = WorldDataTestRows.Quest(1) with
+        {
+            Category = Category, Step = 2, Sort = 1, Solution1 = 700, Solution2 = 1
+        };
         var catalog = Catalog(quest);
         var progress = new QuestProgress(2, 1, 1, 700, 0); // qSort 1, not 3/4/6
 

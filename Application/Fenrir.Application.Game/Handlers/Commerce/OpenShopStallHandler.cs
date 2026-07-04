@@ -123,7 +123,7 @@ public sealed class OpenShopStallHandler(
 
             if (isProxy)
                 offlineItems.Add(new OfflineShopItemSlotTvp((short)(page * PshopPurchasePolicy.MaxSlots + slot),
-                    view.ItemId, view.Quantity, view.Value, view.Serial, view.Price, SocketData: null));
+                    view.ItemId, view.Quantity, view.Value, view.Serial, view.Price, null));
         }
 
         // Fresh server-assigned UniqueNumber (legacy: mGAME.mAvatarPShopUniqueNumber++); CharacterId-derived
@@ -172,7 +172,9 @@ public sealed class OpenShopStallHandler(
         }
 
         var settings = await gameSettings.GetAsync(cancellationToken);
-        var shopDate = GameDate.Today() + settings.ProxyShopDurationDays; // not real calendar-add arithmetic -- shopDate is only ever compared for equality/staleness elsewhere, never added-to again.
+        var shopDate =
+            GameDate.Today() +
+            settings.ProxyShopDurationDays; // not real calendar-add arithmetic -- shopDate is only ever compared for equality/staleness elsewhere, never added-to again.
 
         try
         {

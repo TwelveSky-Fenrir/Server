@@ -9,7 +9,8 @@ namespace Fenrir.Contracts.Packets.Zone;
 ///     (header only). IPC failure or a false <c>mRecv_Result</c> from ts25extra disconnects the client
 ///     (aggressive). Reply: ZC_GET_REWARD_ITEM_RECV.
 /// </summary>
-[FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.GetDailyRewardCatalog, ExpectedSize = 9,
+[FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.GetDailyRewardCatalog,
+    ExpectedSize = 9,
     AllowedStates = [(byte)ZoneSessionState.InWorld])]
 public readonly partial record struct GetDailyRewardCatalogRequest : IIncomingPacket<GetDailyRewardCatalogRequest>
 {

@@ -22,22 +22,8 @@ public static class EnchantMaterialCatalog
         RareOrElite
     }
 
-    /// <summary>
-    ///     One material's rule for the +0..+40 regime. <see cref="IsFillToValue" />: <see cref="Value" /> is
-    ///     the TARGET absolute enchant level (<c>iValue = Value - currentImprove</c>) rather than a flat
-    ///     increment. <see cref="IgnoresFortyCap" /> (material 825 ONLY): the only material allowed to jump
-    ///     straight past +40 in a single +0..+40-regime attempt -- verified real, not a guess (S04_MyWork02.cpp
-    ///     :3178-3184, "if (mat.iInfo->iIndex != 825)" guards the generic 40-clamp).
-    /// </summary>
-    public readonly record struct StandardMaterial(
-        int ItemId,
-        int Value,
-        int MoneyCost,
-        bool IsFillToValue,
-        bool ForcesGuaranteedSuccess,
-        TypeRequirement RequiredType,
-        int? MaxCurrentImproveExclusive,
-        bool IgnoresFortyCap);
+    /// <summary>The ONLY material that advances +40 -&gt; +41 (no roll, always succeeds, cost 0).</summary>
+    public const int UnsealItemId = 1422;
 
     /// <summary>+0..+40 regime materials (<c>CheckItemEnchantMaterial</c>, function.h:2553-2576).</summary>
     public static readonly IReadOnlyDictionary<int, StandardMaterial> StandardMaterials =
@@ -61,9 +47,6 @@ public static class EnchantMaterialCatalog
             [825] = new(825, 50, 0, true, true, TypeRequirement.RareOrElite, null, true)
         };
 
-    /// <summary>One material's rule for the +41..+50 regime (<c>MAX_IMPROVE_150</c>, S04_MyWork02.cpp:2886-2912).</summary>
-    public readonly record struct AdvancedMaterial(int ItemId, int Value, int MoneyCost, bool ForcesGuaranteedSuccess);
-
     /// <summary>+41..+50 regime materials. Item 1422 (the +40-&gt;+41 "UNSEAL" step) is handled separately -- it never rolls.</summary>
     public static readonly IReadOnlyDictionary<int, AdvancedMaterial> AdvancedMaterials =
         new Dictionary<int, AdvancedMaterial>
@@ -76,6 +59,23 @@ public static class EnchantMaterialCatalog
             [825] = new(825, 10, 0, true)
         };
 
-    /// <summary>The ONLY material that advances +40 -&gt; +41 (no roll, always succeeds, cost 0).</summary>
-    public const int UnsealItemId = 1422;
+    /// <summary>
+    ///     One material's rule for the +0..+40 regime. <see cref="IsFillToValue" />: <see cref="Value" /> is
+    ///     the TARGET absolute enchant level (<c>iValue = Value - currentImprove</c>) rather than a flat
+    ///     increment. <see cref="IgnoresFortyCap" /> (material 825 ONLY): the only material allowed to jump
+    ///     straight past +40 in a single +0..+40-regime attempt -- verified real, not a guess (S04_MyWork02.cpp
+    ///     :3178-3184, "if (mat.iInfo->iIndex != 825)" guards the generic 40-clamp).
+    /// </summary>
+    public readonly record struct StandardMaterial(
+        int ItemId,
+        int Value,
+        int MoneyCost,
+        bool IsFillToValue,
+        bool ForcesGuaranteedSuccess,
+        TypeRequirement RequiredType,
+        int? MaxCurrentImproveExclusive,
+        bool IgnoresFortyCap);
+
+    /// <summary>One material's rule for the +41..+50 regime (<c>MAX_IMPROVE_150</c>, S04_MyWork02.cpp:2886-2912).</summary>
+    public readonly record struct AdvancedMaterial(int ItemId, int Value, int MoneyCost, bool ForcesGuaranteedSuccess);
 }

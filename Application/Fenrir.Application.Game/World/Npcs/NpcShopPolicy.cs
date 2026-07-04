@@ -28,10 +28,56 @@ namespace Fenrir.Application.Game.World.Npcs;
 /// </remarks>
 public static class NpcShopPolicy
 {
-    /// <summary><c>IsValidTownAll</c> (mapcheck.h:116-128) -- both buy and sell require the CURRENT zone to be one of these.</summary>
-    public static readonly IReadOnlySet<short> TownZoneNumbers = new HashSet<short> { 1, 6, 11, 37, 140 };
+    public enum BuyOutcome
+    {
+        Success,
 
-    /// <summary><c>IRARE</c> (STRUCT.h:1657) -- items of this type or higher (IELITE=4) cannot be sold if enchanted/combined/refined/socketed.</summary>
+        /// <summary><c>iCheckNPCShop != 2</c> -- clean failure (<c>*tResult=1</c>, NOT a disconnect).</summary>
+        NotSellableHere,
+
+        /// <summary>Not present in ANY of this NPC's shop pages/slots -- structural cheat (Quit()-worthy).</summary>
+        NotInCatalog,
+
+        /// <summary>Stackable quantity outside [1, <see cref="GroundItemPickupPolicy.MaxStackQuantity" />] -- clean failure.</summary>
+        InvalidQuantity,
+
+        /// <summary>
+        ///     Destination occupied by a DIFFERENT item, or a merge would exceed the stack cap, or (non-stackable)
+        ///     destination is occupied at all -- Quit()-worthy.
+        /// </summary>
+        DestinationConflict,
+
+        /// <summary>
+        ///     This item costs Contribution Points (<c>iBuyCost2 &gt; 0</c>) -- NOT supported (see class remarks); clean
+        ///     failure.
+        /// </summary>
+        ContributionCostUnsupported,
+
+        /// <summary><c>nType == 13</c> shop, player below <see cref="SpecialShopMinimumLevel" /> -- Quit()-worthy.</summary>
+        BelowMinimumLevel
+    }
+
+    public enum SellOutcome
+    {
+        Success,
+
+        /// <summary>
+        ///     <c>iCheckNPCSell == 1</c>, or a Rare/Elite item with any upgrade value applied -- clean failure, no graceful
+        ///     path in the legacy (Quit()-worthy).
+        /// </summary>
+        Rejected,
+
+        /// <summary>
+        ///     Stackable quantity outside [1, <see cref="GroundItemPickupPolicy.MaxStackQuantity" />] or exceeding the held
+        ///     quantity.
+        /// </summary>
+        InvalidQuantity
+    }
+
+    /// <summary>
+    ///     <c>IRARE</c> (STRUCT.h:1657) -- items of this type or higher (IELITE=4) cannot be sold if
+    ///     enchanted/combined/refined/socketed.
+    /// </summary>
     private const byte RareItemType = 3;
 
     /// <summary><c>nType == 13</c> gate on buy (<c>ProcessForNPCShopToInventory</c>) -- requires <c>LV_M1</c> (DEFINE.h:451).</summary>
@@ -39,24 +85,8 @@ public static class NpcShopPolicy
 
     public const short SpecialShopMinimumLevel = 113;
 
-    public enum SellOutcome
-    {
-        Success,
-
-        /// <summary><c>iCheckNPCSell == 1</c>, or a Rare/Elite item with any upgrade value applied -- clean failure, no graceful path in the legacy (Quit()-worthy).</summary>
-        Rejected,
-
-        /// <summary>Stackable quantity outside [1, <see cref="GroundItemPickupPolicy.MaxStackQuantity" />] or exceeding the held quantity.</summary>
-        InvalidQuantity
-    }
-
-    public readonly record struct SellResult(
-        SellOutcome Outcome,
-        long MoneyGained,
-        ItemStack? RemainingSourceStack)
-    {
-        public bool Succeeded => Outcome == SellOutcome.Success;
-    }
+    /// <summary><c>IsValidTownAll</c> (mapcheck.h:116-128) -- both buy and sell require the CURRENT zone to be one of these.</summary>
+    public static readonly IReadOnlySet<short> TownZoneNumbers = new HashSet<short> { 1, 6, 11, 37, 140 };
 
     /// <summary>
     ///     Ports <c>ProcessForInventoryToNPCShop</c>'s branch on <c>iSort</c> (stackable vs. not) exactly.
@@ -81,7 +111,9 @@ public static class NpcShopPolicy
 
             var gained = (long)item.SellCost * requestedQuantity;
             var remainingQuantity = sourceStack.Quantity - requestedQuantity;
-            var remaining = remainingQuantity > 0 ? sourceStack with { Quantity = remainingQuantity } : (ItemStack?)null;
+            var remaining = remainingQuantity > 0
+                ? sourceStack with { Quantity = remainingQuantity }
+                : (ItemStack?)null;
             return new SellResult(SellOutcome.Success, gained, remaining);
         }
 
@@ -94,41 +126,6 @@ public static class NpcShopPolicy
             return new SellResult(SellOutcome.Rejected, 0, sourceStack);
 
         return new SellResult(SellOutcome.Success, item.SellCost, null);
-    }
-
-    public enum BuyOutcome
-    {
-        Success,
-
-        /// <summary><c>iCheckNPCShop != 2</c> -- clean failure (<c>*tResult=1</c>, NOT a disconnect).</summary>
-        NotSellableHere,
-
-        /// <summary>Not present in ANY of this NPC's shop pages/slots -- structural cheat (Quit()-worthy).</summary>
-        NotInCatalog,
-
-        /// <summary>Stackable quantity outside [1, <see cref="GroundItemPickupPolicy.MaxStackQuantity" />] -- clean failure.</summary>
-        InvalidQuantity,
-
-        /// <summary>Destination occupied by a DIFFERENT item, or a merge would exceed the stack cap, or (non-stackable) destination is occupied at all -- Quit()-worthy.</summary>
-        DestinationConflict,
-
-        /// <summary>This item costs Contribution Points (<c>iBuyCost2 &gt; 0</c>) -- NOT supported (see class remarks); clean failure.</summary>
-        ContributionCostUnsupported,
-
-        /// <summary><c>nType == 13</c> shop, player below <see cref="SpecialShopMinimumLevel" /> -- Quit()-worthy.</summary>
-        BelowMinimumLevel
-    }
-
-    public readonly record struct BuyResult(
-        BuyOutcome Outcome,
-        int MoneyCost,
-        ItemStack? NewDestinationStack)
-    {
-        public bool Succeeded => Outcome == BuyOutcome.Success;
-
-        /// <summary>Clean <c>*tResult=1</c> failures (NOT disconnect-worthy) per the verified source.</summary>
-        public bool IsCleanFailure => Outcome is BuyOutcome.NotSellableHere or BuyOutcome.InvalidQuantity
-            or BuyOutcome.ContributionCostUnsupported;
     }
 
     /// <summary>
@@ -205,5 +202,25 @@ public static class NpcShopPolicy
     {
         var unitCost = currentZoneNumber == 291 ? (int)(item.BuyCost * 0.9f) : item.BuyCost;
         return ContainerMatrix.IsStackableSort(item.Sort) ? unitCost * quantity : unitCost;
+    }
+
+    public readonly record struct SellResult(
+        SellOutcome Outcome,
+        long MoneyGained,
+        ItemStack? RemainingSourceStack)
+    {
+        public bool Succeeded => Outcome == SellOutcome.Success;
+    }
+
+    public readonly record struct BuyResult(
+        BuyOutcome Outcome,
+        int MoneyCost,
+        ItemStack? NewDestinationStack)
+    {
+        public bool Succeeded => Outcome == BuyOutcome.Success;
+
+        /// <summary>Clean <c>*tResult=1</c> failures (NOT disconnect-worthy) per the verified source.</summary>
+        public bool IsCleanFailure => Outcome is BuyOutcome.NotSellableHere or BuyOutcome.InvalidQuantity
+            or BuyOutcome.ContributionCostUnsupported;
     }
 }

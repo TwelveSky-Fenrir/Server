@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using System.Linq;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Inventory;
 using Fenrir.Application.Game.Tests.GameData;
@@ -18,7 +17,10 @@ public class NpcShopPolicyTests
 
     private static ItemDefinition Sellable(int itemId, byte sort, int sellCost, byte type = 0, byte checkNpcSell = 0)
     {
-        var row = WorldDataTestRows.Item(itemId) with { Sort = sort, SellCost = sellCost, Type = type, CheckNpcSell = checkNpcSell };
+        var row = WorldDataTestRows.Item(itemId) with
+        {
+            Sort = sort, SellCost = sellCost, Type = type, CheckNpcSell = checkNpcSell
+        };
         return new ItemDefinition(row, []);
     }
 
@@ -42,8 +44,8 @@ public class NpcShopPolicyTests
     [Fact]
     public void Sell_NonStackable_CreditsFlatSellCost_ClearsSlot()
     {
-        var item = Sellable(700, sort: 9, sellCost: 500);
-        var result = NpcShopPolicy.ResolveSell(item, Stack(700, 1), requestedQuantity: 0);
+        var item = Sellable(700, 9, 500);
+        var result = NpcShopPolicy.ResolveSell(item, Stack(700, 1), 0);
 
         Assert.True(result.Succeeded);
         Assert.Equal(500, result.MoneyGained);
@@ -53,8 +55,8 @@ public class NpcShopPolicyTests
     [Fact]
     public void Sell_Stackable_CreditsSellCostTimesQuantity_PartialStackRemains()
     {
-        var item = Sellable(50, sort: 2, sellCost: 10);
-        var result = NpcShopPolicy.ResolveSell(item, Stack(50, 20), requestedQuantity: 5);
+        var item = Sellable(50, 2, 10);
+        var result = NpcShopPolicy.ResolveSell(item, Stack(50, 20), 5);
 
         Assert.True(result.Succeeded);
         Assert.Equal(50, result.MoneyGained);
@@ -64,8 +66,8 @@ public class NpcShopPolicyTests
     [Fact]
     public void Sell_Stackable_SellingWholeStack_ClearsSlot()
     {
-        var item = Sellable(50, sort: 2, sellCost: 10);
-        var result = NpcShopPolicy.ResolveSell(item, Stack(50, 20), requestedQuantity: 20);
+        var item = Sellable(50, 2, 10);
+        var result = NpcShopPolicy.ResolveSell(item, Stack(50, 20), 20);
 
         Assert.True(result.Succeeded);
         Assert.Null(result.RemainingSourceStack);
@@ -74,7 +76,7 @@ public class NpcShopPolicyTests
     [Fact]
     public void Sell_CheckNpcSellFlagSet_IsRejected()
     {
-        var item = Sellable(700, sort: 9, sellCost: 500, checkNpcSell: 1);
+        var item = Sellable(700, 9, 500, checkNpcSell: 1);
         var result = NpcShopPolicy.ResolveSell(item, Stack(700, 1), 0);
 
         Assert.False(result.Succeeded);
@@ -84,8 +86,8 @@ public class NpcShopPolicyTests
     [Fact]
     public void Sell_RareItemWithEnchantApplied_IsRejected()
     {
-        var item = Sellable(700, sort: 9, sellCost: 500, type: 3); // IRARE
-        var result = NpcShopPolicy.ResolveSell(item, Stack(700, 1, enchant: 5), 0);
+        var item = Sellable(700, 9, 500, 3); // IRARE
+        var result = NpcShopPolicy.ResolveSell(item, Stack(700, 1, 5), 0);
 
         Assert.False(result.Succeeded);
     }
@@ -93,7 +95,7 @@ public class NpcShopPolicyTests
     [Fact]
     public void Sell_RareItemWithNoUpgradeApplied_Succeeds()
     {
-        var item = Sellable(700, sort: 9, sellCost: 500, type: 3);
+        var item = Sellable(700, 9, 500, 3);
         var result = NpcShopPolicy.ResolveSell(item, Stack(700, 1), 0);
 
         Assert.True(result.Succeeded);
@@ -102,8 +104,8 @@ public class NpcShopPolicyTests
     [Fact]
     public void Sell_StackableQuantityExceedsHeld_IsRejected()
     {
-        var item = Sellable(50, sort: 2, sellCost: 10);
-        var result = NpcShopPolicy.ResolveSell(item, Stack(50, 5), requestedQuantity: 10);
+        var item = Sellable(50, 2, 10);
+        var result = NpcShopPolicy.ResolveSell(item, Stack(50, 5), 10);
 
         Assert.Equal(NpcShopPolicy.SellOutcome.InvalidQuantity, result.Outcome);
     }
@@ -113,10 +115,10 @@ public class NpcShopPolicyTests
     [Fact]
     public void Buy_ItemNotInNpcCatalog_IsRejected()
     {
-        var npc = Shop(1, npcType: 1, 100);
-        var item = Buyable(200, sort: 9, buyCost: 1000);
+        var npc = Shop(1, 1, 100);
+        var item = Buyable(200, 9, 1000);
 
-        var result = NpcShopPolicy.ResolveBuy(npc, item, 0, null, playerLevel: 1, currentZoneNumber: 1);
+        var result = NpcShopPolicy.ResolveBuy(npc, item, 0, null, 1, 1);
 
         Assert.Equal(NpcShopPolicy.BuyOutcome.NotInCatalog, result.Outcome);
     }
@@ -124,10 +126,10 @@ public class NpcShopPolicyTests
     [Fact]
     public void Buy_NonStackable_EmptyDestination_Succeeds_AtFlatCost()
     {
-        var npc = Shop(1, npcType: 1, 700);
-        var item = Buyable(700, sort: 9, buyCost: 1000);
+        var npc = Shop(1, 1, 700);
+        var item = Buyable(700, 9, 1000);
 
-        var result = NpcShopPolicy.ResolveBuy(npc, item, 0, null, playerLevel: 1, currentZoneNumber: 1);
+        var result = NpcShopPolicy.ResolveBuy(npc, item, 0, null, 1, 1);
 
         Assert.True(result.Succeeded);
         Assert.Equal(1000, result.MoneyCost);
@@ -138,10 +140,10 @@ public class NpcShopPolicyTests
     [Fact]
     public void Buy_NonStackable_OccupiedDestination_IsConflict()
     {
-        var npc = Shop(1, npcType: 1, 700);
-        var item = Buyable(700, sort: 9, buyCost: 1000);
+        var npc = Shop(1, 1, 700);
+        var item = Buyable(700, 9, 1000);
 
-        var result = NpcShopPolicy.ResolveBuy(npc, item, 0, Stack(1, 1), playerLevel: 1, currentZoneNumber: 1);
+        var result = NpcShopPolicy.ResolveBuy(npc, item, 0, Stack(1, 1), 1, 1);
 
         Assert.Equal(NpcShopPolicy.BuyOutcome.DestinationConflict, result.Outcome);
     }
@@ -149,10 +151,10 @@ public class NpcShopPolicyTests
     [Fact]
     public void Buy_Stackable_MergesIntoExistingSameItemStack_CostsPerUnit()
     {
-        var npc = Shop(1, npcType: 1, 50);
-        var item = Buyable(50, sort: 2, buyCost: 100);
+        var npc = Shop(1, 1, 50);
+        var item = Buyable(50, 2, 100);
 
-        var result = NpcShopPolicy.ResolveBuy(npc, item, 5, Stack(50, 10), playerLevel: 1, currentZoneNumber: 1);
+        var result = NpcShopPolicy.ResolveBuy(npc, item, 5, Stack(50, 10), 1, 1);
 
         Assert.True(result.Succeeded);
         Assert.Equal(500, result.MoneyCost);
@@ -162,10 +164,10 @@ public class NpcShopPolicyTests
     [Fact]
     public void Buy_Stackable_MergeExceedingCap_IsConflict()
     {
-        var npc = Shop(1, npcType: 1, 50);
-        var item = Buyable(50, sort: 2, buyCost: 100);
+        var npc = Shop(1, 1, 50);
+        var item = Buyable(50, 2, 100);
 
-        var result = NpcShopPolicy.ResolveBuy(npc, item, 10, Stack(50, 995), playerLevel: 1, currentZoneNumber: 1);
+        var result = NpcShopPolicy.ResolveBuy(npc, item, 10, Stack(50, 995), 1, 1);
 
         Assert.Equal(NpcShopPolicy.BuyOutcome.DestinationConflict, result.Outcome);
     }
@@ -173,10 +175,10 @@ public class NpcShopPolicyTests
     [Fact]
     public void Buy_ItemNotFlaggedForNpcShop_IsCleanFailure_NotDisconnect()
     {
-        var npc = Shop(1, npcType: 1, 700);
-        var item = Buyable(700, sort: 9, buyCost: 1000, checkNpcShop: 0);
+        var npc = Shop(1, 1, 700);
+        var item = Buyable(700, 9, 1000, checkNpcShop: 0);
 
-        var result = NpcShopPolicy.ResolveBuy(npc, item, 0, null, playerLevel: 1, currentZoneNumber: 1);
+        var result = NpcShopPolicy.ResolveBuy(npc, item, 0, null, 1, 1);
 
         Assert.Equal(NpcShopPolicy.BuyOutcome.NotSellableHere, result.Outcome);
         Assert.True(result.IsCleanFailure);
@@ -185,10 +187,10 @@ public class NpcShopPolicyTests
     [Fact]
     public void Buy_ContributionPointCostItem_IsUnsupported_CleanFailure()
     {
-        var npc = Shop(1, npcType: 1, 700);
-        var item = Buyable(700, sort: 9, buyCost: 1000, buyCost2: 50);
+        var npc = Shop(1, 1, 700);
+        var item = Buyable(700, 9, 1000, 50);
 
-        var result = NpcShopPolicy.ResolveBuy(npc, item, 0, null, playerLevel: 1, currentZoneNumber: 1);
+        var result = NpcShopPolicy.ResolveBuy(npc, item, 0, null, 1, 1);
 
         Assert.Equal(NpcShopPolicy.BuyOutcome.ContributionCostUnsupported, result.Outcome);
         Assert.True(result.IsCleanFailure);
@@ -197,10 +199,10 @@ public class NpcShopPolicyTests
     [Fact]
     public void Buy_SpecialShopNpcType_BelowMinimumLevel_IsRejected()
     {
-        var npc = Shop(1, npcType: NpcShopPolicy.SpecialShopNpcType, 700);
-        var item = Buyable(700, sort: 9, buyCost: 1000);
+        var npc = Shop(1, NpcShopPolicy.SpecialShopNpcType, 700);
+        var item = Buyable(700, 9, 1000);
 
-        var result = NpcShopPolicy.ResolveBuy(npc, item, 0, null, playerLevel: 50, currentZoneNumber: 1);
+        var result = NpcShopPolicy.ResolveBuy(npc, item, 0, null, 50, 1);
 
         Assert.Equal(NpcShopPolicy.BuyOutcome.BelowMinimumLevel, result.Outcome);
     }
@@ -208,11 +210,11 @@ public class NpcShopPolicyTests
     [Fact]
     public void Buy_SpecialShopNpcType_AtOrAboveMinimumLevel_Succeeds()
     {
-        var npc = Shop(1, npcType: NpcShopPolicy.SpecialShopNpcType, 700);
-        var item = Buyable(700, sort: 9, buyCost: 1000);
+        var npc = Shop(1, NpcShopPolicy.SpecialShopNpcType, 700);
+        var item = Buyable(700, 9, 1000);
 
-        var result = NpcShopPolicy.ResolveBuy(npc, item, 0, null, playerLevel: NpcShopPolicy.SpecialShopMinimumLevel,
-            currentZoneNumber: 1);
+        var result = NpcShopPolicy.ResolveBuy(npc, item, 0, null, NpcShopPolicy.SpecialShopMinimumLevel,
+            1);
 
         Assert.True(result.Succeeded);
     }
@@ -220,10 +222,10 @@ public class NpcShopPolicyTests
     [Fact]
     public void Buy_Zone291_Applies10PercentDiscount()
     {
-        var npc = Shop(1, npcType: 1, 700);
-        var item = Buyable(700, sort: 9, buyCost: 1000);
+        var npc = Shop(1, 1, 700);
+        var item = Buyable(700, 9, 1000);
 
-        var result = NpcShopPolicy.ResolveBuy(npc, item, 0, null, playerLevel: 1, currentZoneNumber: 291);
+        var result = NpcShopPolicy.ResolveBuy(npc, item, 0, null, 1, 291);
 
         Assert.Equal(900, result.MoneyCost);
     }

@@ -30,7 +30,10 @@ public sealed record TribeRepository(ICaeriusNetDbContext Db) : ITribeRepository
         return await Db.ExecuteScalarAsync<byte>(sp, ct);
     }
 
-    /// <summary>All 4 tribes (MAX_TRIBE_NUM) -- TRIBE_WORK tSort 5's own <c>mWorldInfo-&gt;mTribePoint[i]&gt;100</c>/<c>ReturnSmallTribe</c> gate reads every tribe's Points at once.</summary>
+    /// <summary>
+    ///     All 4 tribes (MAX_TRIBE_NUM) -- TRIBE_WORK tSort 5's own <c>mWorldInfo-&gt;mTribePoint[i]&gt;100</c>/
+    ///     <c>ReturnSmallTribe</c> gate reads every tribe's Points at once.
+    /// </summary>
     public async ValueTask<ReadOnlyCollection<TribeSummaryDto>> GetAllAsync(CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Tribe_GetAll", 4).Build();
@@ -71,7 +74,10 @@ public sealed record TribeRepository(ICaeriusNetDbContext Db) : ITribeRepository
         await Db.ExecuteAsync(sp, ct);
     }
 
-    /// <summary>All 50 tribe-bank slot balances for one tribe (CZ_TRIBE_BANK_SEND sort 1 view, and sort 2's own current-balance read).</summary>
+    /// <summary>
+    ///     All 50 tribe-bank slot balances for one tribe (CZ_TRIBE_BANK_SEND sort 1 view, and sort 2's own
+    ///     current-balance read).
+    /// </summary>
     public async ValueTask<ReadOnlyCollection<TribeBankSlotDto>> GetBankAsync(byte tribeId, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_TribeBank_GetByTribe", 50)
@@ -81,7 +87,10 @@ public sealed record TribeRepository(ICaeriusNetDbContext Db) : ITribeRepository
         return await Db.QueryAsReadOnlyCollectionAsync<TribeBankSlotDto>(sp, ct);
     }
 
-    /// <summary>CZ_TRIBE_BANK_SEND sort 2 -- withdraw the given amount from one slot; throws (50210/50211) if the amount is non-positive or exceeds the slot's balance.</summary>
+    /// <summary>
+    ///     CZ_TRIBE_BANK_SEND sort 2 -- withdraw the given amount from one slot; throws (50210/50211) if the amount is
+    ///     non-positive or exceeds the slot's balance.
+    /// </summary>
     public async ValueTask WithdrawBankAsync(byte tribeId, byte slotIndex, int amount, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_TribeBank_Withdraw", 0)

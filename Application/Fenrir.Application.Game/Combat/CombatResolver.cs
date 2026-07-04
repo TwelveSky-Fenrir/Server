@@ -17,17 +17,23 @@ namespace Fenrir.Application.Game.Combat;
 ///     SCOPE for this pass (report 05 §4's other guards/mechanics, deliberately NOT reproduced -- see this
 ///     task's StructuredOutput for the full list):
 ///     <list type="bullet">
-///         <item><c>mCase</c> 1 (DUEL): the legacy gates it on a 3-way duel-state match
+///         <item>
+///             <c>mCase</c> 1 (DUEL): the legacy gates it on a 3-way duel-state match
 ///             (<c>aDuelState[0..2]</c>) Fenrir has no subsystem for yet -- NOT implemented; a client sending
 ///             Case=1 is silently dropped by <c>Zone.ApplyCombatCommand</c> (no fabricated duel state to
-///             validate against).</item>
-///         <item><c>mCase</c> 3/4 (PvM/MvP), 5/6 (stun/unstun): monsters and the stun subsystem do not exist
+///             validate against).
+///         </item>
+///         <item>
+///             <c>mCase</c> 3/4 (PvM/MvP), 5/6 (stun/unstun): monsters and the stun subsystem do not exist
 ///             yet (V4's job) -- <c>Zone.ApplyCombatCommand</c> drops these too. <see cref="CombatMath" />'s
-///             primitives are already general enough for V4 to reuse once monster entities exist.</item>
-///         <item>Holy Shield absorption / Return Damage / shield removal (buff slots 9/12/14), tribe-master-call
+///             primitives are already general enough for V4 to reuse once monster entities exist.
+///         </item>
+///         <item>
+///             Holy Shield absorption / Return Damage / shield removal (buff slots 9/12/14), tribe-master-call
 ///             formation bonuses, zone-124's &lt;10s triple-crit, PvP kill rewards (<c>ProcessForKillOtherTribe</c>,
 ///             report 05 §6) -- all need zone/tribe/alliance state this pass does not model. A PvP kill here
-///             only calls <c>Zone.ApplyDeath</c> (HP mechanism); it grants no CP/XP/drop to the killer.</item>
+///             only calls <c>Zone.ApplyDeath</c> (HP mechanism); it grants no CP/XP/drop to the killer.
+///         </item>
 ///     </list>
 ///     PRESERVED VERBATIM despite looking like a bug (D8 iso-behavior policy): after the min-5 floor and the
 ///     possible critical doubling, avatar-vs-avatar damage is divided by <see cref="MinimumDamageAgainstAvatar" />
@@ -41,19 +47,25 @@ public static class CombatResolver
     /// <summary><c>tMaxAttackDistance</c> (S07_MyGame02.cpp:512).</summary>
     public const float MaxAttackDistance = 185.0f;
 
-    /// <summary><c>tMinDamageValueWithAvatar</c> (S07_MyGame02.cpp:511) -- both a damage FLOOR and the PvP-only final divisor (class remarks).</summary>
+    /// <summary>
+    ///     <c>tMinDamageValueWithAvatar</c> (S07_MyGame02.cpp:511) -- both a damage FLOOR and the PvP-only final divisor
+    ///     (class remarks).
+    /// </summary>
     public const int MinimumDamageAgainstAvatar = 5;
 
-    /// <summary><c>PROTECT_TICK</c> (S07_MyGame02.cpp:9) -- 20 legacy ticks = 10s anti-chain-attack window after either side last took damage.</summary>
+    /// <summary>
+    ///     <c>PROTECT_TICK</c> (S07_MyGame02.cpp:9) -- 20 legacy ticks = 10s anti-chain-attack window after either side
+    ///     last took damage.
+    /// </summary>
     public const int ProtectTickLegacyTicks = 20;
-
-    public static readonly TimeSpan ProtectDuration = SimulationClock.ToTimeSpan(ProtectTickLegacyTicks);
 
     /// <summary>
     ///     Skill number 78 is explicitly excluded from the critical roll at its OWN call site (l.1123, l.1205) --
     ///     preserved verbatim, not otherwise explained in the source.
     /// </summary>
     private const int SkillNumberExcludedFromCritical = 78;
+
+    public static readonly TimeSpan ProtectDuration = SimulationClock.ToTimeSpan(ProtectTickLegacyTicks);
 
     public static AttackOutcome ResolveEnemyTribeAttack(
         CombatantSnapshot attacker,

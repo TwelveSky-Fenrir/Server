@@ -13,17 +13,23 @@ namespace Fenrir.Application.Game.Skills;
 /// <remarks>
 ///     NOT reproduced (open issues, explicitly out of this pass's scope -- see this task's StructuredOutput):
 ///     <list type="bullet">
-///         <item>Party-wide application for skills 76/77/79/81 ("Formation" skills): the legacy requires a
+///         <item>
+///             Party-wide application for skills 76/77/79/81 ("Formation" skills): the legacy requires a
 ///             FULL 5-member party present (<c>mParty_Buff_Act</c>/<c>MAX_PARTY_AVATAR_NUM</c> gate,
 ///             S07_MyGame04.cpp:1344-1375) before buffing every member. Fenrir has no Party subsystem yet, so
 ///             these four collapse to a SELF-only cast here -- strictly weaker than legacy, never exploitable
-///             the other way.</item>
-///         <item>Skill 82's zone-124 10s real-time additional cooldown (<c>mLastHSTick</c>) and the dead
+///             the other way.
+///         </item>
+///         <item>
+///             Skill 82's zone-124 10s real-time additional cooldown (<c>mLastHSTick</c>) and the dead
 ///             <c>MG5ORIGIN_ECAPE</c> cape-redirect block (that macro is never <c>#define</c>d anywhere in the
-///             tree -- confirmed dead code, correctly NOT ported).</item>
-///         <item><c>mSupportSkillTimeUpRatio</c> (duration multiplier, up to ×4 for premium): no such field
+///             tree -- confirmed dead code, correctly NOT ported).
+///         </item>
+///         <item>
+///             <c>mSupportSkillTimeUpRatio</c> (duration multiplier, up to ×4 for premium): no such field
 ///             exists on <c>PlayerRuntimeState</c> yet -- every duration below is the raw <c>RunTime</c> value,
-///             equivalent to a ratio of 1.0.</item>
+///             equivalent to a ratio of 1.0.
+///         </item>
 ///     </list>
 /// </remarks>
 public static class SkillEffectCatalog
@@ -79,11 +85,11 @@ public static class SkillEffectCatalog
         AddPartyBuffAsSelf(entries, 81, [(10, SkillValueKind.CriticalUp, false)]);
 
         // l.9449-9511: targeted HP heal, flat amount = RecoverInfo1 (kind 2).
-        foreach (var skillId in (int[]) [106, 108, 110])
+        foreach (var skillId in (int[])[106, 108, 110])
             entries[skillId] = SkillEffectDefinition.HealLife;
 
         // l.9512-9576: targeted MP heal, flat amount = RecoverInfo2 (kind 3).
-        foreach (var skillId in (int[]) [107, 109, 111])
+        foreach (var skillId in (int[])[107, 109, 111])
             entries[skillId] = SkillEffectDefinition.HealMana;
 
         return entries.ToFrozenDictionary();
@@ -118,7 +124,10 @@ public enum SkillEffectKind
     HealMana
 }
 
-/// <summary>One BUFF_INFO slot a skill writes on cast: value from <see cref="Kind" />, duration always from <see cref="SkillValueKind.RunTime" />.</summary>
+/// <summary>
+///     One BUFF_INFO slot a skill writes on cast: value from <see cref="Kind" />, duration always from
+///     <see cref="SkillValueKind.RunTime" />.
+/// </summary>
 public readonly record struct BuffEffectSlot(int Slot, SkillValueKind Kind, bool IsPercentOfMaxLife);
 
 public sealed record SkillEffectDefinition(

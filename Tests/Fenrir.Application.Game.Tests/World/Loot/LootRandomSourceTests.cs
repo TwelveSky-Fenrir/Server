@@ -4,19 +4,6 @@ namespace Fenrir.Application.Game.Tests.World.Loot;
 
 public class LootRandomSourceTests
 {
-    /// <summary>Scripted <see cref="Random" /> subclass -- <see cref="Random.Next(int, int)" /> is virtual precisely for this kind of deterministic test double.</summary>
-    private sealed class ScriptedRandom(params int[] sequence) : Random
-    {
-        private int _index;
-
-        public override int Next(int minValue, int maxValue)
-        {
-            var value = sequence[_index % sequence.Length];
-            _index++;
-            return minValue + value % (maxValue - minValue);
-        }
-    }
-
     [Fact]
     public void RandomNumber_BothDrawsZero_ReturnsOne()
     {
@@ -55,6 +42,22 @@ public class LootRandomSourceTests
         {
             var value = LootRandomSource.RandomNumber(random);
             Assert.InRange(value, 1, 1_000_000);
+        }
+    }
+
+    /// <summary>
+    ///     Scripted <see cref="Random" /> subclass -- <see cref="Random.Next(int, int)" /> is virtual precisely for this
+    ///     kind of deterministic test double.
+    /// </summary>
+    private sealed class ScriptedRandom(params int[] sequence) : Random
+    {
+        private int _index;
+
+        public override int Next(int minValue, int maxValue)
+        {
+            var value = sequence[_index % sequence.Length];
+            _index++;
+            return minValue + value % (maxValue - minValue);
         }
     }
 }

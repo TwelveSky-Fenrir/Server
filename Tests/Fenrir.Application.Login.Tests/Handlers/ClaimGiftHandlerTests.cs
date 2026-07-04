@@ -20,7 +20,8 @@ public class ClWantGiftSendHandlerTests
         var handler = new ClaimGiftHandler(gifts, NullLogger<ClaimGiftHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
 
-        await handler.HandleAsync(new ClaimGiftRequest { Sort = 0, GiftInfoIndex = 1 }, session, CancellationToken.None);
+        await handler.HandleAsync(new ClaimGiftRequest { Sort = 0, GiftInfoIndex = 1 }, session,
+            CancellationToken.None);
 
         Assert.Equal(502, gifts.LastClaimedGiftId);
         Assert.Null(session.DisconnectReason);
@@ -34,7 +35,8 @@ public class ClWantGiftSendHandlerTests
         var handler = new ClaimGiftHandler(gifts, NullLogger<ClaimGiftHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
 
-        await handler.HandleAsync(new ClaimGiftRequest { Sort = 0, GiftInfoIndex = 5 }, session, CancellationToken.None);
+        await handler.HandleAsync(new ClaimGiftRequest { Sort = 0, GiftInfoIndex = 5 }, session,
+            CancellationToken.None);
 
         Assert.Null(gifts.LastClaimedGiftId);
         await PacketAssert.AssertSentAsync(pipe, new ClaimGiftResponse { Result = 1 });
@@ -47,7 +49,8 @@ public class ClWantGiftSendHandlerTests
         var handler = new ClaimGiftHandler(gifts, NullLogger<ClaimGiftHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
 
-        await handler.HandleAsync(new ClaimGiftRequest { Sort = 0, GiftInfoIndex = 0 }, session, CancellationToken.None);
+        await handler.HandleAsync(new ClaimGiftRequest { Sort = 0, GiftInfoIndex = 0 }, session,
+            CancellationToken.None);
 
         await PacketAssert.AssertSentAsync(pipe, new ClaimGiftResponse { Result = 1 });
     }
@@ -59,7 +62,8 @@ public class ClWantGiftSendHandlerTests
         var handler = new ClaimGiftHandler(gifts, NullLogger<ClaimGiftHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
 
-        await handler.HandleAsync(new ClaimGiftRequest { Sort = 0, GiftInfoIndex = 0 }, session, CancellationToken.None);
+        await handler.HandleAsync(new ClaimGiftRequest { Sort = 0, GiftInfoIndex = 0 }, session,
+            CancellationToken.None);
 
         Assert.Null(session.DisconnectReason);
         await PacketAssert.AssertSentAsync(pipe, new ClaimGiftResponse { Result = 2 });
@@ -74,7 +78,8 @@ public class ClWantGiftSendHandlerTests
         var handler = new ClaimGiftHandler(gifts, NullLogger<ClaimGiftHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
 
-        await handler.HandleAsync(new ClaimGiftRequest { Sort = 0, GiftInfoIndex = index }, session, CancellationToken.None);
+        await handler.HandleAsync(new ClaimGiftRequest { Sort = 0, GiftInfoIndex = index }, session,
+            CancellationToken.None);
 
         Assert.Equal(DisconnectReason.Malformed, session.DisconnectReason);
         PacketAssert.AssertNothingSent(pipe);

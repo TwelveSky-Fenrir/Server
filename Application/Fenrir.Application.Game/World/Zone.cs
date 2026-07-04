@@ -5,13 +5,19 @@ using System.Diagnostics;
 using System.Threading.Channels;
 using Fenrir.Application.Game.Combat;
 using Fenrir.Application.Game.GameData;
+using Fenrir.Application.Game.Guilds;
 using Fenrir.Application.Game.Inventory;
 using Fenrir.Application.Game.Movement;
+using Fenrir.Application.Game.Pets;
+using Fenrir.Application.Game.Progression;
 using Fenrir.Application.Game.Quests;
 using Fenrir.Application.Game.Simulation;
 using Fenrir.Application.Game.Skills;
 using Fenrir.Application.Game.Social.Chat;
+using Fenrir.Application.Game.Social.Mentor;
+using Fenrir.Application.Game.Social.Pshop;
 using Fenrir.Application.Game.Stats;
+using Fenrir.Application.Game.Tribes;
 using Fenrir.Application.Game.World.Geometry;
 using Fenrir.Application.Game.World.Loot;
 using Fenrir.Application.Game.World.Monsters;
@@ -55,18 +61,23 @@ public sealed class Zone(
     private readonly SimulationTickAccumulator _accumulator = new();
 
     /// <summary>
-    ///     Server Logic V9 Progression -- resolved once per zone. Null (production default from
-    ///     <see cref="ZoneRegistry" />, which owns the single process-wide <see cref="QuestCatalog" />
-    ///     singleton) builds a private one from <paramref name="worldData" /> instead, so pre-existing test
-    ///     call sites (<c>ZoneTestKit</c>) that construct a <see cref="Zone" /> directly keep compiling
-    ///     unchanged.
+    ///     Fifth inbox, same additive posture as <see cref="_skillInbox" />/<see cref="_inventoryInbox" />:
+    ///     raw local/shout/tribe chat sends (<see cref="Social.Chat.ChatZoneCommand" />, Phase C/V6
+    ///     Social) that need this zone's own tick-owned <see cref="_grid" />/<see cref="_players" /> to
+    ///     resolve their audience -- every other chat channel (whisper/party/guild/world/notices) is a
+    ///     plain cross-zone or same-zone fan-out a handler does directly via <c>ZoneRegistry</c>/
+    ///     <see cref="Players" /> without ever touching the tick thread (see
+    ///     <see cref="Social.Chat.ChatZoneCommand" />'s own remarks).
     /// </summary>
-    private readonly QuestCatalog _questCatalog = questCatalog ?? new QuestCatalog(worldData);
+    private readonly Channel<ChatZoneCommand> _chatInbox =
+        Channel.CreateBounded<ChatZoneCommand>(
+            new BoundedChannelOptions(2048) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
-    private readonly AoiGrid _grid = new(options.AoiCellSize);
-
-    private readonly Channel<ZoneCommand> _inbox = Channel.CreateBounded<ZoneCommand>(
-        new BoundedChannelOptions(8192) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+    /// <summary>
+    ///     Enqueued by <see cref="TryClaimGroundItem" /> (any thread) so the despawn BROADCAST (needs
+    ///     <see cref="_grid" />, tick-thread-only) happens from the tick, never from the claiming handler's own thread.
+    /// </summary>
+    private readonly ConcurrentQueue<GroundItemEntity> _claimedGroundItemDespawns = new();
 
     /// <summary>
     ///     Third inbox, alongside <see cref="_inbox" />/<see cref="_inventoryInbox" />: raw, UNVALIDATED
@@ -76,8 +87,36 @@ public sealed class Zone(
     private readonly Channel<CombatCommand> _combatInbox = Channel.CreateBounded<CombatCommand>(
         new BoundedChannelOptions(4096) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
-    /// <summary>Combat/skill RNG -- <see cref="SystemRandomSource" /> in production, injectable for deterministic tests.</summary>
-    private readonly IRandomSource _random = randomSource ?? SystemRandomSource.Instance;
+    /// <summary>
+    ///     Enqueued by <see cref="TryDamageMonster" /> (any thread) on a killing blow, drained by
+    ///     <see cref="Monsters.MonsterSpawnScheduler" /> on this zone's own next tick (loot/XP/respawn -- single-writer
+    ///     preserved).
+    /// </summary>
+    private readonly ConcurrentQueue<DeadMonsterEvent> _deadMonsters = new();
+
+    private readonly AoiGrid _grid = new(options.AoiCellSize);
+
+    /// <summary>Tick-owned only (rebroadcast/expiry both run on the tick thread) -- see <see cref="_groundItems" />'s remarks.</summary>
+    private readonly Dictionary<int, TimeSpan> _groundItemLastRebroadcast = new();
+
+    // Populated/expired ONLY by this zone's own tick (single-writer); CLAIMED (removed) via an atomic
+    // compare-and-remove callable from ANY thread -- see TryClaimGroundItem's remarks for why pickup is the
+    // one narrow exception, mirroring the same reasoning already accepted for TryDamageMonster/ApplyDeath.
+    private readonly ConcurrentDictionary<int, GroundItemEntity> _groundItems = new();
+
+    /// <summary>
+    ///     Seventh inbox, same additive posture as <see cref="_mentorInbox" />: already-durably-persisted
+    ///     guild-membership mirrors (<see cref="Guilds.GuildMembershipZoneCommand" />, Phase C/V7 Guilds
+    ///     &amp; Tribes -- GUILD_WORK create/join/leave/kick/promote/title/transfer/disband, doc 10 §1) for
+    ///     THIS character's own hosting zone, posted by <c>GuildActionHandler</c> whether the target is the
+    ///     actor themselves or a DIFFERENT (possibly cross-zone or offline) guild member.
+    /// </summary>
+    private readonly Channel<GuildMembershipZoneCommand> _guildInbox =
+        Channel.CreateBounded<GuildMembershipZoneCommand>(
+            new BoundedChannelOptions(512) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+
+    private readonly Channel<ZoneCommand> _inbox = Channel.CreateBounded<ZoneCommand>(
+        new BoundedChannelOptions(8192) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
     /// <summary>
     ///     Second, SEPARATE inbox for already-validated-and-SQL-durable inventory results
@@ -92,6 +131,91 @@ public sealed class Zone(
     private readonly Channel<InventoryZoneCommand> _inventoryInbox = Channel.CreateBounded<InventoryZoneCommand>(
         new BoundedChannelOptions(2048) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
+    private readonly KeyValuePair<string, object?> _mapTag = ZoneTickMetrics.MapTag(mapId);
+
+    /// <summary>
+    ///     Sixth inbox, same additive posture as <see cref="_chatInbox" />/<see cref="_skillInbox" />: mirrors
+    ///     ONE cross-character field write (<see cref="Social.Mentor.MentorZoneCommand" />, posted by
+    ///     <c>MentorStartHandler</c>) onto the TARGET character's own hosting zone -- see that command type's
+    ///     own remarks for the direct-cross-thread-mutation bug this closes.
+    /// </summary>
+    private readonly Channel<MentorZoneCommand> _mentorInbox =
+        Channel.CreateBounded<MentorZoneCommand>(
+            new BoundedChannelOptions(256) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+
+    /// <summary>
+    ///     Additional inbox, same additive posture as <see cref="_questInbox" />: already-validated,
+    ///     already-SQL-durable daily-mission claims (<see cref="Progression.MissionZoneCommand" />, posted
+    ///     by <c>DailyMissionHandler</c>, Server Logic V9 Progression) -- mirrors the 4 mission counters
+    ///     plus the claimed reward item's container onto the live <see cref="PlayerRuntimeState" />.
+    /// </summary>
+    private readonly Channel<MissionZoneCommand> _missionInbox =
+        Channel.CreateBounded<MissionZoneCommand>(
+            new BoundedChannelOptions(256) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+
+    /// <summary>
+    ///     Released once per queued grant so <c>MonsterLootFlushHost</c> can flush as soon as a grant arrives
+    ///     (racing against its own periodic timer) instead of waiting up to a full flush interval -- shrinks the
+    ///     in-memory-only loss window (review finding: money-grant durability was flagged as D7-regime-adjacent
+    ///     even though a kill has no client ack to gate on, per <see cref="_pendingMoneyGrants" />'s own remarks)
+    ///     down to roughly one SQL round trip instead of a fixed worst case.
+    /// </summary>
+    private readonly SemaphoreSlim _moneyGrantSignal = new(0, int.MaxValue);
+
+    // V4 (Monsters & Loot): same ConcurrentDictionary posture as _players -- the tick (MonsterSpawnScheduler/
+    // MonsterAiSystem) is the sole writer for spawn/AI mutation, but TryDamageMonster is a deliberate, narrow
+    // exception (mirrors ApplyDeath's own established precedent) that lets a combat packet handler thread
+    // apply damage directly via an atomic Interlocked path on MonsterEntity itself -- see that method's remarks.
+    private readonly ConcurrentDictionary<int, MonsterEntity> _monsters = new();
+
+    /// <summary>
+    ///     Server-initiated monster-kill money grants (<see cref="Monsters.MonsterSpawnScheduler" />'s own
+    ///     loot pipeline) -- queued rather than awaited inline because <see cref="Tick" /> is fully synchronous
+    ///     and must never block on SQL I/O; drained by a dedicated background flush host
+    ///     (<see cref="MonsterLootFlushHost" />) from any thread (<see cref="ConcurrentQueue{T}" />'s
+    ///     own thread-safety). Unlike a client-requested pickup (D7 regime, awaited synchronously in
+    ///     <c>GenericActionHandler</c>), a kill reward has no client ack to gate on durability.
+    /// </summary>
+    private readonly ConcurrentQueue<(int CharacterId, long Amount)> _pendingMoneyGrants = new();
+
+    // ConcurrentDictionary, not a plain Dictionary: the tick is the sole WRITER (single-writer invariant intact),
+    // but the write-behind flush callback and the directory-heartbeat CCU count both read this from other
+    // threads -- lock-free concurrent reads are exactly what this type is for.
+    private readonly ConcurrentDictionary<int, PlayerRuntimeState> _players = new();
+
+    /// <summary>
+    ///     Additional inbox, same additive posture as <see cref="_mentorInbox" />: fire-and-forget, purely
+    ///     cosmetic PShop-stall mirrors (<see cref="Social.Pshop.PshopZoneCommand" />, Server Logic V8
+    ///     Player Commerce &amp; Cash) posted by <c>BuyShopItemHandler</c> onto the SELLER's own hosting
+    ///     zone after a live PShop purchase already durably committed -- see that command type's own
+    ///     remarks for why no <c>...AndWaitAsync</c> twin exists here (unlike every other additive inbox).
+    /// </summary>
+    private readonly Channel<PshopZoneCommand> _pshopInbox =
+        Channel.CreateBounded<PshopZoneCommand>(
+            new BoundedChannelOptions(256) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+
+    /// <summary>
+    ///     Server Logic V9 Progression -- resolved once per zone. Null (production default from
+    ///     <see cref="ZoneRegistry" />, which owns the single process-wide <see cref="QuestCatalog" />
+    ///     singleton) builds a private one from <paramref name="worldData" /> instead, so pre-existing test
+    ///     call sites (<c>ZoneTestKit</c>) that construct a <see cref="Zone" /> directly keep compiling
+    ///     unchanged.
+    /// </summary>
+    private readonly QuestCatalog _questCatalog = questCatalog ?? new QuestCatalog(worldData);
+
+    /// <summary>
+    ///     Seventh inbox, same additive posture as <see cref="_mentorInbox" />: already-validated,
+    ///     already-SQL-durable quest-state transitions (<see cref="QuestZoneCommand" />, posted by
+    ///     <c>QuestProgressHandler</c>, Server Logic V9 Progression) -- mirrors the 5 quest-state ints plus
+    ///     any Experience/ContributionPoints deltas and touched inventory containers onto the live
+    ///     <see cref="PlayerRuntimeState" />.
+    /// </summary>
+    private readonly Channel<QuestZoneCommand> _questInbox = Channel.CreateBounded<QuestZoneCommand>(
+        new BoundedChannelOptions(512) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+
+    /// <summary>Combat/skill RNG -- <see cref="SystemRandomSource" /> in production, injectable for deterministic tests.</summary>
+    private readonly IRandomSource _random = randomSource ?? SystemRandomSource.Instance;
+
     /// <summary>
     ///     Fourth inbox, same additive posture as <see cref="_inventoryInbox" />: already-validated,
     ///     already-SQL-durable skill learn/upgrade results (<see cref="SkillZoneCommand" />, posted by
@@ -104,128 +228,13 @@ public sealed class Zone(
         new BoundedChannelOptions(1024) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
     /// <summary>
-    ///     Fifth inbox, same additive posture as <see cref="_skillInbox" />/<see cref="_inventoryInbox" />:
-    ///     raw local/shout/tribe chat sends (<see cref="Social.Chat.ChatZoneCommand" />, Phase C/V6
-    ///     Social) that need this zone's own tick-owned <see cref="_grid" />/<see cref="_players" /> to
-    ///     resolve their audience -- every other chat channel (whisper/party/guild/world/notices) is a
-    ///     plain cross-zone or same-zone fan-out a handler does directly via <c>ZoneRegistry</c>/
-    ///     <see cref="Players" /> without ever touching the tick thread (see
-    ///     <see cref="Social.Chat.ChatZoneCommand" />'s own remarks).
-    /// </summary>
-    private readonly Channel<Social.Chat.ChatZoneCommand> _chatInbox =
-        Channel.CreateBounded<Social.Chat.ChatZoneCommand>(
-            new BoundedChannelOptions(2048) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
-
-    /// <summary>
-    ///     Sixth inbox, same additive posture as <see cref="_chatInbox" />/<see cref="_skillInbox" />: mirrors
-    ///     ONE cross-character field write (<see cref="Social.Mentor.MentorZoneCommand" />, posted by
-    ///     <c>MentorStartHandler</c>) onto the TARGET character's own hosting zone -- see that command type's
-    ///     own remarks for the direct-cross-thread-mutation bug this closes.
-    /// </summary>
-    private readonly Channel<Social.Mentor.MentorZoneCommand> _mentorInbox =
-        Channel.CreateBounded<Social.Mentor.MentorZoneCommand>(
-            new BoundedChannelOptions(256) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
-
-    /// <summary>
-    ///     Seventh inbox, same additive posture as <see cref="_mentorInbox" />: already-durably-persisted
-    ///     guild-membership mirrors (<see cref="Guilds.GuildMembershipZoneCommand" />, Phase C/V7 Guilds
-    ///     &amp; Tribes -- GUILD_WORK create/join/leave/kick/promote/title/transfer/disband, doc 10 §1) for
-    ///     THIS character's own hosting zone, posted by <c>GuildActionHandler</c> whether the target is the
-    ///     actor themselves or a DIFFERENT (possibly cross-zone or offline) guild member.
-    /// </summary>
-    private readonly Channel<Guilds.GuildMembershipZoneCommand> _guildInbox =
-        Channel.CreateBounded<Guilds.GuildMembershipZoneCommand>(
-            new BoundedChannelOptions(512) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
-
-    /// <summary>
     ///     Eighth inbox, same additive posture: already-decided TRIBE_WORK self-mutations
     ///     (<see cref="Tribes.TribeProgressZoneCommand" />, Phase C/V7 Guilds &amp; Tribes, doc 10 §2) posted
     ///     by <c>TribeActionHandler</c> for the ACTOR'S OWN hosting zone.
     /// </summary>
-    private readonly Channel<Tribes.TribeProgressZoneCommand> _tribeInbox =
-        Channel.CreateBounded<Tribes.TribeProgressZoneCommand>(
+    private readonly Channel<TribeProgressZoneCommand> _tribeInbox =
+        Channel.CreateBounded<TribeProgressZoneCommand>(
             new BoundedChannelOptions(512) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
-
-    /// <summary>
-    ///     Seventh inbox, same additive posture as <see cref="_mentorInbox" />: already-validated,
-    ///     already-SQL-durable quest-state transitions (<see cref="QuestZoneCommand" />, posted by
-    ///     <c>QuestProgressHandler</c>, Server Logic V9 Progression) -- mirrors the 5 quest-state ints plus
-    ///     any Experience/ContributionPoints deltas and touched inventory containers onto the live
-    ///     <see cref="PlayerRuntimeState" />.
-    /// </summary>
-    private readonly Channel<QuestZoneCommand> _questInbox = Channel.CreateBounded<QuestZoneCommand>(
-        new BoundedChannelOptions(512) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
-
-    /// <summary>
-    ///     Additional inbox, same additive posture as <see cref="_mentorInbox" />: fire-and-forget, purely
-    ///     cosmetic PShop-stall mirrors (<see cref="Social.Pshop.PshopZoneCommand" />, Server Logic V8
-    ///     Player Commerce &amp; Cash) posted by <c>BuyShopItemHandler</c> onto the SELLER's own hosting
-    ///     zone after a live PShop purchase already durably committed -- see that command type's own
-    ///     remarks for why no <c>...AndWaitAsync</c> twin exists here (unlike every other additive inbox).
-    /// </summary>
-    private readonly Channel<Social.Pshop.PshopZoneCommand> _pshopInbox =
-        Channel.CreateBounded<Social.Pshop.PshopZoneCommand>(
-            new BoundedChannelOptions(256) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
-
-    /// <summary>
-    ///     Additional inbox, same additive posture as <see cref="_questInbox" />: already-validated,
-    ///     already-SQL-durable daily-mission claims (<see cref="Progression.MissionZoneCommand" />, posted
-    ///     by <c>DailyMissionHandler</c>, Server Logic V9 Progression) -- mirrors the 4 mission counters
-    ///     plus the claimed reward item's container onto the live <see cref="PlayerRuntimeState" />.
-    /// </summary>
-    private readonly Channel<Progression.MissionZoneCommand> _missionInbox =
-        Channel.CreateBounded<Progression.MissionZoneCommand>(
-            new BoundedChannelOptions(256) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
-
-    private readonly KeyValuePair<string, object?> _mapTag = ZoneTickMetrics.MapTag(mapId);
-
-    // ConcurrentDictionary, not a plain Dictionary: the tick is the sole WRITER (single-writer invariant intact),
-    // but the write-behind flush callback and the directory-heartbeat CCU count both read this from other
-    // threads -- lock-free concurrent reads are exactly what this type is for.
-    private readonly ConcurrentDictionary<int, PlayerRuntimeState> _players = new();
-
-    // V4 (Monsters & Loot): same ConcurrentDictionary posture as _players -- the tick (MonsterSpawnScheduler/
-    // MonsterAiSystem) is the sole writer for spawn/AI mutation, but TryDamageMonster is a deliberate, narrow
-    // exception (mirrors ApplyDeath's own established precedent) that lets a combat packet handler thread
-    // apply damage directly via an atomic Interlocked path on MonsterEntity itself -- see that method's remarks.
-    private readonly ConcurrentDictionary<int, MonsterEntity> _monsters = new();
-
-    // Populated/expired ONLY by this zone's own tick (single-writer); CLAIMED (removed) via an atomic
-    // compare-and-remove callable from ANY thread -- see TryClaimGroundItem's remarks for why pickup is the
-    // one narrow exception, mirroring the same reasoning already accepted for TryDamageMonster/ApplyDeath.
-    private readonly ConcurrentDictionary<int, GroundItemEntity> _groundItems = new();
-
-    /// <summary>Tick-owned only (rebroadcast/expiry both run on the tick thread) -- see <see cref="_groundItems" />'s remarks.</summary>
-    private readonly Dictionary<int, TimeSpan> _groundItemLastRebroadcast = new();
-
-    /// <summary>Enqueued by <see cref="TryDamageMonster" /> (any thread) on a killing blow, drained by <see cref="Monsters.MonsterSpawnScheduler" /> on this zone's own next tick (loot/XP/respawn -- single-writer preserved).</summary>
-    private readonly ConcurrentQueue<DeadMonsterEvent> _deadMonsters = new();
-
-    /// <summary>Enqueued by <see cref="TryClaimGroundItem" /> (any thread) so the despawn BROADCAST (needs <see cref="_grid" />, tick-thread-only) happens from the tick, never from the claiming handler's own thread.</summary>
-    private readonly ConcurrentQueue<GroundItemEntity> _claimedGroundItemDespawns = new();
-
-    /// <summary>
-    ///     Server-initiated monster-kill money grants (<see cref="Monsters.MonsterSpawnScheduler" />'s own
-    ///     loot pipeline) -- queued rather than awaited inline because <see cref="Tick" /> is fully synchronous
-    ///     and must never block on SQL I/O; drained by a dedicated background flush host
-    ///     (<see cref="MonsterLootFlushHost" />) from any thread (<see cref="ConcurrentQueue{T}" />'s
-    ///     own thread-safety). Unlike a client-requested pickup (D7 regime, awaited synchronously in
-    ///     <c>GenericActionHandler</c>), a kill reward has no client ack to gate on durability.
-    /// </summary>
-    private readonly ConcurrentQueue<(int CharacterId, long Amount)> _pendingMoneyGrants = new();
-
-    /// <summary>
-    ///     Released once per queued grant so <c>MonsterLootFlushHost</c> can flush as soon as a grant arrives
-    ///     (racing against its own periodic timer) instead of waiting up to a full flush interval -- shrinks the
-    ///     in-memory-only loss window (review finding: money-grant durability was flagged as D7-regime-adjacent
-    ///     even though a kill has no client ack to gate on, per <see cref="_pendingMoneyGrants" />'s own remarks)
-    ///     down to roughly one SQL round trip instead of a fixed worst case.
-    /// </summary>
-    private readonly SemaphoreSlim _moneyGrantSignal = new(0, int.MaxValue);
-
-    private int _monsterUniqueNumberSeed;
-    private int _groundItemServerIndexSeed;
-    private int _groundItemUniqueNumberSeed;
 
     /// <summary>
     ///     This zone's own monotonic simulated clock: the sum of every elapsed span fed to <see cref="Tick" />,
@@ -234,6 +243,11 @@ public sealed class Zone(
     ///     <see cref="Tick" /> in microseconds.
     /// </summary>
     private TimeSpan _clock;
+
+    private int _groundItemServerIndexSeed;
+    private int _groundItemUniqueNumberSeed;
+
+    private int _monsterUniqueNumberSeed;
 
     /// <summary>The legacy map this actor simulates — its key in <see cref="ZoneRegistry" />.</summary>
     public short MapId { get; } = mapId;
@@ -264,6 +278,12 @@ public sealed class Zone(
     ///     regression from the pre-V1 behavior).
     /// </summary>
     public ZoneGeometry? Geometry { get; } = TryLoadGeometry(mapId, options, logger);
+
+    /// <summary>
+    ///     Every monster currently alive in this zone -- read by <see cref="Monsters.MonsterAiSystem" />
+    ///     (tick-thread-only enumeration, same lock-free posture as <see cref="Players" />).
+    /// </summary>
+    internal IEnumerable<MonsterEntity> MonstersSnapshot => _monsters.Values;
 
     /// <summary>
     ///     Enqueues a command for the next tick. Never blocks: a full inbox drops the write (architecture reference
@@ -336,7 +356,7 @@ public sealed class Zone(
     ///     (the target character's own hosting) zone's tick to mirror -- see <see cref="_mentorInbox" />'s
     ///     remarks.
     /// </summary>
-    public bool PostMentorCommand(in Social.Mentor.MentorZoneCommand command)
+    public bool PostMentorCommand(in MentorZoneCommand command)
     {
         return _mentorInbox.Writer.TryWrite(command);
     }
@@ -345,7 +365,7 @@ public sealed class Zone(
     ///     Enqueues an already-durably-persisted guild-membership mirror for THIS character's own hosting
     ///     zone's tick to mirror -- see <see cref="_guildInbox" />'s remarks.
     /// </summary>
-    public bool PostGuildCommand(in Guilds.GuildMembershipZoneCommand command)
+    public bool PostGuildCommand(in GuildMembershipZoneCommand command)
     {
         return _guildInbox.Writer.TryWrite(command);
     }
@@ -360,7 +380,7 @@ public sealed class Zone(
     ///     have no such lock to hold and may use the bare <see cref="PostGuildCommand" /> fire-and-forget
     ///     instead (their own DB write is already durable regardless of this mirror's timing).
     /// </summary>
-    public async Task<bool> PostGuildCommandAndWaitAsync(Guilds.GuildMembershipZoneCommand command,
+    public async Task<bool> PostGuildCommandAndWaitAsync(GuildMembershipZoneCommand command,
         CancellationToken ct, TimeSpan? timeout = null)
     {
         var applied = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -386,7 +406,7 @@ public sealed class Zone(
     ///     Enqueues an already-decided TRIBE_WORK self-mutation for the ACTOR'S OWN hosting zone's tick to
     ///     mirror -- see <see cref="_tribeInbox" />'s remarks.
     /// </summary>
-    public bool PostTribeProgressCommand(in Tribes.TribeProgressZoneCommand command)
+    public bool PostTribeProgressCommand(in TribeProgressZoneCommand command)
     {
         return _tribeInbox.Writer.TryWrite(command);
     }
@@ -398,7 +418,7 @@ public sealed class Zone(
     ///     call this (never the bare <see cref="PostTribeProgressCommand" />) while still holding
     ///     <see cref="PlayerRuntimeState.EconomyActionLock" /> for any tSort that also debits money/CP.
     /// </summary>
-    public async Task<bool> PostTribeProgressCommandAndWaitAsync(Tribes.TribeProgressZoneCommand command,
+    public async Task<bool> PostTribeProgressCommandAndWaitAsync(TribeProgressZoneCommand command,
         CancellationToken ct, TimeSpan? timeout = null)
     {
         var applied = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -429,7 +449,8 @@ public sealed class Zone(
     ///     Posts an already-validated, already-SQL-durable quest-state transition and awaits this zone's own
     ///     tick actually mirroring it -- the <see cref="QuestZoneCommand" /> twin of
     ///     <see cref="PostInventoryCommandAndWaitAsync" />'s own contract (same reason: a quest action is
-    ///     exactly the "read state / await SQL / mirror" economy-action shape <see cref="PlayerRuntimeState.EconomyActionLock" />'s
+    ///     exactly the "read state / await SQL / mirror" economy-action shape
+    ///     <see cref="PlayerRuntimeState.EconomyActionLock" />'s
     ///     own remarks describe). Callers MUST already hold that lock and leave <see cref="QuestZoneCommand.Applied" />
     ///     at its default -- overwritten here.
     /// </summary>
@@ -455,7 +476,7 @@ public sealed class Zone(
         return true;
     }
 
-    private bool PostMissionCommand(in Progression.MissionZoneCommand command)
+    private bool PostMissionCommand(in MissionZoneCommand command)
     {
         return _missionInbox.Writer.TryWrite(command);
     }
@@ -467,7 +488,7 @@ public sealed class Zone(
     ///     <see cref="PlayerRuntimeState.EconomyActionLock" /> and leave
     ///     <see cref="Progression.MissionZoneCommand.Applied" /> at its default -- overwritten here.
     /// </summary>
-    public async Task<bool> PostMissionCommandAndWaitAsync(Progression.MissionZoneCommand command,
+    public async Task<bool> PostMissionCommandAndWaitAsync(MissionZoneCommand command,
         CancellationToken ct, TimeSpan? timeout = null)
     {
         var applied = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -503,13 +524,16 @@ public sealed class Zone(
     ///     Enqueues an already-cleared (non-empty content, sender not muted) local/shout/tribe chat send
     ///     for this zone's own tick to resolve the audience for -- see <see cref="_chatInbox" />'s remarks.
     /// </summary>
-    public bool PostChatCommand(in Social.Chat.ChatZoneCommand command)
+    public bool PostChatCommand(in ChatZoneCommand command)
     {
         return _chatInbox.Writer.TryWrite(command);
     }
 
-    /// <summary>Enqueues a fire-and-forget PShop-stall mirror for THIS (the seller's own hosting) zone's tick to apply -- see <see cref="_pshopInbox" />'s remarks.</summary>
-    public bool PostPshopCommand(in Social.Pshop.PshopZoneCommand command)
+    /// <summary>
+    ///     Enqueues a fire-and-forget PShop-stall mirror for THIS (the seller's own hosting) zone's tick to apply -- see
+    ///     <see cref="_pshopInbox" />'s remarks.
+    /// </summary>
+    public bool PostPshopCommand(in PshopZoneCommand command)
     {
         return _pshopInbox.Writer.TryWrite(command);
     }
@@ -525,9 +549,6 @@ public sealed class Zone(
     {
         return _monsters.TryGetValue(serverIndex, out monster);
     }
-
-    /// <summary>Every monster currently alive in this zone -- read by <see cref="Monsters.MonsterAiSystem" /> (tick-thread-only enumeration, same lock-free posture as <see cref="Players" />).</summary>
-    internal IEnumerable<MonsterEntity> MonstersSnapshot => _monsters.Values;
 
     /// <summary>
     ///     Player character ids in this zone's AOI grid neighborhood of (x, z) -- reused for BOTH monster aggro
@@ -545,7 +566,10 @@ public sealed class Zone(
         return unchecked((uint)Interlocked.Increment(ref _monsterUniqueNumberSeed));
     }
 
-    /// <summary>Adds a freshly-spawned monster to this zone's live pool and broadcasts its creation. Tick-owned caller only (<see cref="Monsters.MonsterSpawnScheduler" />).</summary>
+    /// <summary>
+    ///     Adds a freshly-spawned monster to this zone's live pool and broadcasts its creation. Tick-owned caller only (
+    ///     <see cref="Monsters.MonsterSpawnScheduler" />).
+    /// </summary>
     internal void SpawnMonster(MonsterEntity monster)
     {
         monster.LastRebroadcastAt = _clock;
@@ -585,7 +609,11 @@ public sealed class Zone(
         return _deadMonsters.TryDequeue(out deadMonster);
     }
 
-    /// <summary>Tick-owned caller only (<see cref="Monsters.MonsterSpawnScheduler" />'s dead-monster drain) -- sets the transient <see cref="MonsterAiState.Dead" /> bookkeeping value and broadcasts the final (LifeValue == 0) replication frame.</summary>
+    /// <summary>
+    ///     Tick-owned caller only (<see cref="Monsters.MonsterSpawnScheduler" />'s dead-monster drain) -- sets the
+    ///     transient <see cref="MonsterAiState.Dead" /> bookkeeping value and broadcasts the final (LifeValue == 0)
+    ///     replication frame.
+    /// </summary>
     internal void BroadcastMonsterDeath(MonsterEntity monster)
     {
         monster.AiState = MonsterAiState.Dead;
@@ -645,7 +673,10 @@ public sealed class Zone(
             ApplyDeath(target.CharacterId, DeathCause.MonsterKill);
     }
 
-    /// <summary>Queued for <c>Fenrir.GameServer.MonsterLootFlushHost</c> to persist -- see <see cref="_pendingMoneyGrants" />'s remarks.</summary>
+    /// <summary>
+    ///     Queued for <c>Fenrir.GameServer.MonsterLootFlushHost</c> to persist -- see <see cref="_pendingMoneyGrants" />
+    ///     's remarks.
+    /// </summary>
     internal void QueueMoneyGrant(int characterId, long amount)
     {
         _pendingMoneyGrants.Enqueue((characterId, amount));
@@ -662,7 +693,10 @@ public sealed class Zone(
         return _moneyGrantSignal.WaitAsync(ct);
     }
 
-    /// <summary>Drains every pending monster-kill money grant queued since the last drain -- callable from ANY thread (<see cref="ConcurrentQueue{T}" />'s own thread-safety); the ONLY intended caller is the background flush host.</summary>
+    /// <summary>
+    ///     Drains every pending monster-kill money grant queued since the last drain -- callable from ANY thread (
+    ///     <see cref="ConcurrentQueue{T}" />'s own thread-safety); the ONLY intended caller is the background flush host.
+    /// </summary>
     public IReadOnlyList<(int CharacterId, long Amount)> DrainPendingMoneyGrants()
     {
         if (_pendingMoneyGrants.IsEmpty)
@@ -675,16 +709,19 @@ public sealed class Zone(
         return (IReadOnlyList<(int CharacterId, long Amount)>?)grants ?? [];
     }
 
-    /// <summary>Spawns one dropped item on the ground (report 05 §5's generic drop pipeline) and broadcasts its creation. Tick-owned caller only (<see cref="Monsters.MonsterSpawnScheduler" />).</summary>
+    /// <summary>
+    ///     Spawns one dropped item on the ground (report 05 §5's generic drop pipeline) and broadcasts its creation.
+    ///     Tick-owned caller only (<see cref="Monsters.MonsterSpawnScheduler" />).
+    /// </summary>
     internal void SpawnGroundItem(int itemId, int quantity, float posX, float posY, float posZ, string master,
         string partyName, int dropSort)
     {
         var index = Interlocked.Increment(ref _groundItemServerIndexSeed);
         var uniqueNumber = unchecked((uint)Interlocked.Increment(ref _groundItemUniqueNumberSeed));
 
-        var entity = new GroundItemEntity(index, uniqueNumber, itemId, quantity, Value: 0, SerialNumber: 0, posX,
-            posY, posZ, TruncateName(master), TruncateName(partyName), dropSort, _clock, SocketGem1: 0,
-            SocketGem2: 0, SocketGem3: 0);
+        var entity = new GroundItemEntity(index, uniqueNumber, itemId, quantity, 0, 0, posX,
+            posY, posZ, TruncateName(master), TruncateName(partyName), dropSort, _clock, 0,
+            0, 0);
 
         _groundItems[index] = entity;
         _groundItemLastRebroadcast[index] = _clock;
@@ -909,7 +946,7 @@ public sealed class Zone(
             // this is tracked per-character rather than per-item-instance.
             if (snapshot.Container == ContainerMatrix.Equipment)
             {
-                var newPetItemId = snapshot.Slots.TryGetValue(Pets.PetSlots.EquipmentSlot, out var petStack)
+                var newPetItemId = snapshot.Slots.TryGetValue(PetSlots.EquipmentSlot, out var petStack)
                     ? petStack.ItemId
                     : 0;
                 if (newPetItemId != state.LastSeenPetItemId)
@@ -990,7 +1027,7 @@ public sealed class Zone(
     ///     target character already left this zone by the time the tick drains this (same benign race
     ///     <see cref="ApplyInventoryCommand" />/<see cref="ApplySkillCommand" /> already accept).
     /// </summary>
-    private void ApplyMentorCommand(in Social.Mentor.MentorZoneCommand command)
+    private void ApplyMentorCommand(in MentorZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state))
             return;
@@ -1025,7 +1062,7 @@ public sealed class Zone(
     ///     character already left this zone by the time the tick drains this (same benign race
     ///     <see cref="ApplyInventoryCommand" />/<see cref="ApplyMentorCommand" /> already accept).
     /// </summary>
-    private void ApplyGuildMembershipCommand(in Guilds.GuildMembershipZoneCommand command)
+    private void ApplyGuildMembershipCommand(in GuildMembershipZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state))
             return;
@@ -1063,7 +1100,7 @@ public sealed class Zone(
     ///     optional: null means "this tSort did not touch this field," never "reset to zero/false." A no-op
     ///     if the character already left this zone by the time the tick drains this.
     /// </summary>
-    private void ApplyTribeProgressCommand(in Tribes.TribeProgressZoneCommand command)
+    private void ApplyTribeProgressCommand(in TribeProgressZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state))
             return;
@@ -1249,7 +1286,7 @@ public sealed class Zone(
     ///     the character already left this zone by the time the tick drains this (same benign race
     ///     <see cref="ApplyQuestCommand" /> already accepts).
     /// </summary>
-    private void ApplyMissionCommand(in Progression.MissionZoneCommand command)
+    private void ApplyMissionCommand(in MissionZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state))
             return;
@@ -1283,8 +1320,12 @@ public sealed class Zone(
             }
     }
 
-    /// <summary>No-op if the character already left this zone (same benign race every other Apply* method already accepts) or their stall was already re-opened/re-populated since (a stale mirror is harmless -- see <see cref="Social.Pshop.PshopZoneCommand" />'s own remarks).</summary>
-    private void ApplyPshopCommand(in Social.Pshop.PshopZoneCommand command)
+    /// <summary>
+    ///     No-op if the character already left this zone (same benign race every other Apply* method already accepts) or
+    ///     their stall was already re-opened/re-populated since (a stale mirror is harmless -- see
+    ///     <see cref="Social.Pshop.PshopZoneCommand" />'s own remarks).
+    /// </summary>
+    private void ApplyPshopCommand(in PshopZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state) || state.PshopListing is not { } listing)
             return;
@@ -1412,9 +1453,9 @@ public sealed class Zone(
         var attackerSnapshot = ToCombatantSnapshot(attackerState);
         var defenderSnapshot = ToCombatantSnapshot(defenderState);
 
-        SkillDefinition? attackSkill = command.AttackInfo.AttackActionValue1 == 2 &&
-                                       worldData.SkillsById.TryGetValue(command.AttackInfo.AttackActionValue2,
-                                           out var skillDef)
+        var attackSkill = command.AttackInfo.AttackActionValue1 == 2 &&
+                          worldData.SkillsById.TryGetValue(command.AttackInfo.AttackActionValue2,
+                              out var skillDef)
             ? skillDef
             : null;
 
@@ -1479,7 +1520,8 @@ public sealed class Zone(
             return;
 
         if (outcome.ChargeConsumed)
-            attackerState.Buffs.Buff[8 * 2] = 0; // charge buff slot 8, value half -- single-use, same convention as mCase 2
+            attackerState.Buffs.Buff[8 * 2] =
+                0; // charge buff slot 8, value half -- single-use, same convention as mCase 2
 
         var attackerWeaponItemId = attackerState.Inventory.GetSlot(ContainerMatrix.Equipment, 7)?.ItemId ?? 0;
         var response = new AttackResponse
@@ -1521,7 +1563,10 @@ public sealed class Zone(
             state.Buffs.Buff[8 * 2]);
     }
 
-    /// <summary>Attacker + defender + both their AOI neighbors, deduplicated -- matches the legacy's own "AOI broadcast + unicast to the attacker" (contract doc on <c>AttackResponse</c>).</summary>
+    /// <summary>
+    ///     Attacker + defender + both their AOI neighbors, deduplicated -- matches the legacy's own "AOI broadcast +
+    ///     unicast to the attacker" (contract doc on <c>AttackResponse</c>).
+    /// </summary>
     private HashSet<int> CombatRecipients(PlayerRuntimeState attacker, PlayerRuntimeState defender)
     {
         var recipients = new HashSet<int> { attacker.CharacterId, defender.CharacterId };
@@ -1705,7 +1750,10 @@ public sealed class Zone(
         }
     }
 
-    /// <summary>V4 keep-alive rebroadcast for monsters -- 5 s cadence (<see cref="SimulationClock.MonsterRebroadcastInterval" />, report 05 §0 item 7).</summary>
+    /// <summary>
+    ///     V4 keep-alive rebroadcast for monsters -- 5 s cadence (
+    ///     <see cref="SimulationClock.MonsterRebroadcastInterval" />, report 05 §0 item 7).
+    /// </summary>
     private void RebroadcastMonsters()
     {
         foreach (var monster in _monsters.Values)
@@ -1718,7 +1766,10 @@ public sealed class Zone(
         }
     }
 
-    /// <summary>V4 keep-alive rebroadcast for ground items -- 5 s cadence (<see cref="SimulationClock.GroundItemRebroadcastInterval" />, report 05 §0 item 8).</summary>
+    /// <summary>
+    ///     V4 keep-alive rebroadcast for ground items -- 5 s cadence (
+    ///     <see cref="SimulationClock.GroundItemRebroadcastInterval" />, report 05 §0 item 8).
+    /// </summary>
     private void RebroadcastGroundItems()
     {
         foreach (var (index, item) in _groundItems)
@@ -1732,7 +1783,10 @@ public sealed class Zone(
         }
     }
 
-    /// <summary>60 s lifetime sweep (<see cref="SimulationClock.GroundItemLifetime" />, report 05 §5) -- despawns and broadcasts every expired ground item still present.</summary>
+    /// <summary>
+    ///     60 s lifetime sweep (<see cref="SimulationClock.GroundItemLifetime" />, report 05 §5) -- despawns and
+    ///     broadcasts every expired ground item still present.
+    /// </summary>
     private void ExpireGroundItems()
     {
         List<(int Index, GroundItemEntity Item)>? expired = null;
@@ -1751,7 +1805,10 @@ public sealed class Zone(
             }
     }
 
-    /// <summary>Drains despawn broadcasts queued by a cross-thread <see cref="TryClaimGroundItem" /> success -- see <see cref="_claimedGroundItemDespawns" />'s remarks for why this can't broadcast inline.</summary>
+    /// <summary>
+    ///     Drains despawn broadcasts queued by a cross-thread <see cref="TryClaimGroundItem" /> success -- see
+    ///     <see cref="_claimedGroundItemDespawns" />'s remarks for why this can't broadcast inline.
+    /// </summary>
     private void DrainClaimedGroundItemDespawns()
     {
         while (_claimedGroundItemDespawns.TryDequeue(out var item))
@@ -2004,7 +2061,7 @@ public sealed class Zone(
         state.PetGrowth = data.PetGrowth;
         state.PetActivity = data.PetActivity;
         state.LastSeenPetItemId = data.Items is { } petScanItems
-            ? Pets.PetSlots.ResolveEquippedPetItemId(petScanItems)
+            ? PetSlots.ResolveEquippedPetItemId(petScanItems)
             : 0;
 
         var cell = _grid.CellOf(state.PosX, state.PosZ);
@@ -2157,7 +2214,8 @@ public sealed class Zone(
 
     /// <summary>
     ///     The MvP XP-loss branch of <see cref="ApplyDeath" /> (report 05 §4, S07_MyGame02.cpp:3445-3489):
-    ///     refuses below level 10 or at/above the level cap (loses CP instead there -- <see cref="ExperienceFormulas.CpLossAtLevelCap" />).
+    ///     refuses below level 10 or at/above the level cap (loses CP instead there --
+    ///     <see cref="ExperienceFormulas.CpLossAtLevelCap" />).
     ///     <see cref="ExperienceFormulas.ComputeDeathExperienceLoss" /> needs <c>ReturnLevelFactor1(level)</c> =
     ///     <c>world.Levels[level].ExpRangeMin</c> -- a level outside the catalog (data gap) contributes 0 (no loss),
     ///     the same "absent contributes nothing" posture <see cref="Stats.StatCalculator" /> already applies.
@@ -2323,10 +2381,10 @@ public sealed class Zone(
                 ApplySkillBuffWrites(state, result.BuffWrites);
                 break;
             case SkillEffectKind.HealLife:
-                ApplyTargetedHeal(action, isLife: true, result.HealAmount);
+                ApplyTargetedHeal(action, true, result.HealAmount);
                 break;
             case SkillEffectKind.HealMana:
-                ApplyTargetedHeal(action, isLife: false, result.HealAmount);
+                ApplyTargetedHeal(action, false, result.HealAmount);
                 break;
         }
     }
@@ -2402,14 +2460,14 @@ public sealed class Zone(
 
         // Server Logic V9 Progression: same pet-contribution wiring as GenericActionHandler's equip-touching
         // recompute -- see that call site's own remarks.
-        var petItemId = equipmentContainer.TryGetValue(Pets.PetSlots.EquipmentSlot, out var petStack)
+        var petItemId = equipmentContainer.TryGetValue(PetSlots.EquipmentSlot, out var petStack)
             ? petStack.ItemId
             : 0;
-        var petContribution = Pets.PetGrowthCalculator.Compute(petItemId, state.PetGrowth, state.PetActivity,
+        var petContribution = PetGrowthCalculator.Compute(petItemId, state.PetGrowth, state.PetActivity,
             worldData.ItemsById);
 
         state.Stats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData, state.Buffs,
-            pet: petContribution);
+            petContribution);
 
         var response = new AvatarEffectStateResponse
         {
@@ -2531,7 +2589,8 @@ public sealed class Zone(
                 Level2 = 0,
                 // Reflects the live Equipment container instead of a hardcoded blank -- see
                 // EquipmentViewCodec's own remarks (shared with EnterWorldHandler's self-spawn).
-                EquipForView = EquipmentViewCodec.BuildEquipForView(state.Inventory.GetContainer(ContainerMatrix.Equipment)),
+                EquipForView =
+                    EquipmentViewCodec.BuildEquipForView(state.Inventory.GetContainer(ContainerMatrix.Equipment)),
                 AnimalNumber = 0,
                 Title = state.Title,
                 Halo = state.Halo,

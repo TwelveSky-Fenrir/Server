@@ -1,12 +1,18 @@
 namespace Fenrir.Application.Game.Social.Party;
 
-/// <summary>Soft (non-disconnecting) outcomes of a party invite ask -- mirrors ZC_PARTY_ANSWER_RECV's pre-check codes (contracts/05_social.md CZ_PARTY_ASK_SEND).</summary>
+/// <summary>
+///     Soft (non-disconnecting) outcomes of a party invite ask -- mirrors ZC_PARTY_ANSWER_RECV's pre-check codes
+///     (contracts/05_social.md CZ_PARTY_ASK_SEND).
+/// </summary>
 public enum PartyInviteOutcome
 {
     /// <summary>No pre-check tripped -- the ask was relayed to the target (ZC_PARTY_ASK_RECV).</summary>
     Sent,
 
-    /// <summary>Code 3 -- the inviter itself is already mid-negotiation of another social action (this pass only models "already has a pending party ask/answer in flight").</summary>
+    /// <summary>
+    ///     Code 3 -- the inviter itself is already mid-negotiation of another social action (this pass only models
+    ///     "already has a pending party ask/answer in flight").
+    /// </summary>
     InviterBusy,
 
     /// <summary>Code 5 -- the target is busy (already mid-negotiation).</summary>
@@ -40,7 +46,11 @@ public enum PartyJoinOutcome
     PartyWasFull
 }
 
-/// <summary>One party's composition -- <see cref="LeaderId" /> is always <c>Members[0]</c>. Legacy keyed parties by leader NAME (ts25center's <c>mPartyList</c>); Fenrir keys by leader CharacterId instead, a stable identity a rename/duplicate name can't violate.</summary>
+/// <summary>
+///     One party's composition -- <see cref="LeaderId" /> is always <c>Members[0]</c>. Legacy keyed parties by leader
+///     NAME (ts25center's <c>mPartyList</c>); Fenrir keys by leader CharacterId instead, a stable identity a
+///     rename/duplicate name can't violate.
+/// </summary>
 public sealed class Party
 {
     private readonly List<int> _members;
@@ -97,19 +107,22 @@ public sealed class PartyRegistry
     /// <summary><c>abs((aLevel1+aLevel2) - (oLevel1+oLevel2)) &gt; 9</c> (S04_MyWork02.cpp:9608-9614), verified.</summary>
     public const int MaxLevelGap = 9;
 
+    /// <summary>Reverse index: any member characterId -&gt; their party's leader characterId.</summary>
+    private readonly Dictionary<int, int> _leaderByMember = new();
+
     private readonly Lock _lock = new();
-
-    /// <summary>Pending ask: inviter characterId -&gt; invitee characterId (legacy <c>mPartyProcessState==1</c>).</summary>
-    private readonly Dictionary<int, int> _pendingByInviter = new();
-
-    /// <summary>Pending ask, reverse index: invitee characterId -&gt; inviter characterId (legacy <c>mPartyProcessState==2</c>).</summary>
-    private readonly Dictionary<int, int> _pendingByInvitee = new();
 
     /// <summary>Live party, keyed by leader characterId.</summary>
     private readonly Dictionary<int, Party> _partiesByLeader = new();
 
-    /// <summary>Reverse index: any member characterId -&gt; their party's leader characterId.</summary>
-    private readonly Dictionary<int, int> _leaderByMember = new();
+    /// <summary>
+    ///     Pending ask, reverse index: invitee characterId -&gt; inviter characterId (legacy <c>mPartyProcessState==2</c>
+    ///     ).
+    /// </summary>
+    private readonly Dictionary<int, int> _pendingByInvitee = new();
+
+    /// <summary>Pending ask: inviter characterId -&gt; invitee characterId (legacy <c>mPartyProcessState==1</c>).</summary>
+    private readonly Dictionary<int, int> _pendingByInviter = new();
 
     public bool IsInParty(int characterId)
     {
@@ -127,7 +140,10 @@ public sealed class PartyRegistry
         }
     }
 
-    /// <summary>Snapshot of the current member list (leader first), or empty if not partied. Safe to enumerate after the call returns -- a fresh copy, never the live list.</summary>
+    /// <summary>
+    ///     Snapshot of the current member list (leader first), or empty if not partied. Safe to enumerate after the call
+    ///     returns -- a fresh copy, never the live list.
+    /// </summary>
     public IReadOnlyList<int> GetMembers(int characterId)
     {
         lock (_lock)
@@ -140,7 +156,10 @@ public sealed class PartyRegistry
         }
     }
 
-    /// <summary>True while a pending ask FROM <paramref name="characterId" /> or TO <paramref name="characterId" /> exists -- the legacy's own <c>mPartyProcessState != 0</c> busy check.</summary>
+    /// <summary>
+    ///     True while a pending ask FROM <paramref name="characterId" /> or TO <paramref name="characterId" /> exists --
+    ///     the legacy's own <c>mPartyProcessState != 0</c> busy check.
+    /// </summary>
     private bool IsNegotiating(int characterId)
     {
         return _pendingByInviter.ContainsKey(characterId) || _pendingByInvitee.ContainsKey(characterId);
@@ -184,7 +203,10 @@ public sealed class PartyRegistry
         }
     }
 
-    /// <summary>CZ_PARTY_CANCEL_SEND -- the inviter withdraws their own still-pending ask. No-op (matching the legacy's silent <c>return</c>) if there is no such pending ask.</summary>
+    /// <summary>
+    ///     CZ_PARTY_CANCEL_SEND -- the inviter withdraws their own still-pending ask. No-op (matching the legacy's silent
+    ///     <c>return</c>) if there is no such pending ask.
+    /// </summary>
     public bool TryCancel(int inviterId, out int inviteeId)
     {
         lock (_lock)
@@ -239,16 +261,25 @@ public sealed class PartyRegistry
         }
     }
 
-    /// <summary>CZ_PARTY_LEAVE_SEND -- a non-leader member leaves voluntarily. Returns the FULL member list from BEFORE the departure (for notifying everyone who needs to know) and whether the party auto-disbanded as a result (mission brief: disband when membership drops to 1).</summary>
+    /// <summary>
+    ///     CZ_PARTY_LEAVE_SEND -- a non-leader member leaves voluntarily. Returns the FULL member list from BEFORE the
+    ///     departure (for notifying everyone who needs to know) and whether the party auto-disbanded as a result (mission
+    ///     brief: disband when membership drops to 1).
+    /// </summary>
     public bool TryLeave(int characterId, out IReadOnlyList<int> membersBeforeLeave, out bool disbanded)
     {
-        return TryRemove(characterId, characterId, requireLeader: false, out membersBeforeLeave, out disbanded);
+        return TryRemove(characterId, characterId, false, out membersBeforeLeave, out disbanded);
     }
 
-    /// <summary>CZ_PARTY_EXILE_SEND -- the leader removes <paramref name="targetId" />. Reserved to the leader (caller has already verified <paramref name="leaderId" /> IS the party leader, matching the wire contract's own "réservé au CHEF" gate); a self-targeted kick is not specially guarded (the legacy source does not either -- see <see cref="Party.TryRemoveMember" />'s own remarks).</summary>
+    /// <summary>
+    ///     CZ_PARTY_EXILE_SEND -- the leader removes <paramref name="targetId" />. Reserved to the leader (caller has
+    ///     already verified <paramref name="leaderId" /> IS the party leader, matching the wire contract's own "réservé au
+    ///     CHEF" gate); a self-targeted kick is not specially guarded (the legacy source does not either -- see
+    ///     <see cref="Party.TryRemoveMember" />'s own remarks).
+    /// </summary>
     public bool TryKick(int leaderId, int targetId, out IReadOnlyList<int> membersBeforeKick, out bool disbanded)
     {
-        return TryRemove(leaderId, targetId, requireLeader: true, out membersBeforeKick, out disbanded);
+        return TryRemove(leaderId, targetId, true, out membersBeforeKick, out disbanded);
     }
 
     private bool TryRemove(int actingId, int targetId, bool requireLeader, out IReadOnlyList<int> membersBefore,
@@ -286,7 +317,10 @@ public sealed class PartyRegistry
         }
     }
 
-    /// <summary>CZ_PARTY_BREAK_SEND -- the leader disbands the whole party unconditionally. Returns the full member list (for notifying everyone) or empty if <paramref name="leaderId" /> does not currently lead a party.</summary>
+    /// <summary>
+    ///     CZ_PARTY_BREAK_SEND -- the leader disbands the whole party unconditionally. Returns the full member list (for
+    ///     notifying everyone) or empty if <paramref name="leaderId" /> does not currently lead a party.
+    /// </summary>
     public IReadOnlyList<int> Disband(int leaderId)
     {
         lock (_lock)
@@ -300,7 +334,10 @@ public sealed class PartyRegistry
         }
     }
 
-    /// <summary>Also called when a departure/kick shrinks a party below 2 members (mission brief) -- the sole remaining member is not left in a phantom 1-person "party".</summary>
+    /// <summary>
+    ///     Also called when a departure/kick shrinks a party below 2 members (mission brief) -- the sole remaining member
+    ///     is not left in a phantom 1-person "party".
+    /// </summary>
     private void DisbandLocked(Party party)
     {
         foreach (var memberId in party.Members)

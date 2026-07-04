@@ -108,7 +108,7 @@ public sealed class EnchantItemHandler(
         var luck = state.Stats?.Luck ?? 0;
 
         var resolved = EnchantResolver.Resolve(targetDefinition, target, materialDefinition, luck,
-            protectForDestroyCharges: 0, SystemRandomSource.Instance);
+            0, SystemRandomSource.Instance);
 
         if (resolved.Outcome == EnchantResolver.EnchantOutcome.NotSupported)
         {
@@ -191,7 +191,10 @@ public sealed class EnchantItemHandler(
                 zone.MapId, characterId);
     }
 
-    /// <summary>ZC_IMPROVE_ITEM_RECV result codes (report 04 §4/contract doc): 0 success, 1 fail/-1, 2 destroyed, 3 reset-to-+40, 4 protected.</summary>
+    /// <summary>
+    ///     ZC_IMPROVE_ITEM_RECV result codes (report 04 §4/contract doc): 0 success, 1 fail/-1, 2 destroyed, 3
+    ///     reset-to-+40, 4 protected.
+    /// </summary>
     private static int MapResultCode(EnchantResolver.EnchantOutcome outcome)
     {
         return outcome switch

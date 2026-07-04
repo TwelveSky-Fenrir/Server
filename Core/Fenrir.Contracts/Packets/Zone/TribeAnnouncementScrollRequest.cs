@@ -12,7 +12,8 @@ namespace Fenrir.Contracts.Packets.Zone;
 ///     Relayed via center tSort=114 as ZC 139 to tribe members across every zone (tribe filter active,
 ///     LNW33).
 /// </summary>
-[FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.TribeAnnouncementScroll, ExpectedSize = 70,
+[FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.TribeAnnouncementScroll,
+    ExpectedSize = 70,
     AllowedStates = [(byte)ZoneSessionState.InWorld])]
 public readonly partial record struct TribeAnnouncementScrollRequest : IIncomingPacket<TribeAnnouncementScrollRequest>
 {

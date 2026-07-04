@@ -57,6 +57,7 @@ public sealed class QuestProgressHandler(
         PlayerRuntimeState state, int characterId, CancellationToken ct)
     {
         var edits = new ContainerEdits(state);
+
         bool HasItem(int itemId)
         {
             return edits.Get(ContainerMatrix.InventoryPage0).Values.Any(s => s.ItemId == itemId) ||
@@ -115,8 +116,8 @@ public sealed class QuestProgressHandler(
             edits.Deposit(container, slot, new ItemStack(depositItemId, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0));
         }
 
-        await PersistAndMirrorAsync(characters, zone, logger, characterId, result.NewProgress, deltaMoney: 0,
-            experienceDelta: 0, contributionPointsDelta: 0, teacherPointDelta: 0, edits, ct);
+        await PersistAndMirrorAsync(characters, zone, logger, characterId, result.NewProgress, 0,
+            0, 0, 0, edits, ct);
 
         SendEcho(zoneSession, packet);
     }
@@ -164,7 +165,10 @@ public sealed class QuestProgressHandler(
         SendEcho(zoneSession, packet);
     }
 
-    /// <summary>tSort 3, "mission receive" (S04_MyWork02.cpp:7453-7504) -- does NOT mutate quest state at all, only deposits an item; reuses the plain InventoryZoneCommand channel rather than QuestZoneCommand.</summary>
+    /// <summary>
+    ///     tSort 3, "mission receive" (S04_MyWork02.cpp:7453-7504) -- does NOT mutate quest state at all, only deposits
+    ///     an item; reuses the plain InventoryZoneCommand channel rather than QuestZoneCommand.
+    /// </summary>
     private async ValueTask HandleReceiveAsync(QuestProgressRequest packet, ZoneClientSession zoneSession, Zone zone,
         PlayerRuntimeState state, int characterId, QuestProgress progress, ContainerEdits edits,
         Func<int, bool> hasItem, CancellationToken ct)
@@ -218,8 +222,8 @@ public sealed class QuestProgressHandler(
             return;
         }
 
-        await PersistAndMirrorAsync(characters, zone, logger, characterId, result.NewProgress, deltaMoney: 0,
-            experienceDelta: 0, contributionPointsDelta: 0, teacherPointDelta: 0, edits, ct);
+        await PersistAndMirrorAsync(characters, zone, logger, characterId, result.NewProgress, 0,
+            0, 0, 0, edits, ct);
 
         SendEcho(zoneSession, packet);
     }
@@ -237,8 +241,8 @@ public sealed class QuestProgressHandler(
         }
 
         await characters.ApplyQuestTransitionAsync(characterId, newProgress.StepPermanent, newProgress.ActiveFlag,
-            newProgress.QSort, newProgress.TargetPhase, newProgress.KillCounter, deltaMoney: 0,
-            container1: null, items1: [], container2: null, items2: [], ct);
+            newProgress.QSort, newProgress.TargetPhase, newProgress.KillCounter, 0,
+            null, [], null, [], ct);
 
         SendEcho(zoneSession, packet);
 
@@ -250,7 +254,10 @@ public sealed class QuestProgressHandler(
                 zone.MapId, characterId);
     }
 
-    /// <summary>Shared tail for Accept/Complete/Exchange: persist (quest-state + optional money + up to 2 containers) in ONE transaction, then mirror onto the live PlayerRuntimeState.</summary>
+    /// <summary>
+    ///     Shared tail for Accept/Complete/Exchange: persist (quest-state + optional money + up to 2 containers) in ONE
+    ///     transaction, then mirror onto the live PlayerRuntimeState.
+    /// </summary>
     private static async ValueTask PersistAndMirrorAsync(ICharacterRepository characters, Zone zone,
         ILogger logger, int characterId, QuestProgress newProgress, long deltaMoney, int experienceDelta,
         int contributionPointsDelta, int teacherPointDelta, ContainerEdits edits, CancellationToken ct)
@@ -275,7 +282,10 @@ public sealed class QuestProgressHandler(
             state.QuestTargetPhase, state.QuestKillCounter);
     }
 
-    /// <summary>Bounds/occupancy validation shared by Accept(3/6)/Complete/Receive -- CheckInv(1) + 0..7 XPost/YPost + empty-slot, all Quit()-worthy on violation (verified S04_MyWork02.cpp:7331-7346 et al.).</summary>
+    /// <summary>
+    ///     Bounds/occupancy validation shared by Accept(3/6)/Complete/Receive -- CheckInv(1) + 0..7 XPost/YPost +
+    ///     empty-slot, all Quit()-worthy on violation (verified S04_MyWork02.cpp:7331-7346 et al.).
+    /// </summary>
     private static bool TryValidateDepositSlot(int page, int index, int xPost, int yPost, ContainerEdits edits,
         out byte container, out byte slot)
     {
@@ -316,6 +326,9 @@ public sealed class QuestProgressHandler(
     /// </summary>
     private sealed class ContainerEdits(PlayerRuntimeState state)
     {
+        private static readonly byte[] InventoryContainers =
+            [ContainerMatrix.InventoryPage0, ContainerMatrix.InventoryPage1];
+
         private readonly Dictionary<byte, ImmutableDictionary<byte, ItemStack>> _edits = new();
 
         public ImmutableDictionary<byte, ItemStack> Get(byte container)
@@ -328,7 +341,10 @@ public sealed class QuestProgressHandler(
             _edits[container] = Get(container).SetItem(slot, stack);
         }
 
-        /// <summary>Mirrors DeleteQuestItem (S07_MyGame04.cpp:2246-2269): scans page 0 then page 1, wipes the FIRST matching slot, a no-op if not found anywhere.</summary>
+        /// <summary>
+        ///     Mirrors DeleteQuestItem (S07_MyGame04.cpp:2246-2269): scans page 0 then page 1, wipes the FIRST matching slot,
+        ///     a no-op if not found anywhere.
+        /// </summary>
         public void DeleteFirstMatch(int itemId)
         {
             foreach (var container in InventoryContainers)
@@ -343,7 +359,10 @@ public sealed class QuestProgressHandler(
             }
         }
 
-        /// <summary>Mirrors ChangeQuestItem (S07_MyGame04.cpp:2223-2244): scans page 0 then page 1, replaces the FIRST matching slot's content via <paramref name="transform" />. False if not found anywhere.</summary>
+        /// <summary>
+        ///     Mirrors ChangeQuestItem (S07_MyGame04.cpp:2223-2244): scans page 0 then page 1, replaces the FIRST matching
+        ///     slot's content via <paramref name="transform" />. False if not found anywhere.
+        /// </summary>
         public bool TryReplaceFirstMatch(int itemId, Func<ItemStack, ItemStack> transform)
         {
             foreach (var container in InventoryContainers)
@@ -371,8 +390,12 @@ public sealed class QuestProgressHandler(
             return builder.ToImmutable();
         }
 
-        /// <summary>Splits the (at most 2) touched containers into the (Container, Items) parameter pairs <see cref="CharacterRepository.ApplyQuestTransitionAsync" /> expects -- null container = "not touched".</summary>
-        public (byte? Container1, List<CharacterItemSlotTvp> Items1, byte? Container2, List<CharacterItemSlotTvp> Items2)
+        /// <summary>
+        ///     Splits the (at most 2) touched containers into the (Container, Items) parameter pairs
+        ///     <see cref="CharacterRepository.ApplyQuestTransitionAsync" /> expects -- null container = "not touched".
+        /// </summary>
+        public (byte? Container1, List<CharacterItemSlotTvp> Items1, byte? Container2, List<CharacterItemSlotTvp> Items2
+            )
             ToTvpPairs()
         {
             byte? c1 = null;
@@ -402,7 +425,5 @@ public sealed class QuestProgressHandler(
                     return slot;
             return null;
         }
-
-        private static readonly byte[] InventoryContainers = [ContainerMatrix.InventoryPage0, ContainerMatrix.InventoryPage1];
     }
 }

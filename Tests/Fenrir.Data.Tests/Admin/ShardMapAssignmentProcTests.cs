@@ -11,8 +11,8 @@ namespace Fenrir.Data.Tests.Admin;
 [Collection("SqlServer")]
 public class ShardMapAssignmentProcTests
 {
-    private readonly IShardMapAssignmentRepository _repository;
     private readonly string _connectionString;
+    private readonly IShardMapAssignmentRepository _repository;
 
     public ShardMapAssignmentProcTests(SqlServerFixture fixture)
     {
@@ -50,7 +50,7 @@ public class ShardMapAssignmentProcTests
 
         var maps = await _repository.GetHostedMapsAsync(77, CancellationToken.None);
 
-        Assert.Equal([(short)305, (short)310], maps);
+        Assert.Equal([305, 310], maps);
     }
 
     private async Task InsertAssignmentAsync(byte shardId, short mapId)

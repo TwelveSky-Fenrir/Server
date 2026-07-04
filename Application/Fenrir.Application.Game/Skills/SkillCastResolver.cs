@@ -23,23 +23,6 @@ public static class SkillCastResolver
         WrongWeaponClass
     }
 
-    public readonly record struct BuffWrite(int Slot, int Value, int DurationTicks);
-
-    public readonly record struct Result(
-        bool Success,
-        FailureReason Failure,
-        int ManaCost,
-        ImmutableArray<BuffWrite> BuffWrites,
-        SkillEffectKind Kind,
-        /// <summary>Meaningful only for <see cref="SkillEffectKind.HealLife" />/<see cref="SkillEffectKind.HealMana" /> -- the RAW (unclamped) flat amount; the caller clamps to the target's remaining capacity, exactly like the legacy does at its own call site.</summary>
-        int HealAmount)
-    {
-        public static Result Fail(FailureReason reason)
-        {
-            return new Result(false, reason, 0, ImmutableArray<BuffWrite>.Empty, SkillEffectKind.SelfBuff, 0);
-        }
-    }
-
     /// <summary>
     ///     <paramref name="equippedWeaponSort" /> is the caster's current EWEAPON slot's <c>world.Items.Sort</c>,
     ///     or null if no weapon is equipped -- resolved by the caller (Zone already has
@@ -83,5 +66,22 @@ public static class SkillCastResolver
         }
 
         return new Result(true, FailureReason.None, manaCost, writes.ToImmutable(), effect.Kind, 0);
+    }
+
+    public readonly record struct BuffWrite(int Slot, int Value, int DurationTicks);
+
+    public readonly record struct Result(
+        bool Success,
+        FailureReason Failure,
+        int ManaCost,
+        ImmutableArray<BuffWrite> BuffWrites,
+        SkillEffectKind Kind,
+        /// <summary>Meaningful only for <see cref="SkillEffectKind.HealLife" />/<see cref="SkillEffectKind.HealMana" /> -- the RAW (unclamped) flat amount; the caller clamps to the target's remaining capacity, exactly like the legacy does at its own call site.</summary>
+        int HealAmount)
+    {
+        public static Result Fail(FailureReason reason)
+        {
+            return new Result(false, reason, 0, ImmutableArray<BuffWrite>.Empty, SkillEffectKind.SelfBuff, 0);
+        }
     }
 }

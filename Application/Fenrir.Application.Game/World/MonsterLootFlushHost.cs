@@ -65,7 +65,7 @@ public sealed class MonsterLootFlushHost(
             foreach (var (characterId, amount) in grants)
                 try
                 {
-                    await characters.AdjustMoneyAsync(characterId, amount, deltaBigMoney: 0, stoppingToken)
+                    await characters.AdjustMoneyAsync(characterId, amount, 0, stoppingToken)
                         .ConfigureAwait(false);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)

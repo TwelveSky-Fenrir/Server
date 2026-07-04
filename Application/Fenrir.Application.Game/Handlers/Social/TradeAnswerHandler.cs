@@ -6,8 +6,12 @@ using Fenrir.Network.Sessions;
 
 namespace Fenrir.Application.Game.Handlers.Social;
 
-/// <summary>CZ_TRADE_ANSWER_SEND (opcode 49). 0 = accept, 1/2 = refuse, else ignored. On accept BOTH sides may send CZ_TRADE_START_SEND (symmetric, see <see cref="TradeRegistry" />'s own remarks).</summary>
-public sealed class TradeAnswerHandler(ZoneRegistry zones, TradeRegistry trades) : IInlinePacketHandler<TradeAnswerRequest>
+/// <summary>
+///     CZ_TRADE_ANSWER_SEND (opcode 49). 0 = accept, 1/2 = refuse, else ignored. On accept BOTH sides may send
+///     CZ_TRADE_START_SEND (symmetric, see <see cref="TradeRegistry" />'s own remarks).
+/// </summary>
+public sealed class TradeAnswerHandler(ZoneRegistry zones, TradeRegistry trades)
+    : IInlinePacketHandler<TradeAnswerRequest>
 {
     public void Handle(in TradeAnswerRequest packet, IPacketSession session)
     {

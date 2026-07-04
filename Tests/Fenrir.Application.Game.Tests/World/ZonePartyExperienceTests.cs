@@ -30,8 +30,8 @@ public class ZonePartyExperienceTests
     {
         var (zone, killerId, memberId) = SetUpTwoPresentPartyMembers();
 
-        zone.GrantMonsterKillExperience(killerId, monsterLevel: 50, monsterGeneralExperience: 1000,
-            partyMemberIds: [killerId, memberId]);
+        zone.GrantMonsterKillExperience(killerId, 50, 1000,
+            [killerId, memberId]);
 
         zone.TryGetPlayer(killerId, out var killer);
         zone.TryGetPlayer(memberId, out var member);
@@ -50,7 +50,7 @@ public class ZonePartyExperienceTests
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1, "Solo", level: 50)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
-        zone.GrantMonsterKillExperience(10, monsterLevel: 50, monsterGeneralExperience: 1000);
+        zone.GrantMonsterKillExperience(10, 50, 1000);
 
         zone.TryGetPlayer(10, out var killer);
         Assert.Equal(333, killer!.Experience);
@@ -62,8 +62,8 @@ public class ZonePartyExperienceTests
         var (zone, killerId, memberId) = SetUpTwoPresentPartyMembers();
         zone.ApplyDeath(memberId);
 
-        zone.GrantMonsterKillExperience(killerId, monsterLevel: 50, monsterGeneralExperience: 1000,
-            partyMemberIds: [killerId, memberId]);
+        zone.GrantMonsterKillExperience(killerId, 50, 1000,
+            [killerId, memberId]);
 
         zone.TryGetPlayer(killerId, out var killer);
         zone.TryGetPlayer(memberId, out var member);
@@ -83,8 +83,8 @@ public class ZonePartyExperienceTests
 
         // characterId 20 is a party member per the roster, but never entered THIS zone -- matches the
         // legacy's own per-process mUSER[] scope (report 05 §5 verified remarks on GrantMonsterKillExperience).
-        zone.GrantMonsterKillExperience(10, monsterLevel: 50, monsterGeneralExperience: 1000,
-            partyMemberIds: [10, 20]);
+        zone.GrantMonsterKillExperience(10, 50, 1000,
+            [10, 20]);
 
         zone.TryGetPlayer(10, out var killer);
         Assert.Equal(333, killer!.Experience); // no bonus -- only 1 present member found

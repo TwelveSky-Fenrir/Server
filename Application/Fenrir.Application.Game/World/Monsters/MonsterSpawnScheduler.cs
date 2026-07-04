@@ -56,7 +56,10 @@ internal sealed class MonsterZoneSpawnState
 ///     "normal monster" population report 05 calls the cruising regime.
 ///     </para>
 /// </remarks>
-public sealed class MonsterSpawnScheduler(WorldDataCache worldData, Func<Random>? randomFactory = null)
+public sealed class MonsterSpawnScheduler(
+    WorldDataCache worldData,
+    Func<Random>? randomFactory = null,
+    Social.Party.PartyRegistry? partyRegistry = null)
     : ISimulationSystem
 {
     private readonly ConcurrentDictionary<short, MonsterZoneSpawnState> _stateByZone = new();
@@ -217,9 +220,17 @@ public sealed class MonsterSpawnScheduler(WorldDataCache worldData, Func<Random>
             return; // no resolvable killer -- report 04/05's own drop/XP pipeline both key off the killer, nothing to roll
 
         // Already-built V3 seam (Zone.GrantMonsterKillExperience, report 05 §5 ProcessForExp/§6 ProcessForExperience) --
-        // this pass just supplies the two plain template values it needs.
+        // this pass just supplies the two plain template values it needs, plus (Phase C/V6 Social) the
+        // killer's full party roster so Zone can pay the flat present-member bonus -- see that method's
+        // own remarks for why party membership never changes the killer's OWN base gain above.
+        var partyMemberIds = partyRegistry?.GetMembers(killer.CharacterId);
         zone.GrantMonsterKillExperience(killer.CharacterId, monster.Template.RealLevel,
-            monster.Template.GeneralExperience);
+            monster.Template.GeneralExperience, partyMemberIds);
+
+        // Server Logic V9 Progression: the SAME kill-death seam as the XP grant above (report 04 §5's own
+        // hook, verified S07_MyGame02.cpp:2493-2564) -- a no-op unless the killer's active quest is a
+        // kill-type (qSort 1/5) targeting THIS monster id.
+        zone.ApplyQuestKillProgress(killer.CharacterId, monster.Template.MonsterId);
 
         var luck = (killer.Stats?.Luck ?? 0) * 10;
         var result = state.DropRoller.Roll(monsterDefinition, killer.Level, killer.Tribe, luck);

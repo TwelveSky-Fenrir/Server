@@ -22,9 +22,18 @@ public static class AvatarInfoFactory
     ///     <see cref="BuildEquipArrayFromRows" />'s own remarks for exactly which of <c>AvatarInfo.Equip</c>'s
     ///     4 ints/slot are populated.
     /// </summary>
+    /// <param name="social">
+    ///     Phase C/V6 Social: the friend list / teacher-student bond / guild membership loaded alongside
+    ///     the rest of the world-entry snapshot (<c>EnterWorldHandler</c>'s own remarks) -- null keeps
+    ///     every one of those AVATAR_INFO fields at the shared zeroed template's blank default (a
+    ///     guildless, friendless, un-bonded fresh character, the common case for a test/tool caller that
+    ///     does not care about this facet).
+    /// </param>
     public static AvatarInfo CreateForCharacter(CharacterWorldSnapshotDto character,
-        IReadOnlyList<CharacterItemSlotDto> items)
+        IReadOnlyList<CharacterItemSlotDto> items, AvatarSocialSnapshot? social = null)
     {
+        var s = social ?? AvatarSocialSnapshot.Empty;
+
         return AvatarInfoTemplates.Zeroed with
         {
             Name = character.Name,
@@ -50,6 +59,19 @@ public static class AvatarInfoFactory
             Halo = character.Halo,
             RebirthNum = character.RebirthCount,
             Equip = BuildEquipArrayFromRows(items),
+            Friend = s.BuildFriendArray(),
+            Teacher = s.Teacher,
+            Student = s.Student,
+            GuildName = s.GuildName,
+            GuildRole = s.GuildRoleWire,
+            CallName = s.CallName,
+            // Server Logic V9 Progression: wAvatar.aQuestInfo[5] (report 04 §5) -- previously left at the
+            // shared zeroed template's all-zero default (an open issue this pass closes).
+            QuestInfo =
+            [
+                character.QuestStepPermanent, character.QuestActiveId, character.QuestSort,
+                character.QuestTargetPhase, character.QuestKillCounter
+            ],
             LogoutInfo =
             [
                 character.MapId,
@@ -89,7 +111,15 @@ public static class AvatarInfoFactory
             Title = state.Title,
             Halo = state.Halo,
             RebirthNum = state.RebirthCount,
+            GuildName = state.GuildName,
+            GuildRole = Social.GuildRoleCodec.DbRoleToWire(state.GuildRoleDb),
+            CallName = state.GuildCallName,
             Equip = BuildEquipArrayFromContainer(state.Inventory.GetContainer(ContainerMatrix.Equipment)),
+            QuestInfo =
+            [
+                state.QuestStepPermanent, state.QuestActiveFlag, state.QuestSort, state.QuestTargetPhase,
+                state.QuestKillCounter
+            ],
             LogoutInfo = [mapId, (int)posX, (int)posY, (int)posZ, state.Life, state.Mana]
         };
     }
@@ -145,5 +175,38 @@ public static class AvatarInfoFactory
     private static int PackUpgradeBytes(byte enchant, byte combine, byte refine, byte socket)
     {
         return enchant | (combine << 8) | (refine << 16) | (socket << 24);
+    }
+}
+
+/// <summary>
+///     The Phase C/V6 Social facet of AVATAR_INFO, loaded by <c>EnterWorldHandler</c> from
+///     <c>FriendRepository</c>/<c>MentorRepository</c>/<c>GuildRepository</c> alongside the rest of the
+///     world-entry snapshot. <see cref="AvatarInfo.PartyName" />/<see cref="AvatarInfo.DuelState" /> are
+///     deliberately NOT modeled here: party membership is never persisted (fresh login = no party,
+///     PartyRegistry's own remarks) and a duel cannot possibly be in progress at login time either, so
+///     both are correctly already blank on <c>AvatarInfoTemplates.Zeroed</c>.
+/// </summary>
+public sealed record AvatarSocialSnapshot(
+    IReadOnlyDictionary<byte, string> FriendNameBySlot,
+    string Teacher,
+    string Student,
+    string GuildName,
+    int GuildRoleWire,
+    string CallName = "")
+{
+    public static readonly AvatarSocialSnapshot Empty =
+        new(new Dictionary<byte, string>(), "", "", "", 0);
+
+    /// <summary>Expands the sparse (slot -&gt; name) map into AVATAR_INFO's fixed 10-slot <c>Friend</c> array, empty string for every unfilled slot -- slots are client-chosen (contracts/05_social.md), so gaps are normal.</summary>
+    public string[] BuildFriendArray()
+    {
+        var friends = new string[10];
+        Array.Fill(friends, "");
+
+        foreach (var (slot, name) in FriendNameBySlot)
+            if (slot < 10)
+                friends[slot] = name;
+
+        return friends;
     }
 }

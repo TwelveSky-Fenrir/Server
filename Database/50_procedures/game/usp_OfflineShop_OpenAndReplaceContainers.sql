@@ -1,0 +1,86 @@
+-- database/50_procedures/game/usp_OfflineShop_OpenAndReplaceContainers.sql
+-- Contract: atomically open a character's offline (deputy/proxy) shop -- CZ_START_PSHOP_SEND Sort=2
+-- (contracts/04_commerce.md) -- by (1) upserting the game.OfflineShops row + its game.OfflineShopItems
+-- slots and (2) whole-container replacing BOTH inventory containers (the listed items physically leave
+-- the owner's live inventory at open time and live in game.OfflineShopItems instead -- verified
+-- S07_MyGame09.cpp:487-495, "delete inventory item&socket" on every listed slot). D7 regime (b): one
+-- transaction, never a lossy multi-step sequence.
+-- Params:
+--   @CharacterId      INT
+--   @ZoneNumber       SMALLINT
+--   @ShopDate         INT     -- YYYYMMDD expiration (see game.OfflineShops)
+--   @ShopName         NVARCHAR(48)
+--   @LocationX/Y/Z    INT
+--   @Items            game.tvp_OfflineShopItemSlot READONLY -- the shop's full slot layout
+--   @InventoryPage0   game.tvp_CharacterItemSlot READONLY -- owner's FULL new InventoryPage0 (item(s) sold removed)
+--   @InventoryPage1   game.tvp_CharacterItemSlot READONLY -- owner's FULL new InventoryPage1
+-- Result set: none.
+-- Idempotent: no.
+-- Guard: refuses to open over an EXISTING shop that is still open (ShopState=1) OR still holds unclaimed
+-- value (leftover items or a nonzero Money/BigMoney) -- opening would otherwise silently overwrite/destroy
+-- that unclaimed value. The owner must fully retrieve items and withdraw earnings from a previous closed
+-- shop before opening a new one.
+-- Errors:
+--   THROW 50272 -- an existing offline shop for this character is open or still holds unclaimed items/money.
+CREATE PROCEDURE game.usp_OfflineShop_OpenAndReplaceContainers
+    @CharacterId    INT,
+    @ZoneNumber     SMALLINT,
+    @ShopDate       INT,
+    @ShopName       NVARCHAR(48),
+    @LocationX      INT,
+    @LocationY      INT,
+    @LocationZ      INT,
+    @Items          game.tvp_OfflineShopItemSlot READONLY,
+    @InventoryPage0 game.tvp_CharacterItemSlot READONLY,
+    @InventoryPage1 game.tvp_CharacterItemSlot READONLY
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    BEGIN TRANSACTION;
+
+    IF EXISTS (SELECT 1
+               FROM game.OfflineShops
+               WHERE CharacterId = @CharacterId
+                 AND (ShopState = 1 OR Money <> 0 OR BigMoney <> 0
+                      OR EXISTS (SELECT 1 FROM game.OfflineShopItems WHERE CharacterId = @CharacterId)))
+        THROW 50272, N'An existing offline shop for this character is open or still holds unclaimed items/money.', 1;
+
+    UPDATE game.OfflineShops
+    SET ZoneNumber = @ZoneNumber,
+        ShopState  = 1,
+        ShopDate   = @ShopDate,
+        Money      = 0,
+        BigMoney   = 0,
+        LocationX  = @LocationX,
+        LocationY  = @LocationY,
+        LocationZ  = @LocationZ,
+        ShopName   = @ShopName
+    WHERE CharacterId = @CharacterId;
+
+    IF @@ROWCOUNT = 0
+        INSERT INTO game.OfflineShops (CharacterId, ZoneNumber, ShopState, ShopDate, Money, BigMoney,
+                                        LocationX, LocationY, LocationZ, ShopName)
+        VALUES (@CharacterId, @ZoneNumber, 1, @ShopDate, 0, 0, @LocationX, @LocationY, @LocationZ, @ShopName);
+
+    INSERT INTO game.OfflineShopItems (CharacterId, SlotIndex, ItemId, Quantity, Value, SerialNumber, Price, SocketData)
+    SELECT @CharacterId, SlotIndex, ItemId, Quantity, Value, SerialNumber, Price, SocketData
+    FROM @Items;
+
+    DELETE FROM game.CharacterItems WHERE CharacterId = @CharacterId AND Container = 0;
+    INSERT INTO game.CharacterItems (CharacterId, Container, Slot, ItemId, Quantity, Enchant, Combine,
+                                      Refine, Socket, SocketGem1, SocketGem2, SocketGem3, ExpireDate, Serial)
+    SELECT @CharacterId, 0, Slot, ItemId, Quantity, Enchant, Combine, Refine, Socket,
+           SocketGem1, SocketGem2, SocketGem3, ExpireDate, Serial
+    FROM @InventoryPage0;
+
+    DELETE FROM game.CharacterItems WHERE CharacterId = @CharacterId AND Container = 1;
+    INSERT INTO game.CharacterItems (CharacterId, Container, Slot, ItemId, Quantity, Enchant, Combine,
+                                      Refine, Socket, SocketGem1, SocketGem2, SocketGem3, ExpireDate, Serial)
+    SELECT @CharacterId, 1, Slot, ItemId, Quantity, Enchant, Combine, Refine, Socket,
+           SocketGem1, SocketGem2, SocketGem3, ExpireDate, Serial
+    FROM @InventoryPage1;
+
+    COMMIT TRANSACTION;
+END;

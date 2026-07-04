@@ -18,6 +18,14 @@
 --   48..52  QuestStepPermanent, QuestActiveId, QuestSort, QuestTargetPhase, QuestKillCounter
 --           (game.CharacterQuests LEFT JOIN, ISNULL 0 -- no row = the all-zeros aQuestInfo of a fresh
 --           character).
+--   53..62  [Server Logic V9 Progression] JoinWar, MissionKillOtherTribe, MissionKillMonster,
+--           MissionPlayTime (wAvatar.aMissionDate, report 04 CZ_MISSION_COMPLETE_SEND), AutoHuntEnabled,
+--           AutoHuntConfig (raw 112-byte AUTO_HUNT blob, NULL for a character that never configured
+--           auto-hunt -- callers must treat NULL as "all-zeros"), AutoLifeRatio, AutoManaRatio
+--           (CZ_CHANGE_AUTO_INFO), PetGrowth, PetActivity (see game.Characters.PetGrowth's own ALTER
+--           header for the per-character simplification these two model).
+--   63      TeacherPoint (quest reward type 5, wAvatar.aTeacherPoint -- see Characters_v9_teacherpoint.sql's
+--           own ALTER header; appended LAST, matching this proc's own ordinal-mapped contract).
 -- RS1 (0..n): occupied item slots -- Container, Slot, ItemId, Quantity, Enchant, Combine, Refine,
 --   Socket, SocketGem1, SocketGem2, SocketGem3, ExpireDate, Serial (ORDER BY Container, Slot: wire
 --   arrays are rebuilt in slot order).
@@ -90,7 +98,18 @@ SELECT c.CharacterId,
        ISNULL(q.ActiveQuestId, 0) AS QuestActiveId,
        ISNULL(q.QSort, 0)         AS QuestSort,
        ISNULL(q.TargetPhase, 0)   AS QuestTargetPhase,
-       ISNULL(q.KillCounter, 0)   AS QuestKillCounter
+       ISNULL(q.KillCounter, 0)   AS QuestKillCounter,
+       c.JoinWar,
+       c.MissionKillOtherTribe,
+       c.MissionKillMonster,
+       c.MissionPlayTime,
+       c.AutoHuntEnabled,
+       c.AutoHuntConfig,
+       c.AutoLifeRatio,
+       c.AutoManaRatio,
+       c.PetGrowth,
+       c.PetActivity,
+       c.TeacherPoint
 FROM game.Characters AS c
          LEFT JOIN game.CharacterQuests AS q
                    ON q.CharacterId = c.CharacterId

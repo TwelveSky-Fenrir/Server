@@ -81,6 +81,12 @@ public static class LegacyTime
     public static readonly TimeSpan GroundItemPartyShareDelay = TimeSpan.FromSeconds(10);
 
     /// <summary>
+    ///     Pet activity decay cadence: -1 every 60 legacy ticks (30 s, report 12 §2.1: "Décroissance
+    ///     d'activité : −1 toutes les 60 ticks (30 s)"). Consumed by <see cref="PetActivitySystem" />.
+    /// </summary>
+    public const int PetActivityDecayLegacyTicks = 60;
+
+    /// <summary>
     ///     Real duration of <paramref name="legacyTicks" /> legacy ticks (e.g. a 20-legacy-tick buff = 10 s,
     ///     never 1 s — see the anti-×10 remark on this class).
     /// </summary>

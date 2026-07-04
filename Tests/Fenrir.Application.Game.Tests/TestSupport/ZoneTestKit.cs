@@ -95,7 +95,9 @@ internal static class ZoneTestKit
             BloodExchangeCatalog = [],
             EventDefinitions = [],
             ItemMallProductsById = EmptyFrozen<int, ItemMallProductRowDto>(),
-            RewardBundleItemsByBundleId = EmptyFrozen<int, ImmutableArray<RewardBundleItemRowDto>>()
+            RewardBundleItemsByBundleId = EmptyFrozen<int, ImmutableArray<RewardBundleItemRowDto>>(),
+            CashCatalog = CashCatalogBuilder.Build([]),
+            CashCatalogVersion = 0
         };
     }
 

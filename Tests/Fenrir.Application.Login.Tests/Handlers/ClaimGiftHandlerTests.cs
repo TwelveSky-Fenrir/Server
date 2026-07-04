@@ -2,39 +2,79 @@ using Fenrir.Application.Login.Handlers;
 using Fenrir.Application.Login.Tests.TestSupport;
 using Fenrir.Contracts.Packets.Login;
 using Fenrir.Network.Sessions;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Login.Tests.Handlers;
 
 /// <summary>
-///     op21 CL_WANT_GIFT_SEND — V1 gift claim (login protocol report §4.21). GIFT_V2 is off in EU33, so every
-///     page is empty for the whole population until the web-API path lands (chantier V8): Result=1 is the exact
-///     legacy answer today, not a placeholder.
+///     op21 CL_WANT_GIFT_SEND — V8 gift claim (login protocol report §4.21, "chantier V8"): now backed by
+///     the real game.Gifts pending queue + usp_Gift_ClaimIntoVault instead of the pre-V8 static
+///     always-"no gift" placeholder.
 /// </summary>
 public class ClWantGiftSendHandlerTests
 {
-    [Theory]
-    [InlineData(0)]
-    [InlineData(9)]
-    public async Task Handle_IndexInRange_AlwaysRepliesNoGift(int index)
+    [Fact]
+    public async Task HandleAsync_IndexWithinPendingList_ClaimsThatGiftAndRepliesResultZero()
     {
-        var handler = new ClaimGiftHandler();
+        var gifts = FakeGiftRepository.WithPending((501, 1211), (502, 99700));
+        var handler = new ClaimGiftHandler(gifts, NullLogger<ClaimGiftHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
 
-        handler.Handle(new ClaimGiftRequest { Sort = 0, GiftInfoIndex = index }, session);
+        await handler.HandleAsync(new ClaimGiftRequest { Sort = 0, GiftInfoIndex = 1 }, session, CancellationToken.None);
+
+        Assert.Equal(502, gifts.LastClaimedGiftId);
+        Assert.Null(session.DisconnectReason);
+        await PacketAssert.AssertSentAsync(pipe, new ClaimGiftResponse { Result = 0 });
+    }
+
+    [Fact]
+    public async Task HandleAsync_IndexBeyondPendingList_RepliesResultOneWithoutClaiming()
+    {
+        var gifts = FakeGiftRepository.WithPending((501, 1211));
+        var handler = new ClaimGiftHandler(gifts, NullLogger<ClaimGiftHandler>.Instance);
+        var (session, pipe) = CreateSessionInCharSelect();
+
+        await handler.HandleAsync(new ClaimGiftRequest { Sort = 0, GiftInfoIndex = 5 }, session, CancellationToken.None);
+
+        Assert.Null(gifts.LastClaimedGiftId);
+        await PacketAssert.AssertSentAsync(pipe, new ClaimGiftResponse { Result = 1 });
+    }
+
+    [Fact]
+    public async Task HandleAsync_NoPendingGifts_RepliesResultOne()
+    {
+        var gifts = FakeGiftRepository.Empty();
+        var handler = new ClaimGiftHandler(gifts, NullLogger<ClaimGiftHandler>.Instance);
+        var (session, pipe) = CreateSessionInCharSelect();
+
+        await handler.HandleAsync(new ClaimGiftRequest { Sort = 0, GiftInfoIndex = 0 }, session, CancellationToken.None);
+
+        await PacketAssert.AssertSentAsync(pipe, new ClaimGiftResponse { Result = 1 });
+    }
+
+    [Fact]
+    public async Task HandleAsync_ClaimThrows_RepliesResultTwoWithoutDisconnecting()
+    {
+        var gifts = FakeGiftRepository.ThrowingOnClaim(new InvalidOperationException("vault full"), (501, 1211));
+        var handler = new ClaimGiftHandler(gifts, NullLogger<ClaimGiftHandler>.Instance);
+        var (session, pipe) = CreateSessionInCharSelect();
+
+        await handler.HandleAsync(new ClaimGiftRequest { Sort = 0, GiftInfoIndex = 0 }, session, CancellationToken.None);
 
         Assert.Null(session.DisconnectReason);
-        await PacketAssert.AssertSentAsync(pipe, new ClaimGiftResponse { Result = 1 });
+        await PacketAssert.AssertSentAsync(pipe, new ClaimGiftResponse { Result = 2 });
     }
 
     [Theory]
     [InlineData(-1)]
     [InlineData(10)]
-    public void Handle_IndexOutOfRange_AbortsAsMalformed(int index)
+    public async Task HandleAsync_IndexOutOfRange_AbortsAsMalformed(int index)
     {
-        var handler = new ClaimGiftHandler();
+        var gifts = FakeGiftRepository.Empty();
+        var handler = new ClaimGiftHandler(gifts, NullLogger<ClaimGiftHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
 
-        handler.Handle(new ClaimGiftRequest { Sort = 0, GiftInfoIndex = index }, session);
+        await handler.HandleAsync(new ClaimGiftRequest { Sort = 0, GiftInfoIndex = index }, session, CancellationToken.None);
 
         Assert.Equal(DisconnectReason.Malformed, session.DisconnectReason);
         PacketAssert.AssertNothingSent(pipe);

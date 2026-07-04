@@ -303,6 +303,36 @@ public class CharacterWorldPersistenceTests
     }
 
     [Fact]
+    public async Task AdjustMoneyAsync_CreditAboveTheLegacyCap_IsRejected_AndLeavesBalanceUntouched()
+    {
+        // Review finding (Phase C/V5): the MAX_NUMBER_SIZE (2,000,000,000) upper-cap guard used to be a
+        // separate `IF EXISTS` pre-check ahead of the atomic UPDATE...WHERE, a real TOCTOU window under
+        // concurrent credits -- now folded into the SAME guarded UPDATE as the lower (>=0) bound. This proves
+        // the guard itself still rejects (never clamps) a single over-cap credit, with zero prior coverage.
+        var characterId = await CreateCharacterAsync();
+
+        await _characters.AdjustMoneyAsync(characterId, 1_999_999_999L, 0, CancellationToken.None);
+
+        var ex = await Record.ExceptionAsync(() =>
+            _characters.AdjustMoneyAsync(characterId, 2L, 0, CancellationToken.None).AsTask());
+
+        Assert.NotNull(ex);
+        var sqlException = ex as SqlException ?? ex!.InnerException as SqlException;
+        if (sqlException is not null)
+            Assert.Equal(50261, sqlException.Number);
+
+        var afterRejectedCredit = await _characters.GetWorldEntryBundleAsync(characterId, CancellationToken.None);
+        Assert.NotNull(afterRejectedCredit);
+        Assert.Equal(1_999_999_999L, afterRejectedCredit.Character.Money);
+
+        // Landing EXACTLY on the cap is legal (BETWEEN is inclusive) -- only exceeding it is rejected.
+        await _characters.AdjustMoneyAsync(characterId, 1L, 0, CancellationToken.None);
+        var atExactCap = await _characters.GetWorldEntryBundleAsync(characterId, CancellationToken.None);
+        Assert.NotNull(atExactCap);
+        Assert.Equal(2_000_000_000L, atExactCap.Character.Money);
+    }
+
+    [Fact]
     public async Task GetForWorldEntryAsync_TheM1PrefixRead_StillWorksAgainstTheExtendedProc()
     {
         var characterId = await CreateCharacterAsync();

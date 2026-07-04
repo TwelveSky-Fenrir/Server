@@ -26,10 +26,23 @@ namespace Fenrir.Application.Game.Inventory;
 ///     <see cref="EffectiveStats" /> (<see cref="EquipmentService.RecomputeStats" />), replacing
 ///     <c>PlayerRuntimeState.Stats</c> wholesale exactly like every other equipment-change event.
 /// </param>
+/// <param name="Applied">
+///     Completed by <c>Zone.ApplyInventoryCommand</c> the instant the tick actually mirrors this command into
+///     <c>PlayerRuntimeState.Inventory</c> (whether that mirror finds the player still present or not) --
+///     NOT merely when this command is posted/accepted into the inbox. Review finding (Phase C/V5 NPC &amp;
+///     Economy): posting alone is not enough to close the read-await-write race the per-character
+///     <c>PlayerRuntimeState.EconomyActionLock</c> exists to serialize -- a handler that released that lock
+///     right after posting (rather than after the mirror is CONFIRMED applied) would still let a
+///     back-to-back second request read a stale, pre-mirror <c>Inventory</c> snapshot if it arrived before
+///     the zone's next tick. Null for any caller that genuinely doesn't need this guarantee (there are none
+///     left in this codebase as of this fix, but the field stays optional rather than required so a future,
+///     provably-safe caller isn't forced to pay for a signal it doesn't need).
+/// </param>
 public readonly record struct InventoryZoneCommand(
     int CharacterId,
     ImmutableArray<InventoryContainerSnapshot> Containers,
-    EffectiveStats? UpdatedStats);
+    EffectiveStats? UpdatedStats,
+    TaskCompletionSource? Applied = null);
 
 /// <summary>One touched container's full new content, keyed by <see cref="ContainerMatrix" />'s Container byte.</summary>
 public readonly record struct InventoryContainerSnapshot(byte Container, ImmutableDictionary<byte, ItemStack> Slots);

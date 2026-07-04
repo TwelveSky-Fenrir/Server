@@ -13,6 +13,11 @@
 -- Errors:
 --   THROW 50230 -- guild name already taken (admin.ErrorCatalog, 502xx = game range).
 --   THROW 50231 -- the master character already belongs to a guild.
+-- [CORRIGÉ-REVUE, Phase C/V7 Guilds & Tribes] The INSERT below now sets Grade=1 explicitly. It previously
+-- relied on game.Guilds' own DF_Guilds_Grade DEFAULT of 0 -- but the legacy's own CreateGuild (doc 10 §1
+-- tSort 1) hard-codes `gGrade=1` on every newly created guild (S04_MyWork02.cpp's CREATE_GUILD path,
+-- ts25extra), and GUILD_WORK tSort 7 (grade upgrade)'s own grade-1..4 switch has NO case for grade 0 --
+-- a guild stuck at the table's raw default would therefore Quit() on every single upgrade attempt forever.
 CREATE PROCEDURE game.usp_Guild_Create @Name              NVARCHAR(12),
     @MasterCharacterId INT
 AS
@@ -36,8 +41,8 @@ EXISTS (SELECT 1 FROM game.GuildMembers WHERE CharacterId = @MasterCharacterId)
 BEGIN
 TRANSACTION;
 
-INSERT INTO game.Guilds (Name, MasterCharacterId)
-VALUES (@Name, @MasterCharacterId);
+INSERT INTO game.Guilds (Name, MasterCharacterId, Grade)
+VALUES (@Name, @MasterCharacterId, 1);
 
 SET
 @GuildId = SCOPE_IDENTITY();

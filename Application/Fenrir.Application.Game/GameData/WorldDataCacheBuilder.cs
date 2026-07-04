@@ -45,7 +45,9 @@ public static class WorldDataCacheBuilder
             EventDefinitions = [.. rows.EventDefinitions],
             ItemMallProductsById =
                 rows.ItemMallProducts.ToFrozenDictionary(static product => product.ItemMallProductId),
-            RewardBundleItemsByBundleId = BuildRewardBundles(rows.RewardBundles, rows.RewardBundleItems)
+            RewardBundleItemsByBundleId = BuildRewardBundles(rows.RewardBundles, rows.RewardBundleItems),
+            CashCatalog = CashCatalogBuilder.Build(rows.ItemMallProducts),
+            CashCatalogVersion = CashCatalogBuilder.ResolveVersion(rows.ItemMallProducts)
         };
 
         return (cache, stats);

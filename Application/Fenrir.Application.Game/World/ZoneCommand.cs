@@ -102,4 +102,49 @@ public sealed record PlayerEnterData(
     bool IsDead = false,
     TimeSpan? ReviveRemaining = null,
     IReadOnlyList<CharacterItemSlotDto>? Items = null,
-    EffectiveStats? Stats = null);
+    EffectiveStats? Stats = null,
+    bool IsMuted = false,
+    int? GuildId = null,
+    string GuildName = "",
+    byte GuildRoleDb = 0,
+    byte TribeRole = 0,
+    IReadOnlyDictionary<byte, int>? FriendsBySlot = null,
+    IReadOnlyList<CharacterSkillDto>? Skills = null,
+    int? TeacherCharacterId = null,
+    int? StudentCharacterId = null,
+    Quests.QuestProgress QuestProgress = default,
+    int MissionJoinWar = 0,
+    int MissionKillOtherTribe = 0,
+    int MissionKillMonster = 0,
+    int MissionPlayTime = 0,
+    bool AutoHuntEnabled = false,
+    Contracts.Packets.Shared.AutoHunt? AutoHuntConfig = null,
+    byte AutoLifeRatio = 0,
+    byte AutoManaRatio = 0,
+    int PetGrowth = 0,
+    byte PetActivity = 0,
+    // Phase C/V7 Guilds & Tribes: cosmetic in-guild title (game.GuildMembers.CallName) -- "" when none
+    // set or when guildless, same posture as GuildName/GuildRoleDb.
+    string GuildCallName = "",
+    // CORRECTION (review finding, Phase C/V7): these raw progression fields are read from the DB into
+    // EnterWorldHandler's own `character` DTO and used ONCE to compute the world-entry EffectiveStats
+    // snapshot (see Stats above), but were never themselves carried into PlayerRuntimeState -- so
+    // PlayerRuntimeState.StatVit/StatStr/StatInt/StatDex/Title/Halo/RebirthCount/Experience/
+    // ContributionPoints/StatPoints silently reset to 0/default on EVERY world entry AND zone transfer,
+    // regardless of the real persisted value. Harmless for the FIRST stat computation (EnterWorldHandler
+    // computes EffectiveStats directly from the DB row, bypassing PlayerRuntimeState entirely), but any
+    // LATER recompute that reads these raw fields off PlayerRuntimeState directly (equip/unequip, enchant,
+    // halo purchase, stat-point reset, any V7 feature gated on Title/Halo/ContributionPoints) would then
+    // wrongly operate on zero instead of the persisted value.
+    int StatVit = 0,
+    int StatStr = 0,
+    int StatInt = 0,
+    int StatDex = 0,
+    int StatPoints = 0,
+    int Title = 0,
+    int Halo = 0,
+    int RebirthCount = 0,
+    long Experience = 0,
+    int ContributionPoints = 0,
+    // Quest reward type 5 (wAvatar.aTeacherPoint) -- see PlayerRuntimeState.TeacherPoint's own remarks.
+    int TeacherPoint = 0);

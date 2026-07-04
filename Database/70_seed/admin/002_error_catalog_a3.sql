@@ -52,6 +52,26 @@ NOT EXISTS (SELECT 1 FROM admin.ErrorCatalog WHERE ErrorNumber = 50260)
     VALUES (50260, N'game', N'usp_CharacterItems_ReplaceTwoContainers: ContainerA and ContainerB must differ.');
 
 IF
+NOT EXISTS (SELECT 1 FROM admin.ErrorCatalog WHERE ErrorNumber = 50261)
+    INSERT INTO admin.ErrorCatalog (ErrorNumber, SchemaName, Description)
+    VALUES (50261, N'game', N'usp_Character_AdjustMoney/usp_Character_AdjustMoneyAndReplaceContainer/...AndReplaceTwoContainers: adjustment would exceed the legacy money cap (MAX_NUMBER_SIZE = 2,000,000,000).');
+
+IF
+NOT EXISTS (SELECT 1 FROM admin.ErrorCatalog WHERE ErrorNumber = 50264)
+    INSERT INTO admin.ErrorCatalog (ErrorNumber, SchemaName, Description)
+    VALUES (50264, N'game', N'usp_Character_AdjustMoneyAndReplaceContainer: unknown character or insufficient money balance for this adjustment.');
+
+IF
+NOT EXISTS (SELECT 1 FROM admin.ErrorCatalog WHERE ErrorNumber = 50265)
+    INSERT INTO admin.ErrorCatalog (ErrorNumber, SchemaName, Description)
+    VALUES (50265, N'game', N'usp_Character_AdjustMoneyAndReplaceTwoContainers: unknown character or insufficient money balance for this adjustment.');
+
+IF
+NOT EXISTS (SELECT 1 FROM admin.ErrorCatalog WHERE ErrorNumber = 50266)
+    INSERT INTO admin.ErrorCatalog (ErrorNumber, SchemaName, Description)
+    VALUES (50266, N'game', N'usp_Character_AdjustMoneyAndReplaceTwoContainers: ContainerA and ContainerB must differ.');
+
+IF
 NOT EXISTS (SELECT 1 FROM admin.ErrorCatalog WHERE ErrorNumber = 50306)
     INSERT INTO admin.ErrorCatalog (ErrorNumber, SchemaName, Description)
     VALUES (50306, N'admin', N'usp_Mute_Create: a mute must target at least one of @AccountId or @CharacterId.');

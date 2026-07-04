@@ -115,4 +115,29 @@ public class ExperienceFormulasTests
         // clamped down to currentExperience itself, never going negative.
         Assert.Equal(100, ExperienceFormulas.ComputeDeathExperienceLoss(100, -100_000));
     }
+
+    [Theory]
+    [InlineData(2, 100)] // +10%
+    [InlineData(3, 200)] // +20%
+    [InlineData(4, 300)] // +30%
+    [InlineData(5, 500)] // +50%
+    public void ComputePartyBonusExperience_MatchesTheVerifiedSwitchTable(int presentPartySize, int expectedBonus)
+    {
+        Assert.Equal(expectedBonus, ExperienceFormulas.ComputePartyBonusExperience(presentPartySize, 1000));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(6)]
+    public void ComputePartyBonusExperience_SizeOutsideTwoToFive_GrantsNothing(int presentPartySize)
+    {
+        Assert.Equal(0, ExperienceFormulas.ComputePartyBonusExperience(presentPartySize, 1000));
+    }
+
+    [Fact]
+    public void ComputePartyBonusExperience_ZeroGeneralExperience_GrantsNothing()
+    {
+        Assert.Equal(0, ExperienceFormulas.ComputePartyBonusExperience(3, 0));
+    }
 }

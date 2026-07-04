@@ -55,13 +55,19 @@ public static class EquipmentService
     ///     matching <see cref="StatCalculator.ComputeEffectiveStats" />'s own "null = no buffs" default) so
     ///     every pre-V3 caller keeps compiling and behaving exactly as before.
     /// </summary>
+    /// <param name="pet">
+    ///     Server Logic V9 Progression: the equipped pet's Life/Mana/AttackPower/DefensePower contribution
+    ///     (<see cref="Pets.PetGrowthCalculator" />) -- defaults to <c>default</c> (no pet) so every
+    ///     pre-V9 caller keeps compiling and behaving exactly as before.
+    /// </param>
     public static EffectiveStats RecomputeStats(
         CharacterBaseAttributes attributes,
         IReadOnlyDictionary<byte, ItemStack> equipmentContainer,
         WorldDataCache worldData,
-        BuffInfo? buffs = null)
+        BuffInfo? buffs = null,
+        PetStatContribution pet = default)
     {
         var equipped = BuildEquippedSlots(equipmentContainer, worldData.ItemsById);
-        return StatCalculator.ComputeEffectiveStats(attributes, equipped, worldData.LevelsByLevel, buffs);
+        return StatCalculator.ComputeEffectiveStats(attributes, equipped, worldData.LevelsByLevel, buffs, pet: pet);
     }
 }

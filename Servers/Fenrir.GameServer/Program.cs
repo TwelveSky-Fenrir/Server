@@ -2,7 +2,13 @@ using Fenrir.Application.Game;
 using Fenrir.Application.Game.Dispatching;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Movement;
+using Fenrir.Application.Game.Quests;
 using Fenrir.Application.Game.Simulation;
+using Fenrir.Application.Game.Social.Duel;
+using Fenrir.Application.Game.Social.Friends;
+using Fenrir.Application.Game.Social.Mentor;
+using Fenrir.Application.Game.Social.Party;
+using Fenrir.Application.Game.Social.Trade;
 using Fenrir.Application.Game.World;
 using Fenrir.Application.Game.World.Monsters;
 using Fenrir.Contracts.Abstractions;
@@ -32,6 +38,10 @@ builder.Services.AddSingleton<IFrameDispatcher, ZoneFrameDispatcher>();
 builder.Services.AddSingleton<MovementRules>();
 builder.Services.AddSingleton<DirtyTracker<int>>();
 
+// Server Logic V9 Progression -- one process-wide (Category, Step) index over WorldDataCache.QuestsById,
+// shared by every Zone actor (ZoneRegistry) and every handler that needs mQUEST.Search's own lookup shape.
+builder.Services.AddSingleton<QuestCatalog>();
+
 // Registration order IS simulation order within a zone's tick (report 05 §0 / ZoneRegistry's own remarks):
 // buffs must expire before meditation regen reads a (possibly just-cleared) sit-skill for the frame; monster
 // AI (report 05 §0 item 7, "boucle monstres") runs before that same tick's respawn scan (item 12, "boucle
@@ -41,8 +51,20 @@ builder.Services.AddSingleton<ISimulationSystem, BuffExpirySystem>();
 builder.Services.AddSingleton<ISimulationSystem, MeditationRegenSystem>();
 builder.Services.AddSingleton<ISimulationSystem, MonsterAiSystem>();
 builder.Services.AddSingleton<ISimulationSystem, MonsterSpawnScheduler>();
+// Server Logic V9 Progression -- order-independent (touches only PlayerRuntimeState.PetActivity/PetActivityDecayTicks).
+builder.Services.AddSingleton<ISimulationSystem, PetActivitySystem>();
 
 builder.Services.AddSingleton<ZoneRegistry>();
+
+// Phase C/V6 Social: process-wide singletons (a party/duel/trade/friend-ask/mentor-ask negotiation can
+// span multiple Zone actors -- report 04's own note on the legacy's "center" relay collapsing into a
+// single in-process authority in a mono-GameServer topology).
+builder.Services.AddSingleton<PartyRegistry>();
+builder.Services.AddSingleton<FriendRegistry>();
+builder.Services.AddSingleton<MentorRegistry>();
+builder.Services.AddSingleton<DuelRegistry>();
+builder.Services.AddSingleton<TradeRegistry>();
+
 builder.Services.AddHostedService<ZoneTickHost>();
 builder.Services.AddHostedService<MonsterLootFlushHost>();
 

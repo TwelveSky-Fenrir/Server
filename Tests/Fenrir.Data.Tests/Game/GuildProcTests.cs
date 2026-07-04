@@ -173,6 +173,61 @@ public class GuildProcTests
         Assert.Equal(50235, again.Number);
     }
 
+    [Fact]
+    public async Task GuildMember_SetCallName_UpdatesTheRow_AndThrowsForANonMember()
+    {
+        var masterId = await CreateCharacterAsync();
+        var memberId = await CreateCharacterAsync();
+        var guildId = await CreateGuildAsync(NewGuildName(), masterId);
+        await ExecProcAsync("game.usp_GuildMember_Add", ("GuildId", guildId), ("CharacterId", memberId),
+            ("Role", (byte)0));
+
+        await ExecProcAsync("game.usp_GuildMember_SetCallName",
+            ("GuildId", guildId), ("CharacterId", memberId), ("CallName", "Duke"));
+        Assert.Equal("Duke", await ScalarAsync<string>(
+            $"SELECT CallName FROM game.GuildMembers WHERE GuildId = {guildId} AND CharacterId = {memberId};"));
+
+        // Clearing it back to "" is a valid, deliberate no-title state.
+        await ExecProcAsync("game.usp_GuildMember_SetCallName",
+            ("GuildId", guildId), ("CharacterId", memberId), ("CallName", ""));
+        Assert.Equal("", await ScalarAsync<string>(
+            $"SELECT CallName FROM game.GuildMembers WHERE GuildId = {guildId} AND CharacterId = {memberId};"));
+
+        var notAMember = await Assert.ThrowsAsync<SqlException>(() => ExecProcAsync(
+            "game.usp_GuildMember_SetCallName", ("GuildId", guildId), ("CharacterId", -1), ("CallName", "X")));
+        Assert.Equal(50233, notAMember.Number);
+    }
+
+    [Fact]
+    public async Task Guild_GetById_ReturnsTheRow_WithMemberCount_AndNoRowForAnUnknownGuild()
+    {
+        var masterId = await CreateCharacterAsync();
+        var memberId = await CreateCharacterAsync();
+        var guildId = await CreateGuildAsync(NewGuildName(), masterId);
+        await ExecProcAsync("game.usp_GuildMember_Add", ("GuildId", guildId), ("CharacterId", memberId),
+            ("Role", (byte)0));
+
+        await using var connection = new SqlConnection(_connectionString);
+        await connection.OpenAsync();
+        await using var command = new SqlCommand("game.usp_Guild_GetById", connection)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+        command.Parameters.AddWithValue("GuildId", guildId);
+        await using var reader = await command.ExecuteReaderAsync();
+        Assert.True(await reader.ReadAsync());
+        Assert.Equal(guildId, reader.GetInt32(reader.GetOrdinal("GuildId")));
+        Assert.Equal(1, reader.GetInt32(reader.GetOrdinal("Grade"))); // [CORRIGÉ-REVUE] fresh guilds now start at grade 1
+        // MemberCount is INT (plain COUNT(*)), not BIGINT -- see GuildSummaryDto's own remarks.
+        Assert.Equal(2, reader.GetInt32(reader.GetOrdinal("MemberCount")));
+        Assert.False(await reader.ReadAsync());
+        await reader.CloseAsync();
+
+        command.Parameters["GuildId"].Value = -1;
+        await using var emptyReader = await command.ExecuteReaderAsync();
+        Assert.False(await emptyReader.ReadAsync());
+    }
+
     private async Task<int> CreateCharacterAsync()
     {
         var accountId = await _accounts.CreateAsync($"gldtest-{Guid.NewGuid():N}",

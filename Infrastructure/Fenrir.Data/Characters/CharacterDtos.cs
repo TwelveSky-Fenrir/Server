@@ -3,6 +3,10 @@ using CaeriusNet.Attributes.Dto;
 
 namespace Fenrir.Data.Characters;
 
+/// <summary>One-row result of usp_Character_GetIdByName -- resolves an avatar name to its CharacterId.</summary>
+[GenerateDto]
+public sealed partial record CharacterIdDto(int CharacterId);
+
 /// <summary>
 ///     Character-select list row (architecture reference §11.2) -- ordinal contract of
 ///     game.usp_Character_GetByAccount's result set: CharacterId, Slot, Name, Tribe, Gender, HeadType, FaceType, Level.
@@ -108,7 +112,24 @@ public sealed partial record CharacterWorldSnapshotDto(
     int QuestActiveId,
     int QuestSort,
     int QuestTargetPhase,
-    int QuestKillCounter);
+    int QuestKillCounter,
+    int JoinWar,
+    int MissionKillOtherTribe,
+    int MissionKillMonster,
+    int MissionPlayTime,
+    bool AutoHuntEnabled,
+    // Not '?'-annotated: CaeriusNet's [GenerateDto] source generator only recognizes the bare `byte[]`
+    // syntax for its native varbinary mapping (CAERIUS005) -- a nullable-annotated array type still maps
+    // fine at runtime (NULL rows simply populate this with a null reference), this is a compile-time-only
+    // annotation difference, not a behavior change.
+    byte[] AutoHuntConfig,
+    byte AutoLifeRatio,
+    byte AutoManaRatio,
+    int PetGrowth,
+    byte PetActivity,
+    // Quest reward type 5 (wAvatar.aTeacherPoint) -- appended LAST, matching this proc's ordinal contract;
+    // see Characters_v9_teacherpoint.sql's own ALTER header.
+    int TeacherPoint);
 
 /// <summary>
 ///     One occupied item slot (RS1 of usp_Character_GetForWorldEntry) -- ordinal contract: Container, Slot, ItemId,

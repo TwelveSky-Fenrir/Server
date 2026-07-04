@@ -2,13 +2,20 @@ using System.Collections.Immutable;
 using Fenrir.Application.Game.Avatars;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Inventory;
+using Fenrir.Application.Game.Pets;
+using Fenrir.Application.Game.Quests;
+using Fenrir.Application.Game.Social;
 using Fenrir.Application.Game.Stats;
 using Fenrir.Application.Game.World;
 using Fenrir.Contracts.Abstractions;
 using Fenrir.Contracts.Packets.Shared;
 using Fenrir.Contracts.Packets.Zone;
 using Fenrir.Contracts.Wire;
+using Fenrir.Data.Admin;
 using Fenrir.Data.Characters;
+using Fenrir.Data.Guilds;
+using Fenrir.Data.Social;
+using Fenrir.Data.Tribes;
 using Fenrir.Network.Sessions;
 using Microsoft.Extensions.Logging;
 
@@ -34,6 +41,11 @@ public sealed class EnterWorldHandler(
     CharacterRepository characters,
     WorldDataCache worldData,
     ZoneRegistry zones,
+    MuteRepository mutes,
+    GuildRepository guilds,
+    TribeRepository tribes,
+    FriendRepository friends,
+    MentorRepository mentors,
     ILogger<EnterWorldHandler> logger)
     : IAsyncPacketHandler<EnterWorldRequest>
 {
@@ -98,11 +110,49 @@ public sealed class EnterWorldHandler(
         var attributes = new CharacterBaseAttributes(character.StatVit, character.StatStr, character.StatInt,
             character.StatDex, character.Level, character.Tribe, character.Title, character.Halo,
             character.RebirthCount);
-        var stats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData);
+
+        // Server Logic V9 Progression: the equipped pet's stat contribution, resolved from the SAME item
+        // bundle BuildEquipmentContainer already scanned -- see PetGrowthCalculator's own remarks.
+        var petItemId = PetSlots.ResolveEquippedPetItemId(bundle.Items);
+        var petContribution = PetGrowthCalculator.Compute(petItemId, character.PetGrowth, character.PetActivity,
+            worldData.ItemsById);
+
+        var stats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData,
+            pet: petContribution);
+
+        // Phase C/V6 Social: mute/guild/tribe-role/friends/mentor are all loaded ONCE here, alongside the
+        // rest of the world-entry snapshot -- never re-queried per chat message afterwards (report 06
+        // §1.7's "hidden flag" posture, now extended to every other social facet this batch caches on
+        // PlayerRuntimeState). Five independent reads, fired concurrently rather than five sequential
+        // round trips on the login-critical path.
+        var isMutedTask = mutes.IsActiveForCharacterAsync(characterId, cancellationToken);
+        var guildTask = guilds.GetByCharacterAsync(characterId, cancellationToken);
+        var tribeRoleTask = tribes.GetRoleForCharacterAsync(characterId, cancellationToken);
+        var friendsTask = friends.GetByCharacterAsync(characterId, cancellationToken);
+        var mentorTask = mentors.GetForCharacterAsync(characterId, cancellationToken);
+        await Task.WhenAll(isMutedTask.AsTask(), guildTask.AsTask(), tribeRoleTask.AsTask(),
+            friendsTask.AsTask(), mentorTask.AsTask());
+
+        var isMuted = isMutedTask.Result;
+        var guildMembership = guildTask.Result;
+        var tribeRole = tribeRoleTask.Result;
+        var friendRows = friendsTask.Result;
+        var mentorBond = mentorTask.Result;
+
+        var guildRoleWire = guildMembership is { } gm ? GuildRoleCodec.DbRoleToWire(gm.Role) : 0;
+        var friendNameBySlot = friendRows.ToDictionary(f => f.Slot, f => f.FriendName);
+        var friendIdBySlot = friendRows.ToDictionary(f => f.Slot, f => f.FriendCharacterId);
+        var socialSnapshot = new AvatarSocialSnapshot(
+            friendNameBySlot,
+            mentorBond?.TeacherName ?? "",
+            mentorBond?.StudentName ?? "",
+            guildMembership?.GuildName ?? "",
+            guildRoleWire,
+            guildMembership?.CallName ?? "");
 
         var registerRecv = new EnterWorldResponse
         {
-            AvatarInfo = AvatarInfoFactory.CreateForCharacter(character, bundle.Items),
+            AvatarInfo = AvatarInfoFactory.CreateForCharacter(character, bundle.Items, socialSnapshot),
             BuffInfo = WorldStateTemplates.ZeroedBuffInfo
         };
         zoneSession.SendRaw(ZoneMessageFactory.Encode(in registerRecv));
@@ -126,9 +176,9 @@ public sealed class EnterWorldHandler(
                 SpecialState = 0,
                 KillOtherTribe = 0,
                 GoodFellow = 0,
-                GuildName = "",
-                GuildRole = 0,
-                CallName = "",
+                GuildName = socialSnapshot.GuildName,
+                GuildRole = socialSnapshot.GuildRoleWire,
+                CallName = socialSnapshot.CallName,
                 GuildMarkEffect = 0,
                 Name = character.Name,
                 Tribe = character.Tribe,
@@ -219,7 +269,42 @@ public sealed class EnterWorldHandler(
             character.MaxMana,
             character.FlushSequence,
             Items: bundle.Items,
-            Stats: stats)));
+            Stats: stats,
+            IsMuted: isMuted,
+            GuildId: guildMembership?.GuildId,
+            GuildName: socialSnapshot.GuildName,
+            GuildRoleDb: guildMembership?.Role ?? 0,
+            TribeRole: tribeRole,
+            FriendsBySlot: friendIdBySlot,
+            Skills: bundle.Skills,
+            TeacherCharacterId: mentorBond?.TeacherCharacterId,
+            StudentCharacterId: mentorBond?.StudentCharacterId,
+            QuestProgress: new QuestProgress(character.QuestStepPermanent, character.QuestActiveId,
+                character.QuestSort, character.QuestTargetPhase, character.QuestKillCounter),
+            MissionJoinWar: character.JoinWar,
+            MissionKillOtherTribe: character.MissionKillOtherTribe,
+            MissionKillMonster: character.MissionKillMonster,
+            MissionPlayTime: character.MissionPlayTime,
+            AutoHuntEnabled: character.AutoHuntEnabled,
+            AutoHuntConfig: character.AutoHuntConfig is { } configBytes &&
+                            Fenrir.Contracts.Packets.Shared.AutoHunt.TryRead(configBytes, out var autoHunt)
+                ? autoHunt
+                : null,
+            AutoLifeRatio: character.AutoLifeRatio,
+            AutoManaRatio: character.AutoManaRatio,
+            PetGrowth: character.PetGrowth,
+            PetActivity: character.PetActivity,
+            StatVit: character.StatVit,
+            StatStr: character.StatStr,
+            StatInt: character.StatInt,
+            StatDex: character.StatDex,
+            StatPoints: character.StatPoints,
+            Title: character.Title,
+            Halo: character.Halo,
+            RebirthCount: character.RebirthCount,
+            Experience: character.Experience,
+            ContributionPoints: character.ContributionPoints,
+            TeacherPoint: character.TeacherPoint)));
 
         // Unlike a dropped Move (superseded by the client's next one, Zone.Post's documented rationale), a
         // dropped Enter is NOT replayed by anything -- the character would never be added to _players, staying

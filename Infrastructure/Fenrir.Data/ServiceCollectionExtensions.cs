@@ -1,7 +1,13 @@
 using CaeriusNet.Builders;
 using Fenrir.Data.Accounts;
+using Fenrir.Data.Admin;
 using Fenrir.Data.Characters;
+using Fenrir.Data.Commerce;
+using Fenrir.Data.Guilds;
+using Fenrir.Data.Progression;
 using Fenrir.Data.Runtime;
+using Fenrir.Data.Social;
+using Fenrir.Data.Tribes;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
@@ -40,6 +46,22 @@ public static class FenrirDataServiceCollectionExtensions
         builder.Services.AddSingleton<ICharacterRenameRepository, CharacterRenameRepository>();
         builder.Services.AddSingleton<SessionTicketRepository>();
         builder.Services.AddSingleton<GameServerDirectoryRepository>();
+
+        // Phase C/V6 Social.
+        builder.Services.AddSingleton<MuteRepository>();
+        builder.Services.AddSingleton<GuildRepository>();
+        builder.Services.AddSingleton<TribeRepository>();
+        builder.Services.AddSingleton<FriendRepository>();
+        builder.Services.AddSingleton<MentorRepository>();
+
+        // Server Logic V9 Progression.
+        builder.Services.AddSingleton<HeroRankingRepository>();
+        builder.Services.AddSingleton<TowerRepository>();
+
+        // Server Logic V8 Player Commerce & Cash.
+        builder.Services.AddSingleton<CashRepository>();
+        builder.Services.AddSingleton<OfflineShopRepository>();
+        builder.Services.AddSingleton<IGiftRepository, GiftRepository>();
 
         return builder;
     }

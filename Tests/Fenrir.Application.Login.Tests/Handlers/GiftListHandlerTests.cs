@@ -6,24 +6,60 @@ using Fenrir.Network.Sessions;
 namespace Fenrir.Application.Login.Tests.Handlers;
 
 /// <summary>
-///     op25 CL_GIFT_INFO_SEND — the 10-page gift list (login protocol report §4.25). GIFT_V2 is off in EU33 and
-///     the web-API gift path is deferred to chantier V8, so the byte-exact legacy answer for every current
-///     account is a static Result=0 with an all-zero matrix.
+///     op25 CL_GIFT_INFO_SEND — the 10-page gift list (login protocol report §4.25, "chantier V8"): now
+///     backed by the real game.Gifts pending queue instead of the pre-V8 static all-zero placeholder.
 /// </summary>
 public class ClGiftInfoSendHandlerTests
 {
-    [Fact]
-    public async Task Handle_AlwaysRepliesResultZeroWithEmptyMatrix()
-    {
-        var handler = new GiftListHandler();
-        var pipe = new FakeDuplexPipe();
-        var session = new LoginClientSession(1, pipe);
-        session.MarkAuthenticated(1);
-        session.MarkCharSelect();
+    private const int AccountId = 42;
 
-        handler.Handle(new GiftListRequest(), session);
+    [Fact]
+    public async Task HandleAsync_NoPendingGifts_RepliesResultZeroWithEmptyMatrix()
+    {
+        var handler = new GiftListHandler(FakeGiftRepository.Empty());
+        var (session, pipe) = CreateSessionInCharSelect();
+
+        await handler.HandleAsync(new GiftListRequest(), session, CancellationToken.None);
 
         Assert.Null(session.DisconnectReason);
         await PacketAssert.AssertSentAsync(pipe, new GiftListResponse { Result = 0, GiftItem = new int[20] });
+    }
+
+    [Fact]
+    public async Task HandleAsync_PendingGifts_FillsOldestFirstWithProductIdAndZeroSecondColumn()
+    {
+        var handler = new GiftListHandler(FakeGiftRepository.WithPending((1, 1211), (2, 99700)));
+        var (session, pipe) = CreateSessionInCharSelect();
+
+        await handler.HandleAsync(new GiftListRequest(), session, CancellationToken.None);
+
+        var expected = new int[20];
+        expected[0] = 1211;
+        expected[2] = 99700;
+        await PacketAssert.AssertSentAsync(pipe, new GiftListResponse { Result = 0, GiftItem = expected });
+    }
+
+    [Fact]
+    public async Task HandleAsync_MoreThanTenPendingGifts_OnlyShowsFirstTen()
+    {
+        var pending = Enumerable.Range(1, 15).Select(i => (i, (int?)i)).ToArray();
+        var handler = new GiftListHandler(FakeGiftRepository.WithPending(pending));
+        var (session, pipe) = CreateSessionInCharSelect();
+
+        await handler.HandleAsync(new GiftListRequest(), session, CancellationToken.None);
+
+        var expected = new int[20];
+        for (var i = 0; i < 10; i++)
+            expected[i * 2] = i + 1;
+        await PacketAssert.AssertSentAsync(pipe, new GiftListResponse { Result = 0, GiftItem = expected });
+    }
+
+    private static (LoginClientSession Session, FakeDuplexPipe Pipe) CreateSessionInCharSelect()
+    {
+        var pipe = new FakeDuplexPipe();
+        var session = new LoginClientSession(1, pipe);
+        session.MarkAuthenticated(AccountId);
+        session.MarkCharSelect();
+        return (session, pipe);
     }
 }

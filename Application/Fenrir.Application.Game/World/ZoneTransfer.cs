@@ -85,6 +85,12 @@ public static class ZoneTransfer
                 : TimeSpan.Zero
             : null;
 
+        // Same "no second SQL read" rationale as Items above -- round-trips the CURRENT in-memory learned-skill
+        // slots (Skills.LearnedSkill) back into the flat DTO shape PlayerEnterData/Zone.HandleEnter already share.
+        List<CharacterSkillDto> skills = [];
+        foreach (var (slot, learned) in state.LearnedSkills)
+            skills.Add(new CharacterSkillDto(slot, learned.SkillId, learned.Grade));
+
         return new PlayerEnterData(
             state.Session,
             state.Name,
@@ -106,6 +112,29 @@ public static class ZoneTransfer
             state.IsDead,
             reviveRemaining,
             items,
-            state.Stats);
+            state.Stats,
+            state.IsMuted,
+            state.GuildId,
+            state.GuildName,
+            state.GuildRoleDb,
+            state.TribeRole,
+            state.Friends,
+            skills,
+            state.TeacherCharacterId,
+            state.StudentCharacterId,
+            GuildCallName: state.GuildCallName,
+            // CORRECTION (review finding, Phase C/V7): these live values must travel across an in-process
+            // handoff too -- see PlayerEnterData's own remarks on the "resets to 0" bug this closes.
+            StatVit: state.StatVit,
+            StatStr: state.StatStr,
+            StatInt: state.StatInt,
+            StatDex: state.StatDex,
+            StatPoints: state.StatPoints,
+            Title: state.Title,
+            Halo: state.Halo,
+            RebirthCount: state.RebirthCount,
+            Experience: state.Experience,
+            ContributionPoints: state.ContributionPoints,
+            TeacherPoint: state.TeacherPoint);
     }
 }

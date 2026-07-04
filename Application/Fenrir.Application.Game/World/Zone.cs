@@ -7,8 +7,10 @@ using Fenrir.Application.Game.Combat;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Inventory;
 using Fenrir.Application.Game.Movement;
+using Fenrir.Application.Game.Quests;
 using Fenrir.Application.Game.Simulation;
 using Fenrir.Application.Game.Skills;
+using Fenrir.Application.Game.Social.Chat;
 using Fenrir.Application.Game.Stats;
 using Fenrir.Application.Game.World.Geometry;
 using Fenrir.Application.Game.World.Loot;
@@ -47,9 +49,19 @@ public sealed class Zone(
     IReadOnlyList<ISimulationSystem> simulationSystems,
     ILogger<Zone> logger,
     WorldDataCache worldData,
-    IRandomSource? randomSource = null) : IZoneActor
+    IRandomSource? randomSource = null,
+    QuestCatalog? questCatalog = null) : IZoneActor
 {
     private readonly LegacyTickAccumulator _accumulator = new();
+
+    /// <summary>
+    ///     Server Logic V9 Progression -- resolved once per zone. Null (production default from
+    ///     <see cref="ZoneRegistry" />, which owns the single process-wide <see cref="QuestCatalog" />
+    ///     singleton) builds a private one from <paramref name="worldData" /> instead, so pre-existing test
+    ///     call sites (<c>ZoneTestKit</c>) that construct a <see cref="Zone" /> directly keep compiling
+    ///     unchanged.
+    /// </summary>
+    private readonly QuestCatalog _questCatalog = questCatalog ?? new QuestCatalog(worldData);
 
     private readonly AoiGrid _grid = new(options.AoiCellSize);
 
@@ -79,6 +91,91 @@ public sealed class Zone(
     /// </summary>
     private readonly Channel<InventoryZoneCommand> _inventoryInbox = Channel.CreateBounded<InventoryZoneCommand>(
         new BoundedChannelOptions(2048) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+
+    /// <summary>
+    ///     Fourth inbox, same additive posture as <see cref="_inventoryInbox" />: already-validated,
+    ///     already-SQL-durable skill learn/upgrade results (<see cref="SkillZoneCommand" />, posted by
+    ///     <c>GenericActionHandler</c>, tSort 202/233/203 -- V5 NPC &amp; Economy). Kept as its OWN
+    ///     channel/method rather than folded into <see cref="_inventoryInbox" />'s union: this task's
+    ///     perimeter must stay additive-only and never edit <see cref="DrainInventoryCommands" />'s own body
+    ///     either, exactly the same rationale <see cref="_inventoryInbox" />'s own remarks already give.
+    /// </summary>
+    private readonly Channel<SkillZoneCommand> _skillInbox = Channel.CreateBounded<SkillZoneCommand>(
+        new BoundedChannelOptions(1024) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+
+    /// <summary>
+    ///     Fifth inbox, same additive posture as <see cref="_skillInbox" />/<see cref="_inventoryInbox" />:
+    ///     raw local/shout/tribe chat sends (<see cref="Social.Chat.ChatZoneCommand" />, Phase C/V6
+    ///     Social) that need this zone's own tick-owned <see cref="_grid" />/<see cref="_players" /> to
+    ///     resolve their audience -- every other chat channel (whisper/party/guild/world/notices) is a
+    ///     plain cross-zone or same-zone fan-out a handler does directly via <c>ZoneRegistry</c>/
+    ///     <see cref="Players" /> without ever touching the tick thread (see
+    ///     <see cref="Social.Chat.ChatZoneCommand" />'s own remarks).
+    /// </summary>
+    private readonly Channel<Social.Chat.ChatZoneCommand> _chatInbox =
+        Channel.CreateBounded<Social.Chat.ChatZoneCommand>(
+            new BoundedChannelOptions(2048) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+
+    /// <summary>
+    ///     Sixth inbox, same additive posture as <see cref="_chatInbox" />/<see cref="_skillInbox" />: mirrors
+    ///     ONE cross-character field write (<see cref="Social.Mentor.MentorZoneCommand" />, posted by
+    ///     <c>MentorStartHandler</c>) onto the TARGET character's own hosting zone -- see that command type's
+    ///     own remarks for the direct-cross-thread-mutation bug this closes.
+    /// </summary>
+    private readonly Channel<Social.Mentor.MentorZoneCommand> _mentorInbox =
+        Channel.CreateBounded<Social.Mentor.MentorZoneCommand>(
+            new BoundedChannelOptions(256) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+
+    /// <summary>
+    ///     Seventh inbox, same additive posture as <see cref="_mentorInbox" />: already-durably-persisted
+    ///     guild-membership mirrors (<see cref="Guilds.GuildMembershipZoneCommand" />, Phase C/V7 Guilds
+    ///     &amp; Tribes -- GUILD_WORK create/join/leave/kick/promote/title/transfer/disband, doc 10 §1) for
+    ///     THIS character's own hosting zone, posted by <c>GuildActionHandler</c> whether the target is the
+    ///     actor themselves or a DIFFERENT (possibly cross-zone or offline) guild member.
+    /// </summary>
+    private readonly Channel<Guilds.GuildMembershipZoneCommand> _guildInbox =
+        Channel.CreateBounded<Guilds.GuildMembershipZoneCommand>(
+            new BoundedChannelOptions(512) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+
+    /// <summary>
+    ///     Eighth inbox, same additive posture: already-decided TRIBE_WORK self-mutations
+    ///     (<see cref="Tribes.TribeProgressZoneCommand" />, Phase C/V7 Guilds &amp; Tribes, doc 10 §2) posted
+    ///     by <c>TribeActionHandler</c> for the ACTOR'S OWN hosting zone.
+    /// </summary>
+    private readonly Channel<Tribes.TribeProgressZoneCommand> _tribeInbox =
+        Channel.CreateBounded<Tribes.TribeProgressZoneCommand>(
+            new BoundedChannelOptions(512) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+
+    /// <summary>
+    ///     Seventh inbox, same additive posture as <see cref="_mentorInbox" />: already-validated,
+    ///     already-SQL-durable quest-state transitions (<see cref="QuestZoneCommand" />, posted by
+    ///     <c>QuestProgressHandler</c>, Server Logic V9 Progression) -- mirrors the 5 quest-state ints plus
+    ///     any Experience/ContributionPoints deltas and touched inventory containers onto the live
+    ///     <see cref="PlayerRuntimeState" />.
+    /// </summary>
+    private readonly Channel<QuestZoneCommand> _questInbox = Channel.CreateBounded<QuestZoneCommand>(
+        new BoundedChannelOptions(512) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+
+    /// <summary>
+    ///     Additional inbox, same additive posture as <see cref="_mentorInbox" />: fire-and-forget, purely
+    ///     cosmetic PShop-stall mirrors (<see cref="Social.Pshop.PshopZoneCommand" />, Server Logic V8
+    ///     Player Commerce &amp; Cash) posted by <c>BuyShopItemHandler</c> onto the SELLER's own hosting
+    ///     zone after a live PShop purchase already durably committed -- see that command type's own
+    ///     remarks for why no <c>...AndWaitAsync</c> twin exists here (unlike every other additive inbox).
+    /// </summary>
+    private readonly Channel<Social.Pshop.PshopZoneCommand> _pshopInbox =
+        Channel.CreateBounded<Social.Pshop.PshopZoneCommand>(
+            new BoundedChannelOptions(256) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+
+    /// <summary>
+    ///     Additional inbox, same additive posture as <see cref="_questInbox" />: already-validated,
+    ///     already-SQL-durable daily-mission claims (<see cref="Progression.MissionZoneCommand" />, posted
+    ///     by <c>DailyMissionHandler</c>, Server Logic V9 Progression) -- mirrors the 4 mission counters
+    ///     plus the claimed reward item's container onto the live <see cref="PlayerRuntimeState" />.
+    /// </summary>
+    private readonly Channel<Progression.MissionZoneCommand> _missionInbox =
+        Channel.CreateBounded<Progression.MissionZoneCommand>(
+            new BoundedChannelOptions(256) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
     private readonly KeyValuePair<string, object?> _mapTag = ZoneTickMetrics.MapTag(mapId);
 
@@ -190,6 +287,209 @@ public sealed class Zone(
     }
 
     /// <summary>
+    ///     Posts <paramref name="command" /> (its <see cref="InventoryZoneCommand.Applied" /> is overwritten
+    ///     here -- callers should leave it default) and asynchronously waits until this zone's own tick has
+    ///     actually mirrored it into <see cref="PlayerRuntimeState.Inventory" />, not merely until it was
+    ///     accepted into the inbox. Every economy-affecting handler (<c>GenericActionHandler</c>,
+    ///     <c>EnchantItemHandler</c>, <c>CraftItemHandler</c>) MUST call this (never the bare
+    ///     <see cref="PostInventoryCommand" />) while still holding <see cref="PlayerRuntimeState.EconomyActionLock" />
+    ///     -- see that property's own remarks for the duplication race this closes. Bounded by
+    ///     <paramref name="timeout" /> (default 2s, comfortably beyond the 20Hz/50ms tick cadence even under
+    ///     load) so a wedged/backlogged zone can never hang the caller (and therefore the lock) forever; the
+    ///     underlying SQL write is already durable regardless of whether this wait itself times out -- a timed-
+    ///     out mirror just means the in-memory cache stays stale until the character's next world entry,
+    ///     exactly the same documented fallback every dropped-inbox log message already describes.
+    /// </summary>
+    public async Task<bool> PostInventoryCommandAndWaitAsync(InventoryZoneCommand command, CancellationToken ct,
+        TimeSpan? timeout = null)
+    {
+        var applied = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var withSignal = command with { Applied = applied };
+
+        if (!PostInventoryCommand(in withSignal))
+            return false; // inbox full -- caller logs this; nothing to wait for.
+
+        try
+        {
+            await applied.Task.WaitAsync(timeout ?? TimeSpan.FromSeconds(2), ct).ConfigureAwait(false);
+        }
+        catch (TimeoutException)
+        {
+            // See remarks: SQL is already durable, only the in-memory mirror timing is affected.
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    ///     Enqueues an already-validated, already-SQL-durable skill learn/upgrade result for this zone's own
+    ///     tick to mirror into <see cref="PlayerRuntimeState.LearnedSkills" />/<see cref="PlayerRuntimeState.SkillPoints" />
+    ///     -- see <see cref="_skillInbox" />'s remarks.
+    /// </summary>
+    public bool PostSkillCommand(in SkillZoneCommand command)
+    {
+        return _skillInbox.Writer.TryWrite(command);
+    }
+
+    /// <summary>
+    ///     Enqueues an already-durably-bonded mentor relationship's cross-character field write for THIS
+    ///     (the target character's own hosting) zone's tick to mirror -- see <see cref="_mentorInbox" />'s
+    ///     remarks.
+    /// </summary>
+    public bool PostMentorCommand(in Social.Mentor.MentorZoneCommand command)
+    {
+        return _mentorInbox.Writer.TryWrite(command);
+    }
+
+    /// <summary>
+    ///     Enqueues an already-durably-persisted guild-membership mirror for THIS character's own hosting
+    ///     zone's tick to mirror -- see <see cref="_guildInbox" />'s remarks.
+    /// </summary>
+    public bool PostGuildCommand(in Guilds.GuildMembershipZoneCommand command)
+    {
+        return _guildInbox.Writer.TryWrite(command);
+    }
+
+    /// <summary>
+    ///     Posts <paramref name="command" /> and asynchronously waits until this zone's own tick has
+    ///     actually mirrored it -- the <see cref="Guilds.GuildMembershipZoneCommand" /> twin of
+    ///     <see cref="PostInventoryCommandAndWaitAsync" />'s own contract. Callers acting on the REQUESTER's
+    ///     own guild membership (create/leave/disband/upgrade/transfer -- anything that also touches money)
+    ///     MUST call this while still holding their own <see cref="PlayerRuntimeState.EconomyActionLock" />;
+    ///     callers mirroring a DIFFERENT, possibly-offline member (kick/promote/title/disband's other rows)
+    ///     have no such lock to hold and may use the bare <see cref="PostGuildCommand" /> fire-and-forget
+    ///     instead (their own DB write is already durable regardless of this mirror's timing).
+    /// </summary>
+    public async Task<bool> PostGuildCommandAndWaitAsync(Guilds.GuildMembershipZoneCommand command,
+        CancellationToken ct, TimeSpan? timeout = null)
+    {
+        var applied = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var withSignal = command with { Applied = applied };
+
+        if (!PostGuildCommand(in withSignal))
+            return false;
+
+        try
+        {
+            await applied.Task.WaitAsync(timeout ?? TimeSpan.FromSeconds(2), ct).ConfigureAwait(false);
+        }
+        catch (TimeoutException)
+        {
+            // See PostInventoryCommandAndWaitAsync's remarks: SQL is already durable, only the in-memory
+            // mirror timing is affected.
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    ///     Enqueues an already-decided TRIBE_WORK self-mutation for the ACTOR'S OWN hosting zone's tick to
+    ///     mirror -- see <see cref="_tribeInbox" />'s remarks.
+    /// </summary>
+    public bool PostTribeProgressCommand(in Tribes.TribeProgressZoneCommand command)
+    {
+        return _tribeInbox.Writer.TryWrite(command);
+    }
+
+    /// <summary>
+    ///     Posts <paramref name="command" /> and asynchronously waits until this zone's own tick has
+    ///     actually mirrored it -- the <see cref="Tribes.TribeProgressZoneCommand" /> twin of
+    ///     <see cref="PostInventoryCommandAndWaitAsync" />'s own contract. <c>TribeActionHandler</c> MUST
+    ///     call this (never the bare <see cref="PostTribeProgressCommand" />) while still holding
+    ///     <see cref="PlayerRuntimeState.EconomyActionLock" /> for any tSort that also debits money/CP.
+    /// </summary>
+    public async Task<bool> PostTribeProgressCommandAndWaitAsync(Tribes.TribeProgressZoneCommand command,
+        CancellationToken ct, TimeSpan? timeout = null)
+    {
+        var applied = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var withSignal = command with { Applied = applied };
+
+        if (!PostTribeProgressCommand(in withSignal))
+            return false;
+
+        try
+        {
+            await applied.Task.WaitAsync(timeout ?? TimeSpan.FromSeconds(2), ct).ConfigureAwait(false);
+        }
+        catch (TimeoutException)
+        {
+            // See PostInventoryCommandAndWaitAsync's remarks: SQL is already durable, only the in-memory
+            // mirror timing is affected.
+        }
+
+        return true;
+    }
+
+    private bool PostQuestCommand(in QuestZoneCommand command)
+    {
+        return _questInbox.Writer.TryWrite(command);
+    }
+
+    /// <summary>
+    ///     Posts an already-validated, already-SQL-durable quest-state transition and awaits this zone's own
+    ///     tick actually mirroring it -- the <see cref="QuestZoneCommand" /> twin of
+    ///     <see cref="PostInventoryCommandAndWaitAsync" />'s own contract (same reason: a quest action is
+    ///     exactly the "read state / await SQL / mirror" economy-action shape <see cref="PlayerRuntimeState.EconomyActionLock" />'s
+    ///     own remarks describe). Callers MUST already hold that lock and leave <see cref="QuestZoneCommand.Applied" />
+    ///     at its default -- overwritten here.
+    /// </summary>
+    public async Task<bool> PostQuestCommandAndWaitAsync(QuestZoneCommand command, CancellationToken ct,
+        TimeSpan? timeout = null)
+    {
+        var applied = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var withSignal = command with { Applied = applied };
+
+        if (!PostQuestCommand(in withSignal))
+            return false;
+
+        try
+        {
+            await applied.Task.WaitAsync(timeout ?? TimeSpan.FromSeconds(2), ct).ConfigureAwait(false);
+        }
+        catch (TimeoutException)
+        {
+            // See PostInventoryCommandAndWaitAsync's remarks: SQL is already durable, only the in-memory
+            // mirror timing is affected.
+        }
+
+        return true;
+    }
+
+    private bool PostMissionCommand(in Progression.MissionZoneCommand command)
+    {
+        return _missionInbox.Writer.TryWrite(command);
+    }
+
+    /// <summary>
+    ///     Posts an already-validated, already-SQL-durable daily-mission claim and awaits this zone's own
+    ///     tick actually mirroring it -- the <see cref="Progression.MissionZoneCommand" /> twin of
+    ///     <see cref="PostQuestCommandAndWaitAsync" />'s own contract. Callers MUST already hold
+    ///     <see cref="PlayerRuntimeState.EconomyActionLock" /> and leave
+    ///     <see cref="Progression.MissionZoneCommand.Applied" /> at its default -- overwritten here.
+    /// </summary>
+    public async Task<bool> PostMissionCommandAndWaitAsync(Progression.MissionZoneCommand command,
+        CancellationToken ct, TimeSpan? timeout = null)
+    {
+        var applied = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var withSignal = command with { Applied = applied };
+
+        if (!PostMissionCommand(in withSignal))
+            return false;
+
+        try
+        {
+            await applied.Task.WaitAsync(timeout ?? TimeSpan.FromSeconds(2), ct).ConfigureAwait(false);
+        }
+        catch (TimeoutException)
+        {
+            // See PostInventoryCommandAndWaitAsync's remarks: SQL is already durable, only the in-memory
+            // mirror timing is affected.
+        }
+
+        return true;
+    }
+
+    /// <summary>
     ///     Enqueues a raw, unvalidated CZ_PROCESS_ATTACK_SEND request (<c>AttackHandler</c>) for this zone's own
     ///     tick to resolve -- see <see cref="CombatCommand" />'s remarks for why combat is resolved entirely on
     ///     the tick thread rather than pre-decided by the posting handler.
@@ -197,6 +497,21 @@ public sealed class Zone(
     public bool PostCombatCommand(in CombatCommand command)
     {
         return _combatInbox.Writer.TryWrite(command);
+    }
+
+    /// <summary>
+    ///     Enqueues an already-cleared (non-empty content, sender not muted) local/shout/tribe chat send
+    ///     for this zone's own tick to resolve the audience for -- see <see cref="_chatInbox" />'s remarks.
+    /// </summary>
+    public bool PostChatCommand(in Social.Chat.ChatZoneCommand command)
+    {
+        return _chatInbox.Writer.TryWrite(command);
+    }
+
+    /// <summary>Enqueues a fire-and-forget PShop-stall mirror for THIS (the seller's own hosting) zone's tick to apply -- see <see cref="_pshopInbox" />'s remarks.</summary>
+    public bool PostPshopCommand(in Social.Pshop.PshopZoneCommand command)
+    {
+        return _pshopInbox.Writer.TryWrite(command);
     }
 
     public bool TryGetPlayer(int characterId, out PlayerRuntimeState? state)
@@ -474,8 +789,24 @@ public sealed class Zone(
         // additive-only and never edit DrainInbox's own switch. Folded into the same "Drain" timing bucket
         // below since it is, in spirit, just another inbox drain.
         DrainInventoryCommands();
+        // Same additive posture as DrainInventoryCommands -- see _skillInbox's own remarks.
+        DrainSkillCommands();
         // Same additive posture as DrainInventoryCommands -- see CombatCommand's own remarks.
         DrainCombatCommands();
+        // Same additive posture -- see _chatInbox's own remarks.
+        DrainChatCommands();
+        // Same additive posture -- see _mentorInbox's own remarks.
+        DrainMentorCommands();
+        // Same additive posture -- see _questInbox's own remarks.
+        DrainQuestCommands();
+        // Same additive posture -- see _guildInbox's own remarks.
+        DrainGuildCommands();
+        // Same additive posture -- see _tribeInbox's own remarks.
+        DrainTribeProgressCommands();
+        // Same additive posture -- see _pshopInbox's own remarks.
+        DrainPshopCommands();
+        // Same additive posture -- see _missionInbox's own remarks.
+        DrainMissionCommands();
         var t1 = Stopwatch.GetTimestamp();
         Simulate(_accumulator.Advance(elapsed));
         var t2 = Stopwatch.GetTimestamp();
@@ -542,6 +873,7 @@ public sealed class Zone(
             try
             {
                 ApplyInventoryCommand(in command);
+                command.Applied?.TrySetResult();
             }
             catch (Exception ex)
             {
@@ -549,6 +881,9 @@ public sealed class Zone(
                 // tick loop down for every other player in the zone.
                 logger.LogError(ex, "Zone {MapId} inventory command for character {CharacterId} failed", MapId,
                     command.CharacterId);
+                // Still signal (as faulted, not merely completed) so a caller awaiting InventoryZoneCommand.Applied
+                // to safely release its per-character EconomyActionLock never hangs on a command that blew up.
+                command.Applied?.TrySetException(ex);
             }
     }
 
@@ -566,10 +901,404 @@ public sealed class Zone(
             return;
 
         foreach (var snapshot in command.Containers)
+        {
             state.Inventory.ReplaceContainer(snapshot.Container, snapshot.Slots);
+
+            // Server Logic V9 Progression: a pet SWAP (not just any equip touch) resets growth/activity to
+            // the newly-equipped pet's fresh state -- see PlayerRuntimeState.PetGrowth's own remarks for why
+            // this is tracked per-character rather than per-item-instance.
+            if (snapshot.Container == ContainerMatrix.Equipment)
+            {
+                var newPetItemId = snapshot.Slots.TryGetValue(Pets.PetSlots.EquipmentSlot, out var petStack)
+                    ? petStack.ItemId
+                    : 0;
+                if (newPetItemId != state.LastSeenPetItemId)
+                {
+                    state.LastSeenPetItemId = newPetItemId;
+                    state.PetGrowth = 0;
+                    state.PetActivity = 0;
+                    dirtyTracker.MarkDirty(command.CharacterId, DirtyFlags.Progression);
+                }
+            }
+        }
 
         if (command.UpdatedStats is { } stats)
             state.Stats = stats;
+    }
+
+    /// <summary>
+    ///     Drains <see cref="_skillInbox" />: applies each already-validated, already-SQL-durable
+    ///     <see cref="SkillZoneCommand" /> (<c>GenericActionHandler</c>, tSort 202/233/203) onto the live
+    ///     <see cref="PlayerRuntimeState" /> -- the ONLY place <see cref="PlayerRuntimeState.LearnedSkills" />/
+    ///     <see cref="PlayerRuntimeState.SkillPoints" /> are mutated after world entry, same single-writer
+    ///     posture as <see cref="DrainInventoryCommands" />.
+    /// </summary>
+    private void DrainSkillCommands()
+    {
+        while (_skillInbox.Reader.TryRead(out var command))
+            try
+            {
+                ApplySkillCommand(in command);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Zone {MapId} skill command for character {CharacterId} failed", MapId,
+                    command.CharacterId);
+            }
+    }
+
+    /// <summary>
+    ///     No validation, no I/O, no business logic here on purpose (see <see cref="SkillZoneCommand" />'s own
+    ///     remarks) -- everything was already decided and already persisted by the posting handler. A no-op
+    ///     if the character already left this zone by the time the tick drains this (same benign race
+    ///     <see cref="ApplyInventoryCommand" /> already accepts).
+    /// </summary>
+    private void ApplySkillCommand(in SkillZoneCommand command)
+    {
+        if (!_players.TryGetValue(command.CharacterId, out var state))
+            return;
+
+        state.LearnedSkills = state.LearnedSkills.SetItem(command.Slot, command.Skill);
+        state.SkillPoints = command.NewSkillPoints;
+        dirtyTracker.MarkDirty(command.CharacterId, DirtyFlags.Progression);
+    }
+
+    /// <summary>
+    ///     Drains <see cref="_mentorInbox" />: applies each already-durably-bonded
+    ///     <see cref="Social.Mentor.MentorZoneCommand" /> (<c>MentorStartHandler</c>) onto the live
+    ///     <see cref="PlayerRuntimeState" /> -- the ONLY place <see cref="PlayerRuntimeState.TeacherCharacterId" />
+    ///     is mutated for a character OTHER than the one whose own request thread decided the change, same
+    ///     single-writer posture as <see cref="DrainSkillCommands" />.
+    /// </summary>
+    private void DrainMentorCommands()
+    {
+        while (_mentorInbox.Reader.TryRead(out var command))
+            try
+            {
+                ApplyMentorCommand(in command);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Zone {MapId} mentor command for character {CharacterId} failed", MapId,
+                    command.CharacterId);
+            }
+    }
+
+    /// <summary>
+    ///     No validation, no I/O, no business logic here (see <see cref="Social.Mentor.MentorZoneCommand" />'s
+    ///     own remarks) -- already decided and already persisted by <c>MentorStartHandler</c>. A no-op if the
+    ///     target character already left this zone by the time the tick drains this (same benign race
+    ///     <see cref="ApplyInventoryCommand" />/<see cref="ApplySkillCommand" /> already accept).
+    /// </summary>
+    private void ApplyMentorCommand(in Social.Mentor.MentorZoneCommand command)
+    {
+        if (!_players.TryGetValue(command.CharacterId, out var state))
+            return;
+
+        state.TeacherCharacterId = command.TeacherCharacterId;
+    }
+
+    /// <summary>
+    ///     Drains <see cref="_guildInbox" />: applies each already-durably-persisted
+    ///     <see cref="Guilds.GuildMembershipZoneCommand" /> (<c>GuildActionHandler</c>) onto the live
+    ///     <see cref="PlayerRuntimeState" /> -- same single-writer posture as <see cref="DrainMentorCommands" />.
+    /// </summary>
+    private void DrainGuildCommands()
+    {
+        while (_guildInbox.Reader.TryRead(out var command))
+            try
+            {
+                ApplyGuildMembershipCommand(in command);
+                command.Applied?.TrySetResult();
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Zone {MapId} guild command for character {CharacterId} failed", MapId,
+                    command.CharacterId);
+                command.Applied?.TrySetException(ex);
+            }
+    }
+
+    /// <summary>
+    ///     No validation, no I/O, no business logic here (see <see cref="Guilds.GuildMembershipZoneCommand" />'s
+    ///     own remarks) -- already decided and already persisted by <c>GuildActionHandler</c>. A no-op if the
+    ///     character already left this zone by the time the tick drains this (same benign race
+    ///     <see cref="ApplyInventoryCommand" />/<see cref="ApplyMentorCommand" /> already accept).
+    /// </summary>
+    private void ApplyGuildMembershipCommand(in Guilds.GuildMembershipZoneCommand command)
+    {
+        if (!_players.TryGetValue(command.CharacterId, out var state))
+            return;
+
+        state.GuildId = command.GuildId;
+        state.GuildName = command.GuildName;
+        state.GuildRoleDb = command.GuildRoleDb;
+        state.GuildCallName = command.GuildCallName;
+    }
+
+    /// <summary>
+    ///     Drains <see cref="_tribeInbox" />: applies each already-decided
+    ///     <see cref="Tribes.TribeProgressZoneCommand" /> (<c>TribeActionHandler</c>) onto the live
+    ///     <see cref="PlayerRuntimeState" /> -- same single-writer posture as <see cref="DrainInventoryCommands" />.
+    /// </summary>
+    private void DrainTribeProgressCommands()
+    {
+        while (_tribeInbox.Reader.TryRead(out var command))
+            try
+            {
+                ApplyTribeProgressCommand(in command);
+                command.Applied?.TrySetResult();
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Zone {MapId} tribe progress command for character {CharacterId} failed", MapId,
+                    command.CharacterId);
+                command.Applied?.TrySetException(ex);
+            }
+    }
+
+    /// <summary>
+    ///     No validation, no I/O, no business logic here (see <see cref="Tribes.TribeProgressZoneCommand" />'s
+    ///     own remarks) -- already decided by <c>TribeActionHandler</c>. Every field is independently
+    ///     optional: null means "this tSort did not touch this field," never "reset to zero/false." A no-op
+    ///     if the character already left this zone by the time the tick drains this.
+    /// </summary>
+    private void ApplyTribeProgressCommand(in Tribes.TribeProgressZoneCommand command)
+    {
+        if (!_players.TryGetValue(command.CharacterId, out var state))
+            return;
+
+        var changed = false;
+
+        if (command.ContributionPoints is { } contributionPoints)
+        {
+            state.ContributionPoints = contributionPoints;
+            changed = true;
+        }
+
+        if (command.TribeRole is { } tribeRole)
+        {
+            state.TribeRole = tribeRole;
+            changed = true;
+        }
+
+        if (command.Title is { } title)
+        {
+            state.Title = title;
+            changed = true;
+        }
+
+        if (command.Halo is { } halo)
+        {
+            state.Halo = halo;
+            changed = true;
+        }
+
+        if (command.ProtectForHalo is { } protectForHalo)
+        {
+            state.ProtectForHalo = protectForHalo;
+            changed = true;
+        }
+
+        if (command.UseOrnament is { } useOrnament)
+        {
+            state.UseOrnament = useOrnament;
+            changed = true;
+        }
+
+        if (command.BonusItemLevel is { } bonusItemLevel)
+        {
+            state.BonusItemLevel = bonusItemLevel;
+            changed = true;
+        }
+
+        if (command.BonusItemValue is { } bonusItemValue)
+        {
+            state.BonusItemValue = bonusItemValue;
+            changed = true;
+        }
+
+        if (command.StatVit is { } statVit)
+        {
+            state.StatVit = statVit;
+            changed = true;
+        }
+
+        if (command.StatStr is { } statStr)
+        {
+            state.StatStr = statStr;
+            changed = true;
+        }
+
+        if (command.StatInt is { } statInt)
+        {
+            state.StatInt = statInt;
+            changed = true;
+        }
+
+        if (command.StatDex is { } statDex)
+        {
+            state.StatDex = statDex;
+            changed = true;
+        }
+
+        if (command.StatPoints is { } statPoints)
+        {
+            state.StatPoints = statPoints;
+            changed = true;
+        }
+
+        if (command.Life is { } life)
+        {
+            state.Life = life;
+            changed = true;
+        }
+
+        if (command.Mana is { } mana)
+        {
+            state.Mana = mana;
+            changed = true;
+        }
+
+        if (command.UpdatedStats is { } stats)
+            state.Stats = stats;
+
+        if (changed)
+            dirtyTracker.MarkDirty(command.CharacterId, DirtyFlags.Progression);
+
+        if (!command.DropItems.IsDefaultOrEmpty)
+            foreach (var drop in command.DropItems)
+                SpawnGroundItem(drop.ItemId, drop.Quantity, state.PosX, state.PosY, state.PosZ, state.Name, "", 0);
+    }
+
+    /// <summary>
+    ///     Drains <see cref="_questInbox" />: applies each already-validated, already-SQL-durable
+    ///     <see cref="QuestZoneCommand" /> (<c>QuestProgressHandler</c>) onto the live
+    ///     <see cref="PlayerRuntimeState" /> -- same single-writer posture as <see cref="DrainInventoryCommands" />.
+    /// </summary>
+    private void DrainQuestCommands()
+    {
+        while (_questInbox.Reader.TryRead(out var command))
+            try
+            {
+                ApplyQuestCommand(in command);
+                command.Applied?.TrySetResult();
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Zone {MapId} quest command for character {CharacterId} failed", MapId,
+                    command.CharacterId);
+                command.Applied?.TrySetException(ex);
+            }
+    }
+
+    /// <summary>
+    ///     No validation, no I/O, no business logic here on purpose (see <see cref="QuestZoneCommand" />'s
+    ///     own remarks) -- everything was already decided and already persisted by <c>QuestProgressHandler</c>
+    ///     before this ever reached the inbox. A no-op if the character already left this zone by the time
+    ///     the tick drains this (same benign race <see cref="ApplyInventoryCommand" /> already accepts).
+    /// </summary>
+    private void ApplyQuestCommand(in QuestZoneCommand command)
+    {
+        if (!_players.TryGetValue(command.CharacterId, out var state))
+            return;
+
+        state.QuestStepPermanent = command.Progress.StepPermanent;
+        state.QuestActiveFlag = command.Progress.ActiveFlag;
+        state.QuestSort = command.Progress.QSort;
+        state.QuestTargetPhase = command.Progress.TargetPhase;
+        state.QuestKillCounter = command.Progress.KillCounter;
+
+        foreach (var snapshot in command.Containers)
+            state.Inventory.ReplaceContainer(snapshot.Container, snapshot.Slots);
+
+        if (command.ExperienceDelta != 0)
+            state.Experience += command.ExperienceDelta;
+        if (command.ContributionPointsDelta != 0)
+            state.ContributionPoints += command.ContributionPointsDelta;
+        if (command.TeacherPointDelta != 0)
+            state.TeacherPoint += command.TeacherPointDelta;
+        if (command.ExperienceDelta != 0 || command.ContributionPointsDelta != 0 || command.TeacherPointDelta != 0)
+            dirtyTracker.MarkDirty(command.CharacterId, DirtyFlags.Progression);
+    }
+
+    /// <summary>
+    ///     Drains <see cref="_missionInbox" />: applies each already-validated, already-SQL-durable
+    ///     <see cref="Progression.MissionZoneCommand" /> (<c>DailyMissionHandler</c>) onto the live
+    ///     <see cref="PlayerRuntimeState" /> -- same single-writer posture as <see cref="DrainQuestCommands" />.
+    /// </summary>
+    private void DrainMissionCommands()
+    {
+        while (_missionInbox.Reader.TryRead(out var command))
+            try
+            {
+                ApplyMissionCommand(in command);
+                command.Applied?.TrySetResult();
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Zone {MapId} mission command for character {CharacterId} failed", MapId,
+                    command.CharacterId);
+                command.Applied?.TrySetException(ex);
+            }
+    }
+
+    /// <summary>
+    ///     No validation, no I/O, no business logic here (see <see cref="Progression.MissionZoneCommand" />'s
+    ///     own remarks) -- already decided and already persisted by <c>DailyMissionHandler</c>. A no-op if
+    ///     the character already left this zone by the time the tick drains this (same benign race
+    ///     <see cref="ApplyQuestCommand" /> already accepts).
+    /// </summary>
+    private void ApplyMissionCommand(in Progression.MissionZoneCommand command)
+    {
+        if (!_players.TryGetValue(command.CharacterId, out var state))
+            return;
+
+        state.MissionJoinWar = command.JoinWar;
+        state.MissionKillOtherTribe = command.KillOtherTribe;
+        state.MissionKillMonster = command.KillMonster;
+        state.MissionPlayTime = command.PlayTime;
+
+        foreach (var snapshot in command.Containers)
+            state.Inventory.ReplaceContainer(snapshot.Container, snapshot.Slots);
+    }
+
+    /// <summary>
+    ///     Drains <see cref="_pshopInbox" />: applies each fire-and-forget
+    ///     <see cref="Social.Pshop.PshopZoneCommand" /> (<c>BuyShopItemHandler</c>) onto the live
+    ///     <see cref="PlayerRuntimeState" /> -- same single-writer posture as every other Drain* method,
+    ///     purely cosmetic (see that command type's own remarks).
+    /// </summary>
+    private void DrainPshopCommands()
+    {
+        while (_pshopInbox.Reader.TryRead(out var command))
+            try
+            {
+                ApplyPshopCommand(in command);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Zone {MapId} pshop command for character {CharacterId} failed", MapId,
+                    command.CharacterId);
+            }
+    }
+
+    /// <summary>No-op if the character already left this zone (same benign race every other Apply* method already accepts) or their stall was already re-opened/re-populated since (a stale mirror is harmless -- see <see cref="Social.Pshop.PshopZoneCommand" />'s own remarks).</summary>
+    private void ApplyPshopCommand(in Social.Pshop.PshopZoneCommand command)
+    {
+        if (!_players.TryGetValue(command.CharacterId, out var state) || state.PshopListing is not { } listing)
+            return;
+
+        if (command.CloseShop)
+        {
+            state.PshopOpen = false;
+            return;
+        }
+
+        var itemInfo = listing.ItemInfo;
+        var baseIndex = (command.Page * 5 + command.Slot) * 9;
+        for (var k = 0; k < 9; k++)
+            itemInfo[baseIndex + k] = 0;
     }
 
     private void DrainCombatCommands()
@@ -586,6 +1315,68 @@ public sealed class Zone(
                 logger.LogError(ex, "Zone {MapId} combat command from character {CharacterId} failed", MapId,
                     command.AttackerCharacterId);
             }
+    }
+
+    private void DrainChatCommands()
+    {
+        while (_chatInbox.Reader.TryRead(out var command))
+            try
+            {
+                ApplyChatCommand(in command);
+            }
+            catch (Exception ex)
+            {
+                // Same containment posture as every other drain: one bad send must never take the whole
+                // tick loop down for every other player in the zone.
+                logger.LogError(ex, "Zone {MapId} chat command from character {CharacterId} failed", MapId,
+                    command.SenderCharacterId);
+            }
+    }
+
+    /// <summary>
+    ///     Resolves Local/Shout/Tribe chat's audience entirely on this zone's own tick thread (the ONE
+    ///     thing only the tick may safely touch -- <see cref="_grid" />/<see cref="_players" />, report 04
+    ///     §NB / contracts/05_social.md). Local = AOI-neighbor broadcast filtered by the sender's own
+    ///     tribe (alliance NOT modeled -- a real alliance would let MORE recipients through, same
+    ///     documented simplification as <see cref="Combat.CombatResolver" />); Shout/Tribe = whole-zone,
+    ///     Tribe additionally filtered by tribe. The sender always receives its own echo (contract note:
+    ///     "l'émetteur se reçoit lui-même") -- trivially true for all three since it always matches its
+    ///     own tribe and <see cref="AoiGrid.Neighbors" /> includes the querying cell itself.
+    /// </summary>
+    private void ApplyChatCommand(in ChatZoneCommand command)
+    {
+        if (!_players.TryGetValue(command.SenderCharacterId, out var sender))
+            return; // sender disconnected/handed off between post and drain -- benign, same posture as every other drain
+
+        switch (command.Kind)
+        {
+            case ChatBroadcastKind.Local:
+            {
+                var response = new LocalChatResponse
+                    { AvatarName = sender.Name, Content = command.Content, Link = command.Link };
+                foreach (var id in _grid.Neighbors(sender.CurrentCell))
+                    if (_players.TryGetValue(id, out var recipient) && recipient.Tribe == sender.Tribe)
+                        recipient.Session.Send(response);
+                break;
+            }
+            case ChatBroadcastKind.Shout:
+            {
+                var response = new ShoutResponse
+                    { AvatarName = sender.Name, Content = command.Content, Link = command.Link };
+                foreach (var recipient in _players.Values)
+                    recipient.Session.Send(response);
+                break;
+            }
+            case ChatBroadcastKind.Tribe:
+            {
+                var response = new TribeChatResponse
+                    { AvatarName = sender.Name, Content = command.Content, Link = command.Link };
+                foreach (var recipient in _players.Values)
+                    if (recipient.Tribe == sender.Tribe)
+                        recipient.Session.Send(response);
+                break;
+            }
+        }
     }
 
     /// <summary>
@@ -762,7 +1553,24 @@ public sealed class Zone(
     ///     §5 <c>MONSTER_OBJECT::ProcessForExp</c>, ported in <see cref="ExperienceFormulas" /> (see that type's
     ///     remarks for the multipliers deliberately NOT modeled -- last-hit/teacher/party/event bonuses).
     /// </summary>
-    public void GrantMonsterKillExperience(int killerCharacterId, int monsterLevel, int monsterGeneralExperience)
+    /// <param name="partyMemberIds">
+    ///     Phase C/V6 Social: the killer's FULL party roster (leader first), resolved by the caller via
+    ///     <c>Social.Party.PartyRegistry.GetMembers</c> -- null/empty for a solo killer. Verified against
+    ///     <c>MONSTER_OBJECT::ProcessForExp</c>'s own party branch (<c>Server/ts25zone/S07_MyGame05.cpp:3877-3919</c>):
+    ///     the killer's base <paramref name="monsterGeneralExperience" />-derived gain above is ALWAYS
+    ///     solo/killer-only (party membership never changes it); a SEPARATE flat bonus
+    ///     (<see cref="ExperienceFormulas.ComputePartyBonusExperience" />, un-multiplied raw
+    ///     <paramref name="monsterGeneralExperience" /> × 10/20/30/50% by 2-5 PRESENT members) is granted
+    ///     to every party member "present" in THIS SAME ZONE (matching the legacy's own per-process
+    ///     <c>mUSER[]</c> scope -- one ts25zone process = one map/zone, so a member on a DIFFERENT zone was
+    ///     never reachable by that loop either) who is not dead -- INCLUDING the killer again, who
+    ///     therefore receives both grants (verified: the killer's own record also satisfies the loop's
+    ///     party-name-match filter, and the source does not exclude it). Not gated on a minimum size here
+    ///     -- the caller passes whatever <c>GetMembers</c> returns; this method itself only pays out once
+    ///     ≥2 members are found present.
+    /// </param>
+    public void GrantMonsterKillExperience(int killerCharacterId, int monsterLevel, int monsterGeneralExperience,
+        IReadOnlyList<int>? partyMemberIds = null)
     {
         if (!_players.TryGetValue(killerCharacterId, out var state))
             return;
@@ -771,11 +1579,82 @@ public sealed class Zone(
         var rawGain = ExperienceFormulas.ComputeMonsterKillExperience(fixedLevel, monsterLevel,
             monsterGeneralExperience);
         var finalGain = ExperienceFormulas.ApplyRebirthDivisor(rawGain, state.Level);
-        if (finalGain <= 0)
+        if (finalGain > 0)
+        {
+            state.Experience += finalGain;
+            dirtyTracker.MarkDirty(killerCharacterId, DirtyFlags.Progression);
+        }
+
+        if (partyMemberIds is not { Count: > 0 })
             return;
 
-        state.Experience += finalGain;
-        dirtyTracker.MarkDirty(killerCharacterId, DirtyFlags.Progression);
+        List<PlayerRuntimeState>? present = null;
+        foreach (var memberId in partyMemberIds)
+            if (_players.TryGetValue(memberId, out var member) && !member.IsDead)
+                (present ??= []).Add(member);
+
+        if (present is not { Count: >= 2 })
+            return;
+
+        var bonus = ExperienceFormulas.ComputePartyBonusExperience(present.Count, monsterGeneralExperience);
+        if (bonus <= 0)
+            return;
+
+        foreach (var member in present)
+        {
+            member.Experience += bonus;
+            dirtyTracker.MarkDirty(member.CharacterId, DirtyFlags.Progression);
+        }
+    }
+
+    /// <summary>
+    ///     Quest kill-hook, Server Logic V9 Progression -- the SAME monster-death seam
+    ///     <see cref="GrantMonsterKillExperience" /> already uses (<c>Monsters.MonsterSpawnScheduler.ProcessDeath</c>
+    ///     calls both from the SAME kill, never a separate/duplicated hook). Verified
+    ///     <c>Server/ts25zone/S07_MyGame02.cpp:2493-2564</c> (PvM kill-counter increments inside
+    ///     <c>ProcessAttack03</c>): increments <see cref="PlayerRuntimeState.QuestKillCounter" /> by exactly
+    ///     1 when the killer's active quest is qSort 1 (kill monsters) or 5 (kill the captain),
+    ///     <paramref name="monsterId" /> matches <see cref="PlayerRuntimeState.QuestTargetPhase" />, AND
+    ///     <c>ReturnQuestPresentState() == 2</c> still holds -- verified the source gates the increment on
+    ///     that state check (<c>if (... != 2) break;</c>), which for qSort 1 means "KillCounter is still
+    ///     BELOW qSolution[1]" and for qSort 5 means "KillCounter is still 0": this IS the clamp (a prior
+    ///     reading of this method assumed a bare, unclamped <c>++</c> -- corrected here against the actual
+    ///     source). Party propagation (the legacy's own same-party-name loop crediting every OTHER present,
+    ///     non-hiding, non-dead party member with a matching active quest) is NOT modeled here -- Fenrir's
+    ///     party membership is resolved via <c>Social.Party.PartyRegistry</c>, a different subsystem than
+    ///     this pass touches; see this feature's StructuredOutput open issues. A no-op (not an error) for a
+    ///     killer with no active kill-type quest, a mismatched monster id, or an already-satisfied counter.
+    /// </summary>
+    public void ApplyQuestKillProgress(int killerCharacterId, int monsterId)
+    {
+        if (!_players.TryGetValue(killerCharacterId, out var state))
+            return;
+
+        if (state.QuestActiveFlag != 1 || state.QuestTargetPhase != monsterId)
+            return;
+
+        switch (state.QuestSort)
+        {
+            case 1:
+                var quest = _questCatalog.TryGet(state.Tribe, state.QuestStepPermanent);
+                if (quest is null)
+                    return;
+                if (state.QuestKillCounter < (quest.Quest.Solution2 ?? 0))
+                {
+                    state.QuestKillCounter++;
+                    dirtyTracker.MarkDirty(killerCharacterId, DirtyFlags.Progression);
+                }
+
+                break;
+            case 5:
+                if (state.QuestKillCounter < 1)
+                {
+                    state.QuestKillCounter++;
+                    dirtyTracker.MarkDirty(killerCharacterId, DirtyFlags.Progression);
+                }
+
+                break;
+        }
     }
 
     /// <summary>
@@ -1047,6 +1926,30 @@ public sealed class Zone(
             // column exists in game.Characters, since Vitals are not yet part of any write-behind flush -- see
             // this task's StructuredOutput openIssues).
             IsDead = data.IsDead,
+            // CORRECTION (review finding, Phase C/V7): these were never copied from PlayerEnterData at all --
+            // see that record's own remarks on the resulting "silently resets to 0 on every world entry/zone
+            // transfer" bug this closes.
+            StatVit = data.StatVit,
+            StatStr = data.StatStr,
+            StatInt = data.StatInt,
+            StatDex = data.StatDex,
+            StatPoints = data.StatPoints,
+            Title = data.Title,
+            Halo = data.Halo,
+            RebirthCount = data.RebirthCount,
+            Experience = data.Experience,
+            ContributionPoints = data.ContributionPoints,
+            TeacherPoint = data.TeacherPoint,
+            IsMuted = data.IsMuted,
+            GuildId = data.GuildId,
+            GuildName = data.GuildName,
+            GuildRoleDb = data.GuildRoleDb,
+            GuildCallName = data.GuildCallName,
+            TribeRole = data.TribeRole,
+            // No rebirth/tribe-transition system populates a real "previous tribe" yet (see
+            // PlayerRuntimeState.PreviousTribe's own remarks) -- defaults to the character's CURRENT tribe,
+            // a documented "never transferred" inference, not an independently verified legacy default.
+            PreviousTribe = data.Tribe,
             // This zone's OWN clock plus whatever remained of the timer in the SOURCE zone (data.ReviveRemaining,
             // already translated out of the source's absolute clock by ZoneTransfer.CreateEnterData) -- NOT a
             // fresh full delay, and NOT left at the type's own zero-default (which ProcessPendingRevives would
@@ -1068,6 +1971,41 @@ public sealed class Zone(
             state.Inventory.Seed(items);
         if (data.Stats is { } stats)
             state.Stats = stats;
+        if (data.Skills is { } skills)
+        {
+            var builder = ImmutableDictionary.CreateBuilder<byte, LearnedSkill>();
+            foreach (var skill in skills)
+                builder[skill.SlotIndex] = new LearnedSkill(skill.SkillId, skill.Grade);
+            state.LearnedSkills = builder.ToImmutable();
+        }
+
+        if (data.FriendsBySlot is { } friends)
+            foreach (var (slot, friendId) in friends)
+                state.Friends[slot] = friendId;
+
+        state.TeacherCharacterId = data.TeacherCharacterId;
+        state.StudentCharacterId = data.StudentCharacterId;
+
+        // Server Logic V9 Progression -- plain copies, same posture as every other already-computed field
+        // above (no catalog lookup/formula runs here, only in the poster or in this zone's own later ticks).
+        state.QuestStepPermanent = data.QuestProgress.StepPermanent;
+        state.QuestActiveFlag = data.QuestProgress.ActiveFlag;
+        state.QuestSort = data.QuestProgress.QSort;
+        state.QuestTargetPhase = data.QuestProgress.TargetPhase;
+        state.QuestKillCounter = data.QuestProgress.KillCounter;
+        state.MissionJoinWar = data.MissionJoinWar;
+        state.MissionKillOtherTribe = data.MissionKillOtherTribe;
+        state.MissionKillMonster = data.MissionKillMonster;
+        state.MissionPlayTime = data.MissionPlayTime;
+        state.AutoHuntEnabled = data.AutoHuntEnabled;
+        state.AutoHuntConfig = data.AutoHuntConfig;
+        state.AutoLifeRatio = data.AutoLifeRatio;
+        state.AutoManaRatio = data.AutoManaRatio;
+        state.PetGrowth = data.PetGrowth;
+        state.PetActivity = data.PetActivity;
+        state.LastSeenPetItemId = data.Items is { } petScanItems
+            ? Pets.PetSlots.ResolveEquippedPetItemId(petScanItems)
+            : 0;
 
         var cell = _grid.CellOf(state.PosX, state.PosZ);
         state.CurrentCell = cell;
@@ -1460,8 +2398,18 @@ public sealed class Zone(
     {
         var attributes = new CharacterBaseAttributes(state.StatVit, state.StatStr, state.StatInt, state.StatDex,
             state.Level, state.Tribe, state.Title, state.Halo, state.RebirthCount);
-        state.Stats = EquipmentService.RecomputeStats(attributes,
-            state.Inventory.GetContainer(ContainerMatrix.Equipment), worldData, state.Buffs);
+        var equipmentContainer = state.Inventory.GetContainer(ContainerMatrix.Equipment);
+
+        // Server Logic V9 Progression: same pet-contribution wiring as GenericActionHandler's equip-touching
+        // recompute -- see that call site's own remarks.
+        var petItemId = equipmentContainer.TryGetValue(Pets.PetSlots.EquipmentSlot, out var petStack)
+            ? petStack.ItemId
+            : 0;
+        var petContribution = Pets.PetGrowthCalculator.Compute(petItemId, state.PetGrowth, state.PetActivity,
+            worldData.ItemsById);
+
+        state.Stats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData, state.Buffs,
+            pet: petContribution);
 
         var response = new AvatarEffectStateResponse
         {

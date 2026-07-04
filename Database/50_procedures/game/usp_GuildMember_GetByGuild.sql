@@ -9,7 +9,9 @@
 --   3. CharacterId   INT
 --   4. CharacterName NVARCHAR(13)
 --   5. Role          TINYINT (0=member, 1=sub-master, 2=master)
---   6. JoinedAtUtc   DATETIME2(3)
+--   6. CallName      NVARCHAR(4) -- [Phase C/V7 Guilds & Tribes] cosmetic in-guild title, see
+--                      GuildMembers_callname.sql
+--   7. JoinedAtUtc   DATETIME2(3)
 -- Rows: 0..50 (MAX_GUILD_AVATAR_NUM legacy cap; not DB-enforced, an application-layer join-limit concern).
 -- Idempotent: yes (read-only).
 -- Errors: none (an unknown @GuildId simply returns zero rows).
@@ -24,6 +26,7 @@ SELECT GuildId,
        CharacterId,
        CharacterName,
        Role,
+       CallName,
        JoinedAtUtc
 FROM game.vw_GuildRoster
 WHERE GuildId = @GuildId

@@ -119,4 +119,36 @@ public static class ExperienceFormulas
         if (loss < 1) return 0;
         return loss > currentExperience ? currentExperience : loss;
     }
+
+    /// <summary>
+    ///     Party-kill bonus XP (Phase C/V6 Social, report 04's own line: "bonus 10/20/30/50% de l'XP de
+    ///     base selon taille 2-5" -- verified in full against <c>MONSTER_OBJECT::ProcessForExp</c>'s own
+    ///     party branch, <c>Server/ts25zone/S07_MyGame05.cpp:3899-3918</c>). A FLAT amount granted to EVERY
+    ///     present party member (see <see cref="Zone.GrantMonsterKillExperience" />'s own remarks) --
+    ///     computed straight from the monster's raw <paramref name="monsterGeneralExperience" />, with
+    ///     NONE of <see cref="ComputeMonsterKillExperience" />'s level-gap/last-hit/event multipliers and
+    ///     NOT run back through <see cref="ApplyRebirthDivisor" /> a second time (both verified: the
+    ///     source computes <c>tBonusExp</c> from <c>shmMONSTER_INFO-&gt;mGeneralExperience</c> directly, in
+    ///     a code path that runs AFTER the killer's own ÷3/÷5 divisor already applied to a DIFFERENT
+    ///     local). <paramref name="presentPartySize" /> is the count of party members "present" (online, in
+    ///     this same zone, not dead) INCLUDING the killer -- sizes outside [2,5] (can only happen if the
+    ///     caller passes something other than <c>PartyRegistry</c>'s own MAX_PARTY_AVATAR_NUM=5-capped
+    ///     roster) yield 0, matching the source's own <c>switch</c> having no default case.
+    /// </summary>
+    public static int ComputePartyBonusExperience(int presentPartySize, int monsterGeneralExperience)
+    {
+        if (monsterGeneralExperience < 1)
+            return 0;
+
+        var ratio = presentPartySize switch
+        {
+            2 => 0.1f,
+            3 => 0.2f,
+            4 => 0.3f,
+            5 => 0.5f,
+            _ => 0f
+        };
+
+        return (int)(monsterGeneralExperience * ratio);
+    }
 }

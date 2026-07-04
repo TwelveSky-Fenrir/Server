@@ -19,7 +19,10 @@
 --   9. BuffTimeForDiff   BIGINT
 --   10. Logo             INT
 --   11. CreatedAtUtc     DATETIME2(3)
---   12. MemberCount      BIGINT (0 for a guild with no members yet)
+--   12. MemberCount      INT (0 for a guild with no members yet -- [CORRIGÉ-REVUE, Phase C/V7] plain
+--                         COUNT(*) in game.vw_GuildRosterCounts returns INT, not BIGINT -- verified
+--                         against a real SQL Server container after game.GuildSummaryDto's own
+--                         BIGINT-typed field threw InvalidCastException the first time this ran for real)
 -- Idempotent: yes (read-only).
 -- Errors: none.
 CREATE PROCEDURE game.usp_Guild_GetAll

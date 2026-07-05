@@ -1,4 +1,4 @@
-using Fenrir.Application.Game.Social.Party;
+using Fenrir.Application.Game.Handlers.Social.Services;
 using Fenrir.Application.Game.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Serialization.Packets.Zone;
@@ -10,7 +10,7 @@ namespace Fenrir.Application.Game.Handlers.Social;
 ///     CZ_PARTY_ASK_SEND (opcode 65) -- level check uses <see cref="PlayerRuntimeState.Level" /> alone;
 ///     aLevel2 (legacy's rebirth sub-level) isn't modeled.
 /// </summary>
-public sealed class PartyInviteHandler(PartyRegistry parties) : IInlinePacketHandler<PartyInviteRequest>
+public sealed class PartyInviteHandler(IPartyInviteService partyInviteService) : IInlinePacketHandler<PartyInviteRequest>
 {
     public void Handle(in PartyInviteRequest packet, IPacketSession session)
     {
@@ -23,39 +23,28 @@ public sealed class PartyInviteHandler(PartyRegistry parties) : IInlinePacketHan
         if (!zone.TryGetPlayer(inviterId, out var inviter) || inviter is null)
             return;
 
-        PlayerRuntimeState? target = null;
-        foreach (var candidate in zone.Players)
-            if (string.Equals(candidate.Name, packet.AvatarName, StringComparison.OrdinalIgnoreCase))
-            {
-                target = candidate;
-                break;
-            }
+        var result = partyInviteService.Invite(zone, inviter, packet.AvatarName);
 
-        if (target is null)
+        switch (result.Kind)
         {
-            session.Send(new PartyAnswerResponse { Answer = 4 });
-            return;
-        }
-
-        var outcome = parties.TryInvite(inviterId, inviter.Level, inviter.Tribe, target.CharacterId, target.Level,
-            target.Tribe);
-
-        switch (outcome)
-        {
-            case PartyInviteOutcome.InviterMustDisconnect:
+            case PartyInviteResultKind.InviterMustDisconnect:
                 zoneSession.Abort(DisconnectReason.Faulted);
                 return;
-            case PartyInviteOutcome.InviterBusy:
+            case PartyInviteResultKind.TargetNotFound:
+                session.Send(new PartyAnswerResponse { Answer = 4 });
+                return;
+            case PartyInviteResultKind.InviterBusy:
                 session.Send(new PartyAnswerResponse { Answer = 3 });
                 return;
-            case PartyInviteOutcome.TargetBusy:
+            case PartyInviteResultKind.TargetBusy:
                 session.Send(new PartyAnswerResponse { Answer = 5 });
                 return;
-            case PartyInviteOutcome.TargetAlreadyPartied:
+            case PartyInviteResultKind.TargetAlreadyPartied:
                 session.Send(new PartyAnswerResponse { Answer = 6 });
                 return;
-            case PartyInviteOutcome.Sent:
-                target.Session.Send(new PartyInviteResponse { AvatarName = inviter.Name });
+            case PartyInviteResultKind.Sent:
+                zone.TryGetPlayer(result.TargetCharacterId, out var target);
+                target!.Session.Send(new PartyInviteResponse { AvatarName = result.InviterName! });
                 return;
         }
     }

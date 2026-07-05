@@ -1,4 +1,4 @@
-using Fenrir.Application.Game.Social.Trade;
+using Fenrir.Application.Game.Handlers.Social.Services;
 using Fenrir.Application.Game.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Serialization.Packets.Zone;
@@ -10,7 +10,7 @@ namespace Fenrir.Application.Game.Handlers.Social;
 ///     CZ_TRADE_ASK_SEND (opcode 47) -- level uses <see cref="PlayerRuntimeState.Level" /> alone; aLevel2
 ///     isn't modeled, same gap as party's invite check.
 /// </summary>
-public sealed class TradeInviteHandler(TradeRegistry trades) : IInlinePacketHandler<TradeInviteRequest>
+public sealed class TradeInviteHandler(ITradeInviteService tradeInviteService) : IInlinePacketHandler<TradeInviteRequest>
 {
     public void Handle(in TradeInviteRequest packet, IPacketSession session)
     {
@@ -23,37 +23,25 @@ public sealed class TradeInviteHandler(TradeRegistry trades) : IInlinePacketHand
         if (!zone.TryGetPlayer(askerId, out var asker) || asker is null)
             return;
 
-        PlayerRuntimeState? target = null;
-        foreach (var candidate in zone.Players)
-            if (string.Equals(candidate.Name, packet.AvatarName, StringComparison.OrdinalIgnoreCase))
-            {
-                target = candidate;
-                break;
-            }
+        var result = tradeInviteService.Invite(zone, asker, packet.AvatarName);
 
-        if (target is null)
+        switch (result.Kind)
         {
-            session.Send(new TradeAnswerResponse { Answer = 4 });
-            return;
-        }
-
-        var interTribeAllowed = zone.MapId is 37 or 119 or 124;
-        if (!interTribeAllowed && asker.Tribe != target.Tribe)
-        {
-            zoneSession.Abort(DisconnectReason.Faulted);
-            return;
-        }
-
-        switch (trades.TryAsk(askerId, target.CharacterId))
-        {
-            case TradeAskOutcome.AskerBusy:
+            case TradeInviteResultKind.TargetNotFound:
+                session.Send(new TradeAnswerResponse { Answer = 4 });
+                return;
+            case TradeInviteResultKind.MustDisconnect:
+                zoneSession.Abort(DisconnectReason.Faulted);
+                return;
+            case TradeInviteResultKind.AskerBusy:
                 session.Send(new TradeAnswerResponse { Answer = 3 });
                 return;
-            case TradeAskOutcome.TargetBusy:
+            case TradeInviteResultKind.TargetBusy:
                 session.Send(new TradeAnswerResponse { Answer = 5 });
                 return;
-            case TradeAskOutcome.Sent:
-                target.Session.Send(new TradeInviteResponse { AvatarName = asker.Name, Level = asker.Level });
+            case TradeInviteResultKind.Sent:
+                zone.TryGetPlayer(result.TargetCharacterId, out var target);
+                target!.Session.Send(new TradeInviteResponse { AvatarName = result.AskerName!, Level = result.AskerLevel });
                 return;
         }
     }

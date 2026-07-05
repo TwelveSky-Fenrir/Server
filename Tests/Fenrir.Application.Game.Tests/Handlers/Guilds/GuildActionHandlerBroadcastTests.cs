@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using Fenrir.Application.Game.Guilds;
 using Fenrir.Application.Game.Handlers.Guilds;
+using Fenrir.Application.Game.Handlers.Guilds.Services;
 using Fenrir.Application.Game.Movement;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Application.Game.World;
@@ -35,8 +36,9 @@ public class GuildActionHandlerBroadcastTests
 
         guilds.Seed(SeedGuild(memberCount: 2));
 
-        var handler = new GuildActionHandler(zones, guilds, new FakeCharacterRepository(),
-            new GuildInviteRegistry(), NullLogger<GuildActionHandler>.Instance);
+        var service = new GuildActionService(zones, guilds, new FakeCharacterRepository(),
+            new GuildInviteRegistry(), NullLogger<GuildActionService>.Instance);
+        var handler = new GuildActionHandler(service);
 
         var data = new byte[500];
         new GuildWorkNoticePayload { Notices = ["Raid at 8pm", "", "", ""] }.Write(data);
@@ -64,8 +66,9 @@ public class GuildActionHandlerBroadcastTests
             new GuildRosterRowDto(GuildId, "Aesir", OutsiderId, "Freya", 0, "", DateTime.UtcNow));
         guilds.Seed(SeedGuild(memberCount: 3));
 
-        var handler = new GuildActionHandler(zones, guilds, new FakeCharacterRepository(),
-            new GuildInviteRegistry(), NullLogger<GuildActionHandler>.Instance);
+        var service = new GuildActionService(zones, guilds, new FakeCharacterRepository(),
+            new GuildInviteRegistry(), NullLogger<GuildActionService>.Instance);
+        var handler = new GuildActionHandler(service);
 
         var data = new byte[500];
         new GuildWorkAgmPayload { AvatarName = "Thor", GuildRole = 1 }.Write(data);
@@ -89,8 +92,9 @@ public class GuildActionHandlerBroadcastTests
             new GuildRosterRowDto(GuildId, "Aesir", MemberId, "Thor", 0, "", DateTime.UtcNow));
         guilds.Seed(SeedGuild(memberCount: 2));
 
-        var handler = new GuildActionHandler(zones, guilds, new FakeCharacterRepository(),
-            new GuildInviteRegistry(), NullLogger<GuildActionHandler>.Instance);
+        var service = new GuildActionService(zones, guilds, new FakeCharacterRepository(),
+            new GuildInviteRegistry(), NullLogger<GuildActionService>.Instance);
+        var handler = new GuildActionHandler(service);
 
         var data = new byte[500];
         new GuildWorkTitlePayload { AvatarName = "Thor", CallName = "Duke" }.Write(data);
@@ -111,8 +115,9 @@ public class GuildActionHandlerBroadcastTests
 
         guilds.Seed(SeedGuild(memberCount: 2, buffTime: 60, buffTimeForDiff: 0));
 
-        var handler = new GuildActionHandler(zones, guilds, new FakeCharacterRepository(),
-            new GuildInviteRegistry(), NullLogger<GuildActionHandler>.Instance);
+        var service = new GuildActionService(zones, guilds, new FakeCharacterRepository(),
+            new GuildInviteRegistry(), NullLogger<GuildActionService>.Instance);
+        var handler = new GuildActionHandler(service);
 
         var data = new byte[500];
         new GuildWorkBuffPayload { GuildBuffType = 2 }.Write(data);

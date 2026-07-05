@@ -1,4 +1,5 @@
 using Fenrir.Application.Login.Handlers;
+using Fenrir.Application.Login.Handlers.Services;
 using Fenrir.Application.Login.Tests.TestSupport;
 using Fenrir.Contracts.Packets.Login;
 using Fenrir.Network.Sessions;
@@ -15,7 +16,7 @@ public class ClChangeAvatarNameSendHandlerTests
     public async Task HandleAsync_RenameSucceeds_RepliesResultZero()
     {
         var renames = FakeCharacterRenameRepository.ReturningResult(0);
-        var handler = new RenameAvatarHandler(renames);
+        var handler = new RenameAvatarHandler(new RenameAvatarService(renames));
         var (session, pipe) = CreateSessionInCharSelect();
 
         await handler.HandleAsync(
@@ -36,7 +37,7 @@ public class ClChangeAvatarNameSendHandlerTests
     public async Task HandleAsync_ProcReturnsLegacyFailureCode_ForwardsItVerbatim(int code)
     {
         var renames = FakeCharacterRenameRepository.ReturningResult(code);
-        var handler = new RenameAvatarHandler(renames);
+        var handler = new RenameAvatarHandler(new RenameAvatarService(renames));
         var (session, pipe) = CreateSessionInCharSelect();
 
         await handler.HandleAsync(
@@ -50,7 +51,7 @@ public class ClChangeAvatarNameSendHandlerTests
     public async Task HandleAsync_RepositoryThrows_RepliesResult101WithoutDisconnecting()
     {
         var renames = FakeCharacterRenameRepository.Throwing(new InvalidOperationException("boom"));
-        var handler = new RenameAvatarHandler(renames);
+        var handler = new RenameAvatarHandler(new RenameAvatarService(renames));
         var (session, pipe) = CreateSessionInCharSelect();
 
         await handler.HandleAsync(
@@ -71,7 +72,7 @@ public class ClChangeAvatarNameSendHandlerTests
         int page, int index)
     {
         var renames = FakeCharacterRenameRepository.ReturningResult(0);
-        var handler = new RenameAvatarHandler(renames);
+        var handler = new RenameAvatarHandler(new RenameAvatarService(renames));
         var (session, pipe) = CreateSessionInCharSelect();
 
         await handler.HandleAsync(

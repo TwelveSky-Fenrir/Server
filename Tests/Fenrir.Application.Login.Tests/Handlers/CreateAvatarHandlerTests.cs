@@ -1,5 +1,6 @@
 using Fenrir.Application.Login.Avatars;
 using Fenrir.Application.Login.Handlers;
+using Fenrir.Application.Login.Handlers.Services;
 using Fenrir.Application.Login.Tests.TestSupport;
 using Fenrir.Contracts.Packets.Login;
 using Fenrir.Data.Characters;
@@ -30,7 +31,7 @@ public class CreateAvatarHandlerTests
     {
         var characters = FakeCharacterRepository.WithNone();
         var starterKits = FakeStarterKitRepository.NobleDragonKit();
-        var handler = new CreateAvatarHandler(characters, starterKits);
+        var handler = new CreateAvatarHandler(new CreateAvatarService(characters, starterKits));
         var (session, _) = CreateSessionInCharSelect();
 
         var before = DateTimeOffset.UtcNow;
@@ -93,7 +94,7 @@ public class CreateAvatarHandlerTests
     {
         var characters = FakeCharacterRepository.WithNone();
         var starterKits = FakeStarterKitRepository.NobleDragonKit();
-        var handler = new CreateAvatarHandler(characters, starterKits);
+        var handler = new CreateAvatarHandler(new CreateAvatarService(characters, starterKits));
         var (session, pipe) = CreateSessionInCharSelect();
 
         await handler.HandleAsync(ValidRequest(), session, CancellationToken.None);
@@ -127,7 +128,7 @@ public class CreateAvatarHandlerTests
     {
         var characters = FakeCharacterRepository.WithNone();
         var starterKits = FakeStarterKitRepository.NobleDragonKit();
-        var handler = new CreateAvatarHandler(characters, starterKits);
+        var handler = new CreateAvatarHandler(new CreateAvatarService(characters, starterKits));
         var (session, _) = CreateSessionInCharSelect();
 
         await handler.HandleAsync(ValidRequest(weapon), session, CancellationToken.None);
@@ -142,7 +143,7 @@ public class CreateAvatarHandlerTests
     {
         var characters = FakeCharacterRepository.WithNone();
         var starterKits = FakeStarterKitRepository.NobleDragonKit();
-        var handler = new CreateAvatarHandler(characters, starterKits);
+        var handler = new CreateAvatarHandler(new CreateAvatarService(characters, starterKits));
         var (session, pipe) = CreateSessionInCharSelect();
 
         // 11 is a valid Royal Serpent weapon id, not one of Noble Dragon's (5/6/7).
@@ -169,7 +170,7 @@ public class CreateAvatarHandlerTests
     {
         var characters = FakeCharacterRepository.WithNone();
         var starterKits = FakeStarterKitRepository.NobleDragonKit();
-        var handler = new CreateAvatarHandler(characters, starterKits);
+        var handler = new CreateAvatarHandler(new CreateAvatarService(characters, starterKits));
         var (session, pipe) = CreateSessionInCharSelect();
 
         var request = new CreateAvatarRequest
@@ -198,7 +199,7 @@ public class CreateAvatarHandlerTests
         var characters = FakeCharacterRepository.WithNone();
         characters.CreateWithStarterKitException = new InvalidOperationException("50201: slot already occupied");
         var starterKits = FakeStarterKitRepository.NobleDragonKit();
-        var handler = new CreateAvatarHandler(characters, starterKits);
+        var handler = new CreateAvatarHandler(new CreateAvatarService(characters, starterKits));
         var (session, pipe) = CreateSessionInCharSelect();
 
         await handler.HandleAsync(ValidRequest(), session, CancellationToken.None);

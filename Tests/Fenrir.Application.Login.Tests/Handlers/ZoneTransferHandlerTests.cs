@@ -1,4 +1,5 @@
 using Fenrir.Application.Login.Handlers;
+using Fenrir.Application.Login.Handlers.Services;
 using Fenrir.Application.Login.Tests.TestSupport;
 using Fenrir.Contracts.Packets.Login;
 using Fenrir.Contracts.Wire;
@@ -82,8 +83,9 @@ public class ClDemandZoneServerInfoSendHandlerTests
     {
         var characters = FakeCharacterRepository.With(Summary, WorldEntry);
         var options = Options.Create(new LoginServerOptions());
-        return new ZoneTransferHandler(characters, directory, shardMaps, tickets, options,
-            NullLogger<ZoneTransferHandler>.Instance);
+        var zoneTransferService = new ZoneTransferService(characters, directory, shardMaps, tickets, options,
+            NullLogger<ZoneTransferService>.Instance);
+        return new ZoneTransferHandler(zoneTransferService);
     }
 
     private static (LoginClientSession Session, FakeDuplexPipe Pipe) CreateSessionInCharSelect()

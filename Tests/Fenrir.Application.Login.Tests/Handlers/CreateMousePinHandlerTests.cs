@@ -1,4 +1,5 @@
 using Fenrir.Application.Login.Handlers;
+using Fenrir.Application.Login.Handlers.Services;
 using Fenrir.Application.Login.Tests.TestSupport;
 using Fenrir.Contracts.Packets.Login;
 using Fenrir.Contracts.Wire;
@@ -16,7 +17,7 @@ public class ClCreateMousePasswordSendHandlerTests
     public async Task HandleAsync_NoExistingPin_StoresHashedPinAndOpensCharSelect()
     {
         var pins = FakeAccountPinRepository.WithNoPin();
-        var handler = new CreateMousePinHandler(pins);
+        var handler = new CreateMousePinHandler(new CreateMousePinService(pins));
         var (session, pipe) = CreateSessionInPinRequired();
 
         await handler.HandleAsync(new CreateMousePinRequest { MousePassword = "1234" }, session,
@@ -32,7 +33,7 @@ public class ClCreateMousePasswordSendHandlerTests
     public async Task HandleAsync_PinAlreadyExists_AbortsWithoutStoring()
     {
         var pins = FakeAccountPinRepository.WithPin("5678");
-        var handler = new CreateMousePinHandler(pins);
+        var handler = new CreateMousePinHandler(new CreateMousePinService(pins));
         var (session, pipe) = CreateSessionInPinRequired();
 
         await handler.HandleAsync(new CreateMousePinRequest { MousePassword = "1234" }, session,
@@ -51,7 +52,7 @@ public class ClCreateMousePasswordSendHandlerTests
     public async Task HandleAsync_InvalidFormat_AbortsAsMalformed(string malformedPin)
     {
         var pins = FakeAccountPinRepository.WithNoPin();
-        var handler = new CreateMousePinHandler(pins);
+        var handler = new CreateMousePinHandler(new CreateMousePinService(pins));
         var (session, pipe) = CreateSessionInPinRequired();
 
         await handler.HandleAsync(new CreateMousePinRequest { MousePassword = malformedPin }, session,
@@ -66,7 +67,7 @@ public class ClCreateMousePasswordSendHandlerTests
     {
         var pins = FakeAccountPinRepository.WithNoPin();
         pins.ThrowOnSet = true;
-        var handler = new CreateMousePinHandler(pins);
+        var handler = new CreateMousePinHandler(new CreateMousePinService(pins));
         var (session, pipe) = CreateSessionInPinRequired();
 
         await handler.HandleAsync(new CreateMousePinRequest { MousePassword = "1234" }, session,

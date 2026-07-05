@@ -1,6 +1,6 @@
+using Fenrir.Application.Login.Handlers.Services;
 using Fenrir.Contracts.Abstractions;
 using Fenrir.Contracts.Packets.Login;
-using Fenrir.Data.Characters;
 using Fenrir.Network.Sessions;
 
 namespace Fenrir.Application.Login.Handlers;
@@ -13,13 +13,12 @@ namespace Fenrir.Application.Login.Handlers;
 ///     Rename-scroll item 1133 not verified/consumed (no character inventory persistence yet); tribe/guild/friend/teacher
 ///     Result=3 refusal not reproduced (those relations don't exist for login-visible characters yet).
 /// </remarks>
-public sealed class RenameAvatarHandler(ICharacterRenameRepository renames)
+public sealed class RenameAvatarHandler(IRenameAvatarService renameAvatarService)
     : IAsyncPacketHandler<RenameAvatarRequest>
 {
     private const int MaxAvatarPost = 2; // MAX_USER_AVATAR_NUM - 1
     private const int InventoryPageCount = 2; // MAX_INVENTORY_PAGE_NUM
     private const int InventorySlotCount = 64; // MAX_INVENTORY_SLOT_NUM
-    private const int ResultSqlError = 101; // legacy mDB.ChangeCharacterName "SQL error"
 
     public async ValueTask HandleAsync(RenameAvatarRequest packet, IPacketSession session,
         CancellationToken cancellationToken)
@@ -37,16 +36,8 @@ public sealed class RenameAvatarHandler(ICharacterRenameRepository renames)
             return;
         }
 
-        int result;
-        try
-        {
-            result = await renames.RenameAsync(accountId, (byte)packet.AvatarPost, packet.ChangeAvatarName,
-                cancellationToken);
-        }
-        catch (Exception)
-        {
-            result = ResultSqlError;
-        }
+        var result = await renameAvatarService.RenameAvatarAsync(accountId, (byte)packet.AvatarPost,
+            packet.ChangeAvatarName, cancellationToken);
 
         session.Send(new RenameAvatarResponse { Result = result });
     }

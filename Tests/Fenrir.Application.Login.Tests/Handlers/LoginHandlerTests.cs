@@ -1,5 +1,6 @@
 using System.Net;
 using Fenrir.Application.Login.Handlers;
+using Fenrir.Application.Login.Handlers.Services;
 using Fenrir.Application.Login.RateLimiting;
 using Fenrir.Application.Login.Tests.TestSupport;
 using Fenrir.Contracts.Packets.Login;
@@ -101,7 +102,7 @@ public class LoginHandlerTests
             new FakeFirewallRuleRepository(firewallRuleBlocked),
             new FakeGmAllowlistRepository(gmAllowlisted));
 
-        return new LoginHandler(
+        var loginService = new LoginService(
             accounts,
             FakeAccountPinRepository.WithNoPin(),
             FakeCharacterRepository.WithNone(),
@@ -111,6 +112,8 @@ public class LoginHandlerTests
             new FakeMacRestrictionRepository(bannedMacAddresses),
             Options.Create(new LoginServerOptions { ExpectedClientVersion = ClientVersion }),
             new SessionRegistry());
+
+        return new LoginHandler(loginService);
     }
 
     private static LoginRequest ValidLoginRequest(string id = "someuser", string password = "irrelevant",

@@ -1,11 +1,7 @@
-using Fenrir.Application.Login.RateLimiting;
+using Fenrir.Application.Login.Handlers.Services;
 using Fenrir.Contracts.Abstractions;
 using Fenrir.Contracts.Packets.Login;
-using Fenrir.Data.Accounts;
-using Fenrir.Data.Characters;
-using Fenrir.Data.Security;
 using Fenrir.Network.Sessions;
-using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Login.Handlers;
 
@@ -14,123 +10,40 @@ namespace Fenrir.Application.Login.Handlers;
 ///     auth run in that order so an over-budget/blocked/incompatible/banned-PC attempt never reaches Argon2id/SQL
 ///     account lookup.
 /// </summary>
-public sealed class LoginHandler(
-    IAccountRepository accounts,
-    IAccountPinRepository pins,
-    ICharacterRepository characters,
-    LoginIpRateLimiter ipRateLimiter,
-    ApplicationFirewall firewall,
-    IBanRepository bans,
-    IMacRestrictionRepository macRestrictions,
-    IOptions<LoginServerOptions> options,
-    SessionRegistry registry) : IAsyncPacketHandler<LoginRequest>
+public sealed class LoginHandler(ILoginService loginService) : IAsyncPacketHandler<LoginRequest>
 {
-    // Legacy tResult codes actually producible by Fenrir's flows (S04_MyWork02.cpp W_LOGIN_SEND / S08_MyDB Login):
-    private const int ResultIpBlocked = 2; // MyDB::CheckGMIP/CheckBanIP (S04_MyWork02.cpp:195-215)
-    private const int ResultVersionMismatch = 4; // tVersion != mServerVersion
-    private const int ResultUnknownAccount = 6; // mDB.Login: account not found
-    private const int ResultWrongPassword = 7; // mDB.Login: password mismatch
-    private const int ResultBlocked = 9; // mDB.Login: uBlockInfo >= today (ban); Fenrir lockout maps here too
-    private const int ResultCustomMessage = 10000; // mDB.Login: macinfo mac_limit < 1 ("Your PC has been banned.")
     private const int ResultSuccess = 0;
 
-    private const string MacBannedMessage = "Your PC has been banned.";
-
-    /// <summary>
-    ///     Fixed reference hash so the "account not found" path pays the same Argon2id cost as a real verify
-    ///     (timing-attack defense).
-    /// </summary>
-    private static readonly (byte[] Hash, byte[] Salt) DummyCredential =
-        PasswordHasher.Hash("dummy-unused-reference-password");
-
-    public async ValueTask HandleAsync(LoginRequest packet, IPacketSession session, CancellationToken cancellationToken)
+    public async ValueTask HandleAsync(LoginRequest packet, IPacketSession session,
+        CancellationToken cancellationToken)
     {
         var loginSession = (LoginClientSession)session;
 
-        // Silent drop, no reply/abort: a legitimate NAT-shared client that burst its IP budget just retries later.
-        if (!ipRateLimiter.TryConsume(loginSession.RemoteEndPoint))
-            return;
+        var result = await loginService.LoginAsync(loginSession.SessionId, loginSession.RemoteEndPoint, packet,
+            cancellationToken);
 
-        // Checked ahead of Argon2id/SQL (unlike legacy, which only ran this after a successful mDB.Login): an
-        // already-known-bad IP shouldn't get a free password-guessing attempt against any account.
-        if (!await firewall.IsAllowedAsync(loginSession.RemoteEndPoint, cancellationToken))
+        switch (result.Outcome)
         {
-            LoginTrain.SendFailure(session, ResultIpBlocked, packet.Id);
-            return;
+            case LoginOutcome.RateLimited:
+                // Silent drop, no reply/abort: a legitimate NAT-shared client that burst its IP budget just retries later.
+                return;
+            case LoginOutcome.Failure:
+                // Re-arms VersionOk so the client can retry on this same connection without a reconnect.
+                if (result.ReArmVersionOk)
+                    loginSession.MarkVersionOk();
+                LoginTrain.SendFailure(session, result.ResultCode, packet.Id, result.ResultString);
+                return;
+            default:
+                loginSession.MarkAuthenticated(result.AccountId);
+                if (result.RequirePin)
+                    loginSession.MarkPinRequired();
+
+                var secondLoginSort = result.RequirePin ? 1 : 0;
+                LoginTrain.Send(session,
+                    LoginTrain.BuildLoginRecv(ResultSuccess, "MG" + result.AccountId, secondLoginSort,
+                        result.PinMask),
+                    LoginTrain.BuildAvatarSlots(result.Characters));
+                return;
         }
-
-        if (packet.Version != options.Value.ExpectedClientVersion)
-        {
-            LoginTrain.SendFailure(session, ResultVersionMismatch, packet.Id);
-            return;
-        }
-
-        var macAddress = MacAddressFormatter.Format(packet.Adapter.PhysicalAddress, packet.Adapter.PhysicalAddressLength);
-        if (macAddress.Length > 0 &&
-            await macRestrictions.IsBannedAsync(macAddress, packet.Adapter.AdapterName, cancellationToken))
-        {
-            LoginTrain.SendFailure(session, ResultCustomMessage, packet.Id, MacBannedMessage);
-            return;
-        }
-
-        var account = await accounts.AuthenticateAsync(packet.Id, cancellationToken);
-        var result = await AuthenticateConstantTimeAsync(account, packet.Password, cancellationToken);
-
-        if (result != ResultSuccess)
-        {
-            // Re-arms VersionOk so the client can retry on this same connection without a reconnect.
-            loginSession.MarkVersionOk();
-            LoginTrain.SendFailure(session, result, packet.Id);
-            return;
-        }
-
-        var accountId = account!.AccountId;
-
-        // "****" (PIN exists) vs "" (must create) is what the legacy client keys the op13/op15 choice on.
-        var storedPin = await pins.GetAsync(accountId, cancellationToken);
-        var requirePin = options.Value.RequireSecondPassword;
-        var secondLoginSort = requirePin ? 1 : 0;
-        var pinMask = storedPin is null ? "" : LoginTrain.ExistingPinMask;
-
-        loginSession.MarkAuthenticated(accountId);
-        if (requirePin)
-            loginSession.MarkPinRequired();
-
-        // Evicts any previous login session for this account (legacy playuser-result-4 local kick), then proceeds.
-        registry.AssociateAccount(loginSession.SessionId, accountId);
-
-        var chars = await characters.GetByAccountAsync(accountId, cancellationToken);
-        LoginTrain.Send(session,
-            LoginTrain.BuildLoginRecv(ResultSuccess, "MG" + accountId, secondLoginSort, pinMask),
-            LoginTrain.BuildAvatarSlots(chars));
-    }
-
-    /// <summary>
-    ///     Runs Argon2id verify on every branch so wall-clock time doesn't leak which failure occurred; only the returned
-    ///     code differs.
-    /// </summary>
-    private async ValueTask<int> AuthenticateConstantTimeAsync(AuthenticateAccountDto? account, string password,
-        CancellationToken ct)
-    {
-        if (account is null)
-        {
-            _ = PasswordHasher.Verify(password, DummyCredential.Hash, DummyCredential.Salt);
-            return ResultUnknownAccount;
-        }
-
-        // Always awaited (not short-circuited behind account.IsBanned) so a plain, flag-only ban and a
-        // ban-log-only ban (admin.Bans, never ported into auth.Accounts.IsBanned) cost the same wall-clock time.
-        var loggedBan = await bans.IsActiveForAccountAsync(account.AccountId, ct);
-        if (account.IsBanned || loggedBan || account.LockoutUntilUtc > DateTime.UtcNow)
-        {
-            // Verify still runs (outcome is fixed) so timing doesn't reveal banned/locked vs. other outcomes.
-            _ = PasswordHasher.Verify(password, account.PasswordHash, account.PasswordSalt);
-            return ResultBlocked;
-        }
-
-        var passwordOk = PasswordHasher.Verify(password, account.PasswordHash, account.PasswordSalt);
-
-        await accounts.RecordLoginAttemptAsync(account.AccountId, passwordOk, ct);
-        return passwordOk ? ResultSuccess : ResultWrongPassword;
     }
 }

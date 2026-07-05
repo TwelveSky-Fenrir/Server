@@ -1,4 +1,5 @@
 using Fenrir.Application.Login.Handlers;
+using Fenrir.Application.Login.Handlers.Services;
 using Fenrir.Application.Login.Tests.TestSupport;
 using Fenrir.Contracts.Packets.Login;
 using Fenrir.Network.Sessions;
@@ -13,7 +14,7 @@ public class ClGiftInfoSendHandlerTests
     [Fact]
     public async Task HandleAsync_NoPendingGifts_RepliesResultZeroWithEmptyMatrix()
     {
-        var handler = new GiftListHandler(FakeGiftRepository.Empty());
+        var handler = new GiftListHandler(new GiftListService(FakeGiftRepository.Empty()));
         var (session, pipe) = CreateSessionInCharSelect();
 
         await handler.HandleAsync(new GiftListRequest(), session, CancellationToken.None);
@@ -25,7 +26,7 @@ public class ClGiftInfoSendHandlerTests
     [Fact]
     public async Task HandleAsync_PendingGifts_FillsOldestFirstWithProductIdAndZeroSecondColumn()
     {
-        var handler = new GiftListHandler(FakeGiftRepository.WithPending((1, 1211), (2, 99700)));
+        var handler = new GiftListHandler(new GiftListService(FakeGiftRepository.WithPending((1, 1211), (2, 99700))));
         var (session, pipe) = CreateSessionInCharSelect();
 
         await handler.HandleAsync(new GiftListRequest(), session, CancellationToken.None);
@@ -40,7 +41,7 @@ public class ClGiftInfoSendHandlerTests
     public async Task HandleAsync_MoreThanTenPendingGifts_OnlyShowsFirstTen()
     {
         var pending = Enumerable.Range(1, 15).Select(i => (i, (int?)i)).ToArray();
-        var handler = new GiftListHandler(FakeGiftRepository.WithPending(pending));
+        var handler = new GiftListHandler(new GiftListService(FakeGiftRepository.WithPending(pending)));
         var (session, pipe) = CreateSessionInCharSelect();
 
         await handler.HandleAsync(new GiftListRequest(), session, CancellationToken.None);

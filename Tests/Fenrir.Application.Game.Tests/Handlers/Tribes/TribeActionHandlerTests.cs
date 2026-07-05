@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using System.Collections.Frozen;
 using Fenrir.Application.Game.Handlers.Tribes;
+using Fenrir.Application.Game.Handlers.Tribes.Services;
 using Fenrir.Application.Game.Movement;
 using Fenrir.Application.Game.Tests.GameData;
 using Fenrir.Application.Game.Tests.TestSupport;
@@ -65,8 +66,9 @@ public class TribeActionHandlerTests
         var levels = new Dictionary<short, LevelRowDto> { [145] = WorldDataTestRows.Level(145) }
             .ToFrozenDictionary();
 
-        return new TribeActionHandler(registry, new FakeTribeRepository(), new FakeCharacterRepository(),
-            ZoneTestKit.EmptyWorldData(levelsByLevel: levels), NullLogger<TribeActionHandler>.Instance);
+        var service = new TribeActionService(registry, new FakeTribeRepository(), new FakeCharacterRepository(),
+            ZoneTestKit.EmptyWorldData(levelsByLevel: levels), NullLogger<TribeActionService>.Instance);
+        return new TribeActionHandler(service);
     }
 
     private static TribeActionRequest RebirthRequest()

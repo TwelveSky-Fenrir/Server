@@ -1,4 +1,4 @@
-using Fenrir.Application.Game.World;
+using Fenrir.Application.Game.Handlers.Tribes.Services;
 using Fenrir.Contracts.Abstractions;
 using Fenrir.Contracts.Packets.Zone;
 
@@ -9,23 +9,16 @@ namespace Fenrir.Application.Game.Handlers.Tribes;
 ///     <see cref="TribePopulationRequest.ZoneNumber" /> and always replies with 4 packets, one per tribe
 ///     (0-3), each carrying that tribe's live connected-player count across every zone of this process.
 /// </summary>
-public sealed class TribePopulationHandler(ZoneRegistry zones) : IInlinePacketHandler<TribePopulationRequest>
+public sealed class TribePopulationHandler(ITribePopulationService populationService)
+    : IInlinePacketHandler<TribePopulationRequest>
 {
     private const int BaseZoneNumber = 348;
-    private const int TribeCount = 4;
 
     public void Handle(in TribePopulationRequest packet, IPacketSession session)
     {
-        for (byte tribe = 0; tribe < TribeCount; tribe++)
-        {
-            var connectedUsers = 0;
-            foreach (var zone in zones.Zones)
-            foreach (var player in zone.Players)
-                if (player.Tribe == tribe)
-                    connectedUsers++;
-
+        var counts = populationService.GetConnectedUserCounts();
+        for (byte tribe = 0; tribe < counts.Count; tribe++)
             session.Send(new TribePopulationResponse
-                { ZoneNumber = BaseZoneNumber + tribe, ConnectedUser = connectedUsers });
-        }
+                { ZoneNumber = BaseZoneNumber + tribe, ConnectedUser = counts[tribe] });
     }
 }

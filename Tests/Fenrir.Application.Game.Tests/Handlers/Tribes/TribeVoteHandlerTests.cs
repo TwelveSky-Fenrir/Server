@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using Fenrir.Application.Game.Handlers.Tribes;
+using Fenrir.Application.Game.Handlers.Tribes.Services;
 using Fenrir.Application.Game.Movement;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Application.Game.Tests.World.WorldState;
@@ -63,7 +64,7 @@ public class TribeVoteHandlerTests
     public async Task OutOfBoundsSlot_Aborts(int sort, int value)
     {
         var (session, _, _, election, _) = Setup();
-        var handler = new TribeVoteHandler(election);
+        var handler = new TribeVoteHandler(new TribeVoteService(election));
 
         await handler.HandleAsync(new TribeVoteRequest { Sort = sort, Value = value }, session,
             CancellationToken.None);
@@ -78,7 +79,7 @@ public class TribeVoteHandlerTests
     public async Task UnsupportedSort_Aborts(int sort)
     {
         var (session, _, _, election, _) = Setup();
-        var handler = new TribeVoteHandler(election);
+        var handler = new TribeVoteHandler(new TribeVoteService(election));
 
         await handler.HandleAsync(new TribeVoteRequest { Sort = sort, Value = 0 }, session, CancellationToken.None);
 
@@ -89,7 +90,7 @@ public class TribeVoteHandlerTests
     public async Task Candidacy_WithNoElectionWindowOpen_Aborts()
     {
         var (session, _, _, election, _) = Setup();
-        var handler = new TribeVoteHandler(election);
+        var handler = new TribeVoteHandler(new TribeVoteService(election));
 
         await handler.HandleAsync(new TribeVoteRequest { Sort = 1, Value = 0 }, session, CancellationToken.None);
 
@@ -101,7 +102,7 @@ public class TribeVoteHandlerTests
     {
         var (session, pipe, _, election, repository) = Setup();
         await election.OpenCandidacyWindowAsync(CancellationToken.None);
-        var handler = new TribeVoteHandler(election);
+        var handler = new TribeVoteHandler(new TribeVoteService(election));
 
         await handler.HandleAsync(new TribeVoteRequest { Sort = 1, Value = 3 }, session, CancellationToken.None);
 
@@ -122,7 +123,7 @@ public class TribeVoteHandlerTests
     {
         var (session, _, _, election, _) = Setup(level: 100);
         await election.OpenCandidacyWindowAsync(CancellationToken.None);
-        var handler = new TribeVoteHandler(election);
+        var handler = new TribeVoteHandler(new TribeVoteService(election));
 
         await handler.HandleAsync(new TribeVoteRequest { Sort = 1, Value = 0 }, session, CancellationToken.None);
 
@@ -133,7 +134,7 @@ public class TribeVoteHandlerTests
     public async Task Vote_WithNoElectionWindowOpen_Aborts()
     {
         var (session, _, _, election, _) = Setup();
-        var handler = new TribeVoteHandler(election);
+        var handler = new TribeVoteHandler(new TribeVoteService(election));
 
         await handler.HandleAsync(new TribeVoteRequest { Sort = 3, Value = 0 }, session, CancellationToken.None);
 
@@ -146,7 +147,7 @@ public class TribeVoteHandlerTests
         var (session, pipe, _, election, repository) = Setup(tribe: 2);
         repository.VotesByTribe[2] = [new TribeVoteDto(2, 5, 999, 150, 1200, 0, DateTime.UtcNow)];
         election.OpenVotingWindow();
-        var handler = new TribeVoteHandler(election);
+        var handler = new TribeVoteHandler(new TribeVoteService(election));
 
         await handler.HandleAsync(new TribeVoteRequest { Sort = 3, Value = 5 }, session, CancellationToken.None);
 
@@ -163,7 +164,7 @@ public class TribeVoteHandlerTests
     {
         var (session, _, _, election, _) = Setup(tribe: 2);
         election.OpenVotingWindow();
-        var handler = new TribeVoteHandler(election);
+        var handler = new TribeVoteHandler(new TribeVoteService(election));
 
         await handler.HandleAsync(new TribeVoteRequest { Sort = 3, Value = 5 }, session, CancellationToken.None);
 
@@ -176,7 +177,7 @@ public class TribeVoteHandlerTests
         var (session, pipe, _, election, repository) = Setup(tribe: 2);
         repository.VotesByTribe[2] = [new TribeVoteDto(2, 5, 999, 150, 1200, 0, DateTime.UtcNow)];
         election.OpenVotingWindow();
-        var handler = new TribeVoteHandler(election);
+        var handler = new TribeVoteHandler(new TribeVoteService(election));
         await handler.HandleAsync(new TribeVoteRequest { Sort = 3, Value = 5 }, session, CancellationToken.None);
         ZoneTestKit.DrainOutbound(pipe);
 

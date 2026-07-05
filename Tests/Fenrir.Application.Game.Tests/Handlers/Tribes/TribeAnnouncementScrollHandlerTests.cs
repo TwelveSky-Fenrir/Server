@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using System.Text;
 using Fenrir.Application.Game.Handlers.Tribes;
+using Fenrir.Application.Game.Handlers.Tribes.Services;
 using Fenrir.Application.Game.Movement;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Application.Game.World;
@@ -53,7 +54,7 @@ public class TribeAnnouncementScrollHandlerTests
         registry.TryGetPlayer(10, out var sender);
         sender!.TribeNotifyScrollCount = 3;
 
-        var handler = new TribeAnnouncementScrollHandler(registry);
+        var handler = new TribeAnnouncementScrollHandler(new TribeAnnouncementScrollService(registry));
         handler.Handle(new TribeAnnouncementScrollRequest { Content = "Scroll used!" }, senderSession);
 
         var statFrameSize = FrameWriter.FrameSizeOf<AvatarStatUpdateResponse>();
@@ -100,7 +101,7 @@ public class TribeAnnouncementScrollHandlerTests
         registry.TryGetPlayer(10, out var sender);
         sender!.TribeNotifyScrollCount = 0;
 
-        var handler = new TribeAnnouncementScrollHandler(registry);
+        var handler = new TribeAnnouncementScrollHandler(new TribeAnnouncementScrollService(registry));
         handler.Handle(new TribeAnnouncementScrollRequest { Content = "No charges" }, senderSession);
 
         Assert.Equal(DisconnectReason.Faulted, senderSession.DisconnectReason);
@@ -119,7 +120,7 @@ public class TribeAnnouncementScrollHandlerTests
         registry.TryGetPlayer(10, out var sender);
         sender!.TribeNotifyScrollCount = 5;
 
-        var handler = new TribeAnnouncementScrollHandler(registry);
+        var handler = new TribeAnnouncementScrollHandler(new TribeAnnouncementScrollService(registry));
         handler.Handle(new TribeAnnouncementScrollRequest { Content = "" }, senderSession);
 
         Assert.Equal(DisconnectReason.Faulted, senderSession.DisconnectReason);

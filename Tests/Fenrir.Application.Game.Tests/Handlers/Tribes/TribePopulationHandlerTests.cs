@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using Fenrir.Application.Game.Handlers.Tribes;
+using Fenrir.Application.Game.Handlers.Tribes.Services;
 using Fenrir.Application.Game.Movement;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Application.Game.World;
@@ -41,7 +42,7 @@ public class TribePopulationHandlerTests
         registry[2].Tick(TimeSpan.FromMilliseconds(50));
 
         var (querySession, pipe) = ZoneTestKit.CreateSession(4);
-        var handler = new TribePopulationHandler(registry);
+        var handler = new TribePopulationHandler(new TribePopulationService(registry));
 
         handler.Handle(new TribePopulationRequest { ZoneNumber = 999 }, querySession);
 
@@ -62,7 +63,7 @@ public class TribePopulationHandlerTests
     {
         var registry = CreateRegistry(1);
         var (session, pipe) = ZoneTestKit.CreateSession(1);
-        var handler = new TribePopulationHandler(registry);
+        var handler = new TribePopulationHandler(new TribePopulationService(registry));
 
         handler.Handle(new TribePopulationRequest { ZoneNumber = 1 }, session);
 

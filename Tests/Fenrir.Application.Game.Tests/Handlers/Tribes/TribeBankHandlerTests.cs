@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using Fenrir.Application.Game.Handlers.Tribes;
+using Fenrir.Application.Game.Handlers.Tribes.Services;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Application.Game.World;
 using Fenrir.Contracts.Packets.Zone;
@@ -39,7 +40,8 @@ public class TribeBankHandlerTests
     {
         var zone = ZoneTestKit.CreateZone(1);
         var (session, _, _) = Setup(zone, 1, 0);
-        var handler = new TribeBankHandler(new FakeTribeRepository(), NullLogger<TribeBankHandler>.Instance);
+        var handler =
+            new TribeBankHandler(new TribeBankService(new FakeTribeRepository(), NullLogger<TribeBankService>.Instance));
 
         await handler.HandleAsync(new TribeBankRequest { Sort = 1, Value = 0 }, session, CancellationToken.None);
 
@@ -54,7 +56,7 @@ public class TribeBankHandlerTests
         var repository = new FakeTribeRepository();
         repository.Bank[(2, 5)] = 7_000;
         repository.Bank[(2, 49)] = 12;
-        var handler = new TribeBankHandler(repository, NullLogger<TribeBankHandler>.Instance);
+        var handler = new TribeBankHandler(new TribeBankService(repository, NullLogger<TribeBankService>.Instance));
 
         await handler.HandleAsync(new TribeBankRequest { Sort = 1, Value = 0 }, session, CancellationToken.None);
 
@@ -80,7 +82,7 @@ public class TribeBankHandlerTests
         [
             new TribeSubMasterDto(1, 0, 100), new TribeSubMasterDto(1, 1, 101), new TribeSubMasterDto(1, 2, 102)
         ]);
-        var handler = new TribeBankHandler(repository, NullLogger<TribeBankHandler>.Instance);
+        var handler = new TribeBankHandler(new TribeBankService(repository, NullLogger<TribeBankService>.Instance));
 
         await handler.HandleAsync(new TribeBankRequest { Sort = 2, Value = 0 }, session, CancellationToken.None);
 
@@ -95,7 +97,7 @@ public class TribeBankHandlerTests
         var (session, _, _) = Setup(zone, 1, 1);
         var repository = new FakeTribeRepository();
         repository.SubMasters.Add(new TribeSubMasterDto(1, 0, 100));
-        var handler = new TribeBankHandler(repository, NullLogger<TribeBankHandler>.Instance);
+        var handler = new TribeBankHandler(new TribeBankService(repository, NullLogger<TribeBankService>.Instance));
 
         await handler.HandleAsync(new TribeBankRequest { Sort = 2, Value = 0 }, session, CancellationToken.None);
 
@@ -114,7 +116,7 @@ public class TribeBankHandlerTests
             new TribeSubMasterDto(1, 0, 100), new TribeSubMasterDto(1, 1, 101), new TribeSubMasterDto(1, 2, 102)
         ]);
         repository.WithdrawException = new InvalidOperationException("insufficient tribe bank balance");
-        var handler = new TribeBankHandler(repository, NullLogger<TribeBankHandler>.Instance);
+        var handler = new TribeBankHandler(new TribeBankService(repository, NullLogger<TribeBankService>.Instance));
 
         await handler.HandleAsync(new TribeBankRequest { Sort = 2, Value = 4 }, session, CancellationToken.None);
 
@@ -133,7 +135,7 @@ public class TribeBankHandlerTests
         ]);
         repository.Bank[(1, 4)] = 50_000;
         repository.MoneyAfterWithdraw = 999_999;
-        var handler = new TribeBankHandler(repository, NullLogger<TribeBankHandler>.Instance);
+        var handler = new TribeBankHandler(new TribeBankService(repository, NullLogger<TribeBankService>.Instance));
 
         await handler.HandleAsync(new TribeBankRequest { Sort = 2, Value = 4 }, session, CancellationToken.None);
 
@@ -153,7 +155,8 @@ public class TribeBankHandlerTests
     {
         var zone = ZoneTestKit.CreateZone(1);
         var (session, _, _) = Setup(zone, 1, 1);
-        var handler = new TribeBankHandler(new FakeTribeRepository(), NullLogger<TribeBankHandler>.Instance);
+        var handler =
+            new TribeBankHandler(new TribeBankService(new FakeTribeRepository(), NullLogger<TribeBankService>.Instance));
 
         await handler.HandleAsync(new TribeBankRequest { Sort = 4, Value = 0 }, session, CancellationToken.None);
 
@@ -166,7 +169,7 @@ public class TribeBankHandlerTests
         var zone = ZoneTestKit.CreateZone(1);
         var (session, _, _) = Setup(zone, 1, 0);
         var repository = new FakeTribeRepository();
-        var handler = new TribeBankHandler(repository, NullLogger<TribeBankHandler>.Instance);
+        var handler = new TribeBankHandler(new TribeBankService(repository, NullLogger<TribeBankService>.Instance));
 
         await handler.HandleAsync(new TribeBankRequest { Sort = 3, Value = 50 }, session, CancellationToken.None);
 
@@ -183,7 +186,7 @@ public class TribeBankHandlerTests
         var (session, pipe, _) = Setup(zone, 1, 0);
         var repository = new FakeTribeRepository { MoneyAfterDeposit = 0, DepositAmount = 5_000 };
         repository.Bank[(1, 4)] = 0;
-        var handler = new TribeBankHandler(repository, NullLogger<TribeBankHandler>.Instance);
+        var handler = new TribeBankHandler(new TribeBankService(repository, NullLogger<TribeBankService>.Instance));
 
         await handler.HandleAsync(new TribeBankRequest { Sort = 3, Value = 4 }, session, CancellationToken.None);
 
@@ -202,7 +205,7 @@ public class TribeBankHandlerTests
         {
             DepositException = new InvalidOperationException("character has no money to deposit")
         };
-        var handler = new TribeBankHandler(repository, NullLogger<TribeBankHandler>.Instance);
+        var handler = new TribeBankHandler(new TribeBankService(repository, NullLogger<TribeBankService>.Instance));
 
         await handler.HandleAsync(new TribeBankRequest { Sort = 3, Value = 4 }, session, CancellationToken.None);
 
@@ -216,7 +219,7 @@ public class TribeBankHandlerTests
         var (session, pipe, _) = Setup(zone, 1, 0);
         var repository = new FakeTribeRepository { MoneyAfterDeposit = 0, DepositAmount = 30_000 };
         repository.Bank[(1, 9)] = 20_000;
-        var handler = new TribeBankHandler(repository, NullLogger<TribeBankHandler>.Instance);
+        var handler = new TribeBankHandler(new TribeBankService(repository, NullLogger<TribeBankService>.Instance));
 
         await handler.HandleAsync(new TribeBankRequest { Sort = 3, Value = 9 }, session, CancellationToken.None);
 

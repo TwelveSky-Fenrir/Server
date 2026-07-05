@@ -1,4 +1,4 @@
-using Fenrir.Application.Game.Buffs;
+using Fenrir.Application.Game.Handlers.BuffsMountsCosmetics.Services;
 using Fenrir.Application.Game.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Serialization.Packets.Zone;
@@ -18,14 +18,8 @@ namespace Fenrir.Application.Game.Handlers;
 ///     gate against. <c>MyFactor.cpp</c>'s per-<c>aRankBuffType</c> stat bonuses (7 separate formula sites) are
 ///     not modeled -- only the wire mechanic, the state mirror, and the HP/MP heal are implemented.
 /// </remarks>
-public sealed class RankBuffHandler : IInlinePacketHandler<RankBuffRequest>
+public sealed class RankBuffHandler(IRankBuffService service) : IInlinePacketHandler<RankBuffRequest>
 {
-    /// <summary>
-    ///     ReturnSymbolNumNoMon under a no-alliance, no-capture-event default world state -- see RankBuffResolver's
-    ///     remarks.
-    /// </summary>
-    private const int DefaultStoneCount = 1;
-
     public void Handle(in RankBuffRequest packet, IPacketSession session)
     {
         var zoneSession = (ZoneClientSession)session;
@@ -36,19 +30,13 @@ public sealed class RankBuffHandler : IInlinePacketHandler<RankBuffRequest>
         if (!zone.TryGetPlayer(characterId, out var state) || state is null)
             return;
 
-        var resolved = RankBuffResolver.Resolve(packet.Sort, DefaultStoneCount);
-        if (!resolved.Succeeded)
+        var result = service.Apply(zone, state, characterId, packet.Sort);
+        if (!result.Succeeded)
         {
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }
 
-        var maxLife = state.Stats?.MaxLife ?? state.MaxLife;
-        var maxMana = state.Stats?.MaxMana ?? state.MaxMana;
-
         session.Send(new AvatarStatUpdateResponse { Sort = 68, Value = packet.Sort, Value2 = 0 });
-
-        zone.PostAvatarBuffCommand(new AvatarBuffZoneCommand(characterId, RankBuffType: packet.Sort, Life: maxLife,
-            Mana: maxMana));
     }
 }

@@ -1,3 +1,4 @@
+using Fenrir.Application.Game.Handlers.BuffsMountsCosmetics.Services;
 using Fenrir.Application.Game.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Serialization.Packets.Zone;
@@ -9,7 +10,8 @@ namespace Fenrir.Application.Game.Handlers;
 ///     CZ_COSTUME_STATE2_SEND (op139). Sort must be strictly 0 or 1, else Quit(). Unlike op90, the AOI
 ///     broadcast here is a full avatar-action rebroadcast, not an AvatarStateFlag pair.
 /// </summary>
-public sealed class CostumeVisibilityHandler : IInlinePacketHandler<CostumeVisibilityRequest>
+public sealed class CostumeVisibilityHandler(ICostumeVisibilityService service)
+    : IInlinePacketHandler<CostumeVisibilityRequest>
 {
     public void Handle(in CostumeVisibilityRequest packet, IPacketSession session)
     {
@@ -29,7 +31,6 @@ public sealed class CostumeVisibilityHandler : IInlinePacketHandler<CostumeVisib
 
         session.Send(new CostumeVisibilityResponse { Sort = packet.Sort, Sort2 = 0, Sort3 = 0 });
 
-        zone.PostCostumeCommand(new CostumeZoneCommand(characterId, CostumeState: packet.Sort,
-            FullActionRebroadcast: true));
+        service.Apply(zone, characterId, packet.Sort);
     }
 }

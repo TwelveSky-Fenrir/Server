@@ -1,4 +1,4 @@
-using Fenrir.Application.Game.Mounts;
+using Fenrir.Application.Game.Handlers.BuffsMountsCosmetics.Services;
 using Fenrir.Application.Game.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Serialization.Packets.Zone;
@@ -8,10 +8,10 @@ namespace Fenrir.Application.Game.Handlers;
 
 /// <summary>
 ///     CZ_ANIMAL_STATE_SEND (op87). Only Sort 1-4 (Select/Deselect/Mount/Dismount) are wired -- see
-///     <see cref="MountStateResolver" />'s remarks for why Sort 5+ (Delete Mount, attribute training, tier
+///     <see cref="Mounts.MountStateResolver" />'s remarks for why Sort 5+ (Delete Mount, attribute training, tier
 ///     upgrade) is an out-of-scope disconnect rather than the legacy's own varied per-case behavior.
 /// </summary>
-public sealed class MountStateHandler : IInlinePacketHandler<MountStateRequest>
+public sealed class MountStateHandler(IMountStateService service) : IInlinePacketHandler<MountStateRequest>
 {
     public void Handle(in MountStateRequest packet, IPacketSession session)
     {
@@ -23,46 +23,29 @@ public sealed class MountStateHandler : IInlinePacketHandler<MountStateRequest>
         if (!zone.TryGetPlayer(characterId, out var state) || state is null)
             return;
 
-        var context = new MountStateResolver.Context(state.AnimalIndex, state.AnimalTime, state.ActionSort,
-            state.MountGarage);
-        var result = MountStateResolver.Resolve(packet.Sort, packet.Value, in context);
+        var result = service.Apply(zone, state, characterId, packet.Sort, packet.Value);
 
-        switch (result.Kind)
+        switch (result.Outcome)
         {
-            case MountStateResolver.ResultKind.NoReply:
+            case MountStateOutcome.NoReply:
                 return;
 
-            case MountStateResolver.ResultKind.Disconnect:
+            case MountStateOutcome.Disconnect:
                 zoneSession.Abort(DisconnectReason.Faulted);
                 return;
 
-            case MountStateResolver.ResultKind.Select:
-            case MountStateResolver.ResultKind.Deselect:
+            case MountStateOutcome.Select:
+            case MountStateOutcome.Deselect:
                 session.Send(new MountStateResponse { Sort = packet.Sort, Value = packet.Value });
-                zone.PostMountCommand(new MountZoneCommand(characterId, result.NewAnimalIndex));
                 return;
 
-            case MountStateResolver.ResultKind.Mount:
-            {
-                var maxLife = state.Stats?.MaxLife ?? state.MaxLife;
-                var maxMana = state.Stats?.MaxMana ?? state.MaxMana;
+            case MountStateOutcome.Mount:
                 session.Send(new MountStateResponse { Sort = packet.Sort, Value = packet.Value });
-                zone.PostMountCommand(new MountZoneCommand(characterId, result.NewAnimalIndex,
-                    result.NewAnimalNumber, 0, maxLife, maxMana,
-                    Broadcast: MountBroadcastKind.Mount));
                 return;
-            }
 
-            case MountStateResolver.ResultKind.Dismount:
-            {
-                var maxLife = state.Stats?.MaxLife ?? state.MaxLife;
-                var maxMana = state.Stats?.MaxMana ?? state.MaxMana;
+            case MountStateOutcome.Dismount:
                 session.Send(new MountStateResponse { Sort = packet.Sort, Value = 0 });
-                zone.PostMountCommand(new MountZoneCommand(characterId, result.NewAnimalIndex,
-                    0, 0, maxLife, maxMana,
-                    Broadcast: MountBroadcastKind.Dismount));
                 return;
-            }
         }
     }
 }

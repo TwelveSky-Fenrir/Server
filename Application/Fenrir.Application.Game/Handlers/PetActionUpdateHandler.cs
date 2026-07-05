@@ -1,3 +1,4 @@
+using Fenrir.Application.Game.Handlers.BuffsMountsCosmetics.Services;
 using Fenrir.Application.Game.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Serialization.Packets.Zone;
@@ -6,7 +7,8 @@ using Fenrir.Network.Sessions;
 namespace Fenrir.Application.Game.Handlers;
 
 /// <summary>CZ_UPDATE_PET_ACTION_SEND (op156). No reply -- position rebroadcasts via ZC 15.</summary>
-public sealed class PetActionUpdateHandler : IInlinePacketHandler<PetActionUpdateRequest>
+public sealed class PetActionUpdateHandler(IPetActionUpdateService service)
+    : IInlinePacketHandler<PetActionUpdateRequest>
 {
     public void Handle(in PetActionUpdateRequest packet, IPacketSession session)
     {
@@ -16,6 +18,6 @@ public sealed class PetActionUpdateHandler : IInlinePacketHandler<PetActionUpdat
             return;
 
         var action = packet.Action;
-        zone.Post(ZoneCommand.PetAction(zoneSession.CharacterId!.Value, in action));
+        service.Apply(zone, zoneSession.CharacterId!.Value, in action);
     }
 }

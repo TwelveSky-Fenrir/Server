@@ -1,15 +1,10 @@
-using System.Collections.Immutable;
-using Fenrir.Application.Game.Combat;
-using Fenrir.Application.Game.GameData;
-using Fenrir.Application.Game.Inventory;
-using Fenrir.Application.Game.Progression;
+using Fenrir.Application.Game.Handlers.Progression.Services;
 using Fenrir.Application.Game.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Serialization.Packets.Shared;
 using Fenrir.Network.Serialization.Packets.Zone;
 using Fenrir.Data.Characters;
 using Fenrir.Network.Sessions;
-using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Progression;
 
@@ -24,20 +19,9 @@ namespace Fenrir.Application.Game.Handlers.Progression;
 ///     <see cref="PlayerRuntimeState.MissionKillOtherTribe" /> DOES increment now -- <c>Zone.ApplyPvpKillMissionProgress</c>,
 ///     gated by <see cref="Combat.KillCooldownTracker" /> (C05) -- so a claim is blocked only by the join-war side today.
 /// </remarks>
-public sealed class DailyMissionHandler(
-    ICharacterRepository characters,
-    WorldDataCache worldData,
-    ILogger<DailyMissionHandler> logger)
+public sealed class DailyMissionHandler(IDailyMissionService dailyMissionService)
     : IAsyncPacketHandler<DailyMissionRequest>
 {
-    /// <summary><c>LV_M1</c> -- shared with <see cref="ExperienceFormulas.RebirthDivisorLevelThreshold" />.</summary>
-    private const int MinimumClaimLevel = ExperienceFormulas.RebirthDivisorLevelThreshold;
-
-    private const int RequiredJoinWar = 1;
-    private const int RequiredKillOtherTribe = 10;
-
-    private static readonly byte[] InventoryPages = [ContainerMatrix.InventoryPage0, ContainerMatrix.InventoryPage1];
-
     public async ValueTask HandleAsync(DailyMissionRequest packet, IPacketSession session,
         CancellationToken cancellationToken)
     {
@@ -63,80 +47,26 @@ public sealed class DailyMissionHandler(
         await state.EconomyActionLock.WaitAsync(cancellationToken);
         try
         {
-            await HandleClaimAsync(packet, session, zoneSession, zone, state, characterId, cancellationToken);
+            var result = await dailyMissionService.ClaimAsync(characterId, zone, state, cancellationToken);
+
+            switch (result.Outcome)
+            {
+                case DailyMissionClaimOutcome.Aborted:
+                    zoneSession.Abort(DisconnectReason.Faulted);
+                    return;
+                case DailyMissionClaimOutcome.InventoryFull:
+                    SendResult(session, packet.Sort, 3, state);
+                    return;
+                case DailyMissionClaimOutcome.Success:
+                default:
+                    SendResult(session, packet.Sort, 0, state, result.JoinWar, result.KillOtherTribe);
+                    return;
+            }
         }
         finally
         {
             state.EconomyActionLock.Release();
         }
-    }
-
-    private async ValueTask HandleClaimAsync(DailyMissionRequest packet, IPacketSession session,
-        ZoneClientSession zoneSession, Zone zone, PlayerRuntimeState state, int characterId,
-        CancellationToken ct)
-    {
-        if (state.Level < MinimumClaimLevel || state.MissionJoinWar < RequiredJoinWar ||
-            state.MissionKillOtherTribe < RequiredKillOtherTribe)
-        {
-            zoneSession.Abort(DisconnectReason.Faulted);
-            return;
-        }
-
-        var itemId = DailyMissionRewardTable.Roll(Random.Shared.NextDouble);
-        if (!worldData.ItemsById.TryGetValue(itemId, out var itemDefinition))
-        {
-            // Can't happen against a fully-seeded catalog; mirrors legacy's mITEM.Search-NULL guard.
-            zoneSession.Abort(DisconnectReason.Faulted);
-            return;
-        }
-
-        var quantity = itemDefinition.Item.Sort == 99 ? 1 : 0;
-
-        if (!TryFindEmptySlot(state, out var container, out var slot))
-        {
-            SendResult(session, packet.Sort, 3, state);
-            return;
-        }
-
-        var projected = state.Inventory.GetContainer(container)
-            .SetItem(slot, new ItemStack(itemId, quantity, 0, 0, 0, 0, 0, 0, 0, 0, 0));
-
-        var newJoinWar = state.MissionJoinWar - RequiredJoinWar;
-        var newKillOtherTribe = state.MissionKillOtherTribe - RequiredKillOtherTribe;
-
-        await characters.ApplyDailyMissionClaimAsync(characterId, newJoinWar, newKillOtherTribe,
-            state.MissionKillMonster, state.MissionPlayTime, container, ToTvps(projected), ct);
-
-        SendResult(session, packet.Sort, 0, state, newJoinWar, newKillOtherTribe);
-
-        var containers = ImmutableArray.Create(new InventoryContainerSnapshot(container, projected));
-        if (!await zone.PostMissionCommandAndWaitAsync(
-                new MissionZoneCommand(characterId, newJoinWar, newKillOtherTribe, state.MissionKillMonster,
-                    state.MissionPlayTime, containers), ct))
-            logger.LogError(
-                "Zone {MapId} mission inbox full: dropped claim mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
-                zone.MapId, characterId);
-    }
-
-    /// <summary>First empty slot across both inventory pages, page 0 then page 1 (legacy scan order).</summary>
-    private static bool TryFindEmptySlot(PlayerRuntimeState state, out byte container, out byte slot)
-    {
-        foreach (var page in InventoryPages)
-        {
-            var occupied = state.Inventory.GetContainer(page);
-            for (var i = 0; i <= 63; i++)
-            {
-                if (occupied.ContainsKey((byte)i))
-                    continue;
-                container = page;
-                slot = (byte)i;
-                return true;
-            }
-        }
-
-        container = 0;
-        slot = 0;
-        return false;
     }
 
     private static void SendResult(IPacketSession session, int sort, int result, PlayerRuntimeState state,
@@ -154,13 +84,5 @@ public sealed class DailyMissionHandler(
                 PlayTime = state.MissionPlayTime
             }
         });
-    }
-
-    private static List<CharacterItemSlotTvp> ToTvps(ImmutableDictionary<byte, ItemStack> container)
-    {
-        var list = new List<CharacterItemSlotTvp>(container.Count);
-        foreach (var (slot, stack) in container)
-            list.Add(stack.ToTvp(slot));
-        return list;
     }
 }

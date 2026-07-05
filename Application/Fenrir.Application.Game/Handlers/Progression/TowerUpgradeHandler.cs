@@ -1,12 +1,10 @@
-using System.Collections.Immutable;
-using Fenrir.Application.Game.Inventory;
+using Fenrir.Application.Game.Handlers.Progression.Services;
 using Fenrir.Application.Game.Progression;
 using Fenrir.Application.Game.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Serialization.Packets.Zone;
 using Fenrir.Data.Characters;
 using Fenrir.Network.Sessions;
-using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Progression;
 
@@ -23,14 +21,9 @@ namespace Fenrir.Application.Game.Handlers.Progression;
 ///         tower's own zone tick -- see <see cref="TowerGuardianSystem" />.
 ///     </para>
 /// </summary>
-public sealed class TowerUpgradeHandler(
-    TowerWarState towerWar,
-    ICharacterRepository characters,
-    ILogger<TowerUpgradeHandler> logger) : IAsyncPacketHandler<TowerUpgradeRequest>
+public sealed class TowerUpgradeHandler(ITowerUpgradeService towerUpgradeService)
+    : IAsyncPacketHandler<TowerUpgradeRequest>
 {
-    private const int HerbItemId = 666;
-    private const int BarItemId = 1073;
-
     public async ValueTask HandleAsync(TowerUpgradeRequest packet, IPacketSession session,
         CancellationToken cancellationToken)
     {
@@ -45,106 +38,22 @@ public sealed class TowerUpgradeHandler(
         await state.EconomyActionLock.WaitAsync(cancellationToken);
         try
         {
-            await ResolveAndApplyAsync(packet, session, zoneSession, zone, state, characterId, cancellationToken);
+            var result = await towerUpgradeService.UpgradeAsync(characterId, zone, state, packet, cancellationToken);
+
+            if (result.Outcome != TowerUpgradeOutcome.Success)
+            {
+                zoneSession.Abort(DisconnectReason.Faulted);
+                return;
+            }
+
+            session.Send(new TowerUpgradeResponse
+            {
+                Result = 0, Page = [result.PackedPage, 0], Index = [result.PackedIndex, 0], Count = 1
+            });
         }
         finally
         {
             state.EconomyActionLock.Release();
         }
-    }
-
-    private async ValueTask ResolveAndApplyAsync(TowerUpgradeRequest packet, IPacketSession session,
-        ZoneClientSession zoneSession, Zone zone, PlayerRuntimeState state, int characterId,
-        CancellationToken cancellationToken)
-    {
-        var towerIndex = TowerZoneIndexTable.GetTowerIndex(zone.MapId);
-        var valid = towerIndex is >= 0 and < TowerWarState.TowerCount && towerWar.IsValid(towerIndex);
-        var packedState = towerIndex is >= 0 and < TowerWarState.TowerCount ? towerWar.GetPackedState(towerIndex) : 0;
-
-        var resolved = TowerUpgradeResolver.Validate(state.TribeRole, packet.Index, zone.MapId, state.Tribe,
-            packet.Value01, packet.Value02, packedState, valid);
-
-        if (resolved.Outcome != TowerUpgradeResolver.Outcome.Success)
-        {
-            zoneSession.Abort(DisconnectReason.Faulted);
-            return;
-        }
-
-        var page0 = state.Inventory.GetContainer(ContainerMatrix.InventoryPage0);
-        var page1 = state.Inventory.GetContainer(ContainerMatrix.InventoryPage1);
-
-        if (!TowerUpgradeResolver.TryFindMaterial(page0, page1, HerbItemId, out var herbPage, out var herbSlot) ||
-            !TowerUpgradeResolver.TryFindMaterial(page0, page1, BarItemId, out var barPage, out var barSlot))
-        {
-            zoneSession.Abort(DisconnectReason.Faulted);
-            return;
-        }
-
-        var projectedHerb = ConsumeOne(herbPage == ContainerMatrix.InventoryPage0 ? page0 : page1, herbSlot);
-        ImmutableDictionary<byte, ItemStack> projectedBar;
-
-        if (herbPage == barPage)
-        {
-            projectedBar = ConsumeOne(projectedHerb, barSlot);
-            projectedHerb = projectedBar;
-        }
-        else
-        {
-            projectedBar = ConsumeOne(barPage == ContainerMatrix.InventoryPage0 ? page0 : page1, barSlot);
-        }
-
-        try
-        {
-            if (herbPage == barPage)
-                await characters.ReplaceContainerAsync(characterId, herbPage, ToTvps(projectedHerb),
-                    cancellationToken);
-            else
-                await characters.ReplaceTwoContainersAsync(characterId, herbPage, ToTvps(projectedHerb), barPage,
-                    ToTvps(projectedBar), cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "Character {CharacterId} tower-upgrade material consumption failed", characterId);
-            zoneSession.Abort(DisconnectReason.Faulted);
-            return;
-        }
-
-        towerWar.BeginUpgrade(resolved.TowerIndex, resolved.NewPackedState, state.Tribe);
-
-        var packedPage = herbPage + 10000 + barPage * 100;
-        var packedIndex = herbSlot + 10000 + barSlot * 100;
-
-        session.Send(new TowerUpgradeResponse
-        {
-            Result = 0, Page = [packedPage, 0], Index = [packedIndex, 0], Count = 1
-        });
-
-        var containers = herbPage == barPage
-            ? ImmutableArray.Create(new InventoryContainerSnapshot(herbPage, projectedHerb))
-            : ImmutableArray.Create(
-                new InventoryContainerSnapshot(herbPage, projectedHerb),
-                new InventoryContainerSnapshot(barPage, projectedBar));
-
-        if (!await zone.PostInventoryCommandAndWaitAsync(new InventoryZoneCommand(characterId, containers, null),
-                cancellationToken))
-            logger.LogError(
-                "Zone {MapId} inventory inbox full: dropped tower-upgrade material mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
-                zone.MapId, characterId);
-    }
-
-    private static ImmutableDictionary<byte, ItemStack> ConsumeOne(ImmutableDictionary<byte, ItemStack> container,
-        byte slot)
-    {
-        var stack = container[slot];
-        var remaining = stack.Quantity - 1;
-        return remaining > 0 ? container.SetItem(slot, stack with { Quantity = remaining }) : container.Remove(slot);
-    }
-
-    private static List<CharacterItemSlotTvp> ToTvps(ImmutableDictionary<byte, ItemStack> container)
-    {
-        var list = new List<CharacterItemSlotTvp>(container.Count);
-        foreach (var (slot, stack) in container)
-            list.Add(stack.ToTvp(slot));
-        return list;
     }
 }

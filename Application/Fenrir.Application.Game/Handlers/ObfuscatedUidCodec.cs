@@ -1,5 +1,5 @@
 using System.Text;
-using Fenrir.Contracts.Wire;
+using Fenrir.Network.Compression;
 
 namespace Fenrir.Application.Game.Handlers;
 

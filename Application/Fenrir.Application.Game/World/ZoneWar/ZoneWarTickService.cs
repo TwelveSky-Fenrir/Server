@@ -1,7 +1,7 @@
 using Fenrir.Application.Game.Simulation;
 using Fenrir.Application.Game.World.WorldState;
-using Fenrir.Contracts.Abstractions;
-using Fenrir.Contracts.Packets.Zone;
+using Fenrir.Network.Abstractions;
+using Fenrir.Network.Serialization.Packets.Zone;
 using Microsoft.Extensions.Hosting;
 
 namespace Fenrir.Application.Game.World.ZoneWar;

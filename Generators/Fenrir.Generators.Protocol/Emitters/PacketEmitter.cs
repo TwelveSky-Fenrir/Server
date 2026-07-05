@@ -35,7 +35,7 @@ internal static class PacketEmitter
         {
             writer.Line();
             writer.Line(
-                $"public static global::Fenrir.Contracts.Wire.WireObfuscationMode Obfuscation => global::Fenrir.Contracts.Wire.WireObfuscationMode.{model.Obfuscation};");
+                $"public static global::Fenrir.Network.Abstractions.WireObfuscationMode Obfuscation => global::Fenrir.Network.Abstractions.WireObfuscationMode.{model.Obfuscation};");
         }
 
         if (emitTryRead)
@@ -97,23 +97,23 @@ internal static class PacketEmitter
                     break;
                 case FieldShape.FixedString:
                     writer.Line(
-                        $"var {localName} = global::Fenrir.Contracts.Wire.LegacyWireCodec.ReadFixedString({slice});");
+                        $"var {localName} = global::Fenrir.Network.Serialization.Wire.LegacyWireCodec.ReadFixedString({slice});");
                     break;
                 case FieldShape.Int32Array:
                     writer.Line(
-                        $"var {localName} = global::Fenrir.Contracts.Wire.LegacyWireCodec.ReadInt32Array({slice});");
+                        $"var {localName} = global::Fenrir.Network.Serialization.Wire.LegacyWireCodec.ReadInt32Array({slice});");
                     break;
                 case FieldShape.SingleArray:
                     writer.Line(
-                        $"var {localName} = global::Fenrir.Contracts.Wire.LegacyWireCodec.ReadSingleArray({slice});");
+                        $"var {localName} = global::Fenrir.Network.Serialization.Wire.LegacyWireCodec.ReadSingleArray({slice});");
                     break;
                 case FieldShape.ByteArray:
                     writer.Line(
-                        $"var {localName} = global::Fenrir.Contracts.Wire.LegacyWireCodec.ReadByteArray({slice});");
+                        $"var {localName} = global::Fenrir.Network.Serialization.Wire.LegacyWireCodec.ReadByteArray({slice});");
                     break;
                 case FieldShape.FixedStringArray:
                     writer.Line(
-                        $"var {localName} = global::Fenrir.Contracts.Wire.LegacyWireCodec.ReadFixedStringRows({slice}, {field.StringLength});");
+                        $"var {localName} = global::Fenrir.Network.Serialization.Wire.LegacyWireCodec.ReadFixedStringRows({slice}, {field.StringLength});");
                     break;
                 case FieldShape.Nested:
                     writer.Line($"if (!{field.NestedTypeFullName}.TryRead({slice}, out var {localName}))");
@@ -194,20 +194,20 @@ internal static class PacketEmitter
                         $"global::System.Buffers.Binary.BinaryPrimitives.WriteInt64LittleEndian({slice}, {access});");
                     break;
                 case FieldShape.FixedString:
-                    writer.Line($"global::Fenrir.Contracts.Wire.LegacyWireCodec.WriteFixedString({slice}, {access});");
+                    writer.Line($"global::Fenrir.Network.Serialization.Wire.LegacyWireCodec.WriteFixedString({slice}, {access});");
                     break;
                 case FieldShape.Int32Array:
-                    writer.Line($"global::Fenrir.Contracts.Wire.LegacyWireCodec.WriteInt32Array({slice}, {access});");
+                    writer.Line($"global::Fenrir.Network.Serialization.Wire.LegacyWireCodec.WriteInt32Array({slice}, {access});");
                     break;
                 case FieldShape.SingleArray:
-                    writer.Line($"global::Fenrir.Contracts.Wire.LegacyWireCodec.WriteSingleArray({slice}, {access});");
+                    writer.Line($"global::Fenrir.Network.Serialization.Wire.LegacyWireCodec.WriteSingleArray({slice}, {access});");
                     break;
                 case FieldShape.ByteArray:
-                    writer.Line($"global::Fenrir.Contracts.Wire.LegacyWireCodec.WriteByteArray({slice}, {access});");
+                    writer.Line($"global::Fenrir.Network.Serialization.Wire.LegacyWireCodec.WriteByteArray({slice}, {access});");
                     break;
                 case FieldShape.FixedStringArray:
                     writer.Line(
-                        $"global::Fenrir.Contracts.Wire.LegacyWireCodec.WriteFixedStringRows({slice}, {access}, {field.StringLength});");
+                        $"global::Fenrir.Network.Serialization.Wire.LegacyWireCodec.WriteFixedStringRows({slice}, {access}, {field.StringLength});");
                     break;
                 case FieldShape.Nested:
                     writer.Line($"{access}.Write({slice});");
@@ -225,17 +225,17 @@ internal static class PacketEmitter
                 switch (field.AvatarXor)
                 {
                     case AvatarXorKind.Int:
-                        writer.Line($"global::Fenrir.Contracts.Wire.WireXor.XorInt({slice});");
+                        writer.Line($"global::Fenrir.Network.Compression.WireXor.XorInt({slice});");
                         break;
                     case AvatarXorKind.IntArray:
-                        writer.Line($"global::Fenrir.Contracts.Wire.WireXor.XorIntArray({slice});");
+                        writer.Line($"global::Fenrir.Network.Compression.WireXor.XorIntArray({slice});");
                         break;
                     case AvatarXorKind.Char:
-                        writer.Line($"global::Fenrir.Contracts.Wire.WireXor.XorChar({slice});");
+                        writer.Line($"global::Fenrir.Network.Compression.WireXor.XorChar({slice});");
                         break;
                     case AvatarXorKind.Char2:
                         writer.Line(
-                            $"global::Fenrir.Contracts.Wire.WireXor.XorChar2Rows({slice}, {field.AvatarXorRowLength});");
+                            $"global::Fenrir.Network.Compression.WireXor.XorChar2Rows({slice}, {field.AvatarXorRowLength});");
                         break;
                 }
 
@@ -249,7 +249,7 @@ internal static class PacketEmitter
             writer.Line(
                 "// [ObfuscatedUidField] (§3.3): double-XOR of tID, independent of the global XOR_PACKET applied later by the send layer.");
             writer.Line(
-                $"global::Fenrir.Contracts.Wire.WireXor.ApplyUidXor(destination.Slice({legacyUidField.Offset}, {legacyUidField.OwnSize}));");
+                $"global::Fenrir.Network.Compression.WireXor.ApplyUidXor(destination.Slice({legacyUidField.Offset}, {legacyUidField.OwnSize}));");
         }
 
         writer.Line();

@@ -2,8 +2,8 @@ using System.Collections.Immutable;
 using Fenrir.Application.Game.Inventory;
 using Fenrir.Application.Game.Social.Trade;
 using Fenrir.Application.Game.World;
-using Fenrir.Contracts.Abstractions;
-using Fenrir.Contracts.Packets.Zone;
+using Fenrir.Network.Abstractions;
+using Fenrir.Network.Serialization.Packets.Zone;
 using Fenrir.Data.Characters;
 using Fenrir.Network.Sessions;
 

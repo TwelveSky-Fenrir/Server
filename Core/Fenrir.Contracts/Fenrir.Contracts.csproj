@@ -6,20 +6,4 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="K4os.Compression.LZ4"/>
-  </ItemGroup>
-
-  <ItemGroup>
-    <!-- Both must be loaded into the analyzer host: Protocol calls into Analysis at generator
-         runtime, and a ProjectReference-as-Analyzer only loads the directly referenced assembly,
-         not its own transitive references. -->
-    <ProjectReference Include="..\..\Analysis\Fenrir.Generators.Analysis\Fenrir.Generators.Analysis.csproj"
-                      OutputItemType="Analyzer"
-                      ReferenceOutputAssembly="false"/>
-    <ProjectReference Include="..\..\Generators\Fenrir.Generators.Protocol\Fenrir.Generators.Protocol.csproj"
-                      OutputItemType="Analyzer"
-                      ReferenceOutputAssembly="false"/>
-  </ItemGroup>
-
 </Project>

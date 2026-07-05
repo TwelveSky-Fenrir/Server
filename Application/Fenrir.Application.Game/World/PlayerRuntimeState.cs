@@ -3,8 +3,8 @@ using System.Collections.Immutable;
 using Fenrir.Application.Game.Inventory;
 using Fenrir.Application.Game.Skills;
 using Fenrir.Application.Game.Stats;
-using Fenrir.Contracts.Abstractions;
-using Fenrir.Contracts.Packets.Shared;
+using Fenrir.Network.Abstractions;
+using Fenrir.Network.Serialization.Packets.Shared;
 
 namespace Fenrir.Application.Game.World;
 
@@ -192,7 +192,7 @@ public sealed class PlayerRuntimeState
     /// </summary>
     /// <remarks>
     ///     Deliberately a fresh per-instance array (never
-    ///     <c>Fenrir.Contracts.Packets.Shared.WorldStateTemplates.ZeroedBuffInfo</c>,
+    ///     <c>Fenrir.Network.Serialization.Packets.Shared.WorldStateTemplates.ZeroedBuffInfo</c>,
     ///     a shared static instance) -- reusing that template would let every player's buffs alias the same backing
     ///     <c>int[]</c>.
     /// </remarks>

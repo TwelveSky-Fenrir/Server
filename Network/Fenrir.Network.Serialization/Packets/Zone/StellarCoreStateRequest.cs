@@ -1,0 +1,14 @@
+using Fenrir.Network.Abstractions;
+using Fenrir.Network.Serialization.Attributes;
+using Fenrir.Network.Serialization.Wire;
+
+namespace Fenrir.Network.Serialization.Packets.Zone;
+
+// Sort: 1=select slot (Value=0-9), 2=no-op, 3=equip, 4=remove, 5=return to inventory; other disconnects.
+[FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.StellarCoreState, ExpectedSize = 17,
+    AllowedStates = [(byte)ZoneSessionState.InWorld])]
+public readonly partial record struct StellarCoreStateRequest : IIncomingPacket<StellarCoreStateRequest>
+{
+    public required int Sort { get; init; }
+    public required int Value { get; init; }
+}

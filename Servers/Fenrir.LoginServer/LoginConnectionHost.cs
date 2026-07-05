@@ -1,8 +1,8 @@
 using System.Net;
 using System.Security.Cryptography;
 using Fenrir.Application.Login;
-using Fenrir.Contracts.Abstractions;
-using Fenrir.Contracts.Packets.Login;
+using Fenrir.Network.Abstractions;
+using Fenrir.Network.Serialization.Packets.Login;
 using Fenrir.Data.Runtime;
 using Fenrir.Network.Dispatching;
 using Fenrir.Network.RateLimiting;
@@ -24,12 +24,12 @@ public sealed class LoginConnectionHost(
     IGameServerDirectoryRepository directory,
     ILogger<LoginConnectionHost> logger) : BackgroundService
 {
-    private FenrirTcpListener? _listener;
+    private FenrirTcpListener<LoginClientSession>? _listener;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var opts = options.Value;
-        _listener = new FenrirTcpListener(
+        _listener = new FenrirTcpListener<LoginClientSession>(
             new IPEndPoint(IPAddress.Any, opts.Port),
             static (sessionId, transport, remoteEndPoint) =>
                 new LoginClientSession(sessionId, transport, remoteEndPoint));
@@ -45,9 +45,8 @@ public sealed class LoginConnectionHost(
         }
     }
 
-    private async Task OnAcceptedAsync(ClientSession session, SocketConnection connection, CancellationToken ct)
+    private async Task OnAcceptedAsync(LoginClientSession loginSession, SocketConnection connection, CancellationToken ct)
     {
-        var loginSession = (LoginClientSession)session;
         registry.Register(loginSession);
 
         try

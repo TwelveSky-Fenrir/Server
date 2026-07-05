@@ -1,7 +1,7 @@
 using Fenrir.Application.Game.Inventory;
 using Fenrir.Application.Game.Social;
 using Fenrir.Application.Game.World;
-using Fenrir.Contracts.Packets.Shared;
+using Fenrir.Network.Serialization.Packets.Shared;
 using Fenrir.Data.Characters;
 
 namespace Fenrir.Application.Game.Avatars;

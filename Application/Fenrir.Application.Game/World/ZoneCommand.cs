@@ -1,7 +1,7 @@
 using Fenrir.Application.Game.Quests;
 using Fenrir.Application.Game.Stats;
-using Fenrir.Contracts.Abstractions;
-using Fenrir.Contracts.Packets.Shared;
+using Fenrir.Network.Abstractions;
+using Fenrir.Network.Serialization.Packets.Shared;
 using Fenrir.Data.Characters;
 
 namespace Fenrir.Application.Game.World;

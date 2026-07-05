@@ -1,5 +1,5 @@
-using Fenrir.Contracts.Abstractions;
-using Fenrir.Contracts.Packets.Login;
+using Fenrir.Network.Abstractions;
+using Fenrir.Network.Serialization.Packets.Login;
 
 namespace Fenrir.Application.Login.Handlers;
 

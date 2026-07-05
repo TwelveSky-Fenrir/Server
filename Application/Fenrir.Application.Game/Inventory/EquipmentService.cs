@@ -2,7 +2,7 @@ using System.Collections.Frozen;
 using System.Collections.Immutable;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Stats;
-using Fenrir.Contracts.Packets.Shared;
+using Fenrir.Network.Serialization.Packets.Shared;
 
 namespace Fenrir.Application.Game.Inventory;
 

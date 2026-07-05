@@ -12,13 +12,13 @@ public sealed class LoginServerOptions
     ///     Must match <c>LoginRequest.Version</c> or login fails with Result=4; legacy ini <c>[Server.Info].Version</c>
     ///     (not the "33" placeholder from wire contract §9.1).
     /// </summary>
-    public int ExpectedClientVersion { get; init; } = 90354;
+    public int ExpectedClientVersion { get; set; } = 90354;
 
-    public int TicketTtlSeconds { get; init; } = 15;
+    public int TicketTtlSeconds { get; set; } = 15;
 
     /// <summary>Reported to client as tMaxPlayerNum; informational only, not enforced as a hard cap in M1.</summary>
-    public int MaxPlayerNum { get; init; } = 1000;
+    public int MaxPlayerNum { get; set; } = 1000;
 
     /// <summary>Legacy <c>P2ndPassword</c> (=1 in prod EU33): when true, mouse PIN is mandatory before character select.</summary>
-    public bool RequireSecondPassword { get; init; } = true;
+    public bool RequireSecondPassword { get; set; } = true;
 }

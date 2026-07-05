@@ -1,4 +1,4 @@
-using Fenrir.Contracts.Dispatch;
+using Fenrir.Network.Dispatch;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Fenrir.Application.Game;

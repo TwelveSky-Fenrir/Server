@@ -1,5 +1,5 @@
 using System.Collections.Immutable;
-using Fenrir.Contracts.Packets.Shared;
+using Fenrir.Network.Serialization.Packets.Shared;
 using Fenrir.Data.Guilds;
 
 namespace Fenrir.Application.Game.Guilds;

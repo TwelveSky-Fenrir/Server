@@ -1,5 +1,5 @@
-using Fenrir.Contracts.Packets.Shared;
-using Fenrir.Contracts.Packets.Zone;
+using Fenrir.Network.Serialization.Packets.Shared;
+using Fenrir.Network.Serialization.Packets.Zone;
 using Fenrir.Application.Game.World;
 
 namespace Fenrir.Application.Game.Guilds;

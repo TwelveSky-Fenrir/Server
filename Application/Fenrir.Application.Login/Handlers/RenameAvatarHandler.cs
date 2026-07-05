@@ -1,5 +1,5 @@
-using Fenrir.Contracts.Abstractions;
-using Fenrir.Contracts.Packets.Login;
+using Fenrir.Network.Abstractions;
+using Fenrir.Network.Serialization.Packets.Login;
 using Fenrir.Data.Characters;
 using Fenrir.Network.Sessions;
 

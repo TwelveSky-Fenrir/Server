@@ -2,8 +2,8 @@ using System.Net;
 using System.Security.Cryptography;
 using Fenrir.Application.Game;
 using Fenrir.Application.Game.World;
-using Fenrir.Contracts.Abstractions;
-using Fenrir.Contracts.Packets.Zone;
+using Fenrir.Network.Abstractions;
+using Fenrir.Network.Serialization.Packets.Zone;
 using Fenrir.Data.WriteBehind;
 using Fenrir.Network.Dispatching;
 using Fenrir.Network.RateLimiting;
@@ -23,12 +23,12 @@ public sealed class ZoneConnectionHost(
     IWriteBehindFlusher writeBehindFlusher,
     ILogger<ZoneConnectionHost> logger) : BackgroundService
 {
-    private FenrirTcpListener? _listener;
+    private FenrirTcpListener<ZoneClientSession>? _listener;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var opts = options.Value;
-        _listener = new FenrirTcpListener(
+        _listener = new FenrirTcpListener<ZoneClientSession>(
             new IPEndPoint(IPAddress.Any, opts.Port),
             static (sessionId, transport, remoteEndPoint) =>
                 new ZoneClientSession(sessionId, transport, remoteEndPoint));
@@ -45,9 +45,8 @@ public sealed class ZoneConnectionHost(
         }
     }
 
-    private async Task OnAcceptedAsync(ClientSession session, SocketConnection connection, CancellationToken ct)
+    private async Task OnAcceptedAsync(ZoneClientSession zoneSession, SocketConnection connection, CancellationToken ct)
     {
-        var zoneSession = (ZoneClientSession)session;
         registry.Register(zoneSession);
 
         try

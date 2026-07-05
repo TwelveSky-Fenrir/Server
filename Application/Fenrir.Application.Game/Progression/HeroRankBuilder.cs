@@ -1,4 +1,4 @@
-using Fenrir.Contracts.Packets.Shared;
+using Fenrir.Network.Serialization.Packets.Shared;
 using Fenrir.Data.Progression;
 
 namespace Fenrir.Application.Game.Progression;

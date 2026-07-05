@@ -3,25 +3,25 @@ namespace Fenrir.Generators.Analysis.Support;
 /// <summary>Fully-qualified names on the never-referenced <c>Fenrir.Contracts</c> side, for Roslyn symbol resolution.</summary>
 internal static class WellKnownNames
 {
-    public const string FenrirPacketAttribute = "Fenrir.Contracts.Attributes.FenrirPacketAttribute";
-    public const string FenrirWireTypeAttribute = "Fenrir.Contracts.Attributes.FenrirWireTypeAttribute";
-    public const string FixedStringAttribute = "Fenrir.Contracts.Attributes.FixedStringAttribute";
-    public const string FixedArrayAttribute = "Fenrir.Contracts.Attributes.FixedArrayAttribute";
-    public const string ReservedAttribute = "Fenrir.Contracts.Attributes.ReservedAttribute";
-    public const string ObfuscatedUidFieldAttribute = "Fenrir.Contracts.Attributes.ObfuscatedUidFieldAttribute";
-    public const string AvatarXorKindAttribute = "Fenrir.Contracts.Attributes.AvatarXorKindAttribute";
+    public const string FenrirPacketAttribute = "Fenrir.Network.Serialization.Attributes.FenrirPacketAttribute";
+    public const string FenrirWireTypeAttribute = "Fenrir.Network.Serialization.Attributes.FenrirWireTypeAttribute";
+    public const string FixedStringAttribute = "Fenrir.Network.Serialization.Attributes.FixedStringAttribute";
+    public const string FixedArrayAttribute = "Fenrir.Network.Serialization.Attributes.FixedArrayAttribute";
+    public const string ReservedAttribute = "Fenrir.Network.Serialization.Attributes.ReservedAttribute";
+    public const string ObfuscatedUidFieldAttribute = "Fenrir.Network.Serialization.Attributes.ObfuscatedUidFieldAttribute";
+    public const string AvatarXorKindAttribute = "Fenrir.Network.Serialization.Attributes.AvatarXorKindAttribute";
 
-    public const string IFenrirWireType = "Fenrir.Contracts.Abstractions.IFenrirWireType`1";
-    public const string IIncomingPacket = "Fenrir.Contracts.Abstractions.IIncomingPacket`1";
-    public const string IOutgoingPacket = "Fenrir.Contracts.Abstractions.IOutgoingPacket";
-    public const string IInlinePacketHandler = "Fenrir.Contracts.Abstractions.IInlinePacketHandler`1";
-    public const string IAsyncPacketHandler = "Fenrir.Contracts.Abstractions.IAsyncPacketHandler`1";
-    public const string IPacketSession = "Fenrir.Contracts.Abstractions.IPacketSession";
+    public const string IFenrirWireType = "Fenrir.Network.Abstractions.IFenrirWireType`1";
+    public const string IIncomingPacket = "Fenrir.Network.Abstractions.IIncomingPacket`1";
+    public const string IOutgoingPacket = "Fenrir.Network.Abstractions.IOutgoingPacket";
+    public const string IInlinePacketHandler = "Fenrir.Network.Abstractions.IInlinePacketHandler`1";
+    public const string IAsyncPacketHandler = "Fenrir.Network.Abstractions.IAsyncPacketHandler`1";
+    public const string IPacketSession = "Fenrir.Network.Abstractions.IPacketSession";
 
-    public const string WireXor = "global::Fenrir.Contracts.Wire.WireXor";
-    public const string WireHeaderSizes = "global::Fenrir.Contracts.Wire.WireHeaderSizes";
-    public const string FenrirServerEnum = "global::Fenrir.Contracts.Wire.FenrirServer";
-    public const string FenrirDirectionEnum = "global::Fenrir.Contracts.Wire.FenrirDirection";
-    public const string LoginSessionStateEnum = "global::Fenrir.Contracts.Wire.LoginSessionState";
-    public const string ZoneSessionStateEnum = "global::Fenrir.Contracts.Wire.ZoneSessionState";
+    public const string WireXor = "global::Fenrir.Network.Compression.WireXor";
+    public const string WireHeaderSizes = "global::Fenrir.Network.Serialization.Wire.WireHeaderSizes";
+    public const string FenrirServerEnum = "global::Fenrir.Network.Abstractions.FenrirServer";
+    public const string FenrirDirectionEnum = "global::Fenrir.Network.Serialization.Wire.FenrirDirection";
+    public const string LoginSessionStateEnum = "global::Fenrir.Network.Serialization.Wire.LoginSessionState";
+    public const string ZoneSessionStateEnum = "global::Fenrir.Network.Serialization.Wire.ZoneSessionState";
 }

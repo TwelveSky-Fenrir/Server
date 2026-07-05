@@ -1,6 +1,6 @@
 using System.Buffers.Binary;
 using Fenrir.Application.Game.World.WorldState;
-using Fenrir.Contracts.Packets.Zone;
+using Fenrir.Network.Serialization.Packets.Zone;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.World.ZoneWar;

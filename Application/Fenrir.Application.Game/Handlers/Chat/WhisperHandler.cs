@@ -1,8 +1,8 @@
 using Fenrir.Application.Game.Social.Chat;
 using Fenrir.Application.Game.World;
-using Fenrir.Contracts.Abstractions;
-using Fenrir.Contracts.Packets.Shared;
-using Fenrir.Contracts.Packets.Zone;
+using Fenrir.Network.Abstractions;
+using Fenrir.Network.Serialization.Packets.Shared;
+using Fenrir.Network.Serialization.Packets.Zone;
 using Fenrir.Network.Sessions;
 
 namespace Fenrir.Application.Game.Handlers.Chat;

@@ -1,6 +1,6 @@
-using Fenrir.Contracts.Abstractions;
-using Fenrir.Contracts.Packets.Login;
-using Fenrir.Contracts.Wire;
+using Fenrir.Network.Abstractions;
+using Fenrir.Network.Serialization.Packets.Login;
+using Fenrir.Network.Serialization.Wire;
 using Fenrir.Network.Sessions;
 
 namespace Fenrir.Application.Login.Handlers;

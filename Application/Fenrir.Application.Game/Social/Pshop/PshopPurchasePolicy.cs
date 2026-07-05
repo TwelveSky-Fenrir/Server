@@ -1,7 +1,7 @@
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Inventory;
 using Fenrir.Application.Game.World.Loot;
-using Fenrir.Contracts.Packets.Shared;
+using Fenrir.Network.Serialization.Packets.Shared;
 
 namespace Fenrir.Application.Game.Social.Pshop;
 

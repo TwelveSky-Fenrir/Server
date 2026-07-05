@@ -1,4 +1,4 @@
-using Fenrir.Contracts.Packets.Shared;
+using Fenrir.Network.Serialization.Packets.Shared;
 using Fenrir.Data.Commerce;
 
 namespace Fenrir.Application.Game.Handlers.Commerce;

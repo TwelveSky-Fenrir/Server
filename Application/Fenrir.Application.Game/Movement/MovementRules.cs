@@ -1,6 +1,6 @@
 using Fenrir.Application.Game.World;
 using Fenrir.Application.Game.World.Geometry;
-using Fenrir.Contracts.Packets.Shared;
+using Fenrir.Network.Serialization.Packets.Shared;
 using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Movement;

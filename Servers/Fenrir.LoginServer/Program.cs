@@ -1,7 +1,7 @@
 using Fenrir.Application.Login;
 using Fenrir.Application.Login.Dispatching;
-using Fenrir.Contracts.Abstractions;
-using Fenrir.Contracts.Dispatch;
+using Fenrir.Network.Abstractions;
+using Fenrir.Network.Dispatch;
 using Fenrir.Data;
 using Fenrir.LoginServer;
 using Fenrir.Network.RateLimiting;

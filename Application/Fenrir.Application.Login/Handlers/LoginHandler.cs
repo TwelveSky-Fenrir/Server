@@ -1,6 +1,6 @@
 using Fenrir.Application.Login.RateLimiting;
-using Fenrir.Contracts.Abstractions;
-using Fenrir.Contracts.Packets.Login;
+using Fenrir.Network.Abstractions;
+using Fenrir.Network.Serialization.Packets.Login;
 using Fenrir.Data.Accounts;
 using Fenrir.Data.Characters;
 using Fenrir.Data.Security;

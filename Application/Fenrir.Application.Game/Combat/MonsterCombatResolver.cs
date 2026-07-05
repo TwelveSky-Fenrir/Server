@@ -1,5 +1,5 @@
 using Fenrir.Application.Game.World.Monsters;
-using Fenrir.Contracts.Packets.Shared;
+using Fenrir.Network.Serialization.Packets.Shared;
 
 namespace Fenrir.Application.Game.Combat;
 

@@ -1,6 +1,6 @@
 using Fenrir.Application.Game.GameData;
-using Fenrir.Contracts.Abstractions;
-using Fenrir.Contracts.Packets.Zone;
+using Fenrir.Network.Abstractions;
+using Fenrir.Network.Serialization.Packets.Zone;
 
 namespace Fenrir.Application.Game.Handlers.Commerce;
 

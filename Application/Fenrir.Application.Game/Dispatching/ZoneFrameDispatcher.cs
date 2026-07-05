@@ -1,7 +1,7 @@
 using System.Buffers;
-using Fenrir.Contracts.Abstractions;
-using Fenrir.Contracts.Dispatch;
-using Fenrir.Contracts.Wire;
+using Fenrir.Network.Abstractions;
+using Fenrir.Network.Dispatch;
+using Fenrir.Network.Serialization.Wire;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Dispatching;

@@ -2,6 +2,7 @@ using System.Buffers.Binary;
 using System.Collections.Frozen;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Handlers;
+using Fenrir.Application.Game.Handlers.BuffsMountsCosmetics.Services;
 using Fenrir.Application.Game.Tests.GameData;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Application.Game.World;
@@ -42,8 +43,9 @@ public class StellarCoreStateHandlerTests
             [76527] = new(WorldDataTestRows.Item(76527), [])
         }.ToFrozenDictionary();
 
-        return new StellarCoreStateHandler(characters, ZoneTestKit.EmptyWorldData(itemsById),
-            NullLogger<StellarCoreStateHandler>.Instance);
+        var service = new StellarCoreStateService(characters, ZoneTestKit.EmptyWorldData(itemsById),
+            NullLogger<StellarCoreStateService>.Instance);
+        return new StellarCoreStateHandler(service);
     }
 
     [Fact]

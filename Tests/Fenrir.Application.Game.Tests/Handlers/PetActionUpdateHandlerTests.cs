@@ -1,4 +1,5 @@
 using Fenrir.Application.Game.Handlers;
+using Fenrir.Application.Game.Handlers.BuffsMountsCosmetics.Services;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Application.Game.World;
 using Fenrir.Contracts.Packets.Shared;
@@ -54,7 +55,7 @@ public class PetActionUpdateHandlerTests
     {
         var zone = ZoneTestKit.CreateZone(1);
         var (session, pipe) = Setup(zone, 10);
-        var handler = new PetActionUpdateHandler();
+        var handler = new PetActionUpdateHandler(new PetActionUpdateService());
 
         handler.Handle(new PetActionUpdateRequest { Action = PetAction(3, 1.5f, [1f, 2f, 3f], [4f, 5f, 6f]) },
             session);

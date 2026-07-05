@@ -1,4 +1,4 @@
-using Fenrir.Application.Game.Buffs;
+using Fenrir.Application.Game.Handlers.BuffsMountsCosmetics.Services;
 using Fenrir.Application.Game.World;
 using Fenrir.Contracts.Abstractions;
 using Fenrir.Contracts.Packets.Zone;
@@ -19,7 +19,7 @@ namespace Fenrir.Application.Game.Handlers;
 ///     effect. Only the wire mechanic and <see cref="PlayerRuntimeState.StateTimeEffect" /> mirror are
 ///     implemented.
 /// </remarks>
-public sealed class PlaytimeBuffHandler : IInlinePacketHandler<PlaytimeBuffRequest>
+public sealed class PlaytimeBuffHandler(IPlaytimeBuffService service) : IInlinePacketHandler<PlaytimeBuffRequest>
 {
     public void Handle(in PlaytimeBuffRequest packet, IPacketSession session)
     {
@@ -31,12 +31,8 @@ public sealed class PlaytimeBuffHandler : IInlinePacketHandler<PlaytimeBuffReque
         if (!zone.TryGetPlayer(characterId, out var state) || state is null)
             return;
 
-        var resolved = PlaytimeBuffResolver.Resolve(packet.Sort);
+        var result = service.Apply(zone, characterId, packet.Sort);
 
-        session.Send(new AvatarStatUpdateResponse { Sort = 55, Value = resolved.Value, Value2 = 0 });
-
-        if (resolved.Applied)
-            zone.PostAvatarBuffCommand(new AvatarBuffZoneCommand(characterId,
-                resolved.NewStateTimeEffect));
+        session.Send(new AvatarStatUpdateResponse { Sort = 55, Value = result.Value, Value2 = 0 });
     }
 }

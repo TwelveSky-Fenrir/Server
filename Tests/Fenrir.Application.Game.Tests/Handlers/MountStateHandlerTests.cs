@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using Fenrir.Application.Game.Handlers;
+using Fenrir.Application.Game.Handlers.BuffsMountsCosmetics.Services;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Application.Game.World;
 using Fenrir.Contracts.Packets.Zone;
@@ -38,7 +39,7 @@ public class MountStateHandlerTests
     {
         var zone = ZoneTestKit.CreateZone(1);
         var (session, pipe, _) = Setup(zone, 10);
-        var handler = new MountStateHandler();
+        var handler = new MountStateHandler(new MountStateService());
 
         handler.Handle(new MountStateRequest { Sort = 1, Value = 4 }, session);
         zone.Tick(TimeSpan.FromMilliseconds(50));
@@ -54,7 +55,7 @@ public class MountStateHandlerTests
     {
         var zone = ZoneTestKit.CreateZone(1);
         var (session, pipe, _) = Setup(zone, 10);
-        var handler = new MountStateHandler();
+        var handler = new MountStateHandler(new MountStateService());
 
         handler.Handle(new MountStateRequest { Sort = 1, Value = 99 }, session);
         zone.Tick(TimeSpan.FromMilliseconds(50));
@@ -81,7 +82,7 @@ public class MountStateHandlerTests
         state.MaxMana = 300;
         state.Life = 1;
         state.Mana = 1;
-        var handler = new MountStateHandler();
+        var handler = new MountStateHandler(new MountStateService());
 
         handler.Handle(new MountStateRequest { Sort = 3, Value = 0 }, session);
         zone.Tick(TimeSpan.FromMilliseconds(50));
@@ -106,7 +107,7 @@ public class MountStateHandlerTests
         state.AnimalIndex = 2;
         state.AnimalTime = 5;
         state.ActionSort = 0;
-        var handler = new MountStateHandler();
+        var handler = new MountStateHandler(new MountStateService());
 
         handler.Handle(new MountStateRequest { Sort = 3, Value = 0 }, session);
         zone.Tick(TimeSpan.FromMilliseconds(50));
@@ -129,7 +130,7 @@ public class MountStateHandlerTests
         state.MaxMana = 300;
         state.Life = 1;
         state.Mana = 1;
-        var handler = new MountStateHandler();
+        var handler = new MountStateHandler(new MountStateService());
 
         handler.Handle(new MountStateRequest { Sort = 4, Value = 0 }, session);
         zone.Tick(TimeSpan.FromMilliseconds(50));
@@ -152,7 +153,7 @@ public class MountStateHandlerTests
     {
         var zone = ZoneTestKit.CreateZone(1);
         var (session, _, _) = Setup(zone, 10);
-        var handler = new MountStateHandler();
+        var handler = new MountStateHandler(new MountStateService());
 
         handler.Handle(new MountStateRequest { Sort = sort, Value = 0 }, session);
 

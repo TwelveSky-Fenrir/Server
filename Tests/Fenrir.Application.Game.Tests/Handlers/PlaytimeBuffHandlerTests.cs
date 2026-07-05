@@ -1,4 +1,5 @@
 using Fenrir.Application.Game.Handlers;
+using Fenrir.Application.Game.Handlers.BuffsMountsCosmetics.Services;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Application.Game.World;
 using Fenrir.Contracts.Packets.Zone;
@@ -34,7 +35,7 @@ public class PlaytimeBuffHandlerTests
     {
         var zone = ZoneTestKit.CreateZone(1);
         var (session, pipe, _) = Setup(zone, 10);
-        var handler = new PlaytimeBuffHandler();
+        var handler = new PlaytimeBuffHandler(new PlaytimeBuffService());
 
         handler.Handle(new PlaytimeBuffRequest { Sort = 3 }, session);
         zone.Tick(TimeSpan.FromMilliseconds(50));
@@ -50,7 +51,7 @@ public class PlaytimeBuffHandlerTests
     {
         var zone = ZoneTestKit.CreateZone(1);
         var (session, pipe, _) = Setup(zone, 10);
-        var handler = new PlaytimeBuffHandler();
+        var handler = new PlaytimeBuffHandler(new PlaytimeBuffService());
 
         handler.Handle(new PlaytimeBuffRequest { Sort = 9 }, session);
         zone.Tick(TimeSpan.FromMilliseconds(50));

@@ -1,4 +1,4 @@
-using Fenrir.Application.Game.Mounts;
+using Fenrir.Application.Game.Handlers.BuffsMountsCosmetics.Services;
 using Fenrir.Application.Game.World;
 using Fenrir.Contracts.Abstractions;
 using Fenrir.Contracts.Packets.Zone;
@@ -8,9 +8,10 @@ namespace Fenrir.Application.Game.Handlers;
 
 /// <summary>
 ///     CZ_ANIMAL_ABSORB_SEND (op113). No dedicated reply -- state changes broadcast via AVATAR_CHANGE_INFO_1
-///     (AOI) + AVATAR_CHANGE_INFO_2 (self) instead, mirrored onto the tick through <see cref="MountZoneCommand" />.
+///     (AOI) + AVATAR_CHANGE_INFO_2 (self) instead, mirrored onto the tick through
+///     <see cref="World.MountZoneCommand" />.
 /// </summary>
-public sealed class MountAbsorbHandler : IInlinePacketHandler<MountAbsorbRequest>
+public sealed class MountAbsorbHandler(IMountAbsorbService service) : IInlinePacketHandler<MountAbsorbRequest>
 {
     public void Handle(in MountAbsorbRequest packet, IPacketSession session)
     {
@@ -25,22 +26,12 @@ public sealed class MountAbsorbHandler : IInlinePacketHandler<MountAbsorbRequest
         switch (packet.Sort)
         {
             case 1:
-                if (state.AnimalIndex < MountStateResolver.SlotCount ||
-                    state.AnimalIndex > MountStateResolver.MountedMax || state.AnimalAbsorbTime < 1)
-                {
+                if (!service.TryAbsorb(zone, state, characterId))
                     zoneSession.Abort(DisconnectReason.Faulted);
-                    return;
-                }
-
-                zone.PostMountCommand(new MountZoneCommand(characterId, AnimalAbsorbState: 1,
-                    Broadcast: MountBroadcastKind.AbsorbToggle));
                 return;
 
             case 2:
-                var maxLife = state.Stats?.MaxLife ?? state.MaxLife;
-                var maxMana = state.Stats?.MaxMana ?? state.MaxMana;
-                zone.PostMountCommand(new MountZoneCommand(characterId, AnimalAbsorbState: 0, Life: maxLife,
-                    Mana: maxMana, Broadcast: MountBroadcastKind.AbsorbToggle));
+                service.Release(zone, state, characterId);
                 return;
 
             default:

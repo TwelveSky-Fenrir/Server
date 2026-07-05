@@ -1,4 +1,5 @@
 using Fenrir.Application.Game.Handlers;
+using Fenrir.Application.Game.Handlers.BuffsMountsCosmetics.Services;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Application.Game.World;
 using Fenrir.Contracts.Packets.Zone;
@@ -39,7 +40,7 @@ public class RankBuffHandlerTests
         state.Life = 1;
         state.Mana = 1;
 
-        var handler = new RankBuffHandler();
+        var handler = new RankBuffHandler(new RankBuffService());
         handler.Handle(new RankBuffRequest { Sort = 1 }, session);
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
@@ -56,7 +57,7 @@ public class RankBuffHandlerTests
     {
         var zone = ZoneTestKit.CreateZone(1);
         var (session, _, _) = Setup(zone, 10);
-        var handler = new RankBuffHandler();
+        var handler = new RankBuffHandler(new RankBuffService());
 
         handler.Handle(new RankBuffRequest { Sort = 2 }, session);
 
@@ -68,7 +69,7 @@ public class RankBuffHandlerTests
     {
         var zone = ZoneTestKit.CreateZone(1);
         var (session, _, _) = Setup(zone, 10);
-        var handler = new RankBuffHandler();
+        var handler = new RankBuffHandler(new RankBuffService());
 
         handler.Handle(new RankBuffRequest { Sort = 8 }, session);
 

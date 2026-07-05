@@ -2,6 +2,7 @@ using System.Buffers.Binary;
 using System.Collections.Frozen;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Handlers;
+using Fenrir.Application.Game.Handlers.BuffsMountsCosmetics.Services;
 using Fenrir.Application.Game.Tests.GameData;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Application.Game.World;
@@ -43,8 +44,9 @@ public class CostumeStateHandlerTests
             [305] = new(WorldDataTestRows.Item(305), [])
         }.ToFrozenDictionary();
 
-        return new CostumeStateHandler(characters, ZoneTestKit.EmptyWorldData(itemsById),
-            NullLogger<CostumeStateHandler>.Instance);
+        var service = new CostumeStateService(characters, ZoneTestKit.EmptyWorldData(itemsById),
+            NullLogger<CostumeStateService>.Instance);
+        return new CostumeStateHandler(service);
     }
 
     [Fact]

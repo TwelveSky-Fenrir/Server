@@ -1,4 +1,5 @@
 using Fenrir.Application.Game.Handlers;
+using Fenrir.Application.Game.Handlers.BuffsMountsCosmetics.Services;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Application.Game.World;
 using Fenrir.Contracts.Packets.Zone;
@@ -40,7 +41,7 @@ public class CostumeVisibilityHandlerTests
         var (session, pipe, _) = Setup(zone, 10);
         var (_, neighborPipe, _) = Setup(zone, 20, 12f, 12f);
         ZoneTestKit.DrainOutbound(pipe); // neighbor's own Enter-broadcast join packet, not under test
-        var handler = new CostumeVisibilityHandler();
+        var handler = new CostumeVisibilityHandler(new CostumeVisibilityService());
 
         handler.Handle(new CostumeVisibilityRequest { Sort = sort }, session);
         zone.Tick(TimeSpan.FromMilliseconds(50));
@@ -58,7 +59,7 @@ public class CostumeVisibilityHandlerTests
     {
         var zone = ZoneTestKit.CreateZone(1);
         var (session, pipe, _) = Setup(zone, 10);
-        var handler = new CostumeVisibilityHandler();
+        var handler = new CostumeVisibilityHandler(new CostumeVisibilityService());
 
         handler.Handle(new CostumeVisibilityRequest { Sort = 2 }, session);
 

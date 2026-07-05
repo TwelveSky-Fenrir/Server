@@ -1,4 +1,5 @@
 using Fenrir.Application.Game.Handlers;
+using Fenrir.Application.Game.Handlers.BuffsMountsCosmetics.Services;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Application.Game.World;
 using Fenrir.Contracts.Packets.Zone;
@@ -36,7 +37,7 @@ public class MountAbsorbHandlerTests
     {
         var zone = ZoneTestKit.CreateZone(1);
         var (session, _, _) = Setup(zone, 10);
-        var handler = new MountAbsorbHandler();
+        var handler = new MountAbsorbHandler(new MountAbsorbService());
 
         handler.Handle(new MountAbsorbRequest { Sort = 1 }, session);
 
@@ -49,7 +50,7 @@ public class MountAbsorbHandlerTests
         var zone = ZoneTestKit.CreateZone(1);
         var (session, _, state) = Setup(zone, 10);
         state.AnimalIndex = 13;
-        var handler = new MountAbsorbHandler();
+        var handler = new MountAbsorbHandler(new MountAbsorbService());
 
         handler.Handle(new MountAbsorbRequest { Sort = 1 }, session);
 
@@ -65,7 +66,7 @@ public class MountAbsorbHandlerTests
         ZoneTestKit.DrainOutbound(pipe); // neighbor's own Enter-broadcast join packet, not under test
         state.AnimalIndex = 13;
         state.AnimalAbsorbTime = 5;
-        var handler = new MountAbsorbHandler();
+        var handler = new MountAbsorbHandler(new MountAbsorbService());
 
         handler.Handle(new MountAbsorbRequest { Sort = 1 }, session);
         zone.Tick(TimeSpan.FromMilliseconds(50));
@@ -88,7 +89,7 @@ public class MountAbsorbHandlerTests
         state.Mana = 1;
         state.MaxLife = 800;
         state.MaxMana = 300;
-        var handler = new MountAbsorbHandler();
+        var handler = new MountAbsorbHandler(new MountAbsorbService());
 
         handler.Handle(new MountAbsorbRequest { Sort = 2 }, session);
         zone.Tick(TimeSpan.FromMilliseconds(50));
@@ -106,7 +107,7 @@ public class MountAbsorbHandlerTests
     {
         var zone = ZoneTestKit.CreateZone(1);
         var (session, _, _) = Setup(zone, 10);
-        var handler = new MountAbsorbHandler();
+        var handler = new MountAbsorbHandler(new MountAbsorbService());
 
         handler.Handle(new MountAbsorbRequest { Sort = 3 }, session);
 

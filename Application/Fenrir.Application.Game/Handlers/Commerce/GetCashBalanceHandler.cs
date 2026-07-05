@@ -1,6 +1,6 @@
+using Fenrir.Application.Game.Handlers.Commerce.Services;
 using Fenrir.Contracts.Abstractions;
 using Fenrir.Contracts.Packets.Zone;
-using Fenrir.Data.Commerce;
 using Fenrir.Network.Sessions;
 
 namespace Fenrir.Application.Game.Handlers.Commerce;
@@ -9,7 +9,8 @@ namespace Fenrir.Application.Game.Handlers.Commerce;
 ///     CZ_GET_CASH_SIZE_SEND (opcode 41) -- reads the account's cash balance. <c>Sort</c> is a pure
 ///     client-side UI routing echo, never inspected server-side.
 /// </summary>
-public sealed class GetCashBalanceHandler(ICashRepository cash) : IAsyncPacketHandler<GetCashBalanceRequest>
+public sealed class GetCashBalanceHandler(IGetCashBalanceService service)
+    : IAsyncPacketHandler<GetCashBalanceRequest>
 {
     public async ValueTask HandleAsync(GetCashBalanceRequest packet, IPacketSession session,
         CancellationToken cancellationToken)
@@ -17,7 +18,7 @@ public sealed class GetCashBalanceHandler(ICashRepository cash) : IAsyncPacketHa
         var zoneSession = (ZoneClientSession)session;
         var accountId = zoneSession.AccountId!.Value;
 
-        var balance = await cash.GetBalanceAsync(accountId, cancellationToken);
+        var balance = await service.GetBalanceAsync(accountId, cancellationToken);
 
         session.Send(new GetCashBalanceResponse { CashSize = balance, Sort = packet.Sort });
     }

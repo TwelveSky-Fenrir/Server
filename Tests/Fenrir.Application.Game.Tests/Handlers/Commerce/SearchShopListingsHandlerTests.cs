@@ -1,6 +1,7 @@
 using System.Collections.Frozen;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Handlers.Commerce;
+using Fenrir.Application.Game.Handlers.Commerce.Services;
 using Fenrir.Application.Game.Social.Pshop;
 using Fenrir.Application.Game.Tests.GameData;
 using Fenrir.Application.Game.Tests.TestSupport;
@@ -59,7 +60,7 @@ public class SearchShopListingsHandlerTests
             [500] = new(WorldDataTestRows.Item(500) with { Sort = 11 }, [])
         }.ToFrozenDictionary();
 
-        return new SearchShopListingsHandler(ZoneTestKit.EmptyWorldData(itemsById));
+        return new SearchShopListingsHandler(new SearchShopListingsService(ZoneTestKit.EmptyWorldData(itemsById)));
     }
 
     [Fact]

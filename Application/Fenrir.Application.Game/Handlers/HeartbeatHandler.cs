@@ -1,6 +1,7 @@
 using Fenrir.Application.Game.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Fenrir.Application.Game.ZoneLifecycle.Services;
 using Fenrir.Network.Sessions;
 
 namespace Fenrir.Application.Game.Handlers;
@@ -17,7 +18,7 @@ namespace Fenrir.Application.Game.Handlers;
 ///     compiled out of the very binary this port is based on. Deliberately not modeled here for that reason,
 ///     not an oversight.
 /// </remarks>
-public sealed class HeartbeatHandler : IInlinePacketHandler<HeartbeatRequest>
+public sealed class HeartbeatHandler(IHeartbeatService service) : IInlinePacketHandler<HeartbeatRequest>
 {
     public void Handle(in HeartbeatRequest packet, IPacketSession session)
     {
@@ -27,15 +28,7 @@ public sealed class HeartbeatHandler : IInlinePacketHandler<HeartbeatRequest>
             !zone.TryGetPlayer(characterId, out var state) || state is null)
             return;
 
-        // Anti-replay: a captured-and-resent heartbeat frame carries the exact same LastSend counter twice in
-        // a row. A genuine client always advances it.
-        if (state.PrevSentHeartbeat == packet.LastSend)
-        {
+        if (service.Process(state, packet.LastSend) == HeartbeatOutcome.Replayed)
             zoneSession.Abort(DisconnectReason.Faulted);
-            return;
-        }
-
-        state.PrevSentHeartbeat = packet.LastSend;
-        state.LastSentHeartbeat = DateTime.UtcNow;
     }
 }

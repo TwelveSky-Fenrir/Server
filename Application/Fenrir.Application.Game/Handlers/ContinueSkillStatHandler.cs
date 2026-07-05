@@ -2,6 +2,7 @@ using Fenrir.Application.Game.Skills;
 using Fenrir.Application.Game.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Fenrir.Application.Game.ZoneLifecycle.Services;
 using Fenrir.Network.Sessions;
 
 namespace Fenrir.Application.Game.Handlers;
@@ -12,7 +13,8 @@ namespace Fenrir.Application.Game.Handlers;
 ///     <see cref="AutoBuffSkillResolver" />'s remarks). Always replies Result=0, even when every slot clamps to
 ///     an unlearned skill's -1.
 /// </summary>
-public sealed class ContinueSkillStatHandler : IInlinePacketHandler<ContinueSkillStatRequest>
+public sealed class ContinueSkillStatHandler(IContinueSkillStatService service)
+    : IInlinePacketHandler<ContinueSkillStatRequest>
 {
     public void Handle(in ContinueSkillStatRequest packet, IPacketSession session)
     {
@@ -24,9 +26,7 @@ public sealed class ContinueSkillStatHandler : IInlinePacketHandler<ContinueSkil
         if (!zone.TryGetPlayer(characterId, out var state) || state is null)
             return;
 
-        var registered = AutoBuffSkillResolver.ResolveRegistration(packet.Skill, state.LearnedSkills);
-
+        service.RegisterAutoBuffs(zone, characterId, state, packet.Skill);
         session.Send(new AutoBuffRegisterResponse { Value = 0 });
-        zone.PostAutoBuffCommand(new AutoBuffZoneCommand(characterId, registered));
     }
 }

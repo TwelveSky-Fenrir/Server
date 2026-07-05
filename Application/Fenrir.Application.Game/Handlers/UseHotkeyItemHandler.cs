@@ -1,7 +1,7 @@
-using Fenrir.Application.Game.Inventory;
 using Fenrir.Application.Game.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Fenrir.Application.Game.ZoneLifecycle.Services;
 using Fenrir.Network.Sessions;
 
 namespace Fenrir.Application.Game.Handlers;
@@ -11,7 +11,7 @@ namespace Fenrir.Application.Game.Handlers;
 ///     inventory page/slot locally, so this only validates that slot is occupied and echoes the result.
 /// </summary>
 /// <remarks>Does not yet apply the item's use effect or decrement quantity -- out of scope for this pass.</remarks>
-public sealed class UseHotkeyItemHandler : IInlinePacketHandler<UseHotkeyItemRequest>
+public sealed class UseHotkeyItemHandler(IUseHotkeyItemService service) : IInlinePacketHandler<UseHotkeyItemRequest>
 {
     public void Handle(in UseHotkeyItemRequest packet, IPacketSession session)
     {
@@ -25,10 +25,7 @@ public sealed class UseHotkeyItemHandler : IInlinePacketHandler<UseHotkeyItemReq
         var page = packet.Page1;
         var index = packet.Index1;
 
-        // Compare as int before narrowing to byte: an untrusted page value could otherwise wrap and alias a real container id.
-        var isInventoryPage = page == ContainerMatrix.InventoryPage0 || page == ContainerMatrix.InventoryPage1;
-        var occupied = isInventoryPage && ContainerMatrix.IsValidSlot((byte)page, index) &&
-                       state.Inventory.GetSlot((byte)page, (byte)index) is not null;
+        var occupied = service.IsOccupied(state, page, index);
 
         session.Send(new UseHotkeyItemResponse { Result = occupied ? 0 : 1, Page = page, Index = index });
     }

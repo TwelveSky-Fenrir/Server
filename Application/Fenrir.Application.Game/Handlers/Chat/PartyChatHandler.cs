@@ -1,5 +1,5 @@
+using Fenrir.Application.Game.Handlers.Chat.Services;
 using Fenrir.Application.Game.Social.Chat;
-using Fenrir.Application.Game.Social.Party;
 using Fenrir.Application.Game.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Serialization.Packets.Shared;
@@ -12,10 +12,8 @@ namespace Fenrir.Application.Game.Handlers.Chat;
 ///     CZ_PARTY_CHAT_SEND (opcode 68). The outgoing link is always zeroed -- the legacy decodes the
 ///     incoming item link but never relays it, so it is decoded here and then deliberately discarded.
 /// </summary>
-public sealed class PartyChatHandler(ZoneRegistry zones, PartyRegistry parties) : IInlinePacketHandler<PartyChatRequest>
+public sealed class PartyChatHandler(IPartyChatService partyChatService) : IInlinePacketHandler<PartyChatRequest>
 {
-    private static readonly ItemLinkInfo EmptyLink = new() { Index = 0, Activity = 0, Value = 0, Socket = new int[3] };
-
     public void Handle(in PartyChatRequest packet, IPacketSession session)
     {
         var zoneSession = (ZoneClientSession)session;
@@ -33,15 +31,6 @@ public sealed class PartyChatHandler(ZoneRegistry zones, PartyRegistry parties) 
         if (!zone.TryGetPlayer(characterId, out var sender) || sender is null)
             return;
 
-        var members = parties.GetMembers(characterId);
-        if (members.Count == 0)
-            return;
-
-        var response = new PartyChatResponse
-            { AvatarName = sender.Name, Content = packet.Content, Link = EmptyLink };
-
-        foreach (var memberId in members)
-            if (zones.TryGetPlayer(memberId, out var recipient))
-                recipient.Session.Send(response);
+        partyChatService.TrySendChat(sender, packet.Content);
     }
 }

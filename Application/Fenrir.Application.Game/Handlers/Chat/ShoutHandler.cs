@@ -1,3 +1,4 @@
+using Fenrir.Application.Game.Handlers.Chat.Services;
 using Fenrir.Application.Game.Social.Chat;
 using Fenrir.Application.Game.World;
 using Fenrir.Network.Abstractions;
@@ -10,7 +11,7 @@ namespace Fenrir.Application.Game.Handlers.Chat;
 ///     CZ_GENERAL_SHOUT_SEND (opcode 40). Silently ignored outside shout-enabled maps
 ///     (<see cref="ChatRouter.IsShoutEnabledOnMap" />) -- matches the legacy's silent ignore, not a Quit.
 /// </summary>
-public sealed class ShoutHandler : IInlinePacketHandler<ShoutRequest>
+public sealed class ShoutHandler(IShoutService shoutService) : IInlinePacketHandler<ShoutRequest>
 {
     public void Handle(in ShoutRequest packet, IPacketSession session)
     {
@@ -22,19 +23,13 @@ public sealed class ShoutHandler : IInlinePacketHandler<ShoutRequest>
             return;
         }
 
-        if (zoneSession.CurrentZone is not Zone zone || !ChatRouter.IsShoutEnabledOnMap(zone.MapId))
+        if (zoneSession.CurrentZone is not Zone zone)
             return;
 
         var characterId = zoneSession.CharacterId!.Value;
-        if (!zone.TryGetPlayer(characterId, out var state) || state is null || state.IsMuted)
+        if (!zone.TryGetPlayer(characterId, out var state) || state is null)
             return;
 
-        zone.PostChatCommand(new ChatZoneCommand
-        {
-            SenderCharacterId = characterId,
-            Kind = ChatBroadcastKind.Shout,
-            Content = packet.Content,
-            Link = packet.Link
-        });
+        shoutService.TryPostShout(zone, state, packet.Content, packet.Link);
     }
 }

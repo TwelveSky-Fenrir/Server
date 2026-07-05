@@ -1,4 +1,4 @@
-using Fenrir.Application.Game.Social;
+using Fenrir.Application.Game.Handlers.Chat.Services;
 using Fenrir.Application.Game.World;
 using Fenrir.Contracts.Abstractions;
 using Fenrir.Contracts.Packets.Zone;
@@ -10,7 +10,8 @@ namespace Fenrir.Application.Game.Handlers.Chat;
 ///     CZ_GUILD_NOTICE_SEND (opcode 76). Restricted to the guild master (<c>GuildRoleCodec.IsMaster</c>);
 ///     a non-master sender is silently ignored, not disconnected. No mute gate applies to this channel.
 /// </summary>
-public sealed class GuildAnnouncementHandler(ZoneRegistry zones) : IInlinePacketHandler<GuildAnnouncementRequest>
+public sealed class GuildAnnouncementHandler(IGuildAnnouncementService guildAnnouncementService)
+    : IInlinePacketHandler<GuildAnnouncementRequest>
 {
     public void Handle(in GuildAnnouncementRequest packet, IPacketSession session)
     {
@@ -29,14 +30,6 @@ public sealed class GuildAnnouncementHandler(ZoneRegistry zones) : IInlinePacket
         if (!zone.TryGetPlayer(characterId, out var sender) || sender is null)
             return;
 
-        if (sender.GuildId is not { } guildId || !GuildRoleCodec.IsMaster(sender.GuildRoleDb))
-            return;
-
-        var response = new GuildAnnouncementResponse { AvatarName = sender.Name, Content = packet.Content };
-
-        foreach (var target in zones.Zones)
-        foreach (var recipient in target.Players)
-            if (recipient.GuildId == guildId)
-                recipient.Session.Send(response);
+        guildAnnouncementService.TrySendAnnouncement(sender, packet.Content);
     }
 }

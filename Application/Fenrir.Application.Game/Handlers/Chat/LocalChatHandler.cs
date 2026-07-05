@@ -1,3 +1,4 @@
+using Fenrir.Application.Game.Handlers.Chat.Services;
 using Fenrir.Application.Game.Social.Chat;
 using Fenrir.Application.Game.World;
 using Fenrir.Contracts.Abstractions;
@@ -10,7 +11,7 @@ namespace Fenrir.Application.Game.Handlers.Chat;
 ///     CZ_GENERAL_CHAT_SEND (opcode 38). A muted sender is silently dropped, not disconnected. GM
 ///     inline-command interception is not modeled -- no GM-rank concept exists yet.
 /// </summary>
-public sealed class LocalChatHandler : IInlinePacketHandler<LocalChatRequest>
+public sealed class LocalChatHandler(ILocalChatService localChatService) : IInlinePacketHandler<LocalChatRequest>
 {
     public void Handle(in LocalChatRequest packet, IPacketSession session)
     {
@@ -26,15 +27,9 @@ public sealed class LocalChatHandler : IInlinePacketHandler<LocalChatRequest>
             return;
 
         var characterId = zoneSession.CharacterId!.Value;
-        if (!zone.TryGetPlayer(characterId, out var state) || state is null || state.IsMuted)
+        if (!zone.TryGetPlayer(characterId, out var state) || state is null)
             return;
 
-        zone.PostChatCommand(new ChatZoneCommand
-        {
-            SenderCharacterId = characterId,
-            Kind = ChatBroadcastKind.Local,
-            Content = packet.Content,
-            Link = packet.Link
-        });
+        localChatService.TryPostChat(zone, state, packet.Content, packet.Link);
     }
 }

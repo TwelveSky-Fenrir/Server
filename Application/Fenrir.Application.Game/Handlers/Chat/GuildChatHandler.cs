@@ -1,3 +1,4 @@
+using Fenrir.Application.Game.Handlers.Chat.Services;
 using Fenrir.Application.Game.Social.Chat;
 using Fenrir.Application.Game.World;
 using Fenrir.Contracts.Abstractions;
@@ -10,7 +11,7 @@ namespace Fenrir.Application.Game.Handlers.Chat;
 ///     CZ_GUILD_CHAT_SEND (opcode 77). Guildless/muted senders are silently dropped, not disconnected.
 ///     Unlike party chat, the item link here is genuinely relayed to every guild member.
 /// </summary>
-public sealed class GuildChatHandler(ZoneRegistry zones) : IInlinePacketHandler<GuildChatRequest>
+public sealed class GuildChatHandler(IGuildChatService guildChatService) : IInlinePacketHandler<GuildChatRequest>
 {
     public void Handle(in GuildChatRequest packet, IPacketSession session)
     {
@@ -29,18 +30,6 @@ public sealed class GuildChatHandler(ZoneRegistry zones) : IInlinePacketHandler<
         if (!zone.TryGetPlayer(characterId, out var sender) || sender is null)
             return;
 
-        if (sender.GuildId is not { } guildId)
-            return;
-
-        if (sender.IsMuted)
-            return;
-
-        var response = new GuildChatResponse
-            { AvatarName = sender.Name, Content = packet.Content, Link = packet.Link };
-
-        foreach (var target in zones.Zones)
-        foreach (var recipient in target.Players)
-            if (recipient.GuildId == guildId)
-                recipient.Session.Send(response);
+        guildChatService.TrySendChat(sender, packet.Content, packet.Link);
     }
 }

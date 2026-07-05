@@ -1,3 +1,4 @@
+using Fenrir.Application.Game.Handlers.Chat.Services;
 using Fenrir.Application.Game.World;
 using Fenrir.Contracts.Abstractions;
 using Fenrir.Contracts.Packets.Zone;
@@ -10,7 +11,8 @@ namespace Fenrir.Application.Game.Handlers.Chat;
 ///     (<see cref="PlayerRuntimeState.TribeRole" /> 1 or 2); a regular member is silently ignored, not
 ///     disconnected. Strict tribe match only, no alliance.
 /// </summary>
-public sealed class TribeAnnouncementHandler(ZoneRegistry zones) : IInlinePacketHandler<TribeAnnouncementRequest>
+public sealed class TribeAnnouncementHandler(ITribeAnnouncementService tribeAnnouncementService)
+    : IInlinePacketHandler<TribeAnnouncementRequest>
 {
     public void Handle(in TribeAnnouncementRequest packet, IPacketSession session)
     {
@@ -29,15 +31,6 @@ public sealed class TribeAnnouncementHandler(ZoneRegistry zones) : IInlinePacket
         if (!zone.TryGetPlayer(characterId, out var sender) || sender is null)
             return;
 
-        if (sender.TribeRole is not (1 or 2))
-            return;
-
-        var response = new TribeAnnouncementResponse
-            { TribeRole = sender.TribeRole, AvatarName = sender.Name, Content = packet.Content };
-
-        foreach (var target in zones.Zones)
-        foreach (var recipient in target.Players)
-            if (recipient.Tribe == sender.Tribe)
-                recipient.Session.Send(response);
+        tribeAnnouncementService.TrySendAnnouncement(sender, packet.Content);
     }
 }

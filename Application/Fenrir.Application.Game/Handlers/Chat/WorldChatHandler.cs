@@ -1,3 +1,4 @@
+using Fenrir.Application.Game.Handlers.Chat.Services;
 using Fenrir.Application.Game.Social.Chat;
 using Fenrir.Application.Game.World;
 using Fenrir.Contracts.Abstractions;
@@ -11,10 +12,8 @@ namespace Fenrir.Application.Game.Handlers.Chat;
 ///     silently dropped. Broadcasts to every zone, unfiltered. The wire's <c>TribeRole</c> field for this
 ///     opcode is actually the sender's tribe number, not a role -- passed through verbatim.
 /// </summary>
-public sealed class WorldChatHandler(ZoneRegistry zones) : IInlinePacketHandler<WorldChatRequest>
+public sealed class WorldChatHandler(IWorldChatService worldChatService) : IInlinePacketHandler<WorldChatRequest>
 {
-    private const int MinimumLevel = 10;
-
     public void Handle(in WorldChatRequest packet, IPacketSession session)
     {
         var zoneSession = (ZoneClientSession)session;
@@ -32,24 +31,8 @@ public sealed class WorldChatHandler(ZoneRegistry zones) : IInlinePacketHandler<
         if (!zone.TryGetPlayer(characterId, out var sender) || sender is null)
             return;
 
-        if (sender.Level < MinimumLevel)
-        {
+        var outcome = worldChatService.TrySendChat(sender, packet.Content);
+        if (outcome == WorldChatOutcome.LevelTooLow)
             zoneSession.Abort(DisconnectReason.Faulted);
-            return;
-        }
-
-        if (sender.IsMuted)
-            return;
-
-        var response = new WorldChatResponse
-        {
-            TribeRole = sender.Tribe,
-            AvatarName = sender.Name,
-            Content = packet.Content
-        };
-
-        foreach (var target in zones.Zones)
-        foreach (var recipient in target.Players)
-            recipient.Session.Send(response);
     }
 }

@@ -1,7 +1,7 @@
 using System.Collections.Immutable;
 using System.Net;
 using Fenrir.Application.Login.RateLimiting;
-using Fenrir.Contracts.Packets.Login;
+using Fenrir.Network.Serialization.Packets.Login;
 using Fenrir.Data.Accounts;
 using Fenrir.Data.Characters;
 using Fenrir.Data.Security;

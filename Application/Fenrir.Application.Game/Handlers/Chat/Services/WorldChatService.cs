@@ -1,5 +1,5 @@
 using Fenrir.Application.Game.World;
-using Fenrir.Contracts.Packets.Zone;
+using Fenrir.Network.Serialization.Packets.Zone;
 
 namespace Fenrir.Application.Game.Handlers.Chat.Services;
 

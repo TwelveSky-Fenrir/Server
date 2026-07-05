@@ -1,3 +1,4 @@
+using Fenrir.Application.Login.Handlers.Services;
 using Fenrir.Application.Login.RateLimiting;
 using Fenrir.Network.Dispatch;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,6 +15,7 @@ public static class LoginHandlersServiceCollectionExtensions
     public static IServiceCollection AddLoginHandlers(this IServiceCollection services)
     {
         services.AddSingleton<LoginIpRateLimiter>();
+        services.AddLoginServices();
 
         return services.AddGeneratedPacketHandlers();
     }

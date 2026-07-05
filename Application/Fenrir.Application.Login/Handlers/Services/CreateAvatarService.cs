@@ -1,5 +1,5 @@
 using Fenrir.Application.Login.Avatars;
-using Fenrir.Contracts.Packets.Shared;
+using Fenrir.Network.Serialization.Packets.Shared;
 using Fenrir.Data.Characters;
 
 namespace Fenrir.Application.Login.Handlers.Services;

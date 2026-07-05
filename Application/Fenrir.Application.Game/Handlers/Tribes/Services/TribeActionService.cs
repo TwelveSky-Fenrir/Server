@@ -6,7 +6,7 @@ using Fenrir.Application.Game.Pets;
 using Fenrir.Application.Game.Stats;
 using Fenrir.Application.Game.Tribes;
 using Fenrir.Application.Game.World;
-using Fenrir.Contracts.Packets.Shared;
+using Fenrir.Network.Serialization.Packets.Shared;
 using Fenrir.Data.Characters;
 using Fenrir.Data.Tribes;
 using Microsoft.Extensions.Logging;

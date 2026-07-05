@@ -1,6 +1,6 @@
 using Fenrir.Application.Game.Progression;
 using Fenrir.Application.Game.World;
-using Fenrir.Contracts.Packets.Shared;
+using Fenrir.Network.Serialization.Packets.Shared;
 using Fenrir.Data.Progression;
 
 namespace Fenrir.Application.Game.Handlers.Progression.Services;

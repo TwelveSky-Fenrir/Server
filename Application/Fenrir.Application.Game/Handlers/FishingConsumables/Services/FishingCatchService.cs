@@ -3,8 +3,8 @@ using Fenrir.Application.Game.Combat;
 using Fenrir.Application.Game.Fishing;
 using Fenrir.Application.Game.Inventory;
 using Fenrir.Application.Game.World;
-using Fenrir.Contracts.Abstractions;
-using Fenrir.Contracts.Packets.Zone;
+using Fenrir.Network.Abstractions;
+using Fenrir.Network.Serialization.Packets.Zone;
 using Fenrir.Data.Characters;
 using Microsoft.Extensions.Logging;
 

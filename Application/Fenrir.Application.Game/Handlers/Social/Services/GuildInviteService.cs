@@ -1,7 +1,7 @@
 using Fenrir.Application.Game.Guilds;
 using Fenrir.Application.Game.Social;
 using Fenrir.Application.Game.World;
-using Fenrir.Contracts.Packets.Zone;
+using Fenrir.Network.Serialization.Packets.Zone;
 
 namespace Fenrir.Application.Game.Handlers.Social.Services;
 

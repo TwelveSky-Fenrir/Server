@@ -1,6 +1,6 @@
 using Fenrir.Application.Game.Social.Friends;
 using Fenrir.Application.Game.World;
-using Fenrir.Contracts.Packets.Zone;
+using Fenrir.Network.Serialization.Packets.Zone;
 using Fenrir.Data.Social;
 
 namespace Fenrir.Application.Game.Handlers.Social.Services;

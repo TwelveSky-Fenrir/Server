@@ -3,7 +3,7 @@ using Fenrir.Application.Game.Consumables;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Inventory;
 using Fenrir.Application.Game.World;
-using Fenrir.Contracts.Packets.Zone;
+using Fenrir.Network.Serialization.Packets.Zone;
 using Fenrir.Data.Characters;
 using Fenrir.Data.Guilds;
 using Microsoft.Extensions.Logging;

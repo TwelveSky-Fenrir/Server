@@ -1,4 +1,4 @@
-using Fenrir.Contracts.Packets.Zone;
+using Fenrir.Network.Serialization.Packets.Zone;
 using Fenrir.Data.Commerce;
 using Microsoft.Extensions.Logging;
 

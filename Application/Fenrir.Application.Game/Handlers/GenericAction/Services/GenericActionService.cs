@@ -9,7 +9,7 @@ using Fenrir.Application.Game.Tribes;
 using Fenrir.Application.Game.World;
 using Fenrir.Application.Game.World.Loot;
 using Fenrir.Application.Game.World.Npcs;
-using Fenrir.Contracts.Packets.Shared;
+using Fenrir.Network.Serialization.Packets.Shared;
 using Fenrir.Data.Characters;
 using Microsoft.Extensions.Logging;
 

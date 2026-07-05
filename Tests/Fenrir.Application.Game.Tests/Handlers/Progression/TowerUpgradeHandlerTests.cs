@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using Fenrir.Application.Game.Handlers.Progression;
+using Fenrir.Application.Game.Handlers.Progression.Services;
 using Fenrir.Application.Game.Inventory;
 using Fenrir.Application.Game.Progression;
 using Fenrir.Application.Game.Tests.TestSupport;
@@ -65,7 +66,8 @@ public class TowerUpgradeHandlerTests
 
     private static TowerUpgradeHandler CreateHandler(FakeCharacterRepository characters, TowerWarState towerWar)
     {
-        return new TowerUpgradeHandler(towerWar, characters, NullLogger<TowerUpgradeHandler>.Instance);
+        var service = new TowerUpgradeService(towerWar, characters, NullLogger<TowerUpgradeService>.Instance);
+        return new TowerUpgradeHandler(service);
     }
 
     [Fact]

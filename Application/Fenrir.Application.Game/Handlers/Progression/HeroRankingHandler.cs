@@ -1,8 +1,7 @@
-using Fenrir.Application.Game.Progression;
+using Fenrir.Application.Game.Handlers.Progression.Services;
 using Fenrir.Application.Game.World;
 using Fenrir.Contracts.Abstractions;
 using Fenrir.Contracts.Packets.Zone;
-using Fenrir.Data.Progression;
 using Fenrir.Network.Sessions;
 
 namespace Fenrir.Application.Game.Handlers.Progression;
@@ -14,10 +13,9 @@ namespace Fenrir.Application.Game.Handlers.Progression;
 ///     (S04_MyWork02.cpp:14159-14176). Fenrir has no separate ranking-refresh job, so this reproduces the
 ///     same observable cadence as a flat per-connection 2.5s throttle instead, always querying live.
 /// </summary>
-public sealed class HeroRankingHandler(IHeroRankingRepository heroRankings) : IAsyncPacketHandler<HeroRankingRequest>
+public sealed class HeroRankingHandler(IHeroRankingService heroRankingService)
+    : IAsyncPacketHandler<HeroRankingRequest>
 {
-    private static readonly TimeSpan ThrottleInterval = TimeSpan.FromMilliseconds(2500);
-
     public async ValueTask HandleAsync(HeroRankingRequest packet, IPacketSession session,
         CancellationToken cancellationToken)
     {
@@ -29,22 +27,12 @@ public sealed class HeroRankingHandler(IHeroRankingRepository heroRankings) : IA
         if (!zone.TryGetPlayer(characterId, out var state) || state is null)
             return;
 
-        var now = TimeSpan.FromMilliseconds(Environment.TickCount64);
+        var result = await heroRankingService.QueryAsync(characterId, zone, state, cancellationToken);
 
-        if (state.LastHeroRankingPreviousQueryAtZoneClock is not { } lastPrevious ||
-            now - lastPrevious > ThrottleInterval)
-        {
-            var rows = await heroRankings.GetByPeriodAsync(1, cancellationToken);
-            session.Send(new HeroRankingPreviousResponse { Result = 0, HeroInfo = HeroRankBuilder.Build(rows) });
-            zone.PostHeroRankingQueryCommand(new HeroRankingQueryZoneCommand(characterId, true, now));
-        }
+        if (result.Previous is { } previous)
+            session.Send(new HeroRankingPreviousResponse { Result = 0, HeroInfo = previous });
 
-        if (state.LastHeroRankingCurrentQueryAtZoneClock is not { } lastCurrent ||
-            now - lastCurrent > ThrottleInterval)
-        {
-            var rows = await heroRankings.GetByPeriodAsync(0, cancellationToken);
-            session.Send(new HeroRankingCurrentResponse { Result = 0, HeroInfo = HeroRankBuilder.Build(rows) });
-            zone.PostHeroRankingQueryCommand(new HeroRankingQueryZoneCommand(characterId, false, now));
-        }
+        if (result.Current is { } current)
+            session.Send(new HeroRankingCurrentResponse { Result = 0, HeroInfo = current });
     }
 }

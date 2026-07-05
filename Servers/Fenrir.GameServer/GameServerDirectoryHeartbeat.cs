@@ -1,6 +1,6 @@
 using Fenrir.Application.Game;
 using Fenrir.Application.Game.World;
-using Fenrir.Data.Runtime;
+using Fenrir.Data.Abstractions.Runtime;
 using Microsoft.Extensions.Options;
 
 namespace Fenrir.GameServer;

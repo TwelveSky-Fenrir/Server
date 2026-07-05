@@ -22,7 +22,7 @@ public static class WireXor
 
     /// <summary>
     ///     <c>USE_XOR_UID</c>: XORs only the C-string prefix (up to first null); fragile if length differs between
-    ///     send/receive (§3.3) — legacy behavior reproduced as-is.
+    ///     send/receive — legacy behavior reproduced as-is.
     /// </summary>
     public static void ApplyUidXor(Span<byte> fixedField)
     {
@@ -70,7 +70,7 @@ public static class WireXor
     }
 
     /// <summary>
-    ///     <c>mPacketEncryptionValue</c> (§3.4): uniform single-byte XOR, distinct from <see cref="ApplyPacketXor" />'s
+    ///     <c>mPacketEncryptionValue</c> uniform single-byte XOR, distinct from <see cref="ApplyPacketXor" />'s
     ///     degenerate keystream; key == 0 means unseeded (plaintext), matching legacy behavior.
     /// </summary>
     public static void ApplyStreamXor(Span<byte> buffer, byte key)

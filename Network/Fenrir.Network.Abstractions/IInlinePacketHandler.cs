@@ -1,6 +1,6 @@
 namespace Fenrir.Network.Abstractions;
 
-/// <summary>Synchronous handler run on the session loop: microsecond budget, never SQL or a contended lock (D-04).</summary>
+/// <summary>Synchronous handler run on the session loop: microsecond budget, never SQL or a contended lock.</summary>
 public interface IInlinePacketHandler<TPacket>
     where TPacket : struct, IIncomingPacket<TPacket>
 {

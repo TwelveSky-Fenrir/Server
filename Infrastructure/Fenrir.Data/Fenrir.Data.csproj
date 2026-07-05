@@ -5,6 +5,10 @@
     <PackageReference Include="Konscious.Security.Cryptography.Argon2"/>
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Fenrir.Data.Abstractions\Fenrir.Data.Abstractions.csproj"/>
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>

@@ -20,7 +20,7 @@ public sealed class FenrirPacketAttribute(FenrirServer server, FenrirDirection d
     /// <summary>Whole-packet obfuscation applied by the send layer (none by default).</summary>
     public WireObfuscationMode Obfuscation { get; init; } = WireObfuscationMode.None;
 
-    /// <summary>ZPACKET + LZ4 envelope (zone outbound opcodes 12/13 only). §3.5.</summary>
+    /// <summary>ZPACKET + LZ4 envelope (zone outbound opcodes 12/13 only).</summary>
     public bool Compressed { get; init; }
 
     /// <summary>Expected total wire size (header included); generator emits FEN-LEGACY-001 if field sizes diverge.</summary>

@@ -9,6 +9,10 @@
     <ProjectReference Include="..\..\Network\Fenrir.Network.Abstractions\Fenrir.Network.Abstractions.csproj"/>
     <ProjectReference Include="..\..\Network\Fenrir.Network.Serialization\Fenrir.Network.Serialization.csproj"/>
     <ProjectReference Include="..\..\Network\Fenrir.Network.Dispatch\Fenrir.Network.Dispatch.csproj"/>
+    <ProjectReference Include="..\..\Infrastructure\Fenrir.Data.Abstractions\Fenrir.Data.Abstractions.csproj"/>
+    <!-- WriteBehind (DirtyTracker/WriteBehindFlusher) and ApplicationFirewall have no repository interface and
+         were never part of this extraction — Application references the concrete project directly for those,
+         same as before; only repository access goes through Fenrir.Data.Abstractions now. -->
     <ProjectReference Include="..\..\Infrastructure\Fenrir.Data\Fenrir.Data.csproj"/>
   </ItemGroup>
 
@@ -21,6 +25,23 @@
     <ProjectReference Include="..\..\Generators\Fenrir.Generators.Dispatch\Fenrir.Generators.Dispatch.csproj"
                       OutputItemType="Analyzer"
                       ReferenceOutputAssembly="false"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Repository interfaces + DTOs/TVPs moved out of Fenrir.Data.* into Fenrir.Data.Abstractions.* (Application
+         must only ever reference interfaces, never the concrete Fenrir.Data implementation project) — one implicit
+         using per domain avoids repeating it across ~100+ consumer files. -->
+    <Using Include="Fenrir.Data.Abstractions.Accounts"/>
+    <Using Include="Fenrir.Data.Abstractions.Admin"/>
+    <Using Include="Fenrir.Data.Abstractions.Characters"/>
+    <Using Include="Fenrir.Data.Abstractions.Commerce"/>
+    <Using Include="Fenrir.Data.Abstractions.Guilds"/>
+    <Using Include="Fenrir.Data.Abstractions.Progression"/>
+    <Using Include="Fenrir.Data.Abstractions.Runtime"/>
+    <Using Include="Fenrir.Data.Abstractions.Security"/>
+    <Using Include="Fenrir.Data.Abstractions.Social"/>
+    <Using Include="Fenrir.Data.Abstractions.Tribes"/>
+    <Using Include="Fenrir.Data.Abstractions.World"/>
   </ItemGroup>
 
   <PropertyGroup>

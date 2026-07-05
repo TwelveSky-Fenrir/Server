@@ -9,6 +9,9 @@
   <Folder Name="/Core/">
     <Project Path="Core/Fenrir.Contracts/Fenrir.Contracts.csproj" />
   </Folder>
+  <Folder Name="/Database/">
+    <File Path="Database/_manifest.txt" />
+  </Folder>
   <Folder Name="/Generators/">
     <Project Path="Generators/Fenrir.Generators.Dispatch/Fenrir.Generators.Dispatch.csproj" />
     <Project Path="Generators/Fenrir.Generators.Protocol/Fenrir.Generators.Protocol.csproj" />

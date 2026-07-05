@@ -3,7 +3,7 @@ using Fenrir.Network.Abstractions;
 
 namespace Fenrir.Network.RateLimiting;
 
-// Hand-tuned per-opcode-class budgets (§8.5); not source-generated since operators retune these independently of OpcodeRegistry.
+// Hand-tuned per-opcode-class budgets not source-generated since operators retune these independently of OpcodeRegistry.
 public static class OpcodeRateLimiterPolicy
 {
     /// <summary>Login/character-creation gate — expensive downstream (DB hit, session promotion), so the strictest budget.</summary>
@@ -16,7 +16,7 @@ public static class OpcodeRateLimiterPolicy
     private static readonly (int Capacity, double TokensPerSecond) Heartbeat = (2, 1d / 5d);
 
     /// <summary>
-    ///     Everything else in M1: §8.5's reference burst of 3 is widened to 5 since one bucket covers several
+    ///     Everything else in the reference burst of 3 is widened to 5 since one bucket covers several
     ///     low-frequency opcodes.
     /// </summary>
     private static readonly (int Capacity, double TokensPerSecond) Default = (5, 5d);

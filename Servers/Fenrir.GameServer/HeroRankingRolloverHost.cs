@@ -1,5 +1,5 @@
 using Fenrir.Application.Game;
-using Fenrir.Data.Progression;
+using Fenrir.Data.Abstractions.Progression;
 using Microsoft.Extensions.Options;
 
 namespace Fenrir.GameServer;

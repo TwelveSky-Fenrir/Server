@@ -2,7 +2,7 @@ using System.Collections.Concurrent;
 
 namespace Fenrir.Network.Sessions;
 
-// Enforces one connection per account (§8.1); lifecycle (Abort/CompleteAsync) stays with the caller.
+// Enforces one connection per account lifecycle (Abort/CompleteAsync) stays with the caller.
 public sealed class SessionRegistry
 {
     private readonly ConcurrentDictionary<long, long> _accountToSession = new();

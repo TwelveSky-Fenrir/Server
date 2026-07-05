@@ -1,6 +1,6 @@
 namespace Fenrir.Network.Serialization.Attributes;
 
-/// <summary>Fixed-width C++ <c>char[N]</c> (§0.3): null-terminated, zero-padded, Latin-1 encoded.</summary>
+/// <summary>Fixed-width <c>char[N]</c> null-terminated, zero-padded, Latin-1 encoded.</summary>
 [AttributeUsage(AttributeTargets.Property)]
 public sealed class FixedStringAttribute(int length) : Attribute
 {

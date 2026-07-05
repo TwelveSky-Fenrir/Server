@@ -1,6 +1,6 @@
 namespace Fenrir.Network.Abstractions;
 
-/// <summary>Obfuscation applied to the whole packet (post-Write / pre-TryRead), beyond field serialization. §3.</summary>
+/// <summary>Obfuscation applied to the whole packet (post-Write / pre-TryRead), beyond field serialization.</summary>
 public enum WireObfuscationMode : byte
 {
     /// <summary>No global pass (packet is sent/received exactly as serialized).</summary>
@@ -8,13 +8,12 @@ public enum WireObfuscationMode : byte
 
     /// <summary>
     ///     <c>XOR_PACKET(s, sizeof(*s))</c> over the whole buffer, degenerate keystream {0x10, 0xFE, ...}, last byte
-    ///     untouched. §3.1.
+    ///     untouched.
     /// </summary>
     XorPacketGlobal,
 
     /// <summary>
-    ///     Field-by-field obfuscation (<c>scopyAvtXor*</c>), opcode stays in clear. Unique to <c>LC_USER_AVATAR_RECV2</c>
-    ///     . §3.2.
+    ///     Field-by-field obfuscation (<c>scopyAvtXor*</c>), opcode stays in clear. Unique to <c>LC_USER_AVATAR_RECV2</c>.
     /// </summary>
     XorFieldAvatar
 }

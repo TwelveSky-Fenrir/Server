@@ -3,7 +3,7 @@ using System.Security.Cryptography;
 using Fenrir.Application.Login;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Serialization.Packets.Login;
-using Fenrir.Data.Runtime;
+using Fenrir.Data.Abstractions.Runtime;
 using Fenrir.Network.Dispatching;
 using Fenrir.Network.RateLimiting;
 using Fenrir.Network.Sessions;

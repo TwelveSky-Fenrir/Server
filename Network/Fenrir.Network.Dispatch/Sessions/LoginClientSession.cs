@@ -6,8 +6,7 @@ using Fenrir.Network.Serialization.Wire;
 namespace Fenrir.Network.Sessions;
 
 /// <summary>
-///     Login-flow session: <c>Connected → VersionOk → Authenticated → CharSelect → HandoverIssued</c>
-///     (Docs/protocol/M1_Legacy_Wire_Contract.md §1, §8.1 of the architecture reference).
+///     Login-flow session: <c>Connected → VersionOk → Authenticated → CharSelect → HandoverIssued</c>.
 /// </summary>
 public sealed class LoginClientSession(long sessionId, IDuplexPipe transport, IPEndPoint? remoteEndPoint = null)
     : ClientSession(sessionId, transport, FenrirServer.Login, remoteEndPoint)
@@ -15,14 +14,12 @@ public sealed class LoginClientSession(long sessionId, IDuplexPipe transport, IP
     public LoginSessionState State { get; private set; } = LoginSessionState.Connected;
 
     /// <summary>
-    ///     Set by <see cref="MarkAuthenticated" /> — the DB identity (legacy <c>uUserIdx</c>, ADR-0005). Null until
-    ///     authenticated.
+    ///     Set by <see cref="MarkAuthenticated" /> — the DB identity (legacy <c>uUserIdx</c>). Null until authenticated.
     /// </summary>
     public int? AccountId { get; private set; }
 
     /// <summary>
-    ///     Legacy <c>mSecondLoginTryNum</c>: consecutive mouse-PIN mismatches; the third disconnects (S04_MyWork02.cpp
-    ///     l.517-522).
+    ///     Legacy <c>mSecondLoginTryNum</c>: consecutive mouse-PIN mismatches; the third disconnects.
     /// </summary>
     public int PinFailureCount { get; private set; }
 

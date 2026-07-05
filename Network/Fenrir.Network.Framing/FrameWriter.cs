@@ -4,7 +4,7 @@ using Fenrir.Network.Serialization.Wire;
 
 namespace Fenrir.Network.Framing;
 
-// 1-byte opcode header + payload, whole-frame obfuscation (§3.1) if declared. Field-level XOR is already
+// 1-byte opcode header + payload, whole-frame obfuscation if declared. Field-level XOR is already
 // baked into the generated Write. Compressed packets bypass this entirely via SendRaw.
 public static class FrameWriter
 {

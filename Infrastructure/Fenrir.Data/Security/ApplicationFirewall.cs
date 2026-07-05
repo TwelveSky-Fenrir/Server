@@ -1,4 +1,5 @@
 using System.Net;
+using Fenrir.Data.Abstractions.Security;
 
 namespace Fenrir.Data.Security;
 

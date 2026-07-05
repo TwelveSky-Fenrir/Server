@@ -27,7 +27,7 @@ public abstract class ClientSession(
     /// <summary>The peer's address; null for a transport never backed by a real accepted socket.</summary>
     public IPEndPoint? RemoteEndPoint { get; } = remoteEndPoint;
 
-    /// <summary>Legacy <c>mPacketEncryptionValue</c> (§3.4): 0 until the greeting packet seeds it.</summary>
+    /// <summary>Legacy <c>mPacketEncryptionValue</c> 0 until the greeting packet seeds it.</summary>
     public byte InboundStreamXorKey { get; set; }
 
     public DisconnectReason? DisconnectReason { get; private set; }

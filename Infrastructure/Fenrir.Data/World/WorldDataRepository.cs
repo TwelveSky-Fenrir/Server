@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using CaeriusNet.Abstractions;
 using CaeriusNet.Builders;
 using CaeriusNet.Commands.Reads;
+using Fenrir.Data.Abstractions.World;
 
 namespace Fenrir.Data.World;
 

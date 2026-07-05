@@ -1,6 +1,16 @@
 using System.Linq;
 using CaeriusNet.Abstractions;
 using CaeriusNet.Builders;
+using Fenrir.Data.Abstractions.Accounts;
+using Fenrir.Data.Abstractions.Admin;
+using Fenrir.Data.Abstractions.Characters;
+using Fenrir.Data.Abstractions.Commerce;
+using Fenrir.Data.Abstractions.Guilds;
+using Fenrir.Data.Abstractions.Progression;
+using Fenrir.Data.Abstractions.Runtime;
+using Fenrir.Data.Abstractions.Security;
+using Fenrir.Data.Abstractions.Social;
+using Fenrir.Data.Abstractions.Tribes;
 using Fenrir.Data.Accounts;
 using Fenrir.Data.Admin;
 using Fenrir.Data.Characters;

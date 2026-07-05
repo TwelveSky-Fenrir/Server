@@ -1,0 +1,77 @@
+using System.Linq;
+using CaeriusNet.Abstractions;
+using CaeriusNet.Builders;
+using Fenrir.Data.Accounts;
+using Fenrir.Data.Admin;
+using Fenrir.Data.Characters;
+using Fenrir.Data.Commerce;
+using Fenrir.Data.Guilds;
+using Fenrir.Data.Progression;
+using Fenrir.Data.Runtime;
+using Fenrir.Data.Security;
+using Fenrir.Data.Social;
+using Fenrir.Data.Tribes;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+
+namespace Fenrir.Data;
+
+// Wires CaeriusNet to the AppHost connection resource, then registers repositories as singletons -- CaeriusNet owns connection pooling, so one instance per repository is correct.
+/// <remarks>
+///     Does not register DirtyTracker/WriteBehindFlusher: both are open generics needing a concrete TKey and a flush
+///     callback wired to real repositories.
+/// </remarks>
+public static class FenrirDataServiceCollectionExtensions
+{
+    public static IHostApplicationBuilder AddFenrirData(this IHostApplicationBuilder builder,
+        string connectionName = "FenrirDb")
+    {
+        CaeriusNetBuilder
+            .Create(builder)
+            .WithAspireSqlServer(connectionName)
+            .Build();
+
+        // CaeriusNetBuilder registers ICaeriusNetDbContext as Scoped, which the singleton repositories below
+        // can't consume. CaeriusNetDbContext holds no per-scope state (just a logger and a connection factory --
+        // DbConnectionAsync opens a brand-new SqlConnection every call), so it's safe to promote to Singleton.
+        // Re-register it as Singleton using CaeriusNet's own factory delegate rather than wrapping it in a
+        // manually-created scope: calling IServiceProvider.CreateScope() from inside a singleton factory
+        // deadlocks the moment that singleton is resolved as part of constructing another singleton (the
+        // root ServiceProviderEngineScope's resolution lock isn't reentrant).
+        var dbContextDescriptor = builder.Services.Single(d => d.ServiceType == typeof(ICaeriusNetDbContext));
+        builder.Services.Remove(dbContextDescriptor);
+        builder.Services.Add(new ServiceDescriptor(typeof(ICaeriusNetDbContext), dbContextDescriptor.ImplementationFactory!,
+            ServiceLifetime.Singleton));
+
+        builder.Services.AddSingleton<IAccountRepository, AccountRepository>();
+        builder.Services.AddSingleton<IAccountPinRepository, AccountPinRepository>();
+        builder.Services.AddSingleton<ICharacterRepository, CharacterRepository>();
+        builder.Services.AddSingleton<ICharacterRenameRepository, CharacterRenameRepository>();
+        builder.Services.AddSingleton<IStarterKitRepository, StarterKitRepository>();
+        builder.Services.AddSingleton<ISessionTicketRepository, SessionTicketRepository>();
+        builder.Services.AddSingleton<IGameServerDirectoryRepository, GameServerDirectoryRepository>();
+        builder.Services.AddSingleton<IShardMapAssignmentRepository, ShardMapAssignmentRepository>();
+        builder.Services.AddSingleton<IGameSettingsRepository, GameSettingsRepository>();
+
+        builder.Services.AddSingleton<IMuteRepository, MuteRepository>();
+        builder.Services.AddSingleton<IBanRepository, BanRepository>();
+        builder.Services.AddSingleton<IBlockedIpRepository, BlockedIpRepository>();
+        builder.Services.AddSingleton<IFirewallRuleRepository, FirewallRuleRepository>();
+        builder.Services.AddSingleton<IGmAllowlistRepository, GmAllowlistRepository>();
+        builder.Services.AddSingleton<IMacRestrictionRepository, MacRestrictionRepository>();
+        builder.Services.AddSingleton<ApplicationFirewall>();
+        builder.Services.AddSingleton<IGuildRepository, GuildRepository>();
+        builder.Services.AddSingleton<ITribeRepository, TribeRepository>();
+        builder.Services.AddSingleton<IFriendRepository, FriendRepository>();
+        builder.Services.AddSingleton<IMentorRepository, MentorRepository>();
+
+        builder.Services.AddSingleton<IHeroRankingRepository, HeroRankingRepository>();
+        builder.Services.AddSingleton<ITowerRepository, TowerRepository>();
+
+        builder.Services.AddSingleton<ICashRepository, CashRepository>();
+        builder.Services.AddSingleton<IOfflineShopRepository, OfflineShopRepository>();
+        builder.Services.AddSingleton<IGiftRepository, GiftRepository>();
+
+        return builder;
+    }
+}

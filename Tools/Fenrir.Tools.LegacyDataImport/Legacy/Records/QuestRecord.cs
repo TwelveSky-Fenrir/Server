@@ -1,0 +1,41 @@
+namespace Fenrir.Tools.LegacyDataImport.Legacy.Records;
+
+/// <summary>
+///     Legacy <c>QUEST_INFO</c> (STRUCT.h:237-274): tail is 10 speech blocks (lines[15][51] + 3-byte pad +
+///     colors[15]) in declaration order.
+/// </summary>
+internal sealed record QuestRecord(
+    int Index,
+    string Subject,
+    int Category,
+    int Step,
+    int Level,
+    int Type,
+    int Sort,
+    int[] SummonInfo,
+    int StartNPCNumber,
+    int[] KeyNPCNumber,
+    int EndNPCNumber,
+    int[] Solution,
+    int[][] Reward,
+    int NextIndex,
+    string[] StartSpeech,
+    int[] StartSpeechColor,
+    string[] HurrySpeech,
+    int[] HurrySpeechColor,
+    string[] ProcessSpeech1,
+    int[] ProcessSpeech1Color,
+    string[] ProcessSpeech2,
+    int[] ProcessSpeech2Color,
+    string[] ProcessSpeech3,
+    int[] ProcessSpeech3Color,
+    string[] ProcessSpeech4,
+    int[] ProcessSpeech4Color,
+    string[] ProcessSpeech5,
+    int[] ProcessSpeech5Color,
+    string[] SuccessSpeech,
+    int[] SuccessSpeechColor,
+    string[] FailureSpeech,
+    int[] FailureSpeechColor,
+    string[] CallSpeech,
+    int[] CallSpeechColor);

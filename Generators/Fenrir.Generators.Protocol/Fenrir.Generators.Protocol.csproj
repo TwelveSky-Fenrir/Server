@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Un incremental generator doit cibler netstandard2.0 : c'est le contrat de l'hôte Roslyn,
+         indépendant de la TFM des projets qui le consomment (Directory.Build.props impose net10.0
+         partout ailleurs — override volontaire ici). -->
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsAotCompatible>false</IsAotCompatible>
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <IsRoslynComponent>true</IsRoslynComponent>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Regular reference: Protocol calls Analysis types directly, both DLLs must load together in
+         any analyzer host, so consumers must reference BOTH as Analyzer items (see Fenrir.Contracts.csproj). -->
+    <ProjectReference Include="..\..\Analysis\Fenrir.Generators.Analysis\Fenrir.Generators.Analysis.csproj"/>
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,56 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- SqlServerFixture calls DistributedApplicationTestingBuilder.Create(string[]) (Aspire.Hosting.Testing) to
+       boot an ephemeral SQL Server 2025 container. That factory walks the call stack for an assembly carrying
+       the "dcpclipath" AssemblyMetadata attribute, which is only emitted by Aspire.Hosting.AppHost's build
+       targets, so this test project itself has to import the Aspire.AppHost.Sdk (same version pin as the
+       Aspire.Hosting.* PackageVersions below) to get that attribute, even though it isn't a real AppHost. -->
+  <Sdk Name="Aspire.AppHost.Sdk" Version="13.4.6"/>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <!-- Directory.Build.props defaults InvariantGlobalization to true; Directory.Build.targets only flips it
+         back for FenrirExecutable projects (ADR-0006). This project isn't one, but SqlServerFixture opens a
+         real SqlConnection, which hits the same NotSupportedException during collation negotiation, so it
+         needs the same override, scoped here instead of touching the shared props/targets. -->
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <!-- Aspire.AppHost.Sdk (above) defaults every ProjectReference to an orchestrated "Aspire resource"
+         (ReferenceOutputAssembly=false): fine for a real AppHost, fatal here since the tests below compile
+         directly against Fenrir.Data's repository/DTO types. This is the documented opt-out. -->
+    <TreatProjectReferencesAsResources>false</TreatProjectReferencesAsResources>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.NET.Test.Sdk"/>
+    <PackageReference Include="xunit"/>
+    <PackageReference Include="xunit.runner.visualstudio">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Aspire.Hosting.Testing"/>
+    <PackageReference Include="Aspire.Hosting.SqlServer"/>
+    <PackageReference Include="Microsoft.Data.SqlClient"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Infrastructure\Fenrir.Data\Fenrir.Data.csproj"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Copied next to the test host so SqlServerFixture finds it the same way DbMigrator does
+         (Path.Combine(AppContext.BaseDirectory, "Database")); no repo-root-walking heuristics needed. -->
+    <None Include="..\..\Database\**\*.*" CopyToOutputDirectory="PreserveNewest" LinkBase="Database"/>
+  </ItemGroup>
+
+</Project>

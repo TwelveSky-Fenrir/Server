@@ -1,0 +1,11 @@
+-- Legacy `blockip` (IPv4-only varchar(15)); widened to VARCHAR(45) here to fit IPv6 literals.
+CREATE TABLE admin.BlockedIps
+(
+    BlockedIpId  INT IDENTITY(1,1) NOT NULL,
+    IpAddress    VARCHAR(45) NOT NULL,
+    CreatedAtUtc DATETIME2(3) NOT NULL CONSTRAINT DF_BlockedIps_CreatedAtUtc DEFAULT SYSUTCDATETIME(),
+    CONSTRAINT PK_BlockedIps PRIMARY KEY NONCLUSTERED (BlockedIpId),
+    CONSTRAINT UQ_BlockedIps_IpAddress UNIQUE NONCLUSTERED HASH (IpAddress)
+        WITH (BUCKET_COUNT = 4096)
+)
+    WITH (MEMORY_OPTIMIZED = ON, DURABILITY = SCHEMA_AND_DATA);

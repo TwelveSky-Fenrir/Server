@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsAspireSharedProject>true</IsAspireSharedProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Deliberately NO FrameworkReference to Microsoft.AspNetCore.App: Fenrir.LoginServer/Fenrir.GameServer
+         are TCP-socket-only servers (ADR-0008), and a FrameworkReference here would propagate transitively
+         to both binaries' runtimeconfig.json even with zero ASP.NET Core code in their own Program.cs;
+         confirmed the hard way (Phase 7) when the stock Aspire template's original FrameworkReference did
+         exactly that. Fenrir.AppHost (the one project that IS a web app, for its own dashboard/API) brings
+         in ASP.NET Core itself via the Aspire.AppHost.Sdk, independently of this shared project. -->
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks"/>
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience"/>
+    <PackageReference Include="Microsoft.Extensions.ServiceDiscovery"/>
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol"/>
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting"/>
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http"/>
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime"/>
+  </ItemGroup>
+
+</Project>

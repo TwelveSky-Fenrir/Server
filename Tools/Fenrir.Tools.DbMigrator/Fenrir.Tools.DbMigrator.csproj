@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <FenrirExecutable>true</FenrirExecutable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.SqlClient"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Copied next to the exe so the published/AOT binary finds its scripts the same way in dev and deployed
+         (Path.Combine(AppContext.BaseDirectory, "Database")); no repo-root-walking heuristics needed. -->
+    <None Include="..\..\Database\**\*.*" CopyToOutputDirectory="PreserveNewest" LinkBase="Database"/>
+  </ItemGroup>
+
+</Project>

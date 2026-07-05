@@ -1,3 +1,43 @@
-﻿<Solution>
+<Solution>
+  <Folder Name="/Analysis/">
+    <Project Path="Analysis/Fenrir.Generators.Analysis/Fenrir.Generators.Analysis.csproj"/>
+  </Folder>
+  <Folder Name="/Application/">
+    <Project Path="Application/Fenrir.Application.Game/Fenrir.Application.Game.csproj"/>
+    <Project Path="Application/Fenrir.Application.Login/Fenrir.Application.Login.csproj"/>
+  </Folder>
+  <Folder Name="/Core/">
+    <Project Path="Core/Fenrir.Contracts/Fenrir.Contracts.csproj"/>
+  </Folder>
+  <Folder Name="/Generators/">
+    <Project Path="Generators/Fenrir.Generators.Dispatch/Fenrir.Generators.Dispatch.csproj"/>
+    <Project Path="Generators/Fenrir.Generators.Protocol/Fenrir.Generators.Protocol.csproj"/>
+  </Folder>
+  <Folder Name="/Infrastructure/">
+    <Project Path="Infrastructure/Fenrir.Data/Fenrir.Data.csproj"/>
+    <Project Path="Infrastructure/Fenrir.Network/Fenrir.Network.csproj"/>
+  </Folder>
+  <Folder Name="/Orchestrator/">
+    <Project Path="Orchestration/Fenrir.AppHost/Fenrir.AppHost.csproj"/>
+    <Project Path="Orchestration/Fenrir.ServiceDefaults/Fenrir.ServiceDefaults.csproj"/>
+  </Folder>
+  <Folder Name="/Servers/">
+    <Project Path="Servers/Fenrir.GameServer/Fenrir.GameServer.csproj"/>
+    <Project Path="Servers/Fenrir.LoginServer/Fenrir.LoginServer.csproj"/>
+  </Folder>
+  <Folder Name="/Tests/">
+    <Project Path="Tests/Fenrir.Application.Game.Tests/Fenrir.Application.Game.Tests.csproj"/>
+    <Project Path="Tests/Fenrir.Application.Login.Tests/Fenrir.Application.Login.Tests.csproj"/>
+    <Project Path="Tests/Fenrir.Contracts.Tests/Fenrir.Contracts.Tests.csproj"/>
+    <Project Path="Tests/Fenrir.Data.Tests/Fenrir.Data.Tests.csproj"/>
+    <Project Path="Tests/Fenrir.IntegrationTests/Fenrir.IntegrationTests.csproj"/>
+    <Project Path="Tests/Fenrir.LoginServer.Tests/Fenrir.LoginServer.Tests.csproj"/>
+    <Project Path="Tests/Fenrir.Network.Tests/Fenrir.Network.Tests.csproj"/>
+  </Folder>
+  <Folder Name="/Tools/">
+    <Project Path="Tools/Fenrir.Tools.AccountProvisioning/Fenrir.Tools.AccountProvisioning.csproj"/>
+    <Project Path="Tools/Fenrir.Tools.DbMigrator/Fenrir.Tools.DbMigrator.csproj"/>
+    <Project Path="Tools/Fenrir.Tools.LegacyDataImport/Fenrir.Tools.LegacyDataImport.csproj"/>
+  </Folder>
 
 </Solution>

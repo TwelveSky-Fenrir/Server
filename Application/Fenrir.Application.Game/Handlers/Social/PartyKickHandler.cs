@@ -1,4 +1,4 @@
-using Fenrir.Application.Game.Social.Party;
+using Fenrir.Application.Game.Handlers.Social.Services;
 using Fenrir.Application.Game.World;
 using Fenrir.Contracts.Abstractions;
 using Fenrir.Contracts.Packets.Zone;
@@ -10,43 +10,29 @@ namespace Fenrir.Application.Game.Handlers.Social;
 ///     CZ_PARTY_EXILE_SEND (opcode 70) -- a self-targeted kick isn't specially guarded, matching legacy's
 ///     own lack of a guard.
 /// </summary>
-public sealed class PartyKickHandler(ZoneRegistry zones, PartyRegistry parties) : IInlinePacketHandler<PartyKickRequest>
+public sealed class PartyKickHandler(ZoneRegistry zones, IPartyKickService partyKickService)
+    : IInlinePacketHandler<PartyKickRequest>
 {
     public void Handle(in PartyKickRequest packet, IPacketSession session)
     {
         var zoneSession = (ZoneClientSession)session;
         var leaderId = zoneSession.CharacterId!.Value;
 
-        if (!parties.IsLeader(leaderId))
-            return;
-
-        var currentMembers = parties.GetMembers(leaderId);
-        var targetId = 0;
-        foreach (var memberId in currentMembers)
-            if (zones.TryGetPlayer(memberId, out var member) &&
-                string.Equals(member.Name, packet.AvatarName, StringComparison.OrdinalIgnoreCase))
-            {
-                targetId = memberId;
-                break;
-            }
-
-        if (targetId == 0 || !parties.TryKick(leaderId, targetId, out var membersBeforeKick, out var disbanded))
+        var result = partyKickService.Kick(leaderId, packet.AvatarName);
+        if (result.Kind is PartyKickResultKind.NotLeader or PartyKickResultKind.TargetNotFound)
             return;
 
         var notice = new PartyKickResponse { AvatarName = packet.AvatarName };
-        foreach (var memberId in membersBeforeKick)
+        foreach (var memberId in result.MembersBeforeKick)
             if (zones.TryGetPlayer(memberId, out var member))
                 member.Session.Send(notice);
 
-        if (!disbanded)
+        if (!result.Disbanded)
         {
-            // Anchor on a surviving member, not leaderId: a self-kick removes leaderId from the roster index too.
-            var anchor = membersBeforeKick.FirstOrDefault(id => id != targetId);
-            var remaining = parties.GetMembers(anchor);
-            if (remaining.Count > 0)
+            if (result.RemainingMembers.Count > 0)
             {
-                var roster = PartyBroadcast.BuildRoster(zones, 2, remaining);
-                foreach (var memberId in remaining)
+                var roster = PartyBroadcast.BuildRoster(zones, 2, result.RemainingMembers);
+                foreach (var memberId in result.RemainingMembers)
                     if (zones.TryGetPlayer(memberId, out var member))
                         member.Session.Send(roster);
             }
@@ -55,8 +41,8 @@ public sealed class PartyKickHandler(ZoneRegistry zones, PartyRegistry parties) 
         }
 
         var disbandNotice = new PartyDisbandResponse { Sort = 1, AvatarName = "" };
-        foreach (var memberId in membersBeforeKick)
-            if (memberId != targetId && zones.TryGetPlayer(memberId, out var member))
+        foreach (var memberId in result.MembersBeforeKick)
+            if (memberId != result.TargetId && zones.TryGetPlayer(memberId, out var member))
                 member.Session.Send(disbandNotice);
     }
 }

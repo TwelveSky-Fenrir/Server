@@ -1,4 +1,4 @@
-using Fenrir.Application.Game.Social.Mentor;
+using Fenrir.Application.Game.Handlers.Social.Services;
 using Fenrir.Application.Game.World;
 using Fenrir.Contracts.Abstractions;
 using Fenrir.Contracts.Packets.Zone;
@@ -10,21 +10,19 @@ namespace Fenrir.Application.Game.Handlers.Social;
 ///     CZ_TEACHER_ANSWER_SEND (opcode 61) -- on accept, the master (not the student) later consumes it via
 ///     CZ_TEACHER_START_SEND.
 /// </summary>
-public sealed class MentorAnswerHandler(ZoneRegistry zones, MentorRegistry mentors)
+public sealed class MentorAnswerHandler(ZoneRegistry zones, IMentorAnswerService mentorAnswerService)
     : IInlinePacketHandler<MentorAnswerRequest>
 {
     public void Handle(in MentorAnswerRequest packet, IPacketSession session)
     {
-        if (packet.Answer is not (0 or 1 or 2))
-            return;
-
         var zoneSession = (ZoneClientSession)session;
         var studentId = zoneSession.CharacterId!.Value;
 
-        if (!mentors.TryAnswer(studentId, packet.Answer == 0, out var masterId))
+        var result = mentorAnswerService.Answer(studentId, packet.Answer);
+        if (!result.Handled)
             return;
 
-        if (zones.TryGetPlayer(masterId, out var master))
+        if (zones.TryGetPlayer(result.MasterId, out var master))
             master.Session.Send(new MentorAnswerResponse { Answer = packet.Answer });
     }
 }

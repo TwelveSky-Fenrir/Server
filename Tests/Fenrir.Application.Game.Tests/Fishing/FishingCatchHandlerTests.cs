@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using System.Collections.Immutable;
 using Fenrir.Application.Game.Handlers;
+using Fenrir.Application.Game.Handlers.FishingConsumables.Services;
 using Fenrir.Application.Game.Inventory;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Application.Game.World;
@@ -67,7 +68,7 @@ public class FishingCatchHandlerTests
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
-        var handler = new FishingCatchHandler(new FakeCharacterRepository(), NullLogger<FishingCatchHandler>.Instance);
+        var handler = new FishingCatchHandler(new FishingCatchService(new FakeCharacterRepository(), NullLogger<FishingCatchService>.Instance));
         await handler.HandleAsync(new FishingCatchRequest(), session, CancellationToken.None);
 
         Assert.Equal(DisconnectReason.Faulted, session.DisconnectReason);
@@ -78,7 +79,7 @@ public class FishingCatchHandlerTests
     {
         var (session, pipe, _, _, repo) = SetUp();
 
-        var handler = new FishingCatchHandler(repo, NullLogger<FishingCatchHandler>.Instance);
+        var handler = new FishingCatchHandler(new FishingCatchService(repo, NullLogger<FishingCatchService>.Instance));
         await handler.HandleAsync(new FishingCatchRequest(), session, CancellationToken.None);
 
         Assert.Empty(ZoneTestKit.DrainOutbound(pipe));
@@ -93,7 +94,7 @@ public class FishingCatchHandlerTests
         state.FishingStep = 4;
         state.CatchingFish = true;
 
-        var handler = new FishingCatchHandler(repo, NullLogger<FishingCatchHandler>.Instance);
+        var handler = new FishingCatchHandler(new FishingCatchService(repo, NullLogger<FishingCatchService>.Instance));
         await RunToCompletionAsync(handler.HandleAsync(new FishingCatchRequest(), session, CancellationToken.None),
             zone);
 
@@ -133,7 +134,7 @@ public class FishingCatchHandlerTests
         zone.PostInventoryCommand(new InventoryZoneCommand(10, containers, null));
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
-        var handler = new FishingCatchHandler(repo, NullLogger<FishingCatchHandler>.Instance);
+        var handler = new FishingCatchHandler(new FishingCatchService(repo, NullLogger<FishingCatchService>.Instance));
         await RunToCompletionAsync(handler.HandleAsync(new FishingCatchRequest(), session, CancellationToken.None),
             zone);
 
@@ -157,7 +158,7 @@ public class FishingCatchHandlerTests
         state.FishingStep = 5;
         state.CatchingFish = true;
 
-        var handler = new FishingCatchHandler(repo, NullLogger<FishingCatchHandler>.Instance);
+        var handler = new FishingCatchHandler(new FishingCatchService(repo, NullLogger<FishingCatchService>.Instance));
         await RunToCompletionAsync(handler.HandleAsync(new FishingCatchRequest(), session, CancellationToken.None),
             zone);
 

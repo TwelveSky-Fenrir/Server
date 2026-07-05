@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using Fenrir.Application.Game.Handlers;
+using Fenrir.Application.Game.Handlers.ItemModification.Services;
 using Fenrir.Application.Game.Inventory;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Application.Game.World;
@@ -61,7 +62,7 @@ public class RuneSocketHandlerTests
         SeedInventorySlot(zone, ContainerMatrix.InventoryPage0, 5,
             new ItemStack(93514, 1, 12, 3, 0, 0, 0, 0, 0, 0, 777));
 
-        var handler = new RuneSocketHandler(repo, NullLogger<RuneSocketHandler>.Instance);
+        var handler = new RuneSocketHandler(new RuneSocketService(repo, NullLogger<RuneSocketService>.Instance));
         await RunToCompletionAsync(
             handler.HandleAsync(
                 new RuneSocketRequest { Sort = 0, RuneIndex = 0, ItemIndex = 93514, Page = 0, Index = 5 }, session,
@@ -82,7 +83,7 @@ public class RuneSocketHandlerTests
         var (session, _, zone, _, repo) = SetUp();
         SeedInventorySlot(zone, ContainerMatrix.InventoryPage0, 5, new ItemStack(1234, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0));
 
-        var handler = new RuneSocketHandler(repo, NullLogger<RuneSocketHandler>.Instance);
+        var handler = new RuneSocketHandler(new RuneSocketService(repo, NullLogger<RuneSocketService>.Instance));
         await handler.HandleAsync(
             new RuneSocketRequest { Sort = 0, RuneIndex = 0, ItemIndex = 1234, Page = 0, Index = 5 }, session,
             CancellationToken.None);
@@ -95,7 +96,7 @@ public class RuneSocketHandlerTests
     {
         var (session, _, _, _, repo) = SetUp();
 
-        var handler = new RuneSocketHandler(repo, NullLogger<RuneSocketHandler>.Instance);
+        var handler = new RuneSocketHandler(new RuneSocketService(repo, NullLogger<RuneSocketService>.Instance));
         await handler.HandleAsync(
             new RuneSocketRequest { Sort = 0, RuneIndex = 0, ItemIndex = 93514, Page = 0, Index = 5 }, session,
             CancellationToken.None);
@@ -110,7 +111,7 @@ public class RuneSocketHandlerTests
         state.RuneSystem = state.RuneSystem.SetItem(1, 93515);
         state.RuneSystemStat = state.RuneSystemStat.SetItem(1, ItemValueCodec.Encode(20, 1, 0, 0));
 
-        var handler = new RuneSocketHandler(repo, NullLogger<RuneSocketHandler>.Instance);
+        var handler = new RuneSocketHandler(new RuneSocketService(repo, NullLogger<RuneSocketService>.Instance));
         await RunToCompletionAsync(
             handler.HandleAsync(new RuneSocketRequest { Sort = 1, RuneIndex = 1, ItemIndex = 0, Page = 0, Index = 0 },
                 session, CancellationToken.None), zone);
@@ -131,7 +132,7 @@ public class RuneSocketHandlerTests
     {
         var (session, _, _, _, repo) = SetUp();
 
-        var handler = new RuneSocketHandler(repo, NullLogger<RuneSocketHandler>.Instance);
+        var handler = new RuneSocketHandler(new RuneSocketService(repo, NullLogger<RuneSocketService>.Instance));
         await handler.HandleAsync(
             new RuneSocketRequest { Sort = 1, RuneIndex = 1, ItemIndex = 0, Page = 0, Index = 0 }, session,
             CancellationToken.None);
@@ -144,7 +145,7 @@ public class RuneSocketHandlerTests
     {
         var (session, pipe, _, _, repo) = SetUp();
 
-        var handler = new RuneSocketHandler(repo, NullLogger<RuneSocketHandler>.Instance);
+        var handler = new RuneSocketHandler(new RuneSocketService(repo, NullLogger<RuneSocketService>.Instance));
         await handler.HandleAsync(
             new RuneSocketRequest { Sort = 2, RuneIndex = 0, ItemIndex = 0, Page = 0, Index = 0 }, session,
             CancellationToken.None);

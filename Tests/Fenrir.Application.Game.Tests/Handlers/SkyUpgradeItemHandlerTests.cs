@@ -2,6 +2,7 @@ using System.Collections.Frozen;
 using System.Collections.Immutable;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Handlers;
+using Fenrir.Application.Game.Handlers.ItemModification.Services;
 using Fenrir.Application.Game.Inventory;
 using Fenrir.Application.Game.Tests.GameData;
 using Fenrir.Application.Game.Tests.TestSupport;
@@ -66,8 +67,8 @@ public class SkyUpgradeItemHandlerTests
             [WarlordItemId] = new(WorldDataTestRows.Item(WarlordItemId) with { Sort = 7, CheckSetItem = 2 }, [])
         }.ToFrozenDictionary();
 
-        return new SkyUpgradeItemHandler(characters, ZoneTestKit.EmptyWorldData(itemsById),
-            NullLogger<SkyUpgradeItemHandler>.Instance);
+        return new SkyUpgradeItemHandler(new SkyUpgradeItemService(characters, ZoneTestKit.EmptyWorldData(itemsById),
+            NullLogger<SkyUpgradeItemService>.Instance));
     }
 
     [Fact]

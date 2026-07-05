@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using Fenrir.Application.Game.Handlers;
+using Fenrir.Application.Game.Handlers.ItemModification.Services;
 using Fenrir.Application.Game.Inventory;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Application.Game.World;
@@ -63,7 +64,7 @@ public class UpgradeCapeHandlerTests
         var (session, pipe, zone, _, repo) = SetUp();
         SeedInventory(zone, new ItemStack(1401, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1),
             new ItemStack(984, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0));
-        var handler = new UpgradeCapeHandler(repo, NullLogger<UpgradeCapeHandler>.Instance);
+        var handler = new UpgradeCapeHandler(new UpgradeCapeService(repo, NullLogger<UpgradeCapeService>.Instance));
 
         await RunToCompletionAsync(
             handler.HandleAsync(new UpgradeCapeRequest { Page1 = 0, Index1 = 0, Page2 = 0, Index2 = 1 }, session,
@@ -85,7 +86,7 @@ public class UpgradeCapeHandlerTests
         var (session, _, zone, _, repo) = SetUp();
         SeedInventory(zone, new ItemStack(9999, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1),
             new ItemStack(984, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0));
-        var handler = new UpgradeCapeHandler(repo, NullLogger<UpgradeCapeHandler>.Instance);
+        var handler = new UpgradeCapeHandler(new UpgradeCapeService(repo, NullLogger<UpgradeCapeService>.Instance));
 
         await handler.HandleAsync(new UpgradeCapeRequest { Page1 = 0, Index1 = 0, Page2 = 0, Index2 = 1 }, session,
             CancellationToken.None);
@@ -100,7 +101,7 @@ public class UpgradeCapeHandlerTests
         var (session, _, zone, _, repo) = SetUp();
         SeedInventory(zone, new ItemStack(1401, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1),
             new ItemStack(12345, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0));
-        var handler = new UpgradeCapeHandler(repo, NullLogger<UpgradeCapeHandler>.Instance);
+        var handler = new UpgradeCapeHandler(new UpgradeCapeService(repo, NullLogger<UpgradeCapeService>.Instance));
 
         await handler.HandleAsync(new UpgradeCapeRequest { Page1 = 0, Index1 = 0, Page2 = 0, Index2 = 1 }, session,
             CancellationToken.None);
@@ -115,7 +116,7 @@ public class UpgradeCapeHandlerTests
         SeedInventory(zone, new ItemStack(1401, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1),
             new ItemStack(984, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0));
         repo.ThrowOnAdjustMoney = true;
-        var handler = new UpgradeCapeHandler(repo, NullLogger<UpgradeCapeHandler>.Instance);
+        var handler = new UpgradeCapeHandler(new UpgradeCapeService(repo, NullLogger<UpgradeCapeService>.Instance));
 
         await handler.HandleAsync(new UpgradeCapeRequest { Page1 = 0, Index1 = 0, Page2 = 0, Index2 = 1 }, session,
             CancellationToken.None);

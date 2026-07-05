@@ -36,6 +36,16 @@
     <Project Path="Servers/Fenrir.GameServer/Fenrir.GameServer.csproj" />
     <Project Path="Servers/Fenrir.LoginServer/Fenrir.LoginServer.csproj" />
   </Folder>
+  <Folder Name="/Tests/">
+    <Project Path="Tests/Fenrir.Application.Game.Tests/Fenrir.Application.Game.Tests.csproj" />
+    <Project Path="Tests/Fenrir.Application.Login.Tests/Fenrir.Application.Login.Tests.csproj" />
+    <Project Path="Tests/Fenrir.Data.Tests/Fenrir.Data.Tests.csproj" />
+    <Project Path="Tests/Fenrir.IntegrationTests/Fenrir.IntegrationTests.csproj" />
+    <Project Path="Tests/Fenrir.LoginServer.Tests/Fenrir.LoginServer.Tests.csproj" />
+    <Project Path="Tests/Fenrir.Network.Serialization.Tests/Fenrir.Network.Serialization.Tests.csproj" />
+    <Project Path="Tests/Fenrir.Network.Tests/Fenrir.Network.Tests.csproj" />
+  </Folder>
+
   <Folder Name="/Tools/">
     <Project Path="Tools/Fenrir.Tools.AccountProvisioning/Fenrir.Tools.AccountProvisioning.csproj" />
     <Project Path="Tools/Fenrir.Tools.DbMigrator/Fenrir.Tools.DbMigrator.csproj" />

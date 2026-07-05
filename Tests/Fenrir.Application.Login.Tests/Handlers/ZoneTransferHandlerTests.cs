@@ -1,0 +1,98 @@
+using Fenrir.Application.Login.Handlers;
+using Fenrir.Application.Login.Handlers.Services;
+using Fenrir.Application.Login.Tests.TestSupport;
+using Fenrir.Network.Serialization.Packets.Login;
+using Fenrir.Network.Serialization.Wire;
+using Fenrir.Data.Abstractions.Characters;
+using Fenrir.Data.Abstractions.Runtime;
+using Fenrir.Network.Sessions;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
+
+namespace Fenrir.Application.Login.Tests.Handlers;
+
+// op22 CL_DEMAND_ZONE_SERVER_INFO_SEND -- audited bug: FirstOrDefault() over the shard directory ignored
+// which shard actually hosts the character's MapId (ADR-0012 point 4).
+public class ClDemandZoneServerInfoSendHandlerTests
+{
+    private const short HostedMapId = 42;
+
+    private static readonly CharacterSummaryDto Summary = new(
+        501, 0, "Hero", 1, 0, 1, 1, 10);
+
+    private static readonly CharacterWorldEntryDto WorldEntry = new(
+        501, 1, 0, "Hero", 1, 0, 1, 1,
+        10, HostedMapId, 0, 0, 0, 0, 100, 100,
+        50, 50, 0);
+
+    private static readonly ShardDirectoryEntryDto Shard1 =
+        new(1, "10.0.0.1", 30000, 0, 100, 0f);
+
+    private static readonly ShardDirectoryEntryDto Shard2 =
+        new(2, "10.0.0.2", 30001, 0, 100, 0f);
+
+    [Fact]
+    public async Task HandleAsync_MapHostedByNonFirstShard_RoutesToTheShardThatHostsIt()
+    {
+        var directory = new FakeGameServerDirectoryRepository(Shard1, Shard2);
+        var shardMaps = new FakeShardMapAssignmentRepository(new Dictionary<byte, short[]>
+        {
+            [1] = [1],
+            [2] = [HostedMapId]
+        });
+        var tickets = new FakeSessionTicketRepository();
+        var handler = CreateHandler(directory, shardMaps, tickets);
+        var (session, pipe) = CreateSessionInCharSelect();
+
+        await handler.HandleAsync(new ZoneTransferRequest { AvatarPost = 0 }, session, CancellationToken.None);
+
+        Assert.Equal((1, 501, (byte)2, 15),
+            tickets.LastCreatedTicket);
+        Assert.Equal(LoginSessionState.HandoverIssued, session.State);
+        await PacketAssert.AssertSentAsync(pipe, new ZoneTransferResponse
+        {
+            Result = 0, Ip = Shard2.Host, Port = Shard2.Port, Zone = HostedMapId
+        });
+    }
+
+    [Fact]
+    public async Task HandleAsync_NoShardHostsTheMap_FallsBackToFirstDirectoryEntry()
+    {
+        var directory = new FakeGameServerDirectoryRepository(Shard1, Shard2);
+        var shardMaps = new FakeShardMapAssignmentRepository(new Dictionary<byte, short[]>
+        {
+            [1] = [1],
+            [2] = [2]
+        });
+        var tickets = new FakeSessionTicketRepository();
+        var handler = CreateHandler(directory, shardMaps, tickets);
+        var (session, pipe) = CreateSessionInCharSelect();
+
+        await handler.HandleAsync(new ZoneTransferRequest { AvatarPost = 0 }, session, CancellationToken.None);
+
+        Assert.Equal((1, 501, (byte)1, 15),
+            tickets.LastCreatedTicket);
+        await PacketAssert.AssertSentAsync(pipe, new ZoneTransferResponse
+        {
+            Result = 0, Ip = Shard1.Host, Port = Shard1.Port, Zone = HostedMapId
+        });
+    }
+
+    private static ZoneTransferHandler CreateHandler(FakeGameServerDirectoryRepository directory,
+        FakeShardMapAssignmentRepository shardMaps, FakeSessionTicketRepository tickets)
+    {
+        var characters = FakeCharacterRepository.With(Summary, WorldEntry);
+        var options = Options.Create(new LoginServerOptions());
+        return new ZoneTransferHandler(new ZoneTransferService(characters, directory, shardMaps, tickets, options,
+            NullLogger<ZoneTransferService>.Instance));
+    }
+
+    private static (LoginClientSession Session, FakeDuplexPipe Pipe) CreateSessionInCharSelect()
+    {
+        var pipe = new FakeDuplexPipe();
+        var session = new LoginClientSession(1, pipe);
+        session.MarkAuthenticated(1);
+        session.MarkCharSelect();
+        return (session, pipe);
+    }
+}

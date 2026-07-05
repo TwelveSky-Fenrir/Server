@@ -1,3 +1,4 @@
+using Fenrir.Application.Game.Handlers.Social.Services;
 using Fenrir.Application.Game.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Serialization.Packets.Zone;
@@ -6,7 +7,8 @@ using Fenrir.Network.Sessions;
 namespace Fenrir.Application.Game.Handlers.Social;
 
 /// <summary>CZ_GUILD_FIND_SEND (opcode 78) -- lookup is process-wide via <see cref="ZoneRegistry" />.</summary>
-public sealed class FindGuildMemberHandler(ZoneRegistry zones) : IInlinePacketHandler<FindGuildMemberRequest>
+public sealed class FindGuildMemberHandler(IFindGuildMemberService findGuildMemberService)
+    : IInlinePacketHandler<FindGuildMemberRequest>
 {
     public void Handle(in FindGuildMemberRequest packet, IPacketSession session)
     {
@@ -19,11 +21,10 @@ public sealed class FindGuildMemberHandler(ZoneRegistry zones) : IInlinePacketHa
         if (!zone.TryGetPlayer(characterId, out var asker) || asker is null)
             return;
 
-        if (asker.GuildId is null)
+        var result = findGuildMemberService.FindZone(asker, packet.AvatarName);
+        if (!result.HasGuild)
             return; // No guild: silent return, not Quit (matches legacy's bare return).
 
-        var zoneNumber = zones.TryGetPlayerByName(packet.AvatarName, out var found) ? found.MapId : -1;
-
-        session.Send(new FindGuildMemberResponse { Result = zoneNumber });
+        session.Send(new FindGuildMemberResponse { Result = result.ZoneNumber });
     }
 }

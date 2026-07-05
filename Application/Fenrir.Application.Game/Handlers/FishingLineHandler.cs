@@ -1,4 +1,4 @@
-using Fenrir.Application.Game.Fishing;
+using Fenrir.Application.Game.Handlers.FishingConsumables.Services;
 using Fenrir.Application.Game.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Serialization.Packets.Zone;
@@ -11,7 +11,7 @@ namespace Fenrir.Application.Game.Handlers;
 ///     never have registered this opcode in the legacy, so it disconnects here too. Sort 1=cast (gated by a
 ///     mesh check under the caster's own position), 2=reel; anything else disconnects.
 /// </summary>
-public sealed class FishingLineHandler : IInlinePacketHandler<FishingLineRequest>
+public sealed class FishingLineHandler(IFishingLineService fishingLineService) : IInlinePacketHandler<FishingLineRequest>
 {
     public const short FishingZoneNumber = 52;
 
@@ -30,61 +30,24 @@ public sealed class FishingLineHandler : IInlinePacketHandler<FishingLineRequest
             return;
         }
 
+        FishingLineResult result;
         switch (packet.Sort)
         {
             case 1:
-                Cast(session, zone, state, characterId);
-                return;
+                result = fishingLineService.Cast(zone, state, characterId);
+                break;
             case 2:
-                Reel(session, zone, state, characterId);
-                return;
+                result = fishingLineService.Reel(zone, state, characterId);
+                break;
             default:
                 zoneSession.Abort(DisconnectReason.Faulted);
                 return;
         }
-    }
-
-    private static void Cast(IPacketSession session, Zone zone, PlayerRuntimeState state, int characterId)
-    {
-        if (!FishingCastResolver.HasWaterAtCurrentPosition(zone.Geometry, state.PosX, state.PosY, state.PosZ))
-        {
-            session.Send(new FishingLineResponse
-            {
-                ServerIndex = characterId, UniqueNumber = state.UniqueNumber, Result = 0, FishingState = 0,
-                FishingStep = 0
-            });
-            zone.PostFishingCommand(new FishingZoneCommand(characterId, state.FishingState, state.FishingStep,
-                false, false, null));
-            return;
-        }
 
         session.Send(new FishingLineResponse
         {
-            ServerIndex = characterId, UniqueNumber = state.UniqueNumber, Result = 1, FishingState = 1,
-            FishingStep = 2
+            ServerIndex = characterId, UniqueNumber = state.UniqueNumber, Result = result.Result,
+            FishingState = result.FishingState, FishingStep = result.FishingStep
         });
-        zone.PostFishingCommand(new FishingZoneCommand(characterId, 1, 2, false, true, 92, DateTime.UtcNow));
-    }
-
-    private static void Reel(IPacketSession session, Zone zone, PlayerRuntimeState state, int characterId)
-    {
-        if (state.FishingState == 0)
-        {
-            session.Send(new FishingLineResponse
-            {
-                ServerIndex = characterId, UniqueNumber = state.UniqueNumber, Result = 0, FishingState = 0,
-                FishingStep = 0
-            });
-            zone.PostFishingCommand(new FishingZoneCommand(characterId, state.FishingState, state.FishingStep,
-                false, false, null));
-            return;
-        }
-
-        session.Send(new FishingLineResponse
-        {
-            ServerIndex = characterId, UniqueNumber = state.UniqueNumber, Result = 2, FishingState = 0,
-            FishingStep = 0
-        });
-        zone.PostFishingCommand(new FishingZoneCommand(characterId, 0, 0, false, false, null));
     }
 }

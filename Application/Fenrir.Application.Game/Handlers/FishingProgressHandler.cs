@@ -1,5 +1,4 @@
-using Fenrir.Application.Game.Combat;
-using Fenrir.Application.Game.Fishing;
+using Fenrir.Application.Game.Handlers.FishingConsumables.Services;
 using Fenrir.Application.Game.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Serialization.Packets.Zone;
@@ -14,7 +13,8 @@ namespace Fenrir.Application.Game.Handlers;
 ///     Reaching step 4/5 here always broadcasts action Sort=93 to self + AOI neighbors (mirrors <c>Broadcast22</c>
 ///     + explicit self <c>USEND</c>).
 /// </summary>
-public sealed class FishingProgressHandler : IInlinePacketHandler<FishingProgressRequest>
+public sealed class FishingProgressHandler(IFishingProgressService fishingProgressService)
+    : IInlinePacketHandler<FishingProgressRequest>
 {
     public void Handle(in FishingProgressRequest packet, IPacketSession session)
     {
@@ -31,14 +31,15 @@ public sealed class FishingProgressHandler : IInlinePacketHandler<FishingProgres
             return;
         }
 
+        FishingProgressResult? result;
         switch (packet.Sort)
         {
             case 1:
-                PollBite(session, zone, state, characterId);
-                return;
+                result = fishingProgressService.PollBite(zone, state, characterId);
+                break;
             case 2:
-                Recast(session, zone, state, characterId);
-                return;
+                result = fishingProgressService.Recast(zone, state, characterId);
+                break;
             case 3:
                 if (packet.FishingStep is < 0 or > 5)
                 {
@@ -46,46 +47,20 @@ public sealed class FishingProgressHandler : IInlinePacketHandler<FishingProgres
                     return;
                 }
 
-                Reply(session, zone, state, characterId, 3, packet.FishingStep, null);
-                return;
+                result = fishingProgressService.ForceStep(zone, state, characterId, packet.FishingStep);
+                break;
             default:
                 zoneSession.Abort(DisconnectReason.Faulted);
                 return;
         }
-    }
 
-    private static void PollBite(IPacketSession session, Zone zone, PlayerRuntimeState state, int characterId)
-    {
-        if (state.FishingState == 0 || state.FishingStep != 3 || state.FishingCastAtUtc is not { } castAt ||
-            DateTime.UtcNow - castAt < TimeSpan.FromMinutes(1))
+        if (result is not { } value)
             return;
 
-        var step = FishingRewardResolver.RollBite(SystemRandomSource.Instance) ? 4 : 5;
-        Reply(session, zone, state, characterId, 1, step, null);
-    }
-
-    private static void Recast(IPacketSession session, Zone zone, PlayerRuntimeState state, int characterId)
-    {
-        if (state.FishingState == 0)
-        {
-            Reply(session, zone, state, characterId, 2, state.FishingStep, null);
-            return;
-        }
-
-        Reply(session, zone, state, characterId, 2, 2, DateTime.UtcNow);
-    }
-
-    private static void Reply(IPacketSession session, Zone zone, PlayerRuntimeState state, int characterId,
-        int resultSort, int newStep, DateTime? castAt)
-    {
         session.Send(new FishingProgressResponse
         {
-            ServerIndex = characterId, UniqueNumber = state.UniqueNumber, Result = resultSort,
-            FishingState = state.FishingState, FishingStep = newStep
+            ServerIndex = characterId, UniqueNumber = state.UniqueNumber, Result = value.ResultSort,
+            FishingState = value.FishingState, FishingStep = value.FishingStep
         });
-
-        var caught = newStep is 4 or 5;
-        zone.PostFishingCommand(new FishingZoneCommand(characterId, state.FishingState, newStep,
-            state.CatchingFish || caught, caught, caught ? 93 : null, castAt));
     }
 }

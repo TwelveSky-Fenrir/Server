@@ -1,3 +1,4 @@
+using Fenrir.Application.Game.Handlers.Commerce.Services;
 using Fenrir.Application.Game.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Serialization.Packets.Zone;
@@ -11,7 +12,7 @@ namespace Fenrir.Application.Game.Handlers.Commerce;
 ///     actually open. <c>Sort</c> 2 closes the offline/deputy shop (ShopState only, items/money stay
 ///     attached) and sends no unicast reply, matching the legacy.
 /// </summary>
-public sealed class CloseShopStallHandler(IOfflineShopRepository offlineShops)
+public sealed class CloseShopStallHandler(ICloseShopStallService service)
     : IAsyncPacketHandler<CloseShopStallRequest>
 {
     public async ValueTask HandleAsync(CloseShopStallRequest packet, IPacketSession session,
@@ -32,12 +33,13 @@ public sealed class CloseShopStallHandler(IOfflineShopRepository offlineShops)
 
         switch (packet.Sort)
         {
-            case 1 when state.PshopOpen:
-                state.PshopOpen = false;
-                session.Send(new CloseShopStallResponse { Result = 1 });
+            case 1:
+                var response = service.CloseLiveShop(state);
+                if (response is { } r)
+                    session.Send(r);
                 break;
             case 2:
-                await offlineShops.SetStateAsync(characterId, 0, cancellationToken);
+                await service.CloseOfflineShopAsync(characterId, cancellationToken);
                 break;
         }
     }

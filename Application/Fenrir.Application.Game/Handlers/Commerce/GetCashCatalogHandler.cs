@@ -1,6 +1,7 @@
 using Fenrir.Application.Game.GameData;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Fenrir.Application.Game.Handlers.Commerce.Services;
 
 namespace Fenrir.Application.Game.Handlers.Commerce;
 
@@ -9,15 +10,10 @@ namespace Fenrir.Application.Game.Handlers.Commerce;
 ///     client's cached version differs; Fenrir always replies instead, harmless since the catalog is
 ///     boot-time-static.
 /// </summary>
-public sealed class GetCashCatalogHandler(WorldDataCache worldData) : IInlinePacketHandler<GetCashCatalogRequest>
+public sealed class GetCashCatalogHandler(IGetCashCatalogService service) : IInlinePacketHandler<GetCashCatalogRequest>
 {
     public void Handle(in GetCashCatalogRequest packet, IPacketSession session)
     {
-        session.Send(new GetCashCatalogResponse
-        {
-            Result = 0,
-            Version = worldData.CashCatalogVersion,
-            CashItemInfo = worldData.CashCatalog.DisplayGrid
-        });
+        session.Send(service.GetCatalog());
     }
 }

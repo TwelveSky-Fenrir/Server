@@ -8,6 +8,12 @@ public interface IGuildRepository
 
     public ValueTask<GuildSummaryDto?> GetByIdAsync(int guildId, CancellationToken ct);
 
+    /// <summary>Every guild, master/buff/points included -- game.usp_Guild_GetAll (used by GuildBuffDecayHost's periodic scan).</summary>
+    public ValueTask<ReadOnlyCollection<GuildSummaryDto>> GetAllAsync(CancellationToken ct);
+
+    /// <summary>Top <paramref name="count" /> guilds by Points, highest first -- game.usp_Guild_GetTopByPoints.</summary>
+    public ValueTask<ReadOnlyCollection<GuildRankingRowDto>> GetTopByPointsAsync(int count, CancellationToken ct);
+
     public ValueTask<ReadOnlyCollection<GuildRosterRowDto>> GetRosterAsync(int guildId, CancellationToken ct);
 
     public ValueTask<ReadOnlyCollection<GuildNoticeRowDto>> GetNoticesAsync(int guildId, CancellationToken ct);

@@ -25,6 +25,34 @@ public interface ICharacterRepository
         int maxMana,
         CancellationToken ct);
 
+    /// <summary>
+    ///     Op17's full creation path: same slot/name guards as <see cref="CreateAsync" /> plus the EU33 starter kit
+    ///     (stats, pet, welcome buffs, premium day, tribe equipment/inventory/skills/hotkeys) in one transaction.
+    /// </summary>
+    public ValueTask<int> CreateWithStarterKitAsync(
+        int accountId,
+        byte slot,
+        string name,
+        byte tribe,
+        byte gender,
+        byte headType,
+        byte faceType,
+        short mapId,
+        float posX,
+        float posY,
+        float posZ,
+        int life,
+        int maxLife,
+        int mana,
+        int maxMana,
+        int welcomeBuffUntilDate,
+        long premiumUntilUnixSeconds,
+        IReadOnlyList<CharacterItemSlotTvp> equipment,
+        IReadOnlyList<CharacterItemSlotTvp> inventory,
+        IReadOnlyList<CharacterSkillSlotTvp> skills,
+        IReadOnlyList<CharacterHotkeySlotTvp> hotkeys,
+        CancellationToken ct);
+
     public ValueTask DeleteAsync(int accountId, byte slot, CancellationToken ct);
 
     public ValueTask<CharacterWorldEntryDto?> GetForWorldEntryAsync(int characterId, CancellationToken ct);
@@ -92,4 +120,10 @@ public interface ICharacterRepository
     public ValueTask ExecutePshopPurchaseAsync(int sellerCharacterId, byte sellerContainer,
         IReadOnlyList<CharacterItemSlotTvp> sellerItems, int buyerCharacterId, byte buyerContainer,
         IReadOnlyList<CharacterItemSlotTvp> buyerItems, int price, CancellationToken ct);
+
+    /// <summary>
+    ///     game.Characters.TribeTransferPermitCount -- banks (or, if <paramref name="delta" /> is negative,
+    ///     spends) Faction Transfer Scroll permits. Returns the balance after the adjustment.
+    /// </summary>
+    public ValueTask<int> GrantTribeTransferPermitAsync(int characterId, int delta, CancellationToken ct);
 }

@@ -289,6 +289,7 @@ public static class Opcodes
             public const byte HeroRankingCurrent = 150;
             public const byte TowerUpgrade = 151;
             public const byte TowerStatus = 152;
+            public const byte TowerRepairInfo = 153;
             public const byte DailyMission = 163;
             public const byte UpgradeCape = 164;
             public const byte DrunkState = 165;

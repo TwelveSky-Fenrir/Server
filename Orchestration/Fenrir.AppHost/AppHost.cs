@@ -28,8 +28,8 @@ builder.AddProject<Fenrir_LoginServer>("login-server")
     .WithEnvironment("Login__Port", loginPort.ToString());
 
 // M1 ships exactly one shard; still a loop over shard ids so adding a second is a one-line array change.
-const int gameBasePort = 1100;
-byte[] shardIds = [1];
+const int gameBasePort = 11000;
+byte[] shardIds = [2];
 
 foreach (var shardId in shardIds)
 {

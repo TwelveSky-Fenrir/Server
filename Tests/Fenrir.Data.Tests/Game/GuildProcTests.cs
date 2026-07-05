@@ -147,6 +147,71 @@ public class GuildProcTests
         Assert.Equal(6, await ScalarAsync<int>($"SELECT Points FROM game.Guilds WHERE GuildId = {guildId};"));
     }
 
+    // C08(c): the RvR ranking board query -- usp_Guild_AdjustPoints had no reader until this.
+    [Fact]
+    public async Task Guild_GetTopByPoints_OrdersDescending_AndRespectsCount()
+    {
+        var lowId = await CreateGuildAsync(NewGuildName(), await CreateCharacterAsync());
+        var highId = await CreateGuildAsync(NewGuildName(), await CreateCharacterAsync());
+        var midId = await CreateGuildAsync(NewGuildName(), await CreateCharacterAsync());
+        await ExecProcAsync("game.usp_Guild_AdjustPoints", ("GuildId", lowId), ("Delta", 10));
+        await ExecProcAsync("game.usp_Guild_AdjustPoints", ("GuildId", highId), ("Delta", 900));
+        await ExecProcAsync("game.usp_Guild_AdjustPoints", ("GuildId", midId), ("Delta", 500));
+
+        await using var connection = new SqlConnection(_connectionString);
+        await connection.OpenAsync();
+        await using var command = new SqlCommand("game.usp_Guild_GetTopByPoints", connection)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+        command.Parameters.AddWithValue("Count", 2);
+        await using var reader = await command.ExecuteReaderAsync();
+
+        Assert.True(await reader.ReadAsync());
+        Assert.Equal(highId, reader.GetInt32(reader.GetOrdinal("GuildId")));
+        Assert.Equal(900, reader.GetInt32(reader.GetOrdinal("Points")));
+
+        Assert.True(await reader.ReadAsync());
+        Assert.Equal(midId, reader.GetInt32(reader.GetOrdinal("GuildId")));
+        Assert.Equal(500, reader.GetInt32(reader.GetOrdinal("Points")));
+
+        // TOP 2: lowId (10 points) exists but must not appear in the third row.
+        Assert.False(await reader.ReadAsync());
+    }
+
+    // C08(a): usp_Guild_GetAll had no C# caller until GuildBuffDecayHost's periodic scan.
+    [Fact]
+    public async Task Guild_GetAll_IncludesEveryGuild_WithItsBuffFields()
+    {
+        var masterId = await CreateCharacterAsync();
+        var guildId = await CreateGuildAsync(NewGuildName(), masterId);
+        await ExecProcAsync("game.usp_Guild_SetBuff",
+            ("GuildId", guildId), ("BuffType", 3), ("BuffState", 1), ("BuffTime", 42), ("BuffTimeForDiff", 7L));
+
+        await using var connection = new SqlConnection(_connectionString);
+        await connection.OpenAsync();
+        await using var command = new SqlCommand("game.usp_Guild_GetAll", connection)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+        await using var reader = await command.ExecuteReaderAsync();
+
+        var found = false;
+        while (await reader.ReadAsync())
+        {
+            if (reader.GetInt32(reader.GetOrdinal("GuildId")) != guildId)
+                continue;
+
+            found = true;
+            Assert.Equal(3, reader.GetInt32(reader.GetOrdinal("BuffType")));
+            Assert.Equal(1, reader.GetInt32(reader.GetOrdinal("BuffState")));
+            Assert.Equal(42, reader.GetInt32(reader.GetOrdinal("BuffTime")));
+            Assert.Equal(7L, reader.GetInt64(reader.GetOrdinal("BuffTimeForDiff")));
+        }
+
+        Assert.True(found, "usp_Guild_GetAll must include every guild, this one included.");
+    }
+
     [Fact]
     public async Task Guild_Disband_RemovesGuildMembersAndNotices_AndThrowsForAnUnknownGuild()
     {

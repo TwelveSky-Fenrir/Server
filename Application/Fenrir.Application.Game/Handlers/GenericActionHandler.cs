@@ -5,6 +5,7 @@ using Fenrir.Application.Game.Pets;
 using Fenrir.Application.Game.Quests;
 using Fenrir.Application.Game.Skills;
 using Fenrir.Application.Game.Stats;
+using Fenrir.Application.Game.Tribes;
 using Fenrir.Application.Game.World;
 using Fenrir.Application.Game.World.Loot;
 using Fenrir.Application.Game.World.Npcs;
@@ -537,7 +538,7 @@ public sealed class GenericActionHandler(
         var destinationSlot = state.Inventory.GetSlot((byte)page2, (byte)index2);
 
         var resolved = NpcShopPolicy.ResolveBuy(npc, itemDefinition, move.Quantity1, destinationSlot, state.Level,
-            zone.MapId);
+            zone.MapId, state.ContributionPoints);
 
         if (!resolved.Succeeded)
         {
@@ -575,6 +576,17 @@ public sealed class GenericActionHandler(
                 cancellationToken))
             logger.LogError(
                 "Zone {MapId} inventory inbox full: dropped NPC-buy mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
+                zone.MapId, characterId);
+
+        // Contribution Points (BuyCost2) aren't debited by the SQL call above -- unlike Money, they're a
+        // write-behind field on PlayerRuntimeState (same posture as CraftLegendaryPetHandler's CP spend), so the
+        // in-memory mirror IS the durable-enough record until the next flush.
+        if (resolved.CpCost > 0 &&
+            !await zone.PostTribeProgressCommandAndWaitAsync(
+                new TribeProgressZoneCommand(characterId, state.ContributionPoints - resolved.CpCost),
+                cancellationToken))
+            logger.LogError(
+                "Zone {MapId} tribe-progress inbox full: dropped CP mirror for character {CharacterId} after NPC-shop-buy",
                 zone.MapId, characterId);
     }
 

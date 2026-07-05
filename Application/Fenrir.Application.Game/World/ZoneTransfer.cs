@@ -107,6 +107,8 @@ public static class ZoneTransfer
             RebirthCount: state.RebirthCount,
             Experience: state.Experience,
             ContributionPoints: state.ContributionPoints,
-            TeacherPoint: state.TeacherPoint);
+            TeacherPoint: state.TeacherPoint,
+            Level2: state.Level2,
+            Exp2: state.Exp2);
     }
 }

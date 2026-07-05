@@ -6,9 +6,6 @@
     <Project Path="Application/Fenrir.Application.Game/Fenrir.Application.Game.csproj"/>
     <Project Path="Application/Fenrir.Application.Login/Fenrir.Application.Login.csproj"/>
   </Folder>
-  <Folder Name="/Benchmarks/">
-    <Project Path="Benchmarks/Fenrir.Benchmarks/Fenrir.Benchmarks.csproj"/>
-  </Folder>
   <Folder Name="/Core/">
     <Project Path="Core/Fenrir.Contracts/Fenrir.Contracts.csproj"/>
   </Folder>
@@ -34,6 +31,7 @@
     <Project Path="Tests/Fenrir.Contracts.Tests/Fenrir.Contracts.Tests.csproj"/>
     <Project Path="Tests/Fenrir.Data.Tests/Fenrir.Data.Tests.csproj"/>
     <Project Path="Tests/Fenrir.IntegrationTests/Fenrir.IntegrationTests.csproj"/>
+    <Project Path="Tests/Fenrir.LoginServer.Tests/Fenrir.LoginServer.Tests.csproj"/>
     <Project Path="Tests/Fenrir.Network.Tests/Fenrir.Network.Tests.csproj"/>
   </Folder>
   <Folder Name="/Tools/">

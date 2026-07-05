@@ -16,14 +16,14 @@ public sealed class ShoutHandler : IInlinePacketHandler<ShoutRequest>
     {
         var zoneSession = (ZoneClientSession)session;
 
-        if (zoneSession.CurrentZone is not Zone zone || !ChatRouter.IsShoutEnabledOnMap(zone.MapId))
-            return;
-
         if (ChatRouter.IsContentEmpty(packet.Content))
         {
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }
+
+        if (zoneSession.CurrentZone is not Zone zone || !ChatRouter.IsShoutEnabledOnMap(zone.MapId))
+            return;
 
         var characterId = zoneSession.CharacterId!.Value;
         if (!zone.TryGetPlayer(characterId, out var state) || state is null || state.IsMuted)

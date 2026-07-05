@@ -30,6 +30,24 @@ public sealed record GuildRepository(ICaeriusNetDbContext Db) : IGuildRepository
         return await Db.FirstQueryAsync<GuildSummaryDto>(sp, ct);
     }
 
+    /// <summary>Every guild -- game.usp_Guild_GetAll, the same RS0 shape as <see cref="GetByIdAsync" />.</summary>
+    public async ValueTask<ReadOnlyCollection<GuildSummaryDto>> GetAllAsync(CancellationToken ct)
+    {
+        var sp = new StoredProcedureParametersBuilder("game", "usp_Guild_GetAll", 64).Build();
+
+        return await Db.QueryAsReadOnlyCollectionAsync<GuildSummaryDto>(sp, ct);
+    }
+
+    /// <summary>Ranking-board top N by Points, highest first -- game.usp_Guild_GetTopByPoints.</summary>
+    public async ValueTask<ReadOnlyCollection<GuildRankingRowDto>> GetTopByPointsAsync(int count, CancellationToken ct)
+    {
+        var sp = new StoredProcedureParametersBuilder("game", "usp_Guild_GetTopByPoints", count)
+            .AddParameter("Count", count, SqlDbType.Int)
+            .Build();
+
+        return await Db.QueryAsReadOnlyCollectionAsync<GuildRankingRowDto>(sp, ct);
+    }
+
     /// <summary>Full roster for one guild, master/sub-master first (GUILD_INFO.MemberNames/MemberRoles/MemberCallNames).</summary>
     public async ValueTask<ReadOnlyCollection<GuildRosterRowDto>> GetRosterAsync(int guildId, CancellationToken ct)
     {

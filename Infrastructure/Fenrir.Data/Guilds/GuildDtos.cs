@@ -47,3 +47,10 @@ public sealed partial record GuildNoticeRowDto(
     byte NoticeIndex,
     string Text,
     DateTime UpdatedAtUtc);
+
+/// <summary>game.usp_Guild_GetTopByPoints RS0 -- one ranking-board row (Application.Game.Guilds.GuildRankingCache).</summary>
+[GenerateDto]
+public sealed partial record GuildRankingRowDto(
+    int GuildId,
+    string Name,
+    int Points);

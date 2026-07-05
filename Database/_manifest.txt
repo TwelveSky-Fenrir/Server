@@ -41,6 +41,10 @@
 30_tables/world/EventDefinitions.sql
 30_tables/world/RewardBundles.sql
 30_tables/world/RewardBundleItems.sql
+30_tables/world/StarterKitEquipment.sql
+30_tables/world/StarterKitInventory.sql
+30_tables/world/StarterKitSkills.sql
+30_tables/world/StarterKitHotkeys.sql
 
 30_tables/game/Guilds.sql
 30_tables/game/GuildMembers.sql
@@ -49,13 +53,16 @@
 30_tables/game/TribeSubMasters.sql
 30_tables/game/TribeVotes.sql
 30_tables/game/TribeBank.sql
+30_tables/game/TribeBankLog.sql
 30_tables/game/Gifts.sql
 30_tables/game/GiftLog.sql
 30_tables/game/HeroRankings.sql
+30_tables/game/HeroRankingRolloverState.sql
 30_tables/game/TowerState.sql
 30_tables/game/WorldState.sql
 30_tables/game/WorldStateTribes.sql
 30_tables/game/WorldStateAllianceOffers.sql
+30_tables/game/MonsterBossRespawnTimers.sql
 30_tables/game/OfflineShops.sql
 30_tables/game/OfflineShopItems.sql
 30_tables/game/ProxyShopNames.sql
@@ -86,6 +93,8 @@
 20_types/game/tvp_AccountVaultItemSlot.sql
 20_types/game/tvp_CharacterItemSlot.sql
 20_types/game/tvp_CharacterProgress.sql
+20_types/game/tvp_CharacterSkillSlot.sql
+20_types/game/tvp_CharacterHotkeySlot.sql
 
 35_views/world/vw_ItemBonusSkillDetail.sql
 35_views/world/vw_MonsterWithDropSummary.sql
@@ -124,6 +133,8 @@
 50_procedures/game/usp_Character_SetAutoPotionThreshold.sql
 50_procedures/game/usp_Character_SetAutoHunt.sql
 50_procedures/game/usp_Character_SetPetGrowth.sql
+50_procedures/game/usp_Character_GrantTribeTransferPermit.sql
+50_procedures/game/usp_Character_CreateWithStarterKit.sql
 50_procedures/runtime/usp_SessionTicket_Create.sql
 50_procedures/runtime/usp_SessionTicket_Consume.sql
 50_procedures/runtime/usp_SessionTicket_Purge.sql
@@ -165,6 +176,7 @@
 50_procedures/world/usp_EventDefinition_GetAll.sql
 50_procedures/world/usp_RewardBundle_GetAll.sql
 50_procedures/world/usp_RewardBundleItem_GetAll.sql
+50_procedures/world/usp_StarterKit_GetByPreviousTribe.sql
 
 50_procedures/game/usp_Guild_GetAll.sql
 50_procedures/game/usp_Guild_GetById.sql
@@ -183,17 +195,23 @@
 50_procedures/game/usp_Guild_SetLogo.sql
 50_procedures/game/usp_Guild_SetGrade.sql
 50_procedures/game/usp_Guild_AdjustPoints.sql
+50_procedures/game/usp_Guild_GetTopByPoints.sql
 50_procedures/game/usp_Cash_GetBalance.sql
 50_procedures/game/usp_Cash_Credit.sql
 50_procedures/game/usp_Cash_Debit.sql
 50_procedures/game/usp_Tribe_GetAll.sql
+50_procedures/game/usp_Tribe_SetMaster.sql
 50_procedures/game/usp_TribeSubMaster_GetByTribe.sql
 50_procedures/game/usp_TribeSubMaster_Set.sql
 50_procedures/game/usp_TribeSubMaster_Clear.sql
 50_procedures/game/usp_TribeVote_GetByTribe.sql
+50_procedures/game/usp_TribeVote_Register.sql
+50_procedures/game/usp_TribeVote_AddPoints.sql
+50_procedures/game/usp_TribeVote_ClearTribe.sql
 50_procedures/game/usp_TribeBank_GetByTribe.sql
 50_procedures/game/usp_TribeBank_Deposit.sql
 50_procedures/game/usp_TribeBank_Withdraw.sql
+50_procedures/game/usp_TribeBank_DepositFromCharacter.sql
 50_procedures/game/usp_TribeRole_GetForCharacter.sql
 
 50_procedures/game/usp_CharacterFriend_GetByCharacter.sql
@@ -210,14 +228,18 @@
 50_procedures/game/usp_GiftLog_GetByAccount.sql
 50_procedures/game/usp_HeroRanking_Upsert.sql
 50_procedures/game/usp_HeroRanking_GetByPeriod.sql
+50_procedures/game/usp_HeroRanking_Rollover.sql
 50_procedures/game/usp_TowerState_EnsureInitialized.sql
 50_procedures/game/usp_TowerState_GetAll.sql
 50_procedures/game/usp_TowerState_SetController.sql
 50_procedures/game/usp_WorldState_EnsureInitialized.sql
+50_procedures/game/usp_WorldState_EnsureInitialized_FixMissingTribeSeed.sql
 50_procedures/game/usp_WorldState_Get.sql
 50_procedures/game/usp_WorldState_Update.sql
 50_procedures/game/usp_WorldStateTribe_Update.sql
 50_procedures/game/usp_WorldStateAllianceOffer_Set.sql
+50_procedures/game/usp_MonsterBossRespawnTimer_GetAll.sql
+50_procedures/game/usp_MonsterBossRespawnTimer_Set.sql
 50_procedures/game/usp_OfflineShop_Upsert.sql
 50_procedures/game/usp_OfflineShop_Close.sql
 50_procedures/game/usp_OfflineShop_GetByCharacter.sql
@@ -272,6 +294,10 @@
 70_seed/world/080_items.sql
 70_seed/world/081_item_bonus_skills.sql
 70_seed/world/020_zones.sql
+70_seed/world/082_starter_kit_equipment.sql
+70_seed/world/083_starter_kit_inventory.sql
+70_seed/world/084_starter_kit_skills.sql
+70_seed/world/085_starter_kit_hotkeys.sql
 70_seed/world/090_monsters.sql
 70_seed/world/Npcs.sql
 70_seed/world/021_zone_npc_spawns.sql
@@ -292,3 +318,4 @@
 70_seed/admin/004_error_catalog_v8_commerce.sql
 70_seed/admin/005_shard_map_assignments.sql
 70_seed/admin/006_game_settings.sql
+70_seed/admin/007_error_catalog_c07_item_use.sql

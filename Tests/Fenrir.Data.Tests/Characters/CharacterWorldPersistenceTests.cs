@@ -47,6 +47,7 @@ public class CharacterWorldPersistenceTests
 
         Assert.Equal(0L, bundle.Character.Experience);
         Assert.Equal(1, bundle.Character.Level2); // DF_Characters_Level2
+        Assert.Equal(0, bundle.Character.Exp2); // DF_Characters_Exp2
         Assert.Equal(0, bundle.Character.StatPoints);
         Assert.Equal(0L, bundle.Character.Money);
         Assert.Equal(0, bundle.Character.BigMoney);
@@ -229,7 +230,10 @@ public class CharacterWorldPersistenceTests
         var characterId = await CreateCharacterAsync();
 
         await _characters.PersistProgressAsync(
-            [new CharacterProgressTvp(characterId, 5, 20, 3, 123456789L, 90, 400, 30, 200, 11, 22, 33, 44, 7, 8, 9)],
+            [
+                new CharacterProgressTvp(characterId, 5, 20, 3, 123456789L, 90, 400, 30, 200, 11, 22, 33, 44, 7, 8, 9,
+                    555_555, 2)
+            ],
             CancellationToken.None);
 
         var afterFirstFlush = await _characters.GetWorldEntryBundleAsync(characterId, CancellationToken.None);
@@ -245,16 +249,20 @@ public class CharacterWorldPersistenceTests
         Assert.Equal(7, afterFirstFlush.Character.StatPoints);
         Assert.Equal(8, afterFirstFlush.Character.SkillPoints);
         Assert.Equal(9, afterFirstFlush.Character.ContributionPoints);
+        Assert.Equal(555_555, afterFirstFlush.Character.Exp2);
+        Assert.Equal(2, afterFirstFlush.Character.RebirthCount);
 
         // Stale replay (same FlushSequence, different values) must be discarded silently.
         await _characters.PersistProgressAsync(
-            [new CharacterProgressTvp(characterId, 5, 99, 9, 999L, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0)],
+            [new CharacterProgressTvp(characterId, 5, 99, 9, 999L, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1)],
             CancellationToken.None);
 
         var afterReplay = await _characters.GetWorldEntryBundleAsync(characterId, CancellationToken.None);
         Assert.NotNull(afterReplay);
         Assert.Equal(20, afterReplay.Character.Level);
         Assert.Equal(123456789L, afterReplay.Character.Experience);
+        Assert.Equal(555_555, afterReplay.Character.Exp2);
+        Assert.Equal(2, afterReplay.Character.RebirthCount);
 
         var ex = await Record.ExceptionAsync(() =>
             _characters.PersistProgressAsync(Array.Empty<CharacterProgressTvp>(), CancellationToken.None).AsTask());

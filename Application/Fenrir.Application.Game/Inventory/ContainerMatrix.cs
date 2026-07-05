@@ -180,15 +180,14 @@ public static class ContainerMatrix
             return new MoveOutcomeResult(MoveOutcome.Success, newSource, moved);
         }
 
-        if (sourceIsStackable && dst.ItemId == src.ItemId)
+        if (!sourceIsStackable || dst.ItemId != src.ItemId)
+            return new MoveOutcomeResult(MoveOutcome.Success, destination, source);
         {
             var merged = dst with { Quantity = dst.Quantity + quantity };
             var remaining = src.Quantity - quantity;
             ItemStack? newSource = remaining > 0 ? src with { Quantity = remaining } : null;
             return new MoveOutcomeResult(MoveOutcome.Success, newSource, merged);
         }
-
-        return new MoveOutcomeResult(MoveOutcome.Success, destination, source);
     }
 
     /// <summary>Projects a move onto the current container contents, producing the new full content of each side.</summary>

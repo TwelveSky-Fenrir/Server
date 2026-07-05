@@ -10,23 +10,31 @@ using Microsoft.Extensions.Options;
 namespace Fenrir.Application.Login.Handlers;
 
 /// <summary>
-///     op11 CL_LOGIN_SEND — IP rate limit, then version, then auth run in that order so an over-budget/incompatible
-///     attempt never reaches Argon2id/SQL.
+///     op11 CL_LOGIN_SEND — IP rate limit, then the application firewall, then version, then MAC restriction, then
+///     auth run in that order so an over-budget/blocked/incompatible/banned-PC attempt never reaches Argon2id/SQL
+///     account lookup.
 /// </summary>
 public sealed class LoginHandler(
     IAccountRepository accounts,
     IAccountPinRepository pins,
     ICharacterRepository characters,
     LoginIpRateLimiter ipRateLimiter,
+    ApplicationFirewall firewall,
+    IBanRepository bans,
+    IMacRestrictionRepository macRestrictions,
     IOptions<LoginServerOptions> options,
     SessionRegistry registry) : IAsyncPacketHandler<LoginRequest>
 {
     // Legacy tResult codes actually producible by Fenrir's flows (S04_MyWork02.cpp W_LOGIN_SEND / S08_MyDB Login):
+    private const int ResultIpBlocked = 2; // MyDB::CheckGMIP/CheckBanIP (S04_MyWork02.cpp:195-215)
     private const int ResultVersionMismatch = 4; // tVersion != mServerVersion
     private const int ResultUnknownAccount = 6; // mDB.Login: account not found
     private const int ResultWrongPassword = 7; // mDB.Login: password mismatch
     private const int ResultBlocked = 9; // mDB.Login: uBlockInfo >= today (ban); Fenrir lockout maps here too
+    private const int ResultCustomMessage = 10000; // mDB.Login: macinfo mac_limit < 1 ("Your PC has been banned.")
     private const int ResultSuccess = 0;
+
+    private const string MacBannedMessage = "Your PC has been banned.";
 
     /// <summary>
     ///     Fixed reference hash so the "account not found" path pays the same Argon2id cost as a real verify
@@ -43,9 +51,25 @@ public sealed class LoginHandler(
         if (!ipRateLimiter.TryConsume(loginSession.RemoteEndPoint))
             return;
 
+        // Checked ahead of Argon2id/SQL (unlike legacy, which only ran this after a successful mDB.Login): an
+        // already-known-bad IP shouldn't get a free password-guessing attempt against any account.
+        if (!await firewall.IsAllowedAsync(loginSession.RemoteEndPoint, cancellationToken))
+        {
+            LoginTrain.SendFailure(session, ResultIpBlocked, packet.Id);
+            return;
+        }
+
         if (packet.Version != options.Value.ExpectedClientVersion)
         {
             LoginTrain.SendFailure(session, ResultVersionMismatch, packet.Id);
+            return;
+        }
+
+        var macAddress = MacAddressFormatter.Format(packet.Adapter.PhysicalAddress, packet.Adapter.PhysicalAddressLength);
+        if (macAddress.Length > 0 &&
+            await macRestrictions.IsBannedAsync(macAddress, packet.Adapter.AdapterName, cancellationToken))
+        {
+            LoginTrain.SendFailure(session, ResultCustomMessage, packet.Id, MacBannedMessage);
             return;
         }
 
@@ -94,7 +118,10 @@ public sealed class LoginHandler(
             return ResultUnknownAccount;
         }
 
-        if (account.IsBanned || account.LockoutUntilUtc > DateTime.UtcNow)
+        // Always awaited (not short-circuited behind account.IsBanned) so a plain, flag-only ban and a
+        // ban-log-only ban (admin.Bans, never ported into auth.Accounts.IsBanned) cost the same wall-clock time.
+        var loggedBan = await bans.IsActiveForAccountAsync(account.AccountId, ct);
+        if (account.IsBanned || loggedBan || account.LockoutUntilUtc > DateTime.UtcNow)
         {
             // Verify still runs (outcome is fixed) so timing doesn't reveal banned/locked vs. other outcomes.
             _ = PasswordHasher.Verify(password, account.PasswordHash, account.PasswordSalt);

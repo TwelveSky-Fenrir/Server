@@ -1,3 +1,4 @@
+using Fenrir.Application.Game.Social;
 using Fenrir.Contracts.Packets.Shared;
 using Fenrir.Data.Guilds;
 
@@ -56,7 +57,7 @@ public static class GuildInfoProjection
         {
             var row = ordered[i];
             memberNames[i] = row.CharacterName;
-            memberRoles[i] = row.Role;
+            memberRoles[i] = GuildRoleCodec.DbRoleToWire(row.Role);
             memberCallNames[i] = row.CallName;
 
             switch (row.Role)

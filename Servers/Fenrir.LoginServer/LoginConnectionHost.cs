@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using Fenrir.Application.Login;
 using Fenrir.Contracts.Abstractions;
 using Fenrir.Contracts.Packets.Login;
+using Fenrir.Data.Runtime;
 using Fenrir.Network.Dispatching;
 using Fenrir.Network.RateLimiting;
 using Fenrir.Network.Sessions;
@@ -20,6 +21,7 @@ public sealed class LoginConnectionHost(
     IFrameDispatcher dispatcher,
     ISessionRateLimiter rateLimiter,
     SessionRegistry registry,
+    IGameServerDirectoryRepository directory,
     ILogger<LoginConnectionHost> logger) : BackgroundService
 {
     private FenrirTcpListener? _listener;
@@ -50,7 +52,7 @@ public sealed class LoginConnectionHost(
 
         try
         {
-            Greet(loginSession, connection);
+            await GreetAsync(loginSession, connection, ct).ConfigureAwait(false);
 
             await Task.WhenAll(
                 connection.RunIOAsync(ct),
@@ -70,7 +72,7 @@ public sealed class LoginConnectionHost(
     }
 
     /// <summary>Seeds the stream cipher key BEFORE the I/O pump starts, so no inbound byte is decoded with the wrong key.</summary>
-    private void Greet(LoginClientSession session, SocketConnection connection)
+    private async Task GreetAsync(LoginClientSession session, SocketConnection connection, CancellationToken ct)
     {
         // Legacy rand_nor()%1001 * rand_nor()%1001 need not be reproduced byte-for-byte, only "look random".
         var randomNumber = RandomNumberGenerator.GetInt32(int.MinValue, int.MaxValue);
@@ -83,8 +85,34 @@ public sealed class LoginConnectionHost(
             RandomNumber = randomNumber,
             MaxPlayerNum = options.Value.MaxPlayerNum,
             GagePlayerNum = 0,
-            PresentPlayerNum = registry.Count
+            PresentPlayerNum = await ReadLivePlayerCountAsync(ct).ConfigureAwait(false)
         });
+    }
+
+    /// <summary>
+    ///     Real CCU across every live shard (<c>runtime.GameServerDirectory</c>, the same directory
+    ///     <c>ZoneTransferHandler</c>/<c>ShardPartitionGuard</c> already use for shard selection), not
+    ///     <see cref="SessionRegistry.Count" /> -- that only counts sockets currently mid-login on this one
+    ///     process, unrelated to how many players are actually in the world.
+    ///     A directory read failure must not block the greet (the count is purely cosmetic), so it degrades to 0.
+    /// </summary>
+    internal async ValueTask<int> ReadLivePlayerCountAsync(CancellationToken ct)
+    {
+        try
+        {
+            var shards = await directory.GetDirectoryAsync(ct).ConfigureAwait(false);
+
+            var total = 0;
+            foreach (var shard in shards)
+                total += shard.Ccu;
+            return total;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex,
+                "Failed to read runtime.GameServerDirectory for the login greeting's player count; reporting 0");
+            return 0;
+        }
     }
 
     public override void Dispose()

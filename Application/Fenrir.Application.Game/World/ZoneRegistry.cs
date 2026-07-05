@@ -1,6 +1,7 @@
 using System.Collections.Frozen;
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
+using Fenrir.Application.Game.Combat;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Movement;
 using Fenrir.Application.Game.Quests;
@@ -18,6 +19,7 @@ namespace Fenrir.Application.Game.World;
 public sealed class ZoneRegistry
 {
     private readonly DirtyTracker<int> _dirtyTracker;
+    private readonly KillCooldownTracker _killCooldownTracker;
     private readonly MovementRules _movementRules;
     private readonly GameServerOptions _options;
     private readonly QuestCatalog _questCatalog;
@@ -28,7 +30,8 @@ public sealed class ZoneRegistry
 
     public ZoneRegistry(IOptions<GameServerOptions> options, MovementRules movementRules,
         DirtyTracker<int> dirtyTracker, ILogger<Zone> zoneLogger, WorldDataCache worldData,
-        IEnumerable<ISimulationSystem> simulationSystems, QuestCatalog? questCatalog = null)
+        IEnumerable<ISimulationSystem> simulationSystems, QuestCatalog? questCatalog = null,
+        KillCooldownTracker? killCooldownTracker = null)
     {
         _options = options.Value;
         _movementRules = movementRules;
@@ -41,6 +44,10 @@ public sealed class ZoneRegistry
 
         // Optional: falls back to Zone's own per-zone default so existing test call sites keep compiling.
         _questCatalog = questCatalog ?? new QuestCatalog(worldData);
+
+        // Shared process-wide across every zone (C05 anti-farm gate) -- a PvP kill farmed across a zone handoff
+        // still hits the same tracker instance instead of each zone starting a fresh cooldown clock.
+        _killCooldownTracker = killCooldownTracker ?? new KillCooldownTracker();
     }
 
     /// <summary>Every hosted zone, in no particular order — the tick host launches one loop per entry.</summary>
@@ -70,7 +77,7 @@ public sealed class ZoneRegistry
         _zones = maps.ToFrozenDictionary(
             mapId => mapId,
             mapId => new Zone(mapId, _options, _movementRules, _dirtyTracker, _systems, _zoneLogger, _worldData,
-                questCatalog: _questCatalog));
+                questCatalog: _questCatalog, killCooldownTracker: _killCooldownTracker));
     }
 
     public bool TryGet(short mapId, [NotNullWhen(true)] out Zone? zone)

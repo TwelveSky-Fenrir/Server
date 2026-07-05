@@ -135,4 +135,8 @@ public sealed record PlayerEnterData(
     long Experience = 0,
     int ContributionPoints = 0,
     // Quest reward type 5 (wAvatar.aTeacherPoint) -- see PlayerRuntimeState.TeacherPoint's own remarks.
-    int TeacherPoint = 0);
+    int TeacherPoint = 0,
+    // Same "must travel here or it silently resets" posture as the block above -- see
+    // PlayerRuntimeState.Level2/Exp2's own remarks.
+    short Level2 = 0,
+    int Exp2 = 0);

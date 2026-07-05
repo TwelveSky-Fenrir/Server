@@ -155,8 +155,79 @@ public class TribeBankHandlerTests
         var (session, _, _) = Setup(zone, 1, 1);
         var handler = new TribeBankHandler(new FakeTribeRepository(), NullLogger<TribeBankHandler>.Instance);
 
-        await handler.HandleAsync(new TribeBankRequest { Sort = 3, Value = 0 }, session, CancellationToken.None);
+        await handler.HandleAsync(new TribeBankRequest { Sort = 4, Value = 0 }, session, CancellationToken.None);
 
         Assert.Equal(DisconnectReason.Faulted, session.DisconnectReason);
+    }
+
+    [Fact]
+    public async Task Deposit_SlotIndexOutOfRange_Aborts()
+    {
+        var zone = ZoneTestKit.CreateZone(1);
+        var (session, _, _) = Setup(zone, 1, 0);
+        var repository = new FakeTribeRepository();
+        var handler = new TribeBankHandler(repository, NullLogger<TribeBankHandler>.Instance);
+
+        await handler.HandleAsync(new TribeBankRequest { Sort = 3, Value = 50 }, session, CancellationToken.None);
+
+        Assert.Equal(DisconnectReason.Faulted, session.DisconnectReason);
+        Assert.Null(repository.LastDepositCall);
+    }
+
+    [Fact]
+    public async Task Deposit_RegularMemberWithNoTribeRole_StillAllowed()
+    {
+        // Unlike view/withdraw, deposit only ever moves the depositor's own money -- no privileged role
+        // (TribeRole == 0, i.e. not master/sub-master/vote-candidate) is required.
+        var zone = ZoneTestKit.CreateZone(1);
+        var (session, pipe, _) = Setup(zone, 1, 0);
+        var repository = new FakeTribeRepository { MoneyAfterDeposit = 0, DepositAmount = 5_000 };
+        repository.Bank[(1, 4)] = 0;
+        var handler = new TribeBankHandler(repository, NullLogger<TribeBankHandler>.Instance);
+
+        await handler.HandleAsync(new TribeBankRequest { Sort = 3, Value = 4 }, session, CancellationToken.None);
+
+        Assert.Null(session.DisconnectReason);
+        Assert.Equal(((byte)1, (byte)4, CharacterId), repository.LastDepositCall);
+        var frame = ZoneTestKit.DrainOutbound(pipe);
+        Assert.Equal(FrameWriter.FrameSizeOf<TribeBankResponse>(), frame.Length);
+    }
+
+    [Fact]
+    public async Task Deposit_RepositoryThrows_Aborts()
+    {
+        var zone = ZoneTestKit.CreateZone(1);
+        var (session, _, _) = Setup(zone, 1, 0);
+        var repository = new FakeTribeRepository
+        {
+            DepositException = new InvalidOperationException("character has no money to deposit")
+        };
+        var handler = new TribeBankHandler(repository, NullLogger<TribeBankHandler>.Instance);
+
+        await handler.HandleAsync(new TribeBankRequest { Sort = 3, Value = 4 }, session, CancellationToken.None);
+
+        Assert.Equal(DisconnectReason.Faulted, session.DisconnectReason);
+    }
+
+    [Fact]
+    public async Task Deposit_Success_ReturnsUpdatedBankAndMoney()
+    {
+        var zone = ZoneTestKit.CreateZone(1);
+        var (session, pipe, _) = Setup(zone, 1, 0);
+        var repository = new FakeTribeRepository { MoneyAfterDeposit = 0, DepositAmount = 30_000 };
+        repository.Bank[(1, 9)] = 20_000;
+        var handler = new TribeBankHandler(repository, NullLogger<TribeBankHandler>.Instance);
+
+        await handler.HandleAsync(new TribeBankRequest { Sort = 3, Value = 9 }, session, CancellationToken.None);
+
+        Assert.Null(session.DisconnectReason);
+        Assert.Equal(((byte)1, (byte)9, CharacterId), repository.LastDepositCall);
+
+        var frame = ZoneTestKit.DrainOutbound(pipe);
+        var payload = frame.AsSpan(1);
+        Assert.Equal(0, BinaryPrimitives.ReadInt32LittleEndian(payload));
+        Assert.Equal(3, BinaryPrimitives.ReadInt32LittleEndian(payload[4..]));
+        Assert.Equal(50_000, BinaryPrimitives.ReadInt32LittleEndian(payload[(8 + 9 * 4)..]));
+        Assert.Equal(0, BinaryPrimitives.ReadInt32LittleEndian(payload[208..]));
     }
 }

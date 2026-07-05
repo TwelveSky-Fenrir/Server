@@ -5,6 +5,7 @@ using Fenrir.Contracts.Abstractions;
 using Fenrir.Contracts.Packets.Zone;
 using Fenrir.Data.Progression;
 using Fenrir.Network.Sessions;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Progression;
 
@@ -15,7 +16,9 @@ namespace Fenrir.Application.Game.Handlers.Progression;
 ///     the real reward is CP -- ZC_HEROREWARD_RECV's item-drop fields are dead code in this build
 ///     (S04_MyWork02.cpp:14225-14243 is commented out) and are always sent as 0.
 /// </summary>
-public sealed class HeroRewardClaimHandler(IHeroRankingRepository heroRankings)
+public sealed class HeroRewardClaimHandler(
+    IHeroRankingRepository heroRankings,
+    ILogger<HeroRewardClaimHandler> logger)
     : IAsyncPacketHandler<HeroRewardClaimRequest>
 {
     public async ValueTask HandleAsync(HeroRewardClaimRequest packet, IPacketSession session,
@@ -49,8 +52,11 @@ public sealed class HeroRewardClaimHandler(IHeroRankingRepository heroRankings)
 
             session.Send(EmptyResponse(1000));
 
-            await zone.PostTribeProgressCommandAndWaitAsync(
-                new TribeProgressZoneCommand(characterId, state.ContributionPoints + points), cancellationToken);
+            if (!await zone.PostTribeProgressCommandAndWaitAsync(
+                    new TribeProgressZoneCommand(characterId, state.ContributionPoints + points), cancellationToken))
+                logger.LogError(
+                    "Zone {MapId} tribe-progress inbox full: dropped hero-reward CP mirror for character {CharacterId} -- unlike sibling handlers this is NOT self-healing, the DB reward-claim row is already committed",
+                    zone.MapId, characterId);
         }
         finally
         {

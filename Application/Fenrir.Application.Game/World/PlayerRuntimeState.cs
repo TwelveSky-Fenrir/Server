@@ -73,7 +73,18 @@ public sealed class PlayerRuntimeState
     /// <summary>Total XP (aExp1/aExp2 combined).</summary>
     public long Experience { get; set; }
 
-    /// <summary>aRebirthNum (cap 12) -- read by StatCalculator's CriticalDefence and Critical wrapper bonuses.</summary>
+    /// <summary>
+    ///     aLevel2, the post-cap "high level" rebirth ladder (1-12, MAX_LIMIT_HIGH_LEVEL_NUM) -- only reachable
+    ///     once <see cref="Level" /> reaches <see cref="Stats.LevelProgressionCalculator.MaxLevel" />. No
+    ///     Fenrir-side kill-experience path grants this yet (see <see cref="Stats.LevelProgressionCalculator" />'s
+    ///     own remarks); <c>TribeActionHandler.HandleRebirthAsync</c>'s Max Rebirth gate is its only consumer today.
+    /// </summary>
+    public short Level2 { get; set; }
+
+    /// <summary>aExp2 -- Level2's own XP counter, reset to 0 on every successful Max Rebirth.</summary>
+    public int Exp2 { get; set; }
+
+    /// <summary>aRebirthNum -- real cap is 6 (app-enforced by TribeActionHandler, not this field). Read by StatCalculator's CriticalDefence and Critical wrapper bonuses.</summary>
     public int RebirthCount { get; set; }
 
     /// <summary>aTitle (category*100 + rank 1-14) -- read by StatCalculator's title-rank bonus tables.</summary>
@@ -204,6 +215,38 @@ public sealed class PlayerRuntimeState
     public TimeSpan? LastSkillCastAtZoneClock { get; set; }
 
     /// <summary>
+    ///     Wall-clock instant of this character's last accepted CZ_HEARTBEAT_SEND (op151) -- deliberately
+    ///     wall-clock, not zone-clock, since <see cref="Handlers.ZoneReadyHandler" />/<see cref="Handlers.HeartbeatHandler" />
+    ///     run on the session loop and cannot see Zone's private simulated clock (same posture as
+    ///     <see cref="FishingCastAtUtc" />). Null means "no heartbeat seen yet," matching legacy's
+    ///     <c>mLastSentHeartbeat != -1</c> guard -- a session's very first ZoneReady always finds this null.
+    /// </summary>
+    public DateTime? LastSentHeartbeat { get; set; }
+
+    /// <summary>
+    ///     Legacy <c>mPrevSent</c> -- the <c>LastSend</c> counter value from this character's last accepted
+    ///     heartbeat, compared by <see cref="Handlers.HeartbeatHandler" /> against the next one to reject a
+    ///     replayed frame. Null (not 0) means "never sent" -- unlike legacy's truthy-zero sentinel, a
+    ///     legitimate first <c>LastSend</c> of 0 is not mistaken for "no heartbeat yet."
+    /// </summary>
+    public uint? PrevSentHeartbeat { get; set; }
+
+    /// <summary>
+    ///     Wall-clock instant <see cref="Handlers.ZoneReadyHandler" /> last completed this character's op13
+    ///     handshake without disconnecting it. Legacy restamps <c>mConnectTime</c> on every
+    ///     CLIENT_OK_FOR_ZONE_SEND; Fenrir's op13 is a one-shot Registering-to-InWorld handshake (ZoneReadyRequest's
+    ///     AllowedStates), so this is set exactly once per session. Null until then.
+    /// </summary>
+    public DateTime? ConnectTime { get; set; }
+
+    /// <summary>
+    ///     Legacy <c>mAutoTimeHack</c> -- strikes against a client that declares itself auto-hunting
+    ///     (ZoneReadyRequest.AutoState &gt; 0) while <see cref="AutoHuntEnabled" /> is false server-side.
+    ///     <see cref="Handlers.ZoneReadyHandler" /> disconnects on the 3rd strike, matching legacy exactly.
+    /// </summary>
+    public int AutoTimeHack { get; set; }
+
+    /// <summary>
     ///     Loaded once at world entry -- a hidden flag, never re-queried per chat message. A mute lifted or
     ///     newly applied mid-session is only picked up on the player's next world entry.
     /// </summary>
@@ -329,8 +372,10 @@ public sealed class PlayerRuntimeState
 
     /// <summary>
     ///     Legacy <c>aMissionDate.aKillOtherTribe</c> -- a separate counter from <see cref="ContributionPoints" />,
-    ///     gates the daily-mission claim (&gt;= 10). Same "real but currently unreachable" posture as
-    ///     <see cref="MissionJoinWar" />: its increment hook (PvP-kill CP/XP pipeline) is not implemented.
+    ///     gates the daily-mission claim (&gt;= 10). Incremented by <c>Zone.ApplyPvpKillMissionProgress</c>, gated
+    ///     by <see cref="Fenrir.Application.Game.Combat.KillCooldownTracker" /> so repeat-farming one victim only
+    ///     counts once per cooldown window (C05); the CP/EXP/drop side of a PvP kill's reward is still not
+    ///     implemented.
     /// </summary>
     public int MissionKillOtherTribe { get; set; }
 

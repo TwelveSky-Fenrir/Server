@@ -17,8 +17,13 @@ namespace Fenrir.Application.Game.Handlers.Guilds;
 ///     commented out); anything else falls to the default abort.
 /// </summary>
 /// <remarks>
-///     Cross-zone mirrors only update the character(s) whose own membership changed, never a guild-wide
-///     broadcast -- other members' cached guild fields go stale until their next info query.
+///     Membership changes (join/leave/kick/promote/transfer) still only mirror onto the specific character(s)
+///     whose own <c>PlayerRuntimeState</c> changed, via <see cref="GuildMembershipZoneCommand" /> -- a guild-wide
+///     GUILD_INFO push for those would still leave every other member's roster view stale on its own next query,
+///     but membership rows are looked up fresh every time regardless. Notice/AGM/title/buff, by contrast, mutate
+///     something every member's already-cached GUILD_INFO should reflect immediately, so those four additionally
+///     broadcast the refreshed GUILD_INFO to every currently connected member via
+///     <see cref="GuildInfoBroadcaster" />, not just the actor (who already gets it through <see cref="SendResult" />).
 /// </remarks>
 public sealed class GuildActionHandler(
     ZoneRegistry zones,
@@ -260,7 +265,9 @@ public sealed class GuildActionHandler(
         for (byte i = 0; i < payload.Notices.Length; i++)
             await guilds.SetNoticeAsync(guildId, i, payload.Notices[i].Trim(), ct);
 
-        SendResult(session, 5, await BuildGuildInfoAsync(guildId, ct));
+        var info = await BuildGuildInfoAsync(guildId, ct);
+        SendResult(session, 5, info);
+        GuildInfoBroadcaster.BroadcastGuildInfo(zones, guildId, 5, info, state.CharacterId);
     }
 
     /// <summary>tSort 6 -- disband, master only, requires exactly 1 remaining member.</summary>
@@ -449,7 +456,9 @@ public sealed class GuildActionHandler(
         await guilds.SetRoleAsync(guildId, target.CharacterId, newRole, ct);
         await guilds.SetCallNameAsync(guildId, target.CharacterId, "", ct);
 
-        SendResult(session, 9, await BuildGuildInfoAsync(guildId, ct));
+        var info = await BuildGuildInfoAsync(guildId, ct);
+        SendResult(session, 9, info);
+        GuildInfoBroadcaster.BroadcastGuildInfo(zones, guildId, 9, info, state.CharacterId);
 
         if (zones.TryGetPlayerAndZone(target.CharacterId, out var targetState, out var targetZone))
             targetZone.PostGuildCommand(new GuildMembershipZoneCommand(target.CharacterId, guildId,
@@ -485,7 +494,9 @@ public sealed class GuildActionHandler(
         var callName = payload.CallName.Trim();
         await guilds.SetCallNameAsync(guildId, target.CharacterId, callName, ct);
 
-        SendResult(session, 10, await BuildGuildInfoAsync(guildId, ct));
+        var info = await BuildGuildInfoAsync(guildId, ct);
+        SendResult(session, 10, info);
+        GuildInfoBroadcaster.BroadcastGuildInfo(zones, guildId, 10, info, state.CharacterId);
 
         if (zones.TryGetPlayerAndZone(target.CharacterId, out var targetState, out var targetZone))
             targetZone.PostGuildCommand(new GuildMembershipZoneCommand(target.CharacterId, guildId,
@@ -496,7 +507,10 @@ public sealed class GuildActionHandler(
     ///     tSort 14 -- buff type choice, master/sub-master only. A plain member gets a clean tResult=4, not
     ///     an abort. Requires at least 1 minute of buff-time reserve (only ever recharged by tSort 15's
     ///     guild scrolls). The buff's actual gameplay stat effect is undocumented, so only the state machine
-    ///     (choose a type, track remaining reserve) is implemented -- no stat bonus is invented.
+    ///     (choose a type, track remaining reserve) is implemented -- no stat bonus is invented. Activation
+    ///     stamps BuffTimeForDiff to now: <see cref="GuildBuffDecayHost" /> reads that checkpoint to burn
+    ///     the reserve down over real time, so it must restart from here, never from whatever stale value (or
+    ///     0) the row already carried.
     /// </summary>
     private async ValueTask HandleBuffAsync(GuildActionRequest packet, IPacketSession session,
         ZoneClientSession zoneSession, PlayerRuntimeState state, CancellationToken ct)
@@ -534,7 +548,7 @@ public sealed class GuildActionHandler(
 
         try
         {
-            await guilds.SetBuffAsync(guildId, payload.GuildBuffType, 1, guild.BuffTime, guild.BuffTimeForDiff, ct);
+            await guilds.SetBuffAsync(guildId, payload.GuildBuffType, 1, guild.BuffTime, DateTime.UtcNow.Ticks, ct);
         }
         catch (Exception ex)
         {
@@ -543,7 +557,9 @@ public sealed class GuildActionHandler(
             return;
         }
 
-        SendResult(session, 14, await BuildGuildInfoAsync(guildId, ct));
+        var info = await BuildGuildInfoAsync(guildId, ct);
+        SendResult(session, 14, info);
+        GuildInfoBroadcaster.BroadcastGuildInfo(zones, guildId, 14, info, state.CharacterId);
     }
 
     /// <summary>

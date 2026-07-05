@@ -39,12 +39,12 @@ public sealed class MentorRegistry
         {
             if (IsNegotiating(masterId))
                 return MentorAskOutcome.AskerBusy;
+            if (IsNegotiating(studentId))
+                return MentorAskOutcome.TargetBusy;
             if (targetAlreadyHasTeacher)
                 return MentorAskOutcome.TargetAlreadyHasTeacher;
             if (targetAlreadyHasStudent)
                 return MentorAskOutcome.TargetAlreadyHasStudent;
-            if (IsNegotiating(studentId))
-                return MentorAskOutcome.TargetBusy;
 
             _pendingByMaster[masterId] = studentId;
             _pendingByStudent[studentId] = masterId;

@@ -35,6 +35,34 @@ public sealed class TribeActionHandler(
     private const int HaloEnchantCpCost = 100;
     private const int MapScrollCpCost = 1;
     private const int AlertCharmCpCost = 10;
+    private const int RebirthCpCost = 10_000;
+
+    /// <summary>
+    ///     The real, EU33 rebirth cap. The legacy's own tSort 11 gate constant, <c>MAX_REBIRTH_LIMIT</c>, is
+    ///     12 -- but the legacy's own handler body never lets a character actually get that far: once
+    ///     aRebirthNum reaches 6 it takes its own separate "already maxed" branch (echoes failure, no
+    ///     further increment) every time after, so 6 is the one and only cap real play ever reaches. Folding
+    ///     both legacy checks into this single, lower cap reproduces that same real ceiling directly, instead
+    ///     of the legacy's two-tier (unreachable 12, actual 6) shape; <c>MyWork::MaxRebirth</c>'s own
+    ///     <c>==12</c> drop/broadcast branch (S04_MyWork05.cpp:4851) is this same dead code, confirming 12 is
+    ///     a non-EU33 debug artifact rather than a real milestone.
+    /// </summary>
+    private const int MaxRebirth = 6;
+
+    /// <summary>MAX_LIMIT_HIGH_LEVEL_NUM (DEFINE.h) -- Level2's own cap, the "G12" gate on Max Rebirth.</summary>
+    private const int MaxHighLevel = 12;
+
+    /// <summary>
+    ///     LEVELSYSTEM::ReturnHighExpValue's <c>mRangeForHigh</c> table (GameSystem_01_Level.cpp:319-330):
+    ///     the XP needed to be considered "100%" at Level2 N is HighLevelExpTable[N-1]. Only ever consulted
+    ///     at N=<see cref="MaxHighLevel" /> here (Max Rebirth requires Level2 already at its cap), so this
+    ///     is a plain lookup, not a data-driven catalog like <see cref="GameData.WorldDataCache.LevelsByLevel" />.
+    /// </summary>
+    private static readonly int[] HighLevelExpTable =
+    [
+        962_105_896, 1_000_590_131, 1_040_613_736, 1_082_238_285, 1_125_527_816, 1_170_548_928,
+        1_217_370_885, 1_266_065_720, 1_316_708_348, 1_369_376_681, 1_424_151_748, 1_481_117_817
+    ];
 
     // Indexed by current title rank (0-11) before purchase; the 13th entry is dead but kept for table fidelity.
     private static readonly int[] TitleCostCp =
@@ -99,7 +127,7 @@ public sealed class TribeActionHandler(
                 await HandleOrnamentAsync(packet, session, zoneSession, zone, state, characterId, false, ct);
                 return;
             case 11:
-                HandleRebirth(zoneSession);
+                await HandleRebirthAsync(packet, session, zoneSession, zone, state, characterId, ct);
                 return;
             case 12:
             case 13:
@@ -496,14 +524,44 @@ public sealed class TribeActionHandler(
     }
 
     /// <summary>
-    ///     tSort 11 -- Max Rebirth. The real gate requires a "high level"/rebirth track (Level2/Exp2) Fenrir
-    ///     doesn't have -- Experience is one merged value here -- so completing it would mean fabricating a
-    ///     system this domain doesn't own. This always aborts, matching what the legacy would also do since
-    ///     no current character can satisfy that gate.
+    ///     tSort 11 -- Max Rebirth (S04_MyWork02.cpp:11343-11375, <c>__REBIRTH__</c>). Requires Level1 AND
+    ///     Level2 both already at their own caps, Exp2 at 100% of Level2's threshold, a 10,000 CP toll, and
+    ///     <see cref="MaxRebirth" /> not yet reached; on success resets Exp2, increments RebirthCount, debits
+    ///     the CP, fully heals, and recomputes stats (RebirthCount feeds StatCalculator's critical-defence and
+    ///     critical-wrapper bonuses).
     /// </summary>
-    private void HandleRebirth(ZoneClientSession zoneSession)
+    /// <remarks>
+    ///     The legacy's own success branch also does <c>aZone241Time += 10</c> -- Fenrir has no field for that
+    ///     counter yet (same "not modeled" posture as this file's other untracked wire-only counters), so it
+    ///     is not reproduced. See <see cref="MaxRebirth" />'s own remarks for why 6, not the legacy's own
+    ///     <c>MAX_REBIRTH_LIMIT</c>=12, is the cap enforced here.
+    /// </remarks>
+    private async ValueTask HandleRebirthAsync(TribeActionRequest packet, IPacketSession session,
+        ZoneClientSession zoneSession, Zone zone, PlayerRuntimeState state, int characterId, CancellationToken ct)
     {
-        zoneSession.Abort(DisconnectReason.Faulted);
+        if (state.RebirthCount >= MaxRebirth ||
+            state.Level != LevelProgressionCalculator.MaxLevel ||
+            state.Level2 != MaxHighLevel ||
+            state.Exp2 < HighLevelExpTable[state.Level2 - 1] ||
+            state.ContributionPoints < RebirthCpCost)
+        {
+            zoneSession.Abort(DisconnectReason.Faulted);
+            return;
+        }
+
+        var newRebirthCount = state.RebirthCount + 1;
+        var attributes = new CharacterBaseAttributes(state.StatVit, state.StatStr, state.StatInt, state.StatDex,
+            state.Level, state.Tribe, state.Title, state.Halo, newRebirthCount);
+        var equipmentContainer = state.Inventory.GetContainer(ContainerMatrix.Equipment);
+        var updatedStats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData,
+            pet: ComputePetContribution(state, equipmentContainer));
+
+        SendEcho(session, packet);
+
+        await zone.PostTribeProgressCommandAndWaitAsync(new TribeProgressZoneCommand(characterId,
+            state.ContributionPoints - RebirthCpCost, RebirthCount: newRebirthCount, Exp2: 0,
+            Life: updatedStats.MaxLife, Mana: updatedStats.MaxMana, UpdatedStats: updatedStats,
+            RebirthBroadcast: true), ct);
     }
 
     /// <summary>

@@ -7,9 +7,15 @@ internal sealed class FakeTribeRepository : ITribeRepository
 {
     public Dictionary<(byte TribeId, byte SlotIndex), int> Bank { get; } = new();
     public List<TribeSubMasterDto> SubMasters { get; } = [];
+    public List<TribeSummaryDto> Tribes { get; set; } = [];
+    public List<(byte TribeId, int? NewMasterCharacterId)> SetMasterCalls { get; } = [];
     public long MoneyAfterWithdraw { get; set; }
     public Exception? WithdrawException { get; set; }
     public (byte TribeId, byte SlotIndex, int CharacterId)? LastWithdrawCall { get; private set; }
+    public long MoneyAfterDeposit { get; set; }
+    public Exception? DepositException { get; set; }
+    public (byte TribeId, byte SlotIndex, int CharacterId)? LastDepositCall { get; private set; }
+    public int DepositAmount { get; set; }
 
     public ValueTask<byte> GetRoleForCharacterAsync(int characterId, CancellationToken ct)
     {
@@ -18,7 +24,18 @@ internal sealed class FakeTribeRepository : ITribeRepository
 
     public ValueTask<ReadOnlyCollection<TribeSummaryDto>> GetAllAsync(CancellationToken ct)
     {
-        throw new NotSupportedException();
+        return ValueTask.FromResult(new ReadOnlyCollection<TribeSummaryDto>(Tribes));
+    }
+
+    public ValueTask SetMasterAsync(byte tribeId, int? newMasterCharacterId, CancellationToken ct)
+    {
+        SetMasterCalls.Add((tribeId, newMasterCharacterId));
+
+        var index = Tribes.FindIndex(t => t.TribeId == tribeId);
+        if (index >= 0)
+            Tribes[index] = Tribes[index] with { MasterCharacterId = newMasterCharacterId };
+
+        return ValueTask.CompletedTask;
     }
 
     public ValueTask<ReadOnlyCollection<TribeSubMasterDto>> GetSubMastersAsync(byte tribeId, CancellationToken ct)
@@ -55,5 +72,16 @@ internal sealed class FakeTribeRepository : ITribeRepository
 
         Bank[(tribeId, slotIndex)] = 0;
         return ValueTask.FromResult(MoneyAfterWithdraw);
+    }
+
+    public ValueTask<long> DepositBankAsync(byte tribeId, byte slotIndex, int characterId, CancellationToken ct)
+    {
+        LastDepositCall = (tribeId, slotIndex, characterId);
+
+        if (DepositException is { } ex)
+            throw ex;
+
+        Bank[(tribeId, slotIndex)] = Bank.GetValueOrDefault((tribeId, slotIndex)) + DepositAmount;
+        return ValueTask.FromResult(MoneyAfterDeposit);
     }
 }

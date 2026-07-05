@@ -1,6 +1,7 @@
 namespace Fenrir.Data.WriteBehind;
 
-// Vitals and Progression are raised (Zone.GrantMonsterKillExperience / Zone.ApplyDeath) but have no flush reader yet.
+// Vitals and Progression are raised (Zone.GrantMonsterKillExperience / Zone.ApplyDeath /
+// Zone.ApplyPvpKillMissionProgress) but have no flush reader yet.
 [Flags]
 public enum DirtyFlags : byte
 {

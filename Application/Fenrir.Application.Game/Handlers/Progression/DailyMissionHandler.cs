@@ -19,8 +19,10 @@ namespace Fenrir.Application.Game.Handlers.Progression;
 ///     never block a claim. A full inventory on claim is a clean failure (<c>Result = 3</c>).
 /// </summary>
 /// <remarks>
-///     <see cref="PlayerRuntimeState.MissionJoinWar" />/<see cref="PlayerRuntimeState.MissionKillOtherTribe" />
-///     have no increment hooks in Fenrir (war/PvP tracking out of scope), so claim is currently unreachable end to end.
+///     <see cref="PlayerRuntimeState.MissionJoinWar" /> still has no increment hook in Fenrir (war tracking out of
+///     scope), so a claim needs a war-system gap to close before it's reachable end to end.
+///     <see cref="PlayerRuntimeState.MissionKillOtherTribe" /> DOES increment now -- <c>Zone.ApplyPvpKillMissionProgress</c>,
+///     gated by <see cref="Combat.KillCooldownTracker" /> (C05) -- so a claim is blocked only by the join-war side today.
 /// </remarks>
 public sealed class DailyMissionHandler(
     ICharacterRepository characters,

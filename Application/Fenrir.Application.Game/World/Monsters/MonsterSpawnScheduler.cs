@@ -5,6 +5,7 @@ using Fenrir.Application.Game.Quests;
 using Fenrir.Application.Game.Simulation;
 using Fenrir.Application.Game.Social.Party;
 using Fenrir.Application.Game.World.Loot;
+using Fenrir.Application.Game.World.ZoneWar;
 using Fenrir.Data.World;
 
 namespace Fenrir.Application.Game.World.Monsters;
@@ -44,16 +45,32 @@ internal sealed class MonsterZoneSpawnState
 ///     <see cref="_stateByZone" />, built lazily on that zone's own first <see cref="Simulate" /> call (never
 ///     racy: each zone's tick is its own single thread).
 ///     <para>
-///         Not ported: <c>SummonBossMonster</c> (boss-table state machine), <c>SummonGuard</c>/
-///         <c>SummonTribeSymbol</c> (hardcoded per-server coordinates), the dungeon <c>mNumber</c>-forced-to-20
-///         override, the monster-746 fixed cooldown, and the disk-persisted Yanggok boss timers. This system
-///         covers only the generic per-region "normal monster" population.
+///         Covers the generic per-region "normal monster" population, including two named-monster carve-outs
+///         (<see cref="RollRespawnTicks" />'s monster-746 fixed cooldown, and <see cref="MonsterBossRespawnTracker" />'s
+///         disk-persisted deadline for the 5 monsters 564-568) and the tribe/monster-symbol "Holy Stone" report
+///         on kill (<see cref="ProcessDeath" />). Not ported: <c>SummonBossMonster</c> (a separate boss-table
+///         state machine) and <c>SummonGuard</c>/<c>SummonTribeSymbol</c> (hardcoded per-tribe-territory
+///         coordinates that depend on an unmodeled territory-ownership system) -- both summon their monsters
+///         outside <c>world.MonsterSpawnRegions</c> entirely, so neither is reachable from this scheduler's own
+///         per-region pool. The dungeon <c>mNumber</c>-forced-to-20 instance-population override is also not
+///         ported: it depends on a dungeon/instance flag this schema does not catalog on <c>world.Zones</c> yet.
+///     </para>
+///     <para>
+///         <paramref name="zoneEventBroadcaster" /> is <see cref="Lazy{T}" />, not a direct reference, because
+///         <see cref="ZoneEventBroadcaster" /> itself depends on <see cref="ZoneRegistry" /> and this scheduler
+///         is one of the <see cref="ISimulationSystem" /> instances <see cref="ZoneRegistry" /> resolves at
+///         construction time -- a direct reference here would be a same-container constructor cycle
+///         (ZoneRegistry -&gt; ISimulationSystem -&gt; MonsterSpawnScheduler -&gt; ZoneEventBroadcaster -&gt;
+///         ZoneRegistry). Deferring the lookup until first use (i.e. the first monster kill) resolves it after
+///         every singleton, including <see cref="ZoneRegistry" /> itself, is already constructed and cached.
 ///     </para>
 /// </remarks>
 public sealed class MonsterSpawnScheduler(
     WorldDataCache worldData,
     Func<Random>? randomFactory = null,
-    PartyRegistry? partyRegistry = null)
+    PartyRegistry? partyRegistry = null,
+    Lazy<ZoneEventBroadcaster>? zoneEventBroadcaster = null,
+    MonsterBossRespawnTracker? bossRespawnTracker = null)
     : ISimulationSystem
 {
     /// <summary>
@@ -71,10 +88,13 @@ public sealed class MonsterSpawnScheduler(
 
         if (!state.InitialPopDone)
         {
-            // Every configured slot pops on the very first tick, unconditionally, before any respawn timer logic applies.
+            // Every configured slot pops on the very first tick, unconditionally, before any respawn timer
+            // logic applies -- except a slot BuildState pre-armed from a persisted deadline (the 5 named
+            // "Yanggok" bosses, 564-568), which must wait that out like any other still-cooling-down slot.
             state.InitialPopDone = true;
             foreach (var slot in state.Slots)
-                Spawn(zone, slot);
+                if (slot.RespawnTicksRemaining <= 0)
+                    Spawn(zone, slot);
         }
 
         DrainDeaths(zone, state);
@@ -106,6 +126,7 @@ public sealed class MonsterSpawnScheduler(
 
         var slots = new List<MonsterSpawnSlot>();
         var nextServerIndex = 1;
+        var now = DateTime.UtcNow;
         foreach (var region in regions)
         {
             if (region.MonsterId is not { } monsterId ||
@@ -114,12 +135,22 @@ public sealed class MonsterSpawnScheduler(
 
             var slotCount = Math.Max(0, region.Number);
             for (var i = 0; i < slotCount; i++)
-                slots.Add(new MonsterSpawnSlot
+            {
+                var slot = new MonsterSpawnSlot
                 {
                     Region = region,
                     Monster = monsterDefinition.Monster,
                     ServerIndex = nextServerIndex++
-                });
+                };
+
+                // A restart must resume a persisted boss's cooldown instead of popping it back in at tick 1 --
+                // see MonsterBossRespawnTracker's own remarks.
+                if (IsPersistedBossMonster(monsterId) && bossRespawnTracker is { } tracker &&
+                    tracker.TryGetNextSpawnUtc(region.MonsterSpawnRegionId, out var dueAtUtc))
+                    slot.RespawnTicksRemaining = SimulationClock.ToWholeLegacyTicks(dueAtUtc - now);
+
+                slots.Add(slot);
+            }
         }
 
         var random = _randomFactory();
@@ -164,7 +195,12 @@ public sealed class MonsterSpawnScheduler(
             if (slot is not null)
             {
                 slot.Alive = false;
-                slot.RespawnTicksRemaining = RollRespawnTicks(slot.Monster, state.Random);
+                var respawnTicks = RollRespawnTicks(slot.Monster, state.Random);
+                slot.RespawnTicksRemaining = respawnTicks;
+
+                if (IsPersistedBossMonster(slot.Monster.MonsterId) && bossRespawnTracker is { } tracker)
+                    tracker.SetNextSpawnUtc(slot.Region.MonsterSpawnRegionId,
+                        DateTime.UtcNow + SimulationClock.ToTimeSpan(respawnTicks));
             }
 
             ProcessDeath(zone, state, death!);
@@ -174,10 +210,28 @@ public sealed class MonsterSpawnScheduler(
     /// <summary><c>mSummonTime[0..1]</c> is in seconds (<c>S10_MySummon.cpp:1845</c>) -- converted to legacy ticks here.</summary>
     private static int RollRespawnTicks(MonsterRowDto monster, Random random)
     {
+        // Monster 746 ("Virgin Ghost"): legacy permanently overrides its respawn to a fixed 240s the moment it
+        // has spawned once, superseding whatever SummonTime1/2 the catalog says from then on
+        // (S10_MySummon.cpp:1043-1046). Applying it unconditionally is the steady-state-equivalent
+        // simplification -- the only divergence is this monster's very first death on a freshly booted server,
+        // where legacy would still roll the catalog window once before the override first kicks in.
+        if (monster.MonsterId == 746)
+            return SimulationClock.ToWholeLegacyTicks(TimeSpan.FromSeconds(240));
+
         var minSeconds = monster.SummonTime1;
         var maxSeconds = monster.SummonTime2;
         var seconds = maxSeconds > minSeconds ? minSeconds + random.Next(maxSeconds - minSeconds + 1) : minSeconds;
         return SimulationClock.ToWholeLegacyTicks(TimeSpan.FromSeconds(Math.Max(0, seconds)));
+    }
+
+    /// <summary>
+    ///     YangGok old normal boss spawn IDs (legacy <c>YG_IsNormalBossTimerTarget</c>, <c>S10_MySummon.cpp:11-15</c>)
+    ///     -- the only monsters whose respawn deadline is persisted via <see cref="MonsterBossRespawnTracker" /> so
+    ///     it survives a GameServer restart instead of resetting to "ready now" every boot.
+    /// </summary>
+    private static bool IsPersistedBossMonster(int monsterId)
+    {
+        return monsterId is >= 564 and <= 568;
     }
 
     /// <summary>
@@ -196,6 +250,14 @@ public sealed class MonsterSpawnScheduler(
         PlayerRuntimeState? killer = null;
         if (death.KillerCharacterId is { } killerId)
             zone.TryGetPlayer(killerId, out killer);
+
+        if (killer is not null && TribeSymbolIndexOf(monster.Template.SpecialType) is { } symbolIndex)
+            // Legacy tallies cumulative per-tribe damage across the whole fight (mTribeDamageForTribeSymbol[4],
+            // A013/S07_MyGame05.cpp:1588-1609) and reports whichever tribe dealt the most; Fenrir has no
+            // per-tribe damage accumulator on MonsterEntity (that would mean plumbing tribe attribution through
+            // every hit in CombatResolver, not just the killing blow), so this uses the killing blow's own
+            // tribe instead -- a documented simplification, not a bug.
+            zoneEventBroadcaster?.Value.AnnounceSymbolResolved(symbolIndex, killer.Tribe);
 
         if (killer is null)
             return; // no resolvable killer -- nothing to roll
@@ -225,10 +287,56 @@ public sealed class MonsterSpawnScheduler(
         if (result.Items.Count == 0)
             return;
 
-        // DropSort always 0 (exclusive to the killer until the free-for-all window) -- see
-        // GroundItemEntity.IsClaimableBy's remarks on the not-yet-triggerable party-share branch.
+        var (partyName, dropSort) = ResolvePartyDrop(zone, killer, partyMemberIds);
         foreach (var item in result.Items)
             zone.SpawnGroundItem(item.ItemId, item.Quantity, monster.PosX, monster.PosY, monster.PosZ,
-                killer.Name, "", 0);
+                killer.Name, partyName, dropSort);
+    }
+
+    /// <summary>
+    ///     <c>ProcessForDropItem</c>'s <c>DP_MN_TO_WD</c> branch (<c>S07_MyGame03.cpp:622-625</c>): a partied
+    ///     killer's drop gets DropSort=1 (see <see cref="Loot.GroundItemEntity.IsClaimableBy" />'s party-share
+    ///     window) and PartyName set to the party's own name -- legacy's <c>aPartyName</c> is always the
+    ///     leader's own character name (<c>S04_MyWork02.cpp:9720-9721</c>: copied onto every member at
+    ///     join/create time), never a player-chosen string, so <see cref="PartyRegistry" />'s leader-first
+    ///     member list (<see cref="Social.Party.Party.LeaderId" />) is exactly the same identity.
+    /// </summary>
+    private static (string PartyName, int DropSort) ResolvePartyDrop(Zone zone, PlayerRuntimeState killer,
+        IReadOnlyList<int>? partyMemberIds)
+    {
+        if (partyMemberIds is not { Count: > 0 } members)
+            return ("", 0);
+
+        var leaderId = members[0];
+        if (leaderId == killer.CharacterId)
+            return (killer.Name, 1);
+
+        // Leader is almost always in the same zone (parties hunt together); if not resolvable here (e.g.
+        // mid zone-transfer), fall back to the killer's own name -- still non-empty, still marks the drop
+        // party-shareable, just not byte-identical to legacy's exact string in this rare edge case.
+        return zone.TryGetPlayer(leaderId, out var leader) && leader is not null
+            ? (leader.Name, 1)
+            : (killer.Name, 1);
+    }
+
+    /// <summary>
+    ///     Maps a "Holy Stone" guardian's <c>SpecialType</c> to
+    ///     <see cref="World.ZoneWar.ZoneEventBroadcaster.AnnounceSymbolResolved" />'s symbolIndex (0-3 = one
+    ///     tribe's own slot, 4 = the neutral monster-guarded slot) -- null for every other monster. These are
+    ///     structural legacy constants (<c>A013</c>'s own <c>SpecialType</c> switch, <c>S07_MyGame05.cpp:1568-1587</c>),
+    ///     not DB-catalogued data: monsters 601-605 ("Holy Stone", seeded in <c>world.Monsters</c>) are the only
+    ///     ones that ever carry these values.
+    /// </summary>
+    private static byte? TribeSymbolIndexOf(byte specialType)
+    {
+        return specialType switch
+        {
+            11 => 0,
+            12 => 1,
+            13 => 2,
+            28 => 3,
+            14 => 4, // neutral, monster-guarded slot -- WorldStateService.ResolveMonsterSymbol
+            _ => null
+        };
     }
 }

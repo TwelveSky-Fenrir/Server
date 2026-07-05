@@ -10,12 +10,14 @@ namespace Fenrir.Application.Game.World.Npcs;
 ///     sufficiency and the upper money cap are deliberately not checked here -- both are enforced atomically
 ///     by the SQL layer, and the legacy itself Quit()s (disconnects) on either condition for this action pair,
 ///     so letting the SQL guard's exception propagate to an Abort reproduces that without this policy needing
-///     to know the player's current balance.
+///     to know the player's current balance. Contribution-Point sufficiency, by contrast, IS checked here --
+///     unlike Money, <see cref="Fenrir.Application.Game.World.PlayerRuntimeState.ContributionPoints" /> already
+///     lives in-memory, the same posture <c>CraftLegendaryPetHandler</c>/<c>TribeActionHandler</c> use.
 /// </summary>
 /// <remarks>
-///     Not modeled: (1) <c>IsRentItem</c>'s rentable-item exclusion (no equivalent in Fenrir's
-///     <c>world.Items</c> schema); (2) the WarPoint-shop branch and Contribution-Point cost (an item with
-///     <c>BuyCost2 &gt; 0</c> is rejected as a clean failure instead); (3) <c>IsValidCostume</c> exclusion on sell.
+///     Not modeled: the WarPoint-shop branch (<c>USE_WAR_POINT_SYSTEM</c>) -- Fenrir has no WarPoint NPC/item
+///     catalog to drive it, so only the plain Contribution-Point cost (<c>BuyCost2</c>) that every NPC shop
+///     (WarPoint or not) also charges is reproduced.
 /// </remarks>
 public static class NpcShopPolicy
 {
@@ -39,10 +41,13 @@ public static class NpcShopPolicy
         DestinationConflict,
 
         /// <summary>
-        ///     This item costs Contribution Points (<c>iBuyCost2 &gt; 0</c>) -- NOT supported (see class remarks); clean
-        ///     failure.
+        ///     <c>wAvatar.aKillOtherTribe &lt; tCostCP</c> -- not enough Contribution Points for this item's
+        ///     <c>iBuyCost2</c>. Quit()-worthy, the same treatment the legacy gives an insufficient Money balance.
         /// </summary>
-        ContributionCostUnsupported,
+        InsufficientContributionPoints,
+
+        /// <summary><c>IsRentItem</c> -- rentable items can't be bought through this action; clean failure (<c>*tResult=1</c>).</summary>
+        RentItemNotPurchasable,
 
         /// <summary><c>nType == 13</c> shop, player below <see cref="SpecialShopMinimumLevel" /> -- Quit()-worthy.</summary>
         BelowMinimumLevel
@@ -80,6 +85,50 @@ public static class NpcShopPolicy
     public static readonly IReadOnlySet<short> TownZoneNumbers = new HashSet<short> { 1, 6, 11, 37, 140 };
 
     /// <summary>
+    ///     <c>IsRentItem</c> (function.h:2216) -- a contiguous rentable-item ID range gated on both buy and sell.
+    ///     Not stored in <c>world.Items</c> (the legacy itself hard-codes it too), so it's kept here as a small
+    ///     closed range rather than a schema column.
+    /// </summary>
+    private const int RentItemIdStart = 76500;
+
+    private const int RentItemIdEndInclusive = 76540;
+
+    /// <summary>
+    ///     <c>IsValidCostume</c> (function.h:1798-2008) -- costume-slot item IDs an NPC shop refuses to buy back on
+    ///     sell, gated independently of <see cref="RareItemType" />. Transcribed range-by-range from the legacy
+    ///     switch, including its own dead/commented-out gaps (93331-93333, 93382-93384) -- same "hand-curated,
+    ///     not in world.Items" posture as <see cref="Enchant.CapeUpgradeResolver" />'s item lists.
+    /// </summary>
+    private static readonly (int Start, int EndInclusive)[] CostumeItemIdRanges =
+    [
+        (301, 402),
+        (1801, 1803),
+        (1891, 1893),
+        (2146, 2148),
+        (17701, 17703),
+        (18124, 18132),
+        (76524, 76526),
+        (93301, 93330),
+        (93334, 93345),
+        (93376, 93381),
+        (93385, 93405)
+    ];
+
+    private static bool IsRentItem(int itemId)
+    {
+        return itemId is >= RentItemIdStart and <= RentItemIdEndInclusive;
+    }
+
+    private static bool IsCostumeItem(int itemId)
+    {
+        foreach (var range in CostumeItemIdRanges)
+            if (itemId >= range.Start && itemId <= range.EndInclusive)
+                return true;
+
+        return false;
+    }
+
+    /// <summary>
     ///     Ports <c>ProcessForInventoryToNPCShop</c>'s branch on <c>iSort</c> (stackable vs. not) exactly.
     ///     Every rejection in the legacy function is a <c>Quit()</c> -- treat any non-<see cref="SellOutcome.Success" />
     ///     result as disconnect-worthy, not a soft failure.
@@ -89,6 +138,9 @@ public static class NpcShopPolicy
         var item = itemDefinition.Item;
 
         if (item.CheckNpcSell == 1)
+            return new SellResult(SellOutcome.Rejected, 0, sourceStack);
+
+        if (IsRentItem(item.ItemId))
             return new SellResult(SellOutcome.Rejected, 0, sourceStack);
 
         var isStackable = ContainerMatrix.IsStackableSort(item.Sort);
@@ -114,6 +166,9 @@ public static class NpcShopPolicy
              sourceStack.Socket != 0))
             return new SellResult(SellOutcome.Rejected, 0, sourceStack);
 
+        if (IsCostumeItem(item.ItemId))
+            return new SellResult(SellOutcome.Rejected, 0, sourceStack);
+
         return new SellResult(SellOutcome.Success, item.SellCost, null);
     }
 
@@ -121,8 +176,12 @@ public static class NpcShopPolicy
     ///     Ports <c>ProcessForNPCShopToInventory</c>'s dispatch (WarPoint-shop branch excluded, see class
     ///     remarks). <paramref name="requestedQuantity" /> is only meaningful for a stackable item.
     /// </summary>
+    /// <param name="playerContributionPoints">
+    ///     <see cref="Fenrir.Application.Game.World.PlayerRuntimeState.ContributionPoints" /> at the moment of the
+    ///     request -- only consulted when the item's <c>BuyCost2</c> is nonzero.
+    /// </param>
     public static BuyResult ResolveBuy(NpcDefinition npc, ItemDefinition itemDefinition, int requestedQuantity,
-        ItemStack? destinationSlot, short playerLevel, short currentZoneNumber)
+        ItemStack? destinationSlot, short playerLevel, short currentZoneNumber, int playerContributionPoints)
     {
         var item = itemDefinition.Item;
 
@@ -135,47 +194,79 @@ public static class NpcShopPolicy
             }
 
         if (!inCatalog)
-            return new BuyResult(BuyOutcome.NotInCatalog, 0, null);
+            return new BuyResult(BuyOutcome.NotInCatalog, 0, 0, null);
 
         if (npc.Npc.Type == SpecialShopNpcType && playerLevel < SpecialShopMinimumLevel)
-            return new BuyResult(BuyOutcome.BelowMinimumLevel, 0, null);
+            return new BuyResult(BuyOutcome.BelowMinimumLevel, 0, 0, null);
 
         if (item.CheckNpcShop != 2)
-            return new BuyResult(BuyOutcome.NotSellableHere, 0, null);
+            return new BuyResult(BuyOutcome.NotSellableHere, 0, 0, null);
 
-        if (item.BuyCost2 > 0)
-            return new BuyResult(BuyOutcome.ContributionCostUnsupported, 0, null);
+        if (IsRentItem(item.ItemId))
+            return new BuyResult(BuyOutcome.RentItemNotPurchasable, 0, 0, null);
 
         var isStackable = ContainerMatrix.IsStackableSort(item.Sort);
 
         if (isStackable)
         {
             if (requestedQuantity < 1 || requestedQuantity > GroundItemPickupPolicy.MaxStackQuantity)
-                return new BuyResult(BuyOutcome.InvalidQuantity, 0, null);
+                return new BuyResult(BuyOutcome.InvalidQuantity, 0, 0, null);
 
             if (destinationSlot is { } existing)
             {
                 if (existing.ItemId != item.ItemId)
-                    return new BuyResult(BuyOutcome.DestinationConflict, 0, null);
+                    return new BuyResult(BuyOutcome.DestinationConflict, 0, 0, null);
 
                 var mergedQuantity = existing.Quantity + requestedQuantity;
                 if (mergedQuantity > GroundItemPickupPolicy.MaxStackQuantity)
-                    return new BuyResult(BuyOutcome.DestinationConflict, 0, null);
+                    return new BuyResult(BuyOutcome.DestinationConflict, 0, 0, null);
 
-                var cost = ResolveBuyCost(item, requestedQuantity, currentZoneNumber);
-                return new BuyResult(BuyOutcome.Success, cost, existing with { Quantity = mergedQuantity });
+                if (!TryResolveCost(item, requestedQuantity, currentZoneNumber, playerContributionPoints,
+                        out var moneyCost, out var cpCost, out var costFailure))
+                    return new BuyResult(costFailure, 0, 0, null);
+
+                return new BuyResult(BuyOutcome.Success, moneyCost, cpCost, existing with { Quantity = mergedQuantity });
             }
 
+            if (!TryResolveCost(item, requestedQuantity, currentZoneNumber, playerContributionPoints,
+                    out var newMoneyCost, out var newCpCost, out var newCostFailure))
+                return new BuyResult(newCostFailure, 0, 0, null);
+
             var newStack = new ItemStack(item.ItemId, requestedQuantity, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-            return new BuyResult(BuyOutcome.Success, ResolveBuyCost(item, requestedQuantity, currentZoneNumber),
-                newStack);
+            return new BuyResult(BuyOutcome.Success, newMoneyCost, newCpCost, newStack);
         }
 
         if (destinationSlot is not null)
-            return new BuyResult(BuyOutcome.DestinationConflict, 0, null);
+            return new BuyResult(BuyOutcome.DestinationConflict, 0, 0, null);
 
-        return new BuyResult(BuyOutcome.Success, ResolveBuyCost(item, 1, currentZoneNumber),
+        if (!TryResolveCost(item, 1, currentZoneNumber, playerContributionPoints, out var singleMoneyCost,
+                out var singleCpCost, out var singleCostFailure))
+            return new BuyResult(singleCostFailure, 0, 0, null);
+
+        return new BuyResult(BuyOutcome.Success, singleMoneyCost, singleCpCost,
             new ItemStack(item.ItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0));
+    }
+
+    /// <summary>
+    ///     <c>CheckBuyCostFree</c>: computes both the silver cost (<see cref="ResolveBuyCost" />) and the
+    ///     Contribution-Point cost (<c>iBuyCost2</c>, quantity-scaled for a stackable item, never discounted --
+    ///     the zone-291 10% break only ever applies to silver) in one place, and gates on CP sufficiency the same
+    ///     way the legacy <c>Quit()</c>s when <c>wAvatar.aKillOtherTribe &lt; tCostCP</c>.
+    /// </summary>
+    private static bool TryResolveCost(ItemRowDto item, int quantity, short currentZoneNumber,
+        int playerContributionPoints, out int moneyCost, out int cpCost, out BuyOutcome failureOutcome)
+    {
+        moneyCost = ResolveBuyCost(item, quantity, currentZoneNumber);
+        cpCost = ContainerMatrix.IsStackableSort(item.Sort) ? item.BuyCost2 * quantity : item.BuyCost2;
+
+        if (cpCost > 0 && playerContributionPoints < cpCost)
+        {
+            failureOutcome = BuyOutcome.InsufficientContributionPoints;
+            return false;
+        }
+
+        failureOutcome = default;
+        return true;
     }
 
     /// <summary>
@@ -199,12 +290,13 @@ public static class NpcShopPolicy
     public readonly record struct BuyResult(
         BuyOutcome Outcome,
         int MoneyCost,
+        int CpCost,
         ItemStack? NewDestinationStack)
     {
         public bool Succeeded => Outcome == BuyOutcome.Success;
 
         /// <summary>Clean <c>*tResult=1</c> failures (NOT disconnect-worthy) per the verified source.</summary>
         public bool IsCleanFailure => Outcome is BuyOutcome.NotSellableHere or BuyOutcome.InvalidQuantity
-            or BuyOutcome.ContributionCostUnsupported;
+            or BuyOutcome.RentItemNotPurchasable;
     }
 }

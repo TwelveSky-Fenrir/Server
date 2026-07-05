@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using Fenrir.Application.Game.Avatars;
 using Fenrir.Application.Game.GameData;
+using Fenrir.Application.Game.Guilds;
 using Fenrir.Application.Game.Inventory;
 using Fenrir.Application.Game.Pets;
 using Fenrir.Application.Game.Quests;
@@ -14,6 +15,7 @@ using Fenrir.Contracts.Wire;
 using Fenrir.Data.Admin;
 using Fenrir.Data.Characters;
 using Fenrir.Data.Guilds;
+using Fenrir.Data.Security;
 using Fenrir.Data.Social;
 using Fenrir.Data.Tribes;
 using Fenrir.Network.Sessions;
@@ -30,7 +32,10 @@ public sealed class EnterWorldHandler(
     WorldDataCache worldData,
     ZoneRegistry zones,
     IMuteRepository mutes,
+    IBanRepository bans,
+    ApplicationFirewall firewall,
     IGuildRepository guilds,
+    GuildRankingCache guildRanking,
     ITribeRepository tribes,
     IFriendRepository friends,
     IMentorRepository mentors,
@@ -43,6 +48,22 @@ public sealed class EnterWorldHandler(
         var zoneSession = (ZoneClientSession)session;
         var accountId = zoneSession.AccountId!.Value;
         var characterId = zoneSession.CharacterId!.Value;
+
+        // Re-checked here (not just at Login): Login and Zone are separate TCP listeners (ADR-0012), so an IP
+        // blocked after that account's Login session already happened would otherwise never be re-evaluated.
+        if (!await firewall.IsAllowedAsync(zoneSession.RemoteEndPoint, cancellationToken))
+        {
+            zoneSession.Abort(DisconnectReason.Faulted);
+            return;
+        }
+
+        // A GM-banned character (admin.Bans, ZONE_BLOCK_USER_FOR_PLAYUSER's Fenrir equivalent) must never reach
+        // the world, unlike a mute -- checked before the bundle fetch below to not waste it on a rejected entry.
+        if (await bans.IsActiveForCharacterAsync(characterId, cancellationToken))
+        {
+            zoneSession.Abort(DisconnectReason.Faulted);
+            return;
+        }
 
         // tID must still name the account this socket was ticketed for.
         if (!ObfuscatedUidCodec.TryDecodeAccountId(packet.Id, out var decodedAccountId) ||
@@ -132,7 +153,7 @@ public sealed class EnterWorldHandler(
 
         var broadcastWorldInfo = new WorldSnapshotResponse
         {
-            WorldInfo = WorldStateTemplates.ZeroedWorldInfo,
+            WorldInfo = GuildRankingProjection.Apply(WorldStateTemplates.ZeroedWorldInfo, guildRanking.Top),
             TribeInfo = WorldStateTemplates.ZeroedTribeInfo
         };
         zoneSession.SendRaw(ZoneMessageFactory.Encode(in broadcastWorldInfo));
@@ -159,7 +180,7 @@ public sealed class EnterWorldHandler(
                 HeadType = character.HeadType,
                 FaceType = character.FaceType,
                 Level1 = character.Level,
-                Level2 = 0,
+                Level2 = character.Level2,
                 EquipForView = EquipmentViewCodec.BuildEquipForView(bundle.Items),
                 AnimalNumber = 0,
                 Title = character.Title,
@@ -274,7 +295,9 @@ public sealed class EnterWorldHandler(
             RebirthCount: character.RebirthCount,
             Experience: character.Experience,
             ContributionPoints: character.ContributionPoints,
-            TeacherPoint: character.TeacherPoint)));
+            TeacherPoint: character.TeacherPoint,
+            Level2: character.Level2,
+            Exp2: character.Exp2)));
 
         // A dropped Enter is never replayed -- the character would stay permanently invisible despite the two
         // packets above already telling the client registration succeeded, so treat it as fatal.

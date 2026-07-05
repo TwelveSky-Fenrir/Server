@@ -34,6 +34,17 @@ public sealed record TribeRepository(ICaeriusNetDbContext Db) : ITribeRepository
         return await Db.QueryAsReadOnlyCollectionAsync<TribeSummaryDto>(sp, ct);
     }
 
+    /// <summary>TRIBE_WORK tSort 55's tally write -- see <see cref="ITribeRepository.SetMasterAsync" />.</summary>
+    public async ValueTask SetMasterAsync(byte tribeId, int? newMasterCharacterId, CancellationToken ct)
+    {
+        var sp = new StoredProcedureParametersBuilder("game", "usp_Tribe_SetMaster", 0)
+            .AddParameter("TribeId", tribeId, SqlDbType.TinyInt)
+            .AddParameter("NewMasterCharacterId", (object?)newMasterCharacterId ?? DBNull.Value, SqlDbType.Int)
+            .Build();
+
+        await Db.ExecuteAsync(sp, ct);
+    }
+
     /// <summary>The up-to-12 occupied sub-master slots for one tribe (TRIBE_WORK tSort 2's free-slot/already-listed checks).</summary>
     public async ValueTask<ReadOnlyCollection<TribeSubMasterDto>> GetSubMastersAsync(byte tribeId, CancellationToken ct)
     {
@@ -81,6 +92,18 @@ public sealed record TribeRepository(ICaeriusNetDbContext Db) : ITribeRepository
     public async ValueTask<long> WithdrawBankAsync(byte tribeId, byte slotIndex, int characterId, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_TribeBank_Withdraw", 1)
+            .AddParameter("TribeId", tribeId, SqlDbType.TinyInt)
+            .AddParameter("SlotIndex", slotIndex, SqlDbType.TinyInt)
+            .AddParameter("CharacterId", characterId, SqlDbType.Int)
+            .Build();
+
+        return await Db.ExecuteScalarAsync<long>(sp, ct);
+    }
+
+    /// <summary>CZ_TRIBE_BANK_SEND sort 3 (Fenrir-only addition, see ITribeRepository.DepositBankAsync); throws SQL 50212 (nothing to deposit).</summary>
+    public async ValueTask<long> DepositBankAsync(byte tribeId, byte slotIndex, int characterId, CancellationToken ct)
+    {
+        var sp = new StoredProcedureParametersBuilder("game", "usp_TribeBank_DepositFromCharacter", 1)
             .AddParameter("TribeId", tribeId, SqlDbType.TinyInt)
             .AddParameter("SlotIndex", slotIndex, SqlDbType.TinyInt)
             .AddParameter("CharacterId", characterId, SqlDbType.Int)

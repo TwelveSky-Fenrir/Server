@@ -5,7 +5,8 @@ namespace Fenrir.Application.Game.World.Monsters;
 /// <summary>
 ///     Per-tick monster AI (<c>Server/ts25zone/S07_MyGame05.cpp</c>'s <c>MONSTER_OBJECT::Update</c>): a
 ///     simplified FSM covering spawn-wait, proximity aggro detection, pursuit with a spawn-anchored leash, a
-///     windup-timed attack state, and forced return-to-spawn. One instance per <see cref="Zone" />.
+///     windup-timed attack state (melee, and a Zone175-boss ranged variant), a hit-stagger state, and forced
+///     return-to-spawn. One instance per <see cref="Zone" />.
 /// </summary>
 /// <remarks>
 ///     Deliberately not ported:
@@ -22,7 +23,20 @@ namespace Fenrir.Application.Game.World.Monsters;
 ///             Monster-initiated damage fires via <see cref="Zone.ResolveMonsterAttack" /> (
 ///             <see cref="Combat.MonsterCombatResolver.ResolveMvpAttack" />).
 ///         </item>
-///         <item>Boss/guard/tribe-symbol special AI -- not modeled.</item>
+///         <item>
+///             Guard/tower/tribe-symbol-guard special AI recipes (legacy <c>mSpecialSortNumber</c> 1-6: tower
+///             attacks, guard-attack target selection, throw-car idle AI) -- not modeled; those hang off a
+///             per-slot "recipe" field this schema does not catalog. Only the SpecialType-gated Zone175-boss
+///             ranged branch (<see cref="MonsterAiState.RangedAttackWindup" />) and the universal death/attack-
+///             stone state (<see cref="MonsterAiState.Dead" />, tribe-symbol resolution) are covered -- see
+///             <see cref="RunChase" /> and <see cref="MonsterSpawnScheduler.ProcessDeath" /> respectively.
+///         </item>
+///         <item>
+///             <see cref="MonsterAiState.Flinch" />'s entry condition (a big single hit interrupting whatever
+///             the monster was doing) is not wired -- it lives in <c>Zone.ApplyPvmAttack</c>, outside this
+///             cluster's touched files this round. The state's own tick-countdown behavior is fully implemented
+///             and tested; only the trigger is a follow-up.
+///         </item>
 ///     </list>
 /// </remarks>
 public sealed class MonsterAiSystem : ISimulationSystem
@@ -85,6 +99,26 @@ public sealed class MonsterAiSystem : ISimulationSystem
                     zone.ResolveMonsterAttack(monster, attackTargetId);
 
                 if (monster.StateTicks >= Math.Max(1, (int)monster.Template.FrameInfo3))
+                {
+                    monster.AiState = MonsterAiState.Decision;
+                    monster.StateTicks = 0;
+                }
+
+                break;
+
+            case MonsterAiState.RangedAttackWindup:
+                monster.StateTicks++;
+                if (monster.StateTicks >= Math.Max(1, (int)monster.Template.FrameInfo4))
+                {
+                    monster.AiState = MonsterAiState.Decision;
+                    monster.StateTicks = 0;
+                }
+
+                break;
+
+            case MonsterAiState.Flinch:
+                monster.StateTicks++;
+                if (monster.StateTicks >= Math.Max(1, (int)monster.Template.FrameInfo2))
                 {
                     monster.AiState = MonsterAiState.Decision;
                     monster.StateTicks = 0;
@@ -187,17 +221,41 @@ public sealed class MonsterAiSystem : ISimulationSystem
             return;
         }
 
+        var distanceToTargetSq = DistanceSquared(monster.PosX, monster.PosZ, target.PosX, target.PosZ);
+
         // Attack-windup transition threshold uses RadiusInfo1 (melee range), distinct from the more lenient
         // RadiusInfo2 validation at actual attack-execution time -- do not swap these two.
         var attackRadiusSq = (float)monster.Template.RadiusInfo1 * monster.Template.RadiusInfo1;
-        if (DistanceSquared(monster.PosX, monster.PosZ, target.PosX, target.PosZ) <= attackRadiusSq)
+        if (distanceToTargetSq <= attackRadiusSq)
         {
             monster.AiState = MonsterAiState.AttackWindup;
             monster.StateTicks = 0;
             return;
         }
 
+        // Zone175-type boss (A002/A005_FOR_ZONE_175_TYPE_BOSS, S07_MyGame05.cpp:1176-1298): can also loose a
+        // ranged attack from its full detection radius instead of always closing to melee range first. Legacy
+        // rolls a 1/3 chance each tick between this and continuing to close in, over a multi-candidate
+        // distance-banded target list; simplified here to "always take the ranged opening once in range",
+        // since Fenrir's single-locked-target Chase has no equivalent candidate list to roll over.
+        if (IsZone175TypeBoss(monster.Template.SpecialType))
+        {
+            var detectionRadiusSq = (float)monster.Template.RadiusInfo2 * monster.Template.RadiusInfo2;
+            if (distanceToTargetSq <= detectionRadiusSq)
+            {
+                monster.AiState = MonsterAiState.RangedAttackWindup;
+                monster.StateTicks = 0;
+                return;
+            }
+        }
+
         MoveToward(zone, monster, target.PosX, target.PosZ, monster.Template.RunSpeed, dt);
+    }
+
+    /// <summary><c>mSpecialType</c> 40-44 (S07_MyGame05.cpp:59-92): the 5 seeded "elite boss" monsters (564-568).</summary>
+    private static bool IsZone175TypeBoss(byte specialType)
+    {
+        return specialType is >= 40 and <= 44;
     }
 
     /// <summary>

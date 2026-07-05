@@ -6,7 +6,7 @@ namespace Fenrir.Application.Login;
 /// </summary>
 public sealed class LoginServerOptions
 {
-    public int Port { get; init; } = 29998;
+    public int Port { get; set; } = 29998;
 
     /// <summary>
     ///     Must match <c>LoginRequest.Version</c> or login fails with Result=4; legacy ini <c>[Server.Info].Version</c>

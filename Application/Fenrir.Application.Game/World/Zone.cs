@@ -50,7 +50,8 @@ public sealed class Zone(
     ILogger<Zone> logger,
     WorldDataCache worldData,
     IRandomSource? randomSource = null,
-    QuestCatalog? questCatalog = null) : IZoneActor
+    QuestCatalog? questCatalog = null,
+    KillCooldownTracker? killCooldownTracker = null) : IZoneActor
 {
     private readonly SimulationTickAccumulator _accumulator = new();
 
@@ -220,6 +221,13 @@ public sealed class Zone(
 
     /// <summary>Combat/skill RNG -- <see cref="SystemRandomSource" /> in production, injectable for deterministic tests.</summary>
     private readonly IRandomSource _random = randomSource ?? SystemRandomSource.Instance;
+
+    /// <summary>
+    ///     Process-wide PvP anti-farm gate (C05) -- shared across every <see cref="Zone" /> via
+    ///     <see cref="ZoneRegistry" /> in production; defaults to a private instance in tests so each test zone
+    ///     starts with a clean cooldown state.
+    /// </summary>
+    private readonly KillCooldownTracker _killCooldownTracker = killCooldownTracker ?? new KillCooldownTracker();
 
     /// <summary>
     ///     Op 157 <c>RuneSocket</c> self-mutation mirror. See <see cref="ApplyRuneSocketCommand" />'s remarks
@@ -601,6 +609,17 @@ public sealed class Zone(
         monster.LastRebroadcastAt = _clock;
         _monsters[monster.ServerIndex] = monster;
         BroadcastMonsterAction(monster, 1); // action=1 on B_MONSTER_ACTION_RECV at creation
+    }
+
+    /// <summary>
+    ///     Tick-owned caller only (<see cref="Progression.TowerGuardianSystem" />). Removes a monster outright --
+    ///     no loot, no <see cref="DeadMonsterEvent" />, no death broadcast -- mirroring legacy <c>FreeTower</c>
+    ///     (S07_MyGame01.cpp:13642-13657), which just invalidates the old guardian's shared-memory slot before a
+    ///     stronger one replaces it on upgrade.
+    /// </summary>
+    internal void DespawnMonsterSilently(int serverIndex)
+    {
+        _monsters.TryRemove(serverIndex, out _);
     }
 
     /// <summary>
@@ -1154,12 +1173,30 @@ public sealed class Zone(
             changed = true;
         }
 
+        if (command.Exp2 is { } exp2)
+        {
+            state.Exp2 = exp2;
+            changed = true;
+        }
+
+        if (command.RebirthCount is { } rebirthCount)
+        {
+            state.RebirthCount = rebirthCount;
+            changed = true;
+        }
+
         if (changed)
             dirtyTracker.MarkDirty(command.CharacterId, DirtyFlags.Progression);
 
         if (!command.DropItems.IsDefaultOrEmpty)
             foreach (var drop in command.DropItems)
                 SpawnGroundItem(drop.ItemId, drop.Quantity, state.PosX, state.PosY, state.PosZ, state.Name, "", 0);
+
+        // tSort 11 Max Rebirth's own B_AVATAR_CHANGE_INFO_1(sort 14)+Broadcast11 pairing (S04_MyWork02.cpp:11367);
+        // Value03 (aZone241Time) has no Fenrir-side field yet, same "not modeled" posture as this file's other
+        // untracked wire-only counters -- sent as 0.
+        if (command.RebirthBroadcast)
+            BroadcastAvatarStateFlag(state, 14, state.ContributionPoints, state.RebirthCount, 0);
     }
 
     private void DrainQuestCommands()
@@ -1955,7 +1992,28 @@ public sealed class Zone(
         dirtyTracker.MarkDirty(defenderState.CharacterId, DirtyFlags.Vitals);
 
         if (defenderState.Life <= 0)
+        {
+            ApplyPvpKillMissionProgress(attackerState, defenderState.CharacterId);
             ApplyDeath(defenderState.CharacterId, DeathCause.PlayerKill);
+        }
+    }
+
+    /// <summary>
+    ///     PvP-kill hook gated by <see cref="KillCooldownTracker" /> (C05): repeatedly farming the same victim
+    ///     within <see cref="KillCooldownTracker.DefaultCooldown" /> (10 min) only ever grants this reward once
+    ///     per window for that ordered attacker/defender pair. Currently the only reward this unlocks is
+    ///     <see cref="PlayerRuntimeState.MissionKillOtherTribe" />, clamped at
+    ///     <see cref="KillCooldownTracker.MissionKillOtherTribeCap" /> -- CP/EXP/drop are a separate, not-yet-built
+    ///     pipeline (see <c>16_full_opcode_gap_inventory.md</c> §4 C05).
+    /// </summary>
+    private void ApplyPvpKillMissionProgress(PlayerRuntimeState attackerState, int defenderCharacterId)
+    {
+        if (!_killCooldownTracker.TryRegisterKill(attackerState.CharacterId, defenderCharacterId, DateTime.UtcNow))
+            return;
+
+        attackerState.MissionKillOtherTribe =
+            Math.Min(attackerState.MissionKillOtherTribe + 1, KillCooldownTracker.MissionKillOtherTribeCap);
+        dirtyTracker.MarkDirty(attackerState.CharacterId, DirtyFlags.Progression);
     }
 
     /// <summary>
@@ -2436,6 +2494,8 @@ public sealed class Zone(
             Experience = data.Experience,
             ContributionPoints = data.ContributionPoints,
             TeacherPoint = data.TeacherPoint,
+            Level2 = data.Level2,
+            Exp2 = data.Exp2,
             IsMuted = data.IsMuted,
             GuildId = data.GuildId,
             GuildName = data.GuildName,
@@ -2977,7 +3037,7 @@ public sealed class Zone(
                 HeadType = state.HeadType,
                 FaceType = state.FaceType,
                 Level1 = state.Level,
-                Level2 = 0,
+                Level2 = state.Level2,
                 // Reflects the live Equipment container instead of a hardcoded blank.
                 EquipForView =
                     EquipmentViewCodec.BuildEquipForView(state.Inventory.GetContainer(ContainerMatrix.Equipment)),

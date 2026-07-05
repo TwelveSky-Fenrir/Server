@@ -17,6 +17,11 @@ namespace Fenrir.Application.Game.Handlers.Progression;
 ///     subsequent "page/index == -1" checks (S04_MyWork02.cpp:14396-14403) are dead code in the traced
 ///     source -- ZC_CHUGSOUNG_WAR_UP_RECV's Result=1/2 ("missing herb"/"missing bar") values are never
 ///     actually reachable; a missing herb or bar disconnects instead, same as every earlier gate.
+///     <para>
+///         Material consumption only arms the upgrade (<see cref="TowerWarState.BeginUpgrade" />); the actual
+///         level change, guardian-monster respawn, and the later siege/destruction cycle all run off that
+///         tower's own zone tick -- see <see cref="TowerGuardianSystem" />.
+///     </para>
 /// </summary>
 public sealed class TowerUpgradeHandler(
     TowerWarState towerWar,
@@ -104,7 +109,7 @@ public sealed class TowerUpgradeHandler(
             return;
         }
 
-        towerWar.MarkUpgradeSubmitted(resolved.TowerIndex);
+        towerWar.BeginUpgrade(resolved.TowerIndex, resolved.NewPackedState, state.Tribe);
 
         var packedPage = herbPage + 10000 + barPage * 100;
         var packedIndex = herbSlot + 10000 + barSlot * 100;

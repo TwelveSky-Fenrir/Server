@@ -20,6 +20,9 @@ public sealed class GameServerOptionsValidator : IValidateOptions<GameServerOpti
             errors.Add($"Game:MaxPlausibleSpeedPerSecond must be positive (was {options.MaxPlausibleSpeedPerSecond}).");
         if (options.HeartbeatIntervalSeconds <= 0)
             errors.Add($"Game:HeartbeatIntervalSeconds must be positive (was {options.HeartbeatIntervalSeconds}).");
+        if (options.HeroRankingRolloverCheckIntervalMinutes <= 0)
+            errors.Add(
+                $"Game:HeroRankingRolloverCheckIntervalMinutes must be positive (was {options.HeroRankingRolloverCheckIntervalMinutes}).");
         if (options.Capacity <= 0) errors.Add($"Game:Capacity must be positive (was {options.Capacity}).");
 
         return errors.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(errors);

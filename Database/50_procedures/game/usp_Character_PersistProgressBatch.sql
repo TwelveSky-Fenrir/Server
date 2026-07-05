@@ -24,6 +24,8 @@ SET c.Level              = s.Level,
     c.StatPoints         = s.StatPoints,
     c.SkillPoints        = s.SkillPoints,
     c.ContributionPoints = s.ContributionPoints,
+    c.Exp2               = s.Exp2,
+    c.RebirthCount       = s.RebirthCount,
     c.FlushSequence      = s.FlushSequence,
     c.UpdatedAtUtc       = SYSUTCDATETIME() FROM game.Characters AS c
       JOIN @Progress       AS s

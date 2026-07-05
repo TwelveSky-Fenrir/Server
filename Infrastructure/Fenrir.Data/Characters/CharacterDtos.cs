@@ -109,7 +109,14 @@ public sealed partial record CharacterWorldSnapshotDto(
     int PetGrowth,
     byte PetActivity,
     // wAvatar.aTeacherPoint; appended last to match the proc's column order.
-    int TeacherPoint);
+    int TeacherPoint,
+    // aAutoBuffTime/aPremium, both appended after TeacherPoint for the same reason -- neither is read into
+    // PlayerRuntimeState yet (see EnterWorldHandler), same "durably stored, runtime wiring pending" posture
+    // DoubleExpTime1/2 already have above.
+    int AutoBuffTime,
+    long PremiumExpireUtc,
+    // wAvatar.aExp2; appended last for the same reason AutoBuffTime/PremiumExpireUtc were -- see TribeActionHandler.HandleRebirthAsync for the one live consumer.
+    int Exp2);
 
 /// <summary>
 ///     RS1 of usp_Character_GetForWorldEntry. ExpireDate: legacy YYYYMMDD int, 0 = not a rental. Container: 0/1

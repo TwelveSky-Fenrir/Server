@@ -11,7 +11,9 @@ namespace Fenrir.Application.Game.Combat;
 /// </summary>
 /// <remarks>
 ///     Not implemented: duel (<c>mCase</c> 1), PvM/MvP/stun (handled elsewhere or unmodeled), Holy Shield, PvP kill
-///     rewards -- a PvP kill here only applies HP death, no CP/XP/drop to the killer.
+///     rewards -- a PvP kill here only applies HP death, no CP/XP/drop to the killer. The caller
+///     (<c>Zone.ApplyCombatCommand</c>) does gate a small slice of the reward, <c>MissionKillOtherTribe</c>, behind
+///     <see cref="KillCooldownTracker" /> (C05); CP/XP/drop remain unimplemented.
 ///     Also not implemented: the tribe "Formation Skill" x1.1 ATK/DEF modifier gated on
 ///     <c>mWorldInfo->mTribeMasterCallAbility[tribe]</c> (S07_MyGame02.cpp:1071-1079) -- that world-scope buff state isn't
 ///     wired up anywhere yet (see <see cref="Fenrir.Application.Game.Handlers.Tribes.TribeActionHandler" /> tSort 5, which

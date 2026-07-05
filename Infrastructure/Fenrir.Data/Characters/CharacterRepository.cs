@@ -67,6 +67,68 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         return await Db.ExecuteScalarAsync<int>(sp, ct);
     }
 
+    /// <summary>
+    ///     Op17's full creation path -- usp_Character_CreateWithStarterKit's scalar CharacterId result. Empty-TVP
+    ///     omission follows the same rule as <see cref="ReplaceContainerAsync" />.
+    /// </summary>
+    public async ValueTask<int> CreateWithStarterKitAsync(
+        int accountId,
+        byte slot,
+        string name,
+        byte tribe,
+        byte gender,
+        byte headType,
+        byte faceType,
+        short mapId,
+        float posX,
+        float posY,
+        float posZ,
+        int life,
+        int maxLife,
+        int mana,
+        int maxMana,
+        int welcomeBuffUntilDate,
+        long premiumUntilUnixSeconds,
+        IReadOnlyList<CharacterItemSlotTvp> equipment,
+        IReadOnlyList<CharacterItemSlotTvp> inventory,
+        IReadOnlyList<CharacterSkillSlotTvp> skills,
+        IReadOnlyList<CharacterHotkeySlotTvp> hotkeys,
+        CancellationToken ct)
+    {
+        var builder = new StoredProcedureParametersBuilder("game", "usp_Character_CreateWithStarterKit", 1)
+            .AddParameter("AccountId", accountId, SqlDbType.Int)
+            .AddParameter("Slot", slot, SqlDbType.TinyInt)
+            .AddParameter("Name", name, SqlDbType.NVarChar)
+            .AddParameter("Tribe", tribe, SqlDbType.TinyInt)
+            .AddParameter("Gender", gender, SqlDbType.TinyInt)
+            .AddParameter("HeadType", headType, SqlDbType.TinyInt)
+            .AddParameter("FaceType", faceType, SqlDbType.TinyInt)
+            .AddParameter("MapId", mapId, SqlDbType.SmallInt)
+            .AddParameter("PosX", posX, SqlDbType.Real)
+            .AddParameter("PosY", posY, SqlDbType.Real)
+            .AddParameter("PosZ", posZ, SqlDbType.Real)
+            .AddParameter("Life", life, SqlDbType.Int)
+            .AddParameter("MaxLife", maxLife, SqlDbType.Int)
+            .AddParameter("Mana", mana, SqlDbType.Int)
+            .AddParameter("MaxMana", maxMana, SqlDbType.Int)
+            .AddParameter("WelcomeBuffUntilDate", welcomeBuffUntilDate, SqlDbType.Int)
+            .AddParameter("PremiumUntilUnixSeconds", premiumUntilUnixSeconds, SqlDbType.BigInt);
+
+        if (equipment.Count > 0)
+            builder.AddTvpParameter("Equipment", equipment);
+
+        if (inventory.Count > 0)
+            builder.AddTvpParameter("Inventory", inventory);
+
+        if (skills.Count > 0)
+            builder.AddTvpParameter("Skills", skills);
+
+        if (hotkeys.Count > 0)
+            builder.AddTvpParameter("Hotkeys", hotkeys);
+
+        return await Db.ExecuteScalarAsync<int>(builder.Build(), ct);
+    }
+
     /// <summary>Deletes the character occupying (AccountId, Slot) -- CL_DELETE_AVATAR_SEND's target.</summary>
     public async ValueTask DeleteAsync(int accountId, byte slot, CancellationToken ct)
     {
@@ -467,5 +529,20 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         builder.AddParameter("Price", price, SqlDbType.Int);
 
         await Db.ExecuteAsync(builder.Build(), ct);
+    }
+
+    /// <summary>
+    ///     game.Characters.TribeTransferPermitCount adjustment (Faction Transfer Scroll, world.Items 8153/8154).
+    ///     Returns the post-adjustment balance. Throws SQL 50312 on unknown character or an adjustment that
+    ///     would take the balance negative.
+    /// </summary>
+    public async ValueTask<int> GrantTribeTransferPermitAsync(int characterId, int delta, CancellationToken ct)
+    {
+        var sp = new StoredProcedureParametersBuilder("game", "usp_Character_GrantTribeTransferPermit", 1)
+            .AddParameter("CharacterId", characterId, SqlDbType.Int)
+            .AddParameter("Delta", delta, SqlDbType.Int)
+            .Build();
+
+        return await Db.ExecuteScalarAsync<int>(sp, ct);
     }
 }

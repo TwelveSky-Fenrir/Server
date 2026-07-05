@@ -14,7 +14,8 @@ public class GameServerOptionsValidatorTests
         float maxPlausibleSpeedPerSecond = 20f,
         int heartbeatIntervalSeconds = 5,
         int capacity = 300,
-        string? gameDataDirectory = "GameData")
+        string? gameDataDirectory = "GameData",
+        int heroRankingRolloverCheckIntervalMinutes = 60)
     {
         return new GameServerOptions
         {
@@ -26,7 +27,8 @@ public class GameServerOptionsValidatorTests
             MaxPlausibleSpeedPerSecond = maxPlausibleSpeedPerSecond,
             HeartbeatIntervalSeconds = heartbeatIntervalSeconds,
             Capacity = capacity,
-            GameDataDirectory = gameDataDirectory!
+            GameDataDirectory = gameDataDirectory!,
+            HeroRankingRolloverCheckIntervalMinutes = heroRankingRolloverCheckIntervalMinutes
         };
     }
 
@@ -136,5 +138,16 @@ public class GameServerOptionsValidatorTests
 
         Assert.True(result.Failed);
         Assert.Contains(result.Failures!, f => f.Contains("Game:GameDataDirectory"));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void Validate_HeroRankingRolloverCheckIntervalMinutesNotPositive_Fails(int intervalMinutes)
+    {
+        var result = Validator.Validate(null, Options(heroRankingRolloverCheckIntervalMinutes: intervalMinutes));
+
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures!, f => f.Contains("Game:HeroRankingRolloverCheckIntervalMinutes"));
     }
 }

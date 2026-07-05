@@ -62,7 +62,8 @@ public static class LoginTrain
     };
 
     /// <summary>Every LC_LOGIN_RECV field at its "nothing to report" value (legacy always-zero fields, report §5.11).</summary>
-    public static LoginResponse BuildLoginRecv(int result, string id, int secondLoginSort, string mousePassword)
+    public static LoginResponse BuildLoginRecv(int result, string id, int secondLoginSort, string mousePassword,
+        string resultString = "")
     {
         return new LoginResponse
         {
@@ -77,7 +78,7 @@ public static class LoginTrain
             SecretCardIndex01 = 0,
             SecretCardIndex02 = 0,
             GiftInfo = new int[50],
-            ResultString = ""
+            ResultString = resultString
         };
     }
 
@@ -128,9 +129,9 @@ public static class LoginTrain
     ///     The complete failure train: tID echoed back even on failure (legacy XORs it via USE_XOR_UID;
     ///     [ObfuscatedUidField] does the same here).
     /// </summary>
-    public static void SendFailure(IPacketSession session, int result, string requestId)
+    public static void SendFailure(IPacketSession session, int result, string requestId, string resultString = "")
     {
-        Send(session, BuildLoginRecv(result, requestId, 0, FailurePinMask), BuildEmptyAvatarSlots());
+        Send(session, BuildLoginRecv(result, requestId, 0, FailurePinMask, resultString), BuildEmptyAvatarSlots());
     }
 
     private static string[] ZeroStrings(int count)

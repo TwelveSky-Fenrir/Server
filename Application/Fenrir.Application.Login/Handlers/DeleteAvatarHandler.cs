@@ -14,6 +14,12 @@ public sealed class DeleteAvatarHandler(ICharacterRepository characters) : IAsyn
         var loginSession = (LoginClientSession)session;
         var accountId = loginSession.AccountId!.Value;
 
+        if (packet.AvatarPost is < 0 or > 2)
+        {
+            loginSession.Abort(DisconnectReason.Malformed);
+            return;
+        }
+
         // Idempotent (usp_Character_Delete): an already-empty slot is not an error.
         await characters.DeleteAsync(accountId, (byte)packet.AvatarPost, cancellationToken);
 

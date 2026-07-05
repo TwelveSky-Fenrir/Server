@@ -197,12 +197,8 @@ public sealed class CraftItemHandler(
             }
 
             // B_MAKE_ITEM_RECV describes the CONSUMED material slot, not the new item -- the new item rides the
-            // separate ZC_ADD_USER_INVENTORY_ITEM_RECV below.
-            session.Send(new CraftItemResponse
-            {
-                Result = MaterialResultCode(resolved.RemainingMaterial),
-                Value = MaterialValue(resolved.RemainingMaterial)
-            });
+            // separate ZC_ADD_USER_INVENTORY_ITEM_RECV, sent first so the client learns of the new item before
+            // the craft result referencing the consumed slot.
             session.Send(new AddInventoryItemResponse
             {
                 Result = 0,
@@ -215,6 +211,11 @@ public sealed class CraftItemHandler(
                 Serial = newItemStack.Serial,
                 Socket = [0, 0, 0],
                 Expire = 0
+            });
+            session.Send(new CraftItemResponse
+            {
+                Result = MaterialResultCode(resolved.RemainingMaterial),
+                Value = MaterialValue(resolved.RemainingMaterial)
             });
         }
         else

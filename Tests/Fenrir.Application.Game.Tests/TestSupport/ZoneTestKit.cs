@@ -27,12 +27,13 @@ internal static class ZoneTestKit
 
     public static Zone CreateZone(short mapId, GameServerOptions? options = null,
         DirtyTracker<int>? dirtyTracker = null, IReadOnlyList<ISimulationSystem>? simulationSystems = null,
-        WorldDataCache? worldData = null, IRandomSource? randomSource = null)
+        WorldDataCache? worldData = null, IRandomSource? randomSource = null,
+        KillCooldownTracker? killCooldownTracker = null)
     {
         var opts = options ?? Options();
         return new Zone(mapId, opts, new MovementRules(Microsoft.Extensions.Options.Options.Create(opts)),
             dirtyTracker ?? new DirtyTracker<int>(), simulationSystems ?? [], NullLogger<Zone>.Instance,
-            worldData ?? EmptyWorldData(), randomSource);
+            worldData ?? EmptyWorldData(), randomSource, killCooldownTracker: killCooldownTracker);
     }
 
     public static (ZoneClientSession Session, FakeDuplexPipe Pipe) CreateSession(long sessionId)

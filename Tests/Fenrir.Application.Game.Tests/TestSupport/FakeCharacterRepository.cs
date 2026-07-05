@@ -51,6 +51,16 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
         throw new NotImplementedException();
     }
 
+    public ValueTask<int> CreateWithStarterKitAsync(int accountId, byte slot, string name, byte tribe, byte gender,
+        byte headType, byte faceType, short mapId, float posX, float posY, float posZ, int life, int maxLife,
+        int mana, int maxMana, int welcomeBuffUntilDate, long premiumUntilUnixSeconds,
+        IReadOnlyList<CharacterItemSlotTvp> equipment, IReadOnlyList<CharacterItemSlotTvp> inventory,
+        IReadOnlyList<CharacterSkillSlotTvp> skills, IReadOnlyList<CharacterHotkeySlotTvp> hotkeys,
+        CancellationToken ct)
+    {
+        throw new NotImplementedException();
+    }
+
     public ValueTask DeleteAsync(int accountId, byte slot, CancellationToken ct)
     {
         throw new NotImplementedException();
@@ -181,5 +191,16 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
         IReadOnlyList<CharacterItemSlotTvp> buyerItems, int price, CancellationToken ct)
     {
         throw new NotImplementedException();
+    }
+
+    public int TribeTransferPermitCount { get; private set; }
+
+    public (int CharacterId, int Delta)? LastGrantTribeTransferPermit { get; private set; }
+
+    public ValueTask<int> GrantTribeTransferPermitAsync(int characterId, int delta, CancellationToken ct)
+    {
+        LastGrantTribeTransferPermit = (characterId, delta);
+        TribeTransferPermitCount += delta;
+        return ValueTask.FromResult(TribeTransferPermitCount);
     }
 }

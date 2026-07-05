@@ -4,12 +4,13 @@ using Fenrir.Data.Commerce;
 
 namespace Fenrir.Application.Login.Tests.TestSupport;
 
-// In-memory stand-in for ICharacterRepository: only GetByAccountAsync/GetForWorldEntryAsync are exercised by
-// the handlers under test here; every other member is out of scope for those flows.
+// In-memory stand-in for ICharacterRepository: GetByAccountAsync/GetForWorldEntryAsync/CreateWithStarterKitAsync
+// are exercised by the handlers under test here (op16/op17); every other member is out of scope for those flows.
 internal sealed class FakeCharacterRepository : ICharacterRepository
 {
     private readonly List<CharacterSummaryDto> _summaries;
     private readonly Dictionary<int, CharacterWorldEntryDto> _worldEntriesByCharacterId;
+    private int _nextCharacterId = 1000;
 
     private FakeCharacterRepository(IEnumerable<CharacterSummaryDto> summaries,
         IEnumerable<CharacterWorldEntryDto> worldEntries)
@@ -17,6 +18,12 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
         _summaries = [.. summaries];
         _worldEntriesByCharacterId = worldEntries.ToDictionary(w => w.CharacterId);
     }
+
+    /// <summary>Set by a test to make the next <see cref="CreateWithStarterKitAsync" /> call throw instead.</summary>
+    public Exception? CreateWithStarterKitException { get; set; }
+
+    /// <summary>Every argument CreateAvatarHandler passed to the most recent CreateWithStarterKitAsync call.</summary>
+    public CreateWithStarterKitCall? LastCreateWithStarterKit { get; private set; }
 
     public ValueTask<ReadOnlyCollection<CharacterSummaryDto>> GetByAccountAsync(int accountId, CancellationToken ct)
     {
@@ -33,6 +40,28 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
         int mana, int maxMana, CancellationToken ct)
     {
         throw new NotSupportedException();
+    }
+
+    public ValueTask<int> CreateWithStarterKitAsync(int accountId, byte slot, string name, byte tribe, byte gender,
+        byte headType, byte faceType, short mapId, float posX, float posY, float posZ, int life, int maxLife,
+        int mana, int maxMana, int welcomeBuffUntilDate, long premiumUntilUnixSeconds,
+        IReadOnlyList<CharacterItemSlotTvp> equipment, IReadOnlyList<CharacterItemSlotTvp> inventory,
+        IReadOnlyList<CharacterSkillSlotTvp> skills, IReadOnlyList<CharacterHotkeySlotTvp> hotkeys,
+        CancellationToken ct)
+    {
+        LastCreateWithStarterKit = new CreateWithStarterKitCall(accountId, slot, name, tribe, gender, headType,
+            faceType, mapId, posX, posY, posZ, life, maxLife, mana, maxMana, welcomeBuffUntilDate,
+            premiumUntilUnixSeconds, equipment, inventory, skills, hotkeys);
+
+        if (CreateWithStarterKitException is { } exception)
+            throw exception;
+
+        var characterId = _nextCharacterId++;
+        _worldEntriesByCharacterId[characterId] = new CharacterWorldEntryDto(
+            characterId, accountId, slot, name, tribe, gender, headType, faceType,
+            1, mapId, posX, posY, posZ, 0f, life, maxLife, mana, maxMana, 0L);
+
+        return ValueTask.FromResult(characterId);
     }
 
     public ValueTask DeleteAsync(int accountId, byte slot, CancellationToken ct)
@@ -161,8 +190,42 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
         throw new NotSupportedException();
     }
 
+    public ValueTask<int> GrantTribeTransferPermitAsync(int characterId, int delta, CancellationToken ct)
+    {
+        throw new NotSupportedException();
+    }
+
     public static FakeCharacterRepository With(CharacterSummaryDto summary, CharacterWorldEntryDto worldEntry)
     {
         return new FakeCharacterRepository([summary], [worldEntry]);
     }
+
+    /// <summary>A fresh account with no characters yet (e.g. straight after CL_LOGIN_SEND's first-ever login).</summary>
+    public static FakeCharacterRepository WithNone()
+    {
+        return new FakeCharacterRepository([], []);
+    }
 }
+
+internal sealed record CreateWithStarterKitCall(
+    int AccountId,
+    byte Slot,
+    string Name,
+    byte Tribe,
+    byte Gender,
+    byte HeadType,
+    byte FaceType,
+    short MapId,
+    float PosX,
+    float PosY,
+    float PosZ,
+    int Life,
+    int MaxLife,
+    int Mana,
+    int MaxMana,
+    int WelcomeBuffUntilDate,
+    long PremiumUntilUnixSeconds,
+    IReadOnlyList<CharacterItemSlotTvp> Equipment,
+    IReadOnlyList<CharacterItemSlotTvp> Inventory,
+    IReadOnlyList<CharacterSkillSlotTvp> Skills,
+    IReadOnlyList<CharacterHotkeySlotTvp> Hotkeys);

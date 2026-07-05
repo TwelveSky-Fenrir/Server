@@ -188,6 +188,33 @@ public class CharacterRepositoryTests
         Assert.Null(ex);
     }
 
+    [Fact]
+    public async Task GrantTribeTransferPermitAsync_AccumulatesAcrossCalls_AndRejectsGoingNegative()
+    {
+        var accountId = await CreateTestAccountAsync();
+        var characterId = await CreateCharacterAsync(accountId, 0);
+
+        var afterFirst = await _characters.GrantTribeTransferPermitAsync(characterId, 1, CancellationToken.None);
+        Assert.Equal(1, afterFirst);
+
+        var afterSecond = await _characters.GrantTribeTransferPermitAsync(characterId, 1, CancellationToken.None);
+        Assert.Equal(2, afterSecond);
+
+        var afterSpend = await _characters.GrantTribeTransferPermitAsync(characterId, -2, CancellationToken.None);
+        Assert.Equal(0, afterSpend);
+
+        // CharacterRepository goes through CaeriusNet (unlike GuildProcTests' raw ADO.NET calls), which wraps
+        // the driver's SqlException in its own CaeriusNetSqlException -- assert on the wrapped exception's
+        // inner SqlException.Number, same posture as CommerceProcTests' BloodCoin overdraft check.
+        var overspend = await Record.ExceptionAsync(() =>
+            _characters.GrantTribeTransferPermitAsync(characterId, -1, CancellationToken.None).AsTask());
+        Assert.Equal(50312, Assert.IsType<SqlException>(overspend!.InnerException).Number);
+
+        var unknownCharacter = await Record.ExceptionAsync(() =>
+            _characters.GrantTribeTransferPermitAsync(-1, 1, CancellationToken.None).AsTask());
+        Assert.Equal(50312, Assert.IsType<SqlException>(unknownCharacter!.InnerException).Number);
+    }
+
     private async Task<int> CreateTestAccountAsync()
     {
         var loginName = $"chartest-{Guid.NewGuid():N}";

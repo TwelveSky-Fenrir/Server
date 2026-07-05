@@ -68,7 +68,10 @@ SELECT c.CharacterId,
        c.AutoManaRatio,
        c.PetGrowth,
        c.PetActivity,
-       c.TeacherPoint
+       c.TeacherPoint,
+       c.AutoBuffTime,
+       c.PremiumExpireUtc,
+       c.Exp2
 FROM game.Characters AS c
          LEFT JOIN game.CharacterQuests AS q
                    ON q.CharacterId = c.CharacterId

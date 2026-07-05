@@ -41,4 +41,15 @@ public sealed record HeroRankingRepository(ICaeriusNetDbContext Db) : IHeroRanki
 
         await Db.ExecuteAsync(sp, ct);
     }
+
+    /// <summary>
+    ///     usp_HeroRanking_Rollover gates the actual Current-&gt;Previous flip on a 7-day sentinel it owns
+    ///     itself (game.HeroRankingRolloverState) -- most calls are a no-op, which is expected since every
+    ///     shard's <c>HeroRankingRolloverHost</c> polls this independently rather than coordinating.
+    /// </summary>
+    public async ValueTask<bool> RolloverIfDueAsync(CancellationToken ct)
+    {
+        var sp = new StoredProcedureParametersBuilder("game", "usp_HeroRanking_Rollover", 1).Build();
+        return await Db.ExecuteScalarAsync<bool>(sp, ct);
+    }
 }

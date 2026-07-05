@@ -1,3 +1,5 @@
+using Fenrir.Application.Game.Pets;
+using Fenrir.Application.Game.World.Loot;
 using Fenrir.Data.Characters;
 
 namespace Fenrir.Application.Game.Inventory;
@@ -18,7 +20,9 @@ public static class EquipmentViewCodec
                 continue;
 
             view[item.Slot * 2] = item.ItemId;
-            view[item.Slot * 2 + 1] = item.Enchant;
+            view[item.Slot * 2 + 1] = item.Slot == PetSlots.EquipmentSlot
+                ? ItemValueCodec.Encode(item.Enchant, item.Combine, item.Refine, item.Socket)
+                : item.Enchant;
         }
 
         return view;
@@ -35,7 +39,9 @@ public static class EquipmentViewCodec
                 continue;
 
             view[slot * 2] = stack.ItemId;
-            view[slot * 2 + 1] = stack.Enchant;
+            view[slot * 2 + 1] = slot == PetSlots.EquipmentSlot
+                ? ItemValueCodec.Encode(stack.Enchant, stack.Combine, stack.Refine, stack.Socket)
+                : stack.Enchant;
         }
 
         return view;

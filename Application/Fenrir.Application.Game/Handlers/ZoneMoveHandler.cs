@@ -1,5 +1,6 @@
 using Fenrir.Application.Game.Avatars;
 using Fenrir.Application.Game.GameData;
+using Fenrir.Application.Game.Guilds;
 using Fenrir.Application.Game.World;
 using Fenrir.Contracts.Abstractions;
 using Fenrir.Contracts.Packets.Shared;
@@ -28,6 +29,7 @@ namespace Fenrir.Application.Game.Handlers;
 public sealed class ZoneMoveHandler(
     ZoneRegistry zones,
     WorldDataCache worldData,
+    GuildRankingCache guildRanking,
     IOptions<GameServerOptions> options,
     ILogger<ZoneMoveHandler> logger) : IAsyncPacketHandler<ZoneMoveRequest>
 {
@@ -110,7 +112,7 @@ public sealed class ZoneMoveHandler(
 
         var broadcastWorldInfo = new WorldSnapshotResponse
         {
-            WorldInfo = WorldStateTemplates.ZeroedWorldInfo,
+            WorldInfo = GuildRankingProjection.Apply(WorldStateTemplates.ZeroedWorldInfo, guildRanking.Top),
             TribeInfo = WorldStateTemplates.ZeroedTribeInfo
         };
         zoneSession.SendRaw(ZoneMessageFactory.Encode(in broadcastWorldInfo));

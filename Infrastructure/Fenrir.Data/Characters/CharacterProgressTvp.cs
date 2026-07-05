@@ -20,4 +20,6 @@ public sealed partial record CharacterProgressTvp(
     int StatDex,
     int StatPoints,
     int SkillPoints,
-    int ContributionPoints);
+    int ContributionPoints,
+    int Exp2,
+    int RebirthCount);

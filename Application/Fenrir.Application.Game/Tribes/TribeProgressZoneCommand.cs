@@ -26,6 +26,12 @@ namespace Fenrir.Application.Game.Tribes;
 ///     CZ_TRIBE_NOTIFY_SEND (opcode 112) -- the sender's remaining scroll count after
 ///     this send, mirroring <see cref="Fenrir.Application.Game.World.PlayerRuntimeState.TribeNotifyScrollCount" />.
 /// </param>
+/// <param name="Exp2">tSort 11 (Max Rebirth) resets this to 0 on success -- see <see cref="RebirthCount" />.</param>
+/// <param name="RebirthCount">tSort 11 (Max Rebirth) increments this by 1 on success.</param>
+/// <param name="RebirthBroadcast">
+///     tSort 11's own AOI-wide AVATAR_CHANGE_INFO_1 sort-14 notice (ContributionPoints/RebirthCount), sent once
+///     both fields above are already applied to <see cref="Fenrir.Application.Game.World.PlayerRuntimeState" />.
+/// </param>
 /// <param name="Applied">
 ///     Completed once actually mirrored -- see InventoryZoneCommand.Applied for why this matters while
 ///     EconomyActionLock is held.
@@ -50,6 +56,9 @@ public readonly record struct TribeProgressZoneCommand(
     EffectiveStats? UpdatedStats = null,
     ImmutableArray<TribeGroundItemDrop> DropItems = default,
     int? TribeNotifyScrollCount = null,
+    int? Exp2 = null,
+    int? RebirthCount = null,
+    bool RebirthBroadcast = false,
     TaskCompletionSource? Applied = null);
 
 /// <summary>One ground-item drop request -- see TribeProgressZoneCommand.DropItems.</summary>

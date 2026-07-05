@@ -6,6 +6,9 @@
 -- instead of a background job -- see usp_Character_GetRewardClaimState/ClaimDailyReward.
 -- PetGrowth/PetActivity: one counter per character (legacy tracks growth per equipped pet item instance),
 -- reset on pet-item swap. TeacherPoint is unrelated to the TeacherCharacterId/StudentCharacterId mentor bond.
+-- TribeTransferPermitCount: no legacy source available here documents the actual tribe-change mechanic a
+-- Faction Transfer Scroll (world.Items 8153/8154) unlocks -- only the permit-banking half is implemented
+-- (usp_Character_GrantTribeTransferPermit), the mirror image of BloodCoin's "spend but no grant" gap above.
 CREATE TABLE game.Characters
 (
     CharacterId           INT IDENTITY(1,1) NOT NULL,
@@ -17,7 +20,8 @@ CREATE TABLE game.Characters
     HeadType              TINYINT  NOT NULL,
     FaceType              TINYINT  NOT NULL,
     Level                 SMALLINT NOT NULL CONSTRAINT DF_Characters_Level DEFAULT 1,
-    Level2                SMALLINT NOT NULL CONSTRAINT DF_Characters_Level2 DEFAULT 1,                                                                                                  -- aLevel2, martial/battle level
+    Level2                SMALLINT NOT NULL CONSTRAINT DF_Characters_Level2 DEFAULT 1,                                                                                                  -- aLevel2, the post-Level-145 "high level" rebirth ladder (1-12, MAX_LIMIT_HIGH_LEVEL_NUM)
+    Exp2                  INT      NOT NULL CONSTRAINT DF_Characters_Exp2 DEFAULT 0 CONSTRAINT CK_Characters_Exp2 CHECK (Exp2 >= 0),                                                    -- aExp2, Level2's own XP counter; reset to 0 on every successful Max Rebirth
     MapId                 SMALLINT NOT NULL,
     PosX                  REAL     NOT NULL,
     PosY                  REAL     NOT NULL,
@@ -38,7 +42,7 @@ CREATE TABLE game.Characters
     BigMoney              INT      NOT NULL CONSTRAINT DF_Characters_BigMoney DEFAULT 0 CONSTRAINT CK_Characters_BigMoney CHECK (BigMoney >= 0),
     StoreMoney            BIGINT   NOT NULL CONSTRAINT DF_Characters_StoreMoney DEFAULT 0 CONSTRAINT CK_Characters_StoreMoney CHECK (StoreMoney >= 0),
     BigStoreMoney         INT      NOT NULL CONSTRAINT DF_Characters_BigStoreMoney DEFAULT 0 CONSTRAINT CK_Characters_BigStoreMoney CHECK (BigStoreMoney >= 0),
-    RebirthCount          INT      NOT NULL CONSTRAINT DF_Characters_RebirthCount DEFAULT 0,                                                                                            -- MAX_REBIRTH_LIMIT=12, app-enforced
+    RebirthCount          INT      NOT NULL CONSTRAINT DF_Characters_RebirthCount DEFAULT 0,                                                                                            -- aRebirthNum; real cap is 6 (app-enforced) -- legacy's own MAX_REBIRTH_LIMIT=12 is a non-EU33 debug artifact, see TribeActionHandler.HandleRebirthAsync
     Title                 INT      NOT NULL CONSTRAINT DF_Characters_Title DEFAULT 0,
     Halo                  INT      NOT NULL CONSTRAINT DF_Characters_Halo DEFAULT 0,
     ContributionPoints    INT      NOT NULL CONSTRAINT DF_Characters_ContributionPoints DEFAULT 0,                                                                                      -- aKillOtherTribe (CP)
@@ -52,6 +56,7 @@ CREATE TABLE game.Characters
     ProtectForDestroy     INT      NOT NULL CONSTRAINT DF_Characters_ProtectForDestroy DEFAULT 0 CONSTRAINT CK_Characters_ProtectForDestroy CHECK (ProtectForDestroy >= 0),
     DoubleExpTime1        INT      NOT NULL CONSTRAINT DF_Characters_DoubleExpTime1 DEFAULT 0,                                                                                          -- YYYYMMDD, 0 = no boost
     DoubleExpTime2        INT      NOT NULL CONSTRAINT DF_Characters_DoubleExpTime2 DEFAULT 0,
+    AutoBuffTime          INT      NOT NULL CONSTRAINT DF_Characters_AutoBuffTime DEFAULT 0,                                                                                              -- aAutoBuffTime/aContinueSkillDay, YYYYMMDD (PlayerRuntimeState.AutoBuffTime encoding), 0 = no boost
     DropItemTime          INT      NOT NULL CONSTRAINT DF_Characters_DropItemTime DEFAULT 0,
     InventoryDate         INT      NOT NULL CONSTRAINT DF_Characters_InventoryDate DEFAULT 0,                                                                                           -- bonus inventory page rental
     StoreDate             INT      NOT NULL CONSTRAINT DF_Characters_StoreDate DEFAULT 0,
@@ -70,6 +75,8 @@ CREATE TABLE game.Characters
     AutoManaRatio         TINYINT  NOT NULL CONSTRAINT DF_Characters_AutoManaRatio DEFAULT 0 CONSTRAINT CK_Characters_AutoManaRatio CHECK (AutoManaRatio BETWEEN 0 AND 5),
     PetGrowth             INT      NOT NULL CONSTRAINT DF_Characters_PetGrowth DEFAULT 0 CONSTRAINT CK_Characters_PetGrowth CHECK (PetGrowth >= 0),
     PetActivity           TINYINT  NOT NULL CONSTRAINT DF_Characters_PetActivity DEFAULT 0 CONSTRAINT CK_Characters_PetActivity CHECK (PetActivity BETWEEN 0 AND 100),
+    TribeTransferPermitCount INT   NOT NULL CONSTRAINT DF_Characters_TribeTransferPermitCount DEFAULT 0 CONSTRAINT CK_Characters_TribeTransferPermitCount CHECK (TribeTransferPermitCount >= 0), -- banked Faction Transfer Scroll (world.Items 8153/8154) uses; no spend path exists yet, same posture as BloodCoin's absent grant path
+    PremiumExpireUtc      BIGINT   NOT NULL CONSTRAINT DF_Characters_PremiumExpireUtc DEFAULT 0,                                                                                          -- aPremium, Unix epoch seconds (0 = none); distinct scale from the YYYYMMDD ints above
     FlushSequence         BIGINT   NOT NULL CONSTRAINT DF_Characters_FlushSequence DEFAULT 0,                                                                                           -- idempotent write-behind
     CreatedAtUtc          DATETIME2(3)  NOT NULL CONSTRAINT DF_Characters_CreatedAtUtc DEFAULT SYSUTCDATETIME(),
     UpdatedAtUtc          DATETIME2(3)  NOT NULL CONSTRAINT DF_Characters_UpdatedAtUtc DEFAULT SYSUTCDATETIME(),

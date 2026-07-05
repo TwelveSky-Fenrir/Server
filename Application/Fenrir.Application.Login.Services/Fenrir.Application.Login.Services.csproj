@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Fenrir.Application.Login.Abstractions\Fenrir.Application.Login.Abstractions.csproj"/>
+    <ProjectReference Include="..\Fenrir.Application.Login.Domain\Fenrir.Application.Login.Domain.csproj"/>
+    <ProjectReference Include="..\..\Network\Fenrir.Network.Serialization\Fenrir.Network.Serialization.csproj"/>
+    <ProjectReference Include="..\..\Network\Fenrir.Network.Dispatch\Fenrir.Network.Dispatch.csproj"/>
+    <ProjectReference Include="..\..\Infrastructure\Fenrir.Data.Abstractions\Fenrir.Data.Abstractions.csproj"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Fenrir.Data.Abstractions.Accounts"/>
+    <Using Include="Fenrir.Data.Abstractions.Admin"/>
+    <Using Include="Fenrir.Data.Abstractions.Characters"/>
+    <Using Include="Fenrir.Data.Abstractions.Commerce"/>
+    <Using Include="Fenrir.Data.Abstractions.Guilds"/>
+    <Using Include="Fenrir.Data.Abstractions.Progression"/>
+    <Using Include="Fenrir.Data.Abstractions.Runtime"/>
+    <Using Include="Fenrir.Data.Abstractions.Security"/>
+    <Using Include="Fenrir.Data.Abstractions.Social"/>
+    <Using Include="Fenrir.Data.Abstractions.Tribes"/>
+    <Using Include="Fenrir.Data.Abstractions.World"/>
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

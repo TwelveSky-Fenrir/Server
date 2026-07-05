@@ -1,10 +1,11 @@
-using Fenrir.Application.Login.Avatars;
+using Fenrir.Application.Login.Domain.Avatars;
 using Fenrir.Application.Login.Handlers;
-using Fenrir.Application.Login.Handlers.Services;
+using Fenrir.Application.Login.Handlers.Handlers;
+using Fenrir.Application.Login.Services.CreateAvatar;
 using Fenrir.Application.Login.Tests.TestSupport;
 using Fenrir.Network.Serialization.Packets.Login;
 using Fenrir.Data.Characters;
-using Fenrir.Network.Sessions;
+using Fenrir.Network.Dispatch.Sessions;
 
 namespace Fenrir.Application.Login.Tests.Handlers;
 

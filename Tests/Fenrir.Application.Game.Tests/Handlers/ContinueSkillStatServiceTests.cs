@@ -1,8 +1,8 @@
-using Fenrir.Application.Game.Skills;
+using Fenrir.Application.Game.Domain.Skills;
+using Fenrir.Application.Game.Domain.World;
+using Fenrir.Application.Game.Services.ZoneLifecycle;
 using Fenrir.Application.Game.Tests.TestSupport;
-using Fenrir.Application.Game.World;
-using Fenrir.Application.Game.ZoneLifecycle.Services;
-using Fenrir.Network.Sessions;
+using Fenrir.Network.Dispatch.Sessions;
 
 namespace Fenrir.Application.Game.Tests.Handlers;
 

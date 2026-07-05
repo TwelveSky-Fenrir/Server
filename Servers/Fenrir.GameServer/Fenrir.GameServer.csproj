@@ -12,14 +12,17 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Core\Fenrir.Contracts\Fenrir.Contracts.csproj"/>
     <ProjectReference Include="..\..\Network\Fenrir.Network.Abstractions\Fenrir.Network.Abstractions.csproj"/>
     <ProjectReference Include="..\..\Network\Fenrir.Network.Serialization\Fenrir.Network.Serialization.csproj"/>
     <ProjectReference Include="..\..\Network\Fenrir.Network.Transport\Fenrir.Network.Transport.csproj"/>
     <ProjectReference Include="..\..\Network\Fenrir.Network.Framing\Fenrir.Network.Framing.csproj"/>
     <ProjectReference Include="..\..\Network\Fenrir.Network.Dispatch\Fenrir.Network.Dispatch.csproj"/>
     <ProjectReference Include="..\..\Infrastructure\Fenrir.Data\Fenrir.Data.csproj"/>
-    <ProjectReference Include="..\..\Application\Fenrir.Application.Game\Fenrir.Application.Game.csproj"/>
+    <ProjectReference Include="..\..\Application\Fenrir.Application.Game.Domain\Fenrir.Application.Game.Domain.csproj"/>
+    <ProjectReference Include="..\..\Application\Fenrir.Application.Game.GameData\Fenrir.Application.Game.GameData.csproj"/>
+    <ProjectReference Include="..\..\Application\Fenrir.Application.Game.Services\Fenrir.Application.Game.Services.csproj"/>
+    <ProjectReference Include="..\..\Application\Fenrir.Application.Game.Handlers\Fenrir.Application.Game.Handlers.csproj"/>
+    <ProjectReference Include="..\..\Application\Fenrir.Application.Game.Hosting\Fenrir.Application.Game.Hosting.csproj"/>
     <ProjectReference Include="..\..\Orchestration\Fenrir.ServiceDefaults\Fenrir.ServiceDefaults.csproj"/>
   </ItemGroup>
 

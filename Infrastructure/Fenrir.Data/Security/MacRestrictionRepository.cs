@@ -46,7 +46,7 @@ public sealed record MacRestrictionRepository(ICaeriusNetDbContext Db) : IMacRes
     /// <summary>Short in-memory cache, loaded whole and matched client-side (legacy loaded this once at boot too).</summary>
     private ValueTask<ImmutableArray<MacRestrictionRowDto>> GetAllAsync(CancellationToken ct)
     {
-        var sp = new StoredProcedureParametersBuilder("admin", "usp_MacRestriction_GetAll", 16)
+        var sp = new StoredProcedureParametersBuilder("admin", "usp_MacRestriction_GetAll")
             .AddInMemoryCache("admin:mac-restrictions", TimeSpan.FromSeconds(2))
             .Build();
 

@@ -1,5 +1,5 @@
+using Fenrir.Application.Game.Domain.World.Monsters;
 using Fenrir.Application.Game.Tests.GameData;
-using Fenrir.Application.Game.World.Monsters;
 
 namespace Fenrir.Application.Game.Tests.World.Monsters;
 

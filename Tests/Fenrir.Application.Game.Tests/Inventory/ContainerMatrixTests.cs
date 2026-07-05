@@ -1,5 +1,5 @@
 using System.Collections.Immutable;
-using Fenrir.Application.Game.Inventory;
+using Fenrir.Application.Game.Domain.Inventory;
 
 namespace Fenrir.Application.Game.Tests.Inventory;
 

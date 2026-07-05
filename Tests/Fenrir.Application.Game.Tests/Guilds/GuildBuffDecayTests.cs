@@ -1,4 +1,4 @@
-using Fenrir.Application.Game.Guilds;
+using Fenrir.Application.Game.Domain.Guilds;
 using Fenrir.Data.Abstractions.Guilds;
 
 namespace Fenrir.Application.Game.Tests.Guilds;

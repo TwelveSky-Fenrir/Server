@@ -1,8 +1,8 @@
-using Fenrir.Application.Game.Combat;
-using Fenrir.Application.Game.Simulation;
+using Fenrir.Application.Game.Domain.Combat;
+using Fenrir.Application.Game.Domain.Simulation;
+using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Stats;
 using Fenrir.Application.Game.Tests.TestSupport;
-using Fenrir.Application.Game.World;
 using Fenrir.Network.Serialization.Packets.Shared;
 
 namespace Fenrir.Application.Game.Tests.World;

@@ -1,8 +1,8 @@
-using Fenrir.Application.Game.Handlers.BuffsMountsCosmetics.Services;
+using Fenrir.Application.Game.Domain.World;
+using Fenrir.Application.Game.Services.BuffsMountsCosmetics;
 using Fenrir.Application.Game.Tests.TestSupport;
-using Fenrir.Application.Game.World;
+using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
-using Fenrir.Network.Sessions;
 
 namespace Fenrir.Application.Game.Tests.Handlers;
 

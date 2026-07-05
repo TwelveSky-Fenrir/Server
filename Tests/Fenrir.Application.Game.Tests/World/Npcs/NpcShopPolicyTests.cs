@@ -1,8 +1,8 @@
 using System.Collections.Immutable;
+using Fenrir.Application.Game.Domain.Inventory;
+using Fenrir.Application.Game.Domain.World.Npcs;
 using Fenrir.Application.Game.GameData;
-using Fenrir.Application.Game.Inventory;
 using Fenrir.Application.Game.Tests.GameData;
-using Fenrir.Application.Game.World.Npcs;
 using Fenrir.Data.Abstractions.World;
 
 namespace Fenrir.Application.Game.Tests.World.Npcs;

@@ -1,3 +1,5 @@
+using Fenrir.Application.Login.Domain;
+
 namespace Fenrir.Application.Login.Tests;
 
 public sealed class LoginServerOptionsValidatorTests

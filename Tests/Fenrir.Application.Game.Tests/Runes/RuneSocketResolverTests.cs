@@ -1,5 +1,5 @@
 using System.Collections.Immutable;
-using Fenrir.Application.Game.Runes;
+using Fenrir.Application.Game.Domain.Runes;
 
 namespace Fenrir.Application.Game.Tests.Runes;
 

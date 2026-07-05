@@ -1,12 +1,12 @@
 using System.Collections.Frozen;
 using System.Collections.Immutable;
+using Fenrir.Application.Game.Domain.Inventory;
+using Fenrir.Application.Game.Domain.Simulation;
+using Fenrir.Application.Game.Domain.Skills;
+using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.GameData;
-using Fenrir.Application.Game.Inventory;
-using Fenrir.Application.Game.Simulation;
-using Fenrir.Application.Game.Skills;
 using Fenrir.Application.Game.Tests.GameData;
 using Fenrir.Application.Game.Tests.TestSupport;
-using Fenrir.Application.Game.World;
 using Fenrir.Network.Serialization.Packets.Shared;
 using Fenrir.Data.Abstractions.World;
 using Fenrir.Data.WriteBehind;

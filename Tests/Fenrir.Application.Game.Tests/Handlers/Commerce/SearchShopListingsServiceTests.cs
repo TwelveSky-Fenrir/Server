@@ -1,14 +1,14 @@
 using System.Collections.Frozen;
+using Fenrir.Application.Game.Domain.Social.Pshop;
+using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.GameData;
-using Fenrir.Application.Game.Handlers.Commerce;
-using Fenrir.Application.Game.Handlers.Commerce.Services;
-using Fenrir.Application.Game.Social.Pshop;
+using Fenrir.Application.Game.Handlers.Handlers.Commerce;
+using Fenrir.Application.Game.Services.Commerce;
 using Fenrir.Application.Game.Tests.GameData;
 using Fenrir.Application.Game.Tests.TestSupport;
-using Fenrir.Application.Game.World;
+using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Shared;
 using Fenrir.Network.Serialization.Packets.Zone;
-using Fenrir.Network.Sessions;
 
 namespace Fenrir.Application.Game.Tests.Handlers.Commerce;
 

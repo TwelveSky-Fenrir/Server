@@ -1,6 +1,6 @@
+using Fenrir.Application.Game.Domain.Inventory;
+using Fenrir.Application.Game.Domain.Social.Pshop;
 using Fenrir.Application.Game.GameData;
-using Fenrir.Application.Game.Inventory;
-using Fenrir.Application.Game.Social.Pshop;
 using Fenrir.Network.Serialization.Packets.Shared;
 using Fenrir.Data.Abstractions.World;
 

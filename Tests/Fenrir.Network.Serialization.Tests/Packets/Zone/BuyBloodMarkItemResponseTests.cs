@@ -1,5 +1,5 @@
 using System.Buffers.Binary;
-using Fenrir.Contracts;
+using Fenrir.Network.Abstractions;
 using Fenrir.Network.Serialization.Packets.Zone;
 
 namespace Fenrir.Network.Serialization.Tests.Packets.Zone;

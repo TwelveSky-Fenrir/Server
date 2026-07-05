@@ -1,11 +1,10 @@
 using System.Buffers;
 using Fenrir.Network.Abstractions;
-using Fenrir.Network.Serialization.Wire;
+using Fenrir.Network.Dispatch.RateLimiting;
+using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Framing;
-using Fenrir.Network.RateLimiting;
-using Fenrir.Network.Sessions;
 
-namespace Fenrir.Network.Dispatching;
+namespace Fenrir.Network.Dispatch;
 
 // Any malformed frame/unknown opcode/illegal state/rate-limit breach ends the session — matches the
 // legacy server's own "any violation closes the socket" posture.

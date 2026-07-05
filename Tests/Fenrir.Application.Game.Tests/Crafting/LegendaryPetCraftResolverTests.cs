@@ -1,4 +1,4 @@
-using Fenrir.Application.Game.Crafting;
+using Fenrir.Application.Game.Domain.Crafting;
 using Fenrir.Application.Game.Tests.TestSupport;
 
 namespace Fenrir.Application.Game.Tests.Crafting;

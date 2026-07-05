@@ -1,11 +1,13 @@
+using Fenrir.Application.Login.Domain;
 using Fenrir.Application.Login.Handlers;
-using Fenrir.Application.Login.Handlers.Services;
+using Fenrir.Application.Login.Handlers.Handlers;
+using Fenrir.Application.Login.Services.ZoneTransfer;
 using Fenrir.Application.Login.Tests.TestSupport;
 using Fenrir.Network.Serialization.Packets.Login;
 using Fenrir.Network.Serialization.Wire;
 using Fenrir.Data.Abstractions.Characters;
 using Fenrir.Data.Abstractions.Runtime;
-using Fenrir.Network.Sessions;
+using Fenrir.Network.Dispatch.Sessions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 

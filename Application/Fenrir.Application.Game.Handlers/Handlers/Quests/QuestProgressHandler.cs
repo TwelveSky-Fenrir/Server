@@ -1,0 +1,72 @@
+using Fenrir.Application.Game.Abstractions.Quests;
+using Fenrir.Application.Game.Domain.World;
+using Fenrir.Network.Abstractions;
+using Fenrir.Network.Dispatch.Sessions;
+using Fenrir.Network.Serialization.Packets.Zone;
+
+namespace Fenrir.Application.Game.Handlers.Handlers.Quests;
+
+/// <summary>
+///     CZ_PROCESS_QUEST_SEND (opcode 36) -- the 5-action quest state machine (<see cref="Quests.QuestStateMachine" />).
+///     Every rejection aborts; there is no clean <c>tResult</c> failure path for this opcode.
+/// </summary>
+/// <remarks>
+///     Business logic (validation, container edits, persistence, and zone-command mirroring) lives in
+///     <see cref="IQuestProgressService" />; this handler only resolves session-scoped state, holds the
+///     per-character economy lock while the service runs, and translates the result into a wire response.
+/// </remarks>
+public sealed class QuestProgressHandler(IQuestProgressService questProgressService)
+    : IAsyncPacketHandler<QuestProgressRequest>
+{
+    public async ValueTask HandleAsync(QuestProgressRequest packet, IPacketSession session,
+        CancellationToken cancellationToken)
+    {
+        var zoneSession = (ZoneClientSession)session;
+        var characterId = zoneSession.CharacterId!.Value;
+
+        if (zoneSession.CurrentZone is not Zone zone || !zone.TryGetPlayer(characterId, out var state) ||
+            state is null)
+            return;
+
+        await state.EconomyActionLock.WaitAsync(cancellationToken);
+        try
+        {
+            await DispatchAsync(packet, zoneSession, zone, state, characterId, cancellationToken);
+        }
+        finally
+        {
+            state.EconomyActionLock.Release();
+        }
+    }
+
+    private async ValueTask DispatchAsync(QuestProgressRequest packet, ZoneClientSession zoneSession, Zone zone,
+        PlayerRuntimeState state, int characterId, CancellationToken ct)
+    {
+        QuestActionResult? result = packet.Sort switch
+        {
+            1 => await questProgressService.AcceptAsync(packet, state, zone, characterId, ct),
+            2 => await questProgressService.CompleteAsync(packet, state, zone, characterId, ct),
+            3 => await questProgressService.ReceiveAsync(packet, state, zone, characterId, ct),
+            4 => await questProgressService.ExchangeAsync(packet, state, zone, characterId, ct),
+            5 => await questProgressService.AbandonAsync(packet, state, zone, characterId, ct),
+            _ => null
+        };
+
+        if (result is not { Success: true })
+        {
+            zoneSession.Abort(DisconnectReason.Faulted);
+            return;
+        }
+
+        SendEcho(zoneSession, packet);
+    }
+
+    private static void SendEcho(IPacketSession session, QuestProgressRequest packet)
+    {
+        session.Send(new QuestProgressResponse
+        {
+            Sort = packet.Sort, Page = packet.Page1, Index = packet.Index1, XPost = packet.XPost,
+            YPost = packet.YPost
+        });
+    }
+}

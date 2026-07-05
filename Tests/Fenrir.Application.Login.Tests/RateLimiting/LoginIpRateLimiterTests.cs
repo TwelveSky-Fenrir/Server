@@ -1,5 +1,5 @@
 using System.Net;
-using Fenrir.Application.Login.RateLimiting;
+using Fenrir.Application.Login.Domain.RateLimiting;
 
 namespace Fenrir.Application.Login.Tests.RateLimiting;
 

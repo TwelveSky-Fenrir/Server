@@ -1,10 +1,9 @@
 using System.IO.Pipelines;
 using System.Net;
 using Fenrir.Network.Abstractions;
-using Fenrir.Network.Serialization.Wire;
 using Fenrir.Network.Framing;
 
-namespace Fenrir.Network.Sessions;
+namespace Fenrir.Network.Dispatch.Sessions;
 
 // Owns the duplex pipe transport and the send-side lock; state-machine specifics live in the subclasses.
 public abstract class ClientSession(
@@ -56,7 +55,7 @@ public abstract class ClientSession(
     }
 
     /// <summary>
-    ///     Checked by <see cref="Dispatching.SessionLoop" /> before dispatch against the generated
+    ///     Checked by <see cref="SessionLoop" /> before dispatch against the generated
     ///     <c>SessionStateGate</c>.
     /// </summary>
     public abstract bool IsOpcodeAllowed(byte opcode);

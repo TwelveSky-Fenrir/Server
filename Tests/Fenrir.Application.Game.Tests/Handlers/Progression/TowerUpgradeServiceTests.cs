@@ -1,11 +1,12 @@
 using System.Collections.Immutable;
-using Fenrir.Application.Game.Handlers.Progression.Services;
-using Fenrir.Application.Game.Inventory;
-using Fenrir.Application.Game.Progression;
+using Fenrir.Application.Game.Abstractions.Progression;
+using Fenrir.Application.Game.Domain.Inventory;
+using Fenrir.Application.Game.Domain.Progression;
+using Fenrir.Application.Game.Domain.World;
+using Fenrir.Application.Game.Services.Progression;
 using Fenrir.Application.Game.Tests.TestSupport;
-using Fenrir.Application.Game.World;
+using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
-using Fenrir.Network.Sessions;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Handlers.Progression;

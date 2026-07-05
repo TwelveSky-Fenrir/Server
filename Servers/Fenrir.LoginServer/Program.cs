@@ -1,27 +1,26 @@
-using Fenrir.Application.Login;
-using Fenrir.Application.Login.Dispatching;
-using Fenrir.Network.Abstractions;
-using Fenrir.Network.Dispatch;
+using Fenrir.Application.Login.Domain;
+using Fenrir.Application.Login.Domain.Extensions;
+using Fenrir.Application.Login.Handlers.Extensions;
+using Fenrir.Application.Login.Hosting.Extensions;
+using Fenrir.Application.Login.Services.Extensions;
 using Fenrir.Data;
-using Fenrir.LoginServer;
-using Fenrir.Network.RateLimiting;
-using Fenrir.Network.Sessions;
+using Fenrir.Network.Dispatch;
+using Fenrir.Network.Dispatch.RateLimiting;
+using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.ServiceDefaults;
-using Microsoft.Extensions.Options;
 
 var builder = Host.CreateApplicationBuilder(args);
 builder.AddServiceDefaults();
 builder.AddFenrirData();
 
 builder.Services.Configure<LoginServerOptions>(builder.Configuration.GetSection("Login"));
-builder.Services.AddSingleton<IValidateOptions<LoginServerOptions>, LoginServerOptionsValidator>();
-builder.Services.AddOptions<LoginServerOptions>().ValidateOnStart();
+builder.Services.AddLoginDomain();
+builder.Services.AddLoginServices();
+builder.Services.AddLoginHosting();
 builder.Services.AddLoginHandlers();
 
 builder.Services.AddSingleton<SessionRegistry>();
 builder.Services.AddSingleton<ISessionRateLimiter, SessionRateLimiter>();
-builder.Services.AddSingleton<IFrameDispatcher, LoginFrameDispatcher>();
-builder.Services.AddHostedService<LoginConnectionHost>();
 
 var host = builder.Build();
 

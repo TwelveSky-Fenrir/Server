@@ -1,6 +1,6 @@
 using System.Diagnostics;
-using Fenrir.Application.Game.Combat;
-using Fenrir.Application.Game.Inventory;
+using Fenrir.Application.Game.Domain.Combat;
+using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.IntegrationTests.Fixtures;
 using Fenrir.IntegrationTests.Wire;
 using Microsoft.Data.SqlClient;

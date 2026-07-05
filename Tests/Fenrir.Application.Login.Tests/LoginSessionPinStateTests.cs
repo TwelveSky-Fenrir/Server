@@ -1,7 +1,7 @@
 using Fenrir.Application.Login.Tests.TestSupport;
-using Fenrir.Contracts;
+using Fenrir.Network.Abstractions;
+using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Wire;
-using Fenrir.Network.Sessions;
 
 namespace Fenrir.Application.Login.Tests;
 

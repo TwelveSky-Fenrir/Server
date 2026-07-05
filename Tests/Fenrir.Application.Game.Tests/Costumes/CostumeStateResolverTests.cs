@@ -1,5 +1,5 @@
 using System.Collections.Immutable;
-using Fenrir.Application.Game.Costumes;
+using Fenrir.Application.Game.Domain.Costumes;
 
 namespace Fenrir.Application.Game.Tests.Costumes;
 

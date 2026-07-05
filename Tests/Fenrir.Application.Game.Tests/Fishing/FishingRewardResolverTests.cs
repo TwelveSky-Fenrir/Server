@@ -1,5 +1,5 @@
-using Fenrir.Application.Game.Combat;
-using Fenrir.Application.Game.Fishing;
+using Fenrir.Application.Game.Domain.Combat;
+using Fenrir.Application.Game.Domain.Fishing;
 
 namespace Fenrir.Application.Game.Tests.Fishing;
 

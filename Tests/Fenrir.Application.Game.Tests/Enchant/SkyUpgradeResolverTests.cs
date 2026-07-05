@@ -1,4 +1,4 @@
-using Fenrir.Application.Game.Enchant;
+using Fenrir.Application.Game.Domain.Enchant;
 using Fenrir.Application.Game.Tests.GameData;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Data.Abstractions.World;

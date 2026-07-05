@@ -1,7 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
-using Fenrir.Application.Game.Dispatching;
-using Fenrir.Contracts;
+using Fenrir.Application.Game.Handlers.Handlers.Dispatching;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Serialization.Attributes;
 using Fenrir.Network.Serialization.Wire;
@@ -17,7 +16,7 @@ public class OpcodeHandlerCoverageTests
     [Fact]
     public void EveryIncomingZoneOpcodeHasARegisteredHandler()
     {
-        var declared = DeclaredIncomingOpcodes(typeof(Opcodes).Assembly, FenrirServer.Zone);
+        var declared = DeclaredIncomingOpcodes(typeof(FenrirPacketAttribute).Assembly, FenrirServer.Zone);
         var handled = HandledIncomingOpcodes(typeof(ZoneFrameDispatcher).Assembly, FenrirServer.Zone);
 
         var missing = declared.Except(handled).Except(LegacyNoOpAllowList).OrderBy(opcode => opcode).ToArray();

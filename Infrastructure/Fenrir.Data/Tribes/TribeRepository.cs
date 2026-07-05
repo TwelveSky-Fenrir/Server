@@ -101,7 +101,10 @@ public sealed record TribeRepository(ICaeriusNetDbContext Db) : ITribeRepository
         return await Db.ExecuteScalarAsync<long>(sp, ct);
     }
 
-    /// <summary>CZ_TRIBE_BANK_SEND sort 3 (Fenrir-only addition, see ITribeRepository.DepositBankAsync); throws SQL 50212 (nothing to deposit).</summary>
+    /// <summary>
+    ///     CZ_TRIBE_BANK_SEND sort 3 (Fenrir-only addition, see ITribeRepository.DepositBankAsync); throws SQL 50212
+    ///     (nothing to deposit).
+    /// </summary>
     public async ValueTask<long> DepositBankAsync(byte tribeId, byte slotIndex, int characterId, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_TribeBank_DepositFromCharacter", 1)

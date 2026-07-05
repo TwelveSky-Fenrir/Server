@@ -1,5 +1,5 @@
 using System.Collections.Immutable;
-using Fenrir.Application.Game.Mounts;
+using Fenrir.Application.Game.Domain.Mounts;
 
 namespace Fenrir.Application.Game.Tests.Mounts;
 

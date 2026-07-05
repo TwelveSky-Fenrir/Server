@@ -1,4 +1,4 @@
-using Fenrir.Contracts;
+using Fenrir.Network.Abstractions;
 using Fenrir.Network.Serialization.Packets.Shared;
 using Fenrir.Network.Serialization.Packets.Zone;
 

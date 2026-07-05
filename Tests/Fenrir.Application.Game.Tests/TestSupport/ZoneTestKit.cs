@@ -1,15 +1,15 @@
 using System.Buffers;
 using System.Collections.Frozen;
 using System.Collections.Immutable;
-using Fenrir.Application.Game.Combat;
-using Fenrir.Application.Game.Commerce;
+using Fenrir.Application.Game.Domain;
+using Fenrir.Application.Game.Domain.Combat;
+using Fenrir.Application.Game.Domain.Movement;
+using Fenrir.Application.Game.Domain.Simulation;
+using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.GameData;
-using Fenrir.Application.Game.Movement;
-using Fenrir.Application.Game.Simulation;
-using Fenrir.Application.Game.World;
 using Fenrir.Data.Abstractions.World;
 using Fenrir.Data.WriteBehind;
-using Fenrir.Network.Sessions;
+using Fenrir.Network.Dispatch.Sessions;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.TestSupport;

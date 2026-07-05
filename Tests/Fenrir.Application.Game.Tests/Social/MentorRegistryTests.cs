@@ -1,4 +1,4 @@
-using Fenrir.Application.Game.Social.Mentor;
+using Fenrir.Application.Game.Domain.Social.Mentor;
 
 namespace Fenrir.Application.Game.Tests.Social;
 

@@ -1,5 +1,5 @@
-using Fenrir.Application.Game.Combat;
-using Fenrir.Application.Game.Tribes;
+using Fenrir.Application.Game.Domain.Combat;
+using Fenrir.Application.Game.Domain.Tribes;
 
 namespace Fenrir.Application.Game.Tests.Tribes;
 

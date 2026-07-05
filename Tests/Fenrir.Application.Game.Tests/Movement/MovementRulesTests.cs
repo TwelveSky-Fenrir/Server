@@ -1,8 +1,9 @@
 using System.Numerics;
-using Fenrir.Application.Game.Movement;
+using Fenrir.Application.Game.Domain;
+using Fenrir.Application.Game.Domain.Movement;
+using Fenrir.Application.Game.Domain.World;
+using Fenrir.Application.Game.Domain.World.Geometry;
 using Fenrir.Application.Game.Tests.TestSupport;
-using Fenrir.Application.Game.World;
-using Fenrir.Application.Game.World.Geometry;
 using Fenrir.Network.Serialization.Packets.Shared;
 using Microsoft.Extensions.Options;
 

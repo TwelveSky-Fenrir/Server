@@ -25,7 +25,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Application\Fenrir.Application.Login\Fenrir.Application.Login.csproj"/>
+    <ProjectReference Include="..\..\Application\Fenrir.Application.Login.Domain\Fenrir.Application.Login.Domain.csproj"/>
+    <ProjectReference Include="..\..\Application\Fenrir.Application.Login.Abstractions\Fenrir.Application.Login.Abstractions.csproj"/>
+    <ProjectReference Include="..\..\Application\Fenrir.Application.Login.Services\Fenrir.Application.Login.Services.csproj"/>
+    <ProjectReference Include="..\..\Application\Fenrir.Application.Login.Handlers\Fenrir.Application.Login.Handlers.csproj"/>
+    <ProjectReference Include="..\..\Application\Fenrir.Application.Login.Hosting\Fenrir.Application.Login.Hosting.csproj"/>
+    <ProjectReference Include="..\..\Network\Fenrir.Network.Abstractions\Fenrir.Network.Abstractions.csproj"/>
   </ItemGroup>
 
 </Project>

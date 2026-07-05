@@ -1,4 +1,3 @@
-using System.Linq;
 using CaeriusNet.Abstractions;
 using CaeriusNet.Builders;
 using Fenrir.Data.Abstractions.Accounts;
@@ -50,7 +49,8 @@ public static class FenrirDataServiceCollectionExtensions
         // root ServiceProviderEngineScope's resolution lock isn't reentrant).
         var dbContextDescriptor = builder.Services.Single(d => d.ServiceType == typeof(ICaeriusNetDbContext));
         builder.Services.Remove(dbContextDescriptor);
-        builder.Services.Add(new ServiceDescriptor(typeof(ICaeriusNetDbContext), dbContextDescriptor.ImplementationFactory!,
+        builder.Services.Add(new ServiceDescriptor(typeof(ICaeriusNetDbContext),
+            dbContextDescriptor.ImplementationFactory!,
             ServiceLifetime.Singleton));
 
         builder.Services.AddSingleton<IAccountRepository, AccountRepository>();

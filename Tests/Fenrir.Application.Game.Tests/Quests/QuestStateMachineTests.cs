@@ -1,5 +1,5 @@
+using Fenrir.Application.Game.Domain.Quests;
 using Fenrir.Application.Game.GameData;
-using Fenrir.Application.Game.Quests;
 using Fenrir.Application.Game.Tests.GameData;
 using Fenrir.Data.Abstractions.World;
 

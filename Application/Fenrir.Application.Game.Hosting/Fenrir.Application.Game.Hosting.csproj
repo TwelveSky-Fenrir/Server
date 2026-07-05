@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <!-- Full package (not just .Abstractions): these hosts derive from the concrete BackgroundService base class. -->
+    <PackageReference Include="Microsoft.Extensions.Hosting"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Fenrir.Application.Game.Domain\Fenrir.Application.Game.Domain.csproj"/>
+    <ProjectReference Include="..\Fenrir.Application.Game.GameData\Fenrir.Application.Game.GameData.csproj"/>
+    <ProjectReference Include="..\..\Network\Fenrir.Network.Abstractions\Fenrir.Network.Abstractions.csproj"/>
+    <ProjectReference Include="..\..\Network\Fenrir.Network.Serialization\Fenrir.Network.Serialization.csproj"/>
+    <ProjectReference Include="..\..\Network\Fenrir.Network.Transport\Fenrir.Network.Transport.csproj"/>
+    <ProjectReference Include="..\..\Network\Fenrir.Network.Dispatch\Fenrir.Network.Dispatch.csproj"/>
+    <ProjectReference Include="..\..\Infrastructure\Fenrir.Data.Abstractions\Fenrir.Data.Abstractions.csproj"/>
+    <!-- WriteBehind (DirtyTracker/WriteBehindFlusher) has no repository interface, same exception used
+         throughout this migration — ZoneConnectionHost/PositionWriteBehindHost need it directly. -->
+    <ProjectReference Include="..\..\Infrastructure\Fenrir.Data\Fenrir.Data.csproj"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Fenrir.Data.Abstractions.Admin"/>
+    <Using Include="Fenrir.Data.Abstractions.Characters"/>
+    <Using Include="Fenrir.Data.Abstractions.Guilds"/>
+    <Using Include="Fenrir.Data.Abstractions.Progression"/>
+    <Using Include="Fenrir.Data.Abstractions.Runtime"/>
+    <Using Include="Fenrir.Data.Abstractions.World"/>
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

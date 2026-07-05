@@ -1,6 +1,6 @@
 using System.Collections.Immutable;
-using Fenrir.Application.Game.Inventory;
-using Fenrir.Application.Game.Social.Trade;
+using Fenrir.Application.Game.Domain.Inventory;
+using Fenrir.Application.Game.Domain.Social.Trade;
 
 namespace Fenrir.Application.Game.Tests.Social;
 

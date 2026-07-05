@@ -1,11 +1,12 @@
 using System.Buffers.Binary;
+using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Handlers;
-using Fenrir.Application.Game.Handlers.FishingConsumables.Services;
+using Fenrir.Application.Game.Handlers.Handlers;
+using Fenrir.Application.Game.Services.FishingConsumables;
 using Fenrir.Application.Game.Tests.TestSupport;
-using Fenrir.Application.Game.World;
+using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
 using Fenrir.Network.Framing;
-using Fenrir.Network.Sessions;
 
 namespace Fenrir.Application.Game.Tests.Fishing;
 

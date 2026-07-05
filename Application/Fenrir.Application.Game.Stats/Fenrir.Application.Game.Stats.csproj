@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <!-- Reference-data DTOs (LevelRowDto/ItemRowDto) and BuffInfo (wire packet type) are inputs to the pure
+         calculators here — this is not a zero-dependency leaf, only zero Application-layer (Domain/Services)
+         dependency, which is what actually matters for keeping Stats decoupled from gameplay state. -->
+    <ProjectReference Include="..\..\Infrastructure\Fenrir.Data.Abstractions\Fenrir.Data.Abstractions.csproj"/>
+    <ProjectReference Include="..\..\Network\Fenrir.Network.Serialization\Fenrir.Network.Serialization.csproj"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Fenrir.Data.Abstractions.World"/>
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

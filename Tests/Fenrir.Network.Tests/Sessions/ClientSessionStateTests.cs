@@ -1,5 +1,5 @@
-using Fenrir.Contracts;
-using Fenrir.Network.Sessions;
+using Fenrir.Network.Abstractions;
+using Fenrir.Network.Dispatch.Sessions;
 
 namespace Fenrir.Network.Tests.Sessions;
 

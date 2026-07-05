@@ -1,4 +1,4 @@
-using Fenrir.Application.Game.Progression;
+using Fenrir.Application.Game.Domain.Progression;
 
 namespace Fenrir.Application.Game.Tests.Progression;
 

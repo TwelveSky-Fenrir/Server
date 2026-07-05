@@ -1,4 +1,4 @@
-using Fenrir.Network.Sessions;
+using Fenrir.Network.Dispatch.Sessions;
 
 namespace Fenrir.Network.Tests.Sessions;
 

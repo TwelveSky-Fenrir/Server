@@ -61,7 +61,8 @@ public sealed record WorldStateRepository(ICaeriusNetDbContext Db) : IWorldState
         await Db.ExecuteAsync(sp, ct);
     }
 
-    public async ValueTask SetAllianceOfferAsync(byte fromTribeId, byte toTribeId, bool isAccepted, CancellationToken ct)
+    public async ValueTask SetAllianceOfferAsync(byte fromTribeId, byte toTribeId, bool isAccepted,
+        CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_WorldStateAllianceOffer_Set", 0)
             .AddParameter("FromTribeId", fromTribeId, SqlDbType.TinyInt)

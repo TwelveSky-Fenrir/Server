@@ -1,6 +1,6 @@
 using System.Diagnostics;
 
-namespace Fenrir.Network.RateLimiting;
+namespace Fenrir.Network.Dispatch.RateLimiting;
 
 // Token bucket refilled lazily from elapsed Stopwatch ticks in TryConsume, not a timer, so an idle bucket costs nothing.
 public sealed class TokenBucket

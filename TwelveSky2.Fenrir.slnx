@@ -3,11 +3,18 @@
     <Project Path="Analysis/Fenrir.Generators.Analysis/Fenrir.Generators.Analysis.csproj" />
   </Folder>
   <Folder Name="/Application/">
-    <Project Path="Application/Fenrir.Application.Game/Fenrir.Application.Game.csproj" />
-    <Project Path="Application/Fenrir.Application.Login/Fenrir.Application.Login.csproj" />
-  </Folder>
-  <Folder Name="/Core/">
-    <Project Path="Core/Fenrir.Contracts/Fenrir.Contracts.csproj" />
+    <Project Path="Application/Fenrir.Application.Game.Abstractions/Fenrir.Application.Game.Abstractions.csproj" />
+    <Project Path="Application/Fenrir.Application.Game.Domain/Fenrir.Application.Game.Domain.csproj" />
+    <Project Path="Application/Fenrir.Application.Game.GameData/Fenrir.Application.Game.GameData.csproj" />
+    <Project Path="Application/Fenrir.Application.Game.Handlers/Fenrir.Application.Game.Handlers.csproj" />
+    <Project Path="Application/Fenrir.Application.Game.Hosting/Fenrir.Application.Game.Hosting.csproj" />
+    <Project Path="Application/Fenrir.Application.Game.Services/Fenrir.Application.Game.Services.csproj" />
+    <Project Path="Application/Fenrir.Application.Game.Stats/Fenrir.Application.Game.Stats.csproj" />
+    <Project Path="Application/Fenrir.Application.Login.Abstractions/Fenrir.Application.Login.Abstractions.csproj" />
+    <Project Path="Application/Fenrir.Application.Login.Domain/Fenrir.Application.Login.Domain.csproj" />
+    <Project Path="Application/Fenrir.Application.Login.Handlers/Fenrir.Application.Login.Handlers.csproj" />
+    <Project Path="Application/Fenrir.Application.Login.Hosting/Fenrir.Application.Login.Hosting.csproj" />
+    <Project Path="Application/Fenrir.Application.Login.Services/Fenrir.Application.Login.Services.csproj" />
   </Folder>
   <Folder Name="/Database/">
     <File Path="Database/_manifest.txt" />

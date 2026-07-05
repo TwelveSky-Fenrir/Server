@@ -1,5 +1,5 @@
+using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Tests.TestSupport;
-using Fenrir.Application.Game.World;
 using Fenrir.Network.Serialization.Packets.Zone;
 using Fenrir.Network.Framing;
 

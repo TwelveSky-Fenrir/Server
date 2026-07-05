@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using Fenrir.Network.Abstractions;
 
-namespace Fenrir.Network.RateLimiting;
+namespace Fenrir.Network.Dispatch.RateLimiting;
 
 // Per-session table of TokenBuckets, created lazily per (server, opcode) actually hit rather than pre-populated.
 public sealed class SessionRateLimiter : ISessionRateLimiter

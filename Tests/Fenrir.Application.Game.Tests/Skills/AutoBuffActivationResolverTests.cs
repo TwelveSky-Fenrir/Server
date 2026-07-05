@@ -1,4 +1,4 @@
-using Fenrir.Application.Game.Skills;
+using Fenrir.Application.Game.Domain.Skills;
 
 namespace Fenrir.Application.Game.Tests.Skills;
 

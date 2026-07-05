@@ -1,7 +1,7 @@
 using System.Buffers;
 using System.IO.Pipelines;
+using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
-using Fenrir.Network.Sessions;
 
 namespace Fenrir.Network.Tests.Sessions;
 

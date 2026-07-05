@@ -1,8 +1,7 @@
 using System.Collections.Frozen;
 using System.Collections.Immutable;
-using Fenrir.Application.Game.Commerce;
+using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.GameData;
-using Fenrir.Application.Game.Inventory;
 using Fenrir.Application.Game.Stats;
 using Fenrir.Data.Abstractions.World;
 

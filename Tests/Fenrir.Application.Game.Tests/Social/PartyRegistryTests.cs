@@ -1,4 +1,4 @@
-using Fenrir.Application.Game.Social.Party;
+using Fenrir.Application.Game.Domain.Social.Party;
 
 namespace Fenrir.Application.Game.Tests.Social;
 

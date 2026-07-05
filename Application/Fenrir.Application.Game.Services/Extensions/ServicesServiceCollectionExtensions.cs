@@ -1,0 +1,194 @@
+using Fenrir.Application.Game.Abstractions.BuffsMountsCosmetics;
+using Fenrir.Application.Game.Abstractions.Chat;
+using Fenrir.Application.Game.Abstractions.Commerce;
+using Fenrir.Application.Game.Abstractions.FishingConsumables;
+using Fenrir.Application.Game.Abstractions.GenericAction;
+using Fenrir.Application.Game.Abstractions.Guilds;
+using Fenrir.Application.Game.Abstractions.ItemModification;
+using Fenrir.Application.Game.Abstractions.Progression;
+using Fenrir.Application.Game.Abstractions.Quests;
+using Fenrir.Application.Game.Abstractions.Social;
+using Fenrir.Application.Game.Abstractions.Tribes;
+using Fenrir.Application.Game.Abstractions.ZoneLifecycle;
+using Fenrir.Application.Game.Services.BuffsMountsCosmetics;
+using Fenrir.Application.Game.Services.Chat;
+using Fenrir.Application.Game.Services.Commerce;
+using Fenrir.Application.Game.Services.FishingConsumables;
+using Fenrir.Application.Game.Services.GenericAction;
+using Fenrir.Application.Game.Services.Guilds;
+using Fenrir.Application.Game.Services.ItemModification;
+using Fenrir.Application.Game.Services.Progression;
+using Fenrir.Application.Game.Services.Quests;
+using Fenrir.Application.Game.Services.Social;
+using Fenrir.Application.Game.Services.Tribes;
+using Fenrir.Application.Game.Services.ZoneLifecycle;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace Fenrir.Application.Game.Services.Extensions;
+
+/// <summary>Registers every Handler-delegate business-logic Service extracted from the packet handlers.</summary>
+public static class ServicesServiceCollectionExtensions
+{
+    public static IServiceCollection AddGameServices(this IServiceCollection services)
+    {
+        AddGuildsServices(services);
+        AddTribeServices(services);
+        AddQuestsServices(services);
+        AddGenericActionServices(services);
+        AddChatServices(services);
+        AddCommerceServices(services);
+        AddProgressionServices(services);
+        AddSocialServices(services);
+        AddItemModificationServices(services);
+        AddFishingConsumablesServices(services);
+        AddBuffsMountsCosmeticsServices(services);
+        AddZoneLifecycleServices(services);
+
+        return services;
+    }
+
+    private static void AddGuildsServices(IServiceCollection services)
+    {
+        services.AddSingleton<IGuildActionService, GuildActionService>();
+    }
+
+    private static void AddTribeServices(IServiceCollection services)
+    {
+        services.AddSingleton<ITribeActionService, TribeActionService>();
+        services.AddSingleton<ITribeAnnouncementScrollService, TribeAnnouncementScrollService>();
+        services.AddSingleton<ITribeBankService, TribeBankService>();
+        services.AddSingleton<ITribePopulationService, TribePopulationService>();
+        services.AddSingleton<ITribeVoteService, TribeVoteService>();
+    }
+
+    private static void AddQuestsServices(IServiceCollection services)
+    {
+        services.AddSingleton<IQuestProgressService, QuestProgressService>();
+    }
+
+    private static void AddGenericActionServices(IServiceCollection services)
+    {
+        services.AddSingleton<IGenericActionService, GenericActionService>();
+    }
+
+    private static void AddChatServices(IServiceCollection services)
+    {
+        services.AddSingleton<IGuildAnnouncementService, GuildAnnouncementService>();
+        services.AddSingleton<IGuildChatService, GuildChatService>();
+        services.AddSingleton<ILocalChatService, LocalChatService>();
+        services.AddSingleton<IPartyChatService, PartyChatService>();
+        services.AddSingleton<IShoutService, ShoutService>();
+        services.AddSingleton<ITribeAnnouncementService, TribeAnnouncementService>();
+        services.AddSingleton<ITribeChatService, TribeChatService>();
+        services.AddSingleton<IWhisperService, WhisperService>();
+        services.AddSingleton<IWorldChatService, WorldChatService>();
+    }
+
+    private static void AddCommerceServices(IServiceCollection services)
+    {
+        services.AddSingleton<IBuyBloodMarkItemService, BuyBloodMarkItemService>();
+        services.AddSingleton<IBuyCashItemService, BuyCashItemService>();
+        services.AddSingleton<IBuyShopItemService, BuyShopItemService>();
+        services.AddSingleton<IClaimDailyRewardService, ClaimDailyRewardService>();
+        services.AddSingleton<ICloseShopStallService, CloseShopStallService>();
+        services.AddSingleton<IGetBloodMarkCatalogService, GetBloodMarkCatalogService>();
+        services.AddSingleton<IGetCashBalanceService, GetCashBalanceService>();
+        services.AddSingleton<IGetCashCatalogService, GetCashCatalogService>();
+        services.AddSingleton<IGetDailyRewardCatalogService, GetDailyRewardCatalogService>();
+        services.AddSingleton<IGetProxyShopService, GetProxyShopService>();
+        services.AddSingleton<IOpenShopStallService, OpenShopStallService>();
+        services.AddSingleton<ISearchShopListingsService, SearchShopListingsService>();
+        services.AddSingleton<IUpdateProxyShopService, UpdateProxyShopService>();
+        services.AddSingleton<IViewShopStallService, ViewShopStallService>();
+        services.AddSingleton<IWithdrawProxyShopEarningsService, WithdrawProxyShopEarningsService>();
+    }
+
+    private static void AddProgressionServices(IServiceCollection services)
+    {
+        services.AddSingleton<IAutoHuntToggleService, AutoHuntToggleService>();
+        services.AddSingleton<IAutoPotionThresholdService, AutoPotionThresholdService>();
+        services.AddSingleton<IDailyMissionService, DailyMissionService>();
+        services.AddSingleton<IHeroRankingService, HeroRankingService>();
+        services.AddSingleton<IHeroRewardClaimService, HeroRewardClaimService>();
+        services.AddSingleton<ITowerUpgradeService, TowerUpgradeService>();
+    }
+
+    private static void AddSocialServices(IServiceCollection services)
+    {
+        services.AddSingleton<IDuelService, DuelService>();
+        services.AddSingleton<IFriendService, FriendService>();
+        services.AddSingleton<IGuildInviteService, GuildInviteService>();
+        services.AddSingleton<IFindGuildMemberService, FindGuildMemberService>();
+        services.AddSingleton<IMentorAnswerService, MentorAnswerService>();
+        services.AddSingleton<IMentorAskService, MentorAskService>();
+        services.AddSingleton<IMentorCancelService, MentorCancelService>();
+        services.AddSingleton<IMentorEndService, MentorEndService>();
+        services.AddSingleton<IMentorStartService, MentorStartService>();
+        services.AddSingleton<IMentorStatusService, MentorStatusService>();
+
+        services.AddSingleton<IPartyAnswerService, PartyAnswerService>();
+        services.AddSingleton<IPartyCancelService, PartyCancelService>();
+        services.AddSingleton<IPartyDisbandService, PartyDisbandService>();
+        services.AddSingleton<IPartyInviteService, PartyInviteService>();
+        services.AddSingleton<IPartyKickService, PartyKickService>();
+        services.AddSingleton<IPartyLeaveService, PartyLeaveService>();
+        services.AddSingleton<ITradeAnswerService, TradeAnswerService>();
+        services.AddSingleton<ITradeCancelService, TradeCancelService>();
+        services.AddSingleton<ITradeEndService, TradeEndService>();
+        services.AddSingleton<ITradeInviteService, TradeInviteService>();
+        services.AddSingleton<ITradeLockService, TradeLockService>();
+        services.AddSingleton<ITradeStartService, TradeStartService>();
+    }
+
+    private static void AddItemModificationServices(IServiceCollection services)
+    {
+        services.AddSingleton<ICombineItemService, CombineItemService>();
+        services.AddSingleton<ICraftItemService, CraftItemService>();
+        services.AddSingleton<ICraftLegendaryPetService, CraftLegendaryPetService>();
+        services.AddSingleton<ICraftPetService, CraftPetService>();
+        services.AddSingleton<ICraftSkillBookService, CraftSkillBookService>();
+        services.AddSingleton<IDestroyItemService, DestroyItemService>();
+        services.AddSingleton<IDowngradeItemRankService, DowngradeItemRankService>();
+        services.AddSingleton<IEnchantItemService, EnchantItemService>();
+        services.AddSingleton<IRerollItemService, RerollItemService>();
+        services.AddSingleton<IRuneSocketService, RuneSocketService>();
+        services.AddSingleton<ISkyUpgradeItemService, SkyUpgradeItemService>();
+        services.AddSingleton<IUpgradeCapeService, UpgradeCapeService>();
+        services.AddSingleton<IUpgradeItemRankService, UpgradeItemRankService>();
+    }
+
+    private static void AddFishingConsumablesServices(IServiceCollection services)
+    {
+        services.AddSingleton<IFishingCatchService, FishingCatchService>();
+        services.AddSingleton<IFishingLineService, FishingLineService>();
+        services.AddSingleton<IFishingProgressService, FishingProgressService>();
+        services.AddSingleton<IDrinkBottleService, DrinkBottleService>();
+    }
+
+    private static void AddBuffsMountsCosmeticsServices(IServiceCollection services)
+    {
+        services.AddSingleton<IPlaytimeBuffService, PlaytimeBuffService>();
+        services.AddSingleton<IRankBuffService, RankBuffService>();
+        services.AddSingleton<IMountAbsorbService, MountAbsorbService>();
+        services.AddSingleton<IMountStateService, MountStateService>();
+        services.AddSingleton<IPetActionUpdateService, PetActionUpdateService>();
+        services.AddSingleton<ICostumeStateService, CostumeStateService>();
+        services.AddSingleton<ICostumeVisibilityService, CostumeVisibilityService>();
+        services.AddSingleton<IStellarCoreStateService, StellarCoreStateService>();
+    }
+
+    private static void AddZoneLifecycleServices(IServiceCollection services)
+    {
+        services.AddSingleton<IAvatarActionService, AvatarActionService>();
+        services.AddSingleton<IContinueSkillStatService, ContinueSkillStatService>();
+        services.AddSingleton<IContinueSkillUseService, ContinueSkillUseService>();
+        services.AddSingleton<IEnterWorldService, EnterWorldService>();
+        services.AddSingleton<IHeartbeatService, HeartbeatService>();
+        services.AddSingleton<IUseHotkeyItemService, UseHotkeyItemService>();
+        services.AddSingleton<IUseInventoryItemService, UseInventoryItemService>();
+        services.AddSingleton<IZoneHandshakeService, ZoneHandshakeService>();
+        services.AddSingleton<IZoneMoveService, ZoneMoveService>();
+        services.AddSingleton<IZoneReadyService, ZoneReadyService>();
+        services.AddSingleton<IAttackService, AttackService>();
+    }
+}

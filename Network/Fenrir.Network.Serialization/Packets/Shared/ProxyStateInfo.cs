@@ -1,4 +1,3 @@
-using Fenrir.Network.Abstractions;
 using Fenrir.Network.Serialization.Attributes;
 
 namespace Fenrir.Network.Serialization.Packets.Shared;

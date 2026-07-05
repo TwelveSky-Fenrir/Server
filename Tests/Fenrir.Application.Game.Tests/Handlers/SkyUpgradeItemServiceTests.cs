@@ -1,13 +1,14 @@
 using System.Collections.Frozen;
 using System.Collections.Immutable;
+using Fenrir.Application.Game.Abstractions.ItemModification;
+using Fenrir.Application.Game.Domain.Inventory;
+using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.GameData;
-using Fenrir.Application.Game.Handlers.ItemModification.Services;
-using Fenrir.Application.Game.Inventory;
+using Fenrir.Application.Game.Services.ItemModification;
 using Fenrir.Application.Game.Tests.GameData;
 using Fenrir.Application.Game.Tests.TestSupport;
-using Fenrir.Application.Game.World;
+using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
-using Fenrir.Network.Sessions;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Handlers;

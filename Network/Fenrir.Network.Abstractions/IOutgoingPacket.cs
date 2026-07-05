@@ -1,4 +1,3 @@
-
 namespace Fenrir.Network.Abstractions;
 
 /// <summary><c>destination</c> starts after the header; the opcode byte is written by the send layer.</summary>

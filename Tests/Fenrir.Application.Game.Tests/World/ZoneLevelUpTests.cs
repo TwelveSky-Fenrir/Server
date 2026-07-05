@@ -1,6 +1,6 @@
 using System.Collections.Frozen;
+using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Tests.TestSupport;
-using Fenrir.Application.Game.World;
 using Fenrir.Data.Abstractions.World;
 using Fenrir.Data.WriteBehind;
 

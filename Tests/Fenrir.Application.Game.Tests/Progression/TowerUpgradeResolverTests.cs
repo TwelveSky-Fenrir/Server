@@ -1,6 +1,6 @@
 using System.Collections.Immutable;
-using Fenrir.Application.Game.Inventory;
-using Fenrir.Application.Game.Progression;
+using Fenrir.Application.Game.Domain.Inventory;
+using Fenrir.Application.Game.Domain.Progression;
 
 namespace Fenrir.Application.Game.Tests.Progression;
 

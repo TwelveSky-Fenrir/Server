@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 
-namespace Fenrir.Network.Sessions;
+namespace Fenrir.Network.Dispatch.Sessions;
 
 // Enforces one connection per account lifecycle (Abort/CompleteAsync) stays with the caller.
 public sealed class SessionRegistry

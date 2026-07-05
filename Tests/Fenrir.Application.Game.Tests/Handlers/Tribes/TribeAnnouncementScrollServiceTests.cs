@@ -1,14 +1,14 @@
 using System.Buffers.Binary;
 using System.Text;
-using Fenrir.Application.Game.Handlers.Tribes;
-using Fenrir.Application.Game.Handlers.Tribes.Services;
-using Fenrir.Application.Game.Movement;
+using Fenrir.Application.Game.Domain.Movement;
+using Fenrir.Application.Game.Domain.World;
+using Fenrir.Application.Game.Handlers.Handlers.Tribes;
+using Fenrir.Application.Game.Services.Tribes;
 using Fenrir.Application.Game.Tests.TestSupport;
-using Fenrir.Application.Game.World;
 using Fenrir.Network.Serialization.Packets.Zone;
 using Fenrir.Data.WriteBehind;
+using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Framing;
-using Fenrir.Network.Sessions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 

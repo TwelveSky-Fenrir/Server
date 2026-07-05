@@ -1,9 +1,9 @@
+using Fenrir.Application.Game.Domain.Progression;
+using Fenrir.Application.Game.Domain.Simulation;
+using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.GameData;
-using Fenrir.Application.Game.Progression;
-using Fenrir.Application.Game.Simulation;
 using Fenrir.Application.Game.Tests.GameData;
 using Fenrir.Application.Game.Tests.TestSupport;
-using Fenrir.Application.Game.World;
 using Fenrir.Data.Abstractions.World;
 
 namespace Fenrir.Application.Game.Tests.Progression;

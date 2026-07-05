@@ -1,4 +1,4 @@
-using Fenrir.Application.Game.Buffs;
+using Fenrir.Application.Game.Domain.Buffs;
 
 namespace Fenrir.Application.Game.Tests.Buffs;
 

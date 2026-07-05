@@ -1,6 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
-using Fenrir.Application.Login.Dispatching;
+using Fenrir.Application.Login.Handlers.Dispatching;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Serialization.Attributes;
 using Fenrir.Network.Serialization.Wire;

@@ -1,0 +1,51 @@
+using Fenrir.Application.Game.Abstractions.Tribes;
+using Fenrir.Application.Game.Domain.World;
+using Fenrir.Network.Abstractions;
+using Fenrir.Network.Dispatch.Sessions;
+using Fenrir.Network.Serialization.Packets.Zone;
+
+namespace Fenrir.Application.Game.Handlers.Handlers.Tribes;
+
+/// <summary>
+///     CZ_TRIBE_BANK_SEND (opcode 82). Any gate failure disconnects (matches legacy <c>Quit()</c>), never a
+///     graceful error reply.
+/// </summary>
+public sealed class TribeBankHandler(ITribeBankService bankService) : IAsyncPacketHandler<TribeBankRequest>
+{
+    public async ValueTask HandleAsync(TribeBankRequest packet, IPacketSession session,
+        CancellationToken cancellationToken)
+    {
+        var zoneSession = (ZoneClientSession)session;
+        if (zoneSession.CurrentZone is not Zone zone)
+            return;
+
+        var characterId = zoneSession.CharacterId!.Value;
+        if (!zone.TryGetPlayer(characterId, out var state) || state is null)
+            return;
+
+        await state.EconomyActionLock.WaitAsync(cancellationToken);
+        try
+        {
+            var result = packet.Sort switch
+            {
+                1 => await bankService.ViewAsync(state, cancellationToken),
+                2 => await bankService.WithdrawAsync(packet.Value, state, characterId, cancellationToken),
+                3 => await bankService.DepositAsync(packet.Value, state, characterId, cancellationToken),
+                _ => TribeBankResult.Aborted
+            };
+
+            if (!result.Success)
+            {
+                zoneSession.Abort(DisconnectReason.Faulted);
+                return;
+            }
+
+            session.Send(new TribeBankResponse
+                { Result = 0, Sort = result.Sort, TribeBankInfo = result.TribeBankInfo!, Money = result.Money });
+        }
+        finally
+        {
+            state.EconomyActionLock.Release();
+        }
+    }
+}

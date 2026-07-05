@@ -8,7 +8,10 @@ public interface IGuildRepository
 
     public ValueTask<GuildSummaryDto?> GetByIdAsync(int guildId, CancellationToken ct);
 
-    /// <summary>Every guild, master/buff/points included -- game.usp_Guild_GetAll (used by GuildBuffDecayHost's periodic scan).</summary>
+    /// <summary>
+    ///     Every guild, master/buff/points included -- game.usp_Guild_GetAll (used by GuildBuffDecayHost's periodic
+    ///     scan).
+    /// </summary>
     public ValueTask<ReadOnlyCollection<GuildSummaryDto>> GetAllAsync(CancellationToken ct);
 
     /// <summary>Top <paramref name="count" /> guilds by Points, highest first -- game.usp_Guild_GetTopByPoints.</summary>

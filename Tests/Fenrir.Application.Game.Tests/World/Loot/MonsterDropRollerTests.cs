@@ -1,7 +1,7 @@
+using Fenrir.Application.Game.Domain.Quests;
+using Fenrir.Application.Game.Domain.World.Loot;
 using Fenrir.Application.Game.GameData;
-using Fenrir.Application.Game.Quests;
 using Fenrir.Application.Game.Tests.GameData;
-using Fenrir.Application.Game.World.Loot;
 using Fenrir.Data.Abstractions.World;
 
 namespace Fenrir.Application.Game.Tests.World.Loot;

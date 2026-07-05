@@ -1,7 +1,7 @@
-using Fenrir.Application.Game.Handlers.Tribes.Services;
-using Fenrir.Application.Game.Movement;
+using Fenrir.Application.Game.Domain.Movement;
+using Fenrir.Application.Game.Domain.World;
+using Fenrir.Application.Game.Services.Tribes;
 using Fenrir.Application.Game.Tests.TestSupport;
-using Fenrir.Application.Game.World;
 using Fenrir.Data.WriteBehind;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;

@@ -1,5 +1,5 @@
-using Fenrir.Application.Game.Forge;
-using Fenrir.Application.Game.Inventory;
+using Fenrir.Application.Game.Domain.Forge;
+using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Tests.GameData;
 
 namespace Fenrir.Application.Game.Tests.Forge;

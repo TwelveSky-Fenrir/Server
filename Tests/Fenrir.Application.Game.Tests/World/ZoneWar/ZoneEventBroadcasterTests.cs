@@ -1,10 +1,10 @@
 using System.Buffers.Binary;
-using Fenrir.Application.Game.Movement;
+using Fenrir.Application.Game.Domain.Movement;
+using Fenrir.Application.Game.Domain.World;
+using Fenrir.Application.Game.Domain.World.WorldState;
+using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Application.Game.Tests.World.WorldState;
-using Fenrir.Application.Game.World;
-using Fenrir.Application.Game.World.WorldState;
-using Fenrir.Application.Game.World.ZoneWar;
 using Fenrir.Network.Serialization.Packets.Zone;
 using Fenrir.Data.WriteBehind;
 using Fenrir.Network.Framing;

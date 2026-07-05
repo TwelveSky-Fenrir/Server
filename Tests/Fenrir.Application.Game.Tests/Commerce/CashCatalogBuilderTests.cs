@@ -1,4 +1,4 @@
-using Fenrir.Application.Game.Commerce;
+using Fenrir.Application.Game.GameData;
 using Fenrir.Data.Abstractions.World;
 
 namespace Fenrir.Application.Game.Tests.Commerce;

@@ -1,7 +1,9 @@
 using Fenrir.Application.Login;
+using Fenrir.Application.Login.Domain;
+using Fenrir.Application.Login.Hosting;
 using Fenrir.Data.Abstractions.Runtime;
 using Fenrir.LoginServer.Tests.TestSupport;
-using Fenrir.Network.Sessions;
+using Fenrir.Network.Dispatch.Sessions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 

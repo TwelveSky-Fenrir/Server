@@ -1,6 +1,6 @@
 using Fenrir.Network.Abstractions;
 
-namespace Fenrir.Network.RateLimiting;
+namespace Fenrir.Network.Dispatch.RateLimiting;
 
 // Per-session, per-opcode-class buckets; keyed on opcode since the legacy wire has no sequence number.
 public interface ISessionRateLimiter

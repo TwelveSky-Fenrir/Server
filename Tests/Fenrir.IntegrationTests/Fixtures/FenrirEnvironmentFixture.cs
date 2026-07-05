@@ -4,9 +4,9 @@ using System.Net.Sockets;
 using System.Reflection;
 using System.Text;
 using Aspire.Hosting.Testing;
+using Fenrir.Application.Game.Hosting;
+using Fenrir.Application.Login.Hosting;
 using Fenrir.Data.Security;
-using Fenrir.GameServer;
-using Fenrir.LoginServer;
 using Microsoft.Data.SqlClient;
 
 namespace Fenrir.IntegrationTests.Fixtures;
@@ -60,7 +60,7 @@ public sealed class FenrirEnvironmentFixture : IAsyncLifetime
         await WaitForServerReadyAsync(_loginProcess, LoginPort, "LoginServer", _loginLog, _loginLogLock);
 
         _gameProcess = StartServerProcess(
-            OriginalBuildOutputDllPath(typeof(ZoneConnectionHost).Assembly),
+            OriginalBuildOutputDllPath(typeof(GameConnectionHost).Assembly),
             _gameLog, _gameLogLock,
             new Dictionary<string, string?>
             {

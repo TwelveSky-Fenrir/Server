@@ -38,7 +38,7 @@ public sealed record FirewallRuleRepository(ICaeriusNetDbContext Db) : IFirewall
     /// </summary>
     private ValueTask<ImmutableArray<FirewallRuleRowDto>> GetAllAsync(CancellationToken ct)
     {
-        var sp = new StoredProcedureParametersBuilder("admin", "usp_FirewallRule_GetAll", 16)
+        var sp = new StoredProcedureParametersBuilder("admin", "usp_FirewallRule_GetAll")
             .AddInMemoryCache("admin:firewall-rules", TimeSpan.FromSeconds(2))
             .Build();
 

@@ -11,13 +11,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Every packet declaration references Opcodes.* (server/direction constants live in Fenrir.Contracts);
+    <!-- Every packet declaration references Opcodes.* (now living in Fenrir.Network.Abstractions);
          a project-wide implicit using avoids repeating it in ~300 packet files. -->
-    <Using Include="Fenrir.Contracts"/>
+    <Using Include="Fenrir.Network.Abstractions"/>
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Core\Fenrir.Contracts\Fenrir.Contracts.csproj"/>
     <ProjectReference Include="..\Fenrir.Network.Abstractions\Fenrir.Network.Abstractions.csproj"/>
     <!-- Field-level XOR (WireXor.XorInt/XorChar/...) is baked directly into every generated Write(). -->
     <ProjectReference Include="..\Fenrir.Network.Compression\Fenrir.Network.Compression.csproj"/>

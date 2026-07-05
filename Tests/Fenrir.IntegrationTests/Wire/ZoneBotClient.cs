@@ -1,7 +1,6 @@
 using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Text;
-using Fenrir.Contracts;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Compression;
 using Fenrir.Network.Serialization.Packets.Shared;

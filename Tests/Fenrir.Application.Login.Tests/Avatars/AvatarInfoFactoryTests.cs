@@ -1,4 +1,4 @@
-using Fenrir.Application.Login.Avatars;
+using Fenrir.Application.Login.Domain.Avatars;
 using Fenrir.Network.Serialization.Packets.Shared;
 using Fenrir.Data.Abstractions.Characters;
 

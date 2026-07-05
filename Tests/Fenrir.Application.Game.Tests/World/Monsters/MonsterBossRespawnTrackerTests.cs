@@ -1,4 +1,4 @@
-using Fenrir.Application.Game.World.Monsters;
+using Fenrir.Application.Game.Domain.World.Monsters;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.World.Monsters;

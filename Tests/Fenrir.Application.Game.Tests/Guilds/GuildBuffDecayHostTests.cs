@@ -1,4 +1,4 @@
-using Fenrir.Application.Game.Guilds;
+using Fenrir.Application.Game.Hosting.Guilds;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Data.Abstractions.Guilds;
 using Microsoft.Extensions.Logging.Abstractions;

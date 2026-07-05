@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <!-- Full package (not just .Abstractions): LoginConnectionHost derives from the concrete BackgroundService base class. -->
+    <PackageReference Include="Microsoft.Extensions.Hosting"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Fenrir.Application.Login.Domain\Fenrir.Application.Login.Domain.csproj"/>
+    <ProjectReference Include="..\..\Network\Fenrir.Network.Abstractions\Fenrir.Network.Abstractions.csproj"/>
+    <ProjectReference Include="..\..\Network\Fenrir.Network.Serialization\Fenrir.Network.Serialization.csproj"/>
+    <ProjectReference Include="..\..\Network\Fenrir.Network.Transport\Fenrir.Network.Transport.csproj"/>
+    <ProjectReference Include="..\..\Network\Fenrir.Network.Dispatch\Fenrir.Network.Dispatch.csproj"/>
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

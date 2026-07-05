@@ -38,7 +38,8 @@ public interface IWorldStateRepository
     /// <summary>
     ///     Registers (or displaces) one Force Leader candidate slot (game.usp_TribeVote_Register). The caller
     ///     must already have verified the displacement is legal and that the candidate holds no other slot in
-    ///     this tribe -- see <see cref="Fenrir.Application.Game.World.WorldState.WorldStateService.RegisterTribeVoteCandidateAsync" />.
+    ///     this tribe -- see
+    ///     <see cref="Fenrir.Application.Game.World.WorldState.WorldStateService.RegisterTribeVoteCandidateAsync" />.
     /// </summary>
     public ValueTask RegisterTribeVoteCandidateAsync(byte tribeId, byte slotIndex, int candidateCharacterId,
         short candidateLevel, int killOtherTribeCount, CancellationToken ct);

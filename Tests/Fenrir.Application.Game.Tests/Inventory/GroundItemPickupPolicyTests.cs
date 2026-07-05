@@ -1,7 +1,7 @@
+using Fenrir.Application.Game.Domain.Inventory;
+using Fenrir.Application.Game.Domain.World.Loot;
 using Fenrir.Application.Game.GameData;
-using Fenrir.Application.Game.Inventory;
 using Fenrir.Application.Game.Tests.GameData;
-using Fenrir.Application.Game.World.Loot;
 
 namespace Fenrir.Application.Game.Tests.Inventory;
 

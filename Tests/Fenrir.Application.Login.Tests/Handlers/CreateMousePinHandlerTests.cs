@@ -1,9 +1,10 @@
 using Fenrir.Application.Login.Handlers;
-using Fenrir.Application.Login.Handlers.Services;
+using Fenrir.Application.Login.Handlers.Handlers;
+using Fenrir.Application.Login.Services.CreateMousePin;
 using Fenrir.Application.Login.Tests.TestSupport;
+using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Login;
 using Fenrir.Network.Serialization.Wire;
-using Fenrir.Network.Sessions;
 
 namespace Fenrir.Application.Login.Tests.Handlers;
 

@@ -1,7 +1,6 @@
-using Fenrir.Contracts;
 using Fenrir.Network.Abstractions;
 
-namespace Fenrir.Network.RateLimiting;
+namespace Fenrir.Network.Dispatch.RateLimiting;
 
 // Hand-tuned per-opcode-class budgets not source-generated since operators retune these independently of OpcodeRegistry.
 public static class OpcodeRateLimiterPolicy

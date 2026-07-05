@@ -1,14 +1,16 @@
 using System.Net;
+using Fenrir.Application.Login.Domain;
+using Fenrir.Application.Login.Domain.RateLimiting;
 using Fenrir.Application.Login.Handlers;
-using Fenrir.Application.Login.Handlers.Services;
-using Fenrir.Application.Login.RateLimiting;
+using Fenrir.Application.Login.Handlers.Handlers;
+using Fenrir.Application.Login.Services.Login;
 using Fenrir.Application.Login.Tests.TestSupport;
 using Fenrir.Network.Serialization.Packets.Login;
 using Fenrir.Network.Serialization.Packets.Shared;
 using Fenrir.Data.Abstractions.Accounts;
 using Fenrir.Data.Security;
+using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Framing;
-using Fenrir.Network.Sessions;
 using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Login.Tests.Handlers;

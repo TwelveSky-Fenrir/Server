@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <!-- Not a zero-dependency leaf: most I&lt;X&gt;Service method signatures take Zone/PlayerRuntimeState params
+         directly (Handlers resolve them from the session and pass them straight through) — what matters for the
+         DI-abstraction goal is zero *implementation* here, not zero dependency. -->
+    <ProjectReference Include="..\Fenrir.Application.Game.Domain\Fenrir.Application.Game.Domain.csproj"/>
+    <ProjectReference Include="..\..\Network\Fenrir.Network.Serialization\Fenrir.Network.Serialization.csproj"/>
+    <ProjectReference Include="..\..\Network\Fenrir.Network.Dispatch\Fenrir.Network.Dispatch.csproj"/>
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

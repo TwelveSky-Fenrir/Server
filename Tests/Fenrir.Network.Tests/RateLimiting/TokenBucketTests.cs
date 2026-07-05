@@ -1,4 +1,4 @@
-using Fenrir.Network.RateLimiting;
+using Fenrir.Network.Dispatch.RateLimiting;
 
 namespace Fenrir.Network.Tests.RateLimiting;
 

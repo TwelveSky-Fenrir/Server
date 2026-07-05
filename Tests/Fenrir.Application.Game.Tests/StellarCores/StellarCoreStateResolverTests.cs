@@ -1,5 +1,5 @@
 using System.Collections.Immutable;
-using Fenrir.Application.Game.StellarCores;
+using Fenrir.Application.Game.Domain.StellarCores;
 
 namespace Fenrir.Application.Game.Tests.StellarCores;
 

@@ -1,6 +1,6 @@
 using System.Collections.Immutable;
+using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.GameData;
-using Fenrir.Application.Game.Skills;
 using Fenrir.Data.Abstractions.World;
 
 namespace Fenrir.Application.Game.Tests.Skills;

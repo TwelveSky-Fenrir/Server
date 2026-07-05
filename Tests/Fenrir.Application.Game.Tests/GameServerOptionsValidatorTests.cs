@@ -1,3 +1,5 @@
+using Fenrir.Application.Game.Domain;
+
 namespace Fenrir.Application.Game.Tests;
 
 public class GameServerOptionsValidatorTests

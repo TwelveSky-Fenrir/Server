@@ -1,0 +1,27 @@
+using Fenrir.Network.Serialization.Packets.Shared;
+
+namespace Fenrir.Application.Login.Abstractions.CreateAvatar;
+
+public enum CreateAvatarOutcome
+{
+    InvalidWeapon,
+    Success,
+    Failure
+}
+
+public readonly record struct CreateAvatarResult(CreateAvatarOutcome Outcome, AvatarInfo AvatarInfo);
+
+public interface ICreateAvatarService
+{
+    public ValueTask<CreateAvatarResult> CreateAvatarAsync(
+        int accountId,
+        byte avatarPost,
+        string avatarName,
+        byte tribe,
+        byte previousTribe,
+        byte gender,
+        byte head,
+        byte face,
+        int weapon,
+        CancellationToken cancellationToken);
+}

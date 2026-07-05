@@ -3,7 +3,7 @@ using System.Net;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Serialization.Wire;
 
-namespace Fenrir.Network.Sessions;
+namespace Fenrir.Network.Dispatch.Sessions;
 
 /// <summary>
 ///     Zone-flow session: <c>Connected → TicketConsumed → Registering → InWorld</c>.

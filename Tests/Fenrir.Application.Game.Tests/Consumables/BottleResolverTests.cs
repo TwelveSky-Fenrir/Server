@@ -1,5 +1,5 @@
 using System.Collections.Immutable;
-using Fenrir.Application.Game.Consumables;
+using Fenrir.Application.Game.Domain.Consumables;
 
 namespace Fenrir.Application.Game.Tests.Consumables;
 

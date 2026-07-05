@@ -194,16 +194,20 @@ internal static class PacketEmitter
                         $"global::System.Buffers.Binary.BinaryPrimitives.WriteInt64LittleEndian({slice}, {access});");
                     break;
                 case FieldShape.FixedString:
-                    writer.Line($"global::Fenrir.Network.Serialization.Wire.LegacyWireCodec.WriteFixedString({slice}, {access});");
+                    writer.Line(
+                        $"global::Fenrir.Network.Serialization.Wire.LegacyWireCodec.WriteFixedString({slice}, {access});");
                     break;
                 case FieldShape.Int32Array:
-                    writer.Line($"global::Fenrir.Network.Serialization.Wire.LegacyWireCodec.WriteInt32Array({slice}, {access});");
+                    writer.Line(
+                        $"global::Fenrir.Network.Serialization.Wire.LegacyWireCodec.WriteInt32Array({slice}, {access});");
                     break;
                 case FieldShape.SingleArray:
-                    writer.Line($"global::Fenrir.Network.Serialization.Wire.LegacyWireCodec.WriteSingleArray({slice}, {access});");
+                    writer.Line(
+                        $"global::Fenrir.Network.Serialization.Wire.LegacyWireCodec.WriteSingleArray({slice}, {access});");
                     break;
                 case FieldShape.ByteArray:
-                    writer.Line($"global::Fenrir.Network.Serialization.Wire.LegacyWireCodec.WriteByteArray({slice}, {access});");
+                    writer.Line(
+                        $"global::Fenrir.Network.Serialization.Wire.LegacyWireCodec.WriteByteArray({slice}, {access});");
                     break;
                 case FieldShape.FixedStringArray:
                     writer.Line(

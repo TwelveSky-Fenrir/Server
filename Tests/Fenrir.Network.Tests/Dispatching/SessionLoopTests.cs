@@ -1,8 +1,8 @@
 using Fenrir.Network.Serialization.Packets.Zone;
 using Fenrir.Network.Abstractions;
+using Fenrir.Network.Dispatch;
+using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Wire;
-using Fenrir.Network.Dispatching;
-using Fenrir.Network.Sessions;
 using Fenrir.Network.Tests.Sessions;
 using Fenrir.Network.Tests.TestSupport;
 

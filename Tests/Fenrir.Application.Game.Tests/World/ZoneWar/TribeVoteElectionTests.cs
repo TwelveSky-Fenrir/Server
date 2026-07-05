@@ -1,10 +1,10 @@
-using Fenrir.Application.Game.Movement;
+using Fenrir.Application.Game.Domain.Movement;
+using Fenrir.Application.Game.Domain.World;
+using Fenrir.Application.Game.Domain.World.WorldState;
+using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.Tests.Handlers.Tribes;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Application.Game.Tests.World.WorldState;
-using Fenrir.Application.Game.World;
-using Fenrir.Application.Game.World.WorldState;
-using Fenrir.Application.Game.World.ZoneWar;
 using Fenrir.Data.Abstractions.Tribes;
 using Fenrir.Data.Abstractions.World;
 using Fenrir.Data.WriteBehind;

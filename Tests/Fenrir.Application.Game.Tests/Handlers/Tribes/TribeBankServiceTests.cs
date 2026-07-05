@@ -1,10 +1,10 @@
-using Fenrir.Application.Game.Handlers.Tribes;
-using Fenrir.Application.Game.Handlers.Tribes.Services;
+using Fenrir.Application.Game.Domain.World;
+using Fenrir.Application.Game.Handlers.Handlers.Tribes;
+using Fenrir.Application.Game.Services.Tribes;
 using Fenrir.Application.Game.Tests.TestSupport;
-using Fenrir.Application.Game.World;
 using Fenrir.Network.Serialization.Packets.Zone;
 using Fenrir.Data.Abstractions.Tribes;
-using Fenrir.Network.Sessions;
+using Fenrir.Network.Dispatch.Sessions;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Handlers.Tribes;

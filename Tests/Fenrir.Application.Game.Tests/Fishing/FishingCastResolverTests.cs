@@ -1,6 +1,6 @@
 using System.Numerics;
-using Fenrir.Application.Game.Fishing;
-using Fenrir.Application.Game.World.Geometry;
+using Fenrir.Application.Game.Domain.Fishing;
+using Fenrir.Application.Game.Domain.World.Geometry;
 
 namespace Fenrir.Application.Game.Tests.Fishing;
 

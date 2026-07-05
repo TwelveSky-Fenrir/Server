@@ -1,4 +1,4 @@
-using Fenrir.Application.Game.Simulation;
+using Fenrir.Application.Game.Domain.Simulation;
 
 namespace Fenrir.Application.Game.Tests.Simulation;
 

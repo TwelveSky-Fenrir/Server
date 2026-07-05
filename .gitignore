@@ -48,7 +48,8 @@ bld/
 
 # Visual Studio 2017 auto generated files
 Generated\ Files/
-
+.claude/
+CLAUDE.md
 # MSTest test Results
 [Tt]est[Rr]esult*/
 [Bb]uild[Ll]og.*

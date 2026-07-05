@@ -1,4 +1,4 @@
-using Fenrir.Application.Game.Combat;
+using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Tests.TestSupport;
 
 namespace Fenrir.Application.Game.Tests.Combat;

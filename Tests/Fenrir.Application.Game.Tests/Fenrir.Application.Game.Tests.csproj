@@ -25,7 +25,14 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Application\Fenrir.Application.Game\Fenrir.Application.Game.csproj"/>
+    <ProjectReference Include="..\..\Application\Fenrir.Application.Game.Stats\Fenrir.Application.Game.Stats.csproj"/>
+    <ProjectReference Include="..\..\Application\Fenrir.Application.Game.GameData\Fenrir.Application.Game.GameData.csproj"/>
+    <ProjectReference Include="..\..\Application\Fenrir.Application.Game.Domain\Fenrir.Application.Game.Domain.csproj"/>
+    <ProjectReference Include="..\..\Application\Fenrir.Application.Game.Abstractions\Fenrir.Application.Game.Abstractions.csproj"/>
+    <ProjectReference Include="..\..\Application\Fenrir.Application.Game.Services\Fenrir.Application.Game.Services.csproj"/>
+    <ProjectReference Include="..\..\Application\Fenrir.Application.Game.Handlers\Fenrir.Application.Game.Handlers.csproj"/>
+    <ProjectReference Include="..\..\Application\Fenrir.Application.Game.Hosting\Fenrir.Application.Game.Hosting.csproj"/>
+    <ProjectReference Include="..\..\Network\Fenrir.Network.Abstractions\Fenrir.Network.Abstractions.csproj"/>
   </ItemGroup>
 
 </Project>

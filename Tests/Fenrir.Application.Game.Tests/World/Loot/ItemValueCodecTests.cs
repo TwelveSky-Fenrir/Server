@@ -1,4 +1,4 @@
-using Fenrir.Application.Game.World.Loot;
+using Fenrir.Application.Game.Domain.World.Loot;
 
 namespace Fenrir.Application.Game.Tests.World.Loot;
 

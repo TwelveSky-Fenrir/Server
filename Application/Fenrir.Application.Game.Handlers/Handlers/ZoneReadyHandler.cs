@@ -1,0 +1,43 @@
+using Fenrir.Application.Game.Abstractions.ZoneLifecycle;
+using Fenrir.Application.Game.Domain.World;
+using Fenrir.Network.Abstractions;
+using Fenrir.Network.Dispatch.Sessions;
+using Fenrir.Network.Serialization.Packets.Zone;
+
+namespace Fenrir.Application.Game.Handlers.Handlers;
+
+/// <summary>
+///     CZ_CLIENT_OK_FOR_ZONE_SEND (op13) -- the client's final ACK that it is ready for the zone it was just
+///     registered into. Marks the session InWorld and runs the legacy handshake's 3 anti-cheat guardrails
+///     (S04_MyWork02.cpp:1213-1291, see <see cref="IZoneReadyService" />), in the same order as the reference:
+///     heartbeat watchdog, tribe anti-tamper, auto-hunt anti-hack.
+/// </summary>
+/// <remarks>
+///     Fenrir's op13 only ever fires once per session (ZoneReadyRequest.AllowedStates is Registering-only --
+///     any later replay is already rejected upstream by SessionStateGate with StateViolation, unlike legacy
+///     where nothing stops a repeat CLIENT_OK_FOR_ZONE_SEND). The heartbeat watchdog below is consequently
+///     unreachable today (no heartbeat can exist yet before this handshake completes) but is wired for real:
+///     it activates the moment anything re-admits op13 later in a session's life, exactly like legacy's own
+///     zone-transfer resend. Same "real but not yet reachable" posture as several other guards in
+///     <see cref="PlayerRuntimeState" /> (e.g. MissionJoinWar).
+/// </remarks>
+public sealed class ZoneReadyHandler(IZoneReadyService service) : IInlinePacketHandler<ZoneReadyRequest>
+{
+    public void Handle(in ZoneReadyRequest packet, IPacketSession session)
+    {
+        var zoneSession = (ZoneClientSession)session;
+
+        // Benign staleness window around world entry: the posted ZoneCommand.Enter may not have been ticked
+        // yet. Nothing to validate against in that case -- fall through and still admit the session, same as
+        // the handler's pre-existing (unconditional) behavior.
+        if (zoneSession.CurrentZone is Zone zone && zoneSession.CharacterId is { } characterId &&
+            zone.TryGetPlayer(characterId, out var state) && state is not null)
+            if (service.Validate(state, packet.Tribe, packet.AutoState) == ZoneReadyOutcome.Rejected)
+            {
+                zoneSession.Abort(DisconnectReason.Faulted);
+                return;
+            }
+
+        zoneSession.MarkInWorld();
+    }
+}

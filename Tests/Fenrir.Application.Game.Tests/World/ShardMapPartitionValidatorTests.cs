@@ -1,4 +1,4 @@
-using Fenrir.Application.Game.World;
+using Fenrir.Application.Game.Domain.World;
 
 namespace Fenrir.Application.Game.Tests.World;
 

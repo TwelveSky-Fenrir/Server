@@ -1,6 +1,6 @@
 using System.Collections.ObjectModel;
+using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Tests.TestSupport;
-using Fenrir.Application.Game.World.WorldState;
 using Fenrir.Data.Abstractions.World;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;

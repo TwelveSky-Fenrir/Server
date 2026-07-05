@@ -1,6 +1,6 @@
 using System.Collections.Frozen;
+using Fenrir.Application.Game.Domain.Pets;
 using Fenrir.Application.Game.GameData;
-using Fenrir.Application.Game.Pets;
 using Fenrir.Application.Game.Tests.GameData;
 
 namespace Fenrir.Application.Game.Tests.Pets;

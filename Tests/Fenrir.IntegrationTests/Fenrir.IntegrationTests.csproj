@@ -52,11 +52,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Core\Fenrir.Contracts\Fenrir.Contracts.csproj"/>
+    <ProjectReference Include="..\..\Network\Fenrir.Network.Abstractions\Fenrir.Network.Abstractions.csproj"/>
     <ProjectReference Include="..\..\Infrastructure\Fenrir.Data\Fenrir.Data.csproj"/>
     <!-- Only for ExperienceFormulas/LevelProgressionCalculator, to plan "how many kills until a level-up" from
          whatever monster the DB query below actually picks, instead of a hand-duplicated copy of the same math. -->
-    <ProjectReference Include="..\..\Application\Fenrir.Application.Game\Fenrir.Application.Game.csproj"/>
+    <ProjectReference Include="..\..\Application\Fenrir.Application.Game.Domain\Fenrir.Application.Game.Domain.csproj"/>
+    <ProjectReference Include="..\..\Application\Fenrir.Application.Game.Stats\Fenrir.Application.Game.Stats.csproj"/>
     <ProjectReference Include="..\..\Servers\Fenrir.LoginServer\Fenrir.LoginServer.csproj"/>
     <ProjectReference Include="..\..\Servers\Fenrir.GameServer\Fenrir.GameServer.csproj"/>
   </ItemGroup>

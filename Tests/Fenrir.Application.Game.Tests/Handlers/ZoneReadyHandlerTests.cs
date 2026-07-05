@@ -1,6 +1,7 @@
 using Fenrir.Application.Game.Handlers;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Application.Game.World;
+using Fenrir.Application.Game.ZoneLifecycle.Services;
 using Fenrir.Contracts.Packets.Zone;
 using Fenrir.Contracts.Wire;
 using Fenrir.Network.Sessions;
@@ -36,7 +37,7 @@ public class ZoneReadyHandlerTests
     {
         var zone = ZoneTestKit.CreateZone(1);
         var (session, _, state) = Setup(zone, 10, tribe: 2);
-        var handler = new ZoneReadyHandler();
+        var handler = new ZoneReadyHandler(new ZoneReadyService());
 
         handler.Handle(Packet(tribe: 2), session);
 
@@ -51,7 +52,7 @@ public class ZoneReadyHandlerTests
     {
         var zone = ZoneTestKit.CreateZone(1);
         var (session, _, state) = Setup(zone, 10, tribe: 1);
-        var handler = new ZoneReadyHandler();
+        var handler = new ZoneReadyHandler(new ZoneReadyService());
 
         // Client claims tribe 3 while the world-entry snapshot loaded tribe 1 -- a patched client.
         handler.Handle(Packet(tribe: 3), session);
@@ -67,7 +68,7 @@ public class ZoneReadyHandlerTests
         var zone = ZoneTestKit.CreateZone(1);
         var (session, _, state) = Setup(zone, 10, tribe: 1);
         state.LastSentHeartbeat = DateTime.UtcNow.AddSeconds(-11);
-        var handler = new ZoneReadyHandler();
+        var handler = new ZoneReadyHandler(new ZoneReadyService());
 
         handler.Handle(Packet(tribe: 1), session);
 
@@ -81,7 +82,7 @@ public class ZoneReadyHandlerTests
         var zone = ZoneTestKit.CreateZone(1);
         var (session, _, state) = Setup(zone, 10, tribe: 1);
         state.LastSentHeartbeat = DateTime.UtcNow.AddSeconds(-1);
-        var handler = new ZoneReadyHandler();
+        var handler = new ZoneReadyHandler(new ZoneReadyService());
 
         handler.Handle(Packet(tribe: 1), session);
 
@@ -95,7 +96,7 @@ public class ZoneReadyHandlerTests
         var zone = ZoneTestKit.CreateZone(1);
         var (session, _, state) = Setup(zone, 10, tribe: 1);
         Assert.Null(state.LastSentHeartbeat); // never sent, matching legacy's mLastSentHeartbeat == -1
-        var handler = new ZoneReadyHandler();
+        var handler = new ZoneReadyHandler(new ZoneReadyService());
 
         handler.Handle(Packet(tribe: 1), session);
 
@@ -109,7 +110,7 @@ public class ZoneReadyHandlerTests
         var zone = ZoneTestKit.CreateZone(1);
         var (session, _, state) = Setup(zone, 10, tribe: 1);
         state.AutoHuntEnabled = false;
-        var handler = new ZoneReadyHandler();
+        var handler = new ZoneReadyHandler(new ZoneReadyService());
 
         handler.Handle(Packet(tribe: 1, autoState: 1), session);
         Assert.Null(session.DisconnectReason);
@@ -130,7 +131,7 @@ public class ZoneReadyHandlerTests
         var zone = ZoneTestKit.CreateZone(1);
         var (session, _, state) = Setup(zone, 10, tribe: 1);
         state.AutoHuntEnabled = true;
-        var handler = new ZoneReadyHandler();
+        var handler = new ZoneReadyHandler(new ZoneReadyService());
 
         handler.Handle(Packet(tribe: 1, autoState: 1), session);
 
@@ -145,7 +146,7 @@ public class ZoneReadyHandlerTests
         var zone = ZoneTestKit.CreateZone(1);
         var (session, _, state) = Setup(zone, 10, tribe: 1);
         state.AutoHuntEnabled = false;
-        var handler = new ZoneReadyHandler();
+        var handler = new ZoneReadyHandler(new ZoneReadyService());
 
         handler.Handle(Packet(tribe: 1, autoState: 0), session);
 
@@ -161,7 +162,7 @@ public class ZoneReadyHandlerTests
         session.MarkRegistering();
         // Deliberately never posted/ticked ZoneCommand.Enter, nor set CurrentZone -- the benign staleness
         // window this handler already tolerated before C04 (nothing to validate against yet).
-        var handler = new ZoneReadyHandler();
+        var handler = new ZoneReadyHandler(new ZoneReadyService());
 
         handler.Handle(Packet(tribe: 999, autoState: 1), session);
 

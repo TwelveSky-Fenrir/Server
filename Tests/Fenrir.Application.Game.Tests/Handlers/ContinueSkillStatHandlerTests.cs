@@ -2,6 +2,7 @@ using Fenrir.Application.Game.Handlers;
 using Fenrir.Application.Game.Skills;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Application.Game.World;
+using Fenrir.Application.Game.ZoneLifecycle.Services;
 using Fenrir.Contracts.Packets.Zone;
 using Fenrir.Network.Framing;
 using Fenrir.Network.Sessions;
@@ -49,7 +50,7 @@ public class ContinueSkillStatHandlerTests
         var zone = ZoneTestKit.CreateZone(1);
         var (session, pipe, state) = Setup(zone, 10);
         state.LearnedSkills = state.LearnedSkills.Add(0, new LearnedSkill(100, 3));
-        var handler = new ContinueSkillStatHandler();
+        var handler = new ContinueSkillStatHandler(new ContinueSkillStatService());
 
         handler.Handle(new ContinueSkillStatRequest { Skill = Flat((100, 10), (200, 5)) }, session);
         zone.Tick(TimeSpan.FromMilliseconds(50));
@@ -68,7 +69,7 @@ public class ContinueSkillStatHandlerTests
         var zone = ZoneTestKit.CreateZone(1);
         var (session, _, state) = Setup(zone, 10);
         state.LearnedSkills = state.LearnedSkills.Add(0, new LearnedSkill(100, 5));
-        var handler = new ContinueSkillStatHandler();
+        var handler = new ContinueSkillStatHandler(new ContinueSkillStatService());
 
         handler.Handle(new ContinueSkillStatRequest { Skill = Flat((100, 2)) }, session);
         zone.Tick(TimeSpan.FromMilliseconds(50));

@@ -6,6 +6,7 @@ using Fenrir.Application.Game.Simulation;
 using Fenrir.Application.Game.Tests.Handlers.Tribes;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Application.Game.World;
+using Fenrir.Application.Game.ZoneLifecycle.Services;
 using Fenrir.Contracts.Packets.Shared;
 using Fenrir.Contracts.Packets.Zone;
 using Fenrir.Data.Admin;
@@ -68,7 +69,7 @@ public class EnterWorldHandlerTests
             new FakeFirewallRuleRepository(),
             new FakeGmAllowlistRepository());
 
-        return new EnterWorldHandler(
+        return new EnterWorldHandler(new EnterWorldService(
             new FakeCharacterRepository(),
             ZoneTestKit.EmptyWorldData(),
             zones,
@@ -80,7 +81,7 @@ public class EnterWorldHandlerTests
             new FakeTribeRepository(),
             new ThrowingFriendRepository(),
             new ThrowingMentorRepository(),
-            NullLogger<EnterWorldHandler>.Instance);
+            NullLogger<EnterWorldService>.Instance));
     }
 
     private static EnterWorldRequest ValidRequest()

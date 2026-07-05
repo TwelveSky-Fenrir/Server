@@ -2,6 +2,7 @@ using Fenrir.Application.Game.Handlers;
 using Fenrir.Application.Game.Simulation;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Application.Game.World;
+using Fenrir.Application.Game.ZoneLifecycle.Services;
 using Fenrir.Contracts.Packets.Zone;
 using Fenrir.Network.Framing;
 using Fenrir.Network.Sessions;
@@ -48,7 +49,7 @@ public class ContinueSkillUseHandlerTests
         state.AutoBuffTime = GameDate.Today();
         state.ActionSort = 1;
         state.Mana = 100;
-        var handler = new ContinueSkillUseHandler();
+        var handler = new ContinueSkillUseHandler(new ContinueSkillUseService());
 
         handler.Handle(Request(1), session);
         zone.Tick(TimeSpan.FromMilliseconds(50));
@@ -68,7 +69,7 @@ public class ContinueSkillUseHandlerTests
         var zone = ZoneTestKit.CreateZone(1);
         var (session, pipe, state) = Setup(zone, 10);
         var initialMana = state.Mana;
-        var handler = new ContinueSkillUseHandler();
+        var handler = new ContinueSkillUseHandler(new ContinueSkillUseService());
 
         handler.Handle(Request(1), session);
         zone.Tick(TimeSpan.FromMilliseconds(50));
@@ -87,7 +88,7 @@ public class ContinueSkillUseHandlerTests
         state.AutoBuffTime = GameDate.Today();
         state.ActionSort = 30;
         state.Mana = 100;
-        var handler = new ContinueSkillUseHandler();
+        var handler = new ContinueSkillUseHandler(new ContinueSkillUseService());
 
         handler.Handle(Request(1), session);
         zone.Tick(TimeSpan.FromMilliseconds(50));
@@ -105,7 +106,7 @@ public class ContinueSkillUseHandlerTests
         state.AutoBuffTime = GameDate.Today();
         state.ActionSort = 1;
         state.Mana = -10;
-        var handler = new ContinueSkillUseHandler();
+        var handler = new ContinueSkillUseHandler(new ContinueSkillUseService());
 
         handler.Handle(Request(1), session);
 
@@ -117,7 +118,7 @@ public class ContinueSkillUseHandlerTests
     {
         var zone = ZoneTestKit.CreateZone(1);
         var (session, pipe, _) = Setup(zone, 10);
-        var handler = new ContinueSkillUseHandler();
+        var handler = new ContinueSkillUseHandler(new ContinueSkillUseService());
 
         handler.Handle(Request(2), session);
         zone.Tick(TimeSpan.FromMilliseconds(50));
@@ -131,7 +132,7 @@ public class ContinueSkillUseHandlerTests
     {
         var zone = ZoneTestKit.CreateZone(1);
         var (session, pipe, _) = Setup(zone, 10);
-        var handler = new ContinueSkillUseHandler();
+        var handler = new ContinueSkillUseHandler(new ContinueSkillUseService());
 
         handler.Handle(Request(3), session);
 

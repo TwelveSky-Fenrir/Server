@@ -7,6 +7,7 @@ using Fenrir.Application.Game.Inventory;
 using Fenrir.Application.Game.Tests.GameData;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Application.Game.World;
+using Fenrir.Application.Game.ZoneLifecycle.Services;
 using Fenrir.Contracts.Packets.Zone;
 using Fenrir.Data.Guilds;
 using Fenrir.Network.Sessions;
@@ -90,8 +91,8 @@ public class UseInventoryItemHandlerTests
             [UnhandledItemId] = new(WorldDataTestRows.Item(UnhandledItemId) with { Sort = SpecialUseSort }, [])
         }.ToFrozenDictionary();
 
-        return new UseInventoryItemHandler(characters, guilds, ZoneTestKit.EmptyWorldData(itemsById),
-            NullLogger<UseInventoryItemHandler>.Instance);
+        return new UseInventoryItemHandler(new UseInventoryItemService(characters, guilds,
+            ZoneTestKit.EmptyWorldData(itemsById), NullLogger<UseInventoryItemService>.Instance));
     }
 
     [Fact]

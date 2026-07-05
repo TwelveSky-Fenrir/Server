@@ -1,6 +1,6 @@
-using Fenrir.Application.Game.Simulation;
 using Fenrir.Application.Game.Skills;
 using Fenrir.Application.Game.World;
+using Fenrir.Application.Game.ZoneLifecycle.Services;
 using Fenrir.Contracts.Abstractions;
 using Fenrir.Contracts.Packets.Zone;
 using Fenrir.Network.Sessions;
@@ -13,7 +13,8 @@ namespace Fenrir.Application.Game.Handlers;
 ///     here (the legacy itself never replies or disconnects for Sort=2 either; see
 ///     <see cref="AutoBuffActivationResolver" />'s remarks for what's out of scope). Any other Sort disconnects.
 /// </summary>
-public sealed class ContinueSkillUseHandler : IInlinePacketHandler<ContinueSkillUseRequest>
+public sealed class ContinueSkillUseHandler(IContinueSkillUseService service)
+    : IInlinePacketHandler<ContinueSkillUseRequest>
 {
     public void Handle(in ContinueSkillUseRequest packet, IPacketSession session)
     {
@@ -25,8 +26,7 @@ public sealed class ContinueSkillUseHandler : IInlinePacketHandler<ContinueSkill
         if (!zone.TryGetPlayer(characterId, out var state) || state is null)
             return;
 
-        var context = new AutoBuffActivationResolver.Context(state.AutoBuffTime, state.ActionSort, state.Mana);
-        var result = AutoBuffActivationResolver.Resolve(packet.Sort, in context, GameDate.Today());
+        var result = service.Activate(zone, characterId, state, packet.Sort);
 
         switch (result.Kind)
         {
@@ -40,9 +40,6 @@ public sealed class ContinueSkillUseHandler : IInlinePacketHandler<ContinueSkill
 
             case AutoBuffActivationResolver.ResultKind.Activate:
                 session.Send(new AutoBuffActivationResponse { Value = 0 });
-                zone.PostAutoBuffCommand(new AutoBuffZoneCommand(characterId,
-                    ManaAfterActivation: result.ManaAfterActivation,
-                    ActionSort: AutoBuffActivationResolver.ChannelingActionSort, Broadcast: true));
                 return;
         }
     }

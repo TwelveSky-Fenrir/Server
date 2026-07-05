@@ -1,8 +1,7 @@
-using Fenrir.Application.Game.Social.Friends;
+using Fenrir.Application.Game.Handlers.Social.Services;
 using Fenrir.Application.Game.World;
 using Fenrir.Contracts.Abstractions;
 using Fenrir.Contracts.Packets.Zone;
-using Fenrir.Data.Social;
 using Fenrir.Network.Sessions;
 
 namespace Fenrir.Application.Game.Handlers.Social;
@@ -16,11 +15,8 @@ namespace Fenrir.Application.Game.Handlers.Social;
 ///     self-directed, but must stay a <see cref="System.Collections.Concurrent.ConcurrentDictionary{TKey,TValue}" />
 ///     since <c>Zone.HandleEnter</c> enumerates it concurrently during zone transfer.
 /// </remarks>
-public sealed class FriendAddHandler(ZoneRegistry zones, FriendRegistry friends, IFriendRepository repository)
-    : IAsyncPacketHandler<FriendAddRequest>
+public sealed class FriendAddHandler(IFriendService friendService) : IAsyncPacketHandler<FriendAddRequest>
 {
-    private const int MaxFriends = 10;
-
     public async ValueTask HandleAsync(FriendAddRequest packet, IPacketSession session,
         CancellationToken cancellationToken)
     {
@@ -33,21 +29,18 @@ public sealed class FriendAddHandler(ZoneRegistry zones, FriendRegistry friends,
         if (!zone.TryGetPlayer(characterId, out var state) || state is null)
             return;
 
-        if (packet.Index is < 0 or >= MaxFriends || state.Friends.ContainsKey((byte)packet.Index))
+        var result = await friendService.AddAsync(state, packet.Index, cancellationToken);
+
+        switch (result.Kind)
         {
-            zoneSession.Abort(DisconnectReason.Faulted);
-            return;
+            case FriendAddResultKind.InvalidSlot:
+                zoneSession.Abort(DisconnectReason.Faulted);
+                return;
+            case FriendAddResultKind.NoPendingAccept:
+                return;
+            case FriendAddResultKind.Added:
+                session.Send(new FriendAddResponse { Index = packet.Index, AvatarName = result.OtherName });
+                return;
         }
-
-        if (!friends.TryConsumeAccepted(characterId, out var otherId))
-            return;
-
-        var slot = (byte)packet.Index;
-        await repository.AddAsync(characterId, slot, otherId, cancellationToken);
-
-        state.Friends[slot] = otherId;
-
-        var otherName = zones.TryGetPlayer(otherId, out var other) ? other.Name : "";
-        session.Send(new FriendAddResponse { Index = packet.Index, AvatarName = otherName });
     }
 }

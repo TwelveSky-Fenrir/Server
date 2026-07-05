@@ -1,7 +1,7 @@
+using Fenrir.Application.Game.Handlers.Social.Services;
 using Fenrir.Application.Game.World;
 using Fenrir.Contracts.Abstractions;
 using Fenrir.Contracts.Packets.Zone;
-using Fenrir.Data.Social;
 using Fenrir.Network.Sessions;
 
 namespace Fenrir.Application.Game.Handlers.Social;
@@ -10,10 +10,8 @@ namespace Fenrir.Application.Game.Handlers.Social;
 ///     CZ_FRIEND_DELETE_SEND (opcode 58) -- empty slot ⇒ Quit(); otherwise clears then mirrors
 ///     <see cref="PlayerRuntimeState.Friends" />.
 /// </summary>
-public sealed class FriendRemoveHandler(IFriendRepository repository) : IAsyncPacketHandler<FriendRemoveRequest>
+public sealed class FriendRemoveHandler(IFriendService friendService) : IAsyncPacketHandler<FriendRemoveRequest>
 {
-    private const int MaxFriends = 10;
-
     public async ValueTask HandleAsync(FriendRemoveRequest packet, IPacketSession session,
         CancellationToken cancellationToken)
     {
@@ -26,15 +24,13 @@ public sealed class FriendRemoveHandler(IFriendRepository repository) : IAsyncPa
         if (!zone.TryGetPlayer(characterId, out var state) || state is null)
             return;
 
-        if (packet.Index is < 0 or >= MaxFriends || !state.Friends.ContainsKey((byte)packet.Index))
+        var result = await friendService.RemoveAsync(state, packet.Index, cancellationToken);
+
+        if (result == FriendRemoveResultKind.InvalidSlot)
         {
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }
-
-        var slot = (byte)packet.Index;
-        await repository.RemoveAsync(characterId, slot, cancellationToken);
-        state.Friends.TryRemove(slot, out _);
 
         session.Send(new FriendRemoveResponse { Index = packet.Index });
     }

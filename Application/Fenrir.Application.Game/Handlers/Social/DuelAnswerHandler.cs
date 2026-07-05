@@ -1,5 +1,4 @@
-using Fenrir.Application.Game.Social.Duel;
-using Fenrir.Application.Game.World;
+using Fenrir.Application.Game.Handlers.Social.Services;
 using Fenrir.Contracts.Abstractions;
 using Fenrir.Contracts.Packets.Zone;
 using Fenrir.Network.Sessions;
@@ -7,7 +6,7 @@ using Fenrir.Network.Sessions;
 namespace Fenrir.Application.Game.Handlers.Social;
 
 /// <summary>CZ_DUEL_ANSWER_SEND (opcode 45) -- on accept, either side may send CZ_DUEL_START_SEND (symmetric).</summary>
-public sealed class DuelAnswerHandler(ZoneRegistry zones, DuelRegistry duels) : IInlinePacketHandler<DuelAnswerRequest>
+public sealed class DuelAnswerHandler(IDuelService duelService) : IInlinePacketHandler<DuelAnswerRequest>
 {
     public void Handle(in DuelAnswerRequest packet, IPacketSession session)
     {
@@ -17,10 +16,6 @@ public sealed class DuelAnswerHandler(ZoneRegistry zones, DuelRegistry duels) : 
         var zoneSession = (ZoneClientSession)session;
         var targetId = zoneSession.CharacterId!.Value;
 
-        if (!duels.TryAnswer(targetId, packet.Answer == 0, out var challengerId))
-            return;
-
-        if (zones.TryGetPlayer(challengerId, out var challenger))
-            challenger.Session.Send(new DuelAnswerResponse { Answer = packet.Answer });
+        duelService.Answer(targetId, packet.Answer);
     }
 }

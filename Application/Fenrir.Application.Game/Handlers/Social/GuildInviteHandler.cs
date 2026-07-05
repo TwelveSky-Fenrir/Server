@@ -1,4 +1,4 @@
-using Fenrir.Application.Game.Guilds;
+using Fenrir.Application.Game.Handlers.Social.Services;
 using Fenrir.Application.Game.Social;
 using Fenrir.Application.Game.World;
 using Fenrir.Contracts.Abstractions;
@@ -15,7 +15,8 @@ namespace Fenrir.Application.Game.Handlers.Social;
 ///     OPEN ISSUE: legacy also gates on CheckCommunityWork()/stunned-dead and target IsMovingZone(); neither
 ///     has a <see cref="PlayerRuntimeState" /> equivalent here.
 /// </remarks>
-public sealed class GuildInviteHandler(GuildInviteRegistry invites) : IInlinePacketHandler<GuildInviteRequest>
+public sealed class GuildInviteHandler(IGuildInviteService guildInviteService)
+    : IInlinePacketHandler<GuildInviteRequest>
 {
     public void Handle(in GuildInviteRequest packet, IPacketSession session)
     {
@@ -28,48 +29,21 @@ public sealed class GuildInviteHandler(GuildInviteRegistry invites) : IInlinePac
         if (!zone.TryGetPlayer(askerId, out var asker) || asker is null)
             return;
 
-        if (asker.GuildId is null || !GuildRoleCodec.IsMasterOrSubMaster(asker.GuildRoleDb))
+        switch (guildInviteService.Ask(zone, asker, packet.AvatarName))
         {
-            zoneSession.Abort(DisconnectReason.Faulted);
-            return;
-        }
-
-        PlayerRuntimeState? target = null;
-        foreach (var candidate in zone.Players)
-            if (string.Equals(candidate.Name, packet.AvatarName, StringComparison.OrdinalIgnoreCase))
-            {
-                target = candidate;
-                break;
-            }
-
-        if (target is null)
-        {
-            session.Send(new GuildInviteAnswerResponse { Answer = 4 });
-            return;
-        }
-
-        if (target.GuildId is not null)
-        {
-            zoneSession.Abort(DisconnectReason.Faulted);
-            return;
-        }
-
-        if (asker.Tribe != target.Tribe)
-        {
-            zoneSession.Abort(DisconnectReason.Faulted);
-            return;
-        }
-
-        switch (invites.TryAsk(askerId, target.CharacterId))
-        {
-            case GuildInviteAskOutcome.AskerBusy:
+            case GuildInviteAskResultKind.NotAuthorized:
+            case GuildInviteAskResultKind.TargetAlreadyGuilded:
+            case GuildInviteAskResultKind.TribeMismatch:
+                zoneSession.Abort(DisconnectReason.Faulted);
+                return;
+            case GuildInviteAskResultKind.TargetNotFound:
+                session.Send(new GuildInviteAnswerResponse { Answer = 4 });
+                return;
+            case GuildInviteAskResultKind.AskerBusy:
                 session.Send(new GuildInviteAnswerResponse { Answer = 3 });
                 return;
-            case GuildInviteAskOutcome.TargetBusy:
+            case GuildInviteAskResultKind.TargetBusy:
                 session.Send(new GuildInviteAnswerResponse { Answer = 5 });
-                return;
-            case GuildInviteAskOutcome.Sent:
-                target.Session.Send(new GuildInviteResponse { AvatarName = asker.Name });
                 return;
         }
     }

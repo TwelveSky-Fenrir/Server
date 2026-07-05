@@ -1,5 +1,4 @@
-using Fenrir.Application.Game.Social.Friends;
-using Fenrir.Application.Game.World;
+using Fenrir.Application.Game.Handlers.Social.Services;
 using Fenrir.Contracts.Abstractions;
 using Fenrir.Contracts.Packets.Zone;
 using Fenrir.Network.Sessions;
@@ -10,8 +9,7 @@ namespace Fenrir.Application.Game.Handlers.Social;
 ///     CZ_FRIEND_ANSWER_SEND (opcode 55) -- on accept, both sides become eligible to call their own
 ///     CZ_FRIEND_MAKE_SEND; neither is added automatically.
 /// </summary>
-public sealed class FriendAnswerHandler(ZoneRegistry zones, FriendRegistry friends)
-    : IInlinePacketHandler<FriendAnswerRequest>
+public sealed class FriendAnswerHandler(IFriendService friendService) : IInlinePacketHandler<FriendAnswerRequest>
 {
     public void Handle(in FriendAnswerRequest packet, IPacketSession session)
     {
@@ -21,10 +19,6 @@ public sealed class FriendAnswerHandler(ZoneRegistry zones, FriendRegistry frien
         var zoneSession = (ZoneClientSession)session;
         var targetId = zoneSession.CharacterId!.Value;
 
-        if (!friends.TryAnswer(targetId, packet.Answer == 0, out var askerId))
-            return;
-
-        if (zones.TryGetPlayer(askerId, out var asker))
-            asker.Session.Send(new FriendAnswerResponse { Answer = packet.Answer });
+        friendService.Answer(targetId, packet.Answer);
     }
 }

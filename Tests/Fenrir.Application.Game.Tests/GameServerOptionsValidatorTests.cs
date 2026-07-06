@@ -17,7 +17,8 @@ public class GameServerOptionsValidatorTests
         int heartbeatIntervalSeconds = 5,
         int capacity = 300,
         string? gameDataDirectory = "GameData",
-        int heroRankingRolloverCheckIntervalMinutes = 60)
+        int heroRankingRolloverCheckIntervalMinutes = 60,
+        int accountSessionPollIntervalSeconds = 20)
     {
         return new GameServerOptions
         {
@@ -30,7 +31,8 @@ public class GameServerOptionsValidatorTests
             HeartbeatIntervalSeconds = heartbeatIntervalSeconds,
             Capacity = capacity,
             GameDataDirectory = gameDataDirectory!,
-            HeroRankingRolloverCheckIntervalMinutes = heroRankingRolloverCheckIntervalMinutes
+            HeroRankingRolloverCheckIntervalMinutes = heroRankingRolloverCheckIntervalMinutes,
+            AccountSessionPollIntervalSeconds = accountSessionPollIntervalSeconds
         };
     }
 
@@ -151,5 +153,16 @@ public class GameServerOptionsValidatorTests
 
         Assert.True(result.Failed);
         Assert.Contains(result.Failures!, f => f.Contains("Game:HeroRankingRolloverCheckIntervalMinutes"));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void Validate_AccountSessionPollIntervalSecondsNotPositive_Fails(int intervalSeconds)
+    {
+        var result = Validator.Validate(null, Options(accountSessionPollIntervalSeconds: intervalSeconds));
+
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures!, f => f.Contains("Game:AccountSessionPollIntervalSeconds"));
     }
 }

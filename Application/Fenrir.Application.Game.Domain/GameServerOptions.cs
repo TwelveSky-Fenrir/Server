@@ -47,4 +47,10 @@ public sealed class GameServerOptions
 
     /// <summary>Informational only in M1, not enforced as a hard connection cap.</summary>
     public int Capacity { get; set; } = 300;
+
+    /// <summary>
+    ///     How often <c>AccountSessionKickPollHost</c> polls whether any account this shard holds a live Zone
+    ///     session for has been flagged for kick in <c>runtime.AccountSessions</c> (a newer login elsewhere).
+    /// </summary>
+    public int AccountSessionPollIntervalSeconds { get; set; } = 20;
 }

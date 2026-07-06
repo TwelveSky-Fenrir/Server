@@ -41,9 +41,9 @@ public class ZoneAttackTests
     }
 
     private static Zone TwoPlayerZone(out FakeDuplexPipe attackerPipe, out FakeDuplexPipe defenderPipe,
-        byte attackerTribe = 0, byte defenderTribe = 1)
+        byte attackerTribe = 0, byte defenderTribe = 1, short mapId = 1)
     {
-        var zone = ZoneTestKit.CreateZone(1, randomSource: new ScriptedRandomSource(0, 0));
+        var zone = ZoneTestKit.CreateZone(mapId, randomSource: new ScriptedRandomSource(0, 0));
         var (attackerSession, aPipe) = ZoneTestKit.CreateSession(1);
         var (defenderSession, dPipe) = ZoneTestKit.CreateSession(2);
         attackerPipe = aPipe;
@@ -125,6 +125,48 @@ public class ZoneAttackTests
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.Equal(lifeBefore, defender.Life);
+    }
+
+    /// <summary>
+    ///     Blocker #2 (PvP zone gate) end-to-end: <c>Zone.ApplyCombatCommand</c> must resolve
+    ///     <see cref="ZonePvpZoneCatalog.AllowsEnemyTribeAttack" /> for its own <see cref="Zone.MapId" /> and pass
+    ///     it through to <see cref="CombatResolver.ResolveEnemyTribeAttack" /> -- zone 39 ("The Abyss",
+    ///     <c>Server/Header/S18_MyZoneInfo.cpp:180</c>) is one of the legacy's explicit flag-0 zones, so an
+    ///     enemy-tribe attack there must never land, regardless of how strong the attacker is.
+    /// </summary>
+    [Fact]
+    public void PvpDisabledZone_EnemyTribeAttackIsRejected()
+    {
+        Assert.False(ZonePvpZoneCatalog.AllowsEnemyTribeAttack(39));
+
+        var zone = TwoPlayerZone(out _, out _, mapId: 39);
+        Assert.True(zone.TryGetPlayer(2, out var defender));
+        var lifeBefore = defender!.Life;
+
+        zone.PostCombatCommand(new CombatCommand { AttackerCharacterId = 1, AttackInfo = MeleeRequest(1, 2) });
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.Equal(lifeBefore, defender.Life);
+    }
+
+    /// <summary>
+    ///     Same gate, opposite side: zone 146 (<c>Server/Header/S18_MyZoneInfo.cpp:190</c>) is one of the
+    ///     legacy's explicit flag-1 ("open PvP") zones, so the same attack that's rejected in
+    ///     <see cref="PvpDisabledZone_EnemyTribeAttackIsRejected" /> must land here.
+    /// </summary>
+    [Fact]
+    public void PvpEnabledZone_EnemyTribeAttackIsAllowed()
+    {
+        Assert.True(ZonePvpZoneCatalog.AllowsEnemyTribeAttack(146));
+
+        var zone = TwoPlayerZone(out _, out _, mapId: 146);
+        Assert.True(zone.TryGetPlayer(2, out var defender));
+        var lifeBefore = defender!.Life;
+
+        zone.PostCombatCommand(new CombatCommand { AttackerCharacterId = 1, AttackInfo = MeleeRequest(1, 2) });
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.True(defender.Life < lifeBefore);
     }
 
     [Theory]

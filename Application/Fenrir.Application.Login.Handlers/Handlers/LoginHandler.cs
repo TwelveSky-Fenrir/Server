@@ -28,6 +28,10 @@ public sealed class LoginHandler(ILoginService loginService) : IAsyncPacketHandl
             case LoginOutcome.RateLimited:
                 // Silent drop, no reply/abort: a legitimate NAT-shared client that burst its IP budget just retries later.
                 return;
+            case LoginOutcome.DuplicateSessionEvicted:
+                // Silent drop, no reply/abort: the stale local session for this account was just evicted; this
+                // attempt is dropped too (see LoginService's ConflictLogin remarks) -- the client resends.
+                return;
             case LoginOutcome.Failure:
                 // Re-arms VersionOk so the client can retry on this same connection without a reconnect.
                 if (result.ReArmVersionOk)
@@ -36,6 +40,7 @@ public sealed class LoginHandler(ILoginService loginService) : IAsyncPacketHandl
                 return;
             default:
                 loginSession.MarkAuthenticated(result.AccountId);
+                loginSession.MarkAccountSessionToken(result.SessionToken!.Value);
                 if (result.RequirePin)
                     loginSession.MarkPinRequired();
 

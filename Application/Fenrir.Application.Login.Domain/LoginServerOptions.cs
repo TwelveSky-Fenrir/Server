@@ -21,4 +21,11 @@ public sealed class LoginServerOptions
 
     /// <summary>Legacy <c>P2ndPassword</c> (=1 in prod EU33): when true, mouse PIN is mandatory before character select.</summary>
     public bool RequireSecondPassword { get; set; } = true;
+
+    /// <summary>
+    ///     How often <c>AccountSessionLivenessHost</c> refreshes <c>runtime.AccountSessions.LastRefreshedUtc</c> for
+    ///     every account this process holds a live Login session for -- keeps a long-lived Login session (still
+    ///     authenticating, still at char-select) from being wrongly reaped by the 6-minute staleness sweep.
+    /// </summary>
+    public int AccountSessionRefreshIntervalSeconds { get; set; } = 60;
 }

@@ -29,7 +29,7 @@ public sealed class PetActivitySystem(DirtyTracker<int> dirtyTracker) : ISimulat
 
             state.PetActivityDecayTicks -= SimulationClock.PetActivityDecayLegacyTicks;
             state.PetActivity--;
-            dirtyTracker.MarkDirty(state.CharacterId, DirtyFlags.Progression);
+            state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
         }
     }
 }

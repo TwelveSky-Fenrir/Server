@@ -57,6 +57,32 @@ public class CombatResolverTests
     }
 
     [Fact]
+    public void NormalFieldZone_AttackIsAllowed()
+    {
+        // zoneAllowsEnemyTribeAttack defaults to true -- a normal field/PvP zone's flag (legacy value 1 or 2,
+        // both equally "enabled" per S18_MyZoneInfo.cpp table entries and the equals-zero-only test).
+        var attacker = Combatant(1, 0, 1000);
+        var defender = Combatant(2, 1, defensePower: 200);
+        var outcome = CombatResolver.ResolveEnemyTribeAttack(attacker, defender, MeleeRequest(1, 2), TimeSpan.Zero,
+            null, new ScriptedRandomSource(0, 0));
+        Assert.False(outcome.Rejected);
+        Assert.True(outcome.Hit);
+    }
+
+    [Fact]
+    public void TownOrSafeZone_AttackIsRejected_BeforeTribeCheck()
+    {
+        // Legacy zone-gate value 0 (e.g. an unlisted zone id, defaulted to disabled -- S18_MyZoneInfo.cpp:15-18)
+        // rejects silently before the same-tribe/alliance check even runs (S07_MyGame02.cpp:945-950).
+        var attacker = Combatant(1, 0, 1000);
+        var defender = Combatant(2, 1, defensePower: 200);
+        var outcome = CombatResolver.ResolveEnemyTribeAttack(attacker, defender, MeleeRequest(1, 2), TimeSpan.Zero,
+            null, new ScriptedRandomSource(0, 0), false);
+        Assert.True(outcome.Rejected);
+        Assert.Equal(AttackRejectReason.ZonePvpDisabled, outcome.RejectReason);
+    }
+
+    [Fact]
     public void SameTribe_IsRejected()
     {
         var attacker = Combatant(1, 0);

@@ -45,4 +45,42 @@ public class ClientSessionStateTests
 
         Assert.False(session.IsOpcodeAllowed(Opcodes.Zone.Incoming.ZoneHandshake));
     }
+
+    // Cross-process duplicate-login kick/refusal: MarkAccountSessionToken records the token
+    // usp_AccountSession_ClaimOrSignalKick minted for this login epoch.
+    [Fact]
+    public void Login_MarkAccountSessionToken_SetsTheToken()
+    {
+        var session = new LoginClientSession(1, new FakeDuplexPipe());
+        var token = Guid.NewGuid();
+
+        Assert.Null(session.AccountSessionToken);
+
+        session.MarkAccountSessionToken(token);
+
+        Assert.Equal(token, session.AccountSessionToken);
+    }
+
+    // The two-arg overload (every pre-existing call site) must keep leaving AccountSessionToken unset --
+    // only ZoneHandshakeHandler's real ticket-consume path supplies a token.
+    [Fact]
+    public void Zone_MarkTicketConsumed_TwoArgOverload_LeavesAccountSessionTokenNull()
+    {
+        var session = new ZoneClientSession(1, new FakeDuplexPipe());
+
+        session.MarkTicketConsumed(1, 10);
+
+        Assert.Null(session.AccountSessionToken);
+    }
+
+    [Fact]
+    public void Zone_MarkTicketConsumed_WithToken_SetsAccountSessionToken()
+    {
+        var session = new ZoneClientSession(1, new FakeDuplexPipe());
+        var token = Guid.NewGuid();
+
+        session.MarkTicketConsumed(1, 10, token);
+
+        Assert.Equal(token, session.AccountSessionToken);
+    }
 }

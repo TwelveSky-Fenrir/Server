@@ -19,7 +19,7 @@ public sealed class ZoneTransferService(
     ILogger<ZoneTransferService> logger) : IZoneTransferService
 {
     public async ValueTask<ZoneTransferResult> RequestZoneTransferAsync(int accountId, byte avatarPost,
-        CancellationToken cancellationToken)
+        Guid sessionToken, CancellationToken cancellationToken)
     {
         var summaries = await characters.GetByAccountAsync(accountId, cancellationToken);
         var summary = summaries.FirstOrDefault(c => c.Slot == avatarPost);
@@ -37,7 +37,7 @@ public sealed class ZoneTransferService(
             return new ZoneTransferResult(ZoneTransferOutcome.ShardUnavailable, "", 0, 0);
 
         await tickets.CreateAsync(accountId, summary.CharacterId, shard.ShardId, options.Value.TicketTtlSeconds,
-            cancellationToken);
+            sessionToken, cancellationToken);
 
         // Zone = the persisted MapId the character resumes on (same value AvatarInfoFactory writes to LogoutInfo[0]).
         return new ZoneTransferResult(ZoneTransferOutcome.Success, shard.Host, shard.Port, character.MapId);

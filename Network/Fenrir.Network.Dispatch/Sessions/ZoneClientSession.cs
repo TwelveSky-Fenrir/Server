@@ -21,6 +21,13 @@ public sealed class ZoneClientSession(long sessionId, IDuplexPipe transport, IPE
     /// </summary>
     public int? CharacterId { get; private set; }
 
+    /// <summary>
+    ///     Set by <see cref="MarkTicketConsumed" /> — the token carried in the consumed
+    ///     <c>runtime.SessionTickets</c> row, threaded from the Login-side claim through
+    ///     <c>usp_AccountSession_TransitionToGame</c>. Null until the ticket is consumed.
+    /// </summary>
+    public Guid? AccountSessionToken { get; private set; }
+
     // Re-pointed by the source zone's tick on each in-process map transfer. Unsynchronized: a reference
     // write is atomic and a stale read is benign — a command posted to the old zone just finds nothing there and is dropped.
     public IZoneActor? CurrentZone { get; set; }
@@ -30,10 +37,14 @@ public sealed class ZoneClientSession(long sessionId, IDuplexPipe transport, IPE
         return SessionStateGate.Allows(State, opcode);
     }
 
-    public void MarkTicketConsumed(int accountId, int characterId)
+    // sessionToken is optional so every existing call site that never dealt with cross-process duplicate-login
+    // tracking keeps compiling unchanged; ZoneHandshakeHandler (the one production caller that consumes a real
+    // runtime.SessionTickets row) always supplies it.
+    public void MarkTicketConsumed(int accountId, int characterId, Guid? sessionToken = null)
     {
         AccountId = accountId;
         CharacterId = characterId;
+        AccountSessionToken = sessionToken;
         State = ZoneSessionState.TicketConsumed;
     }
 

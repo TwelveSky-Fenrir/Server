@@ -13,7 +13,8 @@ public sealed record SessionTicketRepository(ICaeriusNetDbContext Db) : ISession
     // In-memory OLTP table, sub-millisecond procs -- a short timeout fails fast instead of masking a stuck request.
     private const int CommandTimeoutSeconds = 5;
 
-    public ValueTask CreateAsync(int accountId, int characterId, byte shardId, int ttlSeconds, CancellationToken ct)
+    public ValueTask CreateAsync(int accountId, int characterId, byte shardId, int ttlSeconds, Guid sessionToken,
+        CancellationToken ct)
     {
         var parameters =
             new StoredProcedureParametersBuilder("runtime", "usp_SessionTicket_Create", 0, CommandTimeoutSeconds)
@@ -21,6 +22,7 @@ public sealed record SessionTicketRepository(ICaeriusNetDbContext Db) : ISession
                 .AddParameter("CharacterId", characterId, SqlDbType.Int)
                 .AddParameter("ShardId", shardId, SqlDbType.TinyInt)
                 .AddParameter("TtlSeconds", ttlSeconds, SqlDbType.Int)
+                .AddParameter("SessionToken", sessionToken, SqlDbType.UniqueIdentifier)
                 .Build();
 
         return Db.ExecuteAsync(parameters, ct);

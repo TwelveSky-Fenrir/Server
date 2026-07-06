@@ -24,6 +24,9 @@ public sealed class GameServerOptionsValidator : IValidateOptions<GameServerOpti
             errors.Add(
                 $"Game:HeroRankingRolloverCheckIntervalMinutes must be positive (was {options.HeroRankingRolloverCheckIntervalMinutes}).");
         if (options.Capacity <= 0) errors.Add($"Game:Capacity must be positive (was {options.Capacity}).");
+        if (options.AccountSessionPollIntervalSeconds <= 0)
+            errors.Add(
+                $"Game:AccountSessionPollIntervalSeconds must be positive (was {options.AccountSessionPollIntervalSeconds}).");
 
         return errors.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(errors);
     }

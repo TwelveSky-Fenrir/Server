@@ -37,6 +37,12 @@ public static class HostingServiceCollectionExtensions
         services.AddHostedService<ZoneTickHost>();
         services.AddHostedService<MonsterLootFlushHost>();
 
+        // ProgressWriteBehindHost is a plain singleton, NOT its own BackgroundService/IWriteBehindFlusher --
+        // see its own remarks for why a second, independently-timed drain of the SAME shared DirtyTracker<int>
+        // would be unsafe. PositionWriteBehindHost is the sole owner of the one write-behind loop/flush signal
+        // and calls into it for the Vitals/Progression side of every drained batch.
+        services.AddSingleton<ProgressWriteBehindHost>();
+
         // Same "one instance, three registrations" pattern for a hosted service other code also needs to call directly.
         services.AddSingleton<PositionWriteBehindHost>();
         services.AddSingleton<IWriteBehindFlusher>(sp => sp.GetRequiredService<PositionWriteBehindHost>());
@@ -45,6 +51,9 @@ public static class HostingServiceCollectionExtensions
         services.AddHostedService<GameServerDirectoryHeartbeat>();
         services.AddHostedService<HeroRankingRolloverHost>();
         services.AddHostedService<GameConnectionHost>();
+
+        // Cross-process duplicate-login kick/refusal, Game-side half -- see AccountSessionKickPollHost's remarks.
+        services.AddHostedService<AccountSessionKickPollHost>();
 
         return services;
     }

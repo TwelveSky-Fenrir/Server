@@ -2,6 +2,7 @@ using System.Net;
 using Fenrir.Application.Login.Abstractions.Login;
 using Fenrir.Application.Login.Domain;
 using Fenrir.Application.Login.Domain.RateLimiting;
+using Fenrir.Data.Abstractions.Runtime;
 using Fenrir.Data.Security;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Login;
@@ -23,13 +24,24 @@ public sealed class LoginService(
     IBanRepository bans,
     IMacRestrictionRepository macRestrictions,
     IOptions<LoginServerOptions> options,
-    SessionRegistry registry) : ILoginService
+    SessionRegistry registry,
+    IAccountSessionRepository accountSessions) : ILoginService
 {
     // Legacy tResult codes actually producible by Fenrir's flows (S04_MyWork02.cpp W_LOGIN_SEND / S08_MyDB Login):
     private const int ResultIpBlocked = 2; // MyDB::CheckGMIP/CheckBanIP (S04_MyWork02.cpp:195-215)
     private const int ResultVersionMismatch = 4; // tVersion != mServerVersion
     private const int ResultUnknownAccount = 6; // mDB.Login: account not found
     private const int ResultWrongPassword = 7; // mDB.Login: password mismatch
+
+    /// <summary>
+    ///     "Compte déjà connecté" (local login-side session, in-zone, zone-loading, or account-save-in-progress --
+    ///     all four legacy cases collapse to the same tResult): ServerDocs/11_ts25login/01_Flux_Authentification_
+    ///     Redirection.md:142-151,173,438,500, citing Server/ts25login/S04_MyWork02.cpp:225-284. Reused here as the
+    ///     cross-process duplicate-login refusal code for runtime.AccountSessions' ConflictLogin/ConflictGameKicked/
+    ///     ConflictTearingDown outcomes.
+    /// </summary>
+    private const int ResultAlreadyConnected = 8;
+
     private const int ResultBlocked = 9; // mDB.Login: uBlockInfo >= today (ban); Fenrir lockout maps here too
     private const int ResultCustomMessage = 10000; // mDB.Login: macinfo mac_limit < 1 ("Your PC has been banned.")
     private const int ResultSuccess = 0;
@@ -77,13 +89,42 @@ public sealed class LoginService(
         var requirePin = options.Value.RequireSecondPassword;
         var pinMask = storedPin is null ? "" : LoginTrain.ExistingPinMask;
 
-        // Evicts any previous login session for this account (legacy playuser-result-4 local kick), then proceeds.
+        // Cross-process duplicate-login authority (runtime.AccountSessions) -- see ResultAlreadyConnected's
+        // remarks for the ServerDocs citation behind tResult=8. Every successful credential check claims exactly
+        // once; the claim's own atomic side effect (clear a stale row / flag a live Game row for kick / refuse a
+        // tearing-down row) happens server-side in usp_AccountSession_ClaimOrSignalKick.
+        var newToken = Guid.NewGuid();
+        var claim = await accountSessions.ClaimOrSignalKickAsync(accountId, newToken, cancellationToken);
+
+        switch ((AccountSessionClaimOutcome)claim.Outcome)
+        {
+            case AccountSessionClaimOutcome.ConflictLogin:
+                // "Déjà connecté sur ts25login lui-même": kick the stale local session directly (matches the
+                // legacy kick-then-tResult=8 shape -- the new attempt is refused too, not handed the account).
+                if (registry.TryGetByAccount(accountId, out var existingLocal))
+                {
+                    existingLocal!.Abort(DisconnectReason.Evicted);
+                    return LoginResult.SilentDropResult;
+                }
+
+                // Row claimed to be a live Login session but no matching local socket -- treat like any other refusal.
+                return Failure(ResultAlreadyConnected, "", true);
+            case AccountSessionClaimOutcome.ConflictGameKicked:
+            case AccountSessionClaimOutcome.ConflictTearingDown:
+                // A live Game-side session was just flagged for kick (or is mid-teardown): refuse this attempt,
+                // the account isn't free yet -- the player retries once the kick/teardown completes.
+                return Failure(ResultAlreadyConnected, "", true);
+        }
+
+        // Evicts any previous login session for this account still held locally (legacy playuser-result-4 local
+        // kick) -- belt-and-braces alongside the cross-process claim above, since AssociateAccount's own eviction
+        // only ever sees sessions on this same process.
         registry.AssociateAccount(sessionId, accountId);
 
         var chars = await characters.GetByAccountAsync(accountId, cancellationToken);
 
         return new LoginResult(LoginOutcome.Success, ResultSuccess, "", false, accountId, requirePin, pinMask,
-            [..chars]);
+            [..chars], newToken);
     }
 
     /// <summary>

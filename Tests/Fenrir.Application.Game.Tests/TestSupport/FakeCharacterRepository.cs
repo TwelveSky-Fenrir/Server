@@ -71,9 +71,13 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
         throw new NotImplementedException();
     }
 
+    /// <summary>Every row ever passed to <see cref="PersistPositionsAsync" />, across every call -- append-only.</summary>
+    public List<CharacterPositionTvp> PersistedPositionRows { get; } = [];
+
     public ValueTask PersistPositionsAsync(IReadOnlyList<CharacterPositionTvp> rows, CancellationToken ct)
     {
-        throw new NotImplementedException();
+        PersistedPositionRows.AddRange(rows);
+        return ValueTask.CompletedTask;
     }
 
     public ValueTask<CharacterWorldEntryBundle?> GetWorldEntryBundleAsync(int characterId, CancellationToken ct)
@@ -88,9 +92,13 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
         throw new NotImplementedException();
     }
 
+    /// <summary>Every row ever passed to <see cref="PersistProgressAsync" />, across every call -- append-only.</summary>
+    public List<CharacterProgressTvp> PersistedProgressRows { get; } = [];
+
     public ValueTask PersistProgressAsync(IReadOnlyList<CharacterProgressTvp> rows, CancellationToken ct)
     {
-        throw new NotImplementedException();
+        PersistedProgressRows.AddRange(rows);
+        return ValueTask.CompletedTask;
     }
 
     public ValueTask AdjustMoneyAsync(int characterId, long deltaMoney, int deltaBigMoney, CancellationToken ct)

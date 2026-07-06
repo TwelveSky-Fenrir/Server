@@ -220,7 +220,7 @@ public sealed partial class Zone
         if (command.UpdatedStats is { } stats)
             state.Stats = stats;
 
-        dirtyTracker.MarkDirty(command.CharacterId, DirtyFlags.Vitals);
+        state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
     }
 
     private void DrainHeroRankingQueryCommands()
@@ -377,7 +377,7 @@ public sealed partial class Zone
             state.Stats = stats;
 
         if (changed)
-            dirtyTracker.MarkDirty(command.CharacterId, DirtyFlags.Vitals);
+            state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
 
         switch (command.Broadcast)
         {
@@ -484,7 +484,7 @@ public sealed partial class Zone
             state.Stats = stats;
 
         if (changed)
-            dirtyTracker.MarkDirty(command.CharacterId, DirtyFlags.Vitals);
+            state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
 
         switch (command.Broadcast)
         {
@@ -561,7 +561,7 @@ public sealed partial class Zone
             state.Stats = stats;
 
         if (changed)
-            dirtyTracker.MarkDirty(command.CharacterId, DirtyFlags.Vitals);
+            state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
 
         switch (command.Broadcast)
         {
@@ -625,7 +625,7 @@ public sealed partial class Zone
             state.Stats = stats;
 
         if (changed)
-            dirtyTracker.MarkDirty(command.CharacterId, DirtyFlags.Vitals);
+            state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
     }
 
     private void DrainRuneSocketCommands()
@@ -700,7 +700,7 @@ public sealed partial class Zone
         if (command.ManaAfterActivation is { } mana)
         {
             state.Mana = mana;
-            dirtyTracker.MarkDirty(command.CharacterId, DirtyFlags.Vitals);
+            state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
         }
 
         if (!command.Broadcast)

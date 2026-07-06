@@ -60,6 +60,7 @@ public static class FenrirDataServiceCollectionExtensions
         builder.Services.AddSingleton<IStarterKitRepository, StarterKitRepository>();
         builder.Services.AddSingleton<ISessionTicketRepository, SessionTicketRepository>();
         builder.Services.AddSingleton<IGameServerDirectoryRepository, GameServerDirectoryRepository>();
+        builder.Services.AddSingleton<IAccountSessionRepository, AccountSessionRepository>();
         builder.Services.AddSingleton<IShardMapAssignmentRepository, ShardMapAssignmentRepository>();
         builder.Services.AddSingleton<IGameSettingsRepository, GameSettingsRepository>();
 

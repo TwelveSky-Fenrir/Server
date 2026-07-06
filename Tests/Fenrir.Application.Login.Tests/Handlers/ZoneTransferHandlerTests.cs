@@ -44,11 +44,11 @@ public class ClDemandZoneServerInfoSendHandlerTests
         });
         var tickets = new FakeSessionTicketRepository();
         var handler = CreateHandler(directory, shardMaps, tickets);
-        var (session, pipe) = CreateSessionInCharSelect();
+        var (session, pipe) = CreateSessionInCharSelect(out var sessionToken);
 
         await handler.HandleAsync(new ZoneTransferRequest { AvatarPost = 0 }, session, CancellationToken.None);
 
-        Assert.Equal((1, 501, (byte)2, 15),
+        Assert.Equal((1, 501, (byte)2, 15, sessionToken),
             tickets.LastCreatedTicket);
         Assert.Equal(LoginSessionState.HandoverIssued, session.State);
         await PacketAssert.AssertSentAsync(pipe, new ZoneTransferResponse
@@ -68,11 +68,11 @@ public class ClDemandZoneServerInfoSendHandlerTests
         });
         var tickets = new FakeSessionTicketRepository();
         var handler = CreateHandler(directory, shardMaps, tickets);
-        var (session, pipe) = CreateSessionInCharSelect();
+        var (session, pipe) = CreateSessionInCharSelect(out var sessionToken);
 
         await handler.HandleAsync(new ZoneTransferRequest { AvatarPost = 0 }, session, CancellationToken.None);
 
-        Assert.Equal((1, 501, (byte)1, 15),
+        Assert.Equal((1, 501, (byte)1, 15, sessionToken),
             tickets.LastCreatedTicket);
         await PacketAssert.AssertSentAsync(pipe, new ZoneTransferResponse
         {
@@ -89,11 +89,13 @@ public class ClDemandZoneServerInfoSendHandlerTests
             NullLogger<ZoneTransferService>.Instance));
     }
 
-    private static (LoginClientSession Session, FakeDuplexPipe Pipe) CreateSessionInCharSelect()
+    private static (LoginClientSession Session, FakeDuplexPipe Pipe) CreateSessionInCharSelect(out Guid sessionToken)
     {
         var pipe = new FakeDuplexPipe();
         var session = new LoginClientSession(1, pipe);
         session.MarkAuthenticated(1);
+        sessionToken = Guid.NewGuid();
+        session.MarkAccountSessionToken(sessionToken);
         session.MarkCharSelect();
         return (session, pipe);
     }

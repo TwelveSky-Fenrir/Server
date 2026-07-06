@@ -23,6 +23,13 @@ public sealed class LoginClientSession(long sessionId, IDuplexPipe transport, IP
     /// </summary>
     public int PinFailureCount { get; private set; }
 
+    /// <summary>
+    ///     Set by <see cref="MarkAccountSessionToken" /> — the token <c>runtime.AccountSessions</c> minted
+    ///     for this login epoch. Carried into the zone-transfer ticket so the game-side handshake can prove
+    ///     it's completing the same login, not a hijack of a newer one. Null until authenticated.
+    /// </summary>
+    public Guid? AccountSessionToken { get; private set; }
+
     public override bool IsOpcodeAllowed(byte opcode)
     {
         return SessionStateGate.Allows(State, opcode);
@@ -37,6 +44,12 @@ public sealed class LoginClientSession(long sessionId, IDuplexPipe transport, IP
     {
         AccountId = accountId;
         State = LoginSessionState.Authenticated;
+    }
+
+    /// <summary>Records the token <c>usp_AccountSession_ClaimOrSignalKick</c> minted for this login epoch.</summary>
+    public void MarkAccountSessionToken(Guid token)
+    {
+        AccountSessionToken = token;
     }
 
     /// <summary>

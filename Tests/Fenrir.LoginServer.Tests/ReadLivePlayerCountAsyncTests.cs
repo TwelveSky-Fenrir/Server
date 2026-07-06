@@ -58,6 +58,7 @@ public class ReadLivePlayerCountAsyncTests
             rateLimiter: null!,
             new SessionRegistry(),
             directory,
+            new FakeAccountSessionRepository(),
             NullLogger<LoginConnectionHost>.Instance);
     }
 }

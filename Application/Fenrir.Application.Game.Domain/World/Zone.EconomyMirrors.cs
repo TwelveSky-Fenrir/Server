@@ -283,7 +283,7 @@ public sealed partial class Zone
                     state.LastSeenPetItemId = newPetItemId;
                     state.PetGrowth = 0;
                     state.PetActivity = 0;
-                    dirtyTracker.MarkDirty(command.CharacterId, DirtyFlags.Progression);
+                    state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
                 }
             }
         }
@@ -314,7 +314,7 @@ public sealed partial class Zone
 
         state.LearnedSkills = state.LearnedSkills.SetItem(command.Slot, command.Skill);
         state.SkillPoints = command.NewSkillPoints;
-        dirtyTracker.MarkDirty(command.CharacterId, DirtyFlags.Progression);
+        state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
     }
 
     private void DrainMentorCommands()
@@ -507,7 +507,7 @@ public sealed partial class Zone
         }
 
         if (changed)
-            dirtyTracker.MarkDirty(command.CharacterId, DirtyFlags.Progression);
+            state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
 
         if (!command.DropItems.IsDefaultOrEmpty)
             foreach (var drop in command.DropItems)
@@ -558,7 +558,7 @@ public sealed partial class Zone
         if (command.TeacherPointDelta != 0)
             state.TeacherPoint += command.TeacherPointDelta;
         if (command.ExperienceDelta != 0 || command.ContributionPointsDelta != 0 || command.TeacherPointDelta != 0)
-            dirtyTracker.MarkDirty(command.CharacterId, DirtyFlags.Progression);
+            state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
     }
 
     private void DrainMissionCommands()

@@ -37,13 +37,26 @@ public static class CombatResolver
 
     public static readonly TimeSpan ProtectDuration = SimulationClock.ToTimeSpan(ProtectTickLegacyTicks);
 
+    /// <param name="zoneAllowsEnemyTribeAttack">
+    ///     Whether the zone/map this attack is occurring in has open-tribe PvP enabled. Legacy stores this as a
+    ///     per-zone flag in a 350-entry table (Server/Header/S18_MyZoneInfo.cpp:9-393, defaulted to 0/disabled for
+    ///     any zone id absent from the table, e.g. zone 39) and reads it once from a process-wide zone id fixed at
+    ///     boot (Server/ts25zone/S01_MainApplication.cpp:236) since one legacy process serves exactly one zone;
+    ///     Fenrir shards a disjoint *set* of maps per process, so callers must resolve this per the specific
+    ///     zone/map the attack occurs in, not once per shard -- that lookup is this parameter's caller's
+    ///     responsibility, not this method's. The legacy flag is tri-state (0/1/2) but both real call sites
+    ///     (S07_MyGame02.cpp:947, :3579) test only equality-to-zero, so 1 and 2 collapse to the same "enabled"
+    ///     outcome -- reduced to a bool here since no observed behavior distinguishes them. Defaults to
+    ///     <c>true</c> so existing/test callers that don't yet source real per-zone data keep prior behavior.
+    /// </param>
     public static AttackOutcome ResolveEnemyTribeAttack(
         CombatantSnapshot attacker,
         CombatantSnapshot defender,
         AttackForProtocol request,
         TimeSpan zoneClock,
         SkillDefinition? attackSkill,
-        IRandomSource rng)
+        IRandomSource rng,
+        bool zoneAllowsEnemyTribeAttack = true)
     {
         if (attacker.CharacterId == defender.CharacterId)
             return AttackOutcome.Reject(AttackRejectReason.SameCharacter);
@@ -51,6 +64,10 @@ public static class CombatResolver
             return AttackOutcome.Reject(AttackRejectReason.AttackerDead);
         if (defender.IsDead)
             return AttackOutcome.Reject(AttackRejectReason.DefenderDead);
+        // Zone-wide open-PvP authorization gate -- legacy-faithful position is immediately before the
+        // tribe/alliance check (S07_MyGame02.cpp:945-950, before :952-958); duels never evaluate this gate.
+        if (!zoneAllowsEnemyTribeAttack)
+            return AttackOutcome.Reject(AttackRejectReason.ZonePvpDisabled);
         // Alliance is not modeled -- only the plain same-tribe guard is reproduced (strictly less restrictive).
         if (attacker.Tribe == defender.Tribe)
             return AttackOutcome.Reject(AttackRejectReason.SameOrAlliedTribe);

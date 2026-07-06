@@ -10,7 +10,16 @@ public enum LoginOutcome
     /// <summary>Silent drop, no reply/abort: a legitimate NAT-shared client that burst its IP budget just retries later.</summary>
     RateLimited,
     Failure,
-    Success
+    Success,
+
+    /// <summary>
+    ///     Silent drop, no reply/abort: this account already held a live session on this same LoginServer process
+    ///     (runtime.AccountSessions ConflictLogin) -- the stale local session was just evicted
+    ///     (<see cref="Fenrir.Network.Dispatch.Sessions.DisconnectReason.Evicted" />) and this login attempt is
+    ///     dropped too, mirroring legacy tResult=8's "the player must retry afterward" rather than the new
+    ///     attempt winning outright. See <c>LoginService</c>'s remarks for the ServerDocs citation.
+    /// </summary>
+    DuplicateSessionEvicted
 }
 
 /// <summary>
@@ -18,6 +27,11 @@ public enum LoginOutcome
 ///     (account lookup + password verify) re-arms VersionOk so the client can retry on the same connection --
 ///     the earlier gates (IP block/version/MAC ban) never re-arm it.
 /// </summary>
+/// <param name="SessionToken">
+///     Populated only on <see cref="LoginOutcome.Success" /> -- the token
+///     <c>usp_AccountSession_ClaimOrSignalKick</c> minted for this login epoch (runtime.AccountSessions), carried
+///     into the zone-transfer ticket so the game-side handshake can prove it's completing the same login.
+/// </param>
 public sealed record LoginResult(
     LoginOutcome Outcome,
     int ResultCode,
@@ -26,10 +40,15 @@ public sealed record LoginResult(
     int AccountId,
     bool RequirePin,
     string PinMask,
-    ImmutableArray<CharacterSummaryDto> Characters)
+    ImmutableArray<CharacterSummaryDto> Characters,
+    Guid? SessionToken = null)
 {
     public static LoginResult RateLimitedResult { get; } =
         new(LoginOutcome.RateLimited, 0, "", false, 0, false, "", []);
+
+    /// <summary>Identical wire shape to <see cref="RateLimitedResult" /> -- both are a silent, no-reply drop.</summary>
+    public static LoginResult SilentDropResult { get; } =
+        new(LoginOutcome.DuplicateSessionEvicted, 0, "", false, 0, false, "", []);
 }
 
 public interface ILoginService

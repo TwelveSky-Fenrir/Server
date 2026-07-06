@@ -122,7 +122,7 @@ public sealed class AutoHuntTickSystem(WorldDataCache worldData, DirtyTracker<in
                 continue;
 
             state.Mana -= result.ManaCost;
-            dirtyTracker.MarkDirty(state.CharacterId, DirtyFlags.Vitals);
+            state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
             ApplyBuffWrites(zone, state, result.BuffWrites);
             return; // BotBuff's own `break` -- at most one auto-cast per legacy tick.
         }

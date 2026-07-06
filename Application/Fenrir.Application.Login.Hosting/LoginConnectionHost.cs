@@ -24,6 +24,7 @@ public sealed class LoginConnectionHost(
     ISessionRateLimiter rateLimiter,
     SessionRegistry registry,
     IGameServerDirectoryRepository directory,
+    IAccountSessionRepository accountSessions,
     ILogger<LoginConnectionHost> logger) : BackgroundService
 {
     private FenrirTcpListener<LoginClientSession>? _listener;
@@ -67,9 +68,34 @@ public sealed class LoginConnectionHost(
         }
         finally
         {
+            if (loginSession.AccountId is { } accountId)
+                await TearDownAccountSessionAsync(accountId, loginSession.AccountSessionToken).ConfigureAwait(false);
+
             registry.Unregister(loginSession.SessionId);
             rateLimiter.Remove(loginSession.SessionId);
             await connection.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    ///     Best-effort cross-process cleanup of this account's <c>runtime.AccountSessions</c> row -- must never
+    ///     throw out of a connection-teardown path. <see cref="IAccountSessionRepository.ClearIfOwnerAsync" />
+    ///     idempotently no-ops if the row already moved on (e.g. a newer login already replaced it).
+    /// </summary>
+    private async ValueTask TearDownAccountSessionAsync(int accountId, Guid? sessionToken)
+    {
+        try
+        {
+            await accountSessions.MarkTearingDownAsync(accountId, CancellationToken.None).ConfigureAwait(false);
+            await accountSessions
+                .ClearIfOwnerAsync(accountId, AccountSessionServerKind.Login, null, sessionToken ?? default,
+                    CancellationToken.None)
+                .ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to tear down runtime.AccountSessions row for account {AccountId}",
+                accountId);
         }
     }
 

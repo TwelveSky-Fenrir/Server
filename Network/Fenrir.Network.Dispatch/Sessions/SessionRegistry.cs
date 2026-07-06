@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Collections.Immutable;
 
 namespace Fenrir.Network.Dispatch.Sessions;
 
@@ -24,6 +25,26 @@ public sealed class SessionRegistry
     public bool TryGet(long sessionId, out ClientSession? session)
     {
         return _sessions.TryGetValue(sessionId, out session);
+    }
+
+    // Cross-process duplicate-login kick/refusal: lets a caller resolve "is this account's session held by
+    // this process, and which one" without walking every registered session.
+    public bool TryGetByAccount(long accountId, out ClientSession? session)
+    {
+        if (_accountToSession.TryGetValue(accountId, out var sessionId))
+            return _sessions.TryGetValue(sessionId, out session);
+
+        session = null;
+        return false;
+    }
+
+    /// <summary>
+    ///     Best-effort snapshot of every AccountId this process currently holds a local session for --
+    ///     used by the periodic cross-process liveness/kick polls, never by the synchronous login-time check.
+    /// </summary>
+    public ImmutableArray<long> SnapshotAssociatedAccountIds()
+    {
+        return [.._accountToSession.Keys];
     }
 
     public void Unregister(long sessionId)

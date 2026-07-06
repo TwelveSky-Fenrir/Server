@@ -158,7 +158,7 @@ public sealed partial class Zone
             return;
 
         target.Life -= outcome.DamageApplied;
-        dirtyTracker.MarkDirty(target.CharacterId, DirtyFlags.Vitals);
+        target.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
 
         if (target.Life <= 0)
             ApplyDeath(target.CharacterId, DeathCause.MonsterKill);

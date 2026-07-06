@@ -7,6 +7,13 @@ public enum AttackRejectReason
     SameCharacter,
     AttackerDead,
     DefenderDead,
+
+    /// <summary>
+    ///     Open-PvP (enemy-tribe) is disabled for the zone/map this attack is occurring in -- the
+    ///     legacy-faithful gate at <c>AttackPlayer</c>'s ENEMY branch (S07_MyGame02.cpp:945-950). Duels are
+    ///     never gated by this; it only applies to <see cref="CombatResolver.ResolveEnemyTribeAttack" />.
+    /// </summary>
+    ZonePvpDisabled,
     SameOrAlliedTribe,
     OutOfRange,
     AttackerProtected,

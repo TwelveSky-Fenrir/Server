@@ -9,6 +9,11 @@ public static class HostingServiceCollectionExtensions
     {
         services.AddHostedService<LoginConnectionHost>();
 
+        // Cross-process duplicate-login kick/refusal: keeps this process's live sessions' runtime.AccountSessions
+        // rows warm, and reaps rows any process (Login or Game) abandoned without running its own teardown path.
+        services.AddHostedService<AccountSessionLivenessHost>();
+        services.AddHostedService<AccountSessionReapHost>();
+
         return services;
     }
 }

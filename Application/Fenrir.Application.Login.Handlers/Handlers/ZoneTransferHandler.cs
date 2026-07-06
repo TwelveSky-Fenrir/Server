@@ -18,8 +18,13 @@ public sealed class ZoneTransferHandler(IZoneTransferService zoneTransferService
         var loginSession = (LoginClientSession)session;
         var accountId = loginSession.AccountId!.Value;
 
+        // Never null here: LoginHandler's success branch always calls MarkAuthenticated and MarkAccountSessionToken
+        // together (LoginService.LoginAsync mints the token in the same Success outcome), and SessionStateGate only
+        // allows op22 once the session has reached Authenticated/CharSelect -- both post-date that pairing.
+        var sessionToken = loginSession.AccountSessionToken!.Value;
+
         var result = await zoneTransferService.RequestZoneTransferAsync(accountId, (byte)packet.AvatarPost,
-            cancellationToken);
+            sessionToken, cancellationToken);
 
         if (result.Outcome != ZoneTransferOutcome.Success)
         {

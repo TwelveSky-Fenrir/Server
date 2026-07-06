@@ -84,7 +84,8 @@ public sealed partial class Zone
             : null;
 
         var outcome = CombatResolver.ResolveEnemyTribeAttack(attackerSnapshot, defenderSnapshot,
-            command.AttackInfo, _clock, attackSkill, _random);
+            command.AttackInfo, _clock, attackSkill, _random,
+            ZonePvpZoneCatalog.AllowsEnemyTribeAttack(MapId));
 
         if (outcome.Rejected)
             return;
@@ -113,7 +114,7 @@ public sealed partial class Zone
             return;
 
         defenderState.Life -= outcome.DamageApplied;
-        dirtyTracker.MarkDirty(defenderState.CharacterId, DirtyFlags.Vitals);
+        defenderState.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
 
         if (defenderState.Life <= 0)
         {
@@ -137,7 +138,7 @@ public sealed partial class Zone
 
         attackerState.MissionKillOtherTribe =
             Math.Min(attackerState.MissionKillOtherTribe + 1, KillCooldownTracker.MissionKillOtherTribeCap);
-        dirtyTracker.MarkDirty(attackerState.CharacterId, DirtyFlags.Progression);
+        attackerState.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
     }
 
     /// <summary>
@@ -275,7 +276,7 @@ public sealed partial class Zone
         {
             var previousExperience = target.Experience;
             target.Experience += gain;
-            dirtyTracker.MarkDirty(target.CharacterId, DirtyFlags.Progression);
+            target.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
 
             var levelUp = LevelProgressionCalculator.ResolveLevelUp(previousExperience, gain, worldData.LevelsByLevel);
             if (!levelUp.LeveledUp)
@@ -308,7 +309,7 @@ public sealed partial class Zone
                 target.Mana = stats.MaxMana;
             }
 
-            dirtyTracker.MarkDirty(target.CharacterId, DirtyFlags.Vitals);
+            target.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
         }
     }
 
@@ -336,7 +337,7 @@ public sealed partial class Zone
                 if (state.QuestKillCounter < (quest.Quest.Solution2 ?? 0))
                 {
                     state.QuestKillCounter++;
-                    dirtyTracker.MarkDirty(killerCharacterId, DirtyFlags.Progression);
+                    state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
                 }
 
                 break;
@@ -344,7 +345,7 @@ public sealed partial class Zone
                 if (state.QuestKillCounter < 1)
                 {
                     state.QuestKillCounter++;
-                    dirtyTracker.MarkDirty(killerCharacterId, DirtyFlags.Progression);
+                    state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
                 }
 
                 break;

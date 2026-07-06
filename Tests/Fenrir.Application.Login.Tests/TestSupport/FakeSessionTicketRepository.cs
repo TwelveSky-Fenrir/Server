@@ -6,11 +6,16 @@ namespace Fenrir.Application.Login.Tests.TestSupport;
 // concerns, never exercised from the Login-side handoff handler under test here.
 internal sealed class FakeSessionTicketRepository : ISessionTicketRepository
 {
-    public (int AccountId, int CharacterId, byte ShardId, int TtlSeconds)? LastCreatedTicket { get; private set; }
-
-    public ValueTask CreateAsync(int accountId, int characterId, byte shardId, int ttlSeconds, CancellationToken ct)
+    public (int AccountId, int CharacterId, byte ShardId, int TtlSeconds, Guid SessionToken)? LastCreatedTicket
     {
-        LastCreatedTicket = (accountId, characterId, shardId, ttlSeconds);
+        get;
+        private set;
+    }
+
+    public ValueTask CreateAsync(int accountId, int characterId, byte shardId, int ttlSeconds, Guid sessionToken,
+        CancellationToken ct)
+    {
+        LastCreatedTicket = (accountId, characterId, shardId, ttlSeconds, sessionToken);
         return ValueTask.CompletedTask;
     }
 

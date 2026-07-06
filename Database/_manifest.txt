@@ -7,6 +7,7 @@ Tables/auth/AccountPins.sql
 Tables/game/Characters.sql
 Tables/runtime/SessionTickets.sql
 Tables/runtime/GameServerDirectory.sql
+Tables/runtime/AccountSessions.sql
 
 Tables/world/Levels.sql
 Tables/world/Skills.sql
@@ -95,6 +96,7 @@ Schemas/Types/game/tvp_CharacterItemSlot.sql
 Schemas/Types/game/tvp_CharacterProgress.sql
 Schemas/Types/game/tvp_CharacterSkillSlot.sql
 Schemas/Types/game/tvp_CharacterHotkeySlot.sql
+Schemas/Types/runtime/tvp_AccountIdList.sql
 
 Views/world/vw_ItemBonusSkillDetail.sql
 Views/world/vw_MonsterWithDropSummary.sql
@@ -140,6 +142,14 @@ StoredProcedures/runtime/usp_SessionTicket_Consume.sql
 StoredProcedures/runtime/usp_SessionTicket_Purge.sql
 StoredProcedures/runtime/usp_GameServer_Heartbeat.sql
 StoredProcedures/runtime/usp_GameServer_GetDirectory.sql
+
+# Cross-process duplicate-login kick/refusal (runtime.AccountSessions)
+StoredProcedures/runtime/usp_AccountSession_ClaimOrSignalKick.sql
+StoredProcedures/runtime/usp_AccountSession_TransitionToGame.sql
+StoredProcedures/runtime/usp_AccountSession_MarkTearingDown.sql
+StoredProcedures/runtime/usp_AccountSession_ClearIfOwner.sql
+StoredProcedures/runtime/usp_AccountSession_RefreshAndGetKicked.sql
+StoredProcedures/runtime/usp_AccountSession_ReapStale.sql
 
 StoredProcedures/world/usp_Level_GetAll.sql
 StoredProcedures/world/usp_Skill_GetAll.sql
@@ -284,6 +294,7 @@ StoredProcedures/admin/usp_GameSettings_Get.sql
 
 Migrations/001_roles.sql
 Migrations/002_roles_login_gifts.sql
+Migrations/010_session_tickets_add_session_token.sql
 
 Migrations/Seed/001_dev_account.sql
 

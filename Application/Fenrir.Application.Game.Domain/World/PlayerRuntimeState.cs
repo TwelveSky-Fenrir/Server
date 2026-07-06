@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.Stats;
+using Fenrir.Data.WriteBehind;
 using Fenrir.Network.Abstractions;
 
 namespace Fenrir.Application.Game.Domain.World;
@@ -119,8 +120,32 @@ public sealed partial class PlayerRuntimeState
 
     /// <summary>
     ///     Server-side monotonic counter, independent of the DB's own FlushSequence baseline -- incremented
-    ///     once per accepted move, never reset, so <c>usp_Character_PersistBatch</c>'s idempotence guard
-    ///     always sees a strictly increasing value for this character's lifetime in this zone.
+    ///     once per accepted move (<c>Zone.PlayerLifecycle.HandleMove</c>) or once per call to
+    ///     <see cref="MarkProgressDirty" />, never reset, so <c>usp_Character_PersistBatch</c> AND
+    ///     <c>usp_Character_PersistProgressBatch</c> -- which share this single per-character column -- always
+    ///     see a strictly increasing value for this character's lifetime in this zone.
     /// </summary>
     public long FlushSequence { get; set; }
+
+    /// <summary>
+    ///     Every Vitals/Progression dirty-mark site (combat, death/XP-loss, revive, skill cast/mana, quest/pet/
+    ///     rebirth/CP mirrors) must route through here instead of calling <c>dirtyTracker.MarkDirty</c> directly.
+    ///     Centralizing the <see cref="FlushSequence" /> bump here (rather than duplicating
+    ///     <c>state.FlushSequence++;</c> at each of the ~25 call sites across 8 files) is what makes
+    ///     <c>Fenrir.Application.Game.Hosting.World.ProgressWriteBehindHost</c>'s flush actually durable:
+    ///     without it, a Vitals/Progression-only change with no accompanying move would never bump the shared
+    ///     counter, so <c>usp_Character_PersistProgressBatch</c>'s "FlushSequence &gt; stored" guard would
+    ///     silently no-op every progress flush after the very first one each session -- the exact
+    ///     zero-net-cost item/CP-duplication shape this fix closes. Safe to call unsynchronized: every one of
+    ///     these call sites already runs on this character's own zone tick thread (single-writer), the same
+    ///     contract <see cref="FlushSequence" /> and every other field on this type already relies on. Position
+    ///     keeps its own separate, pre-existing <c>state.FlushSequence++;</c> inline in <c>HandleMove</c> --
+    ///     deliberately not routed through here, so its historical exactly-once-per-accepted-move cadence is
+    ///     untouched by this change.
+    /// </summary>
+    public void MarkProgressDirty(DirtyTracker<int> dirtyTracker, DirtyFlags flags)
+    {
+        FlushSequence++;
+        dirtyTracker.MarkDirty(CharacterId, flags);
+    }
 }

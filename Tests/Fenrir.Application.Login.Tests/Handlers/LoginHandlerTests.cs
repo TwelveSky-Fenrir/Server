@@ -8,6 +8,7 @@ using Fenrir.Application.Login.Tests.TestSupport;
 using Fenrir.Network.Serialization.Packets.Login;
 using Fenrir.Network.Serialization.Packets.Shared;
 using Fenrir.Data.Abstractions.Accounts;
+using Fenrir.Data.Abstractions.Runtime;
 using Fenrir.Data.Security;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Framing;
@@ -90,11 +91,69 @@ public class LoginHandlerTests
 
         // RequireSecondPassword defaults to true (secondLoginSort=1); no stored PIN yet (pinMask="").
         await AssertFirstResponseAsync(pipe, LoginTrain.BuildLoginRecv(0, "MG7", 1, ""));
+        Assert.NotNull(session.AccountSessionToken);
+    }
+
+    // Cross-process duplicate-login kick/refusal: runtime.AccountSessions flags a live Login-side row for this
+    // same account (ServerDocs/11_ts25login/01_Flux_Authentification_Redirection.md:145 "case 4" -- kick the
+    // stale local session directly). The new attempt is dropped too, silently, exactly like RateLimited.
+    [Fact]
+    public async Task HandleAsync_ConflictLogin_WithALiveLocalSession_EvictsTheOldSession_AndDropsTheNewAttemptSilently()
+    {
+        var (hash, salt) = PasswordHasher.Hash("correct-password");
+        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, IsBanned: false);
+        var accounts = FakeAccountRepository.WithAccount(account);
+        var registry = new SessionRegistry();
+        var staleSession = new LoginClientSession(99, new FakeDuplexPipe());
+        registry.Register(staleSession);
+        registry.AssociateAccount(99, 7);
+
+        var accountSessions = new FakeAccountSessionRepository { ClaimOutcome = AccountSessionClaimOutcome.ConflictLogin };
+        var handler = CreateHandler(out var session, out var pipe, accounts, registry: registry,
+            accountSessions: accountSessions);
+
+        await handler.HandleAsync(ValidLoginRequest(password: "correct-password"), session, CancellationToken.None);
+
+        Assert.Equal(DisconnectReason.Evicted, staleSession.DisconnectReason);
+        PacketAssert.AssertNothingSent(pipe);
+        Assert.Null(session.AccountId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ConflictLogin_WithNoMatchingLocalSession_SendsAlreadyConnectedResult()
+    {
+        var (hash, salt) = PasswordHasher.Hash("correct-password");
+        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, IsBanned: false);
+        var accounts = FakeAccountRepository.WithAccount(account);
+        var accountSessions = new FakeAccountSessionRepository { ClaimOutcome = AccountSessionClaimOutcome.ConflictLogin };
+        var handler = CreateHandler(out var session, out var pipe, accounts, accountSessions: accountSessions);
+
+        await handler.HandleAsync(ValidLoginRequest(password: "correct-password"), session, CancellationToken.None);
+
+        await AssertFirstResponseAsync(pipe, LoginTrain.BuildLoginRecv(8, "someuser", 0, LoginTrain.FailurePinMask));
+    }
+
+    [Theory]
+    [InlineData(AccountSessionClaimOutcome.ConflictGameKicked)]
+    [InlineData(AccountSessionClaimOutcome.ConflictTearingDown)]
+    public async Task HandleAsync_AccountAlreadyClaimedElsewhere_SendsAlreadyConnectedResult(
+        AccountSessionClaimOutcome outcome)
+    {
+        var (hash, salt) = PasswordHasher.Hash("correct-password");
+        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, IsBanned: false);
+        var accounts = FakeAccountRepository.WithAccount(account);
+        var accountSessions = new FakeAccountSessionRepository { ClaimOutcome = outcome };
+        var handler = CreateHandler(out var session, out var pipe, accounts, accountSessions: accountSessions);
+
+        await handler.HandleAsync(ValidLoginRequest(password: "correct-password"), session, CancellationToken.None);
+
+        await AssertFirstResponseAsync(pipe, LoginTrain.BuildLoginRecv(8, "someuser", 0, LoginTrain.FailurePinMask));
     }
 
     private static LoginHandler CreateHandler(out LoginClientSession session, out FakeDuplexPipe pipe,
         FakeAccountRepository accounts, bool blockedIp = false, bool firewallRuleBlocked = false,
-        bool gmAllowlisted = false, bool accountBanned = false, params string[] bannedMacAddresses)
+        bool gmAllowlisted = false, bool accountBanned = false, string[]? bannedMacAddresses = null,
+        SessionRegistry? registry = null, FakeAccountSessionRepository? accountSessions = null)
     {
         pipe = new FakeDuplexPipe();
         session = new LoginClientSession(1, pipe, RemoteEndPoint);
@@ -111,9 +170,10 @@ public class LoginHandlerTests
             new LoginIpRateLimiter(),
             firewall,
             new FakeBanRepository(accountBanned),
-            new FakeMacRestrictionRepository(bannedMacAddresses),
+            new FakeMacRestrictionRepository(bannedMacAddresses ?? []),
             Options.Create(new LoginServerOptions { ExpectedClientVersion = ClientVersion }),
-            new SessionRegistry()));
+            registry ?? new SessionRegistry(),
+            accountSessions ?? new FakeAccountSessionRepository()));
     }
 
     private static LoginRequest ValidLoginRequest(string id = "someuser", string password = "irrelevant",

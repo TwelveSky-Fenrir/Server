@@ -3,6 +3,9 @@
   <ItemGroup>
     <PackageReference Include="CaeriusNet"/>
     <PackageReference Include="Konscious.Security.Cryptography.Argon2"/>
+    <!-- Only for catching SqlException.Number on the AccountSessionRepository claim-conflict retry loop;
+         CaeriusNet already pulls this in transitively, this makes the direct dependency explicit. -->
+    <PackageReference Include="Microsoft.Data.SqlClient"/>
   </ItemGroup>
 
   <ItemGroup>

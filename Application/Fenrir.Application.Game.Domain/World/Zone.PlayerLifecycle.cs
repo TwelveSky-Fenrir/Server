@@ -229,7 +229,7 @@ public sealed partial class Zone
         state.IsDead = true;
         state.ReviveAtZoneClock = _clock + SimulationClock.DeathReviveDelay;
 
-        dirtyTracker.MarkDirty(characterId, DirtyFlags.Vitals);
+        state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
 
         if (cause == DeathCause.MonsterKill)
             ApplyDeathExperienceLoss(state);
@@ -275,7 +275,7 @@ public sealed partial class Zone
                 return;
             case >= ExperienceFormulas.MaxLimitLevel:
                 state.ContributionPoints -= ExperienceFormulas.CpLossAtLevelCap;
-                dirtyTracker.MarkDirty(state.CharacterId, DirtyFlags.Progression);
+                state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
                 return;
         }
 
@@ -287,7 +287,7 @@ public sealed partial class Zone
             return;
 
         state.Experience -= loss;
-        dirtyTracker.MarkDirty(state.CharacterId, DirtyFlags.Progression);
+        state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
     }
 
     /// <summary>Sweeps every dead player whose scheduled revive (<see cref="ApplyDeath" />) is due this tick.</summary>
@@ -322,7 +322,7 @@ public sealed partial class Zone
         state.IsDead = false;
         state.Life = 1;
 
-        dirtyTracker.MarkDirty(characterId, DirtyFlags.Vitals);
+        state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
 
         SendAvatarAction(state.Session, state);
         var neighbors = _grid.Neighbors(state.CurrentCell).Where(id => id != characterId).ToArray();
@@ -418,7 +418,7 @@ public sealed partial class Zone
 
         state.LastSkillCastAtZoneClock = _clock;
         state.Mana -= result.ManaCost;
-        dirtyTracker.MarkDirty(state.CharacterId, DirtyFlags.Vitals);
+        state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
 
         switch (result.Kind)
         {
@@ -482,7 +482,7 @@ public sealed partial class Zone
             target.Mana += amount;
         }
 
-        dirtyTracker.MarkDirty(target.CharacterId, DirtyFlags.Vitals);
+        target.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
     }
 
     /// <summary>

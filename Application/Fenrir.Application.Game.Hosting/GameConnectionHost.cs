@@ -2,6 +2,7 @@ using System.Net;
 using System.Security.Cryptography;
 using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Data.Abstractions.Runtime;
 using Fenrir.Data.WriteBehind;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch;
@@ -23,6 +24,7 @@ public sealed class GameConnectionHost(
     ISessionRateLimiter rateLimiter,
     SessionRegistry registry,
     IWriteBehindFlusher writeBehindFlusher,
+    IAccountSessionRepository accountSessions,
     ILogger<GameConnectionHost> logger) : BackgroundService
 {
     private FenrirTcpListener<ZoneClientSession>? _listener;
@@ -80,9 +82,34 @@ public sealed class GameConnectionHost(
                 writeBehindFlusher.RequestImmediateFlush();
             }
 
+            if (zoneSession.AccountId is { } accountId)
+                await TearDownAccountSessionAsync(accountId, zoneSession.AccountSessionToken).ConfigureAwait(false);
+
             registry.Unregister(zoneSession.SessionId);
             rateLimiter.Remove(zoneSession.SessionId);
             await connection.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    ///     Best-effort cross-process cleanup of this account's <c>runtime.AccountSessions</c> row -- must never
+    ///     throw out of a connection-teardown path. <see cref="IAccountSessionRepository.ClearIfOwnerAsync" />
+    ///     idempotently no-ops if the row already moved on (e.g. a newer login already replaced it).
+    /// </summary>
+    private async ValueTask TearDownAccountSessionAsync(int accountId, Guid? sessionToken)
+    {
+        try
+        {
+            await accountSessions.MarkTearingDownAsync(accountId, CancellationToken.None).ConfigureAwait(false);
+            await accountSessions
+                .ClearIfOwnerAsync(accountId, AccountSessionServerKind.Game, options.Value.ShardId,
+                    sessionToken ?? default, CancellationToken.None)
+                .ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to tear down runtime.AccountSessions row for account {AccountId}",
+                accountId);
         }
     }
 

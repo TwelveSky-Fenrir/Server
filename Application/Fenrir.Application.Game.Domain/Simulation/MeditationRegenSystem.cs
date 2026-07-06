@@ -39,7 +39,7 @@ public sealed class MeditationRegenSystem(WorldDataCache worldData, DirtyTracker
 
             state.Life = life;
             state.Mana = mana;
-            dirtyTracker.MarkDirty(state.CharacterId, DirtyFlags.Vitals);
+            state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
         }
     }
 

@@ -76,7 +76,15 @@ public sealed class GameConnectionHost(
             // ordering) -- so this runs before Greet, not after.
             if (remoteIp is not null &&
                 !await ipFloodGuard.TryAcquireConnectionAsync(remoteIp, ct).ConfigureAwait(false))
-                return; // IP just got persistently blocked and every session sharing it (this one included) aborted
+            {
+                // IP just got persistently blocked and every session sharing it (this one included) aborted
+                logger.LogWarning("Zone connection {SessionId} from {RemoteIp} rejected by IP flood guard",
+                    zoneSession.SessionId, remoteIp);
+                return;
+            }
+
+            logger.LogInformation("Zone connection {SessionId} accepted from {RemoteIp}", zoneSession.SessionId,
+                remoteIp);
 
             Greet(zoneSession, connection);
 
@@ -108,6 +116,10 @@ public sealed class GameConnectionHost(
                 writeBehindFlusher.RequestImmediateFlush();
 
                 await LogLogoutAsync(zoneSession.AccountId, characterId, zone.MapId).ConfigureAwait(false);
+
+                logger.LogInformation(
+                    "Zone session {SessionId} for character {CharacterId} left map {MapId}", zoneSession.SessionId,
+                    characterId, zone.MapId);
             }
 
             if (zoneSession.AccountId is { } accountId)

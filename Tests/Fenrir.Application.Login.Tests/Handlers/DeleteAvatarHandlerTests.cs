@@ -6,6 +6,7 @@ using Fenrir.Data.Abstractions.Commerce;
 using Fenrir.Data.Abstractions.Guilds;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Login;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Login.Tests.Handlers;
 
@@ -34,8 +35,11 @@ public class DeleteAvatarHandlerTests
     public async Task HandleAsync_NoRefusalsApply_DeletesAndRepliesResultZero()
     {
         var characters = FakeCharacterRepository.WithSummaries(Summary);
-        var handler = new DeleteAvatarHandler(new DeleteAvatarService(characters, FakeTribeRepository.Empty(),
-            FakeWorldStateRepository.Empty(), FakeGuildRepository.Empty(), FakeOfflineShopRepository.Empty()));
+        var handler = new DeleteAvatarHandler(
+            new DeleteAvatarService(characters, FakeTribeRepository.Empty(),
+                FakeWorldStateRepository.Empty(), FakeGuildRepository.Empty(), FakeOfflineShopRepository.Empty(),
+                NullLogger<DeleteAvatarService>.Instance),
+            NullLogger<DeleteAvatarHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
 
         await handler.HandleAsync(Request(), session, CancellationToken.None);
@@ -49,9 +53,12 @@ public class DeleteAvatarHandlerTests
     public async Task HandleAsync_TribeMaster_RepliesResultTwoWithoutDeleting()
     {
         var characters = FakeCharacterRepository.WithSummaries(Summary);
-        var handler = new DeleteAvatarHandler(new DeleteAvatarService(characters,
-            FakeTribeRepository.WithRole(CharacterId, 1), FakeWorldStateRepository.Empty(),
-            FakeGuildRepository.Empty(), FakeOfflineShopRepository.Empty()));
+        var handler = new DeleteAvatarHandler(
+            new DeleteAvatarService(characters,
+                FakeTribeRepository.WithRole(CharacterId, 1), FakeWorldStateRepository.Empty(),
+                FakeGuildRepository.Empty(), FakeOfflineShopRepository.Empty(),
+                NullLogger<DeleteAvatarService>.Instance),
+            NullLogger<DeleteAvatarHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
 
         await handler.HandleAsync(Request(), session, CancellationToken.None);
@@ -66,9 +73,11 @@ public class DeleteAvatarHandlerTests
     {
         var characters = FakeCharacterRepository.WithSummaries(Summary);
         var membership = new CharacterGuildMembershipDto(1, "Guild", 0, "Rookie");
-        var handler = new DeleteAvatarHandler(new DeleteAvatarService(characters, FakeTribeRepository.Empty(),
-            FakeWorldStateRepository.Empty(), FakeGuildRepository.WithMembership(CharacterId, membership),
-            FakeOfflineShopRepository.Empty()));
+        var handler = new DeleteAvatarHandler(
+            new DeleteAvatarService(characters, FakeTribeRepository.Empty(),
+                FakeWorldStateRepository.Empty(), FakeGuildRepository.WithMembership(CharacterId, membership),
+                FakeOfflineShopRepository.Empty(), NullLogger<DeleteAvatarService>.Instance),
+            NullLogger<DeleteAvatarHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
 
         await handler.HandleAsync(Request(), session, CancellationToken.None);
@@ -83,9 +92,11 @@ public class DeleteAvatarHandlerTests
     {
         var characters = FakeCharacterRepository.WithSummaries(Summary);
         var shop = new OfflineShopRowDto(CharacterId, null, 1, 0, 0, 0, 0, 0, 0, "");
-        var handler = new DeleteAvatarHandler(new DeleteAvatarService(characters, FakeTribeRepository.Empty(),
-            FakeWorldStateRepository.Empty(), FakeGuildRepository.Empty(),
-            FakeOfflineShopRepository.With(CharacterId, shop)));
+        var handler = new DeleteAvatarHandler(
+            new DeleteAvatarService(characters, FakeTribeRepository.Empty(),
+                FakeWorldStateRepository.Empty(), FakeGuildRepository.Empty(),
+                FakeOfflineShopRepository.With(CharacterId, shop), NullLogger<DeleteAvatarService>.Instance),
+            NullLogger<DeleteAvatarHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
 
         await handler.HandleAsync(Request(), session, CancellationToken.None);
@@ -101,8 +112,11 @@ public class DeleteAvatarHandlerTests
     public async Task HandleAsync_AvatarPostOutOfRange_AbortsWithoutReplying(int avatarPost)
     {
         var characters = FakeCharacterRepository.WithSummaries(Summary);
-        var handler = new DeleteAvatarHandler(new DeleteAvatarService(characters, FakeTribeRepository.Empty(),
-            FakeWorldStateRepository.Empty(), FakeGuildRepository.Empty(), FakeOfflineShopRepository.Empty()));
+        var handler = new DeleteAvatarHandler(
+            new DeleteAvatarService(characters, FakeTribeRepository.Empty(),
+                FakeWorldStateRepository.Empty(), FakeGuildRepository.Empty(), FakeOfflineShopRepository.Empty(),
+                NullLogger<DeleteAvatarService>.Instance),
+            NullLogger<DeleteAvatarHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
 
         await handler.HandleAsync(Request(avatarPost), session, CancellationToken.None);
@@ -118,8 +132,11 @@ public class DeleteAvatarHandlerTests
     public async Task HandleAsync_TransferMode_AbortsWithoutReplyingOrDeleting()
     {
         var characters = FakeCharacterRepository.WithSummaries(Summary);
-        var handler = new DeleteAvatarHandler(new DeleteAvatarService(characters, FakeTribeRepository.Empty(),
-            FakeWorldStateRepository.Empty(), FakeGuildRepository.Empty(), FakeOfflineShopRepository.Empty()));
+        var handler = new DeleteAvatarHandler(
+            new DeleteAvatarService(characters, FakeTribeRepository.Empty(),
+                FakeWorldStateRepository.Empty(), FakeGuildRepository.Empty(), FakeOfflineShopRepository.Empty(),
+                NullLogger<DeleteAvatarService>.Instance),
+            NullLogger<DeleteAvatarHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
 
         await handler.HandleAsync(Request(mode: 2), session, CancellationToken.None);
@@ -133,8 +150,11 @@ public class DeleteAvatarHandlerTests
     public async Task HandleAsync_ModeOutsideTheKnownPair_AbortsWithoutReplyingOrDeleting()
     {
         var characters = FakeCharacterRepository.WithSummaries(Summary);
-        var handler = new DeleteAvatarHandler(new DeleteAvatarService(characters, FakeTribeRepository.Empty(),
-            FakeWorldStateRepository.Empty(), FakeGuildRepository.Empty(), FakeOfflineShopRepository.Empty()));
+        var handler = new DeleteAvatarHandler(
+            new DeleteAvatarService(characters, FakeTribeRepository.Empty(),
+                FakeWorldStateRepository.Empty(), FakeGuildRepository.Empty(), FakeOfflineShopRepository.Empty(),
+                NullLogger<DeleteAvatarService>.Instance),
+            NullLogger<DeleteAvatarHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
 
         await handler.HandleAsync(Request(mode: 99), session, CancellationToken.None);

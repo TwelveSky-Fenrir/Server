@@ -6,6 +6,7 @@ using Fenrir.Application.Login.Domain.Security;
 using Fenrir.Data.Security;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Login;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Login.Services.Login;
@@ -40,7 +41,8 @@ public sealed class LoginService(
     IOptions<LoginServerOptions> options,
     SessionRegistry registry,
     IAccountSessionRepository accountSessions,
-    IEventLogRepository eventLog) : ILoginService
+    IEventLogRepository eventLog,
+    ILogger<LoginService> logger) : ILoginService
 {
     // Legacy tResult codes actually producible by Fenrir's flows (S04_MyWork02.cpp W_LOGIN_SEND / S08_MyDB Login):
     private const int ResultMaintenance = 1; // MyGame::mMaxPlayerNum == 0 (S04_MyWork02.cpp:149-154)
@@ -94,7 +96,10 @@ public sealed class LoginService(
         CancellationToken cancellationToken)
     {
         if (!ipRateLimiter.TryConsume(remoteEndPoint))
+        {
+            logger.LogWarning("Login rejected: IP {RemoteIp} exceeded its rate-limit budget", remoteEndPoint);
             return LoginResult.RateLimitedResult;
+        }
 
         // Maintenance lockdown / server-full quota: the two earliest gates in the legacy handler, evaluated
         // before every other check below (including the firewall/version/MAC/auth gates none of which the
@@ -103,31 +108,46 @@ public sealed class LoginService(
         switch (LoginCapacityGate.Evaluate(capacity.MaxPlayers, capacity.CurrentPlayers))
         {
             case LoginCapacityOutcome.Maintenance:
+                logger.LogWarning("Login rejected: server is under maintenance (login {Id})", packet.Id);
                 return Failure(ResultMaintenance, "", false);
             case LoginCapacityOutcome.ServerFull:
+                logger.LogWarning("Login rejected: server is full (login {Id})", packet.Id);
                 return Failure(ResultServerFull, "", false);
         }
 
         // Checked ahead of Argon2id/SQL (unlike legacy, which only ran this after a successful mDB.Login): an
         // already-known-bad IP shouldn't get a free password-guessing attempt against any account.
         if (!await firewall.IsAllowedAsync(remoteEndPoint, cancellationToken))
+        {
+            logger.LogWarning("Login rejected: IP {RemoteIp} is blocked by the application firewall", remoteEndPoint);
             return Failure(ResultIpBlocked, "", false);
+        }
 
         if (packet.Version != options.Value.ExpectedClientVersion)
+        {
+            logger.LogWarning("Login rejected: client version mismatch (login {Id}, version {Version})", packet.Id,
+                packet.Version);
             return Failure(ResultVersionMismatch, "", false);
+        }
 
         var macAddress =
             MacAddressFormatter.Format(packet.Adapter.PhysicalAddress, packet.Adapter.PhysicalAddressLength);
         if (macAddress.Length > 0 &&
             await macRestrictions.IsBannedAsync(macAddress, packet.Adapter.AdapterName, cancellationToken))
+        {
+            logger.LogWarning("Login rejected: MAC {MacAddress} is banned (login {Id})", macAddress, packet.Id);
             return Failure(ResultCustomMessage, MacBannedMessage, false);
+        }
 
         var account = await accounts.AuthenticateAsync(packet.Id, cancellationToken);
         var result = await AuthenticateConstantTimeAsync(account, packet.Password, cancellationToken);
 
         if (result != ResultSuccess)
+        {
+            logger.LogWarning("Login failed: login {Id} rejected with result code {ResultCode}", packet.Id, result);
             // Re-arms VersionOk so the client can retry on this same connection without a reconnect.
             return Failure(result, "", true);
+        }
 
         var accountId = account!.AccountId;
 
@@ -138,7 +158,10 @@ public sealed class LoginService(
         var remoteIp = remoteEndPoint?.Address.ToString();
         if (DeviceSpoofingGuard.IsSpoofedDeviceTuple(account.AccountGrade, macAddress, packet.Adapter.AdapterName,
                 remoteIp))
+        {
+            logger.LogWarning("Login rejected: spoofed device tuple detected for account {AccountId}", accountId);
             return Failure(ResultCustomMessage, InvalidDevicesMessage, true);
+        }
 
         // "****" (PIN exists) vs "" (must create) is what the legacy client keys the op13/op15 choice on.
         var storedPin = await pins.GetAsync(accountId, cancellationToken);
@@ -159,16 +182,25 @@ public sealed class LoginService(
                 // legacy kick-then-tResult=8 shape -- the new attempt is refused too, not handed the account).
                 if (registry.TryGetByAccount(accountId, out var existingLocal))
                 {
+                    logger.LogWarning(
+                        "Login conflict: evicting stale local session for account {AccountId} (ConflictLogin)",
+                        accountId);
                     existingLocal!.Abort(DisconnectReason.Evicted);
                     return LoginResult.SilentDropResult;
                 }
 
                 // Row claimed to be a live Login session but no matching local socket -- treat like any other refusal.
+                logger.LogWarning(
+                    "Login rejected: account {AccountId} already claimed by another Login session (ConflictLogin, no local socket)",
+                    accountId);
                 return Failure(ResultAlreadyConnected, "", true);
             case AccountSessionClaimOutcome.ConflictGameKicked:
             case AccountSessionClaimOutcome.ConflictTearingDown:
                 // A live Game-side session was just flagged for kick (or is mid-teardown): refuse this attempt,
                 // the account isn't free yet -- the player retries once the kick/teardown completes.
+                logger.LogWarning(
+                    "Login rejected: account {AccountId} has a live Game session ({Outcome}); retry once it clears",
+                    accountId, (AccountSessionClaimOutcome)claim.Outcome);
                 return Failure(ResultAlreadyConnected, "", true);
         }
 
@@ -183,6 +215,10 @@ public sealed class LoginService(
         // other three legs). No character is chosen yet at this point in the flow, so ActorCharacterId is null.
         await eventLog.LogAsync(LoginSucceededEventCode, EventLogCategory.Session, accountId, null, null, null,
             null, null, null, null, null, 1, remoteIp is null ? null : $"RemoteIp={remoteIp}", cancellationToken);
+
+        logger.LogInformation(
+            "Login succeeded: account {AccountId} authenticated, {CharacterCount} character(s), PIN required {RequirePin}",
+            accountId, chars.Count, requirePin);
 
         return new LoginResult(LoginOutcome.Success, ResultSuccess, "", false, accountId, requirePin, pinMask,
             [..chars], newToken, account.AccountGrade);

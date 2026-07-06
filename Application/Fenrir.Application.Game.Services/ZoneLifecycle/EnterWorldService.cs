@@ -46,6 +46,9 @@ public sealed class EnterWorldService(
         // blocked after that account's Login session already happened would otherwise never be re-evaluated.
         if (!await firewall.IsAllowedAsync(zoneSession.RemoteEndPoint, cancellationToken))
         {
+            logger.LogWarning(
+                "Enter-world rejected for account {AccountId} character {CharacterId}: remote IP is firewalled",
+                accountId, characterId);
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }
@@ -54,6 +57,8 @@ public sealed class EnterWorldService(
         // the world, unlike a mute -- checked before the bundle fetch below to not waste it on a rejected entry.
         if (await bans.IsActiveForCharacterAsync(characterId, cancellationToken))
         {
+            logger.LogWarning("Enter-world rejected for character {CharacterId}: character is GM-banned",
+                characterId);
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }
@@ -62,6 +67,9 @@ public sealed class EnterWorldService(
         if (!ObfuscatedUidCodec.TryDecodeAccountId(packet.Id, out var decodedAccountId) ||
             decodedAccountId != accountId)
         {
+            logger.LogWarning(
+                "Enter-world rejected for account {AccountId} character {CharacterId}: obfuscated id mismatch",
+                accountId, characterId);
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }
@@ -69,6 +77,9 @@ public sealed class EnterWorldService(
         // A client cannot enter the world already mid-action (move/skill/etc).
         if (packet.Action.Type != 0 || packet.Action.Sort is not (0 or 1))
         {
+            logger.LogWarning(
+                "Enter-world rejected for character {CharacterId}: disallowed action type {ActionType}/sort {ActionSort}",
+                characterId, packet.Action.Type, packet.Action.Sort);
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }
@@ -76,6 +87,8 @@ public sealed class EnterWorldService(
         var bundle = await characters.GetWorldEntryBundleAsync(characterId, cancellationToken);
         if (bundle is null)
         {
+            logger.LogWarning("Enter-world rejected for character {CharacterId}: world-entry bundle fetch failed",
+                characterId);
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }
@@ -85,6 +98,9 @@ public sealed class EnterWorldService(
         // Resolve against the ticket-committed CharacterId; AvatarName only re-confirms it, never picks it.
         if (packet.AvatarName != character.Name)
         {
+            logger.LogWarning(
+                "Enter-world rejected for character {CharacterId}: avatar name {SentName} does not match {ExpectedName}",
+                characterId, packet.AvatarName, character.Name);
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }
@@ -314,6 +330,10 @@ public sealed class EnterWorldService(
 
         zoneSession.CurrentZone = zone;
         zoneSession.MarkRegistering();
+
+        logger.LogInformation(
+            "Character {CharacterId} (account {AccountId}) entered world on map {MapId} -- awaiting zone-ready",
+            characterId, accountId, character.MapId);
     }
 
     private static ImmutableDictionary<byte, ItemStack> BuildEquipmentContainer(

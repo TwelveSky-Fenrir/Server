@@ -6,6 +6,7 @@ using Fenrir.Application.Login.Tests.TestSupport;
 using Fenrir.Data.Abstractions.Characters;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Login;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Login.Tests.Handlers;
@@ -37,7 +38,9 @@ public class CreateAvatarHandlerTests
         var characters = FakeCharacterRepository.WithNone();
         var starterKits = FakeStarterKitRepository.NobleDragonKit();
         var handler = new CreateAvatarHandler(
-            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions()));
+            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions(),
+                NullLogger<CreateAvatarService>.Instance),
+            NullLogger<CreateAvatarHandler>.Instance);
         var (session, _) = CreateSessionInCharSelect();
 
         var before = DateTimeOffset.UtcNow;
@@ -105,7 +108,9 @@ public class CreateAvatarHandlerTests
         var characters = FakeCharacterRepository.WithNone();
         var starterKits = FakeStarterKitRepository.NobleDragonKit();
         var handler = new CreateAvatarHandler(
-            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions()));
+            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions(),
+                NullLogger<CreateAvatarService>.Instance),
+            NullLogger<CreateAvatarHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
 
         await handler.HandleAsync(ValidRequest(), session, CancellationToken.None);
@@ -142,7 +147,9 @@ public class CreateAvatarHandlerTests
         var characters = FakeCharacterRepository.WithNone();
         var starterKits = FakeStarterKitRepository.NobleDragonKit();
         var handler = new CreateAvatarHandler(
-            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions()));
+            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions(),
+                NullLogger<CreateAvatarService>.Instance),
+            NullLogger<CreateAvatarHandler>.Instance);
         var (session, _) = CreateSessionInCharSelect();
 
         await handler.HandleAsync(ValidRequest(weapon), session, CancellationToken.None);
@@ -168,7 +175,9 @@ public class CreateAvatarHandlerTests
         var characters = FakeCharacterRepository.WithNone();
         var starterKits = FakeStarterKitRepository.RoyalSerpentKit();
         var handler = new CreateAvatarHandler(
-            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions()));
+            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions(),
+                NullLogger<CreateAvatarService>.Instance),
+            NullLogger<CreateAvatarHandler>.Instance);
         var (session, _) = CreateSessionInCharSelect();
 
         var request = ValidRequest(12) with { Tribe = 1, PreviousTribe = 1 }; // raw code 12 -> Black Feast
@@ -202,7 +211,9 @@ public class CreateAvatarHandlerTests
         var characters = FakeCharacterRepository.WithNone();
         var starterKits = FakeStarterKitRepository.RoyalSerpentKit();
         var handler = new CreateAvatarHandler(
-            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions()));
+            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions(),
+                NullLogger<CreateAvatarService>.Instance),
+            NullLogger<CreateAvatarHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
 
         // 6 is a valid Noble Dragon weapon id, not one of Royal Serpent's (11/12/13) -- guards the
@@ -222,7 +233,9 @@ public class CreateAvatarHandlerTests
         var characters = FakeCharacterRepository.WithNone();
         var starterKits = FakeStarterKitRepository.GrandTigerKit();
         var handler = new CreateAvatarHandler(
-            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions()));
+            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions(),
+                NullLogger<CreateAvatarService>.Instance),
+            NullLogger<CreateAvatarHandler>.Instance);
         var (session, _) = CreateSessionInCharSelect();
 
         var request = ValidRequest(18) with { Tribe = 2, PreviousTribe = 2 }; // raw code 18 -> Qing Long's Grace
@@ -255,7 +268,9 @@ public class CreateAvatarHandlerTests
         var characters = FakeCharacterRepository.WithNone();
         var starterKits = FakeStarterKitRepository.GrandTigerKit();
         var handler = new CreateAvatarHandler(
-            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions()));
+            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions(),
+                NullLogger<CreateAvatarService>.Instance),
+            NullLogger<CreateAvatarHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
 
         // 12 is a valid Royal Serpent weapon id, not one of Grand Tiger's (17/18/19) -- guards the same gate
@@ -275,7 +290,9 @@ public class CreateAvatarHandlerTests
         var characters = FakeCharacterRepository.WithNone();
         var starterKits = FakeStarterKitRepository.NobleDragonKit();
         var handler = new CreateAvatarHandler(
-            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions()));
+            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions(),
+                NullLogger<CreateAvatarService>.Instance),
+            NullLogger<CreateAvatarHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
 
         // 11 is a valid Royal Serpent weapon id, not one of Noble Dragon's (5/6/7).
@@ -301,7 +318,9 @@ public class CreateAvatarHandlerTests
         var characters = FakeCharacterRepository.WithNone();
         var starterKits = FakeStarterKitRepository.NobleDragonKit();
         var handler = new CreateAvatarHandler(
-            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions()));
+            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions(),
+                NullLogger<CreateAvatarService>.Instance),
+            NullLogger<CreateAvatarHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
 
         var request = new CreateAvatarRequest
@@ -340,7 +359,9 @@ public class CreateAvatarHandlerTests
         var characters = FakeCharacterRepository.WithNone();
         var starterKits = FakeStarterKitRepository.UnseededPreviousTribeKit();
         var handler = new CreateAvatarHandler(
-            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions()));
+            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions(),
+                NullLogger<CreateAvatarService>.Instance),
+            NullLogger<CreateAvatarHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
 
         var request = ValidRequest() with { PreviousTribe = previousTribe };
@@ -391,7 +412,9 @@ public class CreateAvatarHandlerTests
             new CharacterSummaryDto(1000, 0, "Existing", 0, 0, 0, 0, 1));
         var starterKits = FakeStarterKitRepository.NobleDragonKit();
         var handler = new CreateAvatarHandler(
-            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions()));
+            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions(),
+                NullLogger<CreateAvatarService>.Instance),
+            NullLogger<CreateAvatarHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
 
         await handler.HandleAsync(ValidRequest(), session, CancellationToken.None); // AvatarPost = 0, already occupied
@@ -412,7 +435,9 @@ public class CreateAvatarHandlerTests
         characters.CreateWithStarterKitException = new InvalidOperationException("50202: name already taken");
         var starterKits = FakeStarterKitRepository.NobleDragonKit();
         var handler = new CreateAvatarHandler(
-            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions()));
+            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions(),
+                NullLogger<CreateAvatarService>.Instance),
+            NullLogger<CreateAvatarHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
 
         await handler.HandleAsync(ValidRequest(), session, CancellationToken.None);
@@ -428,7 +453,9 @@ public class CreateAvatarHandlerTests
         var characters = FakeCharacterRepository.WithNone();
         var starterKits = FakeStarterKitRepository.NobleDragonKit();
         var handler = new CreateAvatarHandler(
-            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions()));
+            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions(),
+                NullLogger<CreateAvatarService>.Instance),
+            NullLogger<CreateAvatarHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
 
         var request = ValidRequest() with { AvatarName = "" };
@@ -454,7 +481,9 @@ public class CreateAvatarHandlerTests
         var characters = FakeCharacterRepository.WithNone();
         var starterKits = FakeStarterKitRepository.NobleDragonKit();
         var handler = new CreateAvatarHandler(
-            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions()));
+            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions(),
+                NullLogger<CreateAvatarService>.Instance),
+            NullLogger<CreateAvatarHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
 
         var request = ValidRequest() with { AvatarName = name };
@@ -478,7 +507,10 @@ public class CreateAvatarHandlerTests
         var starterKits = FakeStarterKitRepository.NobleDragonKit();
         var tribes = FakeTribeRepository.WithPoints((0, 100), (1, 0), (2, 0), (3, 0));
         var handler =
-            new CreateAvatarHandler(new CreateAvatarService(characters, starterKits, tribes, DefaultOptions()));
+            new CreateAvatarHandler(
+            new CreateAvatarService(characters, starterKits, tribes, DefaultOptions(),
+                NullLogger<CreateAvatarService>.Instance),
+            NullLogger<CreateAvatarHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
 
         await handler.HandleAsync(ValidRequest(), session, CancellationToken.None);
@@ -499,7 +531,10 @@ public class CreateAvatarHandlerTests
         // an absolute floor on the leader's own total, not a margin/gap against the other tribes.
         var tribes = FakeTribeRepository.WithPoints((0, 10), (1, 150), (2, 0), (3, 0));
         var handler =
-            new CreateAvatarHandler(new CreateAvatarService(characters, starterKits, tribes, DefaultOptions()));
+            new CreateAvatarHandler(
+            new CreateAvatarService(characters, starterKits, tribes, DefaultOptions(),
+                NullLogger<CreateAvatarService>.Instance),
+            NullLogger<CreateAvatarHandler>.Instance);
         var (session, _) = CreateSessionInCharSelect();
 
         await handler.HandleAsync(ValidRequest(), session, CancellationToken.None);
@@ -515,7 +550,10 @@ public class CreateAvatarHandlerTests
         var starterKits = FakeStarterKitRepository.NobleDragonKit();
         var tribes = FakeTribeRepository.WithPoints((0, 99), (1, 0), (2, 0), (3, 0));
         var handler =
-            new CreateAvatarHandler(new CreateAvatarService(characters, starterKits, tribes, DefaultOptions()));
+            new CreateAvatarHandler(
+            new CreateAvatarService(characters, starterKits, tribes, DefaultOptions(),
+                NullLogger<CreateAvatarService>.Instance),
+            NullLogger<CreateAvatarHandler>.Instance);
         var (session, _) = CreateSessionInCharSelect();
 
         await handler.HandleAsync(ValidRequest(), session, CancellationToken.None);
@@ -532,7 +570,9 @@ public class CreateAvatarHandlerTests
         var characters = FakeCharacterRepository.WithNone();
         var starterKits = FakeStarterKitRepository.NobleDragonKit();
         var handler = new CreateAvatarHandler(
-            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions()));
+            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions(),
+                NullLogger<CreateAvatarService>.Instance),
+            NullLogger<CreateAvatarHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
 
         var request = ValidRequest() with { Tribe = 3 };
@@ -552,7 +592,9 @@ public class CreateAvatarHandlerTests
         var starterKits = FakeStarterKitRepository.NobleDragonKit();
         var handler = new CreateAvatarHandler(
             new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(),
-                Options.Create(new LoginServerOptions { EnableFourthFaction = true })));
+                Options.Create(new LoginServerOptions { EnableFourthFaction = true }),
+                NullLogger<CreateAvatarService>.Instance),
+            NullLogger<CreateAvatarHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
 
         var request = ValidRequest() with { Tribe = 3 };

@@ -65,25 +65,47 @@ public sealed class ZoneTransferService(
     public async ValueTask<ZoneTransferResult> RequestZoneTransferAsync(int accountId, byte avatarPost,
         Guid sessionToken, short accountGrade, CancellationToken cancellationToken)
     {
+        logger.LogInformation("Zone transfer requested: account {AccountId} slot {AvatarPost}", accountId,
+            avatarPost);
+
         var summaries = await characters.GetByAccountAsync(accountId, cancellationToken);
         var summary = summaries.FirstOrDefault(c => c.Slot == avatarPost);
         if (summary is null)
+        {
+            logger.LogWarning(
+                "Zone transfer rejected: account {AccountId} slot {AvatarPost} holds no character", accountId,
+                avatarPost);
             return new ZoneTransferResult(ZoneTransferOutcome.CharacterNotFound, "", 0, 0);
+        }
 
         var character = await characters.GetForWorldEntryAsync(summary.CharacterId, cancellationToken);
         if (character is null)
+        {
             // Character vanished between the two reads above (concurrent delete elsewhere); bail before minting a ticket.
+            logger.LogWarning(
+                "Zone transfer rejected: character {CharacterId} (account {AccountId} slot {AvatarPost}) vanished between reads",
+                summary.CharacterId, accountId, avatarPost);
             return new ZoneTransferResult(ZoneTransferOutcome.CharacterNotFound, "", 0, 0);
+        }
 
         await ClampVitalsFloorIfNeededAsync(character, cancellationToken);
 
         var shards = await directory.GetDirectoryAsync(cancellationToken);
         var shard = await ResolveShardForMapAsync(shards, character.MapId, character.CharacterId, cancellationToken);
         if (shard is null)
+        {
+            logger.LogWarning(
+                "Zone transfer rejected: no shard available for character {CharacterId} (account {AccountId}, MapId {MapId})",
+                character.CharacterId, accountId, character.MapId);
             return new ZoneTransferResult(ZoneTransferOutcome.ShardUnavailable, "", 0, 0);
+        }
 
         await tickets.CreateAsync(accountId, summary.CharacterId, shard.ShardId, options.Value.TicketTtlSeconds,
             sessionToken, accountGrade, cancellationToken);
+
+        logger.LogInformation(
+            "Zone transfer ticket minted: account {AccountId} character {CharacterId} -> shard {ShardId} ({Host}:{Port}, MapId {MapId})",
+            accountId, character.CharacterId, shard.ShardId, shard.Host, shard.Port, character.MapId);
 
         // Zone = the persisted MapId the character resumes on (same value AvatarInfoFactory writes to LogoutInfo[0]).
         return new ZoneTransferResult(ZoneTransferOutcome.Success, shard.Host, shard.Port, character.MapId);

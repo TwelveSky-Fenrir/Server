@@ -2,6 +2,7 @@ using Fenrir.Application.Game.Abstractions.ZoneLifecycle;
 using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Network.Dispatch.Sessions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Services.ZoneLifecycle;
@@ -18,7 +19,8 @@ public sealed class ZoneHandshakeService(
     ICharacterRepository characters,
     IEventLogRepository eventLog,
     TribeQuotaRegistry tribeQuota,
-    IOptions<GameServerOptions> options) : IZoneHandshakeService
+    IOptions<GameServerOptions> options,
+    ILogger<ZoneHandshakeService>? logger = null) : IZoneHandshakeService
 {
     /// <summary>
     ///     game.EventLog.EventCode for a successfully-consumed zone-transfer ticket (Category=Session) -- see
@@ -34,7 +36,10 @@ public sealed class ZoneHandshakeService(
         ZoneClientSession session, CancellationToken cancellationToken)
     {
         if (!ObfuscatedUidCodec.TryDecodeAccountId(obfuscatedId, out var accountId))
+        {
+            logger?.LogWarning("Zone handshake rejected: malformed obfuscated id");
             return new ZoneHandshakeResult(ZoneHandshakeOutcome.Rejected);
+        }
 
         // function.h:38-44's valid-index-range precondition -- distinct from the malformed-string case above:
         // a well-formed "MG"+digits identifier that parses to an impossible account/session slot is a protocol
@@ -42,27 +47,46 @@ public sealed class ZoneHandshakeService(
         // translated contract names the precondition but not a concrete upper bound, so none is fabricated --
         // see this class's own remarks for the citation.
         if (accountId <= 0)
+        {
+            logger?.LogWarning("Zone handshake protocol violation: decoded account id {AccountId} is out of range",
+                accountId);
             return new ZoneHandshakeResult(ZoneHandshakeOutcome.ProtocolViolation);
+        }
 
         // Repeating this request on an already-registered connection is a protocol violation too, but it never
         // reaches here: ZoneHandshakeRequest.AllowedStates is Connected-only, so SessionStateGate already drops
         // any replay before dispatch (see ZoneHandshakeHandler's own remarks).
         var quotaGroup = options.Value.TribeQuotaGroup;
         if (!TribeQuotaGate.IsDeclaredTribeInRange(quotaGroup, declaredTribe))
+        {
+            logger?.LogWarning(
+                "Zone handshake protocol violation for account {AccountId}: declared tribe {DeclaredTribe} outside quota group {QuotaGroup}",
+                accountId, declaredTribe, quotaGroup);
             return new ZoneHandshakeResult(ZoneHandshakeOutcome.ProtocolViolation);
+        }
 
         // No independently maintained counter -- recomputed by scanning every currently temp-registered
         // connection's recorded (always upstream-resolved, never declared) tribe at the moment of this attempt.
         var populationForDeclaredTribe = tribeQuota.CountForTribe(declaredTribe);
         if (TribeQuotaGate.Evaluate(quotaGroup, options.Value.Capacity, populationForDeclaredTribe) ==
             TribeQuotaOutcome.QuotaFull)
+        {
+            logger?.LogWarning(
+                "Zone handshake rejected for account {AccountId}: tribe {DeclaredTribe} quota full ({Population})",
+                accountId, declaredTribe, populationForDeclaredTribe);
             return new ZoneHandshakeResult(ZoneHandshakeOutcome.QuotaFull);
+        }
 
         var consumed = await tickets.ConsumeAsync(accountId, cancellationToken);
 
         // Refuse absent/expired/wrong-shard tickets identically (Result=1) so we don't leak which failure occurred.
         if (consumed is null || consumed.ShardId != options.Value.ShardId)
+        {
+            logger?.LogWarning(
+                "Zone handshake rejected for account {AccountId}: session ticket absent, expired, or wrong shard",
+                accountId);
             return new ZoneHandshakeResult(ZoneHandshakeOutcome.Rejected);
+        }
 
         // Cross-process duplicate-login authority: proves this world-entry claim is for the same login epoch that
         // minted the ticket, not a hijack of a newer login (runtime.AccountSessions moved on since this ticket was
@@ -72,7 +96,12 @@ public sealed class ZoneHandshakeService(
             .ConfigureAwait(false);
 
         if (!transitioned)
+        {
+            logger?.LogWarning(
+                "Zone handshake superseded for account {AccountId} character {CharacterId}: a newer login already claimed the session",
+                accountId, consumed.CharacterId);
             return new ZoneHandshakeResult(ZoneHandshakeOutcome.SessionSuperseded);
+        }
 
         // Session-lifecycle audit row: this is the "zone-transfer" leg (see ZoneTransferAcceptedEventCode's
         // remarks for the other three legs).

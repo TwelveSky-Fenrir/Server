@@ -1,9 +1,10 @@
 using Fenrir.Application.Game.Abstractions.ZoneLifecycle;
 using Fenrir.Application.Game.Domain.World;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.ZoneLifecycle;
 
-public sealed class ZoneReadyService : IZoneReadyService
+public sealed class ZoneReadyService(ILogger<ZoneReadyService>? logger = null) : IZoneReadyService
 {
     /// <summary>Legacy's <c>mAutoTimeHack == 3</c> -- Quit() on the 3rd offense, not the 1st.</summary>
     private const int AutoHuntHackStrikeLimit = 3;
@@ -18,12 +19,21 @@ public sealed class ZoneReadyService : IZoneReadyService
         // one-shot op13.
         if (state.LastSentHeartbeat is { } lastHeartbeat &&
             DateTime.UtcNow - lastHeartbeat > HeartbeatStaleWindow)
+        {
+            logger?.LogWarning("Zone-ready rejected for character {CharacterId}: heartbeat stale since {LastHeartbeat}",
+                state.CharacterId, lastHeartbeat);
             return ZoneReadyOutcome.Rejected;
+        }
 
         // Guard 2: tribe anti-tamper. The client must echo back exactly the tribe world entry loaded from
         // the DB -- a mismatch means the client patched its own copy of the avatar's tribe.
         if (tribe != state.Tribe)
+        {
+            logger?.LogWarning(
+                "Zone-ready rejected for character {CharacterId}: claimed tribe {ClaimedTribe} does not match {ActualTribe}",
+                state.CharacterId, tribe, state.Tribe);
             return ZoneReadyOutcome.Rejected;
+        }
 
         // Guard 3: auto-hunt anti-hack. Legacy compares the client's claim against two server-held cash-item
         // timers (aAutoTime/aAutoTime2); Fenrir never modeled that cash timer (AvatarInfoTemplates hardcodes
@@ -33,7 +43,12 @@ public sealed class ZoneReadyService : IZoneReadyService
         {
             state.AutoTimeHack++;
             if (state.AutoTimeHack >= AutoHuntHackStrikeLimit)
+            {
+                logger?.LogWarning(
+                    "Zone-ready rejected for character {CharacterId}: auto-hunt anti-hack strike limit reached ({Strikes})",
+                    state.CharacterId, state.AutoTimeHack);
                 return ZoneReadyOutcome.Rejected;
+            }
         }
 
         state.ConnectTime = DateTime.UtcNow;

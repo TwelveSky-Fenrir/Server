@@ -69,6 +69,9 @@ public sealed class LoginConnectionHost(
         // acquire and the matching release below must key on the exact same string.
         var remoteIp = loginSession.RemoteEndPoint?.Address.ToString();
 
+        logger.LogInformation("Login connection accepted: session {SessionId} from {RemoteIp}",
+            loginSession.SessionId, remoteIp);
+
         try
         {
             // Trigger A (contract): the concurrent-connection gauge must already be incremented and read back
@@ -76,7 +79,12 @@ public sealed class LoginConnectionHost(
             // ordering) -- so this runs before GreetAsync, not after.
             if (remoteIp is not null &&
                 !await ipFloodGuard.TryAcquireConnectionAsync(remoteIp, ct).ConfigureAwait(false))
+            {
+                logger.LogWarning(
+                    "Login connection rejected: session {SessionId} from {RemoteIp} blocked by IP flood guard",
+                    loginSession.SessionId, remoteIp);
                 return; // IP just got persistently blocked and every session sharing it (this one included) aborted
+            }
 
             await GreetAsync(loginSession, connection, ct).ConfigureAwait(false);
 
@@ -96,6 +104,9 @@ public sealed class LoginConnectionHost(
 
             if (loginSession.AccountId is { } accountId)
             {
+                logger.LogInformation(
+                    "Login session {SessionId} ended for account {AccountId} in state {State}",
+                    loginSession.SessionId, accountId, loginSession.State);
                 await TearDownAccountSessionAsync(accountId, loginSession.AccountSessionToken).ConfigureAwait(false);
                 await LogLoginSessionEndedAsync(accountId, loginSession.State).ConfigureAwait(false);
             }

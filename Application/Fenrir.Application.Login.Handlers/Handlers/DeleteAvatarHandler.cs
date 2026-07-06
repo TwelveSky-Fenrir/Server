@@ -2,6 +2,7 @@ using Fenrir.Application.Login.Abstractions.DeleteAvatar;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Login;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Login.Handlers.Handlers;
 
@@ -20,7 +21,7 @@ namespace Fenrir.Application.Login.Handlers.Handlers;
 ///     table: 0=success, 1=DB delete failure [not modeled here -- DeleteAvatarService lets it throw], 2=tribe
 ///     role, 3=guild membership, 4=dead level-restriction code [never produced], 5=proxy shop).
 /// </remarks>
-public sealed class DeleteAvatarHandler(IDeleteAvatarService deleteAvatarService)
+public sealed class DeleteAvatarHandler(IDeleteAvatarService deleteAvatarService, ILogger<DeleteAvatarHandler> logger)
     : IAsyncPacketHandler<DeleteAvatarRequest>
 {
     private const int ModeDelete = 1;
@@ -35,6 +36,9 @@ public sealed class DeleteAvatarHandler(IDeleteAvatarService deleteAvatarService
         // value are all silent-disconnect cases -- no B_DELETE_AVATAR_RECV is ever sent for any of them.
         if (packet.AvatarPost is < 0 or > 2 || packet.Unknow1 != ModeDelete)
         {
+            logger.LogWarning(
+                "Delete-avatar rejected: malformed request from account {AccountId} (slot {Slot}, mode {Mode})",
+                accountId, packet.AvatarPost, packet.Unknow1);
             loginSession.Abort(DisconnectReason.Malformed);
             return;
         }
@@ -45,15 +49,24 @@ public sealed class DeleteAvatarHandler(IDeleteAvatarService deleteAvatarService
         switch (result.Outcome)
         {
             case DeleteAvatarOutcome.Success:
+                logger.LogInformation("Avatar deleted: account {AccountId} slot {Slot}", accountId,
+                    packet.AvatarPost);
                 session.Send(new DeleteAvatarResponse { Result = 0 });
                 return;
             case DeleteAvatarOutcome.TribeRoleRefusal:
+                logger.LogWarning("Delete-avatar refused: account {AccountId} slot {Slot} holds a tribe role",
+                    accountId, packet.AvatarPost);
                 session.Send(new DeleteAvatarResponse { Result = 2 });
                 return;
             case DeleteAvatarOutcome.GuildMembershipRefusal:
+                logger.LogWarning("Delete-avatar refused: account {AccountId} slot {Slot} is guilded", accountId,
+                    packet.AvatarPost);
                 session.Send(new DeleteAvatarResponse { Result = 3 });
                 return;
             case DeleteAvatarOutcome.ProxyShopRefusal:
+                logger.LogWarning(
+                    "Delete-avatar refused: account {AccountId} slot {Slot} has a pending proxy shop", accountId,
+                    packet.AvatarPost);
                 session.Send(new DeleteAvatarResponse { Result = 5 });
                 return;
             default:

@@ -1,6 +1,7 @@
 using Fenrir.Application.Login.Abstractions.CreateAvatar;
 using Fenrir.Application.Login.Domain;
 using Fenrir.Application.Login.Domain.Avatars;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Login.Services.CreateAvatar;
@@ -31,7 +32,8 @@ public sealed class CreateAvatarService(
     ICharacterRepository characters,
     IStarterKitRepository starterKits,
     ITribeRepository tribes,
-    IOptions<LoginServerOptions> options)
+    IOptions<LoginServerOptions> options,
+    ILogger<CreateAvatarService> logger)
     : ICreateAvatarService
 {
     private const int StartLife = 100;
@@ -164,10 +166,15 @@ public sealed class CreateAvatarService(
 
             return new CreateAvatarResult(CreateAvatarOutcome.Success, avatarInfo);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
             // usp_Character_CreateWithStarterKit throws distinct codes (slot occupied/name taken), but the wire
             // contract only documents Result=1 for any failure -- the legacy client has no finer-grained handling.
+            // Previously swallowed with no trace at all; logged here (the only place the exception itself is
+            // still in scope) so a real starter-kit failure is diagnosable instead of vanishing silently.
+            logger.LogError(ex,
+                "Character creation failed for account {AccountId} slot {AvatarPost} name {AvatarName}",
+                accountId, avatarPost, avatarName);
             return new CreateAvatarResult(CreateAvatarOutcome.Failure, AvatarInfoFactory.Zeroed);
         }
     }

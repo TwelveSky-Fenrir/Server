@@ -3,6 +3,7 @@ using Fenrir.Application.Login.Domain.Avatars;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Login;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Login.Handlers.Handlers;
 
@@ -30,7 +31,7 @@ namespace Fenrir.Application.Login.Handlers.Handlers;
 ///     request is not rejected on this basis, only the weapon-matching rule is skipped (see
 ///     <see cref="Fenrir.Application.Login.Services.CreateAvatar.CreateAvatarService" />'s own remarks).
 /// </remarks>
-public sealed class CreateAvatarHandler(ICreateAvatarService createAvatarService)
+public sealed class CreateAvatarHandler(ICreateAvatarService createAvatarService, ILogger<CreateAvatarHandler> logger)
     : IAsyncPacketHandler<CreateAvatarRequest>
 {
     public async ValueTask HandleAsync(CreateAvatarRequest packet, IPacketSession session,
@@ -45,6 +46,9 @@ public sealed class CreateAvatarHandler(ICreateAvatarService createAvatarService
             packet.Head is < 0 or > 6 ||
             packet.Face is < 0 or > 2)
         {
+            logger.LogWarning(
+                "Create-avatar rejected: malformed request from account {AccountId} (slot {Slot}, tribe {Tribe})",
+                accountId, packet.AvatarPost, packet.Tribe);
             loginSession.Abort(DisconnectReason.Malformed);
             return;
         }
@@ -53,6 +57,9 @@ public sealed class CreateAvatarHandler(ICreateAvatarService createAvatarService
         // normal failure response (client can retry with a different name) instead of disconnecting.
         if (!AvatarNameValidator.HasOnlyWhitelistedCharacters(packet.AvatarName))
         {
+            logger.LogWarning(
+                "Create-avatar rejected: name fails whitelist check for account {AccountId} (slot {Slot})",
+                accountId, packet.AvatarPost);
             session.Send(new CreateAvatarResponse { Result = 1, AvatarInfo = AvatarInfoFactory.Zeroed });
             return;
         }
@@ -77,21 +84,33 @@ public sealed class CreateAvatarHandler(ICreateAvatarService createAvatarService
             // CreateAvatarOutcome.SlotOccupied's own remarks for the combined slot-occupied/name-empty test.
             case CreateAvatarOutcome.InvalidWeapon or CreateAvatarOutcome.FourthFactionDisabled
                 or CreateAvatarOutcome.SlotOccupied:
+                logger.LogWarning(
+                    "Create-avatar rejected: account {AccountId} slot {Slot} outcome {Outcome}", accountId,
+                    packet.AvatarPost, result.Outcome);
                 loginSession.Abort(DisconnectReason.Malformed);
                 return;
             case CreateAvatarOutcome.Success:
+                logger.LogInformation(
+                    "Avatar created: account {AccountId} slot {Slot} name {AvatarName} tribe {Tribe}", accountId,
+                    packet.AvatarPost, packet.AvatarName, packet.Tribe);
                 session.Send(new CreateAvatarResponse { Result = 0, AvatarInfo = result.AvatarInfo });
                 return;
             case CreateAvatarOutcome.DominantTribeBlocked:
                 // ServerDocs/11_ts25login/01_Flux_Authentification_Redirection.md:250-264 (B_CREATE_AVATAR_RECV
                 // Result=3): distinct from Result=1's generic-failure/name-taken/name-content collapse below,
                 // per the dominant-tribe-gate contract's error semantics.
+                logger.LogWarning(
+                    "Create-avatar rejected: tribe {Tribe} is currently dominant (account {AccountId})",
+                    packet.Tribe, accountId);
                 session.Send(new CreateAvatarResponse { Result = 3, AvatarInfo = AvatarInfoFactory.Zeroed });
                 return;
             default:
                 // usp_Character_CreateWithStarterKit can still throw (e.g. name already taken by another account,
                 // or a same-slot race lost against the proactive occupancy check above), but the wire contract only
                 // documents Result=1 for any such failure -- the legacy client has no finer-grained handling.
+                logger.LogWarning(
+                    "Create-avatar failed: account {AccountId} slot {Slot} (generic failure, see CreateAvatarService logs)",
+                    accountId, packet.AvatarPost);
                 session.Send(new CreateAvatarResponse { Result = 1, AvatarInfo = AvatarInfoFactory.Zeroed });
                 return;
         }

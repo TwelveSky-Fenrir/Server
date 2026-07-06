@@ -5,6 +5,7 @@ using Fenrir.Data.Abstractions.Characters;
 using Fenrir.Data.Abstractions.Commerce;
 using Fenrir.Data.Abstractions.Guilds;
 using Fenrir.Data.Abstractions.World;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Login.Tests.Services;
 
@@ -25,7 +26,8 @@ public class DeleteAvatarServiceTests
     {
         var characters = FakeCharacterRepository.WithSummaries(Summary);
         var service = new DeleteAvatarService(characters, FakeTribeRepository.Empty(),
-            FakeWorldStateRepository.Empty(), FakeGuildRepository.Empty(), FakeOfflineShopRepository.Empty());
+            FakeWorldStateRepository.Empty(), FakeGuildRepository.Empty(), FakeOfflineShopRepository.Empty(),
+            NullLogger<DeleteAvatarService>.Instance);
 
         var result = await service.DeleteAvatarAsync(AccountId, Slot, CancellationToken.None);
 
@@ -41,7 +43,7 @@ public class DeleteAvatarServiceTests
         var guilds = FakeGuildRepository.Empty();
         var shops = FakeOfflineShopRepository.Empty();
         var service = new DeleteAvatarService(characters, FakeTribeRepository.Empty(),
-            FakeWorldStateRepository.Empty(), guilds, shops);
+            FakeWorldStateRepository.Empty(), guilds, shops, NullLogger<DeleteAvatarService>.Instance);
 
         var result = await service.DeleteAvatarAsync(AccountId, Slot, CancellationToken.None);
 
@@ -61,7 +63,7 @@ public class DeleteAvatarServiceTests
         var guilds = FakeGuildRepository.Empty();
         var shops = FakeOfflineShopRepository.Empty();
         var service = new DeleteAvatarService(characters, FakeTribeRepository.WithRole(CharacterId, role),
-            FakeWorldStateRepository.Empty(), guilds, shops);
+            FakeWorldStateRepository.Empty(), guilds, shops, NullLogger<DeleteAvatarService>.Instance);
 
         var result = await service.DeleteAvatarAsync(AccountId, Slot, CancellationToken.None);
 
@@ -78,7 +80,7 @@ public class DeleteAvatarServiceTests
         var votes = new[] { new TribeVoteDto(Tribe, 0, CharacterId, 50, 0, 10, DateTime.UtcNow) };
         var service = new DeleteAvatarService(characters, FakeTribeRepository.Empty(),
             FakeWorldStateRepository.WithVotes(votes), FakeGuildRepository.Empty(),
-            FakeOfflineShopRepository.Empty());
+            FakeOfflineShopRepository.Empty(), NullLogger<DeleteAvatarService>.Instance);
 
         var result = await service.DeleteAvatarAsync(AccountId, Slot, CancellationToken.None);
 
@@ -93,7 +95,8 @@ public class DeleteAvatarServiceTests
         var shops = FakeOfflineShopRepository.Empty();
         var membership = new CharacterGuildMembershipDto(1, "Guild", 0, "Rookie");
         var service = new DeleteAvatarService(characters, FakeTribeRepository.Empty(),
-            FakeWorldStateRepository.Empty(), FakeGuildRepository.WithMembership(CharacterId, membership), shops);
+            FakeWorldStateRepository.Empty(), FakeGuildRepository.WithMembership(CharacterId, membership), shops,
+            NullLogger<DeleteAvatarService>.Instance);
 
         var result = await service.DeleteAvatarAsync(AccountId, Slot, CancellationToken.None);
 
@@ -109,7 +112,7 @@ public class DeleteAvatarServiceTests
         var shop = new OfflineShopRowDto(CharacterId, null, 1, 0, 0, 0, 0, 0, 0, "");
         var service = new DeleteAvatarService(characters, FakeTribeRepository.Empty(),
             FakeWorldStateRepository.Empty(), FakeGuildRepository.Empty(),
-            FakeOfflineShopRepository.With(CharacterId, shop));
+            FakeOfflineShopRepository.With(CharacterId, shop), NullLogger<DeleteAvatarService>.Instance);
 
         var result = await service.DeleteAvatarAsync(AccountId, Slot, CancellationToken.None);
 
@@ -124,7 +127,8 @@ public class DeleteAvatarServiceTests
         var membership = new CharacterGuildMembershipDto(1, "Guild", 0, "Rookie");
         var guilds = FakeGuildRepository.WithMembership(CharacterId, membership);
         var service = new DeleteAvatarService(characters, FakeTribeRepository.WithRole(CharacterId, 1),
-            FakeWorldStateRepository.Empty(), guilds, FakeOfflineShopRepository.Empty());
+            FakeWorldStateRepository.Empty(), guilds, FakeOfflineShopRepository.Empty(),
+            NullLogger<DeleteAvatarService>.Instance);
 
         var result = await service.DeleteAvatarAsync(AccountId, Slot, CancellationToken.None);
 

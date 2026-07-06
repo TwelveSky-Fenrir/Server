@@ -239,6 +239,9 @@ public sealed partial class Zone
         // on a fresh world entry the sequence already equals the DB baseline, so this flush is a deliberate no-op.
         dirtyTracker.MarkDirty(characterId, DirtyFlags.Position);
 
+        // Once per player per zone visit, never on the per-tick rebroadcast paths -- cheap.
+        logger.LogInformation("Character {CharacterId} entered zone {MapId}", characterId, MapId);
+
         // Mutual visibility: existing neighbors learn about the new arrival, and vice versa. The self-spawn
         // packet is sent directly by the registration handler before this command is posted.
         var others = _grid.Neighbors(cell).Where(id => id != characterId).ToArray();
@@ -267,6 +270,9 @@ public sealed partial class Zone
 
         if (handoffTarget is null)
         {
+            // Once per player per zone visit, never on the per-tick rebroadcast paths -- cheap.
+            logger.LogInformation("Character {CharacterId} left zone {MapId}", characterId, MapId);
+
             // Plain leave (disconnect). No despawn/logout opcode exists in the M1 client protocol -- nearby
             // clients simply stop receiving updates for this entity. A documented gap, not an oversight.
             if (characterShardLocations is not null)
@@ -300,6 +306,9 @@ public sealed partial class Zone
         // Plain reference write: atomic, and a stale read by a racing movement handler is benign.
         if (state.Session is ZoneClientSession zoneSession)
             zoneSession.CurrentZone = handoffTarget;
+
+        logger.LogInformation("Character {CharacterId} handed off from zone {MapId} to zone {TargetMapId}",
+            characterId, MapId, handoffTarget.MapId);
     }
 
     /// <summary>

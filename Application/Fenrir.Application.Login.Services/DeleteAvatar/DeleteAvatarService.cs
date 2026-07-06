@@ -1,5 +1,6 @@
 using Fenrir.Application.Login.Abstractions.DeleteAvatar;
 using Fenrir.Application.Login.Domain.Avatars;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Login.Services.DeleteAvatar;
 
@@ -25,7 +26,8 @@ public sealed class DeleteAvatarService(
     ITribeRepository tribes,
     IWorldStateRepository worldState,
     IGuildRepository guilds,
-    IOfflineShopRepository offlineShops) : IDeleteAvatarService
+    IOfflineShopRepository offlineShops,
+    ILogger<DeleteAvatarService> logger) : IDeleteAvatarService
 {
     public async ValueTask<DeleteAvatarResult> DeleteAvatarAsync(int accountId, byte avatarPost,
         CancellationToken cancellationToken)
@@ -44,7 +46,20 @@ public sealed class DeleteAvatarService(
                 return new DeleteAvatarResult(outcome);
         }
 
-        await characters.DeleteAsync(accountId, avatarPost, cancellationToken);
+        try
+        {
+            await characters.DeleteAsync(accountId, avatarPost, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            // Previously invisible: usp_Character_Delete failing here left no trace anywhere (see
+            // DeleteAvatarHandler's own remarks on the "1=DB delete failure, not modeled here" gap) -- logged for
+            // observability only, behavior/semantics unchanged (still rethrows, caller still sees an unhandled fault).
+            logger.LogError(ex, "Character delete failed for account {AccountId} slot {AvatarPost}", accountId,
+                avatarPost);
+            throw;
+        }
+
         return new DeleteAvatarResult(DeleteAvatarOutcome.Success);
     }
 

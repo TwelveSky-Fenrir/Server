@@ -11,6 +11,7 @@ using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Framing;
 using Fenrir.Network.Serialization.Packets.Login;
 using Fenrir.Network.Serialization.Packets.Shared;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Login.Tests.Handlers;
@@ -346,19 +347,22 @@ public class LoginHandlerTests
             new FakeFirewallRuleRepository(firewallRuleBlocked),
             new FakeGmAllowlistRepository(gmAllowlisted));
 
-        return new LoginHandler(new LoginService(
-            accounts,
-            FakeAccountPinRepository.WithNoPin(),
-            FakeCharacterRepository.WithNone(),
-            new LoginIpRateLimiter(),
-            capacity ?? AllowedCapacity(),
-            firewall,
-            new FakeBanRepository(accountBanned),
-            new FakeMacRestrictionRepository(bannedMacAddresses ?? []),
-            Options.Create(new LoginServerOptions { ExpectedClientVersion = ClientVersion }),
-            registry ?? new SessionRegistry(),
-            accountSessions ?? new FakeAccountSessionRepository(),
-            eventLog ?? new FakeEventLogRepository()));
+        return new LoginHandler(
+            new LoginService(
+                accounts,
+                FakeAccountPinRepository.WithNoPin(),
+                FakeCharacterRepository.WithNone(),
+                new LoginIpRateLimiter(),
+                capacity ?? AllowedCapacity(),
+                firewall,
+                new FakeBanRepository(accountBanned),
+                new FakeMacRestrictionRepository(bannedMacAddresses ?? []),
+                Options.Create(new LoginServerOptions { ExpectedClientVersion = ClientVersion }),
+                registry ?? new SessionRegistry(),
+                accountSessions ?? new FakeAccountSessionRepository(),
+                eventLog ?? new FakeEventLogRepository(),
+                NullLogger<LoginService>.Instance),
+            NullLogger<LoginHandler>.Instance);
     }
 
     /// <summary>

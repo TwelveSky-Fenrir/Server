@@ -126,8 +126,10 @@ public class ClDemandZoneServerInfoSendHandlerTests
     {
         var characters = FakeCharacterRepository.With(Summary, WorldEntry);
         var options = Options.Create(new LoginServerOptions());
-        return new ZoneTransferHandler(new ZoneTransferService(characters, directory, shardMaps, tickets, options,
-            NullLogger<ZoneTransferService>.Instance));
+        return new ZoneTransferHandler(
+            new ZoneTransferService(characters, directory, shardMaps, tickets, options,
+                NullLogger<ZoneTransferService>.Instance),
+            NullLogger<ZoneTransferHandler>.Instance);
     }
 
     private static (LoginClientSession Session, FakeDuplexPipe Pipe) CreateSessionInCharSelect(out Guid sessionToken,

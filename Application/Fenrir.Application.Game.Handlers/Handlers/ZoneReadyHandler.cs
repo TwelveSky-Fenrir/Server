@@ -3,6 +3,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers;
 
@@ -21,7 +22,8 @@ namespace Fenrir.Application.Game.Handlers.Handlers;
 ///     zone-transfer resend. Same "real but not yet reachable" posture as several other guards in
 ///     <see cref="PlayerRuntimeState" /> (e.g. MissionJoinWar).
 /// </remarks>
-public sealed class ZoneReadyHandler(IZoneReadyService service) : IInlinePacketHandler<ZoneReadyRequest>
+public sealed class ZoneReadyHandler(IZoneReadyService service, ILogger<ZoneReadyHandler>? logger = null)
+    : IInlinePacketHandler<ZoneReadyRequest>
 {
     public void Handle(in ZoneReadyRequest packet, IPacketSession session)
     {
@@ -34,10 +36,17 @@ public sealed class ZoneReadyHandler(IZoneReadyService service) : IInlinePacketH
             zone.TryGetPlayer(characterId, out var state) && state is not null)
             if (service.Validate(state, packet.Tribe, packet.AutoState) == ZoneReadyOutcome.Rejected)
             {
+                logger?.LogWarning(
+                    "Zone-ready handshake aborted for character {CharacterId} (session {SessionId})",
+                    characterId, session.SessionId);
                 zoneSession.Abort(DisconnectReason.Faulted);
                 return;
             }
 
         zoneSession.MarkInWorld();
+
+        logger?.LogInformation(
+            "Zone-ready handshake complete for character {CharacterId} (session {SessionId}) -- session is now InWorld",
+            zoneSession.CharacterId, session.SessionId);
     }
 }

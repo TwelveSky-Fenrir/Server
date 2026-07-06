@@ -18,7 +18,6 @@ public class StarterKitProcTests
 {
     private readonly IAccountRepository _accounts;
     private readonly ICharacterRepository _characters;
-    private readonly string _connectionString;
     private readonly IStarterKitRepository _starterKits;
 
     public StarterKitProcTests(SqlServerFixture fixture)
@@ -32,7 +31,6 @@ public class StarterKitProcTests
         _accounts = new AccountRepository(db);
         _characters = new CharacterRepository(db);
         _starterKits = new StarterKitRepository(db);
-        _connectionString = fixture.ConnectionString;
     }
 
     [Fact]
@@ -151,19 +149,24 @@ public class StarterKitProcTests
         List<CharacterSkillSlotTvp> skills = [new(0, 1, 1), new(1, 2, 1)];
         List<CharacterHotkeySlotTvp> hotkeys = [new(0, 0, 1, 1, 1)];
 
+        // previousTribe (2, Grand Tiger) is deliberately different from tribe (0) below -- proves the two
+        // persist as genuinely independent columns (Server/ts25zone/S04_MyWork02.cpp:880-901's self-
+        // consistency check treats them as two distinct fields, never one derived from the other) rather
+        // than PreviousTribe silently mirroring Tribe.
         var characterId = await _characters.CreateWithStarterKitAsync(
             accountId, 0, name, 0, 1, 2, 1,
             1, 6f, 0f, -7f,
             100, 100, 50, 50,
             welcomeBuffUntilDate, premiumUntilUnixSeconds,
             equipment, inventory, skills, hotkeys,
-            CancellationToken.None);
+            CancellationToken.None, previousTribe: 2);
 
         Assert.True(characterId > 0);
 
         var bundle = await _characters.GetWorldEntryBundleAsync(characterId, CancellationToken.None);
         Assert.NotNull(bundle);
 
+        Assert.Equal(2, bundle.Character.PreviousTribe);
         Assert.Equal(1, bundle.Character.StatVit);
         Assert.Equal(1, bundle.Character.StatStr);
         Assert.Equal(1, bundle.Character.StatInt);
@@ -197,21 +200,14 @@ public class StarterKitProcTests
         Assert.Single(bundle.Hotkeys);
         Assert.Contains(bundle.Hotkeys, h => h is { Page: 0, KeyIndex: 0, Sort: 1 });
 
-        // Starting mount (S04_MyWork02.cpp:1174-1179) -- game.Characters.Mount* columns aren't projected by
-        // usp_Character_GetForWorldEntry yet (no consumer reads them), so this reads them directly.
-        await using var connection = new SqlConnection(_connectionString);
-        await connection.OpenAsync();
-        await using var command = connection.CreateCommand();
-        command.CommandText =
-            "SELECT MountItemId, MountExpActivity, MountPower, MountSlotIndex, MountTime FROM game.Characters WHERE CharacterId = @CharacterId";
-        command.Parameters.AddWithValue("@CharacterId", characterId);
-        await using var reader = await command.ExecuteReaderAsync();
-        Assert.True(await reader.ReadAsync());
-        Assert.Equal(1301, reader.GetInt32(0));
-        Assert.Equal(0, reader.GetInt32(1));
-        Assert.Equal(5, reader.GetInt32(2));
-        Assert.Equal(0, reader.GetInt32(3));
-        Assert.Equal(99999999, reader.GetInt32(4));
+        // Starting mount (S04_MyWork02.cpp:1174-1179), now projected by usp_Character_GetForWorldEntry's RS0
+        // (Migrations/018_character_previous_tribe_and_mount_readpath.sql) instead of needing a raw SQL
+        // read -- this is the exact read path EnterWorldService will eventually consume.
+        Assert.Equal(1301, bundle.Character.MountItemId);
+        Assert.Equal(0, bundle.Character.MountExpActivity);
+        Assert.Equal(5, bundle.Character.MountPower);
+        Assert.Equal(0, bundle.Character.MountSlotIndex);
+        Assert.Equal(99999999, bundle.Character.MountTime);
     }
 
     [Fact]

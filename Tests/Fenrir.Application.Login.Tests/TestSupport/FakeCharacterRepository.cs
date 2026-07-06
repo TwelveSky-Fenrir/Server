@@ -23,6 +23,10 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
     /// <summary>Set by a test to make the next <see cref="CreateWithStarterKitAsync" /> call throw instead.</summary>
     public Exception? CreateWithStarterKitException { get; set; }
 
+    /// <summary>Set by a test to make the next <see cref="DeleteAsync" /> call throw instead -- for exercising
+    /// DeleteAvatarService's current (unmapped) database-delete-failure path.</summary>
+    public Exception? DeleteException { get; set; }
+
     /// <summary>Every argument CreateAvatarHandler passed to the most recent CreateWithStarterKitAsync call.</summary>
     public CreateWithStarterKitCall? LastCreateWithStarterKit { get; private set; }
 
@@ -65,11 +69,11 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
         int mana, int maxMana, int welcomeBuffUntilDate, long premiumUntilUnixSeconds,
         IReadOnlyList<CharacterItemSlotTvp> equipment, IReadOnlyList<CharacterItemSlotTvp> inventory,
         IReadOnlyList<CharacterSkillSlotTvp> skills, IReadOnlyList<CharacterHotkeySlotTvp> hotkeys,
-        CancellationToken ct)
+        CancellationToken ct, byte previousTribe = 0)
     {
         LastCreateWithStarterKit = new CreateWithStarterKitCall(accountId, slot, name, tribe, gender, headType,
             faceType, mapId, posX, posY, posZ, life, maxLife, mana, maxMana, welcomeBuffUntilDate,
-            premiumUntilUnixSeconds, equipment, inventory, skills, hotkeys);
+            premiumUntilUnixSeconds, equipment, inventory, skills, hotkeys, previousTribe);
 
         if (CreateWithStarterKitException is { } exception)
             throw exception;
@@ -85,6 +89,10 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
     public ValueTask DeleteAsync(int accountId, byte slot, CancellationToken ct)
     {
         DeleteCalls.Add((accountId, slot));
+
+        if (DeleteException is { } exception)
+            throw exception;
+
         _summaries.RemoveAll(s => s.Slot == slot);
         return ValueTask.CompletedTask;
     }
@@ -277,4 +285,5 @@ internal sealed record CreateWithStarterKitCall(
     IReadOnlyList<CharacterItemSlotTvp> Equipment,
     IReadOnlyList<CharacterItemSlotTvp> Inventory,
     IReadOnlyList<CharacterSkillSlotTvp> Skills,
-    IReadOnlyList<CharacterHotkeySlotTvp> Hotkeys);
+    IReadOnlyList<CharacterHotkeySlotTvp> Hotkeys,
+    byte PreviousTribe);

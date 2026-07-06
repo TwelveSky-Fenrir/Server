@@ -27,6 +27,11 @@ public sealed partial record CharacterSummaryDto(
     short Level);
 
 // game.usp_Character_GetForWorldEntry; drives ZC_REGISTER_AVATAR_RECV/AVATAR_INFO. Mirrors game.Characters minus audit timestamps.
+// Deliberately does NOT carry PreviousTribe/Mount* (added to CharacterWorldSnapshotDto by
+// Migrations/018_character_previous_tribe_and_mount_readpath.sql): this type's only current consumers
+// (CreateAvatarService's create-response overlay, ZoneTransferService's shard routing/vitals clamp) don't
+// need either, and both new fields are appended past this record's read range in RS0 for exactly that
+// reason -- extend this record too, in the same append-only fashion, the day a consumer actually needs it.
 [GenerateDto]
 public sealed partial record CharacterWorldEntryDto(
     int CharacterId,
@@ -123,7 +128,20 @@ public sealed partial record CharacterWorldSnapshotDto(
     int AutoBuffTime,
     long PremiumExpireUtc,
     // wAvatar.aExp2; appended last for the same reason AutoBuffTime/PremiumExpireUtc were -- see TribeActionHandler.HandleRebirthAsync for the one live consumer.
-    int Exp2);
+    int Exp2,
+    // Migrations/018_character_previous_tribe_and_mount_readpath.sql: appended after Exp2, not inserted next
+    // to Tribe, so CharacterWorldEntryDto's ordinal-mapped prefix (this record's own first 19 fields) never
+    // shifts. PreviousTribe is the Noble Dragon/Royal Serpent/Grand Tiger starter-kit template (0-2) --
+    // genuinely independent of Tribe, see Server/ts25zone/S04_MyWork02.cpp:880-901's self-consistency check.
+    byte PreviousTribe,
+    // The 5 columns Migrations/015_starter_kit_elite_grant.sql granted at creation
+    // (Server/ts25login/S04_MyWork02.cpp:1174-1179) but no procedure/DTO projected until now -- see this
+    // migration's own header for the full "inert data" citation.
+    int MountItemId,
+    int MountExpActivity,
+    int MountPower,
+    int MountSlotIndex,
+    int MountTime);
 
 /// <summary>
 ///     RS1 of usp_Character_GetForWorldEntry. ExpireDate: legacy YYYYMMDD int, 0 = not a rental. Container: 0/1

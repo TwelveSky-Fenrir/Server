@@ -27,8 +27,13 @@ public static class TribeDominanceGate
     /// <summary>The leader's own point total must reach this before the gate can ever block anything.</summary>
     public const int DominantTribeFloor = 100;
 
-    /// <summary>Server/Header/Protocol/DEFINE.h:309.</summary>
-    private const int TribeSlotCount = 4;
+    /// <summary>
+    ///     Server/Header/Protocol/DEFINE.h:309 -- four tribe slots total. Kept <c>public</c> rather than
+    ///     <c>private</c> so <see cref="FourthFactionGate.FourthFactionTribe" /> (and this constant's own
+    ///     tests) can reference this same constant instead of repeating the "4" as a second, independent
+    ///     literal that could silently drift out of lockstep with this one.
+    /// </summary>
+    public const int TribeSlotCount = 4;
 
     /// <summary>
     ///     True if <paramref name="requestedTribe" /> is the single tribe currently holding the highest point

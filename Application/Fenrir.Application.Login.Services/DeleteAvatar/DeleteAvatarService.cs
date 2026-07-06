@@ -79,6 +79,10 @@ public sealed class DeleteAvatarService(
         // long-lived per-character avatar-info cache to reconcile at login time (see this class's own remarks).
         // A fresh read is always at least as correct as a stale cached one, and this decoupled repository path
         // costs no cross-process call either way -- both are plain DB reads from Login's own process.
+        // Known, accepted divergence: legacy's snapshot is populated once at account login and never refreshed,
+        // so a character that joins a guild mid-session and is deleted later in that same session is NOT refused
+        // by legacy (its stale cache still reads "no guild"). This live read refuses it. Not a bug to "fix" toward
+        // legacy's staleness -- flagged here only so the difference is a recorded, intentional choice.
         var guildMembership = await guilds.GetByCharacterAsync(character.CharacterId, ct);
         if (AvatarDeletionGate.GuildMembershipBlocksDeletion(guildMembership))
             return DeleteAvatarOutcome.GuildMembershipRefusal;

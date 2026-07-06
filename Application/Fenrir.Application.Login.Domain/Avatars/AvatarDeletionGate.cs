@@ -23,6 +23,13 @@ public static class AvatarDeletionGate
     ///     Leader election candidate for its own tribe (present in <paramref name="ownTribeVotes" /> under its
     ///     own <paramref name="characterId" />) -- all three ranks collapse to the same refusal.
     /// </summary>
+    /// <remarks>
+    ///     Implementation-remap note: legacy identifies the vote-candidate rank (encoding 3) by name comparison
+    ///     against a live shared-memory roster, whereas this identifies it by character id against a separately
+    ///     fetched <paramref name="ownTribeVotes" /> list. Functionally equivalent as long as both ultimately
+    ///     model the same candidate set for the tribe, but that equivalence has not been independently verified
+    ///     against the vote-roster data model -- flagged here rather than assumed.
+    /// </remarks>
     public static bool TribeRoleBlocksDeletion(byte tribeRole, int characterId,
         IReadOnlyList<TribeVoteDto> ownTribeVotes)
     {
@@ -30,6 +37,17 @@ public static class AvatarDeletionGate
     }
 
     /// <summary>True if this character currently belongs to any guild.</summary>
+    /// <remarks>
+    ///     Intentional divergence from legacy, not an oversight: this reads whatever guild-membership snapshot
+    ///     its caller fetched, which in Fenrir is a fresh, live lookup at delete-request time. Legacy instead
+    ///     reads a per-session guild-name/guild-role snapshot populated once, at account login, and never
+    ///     refreshed again during that session (Server/ts25login/S08_MyDB.cpp:563-671, within
+    ///     <c>MyDB::Login</c>) -- so a character that joins a guild mid-session and is deleted later in that
+    ///     same session would, under legacy, still be evaluated against its stale "no guild" snapshot and would
+    ///     not be refused. Fenrir's live read is stricter than legacy in exactly that narrow scenario; this is a
+    ///     deliberate, acknowledged deviation (a cross-process caching quirk, not a design worth reproducing),
+    ///     not an assumption that the two are behaviorally identical.
+    /// </remarks>
     public static bool GuildMembershipBlocksDeletion(CharacterGuildMembershipDto? membership)
     {
         return membership is not null;

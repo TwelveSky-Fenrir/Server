@@ -8,6 +8,7 @@ using Fenrir.Application.Game.Domain.Pets;
 using Fenrir.Application.Game.Domain.Quests;
 using Fenrir.Application.Game.Domain.Social;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Stats;
 using Fenrir.Data.Security;
@@ -33,6 +34,7 @@ public sealed class EnterWorldService(
     IFriendRepository friends,
     IMentorRepository mentors,
     ICharacterShardLocationRepository characterShardLocations,
+    WorldStateService worldState,
     IOptions<GameServerOptions> options,
     ILogger<EnterWorldService> logger) : IEnterWorldService
 {
@@ -74,7 +76,9 @@ public sealed class EnterWorldService(
             return;
         }
 
-        // A client cannot enter the world already mid-action (move/skill/etc).
+        // A client cannot enter the world already mid-action (move/skill/etc) -- Server/ts25zone/
+        // S04_MyWork02.cpp:773-782 rejects unless action type is 0 and action sort is 0 or 1, for every
+        // player, unconditionally.
         if (packet.Action.Type != 0 || packet.Action.Sort is not (0 or 1))
         {
             logger.LogWarning(
@@ -101,6 +105,21 @@ public sealed class EnterWorldService(
             logger.LogWarning(
                 "Enter-world rejected for character {CharacterId}: avatar name {SentName} does not match {ExpectedName}",
                 characterId, packet.AvatarName, character.Name);
+            zoneSession.Abort(DisconnectReason.Faulted);
+            return;
+        }
+
+        // Tribe/PreviousTribe self-consistency (Server/ts25zone/S04_MyWork02.cpp:880-901): a main-faction
+        // tribe (0-2) must carry a PreviousTribe exactly equal to itself; the fourth faction (3) must carry a
+        // PreviousTribe in {0,1,2} (the one legitimate case where the two fields differ -- "transferred in
+        // from an original tribe"); any other Tribe value is never valid. This checks the just-loaded
+        // record's own internal consistency, never anything the client asserts, and -- matching legacy -- ends
+        // the session outright with no response on any mismatch rather than a structured failure code.
+        if (!IsTribeAndPreviousTribeConsistent(character.Tribe, character.PreviousTribe))
+        {
+            logger.LogWarning(
+                "Enter-world rejected for character {CharacterId}: tribe {Tribe}/previousTribe {PreviousTribe} are internally inconsistent",
+                characterId, character.Tribe, character.PreviousTribe);
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }
@@ -165,14 +184,20 @@ public sealed class EnterWorldService(
 
         var registerRecv = new EnterWorldResponse
         {
+            // A brand-new character legitimately has no buff rows yet (creation never writes any); a
+            // returning character's own persisted snapshot must ride along here instead of a flat zero.
             AvatarInfo = AvatarInfoFactory.CreateForCharacter(character, bundle.Items, socialSnapshot),
-            BuffInfo = WorldStateTemplates.ZeroedBuffInfo
+            BuffInfo = BuildBuffInfo(bundle.Buffs)
         };
         zoneSession.SendRaw(ZoneMessageFactory.Encode(in registerRecv));
 
         var broadcastWorldInfo = new WorldSnapshotResponse
         {
-            WorldInfo = GuildRankingProjection.Apply(WorldStateTemplates.ZeroedWorldInfo, guildRanking.Top),
+            WorldInfo = WorldStateProjection.Apply(
+                GuildRankingProjection.Apply(WorldStateTemplates.ZeroedWorldInfo, guildRanking.Top), worldState),
+            // No repository currently projects tribe master/sub-master NAMES or the vote/honor-rank rosters
+            // (ITribeRepository only ever returns CharacterIds) -- the zeroed template is the correct
+            // placeholder until that surface exists, not a regression introduced here.
             TribeInfo = WorldStateTemplates.ZeroedTribeInfo
         };
         zoneSession.SendRaw(ZoneMessageFactory.Encode(in broadcastWorldInfo));
@@ -184,6 +209,10 @@ public sealed class EnterWorldService(
             UniqueNumber = unchecked((uint)characterId),
             Data = new ObjectForAvatar
             {
+                // Legacy sources both from the character's own persisted record at this exact moment (not a
+                // fixed value -- visibility can change between sessions), S04_MyWork02.cpp:999-1000; no
+                // VisibleState/SpecialState column exists anywhere in game.Characters yet to source from, so
+                // this remains a flat 0 pending a database-engineer schema addition, not a silent regression.
                 VisibleState = 0,
                 SpecialState = 0,
                 KillOtherTribe = 0,
@@ -191,16 +220,24 @@ public sealed class EnterWorldService(
                 GuildName = socialSnapshot.GuildName,
                 GuildRole = socialSnapshot.GuildRoleWire,
                 CallName = socialSnapshot.CallName,
+                // Legacy zeroes this only for a guild-less character; a real guild member's mark-effect
+                // value has no source anywhere in the current guild repository surface yet (no MarkEffect
+                // column/DTO field exists) -- flagged, not silently assumed correct.
                 GuildMarkEffect = 0,
                 Name = character.Name,
                 Tribe = character.Tribe,
-                PreviousTribe = 0,
+                // The Noble Dragon/Royal Serpent/Grand Tiger starter-kit template (0-2), genuinely independent
+                // of Tribe -- now a real persisted column (Migrations/018), no longer synthesized as 0.
+                PreviousTribe = character.PreviousTribe,
                 Gender = character.Gender,
                 HeadType = character.HeadType,
                 FaceType = character.FaceType,
                 Level1 = character.Level,
                 Level2 = character.Level2,
                 EquipForView = EquipmentViewCodec.BuildEquipForView(bundle.Items),
+                // character.MountItemId/MountSlotIndex are readable since Migrations/018, but the legacy's
+                // exact "currently mounted" condition (S04_MyWork02.cpp:935-940) isn't confirmed yet -- needs
+                // a legacy-behavior-translator contract before this stops being a flat 0.
                 AnimalNumber = 0,
                 Title = character.Title,
                 Halo = character.Halo,
@@ -231,7 +268,11 @@ public sealed class EnterWorldService(
                 LifeValue = character.Life,
                 MaxManaValue = character.MaxMana,
                 ManaValue = character.Mana,
-                EffectValueForView = new int[35],
+                EffectValueForView = BuildEffectValueForView(bundle.Buffs),
+                // Legacy copies the character's own persisted party name here (S04_MyWork02.cpp:1036), not
+                // blank -- no party-name column/DTO field is persisted anywhere on the Fenrir side yet
+                // (PartyRegistry is in-memory-only and does not survive a reconnect), so this stays "" pending
+                // a database-engineer schema addition, not a silent regression.
                 PartyName = "",
                 DuelState = new int[3],
                 PShopState = 0,
@@ -248,7 +289,9 @@ public sealed class EnterWorldService(
                 AnimalAbsorbState = 0,
                 PetValid = 0,
                 Unk1 = 0,
-                PetLocation = new float[3],
+                // Top-level PetLocation (distinct from Action.PetLocation above): legacy sets this to the
+                // avatar's own current position, not zero (S04_MyWork02.cpp:1058-1060).
+                PetLocation = [character.PosX, character.PosY, character.PosZ],
                 PetFrame = 0,
                 Unk624 = 0,
                 Unk625 = 0,
@@ -336,6 +379,21 @@ public sealed class EnterWorldService(
             characterId, accountId, character.MapId);
     }
 
+    /// <summary>
+    ///     Server/ts25zone/S04_MyWork02.cpp:880-901 -- the zone-entry self-consistency switch, all four
+    ///     branches: a main-faction Tribe (0-2) requires PreviousTribe == Tribe; the fourth faction (3)
+    ///     requires PreviousTribe in {0,1,2}; any other Tribe value is rejected outright.
+    /// </summary>
+    private static bool IsTribeAndPreviousTribeConsistent(byte tribe, byte previousTribe)
+    {
+        return tribe switch
+        {
+            0 or 1 or 2 => previousTribe == tribe,
+            3 => previousTribe is 0 or 1 or 2,
+            _ => false
+        };
+    }
+
     private static ImmutableDictionary<byte, ItemStack> BuildEquipmentContainer(
         IReadOnlyList<CharacterItemSlotDto> items)
     {
@@ -346,5 +404,39 @@ public sealed class EnterWorldService(
                 builder[item.Slot] = ItemStack.FromRow(item);
 
         return builder.ToImmutable();
+    }
+
+    /// <summary>
+    ///     Buff[slot*2]/[slot*2+1] pairing (value, remaining-ticks) -- same convention
+    ///     <see cref="Fenrir.Application.Game.Domain.World.Zone" />'s own ClearAllBuffs/ApplySkillBuffWrites use for
+    ///     this identical wire array. A brand-new character has no rows at all (creation never writes any buff), so
+    ///     an empty <paramref name="buffs" /> collapses to the same all-zero snapshot the previous hardcode produced.
+    /// </summary>
+    private static BuffInfo BuildBuffInfo(IReadOnlyList<CharacterBuffDto> buffs)
+    {
+        var buff = new int[70];
+
+        foreach (var row in buffs)
+        {
+            if (row.SlotIndex >= 35)
+                continue;
+
+            buff[row.SlotIndex * 2] = row.Value;
+            buff[row.SlotIndex * 2 + 1] = row.RemainingLegacyTicks;
+        }
+
+        return WorldStateTemplates.ZeroedBuffInfo with { Buff = buff };
+    }
+
+    /// <summary>One value per slot (not the id/duration pair <see cref="BuildBuffInfo" /> produces) -- ObjectForAvatar's own view of the same buff snapshot.</summary>
+    private static int[] BuildEffectValueForView(IReadOnlyList<CharacterBuffDto> buffs)
+    {
+        var effectValueForView = new int[35];
+
+        foreach (var row in buffs)
+            if (row.SlotIndex < 35)
+                effectValueForView[row.SlotIndex] = row.Value;
+
+        return effectValueForView;
     }
 }

@@ -94,7 +94,8 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         IReadOnlyList<CharacterItemSlotTvp> inventory,
         IReadOnlyList<CharacterSkillSlotTvp> skills,
         IReadOnlyList<CharacterHotkeySlotTvp> hotkeys,
-        CancellationToken ct)
+        CancellationToken ct,
+        byte previousTribe = 0)
     {
         var builder = new StoredProcedureParametersBuilder("game", "usp_Character_CreateWithStarterKit", 1)
             .AddParameter("AccountId", accountId, SqlDbType.Int)
@@ -126,6 +127,10 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
 
         if (hotkeys.Count > 0)
             builder.AddTvpParameter("Hotkeys", hotkeys);
+
+        // Appended last (never inserted among the existing scalars/TVPs above) to match
+        // Migrations/018_character_previous_tribe_and_mount_readpath.sql's own append-only parameter rule.
+        builder.AddParameter("PreviousTribe", previousTribe, SqlDbType.TinyInt);
 
         return await Db.ExecuteScalarAsync<int>(builder.Build(), ct);
     }

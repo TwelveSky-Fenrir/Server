@@ -29,6 +29,16 @@ public interface ICharacterRepository
     ///     Op17's full creation path: same slot/name guards as <see cref="CreateAsync" /> plus the EU33 starter kit
     ///     (stats, pet, welcome buffs, premium day, tribe equipment/inventory/skills/hotkeys) in one transaction.
     /// </summary>
+    /// <param name="previousTribe">
+    ///     The Noble Dragon/Royal Serpent/Grand Tiger starter-kit template (0-2) already used to select
+    ///     <paramref name="equipment" />/<paramref name="skills" />/<paramref name="hotkeys" /> via
+    ///     <see cref="IStarterKitRepository.GetByPreviousTribeAsync" /> -- genuinely independent of
+    ///     <paramref name="tribe" /> (Server/ts25zone/S04_MyWork02.cpp:880-901's self-consistency check), now
+    ///     persisted to <c>game.Characters.PreviousTribe</c> instead of only living in the caller's memory.
+    ///     Defaults to 0 (append-only parameter, see Migrations/018_character_previous_tribe_and_mount_readpath.sql)
+    ///     so existing callers that don't pass it yet keep compiling; a caller that already knows its real
+    ///     previousTribe should pass it explicitly.
+    /// </param>
     public ValueTask<int> CreateWithStarterKitAsync(
         int accountId,
         byte slot,
@@ -51,7 +61,8 @@ public interface ICharacterRepository
         IReadOnlyList<CharacterItemSlotTvp> inventory,
         IReadOnlyList<CharacterSkillSlotTvp> skills,
         IReadOnlyList<CharacterHotkeySlotTvp> hotkeys,
-        CancellationToken ct);
+        CancellationToken ct,
+        byte previousTribe = 0);
 
     public ValueTask DeleteAsync(int accountId, byte slot, CancellationToken ct);
 

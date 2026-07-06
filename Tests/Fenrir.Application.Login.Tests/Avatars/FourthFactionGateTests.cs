@@ -29,4 +29,13 @@ public class FourthFactionGateTests
         Assert.False(FourthFactionGate.BlocksCreation(FourthFactionGate.FourthFactionTribe,
             true));
     }
+
+    [Fact]
+    public void FourthFactionTribe_IsDerivedFromTheSharedTribeSlotCount_NotASecondIndependentLiteral()
+    {
+        // Guards against the two gates drifting out of lockstep -- both ultimately come from the same
+        // Server/Header/Protocol/DEFINE.h:309 four-tribe-slot constant.
+        Assert.Equal(TribeDominanceGate.TribeSlotCount - 1, FourthFactionGate.FourthFactionTribe);
+        Assert.Equal(3, FourthFactionGate.FourthFactionTribe);
+    }
 }

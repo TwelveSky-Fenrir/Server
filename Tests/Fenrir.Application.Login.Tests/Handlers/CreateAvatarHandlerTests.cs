@@ -62,10 +62,17 @@ public class CreateAvatarHandlerTests
         Assert.Equal(6f, call.PosX);
         Assert.Equal(0f, call.PosY);
         Assert.Equal(-7f, call.PosZ);
-        Assert.Equal(100, call.Life);
+        // S04_MyWork02.cpp:1096-1097: current life/mana are 30/21, not "full" values -- MaxLife/MaxMana have
+        // no creation-time legacy value at all (recomputed dynamically on world entry), so these two remain
+        // an unresolved placeholder pending a dedicated MyFactor-formula contract.
+        Assert.Equal(30, call.Life);
         Assert.Equal(100, call.MaxLife);
-        Assert.Equal(50, call.Mana);
+        Assert.Equal(21, call.Mana);
         Assert.Equal(50, call.MaxMana);
+        // Confirms CreateAvatarService now passes the request's own PreviousTribe through explicitly (see
+        // HandleAsync_RoyalSerpentPreviousTribe_.../_GrandTiger_... below for non-zero values) instead of
+        // relying on ICharacterRepository.CreateWithStarterKitAsync's byte previousTribe = 0 default.
+        Assert.Equal((byte)0, call.PreviousTribe);
 
         // Amulet/Armor/Gloves/Ring/Boots + the chosen Weapon (raw code 6 -> elite 84527, not the other 2
         // alternatives) + universal Cape/Pet. Every elite-gear row carries the SetISIUIMValue(45, 6, 0, 0)
@@ -125,7 +132,13 @@ public class CreateAvatarHandlerTests
             Str = 1,
             Int = 1,
             Dex = 1,
+            PreviousTribe = 0,
             Equip = AvatarInfoFactory.BuildEquipArray(call.Equipment),
+            Animal = MountSlotArray(1301),
+            AnimalIndex = 0,
+            AnimalTime = 99999999,
+            AnimalPower = MountSlotArray(5),
+            AnimalExpActivity = MountSlotArray(0),
             DoubleExpTime1 = call.WelcomeBuffUntilDate,
             DoubleExpTime2 = call.WelcomeBuffUntilDate,
             AutoBuffTime = call.WelcomeBuffUntilDate,
@@ -191,6 +204,9 @@ public class CreateAvatarHandlerTests
         Assert.NotNull(call);
         Assert.Equal((byte)1, call!.Tribe);
         Assert.Equal((short)6, call.MapId);
+        // Confirms PreviousTribe (1, independent of Tribe's own value) reaches the repository unchanged,
+        // matching Server/ts25zone/S04_MyWork02.cpp:880-901's expectation that the two stay in lockstep here.
+        Assert.Equal((byte)1, call.PreviousTribe);
         Assert.Equal(8, call.Equipment.Count);
         Assert.Contains(call.Equipment, i => i is { Slot: 0, ItemId: 85671, Enchant: 45, Combine: 6 });
         Assert.Contains(call.Equipment, i => i is { Slot: 2, ItemId: 85575, Enchant: 45, Combine: 6 });
@@ -249,6 +265,7 @@ public class CreateAvatarHandlerTests
         Assert.NotNull(call);
         Assert.Equal((byte)2, call!.Tribe);
         Assert.Equal((short)11, call.MapId);
+        Assert.Equal((byte)2, call.PreviousTribe);
         Assert.Equal(8, call.Equipment.Count);
         Assert.Contains(call.Equipment, i => i is { Slot: 0, ItemId: 86671, Enchant: 45, Combine: 6 });
         Assert.Contains(call.Equipment, i => i is { Slot: 2, ItemId: 86575, Enchant: 45, Combine: 6 });
@@ -374,6 +391,9 @@ public class CreateAvatarHandlerTests
         Assert.Equal(((byte)previousTribe, (short)1), starterKits.LastCall);
         var call = characters.LastCreateWithStarterKit;
         Assert.NotNull(call);
+        // Even out-of-range, the value itself is still persisted verbatim (see this method's own remarks on
+        // Migrations/018_character_previous_tribe_and_mount_readpath.sql) -- no clamping/defaulting to 0.
+        Assert.Equal((byte)previousTribe, call!.PreviousTribe);
         Assert.DoesNotContain(call!.Equipment, i => i.Slot == 7); // weapon-equip slot left unassigned
         // No elite gear at all -- only the two universal grants (Cape + Pet) survive, since Equipment
         // (unlike Inventory) is filtered by PreviousTribe in the real proc and comes back empty.
@@ -392,7 +412,13 @@ public class CreateAvatarHandlerTests
             Str = 1,
             Int = 1,
             Dex = 1,
+            PreviousTribe = previousTribe,
             Equip = AvatarInfoFactory.BuildEquipArray(call.Equipment),
+            Animal = MountSlotArray(1301),
+            AnimalIndex = 0,
+            AnimalTime = 99999999,
+            AnimalPower = MountSlotArray(5),
+            AnimalExpActivity = MountSlotArray(0),
             DoubleExpTime1 = call.WelcomeBuffUntilDate,
             DoubleExpTime2 = call.WelcomeBuffUntilDate,
             AutoBuffTime = call.WelcomeBuffUntilDate,
@@ -607,6 +633,10 @@ public class CreateAvatarHandlerTests
         Assert.NotNull(call);
         Assert.Equal((byte)3, call!.Tribe);
         Assert.Equal((short)140, call.MapId);
+        // Tribe (the fourth faction) and PreviousTribe (still 0, Noble Dragon) are independent fields on the
+        // wire and both persisted as-is -- Behavior C's own self-consistency check (a Tribe-3/PreviousTribe-
+        // 0-1-2 pairing is the one legitimate mismatch) is a zone-entry concern, not enforced here.
+        Assert.Equal((byte)0, call.PreviousTribe);
         Assert.Null(session.DisconnectReason);
 
         var createdCharacter = await characters.GetForWorldEntryAsync(1000, CancellationToken.None);
@@ -617,7 +647,13 @@ public class CreateAvatarHandlerTests
             Str = 1,
             Int = 1,
             Dex = 1,
+            PreviousTribe = 0,
             Equip = AvatarInfoFactory.BuildEquipArray(call.Equipment),
+            Animal = MountSlotArray(1301),
+            AnimalIndex = 0,
+            AnimalTime = 99999999,
+            AnimalPower = MountSlotArray(5),
+            AnimalExpActivity = MountSlotArray(0),
             DoubleExpTime1 = call.WelcomeBuffUntilDate,
             DoubleExpTime2 = call.WelcomeBuffUntilDate,
             AutoBuffTime = call.WelcomeBuffUntilDate,
@@ -633,6 +669,15 @@ public class CreateAvatarHandlerTests
     private static IOptions<LoginServerOptions> DefaultOptions()
     {
         return Options.Create(new LoginServerOptions());
+    }
+
+    // AVATAR_INFO's Animal/AnimalPower/AnimalExpActivity arrays are sized for 10 possible owned-mount slots
+    // (S04_MyWork02.cpp:1174-1179); creation only ever grants the one universal starter mount at slot 0.
+    // Written as an explicit literal (not a call into CreateAvatarService's own private helper) so this
+    // asserts the actual wire-level expected values, not just "whatever the implementation computes".
+    private static int[] MountSlotArray(int value)
+    {
+        return [value, 0, 0, 0, 0, 0, 0, 0, 0, 0];
     }
 
     private static (LoginClientSession Session, FakeDuplexPipe Pipe) CreateSessionInCharSelect()

@@ -26,7 +26,17 @@ namespace Fenrir.Application.Login.Services.CreateAvatar;
 ///     case-3/default branch -- weapon validation only runs for PreviousTribe 0/1/2, see
 ///     <see cref="TryResolveWeaponItemId" />'s call site) ; Server/ts25login/S04_MyWork02.cpp:1100-1179 (starting
 ///     level/stats/skill points, the six-category Enchant/Combine grant, and the pet/cape/mount grant -- all
-///     literal legacy constants embedded directly in usp_Character_CreateWithStarterKit, not parameters here).
+///     literal legacy constants embedded directly in usp_Character_CreateWithStarterKit, not parameters here) ;
+///     Server/ts25login/S04_MyWork02.cpp:1094-1097 (the current-life/current-mana literals, 30/21, and the
+///     DEFINE.h:751-756 write-macro confirming those are the logout-info slots this session's own current
+///     values, not any maximum) ; Server/ts25login/S04_MyWork02.cpp:1174-1179 (the universal starter mount --
+///     item 1301/DEFINE.h:157 ANIMAL_NUM_TIGER1, "5%" power, slot 0, permanent expiry) ;
+///     Server/ts25login/S04_MyWork02.cpp:885-892 (DoubleExpTime1/DoubleExpTime2 vs AutoBuffTime are two
+///     independently-sourced legacy fields, not the same value applied twice -- see the DoubleExpTime1/2
+///     assignment below for why this is flagged, not yet fixed) ;
+///     Server/ts25zone/S04_MyWork02.cpp:880-901 (the Tribe/PreviousTribe self-consistency check zone entry
+///     performs against the persisted PreviousTribe this method now threads through to
+///     <see cref="ICharacterRepository.CreateWithStarterKitAsync" /> instead of leaving it un-persisted).
 /// </remarks>
 public sealed class CreateAvatarService(
     ICharacterRepository characters,
@@ -36,9 +46,21 @@ public sealed class CreateAvatarService(
     ILogger<CreateAvatarService> logger)
     : ICreateAvatarService
 {
-    private const int StartLife = 100;
+    // S04_MyWork02.cpp:1096-1097; DEFINE.h:751-756's write-macro confirms these logout-info slots are
+    // current life/current mana. Universal across every race/tribe/gender -- these are deliberately low
+    // relative to a near-max-level, fully-elite-geared character's real maximum (the character is topped
+    // up, or its true maximums recomputed, on first entry into the world), not a mistranscribed number.
+    private const int StartLife = 30;
+    private const int StartMana = 21;
+
+    // MaxLife/MaxMana have no creation-time legacy value at all -- the legacy engine never persists a
+    // maximum, it recomputes both dynamically every time a relevant input changes, from a multi-factor
+    // formula (vitality/ki, gear, elixir, level, mount tier, pet, item-set bonuses --
+    // Server/Header/Protocol/MyFactor.cpp:1902-2010,2226-2357). These two constants are therefore a known
+    // architecture-mismatch placeholder, not a legacy-cited value; treat neither number as authoritative --
+    // a dedicated MyFactor-formula contract is needed before any concrete number or persistence strategy is
+    // chosen (bridge-stats-equipment contract, gap-table row 11).
     private const int StartMaxLife = 100;
-    private const int StartMana = 50;
     private const int StartMaxMana = 50;
 
     // FEQUIP_TYPE (Server/Header/Protocol/STRUCT.h): the slots BuildEquipmentRows writes beyond the tribe catalog.
@@ -56,7 +78,24 @@ public sealed class CreateAvatarService(
     private const byte EliteGearEnchant = 45;
     private const byte EliteGearCombine = 6;
 
-    private const int WelcomeBuffDurationDays = 7; // DoubleExpTime1/2 + AutoBuffTime
+    // Server/ts25login/S04_MyWork02.cpp:1174-1179 (item id: DEFINE.h:157 ANIMAL_NUM_TIGER1): the universal
+    // starter mount -- one tiger mount, slot 0, "5%" power tier, already select/equipped, effectively-
+    // permanent expiry. Identical to the literals 016_starter_kit_create_atomicity.sql bakes into
+    // MountItemId/MountExpActivity/MountPower/MountSlotIndex/MountTime -- game.Characters.Mount* isn't
+    // projected onto CharacterWorldEntryDto (see its own doc comment), so this is a second independent
+    // literal overlaid onto the immediate response, the same "known at creation time, not read back"
+    // pattern as Vit/Str/Int/Dex below.
+    private const int StarterMountItemId = 1301;
+    private const int StarterMountExpActivity = 0;
+    private const int StarterMountPower = 5;
+    private const int StarterMountSlotIndex = 0;
+    private const int StarterMountTime = 99999999;
+
+    // AutoBuffTime is genuinely this many days out (S04_MyWork02.cpp:892, "Starting Auto Buff Scroll: 7
+    // days") -- confirmed legacy-accurate. DoubleExpTime1/DoubleExpTime2 are a SEPARATE, confirmed-wrong
+    // concern applied to the same value below -- see that assignment's own comment for why it isn't fixed
+    // in this pass.
+    private const int WelcomeBuffDurationDays = 7;
 
     private const int PremiumDurationDays = 1;
 
@@ -143,21 +182,43 @@ public sealed class CreateAvatarService(
                 inventory,
                 skills,
                 hotkeys,
-                cancellationToken);
+                cancellationToken,
+                previousTribe);
 
             // Guaranteed non-null: we just created this row within this request.
             var character = await characters.GetForWorldEntryAsync(characterId, cancellationToken);
 
             // CharacterWorldEntryDto is a stable narrow prefix (see its own doc comment) that doesn't carry
-            // stats/equipment/buffs/premium -- overlaid here from the exact values just persisted above rather
-            // than added to that DTO, since every one of them is already known without a second round trip.
+            // stats/equipment/buffs/premium/PreviousTribe/Mount* -- overlaid here instead of added to that DTO,
+            // since every one of these is already known without a second round trip.
             var avatarInfo = AvatarInfoFactory.CreateForCharacter(character!) with
             {
+                // Independent fixed literal constants (S04_MyWork02.cpp:748-751), applied unconditionally
+                // before the race switch -- NOT read back from the row above, they simply equal the same
+                // literals CreateWithStarterKitAsync also persisted.
                 Vit = 1,
                 Str = 1,
                 Int = 1,
                 Dex = 1,
+                // game.Characters.PreviousTribe (Migrations/018_character_previous_tribe_and_mount_readpath.sql)
+                // isn't projected onto CharacterWorldEntryDto either -- already known here as the request's
+                // own (unvalidated-by-design, see this method's own remarks) parameter.
+                PreviousTribe = previousTribe,
                 Equip = AvatarInfoFactory.BuildEquipArray(equipment),
+                Animal = SingleMountSlotArray(StarterMountItemId),
+                AnimalIndex = StarterMountSlotIndex,
+                AnimalTime = StarterMountTime,
+                AnimalPower = SingleMountSlotArray(StarterMountPower),
+                AnimalExpActivity = SingleMountSlotArray(StarterMountExpActivity),
+                // DoubleExpTime1/DoubleExpTime2 vs AutoBuffTime is a CONFIRMED-WRONG collapse, not fixed here:
+                // legacy sets DoubleExpTime1/2 to a fixed raw counter (300, S04_MyWork02.cpp:886-887) that is
+                // NOT date-derived, while AutoBuffTime genuinely is this 7-day-future date (S04_MyWork02.cpp:
+                // 892) -- but usp_Character_CreateWithStarterKit only exposes one @WelcomeBuffUntilDate
+                // parameter for all three columns (016_starter_kit_create_atomicity.sql:74,77), and the exact
+                // unit/encoding of that 300 literal was not independently confirmed. Both a new stored-
+                // procedure parameter and a fresh legacy-research pass on the literal's meaning are needed
+                // before this can change (bridge-stats-equipment contract, gap-table row 12) -- deliberately
+                // not substituted blind.
                 DoubleExpTime1 = welcomeBuffUntilDate,
                 DoubleExpTime2 = welcomeBuffUntilDate,
                 AutoBuffTime = welcomeBuffUntilDate,
@@ -267,5 +328,17 @@ public sealed class CreateAvatarService(
     {
         var future = DateTime.UtcNow.AddDays(days);
         return future.Year * 10000 + future.Month * 100 + future.Day;
+    }
+
+    /// <summary>
+    ///     Places a single value at <see cref="StarterMountSlotIndex" /> of an otherwise-zeroed 10-slot array --
+    ///     the shared shape of AVATAR_INFO's Animal/AnimalPower/AnimalExpActivity arrays, all of which the wire
+    ///     format sizes at 10 possible owned-mount slots even though creation only ever grants one.
+    /// </summary>
+    private static int[] SingleMountSlotArray(int value)
+    {
+        var slots = new int[10];
+        slots[StarterMountSlotIndex] = value;
+        return slots;
     }
 }

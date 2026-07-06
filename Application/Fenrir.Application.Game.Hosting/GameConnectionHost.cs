@@ -90,7 +90,7 @@ public sealed class GameConnectionHost(
 
             await Task.WhenAll(
                 connection.RunIOAsync(ct),
-                SessionLoop.RunAsync(zoneSession, dispatcher, rateLimiter, ipFloodGuard, ct)
+                SessionLoop.RunAsync(zoneSession, dispatcher, rateLimiter, ipFloodGuard, ct, logger)
             ).ConfigureAwait(false);
         }
         catch (Exception ex)

@@ -103,4 +103,38 @@ public class AvatarInfoFactoryTests
         // A field not covered by CreateForCharacter must stay at Zeroed's value.
         Assert.Equal(0, avatar.Money);
     }
+
+    // FEQUIP_TYPE (Server/Header/Protocol/STRUCT.h:1662-1676) has exactly 13 slots (0-12), each packed as 4
+    // wire ints -- previously only exercised indirectly through CreateAvatarHandlerTests' full-AvatarInfo
+    // equality assertions; this pins the exact packing (ItemId/ExpireDate/Enchant-Combine-Refine-Socket) and
+    // the slot-13-and-above skip directly.
+    [Fact]
+    public void BuildEquipArray_PacksItemIdExpireDateAndEnchantEncoding_AndSkipsSlotsAtOrAbove13()
+    {
+        var equipment = new List<CharacterItemSlotTvp>
+        {
+            new(Slot: 0, ItemId: 84671, Quantity: 1, Enchant: 45, Combine: 6, Refine: 1, Socket: 2,
+                SocketGem1: 0, SocketGem2: 0, SocketGem3: 0, ExpireDate: 12345, Serial: 0), // Amulet
+            new(Slot: 7, ItemId: 84527, Quantity: 1, Enchant: 45, Combine: 6, Refine: 0, Socket: 0,
+                SocketGem1: 0, SocketGem2: 0, SocketGem3: 0, ExpireDate: 0, Serial: 0), // Weapon
+            new(Slot: 13, ItemId: 999999, Quantity: 1, Enchant: 0, Combine: 0, Refine: 0, Socket: 0,
+                SocketGem1: 0, SocketGem2: 0, SocketGem3: 0, ExpireDate: 0, Serial: 0) // out of FEQUIP_TYPE's range
+        };
+
+        var equip = AvatarInfoFactory.BuildEquipArray(equipment);
+
+        Assert.Equal(52, equip.Length);
+
+        Assert.Equal(84671, equip[0]);
+        Assert.Equal(12345, equip[1]);
+        Assert.Equal(45 | (6 << 8) | (1 << 16) | (2 << 24), equip[2]);
+        Assert.Equal(0, equip[3]); // 4th wire int per slot is unmapped, always wire-zero
+
+        Assert.Equal(84527, equip[28]); // slot 7 -> baseIndex 7*4
+        Assert.Equal(0, equip[29]);
+        Assert.Equal(45 | (6 << 8), equip[30]);
+
+        // Slot 13 would index past the 52-length array (13*4 == 52) -- silently dropped, not packed/thrown.
+        Assert.DoesNotContain(999999, equip);
+    }
 }

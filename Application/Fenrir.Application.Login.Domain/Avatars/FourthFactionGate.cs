@@ -18,8 +18,13 @@ namespace Fenrir.Application.Login.Domain.Avatars;
 /// </remarks>
 public static class FourthFactionGate
 {
-    /// <summary>The fourth playable tribe slot -- Server/Header/Protocol/DEFINE.h:309 names 4 tribe slots total.</summary>
-    public const byte FourthFactionTribe = 3;
+    /// <summary>
+    ///     The fourth playable tribe slot -- Server/Header/Protocol/DEFINE.h:309 names 4 tribe slots total, so
+    ///     this is the last (index 3) of them. Derived from <see cref="TribeDominanceGate.TribeSlotCount" />
+    ///     rather than a second independent "4"/"3" literal, so the two gates cannot drift out of lockstep if
+    ///     the total slot count ever changes.
+    /// </summary>
+    public const byte FourthFactionTribe = TribeDominanceGate.TribeSlotCount - 1;
 
     /// <summary>
     ///     True only when <paramref name="tribe" /> is exactly <see cref="FourthFactionTribe" /> and

@@ -90,7 +90,7 @@ public sealed class LoginConnectionHost(
 
             await Task.WhenAll(
                 connection.RunIOAsync(ct),
-                SessionLoop.RunAsync(loginSession, dispatcher, rateLimiter, ipFloodGuard, ct)
+                SessionLoop.RunAsync(loginSession, dispatcher, rateLimiter, ipFloodGuard, ct, logger)
             ).ConfigureAwait(false);
         }
         catch (Exception ex)

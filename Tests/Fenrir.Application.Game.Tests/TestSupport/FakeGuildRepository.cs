@@ -83,9 +83,12 @@ internal sealed class FakeGuildRepository : IGuildRepository
         return ValueTask.CompletedTask;
     }
 
+    /// <summary>Scripted return for <see cref="GetByCharacterAsync" /> -- null (the default) means "no guild".</summary>
+    public CharacterGuildMembershipDto? MembershipToReturn { get; set; }
+
     public ValueTask<CharacterGuildMembershipDto?> GetByCharacterAsync(int characterId, CancellationToken ct)
     {
-        throw new NotImplementedException();
+        return ValueTask.FromResult(MembershipToReturn);
     }
 
     public ValueTask<ReadOnlyCollection<GuildRosterRowDto>> GetRosterAsync(int guildId, CancellationToken ct)

@@ -35,6 +35,13 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
     /// </summary>
     public CharacterWorldEntryDto? WorldEntryToReturn { get; set; }
 
+    /// <summary>
+    ///     Scripted return for <see cref="GetWorldEntryBundleAsync" /> -- null (the default) exercises the
+    ///     "world-entry bundle fetch failed" abort path (e.g. EnterWorldService); set this to exercise a
+    ///     happy-path world entry instead.
+    /// </summary>
+    public CharacterWorldEntryBundle? WorldEntryBundleToReturn { get; set; }
+
     /// <summary>Every row ever passed to <see cref="PersistPositionsAsync" />, across every call -- append-only.</summary>
     public List<CharacterPositionTvp> PersistedPositionRows { get; } = [];
 
@@ -77,7 +84,7 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
         int mana, int maxMana, int welcomeBuffUntilDate, long premiumUntilUnixSeconds,
         IReadOnlyList<CharacterItemSlotTvp> equipment, IReadOnlyList<CharacterItemSlotTvp> inventory,
         IReadOnlyList<CharacterSkillSlotTvp> skills, IReadOnlyList<CharacterHotkeySlotTvp> hotkeys,
-        CancellationToken ct)
+        CancellationToken ct, byte previousTribe = 0)
     {
         throw new NotImplementedException();
     }
@@ -106,7 +113,7 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
 
     public ValueTask<CharacterWorldEntryBundle?> GetWorldEntryBundleAsync(int characterId, CancellationToken ct)
     {
-        throw new NotImplementedException();
+        return ValueTask.FromResult(WorldEntryBundleToReturn);
     }
 
     public ValueTask ReplaceTwoContainersAsync(int characterId, byte containerA,

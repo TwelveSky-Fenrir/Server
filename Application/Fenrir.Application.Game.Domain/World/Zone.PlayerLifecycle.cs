@@ -167,8 +167,14 @@ public sealed partial class Zone
             GuildRoleDb = data.GuildRoleDb,
             GuildCallName = data.GuildCallName,
             TribeRole = data.TribeRole,
-            // No rebirth/tribe-transition system populates a real "previous tribe" yet -- defaults to the
-            // character's current tribe (a "never transferred" inference).
+            // game.Characters.PreviousTribe is now a real, independently-persisted column (Migrations/018)
+            // and EnterWorldService.HandleAsync already gates entry on Tribe/PreviousTribe self-consistency
+            // (Server/ts25zone/S04_MyWork02.cpp:880-901), so for a main-faction Tribe (0-2) that gate
+            // guarantees PreviousTribe == Tribe and this stand-in is legacy-accurate. It is NOT accurate for a
+            // fourth-faction (Tribe 3) character, whose real PreviousTribe is one of 0/1/2 and therefore
+            // differs from Tribe by design -- PlayerEnterData (ZoneCommand.cs) does not carry the persisted
+            // value through yet, so this in-process ABI still needs that field added before a tribe-3
+            // character's runtime state can be correct. Tracked, not silently assumed equivalent.
             PreviousTribe = data.Tribe,
             // The only write site for this field: a one-shot ~10s combat grace period starting now, for every
             // arrival. Combat code must never write this field again after today.

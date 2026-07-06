@@ -14,7 +14,7 @@ public class BigMoneyUnitConversionPolicyTests
     public void ResolveMoneyToBigMoney_QuantityBelowOneBillion_IsQuantityBelowMinimum()
     {
         var result = BigMoneyUnitConversionPolicy.ResolveMoneyToBigMoney(
-            requestedQuantity: 999_999_999, inventoryMoney: 2_000_000_000, inventoryBigMoney: 0);
+            999_999_999, 2_000_000_000, 0);
 
         Assert.Equal(BigMoneyUnitConversionPolicy.BigMoneyUnitConversionOutcome.QuantityBelowMinimum, result.Outcome);
         Assert.False(result.Succeeded);
@@ -24,7 +24,7 @@ public class BigMoneyUnitConversionPolicyTests
     public void ResolveMoneyToBigMoney_ZeroQuantity_IsQuantityBelowMinimum()
     {
         var result = BigMoneyUnitConversionPolicy.ResolveMoneyToBigMoney(
-            requestedQuantity: 0, inventoryMoney: 2_000_000_000, inventoryBigMoney: 0);
+            0, 2_000_000_000, 0);
 
         Assert.Equal(BigMoneyUnitConversionPolicy.BigMoneyUnitConversionOutcome.QuantityBelowMinimum, result.Outcome);
     }
@@ -33,7 +33,7 @@ public class BigMoneyUnitConversionPolicyTests
     public void ResolveMoneyToBigMoney_NegativeQuantity_IsQuantityBelowMinimum()
     {
         var result = BigMoneyUnitConversionPolicy.ResolveMoneyToBigMoney(
-            requestedQuantity: -1, inventoryMoney: 2_000_000_000, inventoryBigMoney: 0);
+            -1, 2_000_000_000, 0);
 
         Assert.Equal(BigMoneyUnitConversionPolicy.BigMoneyUnitConversionOutcome.QuantityBelowMinimum, result.Outcome);
     }
@@ -42,7 +42,7 @@ public class BigMoneyUnitConversionPolicyTests
     public void ResolveMoneyToBigMoney_MoneyBelowRequestedQuantity_IsInsufficientSourceBalance()
     {
         var result = BigMoneyUnitConversionPolicy.ResolveMoneyToBigMoney(
-            requestedQuantity: 1_000_000_000, inventoryMoney: 999_999_999, inventoryBigMoney: 0);
+            1_000_000_000, 999_999_999, 0);
 
         Assert.Equal(BigMoneyUnitConversionPolicy.BigMoneyUnitConversionOutcome.InsufficientSourceBalance,
             result.Outcome);
@@ -52,8 +52,8 @@ public class BigMoneyUnitConversionPolicyTests
     public void ResolveMoneyToBigMoney_DestinationAtCap_IsDestinationOverflow()
     {
         var result = BigMoneyUnitConversionPolicy.ResolveMoneyToBigMoney(
-            requestedQuantity: 1_000_000_000, inventoryMoney: 1_000_000_000,
-            inventoryBigMoney: BigMoneyUnitConversionPolicy.BigMoneyCap);
+            1_000_000_000, 1_000_000_000,
+            BigMoneyUnitConversionPolicy.BigMoneyCap);
 
         Assert.Equal(BigMoneyUnitConversionPolicy.BigMoneyUnitConversionOutcome.DestinationOverflow, result.Outcome);
     }
@@ -62,8 +62,8 @@ public class BigMoneyUnitConversionPolicyTests
     public void ResolveMoneyToBigMoney_DestinationOneBelowCap_Succeeds()
     {
         var result = BigMoneyUnitConversionPolicy.ResolveMoneyToBigMoney(
-            requestedQuantity: 1_000_000_000, inventoryMoney: 1_000_000_000,
-            inventoryBigMoney: BigMoneyUnitConversionPolicy.BigMoneyCap - 1);
+            1_000_000_000, 1_000_000_000,
+            BigMoneyUnitConversionPolicy.BigMoneyCap - 1);
 
         Assert.True(result.Succeeded);
         Assert.Equal(BigMoneyUnitConversionPolicy.BigMoneyCap, result.NewInventoryBigMoney);
@@ -73,7 +73,7 @@ public class BigMoneyUnitConversionPolicyTests
     public void ResolveMoneyToBigMoney_ExactlyOneBillion_IsAFair1To1Exchange()
     {
         var result = BigMoneyUnitConversionPolicy.ResolveMoneyToBigMoney(
-            requestedQuantity: 1_000_000_000, inventoryMoney: 1_000_000_000, inventoryBigMoney: 5);
+            1_000_000_000, 1_000_000_000, 5);
 
         Assert.True(result.Succeeded);
         Assert.Equal(0, result.NewInventoryMoney);
@@ -85,7 +85,7 @@ public class BigMoneyUnitConversionPolicyTests
     {
         // A client that overpays loses the excess: no partial refund, no extra units granted.
         var result = BigMoneyUnitConversionPolicy.ResolveMoneyToBigMoney(
-            requestedQuantity: 1_500_000_000, inventoryMoney: 2_000_000_000, inventoryBigMoney: 5);
+            1_500_000_000, 2_000_000_000, 5);
 
         Assert.True(result.Succeeded);
         Assert.Equal(500_000_000, result.NewInventoryMoney);
@@ -98,7 +98,7 @@ public class BigMoneyUnitConversionPolicyTests
     public void ResolveBigMoneyToMoney_ZeroQuantity_IsQuantityBelowMinimum()
     {
         var result = BigMoneyUnitConversionPolicy.ResolveBigMoneyToMoney(
-            requestedQuantity: 0, inventoryBigMoney: 10, inventoryMoney: 0);
+            0, 10, 0);
 
         Assert.Equal(BigMoneyUnitConversionPolicy.BigMoneyUnitConversionOutcome.QuantityBelowMinimum, result.Outcome);
     }
@@ -107,7 +107,7 @@ public class BigMoneyUnitConversionPolicyTests
     public void ResolveBigMoneyToMoney_NegativeQuantity_IsQuantityBelowMinimum()
     {
         var result = BigMoneyUnitConversionPolicy.ResolveBigMoneyToMoney(
-            requestedQuantity: -5, inventoryBigMoney: 10, inventoryMoney: 0);
+            -5, 10, 0);
 
         Assert.Equal(BigMoneyUnitConversionPolicy.BigMoneyUnitConversionOutcome.QuantityBelowMinimum, result.Outcome);
     }
@@ -116,7 +116,7 @@ public class BigMoneyUnitConversionPolicyTests
     public void ResolveBigMoneyToMoney_BigMoneyBelowRequestedQuantity_IsInsufficientSourceBalance()
     {
         var result = BigMoneyUnitConversionPolicy.ResolveBigMoneyToMoney(
-            requestedQuantity: 5, inventoryBigMoney: 4, inventoryMoney: 0);
+            5, 4, 0);
 
         Assert.Equal(BigMoneyUnitConversionPolicy.BigMoneyUnitConversionOutcome.InsufficientSourceBalance,
             result.Outcome);
@@ -126,8 +126,8 @@ public class BigMoneyUnitConversionPolicyTests
     public void ResolveBigMoneyToMoney_DestinationWouldExceedCeiling_IsDestinationOverflow()
     {
         var result = BigMoneyUnitConversionPolicy.ResolveBigMoneyToMoney(
-            requestedQuantity: 1, inventoryBigMoney: 1,
-            inventoryMoney: BigMoneyUnitConversionPolicy.MoneyCeiling - 999_999_999);
+            1, 1,
+            BigMoneyUnitConversionPolicy.MoneyCeiling - 999_999_999);
 
         Assert.Equal(BigMoneyUnitConversionPolicy.BigMoneyUnitConversionOutcome.DestinationOverflow, result.Outcome);
     }
@@ -136,8 +136,8 @@ public class BigMoneyUnitConversionPolicyTests
     public void ResolveBigMoneyToMoney_DestinationExactlyAtCeiling_Succeeds()
     {
         var result = BigMoneyUnitConversionPolicy.ResolveBigMoneyToMoney(
-            requestedQuantity: 1, inventoryBigMoney: 1,
-            inventoryMoney: BigMoneyUnitConversionPolicy.MoneyCeiling - 1_000_000_000);
+            1, 1,
+            BigMoneyUnitConversionPolicy.MoneyCeiling - 1_000_000_000);
 
         Assert.True(result.Succeeded);
         Assert.Equal(BigMoneyUnitConversionPolicy.MoneyCeiling, result.NewInventoryMoney);
@@ -148,7 +148,7 @@ public class BigMoneyUnitConversionPolicyTests
     public void ResolveBigMoneyToMoney_Success_MovesExactlyOneUnitForExactlyOneBillion()
     {
         var result = BigMoneyUnitConversionPolicy.ResolveBigMoneyToMoney(
-            requestedQuantity: 1, inventoryBigMoney: 5, inventoryMoney: 0);
+            1, 5, 0);
 
         Assert.True(result.Succeeded);
         Assert.Equal(1_000_000_000, result.NewInventoryMoney);
@@ -161,7 +161,7 @@ public class BigMoneyUnitConversionPolicyTests
         // Over-supplying the quantity only requires a correspondingly larger BigMoney balance; it has no
         // additional effect on the amounts actually moved.
         var result = BigMoneyUnitConversionPolicy.ResolveBigMoneyToMoney(
-            requestedQuantity: 5, inventoryBigMoney: 5, inventoryMoney: 0);
+            5, 5, 0);
 
         Assert.True(result.Succeeded);
         Assert.Equal(1_000_000_000, result.NewInventoryMoney);

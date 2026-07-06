@@ -3,8 +3,6 @@ using Fenrir.Application.Login.Abstractions.Login;
 using Fenrir.Application.Login.Domain;
 using Fenrir.Application.Login.Domain.RateLimiting;
 using Fenrir.Application.Login.Domain.Security;
-using Fenrir.Data.Abstractions.Game;
-using Fenrir.Data.Abstractions.Runtime;
 using Fenrir.Data.Security;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Login;

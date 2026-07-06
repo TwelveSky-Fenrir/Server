@@ -26,7 +26,8 @@ public enum DungeonInstanceEntryOutcome
 ///     Zone-241 "LOD" personal-boss-chain dungeon: per-avatar content partitioning (NOT per-party -- see the
 ///     class-level framing correction this was implemented from). One <see cref="PlayerRuntimeState" /> per
 ///     avatar carries its own <see cref="PlayerRuntimeState.DungeonInstanceId" />/
-///     <see cref="PlayerRuntimeState.DungeonInstanceLifecycleState" />/<see cref="PlayerRuntimeState.DungeonInstanceTick" />,
+///     <see cref="PlayerRuntimeState.DungeonInstanceLifecycleState" />/
+///     <see cref="PlayerRuntimeState.DungeonInstanceTick" />,
 ///     mirroring legacy's one <c>DUNGEON_INSTANCE</c> struct embedded per connected avatar
 ///     (<c>USER_OBJECT::mInstance</c>) -- never a registry keyed by party.
 /// </summary>
@@ -50,11 +51,14 @@ public enum DungeonInstanceEntryOutcome
 ///     </para>
 ///     <para>
 ///         <b>Deliberately not implemented</b> (the contract this was built from does not specify these, and
-///         guessing would violate the "no legacy parity from memory" rule): <see cref="DungeonInstanceLifecycle.Waiting" />
+///         guessing would violate the "no legacy parity from memory" rule):
+///         <see cref="DungeonInstanceLifecycle.Waiting" />
 ///         is never entered (the one arm call site jumps straight to <see cref="DungeonInstanceLifecycle.Summoning" />);
-///         <see cref="DungeonInstanceLifecycle.Failure" />'s trigger condition (only <see cref="DungeonInstanceLifecycle.Success" />,
+///         <see cref="DungeonInstanceLifecycle.Failure" />'s trigger condition (only
+///         <see cref="DungeonInstanceLifecycle.Success" />,
 ///         on the personal boss's death, is driven); the <see cref="DungeonInstanceLifecycle.WaitBeforeReturn" />/
-///         <see cref="DungeonInstanceLifecycle.ReturnToTownNotice" />/<see cref="DungeonInstanceLifecycle.DisconnectPending" />
+///         <see cref="DungeonInstanceLifecycle.ReturnToTownNotice" />/
+///         <see cref="DungeonInstanceLifecycle.DisconnectPending" />
 ///         tick durations and the auto-return-to-town teleport/forced-disconnect side effects those states
 ///         imply. The two divergent tier-&gt;boss lookup tables (differing at tiers 4/5 between the entry-flow
 ///         and tick-summon copies) are represented only by <see cref="IPersonalDungeonBossCatalog" />'s single
@@ -82,7 +86,8 @@ public sealed partial class Zone
     ///     <see cref="NullPersonalDungeonBossCatalog" /> (every entry attempt's summon step fails) until Hosting
     ///     wires up a real one -- see that type's own remarks.
     /// </summary>
-    public IPersonalDungeonBossCatalog PersonalDungeonBossCatalog { get; set; } = NullPersonalDungeonBossCatalog.Instance;
+    public IPersonalDungeonBossCatalog PersonalDungeonBossCatalog { get; set; } =
+        NullPersonalDungeonBossCatalog.Instance;
 
     /// <summary>
     ///     Whether this zone is configured to run the Zone-241 "LOD" personal dungeon content -- the Fenrir
@@ -225,7 +230,7 @@ public sealed partial class Zone
 
             var instanceId = state.DungeonInstanceId ?? state.CharacterId;
             var bossAlive = _monsters.TryGetValue(instanceId, out var boss) && boss is not null &&
-                             boss.InstanceId == instanceId;
+                            boss.InstanceId == instanceId;
 
             if (!bossAlive)
             {

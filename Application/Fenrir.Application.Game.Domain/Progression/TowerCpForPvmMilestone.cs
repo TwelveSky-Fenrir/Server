@@ -5,7 +5,8 @@ namespace Fenrir.Application.Game.Domain.Progression;
 /// <summary>
 ///     The personal 1000-kill CP milestone inside <c>ProcessAttack03</c>'s post-kill CP section
 ///     (<c>Server/ts25zone/S07_MyGame02.cpp:2752-2789</c>): every level-appropriate monster kill counts toward
-///     a per-character counter (legacy <c>aKillMonsterNum2</c>, see <see cref="World.PlayerRuntimeState.TowerCpMilestoneCounter" />);
+///     a per-character counter (legacy <c>aKillMonsterNum2</c>, see
+///     <see cref="World.PlayerRuntimeState.TowerCpMilestoneCounter" />);
 ///     the 1000th kill resets the counter to 0 and grants a CP reward -- a milestone reward, not a per-kill one.
 /// </summary>
 /// <remarks>
@@ -27,8 +28,6 @@ public static class TowerCpForPvmMilestone
     ///     reproduced here.
     /// </summary>
     public const int BaseKillCp = 1;
-
-    public readonly record struct KillRegistration(int UpdatedCounter, bool MilestoneReached);
 
     /// <summary>
     ///     Advances the milestone counter for one kill. A kill outside the level-appropriate window leaves the
@@ -53,4 +52,6 @@ public static class TowerCpForPvmMilestone
     {
         return BaseKillCp + Math.Max(0, cpForPvmTowerBonus);
     }
+
+    public readonly record struct KillRegistration(int UpdatedCounter, bool MilestoneReached);
 }

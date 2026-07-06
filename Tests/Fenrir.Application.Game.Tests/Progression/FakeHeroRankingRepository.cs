@@ -3,8 +3,10 @@ using Fenrir.Data.Abstractions.Progression;
 
 namespace Fenrir.Application.Game.Tests.Progression;
 
-/// <summary>In-memory stand-in for <see cref="IHeroRankingRepository" /> -- mirrors
-/// game.usp_HeroRanking_AddPoints's own "accumulate, seed on first grant" semantics.</summary>
+/// <summary>
+///     In-memory stand-in for <see cref="IHeroRankingRepository" /> -- mirrors
+///     game.usp_HeroRanking_AddPoints's own "accumulate, seed on first grant" semantics.
+/// </summary>
 internal sealed class FakeHeroRankingRepository : IHeroRankingRepository
 {
     public Dictionary<(int CharacterId, byte PeriodKind), int> Points { get; } = new();

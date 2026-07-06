@@ -15,12 +15,6 @@ internal sealed class FakeCharacterShardLocationRepository : ICharacterShardLoca
     public bool ThrowOnUpsert { get; set; }
     public bool ThrowOnRemove { get; set; }
 
-    /// <summary>Seeds a row as if some other shard already upserted it -- bypasses <see cref="UpsertAsync" /> itself.</summary>
-    public void Seed(CharacterShardLocationDto row)
-    {
-        _byCharacterId[row.CharacterId] = row;
-    }
-
     public ValueTask UpsertAsync(int characterId, byte shardId, short mapId, string avatarName, byte tribe,
         CancellationToken ct)
     {
@@ -61,6 +55,12 @@ internal sealed class FakeCharacterShardLocationRepository : ICharacterShardLoca
     {
         return ValueTask.FromResult(_byCharacterId.TryGetValue(characterId, out var row)
             ? row
-            : (CharacterShardLocationDto?)null);
+            : null);
+    }
+
+    /// <summary>Seeds a row as if some other shard already upserted it -- bypasses <see cref="UpsertAsync" /> itself.</summary>
+    public void Seed(CharacterShardLocationDto row)
+    {
+        _byCharacterId[row.CharacterId] = row;
     }
 }

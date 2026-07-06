@@ -9,7 +9,6 @@ using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Stats;
-using Fenrir.Data.Abstractions.Game;
 using Fenrir.Network.Serialization.Packets.Zone;
 using Microsoft.Extensions.Logging;
 
@@ -50,6 +49,10 @@ public sealed class UseInventoryItemService(
     ///     "app-owned numbering scheme" comment), but a distinct value is still picked here for readability.
     /// </summary>
     private const short ProxyShopRentalExtensionEventCode = 2;
+
+    private const int LodTicketItemId = 1434;
+    private const int FactionNoticeItemId = 566;
+    private const int TaiyanKeyItemId = 1049;
 
     public async ValueTask<UseInventoryItemResponse> ResolveAsync(Zone zone, PlayerRuntimeState state,
         int characterId, int accountId, byte page, byte index, int value, CancellationToken cancellationToken)
@@ -344,10 +347,6 @@ public sealed class UseInventoryItemService(
         return response;
     }
 
-    private const int LodTicketItemId = 1434;
-    private const int FactionNoticeItemId = 566;
-    private const int TaiyanKeyItemId = 1049;
-
     /// <summary>
     ///     Item 1434 -- one of the two catalog ids the loot-box behavior contract's shared prologue handler
     ///     special-cases directly (the other, the rare mount box, is not wired to a production id yet -- see
@@ -421,9 +420,9 @@ public sealed class UseInventoryItemService(
             resolved.NewStatInt, resolved.NewStatDex);
 
         if (!await zone.PostTribeProgressCommandAndWaitAsync(new TribeProgressZoneCommand(characterId,
-                    StatVit: resolved.NewStatVit, StatStr: resolved.NewStatStr, StatInt: resolved.NewStatInt,
-                    StatDex: resolved.NewStatDex, StatPoints: state.StatPoints + resolved.RefundedPoints,
-                    Life: 1, Mana: 0, UpdatedStats: updatedStats), cancellationToken))
+                StatVit: resolved.NewStatVit, StatStr: resolved.NewStatStr, StatInt: resolved.NewStatInt,
+                StatDex: resolved.NewStatDex, StatPoints: state.StatPoints + resolved.RefundedPoints,
+                Life: 1, Mana: 0, UpdatedStats: updatedStats), cancellationToken))
             logger.LogError(
                 "Zone {MapId} tribe-progress inbox full: dropped Stats-Clear mirror for character {CharacterId}",
                 zone.MapId, characterId);
@@ -488,9 +487,9 @@ public sealed class UseInventoryItemService(
         var updatedStats = RecomputeStatsAfterReset(state, newVit, newStr, newInt, newDex);
 
         if (!await zone.PostTribeProgressCommandAndWaitAsync(new TribeProgressZoneCommand(characterId,
-                    StatVit: newVit, StatStr: newStr, StatInt: newInt, StatDex: newDex,
-                    StatPoints: state.StatPoints + resolved.RefundedPoints, Life: 1, Mana: 0,
-                    UpdatedStats: updatedStats), cancellationToken))
+                StatVit: newVit, StatStr: newStr, StatInt: newInt, StatDex: newDex,
+                StatPoints: state.StatPoints + resolved.RefundedPoints, Life: 1, Mana: 0,
+                UpdatedStats: updatedStats), cancellationToken))
             logger.LogError(
                 "Zone {MapId} tribe-progress inbox full: dropped Stat-Cleanse mirror for character {CharacterId}",
                 zone.MapId, characterId);
@@ -511,17 +510,6 @@ public sealed class UseInventoryItemService(
             worldData.ItemsById);
         return EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData, state.Buffs,
             petContribution);
-    }
-
-    private readonly record struct CharmChargeSpec(ProtectionCharmCounterKind Kind, int PerUnitAmount);
-
-    private enum ProtectionCharmCounterKind
-    {
-        Refine,
-        Destroy,
-        Costume,
-        Destroy2,
-        Halo
     }
 
     /// <summary>
@@ -617,16 +605,6 @@ public sealed class UseInventoryItemService(
         };
     }
 
-    private readonly record struct ScrollChargeSpec(ProtectionScrollCounterKind Kind, int FixedAmount);
-
-    private enum ProtectionScrollCounterKind
-    {
-        ImproveItem,
-        AddItem,
-        HighItem,
-        DropItemTime
-    }
-
     /// <summary>
     ///     Same best-effort positional derivation posture as <see cref="ResolveCharmFamily" />. The 4th id in
     ///     each Combine/Upgrade/Drop group (1231/1232/1233) is a variant with no independently-confirmed charge
@@ -693,7 +671,10 @@ public sealed class UseInventoryItemService(
         return await ConsumeAndMirrorAsync(zone, state, characterId, page, index, item, cancellationToken);
     }
 
-    /// <summary>Faction Notice Scroll (world.Item 566) -- recharges <see cref="PlayerRuntimeState.TribeNotifyScrollCount" /> by 5.</summary>
+    /// <summary>
+    ///     Faction Notice Scroll (world.Item 566) -- recharges <see cref="PlayerRuntimeState.TribeNotifyScrollCount" />
+    ///     by 5.
+    /// </summary>
     /// <remarks>Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:2622-2630.</remarks>
     private async ValueTask<UseInventoryItemResponse> ResolveFactionNoticeAsync(Zone zone, PlayerRuntimeState state,
         int characterId, byte page, byte index, ItemStack item, CancellationToken cancellationToken)
@@ -796,5 +777,26 @@ public sealed class UseInventoryItemService(
         foreach (var (slot, stack) in container)
             list.Add(stack.ToTvp(slot));
         return list;
+    }
+
+    private readonly record struct CharmChargeSpec(ProtectionCharmCounterKind Kind, int PerUnitAmount);
+
+    private enum ProtectionCharmCounterKind
+    {
+        Refine,
+        Destroy,
+        Costume,
+        Destroy2,
+        Halo
+    }
+
+    private readonly record struct ScrollChargeSpec(ProtectionScrollCounterKind Kind, int FixedAmount);
+
+    private enum ProtectionScrollCounterKind
+    {
+        ImproveItem,
+        AddItem,
+        HighItem,
+        DropItemTime
     }
 }

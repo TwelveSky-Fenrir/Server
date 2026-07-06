@@ -169,8 +169,8 @@ public class ZoneProxyShopTests
     {
         var zone = ZoneTestKit.CreateZone(ProxyShopZonePolicy.ZoneNumber);
 
-        zone.RegisterProxyShop(Entry(999, "Seller", "OldName", posX: 10f, posZ: 10f));
-        zone.RegisterProxyShop(Entry(999, "Seller", "NewName", posX: 99f, posZ: 99f));
+        zone.RegisterProxyShop(Entry(999, "Seller", "OldName", 10f, posZ: 10f));
+        zone.RegisterProxyShop(Entry(999, "Seller", "NewName", 99f, posZ: 99f));
 
         Assert.Equal(1, zone.ProxyShopCount); // never two entries for the same character
     }
@@ -278,7 +278,7 @@ public class ZoneProxyShopTests
         zone.Tick(TimeSpan.FromMilliseconds(50));
         ZoneTestKit.DrainOutbound(pipe);
 
-        zone.RegisterProxyShop(Entry(777, "Vidar", "VidarStall", posX: 11f, posY: 2f, posZ: 13f));
+        zone.RegisterProxyShop(Entry(777, "Vidar", "VidarStall", 11f, 2f, 13f));
         zone.Tick(SimulationClock.ProxyShopRebroadcastInterval);
 
         var frame = ZoneTestKit.DrainOutbound(pipe);

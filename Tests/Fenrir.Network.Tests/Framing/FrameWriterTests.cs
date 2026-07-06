@@ -1,6 +1,6 @@
+using Fenrir.Network.Framing;
 using Fenrir.Network.Serialization.Packets.Login;
 using Fenrir.Network.Serialization.Packets.Zone;
-using Fenrir.Network.Framing;
 
 namespace Fenrir.Network.Tests.Framing;
 

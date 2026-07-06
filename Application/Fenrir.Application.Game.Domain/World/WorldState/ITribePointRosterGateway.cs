@@ -9,7 +9,11 @@ namespace Fenrir.Application.Game.Domain.World.WorldState;
 ///     query actually targets. See <see cref="ITribePointRosterGateway" />'s own remarks for that bug and why
 ///     this record's contract exists specifically to not reproduce it.
 /// </summary>
-public readonly record struct TribeRosterCharacterSnapshot(byte TribeId, short Level1, short Level2, short RebirthCount);
+public readonly record struct TribeRosterCharacterSnapshot(
+    byte TribeId,
+    short Level1,
+    short Level2,
+    short RebirthCount);
 
 /// <summary>
 ///     The persisted character/avatar roster read <see cref="TribePointLevelRecomputeService" /> needs (contract
@@ -39,7 +43,7 @@ public interface ITribePointRosterGateway
     ///     per-tribe query cannot execute or returns nothing" case: abort without writing any totals for that
     ///     run, previous totals left exactly as they were.
     /// </summary>
-    Task<IReadOnlyList<TribeRosterCharacterSnapshot>?> GetRosterAsync(CancellationToken ct);
+    public Task<IReadOnlyList<TribeRosterCharacterSnapshot>?> GetRosterAsync(CancellationToken ct);
 }
 
 /// <summary>

@@ -40,7 +40,7 @@ public sealed class HeroRankingAddPointsProcTests
     {
         var characterId = await CreateCharacterAsync();
 
-        var total = await _heroRankings.AddPointsAsync(characterId, periodKind: 0, delta: 7, tribeId: 1, level: 42,
+        var total = await _heroRankings.AddPointsAsync(characterId, 0, 7, 1, 42,
             CancellationToken.None);
 
         Assert.Equal(7, total);
@@ -100,9 +100,9 @@ public sealed class HeroRankingAddPointsProcTests
     {
         var characterId = await CreateCharacterAsync();
 
-        await _heroRankings.MarkRewardClaimedAsync(characterId, periodKind: 1, points: 999, tribeId: 0, level: 10,
+        await _heroRankings.MarkRewardClaimedAsync(characterId, 1, 999, 0, 10,
             CancellationToken.None);
-        await _heroRankings.AddPointsAsync(characterId, periodKind: 0, delta: 4, tribeId: 0, level: 10,
+        await _heroRankings.AddPointsAsync(characterId, 0, 4, 0, 10,
             CancellationToken.None);
 
         var previous = await _heroRankings.GetByPeriodAsync(1, CancellationToken.None);

@@ -5,8 +5,7 @@
 -- audit row can never survive a rolled-back mutation, and vice versa. No THROW here -- an insert-only audit
 -- write has no domain failure condition to reject; a bad EventCode/Category from the caller is an app bug,
 -- not a registered admin.ErrorCatalog case.
-CREATE PROCEDURE game.usp_EventLog_Insert
-    @EventCode SMALLINT,
+CREATE PROCEDURE game.usp_EventLog_Insert @EventCode SMALLINT,
     @Category TINYINT,
     @ActorAccountId INT = NULL,
     @ActorCharacterId INT = NULL,
@@ -21,15 +20,16 @@ CREATE PROCEDURE game.usp_EventLog_Insert
     @Payload NVARCHAR(MAX) = NULL
 AS
 BEGIN
-    SET NOCOUNT ON;
-    SET XACT_ABORT ON;
+    SET
+NOCOUNT ON;
+    SET
+XACT_ABORT ON;
 
     -- Single INSERT is already atomic; it naturally joins whatever ambient transaction the caller (if any)
     -- already opened -- no explicit BEGIN TRANSACTION needed, same carve-out as a single guarded UPDATE.
-    INSERT INTO game.EventLog
-    (EventCode, Category, ActorAccountId, ActorCharacterId, TargetAccountId, TargetCharacterId,
-     ShardId, DeltaMoney, DeltaBigMoney, ItemId, Quantity, Outcome, Payload)
-    VALUES
-        (@EventCode, @Category, @ActorAccountId, @ActorCharacterId, @TargetAccountId, @TargetCharacterId,
-         @ShardId, @DeltaMoney, @DeltaBigMoney, @ItemId, @Quantity, @Outcome, @Payload);
+INSERT INTO game.EventLog
+(EventCode, Category, ActorAccountId, ActorCharacterId, TargetAccountId, TargetCharacterId,
+ ShardId, DeltaMoney, DeltaBigMoney, ItemId, Quantity, Outcome, Payload)
+VALUES (@EventCode, @Category, @ActorAccountId, @ActorCharacterId, @TargetAccountId, @TargetCharacterId,
+        @ShardId, @DeltaMoney, @DeltaBigMoney, @ItemId, @Quantity, @Outcome, @Payload);
 END;

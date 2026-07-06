@@ -26,13 +26,6 @@ namespace Fenrir.Application.Game.Domain.Movement;
 /// </remarks>
 public static class CharacterMotionWhitelist
 {
-    private readonly record struct Rule(
-        byte TypeMask,
-        int SkillCategoryCode,
-        bool AttackBudgetEnforced,
-        int AttackFamilyTag,
-        int AttackSubPacketCeiling);
-
     // Type-value bitmasks: bit N set means Type N is one of the values a row legalizes.
     private const byte Type0 = 0b0000_0001;
     private const byte Type3 = 0b0000_1000;
@@ -44,91 +37,95 @@ public static class CharacterMotionWhitelist
 
     private static readonly FrozenDictionary<int, Rule> Rules = new Dictionary<int, Rule>
     {
-        [0] = new Rule(Type0, 0, true, 0, 0),
-        [1] = new Rule(AllTypes, 0, true, 0, 0),
-        [2] = new Rule(AllTypes, 0, true, 0, 0),
-        [3] = new Rule(EvenTypes, 0, true, 0, 0),
-        [4] = new Rule(OddTypes, 0, true, 0, 0),
-        [5] = new Rule(OddTypes, 0, true, 1, 1),
-        [6] = new Rule(OddTypes, 0, true, 1, 2),
-        [7] = new Rule(OddTypes, 0, true, 1, 3),
+        [0] = new(Type0, 0, true, 0, 0),
+        [1] = new(AllTypes, 0, true, 0, 0),
+        [2] = new(AllTypes, 0, true, 0, 0),
+        [3] = new(EvenTypes, 0, true, 0, 0),
+        [4] = new(OddTypes, 0, true, 0, 0),
+        [5] = new(OddTypes, 0, true, 1, 1),
+        [6] = new(OddTypes, 0, true, 1, 2),
+        [7] = new(OddTypes, 0, true, 1, 3),
         // Sort 8 has no row: 8 is not a legal action category.
-        [9] = new Rule(OddTypes, 0, true, 0, 0),
-        [10] = new Rule(AllTypes, 0, true, 0, 0),
+        [9] = new(OddTypes, 0, true, 0, 0),
+        [10] = new(AllTypes, 0, true, 0, 0),
         // 11-12 have no row (11 = stun, a server-applied state per PlayerRuntimeState.IsStunned's own
         // remarks, never a client-originated Sort here); 30/31 dead-sibling note below applies to 31, not
         // this gap.
-        [13] = new Rule(Type0, 0, true, 0, 0),
-        [14] = new Rule(Type0, 0, true, 0, 0),
-        [15] = new Rule(Type0, 0, true, 0, 0),
-        [16] = new Rule(Type0, 0, true, 0, 0),
-        [17] = new Rule(Type0, 0, true, 0, 0),
-        [18] = new Rule(Type0, 0, true, 0, 0),
-        [20] = new Rule(Type0, 0, true, 0, 0),
-        [21] = new Rule(Type0, 0, true, 0, 0),
-        [22] = new Rule(Type0, 0, true, 0, 0),
-        [23] = new Rule(Type0, 0, true, 0, 0),
-        [30] = new Rule(Type0, 1, true, 0, 0),
-        [32] = new Rule(AllTypes, 2, true, 0, 0),
-        [33] = new Rule(Type0, 2, true, 0, 0),
-        [38] = new Rule(Type0, 2, true, 2, 1),
-        [39] = new Rule(Type0, 2, true, 2, 1),
-        [40] = new Rule(Type0, 2, true, 0, 0),
-        [41] = new Rule(Type0, 2, true, 0, 0),
-        [42] = new Rule(Type3, 2, true, 3, 1),
-        [43] = new Rule(Type3, 2, true, 3, 3),
-        [44] = new Rule(Type3, 2, true, 3, 5),
-        [45] = new Rule(Type3, 2, true, 3, 1),
-        [46] = new Rule(Type3, 2, true, 3, 3),
-        [48] = new Rule(Type5, 2, true, 3, 1),
-        [49] = new Rule(Type5, 2, true, 3, 3),
-        [50] = new Rule(Type5, 2, true, 3, 5),
-        [51] = new Rule(Type5, 2, true, 3, 1),
-        [52] = new Rule(Type5, 2, true, 3, 3),
-        [54] = new Rule(Type7, 2, true, 4, 1),
-        [55] = new Rule(Type7, 2, true, 4, 3),
-        [56] = new Rule(Type7, 2, true, 3, 5),
-        [57] = new Rule(Type7, 2, true, 4, 1),
-        [58] = new Rule(Type7, 2, true, 4, 3),
-        [60] = new Rule(Type3, 2, true, 0, 0),
-        [61] = new Rule(Type5, 2, true, 0, 0),
-        [62] = new Rule(Type7, 2, true, 0, 0),
-        [63] = new Rule(Type0, 2, true, 0, 0),
-        [64] = new Rule(Type0, 0, true, 0, 0),
-        [65] = new Rule(Type0, 0, false, 5, 0),
-        [66] = new Rule(Type0, 2, true, 0, 0),
-        [67] = new Rule(Type0, 2, true, 0, 0),
-        [68] = new Rule(Type0, 2, true, 0, 0),
-        [69] = new Rule(Type3, 2, true, 3, 1),
-        [70] = new Rule(Type3, 2, true, 3, 3),
-        [71] = new Rule(Type5, 2, true, 3, 1),
-        [72] = new Rule(Type5, 2, true, 3, 3),
-        [73] = new Rule(Type7, 2, true, 4, 3),
-        [74] = new Rule(Type7, 2, false, 0, 0),
-        [75] = new Rule(Type0, 2, true, 0, 0),
-        [76] = new Rule(Type0, 2, true, 0, 0),
-        [81] = new Rule(Type3, 2, true, 3, 5),
-        [82] = new Rule(Type5, 2, true, 3, 5),
-        [83] = new Rule(Type7, 2, true, 3, 5),
-        [85] = new Rule(Type3, 2, true, 3, 1),
-        [86] = new Rule(Type3, 2, true, 3, 3),
-        [87] = new Rule(Type5, 2, true, 3, 1),
-        [88] = new Rule(Type5, 2, true, 3, 3),
-        [89] = new Rule(Type7, 2, true, 4, 1),
-        [90] = new Rule(Type7, 2, true, 4, 3),
-        [91] = new Rule(Type0, 0, true, 0, 0),
+        [13] = new(Type0, 0, true, 0, 0),
+        [14] = new(Type0, 0, true, 0, 0),
+        [15] = new(Type0, 0, true, 0, 0),
+        [16] = new(Type0, 0, true, 0, 0),
+        [17] = new(Type0, 0, true, 0, 0),
+        [18] = new(Type0, 0, true, 0, 0),
+        [20] = new(Type0, 0, true, 0, 0),
+        [21] = new(Type0, 0, true, 0, 0),
+        [22] = new(Type0, 0, true, 0, 0),
+        [23] = new(Type0, 0, true, 0, 0),
+        [30] = new(Type0, 1, true, 0, 0),
+        [32] = new(AllTypes, 2, true, 0, 0),
+        [33] = new(Type0, 2, true, 0, 0),
+        [38] = new(Type0, 2, true, 2, 1),
+        [39] = new(Type0, 2, true, 2, 1),
+        [40] = new(Type0, 2, true, 0, 0),
+        [41] = new(Type0, 2, true, 0, 0),
+        [42] = new(Type3, 2, true, 3, 1),
+        [43] = new(Type3, 2, true, 3, 3),
+        [44] = new(Type3, 2, true, 3, 5),
+        [45] = new(Type3, 2, true, 3, 1),
+        [46] = new(Type3, 2, true, 3, 3),
+        [48] = new(Type5, 2, true, 3, 1),
+        [49] = new(Type5, 2, true, 3, 3),
+        [50] = new(Type5, 2, true, 3, 5),
+        [51] = new(Type5, 2, true, 3, 1),
+        [52] = new(Type5, 2, true, 3, 3),
+        [54] = new(Type7, 2, true, 4, 1),
+        [55] = new(Type7, 2, true, 4, 3),
+        [56] = new(Type7, 2, true, 3, 5),
+        [57] = new(Type7, 2, true, 4, 1),
+        [58] = new(Type7, 2, true, 4, 3),
+        [60] = new(Type3, 2, true, 0, 0),
+        [61] = new(Type5, 2, true, 0, 0),
+        [62] = new(Type7, 2, true, 0, 0),
+        [63] = new(Type0, 2, true, 0, 0),
+        [64] = new(Type0, 0, true, 0, 0),
+        [65] = new(Type0, 0, false, 5, 0),
+        [66] = new(Type0, 2, true, 0, 0),
+        [67] = new(Type0, 2, true, 0, 0),
+        [68] = new(Type0, 2, true, 0, 0),
+        [69] = new(Type3, 2, true, 3, 1),
+        [70] = new(Type3, 2, true, 3, 3),
+        [71] = new(Type5, 2, true, 3, 1),
+        [72] = new(Type5, 2, true, 3, 3),
+        [73] = new(Type7, 2, true, 4, 3),
+        [74] = new(Type7, 2, false, 0, 0),
+        [75] = new(Type0, 2, true, 0, 0),
+        [76] = new(Type0, 2, true, 0, 0),
+        [81] = new(Type3, 2, true, 3, 5),
+        [82] = new(Type5, 2, true, 3, 5),
+        [83] = new(Type7, 2, true, 3, 5),
+        [85] = new(Type3, 2, true, 3, 1),
+        [86] = new(Type3, 2, true, 3, 3),
+        [87] = new(Type5, 2, true, 3, 1),
+        [88] = new(Type5, 2, true, 3, 3),
+        [89] = new(Type7, 2, true, 4, 1),
+        [90] = new(Type7, 2, true, 4, 3),
+        [91] = new(Type0, 0, true, 0, 0),
         // Sentinel: a generic catch-all bucket carrying no attack budget of its own, but with its own
         // distinct skill-category code.
-        [255] = new Rule(AllTypes, 3, true, 0, 0)
+        [255] = new(AllTypes, 3, true, 0, 0)
     }.ToFrozenDictionary();
 
     /// <summary>
     ///     Resolves <paramref name="sort" />/<paramref name="type" /> against the whitelist.
     /// </summary>
-    /// <param name="sort">The avatar action's category ("Sort"). Any value not in the table -- including any
-    ///     negative value -- is illegal.</param>
-    /// <param name="type">The avatar action's sub-variant ("Type"), 0-7. Legal values depend entirely on
-    ///     <paramref name="sort" />.</param>
+    /// <param name="sort">
+    ///     The avatar action's category ("Sort"). Any value not in the table -- including any
+    ///     negative value -- is illegal.
+    /// </param>
+    /// <param name="type">
+    ///     The avatar action's sub-variant ("Type"), 0-7. Legal values depend entirely on
+    ///     <paramref name="sort" />.
+    /// </param>
     /// <param name="evaluation">
     ///     The resolved outputs when this returns true. Meaningless (default) when this returns false.
     /// </param>
@@ -149,4 +146,11 @@ public static class CharacterMotionWhitelist
         evaluation = default;
         return false;
     }
+
+    private readonly record struct Rule(
+        byte TypeMask,
+        int SkillCategoryCode,
+        bool AttackBudgetEnforced,
+        int AttackFamilyTag,
+        int AttackSubPacketCeiling);
 }

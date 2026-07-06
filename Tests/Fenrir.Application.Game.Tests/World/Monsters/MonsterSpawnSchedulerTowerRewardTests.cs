@@ -117,13 +117,13 @@ public class MonsterSpawnSchedulerTowerRewardTests
     public void MonsterKill_OtherTribesXpTower_NeverAffectsAKillerFromADifferentTribe()
     {
         var cache = CacheWithOneMonster(generalExperience: 1000);
-        var (zone, towerWar) = CreateZoneWithKiller(cache, killerTribe: 1);
+        var (zone, towerWar) = CreateZoneWithKiller(cache, 1);
 
         // Tribe 0's tower (index 0-2), not tribe 1's -- must not affect a tribe-1 killer.
         towerWar.SetTowerState(0, 8 * 100 + 3, true);
         towerWar.RecomputeTribeBonuses();
 
-        var (baselineZone, _) = CreateZoneWithKiller(cache, killerTribe: 1);
+        var (baselineZone, _) = CreateZoneWithKiller(cache, 1);
         baselineZone.TryDamageMonster(1, 10_000, 10, out _, out _);
         baselineZone.Tick(SimulationClock.LegacyTick);
         Assert.True(baselineZone.TryGetPlayer(10, out var baselineKiller));

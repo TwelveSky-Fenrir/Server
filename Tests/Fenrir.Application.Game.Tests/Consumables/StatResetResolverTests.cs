@@ -32,7 +32,7 @@ public class StatResetResolverTests
     [Fact]
     public void ResolveStatsClear_RefundsEverythingAboveFloor_AndResetsAllFourToFloor()
     {
-        var result = StatResetResolver.ResolveStatsClear(statVit: 10, statStr: 25, statInt: 1, statDex: 4);
+        var result = StatResetResolver.ResolveStatsClear(10, 25, 1, 4);
 
         Assert.Equal(1, result.NewStatVit);
         Assert.Equal(1, result.NewStatStr);
@@ -53,7 +53,7 @@ public class StatResetResolverTests
     [Fact]
     public void ResolveStatCleanse_AboveFloor_RefundsTheDifference_AndResetsToFloor()
     {
-        var result = StatResetResolver.ResolveStatCleanse(currentValue: 15);
+        var result = StatResetResolver.ResolveStatCleanse(15);
 
         Assert.True(result.Succeeded);
         Assert.Equal(1, result.NewValue);
@@ -63,7 +63,7 @@ public class StatResetResolverTests
     [Fact]
     public void ResolveStatCleanse_AlreadyAtFloor_FailsCleanly_WithNoRefund()
     {
-        var result = StatResetResolver.ResolveStatCleanse(currentValue: 1);
+        var result = StatResetResolver.ResolveStatCleanse(1);
 
         Assert.Equal(StatResetResolver.CleanseOutcome.AlreadyAtFloor, result.Outcome);
         Assert.Equal(0, result.RefundedPoints);

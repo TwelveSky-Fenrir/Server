@@ -14,8 +14,10 @@ CREATE PROCEDURE game.usp_HeroRanking_AddPoints @CharacterId INT,
     @Level      INT = NULL
 AS
 BEGIN
-    SET NOCOUNT ON;
-    SET XACT_ABORT ON;
+    SET
+NOCOUNT ON;
+    SET
+XACT_ABORT ON;
 
 UPDATE game.HeroRankings
 SET Points        = Points + @Delta,

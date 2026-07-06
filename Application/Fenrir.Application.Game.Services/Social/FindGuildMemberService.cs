@@ -4,7 +4,9 @@ using Fenrir.Application.Game.Domain.World;
 namespace Fenrir.Application.Game.Services.Social;
 
 /// <inheritdoc cref="IFindGuildMemberService" />
-public sealed class FindGuildMemberService(ZoneRegistry zones, ICharacterShardLocationRepository characterShardLocations)
+public sealed class FindGuildMemberService(
+    ZoneRegistry zones,
+    ICharacterShardLocationRepository characterShardLocations)
     : IFindGuildMemberService
 {
     public async ValueTask<FindGuildMemberResult> FindZoneAsync(PlayerRuntimeState asker, string avatarName,

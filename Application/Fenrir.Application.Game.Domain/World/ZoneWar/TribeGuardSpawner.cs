@@ -4,7 +4,6 @@ using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World.Monsters;
 using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.GameData;
-using Fenrir.Data.Abstractions.World;
 
 namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 
@@ -39,10 +38,10 @@ internal sealed class GuardSlotRuntimeState
 /// <summary>Everything <see cref="TribeGuardSpawner" /> needs to remember for one zone, tick-thread-owned.</summary>
 internal sealed class GuardZoneState
 {
+    public readonly Dictionary<int, GuardSlotRuntimeState> Slots = new();
     public bool BootPassDone;
     public int ForceOrdinaryPending;
     public int ForceZone038WinnerPending;
-    public readonly Dictionary<int, GuardSlotRuntimeState> Slots = new();
     public int TicksSinceFullScan;
 }
 
@@ -73,13 +72,6 @@ public sealed class TribeGuardSpawner(
     WorldStateService? worldState = null,
     TribeGuardOptions? options = null) : ISimulationSystem
 {
-    /// <summary>
-    ///     <c>tCheckZone038 == false</c> eligible map/server numbers -- every other map is an unconditional
-    ///     no-op for the ordinary pool (<c>S10_MySummon.cpp:1339-1741, 1739-1740</c>).
-    /// </summary>
-    public static readonly IReadOnlySet<short> OrdinaryEligibleMapIds =
-        new HashSet<short>([38, 2, 3, 4, 7, 8, 9, 12, 13, 14, 141, 142, 143]);
-
     /// <summary>The only map the zone038-winner pool ever handles (<c>S10_MySummon.cpp:1747-1782</c>).</summary>
     public const short Zone038MapId = 38;
 
@@ -95,6 +87,13 @@ public sealed class TribeGuardSpawner(
 
     private const int OrdinaryPoolServerIndexBase = 1_000_000;
     private const int Zone038WinnerPoolServerIndexBase = 1_001_000;
+
+    /// <summary>
+    ///     <c>tCheckZone038 == false</c> eligible map/server numbers -- every other map is an unconditional
+    ///     no-op for the ordinary pool (<c>S10_MySummon.cpp:1339-1741, 1739-1740</c>).
+    /// </summary>
+    public static readonly IReadOnlySet<short> OrdinaryEligibleMapIds =
+        new HashSet<short>([38, 2, 3, 4, 7, 8, 9, 12, 13, 14, 141, 142, 143]);
 
     private readonly TribeGuardOptions _options = options ?? new TribeGuardOptions();
     private readonly ConcurrentDictionary<short, GuardZoneState> _stateByZone = new();

@@ -16,49 +16,59 @@ CREATE PROCEDURE game.usp_Guild_CreateAndDebitMoney @Name              NVARCHAR(
     @DeltaBigMoney     INT
 AS
 BEGIN
-    SET NOCOUNT ON;
-    SET XACT_ABORT ON;
+    SET
+NOCOUNT ON;
+    SET
+XACT_ABORT ON;
 
-    IF EXISTS (SELECT 1 FROM game.Guilds WHERE Name = @Name)
+    IF
+EXISTS (SELECT 1 FROM game.Guilds WHERE Name = @Name)
         THROW 50230, N'Guild name is already taken.', 1;
 
-    IF EXISTS (SELECT 1 FROM game.GuildMembers WHERE CharacterId = @MasterCharacterId)
+    IF
+EXISTS (SELECT 1 FROM game.GuildMembers WHERE CharacterId = @MasterCharacterId)
         THROW 50231, N'Character already belongs to a guild.', 1;
 
-    DECLARE @GuildId INT;
+    DECLARE
+@GuildId INT;
 
-    BEGIN TRANSACTION;
+BEGIN
+TRANSACTION;
 
     -- Guarded UPDATE closes a TOCTOU: two concurrent debits must never jointly breach the floor/cap.
-    UPDATE game.Characters
-    SET Money        = Money + @DeltaMoney,
-        BigMoney     = BigMoney + @DeltaBigMoney,
-        UpdatedAtUtc = SYSUTCDATETIME()
-    WHERE CharacterId = @MasterCharacterId
-      AND Money + @DeltaMoney BETWEEN 0 AND 2000000000
-      AND BigMoney + @DeltaBigMoney >= 0;
+UPDATE game.Characters
+SET Money        = Money + @DeltaMoney,
+    BigMoney     = BigMoney + @DeltaBigMoney,
+    UpdatedAtUtc = SYSUTCDATETIME()
+WHERE CharacterId = @MasterCharacterId
+  AND Money + @DeltaMoney BETWEEN 0 AND 2000000000
+  AND BigMoney + @DeltaBigMoney >= 0;
 
-    IF @@ROWCOUNT = 0
-    BEGIN
+IF
+@@ROWCOUNT = 0
+BEGIN
         -- Diagnostic re-read only; picks which error code to throw.
-        IF EXISTS (SELECT 1
+        IF
+EXISTS (SELECT 1
                    FROM game.Characters
                    WHERE CharacterId = @MasterCharacterId
                      AND Money + @DeltaMoney > 2000000000)
             THROW 50261, N'Adjustment would exceed the legacy money cap (MAX_NUMBER_SIZE = 2,000,000,000).', 1;
 
-        THROW 50277, N'Unknown character or insufficient money balance for the guild creation cost.', 1;
-    END;
+        THROW
+50277, N'Unknown character or insufficient money balance for the guild creation cost.', 1;
+END;
 
-    INSERT INTO game.Guilds (Name, MasterCharacterId, Grade)
-    VALUES (@Name, @MasterCharacterId, 1);
+INSERT INTO game.Guilds (Name, MasterCharacterId, Grade)
+VALUES (@Name, @MasterCharacterId, 1);
 
-    SET @GuildId = SCOPE_IDENTITY();
+SET
+@GuildId = SCOPE_IDENTITY();
 
-    INSERT INTO game.GuildMembers (GuildId, CharacterId, Role)
-    VALUES (@GuildId, @MasterCharacterId, 2); -- 2 = master (game.GuildMembers role enum)
+INSERT INTO game.GuildMembers (GuildId, CharacterId, Role)
+VALUES (@GuildId, @MasterCharacterId, 2); -- 2 = master (game.GuildMembers role enum)
 
-    COMMIT TRANSACTION;
+COMMIT TRANSACTION;
 
-    SELECT @GuildId AS GuildId;
+SELECT @GuildId AS GuildId;
 END;

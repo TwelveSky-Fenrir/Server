@@ -9,15 +9,16 @@ WITH NATIVE_COMPILATION, SCHEMABINDING
 AS
 BEGIN ATOMIC
 WITH (TRANSACTION ISOLATION LEVEL = SNAPSHOT, LANGUAGE = N'us_english')
-    UPDATE runtime.CharacterShardLocation
-    SET ShardId     = @ShardId,
-        MapId       = @MapId,
-        AvatarName  = @AvatarName,
-        Tribe       = @Tribe,
-        LastSeenUtc = SYSUTCDATETIME()
-    WHERE CharacterId = @CharacterId;
+UPDATE runtime.CharacterShardLocation
+SET ShardId     = @ShardId,
+    MapId       = @MapId,
+    AvatarName  = @AvatarName,
+    Tribe       = @Tribe,
+    LastSeenUtc = SYSUTCDATETIME()
+WHERE CharacterId = @CharacterId;
 
-    IF @@ROWCOUNT = 0
+IF
+@@ROWCOUNT = 0
         INSERT INTO runtime.CharacterShardLocation
             (CharacterId, ShardId, MapId, AvatarName, Tribe, LastSeenUtc)
         VALUES

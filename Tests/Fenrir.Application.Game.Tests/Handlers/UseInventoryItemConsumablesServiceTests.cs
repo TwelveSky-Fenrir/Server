@@ -120,7 +120,7 @@ public class UseInventoryItemConsumablesServiceTests
     public async Task LodTicket_BelowLevelCap_FailsCleanly_AndLeavesTheCounterAndItemUntouched()
     {
         var (session, _, zone, state, characters) = SetUp();
-        state.Level = (short)(LevelProgressionCalculator.MaxLevel - 1);
+        state.Level = LevelProgressionCalculator.MaxLevel - 1;
         state.RebirthCount = 1;
         SeedInventory(zone, new ItemStack(LodTicketItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1));
         var service = CreateService(characters);
@@ -345,7 +345,7 @@ public class UseInventoryItemConsumablesServiceTests
     public async Task TaiyanKey_BelowLevelCap_FailsCleanly_AndLeavesTheTimerUntouched()
     {
         var (session, _, zone, state, characters) = SetUp();
-        state.Level = (short)(LevelProgressionCalculator.MaxLevel - 1);
+        state.Level = LevelProgressionCalculator.MaxLevel - 1;
         SeedInventory(zone, new ItemStack(TaiyanKeyItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1));
         var service = CreateService(characters);
 

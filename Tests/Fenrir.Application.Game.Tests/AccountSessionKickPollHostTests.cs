@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Hosting;
 using Fenrir.Application.Game.Tests.TestSupport;

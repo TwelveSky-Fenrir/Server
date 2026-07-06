@@ -58,7 +58,7 @@ public class StunResolverTests
     [Fact]
     public void AttackerDead_IsRejected()
     {
-        var attacker = Combatant(1, 0, isDead: true);
+        var attacker = Combatant(1, 0, true);
         var defender = Combatant(2, 1);
         var outcome = StunResolver.Resolve(Request(attacker, defender, FlatSkill(7, 50, runTime: 5)),
             TimeSpan.Zero, new ScriptedRandomSource(0));
@@ -80,7 +80,7 @@ public class StunResolverTests
     public void DefenderDead_IsRejected()
     {
         var attacker = Combatant(1, 0);
-        var defender = Combatant(2, 1, isDead: true);
+        var defender = Combatant(2, 1, true);
         var outcome = StunResolver.Resolve(Request(attacker, defender, FlatSkill(7, 50, runTime: 5)),
             TimeSpan.Zero, new ScriptedRandomSource(0));
         Assert.Equal(StunRejectReason.DefenderDead, outcome.RejectReason);
@@ -159,7 +159,7 @@ public class StunResolverTests
         var attacker = Combatant(1, 0);
         var defender = Combatant(2, 1);
         var outcome = StunResolver.Resolve(
-            Request(attacker, defender, FlatSkill(7, 50, runTime: 5), usedSkillId: 7, usedSkillGradePoints: 10,
+            Request(attacker, defender, FlatSkill(7, 50, runTime: 5),
                 echoFlag: true, attackerAnimatingSkillNumber: 999, attackerAnimatingGradePoints: 10), TimeSpan.Zero,
             new ScriptedRandomSource(0));
         Assert.Equal(StunRejectReason.AntiCheatEchoMismatch, outcome.RejectReason);
@@ -171,7 +171,7 @@ public class StunResolverTests
         var attacker = Combatant(1, 0);
         var defender = Combatant(2, 1);
         var outcome = StunResolver.Resolve(
-            Request(attacker, defender, FlatSkill(7, 50, runTime: 5), usedSkillId: 7, usedSkillGradePoints: 10,
+            Request(attacker, defender, FlatSkill(7, 50, runTime: 5),
                 echoFlag: false, attackerAnimatingSkillNumber: 999, attackerAnimatingGradePoints: 10), TimeSpan.Zero,
             new ScriptedRandomSource(0));
         Assert.False(outcome.Rejected);
@@ -192,7 +192,7 @@ public class StunResolverTests
     {
         var attacker = Combatant(1, 0);
         var defender = Combatant(2, 1);
-        var outcome = StunResolver.Resolve(Request(attacker, defender, FlatSkill(7, 0, runTime: 5)), TimeSpan.Zero,
+        var outcome = StunResolver.Resolve(Request(attacker, defender, FlatSkill(7, runTime: 5)), TimeSpan.Zero,
             new ScriptedRandomSource(0));
         Assert.Equal(StunRejectReason.NoStunSuccessValue, outcome.RejectReason);
     }
@@ -240,11 +240,11 @@ public class StunResolverTests
     {
         var attacker = Combatant(1, 0);
         var defender = Combatant(2, 1);
-        var skill = FlatSkill(StunResolver.TeamStunSkillId, stunAttack: 10, runTime: 5);
+        var skill = FlatSkill(StunResolver.TeamStunSkillId, 10, runTime: 5);
         // A roll of 60 would still be < margin(10) if the range were mistakenly 500-scaled, but must fail on
         // the real 100-scaled roll used for skill 80 -- this pins the roll range, not just the outcome.
         var outcome = StunResolver.Resolve(
-            Request(attacker, defender, skill, usedSkillId: StunResolver.TeamStunSkillId),
+            Request(attacker, defender, skill, StunResolver.TeamStunSkillId),
             TimeSpan.Zero, new ScriptedRandomSource(60));
         Assert.False(outcome.Success);
     }
@@ -254,10 +254,10 @@ public class StunResolverTests
     {
         var attacker = Combatant(1, 0);
         var defender = Combatant(2, 1);
-        var skill = FlatSkill(StunResolver.TeamStunSkillId, stunAttack: 10, runTime: 5);
+        var skill = FlatSkill(StunResolver.TeamStunSkillId, 10, runTime: 5);
         var resist = FlatSkill(5, stunDefense: 999); // would normally guarantee a miss
         var outcome = StunResolver.Resolve(
-            Request(attacker, defender, skill, usedSkillId: StunResolver.TeamStunSkillId, resistSkill: resist,
+            Request(attacker, defender, skill, StunResolver.TeamStunSkillId, resistSkill: resist,
                 resistGradePoints: 10), TimeSpan.Zero, new ScriptedRandomSource(5)); // 5 < margin(10) on range 100
         Assert.True(outcome.Success);
         Assert.True(outcome.IsTeamStunSkill);
@@ -268,9 +268,9 @@ public class StunResolverTests
     {
         var attacker = Combatant(1, 0);
         var defender = Combatant(2, 1);
-        var skill = FlatSkill(StunResolver.TeamStunSkillId, stunAttack: 10, runTime: 5);
+        var skill = FlatSkill(StunResolver.TeamStunSkillId, 10, runTime: 5);
         var outcome = StunResolver.Resolve(
-            Request(attacker, defender, skill, usedSkillId: StunResolver.TeamStunSkillId,
+            Request(attacker, defender, skill, StunResolver.TeamStunSkillId,
                 defenderHasImmunityBuff: true), TimeSpan.Zero, new ScriptedRandomSource(5));
         Assert.True(outcome.Success);
     }
@@ -282,7 +282,7 @@ public class StunResolverTests
         var defender = Combatant(2, 1);
         // A huge success value would ordinarily guarantee a hit; the buff must still force a loss.
         var outcome = StunResolver.Resolve(
-            Request(attacker, defender, FlatSkill(7, stunAttack: 500, runTime: 5), defenderHasImmunityBuff: true),
+            Request(attacker, defender, FlatSkill(7, 500, runTime: 5), defenderHasImmunityBuff: true),
             TimeSpan.Zero, new ScriptedRandomSource(0));
         Assert.False(outcome.Rejected);
         Assert.False(outcome.Success);

@@ -65,23 +65,23 @@ public sealed class HeroRankingRolloverProcTests
         {
             var characterId = await CreateCharacterAsync();
             ranked.Add(characterId);
-            await _heroRankings.MarkRewardClaimedAsync(characterId, periodKind: 0, points: 1000 - i, tribeId,
-                level: 10, CancellationToken.None);
+            await _heroRankings.MarkRewardClaimedAsync(characterId, 0, 1000 - i, tribeId,
+                10, CancellationToken.None);
         }
 
         // Must never be promoted: zero points ("if (hPoint < 1) continue" in the legacy) ...
         var zeroPointsCharacterId = await CreateCharacterAsync();
-        await _heroRankings.MarkRewardClaimedAsync(zeroPointsCharacterId, periodKind: 0, points: 0, tribeId,
-            level: 1, CancellationToken.None);
+        await _heroRankings.MarkRewardClaimedAsync(zeroPointsCharacterId, 0, 0, tribeId,
+            1, CancellationToken.None);
 
         // ... and no live tribe (unreachable via HeroRankBuilder/HeroRewardResolver anyway).
         var noTribeCharacterId = await CreateCharacterAsync();
-        await _heroRankings.MarkRewardClaimedAsync(noTribeCharacterId, periodKind: 0, points: 500, tribeId: null,
-            level: 1, CancellationToken.None);
+        await _heroRankings.MarkRewardClaimedAsync(noTribeCharacterId, 0, 500, null,
+            1, CancellationToken.None);
 
         // A leftover Previous-period row from the last cycle: the rollover must replace it wholesale, not merge.
         var staleCharacterId = await CreateCharacterAsync();
-        await _heroRankings.MarkRewardClaimedAsync(staleCharacterId, periodKind: 1, points: 42, tribeId, level: 1,
+        await _heroRankings.MarkRewardClaimedAsync(staleCharacterId, 1, 42, tribeId, 1,
             CancellationToken.None);
 
         // Ensure the sentinel row exists, then force it stale enough for the 7-day gate to trip.

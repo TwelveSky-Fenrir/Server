@@ -33,10 +33,10 @@ public class AttackPacketBudgetTests
     [Fact]
     public void EnforcementOff_AlwaysAccepted_AndNeverCounts()
     {
-        var state = State(enforced: false, ceiling: 0, actionSort: 42);
+        var state = State(false, 0, 42);
 
-        Assert.True(AttackPacketBudget.TryConsume(state, attackActionValue4: 999));
-        Assert.True(AttackPacketBudget.TryConsume(state, attackActionValue4: 999));
+        Assert.True(AttackPacketBudget.TryConsume(state, 999));
+        Assert.True(AttackPacketBudget.TryConsume(state, 999));
 
         // Uncapped by explicit original intent (Sort 65/74): the used-so-far counter is never touched.
         Assert.Equal(0, state.AttackSubPacketsUsed);
@@ -45,9 +45,9 @@ public class AttackPacketBudgetTests
     [Fact]
     public void EnforcementOn_WithinCeiling_MatchingReplayGuard_IsAccepted_AndIncrementsCounter()
     {
-        var state = State(enforced: true, ceiling: 3, actionSort: 42);
+        var state = State(true, 3, 42);
 
-        Assert.True(AttackPacketBudget.TryConsume(state, attackActionValue4: 42));
+        Assert.True(AttackPacketBudget.TryConsume(state, 42));
 
         Assert.Equal(1, state.AttackSubPacketsUsed);
     }
@@ -55,12 +55,12 @@ public class AttackPacketBudgetTests
     [Fact]
     public void EnforcementOn_ExceedingCeiling_IsRejected()
     {
-        var state = State(enforced: true, ceiling: 2, actionSort: 42);
+        var state = State(true, 2, 42);
 
-        Assert.True(AttackPacketBudget.TryConsume(state, attackActionValue4: 42));
-        Assert.True(AttackPacketBudget.TryConsume(state, attackActionValue4: 42));
+        Assert.True(AttackPacketBudget.TryConsume(state, 42));
+        Assert.True(AttackPacketBudget.TryConsume(state, 42));
         // Third sub-packet exceeds the ceiling of 2.
-        Assert.False(AttackPacketBudget.TryConsume(state, attackActionValue4: 42));
+        Assert.False(AttackPacketBudget.TryConsume(state, 42));
 
         Assert.Equal(3, state.AttackSubPacketsUsed);
     }
@@ -70,27 +70,27 @@ public class AttackPacketBudgetTests
     {
         // Matches the ordinary non-combat animation default: enforcement on, ceiling zero -- a hard zero, not
         // a soft cap.
-        var state = State(enforced: true, ceiling: 0, actionSort: 0);
+        var state = State(true, 0, 0);
 
-        Assert.False(AttackPacketBudget.TryConsume(state, attackActionValue4: 0));
+        Assert.False(AttackPacketBudget.TryConsume(state, 0));
         Assert.Equal(1, state.AttackSubPacketsUsed);
     }
 
     [Fact]
     public void EnforcementOn_MismatchedReplayGuard_IsRejected_EvenWithinCeiling()
     {
-        var state = State(enforced: true, ceiling: 5, actionSort: 42);
+        var state = State(true, 5, 42);
 
         // AttackActionValue4 must match the character's currently-recorded action category (ActionSort).
-        Assert.False(AttackPacketBudget.TryConsume(state, attackActionValue4: 99));
+        Assert.False(AttackPacketBudget.TryConsume(state, 99));
     }
 
     [Fact]
     public void EnforcementOn_MismatchedReplayGuard_StillCountsTowardTheCeiling()
     {
-        var state = State(enforced: true, ceiling: 5, actionSort: 42);
+        var state = State(true, 5, 42);
 
-        AttackPacketBudget.TryConsume(state, attackActionValue4: 99);
+        AttackPacketBudget.TryConsume(state, 99);
 
         Assert.Equal(1, state.AttackSubPacketsUsed);
     }
@@ -98,24 +98,24 @@ public class AttackPacketBudgetTests
     [Fact]
     public void CountingDisabled_SkipsCeiling_ButStillEnforcesReplayGuard()
     {
-        var state = State(enforced: true, ceiling: 0, actionSort: 42);
+        var state = State(true, 0, 42);
 
         // Ceiling is already exhausted (0), but countAttempt:false mirrors ProcessAttack05's explicit opt-out
         // of the counter/ceiling comparison -- only the replay guard still applies.
-        Assert.True(AttackPacketBudget.TryConsume(state, attackActionValue4: 42, countAttempt: false));
+        Assert.True(AttackPacketBudget.TryConsume(state, 42, false));
         Assert.Equal(0, state.AttackSubPacketsUsed);
 
-        Assert.False(AttackPacketBudget.TryConsume(state, attackActionValue4: 1, countAttempt: false));
+        Assert.False(AttackPacketBudget.TryConsume(state, 1, false));
         Assert.Equal(0, state.AttackSubPacketsUsed);
     }
 
     [Fact]
     public void SuccessiveConsumptions_AccumulateAcrossCalls_UntilCeilingExceeded()
     {
-        var state = State(enforced: true, ceiling: 1, actionSort: 7);
+        var state = State(true, 1, 7);
 
-        Assert.True(AttackPacketBudget.TryConsume(state, attackActionValue4: 7));
-        Assert.False(AttackPacketBudget.TryConsume(state, attackActionValue4: 7));
-        Assert.False(AttackPacketBudget.TryConsume(state, attackActionValue4: 7));
+        Assert.True(AttackPacketBudget.TryConsume(state, 7));
+        Assert.False(AttackPacketBudget.TryConsume(state, 7));
+        Assert.False(AttackPacketBudget.TryConsume(state, 7));
     }
 }

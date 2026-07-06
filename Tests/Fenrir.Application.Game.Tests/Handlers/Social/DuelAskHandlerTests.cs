@@ -56,7 +56,7 @@ public class DuelAskHandlerTests
 
     private sealed class StubDuelService(DuelAskResultKind resultKind) : IDuelService
     {
-        public DuelAskResultKind Ask(Zone zone, Fenrir.Application.Game.Domain.World.PlayerRuntimeState challenger,
+        public DuelAskResultKind Ask(Zone zone, PlayerRuntimeState challenger,
             string targetAvatarName, int sort)
         {
             return resultKind;

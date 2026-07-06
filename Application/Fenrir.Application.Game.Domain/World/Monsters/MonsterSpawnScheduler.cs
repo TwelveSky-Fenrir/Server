@@ -266,7 +266,7 @@ public sealed class MonsterSpawnScheduler(
         var partyMemberIds = partyRegistry?.GetMembers(killer.CharacterId);
         zone.GrantMonsterKillExperience(killer.CharacterId, monster.Template.RealLevel,
             monster.Template.GeneralExperience, partyMemberIds,
-            monsterPatExperience: monster.Template.PatExperience, monsterLifeValue: monster.Template.Life);
+            monster.Template.PatExperience, monster.Template.Life);
 
         zone.ApplyQuestKillProgress(killer.CharacterId, monster.Template.MonsterId);
 

@@ -46,16 +46,16 @@ public class DuelServiceTests
     public void Ask_ChallengerAlreadyActivelyDueling_ReturnsChallengerAlreadyDueling()
     {
         var (service, zones, duels) = CreateService(1);
-        var challenger = Enter(zones, 1, 10, "Challenger", tribe: 1);
-        Enter(zones, 1, 20, "PriorOpponent", tribe: 1);
-        Enter(zones, 1, 30, "NewTarget", tribe: 1);
+        var challenger = Enter(zones, 1, 10, "Challenger", 1);
+        Enter(zones, 1, 20, "PriorOpponent", 1);
+        Enter(zones, 1, 30, "NewTarget", 1);
 
         // 10 is already Active-dueling 20 (seeded directly, bypassing the ask/accept/start round trip).
         Assert.Equal(DuelAskOutcome.Sent, duels.TryAsk(10, 20, false));
         Assert.True(duels.TryAnswer(20, true, out _));
         Assert.True(duels.TryStart(10, out _));
 
-        var result = service.Ask(zones[1], challenger, "NewTarget", sort: 0);
+        var result = service.Ask(zones[1], challenger, "NewTarget", 0);
 
         Assert.Equal(DuelAskResultKind.ChallengerAlreadyDueling, result);
     }
@@ -64,13 +64,13 @@ public class DuelServiceTests
     public void Ask_OrdinaryBusyChallenger_StillNegotiating_ReturnsChallengerBusy()
     {
         var (service, zones, duels) = CreateService(1);
-        var challenger = Enter(zones, 1, 10, "Challenger", tribe: 1);
-        Enter(zones, 1, 20, "PendingTarget", tribe: 1);
-        Enter(zones, 1, 30, "NewTarget", tribe: 1);
+        var challenger = Enter(zones, 1, 10, "Challenger", 1);
+        Enter(zones, 1, 20, "PendingTarget", 1);
+        Enter(zones, 1, 30, "NewTarget", 1);
 
         Assert.Equal(DuelAskOutcome.Sent, duels.TryAsk(10, 20, false)); // still pending, never answered
 
-        var result = service.Ask(zones[1], challenger, "NewTarget", sort: 0);
+        var result = service.Ask(zones[1], challenger, "NewTarget", 0);
 
         Assert.Equal(DuelAskResultKind.ChallengerBusy, result);
     }
@@ -79,8 +79,8 @@ public class DuelServiceTests
     public void Start_SendsRemainTimeEqualToDurationTicks_NotASeparateLiteral()
     {
         var (service, zones, duels) = CreateService(1);
-        var (pipeA, _) = EnterWithPipe(zones, 1, 10, "A", tribe: 1);
-        EnterWithPipe(zones, 1, 20, "B", tribe: 1);
+        var (pipeA, _) = EnterWithPipe(zones, 1, 10, "A", 1);
+        EnterWithPipe(zones, 1, 20, "B", 1);
         duels.TryAsk(10, 20, false);
         duels.TryAnswer(20, true, out _);
         ZoneTestKit.DrainOutbound(pipeA);

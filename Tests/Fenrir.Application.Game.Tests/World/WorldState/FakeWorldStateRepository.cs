@@ -1,23 +1,32 @@
 using System.Collections.ObjectModel;
-using System.Linq;
 using Fenrir.Data.Abstractions.World;
 
 namespace Fenrir.Application.Game.Tests.World.WorldState;
 
-/// <summary>In-memory stand-in for <see cref="IWorldStateRepository" />, seeded like a fresh
-/// usp_WorldState_EnsureInitialized boot (1 singleton row, 4 tribe rows, no alliance offers).</summary>
+/// <summary>
+///     In-memory stand-in for <see cref="IWorldStateRepository" />, seeded like a fresh
+///     usp_WorldState_EnsureInitialized boot (1 singleton row, 4 tribe rows, no alliance offers).
+/// </summary>
 internal sealed class FakeWorldStateRepository : IWorldStateRepository
 {
     public int EnsureInitializedCallCount { get; private set; }
     public int UpdateCallCount { get; private set; }
-    public List<(byte TribeId, DateTime? SymbolDate, bool HasSymbol, int Points, bool IsClosed)> TribeUpdateCalls { get; } = [];
-    public List<(byte TribeId, DateTime? SymbolDate, bool HasSymbol, bool IsClosed)> SymbolStateUpdateCalls { get; } = [];
+
+    public List<(byte TribeId, DateTime? SymbolDate, bool HasSymbol, int Points, bool IsClosed)> TribeUpdateCalls
+    {
+        get;
+    } = [];
+
+    public List<(byte TribeId, DateTime? SymbolDate, bool HasSymbol, bool IsClosed)> SymbolStateUpdateCalls { get; } =
+        [];
+
     // Named distinctly from AddPointsCalls below, which tracks usp_TribeVote_AddPoints (Force Leader voting),
     // an unrelated feature that happens to share the "add points" shape.
     public List<(byte TribeId, int Delta)> TribePointsDeltaCalls { get; } = [];
     public bool ThrowOnAddTribePoints { get; set; }
     public List<(byte From, byte To, bool IsAccepted)> AllianceOfferCalls { get; } = [];
     public WorldStateRowDto Row { get; set; } = new(1, null, 0, false, null, 0, null, 0, DateTime.UtcNow);
+
     public List<WorldStateTribeDto> Tribes { get; set; } =
     [
         new(0, null, true, 0, false),
@@ -30,9 +39,18 @@ internal sealed class FakeWorldStateRepository : IWorldStateRepository
     public Dictionary<byte, List<TribeVoteDto>> VotesByTribe { get; } = new();
     public bool ThrowOnUpdate { get; set; }
     public bool ThrowOnGet { get; set; }
+
     public (byte? Zone038WinTribe, int? Zone038WinTribeTime, bool TribeSymbolBattle, byte? MonsterSymbol,
-        int? MonsterSymbolEndTime, byte? HighTribe, short UpdateTribePoint)? LastWorldUpdate
-    { get; private set; }
+        int? MonsterSymbolEndTime, byte? HighTribe, short UpdateTribePoint)? LastWorldUpdate { get; private set; }
+
+    /// <summary>When set, <see cref="UpdateTribeAsync" /> throws for exactly these tribe ids (others still succeed).</summary>
+    public HashSet<byte> ThrowOnUpdateTribeForIds { get; } = [];
+
+    public List<(byte TribeId, byte SlotIndex, int CandidateCharacterId, short CandidateLevel, int
+        KillOtherTribeCount)> RegisterCalls { get; } = [];
+
+    public List<(byte TribeId, byte SlotIndex, int Points)> AddPointsCalls { get; } = [];
+    public List<byte> ClearCalls { get; } = [];
 
     public ValueTask EnsureInitializedAsync(CancellationToken ct)
     {
@@ -49,7 +67,8 @@ internal sealed class FakeWorldStateRepository : IWorldStateRepository
 
         return ValueTask.FromResult<(WorldStateRowDto?, ReadOnlyCollection<WorldStateTribeDto>,
             ReadOnlyCollection<WorldStateAllianceOfferDto>)>(
-            (Row, new ReadOnlyCollection<WorldStateTribeDto>(Tribes), new ReadOnlyCollection<WorldStateAllianceOfferDto>(AllianceOffers)));
+            (Row, new ReadOnlyCollection<WorldStateTribeDto>(Tribes),
+                new ReadOnlyCollection<WorldStateAllianceOfferDto>(AllianceOffers)));
     }
 
     public ValueTask UpdateAsync(byte? zone038WinTribe, int? zone038WinTribeTime, bool tribeSymbolBattle,
@@ -63,9 +82,6 @@ internal sealed class FakeWorldStateRepository : IWorldStateRepository
             monsterSymbolEndTime, highTribe, updateTribePoint);
         return ValueTask.CompletedTask;
     }
-
-    /// <summary>When set, <see cref="UpdateTribeAsync" /> throws for exactly these tribe ids (others still succeed).</summary>
-    public HashSet<byte> ThrowOnUpdateTribeForIds { get; } = [];
 
     public ValueTask UpdateTribeAsync(byte tribeId, DateTime? symbolDate, bool hasSymbol, int points, bool isClosed,
         CancellationToken ct)
@@ -108,12 +124,6 @@ internal sealed class FakeWorldStateRepository : IWorldStateRepository
         return ValueTask.FromResult(new ReadOnlyCollection<TribeVoteDto>(votes.OrderByDescending(v => v.VotePoint)
             .ThenBy(v => v.SlotIndex).ToList()));
     }
-
-    public List<(byte TribeId, byte SlotIndex, int CandidateCharacterId, short CandidateLevel, int
-        KillOtherTribeCount)> RegisterCalls { get; } = [];
-
-    public List<(byte TribeId, byte SlotIndex, int Points)> AddPointsCalls { get; } = [];
-    public List<byte> ClearCalls { get; } = [];
 
     public ValueTask RegisterTribeVoteCandidateAsync(byte tribeId, byte slotIndex, int candidateCharacterId,
         short candidateLevel, int killOtherTribeCount, CancellationToken ct)

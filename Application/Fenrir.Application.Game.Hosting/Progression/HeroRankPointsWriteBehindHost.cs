@@ -1,5 +1,4 @@
 using Fenrir.Application.Game.Domain.Progression;
-using Fenrir.Data.Abstractions.Progression;
 using Microsoft.Extensions.Hosting;
 
 namespace Fenrir.Application.Game.Hosting.Progression;
@@ -8,7 +7,8 @@ namespace Fenrir.Application.Game.Hosting.Progression;
 ///     Periodic write-behind for <see cref="HeroRankPointAccumulator" />, same "skip the round trip when
 ///     nothing changed" shape as <see cref="TowerWarWriteBehindHost" />.
 /// </summary>
-public sealed class HeroRankPointsWriteBehindHost(HeroRankPointAccumulator heroRankPoints,
+public sealed class HeroRankPointsWriteBehindHost(
+    HeroRankPointAccumulator heroRankPoints,
     IHeroRankingRepository heroRankings) : BackgroundService
 {
     public static readonly TimeSpan Interval = TimeSpan.FromSeconds(5);

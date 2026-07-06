@@ -11,7 +11,10 @@ public readonly record struct TribeBankTaxSweepPayload(long Tribe0, long Tribe1,
 
     public bool IsEmpty => Tribe0 == 0 && Tribe1 == 0 && Tribe2 == 0 && Tribe3 == 0;
 
-    /// <summary>Indexed accessor for the 4 fixed tribe slots -- throws outside 0-3, same contract as <see cref="TribeBankTaxAccumulator.GetTotal" />.</summary>
+    /// <summary>
+    ///     Indexed accessor for the 4 fixed tribe slots -- throws outside 0-3, same contract as
+    ///     <see cref="TribeBankTaxAccumulator.GetTotal" />.
+    /// </summary>
     public long this[byte tribeId] => tribeId switch
     {
         0 => Tribe0,
@@ -59,7 +62,10 @@ public sealed class TribeBankTaxAccumulator(Func<byte, byte>? resolveBeneficiary
     /// <summary>Server/Header/Protocol/DEFINE.h:309.</summary>
     public const int TribeCount = 4;
 
-    /// <summary>Server/Header/Protocol/DEFINE.h:365 -- the same ceiling enforced zone-locally here and, separately, per persistent slot.</summary>
+    /// <summary>
+    ///     Server/Header/Protocol/DEFINE.h:365 -- the same ceiling enforced zone-locally here and, separately, per
+    ///     persistent slot.
+    /// </summary>
     public const long ZoneLocalCeiling = 2_000_000_000L;
 
     /// <summary>1%, truncated toward zero -- the NPC item-improvement-service tax rate.</summary>

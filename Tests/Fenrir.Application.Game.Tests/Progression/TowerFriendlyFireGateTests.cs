@@ -13,7 +13,7 @@ public class TowerFriendlyFireGateTests
     public void NotATowerZone_OwningTribeNull_IsAlwaysRejected()
     {
         var allowed = TowerFriendlyFireGate.CanAttackGuardian(
-            attackerTribe: 1, owningTribe: null, towerActivelyBuilt: true, allyOfOwningTribe: null);
+            1, null, true, null);
 
         Assert.False(allowed);
     }
@@ -22,7 +22,7 @@ public class TowerFriendlyFireGateTests
     public void TowerNotActivelyBuilt_IsRejected_RegardlessOfTribe()
     {
         var allowed = TowerFriendlyFireGate.CanAttackGuardian(
-            attackerTribe: 1, owningTribe: 0, towerActivelyBuilt: false, allyOfOwningTribe: null);
+            1, 0, false, null);
 
         Assert.False(allowed);
     }
@@ -31,7 +31,7 @@ public class TowerFriendlyFireGateTests
     public void AttackerIsTheOwningTribe_IsRejected_SelfTribeProtection()
     {
         var allowed = TowerFriendlyFireGate.CanAttackGuardian(
-            attackerTribe: 0, owningTribe: 0, towerActivelyBuilt: true, allyOfOwningTribe: null);
+            0, 0, true, null);
 
         Assert.False(allowed);
     }
@@ -41,7 +41,7 @@ public class TowerFriendlyFireGateTests
     {
         // Owner is tribe 0, tribe 0 is allied with tribe 2 -- an attacker from tribe 2 must be blocked.
         var allowed = TowerFriendlyFireGate.CanAttackGuardian(
-            attackerTribe: 2, owningTribe: 0, towerActivelyBuilt: true, allyOfOwningTribe: 2);
+            2, 0, true, 2);
 
         Assert.False(allowed);
     }
@@ -50,7 +50,7 @@ public class TowerFriendlyFireGateTests
     public void UnrelatedTribe_NoAllianceInvolved_IsAllowed()
     {
         var allowed = TowerFriendlyFireGate.CanAttackGuardian(
-            attackerTribe: 1, owningTribe: 0, towerActivelyBuilt: true, allyOfOwningTribe: null);
+            1, 0, true, null);
 
         Assert.True(allowed);
     }
@@ -60,7 +60,7 @@ public class TowerFriendlyFireGateTests
     {
         // Owner (tribe 0) is allied with tribe 3, but the attacker is tribe 1 -- unrelated, must be allowed.
         var allowed = TowerFriendlyFireGate.CanAttackGuardian(
-            attackerTribe: 1, owningTribe: 0, towerActivelyBuilt: true, allyOfOwningTribe: 3);
+            1, 0, true, 3);
 
         Assert.True(allowed);
     }
@@ -83,13 +83,13 @@ public class TowerFriendlyFireGateTests
         // the legacy bug and the exemption silently never fires.
         var buggyAllyOfAttacker = owningTribe;
         var allowedUnderTheBug = TowerFriendlyFireGate.CanAttackGuardian(
-            attackerTribe, owningTribe, towerActivelyBuilt: true, allyOfOwningTribe: buggyAllyOfAttacker);
+            attackerTribe, owningTribe, true, buggyAllyOfAttacker);
         Assert.True(allowedUnderTheBug); // the bug: never blocked, because ally-of-attacker != attacker
 
         // Ally of the OWNER (0) is tribe 2 -- the correct input -- correctly blocks the attacker.
         var correctAllyOfOwner = attackerTribe;
         var allowedUnderTheFix = TowerFriendlyFireGate.CanAttackGuardian(
-            attackerTribe, owningTribe, towerActivelyBuilt: true, allyOfOwningTribe: correctAllyOfOwner);
+            attackerTribe, owningTribe, true, correctAllyOfOwner);
         Assert.False(allowedUnderTheFix);
     }
 }

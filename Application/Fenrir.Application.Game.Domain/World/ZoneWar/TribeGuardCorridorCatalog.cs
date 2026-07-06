@@ -15,7 +15,8 @@ public readonly record struct TribeGuardCorridorChain(ImmutableArray<short> Zone
 /// <summary>
 ///     Structural catalog for the <c>mTribeGuardState[4][4]</c> corridor-gate table: which zone is which tribe's
 ///     corridor segment, which zone hosts (and re-derives) each checkpoint's guard-post liveness, and which
-///     reserved monster-slot indices identify that checkpoint's <see cref="TribeGuardCorridorStateDerivationSystem.GuardPostsPerSegment" />
+///     reserved monster-slot indices identify that checkpoint's
+///     <see cref="TribeGuardCorridorStateDerivationSystem.GuardPostsPerSegment" />
 ///     guard-post creatures within the owning zone's own monster table.
 ///     <para>
 ///         Mirrors <see cref="GuardPostCatalog" />'s own documented posture: the actual
@@ -34,12 +35,15 @@ public sealed class TribeGuardCorridorCatalog
     public const int SegmentsPerTribe = 4;
 
     public static readonly TribeGuardCorridorCatalog Empty = new(
-        hubZoneId: 0,
-        chainsByTribe: ImmutableDictionary<byte, TribeGuardCorridorChain>.Empty,
-        guardPostSlotsBySegment: ImmutableDictionary<(byte TribeId, byte SegmentIndex), ImmutableArray<int>>.Empty);
+        0,
+        ImmutableDictionary<byte, TribeGuardCorridorChain>.Empty,
+        ImmutableDictionary<(byte TribeId, byte SegmentIndex), ImmutableArray<int>>.Empty);
 
     private readonly ImmutableDictionary<byte, TribeGuardCorridorChain> _chainsByTribe;
-    private readonly ImmutableDictionary<(byte TribeId, byte SegmentIndex), ImmutableArray<int>> _guardPostSlotsBySegment;
+
+    private readonly ImmutableDictionary<(byte TribeId, byte SegmentIndex), ImmutableArray<int>>
+        _guardPostSlotsBySegment;
+
     private readonly ImmutableDictionary<short, (byte TribeId, byte SegmentIndex)> _segmentByDestinationZone;
     private readonly ImmutableDictionary<short, ImmutableArray<(byte TribeId, byte SegmentIndex)>> _segmentsOwnedByZone;
 
@@ -56,16 +60,16 @@ public sealed class TribeGuardCorridorCatalog
         var ownedByZone = new Dictionary<short, List<(byte, byte)>>();
 
         foreach (var (tribeId, chain) in chainsByTribe)
-        for (var segmentIndex = 0; segmentIndex < chain.Zones.Length; segmentIndex++)
-        {
-            var zoneId = chain.Zones[segmentIndex];
-            segmentByZone[zoneId] = (tribeId, (byte)segmentIndex);
+            for (var segmentIndex = 0; segmentIndex < chain.Zones.Length; segmentIndex++)
+            {
+                var zoneId = chain.Zones[segmentIndex];
+                segmentByZone[zoneId] = (tribeId, (byte)segmentIndex);
 
-            var owningZone = segmentIndex == 0 ? hubZoneId : chain.Zones[segmentIndex - 1];
-            if (!ownedByZone.TryGetValue(owningZone, out var owned))
-                ownedByZone[owningZone] = owned = [];
-            owned.Add((tribeId, (byte)segmentIndex));
-        }
+                var owningZone = segmentIndex == 0 ? hubZoneId : chain.Zones[segmentIndex - 1];
+                if (!ownedByZone.TryGetValue(owningZone, out var owned))
+                    ownedByZone[owningZone] = owned = [];
+                owned.Add((tribeId, (byte)segmentIndex));
+            }
 
         _segmentByDestinationZone = segmentByZone.ToImmutable();
         _segmentsOwnedByZone = ownedByZone.ToImmutableDictionary(kv => kv.Key, kv => kv.Value.ToImmutableArray());

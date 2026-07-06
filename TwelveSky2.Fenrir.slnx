@@ -1,63 +1,63 @@
 <Solution>
   <Folder Name="/Analysis/">
-    <Project Path="Analysis/Fenrir.Generators.Analysis/Fenrir.Generators.Analysis.csproj" />
+    <Project Path="Analysis/Fenrir.Generators.Analysis/Fenrir.Generators.Analysis.csproj"/>
   </Folder>
   <Folder Name="/Application/">
-    <Project Path="Application/Fenrir.Application.Game.Abstractions/Fenrir.Application.Game.Abstractions.csproj" />
-    <Project Path="Application/Fenrir.Application.Game.Domain/Fenrir.Application.Game.Domain.csproj" />
-    <Project Path="Application/Fenrir.Application.Game.GameData/Fenrir.Application.Game.GameData.csproj" />
-    <Project Path="Application/Fenrir.Application.Game.Handlers/Fenrir.Application.Game.Handlers.csproj" />
-    <Project Path="Application/Fenrir.Application.Game.Hosting/Fenrir.Application.Game.Hosting.csproj" />
-    <Project Path="Application/Fenrir.Application.Game.Services/Fenrir.Application.Game.Services.csproj" />
-    <Project Path="Application/Fenrir.Application.Game.Stats/Fenrir.Application.Game.Stats.csproj" />
-    <Project Path="Application/Fenrir.Application.Login.Abstractions/Fenrir.Application.Login.Abstractions.csproj" />
-    <Project Path="Application/Fenrir.Application.Login.Domain/Fenrir.Application.Login.Domain.csproj" />
-    <Project Path="Application/Fenrir.Application.Login.Handlers/Fenrir.Application.Login.Handlers.csproj" />
-    <Project Path="Application/Fenrir.Application.Login.Hosting/Fenrir.Application.Login.Hosting.csproj" />
-    <Project Path="Application/Fenrir.Application.Login.Services/Fenrir.Application.Login.Services.csproj" />
+    <Project Path="Application/Fenrir.Application.Game.Abstractions/Fenrir.Application.Game.Abstractions.csproj"/>
+    <Project Path="Application/Fenrir.Application.Game.Domain/Fenrir.Application.Game.Domain.csproj"/>
+    <Project Path="Application/Fenrir.Application.Game.GameData/Fenrir.Application.Game.GameData.csproj"/>
+    <Project Path="Application/Fenrir.Application.Game.Handlers/Fenrir.Application.Game.Handlers.csproj"/>
+    <Project Path="Application/Fenrir.Application.Game.Hosting/Fenrir.Application.Game.Hosting.csproj"/>
+    <Project Path="Application/Fenrir.Application.Game.Services/Fenrir.Application.Game.Services.csproj"/>
+    <Project Path="Application/Fenrir.Application.Game.Stats/Fenrir.Application.Game.Stats.csproj"/>
+    <Project Path="Application/Fenrir.Application.Login.Abstractions/Fenrir.Application.Login.Abstractions.csproj"/>
+    <Project Path="Application/Fenrir.Application.Login.Domain/Fenrir.Application.Login.Domain.csproj"/>
+    <Project Path="Application/Fenrir.Application.Login.Handlers/Fenrir.Application.Login.Handlers.csproj"/>
+    <Project Path="Application/Fenrir.Application.Login.Hosting/Fenrir.Application.Login.Hosting.csproj"/>
+    <Project Path="Application/Fenrir.Application.Login.Services/Fenrir.Application.Login.Services.csproj"/>
   </Folder>
   <Folder Name="/Database/">
-    <File Path="Database/_manifest.txt" />
+    <File Path="Database/_manifest.txt"/>
   </Folder>
   <Folder Name="/Generators/">
-    <Project Path="Generators/Fenrir.Generators.Dispatch/Fenrir.Generators.Dispatch.csproj" />
-    <Project Path="Generators/Fenrir.Generators.Protocol/Fenrir.Generators.Protocol.csproj" />
+    <Project Path="Generators/Fenrir.Generators.Dispatch/Fenrir.Generators.Dispatch.csproj"/>
+    <Project Path="Generators/Fenrir.Generators.Protocol/Fenrir.Generators.Protocol.csproj"/>
   </Folder>
   <Folder Name="/Infrastructure/">
-    <Project Path="Infrastructure/Fenrir.Data/Fenrir.Data.csproj" />
-    <Project Path="Infrastructure/Fenrir.Data.Abstractions/Fenrir.Data.Abstractions.csproj" />
+    <Project Path="Infrastructure/Fenrir.Data/Fenrir.Data.csproj"/>
+    <Project Path="Infrastructure/Fenrir.Data.Abstractions/Fenrir.Data.Abstractions.csproj"/>
   </Folder>
   <Folder Name="/Network/">
-    <Project Path="Network/Fenrir.Network.Abstractions/Fenrir.Network.Abstractions.csproj" />
-    <Project Path="Network/Fenrir.Network.Serialization/Fenrir.Network.Serialization.csproj" />
-    <Project Path="Network/Fenrir.Network.Compression/Fenrir.Network.Compression.csproj" />
-    <Project Path="Network/Fenrir.Network.Framing/Fenrir.Network.Framing.csproj" />
-    <Project Path="Network/Fenrir.Network.Transport/Fenrir.Network.Transport.csproj" />
-    <Project Path="Network/Fenrir.Network.Dispatch/Fenrir.Network.Dispatch.csproj" />
+    <Project Path="Network/Fenrir.Network.Abstractions/Fenrir.Network.Abstractions.csproj"/>
+    <Project Path="Network/Fenrir.Network.Serialization/Fenrir.Network.Serialization.csproj"/>
+    <Project Path="Network/Fenrir.Network.Compression/Fenrir.Network.Compression.csproj"/>
+    <Project Path="Network/Fenrir.Network.Framing/Fenrir.Network.Framing.csproj"/>
+    <Project Path="Network/Fenrir.Network.Transport/Fenrir.Network.Transport.csproj"/>
+    <Project Path="Network/Fenrir.Network.Dispatch/Fenrir.Network.Dispatch.csproj"/>
   </Folder>
   <Folder Name="/Orchestrator/">
-    <Project Path="Orchestration/Fenrir.AppHost/Fenrir.AppHost.csproj" />
-    <Project Path="Orchestration/Fenrir.ServiceDefaults/Fenrir.ServiceDefaults.csproj" />
+    <Project Path="Orchestration/Fenrir.AppHost/Fenrir.AppHost.csproj"/>
+    <Project Path="Orchestration/Fenrir.ServiceDefaults/Fenrir.ServiceDefaults.csproj"/>
   </Folder>
   <Folder Name="/Servers/">
-    <Project Path="Servers/Fenrir.GameServer/Fenrir.GameServer.csproj" />
-    <Project Path="Servers/Fenrir.LoginServer/Fenrir.LoginServer.csproj" />
+    <Project Path="Servers/Fenrir.GameServer/Fenrir.GameServer.csproj"/>
+    <Project Path="Servers/Fenrir.LoginServer/Fenrir.LoginServer.csproj"/>
   </Folder>
   <Folder Name="/Tests/">
-    <Project Path="Tests/Fenrir.Application.Game.Tests/Fenrir.Application.Game.Tests.csproj" />
-    <Project Path="Tests/Fenrir.Application.Login.Tests/Fenrir.Application.Login.Tests.csproj" />
-    <Project Path="Tests/Fenrir.Data.Tests/Fenrir.Data.Tests.csproj" />
-    <Project Path="Tests/Fenrir.IntegrationTests/Fenrir.IntegrationTests.csproj" />
-    <Project Path="Tests/Fenrir.LoginServer.Tests/Fenrir.LoginServer.Tests.csproj" />
-    <Project Path="Tests/Fenrir.Network.Serialization.Tests/Fenrir.Network.Serialization.Tests.csproj" />
-    <Project Path="Tests/Fenrir.Network.Tests/Fenrir.Network.Tests.csproj" />
-    <Project Path="Tests/Fenrir.Tools.LegacyDataImport.Tests/Fenrir.Tools.LegacyDataImport.Tests.csproj" />
+    <Project Path="Tests/Fenrir.Application.Game.Tests/Fenrir.Application.Game.Tests.csproj"/>
+    <Project Path="Tests/Fenrir.Application.Login.Tests/Fenrir.Application.Login.Tests.csproj"/>
+    <Project Path="Tests/Fenrir.Data.Tests/Fenrir.Data.Tests.csproj"/>
+    <Project Path="Tests/Fenrir.IntegrationTests/Fenrir.IntegrationTests.csproj"/>
+    <Project Path="Tests/Fenrir.LoginServer.Tests/Fenrir.LoginServer.Tests.csproj"/>
+    <Project Path="Tests/Fenrir.Network.Serialization.Tests/Fenrir.Network.Serialization.Tests.csproj"/>
+    <Project Path="Tests/Fenrir.Network.Tests/Fenrir.Network.Tests.csproj"/>
+    <Project Path="Tests/Fenrir.Tools.LegacyDataImport.Tests/Fenrir.Tools.LegacyDataImport.Tests.csproj"/>
   </Folder>
 
   <Folder Name="/Tools/">
-    <Project Path="Tools/Fenrir.Tools.AccountProvisioning/Fenrir.Tools.AccountProvisioning.csproj" />
-    <Project Path="Tools/Fenrir.Tools.DbMigrator/Fenrir.Tools.DbMigrator.csproj" />
-    <Project Path="Tools/Fenrir.Tools.LegacyDataImport/Fenrir.Tools.LegacyDataImport.csproj" />
+    <Project Path="Tools/Fenrir.Tools.AccountProvisioning/Fenrir.Tools.AccountProvisioning.csproj"/>
+    <Project Path="Tools/Fenrir.Tools.DbMigrator/Fenrir.Tools.DbMigrator.csproj"/>
+    <Project Path="Tools/Fenrir.Tools.LegacyDataImport/Fenrir.Tools.LegacyDataImport.csproj"/>
   </Folder>
 
 </Solution>

@@ -39,13 +39,13 @@ internal static class ItemReader
     private static bool IsNoDropForcedOne(int index)
     {
         return index is 706 or 708 or 709 or 710 or 711
-            or (>= 865 and <= 885)
+            or >= 865 and <= 885
             or 983
-            or (>= 1079 and <= 1091)
+            or >= 1079 and <= 1091
             or 1125 or 1369 or 1989
-            or (>= 2001 and <= 2004)
-            or (>= 7001 and <= 7027)
-            or (>= 17001 and <= 17133);
+            or >= 2001 and <= 2004
+            or >= 7001 and <= 7027
+            or >= 17001 and <= 17133;
     }
 
     /// <summary>

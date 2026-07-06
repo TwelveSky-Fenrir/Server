@@ -49,7 +49,7 @@ public class ZoneTowerGuardianCombatTests
 
         var (session, _) = ZoneTestKit.CreateSession(1);
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, TowerZoneNumber, "Attacker",
-            posX: 100, posY: 0, posZ: 100, tribe: attackerTribe)));
+            100, 0, 100, tribe: attackerTribe)));
         zone.Tick(SimulationClock.LegacyTick); // enters + pops the guardian into _players/_monsters
 
         Assert.True(zone.TryGetPlayer(10, out var attacker));
@@ -94,7 +94,7 @@ public class ZoneTowerGuardianCombatTests
     [Fact]
     public void AttackFromUnrelatedTribe_TowerActivelyBuilt_DamagesTheGuardian()
     {
-        var (zone, _) = CreateZoneWithActiveGuardian(attackerTribe: 1);
+        var (zone, _) = CreateZoneWithActiveGuardian(1);
         Assert.True(zone.TryGetMonster(TowerWarState.GuardianServerIndex(TowerIndex), out var guardian));
         var startingLife = guardian!.Life;
 
@@ -108,7 +108,7 @@ public class ZoneTowerGuardianCombatTests
     [Fact]
     public void AttackFromOwningTribe_IsRejected_SelfTribeProtection()
     {
-        var (zone, _) = CreateZoneWithActiveGuardian(attackerTribe: 0); // owner of zone 2's tower is tribe 0
+        var (zone, _) = CreateZoneWithActiveGuardian(0); // owner of zone 2's tower is tribe 0
         Assert.True(zone.TryGetMonster(TowerWarState.GuardianServerIndex(TowerIndex), out var guardian));
         var startingLife = guardian!.Life;
 
@@ -125,7 +125,7 @@ public class ZoneTowerGuardianCombatTests
         var worldState = CreateInitializedWorldState();
         worldState.SetAllianceOffer(0, 2, true); // tribe 0 (this tower's owner) allied with tribe 2
 
-        var (zone, _) = CreateZoneWithActiveGuardian(attackerTribe: 2, worldState: worldState);
+        var (zone, _) = CreateZoneWithActiveGuardian(2, worldState);
         Assert.True(zone.TryGetMonster(TowerWarState.GuardianServerIndex(TowerIndex), out var guardian));
         var startingLife = guardian!.Life;
 
@@ -147,7 +147,7 @@ public class ZoneTowerGuardianCombatTests
 
         var (session, _) = ZoneTestKit.CreateSession(1);
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, TowerZoneNumber, "Attacker",
-            posX: 100, posY: 0, posZ: 100, tribe: 1)));
+            100, 0, 100, tribe: 1)));
         zone.Tick(SimulationClock.LegacyTick);
         Assert.True(zone.TryGetPlayer(10, out var attacker));
         attacker!.Stats = StrongAttacker;
@@ -174,7 +174,7 @@ public class ZoneTowerGuardianCombatTests
 
         var (session, _) = ZoneTestKit.CreateSession(1);
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 39, "Attacker",
-            posX: 100, posY: 0, posZ: 100, tribe: 0)));
+            100, 0, 100, tribe: 0)));
         zone.Tick(SimulationClock.LegacyTick);
         Assert.True(zone.TryGetPlayer(10, out var attacker));
         attacker!.Stats = StrongAttacker;
@@ -190,7 +190,7 @@ public class ZoneTowerGuardianCombatTests
     [Fact]
     public void AllowedHit_ClearsUnderAttackFlag_AndRefreshesTheLastAttackTimestamp()
     {
-        var (zone, towerWar) = CreateZoneWithActiveGuardian(attackerTribe: 1);
+        var (zone, towerWar) = CreateZoneWithActiveGuardian(1);
         Assert.True(zone.TryGetMonster(TowerWarState.GuardianServerIndex(TowerIndex), out var guardian));
 
         zone.PostCombatCommand(new CombatCommand { AttackerCharacterId = 10, AttackInfo = MeleeAgainst(guardian!) });
@@ -203,12 +203,12 @@ public class ZoneTowerGuardianCombatTests
     [Fact]
     public void FirstAllowedHit_RecordsTheFirstAttackTimestamp_AndBroadcastsTowerStatusToEveryPlayerInTheZone()
     {
-        var (zone, towerWar) = CreateZoneWithActiveGuardian(attackerTribe: 1);
+        var (zone, towerWar) = CreateZoneWithActiveGuardian(1);
         Assert.True(zone.TryGetMonster(TowerWarState.GuardianServerIndex(TowerIndex), out var guardian));
 
         var (bystanderSession, bystanderPipe) = ZoneTestKit.CreateSession(2);
         zone.Post(ZoneCommand.Enter(20, ZoneTestKit.EnterData(bystanderSession, TowerZoneNumber, "Bystander",
-            posX: 500, posY: 0, posZ: 500, tribe: 3)));
+            500, 0, 500, tribe: 3)));
         zone.Tick(SimulationClock.LegacyTick);
         ZoneTestKit.DrainOutbound(bystanderPipe); // discard the enter/replication noise before asserting
 
@@ -223,7 +223,7 @@ public class ZoneTowerGuardianCombatTests
     [Fact]
     public void SecondAllowedHit_IsNotFirst_AndDoesNotOverwriteTheFirstAttackTimestamp()
     {
-        var (zone, towerWar) = CreateZoneWithActiveGuardian(attackerTribe: 1);
+        var (zone, towerWar) = CreateZoneWithActiveGuardian(1);
         Assert.True(zone.TryGetMonster(TowerWarState.GuardianServerIndex(TowerIndex), out var guardian));
 
         zone.PostCombatCommand(new CombatCommand { AttackerCharacterId = 10, AttackInfo = MeleeAgainst(guardian!) });

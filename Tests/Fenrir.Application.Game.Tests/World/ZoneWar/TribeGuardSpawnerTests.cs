@@ -116,9 +116,9 @@ public class TribeGuardSpawnerTests
     public void ConditionalFifthPost_SkippedWhole_WhileItsTribeHasLostItsOwnSymbol()
     {
         var cache = CacheWithGuardTemplate();
-        var catalog = new GuardPostCatalog([Post(2, 1, 2, requiresTribeSymbolOwnedBy: 1)], []);
+        var catalog = new GuardPostCatalog([Post(2, 1, 2, 1)], []);
         var worldState = CreateWorldState();
-        worldState.ResolveTribeSymbol(1, winnerTribeId: 2); // tribe 1 loses its own slot to tribe 2
+        worldState.ResolveTribeSymbol(1, 2); // tribe 1 loses its own slot to tribe 2
         var spawner = new TribeGuardSpawner(cache, catalog, worldState);
         var zone = CreateZone(2, cache, spawner);
 
@@ -131,7 +131,7 @@ public class TribeGuardSpawnerTests
     public void ConditionalFifthPost_Spawns_WhileItsTribeStillOwnsItsOwnSymbol()
     {
         var cache = CacheWithGuardTemplate();
-        var catalog = new GuardPostCatalog([Post(2, 1, 2, requiresTribeSymbolOwnedBy: 1)], []);
+        var catalog = new GuardPostCatalog([Post(2, 1, 2, 1)], []);
         var worldState = CreateWorldState(); // fresh boot -- every tribe starts owning its own symbol
         var spawner = new TribeGuardSpawner(cache, catalog, worldState);
         var zone = CreateZone(2, cache, spawner);

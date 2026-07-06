@@ -12,10 +12,12 @@ internal sealed class FakeAccountSessionRepository : IAccountSessionRepository
     public byte? PreviousShardId { get; set; }
     public bool TransitionResult { get; set; } = true;
 
-    public ImmutableArray<ReapedAccountSessionDto> ReapResult { get; set; } = ImmutableArray<ReapedAccountSessionDto>.Empty;
+    public ImmutableArray<ReapedAccountSessionDto> ReapResult { get; set; } =
+        ImmutableArray<ReapedAccountSessionDto>.Empty;
 
     public int ClaimCallCount { get; private set; }
     public int? LastTearingDownAccountId { get; private set; }
+
     public (int AccountId, AccountSessionServerKind ServerKind, byte? ShardId, Guid SessionToken)? LastClearedOwner
     {
         get;
@@ -24,6 +26,10 @@ internal sealed class FakeAccountSessionRepository : IAccountSessionRepository
 
     public List<(AccountSessionServerKind ServerKind, byte? ShardId, IReadOnlyCollection<int> AccountIds)>
         RefreshCalls { get; } = [];
+
+    public int ActiveSessionCount { get; set; }
+    public int ActiveSessionCountCallCount { get; private set; }
+    public Exception? ActiveSessionCountException { get; set; }
 
     public ValueTask<AccountSessionClaimDto> ClaimOrSignalKickAsync(int accountId, Guid newSessionToken,
         CancellationToken ct)
@@ -62,10 +68,6 @@ internal sealed class FakeAccountSessionRepository : IAccountSessionRepository
     {
         return ValueTask.FromResult(ReapResult);
     }
-
-    public int ActiveSessionCount { get; set; }
-    public int ActiveSessionCountCallCount { get; private set; }
-    public Exception? ActiveSessionCountException { get; set; }
 
     public ValueTask<int> GetActiveSessionCountAsync(CancellationToken ct)
     {

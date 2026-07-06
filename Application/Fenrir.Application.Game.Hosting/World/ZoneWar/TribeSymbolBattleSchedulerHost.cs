@@ -25,13 +25,11 @@ public sealed class TribeSymbolBattleSchedulerHost(
     /// <summary>Server/ts25zone/S07_MyGame01.cpp:578-622 -- the one physical instance this scheduler ever arms on.</summary>
     public const int DesignatedShardId = 37;
 
-    private readonly bool _armed = options.Value.ShardId == DesignatedShardId && options.Value.HolyStoneBattleEnabled;
-
-    public bool IsArmed => _armed;
+    public bool IsArmed { get; } = options.Value.ShardId == DesignatedShardId && options.Value.HolyStoneBattleEnabled;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        if (!_armed)
+        if (!IsArmed)
         {
             logger.LogInformation(
                 "TribeSymbolBattleSchedulerHost is inert on this shard (ShardId={ShardId}, HolyStoneBattleEnabled={Enabled})",

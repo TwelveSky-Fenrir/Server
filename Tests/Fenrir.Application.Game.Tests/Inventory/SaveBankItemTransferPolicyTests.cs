@@ -55,7 +55,7 @@ public class SaveBankItemTransferPolicyTests
     {
         var result = SaveBankItemTransferPolicy.ResolveDepositFromInventory(
             ContainerMatrix.InventoryPage1, 0, 0, 0,
-            Stack(1), null, false, false, secondInventoryPageAccessible: false);
+            Stack(1), null, false, false, false);
 
         Assert.Equal(SaveBankItemTransferPolicy.TransferOutcome.SecondInventoryPageExpired, result.Outcome);
     }
@@ -65,7 +65,7 @@ public class SaveBankItemTransferPolicyTests
     {
         var result = SaveBankItemTransferPolicy.ResolveDepositFromInventory(
             ContainerMatrix.InventoryPage0, 0, 0, 0,
-            Stack(1), null, false, false, secondInventoryPageAccessible: false);
+            Stack(1), null, false, false, false);
 
         Assert.True(result.Succeeded);
     }
@@ -85,7 +85,7 @@ public class SaveBankItemTransferPolicyTests
     {
         var result = SaveBankItemTransferPolicy.ResolveDepositFromInventory(
             ContainerMatrix.InventoryPage0, 0, 0, 0,
-            Stack(8290, 1), null, false, false, true);
+            Stack(8290), null, false, false, true);
 
         Assert.Equal(SaveBankItemTransferPolicy.TransferOutcome.SourceItemBlocked, result.Outcome);
     }
@@ -93,13 +93,13 @@ public class SaveBankItemTransferPolicyTests
     [Fact]
     public void Deposit_NonStackable_MovesWholeSlotAndIgnoresQuantity()
     {
-        var source = Stack(100, 1, enchant: 5, combine: 1, refine: 2, socket: 3, gem1: 7, gem2: 8, gem3: 9,
-            expireDate: 20260101, serial: 42);
+        var source = Stack(100, 1, 5, 1, 2, 3, 7, 8, 9,
+            20260101, 42);
 
         // requestedQuantity (999) is deliberately nonsensical -- non-stackable transfers must ignore it entirely.
         var result = SaveBankItemTransferPolicy.ResolveDepositFromInventory(
             ContainerMatrix.InventoryPage0, 0, 999, 0,
-            source, null, sourceIsStackable: false, sourceSupportsSocket: true, secondInventoryPageAccessible: true);
+            source, null, false, true, true);
 
         Assert.True(result.Succeeded);
         Assert.Null(result.NewSource);
@@ -120,11 +120,11 @@ public class SaveBankItemTransferPolicyTests
     [Fact]
     public void Deposit_NonStackable_SocketUnsupported_ZeroesGems()
     {
-        var source = Stack(100, 1, gem1: 7, gem2: 8, gem3: 9, expireDate: 20260101);
+        var source = Stack(100, gem1: 7, gem2: 8, gem3: 9, expireDate: 20260101);
 
         var result = SaveBankItemTransferPolicy.ResolveDepositFromInventory(
             ContainerMatrix.InventoryPage0, 0, 0, 0,
-            source, null, sourceIsStackable: false, sourceSupportsSocket: false, secondInventoryPageAccessible: true);
+            source, null, false, false, true);
 
         var dest = result.NewDestination!.Value;
         Assert.Equal(0, dest.SocketGem1);
@@ -138,8 +138,8 @@ public class SaveBankItemTransferPolicyTests
     {
         var result = SaveBankItemTransferPolicy.ResolveDepositFromInventory(
             ContainerMatrix.InventoryPage0, 0, 0, 0,
-            Stack(100), Stack(200), sourceIsStackable: false, sourceSupportsSocket: false,
-            secondInventoryPageAccessible: true);
+            Stack(100), Stack(200), false, false,
+            true);
 
         Assert.Equal(SaveBankItemTransferPolicy.TransferOutcome.DestinationConflict, result.Outcome);
     }
@@ -147,11 +147,11 @@ public class SaveBankItemTransferPolicyTests
     [Fact]
     public void Deposit_Stackable_PartialIntoEmptyDestination_SplitsAndZeroesDestinationValueAndSerial()
     {
-        var source = Stack(2, 10, enchant: 9, serial: 5);
+        var source = Stack(2, 10, 9, serial: 5);
 
         var result = SaveBankItemTransferPolicy.ResolveDepositFromInventory(
             ContainerMatrix.InventoryPage0, 0, 4, 0,
-            source, null, sourceIsStackable: true, sourceSupportsSocket: true, secondInventoryPageAccessible: true);
+            source, null, true, true, true);
 
         Assert.True(result.Succeeded);
         Assert.False(result.IsNonStackableTransfer);
@@ -169,7 +169,7 @@ public class SaveBankItemTransferPolicyTests
 
         var result = SaveBankItemTransferPolicy.ResolveDepositFromInventory(
             ContainerMatrix.InventoryPage0, 0, 4, 0,
-            source, null, sourceIsStackable: true, sourceSupportsSocket: true, secondInventoryPageAccessible: true);
+            source, null, true, true, true);
 
         Assert.True(result.Succeeded);
         Assert.Null(result.NewSource);
@@ -188,8 +188,8 @@ public class SaveBankItemTransferPolicyTests
 
         var result = SaveBankItemTransferPolicy.ResolveDepositFromInventory(
             ContainerMatrix.InventoryPage0, 0, 3, 0,
-            source, destination, sourceIsStackable: true, sourceSupportsSocket: true,
-            secondInventoryPageAccessible: true);
+            source, destination, true, true,
+            true);
 
         Assert.True(result.Succeeded);
         Assert.Equal(7, result.NewSource!.Value.Quantity);
@@ -205,8 +205,8 @@ public class SaveBankItemTransferPolicyTests
     {
         var result = SaveBankItemTransferPolicy.ResolveDepositFromInventory(
             ContainerMatrix.InventoryPage0, 0, 5, 0,
-            Stack(2, 3), null, sourceIsStackable: true, sourceSupportsSocket: false,
-            secondInventoryPageAccessible: true);
+            Stack(2, 3), null, true, false,
+            true);
 
         Assert.Equal(SaveBankItemTransferPolicy.TransferOutcome.InvalidQuantity, result.Outcome);
     }
@@ -216,8 +216,8 @@ public class SaveBankItemTransferPolicyTests
     {
         var result = SaveBankItemTransferPolicy.ResolveDepositFromInventory(
             ContainerMatrix.InventoryPage0, 0, 1000, 0,
-            Stack(2, 1000), null, sourceIsStackable: true, sourceSupportsSocket: false,
-            secondInventoryPageAccessible: true);
+            Stack(2, 1000), null, true, false,
+            true);
 
         Assert.Equal(SaveBankItemTransferPolicy.TransferOutcome.InvalidQuantity, result.Outcome);
     }
@@ -227,8 +227,8 @@ public class SaveBankItemTransferPolicyTests
     {
         var result = SaveBankItemTransferPolicy.ResolveDepositFromInventory(
             ContainerMatrix.InventoryPage0, 0, 0, 0,
-            Stack(2, 10), null, sourceIsStackable: true, sourceSupportsSocket: false,
-            secondInventoryPageAccessible: true);
+            Stack(2, 10), null, true, false,
+            true);
 
         Assert.Equal(SaveBankItemTransferPolicy.TransferOutcome.InvalidQuantity, result.Outcome);
     }
@@ -238,8 +238,8 @@ public class SaveBankItemTransferPolicyTests
     {
         var result = SaveBankItemTransferPolicy.ResolveDepositFromInventory(
             ContainerMatrix.InventoryPage0, 0, 1, 0,
-            Stack(2, 10), Stack(3, 1), sourceIsStackable: true, sourceSupportsSocket: false,
-            secondInventoryPageAccessible: true);
+            Stack(2, 10), Stack(3), true, false,
+            true);
 
         Assert.Equal(SaveBankItemTransferPolicy.TransferOutcome.DestinationConflict, result.Outcome);
     }
@@ -249,8 +249,8 @@ public class SaveBankItemTransferPolicyTests
     {
         var result = SaveBankItemTransferPolicy.ResolveDepositFromInventory(
             ContainerMatrix.InventoryPage0, 0, 500, 0,
-            Stack(2, 500), Stack(2, 999 - 100), sourceIsStackable: true, sourceSupportsSocket: false,
-            secondInventoryPageAccessible: true);
+            Stack(2, 500), Stack(2, 999 - 100), true, false,
+            true);
 
         Assert.Equal(SaveBankItemTransferPolicy.TransferOutcome.DestinationConflict, result.Outcome);
     }
@@ -296,7 +296,7 @@ public class SaveBankItemTransferPolicyTests
     {
         var result = SaveBankItemTransferPolicy.ResolveWithdrawToInventory(
             0, 0, ContainerMatrix.InventoryPage1, 0, 0, 0,
-            Stack(1), null, false, false, secondInventoryPageAccessible: false);
+            Stack(1), null, false, false, false);
 
         Assert.Equal(SaveBankItemTransferPolicy.TransferOutcome.SecondInventoryPageExpired, result.Outcome);
     }
@@ -306,8 +306,8 @@ public class SaveBankItemTransferPolicyTests
     {
         var result = SaveBankItemTransferPolicy.ResolveWithdrawToInventory(
             0, 0, ContainerMatrix.InventoryPage0, 0, 0, 0,
-            Stack(8290, 1), null, sourceIsStackable: false, sourceSupportsSocket: false,
-            secondInventoryPageAccessible: true);
+            Stack(8290), null, false, false,
+            true);
 
         Assert.True(result.Succeeded);
     }
@@ -330,8 +330,8 @@ public class SaveBankItemTransferPolicyTests
 
         var result = SaveBankItemTransferPolicy.ResolveWithdrawToInventory(
             0, 4, ContainerMatrix.InventoryPage0, 0, 5, 6,
-            source, destination, sourceIsStackable: true, sourceSupportsSocket: false,
-            secondInventoryPageAccessible: true);
+            source, destination, true, false,
+            true);
 
         Assert.True(result.Succeeded);
         Assert.Equal(7, result.NewDestination!.Value.Quantity);
@@ -391,10 +391,10 @@ public class SaveBankItemTransferPolicyTests
     [Fact]
     public void Rearrange_NonStackable_EmptyDestination_MovesWholeSlot()
     {
-        var source = Stack(100, 1, enchant: 4, gem1: 1, expireDate: 55, serial: 9);
+        var source = Stack(100, 1, 4, gem1: 1, expireDate: 55, serial: 9);
 
         var result = SaveBankItemTransferPolicy.ResolveRearrangeWithinBank(
-            0, 999, 1, source, null, sourceIsStackable: false, sourceSupportsSocket: true);
+            0, 999, 1, source, null, false, true);
 
         Assert.True(result.Succeeded);
         Assert.True(result.IsNonStackableTransfer);
@@ -409,7 +409,7 @@ public class SaveBankItemTransferPolicyTests
         var source = Stack(2, 20);
 
         var result = SaveBankItemTransferPolicy.ResolveRearrangeWithinBank(
-            0, 5, 1, source, null, sourceIsStackable: true, sourceSupportsSocket: false);
+            0, 5, 1, source, null, true, false);
 
         Assert.True(result.Succeeded);
         Assert.False(result.IsNonStackableTransfer);

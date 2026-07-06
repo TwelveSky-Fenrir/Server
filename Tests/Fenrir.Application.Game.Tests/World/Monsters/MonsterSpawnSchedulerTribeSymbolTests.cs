@@ -8,7 +8,6 @@ using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Tests.GameData;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Application.Game.Tests.World.WorldState;
-using Fenrir.Data.World;
 using Fenrir.Data.WriteBehind;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -61,7 +60,8 @@ public class MonsterSpawnSchedulerTribeSymbolTests
             new DirtyTracker<int>(), NullLogger<Zone>.Instance, ZoneTestKit.EmptyWorldData(), []);
         emptyRegistry.Initialize([]);
 
-        var broadcaster = new ZoneEventBroadcaster(worldState, emptyRegistry, NullLogger<ZoneEventBroadcaster>.Instance);
+        var broadcaster =
+            new ZoneEventBroadcaster(worldState, emptyRegistry, NullLogger<ZoneEventBroadcaster>.Instance);
         return (worldState, broadcaster);
     }
 
@@ -74,7 +74,8 @@ public class MonsterSpawnSchedulerTribeSymbolTests
     {
         var cache = CacheWithHolyStone(monsterId, specialType);
         var (worldState, broadcaster) = CreateWorldStateAndBroadcaster();
-        var scheduler = new MonsterSpawnScheduler(cache, zoneEventBroadcaster: new Lazy<ZoneEventBroadcaster>(broadcaster));
+        var scheduler =
+            new MonsterSpawnScheduler(cache, zoneEventBroadcaster: new Lazy<ZoneEventBroadcaster>(broadcaster));
         var zone = ZoneTestKit.CreateZone(1, simulationSystems: [scheduler], worldData: cache);
 
         var (session, _) = ZoneTestKit.CreateSession(1);
@@ -95,7 +96,8 @@ public class MonsterSpawnSchedulerTribeSymbolTests
     {
         var cache = CacheWithHolyStone(604, 14);
         var (worldState, broadcaster) = CreateWorldStateAndBroadcaster();
-        var scheduler = new MonsterSpawnScheduler(cache, zoneEventBroadcaster: new Lazy<ZoneEventBroadcaster>(broadcaster));
+        var scheduler =
+            new MonsterSpawnScheduler(cache, zoneEventBroadcaster: new Lazy<ZoneEventBroadcaster>(broadcaster));
         var zone = ZoneTestKit.CreateZone(1, simulationSystems: [scheduler], worldData: cache);
 
         var (session, _) = ZoneTestKit.CreateSession(1);
@@ -106,7 +108,7 @@ public class MonsterSpawnSchedulerTribeSymbolTests
         zone.TryDamageMonster(1, 10_000, 10, out _, out _);
         zone.Tick(SimulationClock.LegacyTick);
 
-        Assert.Equal((byte?)killerTribe, worldState.World.MonsterSymbol);
+        Assert.Equal(killerTribe, worldState.World.MonsterSymbol);
     }
 
     [Fact]
@@ -114,7 +116,8 @@ public class MonsterSpawnSchedulerTribeSymbolTests
     {
         var cache = CacheWithHolyStone(700, 0); // SpecialType 0 -- not a Holy Stone
         var (worldState, broadcaster) = CreateWorldStateAndBroadcaster();
-        var scheduler = new MonsterSpawnScheduler(cache, zoneEventBroadcaster: new Lazy<ZoneEventBroadcaster>(broadcaster));
+        var scheduler =
+            new MonsterSpawnScheduler(cache, zoneEventBroadcaster: new Lazy<ZoneEventBroadcaster>(broadcaster));
         var zone = ZoneTestKit.CreateZone(1, simulationSystems: [scheduler], worldData: cache);
 
         var (session, _) = ZoneTestKit.CreateSession(1);

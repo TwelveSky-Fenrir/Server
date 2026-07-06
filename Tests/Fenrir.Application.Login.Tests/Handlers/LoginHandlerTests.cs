@@ -1,17 +1,16 @@
 using System.Net;
 using Fenrir.Application.Login.Domain;
 using Fenrir.Application.Login.Domain.RateLimiting;
-using Fenrir.Application.Login.Handlers;
 using Fenrir.Application.Login.Handlers.Handlers;
 using Fenrir.Application.Login.Services.Login;
 using Fenrir.Application.Login.Tests.TestSupport;
-using Fenrir.Network.Serialization.Packets.Login;
-using Fenrir.Network.Serialization.Packets.Shared;
 using Fenrir.Data.Abstractions.Accounts;
 using Fenrir.Data.Abstractions.Runtime;
 using Fenrir.Data.Security;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Framing;
+using Fenrir.Network.Serialization.Packets.Login;
+using Fenrir.Network.Serialization.Packets.Shared;
 using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Login.Tests.Handlers;
@@ -22,6 +21,11 @@ public class LoginHandlerTests
 {
     private const int ClientVersion = 90354; // LoginServerOptions.ExpectedClientVersion default
     private static readonly IPEndPoint RemoteEndPoint = new(IPAddress.Parse("203.0.113.50"), 40000);
+
+    // Realistic, non-placeholder default device tuple: a real client always has a non-zero-length MAC, so
+    // the anti-spoofing gate (cluster C09, DeviceSpoofingGuard) never trips unless a test deliberately
+    // asks for the zero-length-MAC or placeholder-literal edge cases it covers below.
+    private static readonly byte[] DefaultPhysicalAddress = ParseMac("11-22-33-44-55-66");
 
     // Login-time maintenance lockdown / server-full quota (Server/ts25login/S04_MyWork02.cpp:149-160): the two
     // earliest gates in the handler, evaluated before the firewall/version/MAC/auth checks below.
@@ -46,7 +50,7 @@ public class LoginHandlerTests
         var accounts = FakeAccountRepository.WithNoAccount();
         var capacity = new LoginCapacityState();
         capacity.SetMaxPlayers(0);
-        var handler = CreateHandler(out var session, out var pipe, accounts, blockedIp: true, capacity: capacity);
+        var handler = CreateHandler(out var session, out var pipe, accounts, true, capacity: capacity);
 
         await handler.HandleAsync(ValidLoginRequest(), session, CancellationToken.None);
 
@@ -72,7 +76,7 @@ public class LoginHandlerTests
     public async Task HandleAsync_ServerFull_CurrentPlayersBelowMax_ProceedsPastTheCapacityGate()
     {
         var (hash, salt) = PasswordHasher.Hash("correct-password");
-        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, IsBanned: false);
+        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, false);
         var accounts = FakeAccountRepository.WithAccount(account);
         var capacity = new LoginCapacityState();
         capacity.SetMaxPlayers(100);
@@ -89,7 +93,7 @@ public class LoginHandlerTests
     {
         var accounts = FakeAccountRepository.WithNoAccount();
         var handler = CreateHandler(out var session, out var pipe, accounts,
-            blockedIp: true);
+            true);
 
         await handler.HandleAsync(ValidLoginRequest(), session, CancellationToken.None);
 
@@ -102,7 +106,7 @@ public class LoginHandlerTests
     {
         var accounts = FakeAccountRepository.WithNoAccount();
         var handler = CreateHandler(out var session, out var pipe, accounts,
-            blockedIp: true, gmAllowlisted: true);
+            true, gmAllowlisted: true);
 
         await handler.HandleAsync(ValidLoginRequest(), session, CancellationToken.None);
 
@@ -131,7 +135,7 @@ public class LoginHandlerTests
     public async Task HandleAsync_AccountHasAnActiveBanLogEntry_SendsBlockedResult_EvenWhenIsBannedFlagIsFalse()
     {
         var (hash, salt) = PasswordHasher.Hash("correct-password");
-        var account = new AuthenticateAccountDto(1, hash, salt, 0, null, IsBanned: false);
+        var account = new AuthenticateAccountDto(1, hash, salt, 0, null, false);
         var accounts = FakeAccountRepository.WithAccount(account);
         var handler = CreateHandler(out var session, out var pipe, accounts, accountBanned: true);
 
@@ -144,7 +148,7 @@ public class LoginHandlerTests
     public async Task HandleAsync_NoRestrictionsAndValidCredentials_Succeeds()
     {
         var (hash, salt) = PasswordHasher.Hash("correct-password");
-        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, IsBanned: false);
+        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, false);
         var accounts = FakeAccountRepository.WithAccount(account);
         var handler = CreateHandler(out var session, out var pipe, accounts);
 
@@ -161,17 +165,19 @@ public class LoginHandlerTests
     // same account (ServerDocs/11_ts25login/01_Flux_Authentification_Redirection.md:145 "case 4" -- kick the
     // stale local session directly). The new attempt is dropped too, silently, exactly like RateLimited.
     [Fact]
-    public async Task HandleAsync_ConflictLogin_WithALiveLocalSession_EvictsTheOldSession_AndDropsTheNewAttemptSilently()
+    public async Task
+        HandleAsync_ConflictLogin_WithALiveLocalSession_EvictsTheOldSession_AndDropsTheNewAttemptSilently()
     {
         var (hash, salt) = PasswordHasher.Hash("correct-password");
-        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, IsBanned: false);
+        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, false);
         var accounts = FakeAccountRepository.WithAccount(account);
         var registry = new SessionRegistry();
         var staleSession = new LoginClientSession(99, new FakeDuplexPipe());
         registry.Register(staleSession);
         registry.AssociateAccount(99, 7);
 
-        var accountSessions = new FakeAccountSessionRepository { ClaimOutcome = AccountSessionClaimOutcome.ConflictLogin };
+        var accountSessions = new FakeAccountSessionRepository
+            { ClaimOutcome = AccountSessionClaimOutcome.ConflictLogin };
         var handler = CreateHandler(out var session, out var pipe, accounts, registry: registry,
             accountSessions: accountSessions);
 
@@ -186,9 +192,10 @@ public class LoginHandlerTests
     public async Task HandleAsync_ConflictLogin_WithNoMatchingLocalSession_SendsAlreadyConnectedResult()
     {
         var (hash, salt) = PasswordHasher.Hash("correct-password");
-        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, IsBanned: false);
+        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, false);
         var accounts = FakeAccountRepository.WithAccount(account);
-        var accountSessions = new FakeAccountSessionRepository { ClaimOutcome = AccountSessionClaimOutcome.ConflictLogin };
+        var accountSessions = new FakeAccountSessionRepository
+            { ClaimOutcome = AccountSessionClaimOutcome.ConflictLogin };
         var handler = CreateHandler(out var session, out var pipe, accounts, accountSessions: accountSessions);
 
         await handler.HandleAsync(ValidLoginRequest(password: "correct-password"), session, CancellationToken.None);
@@ -203,7 +210,7 @@ public class LoginHandlerTests
         AccountSessionClaimOutcome outcome)
     {
         var (hash, salt) = PasswordHasher.Hash("correct-password");
-        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, IsBanned: false);
+        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, false);
         var accounts = FakeAccountRepository.WithAccount(account);
         var accountSessions = new FakeAccountSessionRepository { ClaimOutcome = outcome };
         var handler = CreateHandler(out var session, out var pipe, accounts, accountSessions: accountSessions);
@@ -220,7 +227,7 @@ public class LoginHandlerTests
     public async Task HandleAsync_NonGmAccount_ZeroLengthMac_SendsInvalidDevicesResult()
     {
         var (hash, salt) = PasswordHasher.Hash("correct-password");
-        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, IsBanned: false, AccountGrade: 0);
+        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, false, 0);
         var accounts = FakeAccountRepository.WithAccount(account);
         var handler = CreateHandler(out var session, out var pipe, accounts);
 
@@ -240,7 +247,7 @@ public class LoginHandlerTests
     public async Task HandleAsync_GmAccount_ZeroLengthMac_StillSucceeds()
     {
         var (hash, salt) = PasswordHasher.Hash("correct-password");
-        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, IsBanned: false, AccountGrade: 1);
+        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, false, 1);
         var accounts = FakeAccountRepository.WithAccount(account);
         var handler = CreateHandler(out var session, out var pipe, accounts);
 
@@ -259,7 +266,7 @@ public class LoginHandlerTests
     public async Task HandleAsync_NonGmAccount_MacEqualsPlaceholderLiteral_SendsInvalidDevicesResult()
     {
         var (hash, salt) = PasswordHasher.Hash("correct-password");
-        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, IsBanned: false, AccountGrade: 0);
+        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, false, 0);
         var accounts = FakeAccountRepository.WithAccount(account);
         var handler = CreateHandler(out var session, out var pipe, accounts);
 
@@ -277,7 +284,7 @@ public class LoginHandlerTests
     public async Task HandleAsync_NonGmAccount_AdapterGuidEqualsPlaceholderLiteral_SendsInvalidDevicesResult()
     {
         var (hash, salt) = PasswordHasher.Hash("correct-password");
-        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, IsBanned: false, AccountGrade: 0);
+        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, false, 0);
         var accounts = FakeAccountRepository.WithAccount(account);
         var handler = CreateHandler(out var session, out var pipe, accounts);
 
@@ -295,7 +302,7 @@ public class LoginHandlerTests
     public async Task HandleAsync_NonGmAccount_LoopbackRemoteIp_SendsInvalidDevicesResult()
     {
         var (hash, salt) = PasswordHasher.Hash("correct-password");
-        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, IsBanned: false, AccountGrade: 0);
+        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, false, 0);
         var accounts = FakeAccountRepository.WithAccount(account);
         var loopback = new IPEndPoint(IPAddress.Loopback, 40000);
         var handler = CreateHandler(out var session, out var pipe, accounts, remoteEndPoint: loopback);
@@ -312,7 +319,7 @@ public class LoginHandlerTests
     public async Task HandleAsync_NonGmAccount_RealDeviceTuple_Succeeds()
     {
         var (hash, salt) = PasswordHasher.Hash("correct-password");
-        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, IsBanned: false, AccountGrade: 0);
+        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, false, 0);
         var accounts = FakeAccountRepository.WithAccount(account);
         var handler = CreateHandler(out var session, out var pipe, accounts);
 
@@ -354,8 +361,10 @@ public class LoginHandlerTests
             eventLog ?? new FakeEventLogRepository()));
     }
 
-    /// <summary>Comfortably large cap, never maintenance/full -- the default for every test that isn't
-    /// specifically exercising the capacity gates themselves.</summary>
+    /// <summary>
+    ///     Comfortably large cap, never maintenance/full -- the default for every test that isn't
+    ///     specifically exercising the capacity gates themselves.
+    /// </summary>
     private static LoginCapacityState AllowedCapacity()
     {
         var state = new LoginCapacityState();
@@ -363,11 +372,6 @@ public class LoginHandlerTests
         state.SetCurrentPlayers(0);
         return state;
     }
-
-    // Realistic, non-placeholder default device tuple: a real client always has a non-zero-length MAC, so
-    // the anti-spoofing gate (cluster C09, DeviceSpoofingGuard) never trips unless a test deliberately
-    // asks for the zero-length-MAC or placeholder-literal edge cases it covers below.
-    private static readonly byte[] DefaultPhysicalAddress = ParseMac("11-22-33-44-55-66");
 
     private static LoginRequest ValidLoginRequest(string id = "someuser", string password = "irrelevant",
         byte[]? physicalAddress = null, string adapterName = "")

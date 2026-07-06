@@ -13,7 +13,7 @@ public class AvatarVitalsFloorTests
     [InlineData(100, 100)]
     public void Clamp_FloorsLifeToAtLeastOne(int storedLife, int expectedLife)
     {
-        var (life, _) = AvatarVitalsFloor.Clamp(storedLife, mana: 50);
+        var (life, _) = AvatarVitalsFloor.Clamp(storedLife, 50);
 
         Assert.Equal(expectedLife, life);
     }
@@ -25,7 +25,7 @@ public class AvatarVitalsFloorTests
     [InlineData(50, 50)]
     public void Clamp_FloorsManaToAtLeastZero(int storedMana, int expectedMana)
     {
-        var (_, mana) = AvatarVitalsFloor.Clamp(life: 100, storedMana);
+        var (_, mana) = AvatarVitalsFloor.Clamp(100, storedMana);
 
         Assert.Equal(expectedMana, mana);
     }
@@ -33,7 +33,7 @@ public class AvatarVitalsFloorTests
     [Fact]
     public void Clamp_BothAlreadyAboveFloor_ReturnsBothUnchanged()
     {
-        var result = AvatarVitalsFloor.Clamp(life: 850, mana: 320);
+        var result = AvatarVitalsFloor.Clamp(850, 320);
 
         Assert.Equal((850, 320), result);
     }
@@ -41,7 +41,7 @@ public class AvatarVitalsFloorTests
     [Fact]
     public void Clamp_BothBelowFloor_ClampsBothIndependently()
     {
-        var result = AvatarVitalsFloor.Clamp(life: -10, mana: -10);
+        var result = AvatarVitalsFloor.Clamp(-10, -10);
 
         Assert.Equal((1, 0), result);
     }

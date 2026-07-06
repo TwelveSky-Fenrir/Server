@@ -53,9 +53,9 @@ public class ZoneStunCombatTests
     {
         var skillsById = new Dictionary<int, SkillDefinition>
         {
-            [StunSkillId] = StunAttackSkill(StunSkillId, stunAttack: 50, runTime: 8),
-            [TeamStunSkillId] = StunAttackSkill(TeamStunSkillId, stunAttack: 10, runTime: 5),
-            [StunResistSkillId] = StunResistSkill(StunResistSkillId, stunDefense: 30)
+            [StunSkillId] = StunAttackSkill(StunSkillId, 50, 8),
+            [TeamStunSkillId] = StunAttackSkill(TeamStunSkillId, 10, 5),
+            [StunResistSkillId] = StunResistSkill(StunResistSkillId, 30)
         }.ToFrozenDictionary();
 
         return ZoneTestKit.EmptyWorldData(skillsById: skillsById);
@@ -178,7 +178,7 @@ public class ZoneStunCombatTests
         {
             AttackerCharacterId = curer.CharacterId,
             AttackInfo = StunRequest(curer.CharacterId, target.CharacterId, target.UniqueNumber,
-                usedSkillId: StunResistSkillId, usedSkillGradePoints: 20, mCase: 6)
+                StunResistSkillId, 20, 6)
         });
         zone.Tick(SimulationClock.LegacyTick);
 
@@ -200,7 +200,7 @@ public class ZoneStunCombatTests
         {
             AttackerCharacterId = curer.CharacterId,
             AttackInfo = StunRequest(curer.CharacterId, target.CharacterId, target.UniqueNumber,
-                usedSkillId: StunResistSkillId, usedSkillGradePoints: 20, mCase: 6)
+                StunResistSkillId, 20, 6)
         });
         zone.Tick(SimulationClock.LegacyTick);
 
@@ -296,7 +296,7 @@ public class ZoneStunCombatTests
         {
             AttackerCharacterId = attacker.CharacterId,
             AttackInfo = StunRequest(attacker.CharacterId, defender.CharacterId, defender.UniqueNumber,
-                usedSkillId: TeamStunSkillId, usedSkillGradePoints: 10)
+                TeamStunSkillId, 10)
         });
         zone.Tick(SimulationClock.LegacyTick);
 
@@ -319,7 +319,8 @@ public class ZoneStunCombatTests
         foreach (var memberId in memberIds)
         {
             var (session, _) = ZoneTestKit.CreateSession(memberId);
-            zone.Post(ZoneCommand.Enter(memberId, ZoneTestKit.EnterData(session, zone.MapId, $"Ally{memberId}", tribe: 0)));
+            zone.Post(ZoneCommand.Enter(memberId,
+                ZoneTestKit.EnterData(session, zone.MapId, $"Ally{memberId}", tribe: 0)));
         }
 
         zone.Tick(SimulationClock.LegacyTick);
@@ -345,7 +346,7 @@ public class ZoneStunCombatTests
         {
             AttackerCharacterId = attacker.CharacterId,
             AttackInfo = StunRequest(attacker.CharacterId, defender.CharacterId, defender.UniqueNumber,
-                usedSkillId: TeamStunSkillId, usedSkillGradePoints: 10)
+                TeamStunSkillId, 10)
         });
         zone.Tick(SimulationClock.LegacyTick);
 
@@ -369,7 +370,8 @@ public class ZoneStunCombatTests
         foreach (var memberId in memberIds)
         {
             var (session, _) = ZoneTestKit.CreateSession(memberId);
-            zone.Post(ZoneCommand.Enter(memberId, ZoneTestKit.EnterData(session, zone.MapId, $"Ally{memberId}", tribe: 0)));
+            zone.Post(ZoneCommand.Enter(memberId,
+                ZoneTestKit.EnterData(session, zone.MapId, $"Ally{memberId}", tribe: 0)));
         }
 
         zone.Tick(SimulationClock.LegacyTick);
@@ -389,7 +391,7 @@ public class ZoneStunCombatTests
         {
             AttackerCharacterId = attacker.CharacterId,
             AttackInfo = StunRequest(attacker.CharacterId, defender.CharacterId, defender.UniqueNumber,
-                usedSkillId: TeamStunSkillId, usedSkillGradePoints: 10)
+                TeamStunSkillId, 10)
         });
         zone.Tick(SimulationClock.LegacyTick);
 
@@ -424,9 +426,9 @@ public class ZoneStunCombatTests
         var zone = ZoneTestKit.CreateZone(1,
             worldData: ZoneTestKit.EmptyWorldData(skillsById: new Dictionary<int, SkillDefinition>
             {
-                [StunSkillId] = StunAttackSkill(StunSkillId, stunAttack: 50, runTime: 8),
-                [43] = StunResistSkill(43, stunDefense: 0), // weak block -- should win (slot 0)
-                [5] = StunResistSkill(5, stunDefense: 999) // strong block -- should be ignored (slot 1)
+                [StunSkillId] = StunAttackSkill(StunSkillId, 50, 8),
+                [43] = StunResistSkill(43, 0), // weak block -- should win (slot 0)
+                [5] = StunResistSkill(5, 999) // strong block -- should be ignored (slot 1)
             }.ToFrozenDictionary()), randomSource: new ScriptedRandomSource(10));
 
         var (_, attacker, defender) = EnterTwoPlayers(zone, 10, 0, 20, 1);

@@ -43,7 +43,7 @@ public class FriendServiceTests
         var zones = ZoneTestKit.CreateRegistry();
         zones.Initialize([]);
         var service = CreateService(zones, directory);
-        var asker = MakePlayer(1, "Asker", tribe: 0);
+        var asker = MakePlayer(1, "Asker", 0);
 
         var result = await service.LocateAsync(asker, 99, CancellationToken.None);
 
@@ -57,7 +57,7 @@ public class FriendServiceTests
         var zones = ZoneTestKit.CreateRegistry();
         zones.Initialize([]);
         var service = CreateService(zones, directory);
-        var asker = MakePlayer(1, "Asker", tribe: 0);
+        var asker = MakePlayer(1, "Asker", 0);
 
         var result = await service.LocateAsync(asker, 0, CancellationToken.None);
 
@@ -76,7 +76,7 @@ public class FriendServiceTests
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
         var service = CreateService(zones, directory);
-        var asker = MakePlayer(1, "Asker", tribe: 1);
+        var asker = MakePlayer(1, "Asker", 1);
         asker.Friends[0] = 2;
 
         var result = await service.LocateAsync(asker, 0, CancellationToken.None);
@@ -97,7 +97,7 @@ public class FriendServiceTests
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
         var service = CreateService(zones, directory);
-        var asker = MakePlayer(1, "Asker", tribe: 1);
+        var asker = MakePlayer(1, "Asker", 1);
         asker.Friends[0] = 2;
 
         var result = await service.LocateAsync(asker, 0, CancellationToken.None);
@@ -110,12 +110,12 @@ public class FriendServiceTests
     public async Task LocateAsync_SameShardMiss_FallsBackToDirectory_SameTribe_ReturnsMapId()
     {
         var directory = new FakeCharacterShardLocationRepository();
-        directory.Seed(new CharacterShardLocationDto(2, ShardId: 9, MapId: 77, AvatarName: "Friend", Tribe: 1,
-            LastSeenUtc: DateTime.UtcNow));
+        directory.Seed(new CharacterShardLocationDto(2, 9, 77, "Friend", 1,
+            DateTime.UtcNow));
         var zones = ZoneTestKit.CreateRegistry();
         zones.Initialize([]);
         var service = CreateService(zones, directory);
-        var asker = MakePlayer(1, "Asker", tribe: 1);
+        var asker = MakePlayer(1, "Asker", 1);
         asker.Friends[0] = 2;
 
         var result = await service.LocateAsync(asker, 0, CancellationToken.None);
@@ -125,15 +125,16 @@ public class FriendServiceTests
     }
 
     [Fact]
-    public async Task LocateAsync_SameShardMiss_FallsBackToDirectory_DifferentTribe_ReturnsNegativeOneWithoutASecondQuery()
+    public async Task
+        LocateAsync_SameShardMiss_FallsBackToDirectory_DifferentTribe_ReturnsNegativeOneWithoutASecondQuery()
     {
         var directory = new FakeCharacterShardLocationRepository();
-        directory.Seed(new CharacterShardLocationDto(2, ShardId: 9, MapId: 77, AvatarName: "Friend", Tribe: 3,
-            LastSeenUtc: DateTime.UtcNow));
+        directory.Seed(new CharacterShardLocationDto(2, 9, 77, "Friend", 3,
+            DateTime.UtcNow));
         var zones = ZoneTestKit.CreateRegistry();
         zones.Initialize([]);
         var service = CreateService(zones, directory);
-        var asker = MakePlayer(1, "Asker", tribe: 1);
+        var asker = MakePlayer(1, "Asker", 1);
         asker.Friends[0] = 2;
 
         var result = await service.LocateAsync(asker, 0, CancellationToken.None);
@@ -149,7 +150,7 @@ public class FriendServiceTests
         var zones = ZoneTestKit.CreateRegistry();
         zones.Initialize([]);
         var service = CreateService(zones, directory);
-        var asker = MakePlayer(1, "Asker", tribe: 1);
+        var asker = MakePlayer(1, "Asker", 1);
         asker.Friends[0] = 2;
 
         var result = await service.LocateAsync(asker, 0, CancellationToken.None);

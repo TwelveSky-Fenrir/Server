@@ -12,21 +12,21 @@ public class FourthFactionGateTests
     [InlineData(2)]
     public void BlocksCreation_TribeZeroToTwo_NeverBlocksRegardlessOfToggle(byte tribe)
     {
-        Assert.False(FourthFactionGate.BlocksCreation(tribe, enableFourthFaction: false));
-        Assert.False(FourthFactionGate.BlocksCreation(tribe, enableFourthFaction: true));
+        Assert.False(FourthFactionGate.BlocksCreation(tribe, false));
+        Assert.False(FourthFactionGate.BlocksCreation(tribe, true));
     }
 
     [Fact]
     public void BlocksCreation_TribeThree_ToggleInDefaultDisabledState_Blocks()
     {
         Assert.True(FourthFactionGate.BlocksCreation(FourthFactionGate.FourthFactionTribe,
-            enableFourthFaction: false));
+            false));
     }
 
     [Fact]
     public void BlocksCreation_TribeThree_ToggleOperatorEnabled_DoesNotBlock()
     {
         Assert.False(FourthFactionGate.BlocksCreation(FourthFactionGate.FourthFactionTribe,
-            enableFourthFaction: true));
+            true));
     }
 }

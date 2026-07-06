@@ -5,22 +5,6 @@ namespace Fenrir.Application.Game.Tests.World.WorldState;
 
 public class TribePointLevelRecomputeServiceTests
 {
-    private sealed class FakeRosterGateway : ITribePointRosterGateway
-    {
-        public IReadOnlyList<TribeRosterCharacterSnapshot>? Roster { get; set; } = [];
-        public bool Throw { get; set; }
-        public int CallCount { get; private set; }
-
-        public Task<IReadOnlyList<TribeRosterCharacterSnapshot>?> GetRosterAsync(CancellationToken ct)
-        {
-            CallCount++;
-            if (Throw)
-                throw new InvalidOperationException("simulated roster-read failure");
-
-            return Task.FromResult(Roster);
-        }
-    }
-
     private static (WorldStateService WorldState, FakeWorldStateRepository Repository) CreateInitializedWorldState()
     {
         var repository = new FakeWorldStateRepository();
@@ -115,5 +99,21 @@ public class TribePointLevelRecomputeServiceTests
         gateway.Roster = [];
         await service.RecomputeAsync(CancellationToken.None);
         Assert.Equal(1000, worldState.GetTribe(0).Points);
+    }
+
+    private sealed class FakeRosterGateway : ITribePointRosterGateway
+    {
+        public IReadOnlyList<TribeRosterCharacterSnapshot>? Roster { get; set; } = [];
+        public bool Throw { get; set; }
+        public int CallCount { get; private set; }
+
+        public Task<IReadOnlyList<TribeRosterCharacterSnapshot>?> GetRosterAsync(CancellationToken ct)
+        {
+            CallCount++;
+            if (Throw)
+                throw new InvalidOperationException("simulated roster-read failure");
+
+            return Task.FromResult(Roster);
+        }
     }
 }

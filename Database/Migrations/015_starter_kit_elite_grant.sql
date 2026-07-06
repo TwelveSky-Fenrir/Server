@@ -63,44 +63,47 @@ ALTER TABLE world.StarterKitEquipment
 GO
 
 ALTER TABLE game.Characters
-    ADD MountItemId      INT NOT NULL CONSTRAINT DF_Characters_MountItemId DEFAULT 0,      -- 0 = no mount; ANIMAL_NUM_TIGER1 (1301) once granted
+    ADD MountItemId INT NOT NULL CONSTRAINT DF_Characters_MountItemId DEFAULT 0,      -- 0 = no mount; ANIMAL_NUM_TIGER1 (1301) once granted
         MountExpActivity INT NOT NULL CONSTRAINT DF_Characters_MountExpActivity DEFAULT 0, -- aAnimalExpActivity[0]
         MountPower       INT NOT NULL CONSTRAINT DF_Characters_MountPower DEFAULT 0,       -- aAnimalPower[0]
         MountSlotIndex   INT NOT NULL CONSTRAINT DF_Characters_MountSlotIndex DEFAULT -1,  -- aAnimalIndex; -1 = none active
-        MountTime        INT NOT NULL CONSTRAINT DF_Characters_MountTime DEFAULT 0;        -- aAnimalTime
+        MountTime        INT NOT NULL CONSTRAINT DF_Characters_MountTime DEFAULT 0; -- aAnimalTime
 GO
 
 -- RawWeaponCode is NULL for the 5 unconditional per-race grants (Amulet/Armor/Gloves/Ring/Boots) and holds
 -- the raw client-selectable code for each of the 3 weapon alternatives per race -- CreateAvatarService
 -- validates the client's chosen code against this column, then grants THIS row's ItemId (the elite weapon),
 -- never the raw code itself.
-CREATE OR ALTER PROCEDURE world.usp_StarterKit_GetByPreviousTribe @PreviousTribe TINYINT, @MapId SMALLINT
-AS
+CREATE
+OR
+ALTER PROCEDURE world.usp_StarterKit_GetByPreviousTribe @PreviousTribe TINYINT, @MapId SMALLINT
+    AS
 BEGIN
-    SET NOCOUNT ON;
+    SET
+NOCOUNT ON;
 
-    SELECT EquipSlot, ItemId, RawWeaponCode
-    FROM world.StarterKitEquipment
-    WHERE PreviousTribe = @PreviousTribe
-    ORDER BY EquipSlot, ItemId;
+SELECT EquipSlot, ItemId, RawWeaponCode
+FROM world.StarterKitEquipment
+WHERE PreviousTribe = @PreviousTribe
+ORDER BY EquipSlot, ItemId;
 
-    SELECT SlotIndex, ItemId, Quantity
-    FROM world.StarterKitInventory
-    ORDER BY SlotIndex;
+SELECT SlotIndex, ItemId, Quantity
+FROM world.StarterKitInventory
+ORDER BY SlotIndex;
 
-    SELECT SlotIndex, SkillId, Grade
-    FROM world.StarterKitSkills
-    WHERE PreviousTribe = @PreviousTribe
-    ORDER BY SlotIndex;
+SELECT SlotIndex, SkillId, Grade
+FROM world.StarterKitSkills
+WHERE PreviousTribe = @PreviousTribe
+ORDER BY SlotIndex;
 
-    SELECT Page, KeyIndex, Sort, Value1, Value2
-    FROM world.StarterKitHotkeys
-    WHERE PreviousTribe = @PreviousTribe
-    ORDER BY Page, KeyIndex;
+SELECT Page, KeyIndex, Sort, Value1, Value2
+FROM world.StarterKitHotkeys
+WHERE PreviousTribe = @PreviousTribe
+ORDER BY Page, KeyIndex;
 
-    SELECT DefaultSpawnX, DefaultSpawnY, DefaultSpawnZ
-    FROM world.Zones
-    WHERE ZoneNumber = @MapId;
+SELECT DefaultSpawnX, DefaultSpawnY, DefaultSpawnZ
+FROM world.Zones
+WHERE ZoneNumber = @MapId;
 END;
 GO
 
@@ -109,40 +112,47 @@ GO
 -- -- see this migration file's own header comment for citations. @Equipment's Enchant/Combine columns now
 -- carry CreateAvatarService's SetISIUIMValue(45, 6, 0, 0) encoding for the 6 elite-gear categories; nothing
 -- else about this proc's shape changes.
-CREATE OR ALTER PROCEDURE game.usp_Character_CreateWithStarterKit
-    @AccountId               INT,
-    @Slot                    TINYINT,
-    @Name                    NVARCHAR(13),
-    @Tribe                   TINYINT,
-    @Gender                  TINYINT,
-    @HeadType                TINYINT,
-    @FaceType                TINYINT,
-    @MapId                   SMALLINT,
-    @PosX                    REAL,
-    @PosY                    REAL,
-    @PosZ                    REAL,
-    @Life                    INT,
-    @MaxLife                 INT,
-    @Mana                    INT,
-    @MaxMana                 INT,
-    @WelcomeBuffUntilDate    INT,
+CREATE
+OR
+ALTER PROCEDURE game.usp_Character_CreateWithStarterKit
+    @AccountId INT,
+    @Slot TINYINT,
+    @Name NVARCHAR(13),
+    @Tribe TINYINT,
+    @Gender TINYINT,
+    @HeadType TINYINT,
+    @FaceType TINYINT,
+    @MapId SMALLINT,
+    @PosX REAL,
+    @PosY REAL,
+    @PosZ REAL,
+    @Life INT,
+    @MaxLife INT,
+    @Mana INT,
+    @MaxMana INT,
+    @WelcomeBuffUntilDate INT,
     @PremiumUntilUnixSeconds BIGINT,
-    @Equipment               game.tvp_CharacterItemSlot READONLY,
-    @Inventory               game.tvp_CharacterItemSlot READONLY,
-    @Skills                  game.tvp_CharacterSkillSlot READONLY,
-    @Hotkeys                 game.tvp_CharacterHotkeySlot READONLY
-AS
+    @Equipment game.tvp_CharacterItemSlot READONLY,
+    @Inventory game.tvp_CharacterItemSlot READONLY,
+    @Skills game.tvp_CharacterSkillSlot READONLY,
+    @Hotkeys game.tvp_CharacterHotkeySlot READONLY
+    AS
 BEGIN
-    SET NOCOUNT ON;
-    SET XACT_ABORT ON;
+    SET
+NOCOUNT ON;
+    SET
+XACT_ABORT ON;
 
-    IF EXISTS (SELECT 1 FROM game.Characters WHERE AccountId = @AccountId AND Slot = @Slot)
+    IF
+EXISTS (SELECT 1 FROM game.Characters WHERE AccountId = @AccountId AND Slot = @Slot)
         THROW 50201, 'Character slot already occupied for this account.', 1;
 
-    IF EXISTS (SELECT 1 FROM game.Characters WHERE Name = @Name)
+    IF
+EXISTS (SELECT 1 FROM game.Characters WHERE Name = @Name)
         THROW 50202, 'Character name already taken.', 1;
 
-    DECLARE @CharacterId TABLE (CharacterId INT);
+    DECLARE
+@CharacterId TABLE (CharacterId INT);
 
     -- EU33 defaults: every stat starts at 1 (not the column default of 0); every new character is granted the
     -- same starter pet growth/activity (200% growth, full activity) and the same starting level/rebirth/
@@ -150,50 +160,68 @@ BEGIN
     -- file's own USE_CUSTOME_CREATE -- see this migration's header comment) regardless of tribe. The pet/cape
     -- item rows themselves travel in via @Equipment alongside the tribe's elite armor/gloves/boots/ring/
     -- amulet/weapon.
-    INSERT INTO game.Characters
-        (AccountId, Slot, Name, Tribe, Gender, HeadType, FaceType,
-         MapId, PosX, PosY, PosZ, Life, MaxLife, Mana, MaxMana,
-         StatVit, StatStr, StatInt, StatDex,
-         PetGrowth, PetActivity,
-         Level, Level2, RebirthCount, Experience, Exp2,
-         StatPoints, SkillPoints,
-         MountItemId, MountExpActivity, MountPower, MountSlotIndex, MountTime,
-         DoubleExpTime1, DoubleExpTime2, AutoBuffTime, PremiumExpireUtc)
-        OUTPUT INSERTED.CharacterId INTO @CharacterId
-    VALUES
-        (@AccountId, @Slot, @Name, @Tribe, @Gender, @HeadType, @FaceType,
-         @MapId, @PosX, @PosY, @PosZ, @Life, @MaxLife, @Mana, @MaxMana,
-         1, 1, 1, 1,
-         640000000, 100,
-         145, 12, 0, 2000000000, 0,
-         3175, 10000,
-         1301, 0, 5, 0, 99999999,
-         @WelcomeBuffUntilDate, @WelcomeBuffUntilDate, @WelcomeBuffUntilDate, @PremiumUntilUnixSeconds);
+INSERT INTO game.Characters
+(AccountId, Slot, Name, Tribe, Gender, HeadType, FaceType,
+ MapId, PosX, PosY, PosZ, Life, MaxLife, Mana, MaxMana,
+ StatVit, StatStr, StatInt, StatDex,
+ PetGrowth, PetActivity,
+ Level, Level2, RebirthCount, Experience, Exp2,
+ StatPoints, SkillPoints,
+ MountItemId, MountExpActivity, MountPower, MountSlotIndex, MountTime,
+ DoubleExpTime1, DoubleExpTime2, AutoBuffTime, PremiumExpireUtc)
+    OUTPUT INSERTED.CharacterId INTO @CharacterId
+VALUES
+    (@AccountId, @Slot, @Name, @Tribe, @Gender, @HeadType, @FaceType, @MapId, @PosX, @PosY, @PosZ, @Life, @MaxLife, @Mana, @MaxMana, 1, 1, 1, 1, 640000000, 100, 145, 12, 0, 2000000000, 0, 3175, 10000, 1301, 0, 5, 0, 99999999, @WelcomeBuffUntilDate, @WelcomeBuffUntilDate, @WelcomeBuffUntilDate, @PremiumUntilUnixSeconds);
 
-    DECLARE @NewCharacterId INT = (SELECT CharacterId FROM @CharacterId);
+DECLARE
+@NewCharacterId INT = (SELECT CharacterId FROM @CharacterId);
 
-    INSERT INTO game.CharacterItems
-        (CharacterId, Container, Slot, ItemId, Quantity, Enchant, Combine, Refine, Socket,
-         SocketGem1, SocketGem2, SocketGem3, ExpireDate, Serial)
-    SELECT @NewCharacterId, 2, Slot, ItemId, Quantity, Enchant, Combine, Refine, Socket,
-           SocketGem1, SocketGem2, SocketGem3, ExpireDate, Serial
-    FROM @Equipment;
+INSERT INTO game.CharacterItems
+(CharacterId, Container, Slot, ItemId, Quantity, Enchant, Combine, Refine, Socket,
+ SocketGem1, SocketGem2, SocketGem3, ExpireDate, Serial)
+SELECT @NewCharacterId,
+       2,
+       Slot,
+       ItemId,
+       Quantity,
+       Enchant,
+       Combine,
+       Refine,
+       Socket,
+       SocketGem1,
+       SocketGem2,
+       SocketGem3,
+       ExpireDate,
+       Serial
+FROM @Equipment;
 
-    INSERT INTO game.CharacterItems
-        (CharacterId, Container, Slot, ItemId, Quantity, Enchant, Combine, Refine, Socket,
-         SocketGem1, SocketGem2, SocketGem3, ExpireDate, Serial)
-    SELECT @NewCharacterId, 0, Slot, ItemId, Quantity, Enchant, Combine, Refine, Socket,
-           SocketGem1, SocketGem2, SocketGem3, ExpireDate, Serial
-    FROM @Inventory;
+INSERT INTO game.CharacterItems
+(CharacterId, Container, Slot, ItemId, Quantity, Enchant, Combine, Refine, Socket,
+ SocketGem1, SocketGem2, SocketGem3, ExpireDate, Serial)
+SELECT @NewCharacterId,
+       0,
+       Slot,
+       ItemId,
+       Quantity,
+       Enchant,
+       Combine,
+       Refine,
+       Socket,
+       SocketGem1,
+       SocketGem2,
+       SocketGem3,
+       ExpireDate,
+       Serial
+FROM @Inventory;
 
-    INSERT INTO game.CharacterSkills (CharacterId, SlotIndex, SkillId, Grade)
-    SELECT @NewCharacterId, SlotIndex, SkillId, Grade
-    FROM @Skills;
+INSERT INTO game.CharacterSkills (CharacterId, SlotIndex, SkillId, Grade)
+SELECT @NewCharacterId, SlotIndex, SkillId, Grade
+FROM @Skills;
 
-    INSERT INTO game.CharacterHotkeys (CharacterId, Page, KeyIndex, Sort, Value1, Value2)
-    SELECT @NewCharacterId, Page, KeyIndex, Sort, Value1, Value2
-    FROM @Hotkeys;
+INSERT INTO game.CharacterHotkeys (CharacterId, Page, KeyIndex, Sort, Value1, Value2)
+SELECT @NewCharacterId, Page, KeyIndex, Sort, Value1, Value2
+FROM @Hotkeys;
 
-    SELECT @NewCharacterId AS CharacterId;
+SELECT @NewCharacterId AS CharacterId;
 END;
 GO

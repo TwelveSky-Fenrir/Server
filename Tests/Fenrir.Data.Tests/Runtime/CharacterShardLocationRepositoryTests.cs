@@ -51,7 +51,7 @@ public sealed class CharacterShardLocationRepositoryTests : IDisposable
         const int characterId = 900210;
         await HeartbeatAsync(shardId);
 
-        await _repository.UpsertAsync(characterId, shardId, mapId: 42, avatarName: "ShardLoc210", tribe: 2,
+        await _repository.UpsertAsync(characterId, shardId, 42, "ShardLoc210", 2,
             CancellationToken.None);
 
         var row = await _repository.FindByCharacterIdAsync(characterId, CancellationToken.None);
@@ -71,7 +71,7 @@ public sealed class CharacterShardLocationRepositoryTests : IDisposable
         const int characterId = 900211;
         await HeartbeatAsync(shardId);
 
-        await _repository.UpsertAsync(characterId, shardId, mapId: 7, avatarName: "ShardLoc211", tribe: 0,
+        await _repository.UpsertAsync(characterId, shardId, 7, "ShardLoc211", 0,
             CancellationToken.None);
 
         var row = await _repository.FindByNameAsync("ShardLoc211", CancellationToken.None);
@@ -88,9 +88,9 @@ public sealed class CharacterShardLocationRepositoryTests : IDisposable
         const int characterId = 900212;
         await HeartbeatAsync(shardId);
 
-        await _repository.UpsertAsync(characterId, shardId, mapId: 1, avatarName: "ShardLoc212Old", tribe: 0,
+        await _repository.UpsertAsync(characterId, shardId, 1, "ShardLoc212Old", 0,
             CancellationToken.None);
-        await _repository.UpsertAsync(characterId, shardId, mapId: 2, avatarName: "ShardLoc212New", tribe: 1,
+        await _repository.UpsertAsync(characterId, shardId, 2, "ShardLoc212New", 1,
             CancellationToken.None);
 
         var row = await _repository.FindByCharacterIdAsync(characterId, CancellationToken.None);
@@ -113,10 +113,10 @@ public sealed class CharacterShardLocationRepositoryTests : IDisposable
         await HeartbeatAsync(originalShardId);
         await HeartbeatAsync(newShardId);
 
-        await _repository.UpsertAsync(characterId, originalShardId, mapId: 1, avatarName: "ShardLoc213", tribe: 0,
+        await _repository.UpsertAsync(characterId, originalShardId, 1, "ShardLoc213", 0,
             CancellationToken.None);
         // Character reconnected to a different shard, whose own EnterWorldService already upserted the fresh row.
-        await _repository.UpsertAsync(characterId, newShardId, mapId: 2, avatarName: "ShardLoc213", tribe: 0,
+        await _repository.UpsertAsync(characterId, newShardId, 2, "ShardLoc213", 0,
             CancellationToken.None);
 
         // A stale disconnect-cleanup from the ORIGINAL shard arrives late -- must be scoped away, not delete
@@ -134,7 +134,7 @@ public sealed class CharacterShardLocationRepositoryTests : IDisposable
         const byte shardId = 215;
         const int characterId = 900215;
         await HeartbeatAsync(shardId);
-        await _repository.UpsertAsync(characterId, shardId, mapId: 1, avatarName: "ShardLoc215", tribe: 0,
+        await _repository.UpsertAsync(characterId, shardId, 1, "ShardLoc215", 0,
             CancellationToken.None);
 
         await _repository.RemoveAsync(characterId, shardId, CancellationToken.None);
@@ -156,8 +156,8 @@ public sealed class CharacterShardLocationRepositoryTests : IDisposable
         const byte neverHeartbeatedShardId = 216;
         const int characterId = 900216;
 
-        await _repository.UpsertAsync(characterId, neverHeartbeatedShardId, mapId: 1, avatarName: "ShardLoc216",
-            tribe: 0, CancellationToken.None);
+        await _repository.UpsertAsync(characterId, neverHeartbeatedShardId, 1, "ShardLoc216",
+            0, CancellationToken.None);
 
         Assert.Null(await _repository.FindByCharacterIdAsync(characterId, CancellationToken.None));
     }

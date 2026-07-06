@@ -22,20 +22,20 @@ namespace Fenrir.Application.Game.Domain.World;
 /// </summary>
 public sealed class ZoneRegistry
 {
+    private readonly ICharacterShardLocationRepository? _characterShardLocations;
     private readonly DirtyTracker<int> _dirtyTracker;
+    private readonly DuelRegistry? _duelRegistry;
+    private readonly HeroRankPointAccumulator? _heroRankPointAccumulator;
     private readonly KillCooldownTracker _killCooldownTracker;
     private readonly MovementRules _movementRules;
     private readonly GameServerOptions _options;
+    private readonly PartyRegistry? _partyRegistry;
     private readonly QuestCatalog _questCatalog;
     private readonly ImmutableArray<ISimulationSystem> _systems;
     private readonly TowerWarState? _towerWar;
     private readonly WorldDataCache _worldData;
     private readonly WorldStateService? _worldState;
     private readonly ILogger<Zone> _zoneLogger;
-    private readonly PartyRegistry? _partyRegistry;
-    private readonly DuelRegistry? _duelRegistry;
-    private readonly HeroRankPointAccumulator? _heroRankPointAccumulator;
-    private readonly ICharacterShardLocationRepository? _characterShardLocations;
     private FrozenDictionary<short, Zone> _zones = FrozenDictionary<short, Zone>.Empty;
 
     public ZoneRegistry(IOptions<GameServerOptions> options, MovementRules movementRules,

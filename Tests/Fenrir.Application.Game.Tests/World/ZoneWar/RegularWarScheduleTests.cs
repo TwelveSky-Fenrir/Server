@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 
 namespace Fenrir.Application.Game.Tests.World.ZoneWar;
@@ -43,10 +42,11 @@ public class RegularWarScheduleTests
         var snapshot = preWarSnapshot ?? Present(4, 1, 1, 1, 1);
 
         var totalTicks = RegularWarSchedule.CooldownTicks +
-                          RegularWarSchedule.CountdownAnnounceStartValue * RegularWarSchedule.CountdownAnnounceIntervalTicks +
-                          RegularWarSchedule.FinalWaitTicks +
-                          RegularWarSchedule.OpenGateTicks +
-                          RegularWarSchedule.PreWarTicks;
+                         RegularWarSchedule.CountdownAnnounceStartValue *
+                         RegularWarSchedule.CountdownAnnounceIntervalTicks +
+                         RegularWarSchedule.FinalWaitTicks +
+                         RegularWarSchedule.OpenGateTicks +
+                         RegularWarSchedule.PreWarTicks;
 
         RegularWarTickResult last = default;
         for (var i = 0; i < totalTicks; i++)
@@ -111,7 +111,8 @@ public class RegularWarScheduleTests
         var schedule = new RegularWarSchedule(OrdinaryMap);
         var snapshot = Present(0);
         var idleTotal = RegularWarSchedule.CooldownTicks +
-                        RegularWarSchedule.CountdownAnnounceStartValue * RegularWarSchedule.CountdownAnnounceIntervalTicks +
+                        RegularWarSchedule.CountdownAnnounceStartValue *
+                        RegularWarSchedule.CountdownAnnounceIntervalTicks +
                         RegularWarSchedule.FinalWaitTicks;
 
         TickMany(schedule, idleTotal, snapshot);
@@ -128,12 +129,13 @@ public class RegularWarScheduleTests
     public void PreWar_OnServer160Only_FlagsTheSmallestPresentTribe()
     {
         var schedule = new RegularWarSchedule(SmallestTribeMap);
-        var snapshot = Present(6, 3, 1, 2, 0);
+        var snapshot = Present(6, 3, 1, 2);
         var preWarTotal = RegularWarSchedule.CooldownTicks +
-                           RegularWarSchedule.CountdownAnnounceStartValue * RegularWarSchedule.CountdownAnnounceIntervalTicks +
-                           RegularWarSchedule.FinalWaitTicks +
-                           RegularWarSchedule.OpenGateTicks +
-                           RegularWarSchedule.PreWarTicks;
+                          RegularWarSchedule.CountdownAnnounceStartValue *
+                          RegularWarSchedule.CountdownAnnounceIntervalTicks +
+                          RegularWarSchedule.FinalWaitTicks +
+                          RegularWarSchedule.OpenGateTicks +
+                          RegularWarSchedule.PreWarTicks;
 
         var last = TickMany(schedule, preWarTotal, snapshot);
 
@@ -145,12 +147,13 @@ public class RegularWarScheduleTests
     public void PreWar_OnAnyOtherMap_NeverFlagsASmallestTribe()
     {
         var fresh = new RegularWarSchedule(OrdinaryMap);
-        var snapshot = Present(6, 3, 1, 2, 0);
+        var snapshot = Present(6, 3, 1, 2);
         var preWarTotal = RegularWarSchedule.CooldownTicks +
-                           RegularWarSchedule.CountdownAnnounceStartValue * RegularWarSchedule.CountdownAnnounceIntervalTicks +
-                           RegularWarSchedule.FinalWaitTicks +
-                           RegularWarSchedule.OpenGateTicks +
-                           RegularWarSchedule.PreWarTicks;
+                          RegularWarSchedule.CountdownAnnounceStartValue *
+                          RegularWarSchedule.CountdownAnnounceIntervalTicks +
+                          RegularWarSchedule.FinalWaitTicks +
+                          RegularWarSchedule.OpenGateTicks +
+                          RegularWarSchedule.PreWarTicks;
 
         var last = TickMany(fresh, preWarTotal, snapshot);
 
@@ -175,7 +178,7 @@ public class RegularWarScheduleTests
     {
         var schedule = AdvanceToActive(OrdinaryMap);
 
-        var result = TickMany(schedule, RegularWarSchedule.ActiveEvaluationCadenceTicks, Present(4, 2, 2, 0, 0));
+        var result = TickMany(schedule, RegularWarSchedule.ActiveEvaluationCadenceTicks, Present(4, 2, 2));
 
         Assert.Null(result.Outcome);
         Assert.Equal(RegularWarPhase.Active, schedule.Phase);
@@ -189,7 +192,7 @@ public class RegularWarScheduleTests
         var schedule = AdvanceToActive(OrdinaryMap);
 
         // Only tribe 2 is present -- immediate elimination win, independent of the kill tally.
-        var result = TickMany(schedule, RegularWarSchedule.ActiveEvaluationCadenceTicks, Present(3, 0, 0, 3, 0));
+        var result = TickMany(schedule, RegularWarSchedule.ActiveEvaluationCadenceTicks, Present(3, 0, 0, 3));
 
         Assert.Equal(RegularWarOutcome.TribeWin, result.Outcome);
         Assert.Equal((byte)2, result.WinningTribe);
@@ -202,7 +205,7 @@ public class RegularWarScheduleTests
         var schedule = AdvanceToActive(OrdinaryMap);
 
         // 2 untribed characters remain -- map is not empty, but no tribe has any presence.
-        var result = TickMany(schedule, RegularWarSchedule.ActiveEvaluationCadenceTicks, Present(2, 0, 0, 0, 0));
+        var result = TickMany(schedule, RegularWarSchedule.ActiveEvaluationCadenceTicks, Present(2));
 
         Assert.Equal(RegularWarOutcome.Draw, result.Outcome);
         Assert.Null(result.WinningTribe);
@@ -214,14 +217,14 @@ public class RegularWarScheduleTests
         var schedule = new RegularWarSchedule(OrdinaryMap);
 
         // Outside Active entirely -- never counts.
-        schedule.RegisterKill(killerTribe: 1, killerCharacterId: 100);
+        schedule.RegisterKill(1, 100);
         Assert.Equal(0, schedule.GetTribeKillTally(1));
 
         AdvanceInPlace(schedule);
 
-        schedule.RegisterKill(killerTribe: 1, killerCharacterId: 100);
-        schedule.RegisterKill(killerTribe: 1, killerCharacterId: 100);
-        schedule.RegisterKill(killerTribe: 2, killerCharacterId: 200);
+        schedule.RegisterKill(1, 100);
+        schedule.RegisterKill(1, 100);
+        schedule.RegisterKill(2, 200);
 
         Assert.Equal(2, schedule.GetTribeKillTally(1));
         Assert.Equal(1, schedule.GetTribeKillTally(2));
@@ -234,7 +237,8 @@ public class RegularWarScheduleTests
         {
             var snapshot = Present(4, 1, 1, 1, 1);
             var total = RegularWarSchedule.CooldownTicks +
-                        RegularWarSchedule.CountdownAnnounceStartValue * RegularWarSchedule.CountdownAnnounceIntervalTicks +
+                        RegularWarSchedule.CountdownAnnounceStartValue *
+                        RegularWarSchedule.CountdownAnnounceIntervalTicks +
                         RegularWarSchedule.FinalWaitTicks +
                         RegularWarSchedule.OpenGateTicks +
                         RegularWarSchedule.PreWarTicks;
@@ -249,11 +253,11 @@ public class RegularWarScheduleTests
         var schedule = AdvanceToActive(OrdinaryMap);
 
         for (var i = 0; i < 5; i++)
-            schedule.RegisterKill(killerTribe: 0, killerCharacterId: 10 + i);
-        schedule.RegisterKill(killerTribe: 1, killerCharacterId: 999);
+            schedule.RegisterKill(0, 10 + i);
+        schedule.RegisterKill(1, 999);
 
         // 2+ tribes present throughout so the elimination path never preempts the timeout comparison.
-        var result = TickMany(schedule, RegularWarSchedule.ActiveWarDurationTicks, Present(4, 2, 2, 0, 0));
+        var result = TickMany(schedule, RegularWarSchedule.ActiveWarDurationTicks, Present(4, 2, 2));
 
         Assert.Equal(RegularWarOutcome.TribeWin, result.Outcome);
         Assert.Equal((byte)0, result.WinningTribe);
@@ -265,10 +269,10 @@ public class RegularWarScheduleTests
     {
         var schedule = AdvanceToActive(OrdinaryMap);
 
-        schedule.RegisterKill(killerTribe: 0, killerCharacterId: 1);
-        schedule.RegisterKill(killerTribe: 1, killerCharacterId: 2);
+        schedule.RegisterKill(0, 1);
+        schedule.RegisterKill(1, 2);
 
-        var result = TickMany(schedule, RegularWarSchedule.ActiveWarDurationTicks, Present(4, 2, 2, 0, 0));
+        var result = TickMany(schedule, RegularWarSchedule.ActiveWarDurationTicks, Present(4, 2, 2));
 
         Assert.Equal(RegularWarOutcome.Draw, result.Outcome);
         Assert.Null(result.WinningTribe);
@@ -279,7 +283,7 @@ public class RegularWarScheduleTests
     {
         var schedule = AdvanceToActive(OrdinaryMap);
 
-        var result = TickMany(schedule, RegularWarSchedule.ActiveWarDurationTicks, Present(4, 2, 2, 0, 0));
+        var result = TickMany(schedule, RegularWarSchedule.ActiveWarDurationTicks, Present(4, 2, 2));
 
         Assert.Equal(RegularWarOutcome.Draw, result.Outcome);
         Assert.Null(result.WinningTribe);
@@ -290,17 +294,17 @@ public class RegularWarScheduleTests
     {
         var ordinary = AdvanceToActive(OrdinaryMap);
         var ordinaryResult = TickMany(ordinary, RegularWarSchedule.ActiveEvaluationCadenceTicks,
-            Present(3, 0, 0, 3, 0));
+            Present(3, 0, 0, 3));
         Assert.True(ordinaryResult.MonstersShouldDespawn);
         Assert.False(ordinaryResult.BossMonstersShouldSpawn); // not the boss-war map
 
         var boss = AdvanceToActive(BossWarMap);
-        var bossWinResult = TickMany(boss, RegularWarSchedule.ActiveEvaluationCadenceTicks, Present(3, 0, 0, 3, 0));
+        var bossWinResult = TickMany(boss, RegularWarSchedule.ActiveEvaluationCadenceTicks, Present(3, 0, 0, 3));
         Assert.Equal(RegularWarOutcome.TribeWin, bossWinResult.Outcome);
         Assert.True(bossWinResult.BossMonstersShouldSpawn);
 
         var bossDraw = AdvanceToActive(BossWarMap);
-        var bossDrawResult = TickMany(bossDraw, RegularWarSchedule.ActiveEvaluationCadenceTicks, Present(2, 0, 0, 0, 0));
+        var bossDrawResult = TickMany(bossDraw, RegularWarSchedule.ActiveEvaluationCadenceTicks, Present(2));
         Assert.Equal(RegularWarOutcome.Draw, bossDrawResult.Outcome);
         Assert.False(bossDrawResult.BossMonstersShouldSpawn); // draw never spawns the boss
     }
@@ -309,7 +313,7 @@ public class RegularWarScheduleTests
     public void PostWarCleanup_OrdinaryMap_WaitsThenForcedReset_ThenDisconnectsAfterTwelveTicks_ThenBackToIdle()
     {
         var schedule = AdvanceToActive(OrdinaryMap);
-        TickMany(schedule, RegularWarSchedule.ActiveEvaluationCadenceTicks, Present(3, 0, 0, 3, 0)); // conclude
+        TickMany(schedule, RegularWarSchedule.ActiveEvaluationCadenceTicks, Present(3, 0, 0, 3)); // conclude
         Assert.Equal(RegularWarPhase.PostWarCleanup, schedule.Phase);
 
         var empty = Present(0);
@@ -333,10 +337,10 @@ public class RegularWarScheduleTests
     public void PostWarCleanup_BossMap_BossAlreadyGone_OnlyWaitsBaseAndConfirmedAbsence()
     {
         var schedule = AdvanceToActive(BossWarMap);
-        TickMany(schedule, RegularWarSchedule.ActiveEvaluationCadenceTicks, Present(3, 0, 0, 3, 0)); // TribeWin
+        TickMany(schedule, RegularWarSchedule.ActiveEvaluationCadenceTicks, Present(3, 0, 0, 3)); // TribeWin
         Assert.Equal(RegularWarPhase.PostWarCleanup, schedule.Phase);
 
-        var bossGone = new RegularWarEnvironmentSnapshot(1, [0, 0, 1, 0], BossMonsterAlive: false);
+        var bossGone = new RegularWarEnvironmentSnapshot(1, [0, 0, 1, 0]);
 
         // Base wait (180) -- boss already reported gone, so confirmed-absence starts immediately at tick 180.
         TickMany(schedule, RegularWarSchedule.PostWarCleanupTicks - 1, bossGone);
@@ -357,9 +361,9 @@ public class RegularWarScheduleTests
     public void PostWarCleanup_BossMap_BossAliveTheWholeMaxPoll_EventuallyTimesOutIntoConfirmedAbsence()
     {
         var schedule = AdvanceToActive(BossWarMap);
-        TickMany(schedule, RegularWarSchedule.ActiveEvaluationCadenceTicks, Present(3, 0, 0, 3, 0)); // TribeWin
+        TickMany(schedule, RegularWarSchedule.ActiveEvaluationCadenceTicks, Present(3, 0, 0, 3)); // TribeWin
 
-        var bossAlive = new RegularWarEnvironmentSnapshot(1, [0, 0, 1, 0], BossMonsterAlive: true);
+        var bossAlive = new RegularWarEnvironmentSnapshot(1, [0, 0, 1, 0], true);
 
         // Base wait + the full poll window -- boss never dies, poll simply exhausts.
         TickMany(schedule, RegularWarSchedule.PostWarCleanupTicks + RegularWarSchedule.BossPollMaxTicks, bossAlive);
@@ -376,9 +380,9 @@ public class RegularWarScheduleTests
     public void LeaderboardAndKillTally_AreClearedOnlyAtTheNextCooldownElapse()
     {
         var schedule = AdvanceToActive(OrdinaryMap);
-        schedule.RegisterKill(killerTribe: 0, killerCharacterId: 42);
+        schedule.RegisterKill(0, 42);
 
-        TickMany(schedule, RegularWarSchedule.ActiveEvaluationCadenceTicks, Present(3, 3, 0, 0, 0)); // conclude
+        TickMany(schedule, RegularWarSchedule.ActiveEvaluationCadenceTicks, Present(3, 3)); // conclude
         TickMany(schedule, RegularWarSchedule.PostWarCleanupTicks, Present(0)); // -> ForcedReset
         TickMany(schedule, RegularWarSchedule.ForcedResetDisconnectAtTicks, Present(0)); // -> Idle
 
@@ -397,10 +401,11 @@ public class RegularWarScheduleTests
         var fresh = new RegularWarSchedule(SmallestTribeMap);
         var snapshot = Present(4, 1, 1, 5, 5); // tribes 0 and 1 tie at the smallest count (1)
         var preWarTotal = RegularWarSchedule.CooldownTicks +
-                           RegularWarSchedule.CountdownAnnounceStartValue * RegularWarSchedule.CountdownAnnounceIntervalTicks +
-                           RegularWarSchedule.FinalWaitTicks +
-                           RegularWarSchedule.OpenGateTicks +
-                           RegularWarSchedule.PreWarTicks;
+                          RegularWarSchedule.CountdownAnnounceStartValue *
+                          RegularWarSchedule.CountdownAnnounceIntervalTicks +
+                          RegularWarSchedule.FinalWaitTicks +
+                          RegularWarSchedule.OpenGateTicks +
+                          RegularWarSchedule.PreWarTicks;
 
         RegularWarTickResult last = default;
         for (var i = 0; i < preWarTotal; i++)

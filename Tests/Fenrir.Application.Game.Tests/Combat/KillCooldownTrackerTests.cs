@@ -44,7 +44,7 @@ public class KillCooldownTrackerTests
         tracker.TryRegisterKill(1, 2, Epoch);
 
         var afterCooldown = tracker.TryRegisterKill(1, 2, Epoch + KillCooldownTracker.DefaultCooldown +
-            TimeSpan.FromSeconds(1));
+                                                          TimeSpan.FromSeconds(1));
         Assert.True(afterCooldown);
 
         // the window re-armed against the SECOND grant, not the first

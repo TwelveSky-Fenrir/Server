@@ -105,8 +105,8 @@ public static class RegularWarMapCatalog
             builder.Add(new RegularWarMapConfig(
                 mapId,
                 slot,
-                IsBossWar: mapId == 295,
-                AnnouncesSmallestPresentTribe: mapId == 160,
+                mapId == 295,
+                mapId == 160,
                 cpBonus));
         }
 

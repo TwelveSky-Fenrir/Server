@@ -52,7 +52,7 @@ public class StatAllocationServiceTests
     [Fact]
     public async Task SmallFixedCategory_Succeeds_CreditsStrength_DebitsOnePoint_AndRecomputesStats()
     {
-        var (zone, state, worldData) = Setup(statPoints: 5, statStr: 1);
+        var (zone, state, worldData) = Setup(5, statStr: 1);
         var service = CreateService(worldData);
 
         var result = await service.AllocateStatPointAsync(1, 0, zone, state, CharacterId, CancellationToken.None);
@@ -69,7 +69,7 @@ public class StatAllocationServiceTests
     [Fact]
     public async Task VariableCategory_Succeeds_CreditsVitalityByRequestedAmount_AndDebitsSameAmount()
     {
-        var (zone, state, worldData) = Setup(statPoints: 10, statVit: 3);
+        var (zone, state, worldData) = Setup(10, 3);
         var service = CreateService(worldData);
 
         var result = await service.AllocateStatPointAsync(11, 7, zone, state, CharacterId, CancellationToken.None);
@@ -84,7 +84,7 @@ public class StatAllocationServiceTests
     [Fact]
     public async Task LargeFixedCategory_InsufficientBalance_Aborts_AndDoesNotMutate()
     {
-        var (zone, state, worldData) = Setup(statPoints: 4, statInt: 1);
+        var (zone, state, worldData) = Setup(4, statInt: 1);
         var service = CreateService(worldData);
 
         var result = await service.AllocateStatPointAsync(8, 0, zone, state, CharacterId, CancellationToken.None);
@@ -99,7 +99,7 @@ public class StatAllocationServiceTests
     [Fact]
     public async Task CategoryOutsideLegalRange_Aborts_AndDoesNotMutate()
     {
-        var (zone, state, worldData) = Setup(statPoints: 1_000_000);
+        var (zone, state, worldData) = Setup(1_000_000);
         var service = CreateService(worldData);
 
         var result = await service.AllocateStatPointAsync(13, 50, zone, state, CharacterId, CancellationToken.None);

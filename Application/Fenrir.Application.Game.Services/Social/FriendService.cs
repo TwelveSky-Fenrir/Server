@@ -6,7 +6,10 @@ using Fenrir.Network.Serialization.Packets.Zone;
 namespace Fenrir.Application.Game.Services.Social;
 
 /// <inheritdoc cref="IFriendService" />
-public sealed class FriendService(ZoneRegistry zones, FriendRegistry friends, IFriendRepository repository,
+public sealed class FriendService(
+    ZoneRegistry zones,
+    FriendRegistry friends,
+    IFriendRepository repository,
     ICharacterShardLocationRepository characterShardLocations)
     : IFriendService
 {

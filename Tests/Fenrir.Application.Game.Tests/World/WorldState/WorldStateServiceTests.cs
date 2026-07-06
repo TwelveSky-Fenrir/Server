@@ -187,8 +187,8 @@ public class WorldStateServiceTests
         service.ResolveTribeSymbol(1, 3);
 
         Assert.Contains(logger.Entries, e => e.Level == LogLevel.Information &&
-                                              e.Message.Contains("slot 1", StringComparison.Ordinal) &&
-                                              e.Message.Contains("winner=3", StringComparison.Ordinal));
+                                             e.Message.Contains("slot 1", StringComparison.Ordinal) &&
+                                             e.Message.Contains("winner=3", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -199,7 +199,7 @@ public class WorldStateServiceTests
         service.ResolveMonsterSymbol(2);
 
         Assert.Contains(logger.Entries, e => e.Level == LogLevel.Information &&
-                                              e.Message.Contains("winner=2", StringComparison.Ordinal));
+                                             e.Message.Contains("winner=2", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -371,7 +371,8 @@ public class WorldStateServiceTests
     }
 
     [Fact]
-    public async Task FlushIfDirtyAsync_WhenPointsAreDirty_CallsAddTribePointsAsync_WithTheSummedDelta_NotTheAbsoluteValue()
+    public async Task
+        FlushIfDirtyAsync_WhenPointsAreDirty_CallsAddTribePointsAsync_WithTheSummedDelta_NotTheAbsoluteValue()
     {
         var (service, repository) = CreateInitialized();
         service.AddTribePoints(1, 10);
@@ -508,71 +509,6 @@ public class WorldStateServiceTests
         await service.ReconcileAsync(CancellationToken.None); // must not throw despite never having initialized
     }
 
-    /// <summary>
-    ///     Wraps a plain <see cref="FakeWorldStateRepository" /> (composition, not inheritance -- the fake is
-    ///     sealed) and mutates the service's own WorldState mid-<see cref="GetAsync" />, simulating a race with
-    ///     <see cref="WorldStateService.ReconcileAsync" />'s own read.
-    /// </summary>
-    private sealed class RaceOnGetAsyncRepository : IWorldStateRepository
-    {
-        private readonly FakeWorldStateRepository _inner = new();
-
-        public WorldStateService? ServiceUnderTest { get; set; }
-
-        public WorldStateRowDto Row
-        {
-            get => _inner.Row;
-            set => _inner.Row = value;
-        }
-
-        public ValueTask EnsureInitializedAsync(CancellationToken ct) => _inner.EnsureInitializedAsync(ct);
-
-        public async ValueTask<(WorldStateRowDto? Row, ReadOnlyCollection<WorldStateTribeDto> Tribes,
-                ReadOnlyCollection<WorldStateAllianceOfferDto> AllianceOffers)>
-            GetAsync(CancellationToken ct)
-        {
-            // Null during the service's own InitializeAsync (set only afterward, by the test) -- the race
-            // being simulated is specifically with ReconcileAsync's own read, not the boot-time load.
-            ServiceUnderTest?.SetZone038Winner(3);
-            return await _inner.GetAsync(ct);
-        }
-
-        public ValueTask UpdateAsync(byte? zone038WinTribe, int? zone038WinTribeTime, bool tribeSymbolBattle,
-            byte? monsterSymbol, int? monsterSymbolEndTime, byte? highTribe, short updateTribePoint,
-            CancellationToken ct) =>
-            _inner.UpdateAsync(zone038WinTribe, zone038WinTribeTime, tribeSymbolBattle, monsterSymbol,
-                monsterSymbolEndTime, highTribe, updateTribePoint, ct);
-
-        public ValueTask UpdateTribeAsync(byte tribeId, DateTime? symbolDate, bool hasSymbol, int points,
-            bool isClosed, CancellationToken ct) =>
-            _inner.UpdateTribeAsync(tribeId, symbolDate, hasSymbol, points, isClosed, ct);
-
-        public ValueTask UpdateTribeSymbolStateAsync(byte tribeId, DateTime? symbolDate, bool hasSymbol,
-            bool isClosed, CancellationToken ct) =>
-            _inner.UpdateTribeSymbolStateAsync(tribeId, symbolDate, hasSymbol, isClosed, ct);
-
-        public ValueTask AddTribePointsAsync(byte tribeId, int delta, CancellationToken ct) =>
-            _inner.AddTribePointsAsync(tribeId, delta, ct);
-
-        public ValueTask SetAllianceOfferAsync(byte fromTribeId, byte toTribeId, bool isAccepted,
-            CancellationToken ct) =>
-            _inner.SetAllianceOfferAsync(fromTribeId, toTribeId, isAccepted, ct);
-
-        public ValueTask<ReadOnlyCollection<TribeVoteDto>> GetTribeVotesAsync(byte tribeId, CancellationToken ct) =>
-            _inner.GetTribeVotesAsync(tribeId, ct);
-
-        public ValueTask RegisterTribeVoteCandidateAsync(byte tribeId, byte slotIndex, int candidateCharacterId,
-            short candidateLevel, int killOtherTribeCount, CancellationToken ct) =>
-            _inner.RegisterTribeVoteCandidateAsync(tribeId, slotIndex, candidateCharacterId, candidateLevel,
-                killOtherTribeCount, ct);
-
-        public ValueTask AddTribeVotePointsAsync(byte tribeId, byte slotIndex, int points, CancellationToken ct) =>
-            _inner.AddTribeVotePointsAsync(tribeId, slotIndex, points, ct);
-
-        public ValueTask ClearTribeVotesAsync(byte tribeId, CancellationToken ct) =>
-            _inner.ClearTribeVotesAsync(tribeId, ct);
-    }
-
     [Fact]
     public async Task GetTribeVotesAsync_DelegatesToRepositoryForTheRequestedTribe()
     {
@@ -601,9 +537,98 @@ public class WorldStateServiceTests
         Assert.Equal(threads * callsPerThread, service.GetTribe(0).Points);
     }
 
+    /// <summary>
+    ///     Wraps a plain <see cref="FakeWorldStateRepository" /> (composition, not inheritance -- the fake is
+    ///     sealed) and mutates the service's own WorldState mid-<see cref="GetAsync" />, simulating a race with
+    ///     <see cref="WorldStateService.ReconcileAsync" />'s own read.
+    /// </summary>
+    private sealed class RaceOnGetAsyncRepository : IWorldStateRepository
+    {
+        private readonly FakeWorldStateRepository _inner = new();
+
+        public WorldStateService? ServiceUnderTest { get; set; }
+
+        public WorldStateRowDto Row
+        {
+            get => _inner.Row;
+            set => _inner.Row = value;
+        }
+
+        public ValueTask EnsureInitializedAsync(CancellationToken ct)
+        {
+            return _inner.EnsureInitializedAsync(ct);
+        }
+
+        public async ValueTask<(WorldStateRowDto? Row, ReadOnlyCollection<WorldStateTribeDto> Tribes,
+                ReadOnlyCollection<WorldStateAllianceOfferDto> AllianceOffers)>
+            GetAsync(CancellationToken ct)
+        {
+            // Null during the service's own InitializeAsync (set only afterward, by the test) -- the race
+            // being simulated is specifically with ReconcileAsync's own read, not the boot-time load.
+            ServiceUnderTest?.SetZone038Winner(3);
+            return await _inner.GetAsync(ct);
+        }
+
+        public ValueTask UpdateAsync(byte? zone038WinTribe, int? zone038WinTribeTime, bool tribeSymbolBattle,
+            byte? monsterSymbol, int? monsterSymbolEndTime, byte? highTribe, short updateTribePoint,
+            CancellationToken ct)
+        {
+            return _inner.UpdateAsync(zone038WinTribe, zone038WinTribeTime, tribeSymbolBattle, monsterSymbol,
+                monsterSymbolEndTime, highTribe, updateTribePoint, ct);
+        }
+
+        public ValueTask UpdateTribeAsync(byte tribeId, DateTime? symbolDate, bool hasSymbol, int points,
+            bool isClosed, CancellationToken ct)
+        {
+            return _inner.UpdateTribeAsync(tribeId, symbolDate, hasSymbol, points, isClosed, ct);
+        }
+
+        public ValueTask UpdateTribeSymbolStateAsync(byte tribeId, DateTime? symbolDate, bool hasSymbol,
+            bool isClosed, CancellationToken ct)
+        {
+            return _inner.UpdateTribeSymbolStateAsync(tribeId, symbolDate, hasSymbol, isClosed, ct);
+        }
+
+        public ValueTask AddTribePointsAsync(byte tribeId, int delta, CancellationToken ct)
+        {
+            return _inner.AddTribePointsAsync(tribeId, delta, ct);
+        }
+
+        public ValueTask SetAllianceOfferAsync(byte fromTribeId, byte toTribeId, bool isAccepted,
+            CancellationToken ct)
+        {
+            return _inner.SetAllianceOfferAsync(fromTribeId, toTribeId, isAccepted, ct);
+        }
+
+        public ValueTask<ReadOnlyCollection<TribeVoteDto>> GetTribeVotesAsync(byte tribeId, CancellationToken ct)
+        {
+            return _inner.GetTribeVotesAsync(tribeId, ct);
+        }
+
+        public ValueTask RegisterTribeVoteCandidateAsync(byte tribeId, byte slotIndex, int candidateCharacterId,
+            short candidateLevel, int killOtherTribeCount, CancellationToken ct)
+        {
+            return _inner.RegisterTribeVoteCandidateAsync(tribeId, slotIndex, candidateCharacterId, candidateLevel,
+                killOtherTribeCount, ct);
+        }
+
+        public ValueTask AddTribeVotePointsAsync(byte tribeId, byte slotIndex, int points, CancellationToken ct)
+        {
+            return _inner.AddTribeVotePointsAsync(tribeId, slotIndex, points, ct);
+        }
+
+        public ValueTask ClearTribeVotesAsync(byte tribeId, CancellationToken ct)
+        {
+            return _inner.ClearTribeVotesAsync(tribeId, ct);
+        }
+    }
+
     private sealed class NullRowRepository : IWorldStateRepository
     {
-        public ValueTask EnsureInitializedAsync(CancellationToken ct) => ValueTask.CompletedTask;
+        public ValueTask EnsureInitializedAsync(CancellationToken ct)
+        {
+            return ValueTask.CompletedTask;
+        }
 
         public ValueTask<(WorldStateRowDto? Row, ReadOnlyCollection<WorldStateTribeDto> Tribes,
                 ReadOnlyCollection<WorldStateAllianceOfferDto> AllianceOffers)>
@@ -617,29 +642,53 @@ public class WorldStateServiceTests
 
         public ValueTask UpdateAsync(byte? zone038WinTribe, int? zone038WinTribeTime, bool tribeSymbolBattle,
             byte? monsterSymbol, int? monsterSymbolEndTime, byte? highTribe, short updateTribePoint,
-            CancellationToken ct) => ValueTask.CompletedTask;
+            CancellationToken ct)
+        {
+            return ValueTask.CompletedTask;
+        }
 
         public ValueTask UpdateTribeAsync(byte tribeId, DateTime? symbolDate, bool hasSymbol, int points,
-            bool isClosed, CancellationToken ct) => ValueTask.CompletedTask;
+            bool isClosed, CancellationToken ct)
+        {
+            return ValueTask.CompletedTask;
+        }
 
         public ValueTask UpdateTribeSymbolStateAsync(byte tribeId, DateTime? symbolDate, bool hasSymbol,
-            bool isClosed, CancellationToken ct) => ValueTask.CompletedTask;
+            bool isClosed, CancellationToken ct)
+        {
+            return ValueTask.CompletedTask;
+        }
 
-        public ValueTask AddTribePointsAsync(byte tribeId, int delta, CancellationToken ct) =>
-            ValueTask.CompletedTask;
+        public ValueTask AddTribePointsAsync(byte tribeId, int delta, CancellationToken ct)
+        {
+            return ValueTask.CompletedTask;
+        }
 
         public ValueTask SetAllianceOfferAsync(byte fromTribeId, byte toTribeId, bool isAccepted,
-            CancellationToken ct) => ValueTask.CompletedTask;
+            CancellationToken ct)
+        {
+            return ValueTask.CompletedTask;
+        }
 
-        public ValueTask<ReadOnlyCollection<TribeVoteDto>> GetTribeVotesAsync(byte tribeId, CancellationToken ct) =>
-            ValueTask.FromResult(new ReadOnlyCollection<TribeVoteDto>([]));
+        public ValueTask<ReadOnlyCollection<TribeVoteDto>> GetTribeVotesAsync(byte tribeId, CancellationToken ct)
+        {
+            return ValueTask.FromResult(new ReadOnlyCollection<TribeVoteDto>([]));
+        }
 
         public ValueTask RegisterTribeVoteCandidateAsync(byte tribeId, byte slotIndex, int candidateCharacterId,
-            short candidateLevel, int killOtherTribeCount, CancellationToken ct) => ValueTask.CompletedTask;
+            short candidateLevel, int killOtherTribeCount, CancellationToken ct)
+        {
+            return ValueTask.CompletedTask;
+        }
 
-        public ValueTask AddTribeVotePointsAsync(byte tribeId, byte slotIndex, int points, CancellationToken ct) =>
-            ValueTask.CompletedTask;
+        public ValueTask AddTribeVotePointsAsync(byte tribeId, byte slotIndex, int points, CancellationToken ct)
+        {
+            return ValueTask.CompletedTask;
+        }
 
-        public ValueTask ClearTribeVotesAsync(byte tribeId, CancellationToken ct) => ValueTask.CompletedTask;
+        public ValueTask ClearTribeVotesAsync(byte tribeId, CancellationToken ct)
+        {
+            return ValueTask.CompletedTask;
+        }
     }
 }

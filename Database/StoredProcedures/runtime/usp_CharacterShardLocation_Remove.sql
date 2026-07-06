@@ -7,7 +7,8 @@ WITH NATIVE_COMPILATION, SCHEMABINDING
 AS
 BEGIN ATOMIC
 WITH (TRANSACTION ISOLATION LEVEL = SNAPSHOT, LANGUAGE = N'us_english')
-    DELETE FROM runtime.CharacterShardLocation
-    WHERE CharacterId = @CharacterId
-      AND ShardId = @ShardId;
+DELETE
+FROM runtime.CharacterShardLocation
+WHERE CharacterId = @CharacterId
+  AND ShardId = @ShardId;
 END;

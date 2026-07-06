@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using Fenrir.Application.Game.Hosting.Guilds;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Data.Abstractions.Guilds;
@@ -11,7 +12,7 @@ public class GuildBuffDecayHostTests
     public async Task DecayOnceAsync_ExpiredGuild_PersistsTheDeactivatedRow()
     {
         var repository = new FakeGuildRepository();
-        repository.Seed(Guild(1, buffState: 1, buffTime: 5, buffTimeForDiff: DateTime.UtcNow.AddMinutes(-10).Ticks));
+        repository.Seed(Guild(1, 1, 5, DateTime.UtcNow.AddMinutes(-10).Ticks));
         var host = new GuildBuffDecayHost(repository, NullLogger<GuildBuffDecayHost>.Instance);
 
         await host.DecayOnceAsync(CancellationToken.None);
@@ -28,7 +29,7 @@ public class GuildBuffDecayHostTests
     public async Task DecayOnceAsync_NothingActive_NeverCallsSetBuff()
     {
         var repository = new FakeGuildRepository();
-        repository.Seed(Guild(1, buffState: 0, buffTime: 0, buffTimeForDiff: 0));
+        repository.Seed(Guild(1, 0, 0, 0));
         var host = new GuildBuffDecayHost(repository, NullLogger<GuildBuffDecayHost>.Instance);
 
         await host.DecayOnceAsync(CancellationToken.None);
@@ -40,7 +41,7 @@ public class GuildBuffDecayHostTests
     public async Task DecayOnceAsync_ActiveWithReserveStillRemaining_PersistsTheDecrementedTime()
     {
         var repository = new FakeGuildRepository();
-        repository.Seed(Guild(1, buffState: 1, buffTime: 60, buffTimeForDiff: DateTime.UtcNow.AddMinutes(-7).Ticks));
+        repository.Seed(Guild(1, 1, 60, DateTime.UtcNow.AddMinutes(-7).Ticks));
         var host = new GuildBuffDecayHost(repository, NullLogger<GuildBuffDecayHost>.Instance);
 
         await host.DecayOnceAsync(CancellationToken.None);
@@ -61,68 +62,113 @@ public class GuildBuffDecayHostTests
 
     private static GuildSummaryDto Guild(int guildId, int buffState, int buffTime, long buffTimeForDiff)
     {
-        return new GuildSummaryDto(guildId, "Aesir", Grade: 1, MasterCharacterId: null, Points: 0,
-            BuffType: 2, BuffState: buffState, BuffTime: buffTime, BuffTimeForDiff: buffTimeForDiff, Logo: 0,
-            CreatedAtUtc: DateTime.UtcNow, MemberCount: 1);
+        return new GuildSummaryDto(guildId, "Aesir", 1, null, 0,
+            2, buffState, buffTime, buffTimeForDiff, 0,
+            DateTime.UtcNow, 1);
     }
 
     private sealed class ThrowingGuildRepository : IGuildRepository
     {
-        public ValueTask<CharacterGuildMembershipDto?> GetByCharacterAsync(int characterId, CancellationToken ct) =>
+        public ValueTask<CharacterGuildMembershipDto?> GetByCharacterAsync(int characterId, CancellationToken ct)
+        {
             throw new NotSupportedException();
+        }
 
-        public ValueTask<GuildSummaryDto?> GetByIdAsync(int guildId, CancellationToken ct) =>
+        public ValueTask<GuildSummaryDto?> GetByIdAsync(int guildId, CancellationToken ct)
+        {
             throw new NotSupportedException();
+        }
 
-        public ValueTask<System.Collections.ObjectModel.ReadOnlyCollection<GuildSummaryDto>> GetAllAsync(
-            CancellationToken ct) => throw new InvalidOperationException("Simulated SQL failure");
+        public ValueTask<ReadOnlyCollection<GuildSummaryDto>> GetAllAsync(
+            CancellationToken ct)
+        {
+            throw new InvalidOperationException("Simulated SQL failure");
+        }
 
-        public ValueTask<System.Collections.ObjectModel.ReadOnlyCollection<GuildRankingRowDto>> GetTopByPointsAsync(
-            int count, CancellationToken ct) => throw new NotSupportedException();
-
-        public ValueTask<System.Collections.ObjectModel.ReadOnlyCollection<GuildRosterRowDto>> GetRosterAsync(
-            int guildId, CancellationToken ct) => throw new NotSupportedException();
-
-        public ValueTask<System.Collections.ObjectModel.ReadOnlyCollection<GuildNoticeRowDto>> GetNoticesAsync(
-            int guildId, CancellationToken ct) => throw new NotSupportedException();
-
-        public ValueTask<int> CreateAsync(string name, int masterCharacterId, CancellationToken ct) =>
+        public ValueTask<ReadOnlyCollection<GuildRankingRowDto>> GetTopByPointsAsync(
+            int count, CancellationToken ct)
+        {
             throw new NotSupportedException();
+        }
+
+        public ValueTask<ReadOnlyCollection<GuildRosterRowDto>> GetRosterAsync(
+            int guildId, CancellationToken ct)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask<ReadOnlyCollection<GuildNoticeRowDto>> GetNoticesAsync(
+            int guildId, CancellationToken ct)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask<int> CreateAsync(string name, int masterCharacterId, CancellationToken ct)
+        {
+            throw new NotSupportedException();
+        }
 
         public ValueTask<int> CreateAndDebitMoneyAsync(string name, int masterCharacterId, long deltaMoney,
-            int deltaBigMoney, CancellationToken ct) => throw new NotSupportedException();
-
-        public ValueTask DisbandAsync(int guildId, int characterId, CancellationToken ct) =>
+            int deltaBigMoney, CancellationToken ct)
+        {
             throw new NotSupportedException();
+        }
 
-        public ValueTask AddMemberAsync(int guildId, int characterId, CancellationToken ct) =>
+        public ValueTask DisbandAsync(int guildId, int characterId, CancellationToken ct)
+        {
             throw new NotSupportedException();
+        }
 
-        public ValueTask RemoveMemberAsync(int guildId, int characterId, CancellationToken ct) =>
+        public ValueTask AddMemberAsync(int guildId, int characterId, CancellationToken ct)
+        {
             throw new NotSupportedException();
+        }
 
-        public ValueTask SetRoleAsync(int guildId, int characterId, byte role, CancellationToken ct) =>
+        public ValueTask RemoveMemberAsync(int guildId, int characterId, CancellationToken ct)
+        {
             throw new NotSupportedException();
+        }
 
-        public ValueTask SetCallNameAsync(int guildId, int characterId, string callName, CancellationToken ct) =>
+        public ValueTask SetRoleAsync(int guildId, int characterId, byte role, CancellationToken ct)
+        {
             throw new NotSupportedException();
+        }
 
-        public ValueTask SetMasterAsync(int guildId, int newMasterCharacterId, CancellationToken ct) =>
+        public ValueTask SetCallNameAsync(int guildId, int characterId, string callName, CancellationToken ct)
+        {
             throw new NotSupportedException();
+        }
 
-        public ValueTask SetLogoAsync(int guildId, int logo, CancellationToken ct) =>
+        public ValueTask SetMasterAsync(int guildId, int newMasterCharacterId, CancellationToken ct)
+        {
             throw new NotSupportedException();
+        }
 
-        public ValueTask SetGradeAsync(int guildId, int grade, CancellationToken ct) =>
+        public ValueTask SetLogoAsync(int guildId, int logo, CancellationToken ct)
+        {
             throw new NotSupportedException();
+        }
+
+        public ValueTask SetGradeAsync(int guildId, int grade, CancellationToken ct)
+        {
+            throw new NotSupportedException();
+        }
 
         public ValueTask UpgradeAndDebitMoneyAsync(int guildId, int grade, int characterId, long deltaMoney,
-            int deltaBigMoney, CancellationToken ct) => throw new NotSupportedException();
+            int deltaBigMoney, CancellationToken ct)
+        {
+            throw new NotSupportedException();
+        }
 
         public ValueTask SetBuffAsync(int guildId, int buffType, int buffState, int buffTime, long buffTimeForDiff,
-            CancellationToken ct) => throw new NotSupportedException();
-
-        public ValueTask SetNoticeAsync(int guildId, byte noticeIndex, string text, CancellationToken ct) =>
+            CancellationToken ct)
+        {
             throw new NotSupportedException();
+        }
+
+        public ValueTask SetNoticeAsync(int guildId, byte noticeIndex, string text, CancellationToken ct)
+        {
+            throw new NotSupportedException();
+        }
     }
 }

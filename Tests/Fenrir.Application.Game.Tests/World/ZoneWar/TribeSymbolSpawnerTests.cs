@@ -7,7 +7,6 @@ using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Tests.GameData;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Application.Game.Tests.World.WorldState;
-using Fenrir.Data.Abstractions.World;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.World.ZoneWar;
@@ -73,7 +72,7 @@ public class TribeSymbolSpawnerTests
     public void OwnTribeStillHoldsItsSymbol_AndThisIsItsDesignatedMap_Spawns()
     {
         var cache = CacheWithAllFiveSymbols();
-        var catalog = CatalogWith(symbolIndex: 0, ownerState: 0, mapId: 5);
+        var catalog = CatalogWith(0, 0, 5);
         var worldState = CreateWorldState(); // fresh boot -- tribe 0 still owns its own slot
         var spawner = new TribeSymbolSpawner(cache, catalog, worldState);
         var zone = CreateZone(5, cache);
@@ -88,7 +87,7 @@ public class TribeSymbolSpawnerTests
     public void NotFoundAnywhere_AndThisIsNotTheDesignatedMap_DoesNothing()
     {
         var cache = CacheWithAllFiveSymbols();
-        var catalog = CatalogWith(symbolIndex: 0, ownerState: 0, mapId: 7); // designated map is 7, not this zone's 5
+        var catalog = CatalogWith(0, 0, 7); // designated map is 7, not this zone's 5
         var worldState = CreateWorldState();
         var spawner = new TribeSymbolSpawner(cache, catalog, worldState);
         var zone = CreateZone(5, cache);
@@ -102,7 +101,7 @@ public class TribeSymbolSpawnerTests
     public void AlreadyPresentAndCorrectlyPlaced_IsIdempotent_NeverDuplicated()
     {
         var cache = CacheWithAllFiveSymbols();
-        var catalog = CatalogWith(symbolIndex: 0, ownerState: 0, mapId: 5);
+        var catalog = CatalogWith(0, 0, 5);
         var worldState = CreateWorldState();
         var spawner = new TribeSymbolSpawner(cache, catalog, worldState);
         var zone = CreateZone(5, cache);
@@ -118,9 +117,9 @@ public class TribeSymbolSpawnerTests
     public void CapturedTribeSymbol_IsUnresolvable_AndIsSkippedRatherThanGuessed()
     {
         var cache = CacheWithAllFiveSymbols();
-        var catalog = CatalogWith(symbolIndex: 0, ownerState: 0, mapId: 5);
+        var catalog = CatalogWith(0, 0, 5);
         var worldState = CreateWorldState();
-        worldState.ResolveTribeSymbol(0, winnerTribeId: 1); // tribe 0 loses its own slot
+        worldState.ResolveTribeSymbol(0, 1); // tribe 0 loses its own slot
         var spawner = new TribeSymbolSpawner(cache, catalog, worldState);
         var zone = CreateZone(5, cache);
 
@@ -153,7 +152,7 @@ public class TribeSymbolSpawnerTests
     public void NeutralSymbol_Unclaimed_UsesTheUnclaimedSentinelPlacement()
     {
         var cache = CacheWithAllFiveSymbols();
-        var catalog = CatalogWith(symbolIndex: 4, ownerState: TribeSymbolCatalog.NeutralUnclaimedOwnerState, mapId: 5);
+        var catalog = CatalogWith(4, TribeSymbolCatalog.NeutralUnclaimedOwnerState, 5);
         var worldState = CreateWorldState(); // World.MonsterSymbol starts null
         var spawner = new TribeSymbolSpawner(cache, catalog, worldState);
         var zone = CreateZone(5, cache);
@@ -168,7 +167,7 @@ public class TribeSymbolSpawnerTests
     public void NeutralSymbol_CapturedByATribe_UsesThatTribesOwnerStatePlacement()
     {
         var cache = CacheWithAllFiveSymbols();
-        var catalog = CatalogWith(symbolIndex: 4, ownerState: 2, mapId: 9);
+        var catalog = CatalogWith(4, 2, 9);
         var worldState = CreateWorldState();
         worldState.ResolveMonsterSymbol(2);
         var spawner = new TribeSymbolSpawner(cache, catalog, worldState);
@@ -185,15 +184,15 @@ public class TribeSymbolSpawnerTests
     [Fact]
     public void SmallestTribe_SpawningItsOwnSymbol_GetsDoubleHealth()
     {
-        var cache = CacheWithAllFiveSymbols(life: 100);
-        var catalog = CatalogWith(symbolIndex: 0, ownerState: 0, mapId: 5);
+        var cache = CacheWithAllFiveSymbols(100);
+        var catalog = CatalogWith(0, 0, 5);
         var worldState = CreateWorldState();
         var spawner = new TribeSymbolSpawner(cache, catalog, worldState);
         var zone = CreateZone(5, cache);
 
         // Every tribe must be represented -- an absent tribe would trivially tie for "smallest" at zero.
         // Tribe 0 has 1 player, tribes 1-3 have 2 each -- tribe 0 is unambiguously the smallest.
-        EnterPlayers(zone, tribeCounts: [1, 2, 2, 2]);
+        EnterPlayers(zone, [1, 2, 2, 2]);
 
         spawner.EvaluateNow(zone);
 
@@ -204,14 +203,14 @@ public class TribeSymbolSpawnerTests
     [Fact]
     public void NotTheSmallestTribe_SpawningItsOwnSymbol_GetsNormalHealth()
     {
-        var cache = CacheWithAllFiveSymbols(life: 100);
-        var catalog = CatalogWith(symbolIndex: 0, ownerState: 0, mapId: 5);
+        var cache = CacheWithAllFiveSymbols(100);
+        var catalog = CatalogWith(0, 0, 5);
         var worldState = CreateWorldState();
         var spawner = new TribeSymbolSpawner(cache, catalog, worldState);
         var zone = CreateZone(5, cache);
 
         // Tribe 0 has 2 players; tribe 1 has strictly fewer (1) -- tribe 0 is not the smallest.
-        EnterPlayers(zone, tribeCounts: [2, 1, 2, 2]);
+        EnterPlayers(zone, [2, 1, 2, 2]);
 
         spawner.EvaluateNow(zone);
 

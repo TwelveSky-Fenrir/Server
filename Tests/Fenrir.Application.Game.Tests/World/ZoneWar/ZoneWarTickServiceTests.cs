@@ -4,9 +4,9 @@ using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Hosting.World.ZoneWar;
 using Fenrir.Application.Game.Tests.TestSupport;
-using Fenrir.Network.Serialization.Packets.Zone;
 using Fenrir.Data.WriteBehind;
 using Fenrir.Network.Framing;
+using Fenrir.Network.Serialization.Packets.Zone;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -58,7 +58,7 @@ public class ZoneWarTickServiceTests
         ZoneTestKit.DrainOutbound(pipeC);
 
         var service = new ZoneWarTickService(registry);
-        service.StartWar(ZoneWarKind.Zone049, remainTimeSeconds: 30);
+        service.StartWar(ZoneWarKind.Zone049, 30);
         service.ReportStanding(0, 999); // must be ignored -- Zone049 always computes this live
 
         service.Tick(SimulationClock.LegacyTick);
@@ -81,7 +81,7 @@ public class ZoneWarTickServiceTests
         ZoneTestKit.DrainOutbound(pipe);
 
         var service = new ZoneWarTickService(registry);
-        service.StartWar(ZoneWarKind.Zone051, remainTimeSeconds: 12);
+        service.StartWar(ZoneWarKind.Zone051, 12);
         service.ReportStanding(3, 1);
 
         service.Tick(SimulationClock.LegacyTick);
@@ -104,7 +104,7 @@ public class ZoneWarTickServiceTests
         ZoneTestKit.DrainOutbound(pipe);
 
         var service = new ZoneWarTickService(registry);
-        service.StartWar(ZoneWarKind.Zone241, remainTimeSeconds: 10);
+        service.StartWar(ZoneWarKind.Zone241, 10);
 
         for (var i = 0; i < 9; i++)
         {
@@ -130,7 +130,7 @@ public class ZoneWarTickServiceTests
         ZoneTestKit.DrainOutbound(pipe);
 
         var service = new ZoneWarTickService(registry);
-        service.StartWar(ZoneWarKind.Zone335, remainTimeSeconds: 1);
+        service.StartWar(ZoneWarKind.Zone335, 1);
 
         service.Tick(SimulationClock.LegacyTick); // tick 1: broadcast RemainTime=1, no decrement yet
         Assert.Equal(1, BinaryPrimitives.ReadInt32LittleEndian(ZoneTestKit.DrainOutbound(pipe).AsSpan(1)));
@@ -155,7 +155,7 @@ public class ZoneWarTickServiceTests
         ZoneTestKit.DrainOutbound(pipe);
 
         var service = new ZoneWarTickService(registry);
-        service.StartWar(ZoneWarKind.Zone194, remainTimeSeconds: 20);
+        service.StartWar(ZoneWarKind.Zone194, 20);
         service.ReportStanding(1, 7);
 
         service.Tick(SimulationClock.LegacyTick);
@@ -183,7 +183,7 @@ public class ZoneWarTickServiceTests
         ZoneTestKit.DrainOutbound(pipe);
 
         var service = new ZoneWarTickService(registry);
-        service.StartWar(ZoneWarKind.Zone297, remainTimeSeconds: 42);
+        service.StartWar(ZoneWarKind.Zone297, 42);
         service.ReportExtraStatus(3, 4);
         service.ReportMonsterCount(2, 9);
 
@@ -216,11 +216,11 @@ public class ZoneWarTickServiceTests
         ZoneTestKit.DrainOutbound(pipe);
 
         var service = new ZoneWarTickService(registry);
-        service.StartWar(ZoneWarKind.Zone267, remainTimeSeconds: 10);
+        service.StartWar(ZoneWarKind.Zone267, 10);
         service.ReportStanding(0, 55);
         service.EndWar();
 
-        service.StartWar(ZoneWarKind.Zone267, remainTimeSeconds: 8);
+        service.StartWar(ZoneWarKind.Zone267, 8);
         service.Tick(SimulationClock.LegacyTick);
 
         var payload = ZoneTestKit.DrainOutbound(pipe).AsSpan(1);

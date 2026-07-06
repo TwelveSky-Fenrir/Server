@@ -1,7 +1,7 @@
 using System.Collections.Frozen;
 using Fenrir.Application.Game.Stats;
-using Fenrir.Network.Serialization.Packets.Shared;
 using Fenrir.Data.Abstractions.World;
+using Fenrir.Network.Serialization.Packets.Shared;
 
 namespace Fenrir.Application.Game.Tests.Stats;
 

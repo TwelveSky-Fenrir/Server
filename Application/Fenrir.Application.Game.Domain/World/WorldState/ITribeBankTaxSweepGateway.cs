@@ -22,7 +22,7 @@ namespace Fenrir.Application.Game.Domain.World.WorldState;
 /// </remarks>
 public interface ITribeBankTaxSweepGateway
 {
-    Task SweepAsync(short mapId, TribeBankTaxSweepPayload payload, CancellationToken ct);
+    public Task SweepAsync(short mapId, TribeBankTaxSweepPayload payload, CancellationToken ct);
 }
 
 /// <summary>

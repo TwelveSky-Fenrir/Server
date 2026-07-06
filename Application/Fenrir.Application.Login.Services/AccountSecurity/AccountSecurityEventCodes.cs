@@ -14,7 +14,10 @@ internal static class AccountSecurityEventCodes
     /// <summary>One rejected mouse-PIN verification attempt (op15) that did not yet cross the lockout threshold.</summary>
     public const short MousePinMismatch = 1;
 
-    /// <summary>The specific mouse-PIN attempt (op15) that crossed VerifyMousePinHandler.MaxPinFailures and disconnected the session.</summary>
+    /// <summary>
+    ///     The specific mouse-PIN attempt (op15) that crossed VerifyMousePinHandler.MaxPinFailures and disconnected the
+    ///     session.
+    /// </summary>
     public const short MousePinLockout = 2;
 
     /// <summary>A character was successfully renamed via op19 CL_CHANGE_AVATAR_NAME_SEND.</summary>

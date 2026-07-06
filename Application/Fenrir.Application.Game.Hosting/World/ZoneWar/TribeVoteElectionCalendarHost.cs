@@ -35,7 +35,8 @@ public sealed class TribeVoteElectionCalendarHost(
 
     /// <summary>
     ///     Evaluates and, if due, applies one calendar transition -- pure enough to drive directly from a test
-    ///     without a real timer, same convention as <see cref="Fenrir.Application.Game.Domain.World.ZoneWar.ZoneEventBroadcaster" />'s
+    ///     without a real timer, same convention as
+    ///     <see cref="Fenrir.Application.Game.Domain.World.ZoneWar.ZoneEventBroadcaster" />'s
     ///     sibling <c>ZoneWarTickService.Tick</c>. A no-op entirely if this instance is not armed.
     /// </summary>
     public async ValueTask TickAsync(DateTime utcNow, CancellationToken ct)

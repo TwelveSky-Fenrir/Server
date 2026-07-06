@@ -7,9 +7,9 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Tests.GameData;
 using Fenrir.Application.Game.Tests.TestSupport;
-using Fenrir.Network.Serialization.Packets.Shared;
 using Fenrir.Data.Abstractions.World;
 using Fenrir.Data.WriteBehind;
+using Fenrir.Network.Serialization.Packets.Shared;
 
 namespace Fenrir.Application.Game.Tests.Simulation;
 
@@ -61,9 +61,9 @@ public class AutoHuntTickSystemTests
     private static SkillDefinition HolyShieldSkill(byte maxUpgradePoint, short manaUse, byte shieldPercent,
         short runTime)
     {
-        var row = new SkillRowDto(SkillId: 82, Name: "Holy Shield", Type: 0, AttackType: 0, DataNumber2D: 0,
-            TribeInfo1: 0, TribeInfo2: 0, LearnSkillPoint: 1, MaxUpgradePoint: maxUpgradePoint, TotalHitNumber: 1,
-            ValidRadius: 0);
+        var row = new SkillRowDto(82, "Holy Shield", 0, 0, 0,
+            0, 0, 1, maxUpgradePoint, 1,
+            0);
         var grade0 = HolyShieldGrade(0, manaUse, shieldPercent, runTime);
         var grade1 = HolyShieldGrade(1, manaUse, shieldPercent, runTime);
         return new SkillDefinition(row, ImmutableArray<SkillDescriptionRowDto>.Empty, [grade0, grade1]);
@@ -72,20 +72,20 @@ public class AutoHuntTickSystemTests
     private static SkillGradeRowDto HolyShieldGrade(byte gradeIndex, short manaUse, byte shieldPercent,
         short runTime)
     {
-        return new SkillGradeRowDto(SkillId: 82, GradeIndex: gradeIndex, ManaUse: manaUse, RecoverInfo1: 0,
-            RecoverInfo2: 0, StunAttack: 0, StunDefense: 0, FastRunSpeed: 0, AttackInfo1: 0, AttackInfo2: 0,
-            AttackInfo3: 0, RunTime: runTime, ChargingDamageUp: 0, AttackPowerUp: 0, DefensePowerUp: 0,
-            AttackSuccessUp: 0, AttackBlockUp: 0, ElementAttackUp: 0, ElementDefenseUp: 0, AttackSpeedUp: 0,
-            RunSpeedUp: 0, ShieldLifeUp: shieldPercent, LuckUp: 0, CriticalUp: 0, ReturnSuccessUp: 0,
-            StunDefenseUp: 0, DestroySuccessUp: 0);
+        return new SkillGradeRowDto(82, gradeIndex, manaUse, 0,
+            0, 0, 0, 0, 0, 0,
+            0, runTime, 0, 0, 0,
+            0, 0, 0, 0, 0,
+            0, shieldPercent, 0, 0, 0,
+            0, 0);
     }
 
     // Critical (83): no weapon requirement, slot 10.
     private static SkillDefinition CriticalSkill(byte maxUpgradePoint, short manaUse, byte criticalUp, short runTime)
     {
-        var row = new SkillRowDto(SkillId: 83, Name: "Critical", Type: 0, AttackType: 0, DataNumber2D: 0,
-            TribeInfo1: 0, TribeInfo2: 0, LearnSkillPoint: 1, MaxUpgradePoint: maxUpgradePoint, TotalHitNumber: 1,
-            ValidRadius: 0);
+        var row = new SkillRowDto(83, "Critical", 0, 0, 0,
+            0, 0, 1, maxUpgradePoint, 1,
+            0);
         var grade0 = CriticalGrade(0, manaUse, criticalUp, runTime);
         var grade1 = CriticalGrade(1, manaUse, criticalUp, runTime);
         return new SkillDefinition(row, ImmutableArray<SkillDescriptionRowDto>.Empty, [grade0, grade1]);
@@ -93,21 +93,21 @@ public class AutoHuntTickSystemTests
 
     private static SkillGradeRowDto CriticalGrade(byte gradeIndex, short manaUse, byte criticalUp, short runTime)
     {
-        return new SkillGradeRowDto(SkillId: 83, GradeIndex: gradeIndex, ManaUse: manaUse, RecoverInfo1: 0,
-            RecoverInfo2: 0, StunAttack: 0, StunDefense: 0, FastRunSpeed: 0, AttackInfo1: 0, AttackInfo2: 0,
-            AttackInfo3: 0, RunTime: runTime, ChargingDamageUp: 0, AttackPowerUp: 0, DefensePowerUp: 0,
-            AttackSuccessUp: 0, AttackBlockUp: 0, ElementAttackUp: 0, ElementDefenseUp: 0, AttackSpeedUp: 0,
-            RunSpeedUp: 0, ShieldLifeUp: 0, LuckUp: 0, CriticalUp: criticalUp, ReturnSuccessUp: 0,
-            StunDefenseUp: 0, DestroySuccessUp: 0);
+        return new SkillGradeRowDto(83, gradeIndex, manaUse, 0,
+            0, 0, 0, 0, 0, 0,
+            0, runTime, 0, 0, 0,
+            0, 0, 0, 0, 0,
+            0, 0, 0, criticalUp, 0,
+            0, 0);
     }
 
     // Damage (15): requires an equipped weapon of Sort 14/16/20, slot 0.
     private static SkillDefinition DamageSkill(byte maxUpgradePoint, short manaUse, byte attackPowerUp,
         short runTime)
     {
-        var row = new SkillRowDto(SkillId: 15, Name: "Damage", Type: 0, AttackType: 0, DataNumber2D: 0,
-            TribeInfo1: 0, TribeInfo2: 0, LearnSkillPoint: 1, MaxUpgradePoint: maxUpgradePoint, TotalHitNumber: 1,
-            ValidRadius: 0);
+        var row = new SkillRowDto(15, "Damage", 0, 0, 0,
+            0, 0, 1, maxUpgradePoint, 1,
+            0);
         var grade0 = DamageGrade(0, manaUse, attackPowerUp, runTime);
         var grade1 = DamageGrade(1, manaUse, attackPowerUp, runTime);
         return new SkillDefinition(row, ImmutableArray<SkillDescriptionRowDto>.Empty, [grade0, grade1]);
@@ -115,12 +115,12 @@ public class AutoHuntTickSystemTests
 
     private static SkillGradeRowDto DamageGrade(byte gradeIndex, short manaUse, byte attackPowerUp, short runTime)
     {
-        return new SkillGradeRowDto(SkillId: 15, GradeIndex: gradeIndex, ManaUse: manaUse, RecoverInfo1: 0,
-            RecoverInfo2: 0, StunAttack: 0, StunDefense: 0, FastRunSpeed: 0, AttackInfo1: 0, AttackInfo2: 0,
-            AttackInfo3: 0, RunTime: runTime, ChargingDamageUp: 0, AttackPowerUp: attackPowerUp, DefensePowerUp: 0,
-            AttackSuccessUp: 0, AttackBlockUp: 0, ElementAttackUp: 0, ElementDefenseUp: 0, AttackSpeedUp: 0,
-            RunSpeedUp: 0, ShieldLifeUp: 0, LuckUp: 0, CriticalUp: 0, ReturnSuccessUp: 0, StunDefenseUp: 0,
-            DestroySuccessUp: 0);
+        return new SkillGradeRowDto(15, gradeIndex, manaUse, 0,
+            0, 0, 0, 0, 0, 0,
+            0, runTime, 0, attackPowerUp, 0,
+            0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0,
+            0);
     }
 
     [Fact]
@@ -128,7 +128,7 @@ public class AutoHuntTickSystemTests
     {
         var skillsById = new Dictionary<int, SkillDefinition> { [82] = HolyShieldSkill(10, 30, 20, 40) }
             .ToFrozenDictionary();
-        var (zone, state) = SetUp(skillsById: skillsById);
+        var (zone, state) = SetUp(skillsById);
         var manaBefore = state.Mana; // 300 (EnterData default), MaxLife=840
 
         state.AutoHuntEnabled = true;
@@ -147,7 +147,7 @@ public class AutoHuntTickSystemTests
     {
         var skillsById = new Dictionary<int, SkillDefinition> { [82] = HolyShieldSkill(10, 30, 20, 40) }
             .ToFrozenDictionary();
-        var (zone, state) = SetUp(skillsById: skillsById);
+        var (zone, state) = SetUp(skillsById);
         var manaBefore = state.Mana;
 
         state.AutoHuntEnabled = false;
@@ -177,7 +177,7 @@ public class AutoHuntTickSystemTests
     {
         var skillsById = new Dictionary<int, SkillDefinition> { [82] = HolyShieldSkill(10, 30, 20, 40) }
             .ToFrozenDictionary();
-        var (zone, state) = SetUp(skillsById: skillsById);
+        var (zone, state) = SetUp(skillsById);
         var manaBefore = state.Mana;
 
         state.AutoHuntEnabled = true;
@@ -220,7 +220,7 @@ public class AutoHuntTickSystemTests
         }.ToFrozenDictionary();
         var skillsById = new Dictionary<int, SkillDefinition> { [15] = DamageSkill(10, 20, 50, 30) }
             .ToFrozenDictionary();
-        var (zone, state) = SetUp(skillsById: skillsById, itemsById: itemsById);
+        var (zone, state) = SetUp(skillsById, itemsById);
         Equip(zone, 10, 9001);
         var manaBefore = state.Mana;
 
@@ -243,7 +243,7 @@ public class AutoHuntTickSystemTests
         }.ToFrozenDictionary();
         var skillsById = new Dictionary<int, SkillDefinition> { [15] = DamageSkill(10, 20, 50, 30) }
             .ToFrozenDictionary();
-        var (zone, state) = SetUp(skillsById: skillsById, itemsById: itemsById);
+        var (zone, state) = SetUp(skillsById, itemsById);
         Equip(zone, 10, 9002);
         var manaBefore = state.Mana;
 
@@ -263,7 +263,7 @@ public class AutoHuntTickSystemTests
     {
         var skillsById = new Dictionary<int, SkillDefinition> { [82] = HolyShieldSkill(10, 9999, 20, 40) }
             .ToFrozenDictionary();
-        var (zone, state) = SetUp(skillsById: skillsById);
+        var (zone, state) = SetUp(skillsById);
         var manaBefore = state.Mana;
 
         state.AutoHuntEnabled = true;
@@ -281,7 +281,7 @@ public class AutoHuntTickSystemTests
     {
         var skillsById = new Dictionary<int, SkillDefinition> { [82] = HolyShieldSkill(10, 30, 20, 40) }
             .ToFrozenDictionary();
-        var (zone, state) = SetUp(skillsById: skillsById);
+        var (zone, state) = SetUp(skillsById);
         var manaBefore = state.Mana;
 
         state.AutoHuntEnabled = true;
@@ -299,7 +299,7 @@ public class AutoHuntTickSystemTests
     {
         var skillsById = new Dictionary<int, SkillDefinition> { [82] = HolyShieldSkill(10, 30, 20, 40) }
             .ToFrozenDictionary();
-        var (zone, state) = SetUp(skillsById: skillsById);
+        var (zone, state) = SetUp(skillsById);
         var manaBefore = state.Mana;
 
         state.AutoHuntEnabled = true;
@@ -321,7 +321,7 @@ public class AutoHuntTickSystemTests
     {
         var skillsById = new Dictionary<int, SkillDefinition> { [82] = HolyShieldSkill(10, 30, 20, 40) }
             .ToFrozenDictionary();
-        var (zone, state) = SetUp(skillsById: skillsById);
+        var (zone, state) = SetUp(skillsById);
         var manaBefore = state.Mana;
 
         state.AutoHuntEnabled = true;
@@ -343,7 +343,7 @@ public class AutoHuntTickSystemTests
             [82] = HolyShieldSkill(10, 30, 20, 40),
             [83] = CriticalSkill(10, 10, 15, 25)
         }.ToFrozenDictionary();
-        var (zone, state) = SetUp(skillsById: skillsById);
+        var (zone, state) = SetUp(skillsById);
 
         state.AutoHuntEnabled = true;
         state.AutoHuntConfig = Config(82, 10, 83, 10);
@@ -365,7 +365,7 @@ public class AutoHuntTickSystemTests
     {
         var skillsById = new Dictionary<int, SkillDefinition> { [82] = HolyShieldSkill(10, 30, 20, 40) }
             .ToFrozenDictionary();
-        var (zone, state) = SetUp(skillsById: skillsById);
+        var (zone, state) = SetUp(skillsById);
         var manaBefore = state.Mana;
 
         state.AutoHuntEnabled = true;
@@ -384,7 +384,7 @@ public class AutoHuntTickSystemTests
     {
         var skillsById = new Dictionary<int, SkillDefinition> { [82] = HolyShieldSkill(10, 30, 20, 40) }
             .ToFrozenDictionary();
-        var (zone, state) = SetUp(skillsById: skillsById);
+        var (zone, state) = SetUp(skillsById);
         var manaBefore = state.Mana;
 
         state.AutoHuntEnabled = true;

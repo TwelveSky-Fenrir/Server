@@ -14,7 +14,7 @@ public class TempRegistrationIdleSweepTests
         var sweep = new TempRegistrationIdleSweep(registry, NullLogger<TempRegistrationIdleSweep>.Instance);
         var (session, _) = ZoneTestKit.CreateSession(1);
         session.MarkTicketConsumed(10, 100);
-        registry.Record(session, tribe: 0, accountId: 10, characterId: 100, DateTimeOffset.UtcNow);
+        registry.Record(session, 0, 10, 100, DateTimeOffset.UtcNow);
 
         sweep.Sweep(DateTimeOffset.UtcNow);
 
@@ -31,7 +31,7 @@ public class TempRegistrationIdleSweepTests
         session.MarkTicketConsumed(10, 100);
 
         var registeredAt = DateTimeOffset.UtcNow - TempRegistrationIdleSweep.IdleTimeout - TimeSpan.FromSeconds(1);
-        registry.Record(session, tribe: 1, accountId: 10, characterId: 100, registeredAt);
+        registry.Record(session, 1, 10, 100, registeredAt);
 
         sweep.Sweep(DateTimeOffset.UtcNow);
 
@@ -51,7 +51,7 @@ public class TempRegistrationIdleSweepTests
         session.MarkInWorld();
 
         var registeredAt = DateTimeOffset.UtcNow - TempRegistrationIdleSweep.IdleTimeout - TimeSpan.FromMinutes(5);
-        registry.Record(session, tribe: 1, accountId: 10, characterId: 100, registeredAt);
+        registry.Record(session, 1, 10, 100, registeredAt);
 
         sweep.Sweep(DateTimeOffset.UtcNow);
 

@@ -8,7 +8,8 @@ namespace Fenrir.Application.Game.Domain.World.WorldState;
 ///     <see cref="TribePointLevelRecompute.ComputeTotals" /> formula, and -- only on a successful read -- fully
 ///     overwrites all 4 <see cref="WorldStateService" /> tribe-point totals in one go via
 ///     <see cref="WorldStateService.SetTribePoints" />, matching the contract's "full recompute-and-overwrite,
-///     never an incremental delta." Driven by <c>Fenrir.Application.Game.Hosting.World.WorldState.TribePointRecomputeHost</c>,
+///     never an incremental delta." Driven by
+///     <c>Fenrir.Application.Game.Hosting.World.WorldState.TribePointRecomputeHost</c>,
 ///     once at boot and every 6th ~1-second tick thereafter.
 /// </summary>
 /// <remarks>

@@ -19,9 +19,6 @@ namespace Fenrir.Application.Game.Domain.Consumables;
 /// </remarks>
 public static class CashTimerResolver
 {
-    public const int FactionNoticeAddAmount = 5;
-    public const int TaiyanKeyAddAmount = 180;
-
     public enum Outcome
     {
         Success,
@@ -36,6 +33,9 @@ public static class CashTimerResolver
         /// </summary>
         LevelCapNotMet
     }
+
+    public const int FactionNoticeAddAmount = 5;
+    public const int TaiyanKeyAddAmount = 180;
 
     public static Result ResolveFactionNotice(int currentCount)
     {

@@ -148,8 +148,10 @@ public class SessionRegistryTests
         var registry = new SessionRegistry();
         var sharedIp = new IPEndPoint(IPAddress.Parse("203.0.113.10"), 1000);
         var sessionA = new ZoneClientSession(1, new FakeDuplexPipe(), sharedIp);
-        var sessionB = new ZoneClientSession(2, new FakeDuplexPipe(), new IPEndPoint(IPAddress.Parse("203.0.113.10"), 2000));
-        var otherSession = new ZoneClientSession(3, new FakeDuplexPipe(), new IPEndPoint(IPAddress.Parse("203.0.113.99"), 1000));
+        var sessionB =
+            new ZoneClientSession(2, new FakeDuplexPipe(), new IPEndPoint(IPAddress.Parse("203.0.113.10"), 2000));
+        var otherSession = new ZoneClientSession(3, new FakeDuplexPipe(),
+            new IPEndPoint(IPAddress.Parse("203.0.113.99"), 1000));
         registry.Register(sessionA);
         registry.Register(sessionB);
         registry.Register(otherSession);
@@ -178,7 +180,8 @@ public class SessionRegistryTests
     public void SnapshotByRemoteAddress_UnknownAddress_ReturnsEmpty()
     {
         var registry = new SessionRegistry();
-        registry.Register(new ZoneClientSession(1, new FakeDuplexPipe(), new IPEndPoint(IPAddress.Parse("203.0.113.10"), 1000)));
+        registry.Register(new ZoneClientSession(1, new FakeDuplexPipe(),
+            new IPEndPoint(IPAddress.Parse("203.0.113.10"), 1000)));
 
         var snapshot = registry.SnapshotByRemoteAddress("198.51.100.1");
 

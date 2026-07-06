@@ -17,16 +17,16 @@ namespace Fenrir.Application.Game.Domain.Inventory;
 ///     ServerDocs/12_ts25zone/11_MyGame03_PartieA.md §5.1 (independent prior summary, cross-checked against a
 ///     direct read; source of the "res_sort 1/2/4/8/29" rebirth-gated classification codes used below).
 ///     <para>
-///     Two things this gate deliberately does NOT model, both left to the caller: (1) the avatar's
-///     "action-sort ready" precondition -- a distinct, softer no-op outcome (no disconnect) checked by both
-///     call sites before this gate even runs, whose exact numeric "ready" sentinel was not part of the
-///     originating contract; and (2) the source/destination bounds checks that precede this gate entirely.
+///         Two things this gate deliberately does NOT model, both left to the caller: (1) the avatar's
+///         "action-sort ready" precondition -- a distinct, softer no-op outcome (no disconnect) checked by both
+///         call sites before this gate even runs, whose exact numeric "ready" sentinel was not part of the
+///         originating contract; and (2) the source/destination bounds checks that precede this gate entirely.
 ///     </para>
 ///     <para>
-///     <paramref name="itemSortClassification"/> (see <see cref="Evaluate"/>) stands in for the legacy
-///     <c>ReturnItemSort(...)</c> helper -- that helper's own derivation logic (mapping a raw item onto one
-///     of its classification codes) is a separate function outside this contract's citation range, so it is
-///     accepted here as a caller-supplied, already-computed value rather than re-derived.
+///         <paramref name="itemSortClassification" /> (see <see cref="Evaluate" />) stands in for the legacy
+///         <c>ReturnItemSort(...)</c> helper -- that helper's own derivation logic (mapping a raw item onto one
+///         of its classification codes) is a separate function outside this contract's citation range, so it is
+///         accepted here as a caller-supplied, already-computed value rather than re-derived.
 ///     </para>
 /// </remarks>
 public static class EquipItemValidationGate
@@ -71,31 +71,11 @@ public static class EquipItemValidationGate
     /// </summary>
     private static readonly ImmutableHashSet<int> Rebirth12ClassificationCodes = [1, 2, 4, 8, 29];
 
-    /// <summary>
-    ///     One item's equip-relevant reference-table fields -- the subset of <c>ITEM_INFO</c> this gate reads.
-    ///     A <see langword="null"/> value stands for <c>mITEM.Search(iIndex)</c> returning nothing.
-    /// </summary>
-    /// <param name="ItemId">iIndex -- also the key for the hardcoded per-id rebirth gates.</param>
-    /// <param name="TribeRestriction">iEquipInfo[0].</param>
-    /// <param name="EquipPartTag">iEquipInfo[1].</param>
-    /// <param name="LevelLimit">iLevelLimit.</param>
-    /// <param name="MartialLevelLimit">iMartialLevelLimit.</param>
-    /// <param name="CheckSetItem">iCheckSetItem.</param>
-    /// <param name="Sort">iSort -- both the final-category whitelist input and (indirectly) ReturnItemSort's own input.</param>
-    public readonly record struct EquipCandidate(
-        int ItemId,
-        int TribeRestriction,
-        int EquipPartTag,
-        int LevelLimit,
-        int MartialLevelLimit,
-        int CheckSetItem,
-        int Sort);
-
     /// <param name="item">The resolved item reference-table row, or null if the id did not resolve.</param>
     /// <param name="itemSortClassification">Pre-computed ReturnItemSort(...) result -- see remarks.</param>
     /// <param name="characterTribe">The equipping character's tribe.</param>
     /// <param name="targetEquipSlotIndex">
-    ///     A real 0-12 equip-slot index, or <see cref="SkipSlotCheck"/> to skip the slot-tag check entirely
+    ///     A real 0-12 equip-slot index, or <see cref="SkipSlotCheck" /> to skip the slot-tag check entirely
     ///     (the "use item" call site's own convention -- the true slot is derived by the caller instead).
     /// </param>
     /// <param name="characterCombinedLevel">Sum of the character's two level-tracking fields.</param>
@@ -159,4 +139,24 @@ public static class EquipItemValidationGate
         //  - item id 99200's reject, gated behind a macro never defined anywhere in this repository.
         return true;
     }
+
+    /// <summary>
+    ///     One item's equip-relevant reference-table fields -- the subset of <c>ITEM_INFO</c> this gate reads.
+    ///     A <see langword="null" /> value stands for <c>mITEM.Search(iIndex)</c> returning nothing.
+    /// </summary>
+    /// <param name="ItemId">iIndex -- also the key for the hardcoded per-id rebirth gates.</param>
+    /// <param name="TribeRestriction">iEquipInfo[0].</param>
+    /// <param name="EquipPartTag">iEquipInfo[1].</param>
+    /// <param name="LevelLimit">iLevelLimit.</param>
+    /// <param name="MartialLevelLimit">iMartialLevelLimit.</param>
+    /// <param name="CheckSetItem">iCheckSetItem.</param>
+    /// <param name="Sort">iSort -- both the final-category whitelist input and (indirectly) ReturnItemSort's own input.</param>
+    public readonly record struct EquipCandidate(
+        int ItemId,
+        int TribeRestriction,
+        int EquipPartTag,
+        int LevelLimit,
+        int MartialLevelLimit,
+        int CheckSetItem,
+        int Sort);
 }

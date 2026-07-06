@@ -11,12 +11,14 @@ CREATE PROCEDURE game.usp_WorldStateTribe_UpdateSymbolState @TribeId    TINYINT,
     @IsClosed   BIT
 AS
 BEGIN
-    SET NOCOUNT ON;
-    SET XACT_ABORT ON;
+    SET
+NOCOUNT ON;
+    SET
+XACT_ABORT ON;
 
-    UPDATE game.WorldStateTribes
-    SET SymbolDate = @SymbolDate,
-        HasSymbol  = @HasSymbol,
-        IsClosed   = @IsClosed
-    WHERE TribeId = @TribeId;
+UPDATE game.WorldStateTribes
+SET SymbolDate = @SymbolDate,
+    HasSymbol  = @HasSymbol,
+    IsClosed   = @IsClosed
+WHERE TribeId = @TribeId;
 END;

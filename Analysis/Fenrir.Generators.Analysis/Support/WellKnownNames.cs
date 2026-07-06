@@ -8,7 +8,10 @@ internal static class WellKnownNames
     public const string FixedStringAttribute = "Fenrir.Network.Serialization.Attributes.FixedStringAttribute";
     public const string FixedArrayAttribute = "Fenrir.Network.Serialization.Attributes.FixedArrayAttribute";
     public const string ReservedAttribute = "Fenrir.Network.Serialization.Attributes.ReservedAttribute";
-    public const string ObfuscatedUidFieldAttribute = "Fenrir.Network.Serialization.Attributes.ObfuscatedUidFieldAttribute";
+
+    public const string ObfuscatedUidFieldAttribute =
+        "Fenrir.Network.Serialization.Attributes.ObfuscatedUidFieldAttribute";
+
     public const string AvatarXorKindAttribute = "Fenrir.Network.Serialization.Attributes.AvatarXorKindAttribute";
 
     public const string IFenrirWireType = "Fenrir.Network.Abstractions.IFenrirWireType`1";

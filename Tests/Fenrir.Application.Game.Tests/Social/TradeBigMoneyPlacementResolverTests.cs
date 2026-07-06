@@ -15,7 +15,7 @@ public class TradeBigMoneyPlacementResolverTests
     public void ResolveToTradeOffer_NeitherSideConfirmed_IsNotLocked()
     {
         var result = TradeBigMoneyPlacementResolver.ResolveToTradeOffer(
-            ownMenuState: 0, onHandBigMoney: 10, tradeOfferBigMoney: 0, amount: 5);
+            0, 10, 0, 5);
 
         Assert.True(result.Succeeded);
     }
@@ -24,7 +24,7 @@ public class TradeBigMoneyPlacementResolverTests
     public void ResolveToTradeOffer_OwnSideLocked_IsTradeLocked()
     {
         var result = TradeBigMoneyPlacementResolver.ResolveToTradeOffer(
-            ownMenuState: 1, onHandBigMoney: 10, tradeOfferBigMoney: 0, amount: 5);
+            1, 10, 0, 5);
 
         Assert.Equal(TradeBigMoneyPlacementResolver.BigMoneyPlacementOutcome.TradeLocked, result.Outcome);
         Assert.False(result.Succeeded);
@@ -34,7 +34,7 @@ public class TradeBigMoneyPlacementResolverTests
     public void ResolveToTradeOffer_BothSidesConfirmed_IsTradeLocked()
     {
         var result = TradeBigMoneyPlacementResolver.ResolveToTradeOffer(
-            ownMenuState: 2, onHandBigMoney: 10, tradeOfferBigMoney: 0, amount: 5);
+            2, 10, 0, 5);
 
         Assert.Equal(TradeBigMoneyPlacementResolver.BigMoneyPlacementOutcome.TradeLocked, result.Outcome);
     }
@@ -45,7 +45,7 @@ public class TradeBigMoneyPlacementResolverTests
         // Even a would-otherwise-be-invalid amount is reported as TradeLocked first, matching the legacy's
         // trade-lock-guard-before-anything-else ordering.
         var result = TradeBigMoneyPlacementResolver.ResolveToTradeOffer(
-            ownMenuState: 1, onHandBigMoney: 10, tradeOfferBigMoney: 0, amount: 0);
+            1, 10, 0, 0);
 
         Assert.Equal(TradeBigMoneyPlacementResolver.BigMoneyPlacementOutcome.TradeLocked, result.Outcome);
     }
@@ -54,7 +54,7 @@ public class TradeBigMoneyPlacementResolverTests
     public void ResolveToTradeOffer_AmountBelowOne_IsQuantityOutOfRange()
     {
         var result = TradeBigMoneyPlacementResolver.ResolveToTradeOffer(
-            ownMenuState: 0, onHandBigMoney: 10, tradeOfferBigMoney: 0, amount: 0);
+            0, 10, 0, 0);
 
         Assert.Equal(TradeBigMoneyPlacementResolver.BigMoneyPlacementOutcome.QuantityOutOfRange, result.Outcome);
     }
@@ -63,7 +63,7 @@ public class TradeBigMoneyPlacementResolverTests
     public void ResolveToTradeOffer_AmountExceedsOnHandBalance_IsInsufficientSourceBalance()
     {
         var result = TradeBigMoneyPlacementResolver.ResolveToTradeOffer(
-            ownMenuState: 0, onHandBigMoney: 5, tradeOfferBigMoney: 0, amount: 6);
+            0, 5, 0, 6);
 
         Assert.Equal(TradeBigMoneyPlacementResolver.BigMoneyPlacementOutcome.InsufficientSourceBalance,
             result.Outcome);
@@ -73,8 +73,8 @@ public class TradeBigMoneyPlacementResolverTests
     public void ResolveToTradeOffer_ResultingTradeOfferExceedsCap_IsDestinationOverflow()
     {
         var result = TradeBigMoneyPlacementResolver.ResolveToTradeOffer(
-            ownMenuState: 0, onHandBigMoney: TradeBigMoneyPlacementResolver.BigMoneyCap,
-            tradeOfferBigMoney: TradeBigMoneyPlacementResolver.BigMoneyCap, amount: 1);
+            0, TradeBigMoneyPlacementResolver.BigMoneyCap,
+            TradeBigMoneyPlacementResolver.BigMoneyCap, 1);
 
         Assert.Equal(TradeBigMoneyPlacementResolver.BigMoneyPlacementOutcome.DestinationOverflow, result.Outcome);
     }
@@ -83,8 +83,8 @@ public class TradeBigMoneyPlacementResolverTests
     public void ResolveToTradeOffer_ResultingTradeOfferExactlyAtCap_Succeeds()
     {
         var result = TradeBigMoneyPlacementResolver.ResolveToTradeOffer(
-            ownMenuState: 0, onHandBigMoney: TradeBigMoneyPlacementResolver.BigMoneyCap, tradeOfferBigMoney: 0,
-            amount: TradeBigMoneyPlacementResolver.BigMoneyCap);
+            0, TradeBigMoneyPlacementResolver.BigMoneyCap, 0,
+            TradeBigMoneyPlacementResolver.BigMoneyCap);
 
         Assert.True(result.Succeeded);
         Assert.Equal(0, result.NewOnHandBigMoney);
@@ -95,7 +95,7 @@ public class TradeBigMoneyPlacementResolverTests
     public void ResolveToTradeOffer_Success_MovesAmountBetweenBothBalances()
     {
         var result = TradeBigMoneyPlacementResolver.ResolveToTradeOffer(
-            ownMenuState: 0, onHandBigMoney: 20, tradeOfferBigMoney: 3, amount: 10);
+            0, 20, 3, 10);
 
         Assert.True(result.Succeeded);
         Assert.Equal(10, result.NewOnHandBigMoney);
@@ -108,7 +108,7 @@ public class TradeBigMoneyPlacementResolverTests
     public void ResolveFromTradeOffer_OwnSideLocked_IsTradeLocked()
     {
         var result = TradeBigMoneyPlacementResolver.ResolveFromTradeOffer(
-            ownMenuState: 1, tradeOfferBigMoney: 10, onHandBigMoney: 0, amount: 5);
+            1, 10, 0, 5);
 
         Assert.Equal(TradeBigMoneyPlacementResolver.BigMoneyPlacementOutcome.TradeLocked, result.Outcome);
     }
@@ -117,7 +117,7 @@ public class TradeBigMoneyPlacementResolverTests
     public void ResolveFromTradeOffer_AmountBelowOne_IsQuantityOutOfRange()
     {
         var result = TradeBigMoneyPlacementResolver.ResolveFromTradeOffer(
-            ownMenuState: 0, tradeOfferBigMoney: 10, onHandBigMoney: 0, amount: -1);
+            0, 10, 0, -1);
 
         Assert.Equal(TradeBigMoneyPlacementResolver.BigMoneyPlacementOutcome.QuantityOutOfRange, result.Outcome);
     }
@@ -126,7 +126,7 @@ public class TradeBigMoneyPlacementResolverTests
     public void ResolveFromTradeOffer_AmountExceedsTradeOfferBalance_IsInsufficientSourceBalance()
     {
         var result = TradeBigMoneyPlacementResolver.ResolveFromTradeOffer(
-            ownMenuState: 0, tradeOfferBigMoney: 5, onHandBigMoney: 0, amount: 6);
+            0, 5, 0, 6);
 
         Assert.Equal(TradeBigMoneyPlacementResolver.BigMoneyPlacementOutcome.InsufficientSourceBalance,
             result.Outcome);
@@ -136,8 +136,8 @@ public class TradeBigMoneyPlacementResolverTests
     public void ResolveFromTradeOffer_ResultingOnHandExceedsCap_IsDestinationOverflow()
     {
         var result = TradeBigMoneyPlacementResolver.ResolveFromTradeOffer(
-            ownMenuState: 0, tradeOfferBigMoney: TradeBigMoneyPlacementResolver.BigMoneyCap,
-            onHandBigMoney: TradeBigMoneyPlacementResolver.BigMoneyCap, amount: 1);
+            0, TradeBigMoneyPlacementResolver.BigMoneyCap,
+            TradeBigMoneyPlacementResolver.BigMoneyCap, 1);
 
         Assert.Equal(TradeBigMoneyPlacementResolver.BigMoneyPlacementOutcome.DestinationOverflow, result.Outcome);
     }
@@ -146,7 +146,7 @@ public class TradeBigMoneyPlacementResolverTests
     public void ResolveFromTradeOffer_Success_MovesAmountBetweenBothBalances()
     {
         var result = TradeBigMoneyPlacementResolver.ResolveFromTradeOffer(
-            ownMenuState: 0, tradeOfferBigMoney: 15, onHandBigMoney: 5, amount: 10);
+            0, 15, 5, 10);
 
         Assert.True(result.Succeeded);
         Assert.Equal(15, result.NewOnHandBigMoney);
@@ -158,7 +158,7 @@ public class TradeBigMoneyPlacementResolverTests
     {
         // The guard only fires at MenuState >= 1 -- an open-but-unconfirmed trade window (state 0) never blocks.
         var result = TradeBigMoneyPlacementResolver.ResolveFromTradeOffer(
-            ownMenuState: 0, tradeOfferBigMoney: 15, onHandBigMoney: 5, amount: 10);
+            0, 15, 5, 10);
 
         Assert.NotEqual(TradeBigMoneyPlacementResolver.BigMoneyPlacementOutcome.TradeLocked, result.Outcome);
     }

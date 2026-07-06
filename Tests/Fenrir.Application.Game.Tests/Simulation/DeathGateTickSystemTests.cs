@@ -35,7 +35,7 @@ public class DeathGateTickSystemTests
     public void UnconditionalZone_BeforeTenTicks_StaysDeadAndFlagged()
     {
         var (zone, _) = SetUp(999); // 999 is outside every faction-territory block and 200/322/323
-        EnterAndKill(zone, 10, tribe: 1);
+        EnterAndKill(zone, 10, 1);
 
         // 9 legacy ticks (4.5 s) -- one short of the 10-tick eligibility threshold.
         zone.Tick(TimeSpan.FromMilliseconds(4500));
@@ -49,7 +49,7 @@ public class DeathGateTickSystemTests
     public void UnconditionalZone_AtTenTicks_GrantsReviveEligibility_ClearsEveryDeathGateFlag()
     {
         var (zone, _) = SetUp(999);
-        EnterAndKill(zone, 10, tribe: 1);
+        EnterAndKill(zone, 10, 1);
 
         zone.Tick(TimeSpan.FromMilliseconds(5000)); // exactly 10 legacy ticks
 
@@ -65,7 +65,7 @@ public class DeathGateTickSystemTests
     public void FactionTerritory_AvatarTribeMatchesOwner_GrantsEligibilityAtTenTicks()
     {
         var (zone, _) = SetUp(2); // faction-0 territory block
-        EnterAndKill(zone, 10, tribe: 0); // matches the owning faction
+        EnterAndKill(zone, 10, 0); // matches the owning faction
 
         zone.Tick(TimeSpan.FromMilliseconds(5000));
 
@@ -77,7 +77,7 @@ public class DeathGateTickSystemTests
     public void FactionTerritory_MismatchedTribeNoAlliance_StaysDead_PastTheTenTickMark()
     {
         var (zone, _) = SetUp(2); // faction-0 territory block
-        EnterAndKill(zone, 10, tribe: 1); // does not match, no alliance configured
+        EnterAndKill(zone, 10, 1); // does not match, no alliance configured
 
         zone.Tick(TimeSpan.FromMilliseconds(5000)); // 10 ticks
         zone.Tick(TimeSpan.FromMilliseconds(5000)); // 20 ticks -- still re-checked every tick, still fails
@@ -91,7 +91,7 @@ public class DeathGateTickSystemTests
     {
         var worldState = ZoneTestKit.CreateWorldState();
         var (zone, _) = SetUp(2, worldState); // faction-0 territory block
-        EnterAndKill(zone, 10, tribe: 1);
+        EnterAndKill(zone, 10, 1);
 
         zone.Tick(TimeSpan.FromMilliseconds(5000)); // 10 ticks: not yet allied -- still dead
         Assert.True(zone.TryGetPlayer(10, out var stillDead));
@@ -109,7 +109,7 @@ public class DeathGateTickSystemTests
     public void AlwaysBlockedZone_NeverGrantsEligibility_EvenFarPastTheTenTickMark()
     {
         var (zone, _) = SetUp(200);
-        EnterAndKill(zone, 10, tribe: 0);
+        EnterAndKill(zone, 10, 0);
 
         zone.Tick(TimeSpan.FromSeconds(4)); // 8 legacy ticks -- under the 50-tick force-quit mark, well past 10
 

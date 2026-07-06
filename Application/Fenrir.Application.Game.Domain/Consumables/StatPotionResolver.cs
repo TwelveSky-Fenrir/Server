@@ -23,19 +23,22 @@ namespace Fenrir.Application.Game.Domain.Consumables;
 /// </remarks>
 public static class StatPotionResolver
 {
-    public const int OrdinaryTierCap = 200;
-    public const int G12TierCap = 400;
-
     public enum Outcome
     {
         Success,
 
-        /// <summary>The banked counter is already exactly at its tier cap -- a distinct result code, not the plain failure used elsewhere.</summary>
+        /// <summary>
+        ///     The banked counter is already exactly at its tier cap -- a distinct result code, not the plain failure used
+        ///     elsewhere.
+        /// </summary>
         AlreadyMaxed,
 
         /// <summary>g12 tier only: banked count not yet at the ordinary cap, or rebirth/high-level threshold not met.</summary>
         PreconditionFailed
     }
+
+    public const int OrdinaryTierCap = 200;
+    public const int G12TierCap = 400;
 
     /// <summary>
     ///     Ordinary tier ("1x"/"10x" ids): bulk-aware. If the requested bulk count would overshoot

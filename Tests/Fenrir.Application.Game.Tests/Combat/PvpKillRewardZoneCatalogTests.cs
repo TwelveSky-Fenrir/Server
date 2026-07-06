@@ -7,7 +7,7 @@ public class PvpKillRewardZoneCatalogTests
     [Fact]
     public void FfaZone_DisablesGenericCpAndExpAndDailyMission_ButEnablesDropAndHeroPoint()
     {
-        var profile = PvpKillRewardZoneCatalog.Resolve(PvpKillRewardZoneCatalog.FfaMapNumber, isStunTrigger: false);
+        var profile = PvpKillRewardZoneCatalog.Resolve(PvpKillRewardZoneCatalog.FfaMapNumber, false);
 
         Assert.False(profile.GrantContributionPoints);
         Assert.False(profile.GrantExperience);
@@ -19,8 +19,8 @@ public class PvpKillRewardZoneCatalogTests
     [Fact]
     public void FfaZone_IsUnaffectedByStunTrigger()
     {
-        var normal = PvpKillRewardZoneCatalog.Resolve(PvpKillRewardZoneCatalog.FfaMapNumber, isStunTrigger: false);
-        var stun = PvpKillRewardZoneCatalog.Resolve(PvpKillRewardZoneCatalog.FfaMapNumber, isStunTrigger: true);
+        var normal = PvpKillRewardZoneCatalog.Resolve(PvpKillRewardZoneCatalog.FfaMapNumber, false);
+        var stun = PvpKillRewardZoneCatalog.Resolve(PvpKillRewardZoneCatalog.FfaMapNumber, true);
 
         Assert.Equal(normal, stun);
     }
@@ -32,7 +32,7 @@ public class PvpKillRewardZoneCatalogTests
     [InlineData((short)269)]
     public void UnconditionalFullRewardZones_GrantEverythingEvenOnStunKill(short zoneId)
     {
-        var profile = PvpKillRewardZoneCatalog.Resolve(zoneId, isStunTrigger: true);
+        var profile = PvpKillRewardZoneCatalog.Resolve(zoneId, true);
 
         Assert.True(profile.GrantContributionPoints);
         Assert.True(profile.GrantExperience);
@@ -44,7 +44,7 @@ public class PvpKillRewardZoneCatalogTests
     [Fact]
     public void DefaultZone_NonStunKill_GrantsEverythingExceptHeroPoint()
     {
-        var profile = PvpKillRewardZoneCatalog.Resolve(1, isStunTrigger: false);
+        var profile = PvpKillRewardZoneCatalog.Resolve(1, false);
 
         Assert.True(profile.GrantContributionPoints);
         Assert.True(profile.GrantExperience);
@@ -56,7 +56,7 @@ public class PvpKillRewardZoneCatalogTests
     [Fact]
     public void DefaultZone_StunKill_GrantsNothing()
     {
-        var profile = PvpKillRewardZoneCatalog.Resolve(1, isStunTrigger: true);
+        var profile = PvpKillRewardZoneCatalog.Resolve(1, true);
 
         Assert.Equal(PvpKillZoneRewardProfile.None, profile);
     }

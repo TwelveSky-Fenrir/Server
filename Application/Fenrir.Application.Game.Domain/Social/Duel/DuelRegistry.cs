@@ -223,7 +223,8 @@ public sealed class DuelRegistry
     ///     Unconditional per-character duel-state reset on every zone entry (fresh login or in-process
     ///     handoff) -- closes the narrow race where this character disconnected/transferred a tick before its
     ///     own duel state could be naturally resolved. Silent: no ZC_DUEL_END_RECV is sent and the
-    ///     potion-restriction flag is deliberately left untouched here (<see cref="World.PlayerRuntimeState.CanUseConsumables" />
+    ///     potion-restriction flag is deliberately left untouched here (
+    ///     <see cref="World.PlayerRuntimeState.CanUseConsumables" />
     ///     is shared with stun/death gating and is left to those systems' own carry-over semantics across a
     ///     zone transfer, not forced here) -- there is no meaningful "duel ended" event to report to a client
     ///     that is only now entering.
@@ -232,7 +233,6 @@ public sealed class DuelRegistry
     ///     Réf. C++ : Server/ts25zone/S04_MyWork02.cpp:1037-1046 (avatar zone-entry handler -- unconditional
     ///     force-reset of <c>aDuelState[]</c>/<c>mDuelProcessState</c> on every entry, independent of the
     ///     tick-based cleanup).
-    ///
     ///     Pending/accepted (negotiation) state has no self-correcting per-tick mechanism of its own, so both
     ///     directions of that two-way link are torn down here (matching <see cref="TryCancel" />/
     ///     <see cref="TryAnswer" />'s own symmetric cleanup) -- this also covers the "Accepted but never
@@ -241,7 +241,6 @@ public sealed class DuelRegistry
     ///     found" check), so only THIS character's own key is dropped here; the opponent's own key still maps
     ///     to the same shared <see cref="ActiveDuel" /> instance and gets properly ended (with notification and
     ///     the potion-restriction lift) on the opponent's own next tick evaluation.
-    ///
     ///     KNOWN TRADE-OFF: this method fires on every zone entry, including an in-process map-transfer handoff
     ///     (the same live session/socket, not a fresh connection) -- for that specific case, dropping this
     ///     character's own key here means THEY never receive their own ZC_DUEL_END_RECV (unlike their

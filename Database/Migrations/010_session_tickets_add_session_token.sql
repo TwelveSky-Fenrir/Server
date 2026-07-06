@@ -15,7 +15,8 @@ DROP PROCEDURE runtime.usp_SessionTicket_Purge;
 GO
 
 -- Safe: rows here carry only a 15s TTL and no durable meaning, so clearing before the ALTER loses nothing.
-DELETE FROM runtime.SessionTickets;
+DELETE
+FROM runtime.SessionTickets;
 
 -- A DEFAULT is required by ALTER TABLE ... ADD for a NOT NULL column regardless of the table currently
 -- having zero rows (see ALTER TABLE column_constraint's NULL | NOT NULL remarks) -- this default is never

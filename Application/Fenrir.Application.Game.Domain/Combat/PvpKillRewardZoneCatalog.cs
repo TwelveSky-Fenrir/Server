@@ -35,19 +35,29 @@ public readonly record struct PvpKillZoneRewardProfile(
 ///         therefore falls through to the <c>default</c> branch below instead of its own real behavior --
 ///         a known, deliberate gap, not a silent bug:
 ///         <list type="bullet">
-///             <item>Four "town invasion" zones: should grant drop+EXP+dailyMission unconditionally but gate
-///             CP alone on kill-type != stun (a narrower CP gate than <c>default</c>'s, which gates all
-///             four flags together).</item>
-///             <item>Twelve "tribe-symbol-battle" secondary zones: should grant the full set only while that
-///             zone's tribe-symbol-battle world flag (<c>WorldRvrState.TribeSymbolBattle</c> is the Fenrir
-///             equivalent) is active, and nothing at all otherwise.</item>
-///             <item>One "DTM" zone: should always grant CP+EXP unconditionally regardless of sub-branch,
-///             with only drop-tier/HSB-eligibility/dailyMission varying by the tribe-symbol-battle flag and a
-///             battle-post-distance/battle-state sub-check.</item>
-///             <item>A long list of "regular-war-tier" zones: should grant the full set unconditionally (no
-///             stun gate at all, unlike <c>default</c>).</item>
-///             <item>Two zones gated by a live, time-windowed event flag: full set only while that window is
-///             open.</item>
+///             <item>
+///                 Four "town invasion" zones: should grant drop+EXP+dailyMission unconditionally but gate
+///                 CP alone on kill-type != stun (a narrower CP gate than <c>default</c>'s, which gates all
+///                 four flags together).
+///             </item>
+///             <item>
+///                 Twelve "tribe-symbol-battle" secondary zones: should grant the full set only while that
+///                 zone's tribe-symbol-battle world flag (<c>WorldRvrState.TribeSymbolBattle</c> is the Fenrir
+///                 equivalent) is active, and nothing at all otherwise.
+///             </item>
+///             <item>
+///                 One "DTM" zone: should always grant CP+EXP unconditionally regardless of sub-branch,
+///                 with only drop-tier/HSB-eligibility/dailyMission varying by the tribe-symbol-battle flag and a
+///                 battle-post-distance/battle-state sub-check.
+///             </item>
+///             <item>
+///                 A long list of "regular-war-tier" zones: should grant the full set unconditionally (no
+///                 stun gate at all, unlike <c>default</c>).
+///             </item>
+///             <item>
+///                 Two zones gated by a live, time-windowed event flag: full set only while that window is
+///                 open.
+///             </item>
 ///         </list>
 ///         Zone 335 (FFA) and zones 194/267/268/269 ARE fully modeled below since the contract states their
 ///         ids explicitly.
@@ -57,14 +67,6 @@ public static class PvpKillRewardZoneCatalog
 {
     /// <summary>Server/Header/Protocol/DEFINE.h:99 (<c>FFAMAPNUM</c>).</summary>
     public const short FfaMapNumber = 335;
-
-    /// <summary>
-    ///     "One specific zone number (194) and a group of three consecutive zone numbers (267/268/269)... each
-    ///     grants the full reward set unconditionally." Live case labels per the contract's own Citations
-    ///     (H07_MyGame.h:20,34 shows the <c>ZONE194</c>/<c>ZONE267</c> identifiers exist even though the
-    ///     adjacent scoreboard-tally macros keyed to them are commented out/dead).
-    /// </summary>
-    private static readonly short[] UnconditionalFullRewardZoneIds = [194, 267, 268, 269];
 
     /// <summary>
     ///     No legacy source value plumbed to this contract for the FFA branch's fixed hero-point amount --
@@ -81,6 +83,14 @@ public static class PvpKillRewardZoneCatalog
     public const int HeroPointMinimumCombinedLevel = 0;
 
     /// <summary>
+    ///     "One specific zone number (194) and a group of three consecutive zone numbers (267/268/269)... each
+    ///     grants the full reward set unconditionally." Live case labels per the contract's own Citations
+    ///     (H07_MyGame.h:20,34 shows the <c>ZONE194</c>/<c>ZONE267</c> identifiers exist even though the
+    ///     adjacent scoreboard-tally macros keyed to them are commented out/dead).
+    /// </summary>
+    private static readonly short[] UnconditionalFullRewardZoneIds = [194, 267, 268, 269];
+
+    /// <summary>
     ///     Resolves the reward-eligibility profile for a kill happening in <paramref name="zoneId" />.
     ///     <paramref name="isStunTrigger" /> is the "stun vs. not" collapse of the legacy's three-value
     ///     kill-type marker (<c>KILL_CP_TYPE</c>, H07_MyGame.h:51-55) -- "normal hit" and "designated one-hit
@@ -94,11 +104,11 @@ public static class PvpKillRewardZoneCatalog
             // daily-mission progress are never granted for an FFA kill reached via this branch, even though
             // ordinary town/regular-war kills do grant both.
             return new PvpKillZoneRewardProfile(
-                GrantContributionPoints: false,
-                GrantExperience: false,
-                GrantDrop: true,
-                GrantDailyMissionProgress: false,
-                HeroPointAmount: FfaHeroPointAmount);
+                false,
+                false,
+                true,
+                false,
+                FfaHeroPointAmount);
 
         if (Array.IndexOf(UnconditionalFullRewardZoneIds, zoneId) >= 0)
             return new PvpKillZoneRewardProfile(true, true, true, true, 0);

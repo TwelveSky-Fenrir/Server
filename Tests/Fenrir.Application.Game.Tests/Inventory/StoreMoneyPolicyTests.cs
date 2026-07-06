@@ -11,7 +11,7 @@ public class StoreMoneyPolicyTests
     [Fact]
     public void ResolveDeposit_Success_MovesExactAmountBothWays()
     {
-        var result = StoreMoneyPolicy.ResolveDeposit(requestedAmount: 100, walletMoney: 500, storeMoney: 50);
+        var result = StoreMoneyPolicy.ResolveDeposit(100, 500, 50);
 
         Assert.True(result.Succeeded);
         Assert.Equal(400, result.NewSourceMoney);
@@ -21,7 +21,7 @@ public class StoreMoneyPolicyTests
     [Fact]
     public void ResolveWithdraw_Success_MovesExactAmountBothWays()
     {
-        var result = StoreMoneyPolicy.ResolveWithdraw(requestedAmount: 100, storeMoney: 500, walletMoney: 50);
+        var result = StoreMoneyPolicy.ResolveWithdraw(100, 500, 50);
 
         Assert.True(result.Succeeded);
         Assert.Equal(400, result.NewSourceMoney);
@@ -33,7 +33,7 @@ public class StoreMoneyPolicyTests
     [InlineData(-1)]
     public void Resolve_NonPositiveAmount_IsInvalid(long requestedAmount)
     {
-        var result = StoreMoneyPolicy.ResolveDeposit(requestedAmount, walletMoney: 1000, storeMoney: 0);
+        var result = StoreMoneyPolicy.ResolveDeposit(requestedAmount, 1000, 0);
 
         Assert.Equal(StoreMoneyPolicy.TransferOutcome.InvalidQuantity, result.Outcome);
         Assert.False(result.Succeeded);
@@ -42,7 +42,7 @@ public class StoreMoneyPolicyTests
     [Fact]
     public void Resolve_AmountExceedsSource_IsInsufficient()
     {
-        var result = StoreMoneyPolicy.ResolveDeposit(requestedAmount: 1001, walletMoney: 1000, storeMoney: 0);
+        var result = StoreMoneyPolicy.ResolveDeposit(1001, 1000, 0);
 
         Assert.Equal(StoreMoneyPolicy.TransferOutcome.InsufficientSource, result.Outcome);
     }
@@ -50,7 +50,7 @@ public class StoreMoneyPolicyTests
     [Fact]
     public void Resolve_AmountExactlyEqualsSource_Succeeds()
     {
-        var result = StoreMoneyPolicy.ResolveDeposit(requestedAmount: 1000, walletMoney: 1000, storeMoney: 0);
+        var result = StoreMoneyPolicy.ResolveDeposit(1000, 1000, 0);
 
         Assert.True(result.Succeeded);
         Assert.Equal(0, result.NewSourceMoney);
@@ -60,8 +60,8 @@ public class StoreMoneyPolicyTests
     [Fact]
     public void Resolve_DestinationWouldOverflowCap_IsRejected()
     {
-        var result = StoreMoneyPolicy.ResolveDeposit(requestedAmount: 10,
-            walletMoney: 1_000_000_000, storeMoney: StoreMoneyPolicy.MaxMoney - 5);
+        var result = StoreMoneyPolicy.ResolveDeposit(10,
+            1_000_000_000, StoreMoneyPolicy.MaxMoney - 5);
 
         Assert.Equal(StoreMoneyPolicy.TransferOutcome.DestinationOverflow, result.Outcome);
     }
@@ -69,8 +69,8 @@ public class StoreMoneyPolicyTests
     [Fact]
     public void Resolve_DestinationExactlyAtCap_Succeeds()
     {
-        var result = StoreMoneyPolicy.ResolveDeposit(requestedAmount: 5,
-            walletMoney: 1_000_000_000, storeMoney: StoreMoneyPolicy.MaxMoney - 5);
+        var result = StoreMoneyPolicy.ResolveDeposit(5,
+            1_000_000_000, StoreMoneyPolicy.MaxMoney - 5);
 
         Assert.True(result.Succeeded);
         Assert.Equal(StoreMoneyPolicy.MaxMoney, result.NewDestinationMoney);
@@ -80,8 +80,8 @@ public class StoreMoneyPolicyTests
     public void Resolve_NoFixedPerRequestCapBeyondOverflowGuard()
     {
         // Unlike the 999 stackable-item cap, money has no fixed per-request ceiling besides the overflow guard.
-        var result = StoreMoneyPolicy.ResolveDeposit(requestedAmount: 1_500_000_000,
-            walletMoney: 1_500_000_000, storeMoney: 0);
+        var result = StoreMoneyPolicy.ResolveDeposit(1_500_000_000,
+            1_500_000_000, 0);
 
         Assert.True(result.Succeeded);
         Assert.Equal(1_500_000_000, result.NewDestinationMoney);
@@ -92,7 +92,7 @@ public class StoreMoneyPolicyTests
     {
         // Documentation-as-test: StoreMoneyPolicy's signature has no BigMoney/BigStoreMoney parameter at all --
         // the 1B pool is explicitly out of scope for tSort 226/227 and must not be inferred from this policy.
-        var result = StoreMoneyPolicy.ResolveWithdraw(requestedAmount: 1, storeMoney: 1, walletMoney: 0);
+        var result = StoreMoneyPolicy.ResolveWithdraw(1, 1, 0);
 
         Assert.True(result.Succeeded);
     }

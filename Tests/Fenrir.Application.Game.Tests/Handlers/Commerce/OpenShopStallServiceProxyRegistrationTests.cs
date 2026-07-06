@@ -1,4 +1,3 @@
-using Fenrir.Application.Game.Abstractions.Commerce;
 using Fenrir.Application.Game.Domain.Commerce;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World;
@@ -71,7 +70,7 @@ public class OpenShopStallServiceProxyRegistrationTests
         const int characterId = 42;
 
         zone.Post(ZoneCommand.Enter(characterId,
-            ZoneTestKit.EnterData(session, ProxyShopZonePolicy.ZoneNumber, "Seller", posX: 15f, posZ: 25f)));
+            ZoneTestKit.EnterData(session, ProxyShopZonePolicy.ZoneNumber, "Seller", 15f, posZ: 25f)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
         Assert.True(zone.TryGetPlayer(characterId, out var state));
 
@@ -81,7 +80,7 @@ public class OpenShopStallServiceProxyRegistrationTests
             NullLogger<OpenShopStallService>.Instance);
 
         var packet = ProxyOpenRequest("MyStall");
-        var listing = packet.PshopInfo with { UniqueNumber = unchecked((uint)(characterId * 2 + 1)) };
+        var listing = packet.PshopInfo with { UniqueNumber = unchecked(characterId * 2 + 1) };
 
         var response = await RunToCompletionAsync(
             service.OpenProxyShopAsync(packet, zone, state!, characterId, listing, [], CancellationToken.None),
@@ -101,7 +100,7 @@ public class OpenShopStallServiceProxyRegistrationTests
         const int characterId = 43;
 
         zone.Post(ZoneCommand.Enter(characterId,
-            ZoneTestKit.EnterData(session, ProxyShopZonePolicy.ZoneNumber, "Seller", posX: 15f, posZ: 25f)));
+            ZoneTestKit.EnterData(session, ProxyShopZonePolicy.ZoneNumber, "Seller", 15f, posZ: 25f)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
         Assert.True(zone.TryGetPlayer(characterId, out var state));
 
@@ -111,7 +110,7 @@ public class OpenShopStallServiceProxyRegistrationTests
             NullLogger<OpenShopStallService>.Instance);
 
         var packet = ProxyOpenRequest("MyStall");
-        var listing = packet.PshopInfo with { UniqueNumber = unchecked((uint)(characterId * 2 + 1)) };
+        var listing = packet.PshopInfo with { UniqueNumber = unchecked(characterId * 2 + 1) };
 
         var response = await service.OpenProxyShopAsync(packet, zone, state!, characterId, listing, [],
             CancellationToken.None);
@@ -139,7 +138,10 @@ public class OpenShopStallServiceProxyRegistrationTests
         Assert.Contains((characterId, (byte)0), offlineShops.ClosedStates);
     }
 
-    /// <summary>Only the two members <see cref="OpenShopStallService.OpenProxyShopAsync" />/<see cref="CloseShopStallService" /> call.</summary>
+    /// <summary>
+    ///     Only the two members <see cref="OpenShopStallService.OpenProxyShopAsync" />/
+    ///     <see cref="CloseShopStallService" /> call.
+    /// </summary>
     private sealed class OpenTrackingOfflineShopRepository : IOfflineShopRepository
     {
         public List<(int CharacterId, byte ShopState)> ClosedStates { get; } = [];

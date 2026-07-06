@@ -6,7 +6,8 @@ namespace Fenrir.Application.Game.Domain.World.WorldState;
 /// <summary>
 ///     The one-shot pending-flag check-and-trigger for <see cref="FavoredTribeRankBonusLadder" />, and the sole
 ///     producer of the tSort=1234 cross-cluster broadcast. Reads <see cref="WorldStateService.World" />'s
-///     <c>UpdateTribePoint</c> flag (the same cross-process flag <see cref="WorldStateService.SetUpdateTribePointFlag" />'s
+///     <c>UpdateTribePoint</c> flag (the same cross-process flag <see cref="WorldStateService.SetUpdateTribePointFlag" />
+///     's
 ///     own remarks describe -- ts25playuser writes <see cref="PendingFlagValue" /> when fresh daily tribe points
 ///     are pending, ts25center consumes it to <see cref="ConsumedFlagValue" />); only when it currently reads
 ///     <see cref="PendingFlagValue" /> does <see cref="TickIfPendingAsync" /> flip it to

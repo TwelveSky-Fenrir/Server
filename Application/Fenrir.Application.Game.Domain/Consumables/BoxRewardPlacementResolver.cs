@@ -32,17 +32,6 @@ public static class BoxRewardPlacementResolver
     /// <summary><c>MAX_ITEM_DUPLICATION_NUM</c> (DEFINE.h:611).</summary>
     public const int MaxStackQuantity = 999;
 
-    /// <summary>Already-resolved shape of the reward the caller rolled -- see this type's own remarks.</summary>
-    public readonly record struct ResolvedReward(
-        int ItemId,
-        int Quantity,
-        bool IsStackable,
-        byte Enchant,
-        byte Combine,
-        byte Refine,
-        byte Socket,
-        int ExpireDate);
-
     /// <summary>
     ///     Searches both inventory pages for a mergeable same-id stack first (excluding the box's own slot, per
     ///     <c>BoxReward_FindStackSlot99</c>); falling back to the first empty slot found, page0 before page1,
@@ -60,10 +49,12 @@ public static class BoxRewardPlacementResolver
             return merge1;
 
         if (TryFindEmptySlot(ContainerMatrix.InventoryPage0, page0, out var empty0Slot))
-            return new Result(Outcome.PlacedInEmptySlot, ContainerMatrix.InventoryPage0, empty0Slot, BuildStack(reward));
+            return new Result(Outcome.PlacedInEmptySlot, ContainerMatrix.InventoryPage0, empty0Slot,
+                BuildStack(reward));
 
         if (TryFindEmptySlot(ContainerMatrix.InventoryPage1, page1, out var empty1Slot))
-            return new Result(Outcome.PlacedInEmptySlot, ContainerMatrix.InventoryPage1, empty1Slot, BuildStack(reward));
+            return new Result(Outcome.PlacedInEmptySlot, ContainerMatrix.InventoryPage1, empty1Slot,
+                BuildStack(reward));
 
         return new Result(Outcome.InventoryFull, 0, 0, null);
     }
@@ -115,6 +106,17 @@ public static class BoxRewardPlacementResolver
         return new ItemStack(reward.ItemId, reward.Quantity, reward.Enchant, reward.Combine, reward.Refine,
             reward.Socket, 0, 0, 0, reward.ExpireDate, 0);
     }
+
+    /// <summary>Already-resolved shape of the reward the caller rolled -- see this type's own remarks.</summary>
+    public readonly record struct ResolvedReward(
+        int ItemId,
+        int Quantity,
+        bool IsStackable,
+        byte Enchant,
+        byte Combine,
+        byte Refine,
+        byte Socket,
+        int ExpireDate);
 
     /// <summary>NewStack is null only for <see cref="Outcome.InventoryFull" />.</summary>
     public readonly record struct Result(Outcome Outcome, byte Container, byte Slot, ItemStack? NewStack)

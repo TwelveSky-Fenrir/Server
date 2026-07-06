@@ -16,7 +16,10 @@ public interface IRuneStoneCraftService
     /// <param name="sourcePage">Wire tPage1 -- 0/1, which inventory page holds the rune-stone source item.</param>
     /// <param name="sourceSlot">Wire tIndex1 -- 0-63, the source item's slot within <paramref name="sourcePage" />.</param>
     /// <param name="destinationPage">Wire tPage2 -- 0/1, which inventory page holds the destination rune-core item.</param>
-    /// <param name="destinationSlot">Wire tIndex2 -- 0-63, the destination item's slot within <paramref name="destinationPage" />.</param>
+    /// <param name="destinationSlot">
+    ///     Wire tIndex2 -- 0-63, the destination item's slot within
+    ///     <paramref name="destinationPage" />.
+    /// </param>
     /// <param name="statSlotSelector">Wire tXPost2, repurposed as the 100/200/300/400 stat-slot selector.</param>
     /// <param name="destinationPackedStat">
     ///     The destination item's CURRENT packed STR/DEX/VIT/INT value (see <see cref="RuneStoneStatCodec" />,

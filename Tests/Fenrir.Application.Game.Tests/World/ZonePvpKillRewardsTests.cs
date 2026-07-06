@@ -80,7 +80,7 @@ public class ZonePvpKillRewardsTests
     [Fact]
     public void DefaultZoneKill_GrantsFormulaBasedContributionPoints()
     {
-        var zone = SetUpZone(mapId: 1);
+        var zone = SetUpZone(1);
         KillDefender(zone);
 
         Assert.True(zone.TryGetPlayer(1, out var attacker));
@@ -91,7 +91,7 @@ public class ZonePvpKillRewardsTests
     [Fact]
     public void DefaultZoneKill_GrantsExperience()
     {
-        var zone = SetUpZone(mapId: 1);
+        var zone = SetUpZone(1);
         Assert.True(zone.TryGetPlayer(1, out var attackerBefore));
         var experienceBefore = attackerBefore!.Experience;
 
@@ -104,7 +104,7 @@ public class ZonePvpKillRewardsTests
     [Fact]
     public void DefaultZoneKill_GrantsNoHeroPoints()
     {
-        var zone = SetUpZone(mapId: 1);
+        var zone = SetUpZone(1);
         KillDefender(zone);
 
         Assert.True(zone.TryGetPlayer(1, out var attacker));
@@ -114,7 +114,7 @@ public class ZonePvpKillRewardsTests
     [Fact]
     public void FfaZoneKill_GrantsFlatOverrideContributionPoints_NotTheGenericFormula()
     {
-        var zone = SetUpZone(mapId: PvpKillRewardZoneCatalog.FfaMapNumber);
+        var zone = SetUpZone(PvpKillRewardZoneCatalog.FfaMapNumber);
         KillDefender(zone);
 
         Assert.True(zone.TryGetPlayer(1, out var attacker));
@@ -124,7 +124,7 @@ public class ZonePvpKillRewardsTests
     [Fact]
     public void FfaZoneKill_GrantsFixedHeroPointAmount()
     {
-        var zone = SetUpZone(mapId: PvpKillRewardZoneCatalog.FfaMapNumber);
+        var zone = SetUpZone(PvpKillRewardZoneCatalog.FfaMapNumber);
         KillDefender(zone);
 
         Assert.True(zone.TryGetPlayer(1, out var attacker));
@@ -134,7 +134,7 @@ public class ZonePvpKillRewardsTests
     [Fact]
     public void FfaZoneKill_GrantsNoExperience()
     {
-        var zone = SetUpZone(mapId: PvpKillRewardZoneCatalog.FfaMapNumber);
+        var zone = SetUpZone(PvpKillRewardZoneCatalog.FfaMapNumber);
         Assert.True(zone.TryGetPlayer(1, out var attackerBefore));
         var experienceBefore = attackerBefore!.Experience;
 
@@ -147,7 +147,7 @@ public class ZonePvpKillRewardsTests
     [Fact]
     public void FfaZoneKill_GrantsNoDailyMissionProgress()
     {
-        var zone = SetUpZone(mapId: PvpKillRewardZoneCatalog.FfaMapNumber);
+        var zone = SetUpZone(PvpKillRewardZoneCatalog.FfaMapNumber);
         KillDefender(zone);
 
         Assert.True(zone.TryGetPlayer(1, out var attacker));
@@ -157,7 +157,7 @@ public class ZonePvpKillRewardsTests
     [Fact]
     public void UnconditionalFullRewardZone_GrantsDailyMissionProgress()
     {
-        var zone = SetUpZone(mapId: 194);
+        var zone = SetUpZone(194);
         KillDefender(zone);
 
         Assert.True(zone.TryGetPlayer(1, out var attacker));
@@ -167,7 +167,7 @@ public class ZonePvpKillRewardsTests
     [Fact]
     public void CombinedLevelGapPast13_GrantsNothingAtAll_ButKillStillHappens()
     {
-        var zone = SetUpZone(mapId: 1, attackerLevel: 60, defenderLevel: 40); // gap = 20 > 13
+        var zone = SetUpZone(1, 60, 40); // gap = 20 > 13
         Assert.True(zone.TryGetPlayer(1, out var attackerBefore));
         var experienceBefore = attackerBefore!.Experience;
 
@@ -183,7 +183,7 @@ public class ZonePvpKillRewardsTests
     [Fact]
     public void CombinedLevelGapAtThirteen_StillGrantsRewards()
     {
-        var zone = SetUpZone(mapId: 1, attackerLevel: 53, defenderLevel: 40); // gap = 13, at the cutoff
+        var zone = SetUpZone(1, 53, 40); // gap = 13, at the cutoff
         KillDefender(zone);
 
         Assert.True(zone.TryGetPlayer(1, out var attacker));

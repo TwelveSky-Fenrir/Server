@@ -51,7 +51,7 @@ public class ZoneHandshakeServiceTests
     {
         var tickets = new FakeSessionTicketRepository
         {
-            TicketToReturn = new ConsumedTicketDto(CharacterId, ShardId, SessionToken, AccountGrade: 1)
+            TicketToReturn = new ConsumedTicketDto(CharacterId, ShardId, SessionToken, 1)
         };
         var accountSessions = new FakeAccountSessionRepository { TransitionResult = true };
         var service = CreateService(tickets, accountSessions);
@@ -99,7 +99,8 @@ public class ZoneHandshakeServiceTests
     }
 
     [Fact]
-    public async Task ConsumeTicketAsync_DecodedAccountIndexNotPositive_ReturnsProtocolViolation_AndNeverConsumesTheTicket()
+    public async Task
+        ConsumeTicketAsync_DecodedAccountIndexNotPositive_ReturnsProtocolViolation_AndNeverConsumesTheTicket()
     {
         var tickets = new FakeSessionTicketRepository
         {
@@ -152,10 +153,10 @@ public class ZoneHandshakeServiceTests
         for (var i = 0; i < 3; i++)
         {
             var (other, _) = ZoneTestKit.CreateSession(100 + i);
-            quota.Record(other, tribe: 1, accountId: 900 + i, characterId: 9000 + i, DateTimeOffset.UtcNow);
+            quota.Record(other, 1, 900 + i, 9000 + i, DateTimeOffset.UtcNow);
         }
 
-        var service = CreateService(tickets, accountSessions, TribeQuotaGroup.ThreeWay, quota, capacity: 9);
+        var service = CreateService(tickets, accountSessions, TribeQuotaGroup.ThreeWay, quota, 9);
         var (session, _) = ZoneTestKit.CreateSession(1);
 
         var result = await service.ConsumeTicketAsync(EncodeObfuscatedAccountId(AccountId), 1, session,
@@ -178,15 +179,15 @@ public class ZoneHandshakeServiceTests
         {
             // The character's true, persisted tribe (2) differs from what will be declared below (1) --
             // the recorded tribe must be the resolved one, never the declared one.
-            WorldEntryToReturn = new CharacterWorldEntryDto(CharacterId, AccountId, 0, "Hero", Tribe: 2, 0, 0, 0,
+            WorldEntryToReturn = new CharacterWorldEntryDto(CharacterId, AccountId, 0, "Hero", 2, 0, 0, 0,
                 1, 1, 0, 0, 0, 0, 100, 100, 50, 50, 1)
         };
 
-        var service = CreateService(tickets, accountSessions, TribeQuotaGroup.ThreeWay, quota, capacity: 300,
+        var service = CreateService(tickets, accountSessions, TribeQuotaGroup.ThreeWay, quota, 300,
             characters);
         var (session, _) = ZoneTestKit.CreateSession(1);
 
-        var result = await service.ConsumeTicketAsync(EncodeObfuscatedAccountId(AccountId), declaredTribe: 1,
+        var result = await service.ConsumeTicketAsync(EncodeObfuscatedAccountId(AccountId), 1,
             session, CancellationToken.None);
 
         Assert.Equal(ZoneHandshakeOutcome.Accepted, result.Outcome);
@@ -205,11 +206,11 @@ public class ZoneHandshakeServiceTests
         var quota = new TribeQuotaRegistry();
         var characters = new FakeCharacterRepository { WorldEntryToReturn = null };
 
-        var service = CreateService(tickets, accountSessions, TribeQuotaGroup.None, quota, capacity: 300,
+        var service = CreateService(tickets, accountSessions, TribeQuotaGroup.None, quota, 300,
             characters);
         var (session, _) = ZoneTestKit.CreateSession(1);
 
-        var result = await service.ConsumeTicketAsync(EncodeObfuscatedAccountId(AccountId), declaredTribe: 3,
+        var result = await service.ConsumeTicketAsync(EncodeObfuscatedAccountId(AccountId), 3,
             session, CancellationToken.None);
 
         Assert.Equal(ZoneHandshakeOutcome.Accepted, result.Outcome);
@@ -222,7 +223,8 @@ public class ZoneHandshakeServiceTests
     {
         return new ZoneHandshakeService(tickets, accountSessions, characters ?? new FakeCharacterRepository(),
             new FakeEventLogRepository(), quota ?? new TribeQuotaRegistry(),
-            Options.Create(new GameServerOptions { ShardId = ShardId, TribeQuotaGroup = quotaGroup, Capacity = capacity }));
+            Options.Create(new GameServerOptions
+                { ShardId = ShardId, TribeQuotaGroup = quotaGroup, Capacity = capacity }));
     }
 
     /// <summary>Mirrors ObfuscatedUidCodec.TryDecodeAccountId's encoding half: Latin1("MG"+id), then USE_XOR_UID.</summary>

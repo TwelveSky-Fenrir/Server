@@ -24,14 +24,6 @@ public static class LootBoxRewardResolver
     /// <summary>Every rate in this family is expressed as an integer "X-in-10000" (i.e. X basis points of a percent x100).</summary>
     public const int RateScale = 10_000;
 
-    /// <summary>One entry of a weighted "ordinary tier" table: relative Weight, not a probability -- see <see cref="RollWeighted" />.</summary>
-    public readonly record struct WeightedReward(int ItemId, int Weight);
-
-    /// <summary>One rare-tier band: rolls against a single shared draw, first matching band (in list order) wins.</summary>
-    public readonly record struct RewardBand(int ThresholdPer10000, int RewardItemId);
-
-    public readonly record struct CloakRollResult(int RewardItemId, int NewPityCounter, bool WasGuaranteed);
-
     /// <summary>
     ///     Picks one entry from <paramref name="tiers" /> with probability proportional to its Weight (the
     ///     "five-tier"/"two-tier"/"four-tier" ordinary tables every box family falls back to once its own rare
@@ -114,4 +106,15 @@ public static class LootBoxRewardResolver
 
         return candidateItemIds[random.Next(0, candidateItemIds.Length)];
     }
+
+    /// <summary>
+    ///     One entry of a weighted "ordinary tier" table: relative Weight, not a probability -- see
+    ///     <see cref="RollWeighted" />.
+    /// </summary>
+    public readonly record struct WeightedReward(int ItemId, int Weight);
+
+    /// <summary>One rare-tier band: rolls against a single shared draw, first matching band (in list order) wins.</summary>
+    public readonly record struct RewardBand(int ThresholdPer10000, int RewardItemId);
+
+    public readonly record struct CloakRollResult(int RewardItemId, int NewPityCounter, bool WasGuaranteed);
 }

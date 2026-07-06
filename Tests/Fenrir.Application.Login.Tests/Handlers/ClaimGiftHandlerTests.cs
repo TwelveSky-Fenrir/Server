@@ -1,4 +1,3 @@
-using Fenrir.Application.Login.Handlers;
 using Fenrir.Application.Login.Handlers.Handlers;
 using Fenrir.Application.Login.Services.ClaimGift;
 using Fenrir.Application.Login.Tests.TestSupport;

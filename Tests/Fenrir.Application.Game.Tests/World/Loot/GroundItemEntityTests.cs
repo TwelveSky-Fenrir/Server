@@ -89,7 +89,7 @@ public class GroundItemEntityTests
     {
         // Rule 3: an item with no recorded owner is free for anyone from the moment it lands, regardless of
         // party state or elapsed time.
-        var item = Create(0, master: "");
+        var item = Create(0, "");
 
         Assert.True(item.IsClaimableBy("AnyoneAtAll", null, TimeSpan.Zero));
     }
@@ -99,7 +99,7 @@ public class GroundItemEntityTests
     {
         // Rule 6 compares against Master (the owner-name field), not PartyName -- a stamped PartyName has no
         // bearing on a DropSort=ManualGroundDropSort item at all.
-        var item = Create(GroundItemEntity.ManualGroundDropSort, master: "TheDropperParty", partyName: "Irrelevant");
+        var item = Create(GroundItemEntity.ManualGroundDropSort, "TheDropperParty", "Irrelevant");
 
         Assert.False(item.IsClaimableBy("Stranger", "NotTheRightParty", TimeSpan.Zero));
     }
@@ -108,7 +108,7 @@ public class GroundItemEntityTests
     public void DropSortTwo_MatchingPartyIdentity_ClaimableImmediately_NoExtraDelay()
     {
         // Rule 6: no extra time delay of its own beyond whatever rules 2-4 already impose.
-        var item = Create(GroundItemEntity.ManualGroundDropSort, master: "TheDropperParty");
+        var item = Create(GroundItemEntity.ManualGroundDropSort, "TheDropperParty");
 
         Assert.True(item.IsClaimableBy("PartyMate", "TheDropperParty", TimeSpan.Zero));
     }
@@ -116,7 +116,7 @@ public class GroundItemEntityTests
     [Fact]
     public void DropSortTwo_EmptyClaimantPartyIdentity_NeverClaimsThroughRule6()
     {
-        var item = Create(GroundItemEntity.ManualGroundDropSort, master: "TheDropperParty");
+        var item = Create(GroundItemEntity.ManualGroundDropSort, "TheDropperParty");
 
         Assert.False(item.IsClaimableBy("Stranger", "", TimeSpan.Zero));
         Assert.False(item.IsClaimableBy("Stranger", null, TimeSpan.Zero));
@@ -127,7 +127,7 @@ public class GroundItemEntityTests
     {
         // Rule 5 compares against PartyName, not Master -- a match against the wrong field must not leak
         // eligibility from rule 6's shape into rule 5's DropSort.
-        var item = Create(GroundItemEntity.MonsterKillDropSort, master: "TheDropperParty", partyName: "ADifferentName");
+        var item = Create(GroundItemEntity.MonsterKillDropSort, "TheDropperParty", "ADifferentName");
 
         Assert.False(item.IsClaimableBy("PartyMate", "TheDropperParty", TimeSpan.FromSeconds(15)));
     }

@@ -1,3 +1,5 @@
+using Fenrir.Application.Game.Domain.World.WorldState;
+
 namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 
 /// <summary>
@@ -19,9 +21,12 @@ public enum DenOfRebirthChallengeState : byte
 ///     the Zone175/Zone267/Zone241/Zone335 numbered siege-event state machines, the per-tribe Zone038 DTM
 ///     effect value, and the three tribe bonus-ratio arrays plus the kill-other-tribe bonus value
 ///     (<c>Server/Header/Protocol/STRUCT.h:580-581,613,618,624-625,636,642,645,647-649</c>, matching
-///     <c>WorldInfo.Zone175TypeState/Zone267TypeState/Zone241TypeState/ZoneFFATypeState/Zone038DTMValue/
-///     TribeGeneralExperienceUpRatioInfo/TribeItemDropUpRatioInfo/TribeItemDropUpRatioForMyoungInfo/
-///     TribeKillOtherTribeAddValueInfo</c> field-for-field).
+///     <c>
+///         WorldInfo.Zone175TypeState/Zone267TypeState/Zone241TypeState/ZoneFFATypeState/Zone038DTMValue/
+///         TribeGeneralExperienceUpRatioInfo/TribeItemDropUpRatioInfo/TribeItemDropUpRatioForMyoungInfo/
+///         TribeKillOtherTribeAddValueInfo
+///     </c>
+///     field-for-field).
 ///     <para>
 ///         Deliberately NOT persisted: the legacy ts25center never wrote any of these fields to SQL either --
 ///         they lived only in the one in-memory WORLD_INFO struct, rebuilt from zero on every center process
@@ -51,18 +56,32 @@ public sealed class ZoneCenterSiegeState
     /// </summary>
     public const int Zone241Instances = 20;
 
-    private static readonly int TribeCount = WorldState.WorldStateService.TribeCount;
+    private static readonly int TribeCount = WorldStateService.TribeCount;
+    private readonly float[] _experienceBonusRatio = new float[TribeCount];
+    private readonly float[] _itemDropBonusRatio = new float[TribeCount];
 
     private readonly int[] _killOtherTribeBonus = new int[TribeCount];
     private readonly Lock _lock = new();
+    private readonly float[] _myoungItemDropBonusRatio = new float[TribeCount];
+    private readonly int[] _zone038DtmValue = new int[TribeCount];
+    private readonly int[,] _zone175 = new int[Zone175Instances, Zone175Slots];
     private readonly DenOfRebirthChallengeState[] _zone241 = new DenOfRebirthChallengeState[Zone241Instances];
     private readonly int[] _zone267 = new int[TribeCount];
-    private readonly int[,] _zone175 = new int[Zone175Instances, Zone175Slots];
-    private readonly int[] _zone038DtmValue = new int[TribeCount];
-    private readonly float[] _experienceBonusRatio = new float[TribeCount];
-    private readonly float[] _itemDropBonusRatio = new float[TribeCount];
-    private readonly float[] _myoungItemDropBonusRatio = new float[TribeCount];
     private int _zone335;
+
+    // ---- Free-for-all zone / Zone335 (6 events -- 1 no-op -- cases within 1501-1507, reset 1520;
+    // S04_MyWork02.cpp:1132-1150) -- a single shared scalar, no index.
+
+    public int Zone335
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _zone335;
+            }
+        }
+    }
 
     public static bool IsValidZone175Cell(int instance, int slot)
     {
@@ -166,20 +185,6 @@ public sealed class ZoneCenterSiegeState
     public void ResetZone241(int instance)
     {
         SetZone241(instance, DenOfRebirthChallengeState.Idle);
-    }
-
-    // ---- Free-for-all zone / Zone335 (6 events -- 1 no-op -- cases within 1501-1507, reset 1520;
-    // S04_MyWork02.cpp:1132-1150) -- a single shared scalar, no index.
-
-    public int Zone335
-    {
-        get
-        {
-            lock (_lock)
-            {
-                return _zone335;
-            }
-        }
     }
 
     public void SetZone335(int phaseCode)

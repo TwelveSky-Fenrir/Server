@@ -9,5 +9,8 @@ namespace Fenrir.Data.Abstractions.Runtime;
 // pre-existing 3-arg test construction keeps compiling unchanged -- the Login-side account-grade fact
 // (legacy uUserSort), carried through so the Zone session never has to re-query auth.Accounts for it.
 [GenerateDto]
-public sealed partial record ConsumedTicketDto(int CharacterId, byte ShardId, Guid SessionToken,
+public sealed partial record ConsumedTicketDto(
+    int CharacterId,
+    byte ShardId,
+    Guid SessionToken,
     short AccountGrade = 0);

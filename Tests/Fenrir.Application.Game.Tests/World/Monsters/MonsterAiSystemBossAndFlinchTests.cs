@@ -61,7 +61,7 @@ public class MonsterAiSystemBossAndFlinchTests
     {
         // Melee radius (RadiusInfo1=2) is far smaller than the target's actual distance (10); a non-boss
         // monster would have to keep closing in. RadiusInfo2=1000 easily covers it.
-        var zone = CreateZone(CacheWithOneRegion(specialType: 40, radiusInfo1: 2, radiusInfo2: 1000));
+        var zone = CreateZone(CacheWithOneRegion(40, 2, 1000));
         var (session, _) = ZoneTestKit.CreateSession(1);
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1, "Target", 10, posZ: 0)));
 
@@ -80,7 +80,7 @@ public class MonsterAiSystemBossAndFlinchTests
     [Fact]
     public void NonBossMonster_SamePlacement_MustCloseToMeleeRange_NeverEntersRangedAttackWindup()
     {
-        var zone = CreateZone(CacheWithOneRegion(specialType: 0, radiusInfo1: 2, radiusInfo2: 1000));
+        var zone = CreateZone(CacheWithOneRegion(0, 2, 1000));
         var (session, _) = ZoneTestKit.CreateSession(1);
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1, "Target", 10, posZ: 0)));
 
@@ -100,7 +100,7 @@ public class MonsterAiSystemBossAndFlinchTests
     [Fact]
     public void RangedAttackWindup_ReturnsToDecision_AfterFrameInfo4Ticks()
     {
-        var zone = CreateZone(CacheWithOneRegion(specialType: 40, radiusInfo1: 2, radiusInfo2: 1000, frameInfo4: 2));
+        var zone = CreateZone(CacheWithOneRegion(40, 2, 1000, 2));
         var (session, _) = ZoneTestKit.CreateSession(1);
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1, "Target", 10, posZ: 0)));
 
@@ -127,7 +127,7 @@ public class MonsterAiSystemBossAndFlinchTests
     [Fact]
     public void Flinch_ReturnsToDecision_AfterFrameInfo2Ticks()
     {
-        var zone = CreateZone(CacheWithOneRegion(specialType: 0, radiusInfo1: 0, radiusInfo2: 0));
+        var zone = CreateZone(CacheWithOneRegion(0, 0, 0));
         zone.Tick(SimulationClock.LegacyTick); // pop + Spawning -> Decision (FrameInfo1=1)
         Assert.True(zone.TryGetMonster(1, out var monster));
         Assert.Equal(MonsterAiState.Decision, monster!.AiState);

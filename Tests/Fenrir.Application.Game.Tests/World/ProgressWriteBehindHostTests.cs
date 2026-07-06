@@ -76,7 +76,8 @@ public sealed class ProgressWriteBehindHostTests
     }
 
     [Fact]
-    public async Task FlushAsync_TwoConsecutiveProgressOnlyDrainCycles_WithZeroMovementBetween_BothPersist_AndFlushSequenceStrictlyIncreases()
+    public async Task
+        FlushAsync_TwoConsecutiveProgressOnlyDrainCycles_WithZeroMovementBetween_BothPersist_AndFlushSequenceStrictlyIncreases()
     {
         const int characterId = 11;
         var (registry, dirtyTracker) = CreateRegistryWithOnePlayer(1, characterId, out var state);

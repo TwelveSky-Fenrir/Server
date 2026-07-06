@@ -13,9 +13,13 @@ namespace Fenrir.Application.Game.Hosting.World;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>Why this is not its own independently-timed <see cref="Microsoft.Extensions.Hosting.BackgroundService" />
-///         / <see cref="IWriteBehindFlusher" />, despite that being the more literal reading of "add a new write-behind
-///         host":</b> <see cref="DirtyTracker{TKey}" /> is registered exactly once as a process-wide singleton
+///         <b>
+///             Why this is not its own independently-timed <see cref="Microsoft.Extensions.Hosting.BackgroundService" />
+///             / <see cref="IWriteBehindFlusher" />, despite that being the more literal reading of "add a new
+///             write-behind
+///             host":
+///         </b>
+///         <see cref="DirtyTracker{TKey}" /> is registered exactly once as a process-wide singleton
 ///         (<c>DomainServiceCollectionExtensions.AddGameDomain</c>) and is the SAME instance every Vitals/Progression
 ///         call site (combat, death/XP-loss, revive, skill cast, quest/pet/rebirth/CP mirrors) and
 ///         <c>Zone.PlayerLifecycle.HandleMove</c>'s Position mark both feed. <see cref="DirtyTracker{TKey}.DrainAll" />

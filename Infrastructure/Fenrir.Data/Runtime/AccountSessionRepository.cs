@@ -86,7 +86,10 @@ public sealed record AccountSessionRepository(ICaeriusNetDbContext Db) : IAccoun
         await Db.ExecuteAsync(sp, ct);
     }
 
-    /// <summary>Never called with an empty accountIds collection by contract; guarded here anyway since SQL Server rejects an empty TVP outright.</summary>
+    /// <summary>
+    ///     Never called with an empty accountIds collection by contract; guarded here anyway since SQL Server rejects an
+    ///     empty TVP outright.
+    /// </summary>
     public async ValueTask<ImmutableArray<KickedAccountDto>> RefreshAndGetKickedAsync(
         AccountSessionServerKind serverKind, byte? shardId, IReadOnlyCollection<int> accountIds, CancellationToken ct)
     {
@@ -124,6 +127,8 @@ public sealed record AccountSessionRepository(ICaeriusNetDbContext Db) : IAccoun
         return await Db.ExecuteScalarAsync<int>(sp, ct);
     }
 
-    private static bool IsClaimWriteConflict(int errorNumber) =>
-        errorNumber is ErrorWriteConflict or ErrorDependencyFailure or ErrorCommitDependencyAborted;
+    private static bool IsClaimWriteConflict(int errorNumber)
+    {
+        return errorNumber is ErrorWriteConflict or ErrorDependencyFailure or ErrorCommitDependencyAborted;
+    }
 }

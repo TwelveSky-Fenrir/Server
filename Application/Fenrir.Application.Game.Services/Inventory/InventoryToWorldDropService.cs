@@ -5,7 +5,6 @@ using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.Loot;
 using Fenrir.Application.Game.GameData;
-using Fenrir.Data.Abstractions.Game;
 using Fenrir.Network.Serialization.Packets.Shared;
 using Microsoft.Extensions.Logging;
 
@@ -63,7 +62,7 @@ public sealed class InventoryToWorldDropService(
             ? state.Inventory.GetSlot((byte)sourcePage, (byte)sourceSlot)
             : null;
 
-        ItemDefinition? itemDefinition = source is { } stack && worldData.ItemsById.TryGetValue(stack.ItemId, out var definition)
+        var itemDefinition = source is { } stack && worldData.ItemsById.TryGetValue(stack.ItemId, out var definition)
             ? definition
             : null;
 
@@ -73,11 +72,11 @@ public sealed class InventoryToWorldDropService(
         var resolved = InventoryToWorldDropPolicy.Resolve(
             sourcePage, sourceSlot, move.Quantity1, premiumPageAccessAllowed,
             source, itemDefinition,
-            sourceIsDroppableByPlayer: itemDefinition is null || itemDefinition.Item.CheckAvatarDrop != NonDroppableFlagValue,
-            evaluateSpawnEligibility: static _ => GroundItemSpawnEligibility.Eligible,
-            currentGroundItemCount: zone.GroundItemCount,
-            dropperPosX: state.PosX, dropperPosY: state.PosY, dropperPosZ: state.PosZ,
-            dropperName: state.Name, dropperPartyName: partyName);
+            itemDefinition is null || itemDefinition.Item.CheckAvatarDrop != NonDroppableFlagValue,
+            static _ => GroundItemSpawnEligibility.Eligible,
+            zone.GroundItemCount,
+            state.PosX, state.PosY, state.PosZ,
+            state.Name, partyName);
 
         if (resolved.IsMalformed)
             return InventoryToWorldDropResult.Aborted;

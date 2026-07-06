@@ -64,10 +64,10 @@ public class WorldStateRepositoryProcTests
     public async Task EnsureInitializedAsync_SecondCall_NeverResetsAlreadyPersistedState()
     {
         await _repository.EnsureInitializedAsync(CancellationToken.None);
-        await _repository.UpdateAsync(zone038WinTribe: 1, zone038WinTribeTime: 101, tribeSymbolBattle: true,
-            monsterSymbol: null, monsterSymbolEndTime: null, highTribe: null, updateTribePoint: 0,
+        await _repository.UpdateAsync(1, 101, true,
+            null, null, null, 0,
             CancellationToken.None);
-        await _repository.UpdateTribeAsync(0, symbolDate: null, hasSymbol: false, points: 999, isClosed: true,
+        await _repository.UpdateTribeAsync(0, null, false, 999, true,
             CancellationToken.None);
 
         await _repository.EnsureInitializedAsync(CancellationToken.None); // must stay a no-op from here on
@@ -86,8 +86,8 @@ public class WorldStateRepositoryProcTests
     {
         await _repository.EnsureInitializedAsync(CancellationToken.None);
 
-        await _repository.UpdateAsync(zone038WinTribe: 2, zone038WinTribeTime: 1430, tribeSymbolBattle: true,
-            monsterSymbol: 1, monsterSymbolEndTime: 900, highTribe: 3, updateTribePoint: 2, CancellationToken.None);
+        await _repository.UpdateAsync(2, 1430, true,
+            1, 900, 3, 2, CancellationToken.None);
 
         var (row, _, _) = await _repository.GetAsync(CancellationToken.None);
 
@@ -109,7 +109,7 @@ public class WorldStateRepositoryProcTests
         var othersBefore = before.Where(t => t.TribeId != 2).ToDictionary(t => t.TribeId);
         var symbolDate = new DateTime(2026, 1, 15, 3, 4, 5, DateTimeKind.Utc);
 
-        await _repository.UpdateTribeAsync(2, symbolDate, hasSymbol: false, points: 77, isClosed: true,
+        await _repository.UpdateTribeAsync(2, symbolDate, false, 77, true,
             CancellationToken.None);
 
         var (_, after, _) = await _repository.GetAsync(CancellationToken.None);
@@ -133,7 +133,7 @@ public class WorldStateRepositoryProcTests
         var pointsBefore = before.Single(t => t.TribeId == 3).Points;
         var symbolDate = new DateTime(2026, 2, 1, 6, 7, 8, DateTimeKind.Utc);
 
-        await _repository.UpdateTribeSymbolStateAsync(3, symbolDate, hasSymbol: false, isClosed: true,
+        await _repository.UpdateTribeSymbolStateAsync(3, symbolDate, false, true,
             CancellationToken.None);
 
         var (_, after, _) = await _repository.GetAsync(CancellationToken.None);
@@ -151,7 +151,7 @@ public class WorldStateRepositoryProcTests
     {
         await _repository.EnsureInitializedAsync(CancellationToken.None);
         var symbolDate = new DateTime(2026, 3, 1, 1, 1, 1, DateTimeKind.Utc);
-        await _repository.UpdateTribeSymbolStateAsync(1, symbolDate, hasSymbol: true, isClosed: false,
+        await _repository.UpdateTribeSymbolStateAsync(1, symbolDate, true, false,
             CancellationToken.None);
         var (_, before, _) = await _repository.GetAsync(CancellationToken.None);
         var pointsBefore = before.Single(t => t.TribeId == 1).Points;
@@ -174,8 +174,8 @@ public class WorldStateRepositoryProcTests
     {
         await _repository.EnsureInitializedAsync(CancellationToken.None);
 
-        await _repository.SetAllianceOfferAsync(0, 1, isAccepted: false, CancellationToken.None);
-        await _repository.SetAllianceOfferAsync(0, 1, isAccepted: true, CancellationToken.None);
+        await _repository.SetAllianceOfferAsync(0, 1, false, CancellationToken.None);
+        await _repository.SetAllianceOfferAsync(0, 1, true, CancellationToken.None);
 
         var (_, _, allianceOffers) = await _repository.GetAsync(CancellationToken.None);
         var matching = allianceOffers.Where(o => o is { FromTribeId: 0, ToTribeId: 1 }).ToList();
@@ -203,16 +203,18 @@ public class WorldStateRepositoryProcTests
         var candidate1 = await CreateCharacterAsync();
         var candidate2 = await CreateCharacterAsync();
 
-        await _repository.RegisterTribeVoteCandidateAsync(1, 0, candidate1, candidateLevel: 150,
-            killOtherTribeCount: 1500, CancellationToken.None);
-        await _repository.RegisterTribeVoteCandidateAsync(1, 1, candidate2, candidateLevel: 160,
-            killOtherTribeCount: 2500, CancellationToken.None);
+        await _repository.RegisterTribeVoteCandidateAsync(1, 0, candidate1, 150,
+            1500, CancellationToken.None);
+        await _repository.RegisterTribeVoteCandidateAsync(1, 1, candidate2, 160,
+            2500, CancellationToken.None);
 
         var votes = await _repository.GetTribeVotesAsync(1, CancellationToken.None);
 
         Assert.Equal(2, votes.Count);
-        Assert.Contains(votes, v => v.SlotIndex == 0 && v.CandidateCharacterId == candidate1 && v.KillOtherTribeCount == 1500);
-        Assert.Contains(votes, v => v.SlotIndex == 1 && v.CandidateCharacterId == candidate2 && v.KillOtherTribeCount == 2500);
+        Assert.Contains(votes,
+            v => v.SlotIndex == 0 && v.CandidateCharacterId == candidate1 && v.KillOtherTribeCount == 1500);
+        Assert.Contains(votes,
+            v => v.SlotIndex == 1 && v.CandidateCharacterId == candidate2 && v.KillOtherTribeCount == 2500);
     }
 
     [Fact]
@@ -222,10 +224,10 @@ public class WorldStateRepositoryProcTests
         var firstCandidate = await CreateCharacterAsync();
         var secondCandidate = await CreateCharacterAsync();
 
-        await _repository.RegisterTribeVoteCandidateAsync(2, 4, firstCandidate, candidateLevel: 150,
-            killOtherTribeCount: 1200, CancellationToken.None);
-        await _repository.RegisterTribeVoteCandidateAsync(2, 4, secondCandidate, candidateLevel: 155,
-            killOtherTribeCount: 3000, CancellationToken.None);
+        await _repository.RegisterTribeVoteCandidateAsync(2, 4, firstCandidate, 150,
+            1200, CancellationToken.None);
+        await _repository.RegisterTribeVoteCandidateAsync(2, 4, secondCandidate, 155,
+            3000, CancellationToken.None);
 
         var votes = await _repository.GetTribeVotesAsync(2, CancellationToken.None);
 
@@ -240,8 +242,8 @@ public class WorldStateRepositoryProcTests
     {
         await _repository.EnsureInitializedAsync(CancellationToken.None);
         var candidate = await CreateCharacterAsync();
-        await _repository.RegisterTribeVoteCandidateAsync(0, 2, candidate, candidateLevel: 150,
-            killOtherTribeCount: 1200, CancellationToken.None);
+        await _repository.RegisterTribeVoteCandidateAsync(0, 2, candidate, 150,
+            1200, CancellationToken.None);
 
         await _repository.AddTribeVotePointsAsync(0, 2, 44, CancellationToken.None);
         await _repository.AddTribeVotePointsAsync(0, 2, 51, CancellationToken.None);
@@ -257,10 +259,10 @@ public class WorldStateRepositoryProcTests
         await _repository.EnsureInitializedAsync(CancellationToken.None);
         var tribe3Candidate = await CreateCharacterAsync();
         var tribe1Candidate = await CreateCharacterAsync();
-        await _repository.RegisterTribeVoteCandidateAsync(3, 0, tribe3Candidate, candidateLevel: 150,
-            killOtherTribeCount: 1200, CancellationToken.None);
-        await _repository.RegisterTribeVoteCandidateAsync(1, 9, tribe1Candidate, candidateLevel: 150,
-            killOtherTribeCount: 1200, CancellationToken.None);
+        await _repository.RegisterTribeVoteCandidateAsync(3, 0, tribe3Candidate, 150,
+            1200, CancellationToken.None);
+        await _repository.RegisterTribeVoteCandidateAsync(1, 9, tribe1Candidate, 150,
+            1200, CancellationToken.None);
 
         await _repository.ClearTribeVotesAsync(3, CancellationToken.None);
 

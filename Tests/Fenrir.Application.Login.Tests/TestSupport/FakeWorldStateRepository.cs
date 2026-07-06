@@ -12,25 +12,6 @@ internal sealed class FakeWorldStateRepository : IWorldStateRepository
 {
     private readonly Dictionary<byte, List<TribeVoteDto>> _votesByTribe = new();
 
-    /// <summary>No tribe has any registered Force Leader election candidates.</summary>
-    public static FakeWorldStateRepository Empty()
-    {
-        return new FakeWorldStateRepository();
-    }
-
-    public static FakeWorldStateRepository WithVotes(params TribeVoteDto[] votes)
-    {
-        var repository = new FakeWorldStateRepository();
-        foreach (var vote in votes)
-        {
-            if (!repository._votesByTribe.TryGetValue(vote.TribeId, out var slots))
-                repository._votesByTribe[vote.TribeId] = slots = [];
-            slots.Add(vote);
-        }
-
-        return repository;
-    }
-
     public ValueTask<ReadOnlyCollection<TribeVoteDto>> GetTribeVotesAsync(byte tribeId, CancellationToken ct)
     {
         var votes = _votesByTribe.TryGetValue(tribeId, out var slots) ? slots : [];
@@ -91,5 +72,24 @@ internal sealed class FakeWorldStateRepository : IWorldStateRepository
     public ValueTask ClearTribeVotesAsync(byte tribeId, CancellationToken ct)
     {
         throw new NotSupportedException();
+    }
+
+    /// <summary>No tribe has any registered Force Leader election candidates.</summary>
+    public static FakeWorldStateRepository Empty()
+    {
+        return new FakeWorldStateRepository();
+    }
+
+    public static FakeWorldStateRepository WithVotes(params TribeVoteDto[] votes)
+    {
+        var repository = new FakeWorldStateRepository();
+        foreach (var vote in votes)
+        {
+            if (!repository._votesByTribe.TryGetValue(vote.TribeId, out var slots))
+                repository._votesByTribe[vote.TribeId] = slots = [];
+            slots.Add(vote);
+        }
+
+        return repository;
     }
 }

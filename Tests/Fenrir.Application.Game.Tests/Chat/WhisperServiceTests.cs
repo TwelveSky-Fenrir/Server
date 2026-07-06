@@ -83,8 +83,8 @@ public class WhisperServiceTests
     public async Task ResolveAsync_SameShardMiss_ButFoundOnAnotherShard_ReturnsTargetOnAnotherShard_NotDelivered()
     {
         var directory = new FakeCharacterShardLocationRepository();
-        directory.Seed(new CharacterShardLocationDto(99, ShardId: 3, MapId: 42, AvatarName: "Remote", Tribe: 0,
-            LastSeenUtc: DateTime.UtcNow));
+        directory.Seed(new CharacterShardLocationDto(99, 3, 42, "Remote", 0,
+            DateTime.UtcNow));
         var zones = ZoneTestKit.CreateRegistry();
         zones.Initialize([]);
         var service = new WhisperService(zones, directory);

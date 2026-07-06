@@ -1,8 +1,8 @@
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Tests.TestSupport;
+using Fenrir.Network.Framing;
 using Fenrir.Network.Serialization.Packets.Shared;
 using Fenrir.Network.Serialization.Packets.Zone;
-using Fenrir.Network.Framing;
 
 namespace Fenrir.Application.Game.Tests.World;
 

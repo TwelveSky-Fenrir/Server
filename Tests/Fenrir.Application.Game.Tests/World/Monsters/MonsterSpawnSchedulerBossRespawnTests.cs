@@ -3,7 +3,6 @@ using Fenrir.Application.Game.Domain.World.Monsters;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Tests.GameData;
 using Fenrir.Application.Game.Tests.TestSupport;
-using Fenrir.Data.World;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.World.Monsters;
@@ -51,7 +50,7 @@ public class MonsterSpawnSchedulerBossRespawnTests
     {
         // Catalog says 9999s -- if the override did not apply, the monster would still be nowhere near ready
         // 250s later; if it did, 250s comfortably clears the fixed 240s.
-        var cache = CacheWithOneRegion(746, 1, summonTimeSeconds: 9999);
+        var cache = CacheWithOneRegion(746, 1, 9999);
         var scheduler = new MonsterSpawnScheduler(cache);
         var zone = ZoneTestKit.CreateZone(1, simulationSystems: [scheduler], worldData: cache);
 
@@ -71,7 +70,7 @@ public class MonsterSpawnSchedulerBossRespawnTests
     [Fact]
     public void KillingAPersistedBossMonster_ArmsTheTracker_WithTheRolledDeadline()
     {
-        var cache = CacheWithOneRegion(564, regionId: 77, summonTimeSeconds: 100);
+        var cache = CacheWithOneRegion(564, 77, 100);
         var repository = new FakeMonsterBossRespawnTimerRepository();
         var tracker = CreateTracker(repository);
         var scheduler = new MonsterSpawnScheduler(cache, bossRespawnTracker: tracker);
@@ -94,7 +93,7 @@ public class MonsterSpawnSchedulerBossRespawnTests
     public void Restart_WithAStillPendingPersistedDeadline_DoesNotPopTheSlot_UntilItElapses()
     {
         const int regionId = 9;
-        var cache = CacheWithOneRegion(565, regionId, summonTimeSeconds: 5);
+        var cache = CacheWithOneRegion(565, regionId, 5);
         var repository = new FakeMonsterBossRespawnTimerRepository
         {
             Rows = { [regionId] = DateTime.UtcNow.AddSeconds(3) }
@@ -117,7 +116,7 @@ public class MonsterSpawnSchedulerBossRespawnTests
     public void Restart_WithAnAlreadyDuePersistedDeadline_PopsOnTheFirstTick()
     {
         const int regionId = 11;
-        var cache = CacheWithOneRegion(566, regionId, summonTimeSeconds: 5);
+        var cache = CacheWithOneRegion(566, regionId, 5);
         var repository = new FakeMonsterBossRespawnTimerRepository
         {
             Rows = { [regionId] = DateTime.UtcNow.AddSeconds(-30) } // already elapsed before boot
@@ -134,7 +133,7 @@ public class MonsterSpawnSchedulerBossRespawnTests
     [Fact]
     public void OrdinaryMonsterInThePersistedIdRange_WithNoTrackerWired_BehavesLikeAnyOtherMonster()
     {
-        var cache = CacheWithOneRegion(567, 1, summonTimeSeconds: 2);
+        var cache = CacheWithOneRegion(567, 1, 2);
         var scheduler = new MonsterSpawnScheduler(cache); // bossRespawnTracker left null
         var zone = ZoneTestKit.CreateZone(1, simulationSystems: [scheduler], worldData: cache);
 

@@ -30,7 +30,10 @@ public sealed class AllianceCooldownTracker
         }
     }
 
-    /// <summary>True if <paramref name="today" /> has not yet reached <paramref name="tribeId" />'s recorded eligible-again date.</summary>
+    /// <summary>
+    ///     True if <paramref name="today" /> has not yet reached <paramref name="tribeId" />'s recorded eligible-again
+    ///     date.
+    /// </summary>
     public bool IsInCooldown(byte tribeId, DateOnly today)
     {
         return GetCooldownUntil(tribeId) is { } until && today < until;

@@ -30,32 +30,32 @@
 -- once a real retention policy and a maintenance-job host exist.
 CREATE TABLE game.EventLog
 (
-    EventLogId        BIGINT        IDENTITY(1,1) NOT NULL,
-    EventCode         SMALLINT      NOT NULL,
-    Category          TINYINT       NOT NULL,
-    ActorAccountId    INT           NULL,
-    ActorCharacterId  INT           NULL,
-    TargetAccountId   INT           NULL,
-    TargetCharacterId INT           NULL,
-    ShardId           SMALLINT      NULL,
-    DeltaMoney        BIGINT        NULL,
-    DeltaBigMoney     BIGINT        NULL,
-    ItemId            INT           NULL,
-    Quantity          INT           NULL,
-    Outcome           TINYINT       NULL,
+    EventLogId        BIGINT IDENTITY(1,1) NOT NULL,
+    EventCode         SMALLINT NOT NULL,
+    Category          TINYINT  NOT NULL,
+    ActorAccountId    INT NULL,
+    ActorCharacterId  INT NULL,
+    TargetAccountId   INT NULL,
+    TargetCharacterId INT NULL,
+    ShardId           SMALLINT NULL,
+    DeltaMoney        BIGINT NULL,
+    DeltaBigMoney     BIGINT NULL,
+    ItemId            INT NULL,
+    Quantity          INT NULL,
+    Outcome           TINYINT NULL,
     Payload           NVARCHAR(MAX) NULL,
     CreatedAtUtc      DATETIME2(3)  NOT NULL CONSTRAINT DF_EventLog_CreatedAtUtc DEFAULT SYSUTCDATETIME(),
     CONSTRAINT PK_EventLog PRIMARY KEY CLUSTERED (EventLogId),
     CONSTRAINT CK_EventLog_Category CHECK (Category BETWEEN 0 AND 63),
     -- General time-range browse across every category (admin activity feed).
-    INDEX IX_EventLog_CreatedAtUtc NONCLUSTERED (CreatedAtUtc)
+    INDEX             IX_EventLog_CreatedAtUtc NONCLUSTERED (CreatedAtUtc)
         INCLUDE (EventCode, Category, Outcome, ActorAccountId, ActorCharacterId),
     -- Category-scoped investigation (e.g. "all GmAction events this week", "all AccountSecurity events today").
-    INDEX IX_EventLog_Category_CreatedAtUtc NONCLUSTERED (Category, CreatedAtUtc)
+    INDEX             IX_EventLog_Category_CreatedAtUtc NONCLUSTERED (Category, CreatedAtUtc)
         INCLUDE (EventCode, ActorAccountId, ActorCharacterId, TargetAccountId, TargetCharacterId, Outcome),
     -- Single most common support/investigation drilldown: "what happened to/by this character". Filtered --
     -- ActorCharacterId is null for account-only or system-triggered rows.
-    INDEX IX_EventLog_ActorCharacterId NONCLUSTERED (ActorCharacterId, CreatedAtUtc)
+    INDEX             IX_EventLog_ActorCharacterId NONCLUSTERED (ActorCharacterId, CreatedAtUtc)
         INCLUDE (Category, EventCode, DeltaMoney, ItemId, Quantity)
         WHERE ActorCharacterId IS NOT NULL
 );

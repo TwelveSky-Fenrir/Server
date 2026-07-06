@@ -61,9 +61,9 @@ public class RegularWarMapCatalogTests
         Assert.Equal(25, rule.LosingSideAmount);
         Assert.Equal(RegularWarCpBonusCriterion.RebirthTierExactly11, rule.Criterion);
 
-        Assert.True(rule.IsSatisfiedBy(rebirthTier: 11, rebirthCount: 0));
-        Assert.False(rule.IsSatisfiedBy(rebirthTier: 10, rebirthCount: 6));
-        Assert.False(rule.IsSatisfiedBy(rebirthTier: 12, rebirthCount: 6));
+        Assert.True(rule.IsSatisfiedBy(11, 0));
+        Assert.False(rule.IsSatisfiedBy(10, 6));
+        Assert.False(rule.IsSatisfiedBy(12, 6));
     }
 
     [Fact]
@@ -75,9 +75,9 @@ public class RegularWarMapCatalogTests
         Assert.Equal(50, rule.LosingSideAmount);
         Assert.Equal(RegularWarCpBonusCriterion.RebirthCount0To6, rule.Criterion);
 
-        Assert.True(rule.IsSatisfiedBy(rebirthTier: 3, rebirthCount: 0));
-        Assert.True(rule.IsSatisfiedBy(rebirthTier: 3, rebirthCount: 6));
-        Assert.False(rule.IsSatisfiedBy(rebirthTier: 3, rebirthCount: 7));
+        Assert.True(rule.IsSatisfiedBy(3, 0));
+        Assert.True(rule.IsSatisfiedBy(3, 6));
+        Assert.False(rule.IsSatisfiedBy(3, 7));
     }
 
     [Theory]

@@ -7,21 +7,6 @@ namespace Fenrir.Application.Game.Tests.World.WorldState;
 
 public class TribeBankTaxSweepFlushHostTests
 {
-    private sealed class RecordingGateway : ITribeBankTaxSweepGateway
-    {
-        public readonly List<(short MapId, TribeBankTaxSweepPayload Payload)> Sweeps = [];
-        public bool ThrowOnSweep { get; set; }
-
-        public Task SweepAsync(short mapId, TribeBankTaxSweepPayload payload, CancellationToken ct)
-        {
-            if (ThrowOnSweep)
-                throw new InvalidOperationException("simulated persistent-store failure");
-
-            Sweeps.Add((mapId, payload));
-            return Task.CompletedTask;
-        }
-    }
-
     [Fact]
     public async Task FlushOnceAsync_WithNoZoneHavingADueSweep_ForwardsNothing()
     {
@@ -91,5 +76,20 @@ public class TribeBankTaxSweepFlushHostTests
 
         await gateway.SweepAsync(1, TribeBankTaxSweepPayload.Empty, CancellationToken.None);
         await gateway.SweepAsync(1, new TribeBankTaxSweepPayload(10, 20, 30, 40), CancellationToken.None);
+    }
+
+    private sealed class RecordingGateway : ITribeBankTaxSweepGateway
+    {
+        public readonly List<(short MapId, TribeBankTaxSweepPayload Payload)> Sweeps = [];
+        public bool ThrowOnSweep { get; set; }
+
+        public Task SweepAsync(short mapId, TribeBankTaxSweepPayload payload, CancellationToken ct)
+        {
+            if (ThrowOnSweep)
+                throw new InvalidOperationException("simulated persistent-store failure");
+
+            Sweeps.Add((mapId, payload));
+            return Task.CompletedTask;
+        }
     }
 }

@@ -74,7 +74,8 @@ public sealed class PositionWriteBehindHostTests
     }
 
     [Fact]
-    public async Task RequestImmediateFlush_CharacterDirtyForBothPositionAndProgress_ProgressPersists_PositionDefersInsteadOfCollidingOnTheSharedFlushSequence()
+    public async Task
+        RequestImmediateFlush_CharacterDirtyForBothPositionAndProgress_ProgressPersists_PositionDefersInsteadOfCollidingOnTheSharedFlushSequence()
     {
         const int characterId = 21;
         var (registry, dirtyTracker) = CreateRegistryWithOnePlayer(1, characterId, out var state);

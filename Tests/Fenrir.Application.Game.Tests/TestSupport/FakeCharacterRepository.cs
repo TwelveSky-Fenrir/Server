@@ -29,6 +29,27 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
     public bool ThrowOnReplaceContainer { get; set; }
     public bool ThrowOnAdjustMoney { get; set; }
 
+    /// <summary>
+    ///     Scripted return for <see cref="GetForWorldEntryAsync" /> -- null (the default) exercises the "character
+    ///     vanished" fallback path some callers (e.g. ZoneHandshakeService) defend against.
+    /// </summary>
+    public CharacterWorldEntryDto? WorldEntryToReturn { get; set; }
+
+    /// <summary>Every row ever passed to <see cref="PersistPositionsAsync" />, across every call -- append-only.</summary>
+    public List<CharacterPositionTvp> PersistedPositionRows { get; } = [];
+
+    /// <summary>Every row ever passed to <see cref="PersistProgressAsync" />, across every call -- append-only.</summary>
+    public List<CharacterProgressTvp> PersistedProgressRows { get; } = [];
+
+    /// <summary>Every call ever made to <see cref="ApplyQuestTransitionAsync" />, most-recent last -- append-only.</summary>
+    public List<(int CharacterId, int StepPermanent, int ActiveQuestId, int QSort, int TargetPhase, int KillCounter,
+        long DeltaMoney, byte? Container1, IReadOnlyList<CharacterItemSlotTvp> Items1, byte? Container2,
+        IReadOnlyList<CharacterItemSlotTvp> Items2)> QuestTransitions { get; } = [];
+
+    public int TribeTransferPermitCount { get; private set; }
+
+    public (int CharacterId, int Delta)? LastGrantTribeTransferPermit { get; private set; }
+
     public ValueTask ReplaceContainerAsync(int characterId, byte container,
         IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct)
     {
@@ -66,9 +87,6 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
         throw new NotImplementedException();
     }
 
-    /// <summary>Scripted return for <see cref="GetForWorldEntryAsync" /> -- null (the default) exercises the "character vanished" fallback path some callers (e.g. ZoneHandshakeService) defend against.</summary>
-    public CharacterWorldEntryDto? WorldEntryToReturn { get; set; }
-
     public ValueTask<CharacterWorldEntryDto?> GetForWorldEntryAsync(int characterId, CancellationToken ct)
     {
         return ValueTask.FromResult(WorldEntryToReturn);
@@ -79,9 +97,6 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
     {
         throw new NotImplementedException();
     }
-
-    /// <summary>Every row ever passed to <see cref="PersistPositionsAsync" />, across every call -- append-only.</summary>
-    public List<CharacterPositionTvp> PersistedPositionRows { get; } = [];
 
     public ValueTask PersistPositionsAsync(IReadOnlyList<CharacterPositionTvp> rows, CancellationToken ct)
     {
@@ -100,9 +115,6 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
     {
         throw new NotImplementedException();
     }
-
-    /// <summary>Every row ever passed to <see cref="PersistProgressAsync" />, across every call -- append-only.</summary>
-    public List<CharacterProgressTvp> PersistedProgressRows { get; } = [];
 
     public ValueTask PersistProgressAsync(IReadOnlyList<CharacterProgressTvp> rows, CancellationToken ct)
     {
@@ -149,11 +161,6 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
     {
         throw new NotImplementedException();
     }
-
-    /// <summary>Every call ever made to <see cref="ApplyQuestTransitionAsync" />, most-recent last -- append-only.</summary>
-    public List<(int CharacterId, int StepPermanent, int ActiveQuestId, int QSort, int TargetPhase, int KillCounter,
-        long DeltaMoney, byte? Container1, IReadOnlyList<CharacterItemSlotTvp> Items1, byte? Container2,
-        IReadOnlyList<CharacterItemSlotTvp> Items2)> QuestTransitions { get; } = [];
 
     public ValueTask ApplyQuestTransitionAsync(int characterId, int stepPermanent, int activeQuestId, int qSort,
         int targetPhase, int killCounter, long deltaMoney, byte? container1,
@@ -221,10 +228,6 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
     {
         throw new NotImplementedException();
     }
-
-    public int TribeTransferPermitCount { get; private set; }
-
-    public (int CharacterId, int Delta)? LastGrantTribeTransferPermit { get; private set; }
 
     public ValueTask<int> GrantTribeTransferPermitAsync(int characterId, int delta, CancellationToken ct)
     {

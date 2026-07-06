@@ -40,39 +40,69 @@
 -- tribe leadership/election role, so a live call into this procedure should never observe a row referencing
 -- @CharacterId in any of those tables in the first place -- silently deleting them here would mask a
 -- genuine precondition-check bug instead of surfacing it as the FK violation it should be.
-CREATE OR ALTER PROCEDURE game.usp_Character_Delete @AccountId INT,
-    @Slot      TINYINT
-AS
+CREATE
+OR
+ALTER PROCEDURE game.usp_Character_Delete @AccountId INT,
+    @Slot TINYINT
+    AS
 BEGIN
-    SET NOCOUNT ON;
-    SET XACT_ABORT ON;
+    SET
+NOCOUNT ON;
+    SET
+XACT_ABORT ON;
 
-    DECLARE @CharacterId INT = (SELECT CharacterId
+    DECLARE
+@CharacterId INT = (SELECT CharacterId
                                  FROM game.Characters
                                  WHERE AccountId = @AccountId
                                    AND Slot = @Slot);
 
     -- Idempotent: an already-empty slot (or unknown account) affects 0 rows and raises no error (by design).
-    IF @CharacterId IS NULL
+    IF
+@CharacterId IS NULL
         RETURN;
 
-    BEGIN TRANSACTION;
+BEGIN
+TRANSACTION;
 
-    UPDATE game.Characters SET TeacherCharacterId = NULL WHERE TeacherCharacterId = @CharacterId;
-    UPDATE game.Characters SET StudentCharacterId = NULL WHERE StudentCharacterId = @CharacterId;
+UPDATE game.Characters
+SET TeacherCharacterId = NULL
+WHERE TeacherCharacterId = @CharacterId;
+UPDATE game.Characters
+SET StudentCharacterId = NULL
+WHERE StudentCharacterId = @CharacterId;
 
-    DELETE FROM game.CharacterItems WHERE CharacterId = @CharacterId;
-    DELETE FROM game.CharacterSkills WHERE CharacterId = @CharacterId;
-    DELETE FROM game.CharacterHotkeys WHERE CharacterId = @CharacterId;
-    DELETE FROM game.CharacterBuffs WHERE CharacterId = @CharacterId;
-    DELETE FROM game.CharacterQuests WHERE CharacterId = @CharacterId;
-    DELETE FROM game.CharacterFriends WHERE CharacterId = @CharacterId OR FriendCharacterId = @CharacterId;
+DELETE
+FROM game.CharacterItems
+WHERE CharacterId = @CharacterId;
+DELETE
+FROM game.CharacterSkills
+WHERE CharacterId = @CharacterId;
+DELETE
+FROM game.CharacterHotkeys
+WHERE CharacterId = @CharacterId;
+DELETE
+FROM game.CharacterBuffs
+WHERE CharacterId = @CharacterId;
+DELETE
+FROM game.CharacterQuests
+WHERE CharacterId = @CharacterId;
+DELETE
+FROM game.CharacterFriends
+WHERE CharacterId = @CharacterId
+   OR FriendCharacterId = @CharacterId;
 
-    -- Legacy DeleteCharacter steps 3-5 (RankInfo/HeroRankCur/ProxyInfo): unchecked, fire-and-forget cleanup.
-    DELETE FROM game.HeroRankings WHERE CharacterId = @CharacterId;
-    DELETE FROM game.OfflineShops WHERE CharacterId = @CharacterId;
+-- Legacy DeleteCharacter steps 3-5 (RankInfo/HeroRankCur/ProxyInfo): unchecked, fire-and-forget cleanup.
+DELETE
+FROM game.HeroRankings
+WHERE CharacterId = @CharacterId;
+DELETE
+FROM game.OfflineShops
+WHERE CharacterId = @CharacterId;
 
-    DELETE FROM game.Characters WHERE CharacterId = @CharacterId;
+DELETE
+FROM game.Characters
+WHERE CharacterId = @CharacterId;
 
-    COMMIT TRANSACTION;
+COMMIT TRANSACTION;
 END;

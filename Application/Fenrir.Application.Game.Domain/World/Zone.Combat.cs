@@ -15,9 +15,23 @@ namespace Fenrir.Application.Game.Domain.World;
 
 public sealed partial class Zone
 {
+    /// <summary>
+    ///     "One specific server number/tribe combination" etc. from the CP-formula's residual terms are NOT
+    ///     modeled here -- see <see cref="PvpKillContributionPointCalculator" />'s own remarks.
+    /// </summary>
+    private const int CombinedLevelGapCap = 13;
+
     /// <summary>Raw, unvalidated CZ_PROCESS_ATTACK_SEND requests, resolved entirely on the tick thread (zero-SQL combat).</summary>
     private readonly Channel<CombatCommand> _combatInbox = Channel.CreateBounded<CombatCommand>(
         new BoundedChannelOptions(4096) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+
+    /// <summary>
+    ///     Independent 2-minute same-victim-pair cooldown for the FFA-335 flat CP override (step 5 of the
+    ///     source contract) -- deliberately a SEPARATE table from <see cref="_killCooldownTracker" /> (the main
+    ///     C05 anti-farm gate) and from the not-yet-modeled Regular-War-host override's own table, matching
+    ///     "using its own separate cooldown-state table" in the source contract.
+    /// </summary>
+    private readonly KillCooldownTracker _ffaCpOverrideCooldown = new();
 
     /// <summary>
     ///     Process-wide PvP anti-farm gate (C05) -- shared across every <see cref="Zone" /> via
@@ -140,20 +154,6 @@ public sealed partial class Zone
     }
 
     /// <summary>
-    ///     "One specific server number/tribe combination" etc. from the CP-formula's residual terms are NOT
-    ///     modeled here -- see <see cref="PvpKillContributionPointCalculator" />'s own remarks.
-    /// </summary>
-    private const int CombinedLevelGapCap = 13;
-
-    /// <summary>
-    ///     Independent 2-minute same-victim-pair cooldown for the FFA-335 flat CP override (step 5 of the
-    ///     source contract) -- deliberately a SEPARATE table from <see cref="_killCooldownTracker" /> (the main
-    ///     C05 anti-farm gate) and from the not-yet-modeled Regular-War-host override's own table, matching
-    ///     "using its own separate cooldown-state table" in the source contract.
-    /// </summary>
-    private readonly KillCooldownTracker _ffaCpOverrideCooldown = new();
-
-    /// <summary>
     ///     PvP-kill reward pipeline (<c>MyUtil::ProcessForKillOtherTribe</c>, S07_MyGame03.cpp:2602-3248), gated
     ///     end-to-end by <see cref="KillCooldownTracker" /> (C05): repeatedly farming the same victim within
     ///     <see cref="KillCooldownTracker.DefaultCooldown" /> (10 min) only ever grants this reward once per
@@ -225,7 +225,8 @@ public sealed partial class Zone
     ///     tribe's flat CP-for-PvP tower bonus on a qualifying enemy-tribe kill credit. Gated by the same C05
     ///     anti-farm cooldown as <see cref="PlayerRuntimeState.MissionKillOtherTribe" /> (both are the same
     ///     underlying "kill credit" event, and Fenrir has already chosen to anti-farm-gate rewards on this
-    ///     path) rather than an ungated per-kill hook, and now also by <see cref="PvpKillZoneRewardProfile.GrantContributionPoints" />
+    ///     path) rather than an ungated per-kill hook, and now also by
+    ///     <see cref="PvpKillZoneRewardProfile.GrantContributionPoints" />
     ///     (its only caller, <see cref="ApplyPvpKillRewards" />, already resolves the FFA-335 zone's own
     ///     "CP disabled here, use the dedicated override instead" flag -- this closes exactly the FFA half of
     ///     this method's own previously-documented gap).
@@ -277,8 +278,8 @@ public sealed partial class Zone
         // for each is identified (see PvpKillContributionPointCalculator's own remarks for the other three
         // formula terms this deliberately omits entirely).
         var baseAmount = PvpKillContributionPointCalculator.ComputeBaseAmount(
-            hasPremiumStatus: false,
-            hasWarriorScrollBuff: false);
+            false,
+            false);
 
         var grantedAmount = PvpKillContributionPointCalculator.ClampGrant(attackerState.ContributionPoints,
             baseAmount, PvpKillContributionPointCalculator.PlaceholderHardCap);
@@ -314,7 +315,8 @@ public sealed partial class Zone
     ///     behaves identically to a monster kill's. Pet-experience and mount-activity-experience grants are
     ///     deliberately not modeled: neither a pet-experience counter nor a mount-experience counter exists on
     ///     <see cref="PlayerRuntimeState" /> today (<see cref="PetGrowthCalculator" />'s own growth counter is
-    ///     a stat-contribution input, not an experience track; <see cref="Fenrir.Application.Game.Domain.Mounts.MountStateResolver" />'s own
+    ///     a stat-contribution input, not an experience track;
+    ///     <see cref="Fenrir.Application.Game.Domain.Mounts.MountStateResolver" />'s own
     ///     remarks note the per-slot experience arrays this would need don't exist yet either).
     /// </summary>
     private void ApplyPvpKillExperience(PlayerRuntimeState attackerState, PvpKillZoneRewardProfile profile,
@@ -330,8 +332,8 @@ public sealed partial class Zone
             PvpKillExperienceCalculator.PlaceholderBaseAmountPerKill,
             attackerCombinedLevel,
             defenderCombinedLevel,
-            hasWarriorScrollBuff: false,
-            hasDoubleExpCharge: false);
+            false,
+            false);
 
         if (gain > 0)
             ApplyCharacterExperienceGain(attackerState, gain);
@@ -662,7 +664,7 @@ public sealed partial class Zone
         var credited = PetExperienceCreditResolver.Resolve(petItemId, target.PetGrowth, target.PetActivity,
             monsterPatExperience, worldData.ItemsById);
 
-        if (!credited.IsEligible || credited.CreditedAmount == 0 && !credited.ReactivationApplied)
+        if (!credited.IsEligible || (credited.CreditedAmount == 0 && !credited.ReactivationApplied))
             return;
 
         target.PetGrowth = credited.NewGrowth;

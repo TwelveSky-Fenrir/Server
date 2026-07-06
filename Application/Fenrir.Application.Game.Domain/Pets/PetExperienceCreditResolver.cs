@@ -49,7 +49,7 @@ public static class PetExperienceCreditResolver
         var newGrowth = currentGrowth + creditedAmount;
 
         var tierIncreased = creditedAmount > 0 &&
-                             PetGrowthTierCalculator.HasTierIncreased(petItemId, currentGrowth, newGrowth);
+                            PetGrowthTierCalculator.HasTierIncreased(petItemId, currentGrowth, newGrowth);
 
         return new PetExperienceCreditResult(true, reactivationApplied, newActivity, creditedAmount, newGrowth,
             tierIncreased);

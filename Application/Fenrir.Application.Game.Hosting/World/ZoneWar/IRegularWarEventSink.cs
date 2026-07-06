@@ -13,18 +13,18 @@ namespace Fenrir.Application.Game.Hosting.World.ZoneWar;
 /// </summary>
 public interface IRegularWarEventSink
 {
-    void OnCountdownAnnounced(short mapId, int remainingMinutes);
+    public void OnCountdownAnnounced(short mapId, int remainingMinutes);
 
-    void OnSmallestTribeFlagged(short mapId, byte tribeId);
+    public void OnSmallestTribeFlagged(short mapId, byte tribeId);
 
-    void OnActiveWarStarted(short mapId);
+    public void OnActiveWarStarted(short mapId);
 
-    void OnWarConcluded(short mapId, RegularWarOutcome outcome, byte? winningTribe,
+    public void OnWarConcluded(short mapId, RegularWarOutcome outcome, byte? winningTribe,
         ImmutableArray<RegularWarRewardGrant> rewards, bool bossMonstersShouldSpawn);
 
-    void OnMonstersShouldDespawn(short mapId);
+    public void OnMonstersShouldDespawn(short mapId);
 
-    void OnAllSessionsShouldDisconnect(short mapId);
+    public void OnAllSessionsShouldDisconnect(short mapId);
 }
 
 /// <summary>

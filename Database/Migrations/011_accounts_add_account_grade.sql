@@ -17,13 +17,16 @@ GO
 -- this way (case 519 and siblings 518/520/521, Server/ts25zone/S04_MyWork04.cpp). SMALLINT (not BIT) is
 -- kept to match legacy's own field width and leave room for a future graduated grade, even though nothing
 -- today distinguishes grade 1 from grade 2+.
-CREATE OR ALTER PROCEDURE auth.usp_Account_Authenticate @LoginName NVARCHAR(64)
-AS
+CREATE
+OR
+ALTER PROCEDURE auth.usp_Account_Authenticate @LoginName NVARCHAR(64)
+    AS
 BEGIN
-    SET NOCOUNT ON;
+    SET
+NOCOUNT ON;
 
-    SELECT AccountId, PasswordHash, PasswordSalt, FailedLoginCount, LockoutUntilUtc, IsBanned, AccountGrade
-    FROM auth.Accounts
-    WHERE LoginName = @LoginName;
+SELECT AccountId, PasswordHash, PasswordSalt, FailedLoginCount, LockoutUntilUtc, IsBanned, AccountGrade
+FROM auth.Accounts
+WHERE LoginName = @LoginName;
 END;
 GO

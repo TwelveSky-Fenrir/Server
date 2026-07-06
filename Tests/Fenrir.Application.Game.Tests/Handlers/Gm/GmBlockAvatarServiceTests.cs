@@ -27,11 +27,11 @@ public class GmBlockAvatarServiceTests
         int characterId, string name, short accountGrade = 0, int accountId = 100)
     {
         var (session, pipe) = ZoneTestKit.CreateSession(characterId);
-        session.MarkTicketConsumed(accountId, characterId, sessionToken: null, accountGrade: accountGrade);
+        session.MarkTicketConsumed(accountId, characterId, null, accountGrade);
         session.MarkRegistering();
         session.MarkInWorld();
 
-        zone.Post(ZoneCommand.Enter(characterId, ZoneTestKit.EnterData(session, zone.MapId, name: name)));
+        zone.Post(ZoneCommand.Enter(characterId, ZoneTestKit.EnterData(session, zone.MapId, name)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
         ZoneTestKit.DrainOutbound(pipe);
 
@@ -44,7 +44,7 @@ public class GmBlockAvatarServiceTests
     public async Task HandleAsync_CallerNotGm_AbortsWithNoReply_AndCreatesNoBan()
     {
         var (registry, zone) = CreateWorld();
-        var (caller, callerPipe, _) = Enter(zone, 10, "NotAGm", accountGrade: 0);
+        var (caller, callerPipe, _) = Enter(zone, 10, "NotAGm", 0);
         var bans = new FakeBanRepository();
         var service = new GmBlockAvatarService(registry, bans, NullLogger<GmBlockAvatarService>.Instance);
 
@@ -60,7 +60,7 @@ public class GmBlockAvatarServiceTests
     public async Task HandleAsync_GmButTargetNotOnline_SendsGenericFailureAck_AndDoesNotDisconnectCaller()
     {
         var (registry, zone) = CreateWorld();
-        var (caller, callerPipe, _) = Enter(zone, 10, "TheGm", accountGrade: 1);
+        var (caller, callerPipe, _) = Enter(zone, 10, "TheGm", 1);
         var bans = new FakeBanRepository();
         var service = new GmBlockAvatarService(registry, bans, NullLogger<GmBlockAvatarService>.Instance);
 
@@ -77,7 +77,7 @@ public class GmBlockAvatarServiceTests
     {
         // Legacy SearchAvatar's own default (tWithSameIndex=FALSE) excludes the caller's own index.
         var (registry, zone) = CreateWorld();
-        var (caller, callerPipe, _) = Enter(zone, 10, "TheGm", accountGrade: 1);
+        var (caller, callerPipe, _) = Enter(zone, 10, "TheGm", 1);
         var bans = new FakeBanRepository();
         var service = new GmBlockAvatarService(registry, bans, NullLogger<GmBlockAvatarService>.Instance);
 
@@ -92,9 +92,10 @@ public class GmBlockAvatarServiceTests
     public async Task HandleAsync_GmValidTarget_CreatesTheBan_DisconnectsTheTargetSilently_AndSendsNoAckToTheCaller()
     {
         var (registry, zone) = CreateWorld();
-        var (caller, callerPipe, _) = Enter(zone, 10, "TheGm", accountGrade: 1, accountId: 100);
-        var (target, targetPipe, targetState) = Enter(zone, 20, "Griefer", accountGrade: 0, accountId: 200);
-        ZoneTestKit.DrainOutbound(callerPipe); // target's own Enter-broadcast join packet reaching the GM, not under test
+        var (caller, callerPipe, _) = Enter(zone, 10, "TheGm", 1, 100);
+        var (target, targetPipe, targetState) = Enter(zone, 20, "Griefer", 0, 200);
+        ZoneTestKit.DrainOutbound(
+            callerPipe); // target's own Enter-broadcast join packet reaching the GM, not under test
         var bans = new FakeBanRepository();
         var service = new GmBlockAvatarService(registry, bans, NullLogger<GmBlockAvatarService>.Instance);
 
@@ -106,7 +107,8 @@ public class GmBlockAvatarServiceTests
         Assert.Equal(targetState.CharacterId, ban.CharacterId);
         Assert.Equal(BanReason.GmManualBlock, ban.Reason);
         Assert.NotNull(ban.ExpiresAtUtc);
-        Assert.True(ban.ExpiresAtUtc > DateTime.UtcNow.AddYears(29)); // "today plus 365*30 days," a concrete future date
+        Assert.True(ban.ExpiresAtUtc >
+                    DateTime.UtcNow.AddYears(29)); // "today plus 365*30 days," a concrete future date
 
         Assert.Equal(DisconnectReason.Banned, target.DisconnectReason);
 

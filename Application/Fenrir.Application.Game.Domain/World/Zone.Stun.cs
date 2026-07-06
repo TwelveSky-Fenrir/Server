@@ -17,10 +17,16 @@ public sealed partial class Zone
     /// <summary>"Stun" avatar-action pose (<c>mDATA.aAction.aSort==11</c>).</summary>
     private const int StunActionSort = 11;
 
-    /// <summary>Post-cure/expiry idle pose (<c>mDATA.aAction.aSort=1</c>, S07_MyGame04.cpp:449) -- NOT the same as the default 0 used elsewhere.</summary>
+    /// <summary>
+    ///     Post-cure/expiry idle pose (<c>mDATA.aAction.aSort=1</c>, S07_MyGame04.cpp:449) -- NOT the same as the default
+    ///     0 used elsewhere.
+    /// </summary>
     private const int IdleActionSort = 1;
 
-    /// <summary>Buff slot 13 ("Stun Defense") -- forces a stun attempt's block value to a flat maximum (see <see cref="StunResolver" />).</summary>
+    /// <summary>
+    ///     Buff slot 13 ("Stun Defense") -- forces a stun attempt's block value to a flat maximum (see
+    ///     <see cref="StunResolver" />).
+    /// </summary>
     private const int StunDefenseBuffSlot = 13;
 
     /// <summary>Buff slot 10 ("Critical") -- both sides of the team-stun kill-credit grant must hold this active.</summary>
@@ -208,7 +214,10 @@ public sealed partial class Zone
                duel.OpponentOf(attackerId) == defenderId;
     }
 
-    /// <summary>Slot-order scan of a character's learned skills for the first id in <paramref name="candidateIds" />; 0/default when none match.</summary>
+    /// <summary>
+    ///     Slot-order scan of a character's learned skills for the first id in <paramref name="candidateIds" />;
+    ///     0/default when none match.
+    /// </summary>
     private static int FindFirstLearnedSkill(PlayerRuntimeState state,
         ImmutableArray<int> candidateIds, out int grade)
     {

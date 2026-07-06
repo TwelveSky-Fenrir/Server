@@ -19,15 +19,12 @@ namespace Fenrir.Application.Game.Domain.Consumables;
 /// </remarks>
 public static class StatResetResolver
 {
-    public const int StatFloor = 1;
-
-    /// <summary>Stat Cleanse's target-stat selector -- exactly one of these four values is valid input.</summary>
-    public enum StatSelector
+    public enum CleanseOutcome
     {
-        Strength = 1,
-        Dexterity = 2,
-        Vitality = 3,
-        Intelligence = 4
+        Success,
+
+        /// <summary>The targeted stat is already at <see cref="StatFloor" /> -- nothing to refund.</summary>
+        AlreadyAtFloor
     }
 
     public enum LevelBand
@@ -38,13 +35,16 @@ public static class StatResetResolver
         Level145PlusWithRebirth
     }
 
-    public enum CleanseOutcome
+    /// <summary>Stat Cleanse's target-stat selector -- exactly one of these four values is valid input.</summary>
+    public enum StatSelector
     {
-        Success,
-
-        /// <summary>The targeted stat is already at <see cref="StatFloor" /> -- nothing to refund.</summary>
-        AlreadyAtFloor
+        Strength = 1,
+        Dexterity = 2,
+        Vitality = 3,
+        Intelligence = 4
     }
+
+    public const int StatFloor = 1;
 
     /// <summary>
     ///     See this type's own remarks: the ambiguous mid-range (base level 113-144 with at least one rebirth)
@@ -93,7 +93,11 @@ public static class StatResetResolver
         return Math.Max(0, value - StatFloor);
     }
 
-    public readonly record struct ClearResult(int NewStatVit, int NewStatStr, int NewStatInt, int NewStatDex,
+    public readonly record struct ClearResult(
+        int NewStatVit,
+        int NewStatStr,
+        int NewStatInt,
+        int NewStatDex,
         int RefundedPoints);
 
     public readonly record struct CleanseResult(CleanseOutcome Outcome, int NewValue, int RefundedPoints)

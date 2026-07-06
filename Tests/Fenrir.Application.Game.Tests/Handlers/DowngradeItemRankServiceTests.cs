@@ -110,10 +110,11 @@ public class DowngradeItemRankServiceTests
         var (session, _, zone, state, repo, eventLog) = SetUp();
         SeedInventory(zone, new ItemStack(TargetItemId, 1, 7, 3, 0, 0, 0, 0, 0, 0, 777),
             new ItemStack(MaterialItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0));
-        var service = CreateService(repo, eventLog, includeCandidate: true);
+        var service = CreateService(repo, eventLog, true);
 
         var result = await RunToCompletionAsync(
-            service.DowngradeAsync(new DowngradeItemRankRequest { Page1 = 0, Index1 = 0, Page2 = 0, Index2 = 1, Luck = 0 },
+            service.DowngradeAsync(
+                new DowngradeItemRankRequest { Page1 = 0, Index1 = 0, Page2 = 0, Index2 = 1, Luck = 0 },
                 zone, state, 10, CancellationToken.None), zone);
 
         Assert.Null(session.DisconnectReason);
@@ -164,7 +165,7 @@ public class DowngradeItemRankServiceTests
         var (_, _, zone, state, repo, eventLog) = SetUp();
         SeedInventory(zone, new ItemStack(TargetItemId, 1, 7, 3, 0, 0, 0, 0, 0, 0, 1),
             new ItemStack(MaterialItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0));
-        var service = CreateService(repo, eventLog, includeCandidate: false);
+        var service = CreateService(repo, eventLog, false);
 
         var result = await service.DowngradeAsync(
             new DowngradeItemRankRequest { Page1 = 0, Index1 = 0, Page2 = 0, Index2 = 1, Luck = 0 }, zone, state, 10,
@@ -183,7 +184,7 @@ public class DowngradeItemRankServiceTests
         SeedInventory(zone, new ItemStack(TargetItemId, 1, 7, 3, 0, 0, 0, 0, 0, 0, 1),
             new ItemStack(MaterialItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0));
         repo.ThrowOnAdjustMoney = true;
-        var service = CreateService(repo, eventLog, includeCandidate: true);
+        var service = CreateService(repo, eventLog, true);
 
         var result = await service.DowngradeAsync(
             new DowngradeItemRankRequest { Page1 = 0, Index1 = 0, Page2 = 0, Index2 = 1, Luck = 0 }, zone, state, 10,

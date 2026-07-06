@@ -10,7 +10,7 @@ public class TribeVoteElectionCalendarTests
     [InlineData(31, 23)]
     public void RealCalendarDay_FromClosed_AlwaysOpensRegistration(int dayOfMonth, int hourOfDay)
     {
-        var transition = TribeVoteElectionCalendar.Evaluate(TribeVotePhase.Closed, dayOfMonth, hourOfDay, testMode: false);
+        var transition = TribeVoteElectionCalendar.Evaluate(TribeVotePhase.Closed, dayOfMonth, hourOfDay, false);
 
         Assert.Equal(TribeVoteCalendarTransition.OpenRegistration, transition);
     }
@@ -24,11 +24,11 @@ public class TribeVoteElectionCalendarTests
         // Every valid DateTime.Day is >= 1, so the day >= 1 branch is always taken regardless of which phase
         // the cycle happens to be in -- only "already Candidacy" is guarded against.
         Assert.Equal(TribeVoteCalendarTransition.OpenRegistration,
-            TribeVoteElectionCalendar.Evaluate(TribeVotePhase.VotingClosed, dayOfMonth, hourOfDay, testMode: false));
+            TribeVoteElectionCalendar.Evaluate(TribeVotePhase.VotingClosed, dayOfMonth, hourOfDay, false));
         Assert.Equal(TribeVoteCalendarTransition.OpenRegistration,
-            TribeVoteElectionCalendar.Evaluate(TribeVotePhase.ResultsAnnounced, dayOfMonth, hourOfDay, testMode: false));
+            TribeVoteElectionCalendar.Evaluate(TribeVotePhase.ResultsAnnounced, dayOfMonth, hourOfDay, false));
         Assert.Equal(TribeVoteCalendarTransition.OpenRegistration,
-            TribeVoteElectionCalendar.Evaluate(TribeVotePhase.Voting, dayOfMonth, hourOfDay, testMode: false));
+            TribeVoteElectionCalendar.Evaluate(TribeVotePhase.Voting, dayOfMonth, hourOfDay, false));
     }
 
     [Theory]
@@ -37,7 +37,7 @@ public class TribeVoteElectionCalendarTests
     [InlineData(31, 23)]
     public void RealCalendarDay_AlreadyRegistrationOpen_IsIdempotent_NoTransition(int dayOfMonth, int hourOfDay)
     {
-        var transition = TribeVoteElectionCalendar.Evaluate(TribeVotePhase.Candidacy, dayOfMonth, hourOfDay, testMode: false);
+        var transition = TribeVoteElectionCalendar.Evaluate(TribeVotePhase.Candidacy, dayOfMonth, hourOfDay, false);
 
         Assert.Equal(TribeVoteCalendarTransition.None, transition);
     }
@@ -46,9 +46,9 @@ public class TribeVoteElectionCalendarTests
     public void TestMode_IsACompleteNoOp_RegardlessOfDayOrPhase()
     {
         Assert.Equal(TribeVoteCalendarTransition.None,
-            TribeVoteElectionCalendar.Evaluate(TribeVotePhase.Closed, dayOfMonth: 1, hourOfDay: 0, testMode: true));
+            TribeVoteElectionCalendar.Evaluate(TribeVotePhase.Closed, 1, 0, true));
         Assert.Equal(TribeVoteCalendarTransition.None,
-            TribeVoteElectionCalendar.Evaluate(TribeVotePhase.Voting, dayOfMonth: 15, hourOfDay: 12, testMode: true));
+            TribeVoteElectionCalendar.Evaluate(TribeVotePhase.Voting, 15, 12, true));
     }
 
     [Fact]
@@ -61,8 +61,8 @@ public class TribeVoteElectionCalendarTests
         // same time, which is self-contradictory -- there is no int value, real calendar day or otherwise,
         // that can ever reach them.
         Assert.Equal(TribeVoteCalendarTransition.OpenVoting,
-            TribeVoteElectionCalendar.Evaluate(TribeVotePhase.Closed, dayOfMonth: 0, hourOfDay: 0, testMode: false));
+            TribeVoteElectionCalendar.Evaluate(TribeVotePhase.Closed, 0, 0, false));
         Assert.Equal(TribeVoteCalendarTransition.OpenVoting,
-            TribeVoteElectionCalendar.Evaluate(TribeVotePhase.Closed, dayOfMonth: -1, hourOfDay: 0, testMode: false));
+            TribeVoteElectionCalendar.Evaluate(TribeVotePhase.Closed, -1, 0, false));
     }
 }

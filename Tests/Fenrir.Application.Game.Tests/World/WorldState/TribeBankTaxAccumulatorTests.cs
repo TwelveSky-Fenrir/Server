@@ -82,7 +82,8 @@ public class TribeBankTaxAccumulatorTests
 
         // Push tribe 0 to just 50 below the ceiling, then credit an event whose tax (100) would push it over.
         accumulator.CreditMonsterKillCurrencyTax(0,
-            (long)((TribeBankTaxAccumulator.ZoneLocalCeiling - 50) / TribeBankTaxAccumulator.MonsterKillCurrencyTaxRate));
+            (long)((TribeBankTaxAccumulator.ZoneLocalCeiling - 50) /
+                   TribeBankTaxAccumulator.MonsterKillCurrencyTaxRate));
         var before = accumulator.GetTotal(0);
         Assert.True(before <= TribeBankTaxAccumulator.ZoneLocalCeiling - 50);
 

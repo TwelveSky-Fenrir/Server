@@ -39,7 +39,8 @@ public enum TribeVoteCalendarTransition
 ///         EDGE CASE (preserved, not fixed): <see cref="System.DateTime.Day" /> is always 1-31, so the
 ///         <c>day &gt;= 1</c> branch is always taken and the <c>day &lt;= 2</c> / <c>day &lt;= 3</c> branches
 ///         below it can never run on a live server -- <see cref="TribeVoteCalendarTransition.OpenVoting" />/
-///         <see cref="TribeVoteCalendarTransition.CloseVoting" />/<see cref="TribeVoteCalendarTransition.AnnounceResults" />/
+///         <see cref="TribeVoteCalendarTransition.CloseVoting" />/
+///         <see cref="TribeVoteCalendarTransition.AnnounceResults" />/
 ///         <see cref="TribeVoteCalendarTransition.ResetToIdle" /> are therefore never automatically reachable
 ///         through this function; only <see cref="TribeVoteCalendarTransition.OpenRegistration" /> (guarded by
 ///         "already registration-open, do nothing") and <see cref="TribeVoteCalendarTransition.None" /> are.
@@ -53,7 +54,8 @@ public enum TribeVoteCalendarTransition
 ///         contract, and can only ever run when <paramref name="dayOfMonth" /> is 0 or negative -- impossible
 ///         for a real calendar day -- so no choice of threshold here could ever change production behavior.
 ///         Left unimplemented rather than guessed at; <see cref="TribeVoteCalendarTransition.CloseVoting" />/
-///         <see cref="TribeVoteCalendarTransition.AnnounceResults" />/<see cref="TribeVoteCalendarTransition.ResetToIdle" />
+///         <see cref="TribeVoteCalendarTransition.AnnounceResults" />/
+///         <see cref="TribeVoteCalendarTransition.ResetToIdle" />
 ///         are real, correctly-modeled transitions on <c>TribeVoteElection</c> that a future citation of the
 ///         exact hour cut points could wire this function up to emit automatically.
 ///     </para>

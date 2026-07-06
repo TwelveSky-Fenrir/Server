@@ -15,7 +15,8 @@ GO
 
 -- Safe: rows here carry only a 15s TTL and no durable meaning, so clearing before the ALTER loses nothing
 -- (see 010's own remarks).
-DELETE FROM runtime.SessionTickets;
+DELETE
+FROM runtime.SessionTickets;
 
 ALTER TABLE runtime.SessionTickets
     ADD AccountGrade SMALLINT NOT NULL DEFAULT 0;
@@ -55,7 +56,10 @@ WITH (TRANSACTION ISOLATION LEVEL = SNAPSHOT, LANGUAGE = N'us_english')
     DECLARE
 @CharacterId INT, @ShardId TINYINT, @Exp DATETIME2(3), @SessionToken UNIQUEIDENTIFIER, @AccountGrade SMALLINT;
 
-SELECT @CharacterId = CharacterId, @ShardId = ShardId, @Exp = ExpiresAtUtc, @SessionToken = SessionToken,
+SELECT @CharacterId = CharacterId,
+       @ShardId = ShardId,
+       @Exp = ExpiresAtUtc,
+       @SessionToken = SessionToken,
        @AccountGrade = AccountGrade
 FROM runtime.SessionTickets
 WHERE AccountId = @AccountId;
@@ -66,7 +70,9 @@ WHERE AccountId = @AccountId;
 
 IF
 @Exp IS NOT NULL AND @Exp > SYSUTCDATETIME()
-SELECT @CharacterId AS CharacterId, @ShardId AS ShardId, @SessionToken AS SessionToken,
+SELECT @CharacterId  AS CharacterId,
+       @ShardId      AS ShardId,
+       @SessionToken AS SessionToken,
        @AccountGrade AS AccountGrade;
 END;
 GO

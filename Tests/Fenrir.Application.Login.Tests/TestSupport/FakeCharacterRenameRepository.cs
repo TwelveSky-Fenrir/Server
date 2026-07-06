@@ -15,11 +15,7 @@ internal sealed class FakeCharacterRenameRepository : ICharacterRenameRepository
         _fault = fault;
     }
 
-    public (int AccountId, byte Slot, string NewName, byte ItemContainer, byte ItemSlot)? LastCall
-    {
-        get;
-        private set;
-    }
+    public (int AccountId, byte Slot, string NewName, byte ItemContainer, byte ItemSlot)? LastCall { get; private set; }
 
     public ValueTask<int> RenameAndConsumeItemAsync(int accountId, byte slot, string newName, byte itemContainer,
         byte itemSlot, CancellationToken ct)

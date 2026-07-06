@@ -62,7 +62,7 @@ public class InventoryToWorldDropPolicyTests
     [InlineData(0, 64)]
     public void OutOfRangePageOrSlot_IsMalformed(int page, int slot)
     {
-        var result = Resolve(sourcePage: page, sourceSlot: slot, source: Stack(50, 1),
+        var result = Resolve(page, slot, source: Stack(50, 1),
             itemDefinition: StackableItem(50));
 
         Assert.Equal(InventoryToWorldDropPolicy.Outcome.SourceOutOfRange, result.Outcome);
@@ -74,7 +74,7 @@ public class InventoryToWorldDropPolicyTests
     [Fact]
     public void SecondPageExpired_IsMalformed()
     {
-        var result = Resolve(sourcePage: ContainerMatrix.InventoryPage1, premiumPageAccessAllowed: false,
+        var result = Resolve(ContainerMatrix.InventoryPage1, premiumPageAccessAllowed: false,
             source: Stack(50, 1), itemDefinition: StackableItem(50));
 
         Assert.Equal(InventoryToWorldDropPolicy.Outcome.PremiumPageExpired, result.Outcome);
@@ -84,7 +84,7 @@ public class InventoryToWorldDropPolicyTests
     [Fact]
     public void FirstPage_IgnoresPremiumGate_EvenWhenExpired()
     {
-        var result = Resolve(sourcePage: ContainerMatrix.InventoryPage0, premiumPageAccessAllowed: false,
+        var result = Resolve(ContainerMatrix.InventoryPage0, premiumPageAccessAllowed: false,
             source: Stack(50, 1), itemDefinition: StackableItem(50));
 
         Assert.True(result.Succeeded);
@@ -194,7 +194,7 @@ public class InventoryToWorldDropPolicyTests
     [Fact]
     public void StackablePartialDrop_ReducesSourceQuantityOnly_RestUnchanged()
     {
-        var source = Stack(50, 10, enchant: 3, serial: 777);
+        var source = Stack(50, 10, 3, serial: 777);
         var result = Resolve(requestedQuantity: 4, source: source, itemDefinition: StackableItem(50));
 
         Assert.True(result.Succeeded);
@@ -252,7 +252,7 @@ public class InventoryToWorldDropPolicyTests
     public void StackableDrop_NeverCarriesSocketDataToGroundCopy()
     {
         var result = Resolve(requestedQuantity: 5,
-            source: Stack(50, 10, enchant: 9, combine: 2, refine: 1, socket: 3, gem1: 111, gem2: 222, gem3: 333),
+            source: Stack(50, 10, 9, 2, 1, 3, 111, 222, 333),
             itemDefinition: StackableItem(50));
 
         Assert.True(result.Succeeded);
@@ -277,7 +277,7 @@ public class InventoryToWorldDropPolicyTests
     [Fact]
     public void UniqueItemDrop_CarriesEnchantAndSocketDataToGroundCopy()
     {
-        var source = Stack(700, 1, enchant: 12, combine: 3, refine: 1, socket: 2, gem1: 501, gem2: 502, gem3: 503,
+        var source = Stack(700, 1, 12, 3, 1, 2, 501, 502, 503,
             serial: 909);
         var result = Resolve(source: source, itemDefinition: UniqueItem(700));
 
@@ -361,7 +361,7 @@ public class InventoryToWorldDropPolicyTests
     {
         var invoked = false;
 
-        var result = Resolve(sourcePage: 5, source: Stack(50, 1), itemDefinition: StackableItem(50),
+        var result = Resolve(5, source: Stack(50, 1), itemDefinition: StackableItem(50),
             evaluateSpawnEligibility: _ =>
             {
                 invoked = true;

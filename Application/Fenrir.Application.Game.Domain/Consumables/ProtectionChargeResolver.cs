@@ -18,9 +18,6 @@ namespace Fenrir.Application.Game.Domain.Consumables;
 /// </remarks>
 public static class ProtectionChargeResolver
 {
-    /// <summary>CP Prot Charm's own precondition: a halo rank at or above this rejects the charge outright, regardless of ceiling headroom.</summary>
-    public const int HaloRankGateThreshold = 96;
-
     public enum ChargeOutcome
     {
         Success,
@@ -31,6 +28,12 @@ public static class ProtectionChargeResolver
         /// <summary>CP Prot Charm only: halo rank already &gt;= <see cref="HaloRankGateThreshold" />.</summary>
         HaloRankTooHigh
     }
+
+    /// <summary>
+    ///     CP Prot Charm's own precondition: a halo rank at or above this rejects the charge outright, regardless of
+    ///     ceiling headroom.
+    /// </summary>
+    public const int HaloRankGateThreshold = 96;
 
     /// <summary>
     ///     Charm sub-group (Preserve/Protection/Guardian/Absolute Craft/CP Prot Charm): bulk-aware, wide-safe

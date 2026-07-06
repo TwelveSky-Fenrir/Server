@@ -28,9 +28,6 @@ namespace Fenrir.Application.Game.Domain.Inventory;
 /// </remarks>
 public static class StoreMoneyPolicy
 {
-    /// <summary>MAX_NUMBER_SIZE (DEFINE.h:365) -- the shared cap both counters are checked against.</summary>
-    public const long MaxMoney = 2_000_000_000;
-
     public enum TransferOutcome
     {
         Success,
@@ -45,13 +42,8 @@ public static class StoreMoneyPolicy
         DestinationOverflow
     }
 
-    public readonly record struct TransferResult(
-        TransferOutcome Outcome,
-        long NewSourceMoney,
-        long NewDestinationMoney)
-    {
-        public bool Succeeded => Outcome == TransferOutcome.Success;
-    }
+    /// <summary>MAX_NUMBER_SIZE (DEFINE.h:365) -- the shared cap both counters are checked against.</summary>
+    public const long MaxMoney = 2_000_000_000;
 
     /// <summary>tSort 226 -- wallet money to store money.</summary>
     public static TransferResult ResolveDeposit(long requestedAmount, long walletMoney, long storeMoney)
@@ -80,5 +72,13 @@ public static class StoreMoneyPolicy
             return new TransferResult(TransferOutcome.DestinationOverflow, sourceMoney, destinationMoney);
 
         return new TransferResult(TransferOutcome.Success, sourceMoney - requestedAmount, projectedDestination);
+    }
+
+    public readonly record struct TransferResult(
+        TransferOutcome Outcome,
+        long NewSourceMoney,
+        long NewDestinationMoney)
+    {
+        public bool Succeeded => Outcome == TransferOutcome.Success;
     }
 }

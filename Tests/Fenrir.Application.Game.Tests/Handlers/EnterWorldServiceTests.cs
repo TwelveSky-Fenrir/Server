@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Net;
 using Fenrir.Application.Game.Domain.Guilds;
 using Fenrir.Application.Game.Domain.Movement;
@@ -6,8 +7,6 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Services.ZoneLifecycle;
 using Fenrir.Application.Game.Tests.Handlers.Tribes;
 using Fenrir.Application.Game.Tests.TestSupport;
-using Fenrir.Network.Serialization.Packets.Shared;
-using Fenrir.Network.Serialization.Packets.Zone;
 using Fenrir.Data.Abstractions.Admin;
 using Fenrir.Data.Abstractions.Guilds;
 using Fenrir.Data.Abstractions.Runtime;
@@ -15,6 +14,8 @@ using Fenrir.Data.Abstractions.Social;
 using Fenrir.Data.Security;
 using Fenrir.Data.WriteBehind;
 using Fenrir.Network.Dispatch.Sessions;
+using Fenrir.Network.Serialization.Packets.Shared;
+using Fenrir.Network.Serialization.Packets.Zone;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -34,7 +35,7 @@ public class EnterWorldServiceTests
     [Fact]
     public async Task HandleAsync_CharacterHasAnActiveBan_AbortsBeforeFetchingTheCharacterBundle()
     {
-        var service = CreateService(out var session, characterBanned: true);
+        var service = CreateService(out var session, true);
 
         await service.HandleAsync(ValidRequest(), session, CancellationToken.None);
 
@@ -137,25 +138,25 @@ public class EnterWorldServiceTests
             throw new NotSupportedException();
         }
 
-        public ValueTask<System.Collections.ObjectModel.ReadOnlyCollection<GuildSummaryDto>> GetAllAsync(
+        public ValueTask<ReadOnlyCollection<GuildSummaryDto>> GetAllAsync(
             CancellationToken ct)
         {
             throw new NotSupportedException();
         }
 
-        public ValueTask<System.Collections.ObjectModel.ReadOnlyCollection<GuildRankingRowDto>> GetTopByPointsAsync(
+        public ValueTask<ReadOnlyCollection<GuildRankingRowDto>> GetTopByPointsAsync(
             int count, CancellationToken ct)
         {
             throw new NotSupportedException();
         }
 
-        public ValueTask<System.Collections.ObjectModel.ReadOnlyCollection<GuildRosterRowDto>> GetRosterAsync(
+        public ValueTask<ReadOnlyCollection<GuildRosterRowDto>> GetRosterAsync(
             int guildId, CancellationToken ct)
         {
             throw new NotSupportedException();
         }
 
-        public ValueTask<System.Collections.ObjectModel.ReadOnlyCollection<GuildNoticeRowDto>> GetNoticesAsync(
+        public ValueTask<ReadOnlyCollection<GuildNoticeRowDto>> GetNoticesAsync(
             int guildId, CancellationToken ct)
         {
             throw new NotSupportedException();
@@ -232,7 +233,7 @@ public class EnterWorldServiceTests
 
     private sealed class ThrowingFriendRepository : IFriendRepository
     {
-        public ValueTask<System.Collections.ObjectModel.ReadOnlyCollection<CharacterFriendDto>> GetByCharacterAsync(
+        public ValueTask<ReadOnlyCollection<CharacterFriendDto>> GetByCharacterAsync(
             int characterId, CancellationToken ct)
         {
             throw new InvalidOperationException("Must not be reached once world-entry is already rejected.");

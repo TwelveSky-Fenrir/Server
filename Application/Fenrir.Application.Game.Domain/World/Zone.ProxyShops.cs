@@ -12,16 +12,16 @@ namespace Fenrir.Application.Game.Domain.World;
 
 public sealed partial class Zone
 {
+    // CharacterIds force-closed by this tick's expiry check, awaiting their durable ShopState=0 write.
+    // Tick must stay fully synchronous, so the write is deferred to ProxyShopExpiryFlushHost -- same posture
+    // as _pendingMoneyGrants/MonsterLootFlushHost.
+    private readonly ConcurrentQueue<int> _pendingProxyShopCloses = new();
+
     // Keyed by CharacterId (also this shop's wire ServerIndex -- see ProxyShopBroadcastEntry's remarks).
     // A ConcurrentDictionary, not tick-owned-only: OpenShopStallService/CloseShopStallService register/remove
     // whole entries directly from a handler thread (never mutate an existing entry's fields), while only this
     // zone's own tick ever reads the table or writes LastBroadcastAt -- same split-ownership posture as _monsters.
     private readonly ConcurrentDictionary<int, ProxyShopBroadcastEntry> _proxyShops = new();
-
-    // CharacterIds force-closed by this tick's expiry check, awaiting their durable ShopState=0 write.
-    // Tick must stay fully synchronous, so the write is deferred to ProxyShopExpiryFlushHost -- same posture
-    // as _pendingMoneyGrants/MonsterLootFlushHost.
-    private readonly ConcurrentQueue<int> _pendingProxyShopCloses = new();
 
     public int ProxyShopCount => _proxyShops.Count;
 
@@ -145,8 +145,12 @@ public sealed partial class Zone
     /// <param name="checkChangeActionState">
     ///     0 for the periodic "still here" re-broadcast (per the packet's own doc comment, "no animation
     ///     replay"), or 3 for a force-close despawn -- confirmed as the same code ground items use for their
-    ///     own despawn by <c>ProcessCloseProxyInfo</c>'s <c>mTRANSFER.B_DEPUTY_PSHOP_ACTION_RECV(tProxy-&gt;mIndex,
-    ///     tProxy-&gt;mUniqueNumber, &amp;tProxy-&gt;mState, 3)</c> (Server/ts25zone/S07_MyGame09.cpp:570, in
+    ///     own despawn by <c>ProcessCloseProxyInfo</c>'s
+    ///     <c>
+    ///         mTRANSFER.B_DEPUTY_PSHOP_ACTION_RECV(tProxy-&gt;mIndex,
+    ///         tProxy-&gt;mUniqueNumber, &amp;tProxy-&gt;mState, 3)
+    ///     </c>
+    ///     (Server/ts25zone/S07_MyGame09.cpp:570, in
     ///     context 559-577; ServerDocs/12_ts25zone/15_MyGame08_09_EventsCenter_ProxyShops.md:570,580).
     /// </param>
     private void BroadcastProxyShopState(ProxyShopBroadcastEntry entry, int checkChangeActionState)

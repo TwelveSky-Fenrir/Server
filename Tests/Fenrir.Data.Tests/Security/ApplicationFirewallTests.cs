@@ -11,7 +11,7 @@ public class ApplicationFirewallTests
     [Fact]
     public async Task IsAllowedAsync_NullEndPoint_FailsOpen()
     {
-        var firewall = Create(blocked: true, ruleBlocked: true, allowlisted: false);
+        var firewall = Create(true, true, false);
 
         Assert.True(await firewall.IsAllowedAsync(null, CancellationToken.None));
     }
@@ -19,7 +19,7 @@ public class ApplicationFirewallTests
     [Fact]
     public async Task IsAllowedAsync_NothingMatches_Allows()
     {
-        var firewall = Create(blocked: false, ruleBlocked: false, allowlisted: false);
+        var firewall = Create(false, false, false);
 
         Assert.True(await firewall.IsAllowedAsync(SomeEndPoint, CancellationToken.None));
     }
@@ -27,7 +27,7 @@ public class ApplicationFirewallTests
     [Fact]
     public async Task IsAllowedAsync_BlockedIp_Denies()
     {
-        var firewall = Create(blocked: true, ruleBlocked: false, allowlisted: false);
+        var firewall = Create(true, false, false);
 
         Assert.False(await firewall.IsAllowedAsync(SomeEndPoint, CancellationToken.None));
     }
@@ -35,7 +35,7 @@ public class ApplicationFirewallTests
     [Fact]
     public async Task IsAllowedAsync_FirewallRuleBlocked_Denies()
     {
-        var firewall = Create(blocked: false, ruleBlocked: true, allowlisted: false);
+        var firewall = Create(false, true, false);
 
         Assert.False(await firewall.IsAllowedAsync(SomeEndPoint, CancellationToken.None));
     }
@@ -43,7 +43,7 @@ public class ApplicationFirewallTests
     [Fact]
     public async Task IsAllowedAsync_AllowlistedIp_BypassesBothDenyLists()
     {
-        var firewall = Create(blocked: true, ruleBlocked: true, allowlisted: true);
+        var firewall = Create(true, true, true);
 
         Assert.True(await firewall.IsAllowedAsync(SomeEndPoint, CancellationToken.None));
     }

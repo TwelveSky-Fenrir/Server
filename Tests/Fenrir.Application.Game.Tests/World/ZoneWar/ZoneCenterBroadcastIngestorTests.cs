@@ -4,7 +4,6 @@ using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Network.Framing;
 using Fenrir.Network.Serialization.Packets.Zone;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.World.ZoneWar;

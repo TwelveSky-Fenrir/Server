@@ -24,7 +24,8 @@ public class ZoneHandshakeHandlerTests
         var (session, pipe) = ZoneTestKit.CreateSession(1);
         registry.Register(session);
 
-        await handler.HandleAsync(new ZoneHandshakeRequest { Id = "irrelevant", Tribe = 0, UserSort = 0 }, session, CancellationToken.None);
+        await handler.HandleAsync(new ZoneHandshakeRequest { Id = "irrelevant", Tribe = 0, UserSort = 0 }, session,
+            CancellationToken.None);
 
         Assert.Equal(AccountId, session.AccountId);
         Assert.Equal(CharacterId, session.CharacterId);
@@ -44,11 +45,12 @@ public class ZoneHandshakeHandlerTests
         var registry = new SessionRegistry();
         var handler = new ZoneHandshakeHandler(
             new StubZoneHandshakeService(new ZoneHandshakeResult(ZoneHandshakeOutcome.Accepted, AccountId,
-                CharacterId, SessionToken, AccountGrade: 1)), registry);
+                CharacterId, SessionToken, 1)), registry);
         var (session, _) = ZoneTestKit.CreateSession(1);
         registry.Register(session);
 
-        await handler.HandleAsync(new ZoneHandshakeRequest { Id = "irrelevant", Tribe = 0, UserSort = 0 }, session, CancellationToken.None);
+        await handler.HandleAsync(new ZoneHandshakeRequest { Id = "irrelevant", Tribe = 0, UserSort = 0 }, session,
+            CancellationToken.None);
 
         Assert.Equal((short)1, session.AccountGrade);
         Assert.True(session.IsGm);
@@ -62,7 +64,8 @@ public class ZoneHandshakeHandlerTests
             new StubZoneHandshakeService(new ZoneHandshakeResult(ZoneHandshakeOutcome.SessionSuperseded)), registry);
         var (session, pipe) = ZoneTestKit.CreateSession(1);
 
-        await handler.HandleAsync(new ZoneHandshakeRequest { Id = "irrelevant", Tribe = 0, UserSort = 0 }, session, CancellationToken.None);
+        await handler.HandleAsync(new ZoneHandshakeRequest { Id = "irrelevant", Tribe = 0, UserSort = 0 }, session,
+            CancellationToken.None);
 
         Assert.Equal(DisconnectReason.Evicted, session.DisconnectReason);
         Assert.Null(session.AccountId);
@@ -78,7 +81,8 @@ public class ZoneHandshakeHandlerTests
             new StubZoneHandshakeService(new ZoneHandshakeResult(ZoneHandshakeOutcome.Rejected)), registry);
         var (session, pipe) = ZoneTestKit.CreateSession(1);
 
-        await handler.HandleAsync(new ZoneHandshakeRequest { Id = "irrelevant", Tribe = 0, UserSort = 0 }, session, CancellationToken.None);
+        await handler.HandleAsync(new ZoneHandshakeRequest { Id = "irrelevant", Tribe = 0, UserSort = 0 }, session,
+            CancellationToken.None);
 
         Assert.Null(session.DisconnectReason);
         await PacketAssert.AssertSentAsync(pipe, new ZoneHandshakeResponse { Result = 1 });
@@ -94,7 +98,8 @@ public class ZoneHandshakeHandlerTests
             new StubZoneHandshakeService(new ZoneHandshakeResult(ZoneHandshakeOutcome.QuotaFull)), registry);
         var (session, pipe) = ZoneTestKit.CreateSession(1);
 
-        await handler.HandleAsync(new ZoneHandshakeRequest { Id = "irrelevant", Tribe = 1, UserSort = 0 }, session, CancellationToken.None);
+        await handler.HandleAsync(new ZoneHandshakeRequest { Id = "irrelevant", Tribe = 1, UserSort = 0 }, session,
+            CancellationToken.None);
 
         Assert.Null(session.DisconnectReason);
         await PacketAssert.AssertSentAsync(pipe, new ZoneHandshakeResponse { Result = 1 });
@@ -110,7 +115,8 @@ public class ZoneHandshakeHandlerTests
             new StubZoneHandshakeService(new ZoneHandshakeResult(ZoneHandshakeOutcome.ProtocolViolation)), registry);
         var (session, pipe) = ZoneTestKit.CreateSession(1);
 
-        await handler.HandleAsync(new ZoneHandshakeRequest { Id = "irrelevant", Tribe = 9, UserSort = 0 }, session, CancellationToken.None);
+        await handler.HandleAsync(new ZoneHandshakeRequest { Id = "irrelevant", Tribe = 9, UserSort = 0 }, session,
+            CancellationToken.None);
 
         Assert.Equal(DisconnectReason.Malformed, session.DisconnectReason);
         Assert.Equal([], ZoneTestKit.DrainOutbound(pipe));

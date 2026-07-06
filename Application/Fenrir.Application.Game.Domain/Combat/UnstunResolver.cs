@@ -4,7 +4,10 @@ using Fenrir.Application.Game.GameData;
 
 namespace Fenrir.Application.Game.Domain.Combat;
 
-/// <summary>Why a cure attempt (<c>mCase</c> 6, <c>ProcessAttack06</c>) was refused before rolling -- each is a silent, packet-less <c>return;</c> in the legacy.</summary>
+/// <summary>
+///     Why a cure attempt (<c>mCase</c> 6, <c>ProcessAttack06</c>) was refused before rolling -- each is a silent,
+///     packet-less <c>return;</c> in the legacy.
+/// </summary>
 public enum UnstunRejectReason
 {
     None,
@@ -24,20 +27,23 @@ public enum UnstunRejectReason
     /// <summary>Only ever produced when the curer's own echo-verification flag is set (:3783-3798).</summary>
     AntiCheatEchoMismatch,
 
-    /// <summary>The used skill id is not one of <see cref="UnstunResolver.StunResistSkillIds" />, only checked when the echo flag is set.</summary>
+    /// <summary>
+    ///     The used skill id is not one of <see cref="UnstunResolver.StunResistSkillIds" />, only checked when the echo
+    ///     flag is set.
+    /// </summary>
     UnrecognizedSkill
 }
 
 /// <summary>Same Rejected/roll-failed distinction as <see cref="StunAttemptOutcome" /> -- see that type's own remarks.</summary>
 public readonly record struct UnstunAttemptOutcome(bool Rejected, UnstunRejectReason RejectReason, bool Success)
 {
+    public static readonly UnstunAttemptOutcome Failed = new(false, UnstunRejectReason.None, false);
+    public static readonly UnstunAttemptOutcome Succeeded = new(false, UnstunRejectReason.None, true);
+
     public static UnstunAttemptOutcome Reject(UnstunRejectReason reason)
     {
         return new UnstunAttemptOutcome(true, reason, false);
     }
-
-    public static readonly UnstunAttemptOutcome Failed = new(false, UnstunRejectReason.None, false);
-    public static readonly UnstunAttemptOutcome Succeeded = new(false, UnstunRejectReason.None, true);
 }
 
 /// <summary>
@@ -47,7 +53,10 @@ public readonly record struct UnstunAttemptOutcome(bool Rejected, UnstunRejectRe
 /// <param name="TargetIsStunned"><c>PlayerRuntimeState.IsStunned</c> on the target.</param>
 /// <param name="UsedSkillId">Wire <c>mAttackActionValue2</c>.</param>
 /// <param name="UsedSkillGradePoints">Wire <c>mAttackActionValue3</c> -- already the combined grade.</param>
-/// <param name="CurerAnimatingSkillNumber"><c>PlayerRuntimeState.ActionSkillNumber</c> -- what the echo check compares against.</param>
+/// <param name="CurerAnimatingSkillNumber">
+///     <c>PlayerRuntimeState.ActionSkillNumber</c> -- what the echo check compares
+///     against.
+/// </param>
 /// <param name="CurerAnimatingGradePoints">
 ///     <c>PlayerRuntimeState.ActionSkillGradeNum1 + ActionSkillGradeNum2</c> -- what the echo check compares
 ///     against.
@@ -90,17 +99,17 @@ public readonly record struct UnstunAttemptRequest(
 /// </remarks>
 public static class UnstunResolver
 {
+    /// <summary>A combined grade at/above this guarantees the cure, bypassing the success roll (:3799-3815).</summary>
+    public const int GuaranteedCureGradePoints = 20;
+
+    private const int SuccessRollRange = 100;
+
     /// <summary>
     ///     The stun-resist/cure skill family -- the same triple <see cref="StunResolver.StunResistSkillIds" />
     ///     scans the defender's equipped skills for (<c>S07_MyGame02.cpp:3609-3634</c>); the only ids this
     ///     resolver's own echo check recognizes.
     /// </summary>
     public static readonly ImmutableArray<int> StunResistSkillIds = [5, 24, 43];
-
-    /// <summary>A combined grade at/above this guarantees the cure, bypassing the success roll (:3799-3815).</summary>
-    public const int GuaranteedCureGradePoints = 20;
-
-    private const int SuccessRollRange = 100;
 
     public static UnstunAttemptOutcome Resolve(UnstunAttemptRequest request, IRandomSource rng)
     {

@@ -4,7 +4,6 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Tests.GameData;
 using Fenrir.Application.Game.Tests.TestSupport;
-using Fenrir.Data.Abstractions.World;
 
 namespace Fenrir.Application.Game.Tests.Progression;
 
@@ -46,7 +45,7 @@ public class TowerGuardianSystemTests
         var system = new TowerGuardianSystem(towerWar, worldData);
         var zone = ZoneTestKit.CreateZone(999, simulationSystems: [system], worldData: worldData);
         towerWar.SetTowerState(0, 201, true);
-        towerWar.BeginUpgrade(0, 401, controllingTribeId: 1);
+        towerWar.BeginUpgrade(0, 401, 1);
 
         zone.Tick(SimulationClock.LegacyTick);
 
@@ -58,7 +57,7 @@ public class TowerGuardianSystemTests
     public void Building_SpawnsTheGuardianAtTheCatalogLocation_AndCompletesTheUpgrade()
     {
         var (zone, towerWar) = CreateZone();
-        towerWar.BeginUpgrade(TowerIndex, newPackedState: 201, controllingTribeId: 1);
+        towerWar.BeginUpgrade(TowerIndex, 201, 1);
 
         zone.Tick(SimulationClock.LegacyTick);
 
@@ -79,10 +78,10 @@ public class TowerGuardianSystemTests
     public void Building_WhileAnOlderGuardianIsStillAlive_ReplacesItInsteadOfStacking()
     {
         var (zone, towerWar) = CreateZone();
-        towerWar.BeginUpgrade(TowerIndex, 201, controllingTribeId: 1);
+        towerWar.BeginUpgrade(TowerIndex, 201, 1);
         zone.Tick(SimulationClock.LegacyTick); // level 2 guardian spawns
 
-        towerWar.BeginUpgrade(TowerIndex, 401, controllingTribeId: 1); // level-up to 4
+        towerWar.BeginUpgrade(TowerIndex, 401, 1); // level-up to 4
         zone.Tick(SimulationClock.LegacyTick);
 
         Assert.Equal(1, zone.MonsterCount); // old guardian freed, not stacked
@@ -95,7 +94,7 @@ public class TowerGuardianSystemTests
     public void Active_GuardianStillAlive_StaysActive()
     {
         var (zone, towerWar) = CreateZone();
-        towerWar.BeginUpgrade(TowerIndex, 201, controllingTribeId: 1);
+        towerWar.BeginUpgrade(TowerIndex, 201, 1);
         zone.Tick(SimulationClock.LegacyTick);
 
         zone.Tick(SimulationClock.LegacyTick);
@@ -108,17 +107,18 @@ public class TowerGuardianSystemTests
     public void Active_GuardianKilled_BeginsSiege()
     {
         var (zone, towerWar) = CreateZone();
-        towerWar.BeginUpgrade(TowerIndex, 201, controllingTribeId: 1);
+        towerWar.BeginUpgrade(TowerIndex, 201, 1);
         zone.Tick(SimulationClock.LegacyTick);
         var guardianIndex = TowerWarState.GuardianServerIndex(TowerIndex);
-        zone.TryDamageMonster(guardianIndex, 999_999, attackerCharacterId: null, out var died, out _);
+        zone.TryDamageMonster(guardianIndex, 999_999, null, out var died, out _);
         Assert.True(died);
 
         zone.Tick(SimulationClock.LegacyTick);
 
         Assert.Equal(TowerSiegePhase.Sieged, towerWar.GetPhase(TowerIndex));
         Assert.False(towerWar.IsValid(TowerIndex));
-        Assert.Equal(201, towerWar.GetPackedState(TowerIndex)); // last known level still shown until the destroy cooldown elapses
+        Assert.Equal(201,
+            towerWar.GetPackedState(TowerIndex)); // last known level still shown until the destroy cooldown elapses
     }
 
     [Fact]
@@ -126,7 +126,8 @@ public class TowerGuardianSystemTests
     {
         var (zone, towerWar) = CreateZone();
         towerWar.SetTowerState(TowerIndex, 201, true);
-        towerWar.BeginSiege(TowerIndex, DateTime.UtcNow - TowerWarState.SiegeCollapseCooldown + TimeSpan.FromSeconds(30));
+        towerWar.BeginSiege(TowerIndex,
+            DateTime.UtcNow - TowerWarState.SiegeCollapseCooldown + TimeSpan.FromSeconds(30));
 
         zone.Tick(SimulationClock.LegacyTick);
 
@@ -139,7 +140,8 @@ public class TowerGuardianSystemTests
     {
         var (zone, towerWar) = CreateZone();
         towerWar.SetTowerState(TowerIndex, 201, true);
-        towerWar.BeginSiege(TowerIndex, DateTime.UtcNow - TowerWarState.SiegeCollapseCooldown - TimeSpan.FromSeconds(1));
+        towerWar.BeginSiege(TowerIndex,
+            DateTime.UtcNow - TowerWarState.SiegeCollapseCooldown - TimeSpan.FromSeconds(1));
 
         zone.Tick(SimulationClock.LegacyTick);
 

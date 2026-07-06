@@ -12,11 +12,17 @@ namespace Fenrir.IntegrationTests.Wire;
 /// </summary>
 public sealed class LoginBotClient : IAsyncDisposable
 {
+    private const int LoginTrainAvatarSlotCount = 3;
     private readonly RawWireConnection _connection;
 
     private LoginBotClient(RawWireConnection connection)
     {
         _connection = connection;
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        return _connection.DisposeAsync();
     }
 
     public static async Task<LoginBotClient> ConnectAsync(int port, CancellationToken ct)
@@ -34,7 +40,8 @@ public sealed class LoginBotClient : IAsyncDisposable
         WireXor.ApplyPacketXor(frame);
 
         if (frame[0] != LoginGreetingResponse.Opcode)
-            throw new InvalidOperationException($"Expected LoginGreetingResponse (op {LoginGreetingResponse.Opcode}), got op {frame[0]}.");
+            throw new InvalidOperationException(
+                $"Expected LoginGreetingResponse (op {LoginGreetingResponse.Opcode}), got op {frame[0]}.");
 
         // Reserved(20) then RandomNumber: payload offset 20, frame offset 1+20.
         var randomNumber = WireScalars.ReadInt32(frame.AsSpan(21, 4));
@@ -61,7 +68,8 @@ public sealed class LoginBotClient : IAsyncDisposable
         var loginRecvFrame = await _connection.ReadExactAsync(1 + LoginResponse.PayloadSize, ct);
         WireXor.ApplyPacketXor(loginRecvFrame);
         if (loginRecvFrame[0] != LoginResponse.Opcode)
-            throw new InvalidOperationException($"Expected LoginResponse (op {LoginResponse.Opcode}), got op {loginRecvFrame[0]}.");
+            throw new InvalidOperationException(
+                $"Expected LoginResponse (op {LoginResponse.Opcode}), got op {loginRecvFrame[0]}.");
         var result = WireScalars.ReadInt32(loginRecvFrame.AsSpan(1, 4));
         // Payload layout: Result(4) Id(255) UserSort(4) GoodFellow(4) LoginPlace(4) LoginPremium(4) SecondLoginSort(4) ...
         var secondLoginSort = WireScalars.ReadInt32(loginRecvFrame.AsSpan(1 + 4 + 255 + 4 + 4 + 4 + 4, 4));
@@ -77,8 +85,6 @@ public sealed class LoginBotClient : IAsyncDisposable
         return new LoginResult(result, secondLoginSort);
     }
 
-    private const int LoginTrainAvatarSlotCount = 3;
-
     /// <summary>op13 CL_CREATE_MOUSE_PASSWORD_SEND -- only legal from PinRequired (fresh account, no stored PIN yet).</summary>
     public async Task<int> CreateMousePinAsync(string pin, CancellationToken ct)
     {
@@ -88,7 +94,8 @@ public sealed class LoginBotClient : IAsyncDisposable
 
         var frame = await _connection.ReadExactAsync(1 + CreateMousePinResponse.PayloadSize, ct);
         if (frame[0] != CreateMousePinResponse.Opcode)
-            throw new InvalidOperationException($"Expected CreateMousePinResponse (op {CreateMousePinResponse.Opcode}), got op {frame[0]}.");
+            throw new InvalidOperationException(
+                $"Expected CreateMousePinResponse (op {CreateMousePinResponse.Opcode}), got op {frame[0]}.");
         return WireScalars.ReadInt32(frame.AsSpan(1, 4));
     }
 
@@ -109,7 +116,8 @@ public sealed class LoginBotClient : IAsyncDisposable
 
         var frame = await _connection.ReadExactAsync(1 + CreateAvatarResponse.PayloadSize, ct);
         if (frame[0] != CreateAvatarResponse.Opcode)
-            throw new InvalidOperationException($"Expected CreateAvatarResponse (op {CreateAvatarResponse.Opcode}), got op {frame[0]}.");
+            throw new InvalidOperationException(
+                $"Expected CreateAvatarResponse (op {CreateAvatarResponse.Opcode}), got op {frame[0]}.");
         return WireScalars.ReadInt32(frame.AsSpan(1, 4));
     }
 
@@ -122,7 +130,8 @@ public sealed class LoginBotClient : IAsyncDisposable
 
         var frame = await _connection.ReadExactAsync(1 + ZoneTransferResponse.PayloadSize, ct);
         if (frame[0] != ZoneTransferResponse.Opcode)
-            throw new InvalidOperationException($"Expected ZoneTransferResponse (op {ZoneTransferResponse.Opcode}), got op {frame[0]}.");
+            throw new InvalidOperationException(
+                $"Expected ZoneTransferResponse (op {ZoneTransferResponse.Opcode}), got op {frame[0]}.");
 
         var result = WireScalars.ReadInt32(frame.AsSpan(1, 4));
         var ip = WireScalars.ReadFixedString(frame.AsSpan(5, 16));
@@ -137,11 +146,6 @@ public sealed class LoginBotClient : IAsyncDisposable
         frame[0] = opcode;
         payload.CopyTo(frame.AsSpan(1));
         await _connection.SendAsync(frame, ct);
-    }
-
-    public ValueTask DisposeAsync()
-    {
-        return _connection.DisposeAsync();
     }
 }
 

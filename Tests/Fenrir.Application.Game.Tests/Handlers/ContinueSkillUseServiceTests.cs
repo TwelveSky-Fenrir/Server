@@ -4,8 +4,8 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Services.ZoneLifecycle;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Network.Dispatch.Sessions;
-using Fenrir.Network.Serialization.Packets.Zone;
 using Fenrir.Network.Framing;
+using Fenrir.Network.Serialization.Packets.Zone;
 
 namespace Fenrir.Application.Game.Tests.Handlers;
 

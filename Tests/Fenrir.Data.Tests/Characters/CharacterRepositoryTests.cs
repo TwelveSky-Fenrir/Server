@@ -142,25 +142,25 @@ public class CharacterRepositoryTests
         // CharacterBuffs/CharacterQuests/CharacterFriends/HeroRankings/OfflineShops have no dedicated
         // repository seed path exercised elsewhere that fits this test's needs -- seed them directly.
         await ExecAsync($"""
-                          INSERT INTO game.CharacterBuffs (CharacterId, SlotIndex, Value, RemainingLegacyTicks)
-                          VALUES ({characterId}, 0, 5, 100);
-                          """);
+                         INSERT INTO game.CharacterBuffs (CharacterId, SlotIndex, Value, RemainingLegacyTicks)
+                         VALUES ({characterId}, 0, 5, 100);
+                         """);
         await ExecAsync($"""
-                          INSERT INTO game.CharacterQuests (CharacterId, StepPermanent, ActiveQuestId, QSort, TargetPhase, KillCounter)
-                          VALUES ({characterId}, 1, 2, 3, 4, 5);
-                          """);
+                         INSERT INTO game.CharacterQuests (CharacterId, StepPermanent, ActiveQuestId, QSort, TargetPhase, KillCounter)
+                         VALUES ({characterId}, 1, 2, 3, 4, 5);
+                         """);
         await ExecAsync($"""
-                          INSERT INTO game.CharacterFriends (CharacterId, Slot, FriendCharacterId)
-                          VALUES ({characterId}, 0, {friendId});
-                          """);
+                         INSERT INTO game.CharacterFriends (CharacterId, Slot, FriendCharacterId)
+                         VALUES ({characterId}, 0, {friendId});
+                         """);
         await ExecAsync($"""
-                          INSERT INTO game.HeroRankings (CharacterId, PeriodKind, Points)
-                          VALUES ({characterId}, 0, 100);
-                          """);
+                         INSERT INTO game.HeroRankings (CharacterId, PeriodKind, Points)
+                         VALUES ({characterId}, 0, 100);
+                         """);
         await ExecAsync($"""
-                          INSERT INTO game.OfflineShops (CharacterId, ZoneNumber, ShopState, Money, BigMoney)
-                          VALUES ({characterId}, NULL, 0, 0, 0);
-                          """);
+                         INSERT INTO game.OfflineShops (CharacterId, ZoneNumber, ShopState, Money, BigMoney)
+                         VALUES ({characterId}, NULL, 0, 0, 0);
+                         """);
 
         // Another character's TeacherCharacterId now points at this one -- FK_Characters_TeacherCharacter
         // would otherwise block the delete outright.
@@ -172,16 +172,24 @@ public class CharacterRepositoryTests
 
         Assert.Empty(await _characters.GetByAccountAsync(accountId, CancellationToken.None));
 
-        Assert.Equal(0, await ScalarAsync<int>($"SELECT COUNT(*) FROM game.CharacterItems WHERE CharacterId = {characterId};"));
-        Assert.Equal(0, await ScalarAsync<int>($"SELECT COUNT(*) FROM game.CharacterSkills WHERE CharacterId = {characterId};"));
-        Assert.Equal(0, await ScalarAsync<int>($"SELECT COUNT(*) FROM game.CharacterHotkeys WHERE CharacterId = {characterId};"));
-        Assert.Equal(0, await ScalarAsync<int>($"SELECT COUNT(*) FROM game.CharacterBuffs WHERE CharacterId = {characterId};"));
-        Assert.Equal(0, await ScalarAsync<int>($"SELECT COUNT(*) FROM game.CharacterQuests WHERE CharacterId = {characterId};"));
+        Assert.Equal(0,
+            await ScalarAsync<int>($"SELECT COUNT(*) FROM game.CharacterItems WHERE CharacterId = {characterId};"));
+        Assert.Equal(0,
+            await ScalarAsync<int>($"SELECT COUNT(*) FROM game.CharacterSkills WHERE CharacterId = {characterId};"));
+        Assert.Equal(0,
+            await ScalarAsync<int>($"SELECT COUNT(*) FROM game.CharacterHotkeys WHERE CharacterId = {characterId};"));
+        Assert.Equal(0,
+            await ScalarAsync<int>($"SELECT COUNT(*) FROM game.CharacterBuffs WHERE CharacterId = {characterId};"));
+        Assert.Equal(0,
+            await ScalarAsync<int>($"SELECT COUNT(*) FROM game.CharacterQuests WHERE CharacterId = {characterId};"));
         Assert.Equal(0, await ScalarAsync<int>(
             $"SELECT COUNT(*) FROM game.CharacterFriends WHERE CharacterId = {characterId} OR FriendCharacterId = {characterId};"));
-        Assert.Equal(0, await ScalarAsync<int>($"SELECT COUNT(*) FROM game.HeroRankings WHERE CharacterId = {characterId};"));
-        Assert.Equal(0, await ScalarAsync<int>($"SELECT COUNT(*) FROM game.OfflineShops WHERE CharacterId = {characterId};"));
-        Assert.Equal(0, await ScalarAsync<int>($"SELECT COUNT(*) FROM game.OfflineShopItems WHERE CharacterId = {characterId};"));
+        Assert.Equal(0,
+            await ScalarAsync<int>($"SELECT COUNT(*) FROM game.HeroRankings WHERE CharacterId = {characterId};"));
+        Assert.Equal(0,
+            await ScalarAsync<int>($"SELECT COUNT(*) FROM game.OfflineShops WHERE CharacterId = {characterId};"));
+        Assert.Equal(0,
+            await ScalarAsync<int>($"SELECT COUNT(*) FROM game.OfflineShopItems WHERE CharacterId = {characterId};"));
 
         // The surviving student's own TeacherCharacterId pointer, which pointed at the now-deleted
         // character, must have been severed rather than left dangling or blocking the delete.

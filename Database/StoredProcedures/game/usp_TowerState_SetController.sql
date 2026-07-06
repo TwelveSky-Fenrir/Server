@@ -14,7 +14,7 @@ XACT_ABORT ON;
 
 UPDATE game.TowerState
 SET Level              = @Level,
-    TowerType           = @TowerType,
+    TowerType          = @TowerType,
     ControllingTribeId = @ControllingTribeId,
     CapturedAtUtc      = CASE WHEN @ControllingTribeId IS NULL THEN NULL ELSE SYSUTCDATETIME() END
 WHERE TowerIndex = @TowerIndex;

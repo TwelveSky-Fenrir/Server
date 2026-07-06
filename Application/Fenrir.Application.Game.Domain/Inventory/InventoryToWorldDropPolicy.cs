@@ -87,21 +87,10 @@ public static class InventoryToWorldDropPolicy
     /// <summary>Server/ts25zone/H01_MainApplication.h:134 -- shared across every drop origin, not just this one.</summary>
     public const int GroundItemCapacity = 4000;
 
-    public readonly record struct Result(Outcome Outcome, ItemStack? NewSource, GroundItemSpawnPlan? Spawn)
-    {
-        /// <summary>Disconnect the session; no acknowledgment is ever sent for this request.</summary>
-        public bool IsMalformed => Outcome is Outcome.SourceOutOfRange or Outcome.PremiumPageExpired
-            or Outcome.UnknownItem or Outcome.NonDroppableItem or Outcome.QuantityOutOfRange
-            or Outcome.InsufficientQuantity;
-
-        /// <summary>Reply with the standard non-zero-code acknowledgment; source left untouched; no disconnect.</summary>
-        public bool IsSoftFailure => Outcome is Outcome.UnsupportedItemType or Outcome.InvalidPackedValue
-            or Outcome.GroundItemTableFull;
-
-        public bool Succeeded => Outcome == Outcome.Success;
-    }
-
-    /// <param name="sourcePage">tPage1 -- valid range 0-1 (<see cref="ContainerMatrix.InventoryPage0" />/<see cref="ContainerMatrix.InventoryPage1" />).</param>
+    /// <param name="sourcePage">
+    ///     tPage1 -- valid range 0-1 (<see cref="ContainerMatrix.InventoryPage0" />/
+    ///     <see cref="ContainerMatrix.InventoryPage1" />).
+    /// </param>
     /// <param name="sourceSlot">tIndex1 -- valid range 0-63.</param>
     /// <param name="requestedQuantity">
     ///     tQuantity1 -- only consulted when the resolved item is stackable; ignored entirely for a unique item
@@ -208,5 +197,19 @@ public static class InventoryToWorldDropPolicy
     private static Result Fail(Outcome outcome)
     {
         return new Result(outcome, null, null);
+    }
+
+    public readonly record struct Result(Outcome Outcome, ItemStack? NewSource, GroundItemSpawnPlan? Spawn)
+    {
+        /// <summary>Disconnect the session; no acknowledgment is ever sent for this request.</summary>
+        public bool IsMalformed => Outcome is Outcome.SourceOutOfRange or Outcome.PremiumPageExpired
+            or Outcome.UnknownItem or Outcome.NonDroppableItem or Outcome.QuantityOutOfRange
+            or Outcome.InsufficientQuantity;
+
+        /// <summary>Reply with the standard non-zero-code acknowledgment; source left untouched; no disconnect.</summary>
+        public bool IsSoftFailure => Outcome is Outcome.UnsupportedItemType or Outcome.InvalidPackedValue
+            or Outcome.GroundItemTableFull;
+
+        public bool Succeeded => Outcome == Outcome.Success;
     }
 }

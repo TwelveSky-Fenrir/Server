@@ -75,7 +75,10 @@ public sealed class ZoneCenterBroadcastIngestor(
     ZoneRegistry zones,
     ILogger<ZoneCenterBroadcastIngestor> logger)
 {
-    /// <summary>Fixed opaque payload size (<c>Server/Header/Protocol/ZONE.h:19-24</c>), matching <see cref="ZoneEventInfoResponse.Data" />.</summary>
+    /// <summary>
+    ///     Fixed opaque payload size (<c>Server/Header/Protocol/ZONE.h:19-24</c>), matching
+    ///     <see cref="ZoneEventInfoResponse.Data" />.
+    /// </summary>
     public const int PayloadSize = 130;
 
     public const int Zone175RangeStart = 64;
@@ -138,11 +141,11 @@ public sealed class ZoneCenterBroadcastIngestor(
         switch (eventCode)
         {
             case Zone175ResetEventCode:
-                ApplyZone175(eventCode, data, isReset: true);
+                ApplyZone175(eventCode, data, true);
                 break;
 
             case >= Zone175RangeStart and <= Zone175RangeEnd:
-                ApplyZone175(eventCode, data, isReset: false);
+                ApplyZone175(eventCode, data, false);
                 break;
 
             case >= Zone267RangeStart and <= Zone267RangeEnd:
@@ -166,8 +169,6 @@ public sealed class ZoneCenterBroadcastIngestor(
             // unrecognized code) is either a legacy empty/commented-out body or truly unknown -- both fall
             // through with zero state effect, which is exactly the legacy's own observable behavior for
             // those ranges.
-            default:
-                break;
         }
     }
 

@@ -5,9 +5,9 @@ using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Application.Game.Tests.World.WorldState;
-using Fenrir.Network.Serialization.Packets.Zone;
 using Fenrir.Data.WriteBehind;
 using Fenrir.Network.Framing;
+using Fenrir.Network.Serialization.Packets.Zone;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -123,7 +123,7 @@ public class ZoneEventBroadcasterTests
         broadcaster.AnnounceSymbolResolved(symbolIndex, winnerTribeId);
 
         if (symbolIndex == WorldStateService.TribeCount)
-            Assert.Equal((byte?)winnerTribeId, worldState.World.MonsterSymbol);
+            Assert.Equal(winnerTribeId, worldState.World.MonsterSymbol);
         else
             Assert.Equal(winnerTribeId == symbolIndex, worldState.GetTribe(symbolIndex).HasSymbol);
 

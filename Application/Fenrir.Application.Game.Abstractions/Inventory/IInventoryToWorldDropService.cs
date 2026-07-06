@@ -34,7 +34,8 @@ public readonly record struct InventoryToWorldDropResult(
 
 /// <summary>
 ///     Business logic behind <c>CZ_PROCESS_DATA_SEND</c>'s tSort 209 ("drop item from inventory to the ground
-///     at the player's own location") -- see <see cref="Fenrir.Application.Game.Domain.Inventory.InventoryToWorldDropPolicy" />
+///     at the player's own location") -- see
+///     <see cref="Fenrir.Application.Game.Domain.Inventory.InventoryToWorldDropPolicy" />
 ///     for the pure rules this orchestrates. Deliberately NOT wired into <c>GenericActionHandler</c>'s existing
 ///     tSort dispatch switch yet -- that integration step (including resolving this method's own
 ///     <paramref name="premiumPageAccessAllowed" />-equivalent input, and routing a successful

@@ -6,8 +6,6 @@ using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Application.Game.Tests.World.WorldState;
 using Fenrir.Data.WriteBehind;
-using Fenrir.Network.Framing;
-using Fenrir.Network.Serialization.Packets.Zone;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -16,7 +14,7 @@ namespace Fenrir.Application.Game.Tests.World.ZoneWar;
 public class HolyStoneWarCycleTests
 {
     private const short StoneMapId = 38;
-    private static readonly HolyStoneWarSite Site = new(StoneMapId, 100f, 100f, CaptureRadius: 10f, ParticipationRadius: 200f);
+    private static readonly HolyStoneWarSite Site = new(StoneMapId, 100f, 100f, 10f, 200f);
 
     private static ZoneRegistry CreateRegistry(params short[] maps)
     {
@@ -266,7 +264,8 @@ public class HolyStoneWarCycleTests
     }
 
     [Fact]
-    public void ResolveCapture_GrantsParticipationReward_ToRebornTribemateWithinRadius_ButNotToCapturerOrNonRebornOrOutOfRadius()
+    public void
+        ResolveCapture_GrantsParticipationReward_ToRebornTribemateWithinRadius_ButNotToCapturerOrNonRebornOrOutOfRadius()
     {
         var worldState = CreateWorldState();
         var registry = CreateRegistry(StoneMapId);
@@ -283,7 +282,8 @@ public class HolyStoneWarCycleTests
 
         var (neverRebornSession, _) = ZoneTestKit.CreateSession(3);
         registry[StoneMapId].Post(ZoneCommand.Enter(12,
-            ZoneTestKit.EnterData(neverRebornSession, StoneMapId, tribe: 1, posX: Site.StoneX + 50, posZ: Site.StoneZ)));
+            ZoneTestKit.EnterData(neverRebornSession, StoneMapId, tribe: 1, posX: Site.StoneX + 50,
+                posZ: Site.StoneZ)));
 
         var (farAwaySession, _) = ZoneTestKit.CreateSession(4);
         registry[StoneMapId].Post(ZoneCommand.Enter(13,

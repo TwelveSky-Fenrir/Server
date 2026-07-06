@@ -20,7 +20,7 @@ public class BoxRewardPlacementResolverTests
             .SetItem(0, new ItemStack(200, 5, 0, 0, 0, 0, 0, 0, 0, 0, 1)) // box's own slot
             .SetItem(3, new ItemStack(500, 10, 0, 0, 0, 0, 0, 0, 0, 0, 2)); // existing reward stack
 
-        var result = BoxRewardPlacementResolver.Resolve(Reward(500, 4, stackable: true), boxContainer: 0, boxSlot: 0,
+        var result = BoxRewardPlacementResolver.Resolve(Reward(500, 4, true), 0, 0,
             page0, ImmutableDictionary<byte, ItemStack>.Empty);
 
         Assert.Equal(BoxRewardPlacementResolver.Outcome.Merged, result.Outcome);
@@ -37,7 +37,7 @@ public class BoxRewardPlacementResolverTests
         var page0 = ImmutableDictionary<byte, ItemStack>.Empty
             .SetItem(0, new ItemStack(500, 5, 0, 0, 0, 0, 0, 0, 0, 0, 1));
 
-        var result = BoxRewardPlacementResolver.Resolve(Reward(500, 1, stackable: true), boxContainer: 0, boxSlot: 0,
+        var result = BoxRewardPlacementResolver.Resolve(Reward(500, 1, true), 0, 0,
             page0, ImmutableDictionary<byte, ItemStack>.Empty);
 
         Assert.Equal(BoxRewardPlacementResolver.Outcome.PlacedInEmptySlot, result.Outcome);
@@ -52,7 +52,7 @@ public class BoxRewardPlacementResolverTests
             .SetItem(0, Filler) // box's own slot
             .SetItem(1, new ItemStack(500, 998, 0, 0, 0, 0, 0, 0, 0, 0, 2));
 
-        var result = BoxRewardPlacementResolver.Resolve(Reward(500, 5, stackable: true), boxContainer: 0, boxSlot: 0,
+        var result = BoxRewardPlacementResolver.Resolve(Reward(500, 5, true), 0, 0,
             page0, ImmutableDictionary<byte, ItemStack>.Empty);
 
         Assert.Equal(BoxRewardPlacementResolver.Outcome.PlacedInEmptySlot, result.Outcome);
@@ -64,7 +64,7 @@ public class BoxRewardPlacementResolverTests
     {
         var page0 = ImmutableDictionary<byte, ItemStack>.Empty.SetItem(0, Filler);
 
-        var result = BoxRewardPlacementResolver.Resolve(Reward(700, 1, stackable: true), boxContainer: 0, boxSlot: 0,
+        var result = BoxRewardPlacementResolver.Resolve(Reward(700, 1, true), 0, 0,
             page0, ImmutableDictionary<byte, ItemStack>.Empty);
 
         Assert.Equal(BoxRewardPlacementResolver.Outcome.PlacedInEmptySlot, result.Outcome);
@@ -82,7 +82,7 @@ public class BoxRewardPlacementResolverTests
             builder[(byte)slot] = Filler;
         var fullPage0 = builder.ToImmutable();
 
-        var result = BoxRewardPlacementResolver.Resolve(Reward(700, 1, stackable: false), boxContainer: 0, boxSlot: 0,
+        var result = BoxRewardPlacementResolver.Resolve(Reward(700, 1, false), 0, 0,
             fullPage0, ImmutableDictionary<byte, ItemStack>.Empty);
 
         Assert.Equal(BoxRewardPlacementResolver.Outcome.PlacedInEmptySlot, result.Outcome);
@@ -99,7 +99,7 @@ public class BoxRewardPlacementResolverTests
             builder[(byte)slot] = Filler;
         var full = builder.ToImmutable();
 
-        var result = BoxRewardPlacementResolver.Resolve(Reward(700, 1, stackable: false), boxContainer: 0, boxSlot: 0,
+        var result = BoxRewardPlacementResolver.Resolve(Reward(700, 1, false), 0, 0,
             full, full);
 
         Assert.Equal(BoxRewardPlacementResolver.Outcome.InventoryFull, result.Outcome);
@@ -114,7 +114,7 @@ public class BoxRewardPlacementResolverTests
             .SetItem(0, Filler)
             .SetItem(1, new ItemStack(900, 1, 0, 0, 0, 0, 0, 0, 0, 0, 2));
 
-        var result = BoxRewardPlacementResolver.Resolve(Reward(900, 1, stackable: false), boxContainer: 0, boxSlot: 0,
+        var result = BoxRewardPlacementResolver.Resolve(Reward(900, 1, false), 0, 0,
             page0, ImmutableDictionary<byte, ItemStack>.Empty);
 
         Assert.Equal(BoxRewardPlacementResolver.Outcome.PlacedInEmptySlot, result.Outcome);

@@ -4,7 +4,6 @@ using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World.Monsters;
 using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.GameData;
-using Fenrir.Data.Abstractions.World;
 
 namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 
@@ -42,13 +41,18 @@ internal sealed class SymbolZoneState
 ///         this class's own World/ZoneWar scope.
 ///     </para>
 /// </summary>
-public sealed class TribeSymbolSpawner(WorldDataCache worldData, TribeSymbolCatalog catalog,
+public sealed class TribeSymbolSpawner(
+    WorldDataCache worldData,
+    TribeSymbolCatalog catalog,
     WorldStateService? worldState = null) : ISimulationSystem
 {
     /// <summary><c>(mTickCount % 20) == 0</c> -- same periodic cadence as <see cref="TribeGuardSpawner" />.</summary>
     private const int FullEvaluationCadenceLegacyTicks = 20;
 
-    /// <summary>No legacy leash figure is given for a stationary symbol guardian -- same stand-in as <see cref="TribeGuardSpawner" />.</summary>
+    /// <summary>
+    ///     No legacy leash figure is given for a stationary symbol guardian -- same stand-in as
+    ///     <see cref="TribeGuardSpawner" />.
+    /// </summary>
     private const float SymbolLeashRadius = 15f;
 
     private const int SymbolPoolServerIndexBase = 1_002_000;

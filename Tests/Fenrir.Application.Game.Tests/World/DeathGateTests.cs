@@ -58,27 +58,27 @@ public class DeathGateTests
     [Fact]
     public void IsEligible_FactionTerritory_OwningFactionMatch_IsEligible()
     {
-        Assert.True(ReviveEligibilityRules.IsEligible(mapId: 2, avatarTribe: 0, avatarAlliedTribe: null));
+        Assert.True(ReviveEligibilityRules.IsEligible(2, 0, null));
     }
 
     [Fact]
     public void IsEligible_FactionTerritory_AlliedFactionMatch_IsEligible()
     {
         // Avatar is tribe 1, dead on a faction-0 territory block, but tribe 1 is currently allied with tribe 0.
-        Assert.True(ReviveEligibilityRules.IsEligible(mapId: 2, avatarTribe: 1, avatarAlliedTribe: 0));
+        Assert.True(ReviveEligibilityRules.IsEligible(2, 1, 0));
     }
 
     [Fact]
     public void IsEligible_FactionTerritory_NoMatchAndNoAlliance_IsNotEligible()
     {
-        Assert.False(ReviveEligibilityRules.IsEligible(mapId: 2, avatarTribe: 1, avatarAlliedTribe: null));
+        Assert.False(ReviveEligibilityRules.IsEligible(2, 1, null));
     }
 
     [Fact]
     public void IsEligible_FactionTerritory_AlliedWithADifferentFaction_IsNotEligible()
     {
         // Tribe 1 allied with tribe 2 does not help against a faction-0 owned block.
-        Assert.False(ReviveEligibilityRules.IsEligible(mapId: 2, avatarTribe: 1, avatarAlliedTribe: 2));
+        Assert.False(ReviveEligibilityRules.IsEligible(2, 1, 2));
     }
 
     [Theory]
@@ -88,7 +88,7 @@ public class DeathGateTests
     [InlineData(3)]
     public void IsEligible_AlwaysBlockedZone_IsNeverEligible_RegardlessOfFactionOrAlliance(byte tribe)
     {
-        Assert.False(ReviveEligibilityRules.IsEligible(mapId: 200, avatarTribe: tribe, avatarAlliedTribe: tribe));
+        Assert.False(ReviveEligibilityRules.IsEligible(200, tribe, tribe));
     }
 
     [Theory]
@@ -97,14 +97,14 @@ public class DeathGateTests
     [InlineData(999)]
     public void IsEligible_UnconditionalZone_IsAlwaysEligible_RegardlessOfFactionOrAlliance(short mapId)
     {
-        Assert.True(ReviveEligibilityRules.IsEligible(mapId, avatarTribe: 3, avatarAlliedTribe: null));
+        Assert.True(ReviveEligibilityRules.IsEligible(mapId, 3, null));
     }
 
     [Fact]
     public void ZoneTransfer_DestinationZone38_IsAlwaysAllowed_RegardlessOfCurrentZoneOrFaction()
     {
         var allowed = ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(
-            currentMapId: 2, destinationMapId: 38, avatarTribe: 1, currentZoneOwningFactionAlly: _ => null);
+            2, 38, 1, _ => null);
 
         Assert.True(allowed);
     }
@@ -113,7 +113,7 @@ public class DeathGateTests
     public void ZoneTransfer_CurrentZoneNotFactionTerritory_IsAlwaysAllowed()
     {
         var allowed = ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(
-            currentMapId: 999, destinationMapId: 50, avatarTribe: 1, currentZoneOwningFactionAlly: _ => null);
+            999, 50, 1, _ => null);
 
         Assert.True(allowed);
     }
@@ -122,7 +122,7 @@ public class DeathGateTests
     public void ZoneTransfer_FactionTerritory_AvatarMatchesOwningFaction_IsAllowed()
     {
         var allowed = ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(
-            currentMapId: 2, destinationMapId: 50, avatarTribe: 0, currentZoneOwningFactionAlly: _ => null);
+            2, 50, 0, _ => null);
 
         Assert.True(allowed);
     }
@@ -134,7 +134,7 @@ public class DeathGateTests
         // only an exact faction-0 match on the avatar avoids the kick. Here the owning faction (0) is
         // "allied" with faction 2, which must NOT suspend the kick.
         var allowed = ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(
-            currentMapId: 2, destinationMapId: 50, avatarTribe: 1, currentZoneOwningFactionAlly: owner => owner == 0 ? (byte)2 : null);
+            2, 50, 1, owner => owner == 0 ? 2 : null);
 
         Assert.False(allowed);
     }
@@ -145,7 +145,7 @@ public class DeathGateTests
         // Legacy quirk: for the OTHER three blocks, an owning-faction alliance with faction 0 SPECIFICALLY
         // suspends the kick for every avatar leaving the zone, not just members of the allied faction.
         var allowed = ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(
-            currentMapId: 7, destinationMapId: 50, avatarTribe: 3, currentZoneOwningFactionAlly: owner => owner == 1 ? (byte)0 : null);
+            7, 50, 3, owner => owner == 1 ? 0 : null);
 
         Assert.True(allowed);
     }
@@ -155,7 +155,7 @@ public class DeathGateTests
     {
         // The quirk specifically keys on faction 0 -- an alliance with any other faction does not help.
         var allowed = ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(
-            currentMapId: 7, destinationMapId: 50, avatarTribe: 3, currentZoneOwningFactionAlly: owner => owner == 1 ? (byte)2 : null);
+            7, 50, 3, owner => owner == 1 ? 2 : null);
 
         Assert.False(allowed);
     }

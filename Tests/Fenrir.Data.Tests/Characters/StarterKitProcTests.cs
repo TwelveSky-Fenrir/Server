@@ -18,8 +18,8 @@ public class StarterKitProcTests
 {
     private readonly IAccountRepository _accounts;
     private readonly ICharacterRepository _characters;
-    private readonly IStarterKitRepository _starterKits;
     private readonly string _connectionString;
+    private readonly IStarterKitRepository _starterKits;
 
     public StarterKitProcTests(SqlServerFixture fixture)
     {
@@ -75,14 +75,54 @@ public class StarterKitProcTests
     {
         var bundle = await _starterKits.GetByPreviousTribeAsync(1, 6, CancellationToken.None);
 
-        Assert.Contains(bundle.Equipment, e => e is { EquipSlot: 2, ItemId: 85575 });
+        // G12 Elite Normal Set (S04_MyWork02.cpp:783-809): Amulet+Armor+Gloves+Ring+Boots + 3 weapon
+        // alternatives (raw code -> elite id). Asserted row-for-row, like the Noble Dragon test above, so a
+        // seed-data mixup between races (e.g. an ND item id leaking into RS's catalog) fails here rather than
+        // only being caught by the generic-across-races C# service logic.
+        Assert.Equal(8, bundle.Equipment.Count);
+        Assert.Contains(bundle.Equipment, e => e is { EquipSlot: 0, ItemId: 85671, RawWeaponCode: null });
+        Assert.Contains(bundle.Equipment, e => e is { EquipSlot: 2, ItemId: 85575, RawWeaponCode: null });
+        Assert.Contains(bundle.Equipment, e => e is { EquipSlot: 3, ItemId: 85623, RawWeaponCode: null });
+        Assert.Contains(bundle.Equipment, e => e is { EquipSlot: 4, ItemId: 85647, RawWeaponCode: null });
+        Assert.Contains(bundle.Equipment, e => e is { EquipSlot: 5, ItemId: 85599, RawWeaponCode: null });
         Assert.Contains(bundle.Equipment, e => e is { EquipSlot: 7, ItemId: 85503, RawWeaponCode: 11 });
+        Assert.Contains(bundle.Equipment, e => e is { EquipSlot: 7, ItemId: 85527, RawWeaponCode: 12 });
+        Assert.Contains(bundle.Equipment, e => e is { EquipSlot: 7, ItemId: 85551, RawWeaponCode: 13 });
+
         Assert.Contains(bundle.Skills, s => s is { SlotIndex: 0, SkillId: 20, Grade: 1 });
-        Assert.Contains(bundle.Hotkeys, h => h is { Page: 0, KeyIndex: 0, Sort: 20 });
+        Assert.Contains(bundle.Hotkeys, h => h is { Page: 0, KeyIndex: 0, Sort: 20, Value1: 1, Value2: 1 });
 
         Assert.NotNull(bundle.Spawn);
         Assert.Equal(-190f, bundle.Spawn!.PosX);
+        Assert.Equal(0f, bundle.Spawn.PosY);
         Assert.Equal(1270f, bundle.Spawn.PosZ);
+    }
+
+    [Fact]
+    public async Task GetByPreviousTribeAsync_GrandTiger_ReturnsItsOwnCatalogAndZone11sSpawn()
+    {
+        var bundle = await _starterKits.GetByPreviousTribeAsync(2, 11, CancellationToken.None);
+
+        // G12 Elite Normal Set (S04_MyWork02.cpp:811-838): Amulet+Armor+Gloves+Ring+Boots + 3 weapon
+        // alternatives (raw code -> elite id). Grand Tiger had zero test coverage anywhere in this suite prior
+        // to this test -- only Noble Dragon and (partially) Royal Serpent were previously asserted.
+        Assert.Equal(8, bundle.Equipment.Count);
+        Assert.Contains(bundle.Equipment, e => e is { EquipSlot: 0, ItemId: 86671, RawWeaponCode: null });
+        Assert.Contains(bundle.Equipment, e => e is { EquipSlot: 2, ItemId: 86575, RawWeaponCode: null });
+        Assert.Contains(bundle.Equipment, e => e is { EquipSlot: 3, ItemId: 86623, RawWeaponCode: null });
+        Assert.Contains(bundle.Equipment, e => e is { EquipSlot: 4, ItemId: 86647, RawWeaponCode: null });
+        Assert.Contains(bundle.Equipment, e => e is { EquipSlot: 5, ItemId: 86599, RawWeaponCode: null });
+        Assert.Contains(bundle.Equipment, e => e is { EquipSlot: 7, ItemId: 86503, RawWeaponCode: 17 });
+        Assert.Contains(bundle.Equipment, e => e is { EquipSlot: 7, ItemId: 86527, RawWeaponCode: 18 });
+        Assert.Contains(bundle.Equipment, e => e is { EquipSlot: 7, ItemId: 86551, RawWeaponCode: 19 });
+
+        Assert.Contains(bundle.Skills, s => s is { SlotIndex: 0, SkillId: 39, Grade: 1 });
+        Assert.Contains(bundle.Hotkeys, h => h is { Page: 0, KeyIndex: 0, Sort: 39, Value1: 1, Value2: 1 });
+
+        Assert.NotNull(bundle.Spawn);
+        Assert.Equal(447f, bundle.Spawn!.PosX);
+        Assert.Equal(1f, bundle.Spawn.PosY);
+        Assert.Equal(440f, bundle.Spawn.PosZ);
     }
 
     [Fact]
@@ -103,13 +143,13 @@ public class StarterKitProcTests
 
         List<CharacterItemSlotTvp> equipment =
         [
-            new CharacterItemSlotTvp(2, 8, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0),
-            new CharacterItemSlotTvp(7, 6, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0),
-            new CharacterItemSlotTvp(1, 1407, 1, 40, 0, 0, 0, 0, 0, 0, 0, 0)
+            new(2, 8, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+            new(7, 6, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+            new(1, 1407, 1, 40, 0, 0, 0, 0, 0, 0, 0, 0)
         ];
-        List<CharacterItemSlotTvp> inventory = [new CharacterItemSlotTvp(0, 1026, 999, 0, 0, 0, 0, 0, 0, 0, 0, 0)];
-        List<CharacterSkillSlotTvp> skills = [new CharacterSkillSlotTvp(0, 1, 1), new CharacterSkillSlotTvp(1, 2, 1)];
-        List<CharacterHotkeySlotTvp> hotkeys = [new CharacterHotkeySlotTvp(0, 0, 1, 1, 1)];
+        List<CharacterItemSlotTvp> inventory = [new(0, 1026, 999, 0, 0, 0, 0, 0, 0, 0, 0, 0)];
+        List<CharacterSkillSlotTvp> skills = [new(0, 1, 1), new(1, 2, 1)];
+        List<CharacterHotkeySlotTvp> hotkeys = [new(0, 0, 1, 1, 1)];
 
         var characterId = await _characters.CreateWithStarterKitAsync(
             accountId, 0, name, 0, 1, 2, 1,

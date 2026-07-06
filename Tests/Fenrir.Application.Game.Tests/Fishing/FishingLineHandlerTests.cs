@@ -1,12 +1,11 @@
 using System.Buffers.Binary;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game.Handlers;
 using Fenrir.Application.Game.Handlers.Handlers;
 using Fenrir.Application.Game.Services.FishingConsumables;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Network.Dispatch.Sessions;
-using Fenrir.Network.Serialization.Packets.Zone;
 using Fenrir.Network.Framing;
+using Fenrir.Network.Serialization.Packets.Zone;
 
 namespace Fenrir.Application.Game.Tests.Fishing;
 
@@ -28,7 +27,8 @@ public class FishingLineHandlerTests
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
-        new FishingLineHandler(new FishingLineService()).Handle(new FishingLineRequest { Sort = 1, LocationX = 0, LocationZ = 0 }, session);
+        new FishingLineHandler(new FishingLineService()).Handle(
+            new FishingLineRequest { Sort = 1, LocationX = 0, LocationZ = 0 }, session);
 
         Assert.Equal(DisconnectReason.Faulted, session.DisconnectReason);
     }
@@ -43,7 +43,8 @@ public class FishingLineHandlerTests
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, FishingLineHandler.FishingZoneNumber)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
-        new FishingLineHandler(new FishingLineService()).Handle(new FishingLineRequest { Sort = 3, LocationX = 0, LocationZ = 0 }, session);
+        new FishingLineHandler(new FishingLineService()).Handle(
+            new FishingLineRequest { Sort = 3, LocationX = 0, LocationZ = 0 }, session);
 
         Assert.Equal(DisconnectReason.Faulted, session.DisconnectReason);
     }
@@ -59,7 +60,8 @@ public class FishingLineHandlerTests
         zone.Tick(TimeSpan.FromMilliseconds(50));
         ZoneTestKit.DrainOutbound(pipe);
 
-        new FishingLineHandler(new FishingLineService()).Handle(new FishingLineRequest { Sort = 1, LocationX = 0, LocationZ = 0 }, session);
+        new FishingLineHandler(new FishingLineService()).Handle(
+            new FishingLineRequest { Sort = 1, LocationX = 0, LocationZ = 0 }, session);
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.True(zone.TryGetPlayer(10, out var state));
@@ -87,7 +89,8 @@ public class FishingLineHandlerTests
         state.FishingStep = 2;
         state.CatchingFish = true;
 
-        new FishingLineHandler(new FishingLineService()).Handle(new FishingLineRequest { Sort = 2, LocationX = 0, LocationZ = 0 }, session);
+        new FishingLineHandler(new FishingLineService()).Handle(
+            new FishingLineRequest { Sort = 2, LocationX = 0, LocationZ = 0 }, session);
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.Equal(0, state.FishingState);
@@ -110,7 +113,8 @@ public class FishingLineHandlerTests
         zone.Tick(TimeSpan.FromMilliseconds(50));
         ZoneTestKit.DrainOutbound(pipe);
 
-        new FishingLineHandler(new FishingLineService()).Handle(new FishingLineRequest { Sort = 2, LocationX = 0, LocationZ = 0 }, session);
+        new FishingLineHandler(new FishingLineService()).Handle(
+            new FishingLineRequest { Sort = 2, LocationX = 0, LocationZ = 0 }, session);
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.True(zone.TryGetPlayer(10, out var state));

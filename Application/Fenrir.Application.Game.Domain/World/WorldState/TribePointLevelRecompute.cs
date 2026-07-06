@@ -58,8 +58,8 @@ public static class TribePointLevelRecompute
                 continue;
 
             totals[character.TribeId] += character.Level1 - LevelOffset
-                                          + character.Level2 * SecondaryLevelMultiplier
-                                          + character.RebirthCount * RebirthMultiplier;
+                                         + character.Level2 * SecondaryLevelMultiplier
+                                         + character.RebirthCount * RebirthMultiplier;
         }
 
         totals[BonusTribeId] += BonusTribeBonus;

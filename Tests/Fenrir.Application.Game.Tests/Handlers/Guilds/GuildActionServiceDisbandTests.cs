@@ -4,7 +4,6 @@ using Fenrir.Application.Game.Services.Guilds;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Data.Abstractions.Guilds;
 using Fenrir.Network.Dispatch.Sessions;
-using Fenrir.Network.Serialization.Packets.Zone;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Handlers.Guilds;
@@ -28,7 +27,8 @@ public class GuildActionServiceDisbandTests
     {
         var (zones, guilds) = CreateWorld();
         var (_, _, state) = EnterZone(zones, 1, CharacterId, "Odin", GuildId, 2);
-        guilds.SeedRoster(GuildId, new GuildRosterRowDto(GuildId, "Aesir", CharacterId, "Odin", 2, "", DateTime.UtcNow));
+        guilds.SeedRoster(GuildId,
+            new GuildRosterRowDto(GuildId, "Aesir", CharacterId, "Odin", 2, "", DateTime.UtcNow));
 
         var service = CreateService(zones, guilds);
 
@@ -72,7 +72,8 @@ public class GuildActionServiceDisbandTests
     {
         var (zones, guilds) = CreateWorld();
         var (_, _, state) = EnterZone(zones, 1, CharacterId, "Odin", GuildId, 0);
-        guilds.SeedRoster(GuildId, new GuildRosterRowDto(GuildId, "Aesir", CharacterId, "Odin", 0, "", DateTime.UtcNow));
+        guilds.SeedRoster(GuildId,
+            new GuildRosterRowDto(GuildId, "Aesir", CharacterId, "Odin", 0, "", DateTime.UtcNow));
 
         var service = CreateService(zones, guilds);
 
@@ -118,7 +119,7 @@ public class GuildActionServiceDisbandTests
         session.MarkInWorld();
 
         var zone = zones[mapId];
-        zone.Post(ZoneCommand.Enter(characterId, ZoneTestKit.EnterData(session, mapId, name: name)));
+        zone.Post(ZoneCommand.Enter(characterId, ZoneTestKit.EnterData(session, mapId, name)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
         ZoneTestKit.DrainOutbound(pipe);
 

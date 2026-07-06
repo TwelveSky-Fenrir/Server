@@ -1,10 +1,10 @@
 using Fenrir.Application.Login.Domain;
 using Fenrir.Application.Login.Tests.TestSupport;
-using Fenrir.Network.Abstractions;
-using Fenrir.Network.Serialization.Packets.Login;
 using Fenrir.Data.Abstractions.Characters;
+using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Framing;
+using Fenrir.Network.Serialization.Packets.Login;
 
 namespace Fenrir.Application.Login.Tests;
 

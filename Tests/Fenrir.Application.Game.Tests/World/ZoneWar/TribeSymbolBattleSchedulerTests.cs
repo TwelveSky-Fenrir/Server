@@ -19,6 +19,8 @@ public class TribeSymbolBattleSchedulerTests
     private static readonly DateTime OpeningHour = new(2026, 7, 8, 20, 0, 0, DateTimeKind.Utc);
     private static readonly DateTime ClosingHour = new(2026, 7, 8, 22, 0, 0, DateTimeKind.Utc);
 
+    private static int OneFrame => FrameWriter.FrameSizeOf<ZoneEventInfoResponse>();
+
     private static ZoneRegistry CreateRegistry(params short[] maps)
     {
         var options = ZoneTestKit.Options();
@@ -35,8 +37,6 @@ public class TribeSymbolBattleSchedulerTests
         service.InitializeAsync(CancellationToken.None).GetAwaiter().GetResult();
         return service;
     }
-
-    private static int OneFrame => FrameWriter.FrameSizeOf<ZoneEventInfoResponse>();
 
     [Fact]
     public void Tick_HourDoesNotMatch_StaysWaiting()
@@ -88,14 +88,14 @@ public class TribeSymbolBattleSchedulerTests
         var registry = CreateRegistry(1);
         var broadcaster = new ZoneEventBroadcaster(worldState, registry, NullLogger<ZoneEventBroadcaster>.Instance);
         var scheduler = new TribeSymbolBattleScheduler(worldState, broadcaster,
-            NullLogger<TribeSymbolBattleScheduler>.Instance, allowedDays: new HashSet<DayOfWeek>(), testMode: true);
+            NullLogger<TribeSymbolBattleScheduler>.Instance, new HashSet<DayOfWeek>(), true);
 
         // Wrong day, but test mode -- the hour still matches, so it must arm.
         scheduler.Tick(TimeSpan.Zero, OpeningHour);
         Assert.Equal(TribeSymbolBattleSchedulePhase.Counting, scheduler.Phase);
 
         var other = new TribeSymbolBattleScheduler(worldState, broadcaster,
-            NullLogger<TribeSymbolBattleScheduler>.Instance, allowedDays: new HashSet<DayOfWeek>(), testMode: true);
+            NullLogger<TribeSymbolBattleScheduler>.Instance, new HashSet<DayOfWeek>(), true);
         other.Tick(TimeSpan.Zero, OpeningHour.AddHours(1));
         Assert.Equal(TribeSymbolBattleSchedulePhase.WaitingForHour, other.Phase);
     }

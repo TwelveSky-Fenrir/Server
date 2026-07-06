@@ -8,14 +8,17 @@ CREATE PROCEDURE admin.usp_FirewallRule_Upsert @IpAddress VARCHAR(45),
     @RuleType  TINYINT
 AS
 BEGIN
-    SET NOCOUNT ON;
-    SET XACT_ABORT ON;
+    SET
+NOCOUNT ON;
+    SET
+XACT_ABORT ON;
 
-    UPDATE admin.FirewallRules
-    SET RuleType = @RuleType
-    WHERE IpAddress = @IpAddress;
+UPDATE admin.FirewallRules
+SET RuleType = @RuleType
+WHERE IpAddress = @IpAddress;
 
-    IF @@ROWCOUNT = 0
+IF
+@@ROWCOUNT = 0
         INSERT INTO admin.FirewallRules (IpAddress, RuleType)
         VALUES (@IpAddress, @RuleType);
 END;

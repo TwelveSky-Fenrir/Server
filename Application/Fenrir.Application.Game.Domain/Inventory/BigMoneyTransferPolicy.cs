@@ -35,9 +35,6 @@ namespace Fenrir.Application.Game.Domain.Inventory;
 /// </remarks>
 public static class BigMoneyTransferPolicy
 {
-    /// <summary>MAX_NUMBER_SIZE2 (DEFINE.h:367) -- the shared cap every BigMoney-family counter is checked against.</summary>
-    public const long BigMoneyCap = 999;
-
     public enum TransferOutcome
     {
         Success,
@@ -52,14 +49,8 @@ public static class BigMoneyTransferPolicy
         DestinationOverflow
     }
 
-    /// <summary>NewSourceBigMoney/NewDestinationBigMoney are both sides' post-transfer balances, valid only when Succeeded.</summary>
-    public readonly record struct TransferResult(
-        TransferOutcome Outcome,
-        long NewSourceBigMoney,
-        long NewDestinationBigMoney)
-    {
-        public bool Succeeded => Outcome == TransferOutcome.Success;
-    }
+    /// <summary>MAX_NUMBER_SIZE2 (DEFINE.h:367) -- the shared cap every BigMoney-family counter is checked against.</summary>
+    public const long BigMoneyCap = 999;
 
     /// <summary>tSort 241 -- Inventory BigMoney to Store BigMoney.</summary>
     public static TransferResult ResolveInventoryToStore(
@@ -102,5 +93,14 @@ public static class BigMoneyTransferPolicy
             return new TransferResult(TransferOutcome.DestinationOverflow, sourceBigMoney, destinationBigMoney);
 
         return new TransferResult(TransferOutcome.Success, sourceBigMoney - requestedQuantity, projectedDestination);
+    }
+
+    /// <summary>NewSourceBigMoney/NewDestinationBigMoney are both sides' post-transfer balances, valid only when Succeeded.</summary>
+    public readonly record struct TransferResult(
+        TransferOutcome Outcome,
+        long NewSourceBigMoney,
+        long NewDestinationBigMoney)
+    {
+        public bool Succeeded => Outcome == TransferOutcome.Success;
     }
 }

@@ -13,7 +13,9 @@ public sealed class SeedGeneratorRegressionTests : IDisposable
 {
     private readonly string _dataDirectory = Path.Combine(AppContext.BaseDirectory, "LegacyData");
     private readonly string _itemsOutputPath = Path.Combine(Path.GetTempPath(), $"080_items_{Guid.NewGuid():N}.sql");
-    private readonly string _monstersOutputPath = Path.Combine(Path.GetTempPath(), $"090_monsters_{Guid.NewGuid():N}.sql");
+
+    private readonly string _monstersOutputPath =
+        Path.Combine(Path.GetTempPath(), $"090_monsters_{Guid.NewGuid():N}.sql");
 
     public void Dispose()
     {

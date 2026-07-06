@@ -20,21 +20,6 @@ namespace Fenrir.Application.Game.Domain.Stats;
 /// </remarks>
 public static class StatAllocationResolver
 {
-    /// <summary>tStatSort 1-4: fixed regime, +1 to Str/Dex/Vit/Int respectively, at a fixed cost of 1 stat point.</summary>
-    public const int SmallFixedCategoryMin = 1;
-
-    public const int SmallFixedCategoryMax = 4;
-
-    /// <summary>tStatSort 5-8: fixed regime, +5 to Str/Dex/Vit/Int respectively, at a fixed cost of 5 stat points.</summary>
-    public const int LargeFixedCategoryMin = 5;
-
-    public const int LargeFixedCategoryMax = 8;
-
-    /// <summary>tStatSort 9-12: variable regime, +tAddValue to Str/Dex/Vit/Int respectively, cost == tAddValue.</summary>
-    public const int VariableCategoryMin = 9;
-
-    public const int VariableCategoryMax = 12;
-
     /// <summary>The four base attributes a category code may credit -- Str/Dex/Vit/Int order per the legacy switch.</summary>
     public enum BaseStat
     {
@@ -54,6 +39,21 @@ public static class StatAllocationResolver
 
         Success
     }
+
+    /// <summary>tStatSort 1-4: fixed regime, +1 to Str/Dex/Vit/Int respectively, at a fixed cost of 1 stat point.</summary>
+    public const int SmallFixedCategoryMin = 1;
+
+    public const int SmallFixedCategoryMax = 4;
+
+    /// <summary>tStatSort 5-8: fixed regime, +5 to Str/Dex/Vit/Int respectively, at a fixed cost of 5 stat points.</summary>
+    public const int LargeFixedCategoryMin = 5;
+
+    public const int LargeFixedCategoryMax = 8;
+
+    /// <summary>tStatSort 9-12: variable regime, +tAddValue to Str/Dex/Vit/Int respectively, cost == tAddValue.</summary>
+    public const int VariableCategoryMin = 9;
+
+    public const int VariableCategoryMax = 12;
 
     /// <summary>
     ///     Resolves one CZ_PROCESS_DATA_SEND tSort-206 request. <paramref name="addValue" /> is read only for
@@ -106,7 +106,10 @@ public static class StatAllocationResolver
     ///     <see cref="StatAllocationResolver.Outcome.Disconnect" /> means the caller must terminate the
     ///     session for this request; nothing described by the other fields should be applied.
     /// </param>
-    /// <param name="Stat">Which base attribute to credit -- meaningless when <see cref="Outcome" /> is <see cref="StatAllocationResolver.Outcome.Disconnect" />.</param>
+    /// <param name="Stat">
+    ///     Which base attribute to credit -- meaningless when <see cref="Outcome" /> is
+    ///     <see cref="StatAllocationResolver.Outcome.Disconnect" />.
+    /// </param>
     /// <param name="Amount">
     ///     Both the amount credited to <see cref="Stat" /> and the amount debited from the stat-points balance.
     ///     No overflow guard is applied here on the destination attribute, matching the legacy's own lack of one

@@ -83,7 +83,7 @@ public sealed class GenericActionService(
             // rebirth gate is skipped here; tribe/slot-tag/level/final-category and the per-item-id/CheckSetItem
             // rebirth gates all run for real (including ItemNotFound when the item id itself doesn't resolve).
             // Flagged for a follow-up legacy finding, not guessed at.
-            var equipOutcome = EquipItemValidationGate.Evaluate(candidate, itemSortClassification: 0,
+            var equipOutcome = EquipItemValidationGate.Evaluate(candidate, 0,
                 state.PreviousTribe, move.Index2, state.Level + state.Level2, state.RebirthCount);
 
             if (equipOutcome != EquipItemValidationGate.Outcome.Success)
@@ -450,7 +450,8 @@ public sealed class GenericActionService(
     ///     tSort 206 -- spends unspent stat points (aStatPoint) to raise Strength/Dexterity/Vitality/Intelligence.
     ///     Every rejection is a bare <see cref="GenericActionResult.Aborted" />: the legacy disconnects the
     ///     session for any illegal category code or unaffordable amount here, never a soft failure reply. Not
-    ///     yet reachable from <c>GenericActionHandler</c>'s dispatch switch -- see <see cref="IGenericActionService.AllocateStatPointAsync" />.
+    ///     yet reachable from <c>GenericActionHandler</c>'s dispatch switch -- see
+    ///     <see cref="IGenericActionService.AllocateStatPointAsync" />.
     /// </summary>
     /// <remarks>
     ///     Réf. C++ : Server/ts25zone/S04_MyWork05.cpp:705-791 (<c>ProcessForStatPlus</c> -- debit, attribute
@@ -493,8 +494,8 @@ public sealed class GenericActionService(
             petContribution);
 
         if (!await zone.PostTribeProgressCommandAndWaitAsync(new TribeProgressZoneCommand(characterId,
-                    StatVit: newVit, StatStr: newStr, StatInt: newInt, StatDex: newDex,
-                    StatPoints: resolved.NewStatPoints, UpdatedStats: updatedStats), cancellationToken))
+                StatVit: newVit, StatStr: newStr, StatInt: newInt, StatDex: newDex,
+                StatPoints: resolved.NewStatPoints, UpdatedStats: updatedStats), cancellationToken))
             logger.LogError(
                 "Zone {MapId} tribe-progress inbox full: dropped stat-allocation mirror for character {CharacterId}",
                 zone.MapId, characterId);

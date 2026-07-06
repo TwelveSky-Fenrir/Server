@@ -19,7 +19,8 @@ namespace Fenrir.Application.Game.Domain.Simulation;
 ///     reset-on-death system instead, S07_MyGame04.cpp:723-748, confirmed still compiled in production by the
 ///     unconditional <c>ZONE124</c> macro at H07_MyGame.h:19 -- reproduced below as an explicit
 ///     <see cref="Zone.MapId" /> guard, matching every other per-map gate in this codebase
-///     (e.g. <c>ZonePvpZoneCatalog</c>) rather than omitting the system per zone) ; Server/ts25zone/S04_MyWork02.cpp:8400-8454
+///     (e.g. <c>ZonePvpZoneCatalog</c>) rather than omitting the system per zone) ;
+///     Server/ts25zone/S04_MyWork02.cpp:8400-8454
 ///     (DUEL_START_SEND seeds the 180-unit remaining-time counter) ; Server/ts25zone/S07_MyGame03.cpp:4422-4452
 ///     (<c>MyUtil::SearchAvatar</c> -- the exact-name, no-distance-filter "opponent still present" test the
 ///     legacy uses; re-expressed here as an exact-zone-membership test via <see cref="Zone.TryGetPlayer" />,
@@ -27,7 +28,6 @@ namespace Fenrir.Application.Game.Domain.Simulation;
 ///     ; ServerDocs/12_ts25zone/13_MyGame04_06_07_Avatar_Item_Tick.md §2.5.5 (reason-code mapping: 0 = time
 ///     expired/draw, 1 = opponent died/win, 2 = self died/lose, 3 = opponent not found -- mirrored exactly by
 ///     <see cref="DuelEndReason" />'s own numeric values).
-///
 ///     The legacy resolves this asymmetrically per-participant (only the "case 1"/initiator side's own
 ///     per-tick pass runs the full four-condition resolution; the "case 2" side's own pass only handles its
 ///     own opponent-not-found sub-case, per §2.5.5's own note) -- whose net externally observable effect is
@@ -41,7 +41,10 @@ namespace Fenrir.Application.Game.Domain.Simulation;
 /// </remarks>
 public sealed class DuelMaintenanceSystem(DuelRegistry duels) : ISimulationSystem
 {
-    /// <summary>Map 124 (scripted-duel/team-arena server) -- CZ_DUEL_ASK_SEND already refuses outright here, so no active duel ever exists to maintain, but the guard is kept explicit to match the legacy's own (S07_MyGame04.cpp:602).</summary>
+    /// <summary>
+    ///     Map 124 (scripted-duel/team-arena server) -- CZ_DUEL_ASK_SEND already refuses outright here, so no active duel
+    ///     ever exists to maintain, but the guard is kept explicit to match the legacy's own (S07_MyGame04.cpp:602).
+    /// </summary>
     private const short ScriptedDuelArenaMapId = 124;
 
     public void Simulate(Zone zone, int legacyTicksElapsed)

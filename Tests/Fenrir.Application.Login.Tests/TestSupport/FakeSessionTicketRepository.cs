@@ -7,11 +7,7 @@ namespace Fenrir.Application.Login.Tests.TestSupport;
 internal sealed class FakeSessionTicketRepository : ISessionTicketRepository
 {
     public (int AccountId, int CharacterId, byte ShardId, int TtlSeconds, Guid SessionToken, short AccountGrade)?
-        LastCreatedTicket
-    {
-        get;
-        private set;
-    }
+        LastCreatedTicket { get; private set; }
 
     public ValueTask CreateAsync(int accountId, int characterId, byte shardId, int ttlSeconds, Guid sessionToken,
         short accountGrade, CancellationToken ct)

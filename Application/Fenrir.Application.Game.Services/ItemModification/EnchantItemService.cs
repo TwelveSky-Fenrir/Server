@@ -116,7 +116,8 @@ public sealed class EnchantItemService(
 
         if (!eventLogQueue.Enqueue(new EventLogEntryTvp(EnchantEventCode, (byte)EventLogCategory.Enchant, null,
                 characterId, null, null, null, -(long)resolved.Cost, null, target.ItemId, target.Quantity,
-                (byte)resultCode, $"Serial={target.Serial};From={target.Enchant};To={resolved.NewEnchant};Material={material.ItemId}",
+                (byte)resultCode,
+                $"Serial={target.Serial};From={target.Enchant};To={resolved.NewEnchant};Material={material.ItemId}",
                 DateTime.UtcNow)))
             logger.LogWarning(
                 "game.EventLog write-behind queue full: dropped enchant-attempt audit row for character {CharacterId}",

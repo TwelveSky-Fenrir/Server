@@ -6,11 +6,12 @@ CREATE PROCEDURE game.usp_CharacterItem_GetIdAtSlot @CharacterId INT,
     @Slot        TINYINT
 AS
 BEGIN
-    SET NOCOUNT ON;
+    SET
+NOCOUNT ON;
 
-    SELECT ItemId
-    FROM game.CharacterItems
-    WHERE CharacterId = @CharacterId
-      AND Container = @Container
-      AND Slot = @Slot;
+SELECT ItemId
+FROM game.CharacterItems
+WHERE CharacterId = @CharacterId
+  AND Container = @Container
+  AND Slot = @Slot;
 END;

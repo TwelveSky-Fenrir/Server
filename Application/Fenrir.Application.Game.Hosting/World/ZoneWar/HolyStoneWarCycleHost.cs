@@ -24,13 +24,11 @@ public sealed class HolyStoneWarCycleHost(
     /// <summary>Server/ts25zone/S07_MyGame01.cpp:793-819 -- the one physical instance this scheduler ever arms on.</summary>
     public const int DesignatedShardId = 38;
 
-    private readonly bool _armed = options.Value.ShardId == DesignatedShardId && options.Value.HolyStoneWarEnabled;
-
-    public bool IsArmed => _armed;
+    public bool IsArmed { get; } = options.Value.ShardId == DesignatedShardId && options.Value.HolyStoneWarEnabled;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        if (!_armed)
+        if (!IsArmed)
         {
             logger.LogInformation(
                 "HolyStoneWarCycleHost is inert on this shard (ShardId={ShardId}, HolyStoneWarEnabled={Enabled})",

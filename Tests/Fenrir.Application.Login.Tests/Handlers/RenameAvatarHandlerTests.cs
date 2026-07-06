@@ -1,4 +1,3 @@
-using Fenrir.Application.Login.Handlers;
 using Fenrir.Application.Login.Handlers.Handlers;
 using Fenrir.Application.Login.Services.RenameAvatar;
 using Fenrir.Application.Login.Tests.TestSupport;
@@ -26,13 +25,16 @@ public class ClChangeAvatarNameSendHandlerTests
     private static CharacterSummaryDto Summary => new(CharacterId, Slot, "Hero", Tribe, 0, 0, 0, 10);
 
     private static RenameAvatarRequest Request(int avatarPost = Slot, string name = "NewName",
-        int page = ItemContainer, int index = ItemSlot) => new()
+        int page = ItemContainer, int index = ItemSlot)
     {
-        AvatarPost = avatarPost,
-        ChangeAvatarName = name,
-        Page = page,
-        Index = index
-    };
+        return new RenameAvatarRequest
+        {
+            AvatarPost = avatarPost,
+            ChangeAvatarName = name,
+            Page = page,
+            Index = index
+        };
+    }
 
     private static RenameAvatarHandler BuildHandler(
         FakeCharacterRepository characters,

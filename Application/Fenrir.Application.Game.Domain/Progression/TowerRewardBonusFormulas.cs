@@ -11,7 +11,11 @@ namespace Fenrir.Application.Game.Domain.Progression;
 ///     (<see cref="World.Zone.GrantMonsterKillExperience" />, the CP-for-PvM/PvP hooks in <c>Zone.Combat.cs</c>)
 ///     for where each field is actually spent.
 /// </summary>
-public readonly record struct TowerTribeRewardBonus(float SilverRatio, int CpForPvmBonus, int CpForPvpBonus, float XpRatio)
+public readonly record struct TowerTribeRewardBonus(
+    float SilverRatio,
+    int CpForPvmBonus,
+    int CpForPvpBonus,
+    float XpRatio)
 {
     /// <summary>All-zero -- the value for a tribe holding no built tower at all, or before the first tick recomputes.</summary>
     public static readonly TowerTribeRewardBonus None = default;

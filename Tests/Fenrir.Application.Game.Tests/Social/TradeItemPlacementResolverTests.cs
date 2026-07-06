@@ -48,7 +48,7 @@ public class TradeItemPlacementResolverTests
     [Fact]
     public void ResolveDeposit_CheckAvatarTradeFlagged_IsUntradeableItem()
     {
-        var item = StackableItem(1, checkAvatarTrade: 1);
+        var item = StackableItem(1, 1);
 
         var result = TradeItemPlacementResolver.ResolveDeposit(Stack(1, 1), 1, null, item, true);
 
@@ -59,7 +59,7 @@ public class TradeItemPlacementResolverTests
     public void ResolveWithdrawal_CheckAvatarTradeFlagged_IsNeverRechecked()
     {
         // Withdrawal must NOT re-check iCheckAvatarTrade -- only deposit gates on it.
-        var item = StackableItem(1, checkAvatarTrade: 1);
+        var item = StackableItem(1, 1);
 
         var result = TradeItemPlacementResolver.ResolveWithdrawal(Stack(1, 1), 1, null, item, true);
 
@@ -69,7 +69,7 @@ public class TradeItemPlacementResolverTests
     [Fact]
     public void ResolveRearrange_CheckAvatarTradeFlagged_IsNeverRechecked()
     {
-        var item = NonStackableItem(1, checkAvatarTrade: 1);
+        var item = NonStackableItem(1, 1);
 
         var result = TradeItemPlacementResolver.ResolveRearrange(Stack(1, 1), 0, null, item, true);
 
@@ -122,8 +122,8 @@ public class TradeItemPlacementResolverTests
     [Fact]
     public void ResolveDeposit_Stackable_FullMoveIntoEmptyDestination_ClearsSourceAndSetsSocketTripleWhenEligible()
     {
-        var source = Stack(50, 10, enchant: 1, combine: 1, refine: 1, socket: 1, gem1: 7, gem2: 8, gem3: 9,
-            expireDate: 20260101);
+        var source = Stack(50, 10, 1, 1, 1, 1, 7, 8, 9,
+            20260101);
 
         var result = TradeItemPlacementResolver.ResolveDeposit(source, 10, null, StackableItem(50), true);
 
@@ -178,7 +178,7 @@ public class TradeItemPlacementResolverTests
     public void ResolveDeposit_Stackable_MergeOntoPopulatedSlot_AlwaysResetsValueAndSerialToZero()
     {
         var source = Stack(50, 10);
-        var destination = Stack(50, 5, enchant: 9, combine: 9, refine: 9, socket: 9, serial: 12345);
+        var destination = Stack(50, 5, 9, 9, 9, 9, serial: 12345);
 
         var result = TradeItemPlacementResolver.ResolveDeposit(source, 10, destination, StackableItem(50), true);
 
@@ -217,7 +217,7 @@ public class TradeItemPlacementResolverTests
     [Fact]
     public void ResolveDeposit_NonStackable_MovesWholeSlotAsOneUnit_AndCarriesExpireDateThrough()
     {
-        var source = Stack(700, 1, enchant: 4, combine: 3, refine: 2, socket: 1, serial: 999, expireDate: 20260615);
+        var source = Stack(700, 1, 4, 3, 2, 1, serial: 999, expireDate: 20260615);
 
         var result = TradeItemPlacementResolver.ResolveDeposit(source, 0, null, NonStackableItem(700), true);
 

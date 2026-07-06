@@ -12,19 +12,11 @@ namespace Fenrir.Application.Game.Tests.Consumables;
 /// </summary>
 public class LootBoxRewardResolverTests
 {
-    private sealed class FixedRandom(int value) : Random
-    {
-        public override int Next(int minValue, int maxValue)
-        {
-            return value;
-        }
-    }
-
     private static readonly ImmutableArray<LootBoxRewardResolver.WeightedReward> ThreeTierTable =
     [
-        new LootBoxRewardResolver.WeightedReward(100, 70), // cumulative [0,70)
-        new LootBoxRewardResolver.WeightedReward(200, 20), // cumulative [70,90)
-        new LootBoxRewardResolver.WeightedReward(300, 10) // cumulative [90,100)
+        new(100, 70), // cumulative [0,70)
+        new(200, 20), // cumulative [70,90)
+        new(300, 10) // cumulative [90,100)
     ];
 
     [Fact]
@@ -63,7 +55,8 @@ public class LootBoxRewardResolverTests
     public void RollWeighted_EmptyTable_Throws()
     {
         Assert.Throws<ArgumentException>(() =>
-            LootBoxRewardResolver.RollWeighted(new FixedRandom(0), ImmutableArray<LootBoxRewardResolver.WeightedReward>.Empty));
+            LootBoxRewardResolver.RollWeighted(new FixedRandom(0),
+                ImmutableArray<LootBoxRewardResolver.WeightedReward>.Empty));
     }
 
     [Fact]
@@ -112,9 +105,9 @@ public class LootBoxRewardResolverTests
     [Fact]
     public void RollCloak_PityCounterReachesCeiling_ReturnsGuaranteedReward_AndResetsCounterToZero()
     {
-        var result = LootBoxRewardResolver.RollCloak(new FixedRandom(0), pityCounter: 99, pityCeiling: 100,
-            guaranteedRewardItemId: 2249, flatRareThresholdPer10000: 60, flatRareRewardItemId: 5000,
-            fallbackTiers: ThreeTierTable);
+        var result = LootBoxRewardResolver.RollCloak(new FixedRandom(0), 99, 100,
+            2249, 60, 5000,
+            ThreeTierTable);
 
         Assert.Equal(2249, result.RewardItemId);
         Assert.Equal(0, result.NewPityCounter);
@@ -124,9 +117,9 @@ public class LootBoxRewardResolverTests
     [Fact]
     public void RollCloak_PityBelowCeiling_FlatRareHit_ReturnsRareReward_AndIncrementsPity()
     {
-        var result = LootBoxRewardResolver.RollCloak(new FixedRandom(0), pityCounter: 10, pityCeiling: 100,
-            guaranteedRewardItemId: 2249, flatRareThresholdPer10000: 60, flatRareRewardItemId: 5000,
-            fallbackTiers: ThreeTierTable);
+        var result = LootBoxRewardResolver.RollCloak(new FixedRandom(0), 10, 100,
+            2249, 60, 5000,
+            ThreeTierTable);
 
         Assert.Equal(5000, result.RewardItemId);
         Assert.Equal(11, result.NewPityCounter);
@@ -136,9 +129,9 @@ public class LootBoxRewardResolverTests
     [Fact]
     public void RollCloak_PityBelowCeiling_FlatRareMiss_FallsToWeightedTable_AndIncrementsPity()
     {
-        var result = LootBoxRewardResolver.RollCloak(new FixedRandom(60), pityCounter: 10, pityCeiling: 100,
-            guaranteedRewardItemId: 2249, flatRareThresholdPer10000: 60, flatRareRewardItemId: 5000,
-            fallbackTiers: ThreeTierTable);
+        var result = LootBoxRewardResolver.RollCloak(new FixedRandom(60), 10, 100,
+            2249, 60, 5000,
+            ThreeTierTable);
 
         // FixedRandom(60) misses the 60-in-10000 threshold (roll < 60 required) and is then reused for the
         // fallback weighted roll, landing in the second tier of [0,70)/[70,90).
@@ -161,5 +154,13 @@ public class LootBoxRewardResolverTests
     {
         Assert.Throws<ArgumentException>(() =>
             LootBoxRewardResolver.RollUniform(new FixedRandom(0), ImmutableArray<int>.Empty));
+    }
+
+    private sealed class FixedRandom(int value) : Random
+    {
+        public override int Next(int minValue, int maxValue)
+        {
+            return value;
+        }
     }
 }

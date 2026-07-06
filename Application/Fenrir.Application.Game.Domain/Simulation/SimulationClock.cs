@@ -27,6 +27,37 @@ public static class SimulationClock
     /// </summary>
     public const int StunCountdownLegacyTicks = 2;
 
+    /// <summary>
+    ///     Post-death territorial revive-eligibility recheck (side effect 1, <c>S07_MyGame04.cpp:257-327</c>):
+    ///     begins once this many legacy ticks (5 s) have elapsed since death, then re-runs every subsequent
+    ///     tick (not a one-shot) until it succeeds or <see cref="AntiAbuseForceQuitLegacyTicks" /> fires first.
+    ///     Consumed by <see cref="DeathGateTickSystem" />.
+    /// </summary>
+    public const int ReviveEligibilityLegacyTicks = 10;
+
+    /// <summary>
+    ///     Death-gate broadcast-suppression threshold (side effect 3,
+    ///     <c>
+    ///         S07_MyGame03.cpp:809-833,857-880,
+    ///         893-935,954-978
+    ///     </c>
+    ///     ): a still-flagged recipient stops receiving proximity-broadcast avatar traffic
+    ///     once this many legacy ticks (15 s) have elapsed since their own death. Always strictly between
+    ///     <see cref="ReviveEligibilityLegacyTicks" /> and <see cref="AntiAbuseForceQuitLegacyTicks" />.
+    /// </summary>
+    public const int DeathBroadcastSuppressionLegacyTicks = 30;
+
+    /// <summary>
+    ///     <c>mProtect_ReviveHack</c> anti-abuse force-quit safety valve (side effect 2,
+    ///     <c>
+    ///         S07_MyGame04.cpp:
+    ///         328-332
+    ///     </c>
+    ///     ): a session still flagged this many legacy ticks (25 s) after death is torn down
+    ///     outright. Consumed by <see cref="DeathGateTickSystem" />.
+    /// </summary>
+    public const int AntiAbuseForceQuitLegacyTicks = 50;
+
     public static readonly TimeSpan LegacyTick = TimeSpan.FromMilliseconds(LegacyTickMilliseconds);
 
     /// <summary>Keep-alive re-broadcast cadence for avatar positions: 3.5 s (tLogicAvatarTick).</summary>
@@ -45,29 +76,9 @@ public static class SimulationClock
     public static readonly TimeSpan ProxyShopRebroadcastInterval = TimeSpan.FromSeconds(5);
 
     /// <summary>
-    ///     Post-death territorial revive-eligibility recheck (side effect 1, <c>S07_MyGame04.cpp:257-327</c>):
-    ///     begins once this many legacy ticks (5 s) have elapsed since death, then re-runs every subsequent
-    ///     tick (not a one-shot) until it succeeds or <see cref="AntiAbuseForceQuitLegacyTicks" /> fires first.
-    ///     Consumed by <see cref="DeathGateTickSystem" />.
+    ///     TimeSpan convenience form of <see cref="ReviveEligibilityLegacyTicks" />, for test call sites driving
+    ///     <c>Zone.Tick</c> directly.
     /// </summary>
-    public const int ReviveEligibilityLegacyTicks = 10;
-
-    /// <summary>
-    ///     Death-gate broadcast-suppression threshold (side effect 3, <c>S07_MyGame03.cpp:809-833,857-880,
-    ///     893-935,954-978</c>): a still-flagged recipient stops receiving proximity-broadcast avatar traffic
-    ///     once this many legacy ticks (15 s) have elapsed since their own death. Always strictly between
-    ///     <see cref="ReviveEligibilityLegacyTicks" /> and <see cref="AntiAbuseForceQuitLegacyTicks" />.
-    /// </summary>
-    public const int DeathBroadcastSuppressionLegacyTicks = 30;
-
-    /// <summary>
-    ///     <c>mProtect_ReviveHack</c> anti-abuse force-quit safety valve (side effect 2, <c>S07_MyGame04.cpp:
-    ///     328-332</c>): a session still flagged this many legacy ticks (25 s) after death is torn down
-    ///     outright. Consumed by <see cref="DeathGateTickSystem" />.
-    /// </summary>
-    public const int AntiAbuseForceQuitLegacyTicks = 50;
-
-    /// <summary>TimeSpan convenience form of <see cref="ReviveEligibilityLegacyTicks" />, for test call sites driving <c>Zone.Tick</c> directly.</summary>
     public static readonly TimeSpan ReviveEligibilityDelay = ToTimeSpan(ReviveEligibilityLegacyTicks);
 
     /// <summary>Ground item lifetime: 60 000 ms from creation.</summary>

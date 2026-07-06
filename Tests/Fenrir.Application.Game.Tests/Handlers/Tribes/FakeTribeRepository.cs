@@ -17,6 +17,8 @@ internal sealed class FakeTribeRepository : ITribeRepository
     public (byte TribeId, byte SlotIndex, int CharacterId)? LastDepositCall { get; private set; }
     public int DepositAmount { get; set; }
 
+    public List<(byte TribeId, int CharacterId)> ClearSubMasterCalls { get; } = [];
+
     public ValueTask<byte> GetRoleForCharacterAsync(int characterId, CancellationToken ct)
     {
         throw new NotSupportedException();
@@ -48,8 +50,6 @@ internal sealed class FakeTribeRepository : ITribeRepository
     {
         throw new NotSupportedException();
     }
-
-    public List<(byte TribeId, int CharacterId)> ClearSubMasterCalls { get; } = [];
 
     public ValueTask ClearSubMasterAsync(byte tribeId, int characterId, CancellationToken ct)
     {

@@ -33,7 +33,7 @@ public class DuelMaintenanceSystemTests
     private static void Enter(Zone zone, int characterId, ZoneClientSession session, float posX, float posZ)
     {
         zone.Post(ZoneCommand.Enter(characterId,
-            ZoneTestKit.EnterData(session, zone.MapId, name: $"C{characterId}", posX: posX, posZ: posZ)));
+            ZoneTestKit.EnterData(session, zone.MapId, $"C{characterId}", posX, posZ: posZ)));
     }
 
     private static ActiveDuel StartDuel(DuelRegistry duels, int a, int b, bool noPotions = false)

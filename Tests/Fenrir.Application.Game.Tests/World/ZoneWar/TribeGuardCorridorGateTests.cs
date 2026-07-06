@@ -44,7 +44,7 @@ public class TribeGuardCorridorGateTests
         var catalog = CreateCatalog();
         var state = new TribeGuardCorridorState(); // every segment closed
 
-        var outcome = Evaluate(catalog, state, requesterTribe: OtherTribe, origin: 9999, destination: 8888);
+        var outcome = Evaluate(catalog, state, OtherTribe, 9999, 8888);
 
         Assert.Equal(TribeGuardCorridorMoveOutcome.Allowed, outcome);
     }
@@ -55,7 +55,7 @@ public class TribeGuardCorridorGateTests
         var catalog = CreateCatalog();
         var state = new TribeGuardCorridorState();
 
-        var outcome = Evaluate(catalog, state, requesterTribe: OtherTribe, origin: 1, destination: HubZoneId);
+        var outcome = Evaluate(catalog, state, OtherTribe, 1, HubZoneId);
 
         Assert.Equal(TribeGuardCorridorMoveOutcome.Allowed, outcome);
     }
@@ -67,7 +67,7 @@ public class TribeGuardCorridorGateTests
         var state = new TribeGuardCorridorState(); // segment 2 closed
 
         // origin 9999 is not even a valid adjacent zone -- would fail adjacency too, if evaluated.
-        var outcome = Evaluate(catalog, state, requesterTribe: OtherTribe, origin: 9999, destination: 3, isGm: true);
+        var outcome = Evaluate(catalog, state, OtherTribe, 9999, 3, true);
 
         Assert.Equal(TribeGuardCorridorMoveOutcome.Allowed, outcome);
     }
@@ -78,7 +78,7 @@ public class TribeGuardCorridorGateTests
         var catalog = CreateCatalog();
         var state = new TribeGuardCorridorState();
 
-        var outcome = Evaluate(catalog, state, requesterTribe: OwnerTribe, origin: 9999, destination: 3);
+        var outcome = Evaluate(catalog, state, OwnerTribe, 9999, 3);
 
         Assert.Equal(TribeGuardCorridorMoveOutcome.Allowed, outcome);
     }
@@ -89,7 +89,7 @@ public class TribeGuardCorridorGateTests
         var catalog = CreateCatalog();
         var state = new TribeGuardCorridorState(); // closed
 
-        var outcome = Evaluate(catalog, state, requesterTribe: OtherTribe, origin: 1, destination: 2,
+        var outcome = Evaluate(catalog, state, OtherTribe, 1, 2,
             resolveAlly: owner => owner == OwnerTribe ? OtherTribe : null);
 
         Assert.Equal(TribeGuardCorridorMoveOutcome.Allowed, outcome);
@@ -112,7 +112,7 @@ public class TribeGuardCorridorGateTests
             return tribeId == OwnerTribe ? OtherTribe : null;
         }
 
-        var outcome = Evaluate(catalog, state, requesterTribe: OtherTribe, origin: 1, destination: 2,
+        var outcome = Evaluate(catalog, state, OtherTribe, 1, 2,
             resolveAlly: ResolveAlly);
 
         Assert.Equal(TribeGuardCorridorMoveOutcome.Allowed, outcome);
@@ -126,7 +126,7 @@ public class TribeGuardCorridorGateTests
         var state = new TribeGuardCorridorState();
         state.TrySetOpen(OwnerTribe, 1, true); // segment gating entry into zone 2 (chain[1])
 
-        var outcome = Evaluate(catalog, state, requesterTribe: OtherTribe, origin: 1, destination: 2);
+        var outcome = Evaluate(catalog, state, OtherTribe, 1, 2);
 
         Assert.Equal(TribeGuardCorridorMoveOutcome.Allowed, outcome);
     }
@@ -137,7 +137,7 @@ public class TribeGuardCorridorGateTests
         var catalog = CreateCatalog();
         var state = new TribeGuardCorridorState(); // closed by default
 
-        var outcome = Evaluate(catalog, state, requesterTribe: OtherTribe, origin: 1, destination: 2);
+        var outcome = Evaluate(catalog, state, OtherTribe, 1, 2);
 
         Assert.Equal(TribeGuardCorridorMoveOutcome.RejectedSoft, outcome);
     }
@@ -149,7 +149,7 @@ public class TribeGuardCorridorGateTests
         var state = new TribeGuardCorridorState();
         state.TrySetOpen(OwnerTribe, 0, true);
 
-        var outcome = Evaluate(catalog, state, requesterTribe: OtherTribe, origin: HubZoneId, destination: 1);
+        var outcome = Evaluate(catalog, state, OtherTribe, HubZoneId, 1);
 
         Assert.Equal(TribeGuardCorridorMoveOutcome.Allowed, outcome);
     }
@@ -161,7 +161,7 @@ public class TribeGuardCorridorGateTests
         var state = new TribeGuardCorridorState(); // segment 0 (gating zone 1) closed
 
         // Moving from zone 2 (segment-1 depth) back to zone 1 (segment-0 depth) -- retreating toward the hub.
-        var outcome = Evaluate(catalog, state, requesterTribe: OtherTribe, origin: 2, destination: 1);
+        var outcome = Evaluate(catalog, state, OtherTribe, 2, 1);
 
         Assert.Equal(TribeGuardCorridorMoveOutcome.Allowed, outcome);
     }
@@ -172,7 +172,7 @@ public class TribeGuardCorridorGateTests
         var catalog = CreateCatalog();
         var state = new TribeGuardCorridorState();
 
-        var outcome = Evaluate(catalog, state, requesterTribe: OtherTribe, origin: 3, destination: HubZoneId);
+        var outcome = Evaluate(catalog, state, OtherTribe, 3, HubZoneId);
 
         Assert.Equal(TribeGuardCorridorMoveOutcome.Allowed, outcome);
     }
@@ -187,7 +187,7 @@ public class TribeGuardCorridorGateTests
         state.TrySetOpen(OwnerTribe, 2, true);
 
         // Jumping from the hub straight into zone 3 (segment 2), skipping zone 1/2 entirely.
-        var outcome = Evaluate(catalog, state, requesterTribe: OtherTribe, origin: HubZoneId, destination: 3);
+        var outcome = Evaluate(catalog, state, OtherTribe, HubZoneId, 3);
 
         Assert.Equal(TribeGuardCorridorMoveOutcome.RejectedSoft, outcome);
     }
@@ -199,7 +199,7 @@ public class TribeGuardCorridorGateTests
         var state = new TribeGuardCorridorState();
         state.TrySetOpen(OwnerTribe, 1, true);
 
-        var outcome = Evaluate(catalog, state, requesterTribe: OtherTribe, origin: 555, destination: 2);
+        var outcome = Evaluate(catalog, state, OtherTribe, 555, 2);
 
         Assert.Equal(TribeGuardCorridorMoveOutcome.RejectedSoft, outcome);
     }
@@ -210,7 +210,7 @@ public class TribeGuardCorridorGateTests
         var catalog = CreateCatalog();
         var state = new TribeGuardCorridorState(); // closed
 
-        var outcome = Evaluate(catalog, state, requesterTribe: OtherTribe, origin: 37, destination: 1);
+        var outcome = Evaluate(catalog, state, OtherTribe, 37, 1);
 
         Assert.Equal(TribeGuardCorridorMoveOutcome.RejectedHardDisconnect, outcome);
     }
@@ -222,7 +222,7 @@ public class TribeGuardCorridorGateTests
         var state = new TribeGuardCorridorState();
         state.TrySetOpen(OwnerTribe, 2, true); // even with guards defeated, adjacency still fails
 
-        var outcome = Evaluate(catalog, state, requesterTribe: OtherTribe, origin: 37, destination: 3);
+        var outcome = Evaluate(catalog, state, OtherTribe, 37, 3);
 
         Assert.Equal(TribeGuardCorridorMoveOutcome.RejectedHardDisconnect, outcome);
     }
@@ -230,10 +230,10 @@ public class TribeGuardCorridorGateTests
     [Fact]
     public void RejectionInvolvingZone37AsDestination_IsAHardDisconnect()
     {
-        var catalog = CreateCatalog(segment0Override: 37); // segment 0's own destination zone is (contrived) 37
+        var catalog = CreateCatalog(37); // segment 0's own destination zone is (contrived) 37
         var state = new TribeGuardCorridorState(); // closed
 
-        var outcome = Evaluate(catalog, state, requesterTribe: OtherTribe, origin: HubZoneId, destination: 37);
+        var outcome = Evaluate(catalog, state, OtherTribe, HubZoneId, 37);
 
         Assert.Equal(TribeGuardCorridorMoveOutcome.RejectedHardDisconnect, outcome);
     }
@@ -241,12 +241,12 @@ public class TribeGuardCorridorGateTests
     [Fact]
     public void AllowedOutcome_NeverTriggersHardDisconnect_EvenWhenZone37IsInvolved()
     {
-        var catalog = CreateCatalog(segment0Override: 37);
+        var catalog = CreateCatalog(37);
         var state = new TribeGuardCorridorState();
 
         // Owning tribe's own move into its own segment-0 zone (which happens to be numbered 37) -- unconditional
         // bypass, never even reaches the hard-disconnect check.
-        var outcome = Evaluate(catalog, state, requesterTribe: OwnerTribe, origin: HubZoneId, destination: 37);
+        var outcome = Evaluate(catalog, state, OwnerTribe, HubZoneId, 37);
 
         Assert.Equal(TribeGuardCorridorMoveOutcome.Allowed, outcome);
     }
@@ -257,7 +257,7 @@ public class TribeGuardCorridorGateTests
         var catalog = CreateCatalog();
         var state = new TribeGuardCorridorState();
 
-        var outcome = Evaluate(catalog, state, requesterTribe: OtherTribe, origin: 1, destination: 2);
+        var outcome = Evaluate(catalog, state, OtherTribe, 1, 2);
 
         Assert.Equal(TribeGuardCorridorMoveOutcome.RejectedSoft, outcome);
     }

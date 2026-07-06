@@ -10,7 +10,8 @@ namespace Fenrir.Application.Login.Hosting;
 /// <summary>
 ///     Keeps every Login-held account's <c>runtime.AccountSessions.LastRefreshedUtc</c> warm so
 ///     <c>AccountSessionReapHost</c>'s 6-minute staleness sweep never reaps a session that is simply still sitting
-///     at char-select/PIN-entry. Never kicks anything itself -- <see cref="IAccountSessionRepository.RefreshAndGetKickedAsync" />
+///     at char-select/PIN-entry. Never kicks anything itself --
+///     <see cref="IAccountSessionRepository.RefreshAndGetKickedAsync" />
 ///     always returns empty for <see cref="AccountSessionServerKind.Login" /> by construction (the kick-request flag
 ///     only ever gets set against a Game-side row).
 /// </summary>

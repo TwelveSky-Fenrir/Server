@@ -17,16 +17,7 @@ internal sealed class FakeCashRepository : ICashRepository
     public (int AccountId, int Amount, byte Reason, int? ProductId)? LastCredit { get; private set; }
 
     public (int AccountId, int Amount, byte Reason, int ProductId, int CharacterId, byte Container,
-        IReadOnlyList<CharacterItemSlotTvp> Items)? LastDebitAndGrantItem
-    {
-        get;
-        private set;
-    }
-
-    public void SeedBalance(int accountId, int balance)
-    {
-        _balances[accountId] = balance;
-    }
+        IReadOnlyList<CharacterItemSlotTvp> Items)? LastDebitAndGrantItem { get; private set; }
 
     public ValueTask<int> GetBalanceAsync(int accountId, CancellationToken ct)
     {
@@ -53,5 +44,10 @@ internal sealed class FakeCashRepository : ICashRepository
         LastCredit = (accountId, amount, reason, productId);
         _balances[accountId] = _balances.GetValueOrDefault(accountId) + amount;
         return ValueTask.CompletedTask;
+    }
+
+    public void SeedBalance(int accountId, int balance)
+    {
+        _balances[accountId] = balance;
     }
 }

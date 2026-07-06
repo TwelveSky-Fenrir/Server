@@ -463,7 +463,6 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
 
         var allSucceeded = true;
         foreach (var tribe in updated)
-        {
             try
             {
                 await repository.UpdateTribeAsync(tribe.TribeId, tribe.SymbolDate, tribe.HasSymbol, tribe.Points,
@@ -476,7 +475,6 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
                     "WorldState: immediate persist of tribe {TribeId} point total failed -- in-memory mirror already changed and will not be retried for this request",
                     tribe.TribeId);
             }
-        }
 
         return allSucceeded;
     }
@@ -580,7 +578,8 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
     ///         Split in two independent halves so a Points-delta failure can never re-dirty the (usually
     ///         unrelated) scalar/symbol-state/alliance-offer writes, and vice versa: the world/symbol-state/
     ///         offer half persists the always-single-writer-by-construction fields exactly like before
-    ///         (<see cref="IWorldStateRepository.UpdateAsync" />/<see cref="IWorldStateRepository.UpdateTribeSymbolStateAsync" />/
+    ///         (<see cref="IWorldStateRepository.UpdateAsync" />/
+    ///         <see cref="IWorldStateRepository.UpdateTribeSymbolStateAsync" />/
     ///         <see cref="IWorldStateRepository.SetAllianceOfferAsync" />); the Points-delta half calls
     ///         <see cref="IWorldStateRepository.AddTribePointsAsync" /> only for tribes with a nonzero pending
     ///         delta, additive at the DB so concurrent shards' deltas can never clobber each other.

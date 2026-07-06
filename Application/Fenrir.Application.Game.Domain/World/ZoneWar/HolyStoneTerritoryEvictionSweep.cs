@@ -1,5 +1,5 @@
-using Microsoft.Extensions.Logging;
 using Fenrir.Application.Game.Domain.World.WorldState;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 
@@ -11,7 +11,7 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 /// </summary>
 public interface IHolyStoneForcedReturnGateway
 {
-    void ForceReturnToSafeLocation(Zone zone, PlayerRuntimeState player);
+    public void ForceReturnToSafeLocation(Zone zone, PlayerRuntimeState player);
 }
 
 /// <summary>

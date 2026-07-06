@@ -1,3 +1,4 @@
+using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Crafting;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Tests.TestSupport;
@@ -87,7 +88,7 @@ public class RuneStoneCraftResolverTests
     [InlineData(93514)] // a destination id, not a source id
     public void SourceItemNotOneOfTheThreeWhitelistedIds_Disconnects(int sourceItemId)
     {
-        var result = RuneStoneCraftResolver.Resolve(Request(sourceItemId: sourceItemId), new ScriptedRandomSource(0));
+        var result = RuneStoneCraftResolver.Resolve(Request(sourceItemId), new ScriptedRandomSource(0));
 
         Assert.Equal(RuneStoneCraftOutcome.Disconnect, result.Outcome);
     }
@@ -100,7 +101,7 @@ public class RuneStoneCraftResolverTests
     public void RerollOneStat_InvalidStatSlotSelector_Disconnects(int selector)
     {
         var result = RuneStoneCraftResolver.Resolve(
-            Request(sourceItemId: RuneStoneCraftCatalog.RerollOneStatItemId, statSlotSelector: selector),
+            Request(RuneStoneCraftCatalog.RerollOneStatItemId, statSlotSelector: selector),
             new ScriptedRandomSource(0));
 
         Assert.Equal(RuneStoneCraftOutcome.Disconnect, result.Outcome);
@@ -138,7 +139,7 @@ public class RuneStoneCraftResolverTests
     {
         var packed = RuneStoneStatCodec.Encode(1, 1, 1, 1);
         var result = RuneStoneCraftResolver.Resolve(
-            Request(sourceItemId: RuneStoneCraftCatalog.AddStatItemId, destinationPackedStat: packed),
+            Request(RuneStoneCraftCatalog.AddStatItemId, destinationPackedStat: packed),
             new ScriptedRandomSource(0));
 
         Assert.Equal(RuneStoneCraftOutcome.Refused, result.Outcome);
@@ -151,7 +152,7 @@ public class RuneStoneCraftResolverTests
     public void AddStat_AllEmpty_FillsStrFirst()
     {
         var result = RuneStoneCraftResolver.Resolve(
-            Request(sourceItemId: RuneStoneCraftCatalog.AddStatItemId, destinationPackedStat: 0),
+            Request(RuneStoneCraftCatalog.AddStatItemId, destinationPackedStat: 0),
             new ScriptedRandomSource(199)); // top tier => 30
 
         Assert.True(result.Succeeded);
@@ -169,7 +170,7 @@ public class RuneStoneCraftResolverTests
     {
         var packed = RuneStoneStatCodec.Encode(5, 0, 0, 0);
         var result = RuneStoneCraftResolver.Resolve(
-            Request(sourceItemId: RuneStoneCraftCatalog.AddStatItemId, destinationPackedStat: packed),
+            Request(RuneStoneCraftCatalog.AddStatItemId, destinationPackedStat: packed),
             new ScriptedRandomSource(199));
 
         Assert.True(result.Succeeded);
@@ -185,7 +186,7 @@ public class RuneStoneCraftResolverTests
     {
         var packed = RuneStoneStatCodec.Encode(5, 6, 0, 0);
         var result = RuneStoneCraftResolver.Resolve(
-            Request(sourceItemId: RuneStoneCraftCatalog.AddStatItemId, destinationPackedStat: packed),
+            Request(RuneStoneCraftCatalog.AddStatItemId, destinationPackedStat: packed),
             new ScriptedRandomSource(199));
 
         Assert.True(result.Succeeded);
@@ -201,7 +202,7 @@ public class RuneStoneCraftResolverTests
     {
         var packed = RuneStoneStatCodec.Encode(5, 6, 7, 0);
         var result = RuneStoneCraftResolver.Resolve(
-            Request(sourceItemId: RuneStoneCraftCatalog.AddStatItemId, destinationPackedStat: packed),
+            Request(RuneStoneCraftCatalog.AddStatItemId, destinationPackedStat: packed),
             new ScriptedRandomSource(199));
 
         Assert.True(result.Succeeded);
@@ -223,7 +224,7 @@ public class RuneStoneCraftResolverTests
     {
         var packed = RuneStoneStatCodec.Encode(str, dex, vit, intel);
         var result = RuneStoneCraftResolver.Resolve(
-            Request(sourceItemId: RuneStoneCraftCatalog.RerollAllStatsItemId, destinationPackedStat: packed),
+            Request(RuneStoneCraftCatalog.RerollAllStatsItemId, destinationPackedStat: packed),
             new ScriptedRandomSource(0));
 
         Assert.Equal(RuneStoneCraftOutcome.Refused, result.Outcome);
@@ -236,7 +237,7 @@ public class RuneStoneCraftResolverTests
     {
         var packed = RuneStoneStatCodec.Encode(1, 2, 3, 4);
         var result = RuneStoneCraftResolver.Resolve(
-            Request(sourceItemId: RuneStoneCraftCatalog.RerollAllStatsItemId, destinationPackedStat: packed),
+            Request(RuneStoneCraftCatalog.RerollAllStatsItemId, destinationPackedStat: packed),
             new ScriptedRandomSource(199));
 
         Assert.True(result.Succeeded);
@@ -259,7 +260,7 @@ public class RuneStoneCraftResolverTests
     public void RerollOne_SelectedSlotEmpty_IsRefusedWithResultCode14(int selector, int expectedSlotIndicator)
     {
         var result = RuneStoneCraftResolver.Resolve(
-            Request(sourceItemId: RuneStoneCraftCatalog.RerollOneStatItemId, destinationPackedStat: 0,
+            Request(RuneStoneCraftCatalog.RerollOneStatItemId, destinationPackedStat: 0,
                 statSlotSelector: selector),
             new ScriptedRandomSource(0));
 
@@ -274,7 +275,7 @@ public class RuneStoneCraftResolverTests
     {
         var packed = RuneStoneStatCodec.Encode(5, 6, 7, 8);
         var result = RuneStoneCraftResolver.Resolve(
-            Request(sourceItemId: RuneStoneCraftCatalog.RerollOneStatItemId, destinationPackedStat: packed,
+            Request(RuneStoneCraftCatalog.RerollOneStatItemId, destinationPackedStat: packed,
                 statSlotSelector: RuneStoneCraftCatalog.StatSlotSelectorDexterity),
             new ScriptedRandomSource(199));
 
@@ -294,7 +295,7 @@ public class RuneStoneCraftResolverTests
         // Deliberate legacy asymmetry: 92298's emptiness test is strictly "== 0", not "<= 0" like 92296/92297.
         var packed = RuneStoneStatCodec.Encode(-5, 0, 0, 0);
         var result = RuneStoneCraftResolver.Resolve(
-            Request(sourceItemId: RuneStoneCraftCatalog.RerollOneStatItemId, destinationPackedStat: packed,
+            Request(RuneStoneCraftCatalog.RerollOneStatItemId, destinationPackedStat: packed,
                 statSlotSelector: RuneStoneCraftCatalog.StatSlotSelectorStrength),
             new ScriptedRandomSource(199));
 
@@ -310,7 +311,7 @@ public class RuneStoneCraftResolverTests
     {
         var random = new CountingRandomSource();
         RuneStoneCraftResolver.Resolve(
-            Request(sourceItemId: RuneStoneCraftCatalog.RerollOneStatItemId, destinationPackedStat: 0,
+            Request(RuneStoneCraftCatalog.RerollOneStatItemId, destinationPackedStat: 0,
                 statSlotSelector: RuneStoneCraftCatalog.StatSlotSelectorStrength),
             random);
 
@@ -318,7 +319,7 @@ public class RuneStoneCraftResolverTests
         Assert.Equal(4, random.CallCount);
     }
 
-    private sealed class CountingRandomSource : Fenrir.Application.Game.Domain.Combat.IRandomSource
+    private sealed class CountingRandomSource : IRandomSource
     {
         public int CallCount { get; private set; }
 

@@ -8,6 +8,7 @@ using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Data.Abstractions.World;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.Handlers;
@@ -35,7 +36,7 @@ public class ZoneMoveServiceTests
 
         var worldState = ZoneTestKit.CreateWorldState();
         var service = new ZoneMoveService(zones, worldData, new GuildRankingCache(), worldState,
-            Options.Create(new GameServerOptions()), Microsoft.Extensions.Logging.Abstractions.NullLogger<ZoneMoveService>.Instance);
+            Options.Create(new GameServerOptions()), NullLogger<ZoneMoveService>.Instance);
 
         var (session, _) = ZoneTestKit.CreateSession(1);
         session.MarkTicketConsumed(1, CharacterId);
@@ -63,7 +64,7 @@ public class ZoneMoveServiceTests
     public async Task Flagged_FactionTerritoryMismatch_NotZone38_KicksTheSession()
     {
         // Source zone 2 (faction-0 territory), avatar tribe 1 (mismatch), no alliance configured.
-        var (service, session, sourceZone) = CreateService(2, tribe: 1, reviveHackFlag: true, 50);
+        var (service, session, sourceZone) = CreateService(2, 1, true, 50);
 
         await service.HandleAsync(Request(2, 50), session, CancellationToken.None);
 
@@ -73,7 +74,7 @@ public class ZoneMoveServiceTests
     [Fact]
     public async Task Flagged_DestinationZone38_IsAlwaysExempt_EvenOnAFactionMismatch()
     {
-        var (service, session, sourceZone) = CreateService(2, tribe: 1, reviveHackFlag: true, 38);
+        var (service, session, sourceZone) = CreateService(2, 1, true, 38);
 
         await service.HandleAsync(Request(2, 38), session, CancellationToken.None);
 
@@ -83,7 +84,7 @@ public class ZoneMoveServiceTests
     [Fact]
     public async Task Flagged_AvatarTribeMatchesOwningFaction_IsNotKicked()
     {
-        var (service, session, sourceZone) = CreateService(2, tribe: 0, reviveHackFlag: true, 50);
+        var (service, session, sourceZone) = CreateService(2, 0, true, 50);
 
         await service.HandleAsync(Request(2, 50), session, CancellationToken.None);
 
@@ -93,7 +94,7 @@ public class ZoneMoveServiceTests
     [Fact]
     public async Task NotFlagged_TransfersNormally_EvenOnAFactionMismatch()
     {
-        var (service, session, sourceZone) = CreateService(2, tribe: 1, reviveHackFlag: false, 50);
+        var (service, session, sourceZone) = CreateService(2, 1, false, 50);
 
         await service.HandleAsync(Request(2, 50), session, CancellationToken.None);
 
@@ -103,7 +104,7 @@ public class ZoneMoveServiceTests
     [Fact]
     public async Task Flagged_CurrentZoneNotFactionTerritory_IsNeverKicked()
     {
-        var (service, session, sourceZone) = CreateService(999, tribe: 1, reviveHackFlag: true, 50);
+        var (service, session, sourceZone) = CreateService(999, 1, true, 50);
 
         await service.HandleAsync(Request(999, 50), session, CancellationToken.None);
 
@@ -117,7 +118,7 @@ public class ZoneMoveServiceTests
         // tribe 0 (zone 2's owner) is allied with tribe 2 here, which must NOT suspend the kick.
         var worldData = ZoneTestKit.EmptyWorldData(zonesByNumber: new Dictionary<short, ZoneDefinition>
         {
-            [50] = new ZoneDefinition(new ZoneRowDto(50, 0f, 0f, 0f), [], [], [], [])
+            [50] = new(new ZoneRowDto(50, 0f, 0f, 0f), [], [], [], [])
         }.ToFrozenDictionary());
         var zones = ZoneTestKit.CreateRegistry(worldData: worldData);
         zones.Initialize([2, 50]);
@@ -125,7 +126,7 @@ public class ZoneMoveServiceTests
         var worldState = ZoneTestKit.CreateWorldState();
         worldState.SetAllianceOffer(0, 2, true);
         var service = new ZoneMoveService(zones, worldData, new GuildRankingCache(), worldState,
-            Options.Create(new GameServerOptions()), Microsoft.Extensions.Logging.Abstractions.NullLogger<ZoneMoveService>.Instance);
+            Options.Create(new GameServerOptions()), NullLogger<ZoneMoveService>.Instance);
 
         var (session, _) = ZoneTestKit.CreateSession(1);
         session.MarkTicketConsumed(1, CharacterId);
@@ -149,7 +150,7 @@ public class ZoneMoveServiceTests
         // (neither the owner nor the ally).
         var worldData = ZoneTestKit.EmptyWorldData(zonesByNumber: new Dictionary<short, ZoneDefinition>
         {
-            [50] = new ZoneDefinition(new ZoneRowDto(50, 0f, 0f, 0f), [], [], [], [])
+            [50] = new(new ZoneRowDto(50, 0f, 0f, 0f), [], [], [], [])
         }.ToFrozenDictionary());
         var zones = ZoneTestKit.CreateRegistry(worldData: worldData);
         zones.Initialize([7, 50]);
@@ -157,7 +158,7 @@ public class ZoneMoveServiceTests
         var worldState = ZoneTestKit.CreateWorldState();
         worldState.SetAllianceOffer(1, 0, true); // tribe 1 (zone 7's owner) allied with tribe 0
         var service = new ZoneMoveService(zones, worldData, new GuildRankingCache(), worldState,
-            Options.Create(new GameServerOptions()), Microsoft.Extensions.Logging.Abstractions.NullLogger<ZoneMoveService>.Instance);
+            Options.Create(new GameServerOptions()), NullLogger<ZoneMoveService>.Instance);
 
         var (session, _) = ZoneTestKit.CreateSession(1);
         session.MarkTicketConsumed(1, CharacterId);

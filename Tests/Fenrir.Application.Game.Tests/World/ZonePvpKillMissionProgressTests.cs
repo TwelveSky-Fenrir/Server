@@ -43,8 +43,10 @@ public class ZonePvpKillMissionProgressTests
         };
     }
 
-    /// <summary>One attacker (tribe 0) plus <paramref name="defenderIds" /> defenders (tribe 1), past both
-    /// zone-entry protect windows and combat-ready.</summary>
+    /// <summary>
+    ///     One attacker (tribe 0) plus <paramref name="defenderIds" /> defenders (tribe 1), past both
+    ///     zone-entry protect windows and combat-ready.
+    /// </summary>
     /// <remarks>
     ///     Map id 49 (not 1): still PvP-enabled (<see cref="ZonePvpZoneCatalog.AllowsEnemyTribeAttack" />) but
     ///     outside every territorial revive-eligibility block, so <see cref="DeathGateTickSystem" /> grants

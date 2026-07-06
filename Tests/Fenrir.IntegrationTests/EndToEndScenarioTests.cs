@@ -24,7 +24,8 @@ namespace Fenrir.IntegrationTests;
 ///             <c>GenericActionHandler</c>'s tSort dispatch has no such branch). A level-1 character's
 ///             <c>StatCalculator.ComputeAttackSuccess</c> is therefore always 0, and
 ///             <c>MonsterCombatResolver.ResolvePvmAttack</c> unconditionally rejects any attack with
-///             AttackSuccess &lt; 1 -- a fresh character can never land a hit. <see cref="ApplyCombatUnblockWorkaroundAsync" />
+///             AttackSuccess &lt; 1 -- a fresh character can never land a hit.
+///             <see cref="ApplyCombatUnblockWorkaroundAsync" />
 ///             seeds StatStr directly so the combat/kill/loot/XP leg can be driven for real over the wire.
 ///         </item>
 ///         <item>
@@ -175,7 +176,10 @@ public sealed class EndToEndScenarioTests
         return (int)(await command.ExecuteScalarAsync(ct))!;
     }
 
-    /// <summary>See the class remarks for why this precondition exists; both values are hand-picked to make combat/purchase reliable, not realistic game balance.</summary>
+    /// <summary>
+    ///     See the class remarks for why this precondition exists; both values are hand-picked to make combat/purchase
+    ///     reliable, not realistic game balance.
+    /// </summary>
     private async Task ApplyCombatUnblockWorkaroundAsync(int characterId, EncounterPlan plan, long money,
         CancellationToken ct)
     {
@@ -309,7 +313,8 @@ public sealed class EndToEndScenarioTests
         Assert.Equal(FenrirEnvironmentFixture.SecondaryMapId, mapId);
 
         // Money: debited synchronously inside BuyShopItemHandler's own SQL call, not write-behind -- always current.
-        Assert.True(money < seededMoney, $"Expected Money ({money}) to be less than the seeded {seededMoney} after the NPC purchase.");
+        Assert.True(money < seededMoney,
+            $"Expected Money ({money}) to be less than the seeded {seededMoney} after the NPC purchase.");
 
         await using (var itemConnection = await _environment.OpenConnectionAsync())
         await using (var command = new SqlCommand(

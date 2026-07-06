@@ -35,12 +35,14 @@ public enum TribeSymbolBattleSchedulePhase : byte
 ///     <c>Fenrir.Application.Game.Hosting.World.ZoneWar.TribeSymbolBattleSchedulerHost</c>, this class's own
 ///     driver; this class itself has no shard-election concept, it simply always evaluates) ;
 ///     Server/ts25center/S04_MyWork02.cpp:364-372,398-407 (the two broadcast notices that flip
-///     the shared flag on the receiving/center side -- collapsed onto <see cref="ZoneEventBroadcaster.AnnounceTribeSymbolBattleStarted" />/
+///     the shared flag on the receiving/center side -- collapsed onto
+///     <see cref="ZoneEventBroadcaster.AnnounceTribeSymbolBattleStarted" />/
 ///     <see cref="ZoneEventBroadcaster.AnnounceTribeSymbolBattleEnded" />, which already both mutate
 ///     <see cref="WorldStateService" /> and broadcast sort 40/45 in one call) ; Server/Header/function.h:1642-1652
 ///     (tick-to-minute conversion, see <see cref="MinuteCountdown" />'s own remarks).
 ///     <para>
-///         Each of the ten interim per-minute countdown steps broadcasts <see cref="ZoneEventBroadcaster.AnnounceTribeSymbolBattleCountdown" />
+///         Each of the ten interim per-minute countdown steps broadcasts
+///         <see cref="ZoneEventBroadcaster.AnnounceTribeSymbolBattleCountdown" />
 ///         (sort 39, "hsb countdown") -- a real, already-modeled wire notice, not a guess: it carries no
 ///         minutes-remaining payload (matching the legacy's own bare <c>Broadcast(39)</c> call), so this is a
 ///         pulse only, with the actual minute count logged locally alongside it.
@@ -74,6 +76,8 @@ public sealed class TribeSymbolBattleScheduler(
     /// <summary>Ten simulated minutes of "opens/closes in N minutes" countdown steps, N = 10 down to 1.</summary>
     public const int CountdownMinutes = 10;
 
+    private readonly MinuteCountdown _countdown = new();
+
     /// <summary>
     ///     Which three days of the week the legacy restricts this behavior to outside test mode -- NOT named
     ///     by the translated behavior contract (only "one of three fixed days" is stated). Defaults to empty:
@@ -82,8 +86,6 @@ public sealed class TribeSymbolBattleScheduler(
     ///     on the wrong day of the week.
     /// </summary>
     public IReadOnlySet<DayOfWeek> AllowedDays { get; } = allowedDays ?? new HashSet<DayOfWeek>();
-
-    private readonly MinuteCountdown _countdown = new();
 
     public TribeSymbolBattleSchedulePhase Phase { get; private set; } = TribeSymbolBattleSchedulePhase.WaitingForHour;
 

@@ -15,19 +15,6 @@ internal sealed class FakeFriendRepository : IFriendRepository
     /// <summary>Every characterId GetByCharacterAsync was called with, in call order -- proves ordering/short-circuit.</summary>
     public List<int> QueriedCharacterIds { get; } = [];
 
-    /// <summary>No character has any friends at all.</summary>
-    public static FakeFriendRepository Empty()
-    {
-        return new FakeFriendRepository();
-    }
-
-    public static FakeFriendRepository With(int characterId, params CharacterFriendDto[] friendRows)
-    {
-        var repository = new FakeFriendRepository();
-        repository._friendsByCharacterId[characterId] = [.. friendRows];
-        return repository;
-    }
-
     public ValueTask<ReadOnlyCollection<CharacterFriendDto>> GetByCharacterAsync(int characterId,
         CancellationToken ct)
     {
@@ -44,5 +31,18 @@ internal sealed class FakeFriendRepository : IFriendRepository
     public ValueTask RemoveAsync(int characterId, byte slot, CancellationToken ct)
     {
         throw new NotSupportedException();
+    }
+
+    /// <summary>No character has any friends at all.</summary>
+    public static FakeFriendRepository Empty()
+    {
+        return new FakeFriendRepository();
+    }
+
+    public static FakeFriendRepository With(int characterId, params CharacterFriendDto[] friendRows)
+    {
+        var repository = new FakeFriendRepository();
+        repository._friendsByCharacterId[characterId] = [.. friendRows];
+        return repository;
     }
 }

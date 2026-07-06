@@ -35,6 +35,83 @@ namespace Fenrir.Application.Game.Domain.Hotkeys;
 /// </remarks>
 public static class HotkeyActionResolver
 {
+    public enum BindEmoticonFailure
+    {
+        None,
+        InvalidDestinationPage,
+        InvalidDestinationIndex,
+        InvalidCode,
+        DestinationOccupied
+    }
+
+    public enum BindItemFailure
+    {
+        None,
+        InvalidDestinationPage,
+        InvalidDestinationIndex,
+        InvalidSourcePage,
+        InvalidSourceIndex,
+        SourceEmpty,
+        NotStackable,
+        ExcludedPotionSubtype,
+        InvalidQuantity,
+        InsufficientSourceQuantity,
+        DestinationItemMismatch,
+        DestinationOverCap
+    }
+
+    public enum BindSkillFailure
+    {
+        None,
+        InvalidDestinationPage,
+        InvalidDestinationIndex,
+        InvalidSkillSlot,
+        SkillSlotEmpty,
+        InvalidGrade,
+        DestinationOccupied
+    }
+
+    public enum RearrangeFailure
+    {
+        None,
+        InvalidSourcePage,
+        InvalidSourceIndex,
+        InvalidDestinationPage,
+        InvalidDestinationIndex,
+        SourceEmpty,
+        DestinationOccupied,
+        InvalidQuantity,
+        InsufficientSourceQuantity,
+        DestinationItemMismatch,
+        DestinationOverCap
+    }
+
+    public enum UnbindFailure
+    {
+        None,
+        InvalidPage,
+        InvalidIndex,
+        AlreadyEmpty,
+        ItemBindingNotSupported
+    }
+
+    public enum WithdrawItemFailure
+    {
+        None,
+        InvalidSourcePage,
+        InvalidSourceIndex,
+        SourceEmpty,
+        SourceNotItem,
+        InvalidQuantity,
+        InsufficientSourceQuantity,
+        InvalidDestinationPage,
+        InvalidDestinationIndex,
+        InvalidDestinationX,
+        InvalidDestinationY,
+        DestinationItemMismatch,
+        DestinationOverCap
+    }
+
     /// <summary>MAX_HOT_KEY_PAGE.</summary>
     public const int PageCount = 3;
 
@@ -62,17 +139,6 @@ public static class HotkeyActionResolver
     public static bool IsValidIndex(int index)
     {
         return index is >= 0 and < SlotsPerPage;
-    }
-
-    public enum BindSkillFailure
-    {
-        None,
-        InvalidDestinationPage,
-        InvalidDestinationIndex,
-        InvalidSkillSlot,
-        SkillSlotEmpty,
-        InvalidGrade,
-        DestinationOccupied
     }
 
     /// <summary>
@@ -112,23 +178,6 @@ public static class HotkeyActionResolver
         return new BindSkillResult(true, BindSkillFailure.None, newDestination);
     }
 
-    public readonly record struct BindSkillResult(bool Success, BindSkillFailure Failure, HotkeySlot NewDestination)
-    {
-        public static BindSkillResult Fail(BindSkillFailure failure)
-        {
-            return new BindSkillResult(false, failure, default);
-        }
-    }
-
-    public enum BindEmoticonFailure
-    {
-        None,
-        InvalidDestinationPage,
-        InvalidDestinationIndex,
-        InvalidCode,
-        DestinationOccupied
-    }
-
     /// <summary>
     ///     tSort 204, emoticon branch. The wire field reused as a skill-slot index for the skill branch instead
     ///     carries a literal fixed emoticon id here (1-9) -- no catalog lookup. The stored grade is always
@@ -154,24 +203,6 @@ public static class HotkeyActionResolver
         return new BindEmoticonResult(true, BindEmoticonFailure.None, newDestination);
     }
 
-    public readonly record struct BindEmoticonResult(bool Success, BindEmoticonFailure Failure,
-        HotkeySlot NewDestination)
-    {
-        public static BindEmoticonResult Fail(BindEmoticonFailure failure)
-        {
-            return new BindEmoticonResult(false, failure, default);
-        }
-    }
-
-    public enum UnbindFailure
-    {
-        None,
-        InvalidPage,
-        InvalidIndex,
-        AlreadyEmpty,
-        ItemBindingNotSupported
-    }
-
     /// <summary>
     ///     tSort 205. Not idempotent: an already-empty slot is rejected exactly like any other invalid input,
     ///     there is no "already cleared" no-op success. Clearing an item binding is deliberately unsupported on
@@ -193,33 +224,6 @@ public static class HotkeyActionResolver
             return UnbindResult.Fail(UnbindFailure.ItemBindingNotSupported);
 
         return UnbindResult.Succeeded;
-    }
-
-    /// <summary>On success the addressed slot's new content is always <see cref="HotkeySlot.Empty" />.</summary>
-    public readonly record struct UnbindResult(bool Success, UnbindFailure Failure)
-    {
-        public static readonly UnbindResult Succeeded = new(true, UnbindFailure.None);
-
-        public static UnbindResult Fail(UnbindFailure failure)
-        {
-            return new UnbindResult(false, failure);
-        }
-    }
-
-    public enum BindItemFailure
-    {
-        None,
-        InvalidDestinationPage,
-        InvalidDestinationIndex,
-        InvalidSourcePage,
-        InvalidSourceIndex,
-        SourceEmpty,
-        NotStackable,
-        ExcludedPotionSubtype,
-        InvalidQuantity,
-        InsufficientSourceQuantity,
-        DestinationItemMismatch,
-        DestinationOverCap
     }
 
     /// <summary>
@@ -309,37 +313,6 @@ public static class HotkeyActionResolver
     }
 
     /// <summary>
-    ///     <see cref="RemainingSourceQuantity" /> is the source inventory slot's quantity after the debit --
-    ///     0 means the caller must clear that slot entirely (item identity, position, gem-socket data and
-    ///     expiry date all reset to empty), matching the same "clear a slot" step used throughout this family.
-    /// </summary>
-    public readonly record struct BindItemResult(
-        bool Success, BindItemFailure Failure, HotkeySlot NewDestination, int RemainingSourceQuantity)
-    {
-        public static BindItemResult Fail(BindItemFailure failure)
-        {
-            return new BindItemResult(false, failure, default, 0);
-        }
-    }
-
-    public enum WithdrawItemFailure
-    {
-        None,
-        InvalidSourcePage,
-        InvalidSourceIndex,
-        SourceEmpty,
-        SourceNotItem,
-        InvalidQuantity,
-        InsufficientSourceQuantity,
-        InvalidDestinationPage,
-        InvalidDestinationIndex,
-        InvalidDestinationX,
-        InvalidDestinationY,
-        DestinationItemMismatch,
-        DestinationOverCap
-    }
-
-    /// <summary>
     ///     tSort 214 -- moves a quantity of an item-type hotkey binding back into an inventory slot. Rejects a
     ///     source slot that isn't currently an Item binding (the reciprocal of <see cref="ResolveUnbind" />
     ///     refusing an Item binding).
@@ -416,37 +389,6 @@ public static class HotkeyActionResolver
 
         return new WithdrawItemResult(true, WithdrawItemFailure.None, newSource, source.Value1,
             newDestinationQuantity);
-    }
-
-    /// <summary>
-    ///     <see cref="NewDestinationItemId" />/<see cref="NewDestinationQuantity" /> are the values to write
-    ///     into the destination inventory slot (a brand-new slot populated outright, or an existing matching
-    ///     stack topped up) -- on/off-screen X/Y are validated but not modeled (Fenrir's <see cref="ItemStack" />
-    ///     carries no such field, same posture as ground-item pickup's own X/Y bound-check-only handling).
-    /// </summary>
-    public readonly record struct WithdrawItemResult(
-        bool Success, WithdrawItemFailure Failure, HotkeySlot NewSource,
-        int NewDestinationItemId, int NewDestinationQuantity)
-    {
-        public static WithdrawItemResult Fail(WithdrawItemFailure failure)
-        {
-            return new WithdrawItemResult(false, failure, default, 0, 0);
-        }
-    }
-
-    public enum RearrangeFailure
-    {
-        None,
-        InvalidSourcePage,
-        InvalidSourceIndex,
-        InvalidDestinationPage,
-        InvalidDestinationIndex,
-        SourceEmpty,
-        DestinationOccupied,
-        InvalidQuantity,
-        InsufficientSourceQuantity,
-        DestinationItemMismatch,
-        DestinationOverCap
     }
 
     /// <summary>
@@ -527,8 +469,77 @@ public static class HotkeyActionResolver
         return new RearrangeResult(true, RearrangeFailure.None, newSource, newDestination);
     }
 
+    public readonly record struct BindSkillResult(bool Success, BindSkillFailure Failure, HotkeySlot NewDestination)
+    {
+        public static BindSkillResult Fail(BindSkillFailure failure)
+        {
+            return new BindSkillResult(false, failure, default);
+        }
+    }
+
+    public readonly record struct BindEmoticonResult(
+        bool Success,
+        BindEmoticonFailure Failure,
+        HotkeySlot NewDestination)
+    {
+        public static BindEmoticonResult Fail(BindEmoticonFailure failure)
+        {
+            return new BindEmoticonResult(false, failure, default);
+        }
+    }
+
+    /// <summary>On success the addressed slot's new content is always <see cref="HotkeySlot.Empty" />.</summary>
+    public readonly record struct UnbindResult(bool Success, UnbindFailure Failure)
+    {
+        public static readonly UnbindResult Succeeded = new(true, UnbindFailure.None);
+
+        public static UnbindResult Fail(UnbindFailure failure)
+        {
+            return new UnbindResult(false, failure);
+        }
+    }
+
+    /// <summary>
+    ///     <see cref="RemainingSourceQuantity" /> is the source inventory slot's quantity after the debit --
+    ///     0 means the caller must clear that slot entirely (item identity, position, gem-socket data and
+    ///     expiry date all reset to empty), matching the same "clear a slot" step used throughout this family.
+    /// </summary>
+    public readonly record struct BindItemResult(
+        bool Success,
+        BindItemFailure Failure,
+        HotkeySlot NewDestination,
+        int RemainingSourceQuantity)
+    {
+        public static BindItemResult Fail(BindItemFailure failure)
+        {
+            return new BindItemResult(false, failure, default, 0);
+        }
+    }
+
+    /// <summary>
+    ///     <see cref="NewDestinationItemId" />/<see cref="NewDestinationQuantity" /> are the values to write
+    ///     into the destination inventory slot (a brand-new slot populated outright, or an existing matching
+    ///     stack topped up) -- on/off-screen X/Y are validated but not modeled (Fenrir's <see cref="ItemStack" />
+    ///     carries no such field, same posture as ground-item pickup's own X/Y bound-check-only handling).
+    /// </summary>
+    public readonly record struct WithdrawItemResult(
+        bool Success,
+        WithdrawItemFailure Failure,
+        HotkeySlot NewSource,
+        int NewDestinationItemId,
+        int NewDestinationQuantity)
+    {
+        public static WithdrawItemResult Fail(WithdrawItemFailure failure)
+        {
+            return new WithdrawItemResult(false, failure, default, 0, 0);
+        }
+    }
+
     public readonly record struct RearrangeResult(
-        bool Success, RearrangeFailure Failure, HotkeySlot NewSource, HotkeySlot NewDestination)
+        bool Success,
+        RearrangeFailure Failure,
+        HotkeySlot NewSource,
+        HotkeySlot NewDestination)
     {
         public static RearrangeResult Fail(RearrangeFailure failure)
         {

@@ -21,7 +21,7 @@ public class HeroRankPointAccumulatorTests
         var accumulator = new HeroRankPointAccumulator();
         var repo = new FakeHeroRankingRepository();
 
-        accumulator.AddPending(characterId: 7, delta: 3, tribeId: 1, level: 42);
+        accumulator.AddPending(7, 3, 1, 42);
         await accumulator.FlushDirtyAsync(repo, CancellationToken.None);
 
         var call = Assert.Single(repo.AddPointsCalls);

@@ -5,12 +5,12 @@ using Fenrir.Application.Game.Domain.Movement;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Services.Guilds;
 using Fenrir.Application.Game.Tests.TestSupport;
-using Fenrir.Network.Serialization.Packets.Shared;
-using Fenrir.Network.Serialization.Packets.Zone;
 using Fenrir.Data.Abstractions.Guilds;
 using Fenrir.Data.WriteBehind;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Framing;
+using Fenrir.Network.Serialization.Packets.Shared;
+using Fenrir.Network.Serialization.Packets.Zone;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -34,7 +34,7 @@ public class GuildActionServiceBroadcastTests
         var (memberSession, memberPipe, _) = EnterZone(zones, 2, MemberId, "Thor", GuildId, 0);
         var (_, outsiderPipe, _) = EnterZone(zones, 2, OutsiderId, "Loki", null, 0);
 
-        guilds.Seed(SeedGuild(memberCount: 2));
+        guilds.Seed(SeedGuild(2));
 
         var service = CreateService(zones, guilds);
 
@@ -63,7 +63,7 @@ public class GuildActionServiceBroadcastTests
             new GuildRosterRowDto(GuildId, "Aesir", MasterId, "Odin", 2, "", DateTime.UtcNow),
             new GuildRosterRowDto(GuildId, "Aesir", MemberId, "Thor", 0, "", DateTime.UtcNow),
             new GuildRosterRowDto(GuildId, "Aesir", OutsiderId, "Freya", 0, "", DateTime.UtcNow));
-        guilds.Seed(SeedGuild(memberCount: 3));
+        guilds.Seed(SeedGuild(3));
 
         var service = CreateService(zones, guilds);
 
@@ -88,7 +88,7 @@ public class GuildActionServiceBroadcastTests
         guilds.SeedRoster(GuildId,
             new GuildRosterRowDto(GuildId, "Aesir", MasterId, "Odin", 2, "", DateTime.UtcNow),
             new GuildRosterRowDto(GuildId, "Aesir", MemberId, "Thor", 0, "", DateTime.UtcNow));
-        guilds.Seed(SeedGuild(memberCount: 2));
+        guilds.Seed(SeedGuild(2));
 
         var service = CreateService(zones, guilds);
 
@@ -110,7 +110,7 @@ public class GuildActionServiceBroadcastTests
         var (masterSession, masterPipe, masterState) = EnterZone(zones, 1, MasterId, "Odin", GuildId, 2);
         var (_, memberPipe, _) = EnterZone(zones, 2, MemberId, "Thor", GuildId, 0);
 
-        guilds.Seed(SeedGuild(memberCount: 2, buffTime: 60, buffTimeForDiff: 0));
+        guilds.Seed(SeedGuild(2, 60, 0));
 
         var service = CreateService(zones, guilds);
 
@@ -149,14 +149,15 @@ public class GuildActionServiceBroadcastTests
             return;
         }
 
-        session.Send(new GuildActionResponse { Result = result.Result, Sort = result.Sort, GuildInfo = result.GuildInfo });
+        session.Send(new GuildActionResponse
+            { Result = result.Result, Sort = result.Sort, GuildInfo = result.GuildInfo });
     }
 
     private static GuildSummaryDto SeedGuild(int memberCount, int buffTime = 0, long buffTimeForDiff = 0)
     {
-        return new GuildSummaryDto(GuildId, "Aesir", Grade: 1, MasterCharacterId: MasterId, Points: 0,
-            BuffType: 0, BuffState: 0, BuffTime: buffTime, BuffTimeForDiff: buffTimeForDiff, Logo: 0,
-            CreatedAtUtc: DateTime.UtcNow, MemberCount: memberCount);
+        return new GuildSummaryDto(GuildId, "Aesir", 1, MasterId, 0,
+            0, 0, buffTime, buffTimeForDiff, 0,
+            DateTime.UtcNow, memberCount);
     }
 
     private static (ZoneRegistry Zones, FakeGuildRepository Guilds) CreateWorld()
@@ -182,7 +183,7 @@ public class GuildActionServiceBroadcastTests
         // right before this test's actual assertions run.
         var zone = zones[mapId];
         zone.Post(ZoneCommand.Enter(characterId,
-            ZoneTestKit.EnterData(session, mapId, name: name, posX: characterId * 10_000f)));
+            ZoneTestKit.EnterData(session, mapId, name, characterId * 10_000f)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
         ZoneTestKit.DrainOutbound(pipe);
 

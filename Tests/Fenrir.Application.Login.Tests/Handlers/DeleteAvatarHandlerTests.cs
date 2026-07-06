@@ -4,7 +4,6 @@ using Fenrir.Application.Login.Tests.TestSupport;
 using Fenrir.Data.Abstractions.Characters;
 using Fenrir.Data.Abstractions.Commerce;
 using Fenrir.Data.Abstractions.Guilds;
-using Fenrir.Data.Abstractions.World;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Login;
 
@@ -21,12 +20,15 @@ public class DeleteAvatarHandlerTests
 
     private static CharacterSummaryDto Summary => new(CharacterId, Slot, "Hero", Tribe, 0, 0, 0, 10);
 
-    private static DeleteAvatarRequest Request(int avatarPost = Slot, int mode = 1, int unused = 0) => new()
+    private static DeleteAvatarRequest Request(int avatarPost = Slot, int mode = 1, int unused = 0)
     {
-        AvatarPost = avatarPost,
-        Unknow1 = mode,
-        Unknow2 = unused
-    };
+        return new DeleteAvatarRequest
+        {
+            AvatarPost = avatarPost,
+            Unknow1 = mode,
+            Unknow2 = unused
+        };
+    }
 
     [Fact]
     public async Task HandleAsync_NoRefusalsApply_DeletesAndRepliesResultZero()

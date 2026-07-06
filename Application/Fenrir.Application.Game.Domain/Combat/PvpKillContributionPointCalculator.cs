@@ -46,18 +46,18 @@ public static class PvpKillContributionPointCalculator
     public const int PlaceholderHardCap = 2_000_000_000;
 
     /// <summary>
+    ///     "A dedicated function grants the attacker a flat CP amount" for the zone-335 (FFA) override -- no
+    ///     legacy source value plumbed to this contract. Placeholder, not real game-balance tuning.
+    /// </summary>
+    public const int FfaOverrideFlatAmount = 5;
+
+    /// <summary>
     ///     "Its own independent 2-minute same-victim-pair cooldown" -- shared literal for both the
     ///     Regular-War-host and FFA-335 CP overrides (step 4/5 of the source contract), each using its own
     ///     separate cooldown-state table (a fresh <see cref="KillCooldownTracker" /> instance per override,
     ///     not the main C05 anti-farm tracker).
     /// </summary>
     public static readonly TimeSpan FlatOverrideCooldown = TimeSpan.FromMinutes(2);
-
-    /// <summary>
-    ///     "A dedicated function grants the attacker a flat CP amount" for the zone-335 (FFA) override -- no
-    ///     legacy source value plumbed to this contract. Placeholder, not real game-balance tuning.
-    /// </summary>
-    public const int FfaOverrideFlatAmount = 5;
 
     /// <summary>
     ///     Base grant amount before the CP-cap clamp: <paramref name="basePerKillAmount" /> (defaults to

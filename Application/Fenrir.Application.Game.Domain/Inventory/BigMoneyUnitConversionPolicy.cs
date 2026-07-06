@@ -34,18 +34,6 @@ namespace Fenrir.Application.Game.Domain.Inventory;
 /// </remarks>
 public static class BigMoneyUnitConversionPolicy
 {
-    /// <summary>MAX_NUMBER_SIZE (DEFINE.h:365) -- the general money ceiling, tSort 247's destination cap.</summary>
-    public const long MoneyCeiling = 2_000_000_000;
-
-    /// <summary>
-    ///     MAX_NUMBER_SIZE1 (DEFINE.h:366) -- both the mandatory eligibility floor for tSort 246's requested
-    ///     quantity and the fixed amount of ordinary money one BigMoney unit is always worth.
-    /// </summary>
-    public const long BigMoneyUnitValue = 1_000_000_000;
-
-    /// <summary>MAX_NUMBER_SIZE2 (DEFINE.h:367) -- the BigMoney counter's own cap, tSort 246's destination cap.</summary>
-    public const long BigMoneyCap = 999;
-
     public enum BigMoneyUnitConversionOutcome
     {
         Success,
@@ -60,14 +48,17 @@ public static class BigMoneyUnitConversionPolicy
         DestinationOverflow
     }
 
-    /// <summary>NewInventoryMoney/NewInventoryBigMoney are both counters' post-conversion values, valid only when Succeeded.</summary>
-    public readonly record struct BigMoneyUnitConversionResult(
-        BigMoneyUnitConversionOutcome Outcome,
-        long NewInventoryMoney,
-        long NewInventoryBigMoney)
-    {
-        public bool Succeeded => Outcome == BigMoneyUnitConversionOutcome.Success;
-    }
+    /// <summary>MAX_NUMBER_SIZE (DEFINE.h:365) -- the general money ceiling, tSort 247's destination cap.</summary>
+    public const long MoneyCeiling = 2_000_000_000;
+
+    /// <summary>
+    ///     MAX_NUMBER_SIZE1 (DEFINE.h:366) -- both the mandatory eligibility floor for tSort 246's requested
+    ///     quantity and the fixed amount of ordinary money one BigMoney unit is always worth.
+    /// </summary>
+    public const long BigMoneyUnitValue = 1_000_000_000;
+
+    /// <summary>MAX_NUMBER_SIZE2 (DEFINE.h:367) -- the BigMoney counter's own cap, tSort 246's destination cap.</summary>
+    public const long BigMoneyCap = 999;
 
     /// <summary>
     ///     tSort 246 -- ordinary money to BigMoney. The full <paramref name="requestedQuantity" /> is debited from
@@ -120,5 +111,14 @@ public static class BigMoneyUnitConversionPolicy
 
         return new BigMoneyUnitConversionResult(BigMoneyUnitConversionOutcome.Success,
             newInventoryMoney, inventoryBigMoney - 1);
+    }
+
+    /// <summary>NewInventoryMoney/NewInventoryBigMoney are both counters' post-conversion values, valid only when Succeeded.</summary>
+    public readonly record struct BigMoneyUnitConversionResult(
+        BigMoneyUnitConversionOutcome Outcome,
+        long NewInventoryMoney,
+        long NewInventoryBigMoney)
+    {
+        public bool Succeeded => Outcome == BigMoneyUnitConversionOutcome.Success;
     }
 }

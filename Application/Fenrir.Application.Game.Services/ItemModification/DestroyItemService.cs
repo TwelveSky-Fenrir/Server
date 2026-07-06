@@ -4,7 +4,6 @@ using Fenrir.Application.Game.Domain.Forge;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.GameData;
-using Fenrir.Data.Abstractions.Game;
 using Fenrir.Network.Serialization.Packets.Zone;
 using Microsoft.Extensions.Logging;
 

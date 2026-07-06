@@ -73,7 +73,7 @@ public class GemSocketContributionResolverTests
         var total = GemSocketContributionResolver.GetSocketInfo(GemSocketStatRequest.AttackPower, p1, p2, p3,
             (_, entry) => entry.GemType + entry.GemTier);
 
-        Assert.Equal((10 + 1) + (20 + 2), total);
+        Assert.Equal(10 + 1 + 20 + 2, total);
     }
 
     [Fact]

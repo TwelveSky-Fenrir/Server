@@ -11,7 +11,7 @@ public class SaveBankMoneyPolicyTests
     [Fact]
     public void ResolveDeposit_Success_MovesExactAmountBothWays()
     {
-        var result = SaveBankMoneyPolicy.ResolveDeposit(requestedAmount: 100, inventoryMoney: 500, bankMoney: 50);
+        var result = SaveBankMoneyPolicy.ResolveDeposit(100, 500, 50);
 
         Assert.True(result.Succeeded);
         Assert.Equal(400, result.NewSourceMoney);
@@ -21,7 +21,7 @@ public class SaveBankMoneyPolicyTests
     [Fact]
     public void ResolveWithdraw_Success_MovesExactAmountBothWays()
     {
-        var result = SaveBankMoneyPolicy.ResolveWithdraw(requestedAmount: 100, bankMoney: 500, inventoryMoney: 50);
+        var result = SaveBankMoneyPolicy.ResolveWithdraw(100, 500, 50);
 
         Assert.True(result.Succeeded);
         Assert.Equal(400, result.NewSourceMoney);
@@ -33,7 +33,7 @@ public class SaveBankMoneyPolicyTests
     [InlineData(-1)]
     public void Resolve_NonPositiveAmount_IsInvalid(long requestedAmount)
     {
-        var result = SaveBankMoneyPolicy.ResolveDeposit(requestedAmount, inventoryMoney: 1000, bankMoney: 0);
+        var result = SaveBankMoneyPolicy.ResolveDeposit(requestedAmount, 1000, 0);
 
         Assert.Equal(SaveBankMoneyPolicy.TransferOutcome.InvalidQuantity, result.Outcome);
         Assert.False(result.Succeeded);
@@ -42,7 +42,7 @@ public class SaveBankMoneyPolicyTests
     [Fact]
     public void Resolve_AmountExceedsSource_IsInsufficient()
     {
-        var result = SaveBankMoneyPolicy.ResolveDeposit(requestedAmount: 1001, inventoryMoney: 1000, bankMoney: 0);
+        var result = SaveBankMoneyPolicy.ResolveDeposit(1001, 1000, 0);
 
         Assert.Equal(SaveBankMoneyPolicy.TransferOutcome.InsufficientSource, result.Outcome);
     }
@@ -50,7 +50,7 @@ public class SaveBankMoneyPolicyTests
     [Fact]
     public void Resolve_AmountExactlyEqualsSource_Succeeds()
     {
-        var result = SaveBankMoneyPolicy.ResolveDeposit(requestedAmount: 1000, inventoryMoney: 1000, bankMoney: 0);
+        var result = SaveBankMoneyPolicy.ResolveDeposit(1000, 1000, 0);
 
         Assert.True(result.Succeeded);
         Assert.Equal(0, result.NewSourceMoney);
@@ -60,8 +60,8 @@ public class SaveBankMoneyPolicyTests
     [Fact]
     public void Resolve_DestinationWouldOverflowCap_IsRejected()
     {
-        var result = SaveBankMoneyPolicy.ResolveDeposit(requestedAmount: 10,
-            inventoryMoney: 1_000_000_000, bankMoney: SaveBankMoneyPolicy.MaxMoney - 5);
+        var result = SaveBankMoneyPolicy.ResolveDeposit(10,
+            1_000_000_000, SaveBankMoneyPolicy.MaxMoney - 5);
 
         Assert.Equal(SaveBankMoneyPolicy.TransferOutcome.DestinationOverflow, result.Outcome);
     }
@@ -69,8 +69,8 @@ public class SaveBankMoneyPolicyTests
     [Fact]
     public void Resolve_DestinationExactlyAtCap_Succeeds()
     {
-        var result = SaveBankMoneyPolicy.ResolveDeposit(requestedAmount: 5,
-            inventoryMoney: 1_000_000_000, bankMoney: SaveBankMoneyPolicy.MaxMoney - 5);
+        var result = SaveBankMoneyPolicy.ResolveDeposit(5,
+            1_000_000_000, SaveBankMoneyPolicy.MaxMoney - 5);
 
         Assert.True(result.Succeeded);
         Assert.Equal(SaveBankMoneyPolicy.MaxMoney, result.NewDestinationMoney);
@@ -80,8 +80,8 @@ public class SaveBankMoneyPolicyTests
     public void Resolve_NoFixedPerRequestCapBeyondOverflowGuard()
     {
         // Unlike the 999 stackable-item cap, money has no fixed per-request ceiling besides the overflow guard.
-        var result = SaveBankMoneyPolicy.ResolveDeposit(requestedAmount: 1_500_000_000,
-            inventoryMoney: 1_500_000_000, bankMoney: 0);
+        var result = SaveBankMoneyPolicy.ResolveDeposit(1_500_000_000,
+            1_500_000_000, 0);
 
         Assert.True(result.Succeeded);
         Assert.Equal(1_500_000_000, result.NewDestinationMoney);

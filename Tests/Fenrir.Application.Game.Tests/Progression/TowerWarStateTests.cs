@@ -67,7 +67,7 @@ public class TowerWarStateTests
         var state = new TowerWarState();
         state.SetTowerState(3, 201, true);
 
-        state.BeginUpgrade(3, 401, controllingTribeId: 2);
+        state.BeginUpgrade(3, 401, 2);
 
         Assert.False(state.IsValid(3));
         Assert.Equal(201, state.GetPackedState(3)); // unchanged -- guardian hasn't (re)spawned yet
@@ -80,7 +80,7 @@ public class TowerWarStateTests
     {
         var state = new TowerWarState();
         state.SetTowerState(3, 201, true);
-        state.BeginUpgrade(3, 401, controllingTribeId: 2);
+        state.BeginUpgrade(3, 401, 2);
 
         state.CompleteUpgrade(3);
 
@@ -126,7 +126,8 @@ public class TowerWarStateTests
         state.BeginSiege(3, first);
         state.BeginSiege(3, first + TimeSpan.FromMinutes(10));
 
-        Assert.False(state.IsDueForDestruction(3, first + TowerWarState.SiegeCollapseCooldown - TimeSpan.FromSeconds(1)));
+        Assert.False(
+            state.IsDueForDestruction(3, first + TowerWarState.SiegeCollapseCooldown - TimeSpan.FromSeconds(1)));
         Assert.True(state.IsDueForDestruction(3, first + TowerWarState.SiegeCollapseCooldown));
     }
 
@@ -214,7 +215,7 @@ public class TowerWarStateTests
         state.RecordGuardianHit(3, DateTime.UtcNow);
         Assert.NotNull(state.GetFirstAttackAtUtc(3));
 
-        state.BeginUpgrade(3, 401, controllingTribeId: 2);
+        state.BeginUpgrade(3, 401, 2);
         state.CompleteUpgrade(3);
 
         Assert.Null(state.GetFirstAttackAtUtc(3));
@@ -260,7 +261,7 @@ public class TowerWarStateTests
         var repository = new FakeTowerRepository();
         var state = new TowerWarState();
         state.SetTowerState(3, 201, true);
-        state.BeginUpgrade(3, 401, controllingTribeId: 2);
+        state.BeginUpgrade(3, 401, 2);
         state.CompleteUpgrade(3); // only this one is marked dirty
 
         await state.FlushDirtyAsync(repository, CancellationToken.None);
@@ -289,7 +290,7 @@ public class TowerWarStateTests
         var repository = new FakeTowerRepository { ThrowOnSetProgress = true };
         var state = new TowerWarState();
         state.SetTowerState(3, 201, true);
-        state.BeginUpgrade(3, 401, controllingTribeId: 2);
+        state.BeginUpgrade(3, 401, 2);
         state.CompleteUpgrade(3);
 
         await state.FlushDirtyAsync(repository, CancellationToken.None); // must not throw

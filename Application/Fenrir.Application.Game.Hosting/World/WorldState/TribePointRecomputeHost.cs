@@ -42,7 +42,10 @@ public sealed class TribePointRecomputeHost(
     /// <summary>Server/ts25center/S07_MyGame01.cpp:240-244/253-266 -- both mechanisms share this same gate.</summary>
     public const int TickGate = 6;
 
-    /// <summary>Server/BuildEU33/ServerInfo.ini:95 + Server/Header/socket.h:7-9 -- ts25center's own tick period, distinct from the zone tick.</summary>
+    /// <summary>
+    ///     Server/BuildEU33/ServerInfo.ini:95 + Server/Header/socket.h:7-9 -- ts25center's own tick period, distinct from
+    ///     the zone tick.
+    /// </summary>
     public static readonly TimeSpan CenterTick = TimeSpan.FromSeconds(1);
 
     private int _tickCount;
@@ -52,7 +55,10 @@ public sealed class TribePointRecomputeHost(
     ///     (Server/ts25center/S08_MyDB.cpp:17-54, <c>GetWorldInfo</c> line 42), which happens once before the
     ///     periodic gate ever starts counting.
     /// </summary>
-    public Task RunBootRecomputeAsync(CancellationToken ct) => RunOnceAsync(ct);
+    public Task RunBootRecomputeAsync(CancellationToken ct)
+    {
+        return RunOnceAsync(ct);
+    }
 
     /// <summary>
     ///     One tick of the underlying ~1-second clock; only every <see cref="TickGate" />th call actually runs

@@ -27,9 +27,18 @@ namespace Fenrir.Application.Game.Services.ItemModification;
 ///         equipment. Until <c>fenrir-database-engineer</c> adds a dedicated column (or
 ///         <c>cpp-zone-gameplay-analyst</c> confirms an existing one is reused), this service:
 ///         <list type="bullet">
-///             <item>takes the destination's CURRENT packed stat as a plain caller-supplied <see cref="int" />, never read off <c>ItemStack</c>;</item>
-///             <item>returns the NEW packed stat in its result for the caller to relay on the wire (<c>GenericActionResponse.RuneValue</c>);</item>
-///             <item>does NOT persist the destination item's row itself, and does NOT mirror a destination-side change to the zone.</item>
+///             <item>
+///                 takes the destination's CURRENT packed stat as a plain caller-supplied <see cref="int" />, never read
+///                 off <c>ItemStack</c>;
+///             </item>
+///             <item>
+///                 returns the NEW packed stat in its result for the caller to relay on the wire (
+///                 <c>GenericActionResponse.RuneValue</c>);
+///             </item>
+///             <item>
+///                 does NOT persist the destination item's row itself, and does NOT mirror a destination-side change to
+///                 the zone.
+///             </item>
 ///         </list>
 ///         The source item's consumption (quantity decrement / slot clear) has no such gap -- it only touches
 ///         <c>ItemStack.Quantity</c>, and IS fully persisted and mirrored below.

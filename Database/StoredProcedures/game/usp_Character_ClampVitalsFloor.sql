@@ -12,14 +12,16 @@ CREATE PROCEDURE game.usp_Character_ClampVitalsFloor @CharacterId INT,
     @Mana          INT
 AS
 BEGIN
-    SET NOCOUNT ON;
-    SET XACT_ABORT ON;
+    SET
+NOCOUNT ON;
+    SET
+XACT_ABORT ON;
 
-    UPDATE game.Characters
-    SET Life          = @Life,
-        Mana          = @Mana,
-        FlushSequence = @FlushSequence,
-        UpdatedAtUtc  = SYSUTCDATETIME()
-    WHERE CharacterId = @CharacterId
-      AND @FlushSequence > FlushSequence;
+UPDATE game.Characters
+SET Life          = @Life,
+    Mana          = @Mana,
+    FlushSequence = @FlushSequence,
+    UpdatedAtUtc  = SYSUTCDATETIME()
+WHERE CharacterId = @CharacterId
+  AND @FlushSequence > FlushSequence;
 END;

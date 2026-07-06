@@ -170,30 +170,29 @@ public sealed class RegularWarSchedule(RegularWarMapConfig config)
     public const int ForcedResetDisconnectAtTicks = 12;
 
     public const int ForcedResetHeartbeatTicks = 120;
-
-    private readonly int[] _tribeKillTally = new int[TribeCount];
     private readonly Dictionary<int, int> _killCountByCharacter = new();
     private readonly List<int> _killOrderSeen = [];
 
-    private RegularWarIdleSubPhase _idleSubPhase = RegularWarIdleSubPhase.Cooldown;
-    private int _cooldownTicksElapsed;
-    private int _countdownAnnounceValue;
-    private int _countdownAnnounceTicksElapsed;
-    private int _finalWaitTicksElapsed;
-    private int _openGateTicksElapsed;
-    private int _preWarTicksElapsed;
-    private int _activeCountdownTicks;
+    private readonly int[] _tribeKillTally = new int[TribeCount];
     private int _activeEvaluationTicksElapsed;
-    private int _postWarTicksElapsed;
-    private int _bossPollTicksElapsed;
-    private bool _bossConfirmedAbsenceInProgress;
     private int _bossAbsenceTicksElapsed;
+    private bool _bossConfirmedAbsenceInProgress;
+    private int _bossPollTicksElapsed;
+    private int _cooldownTicksElapsed;
+    private int _countdownAnnounceTicksElapsed;
+    private int _countdownAnnounceValue;
+    private int _finalWaitTicksElapsed;
     private int _forcedResetTicksElapsed;
+
+    private RegularWarIdleSubPhase _idleSubPhase = RegularWarIdleSubPhase.Cooldown;
+    private int _openGateTicksElapsed;
+    private int _postWarTicksElapsed;
+    private int _preWarTicksElapsed;
 
     public RegularWarPhase Phase { get; private set; } = RegularWarPhase.Idle;
 
     /// <summary>Set only while <see cref="RegularWarPhase.Active" /> is running down; 0 otherwise.</summary>
-    public int RemainingActiveWarTicks => _activeCountdownTicks;
+    public int RemainingActiveWarTicks { get; private set; }
 
     /// <summary>
     ///     Incremented once per cooldown-elapse (Idle sub-phase 0 -&gt; 1). Starts at 1 -- mirrors the legacy's
@@ -207,7 +206,8 @@ public sealed class RegularWarSchedule(RegularWarMapConfig config)
 
     /// <summary>
     ///     Advances by exactly one legacy tick (~500 ms). The caller is expected to bridge real elapsed time
-    ///     into whole-tick calls itself (e.g. via <see cref="Fenrir.Application.Game.Domain.Simulation.SimulationTickAccumulator" />,
+    ///     into whole-tick calls itself (e.g. via
+    ///     <see cref="Fenrir.Application.Game.Domain.Simulation.SimulationTickAccumulator" />,
     ///     same convention as <see cref="Fenrir.Application.Game.Hosting.World.ZoneWar.ZoneWarTickService" />).
     /// </summary>
     public RegularWarTickResult Tick(RegularWarEnvironmentSnapshot snapshot)
@@ -278,7 +278,7 @@ public sealed class RegularWarSchedule(RegularWarMapConfig config)
 
         _killCountByCharacter[killerCharacterId] = _killCountByCharacter.GetValueOrDefault(killerCharacterId) + 1;
 
-        if (_activeCountdownTicks > 0 && killerTribe < TribeCount)
+        if (RemainingActiveWarTicks > 0 && killerTribe < TribeCount)
             _tribeKillTally[killerTribe]++;
     }
 
@@ -298,10 +298,13 @@ public sealed class RegularWarSchedule(RegularWarMapConfig config)
         if (_killOrderSeen.Count == 0)
             return [];
 
-        return [.. _killOrderSeen
-            .Where(id => _killCountByCharacter[id] > 0)
-            .OrderByDescending(id => _killCountByCharacter[id])
-            .Take(count)];
+        return
+        [
+            .. _killOrderSeen
+                .Where(id => _killCountByCharacter[id] > 0)
+                .OrderByDescending(id => _killCountByCharacter[id])
+                .Take(count)
+        ];
     }
 
     private void TickIdle(ref int? countdownAnnounceValue)
@@ -369,7 +372,7 @@ public sealed class RegularWarSchedule(RegularWarMapConfig config)
             smallestPresentTribe = ComputeSmallestPresentTribe(snapshot.PresentCountByTribe);
 
         Array.Clear(_tribeKillTally);
-        _activeCountdownTicks = ActiveWarDurationTicks;
+        RemainingActiveWarTicks = ActiveWarDurationTicks;
         _activeEvaluationTicksElapsed = 0;
         Phase = RegularWarPhase.Active;
     }
@@ -386,8 +389,8 @@ public sealed class RegularWarSchedule(RegularWarMapConfig config)
             return;
         }
 
-        if (_activeCountdownTicks > 0)
-            _activeCountdownTicks--;
+        if (RemainingActiveWarTicks > 0)
+            RemainingActiveWarTicks--;
 
         _activeEvaluationTicksElapsed++;
         if (_activeEvaluationTicksElapsed < ActiveEvaluationCadenceTicks)
@@ -395,7 +398,7 @@ public sealed class RegularWarSchedule(RegularWarMapConfig config)
 
         _activeEvaluationTicksElapsed = 0;
 
-        var determined = _activeCountdownTicks <= 0
+        var determined = RemainingActiveWarTicks <= 0
             ? DetermineTimeoutOutcome()
             : DetermineEliminationOutcome(snapshot.PresentCountByTribe);
 
@@ -463,7 +466,7 @@ public sealed class RegularWarSchedule(RegularWarMapConfig config)
         // time was left when the war ended" throughout PostWarCleanup/ForcedReset (see
         // Active_ElimintationVictory_CanHappenLongBeforeTheCountdownExpires). Only reset once the cycle is
         // fully back to Idle, matching RemainingActiveWarTicks's own contract ("0 otherwise").
-        _activeCountdownTicks = 0;
+        RemainingActiveWarTicks = 0;
     }
 
     private void EnterForcedReset()

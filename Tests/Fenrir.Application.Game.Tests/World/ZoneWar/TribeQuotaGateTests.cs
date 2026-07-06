@@ -41,8 +41,8 @@ public class TribeQuotaGateTests
     [InlineData(TribeQuotaGroup.RvrInstancedNoGate)]
     public void Evaluate_NoGateGroups_AlwaysAccepted_RegardlessOfPopulation(TribeQuotaGroup group)
     {
-        Assert.Equal(TribeQuotaOutcome.Accepted, TribeQuotaGate.Evaluate(group, maxConcurrentConnections: 300,
-            currentPopulationForDeclaredTribe: int.MaxValue));
+        Assert.Equal(TribeQuotaOutcome.Accepted, TribeQuotaGate.Evaluate(group, 300,
+            int.MaxValue));
     }
 
     [Theory]

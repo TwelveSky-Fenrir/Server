@@ -60,7 +60,8 @@ public class ZoneDeathTests
 
         zone.ApplyDeath(10); // duplicate killing blow -- must not push eligibility further out
 
-        zone.Tick(TimeSpan.FromSeconds(3)); // total elapsed since the FIRST ApplyDeath: 6s = 12 ticks > the 10-tick mark
+        zone.Tick(TimeSpan
+            .FromSeconds(3)); // total elapsed since the FIRST ApplyDeath: 6s = 12 ticks > the 10-tick mark
 
         Assert.True(zone.TryGetPlayer(10, out var revived));
         Assert.False(revived!.IsDead);

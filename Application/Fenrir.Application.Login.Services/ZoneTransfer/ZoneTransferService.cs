@@ -33,7 +33,8 @@ namespace Fenrir.Application.Login.Services.ZoneTransfer;
 ///             Logout-zone/tribe realignment (S04_MyWork02.cpp:330-356, <c>GetReturnBornInTownLocation</c> at
 ///             Server/Header/mapcheck.h:298-326) needs the static zone-number-&gt;owning-tribe table (column [0] of
 ///             <c>mZoneTribeInfo</c>, Server/Header/S18_MyZoneInfo.cpp:9-393 / accessor :417-424). That table's
-///             other column (PvP flag) is already ported as <c>Fenrir.Application.Game.Domain.Combat.ZonePvpZoneCatalog</c>,
+///             other column (PvP flag) is already ported as
+///             <c>Fenrir.Application.Game.Domain.Combat.ZonePvpZoneCatalog</c>,
 ///             but the owning-tribe column itself is not present anywhere in current Fenrir code, and the behavior
 ///             contract handed to this change only cites 3 illustrative zone ids (5, 10, 15) rather than the full
 ///             ~117-350-entry table -- porting it here would mean fabricating the other entries from memory, which

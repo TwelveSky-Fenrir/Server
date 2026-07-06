@@ -62,7 +62,8 @@ public sealed record GroundItemEntity(
 
     /// <summary>
     ///     Ports <c>ITEM_OBJECT::CheckPossibleGetItem</c>'s ownership window (rules checked in the order
-    ///     below, first match wins): free-for-all once expired or once <see cref="SimulationClock.GroundItemFreeForAllDelay" />
+    ///     below, first match wins): free-for-all once expired or once
+    ///     <see cref="SimulationClock.GroundItemFreeForAllDelay" />
     ///     has elapsed; an item with no recorded owner is free for anyone from the moment it lands; the
     ///     recorded owner can always reclaim their own drop; monster-kill loot (<see cref="DropSort" /> ==
     ///     <see cref="MonsterKillDropSort" />) becomes claimable by the killer's own party

@@ -193,7 +193,7 @@ public class ZoneHandoffTests
         var characterShardLocations = new FakeCharacterShardLocationRepository();
         var options = ZoneTestKit.Options();
         options.ShardId = 7;
-        var zone = ZoneTestKit.CreateZone(1, options: options, characterShardLocations: characterShardLocations);
+        var zone = ZoneTestKit.CreateZone(1, options, characterShardLocations: characterShardLocations);
         var (session, _) = ZoneTestKit.CreateSession(1);
 
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1)));

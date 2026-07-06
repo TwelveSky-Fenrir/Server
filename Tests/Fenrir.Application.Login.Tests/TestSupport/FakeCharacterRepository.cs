@@ -8,9 +8,9 @@ namespace Fenrir.Application.Login.Tests.TestSupport;
 // are exercised by the handlers under test here (op16/op17); every other member is out of scope for those flows.
 internal sealed class FakeCharacterRepository : ICharacterRepository
 {
+    private readonly Dictionary<(int CharacterId, byte Container, byte Slot), int> _itemIdBySlot = new();
     private readonly List<CharacterSummaryDto> _summaries;
     private readonly Dictionary<int, CharacterWorldEntryDto> _worldEntriesByCharacterId;
-    private readonly Dictionary<(int CharacterId, byte Container, byte Slot), int> _itemIdBySlot = new();
     private int _nextCharacterId = 1000;
 
     private FakeCharacterRepository(IEnumerable<CharacterSummaryDto> summaries,
@@ -29,12 +29,11 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
     /// <summary>Every (characterId, container, slot) tuple GetItemIdAtSlotAsync was queried with, in call order.</summary>
     public List<(int CharacterId, byte Container, byte Slot)> QueriedItemSlots { get; } = [];
 
-    /// <summary>Seeds one occupied item slot for <see cref="GetItemIdAtSlotAsync" /> -- RenameAvatarService tests.</summary>
-    public FakeCharacterRepository WithItemAtSlot(int characterId, byte container, byte slot, int itemId)
-    {
-        _itemIdBySlot[(characterId, container, slot)] = itemId;
-        return this;
-    }
+    /// <summary>Every (accountId, slot) pair passed to DeleteAsync, in call order -- for DeleteAvatarService tests.</summary>
+    public List<(int AccountId, byte Slot)> DeleteCalls { get; } = [];
+
+    /// <summary>Every argument the most recent ClampVitalsFloorAsync call received, for ZoneTransferService tests.</summary>
+    public ClampVitalsFloorCall? LastClampVitalsFloor { get; private set; }
 
     public ValueTask<int?> GetItemIdAtSlotAsync(int characterId, byte container, byte slot, CancellationToken ct)
     {
@@ -83,9 +82,6 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
         return ValueTask.FromResult(characterId);
     }
 
-    /// <summary>Every (accountId, slot) pair passed to DeleteAsync, in call order -- for DeleteAvatarService tests.</summary>
-    public List<(int AccountId, byte Slot)> DeleteCalls { get; } = [];
-
     public ValueTask DeleteAsync(int accountId, byte slot, CancellationToken ct)
     {
         DeleteCalls.Add((accountId, slot));
@@ -97,9 +93,6 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
     {
         throw new NotSupportedException();
     }
-
-    /// <summary>Every argument the most recent ClampVitalsFloorAsync call received, for ZoneTransferService tests.</summary>
-    public ClampVitalsFloorCall? LastClampVitalsFloor { get; private set; }
 
     public ValueTask ClampVitalsFloorAsync(int characterId, long flushSequence, int life, int mana,
         CancellationToken ct)
@@ -231,6 +224,13 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
     public ValueTask<int> GrantTribeTransferPermitAsync(int characterId, int delta, CancellationToken ct)
     {
         throw new NotSupportedException();
+    }
+
+    /// <summary>Seeds one occupied item slot for <see cref="GetItemIdAtSlotAsync" /> -- RenameAvatarService tests.</summary>
+    public FakeCharacterRepository WithItemAtSlot(int characterId, byte container, byte slot, int itemId)
+    {
+        _itemIdBySlot[(characterId, container, slot)] = itemId;
+        return this;
     }
 
     public static FakeCharacterRepository With(CharacterSummaryDto summary, CharacterWorldEntryDto worldEntry)

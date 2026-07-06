@@ -26,11 +26,11 @@ public class ZoneTransferServiceTests
     [Fact]
     public async Task RequestZoneTransferAsync_LifeAndManaAlreadyAtOrAboveFloor_NeverWritesVitals()
     {
-        var worldEntry = WorldEntryWith(life: 850, mana: 320);
+        var worldEntry = WorldEntryWith(850, 320);
         var characters = FakeCharacterRepository.With(Summary, worldEntry);
         var service = CreateService(characters);
 
-        await service.RequestZoneTransferAsync(AccountId, Summary.Slot, Guid.NewGuid(), accountGrade: 0,
+        await service.RequestZoneTransferAsync(AccountId, Summary.Slot, Guid.NewGuid(), 0,
             CancellationToken.None);
 
         Assert.Null(characters.LastClampVitalsFloor);
@@ -39,11 +39,11 @@ public class ZoneTransferServiceTests
     [Fact]
     public async Task RequestZoneTransferAsync_LifeBelowOne_ClampsLifeToOneAndBumpsFlushSequence()
     {
-        var worldEntry = WorldEntryWith(life: 0, mana: 320);
+        var worldEntry = WorldEntryWith(0, 320);
         var characters = FakeCharacterRepository.With(Summary, worldEntry);
         var service = CreateService(characters);
 
-        await service.RequestZoneTransferAsync(AccountId, Summary.Slot, Guid.NewGuid(), accountGrade: 0,
+        await service.RequestZoneTransferAsync(AccountId, Summary.Slot, Guid.NewGuid(), 0,
             CancellationToken.None);
 
         Assert.NotNull(characters.LastClampVitalsFloor);
@@ -56,11 +56,11 @@ public class ZoneTransferServiceTests
     [Fact]
     public async Task RequestZoneTransferAsync_ManaBelowZero_ClampsManaToZero()
     {
-        var worldEntry = WorldEntryWith(life: 850, mana: -40);
+        var worldEntry = WorldEntryWith(850, -40);
         var characters = FakeCharacterRepository.With(Summary, worldEntry);
         var service = CreateService(characters);
 
-        await service.RequestZoneTransferAsync(AccountId, Summary.Slot, Guid.NewGuid(), accountGrade: 0,
+        await service.RequestZoneTransferAsync(AccountId, Summary.Slot, Guid.NewGuid(), 0,
             CancellationToken.None);
 
         Assert.NotNull(characters.LastClampVitalsFloor);
@@ -71,11 +71,11 @@ public class ZoneTransferServiceTests
     [Fact]
     public async Task RequestZoneTransferAsync_BothBelowFloor_ClampsBothIndependentlyInOneWrite()
     {
-        var worldEntry = WorldEntryWith(life: -10, mana: -10);
+        var worldEntry = WorldEntryWith(-10, -10);
         var characters = FakeCharacterRepository.With(Summary, worldEntry);
         var service = CreateService(characters);
 
-        await service.RequestZoneTransferAsync(AccountId, Summary.Slot, Guid.NewGuid(), accountGrade: 0,
+        await service.RequestZoneTransferAsync(AccountId, Summary.Slot, Guid.NewGuid(), 0,
             CancellationToken.None);
 
         Assert.NotNull(characters.LastClampVitalsFloor);
@@ -87,12 +87,12 @@ public class ZoneTransferServiceTests
     public async Task RequestZoneTransferAsync_CharacterVanishedBeforeClamp_ReturnsCharacterNotFoundWithoutThrowing()
     {
         var characters = FakeCharacterRepository.With(Summary,
-            WorldEntryWith(life: 0, mana: 0)); // FakeCharacterRepository.With always seeds one world entry
+            WorldEntryWith(0, 0)); // FakeCharacterRepository.With always seeds one world entry
         var service = CreateService(characters);
 
         // A slot the account doesn't actually have a character in (per-slot occupancy check).
-        var result = await service.RequestZoneTransferAsync(AccountId, avatarPost: 2, Guid.NewGuid(),
-            accountGrade: 0, CancellationToken.None);
+        var result = await service.RequestZoneTransferAsync(AccountId, 2, Guid.NewGuid(),
+            0, CancellationToken.None);
 
         Assert.Equal(ZoneTransferOutcome.CharacterNotFound, result.Outcome);
         Assert.Null(characters.LastClampVitalsFloor);
@@ -103,8 +103,8 @@ public class ZoneTransferServiceTests
         return new CharacterWorldEntryDto(
             Summary.CharacterId, AccountId, Summary.Slot, Summary.Name, Summary.Tribe, Summary.Gender,
             Summary.HeadType, Summary.FaceType, Summary.Level, HostedMapId,
-            PosX: 0, PosY: 0, PosZ: 0, Heading: 0,
-            Life: life, MaxLife: 1000, Mana: mana, MaxMana: 400, FlushSequence: 99L);
+            0, 0, 0, 0,
+            life, 1000, mana, 400, 99L);
     }
 
     private static ZoneTransferService CreateService(FakeCharacterRepository characters)

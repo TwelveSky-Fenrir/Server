@@ -8,17 +8,6 @@ namespace Fenrir.Application.Game.Tests.World.WorldState;
 
 public class TribePointRecomputeHostTests
 {
-    private sealed class CountingRosterGateway : ITribePointRosterGateway
-    {
-        public int CallCount { get; private set; }
-
-        public Task<IReadOnlyList<TribeRosterCharacterSnapshot>?> GetRosterAsync(CancellationToken ct)
-        {
-            CallCount++;
-            return Task.FromResult<IReadOnlyList<TribeRosterCharacterSnapshot>?>([]);
-        }
-    }
-
     private static (WorldStateService WorldState, CountingRosterGateway Gateway, TribePointRecomputeHost Host)
         CreateHost()
     {
@@ -87,5 +76,16 @@ public class TribePointRecomputeHostTests
 
         // Level recompute ran (empty roster -> baseline), ladder did not (flag not pending).
         Assert.Equal(1000, worldState.GetTribe(0).Points);
+    }
+
+    private sealed class CountingRosterGateway : ITribePointRosterGateway
+    {
+        public int CallCount { get; private set; }
+
+        public Task<IReadOnlyList<TribeRosterCharacterSnapshot>?> GetRosterAsync(CancellationToken ct)
+        {
+            CallCount++;
+            return Task.FromResult<IReadOnlyList<TribeRosterCharacterSnapshot>?>([]);
+        }
     }
 }

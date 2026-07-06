@@ -99,7 +99,7 @@ public class GuildActionServiceCreateUpgradeTests
     {
         var (zones, guilds) = CreateWorld();
         var (_, _, state) = EnterZone(zones, 1, CharacterId, "Odin", GuildId, 2, 60);
-        guilds.Seed(SeedGuild(grade: 1, memberCount: 10));
+        guilds.Seed(SeedGuild(1, 10));
         guilds.SeedRoster(GuildId, RosterOfSize(10));
         var service = CreateService(zones, guilds);
 
@@ -123,7 +123,7 @@ public class GuildActionServiceCreateUpgradeTests
     {
         var (zones, guilds) = CreateWorld();
         var (_, _, state) = EnterZone(zones, 1, CharacterId, "Odin", GuildId, 2, 60);
-        guilds.Seed(SeedGuild(grade: 1, memberCount: 10));
+        guilds.Seed(SeedGuild(1, 10));
         guilds.SeedRoster(GuildId, RosterOfSize(10));
         guilds.ThrowOnUpgradeAndDebitMoney = true;
         var service = CreateService(zones, guilds);
@@ -140,7 +140,7 @@ public class GuildActionServiceCreateUpgradeTests
     {
         var (zones, guilds) = CreateWorld();
         var (_, _, state) = EnterZone(zones, 1, CharacterId, "Odin", GuildId, 0, 60);
-        guilds.Seed(SeedGuild(grade: 1, memberCount: 10));
+        guilds.Seed(SeedGuild(1, 10));
         guilds.SeedRoster(GuildId, RosterOfSize(10));
         var service = CreateService(zones, guilds);
 
@@ -172,7 +172,7 @@ public class GuildActionServiceCreateUpgradeTests
         session.MarkInWorld();
 
         var zone = zones[mapId];
-        zone.Post(ZoneCommand.Enter(characterId, ZoneTestKit.EnterData(session, mapId, name: name, level: level)));
+        zone.Post(ZoneCommand.Enter(characterId, ZoneTestKit.EnterData(session, mapId, name, level: level)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
         ZoneTestKit.DrainOutbound(pipe);
 
@@ -187,9 +187,9 @@ public class GuildActionServiceCreateUpgradeTests
 
     private static GuildSummaryDto SeedGuild(int grade, int memberCount)
     {
-        return new GuildSummaryDto(GuildId, "Aesir", Grade: grade, MasterCharacterId: CharacterId, Points: 0,
-            BuffType: 0, BuffState: 0, BuffTime: 0, BuffTimeForDiff: 0, Logo: 0, CreatedAtUtc: DateTime.UtcNow,
-            MemberCount: memberCount);
+        return new GuildSummaryDto(GuildId, "Aesir", grade, CharacterId, 0,
+            0, 0, 0, 0, 0, DateTime.UtcNow,
+            memberCount);
     }
 
     private static GuildRosterRowDto[] RosterOfSize(int count)

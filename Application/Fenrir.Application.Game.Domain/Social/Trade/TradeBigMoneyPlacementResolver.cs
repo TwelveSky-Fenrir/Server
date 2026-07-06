@@ -35,12 +35,6 @@ namespace Fenrir.Application.Game.Domain.Social.Trade;
 /// </remarks>
 public static class TradeBigMoneyPlacementResolver
 {
-    /// <summary>MAX_NUMBER_SIZE2 (DEFINE.h:367) -- the same BigMoney cap every BigMoney-family destination uses.</summary>
-    public const long BigMoneyCap = BigMoneyTransferPolicy.BigMoneyCap;
-
-    /// <summary>TradeOfferSide.MenuState value at/above which the caller has locked their side of the trade.</summary>
-    public const int LockedMenuState = 1;
-
     public enum BigMoneyPlacementOutcome
     {
         Success,
@@ -61,14 +55,11 @@ public static class TradeBigMoneyPlacementResolver
         DestinationOverflow
     }
 
-    /// <summary>NewOnHandBigMoney/NewTradeOfferBigMoney are both sides' post-move balances, valid only when Succeeded.</summary>
-    public readonly record struct BigMoneyPlacementResult(
-        BigMoneyPlacementOutcome Outcome,
-        long NewOnHandBigMoney,
-        long NewTradeOfferBigMoney)
-    {
-        public bool Succeeded => Outcome == BigMoneyPlacementOutcome.Success;
-    }
+    /// <summary>MAX_NUMBER_SIZE2 (DEFINE.h:367) -- the same BigMoney cap every BigMoney-family destination uses.</summary>
+    public const long BigMoneyCap = BigMoneyTransferPolicy.BigMoneyCap;
+
+    /// <summary>TradeOfferSide.MenuState value at/above which the caller has locked their side of the trade.</summary>
+    public const int LockedMenuState = 1;
 
     /// <summary>
     ///     tSort 240 -- ProcessFor1BInventoryMoneyTo1BTradeMoney: on-hand BigMoney moves into the trade offer.
@@ -124,5 +115,14 @@ public static class TradeBigMoneyPlacementResolver
 
         return new BigMoneyPlacementResult(BigMoneyPlacementOutcome.Success, newOnHandBigMoney,
             tradeOfferBigMoney - amount);
+    }
+
+    /// <summary>NewOnHandBigMoney/NewTradeOfferBigMoney are both sides' post-move balances, valid only when Succeeded.</summary>
+    public readonly record struct BigMoneyPlacementResult(
+        BigMoneyPlacementOutcome Outcome,
+        long NewOnHandBigMoney,
+        long NewTradeOfferBigMoney)
+    {
+        public bool Succeeded => Outcome == BigMoneyPlacementOutcome.Success;
     }
 }

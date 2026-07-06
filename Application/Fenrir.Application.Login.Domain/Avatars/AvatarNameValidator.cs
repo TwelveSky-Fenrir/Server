@@ -41,7 +41,7 @@ public static class AvatarNameValidator
             return false;
 
         foreach (var character in name)
-            if (character is not ((>= '0' and <= '9') or (>= 'A' and <= 'Z') or (>= 'a' and <= 'z')))
+            if (character is not (>= '0' and <= '9' or >= 'A' and <= 'Z' or >= 'a' and <= 'z'))
                 return false;
 
         return true;

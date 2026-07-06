@@ -64,17 +64,13 @@ public sealed partial class Zone(
     private readonly SimulationTickAccumulator _accumulator = new();
 
     /// <summary>
-    ///     Process-wide party authority (team-stun's exact-5-member gate, <see cref="ApplyStunAttack" />) --
-    ///     defaults to a private instance in tests so each test zone starts with a clean, empty party roster.
-    /// </summary>
-    private readonly PartyRegistry _partyRegistry = partyRegistry ?? new PartyRegistry();
-
-    /// <summary>
     ///     Process-wide 1v1 duel authority (the stun request's duel-exception tribe gate,
     ///     <see cref="ApplyStunAttack" />) -- defaults to a private instance in tests, same posture as
     ///     <see cref="_partyRegistry" />.
     /// </summary>
     private readonly DuelRegistry _duelRegistry = duelRegistry ?? new DuelRegistry();
+
+    private readonly AoiGrid _grid = new(options.AoiCellSize);
 
     /// <summary>
     ///     Process-wide write-behind for hero-rank points granted by <see cref="ApplyPvpKillHeroPoints" /> --
@@ -83,12 +79,16 @@ public sealed partial class Zone(
     private readonly HeroRankPointAccumulator _heroRankPointAccumulator =
         heroRankPointAccumulator ?? new HeroRankPointAccumulator();
 
-    private readonly AoiGrid _grid = new(options.AoiCellSize);
-
     private readonly Channel<ZoneCommand> _inbox = Channel.CreateBounded<ZoneCommand>(
         new BoundedChannelOptions(8192) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
     private readonly KeyValuePair<string, object?> _mapTag = ZoneTickMetrics.MapTag(mapId);
+
+    /// <summary>
+    ///     Process-wide party authority (team-stun's exact-5-member gate, <see cref="ApplyStunAttack" />) --
+    ///     defaults to a private instance in tests so each test zone starts with a clean, empty party roster.
+    /// </summary>
+    private readonly PartyRegistry _partyRegistry = partyRegistry ?? new PartyRegistry();
 
     // ConcurrentDictionary, not a plain Dictionary: the tick is the sole writer, but the write-behind flush
     // callback and the directory-heartbeat CCU count both read this from other threads.

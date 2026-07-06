@@ -43,7 +43,7 @@ public class UnstunResolverTests
     [Fact]
     public void CurerDead_IsRejected()
     {
-        var curer = Combatant(1, 0, isDead: true);
+        var curer = Combatant(1, 0, true);
         var target = Combatant(2, 0);
         var outcome = UnstunResolver.Resolve(Request(curer, target), new ScriptedRandomSource(0));
         Assert.True(outcome.Rejected);
@@ -54,7 +54,7 @@ public class UnstunResolverTests
     public void TargetDead_IsRejected()
     {
         var curer = Combatant(1, 0);
-        var target = Combatant(2, 0, isDead: true);
+        var target = Combatant(2, 0, true);
         var outcome = UnstunResolver.Resolve(Request(curer, target), new ScriptedRandomSource(0));
         Assert.Equal(UnstunRejectReason.TargetDead, outcome.RejectReason);
     }
@@ -74,7 +74,7 @@ public class UnstunResolverTests
     {
         var curer = Combatant(1, 0);
         var target = Combatant(2, 0);
-        var outcome = UnstunResolver.Resolve(Request(curer, target, targetIsStunned: false, usedSkillGradePoints: 20),
+        var outcome = UnstunResolver.Resolve(Request(curer, target, false, usedSkillGradePoints: 20),
             new ScriptedRandomSource(0));
         Assert.Equal(UnstunRejectReason.TargetNotStunned, outcome.RejectReason);
     }
@@ -147,7 +147,7 @@ public class UnstunResolverTests
     {
         var curer = Combatant(1, 0);
         var target = Combatant(2, 0);
-        var skill = FlatSkill(5, stunDefense: 30); // doubled = 60
+        var skill = FlatSkill(5, 30); // doubled = 60
         var outcome = UnstunResolver.Resolve(Request(curer, target, usedSkillGradePoints: 10, usedSkill: skill),
             new ScriptedRandomSource(59)); // 59 < 60
         Assert.True(outcome.Success);
@@ -158,7 +158,7 @@ public class UnstunResolverTests
     {
         var curer = Combatant(1, 0);
         var target = Combatant(2, 0);
-        var skill = FlatSkill(5, stunDefense: 30); // doubled = 60
+        var skill = FlatSkill(5, 30); // doubled = 60
         var outcome = UnstunResolver.Resolve(Request(curer, target, usedSkillGradePoints: 10, usedSkill: skill),
             new ScriptedRandomSource(60)); // 60 is not < 60
         Assert.False(outcome.Rejected);

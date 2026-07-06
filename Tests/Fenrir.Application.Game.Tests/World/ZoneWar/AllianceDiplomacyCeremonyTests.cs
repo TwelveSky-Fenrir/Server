@@ -38,7 +38,8 @@ public class AllianceDiplomacyCeremonyTests
         worldState.InitializeAsync(CancellationToken.None).GetAwaiter().GetResult();
 
         var cooldowns = new AllianceCooldownTracker();
-        var broadcaster = new ZoneEventBroadcaster(worldState, CreateRegistry(), NullLogger<ZoneEventBroadcaster>.Instance);
+        var broadcaster =
+            new ZoneEventBroadcaster(worldState, CreateRegistry(), NullLogger<ZoneEventBroadcaster>.Instance);
         var ceremony = new AllianceDiplomacyCeremony(worldState, cooldowns, broadcaster,
             NullLogger<AllianceDiplomacyCeremony>.Instance, newAllianceDuration, alreadyAlliedDuration);
 
@@ -52,7 +53,8 @@ public class AllianceDiplomacyCeremonyTests
         var worldState = new WorldStateService(repository, NullLogger<WorldStateService>.Instance);
         await worldState.InitializeAsync(CancellationToken.None);
         var cooldowns = new AllianceCooldownTracker();
-        var broadcaster = new ZoneEventBroadcaster(worldState, CreateRegistry(), NullLogger<ZoneEventBroadcaster>.Instance);
+        var broadcaster =
+            new ZoneEventBroadcaster(worldState, CreateRegistry(), NullLogger<ZoneEventBroadcaster>.Instance);
 
         Assert.Throws<ArgumentOutOfRangeException>(() =>
             new AllianceDiplomacyCeremony(worldState, cooldowns, broadcaster,
@@ -133,7 +135,7 @@ public class AllianceDiplomacyCeremonyTests
         worldState.SetTribePoints(1, 150);
         worldState.SetTribePoints(2, 150);
         worldState.SetTribePoints(3, 150);
-        worldState.SetAllianceOffer(2, 3, isAccepted: true); // tribes 2 and 3 are already each other's ally
+        worldState.SetAllianceOffer(2, 3, true); // tribes 2 and 3 are already each other's ally
         var one = new AllianceCeremonyCandidate(1, 2); // tribe 2 already has an ally
         var two = new AllianceCeremonyCandidate(2, 0);
 
@@ -178,7 +180,7 @@ public class AllianceDiplomacyCeremonyTests
         var (ceremony, worldState, cooldowns) = CreateCeremony();
         worldState.SetTribePoints(0, 100_000); // would otherwise be the single biggest tribe
         worldState.SetTribePoints(1, 0); // would otherwise fail the points floor
-        worldState.SetAllianceOffer(0, 1, isAccepted: true);
+        worldState.SetAllianceOffer(0, 1, true);
         cooldowns.SetCooldownUntil(0, Today.AddDays(30)); // would otherwise fail the cooldown check
         var one = new AllianceCeremonyCandidate(1, 0);
         var two = new AllianceCeremonyCandidate(2, 1);
@@ -211,7 +213,7 @@ public class AllianceDiplomacyCeremonyTests
     [Fact]
     public void NewAllianceNegotiation_ProgressesEveryOtherRawTick_AndSkipsOddTicks()
     {
-        var (ceremony, worldState, _) = CreateCeremony(newAllianceDuration: 4, alreadyAlliedDuration: AlreadyAlliedDuration);
+        var (ceremony, worldState, _) = CreateCeremony(4, AlreadyAlliedDuration);
         worldState.SetTribePoints(0, 500);
         worldState.SetTribePoints(1, 500);
         var one = new AllianceCeremonyCandidate(1, 0);
@@ -249,7 +251,7 @@ public class AllianceDiplomacyCeremonyTests
     [Fact]
     public void NewAllianceNegotiation_OddTick_DoesNotYetDetectALeaderHavingLeft()
     {
-        var (ceremony, worldState, _) = CreateCeremony(newAllianceDuration: 10, alreadyAlliedDuration: AlreadyAlliedDuration);
+        var (ceremony, worldState, _) = CreateCeremony(10, AlreadyAlliedDuration);
         worldState.SetTribePoints(0, 500);
         worldState.SetTribePoints(1, 500);
         var one = new AllianceCeremonyCandidate(1, 0);
@@ -267,7 +269,7 @@ public class AllianceDiplomacyCeremonyTests
     [Fact]
     public void NewAllianceNegotiation_CompletingTheCountdown_IsADeadEnd_NoAllianceIsEverFormed()
     {
-        var (ceremony, worldState, _) = CreateCeremony(newAllianceDuration: 2, alreadyAlliedDuration: AlreadyAlliedDuration);
+        var (ceremony, worldState, _) = CreateCeremony(2, AlreadyAlliedDuration);
         worldState.SetTribePoints(0, 500);
         worldState.SetTribePoints(1, 500);
         var one = new AllianceCeremonyCandidate(1, 0);
@@ -287,8 +289,8 @@ public class AllianceDiplomacyCeremonyTests
     [Fact]
     public void AlreadyAlliedNegotiation_CompletingTheCountdown_DissolvesTheAlliance_AndSetsA14DayCooldownForBoth()
     {
-        var (ceremony, worldState, cooldowns) = CreateCeremony(newAllianceDuration: NewAllianceDuration, alreadyAlliedDuration: 2);
-        worldState.SetAllianceOffer(0, 1, isAccepted: true);
+        var (ceremony, worldState, cooldowns) = CreateCeremony(NewAllianceDuration, 2);
+        worldState.SetAllianceOffer(0, 1, true);
         var one = new AllianceCeremonyCandidate(1, 0);
         var two = new AllianceCeremonyCandidate(2, 1);
         ceremony.Tick(one, two, Today); // raw tick 1: already allied -> enters AlreadyAlliedNegotiation, countdown = 2
@@ -304,9 +306,10 @@ public class AllianceDiplomacyCeremonyTests
     }
 
     [Fact]
-    public void PostNegotiationCooldown_HoldsForExactlyTheGameTickHourConvention_ThenReturnsToIdle_RegardlessOfWhichPathLedIntoIt()
+    public void
+        PostNegotiationCooldown_HoldsForExactlyTheGameTickHourConvention_ThenReturnsToIdle_RegardlessOfWhichPathLedIntoIt()
     {
-        var (ceremony, worldState, _) = CreateCeremony(newAllianceDuration: 2, alreadyAlliedDuration: AlreadyAlliedDuration);
+        var (ceremony, worldState, _) = CreateCeremony(2, AlreadyAlliedDuration);
         worldState.SetTribePoints(0, 500);
         worldState.SetTribePoints(1, 500);
         var one = new AllianceCeremonyCandidate(1, 0);

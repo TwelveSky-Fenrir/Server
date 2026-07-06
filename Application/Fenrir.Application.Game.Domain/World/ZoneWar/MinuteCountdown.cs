@@ -24,7 +24,10 @@ public sealed class MinuteCountdown
         MinutesElapsed = 0;
     }
 
-    /// <summary>Advances by real time <paramref name="elapsed" />; returns how many whole minutes just ticked over (usually 0 or 1).</summary>
+    /// <summary>
+    ///     Advances by real time <paramref name="elapsed" />; returns how many whole minutes just ticked over (usually 0
+    ///     or 1).
+    /// </summary>
     public int Advance(TimeSpan elapsed)
     {
         _accumulated += elapsed;

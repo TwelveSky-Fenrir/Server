@@ -25,9 +25,9 @@ public sealed class TribeGuardCorridorState
 {
     public const int TribeCount = 4;
     public const int SegmentCount = 4;
+    private readonly Lock _lock = new();
 
     private readonly bool[,] _open = new bool[TribeCount, SegmentCount]; // default false = closed, the boot state
-    private readonly Lock _lock = new();
 
     /// <summary>True (open/passable) or false (closed/blocking) for one tribe's own checkpoint segment.</summary>
     public bool IsOpen(byte tribeId, byte segmentIndex)

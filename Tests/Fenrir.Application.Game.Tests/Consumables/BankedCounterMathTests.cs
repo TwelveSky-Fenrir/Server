@@ -61,7 +61,7 @@ public class BankedCounterMathTests
     [Fact]
     public void CoerceBulkToHeadroom_RequestFitsEntirely_ReturnsFullRequest()
     {
-        var count = BankedCounterMath.CoerceBulkToHeadroom(current: 0, cap: 200, perUnitAmount: 10, requestedCount: 5);
+        var count = BankedCounterMath.CoerceBulkToHeadroom(0, 200, 10, 5);
 
         Assert.Equal(5, count);
     }
@@ -70,7 +70,7 @@ public class BankedCounterMathTests
     public void CoerceBulkToHeadroom_RequestOvershootsCap_IsSilentlyReducedToWhatFits()
     {
         // current=190, cap=200, perUnitAmount=10 -> only 1 unit fits, not the requested 5.
-        var count = BankedCounterMath.CoerceBulkToHeadroom(current: 190, cap: 200, perUnitAmount: 10, requestedCount: 5);
+        var count = BankedCounterMath.CoerceBulkToHeadroom(190, 200, 10, 5);
 
         Assert.Equal(1, count);
     }
@@ -78,7 +78,7 @@ public class BankedCounterMathTests
     [Fact]
     public void CoerceBulkToHeadroom_AlreadyAtCap_ReturnsZero()
     {
-        var count = BankedCounterMath.CoerceBulkToHeadroom(current: 200, cap: 200, perUnitAmount: 10, requestedCount: 5);
+        var count = BankedCounterMath.CoerceBulkToHeadroom(200, 200, 10, 5);
 
         Assert.Equal(0, count);
     }

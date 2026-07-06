@@ -91,12 +91,15 @@ public readonly record struct AllianceCeremonyTickResult(
 ///     </para>
 ///     <para>
 ///         GAP 2 (negotiation countdown length, not guessed): the legacy's "fresh countdown" starting value
-///         for <see cref="AllianceCeremonyPhase.NewAllianceNegotiation" />/<see cref="AllianceCeremonyPhase.AlreadyAlliedNegotiation" />
+///         for <see cref="AllianceCeremonyPhase.NewAllianceNegotiation" />/
+///         <see cref="AllianceCeremonyPhase.AlreadyAlliedNegotiation" />
 ///         has no cited numeric value, unlike <see cref="RejectionMessageDurationRawTicks" />/
 ///         <see cref="PostNegotiationCooldownDurationRawTicks" /> (both explicitly tied to the cited
 ///         <c>GetGameTickMinute</c>/<c>GetGameTickHour</c> convention). Rather than fabricate a number, this
 ///         class requires its caller to supply both durations explicitly -- see
-///         <see cref="AllianceDiplomacyCeremony(WorldStateService,AllianceCooldownTracker,ZoneEventBroadcaster,ILogger{AllianceDiplomacyCeremony},int,int)" />.
+///         <see
+///             cref="AllianceDiplomacyCeremony(WorldStateService,AllianceCooldownTracker,ZoneEventBroadcaster,ILogger{AllianceDiplomacyCeremony},int,int)" />
+///         .
 ///     </para>
 ///     <para>
 ///         GAP 3 (player-facing wire messages, not implemented here): <see cref="AllianceCeremonyTickResult" />
@@ -120,12 +123,13 @@ public sealed class AllianceDiplomacyCeremony
     /// <summary>S04_MyWork02.cpp:427-448 case 47's mutual re-alliance cooldown length.</summary>
     public const int ReAllianceCooldownDays = 14;
 
-    private readonly AllianceCooldownTracker _cooldowns;
-    private readonly ZoneEventBroadcaster _broadcaster;
-    private readonly ILogger<AllianceDiplomacyCeremony> _logger;
-    private readonly Lock _lock = new();
-    private readonly int _newAllianceNegotiationDurationRawTicks;
     private readonly int _alreadyAlliedNegotiationDurationRawTicks;
+    private readonly ZoneEventBroadcaster _broadcaster;
+
+    private readonly AllianceCooldownTracker _cooldowns;
+    private readonly Lock _lock = new();
+    private readonly ILogger<AllianceDiplomacyCeremony> _logger;
+    private readonly int _newAllianceNegotiationDurationRawTicks;
     private readonly WorldStateService _worldState;
 
     private AllianceCeremonyCandidate? _leaderOne;
@@ -135,8 +139,14 @@ public sealed class AllianceDiplomacyCeremony
     private int _rawTick;
     private int _remainingCountdown;
 
-    /// <param name="newAllianceNegotiationDurationRawTicks">See GAP 2 in this class's own remarks -- no legacy-cited default exists; must be positive.</param>
-    /// <param name="alreadyAlliedNegotiationDurationRawTicks">Same caveat as <paramref name="newAllianceNegotiationDurationRawTicks" />.</param>
+    /// <param name="newAllianceNegotiationDurationRawTicks">
+    ///     See GAP 2 in this class's own remarks -- no legacy-cited default
+    ///     exists; must be positive.
+    /// </param>
+    /// <param name="alreadyAlliedNegotiationDurationRawTicks">
+    ///     Same caveat as
+    ///     <paramref name="newAllianceNegotiationDurationRawTicks" />.
+    /// </param>
     public AllianceDiplomacyCeremony(
         WorldStateService worldState,
         AllianceCooldownTracker cooldowns,
@@ -190,9 +200,9 @@ public sealed class AllianceDiplomacyCeremony
                 AllianceCeremonyPhase.Idle => EvaluateIdle(postOneLeader, postTwoLeader, today),
                 AllianceCeremonyPhase.RejectionMessage => AdvanceRejection(),
                 AllianceCeremonyPhase.NewAllianceNegotiation => AdvanceNegotiation(postOneLeader, postTwoLeader,
-                    isAlreadyAllied: false, today),
+                    false, today),
                 AllianceCeremonyPhase.AlreadyAlliedNegotiation => AdvanceNegotiation(postOneLeader, postTwoLeader,
-                    isAlreadyAllied: true, today),
+                    true, today),
                 AllianceCeremonyPhase.PostNegotiationCooldown => AdvanceCooldown(),
                 _ => AllianceCeremonyTickResult.None
             };
@@ -255,13 +265,15 @@ public sealed class AllianceDiplomacyCeremony
         var leaderTwo = _leaderTwo!.Value;
 
         var stillValid = postOneLeader is { } one && postTwoLeader is { } two &&
-                          one == leaderOne && two == leaderTwo;
+                         one == leaderOne && two == leaderTwo;
 
         if (!stillValid)
         {
             TransitionToIdle();
             return new AllianceCeremonyTickResult(
-                isAlreadyAllied ? AllianceCeremonyNotice.AlreadyAlliedAborted : AllianceCeremonyNotice.NewAllianceAborted,
+                isAlreadyAllied
+                    ? AllianceCeremonyNotice.AlreadyAlliedAborted
+                    : AllianceCeremonyNotice.NewAllianceAborted,
                 leaderOne, leaderTwo, 0);
         }
 
@@ -269,7 +281,9 @@ public sealed class AllianceDiplomacyCeremony
 
         if (_remainingCountdown > 0)
             return new AllianceCeremonyTickResult(
-                isAlreadyAllied ? AllianceCeremonyNotice.AlreadyAlliedProgress : AllianceCeremonyNotice.NewAllianceProgress,
+                isAlreadyAllied
+                    ? AllianceCeremonyNotice.AlreadyAlliedProgress
+                    : AllianceCeremonyNotice.NewAllianceProgress,
                 leaderOne, leaderTwo, _remainingCountdown);
 
         if (isAlreadyAllied)

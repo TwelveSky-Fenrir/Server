@@ -1,8 +1,8 @@
 using System.Buffers;
-using Fenrir.Network.Serialization.Packets.Zone;
 using Fenrir.Network.Abstractions;
-using Fenrir.Network.Serialization.Wire;
 using Fenrir.Network.Framing;
+using Fenrir.Network.Serialization.Packets.Zone;
+using Fenrir.Network.Serialization.Wire;
 
 namespace Fenrir.Network.Tests.Framing;
 

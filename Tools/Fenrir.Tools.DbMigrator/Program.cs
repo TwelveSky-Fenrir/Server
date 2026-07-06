@@ -45,8 +45,7 @@ if (!string.IsNullOrEmpty(databaseName))
     var masterBuilder = new SqlConnectionStringBuilder(connectionString) { InitialCatalog = "master" };
     await using var masterConnection = new SqlConnection(masterBuilder.ConnectionString);
 
-    for (var attempt = 1; ; attempt++)
-    {
+    for (var attempt = 1;; attempt++)
         try
         {
             await masterConnection.OpenAsync();
@@ -62,7 +61,6 @@ if (!string.IsNullOrEmpty(databaseName))
             Console.Error.WriteLine($"Could not connect after {maxAttempts} attempts: {ex.Message}");
             return 1;
         }
-    }
 
     var quotedName = databaseName.Replace("]", "]]");
     await using var createDbCommand = new SqlCommand(
@@ -73,8 +71,7 @@ if (!string.IsNullOrEmpty(databaseName))
 
 await using var connection = new SqlConnection(connectionString);
 
-for (var attempt = 1; ; attempt++)
-{
+for (var attempt = 1;; attempt++)
     try
     {
         await connection.OpenAsync();
@@ -90,7 +87,6 @@ for (var attempt = 1; ; attempt++)
         Console.Error.WriteLine($"Could not connect after {maxAttempts} attempts: {ex.Message}");
         return 1;
     }
-}
 
 var journalReady = await JournalTableExistsAsync(connection);
 var applied = journalReady

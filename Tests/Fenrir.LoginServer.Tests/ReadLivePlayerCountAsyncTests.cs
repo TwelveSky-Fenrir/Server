@@ -1,4 +1,3 @@
-using Fenrir.Application.Login;
 using Fenrir.Application.Login.Domain;
 using Fenrir.Application.Login.Hosting;
 using Fenrir.Data.Abstractions.Runtime;
@@ -55,8 +54,8 @@ public class ReadLivePlayerCountAsyncTests
         // I/O-pump continuation (not exercised here) would need them.
         return new LoginConnectionHost(
             Options.Create(new LoginServerOptions()),
-            dispatcher: null!,
-            rateLimiter: null!,
+            null!,
+            null!,
             new SessionRegistry(),
             directory,
             new FakeAccountSessionRepository(),

@@ -58,8 +58,8 @@ public class TowerUpgradeServiceTests
     private static void SeedHerbAndBar(Zone zone)
     {
         var slots = ImmutableDictionary<byte, ItemStack>.Empty
-            .SetItem((byte)0, new ItemStack(HerbItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1))
-            .SetItem((byte)1, new ItemStack(BarItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 2));
+            .SetItem(0, new ItemStack(HerbItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1))
+            .SetItem(1, new ItemStack(BarItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 2));
         var containers = ImmutableArray.Create(new InventoryContainerSnapshot(ContainerMatrix.InventoryPage0, slots));
         zone.PostInventoryCommand(new InventoryZoneCommand(10, containers, null));
         zone.Tick(TimeSpan.FromMilliseconds(50));

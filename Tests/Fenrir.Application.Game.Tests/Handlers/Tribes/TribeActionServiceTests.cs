@@ -6,11 +6,11 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Services.Tribes;
 using Fenrir.Application.Game.Tests.GameData;
 using Fenrir.Application.Game.Tests.TestSupport;
-using Fenrir.Network.Serialization.Packets.Zone;
 using Fenrir.Data.Abstractions.World;
 using Fenrir.Data.WriteBehind;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Framing;
+using Fenrir.Network.Serialization.Packets.Zone;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -106,7 +106,7 @@ public class TribeActionServiceTests
     public async Task Rebirth_Level1NotAtCap_Aborts()
     {
         var zone = ZoneTestKit.CreateZone(1);
-        var (session, _, state) = Setup(zone, CharacterId, level: 144);
+        var (session, _, state) = Setup(zone, CharacterId, 144);
         var service = CreateService();
 
         var outcome = await service.RebirthAsync(zone, state, CharacterId, CancellationToken.None);

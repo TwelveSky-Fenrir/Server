@@ -27,21 +27,15 @@ namespace Fenrir.Application.Game.Domain.Inventory;
 /// </remarks>
 public static class SaveBankItemTransferPolicy
 {
-    /// <summary>MAX_SAVE_ITEM_SLOT_NUM (DEFINE.h:313).</summary>
-    public const int SlotCount = 28;
-
-    public const int MaxSlotInclusive = SlotCount - 1;
-
-    /// <summary>Deposit-item-only hard block (S04_MyWork05.cpp:3005-3009); not present for withdraw or rearrange.</summary>
-    private const int DepositBlockedItemId = 8290;
-
     public enum TransferOutcome
     {
         Success,
 
-        /// <summary>Bank-to-bank rearrange targeting the slot it already occupies -- a no-mutation safe guard mirroring
-        /// <see cref="ContainerMatrix.MoveOutcome.NoOp" />'s same-slot precedent; not itself sourced from the cited
-        /// range, which does not describe this input.</summary>
+        /// <summary>
+        ///     Bank-to-bank rearrange targeting the slot it already occupies -- a no-mutation safe guard mirroring
+        ///     <see cref="ContainerMatrix.MoveOutcome.NoOp" />'s same-slot precedent; not itself sourced from the cited
+        ///     range, which does not describe this input.
+        /// </summary>
         NoOp,
 
         SourceOutOfRange,
@@ -62,25 +56,20 @@ public static class SaveBankItemTransferPolicy
         /// <summary>Stackable transfer: requested quantity is non-positive, &gt; 999, or &gt; the source's current quantity.</summary>
         InvalidQuantity,
 
-        /// <summary>Stackable: destination holds a different item id, or the merge would exceed 999. Non-stackable:
-        /// destination is already occupied (no partial/merge concept for non-stackable items).</summary>
+        /// <summary>
+        ///     Stackable: destination holds a different item id, or the merge would exceed 999. Non-stackable:
+        ///     destination is already occupied (no partial/merge concept for non-stackable items).
+        /// </summary>
         DestinationConflict
     }
 
-    /// <summary>
-    ///     NewSource/NewDestination are the values to write back; null means "slot becomes empty".
-    ///     <see cref="IsNonStackableTransfer" /> tells the caller whether this move took the non-stackable
-    ///     whole-slot path -- deposit/withdraw only emit their <c>GL_626_SAVESLOT_ITEM</c> audit-log call on that
-    ///     path (S04_MyWork05.cpp:3061 deposit action 1, :3169 withdraw action 2); rearrange never logs regardless.
-    /// </summary>
-    public readonly record struct TransferResult(
-        TransferOutcome Outcome,
-        ItemStack? NewSource,
-        ItemStack? NewDestination,
-        bool IsNonStackableTransfer)
-    {
-        public bool Succeeded => Outcome is TransferOutcome.Success or TransferOutcome.NoOp;
-    }
+    /// <summary>MAX_SAVE_ITEM_SLOT_NUM (DEFINE.h:313).</summary>
+    public const int SlotCount = 28;
+
+    public const int MaxSlotInclusive = SlotCount - 1;
+
+    /// <summary>Deposit-item-only hard block (S04_MyWork05.cpp:3005-3009); not present for withdraw or rearrange.</summary>
+    private const int DepositBlockedItemId = 8290;
 
     public static bool IsValidSlot(int slot)
     {
@@ -232,5 +221,20 @@ public static class SaveBankItemTransferPolicy
     private static TransferResult Fail(TransferOutcome outcome)
     {
         return new TransferResult(outcome, null, null, false);
+    }
+
+    /// <summary>
+    ///     NewSource/NewDestination are the values to write back; null means "slot becomes empty".
+    ///     <see cref="IsNonStackableTransfer" /> tells the caller whether this move took the non-stackable
+    ///     whole-slot path -- deposit/withdraw only emit their <c>GL_626_SAVESLOT_ITEM</c> audit-log call on that
+    ///     path (S04_MyWork05.cpp:3061 deposit action 1, :3169 withdraw action 2); rearrange never logs regardless.
+    /// </summary>
+    public readonly record struct TransferResult(
+        TransferOutcome Outcome,
+        ItemStack? NewSource,
+        ItemStack? NewDestination,
+        bool IsNonStackableTransfer)
+    {
+        public bool Succeeded => Outcome is TransferOutcome.Success or TransferOutcome.NoOp;
     }
 }

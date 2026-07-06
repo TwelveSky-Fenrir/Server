@@ -67,10 +67,11 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
     private readonly byte?[] _controllingTribe = new byte?[TowerCount];
     private readonly bool[] _dirty = new bool[TowerCount];
 
+    private readonly DateTime?[] _firstAttackAtUtc = new DateTime?[TowerCount];
+
     /// <summary>One-shot per guardian lifetime, reset alongside everything else in <see cref="CompleteUpgrade" />.</summary>
     private readonly bool[] _firstAttackRecorded = new bool[TowerCount];
 
-    private readonly DateTime?[] _firstAttackAtUtc = new DateTime?[TowerCount];
     private readonly DateTime?[] _lastAttackAtUtc = new DateTime?[TowerCount];
     private readonly Lock _lock = new();
     private readonly int[] _packedState = new int[TowerCount];
@@ -83,7 +84,7 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
     ///     refreshed once per tick by <see cref="TowerRewardBonusSystem" />, read by
     ///     <see cref="World.Zone" />'s tower-reward consumption hooks. All-zero until the first recompute.
     /// </summary>
-    private TowerTribeRewardBonus[] _tribeBonus = new TowerTribeRewardBonus[TowerRewardBonusTable.TribeCount];
+    private readonly TowerTribeRewardBonus[] _tribeBonus = new TowerTribeRewardBonus[TowerRewardBonusTable.TribeCount];
 
     /// <summary>
     ///     The client-facing "under siege" broadcast flag -- cleared by every allowed, landed guardian hit (see

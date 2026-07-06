@@ -51,8 +51,14 @@ public readonly record struct ZoneHandshakeResult(
 public interface IZoneHandshakeService
 {
     /// <param name="obfuscatedId">The wire-obfuscated "MG"+accountId identifier text.</param>
-    /// <param name="declaredTribe">The tribe the connection declares it wants to enter as -- gated against the current population, but not necessarily the tribe later recorded (see <see cref="TribeQuotaRegistry" />'s own remarks).</param>
-    /// <param name="session">The connection attempting to register -- recorded on success so its slot can be counted and later released.</param>
+    /// <param name="declaredTribe">
+    ///     The tribe the connection declares it wants to enter as -- gated against the current
+    ///     population, but not necessarily the tribe later recorded (see <see cref="TribeQuotaRegistry" />'s own remarks).
+    /// </param>
+    /// <param name="session">
+    ///     The connection attempting to register -- recorded on success so its slot can be counted and later
+    ///     released.
+    /// </param>
     public ValueTask<ZoneHandshakeResult> ConsumeTicketAsync(string obfuscatedId, int declaredTribe,
         ZoneClientSession session, CancellationToken cancellationToken);
 }

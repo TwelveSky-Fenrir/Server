@@ -30,7 +30,7 @@ public sealed class CostumeStateService(
 
             case CostumeStateResolver.ResultKind.Select:
                 zone.PostCostumeCommand(new CostumeZoneCommand(characterId, result.NewCostumeIndex));
-                return new CostumeStateResult(CostumeStateOutcome.Reply, 0);
+                return new CostumeStateResult(CostumeStateOutcome.Reply);
 
             case CostumeStateResolver.ResultKind.Equip:
             {
@@ -39,7 +39,7 @@ public sealed class CostumeStateService(
                 zone.PostCostumeCommand(new CostumeZoneCommand(characterId, result.NewCostumeIndex,
                     result.NewCostumeNumber, Life: maxLife, Mana: maxMana,
                     Broadcast: CostumeBroadcastKind.Equip));
-                return new CostumeStateResult(CostumeStateOutcome.Reply, 0);
+                return new CostumeStateResult(CostumeStateOutcome.Reply);
             }
 
             case CostumeStateResolver.ResultKind.Remove:
@@ -48,7 +48,7 @@ public sealed class CostumeStateService(
                 var maxMana = state.Stats?.MaxMana ?? state.MaxMana;
                 zone.PostCostumeCommand(new CostumeZoneCommand(characterId, result.NewCostumeIndex,
                     0, Life: maxLife, Mana: maxMana, Broadcast: CostumeBroadcastKind.Remove));
-                return new CostumeStateResult(CostumeStateOutcome.Reply, 0);
+                return new CostumeStateResult(CostumeStateOutcome.Reply);
             }
 
             case CostumeStateResolver.ResultKind.ReturnToInventoryMismatch:

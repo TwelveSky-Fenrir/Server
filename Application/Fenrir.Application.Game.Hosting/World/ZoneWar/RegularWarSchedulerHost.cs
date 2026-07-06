@@ -89,7 +89,8 @@ public sealed class RegularWarSchedulerHost(
                 sink.OnActiveWarStarted(mapConfig.MapId);
 
             if (result.Outcome is { } outcome)
-                HandleConclusion(mapConfig, zone, schedule, outcome, result.WinningTribe, result.BossMonstersShouldSpawn);
+                HandleConclusion(mapConfig, zone, schedule, outcome, result.WinningTribe,
+                    result.BossMonstersShouldSpawn);
 
             if (result.MonstersShouldDespawn)
                 sink.OnMonstersShouldDespawn(mapConfig.MapId);
@@ -104,7 +105,7 @@ public sealed class RegularWarSchedulerHost(
     {
         if (outcome == RegularWarOutcome.AbortedEmptyMap)
         {
-            sink.OnWarConcluded(mapConfig.MapId, outcome, winningTribe, [], bossMonstersShouldSpawn: false);
+            sink.OnWarConcluded(mapConfig.MapId, outcome, winningTribe, [], false);
             return;
         }
 

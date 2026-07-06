@@ -12,9 +12,12 @@ public sealed class EventLogQueueTests
 {
     private static readonly TimeSpan BoundedWait = TimeSpan.FromSeconds(5);
 
-    private static EventLogEntryTvp MakeEntry(short eventCode = 1, byte category = 0) =>
-        new(eventCode, category, null, null, null, null, null, null, null, null, null, null, null,
+    private static EventLogEntryTvp MakeEntry(short eventCode = 1, byte category = 0)
+    {
+        return new EventLogEntryTvp(eventCode, category, null, null, null, null, null, null, null, null, null, null,
+            null,
             DateTime.UtcNow);
+    }
 
     [Fact]
     public async Task RunAsync_FlushesAssoonAsAnEntryIsEnqueued_WithoutWaitingForTheLongInterval()
@@ -95,7 +98,7 @@ public sealed class EventLogQueueTests
         var dropped = 0;
         await using var queue = new EventLogQueue(
             (_, _) => ValueTask.CompletedTask,
-            capacity: 2,
+            2,
             onDropped: count => Interlocked.Add(ref dropped, count));
 
         Assert.True(queue.Enqueue(MakeEntry()));
@@ -131,7 +134,7 @@ public sealed class EventLogQueueTests
         using var cts = new CancellationTokenSource();
         var runTask = queue.RunAsync(cts.Token);
 
-        Assert.True(queue.Enqueue(MakeEntry(1)));
+        Assert.True(queue.Enqueue(MakeEntry()));
         var observedFailure = await firstAttemptFailed.Task.WaitAsync(BoundedWait);
         Assert.IsType<InvalidOperationException>(observedFailure);
 

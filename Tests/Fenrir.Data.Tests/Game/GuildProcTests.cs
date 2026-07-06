@@ -243,7 +243,8 @@ public class GuildProcTests
     public async Task Guild_CreateAndDebitMoney_WritesAGuildMoneyEventLogRow_WithTheDebitedAmount()
     {
         var masterId = await CreateCharacterWithMoneyAsync(10_000_000);
-        var accountId = await ScalarAsync<int>($"SELECT AccountId FROM game.Characters WHERE CharacterId = {masterId};");
+        var accountId =
+            await ScalarAsync<int>($"SELECT AccountId FROM game.Characters WHERE CharacterId = {masterId};");
         var name = NewGuildName();
 
         var guildId = await CreateAndDebitMoneyAsync(name, masterId, -10_000_000, 0);

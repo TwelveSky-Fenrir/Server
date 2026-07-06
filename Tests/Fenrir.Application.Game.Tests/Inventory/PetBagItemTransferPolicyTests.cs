@@ -49,7 +49,7 @@ public class PetBagItemTransferPolicyTests
         var result = PetBagItemTransferPolicy.ResolveDepositFromInventory(
             ContainerMatrix.InventoryPage0, 64, 0,
             Stack(1, serial: 1), null, EligibleSort,
-            petEquipped: true, bagUpperHalfEntitlementActive: true, secondInventoryPageEntitlementActive: true);
+            true, true, true);
 
         Assert.Equal(PetBagItemTransferPolicy.TransferOutcome.SourceOutOfRange, result.Outcome);
         Assert.False(result.Succeeded);
@@ -61,7 +61,7 @@ public class PetBagItemTransferPolicyTests
         var result = PetBagItemTransferPolicy.ResolveDepositFromInventory(
             ContainerMatrix.InventoryPage0, 0, 20,
             Stack(1), null, EligibleSort,
-            petEquipped: true, bagUpperHalfEntitlementActive: true, secondInventoryPageEntitlementActive: true);
+            true, true, true);
 
         Assert.Equal(PetBagItemTransferPolicy.TransferOutcome.DestinationOutOfRange, result.Outcome);
     }
@@ -72,7 +72,7 @@ public class PetBagItemTransferPolicyTests
         var result = PetBagItemTransferPolicy.ResolveDepositFromInventory(
             ContainerMatrix.InventoryPage0, 0, 0,
             Stack(1), null, EligibleSort,
-            petEquipped: false, bagUpperHalfEntitlementActive: true, secondInventoryPageEntitlementActive: true);
+            false, true, true);
 
         Assert.Equal(PetBagItemTransferPolicy.TransferOutcome.PetNotEquipped, result.Outcome);
     }
@@ -83,7 +83,7 @@ public class PetBagItemTransferPolicyTests
         var result = PetBagItemTransferPolicy.ResolveDepositFromInventory(
             ContainerMatrix.InventoryPage0, 0, 10,
             Stack(1), null, EligibleSort,
-            petEquipped: true, bagUpperHalfEntitlementActive: false, secondInventoryPageEntitlementActive: true);
+            true, false, true);
 
         Assert.Equal(PetBagItemTransferPolicy.TransferOutcome.PetBagUpperHalfExpired, result.Outcome);
     }
@@ -94,7 +94,7 @@ public class PetBagItemTransferPolicyTests
         var result = PetBagItemTransferPolicy.ResolveDepositFromInventory(
             ContainerMatrix.InventoryPage0, 0, 9,
             Stack(1), null, EligibleSort,
-            petEquipped: true, bagUpperHalfEntitlementActive: false, secondInventoryPageEntitlementActive: true);
+            true, false, true);
 
         Assert.True(result.Succeeded);
     }
@@ -105,7 +105,7 @@ public class PetBagItemTransferPolicyTests
         var result = PetBagItemTransferPolicy.ResolveDepositFromInventory(
             ContainerMatrix.InventoryPage1, 0, 0,
             Stack(1), null, EligibleSort,
-            petEquipped: true, bagUpperHalfEntitlementActive: true, secondInventoryPageEntitlementActive: false);
+            true, true, false);
 
         Assert.Equal(PetBagItemTransferPolicy.TransferOutcome.SecondInventoryPageExpired, result.Outcome);
     }
@@ -116,7 +116,7 @@ public class PetBagItemTransferPolicyTests
         var result = PetBagItemTransferPolicy.ResolveDepositFromInventory(
             ContainerMatrix.InventoryPage0, 0, 0,
             Stack(1), null, EligibleSort,
-            petEquipped: true, bagUpperHalfEntitlementActive: true, secondInventoryPageEntitlementActive: false);
+            true, true, false);
 
         Assert.True(result.Succeeded);
     }
@@ -127,7 +127,7 @@ public class PetBagItemTransferPolicyTests
         var result = PetBagItemTransferPolicy.ResolveDepositFromInventory(
             ContainerMatrix.InventoryPage0, 0, 0,
             null, null, EligibleSort,
-            petEquipped: true, bagUpperHalfEntitlementActive: true, secondInventoryPageEntitlementActive: true);
+            true, true, true);
 
         Assert.Equal(PetBagItemTransferPolicy.TransferOutcome.SourceEmpty, result.Outcome);
     }
@@ -143,7 +143,7 @@ public class PetBagItemTransferPolicyTests
         var result = PetBagItemTransferPolicy.ResolveDepositFromInventory(
             ContainerMatrix.InventoryPage0, 0, 0,
             Stack(1, quantity, (byte)enchant, (byte)combine, (byte)refine, (byte)socket), null, EligibleSort,
-            petEquipped: true, bagUpperHalfEntitlementActive: true, secondInventoryPageEntitlementActive: true);
+            true, true, true);
 
         Assert.Equal(PetBagItemTransferPolicy.TransferOutcome.SourceNotAtRest, result.Outcome);
     }
@@ -154,7 +154,7 @@ public class PetBagItemTransferPolicyTests
         var result = PetBagItemTransferPolicy.ResolveDepositFromInventory(
             ContainerMatrix.InventoryPage0, 0, 0,
             Stack(1), null, IneligibleSort,
-            petEquipped: true, bagUpperHalfEntitlementActive: true, secondInventoryPageEntitlementActive: true);
+            true, true, true);
 
         Assert.Equal(PetBagItemTransferPolicy.TransferOutcome.SourceItemNotPetEligible, result.Outcome);
     }
@@ -165,7 +165,7 @@ public class PetBagItemTransferPolicyTests
         var result = PetBagItemTransferPolicy.ResolveDepositFromInventory(
             ContainerMatrix.InventoryPage0, 0, 0,
             Stack(1), 999, EligibleSort,
-            petEquipped: true, bagUpperHalfEntitlementActive: true, secondInventoryPageEntitlementActive: true);
+            true, true, true);
 
         Assert.Equal(PetBagItemTransferPolicy.TransferOutcome.DestinationOccupied, result.Outcome);
     }
@@ -178,7 +178,7 @@ public class PetBagItemTransferPolicyTests
         var result = PetBagItemTransferPolicy.ResolveDepositFromInventory(
             ContainerMatrix.InventoryPage0, 0, 5,
             source, null, EligibleSort,
-            petEquipped: true, bagUpperHalfEntitlementActive: true, secondInventoryPageEntitlementActive: true);
+            true, true, true);
 
         Assert.True(result.Succeeded);
         Assert.Null(result.NewGeneralInventorySlot);
@@ -195,7 +195,7 @@ public class PetBagItemTransferPolicyTests
             20, 1,
             ContainerMatrix.InventoryPage0, 0, 0, 0,
             null, 0,
-            petEquipped: true, bagUpperHalfEntitlementActive: true, secondInventoryPageEntitlementActive: true);
+            true, true, true);
 
         Assert.Equal(PetBagItemTransferPolicy.TransferOutcome.SourceOutOfRange, result.Outcome);
     }
@@ -207,7 +207,7 @@ public class PetBagItemTransferPolicyTests
             0, 1,
             ContainerMatrix.InventoryPage0, 64, 0, 0,
             null, 0,
-            petEquipped: true, bagUpperHalfEntitlementActive: true, secondInventoryPageEntitlementActive: true);
+            true, true, true);
 
         Assert.Equal(PetBagItemTransferPolicy.TransferOutcome.DestinationOutOfRange, result.Outcome);
     }
@@ -223,7 +223,7 @@ public class PetBagItemTransferPolicyTests
             0, 1,
             ContainerMatrix.InventoryPage0, 0, x, y,
             null, 0,
-            petEquipped: true, bagUpperHalfEntitlementActive: true, secondInventoryPageEntitlementActive: true);
+            true, true, true);
 
         Assert.Equal(PetBagItemTransferPolicy.TransferOutcome.DestinationCoordinateOutOfRange, result.Outcome);
     }
@@ -235,7 +235,7 @@ public class PetBagItemTransferPolicyTests
             0, 1,
             ContainerMatrix.InventoryPage0, 0, 0, 0,
             null, 0,
-            petEquipped: false, bagUpperHalfEntitlementActive: true, secondInventoryPageEntitlementActive: true);
+            false, true, true);
 
         Assert.Equal(PetBagItemTransferPolicy.TransferOutcome.PetNotEquipped, result.Outcome);
     }
@@ -247,7 +247,7 @@ public class PetBagItemTransferPolicyTests
             10, 1,
             ContainerMatrix.InventoryPage0, 0, 0, 0,
             null, 0,
-            petEquipped: true, bagUpperHalfEntitlementActive: false, secondInventoryPageEntitlementActive: true);
+            true, false, true);
 
         Assert.Equal(PetBagItemTransferPolicy.TransferOutcome.PetBagUpperHalfExpired, result.Outcome);
     }
@@ -259,7 +259,7 @@ public class PetBagItemTransferPolicyTests
             0, 1,
             ContainerMatrix.InventoryPage1, 0, 0, 0,
             null, 0,
-            petEquipped: true, bagUpperHalfEntitlementActive: true, secondInventoryPageEntitlementActive: false);
+            true, true, false);
 
         Assert.Equal(PetBagItemTransferPolicy.TransferOutcome.SecondInventoryPageExpired, result.Outcome);
     }
@@ -271,7 +271,7 @@ public class PetBagItemTransferPolicyTests
             0, null,
             ContainerMatrix.InventoryPage0, 0, 0, 0,
             null, 0,
-            petEquipped: true, bagUpperHalfEntitlementActive: true, secondInventoryPageEntitlementActive: true);
+            true, true, true);
 
         Assert.Equal(PetBagItemTransferPolicy.TransferOutcome.SourceEmpty, result.Outcome);
     }
@@ -283,7 +283,7 @@ public class PetBagItemTransferPolicyTests
             0, 1,
             ContainerMatrix.InventoryPage0, 0, 0, 0,
             Stack(999), 0,
-            petEquipped: true, bagUpperHalfEntitlementActive: true, secondInventoryPageEntitlementActive: true);
+            true, true, true);
 
         Assert.Equal(PetBagItemTransferPolicy.TransferOutcome.DestinationOccupied, result.Outcome);
     }
@@ -294,8 +294,8 @@ public class PetBagItemTransferPolicyTests
         var result = PetBagItemTransferPolicy.ResolveWithdrawToInventory(
             3, 555,
             ContainerMatrix.InventoryPage0, 0, 2, 4,
-            null, newSerialNumber: 0,
-            petEquipped: true, bagUpperHalfEntitlementActive: true, secondInventoryPageEntitlementActive: true);
+            null, 0,
+            true, true, true);
 
         Assert.True(result.Succeeded);
         Assert.Null(result.NewSourcePetBagItemId);
@@ -319,8 +319,8 @@ public class PetBagItemTransferPolicyTests
         var result = PetBagItemTransferPolicy.ResolveWithdrawToInventory(
             3, 555,
             ContainerMatrix.InventoryPage0, 0, 0, 0,
-            null, newSerialNumber: 12345,
-            petEquipped: true, bagUpperHalfEntitlementActive: true, secondInventoryPageEntitlementActive: true);
+            null, 12345,
+            true, true, true);
 
         Assert.Equal(12345, result.NewGeneralInventorySlot!.Value.Serial);
     }
@@ -335,7 +335,7 @@ public class PetBagItemTransferPolicyTests
             0, 1,
             ContainerMatrix.InventoryPage0, 0, 0, 0,
             null, 0,
-            petEquipped: true, bagUpperHalfEntitlementActive: true, secondInventoryPageEntitlementActive: true);
+            true, true, true);
 
         Assert.True(result.Succeeded);
     }
@@ -348,7 +348,7 @@ public class PetBagItemTransferPolicyTests
         var result = PetBagItemTransferPolicy.ResolveRearrangeWithinPetBag(
             5, 5,
             10, 10, IneligibleSort,
-            petEquipped: false, bagUpperHalfEntitlementActive: false);
+            false, false);
 
         Assert.Equal(PetBagItemTransferPolicy.TransferOutcome.NoOp, result.Outcome);
         Assert.True(result.Succeeded);
@@ -362,7 +362,7 @@ public class PetBagItemTransferPolicyTests
         var result = PetBagItemTransferPolicy.ResolveRearrangeWithinPetBag(
             20, 0,
             1, null, EligibleSort,
-            petEquipped: true, bagUpperHalfEntitlementActive: true);
+            true, true);
 
         Assert.Equal(PetBagItemTransferPolicy.TransferOutcome.SourceOutOfRange, result.Outcome);
     }
@@ -373,7 +373,7 @@ public class PetBagItemTransferPolicyTests
         var result = PetBagItemTransferPolicy.ResolveRearrangeWithinPetBag(
             0, 20,
             1, null, EligibleSort,
-            petEquipped: true, bagUpperHalfEntitlementActive: true);
+            true, true);
 
         Assert.Equal(PetBagItemTransferPolicy.TransferOutcome.DestinationOutOfRange, result.Outcome);
     }
@@ -384,7 +384,7 @@ public class PetBagItemTransferPolicyTests
         var result = PetBagItemTransferPolicy.ResolveRearrangeWithinPetBag(
             0, 1,
             1, null, EligibleSort,
-            petEquipped: false, bagUpperHalfEntitlementActive: true);
+            false, true);
 
         Assert.Equal(PetBagItemTransferPolicy.TransferOutcome.PetNotEquipped, result.Outcome);
     }
@@ -397,7 +397,7 @@ public class PetBagItemTransferPolicyTests
         var result = PetBagItemTransferPolicy.ResolveRearrangeWithinPetBag(
             sourceSlot, destinationSlot,
             1, null, EligibleSort,
-            petEquipped: true, bagUpperHalfEntitlementActive: false);
+            true, false);
 
         Assert.Equal(PetBagItemTransferPolicy.TransferOutcome.PetBagUpperHalfExpired, result.Outcome);
     }
@@ -408,7 +408,7 @@ public class PetBagItemTransferPolicyTests
         var result = PetBagItemTransferPolicy.ResolveRearrangeWithinPetBag(
             0, 1,
             null, null, EligibleSort,
-            petEquipped: true, bagUpperHalfEntitlementActive: true);
+            true, true);
 
         Assert.Equal(PetBagItemTransferPolicy.TransferOutcome.SourceEmpty, result.Outcome);
     }
@@ -419,7 +419,7 @@ public class PetBagItemTransferPolicyTests
         var result = PetBagItemTransferPolicy.ResolveRearrangeWithinPetBag(
             0, 1,
             1, null, IneligibleSort,
-            petEquipped: true, bagUpperHalfEntitlementActive: true);
+            true, true);
 
         Assert.Equal(PetBagItemTransferPolicy.TransferOutcome.SourceItemNotPetEligible, result.Outcome);
     }
@@ -430,7 +430,7 @@ public class PetBagItemTransferPolicyTests
         var result = PetBagItemTransferPolicy.ResolveRearrangeWithinPetBag(
             0, 1,
             1, 999, EligibleSort,
-            petEquipped: true, bagUpperHalfEntitlementActive: true);
+            true, true);
 
         Assert.Equal(PetBagItemTransferPolicy.TransferOutcome.DestinationOccupied, result.Outcome);
     }
@@ -441,7 +441,7 @@ public class PetBagItemTransferPolicyTests
         var result = PetBagItemTransferPolicy.ResolveRearrangeWithinPetBag(
             0, 1,
             777, null, EligibleSort,
-            petEquipped: true, bagUpperHalfEntitlementActive: true);
+            true, true);
 
         Assert.True(result.Succeeded);
         Assert.Null(result.NewSourcePetBagItemId);

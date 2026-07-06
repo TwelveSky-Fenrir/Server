@@ -59,8 +59,12 @@ public sealed class AntiCampingGuardPointCatalog(IReadOnlyDictionary<short, Anti
     /// </summary>
     public static readonly ImmutableArray<short> GuardedMapIds = [2, 3, 4, 7, 8, 9, 12, 13, 14, 141, 142, 143];
 
-    /// <summary>Every guarded map present, but with no coordinate data configured for any of them -- see this class's own GAP remarks.</summary>
-    public static readonly AntiCampingGuardPointCatalog Empty = new(ImmutableDictionary<short, AntiCampingMapGuardPoints>.Empty);
+    /// <summary>
+    ///     Every guarded map present, but with no coordinate data configured for any of them -- see this class's own GAP
+    ///     remarks.
+    /// </summary>
+    public static readonly AntiCampingGuardPointCatalog Empty =
+        new(ImmutableDictionary<short, AntiCampingMapGuardPoints>.Empty);
 
     /// <summary>
     ///     Whether <paramref name="mapId" /> is one of the fixed <see cref="GuardedMapIds" /> -- a map outside

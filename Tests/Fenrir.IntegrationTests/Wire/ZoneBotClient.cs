@@ -1,6 +1,5 @@
 using System.Buffers.Binary;
 using System.Collections.Concurrent;
-using System.Text;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Compression;
 using Fenrir.Network.Serialization.Packets.Shared;
@@ -20,19 +19,36 @@ namespace Fenrir.IntegrationTests.Wire;
 /// </summary>
 public sealed class ZoneBotClient : IAsyncDisposable
 {
+    private readonly ConcurrentQueue<AttackForProtocol> _attackResults = new();
     private readonly RawWireConnection _connection;
+    private readonly ConcurrentQueue<GenericActionResult> _genericActionResults = new();
     private readonly CancellationTokenSource _pumpCts = new();
-    private Task? _pumpTask;
+    private readonly ConcurrentQueue<int> _zoneMoveResults = new();
+    public readonly ConcurrentDictionary<int, GroundItemSnapshot> GroundItems = new();
 
     public readonly ConcurrentDictionary<int, MonsterSnapshot> Monsters = new();
-    public readonly ConcurrentDictionary<int, GroundItemSnapshot> GroundItems = new();
-    private readonly ConcurrentQueue<AttackForProtocol> _attackResults = new();
-    private readonly ConcurrentQueue<GenericActionResult> _genericActionResults = new();
-    private readonly ConcurrentQueue<int> _zoneMoveResults = new();
+    private Task? _pumpTask;
 
     private ZoneBotClient(RawWireConnection connection)
     {
         _connection = connection;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await _pumpCts.CancelAsync();
+        if (_pumpTask is not null)
+            try
+            {
+                await _pumpTask;
+            }
+            catch
+            {
+                // Pump loop already swallows its own expected faults; a leftover exception here is never fatal to teardown.
+            }
+
+        _pumpCts.Dispose();
+        await _connection.DisposeAsync();
     }
 
     public static async Task<ZoneBotClient> ConnectAsync(int port, CancellationToken ct)
@@ -48,7 +64,8 @@ public sealed class ZoneBotClient : IAsyncDisposable
     {
         var frame = await _connection.ReadExactAsync(1 + ZoneGreetingResponse.PayloadSize, ct);
         if (frame[0] != ZoneGreetingResponse.Opcode)
-            throw new InvalidOperationException($"Expected ZoneGreetingResponse (op {ZoneGreetingResponse.Opcode}), got op {frame[0]}.");
+            throw new InvalidOperationException(
+                $"Expected ZoneGreetingResponse (op {ZoneGreetingResponse.Opcode}), got op {frame[0]}.");
 
         var randomNumber = WireScalars.ReadInt32(frame.AsSpan(1, 4));
         _connection.SeedOutboundStreamKey(randomNumber);
@@ -65,7 +82,8 @@ public sealed class ZoneBotClient : IAsyncDisposable
 
         var frame = await _connection.ReadExactAsync(1 + ZoneHandshakeResponse.PayloadSize, ct);
         if (frame[0] != ZoneHandshakeResponse.Opcode)
-            throw new InvalidOperationException($"Expected ZoneHandshakeResponse (op {ZoneHandshakeResponse.Opcode}), got op {frame[0]}.");
+            throw new InvalidOperationException(
+                $"Expected ZoneHandshakeResponse (op {ZoneHandshakeResponse.Opcode}), got op {frame[0]}.");
         return WireScalars.ReadInt32(frame.AsSpan(1, 4));
     }
 
@@ -94,7 +112,8 @@ public sealed class ZoneBotClient : IAsyncDisposable
         var selfServerIndex = WireScalars.ReadInt32(selfSpawnFrame.AsSpan(1, 4));
         var selfUniqueNumber = WireScalars.ReadUInt32(selfSpawnFrame.AsSpan(5, 4));
         if (!ObjectForAvatar.TryRead(selfSpawnFrame.AsSpan(9, ObjectForAvatar.WireSize), out var selfObject))
-            throw new InvalidOperationException("Failed to decode ObjectForAvatar from self-spawn AvatarActionResponse.");
+            throw new InvalidOperationException(
+                "Failed to decode ObjectForAvatar from self-spawn AvatarActionResponse.");
 
         return new EnterWorldResult(avatarInfo, selfServerIndex, selfUniqueNumber, selfObject);
     }
@@ -125,7 +144,8 @@ public sealed class ZoneBotClient : IAsyncDisposable
 
                 if (opcode is Opcodes.Zone.Outgoing.EnterWorld or Opcodes.Zone.Outgoing.WorldSnapshot)
                 {
-                    await ReadCompressedBodyAsync(ct); // periodic full re-snapshot, if the server ever sends one; discarded
+                    await ReadCompressedBodyAsync(
+                        ct); // periodic full re-snapshot, if the server ever sends one; discarded
                     continue;
                 }
 
@@ -252,7 +272,10 @@ public sealed class ZoneBotClient : IAsyncDisposable
         await SendAsync(AttackRequest.Opcode, payload, ct);
     }
 
-    /// <summary>op19 CZ_PROCESS_DATA_SEND, tSort 201 -- ground pickup (Page1/Index1 repurposed as the item's ServerIndex/UniqueNumber).</summary>
+    /// <summary>
+    ///     op19 CZ_PROCESS_DATA_SEND, tSort 201 -- ground pickup (Page1/Index1 repurposed as the item's
+    ///     ServerIndex/UniqueNumber).
+    /// </summary>
     public async Task PickupGroundItemAsync(int itemServerIndex, uint itemUniqueNumber, byte destinationContainer,
         byte destinationSlot, CancellationToken ct)
     {
@@ -384,28 +407,13 @@ public sealed class ZoneBotClient : IAsyncDisposable
         payload.CopyTo(frame.AsSpan(1));
         await _connection.SendAsync(frame, ct);
     }
-
-    public async ValueTask DisposeAsync()
-    {
-        await _pumpCts.CancelAsync();
-        if (_pumpTask is not null)
-        {
-            try
-            {
-                await _pumpTask;
-            }
-            catch
-            {
-                // Pump loop already swallows its own expected faults; a leftover exception here is never fatal to teardown.
-            }
-        }
-
-        _pumpCts.Dispose();
-        await _connection.DisposeAsync();
-    }
 }
 
-public readonly record struct EnterWorldResult(AvatarInfo AvatarInfo, int SelfServerIndex, uint SelfUniqueNumber, ObjectForAvatar SelfObject);
+public readonly record struct EnterWorldResult(
+    AvatarInfo AvatarInfo,
+    int SelfServerIndex,
+    uint SelfUniqueNumber,
+    ObjectForAvatar SelfObject);
 
 public readonly record struct MonsterSnapshot(int ServerIndex, uint UniqueNumber, ObjectForMonster Data);
 

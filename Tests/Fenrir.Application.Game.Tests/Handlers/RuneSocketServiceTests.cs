@@ -3,7 +3,6 @@ using Fenrir.Application.Game.Abstractions.ItemModification;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.Loot;
-using Fenrir.Application.Game.Handlers;
 using Fenrir.Application.Game.Handlers.Handlers;
 using Fenrir.Application.Game.Services.ItemModification;
 using Fenrir.Application.Game.Tests.TestSupport;
@@ -67,7 +66,8 @@ public class RuneSocketServiceTests
 
         var service = new RuneSocketService(repo, eventLog, NullLogger<RuneSocketService>.Instance);
         var result = await RunToCompletionAsync(
-            service.InsertAsync(new RuneSocketRequest { Sort = 0, RuneIndex = 0, ItemIndex = 93514, Page = 0, Index = 5 },
+            service.InsertAsync(
+                new RuneSocketRequest { Sort = 0, RuneIndex = 0, ItemIndex = 93514, Page = 0, Index = 5 },
                 zone, state, 10, CancellationToken.None), zone);
 
         Assert.Null(session.DisconnectReason);
@@ -169,7 +169,8 @@ public class RuneSocketServiceTests
         // exercise the real handler here.
         var (session, pipe, zone, _, repo, eventLog) = SetUp();
 
-        var handler = new RuneSocketHandler(new RuneSocketService(repo, eventLog, NullLogger<RuneSocketService>.Instance));
+        var handler =
+            new RuneSocketHandler(new RuneSocketService(repo, eventLog, NullLogger<RuneSocketService>.Instance));
         await handler.HandleAsync(
             new RuneSocketRequest { Sort = 2, RuneIndex = 0, ItemIndex = 0, Page = 0, Index = 0 }, session,
             CancellationToken.None);

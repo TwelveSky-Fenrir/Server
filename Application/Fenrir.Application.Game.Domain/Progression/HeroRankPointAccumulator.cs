@@ -1,5 +1,4 @@
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Data.Abstractions.Progression;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Domain.Progression;

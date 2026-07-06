@@ -18,7 +18,10 @@ internal sealed class CapturingLogger<T> : ILogger<T>
         return NoopScope.Instance;
     }
 
-    public bool IsEnabled(LogLevel logLevel) => true;
+    public bool IsEnabled(LogLevel logLevel)
+    {
+        return true;
+    }
 
     public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
         Func<TState, Exception?, string> formatter)
@@ -31,12 +34,17 @@ internal sealed class CapturingLogger<T> : ILogger<T>
     ///     opened via the <c>logger.BeginScope("template {Prop}", value)</c> convenience overload implements this
     ///     interface with one entry per placeholder plus a trailing "{OriginalFormat}".
     /// </summary>
-    public static IReadOnlyList<KeyValuePair<string, object>> PropertiesOf(object scope) =>
-        (IReadOnlyList<KeyValuePair<string, object>>)scope;
+    public static IReadOnlyList<KeyValuePair<string, object>> PropertiesOf(object scope)
+    {
+        return (IReadOnlyList<KeyValuePair<string, object>>)scope;
+    }
 
     private sealed class NoopScope : IDisposable
     {
         public static readonly NoopScope Instance = new();
-        public void Dispose() { }
+
+        public void Dispose()
+        {
+        }
     }
 }

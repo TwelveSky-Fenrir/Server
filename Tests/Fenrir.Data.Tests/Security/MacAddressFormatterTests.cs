@@ -17,7 +17,7 @@ public class MacAddressFormatterTests
     [Fact]
     public void Format_ZeroLength_ReturnsEmptyString()
     {
-        byte[] address = new byte[8];
+        var address = new byte[8];
 
         var result = MacAddressFormatter.Format(address, 0);
 

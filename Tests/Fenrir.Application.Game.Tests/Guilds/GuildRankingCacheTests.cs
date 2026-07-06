@@ -47,8 +47,8 @@ public class GuildRankingCacheTests
 
     private static GuildSummaryDto Guild(int guildId, string name, int points)
     {
-        return new GuildSummaryDto(guildId, name, Grade: 1, MasterCharacterId: null, Points: points,
-            BuffType: 0, BuffState: 0, BuffTime: 0, BuffTimeForDiff: 0, Logo: 0,
-            CreatedAtUtc: DateTime.UtcNow, MemberCount: 1);
+        return new GuildSummaryDto(guildId, name, 1, null, points,
+            0, 0, 0, 0, 0,
+            DateTime.UtcNow, 1);
     }
 }

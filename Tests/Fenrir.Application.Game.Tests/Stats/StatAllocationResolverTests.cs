@@ -13,7 +13,7 @@ public class StatAllocationResolverTests
     [InlineData(4, StatAllocationResolver.BaseStat.Intelligence)]
     public void SmallFixedCategory_Succeeds_CreditsOneAndDebitsOne(int statSort, StatAllocationResolver.BaseStat stat)
     {
-        var result = StatAllocationResolver.Resolve(statSort, addValue: 0, currentStatPoints: 1);
+        var result = StatAllocationResolver.Resolve(statSort, 0, 1);
 
         Assert.True(result.Succeeded);
         Assert.Equal(stat, result.Stat);
@@ -28,7 +28,7 @@ public class StatAllocationResolverTests
     [InlineData(4)]
     public void SmallFixedCategory_ZeroBalance_Disconnects_DoesNotMutate(int statSort)
     {
-        var result = StatAllocationResolver.Resolve(statSort, addValue: 0, currentStatPoints: 0);
+        var result = StatAllocationResolver.Resolve(statSort, 0, 0);
 
         Assert.False(result.Succeeded);
         Assert.Equal(StatAllocationResolver.Outcome.Disconnect, result.Outcome);
@@ -38,9 +38,9 @@ public class StatAllocationResolverTests
     [Fact]
     public void SmallFixedCategory_AddValueIgnored()
     {
-        var withZero = StatAllocationResolver.Resolve(1, addValue: 0, currentStatPoints: 10);
-        var withHuge = StatAllocationResolver.Resolve(1, addValue: 999_999, currentStatPoints: 10);
-        var withNegative = StatAllocationResolver.Resolve(1, addValue: -5, currentStatPoints: 10);
+        var withZero = StatAllocationResolver.Resolve(1, 0, 10);
+        var withHuge = StatAllocationResolver.Resolve(1, 999_999, 10);
+        var withNegative = StatAllocationResolver.Resolve(1, -5, 10);
 
         Assert.Equal(withZero, withHuge);
         Assert.Equal(withZero, withNegative);
@@ -56,7 +56,7 @@ public class StatAllocationResolverTests
     public void LargeFixedCategory_Succeeds_CreditsFiveAndDebitsFive(int statSort,
         StatAllocationResolver.BaseStat stat)
     {
-        var result = StatAllocationResolver.Resolve(statSort, addValue: 0, currentStatPoints: 5);
+        var result = StatAllocationResolver.Resolve(statSort, 0, 5);
 
         Assert.True(result.Succeeded);
         Assert.Equal(stat, result.Stat);
@@ -67,7 +67,7 @@ public class StatAllocationResolverTests
     [Fact]
     public void LargeFixedCategory_ExactlyFourBelowThreshold_Disconnects()
     {
-        var result = StatAllocationResolver.Resolve(5, addValue: 0, currentStatPoints: 4);
+        var result = StatAllocationResolver.Resolve(5, 0, 4);
 
         Assert.False(result.Succeeded);
     }
@@ -77,7 +77,7 @@ public class StatAllocationResolverTests
     {
         // The server never grants "as many as the character can afford" -- confirms the whole request rejects,
         // not a reduced-amount success.
-        var result = StatAllocationResolver.Resolve(8, addValue: 0, currentStatPoints: 4);
+        var result = StatAllocationResolver.Resolve(8, 0, 4);
 
         Assert.False(result.Succeeded);
         Assert.Equal(0, result.Amount);
@@ -91,7 +91,7 @@ public class StatAllocationResolverTests
     public void VariableCategory_Succeeds_CreditsAndDebitsTheRequestedAmount(int statSort,
         StatAllocationResolver.BaseStat stat)
     {
-        var result = StatAllocationResolver.Resolve(statSort, addValue: 37, currentStatPoints: 100);
+        var result = StatAllocationResolver.Resolve(statSort, 37, 100);
 
         Assert.True(result.Succeeded);
         Assert.Equal(stat, result.Stat);
@@ -102,7 +102,7 @@ public class StatAllocationResolverTests
     [Fact]
     public void VariableCategory_ExactBalance_Succeeds_ZerosBalance()
     {
-        var result = StatAllocationResolver.Resolve(9, addValue: 100, currentStatPoints: 100);
+        var result = StatAllocationResolver.Resolve(9, 100, 100);
 
         Assert.True(result.Succeeded);
         Assert.Equal(100, result.Amount);
@@ -112,7 +112,7 @@ public class StatAllocationResolverTests
     [Fact]
     public void VariableCategory_AmountAboveBalance_Disconnects()
     {
-        var result = StatAllocationResolver.Resolve(9, addValue: 101, currentStatPoints: 100);
+        var result = StatAllocationResolver.Resolve(9, 101, 100);
 
         Assert.False(result.Succeeded);
     }
@@ -122,7 +122,7 @@ public class StatAllocationResolverTests
     [InlineData(-1)]
     public void VariableCategory_AmountBelowOne_Disconnects(int addValue)
     {
-        var result = StatAllocationResolver.Resolve(9, addValue, currentStatPoints: 100);
+        var result = StatAllocationResolver.Resolve(9, addValue, 100);
 
         Assert.False(result.Succeeded);
     }
@@ -134,7 +134,7 @@ public class StatAllocationResolverTests
     [InlineData(1000)]
     public void CategoryOutsideLegalRange_Disconnects_RegardlessOfBalance(int statSort)
     {
-        var result = StatAllocationResolver.Resolve(statSort, addValue: 50, currentStatPoints: 1_000_000);
+        var result = StatAllocationResolver.Resolve(statSort, 50, 1_000_000);
 
         Assert.False(result.Succeeded);
         Assert.Equal(StatAllocationResolver.Outcome.Disconnect, result.Outcome);

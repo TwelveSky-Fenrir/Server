@@ -65,7 +65,7 @@ public class SkyUpgradeResolverTests
     [Fact]
     public void Material501_SuccessRoll_ShiftsItemIdAndDecreasesEnchant()
     {
-        var item = WarlordItem(87000);
+        var item = WarlordItem();
 
         // Tier 501: 40% probability -- roll 0 always succeeds.
         var result = SkyUpgradeResolver.Resolve(item, 30, 501, new ScriptedRandomSource(0));
@@ -78,7 +78,7 @@ public class SkyUpgradeResolverTests
     [Fact]
     public void Material501_FailureRoll_NoItemMutation()
     {
-        var item = WarlordItem(87000);
+        var item = WarlordItem();
 
         // Tier 501: 40% probability -- roll 40 (>= 40) fails.
         var result = SkyUpgradeResolver.Resolve(item, 30, 501, new ScriptedRandomSource(40));
@@ -89,7 +89,7 @@ public class SkyUpgradeResolverTests
     [Fact]
     public void Material504_SuccessRoll_ShiftsItemIdWithNoEnchantDecrease()
     {
-        var item = WarlordItem(87000);
+        var item = WarlordItem();
 
         // Tier 504: 10% probability -- roll 0 always succeeds, no decrease.
         var result = SkyUpgradeResolver.Resolve(item, 35, 504, new ScriptedRandomSource(0));

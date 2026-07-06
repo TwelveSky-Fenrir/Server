@@ -8,7 +8,7 @@ public class PvpKillContributionPointCalculatorTests
     public void ComputeBaseAmount_NoBonuses_ReturnsBaseOnly()
     {
         var amount = PvpKillContributionPointCalculator.ComputeBaseAmount(
-            hasPremiumStatus: false, hasWarriorScrollBuff: false);
+            false, false);
 
         Assert.Equal(PvpKillContributionPointCalculator.BasePerKillAmount, amount);
     }
@@ -17,7 +17,7 @@ public class PvpKillContributionPointCalculatorTests
     public void ComputeBaseAmount_Premium_AddsPremiumBonus()
     {
         var amount = PvpKillContributionPointCalculator.ComputeBaseAmount(
-            hasPremiumStatus: true, hasWarriorScrollBuff: false);
+            true, false);
 
         Assert.Equal(PvpKillContributionPointCalculator.BasePerKillAmount +
                      PvpKillContributionPointCalculator.PremiumStatusBonus, amount);
@@ -27,7 +27,7 @@ public class PvpKillContributionPointCalculatorTests
     public void ComputeBaseAmount_WarriorScroll_AddsWarriorScrollBonus()
     {
         var amount = PvpKillContributionPointCalculator.ComputeBaseAmount(
-            hasPremiumStatus: false, hasWarriorScrollBuff: true);
+            false, true);
 
         Assert.Equal(PvpKillContributionPointCalculator.BasePerKillAmount +
                      PvpKillContributionPointCalculator.WarriorScrollBuffBonus, amount);
@@ -37,9 +37,9 @@ public class PvpKillContributionPointCalculatorTests
     public void ComputeBaseAmount_BothBonusesAndOverrides_SumsEveryTerm()
     {
         var amount = PvpKillContributionPointCalculator.ComputeBaseAmount(
-            hasPremiumStatus: true, hasWarriorScrollBuff: true,
-            perCharacterOverride: 3, perTribeWorldStateBonus: 4, towerControlBonus: 5,
-            basePerKillAmount: 10);
+            true, true,
+            3, 4, 5,
+            10);
 
         Assert.Equal(10 + 3 + 4 + 5 +
                      PvpKillContributionPointCalculator.PremiumStatusBonus +
@@ -49,7 +49,7 @@ public class PvpKillContributionPointCalculatorTests
     [Fact]
     public void ClampGrant_WellBelowCap_ReturnsFullAmount()
     {
-        var granted = PvpKillContributionPointCalculator.ClampGrant(currentTotal: 0, amountToAdd: 10, cap: 1000);
+        var granted = PvpKillContributionPointCalculator.ClampGrant(0, 10, 1000);
 
         Assert.Equal(10, granted);
     }
@@ -57,7 +57,7 @@ public class PvpKillContributionPointCalculatorTests
     [Fact]
     public void ClampGrant_WouldOvershootCap_ReturnsReducedAmount()
     {
-        var granted = PvpKillContributionPointCalculator.ClampGrant(currentTotal: 995, amountToAdd: 10, cap: 1000);
+        var granted = PvpKillContributionPointCalculator.ClampGrant(995, 10, 1000);
 
         Assert.Equal(5, granted);
     }
@@ -65,7 +65,7 @@ public class PvpKillContributionPointCalculatorTests
     [Fact]
     public void ClampGrant_AlreadyPastCap_ReturnsNegative()
     {
-        var granted = PvpKillContributionPointCalculator.ClampGrant(currentTotal: 1010, amountToAdd: 10, cap: 1000);
+        var granted = PvpKillContributionPointCalculator.ClampGrant(1010, 10, 1000);
 
         Assert.Equal(-10, granted);
     }
@@ -73,7 +73,7 @@ public class PvpKillContributionPointCalculatorTests
     [Fact]
     public void ClampGrant_ExactlyAtCap_ReturnsZero()
     {
-        var granted = PvpKillContributionPointCalculator.ClampGrant(currentTotal: 1000, amountToAdd: 10, cap: 1000);
+        var granted = PvpKillContributionPointCalculator.ClampGrant(1000, 10, 1000);
 
         Assert.Equal(0, granted);
     }

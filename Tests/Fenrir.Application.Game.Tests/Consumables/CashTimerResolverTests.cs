@@ -8,7 +8,7 @@ public class CashTimerResolverTests
     [Fact]
     public void ResolveFactionNotice_AddsFiveToTheBankedCount()
     {
-        var result = CashTimerResolver.ResolveFactionNotice(currentCount: 2);
+        var result = CashTimerResolver.ResolveFactionNotice(2);
 
         Assert.True(result.Succeeded);
         Assert.Equal(7, result.NewValue);
@@ -25,7 +25,7 @@ public class CashTimerResolverTests
     [Fact]
     public void ResolveTaiyanKey_AtLevelCap_AddsOneHundredEighty()
     {
-        var result = CashTimerResolver.ResolveTaiyanKey(LevelProgressionCalculator.MaxLevel, currentTimer: 0);
+        var result = CashTimerResolver.ResolveTaiyanKey(LevelProgressionCalculator.MaxLevel, 0);
 
         Assert.True(result.Succeeded);
         Assert.Equal(180, result.NewValue);
@@ -34,7 +34,7 @@ public class CashTimerResolverTests
     [Fact]
     public void ResolveTaiyanKey_BelowLevelCap_ReportsLevelCapNotMet_ForTheHandlerToDisconnect()
     {
-        var result = CashTimerResolver.ResolveTaiyanKey((short)(LevelProgressionCalculator.MaxLevel - 1), 0);
+        var result = CashTimerResolver.ResolveTaiyanKey(LevelProgressionCalculator.MaxLevel - 1, 0);
 
         Assert.Equal(CashTimerResolver.Outcome.LevelCapNotMet, result.Outcome);
     }

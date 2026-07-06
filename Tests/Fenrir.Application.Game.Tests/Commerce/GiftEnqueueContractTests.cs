@@ -47,7 +47,7 @@ public sealed class GiftEnqueueContractTests
     {
         var repository = new FakeGiftRepository();
 
-        var giftId = await repository.EnqueueAsync(1000000001, productId: null, quantity, value,
+        var giftId = await repository.EnqueueAsync(1000000001, null, quantity, value,
             CancellationToken.None);
 
         Assert.True(giftId > 0);
@@ -63,7 +63,7 @@ public sealed class GiftEnqueueContractTests
         // (no catalog check observed anywhere in the cited range) -- null must round-trip cleanly.
         var repository = new FakeGiftRepository();
 
-        await repository.EnqueueAsync(1000000001, productId: null, quantity: 1, value: 0, CancellationToken.None);
+        await repository.EnqueueAsync(1000000001, null, 1, 0, CancellationToken.None);
 
         var recorded = Assert.Single(repository.Enqueued);
         Assert.Null(recorded.ProductId);

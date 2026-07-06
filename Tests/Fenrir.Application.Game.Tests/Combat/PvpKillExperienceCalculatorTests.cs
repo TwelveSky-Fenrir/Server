@@ -7,8 +7,8 @@ public class PvpKillExperienceCalculatorTests
     [Fact]
     public void EqualLevels_GrantsBaseAmountUnscaled()
     {
-        var gain = PvpKillExperienceCalculator.ComputeGain(100, attackerCombinedLevel: 50, defenderCombinedLevel: 50,
-            hasWarriorScrollBuff: false, hasDoubleExpCharge: false);
+        var gain = PvpKillExperienceCalculator.ComputeGain(100, 50, 50,
+            false, false);
 
         Assert.Equal(100, gain);
     }
@@ -16,8 +16,8 @@ public class PvpKillExperienceCalculatorTests
     [Fact]
     public void UnfavorableGapAtThreshold_StillGrants()
     {
-        var gain = PvpKillExperienceCalculator.ComputeGain(100, attackerCombinedLevel: 59, defenderCombinedLevel: 50,
-            hasWarriorScrollBuff: false, hasDoubleExpCharge: false);
+        var gain = PvpKillExperienceCalculator.ComputeGain(100, 59, 50,
+            false, false);
 
         Assert.Equal(100, gain);
     }
@@ -25,8 +25,8 @@ public class PvpKillExperienceCalculatorTests
     [Fact]
     public void UnfavorableGapPastThreshold_ZeroesOutEntirely()
     {
-        var gain = PvpKillExperienceCalculator.ComputeGain(100, attackerCombinedLevel: 60, defenderCombinedLevel: 50,
-            hasWarriorScrollBuff: false, hasDoubleExpCharge: false);
+        var gain = PvpKillExperienceCalculator.ComputeGain(100, 60, 50,
+            false, false);
 
         Assert.Equal(0, gain);
     }
@@ -34,8 +34,8 @@ public class PvpKillExperienceCalculatorTests
     [Fact]
     public void FavorableGap_DoesNotZeroOut()
     {
-        var gain = PvpKillExperienceCalculator.ComputeGain(100, attackerCombinedLevel: 10, defenderCombinedLevel: 80,
-            hasWarriorScrollBuff: false, hasDoubleExpCharge: false);
+        var gain = PvpKillExperienceCalculator.ComputeGain(100, 10, 80,
+            false, false);
 
         Assert.Equal(100, gain);
     }
@@ -43,8 +43,8 @@ public class PvpKillExperienceCalculatorTests
     [Fact]
     public void ZeroBaseAmount_ReturnsZero()
     {
-        var gain = PvpKillExperienceCalculator.ComputeGain(0, attackerCombinedLevel: 50, defenderCombinedLevel: 50,
-            hasWarriorScrollBuff: true, hasDoubleExpCharge: true);
+        var gain = PvpKillExperienceCalculator.ComputeGain(0, 50, 50,
+            true, true);
 
         Assert.Equal(0, gain);
     }
@@ -52,8 +52,8 @@ public class PvpKillExperienceCalculatorTests
     [Fact]
     public void ZoneMultiplier_ScalesBaseAmount()
     {
-        var gain = PvpKillExperienceCalculator.ComputeGain(100, attackerCombinedLevel: 50, defenderCombinedLevel: 50,
-            hasWarriorScrollBuff: false, hasDoubleExpCharge: false, zoneMultiplier: 2.0f);
+        var gain = PvpKillExperienceCalculator.ComputeGain(100, 50, 50,
+            false, false, 2.0f);
 
         Assert.Equal(200, gain);
     }
@@ -61,8 +61,8 @@ public class PvpKillExperienceCalculatorTests
     [Fact]
     public void WarriorScrollBuff_DoublesGain()
     {
-        var gain = PvpKillExperienceCalculator.ComputeGain(100, attackerCombinedLevel: 50, defenderCombinedLevel: 50,
-            hasWarriorScrollBuff: true, hasDoubleExpCharge: false);
+        var gain = PvpKillExperienceCalculator.ComputeGain(100, 50, 50,
+            true, false);
 
         Assert.Equal(200, gain);
     }
@@ -70,8 +70,8 @@ public class PvpKillExperienceCalculatorTests
     [Fact]
     public void DoubleExpCharge_MultipliesGainByEight()
     {
-        var gain = PvpKillExperienceCalculator.ComputeGain(100, attackerCombinedLevel: 50, defenderCombinedLevel: 50,
-            hasWarriorScrollBuff: false, hasDoubleExpCharge: true);
+        var gain = PvpKillExperienceCalculator.ComputeGain(100, 50, 50,
+            false, true);
 
         Assert.Equal(800, gain);
     }
@@ -79,8 +79,8 @@ public class PvpKillExperienceCalculatorTests
     [Fact]
     public void WarriorScrollAndDoubleExpCharge_StackMultiplicatively()
     {
-        var gain = PvpKillExperienceCalculator.ComputeGain(100, attackerCombinedLevel: 50, defenderCombinedLevel: 50,
-            hasWarriorScrollBuff: true, hasDoubleExpCharge: true);
+        var gain = PvpKillExperienceCalculator.ComputeGain(100, 50, 50,
+            true, true);
 
         Assert.Equal(1600, gain);
     }

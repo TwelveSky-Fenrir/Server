@@ -1,5 +1,4 @@
 using System.Collections.ObjectModel;
-using System.Linq;
 using Fenrir.Data.Abstractions.Guilds;
 
 namespace Fenrir.Application.Game.Tests.TestSupport;
@@ -14,11 +13,11 @@ internal sealed class FakeGuildRepository : IGuildRepository
     private readonly Dictionary<int, List<GuildNoticeRowDto>> _notices = new();
     private readonly Dictionary<int, List<GuildRosterRowDto>> _rosters = new();
 
+    private int _nextGuildId = 1;
+
     public bool ThrowOnSetBuff { get; set; }
     public bool ThrowOnCreateAndDebitMoney { get; set; }
     public bool ThrowOnUpgradeAndDebitMoney { get; set; }
-
-    private int _nextGuildId = 1;
 
     public (string Name, int MasterCharacterId, long DeltaMoney, int DeltaBigMoney)? LastCreateAndDebitMoney
     {
@@ -43,16 +42,6 @@ internal sealed class FakeGuildRepository : IGuildRepository
     {
         get;
         private set;
-    }
-
-    public void Seed(GuildSummaryDto guild)
-    {
-        _guilds[guild.GuildId] = guild;
-    }
-
-    public void SeedRoster(int guildId, params GuildRosterRowDto[] rows)
-    {
-        _rosters[guildId] = [..rows];
     }
 
     public ValueTask<GuildSummaryDto?> GetByIdAsync(int guildId, CancellationToken ct)
@@ -125,9 +114,9 @@ internal sealed class FakeGuildRepository : IGuildRepository
         LastCreateAndDebitMoney = (name, masterCharacterId, deltaMoney, deltaBigMoney);
 
         var guildId = _nextGuildId++;
-        _guilds[guildId] = new GuildSummaryDto(guildId, name, Grade: 1, MasterCharacterId: masterCharacterId,
-            Points: 0, BuffType: 0, BuffState: 0, BuffTime: 0, BuffTimeForDiff: 0, Logo: 0,
-            CreatedAtUtc: DateTime.UtcNow, MemberCount: 1);
+        _guilds[guildId] = new GuildSummaryDto(guildId, name, 1, masterCharacterId,
+            0, 0, 0, 0, 0, 0,
+            DateTime.UtcNow, 1);
 
         return ValueTask.FromResult(guildId);
     }
@@ -215,5 +204,15 @@ internal sealed class FakeGuildRepository : IGuildRepository
             list.Add(row);
 
         return ValueTask.CompletedTask;
+    }
+
+    public void Seed(GuildSummaryDto guild)
+    {
+        _guilds[guild.GuildId] = guild;
+    }
+
+    public void SeedRoster(int guildId, params GuildRosterRowDto[] rows)
+    {
+        _rosters[guildId] = [..rows];
     }
 }

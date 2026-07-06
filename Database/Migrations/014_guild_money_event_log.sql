@@ -35,61 +35,75 @@
 -- DeltaMoney explicitly 0, matching legacy's own zero-value log event. usp_Guild_Disband also gains a new
 -- trailing @CharacterId parameter (appended, not inserted -- the original signature was @GuildId alone) since
 -- it previously had no way to know which character was disbanding for the log's ActorCharacterId/AccountId.
-CREATE OR ALTER PROCEDURE game.usp_Guild_CreateAndDebitMoney @Name              NVARCHAR(12),
+CREATE
+OR
+ALTER PROCEDURE game.usp_Guild_CreateAndDebitMoney @Name NVARCHAR(12),
     @MasterCharacterId INT,
-    @DeltaMoney        BIGINT,
-    @DeltaBigMoney     INT
-AS
+    @DeltaMoney BIGINT,
+    @DeltaBigMoney INT
+    AS
 BEGIN
-    SET NOCOUNT ON;
-    SET XACT_ABORT ON;
+    SET
+NOCOUNT ON;
+    SET
+XACT_ABORT ON;
 
-    IF EXISTS (SELECT 1 FROM game.Guilds WHERE Name = @Name)
+    IF
+EXISTS (SELECT 1 FROM game.Guilds WHERE Name = @Name)
         THROW 50230, N'Guild name is already taken.', 1;
 
-    IF EXISTS (SELECT 1 FROM game.GuildMembers WHERE CharacterId = @MasterCharacterId)
+    IF
+EXISTS (SELECT 1 FROM game.GuildMembers WHERE CharacterId = @MasterCharacterId)
         THROW 50231, N'Character already belongs to a guild.', 1;
 
-    DECLARE @GuildId INT;
-    DECLARE @ActorAccountId INT;
-    DECLARE @AvatarName NVARCHAR(13);
+    DECLARE
+@GuildId INT;
+    DECLARE
+@ActorAccountId INT;
+    DECLARE
+@AvatarName NVARCHAR(13);
 
-    BEGIN TRANSACTION;
+BEGIN
+TRANSACTION;
 
     -- Guarded UPDATE closes a TOCTOU: two concurrent debits must never jointly breach the floor/cap.
-    UPDATE game.Characters
-    SET Money        = Money + @DeltaMoney,
-        BigMoney     = BigMoney + @DeltaBigMoney,
-        UpdatedAtUtc = SYSUTCDATETIME()
-    WHERE CharacterId = @MasterCharacterId
-      AND Money + @DeltaMoney BETWEEN 0 AND 2000000000
-      AND BigMoney + @DeltaBigMoney >= 0;
+UPDATE game.Characters
+SET Money        = Money + @DeltaMoney,
+    BigMoney     = BigMoney + @DeltaBigMoney,
+    UpdatedAtUtc = SYSUTCDATETIME()
+WHERE CharacterId = @MasterCharacterId
+  AND Money + @DeltaMoney BETWEEN 0 AND 2000000000
+  AND BigMoney + @DeltaBigMoney >= 0;
 
-    IF @@ROWCOUNT = 0
-    BEGIN
+IF
+@@ROWCOUNT = 0
+BEGIN
         -- Diagnostic re-read only; picks which error code to throw.
-        IF EXISTS (SELECT 1
+        IF
+EXISTS (SELECT 1
                    FROM game.Characters
                    WHERE CharacterId = @MasterCharacterId
                      AND Money + @DeltaMoney > 2000000000)
             THROW 50261, N'Adjustment would exceed the legacy money cap (MAX_NUMBER_SIZE = 2,000,000,000).', 1;
 
-        THROW 50277, N'Unknown character or insufficient money balance for the guild creation cost.', 1;
-    END;
+        THROW
+50277, N'Unknown character or insufficient money balance for the guild creation cost.', 1;
+END;
 
-    SELECT @ActorAccountId = AccountId, @AvatarName = Name
-    FROM game.Characters
-    WHERE CharacterId = @MasterCharacterId;
+SELECT @ActorAccountId = AccountId, @AvatarName = Name
+FROM game.Characters
+WHERE CharacterId = @MasterCharacterId;
 
-    INSERT INTO game.Guilds (Name, MasterCharacterId, Grade)
-    VALUES (@Name, @MasterCharacterId, 1);
+INSERT INTO game.Guilds (Name, MasterCharacterId, Grade)
+VALUES (@Name, @MasterCharacterId, 1);
 
-    SET @GuildId = SCOPE_IDENTITY();
+SET
+@GuildId = SCOPE_IDENTITY();
 
-    INSERT INTO game.GuildMembers (GuildId, CharacterId, Role)
-    VALUES (@GuildId, @MasterCharacterId, 2); -- 2 = master (game.GuildMembers role enum)
+INSERT INTO game.GuildMembers (GuildId, CharacterId, Role)
+VALUES (@GuildId, @MasterCharacterId, 2); -- 2 = master (game.GuildMembers role enum)
 
-    EXEC game.usp_EventLog_Insert
+EXEC game.usp_EventLog_Insert
         @EventCode = 1, -- create (legacy GL_617_GUILD_MONEY tAction=1)
         @Category = 11, -- game.EventLogCategory.GuildMoney
         @ActorAccountId = @ActorAccountId,
@@ -99,66 +113,77 @@ BEGIN
         @Outcome = 1,
         @Payload = CONCAT(N'GuildId=', @GuildId, N';AvatarName=', @AvatarName, N';Grade=1');
 
-    COMMIT TRANSACTION;
+COMMIT TRANSACTION;
 
-    SELECT @GuildId AS GuildId;
+SELECT @GuildId AS GuildId;
 END;
 GO
 
-CREATE OR ALTER PROCEDURE game.usp_Guild_UpgradeAndDebitMoney @GuildId       INT,
-    @Grade         INT,
-    @CharacterId   INT,
-    @DeltaMoney    BIGINT,
+CREATE
+OR
+ALTER PROCEDURE game.usp_Guild_UpgradeAndDebitMoney @GuildId INT,
+    @Grade INT,
+    @CharacterId INT,
+    @DeltaMoney BIGINT,
     @DeltaBigMoney INT
-AS
+    AS
 BEGIN
-    SET NOCOUNT ON;
-    SET XACT_ABORT ON;
+    SET
+NOCOUNT ON;
+    SET
+XACT_ABORT ON;
 
-    DECLARE @ActorAccountId INT;
-    DECLARE @AvatarName NVARCHAR(13);
+    DECLARE
+@ActorAccountId INT;
+    DECLARE
+@AvatarName NVARCHAR(13);
 
-    BEGIN TRANSACTION;
+BEGIN
+TRANSACTION;
 
-    UPDATE game.Guilds
-    SET Grade = @Grade
-    WHERE GuildId = @GuildId;
+UPDATE game.Guilds
+SET Grade = @Grade
+WHERE GuildId = @GuildId;
 
-    IF @@ROWCOUNT = 0
+IF
+@@ROWCOUNT = 0
         THROW 50235, N'Guild not found.', 1;
 
     -- Guarded UPDATE closes a TOCTOU: two concurrent debits must never jointly breach the floor/cap.
-    UPDATE game.Characters
-    SET Money        = Money + @DeltaMoney,
-        BigMoney     = BigMoney + @DeltaBigMoney,
-        UpdatedAtUtc = SYSUTCDATETIME()
-    WHERE CharacterId = @CharacterId
-      AND Money + @DeltaMoney BETWEEN 0 AND 2000000000
-      AND BigMoney + @DeltaBigMoney >= 0;
+UPDATE game.Characters
+SET Money        = Money + @DeltaMoney,
+    BigMoney     = BigMoney + @DeltaBigMoney,
+    UpdatedAtUtc = SYSUTCDATETIME()
+WHERE CharacterId = @CharacterId
+  AND Money + @DeltaMoney BETWEEN 0 AND 2000000000
+  AND BigMoney + @DeltaBigMoney >= 0;
 
-    IF @@ROWCOUNT = 0
-    BEGIN
+IF
+@@ROWCOUNT = 0
+BEGIN
         -- Diagnostic re-read only; picks which error code to throw.
-        IF EXISTS (SELECT 1
+        IF
+EXISTS (SELECT 1
                    FROM game.Characters
                    WHERE CharacterId = @CharacterId
                      AND Money + @DeltaMoney > 2000000000)
             THROW 50261, N'Adjustment would exceed the legacy money cap (MAX_NUMBER_SIZE = 2,000,000,000).', 1;
 
-        THROW 50278, N'Unknown character or insufficient money balance for the guild upgrade cost.', 1;
-    END;
+        THROW
+50278, N'Unknown character or insufficient money balance for the guild upgrade cost.', 1;
+END;
 
-    SELECT @ActorAccountId = AccountId, @AvatarName = Name
-    FROM game.Characters
-    WHERE CharacterId = @CharacterId;
+SELECT @ActorAccountId = AccountId, @AvatarName = Name
+FROM game.Characters
+WHERE CharacterId = @CharacterId;
 
-    -- Grade logged here is the resulting (post-upgrade) grade, unlike legacy's own log call which logs the
-    -- PRE-upgrade grade (mEXTRA.mRecv_GuildInfo.gGrade, captured before the round trip that performs the
-    -- actual upgrade -- see S04_MyWork02.cpp:10412, which never re-fetches gGrade after the upgrade lands).
-    -- Deliberate divergence: this proc's @Grade parameter IS the value just written to game.Guilds.Grade a
-    -- statement ago, so logging anything else would mean carrying a second, redundant "old grade" parameter
-    -- purely to reproduce a legacy quirk with no audit value of its own.
-    EXEC game.usp_EventLog_Insert
+-- Grade logged here is the resulting (post-upgrade) grade, unlike legacy's own log call which logs the
+-- PRE-upgrade grade (mEXTRA.mRecv_GuildInfo.gGrade, captured before the round trip that performs the
+-- actual upgrade -- see S04_MyWork02.cpp:10412, which never re-fetches gGrade after the upgrade lands).
+-- Deliberate divergence: this proc's @Grade parameter IS the value just written to game.Guilds.Grade a
+-- statement ago, so logging anything else would mean carrying a second, redundant "old grade" parameter
+-- purely to reproduce a legacy quirk with no audit value of its own.
+EXEC game.usp_EventLog_Insert
         @EventCode = 2, -- upgrade (legacy GL_617_GUILD_MONEY tAction=2)
         @Category = 11, -- game.EventLogCategory.GuildMoney
         @ActorAccountId = @ActorAccountId,
@@ -168,50 +193,64 @@ BEGIN
         @Outcome = 1,
         @Payload = CONCAT(N'GuildId=', @GuildId, N';AvatarName=', @AvatarName, N';Grade=', @Grade);
 
-    COMMIT TRANSACTION;
+COMMIT TRANSACTION;
 END;
 GO
 
-CREATE OR ALTER PROCEDURE game.usp_Guild_Disband @GuildId INT, @CharacterId INT
-AS
+CREATE
+OR
+ALTER PROCEDURE game.usp_Guild_Disband @GuildId INT, @CharacterId INT
+    AS
 BEGIN
-    SET NOCOUNT ON;
-    SET XACT_ABORT ON;
+    SET
+NOCOUNT ON;
+    SET
+XACT_ABORT ON;
 
-    DECLARE @Grade INT;
-    DECLARE @ActorAccountId INT;
-    DECLARE @AvatarName NVARCHAR(13);
+    DECLARE
+@Grade INT;
+    DECLARE
+@ActorAccountId INT;
+    DECLARE
+@AvatarName NVARCHAR(13);
 
-    BEGIN TRANSACTION;
+BEGIN
+TRANSACTION;
 
     -- Read the guild's grade and the acting character's identity BEFORE the deletes below remove the guild
     -- row -- there is nothing left to join against afterward. Neither SELECT has a side effect, so doing
     -- them before the not-found check below is safe: if @GuildId doesn't exist, @Grade stays NULL and the
     -- deletes' final @@ROWCOUNT = 0 still throws 50235 before the EXEC is ever reached.
-    SELECT @Grade = Grade FROM game.Guilds WHERE GuildId = @GuildId;
+SELECT @Grade = Grade
+FROM game.Guilds
+WHERE GuildId = @GuildId;
 
-    SELECT @ActorAccountId = AccountId, @AvatarName = Name
-    FROM game.Characters
-    WHERE CharacterId = @CharacterId;
+SELECT @ActorAccountId = AccountId, @AvatarName = Name
+FROM game.Characters
+WHERE CharacterId = @CharacterId;
 
-    -- game.GuildNotices access requires WITH (SNAPSHOT): the database does not set
-    -- MEMORY_OPTIMIZED_ELEVATE_TO_SNAPSHOT, so the hint is mandatory here, not defensive.
-    DELETE FROM game.GuildNotices WITH (SNAPSHOT)
-    WHERE GuildId = @GuildId;
+-- game.GuildNotices access requires WITH (SNAPSHOT): the database does not set
+-- MEMORY_OPTIMIZED_ELEVATE_TO_SNAPSHOT, so the hint is mandatory here, not defensive.
+DELETE
+FROM game.GuildNotices WITH (SNAPSHOT)
+WHERE GuildId = @GuildId;
 
-    DELETE FROM game.GuildMembers
-    WHERE GuildId = @GuildId;
+DELETE
+FROM game.GuildMembers
+WHERE GuildId = @GuildId;
 
-    DELETE FROM game.Guilds
-    WHERE GuildId = @GuildId;
+DELETE
+FROM game.Guilds
+WHERE GuildId = @GuildId;
 
-    IF @@ROWCOUNT = 0
+IF
+@@ROWCOUNT = 0
         THROW 50235, N'Guild not found.', 1;
 
     -- Disband decision (see this migration's own header comment): logged with DeltaMoney=0, matching
     -- legacy's own zero-value GL_617_GUILD_MONEY(..., 0, 3, ...) call for this branch -- disband is still an
     -- audit-worthy guild-state change even though no money moves, so it is not left out of game.EventLog.
-    EXEC game.usp_EventLog_Insert
+EXEC game.usp_EventLog_Insert
         @EventCode = 3, -- disband (legacy GL_617_GUILD_MONEY tAction=3)
         @Category = 11, -- game.EventLogCategory.GuildMoney
         @ActorAccountId = @ActorAccountId,
@@ -220,6 +259,6 @@ BEGIN
         @Outcome = 1,
         @Payload = CONCAT(N'GuildId=', @GuildId, N';AvatarName=', @AvatarName, N';Grade=', @Grade);
 
-    COMMIT TRANSACTION;
+COMMIT TRANSACTION;
 END;
 GO

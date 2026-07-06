@@ -7,8 +7,12 @@ namespace Fenrir.Application.Login.Domain.Avatars;
 ///     <c>Fenrir.Application.Login.Services.ZoneTransfer.ZoneTransferService</c>'s own remarks for why).
 /// </summary>
 /// <remarks>
-///     Réf. C++ : Server/Header/function.h:242-245 (<c>SetIntegerLow</c>: <c>value = value &lt; floor ? floor :
-///     value</c>) ; Server/ts25login/S04_MyWork02.cpp:357-358 (the two call sites -- <c>aLogoutInfo[4]</c> floored
+///     Réf. C++ : Server/Header/function.h:242-245 (<c>SetIntegerLow</c>:
+///     <c>
+///         value = value &lt; floor ? floor :
+///         value
+///     </c>
+///     ) ; Server/ts25login/S04_MyWork02.cpp:357-358 (the two call sites -- <c>aLogoutInfo[4]</c> floored
 ///     to 1, <c>aLogoutInfo[5]</c> floored to 0). Fenrir's <c>AvatarInfoFactory.CreateForCharacter</c> (both Login
 ///     and Game copies) independently corroborates that these two array slots are Life and Mana, since the wire
 ///     struct itself only labels the whole six-element array, not each index.

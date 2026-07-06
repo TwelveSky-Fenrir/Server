@@ -60,7 +60,7 @@ public class AvatarActionServiceTests
     [Fact]
     public void StandUpAction_WhileFlagged_KicksTheSession_AndDoesNotPostTheMove()
     {
-        var (zone, session) = SetUp(reviveHackFlag: true);
+        var (zone, session) = SetUp(true);
         var service = new AvatarActionService();
 
         var action = Action(30);
@@ -72,7 +72,7 @@ public class AvatarActionServiceTests
     [Fact]
     public void StandUpAction_WhileNotFlagged_IsForwardedNormally()
     {
-        var (zone, session) = SetUp(reviveHackFlag: false);
+        var (zone, session) = SetUp(false);
         var service = new AvatarActionService();
 
         var action = Action(30);
@@ -84,7 +84,7 @@ public class AvatarActionServiceTests
     [Fact]
     public void OrdinaryMoveAction_WhileFlagged_IsNotKicked_OnlyStandUpSortIsGated()
     {
-        var (zone, session) = SetUp(reviveHackFlag: true);
+        var (zone, session) = SetUp(true);
         var service = new AvatarActionService();
 
         var action = Action(0); // ordinary movement, not the stand-up sort

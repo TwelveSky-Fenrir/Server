@@ -6,6 +6,7 @@ using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.Hosting.World.ZoneWar;
 using Fenrir.Application.Game.Tests.TestSupport;
+using Fenrir.Application.Game.Tests.World.WorldState;
 using Fenrir.Data.WriteBehind;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -14,41 +15,13 @@ namespace Fenrir.Application.Game.Tests.World.ZoneWar;
 
 public class RegularWarSchedulerHostTests
 {
-    private sealed class RecordingSink : IRegularWarEventSink
-    {
-        public readonly List<(short MapId, int RemainingMinutes)> CountdownAnnouncements = [];
-        public readonly List<short> ActiveWarStarts = [];
-        public readonly List<(short MapId, RegularWarOutcome Outcome, byte? WinningTribe,
-            ImmutableArray<RegularWarRewardGrant> Rewards, bool BossSpawn)> Conclusions = [];
-
-        public void OnCountdownAnnounced(short mapId, int remainingMinutes)
-        {
-            CountdownAnnouncements.Add((mapId, remainingMinutes));
-        }
-
-        public void OnSmallestTribeFlagged(short mapId, byte tribeId)
-        {
-        }
-
-        public void OnActiveWarStarted(short mapId)
-        {
-            ActiveWarStarts.Add(mapId);
-        }
-
-        public void OnWarConcluded(short mapId, RegularWarOutcome outcome, byte? winningTribe,
-            ImmutableArray<RegularWarRewardGrant> rewards, bool bossMonstersShouldSpawn)
-        {
-            Conclusions.Add((mapId, outcome, winningTribe, rewards, bossMonstersShouldSpawn));
-        }
-
-        public void OnMonstersShouldDespawn(short mapId)
-        {
-        }
-
-        public void OnAllSessionsShouldDisconnect(short mapId)
-        {
-        }
-    }
+    /// <summary>Total legacy ticks from a fresh schedule up to (and including) the tick Active war begins.</summary>
+    private static int TicksToActiveWar =>
+        RegularWarSchedule.CooldownTicks +
+        RegularWarSchedule.CountdownAnnounceStartValue * RegularWarSchedule.CountdownAnnounceIntervalTicks +
+        RegularWarSchedule.FinalWaitTicks +
+        RegularWarSchedule.OpenGateTicks +
+        RegularWarSchedule.PreWarTicks;
 
     private static ZoneRegistry CreateRegistry(params short[] maps)
     {
@@ -61,19 +34,11 @@ public class RegularWarSchedulerHostTests
 
     private static WorldStateService CreateWorldState()
     {
-        var service = new WorldStateService(new Fenrir.Application.Game.Tests.World.WorldState.FakeWorldStateRepository(),
+        var service = new WorldStateService(new FakeWorldStateRepository(),
             NullLogger<WorldStateService>.Instance);
         service.InitializeAsync(CancellationToken.None).GetAwaiter().GetResult();
         return service;
     }
-
-    /// <summary>Total legacy ticks from a fresh schedule up to (and including) the tick Active war begins.</summary>
-    private static int TicksToActiveWar =>
-        RegularWarSchedule.CooldownTicks +
-        RegularWarSchedule.CountdownAnnounceStartValue * RegularWarSchedule.CountdownAnnounceIntervalTicks +
-        RegularWarSchedule.FinalWaitTicks +
-        RegularWarSchedule.OpenGateTicks +
-        RegularWarSchedule.PreWarTicks;
 
     [Fact]
     public void UnconfiguredMap_IsNeverScheduled_NoEventsFire()
@@ -99,7 +64,7 @@ public class RegularWarSchedulerHostTests
 
         host.Tick(SimulationClock.LegacyTick * TicksToActiveWar);
 
-        Assert.Equal([(short)49], sink.ActiveWarStarts);
+        Assert.Equal([49], sink.ActiveWarStarts);
         Assert.NotEmpty(sink.CountdownAnnouncements);
         Assert.All(sink.CountdownAnnouncements, a => Assert.Equal(49, a.MapId));
     }
@@ -132,5 +97,43 @@ public class RegularWarSchedulerHostTests
         Assert.Equal((byte)0, conclusion.WinningTribe);
         Assert.Equal(2, conclusion.Rewards.Length);
         Assert.All(conclusion.Rewards, r => Assert.True(r.IsWinningSide));
+    }
+
+    private sealed class RecordingSink : IRegularWarEventSink
+    {
+        public readonly List<short> ActiveWarStarts = [];
+
+        public readonly List<(short MapId, RegularWarOutcome Outcome, byte? WinningTribe,
+            ImmutableArray<RegularWarRewardGrant> Rewards, bool BossSpawn)> Conclusions = [];
+
+        public readonly List<(short MapId, int RemainingMinutes)> CountdownAnnouncements = [];
+
+        public void OnCountdownAnnounced(short mapId, int remainingMinutes)
+        {
+            CountdownAnnouncements.Add((mapId, remainingMinutes));
+        }
+
+        public void OnSmallestTribeFlagged(short mapId, byte tribeId)
+        {
+        }
+
+        public void OnActiveWarStarted(short mapId)
+        {
+            ActiveWarStarts.Add(mapId);
+        }
+
+        public void OnWarConcluded(short mapId, RegularWarOutcome outcome, byte? winningTribe,
+            ImmutableArray<RegularWarRewardGrant> rewards, bool bossMonstersShouldSpawn)
+        {
+            Conclusions.Add((mapId, outcome, winningTribe, rewards, bossMonstersShouldSpawn));
+        }
+
+        public void OnMonstersShouldDespawn(short mapId)
+        {
+        }
+
+        public void OnAllSessionsShouldDisconnect(short mapId)
+        {
+        }
     }
 }

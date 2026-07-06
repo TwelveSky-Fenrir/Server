@@ -47,24 +47,6 @@ public class Zone241PersonalDungeonInstanceTests
         return WorldDataCacheBuilder.Build(rows).Cache;
     }
 
-    private sealed class FakeBossCatalog(int monsterId) : IPersonalDungeonBossCatalog
-    {
-        public bool TryGetBossMonsterId(int rebirthTier, out int resolvedMonsterId)
-        {
-            resolvedMonsterId = monsterId;
-            return true;
-        }
-    }
-
-    /// <summary>Always draws the maximum value so the guaranteed drop rolls succeed deterministically.</summary>
-    private sealed class MaxValueRandom : Random
-    {
-        public override int Next(int minValue, int maxValue)
-        {
-            return Math.Max(minValue, maxValue - 1);
-        }
-    }
-
     [Fact]
     public void IsZone241TypeZone_ReflectsConfiguredMapIds()
     {
@@ -114,7 +96,7 @@ public class Zone241PersonalDungeonInstanceTests
         var zone = ZoneTestKit.CreateZone(Zone241MapId, Zone241Options(), worldData: BossWorldData());
         // Default PersonalDungeonBossCatalog (NullPersonalDungeonBossCatalog) -- every tier resolution fails.
         var (session, _) = ZoneTestKit.CreateSession(1);
-        zone.Post(ZoneCommand.Enter(1, EnterData(session, Zone241MapId, 100, 100, roundsRemaining: 3)));
+        zone.Post(ZoneCommand.Enter(1, EnterData(session, Zone241MapId, 100, 100, 3)));
         zone.Tick(SimulationClock.LegacyTick); // HandleEnter's automatic trigger already ran once and failed
 
         Assert.True(zone.TryGetPlayer(1, out var state));
@@ -137,7 +119,7 @@ public class Zone241PersonalDungeonInstanceTests
         var (session, _) = ZoneTestKit.CreateSession(1);
         const int characterId = 7;
         zone.Post(ZoneCommand.Enter(characterId,
-            EnterData(session, Zone241MapId, 100, 100, roundsRemaining: 1)));
+            EnterData(session, Zone241MapId, 100, 100, 1)));
         zone.Tick(SimulationClock.LegacyTick); // HandleEnter's automatic trigger arms + summons
 
         Assert.True(zone.TryGetPlayer(characterId, out var state));
@@ -165,7 +147,7 @@ public class Zone241PersonalDungeonInstanceTests
 
         var (session, _) = ZoneTestKit.CreateSession(1);
         zone.Post(ZoneCommand.Enter(characterId,
-            EnterData(session, Zone241MapId, 100, 100, roundsRemaining: 1)));
+            EnterData(session, Zone241MapId, 100, 100, 1)));
         zone.Tick(SimulationClock.LegacyTick);
 
         // The colliding monster was silently discarded (not the normal despawn path): no DeadMonsterEvent, no
@@ -187,7 +169,7 @@ public class Zone241PersonalDungeonInstanceTests
         var (ownerSession, ownerPipe) = ZoneTestKit.CreateSession(1);
         var (bystanderSession, bystanderPipe) = ZoneTestKit.CreateSession(2);
 
-        zone.Post(ZoneCommand.Enter(ownerId, EnterData(ownerSession, Zone241MapId, 100, 100, roundsRemaining: 1)));
+        zone.Post(ZoneCommand.Enter(ownerId, EnterData(ownerSession, Zone241MapId, 100, 100, 1)));
         zone.Post(ZoneCommand.Enter(bystanderId, EnterData(bystanderSession, Zone241MapId, 105, 105)));
         zone.Tick(SimulationClock.LegacyTick); // enters both + arms/summons the owner's personal boss
 
@@ -217,10 +199,10 @@ public class Zone241PersonalDungeonInstanceTests
     public void TryClaimGroundItem_TaggedItem_MismatchedInstance_IsRefused_AsNotFound()
     {
         var zone = ZoneTestKit.CreateZone(Zone241MapId, Zone241Options());
-        zone.SpawnGroundItem(8001, 1, 50, 0, 50, "Boss", "", GroundItemEntity.MonsterKillDropSort, instanceId: 9);
+        zone.SpawnGroundItem(8001, 1, 50, 0, 50, "Boss", "", GroundItemEntity.MonsterKillDropSort, 9);
 
         var outcome = zone.TryClaimGroundItem(1, 1u, "Someone", null, 50, 0, 50, out var item,
-            claimantInstanceId: 123);
+            123);
 
         Assert.Equal(GroundItemClaimOutcome.NotFound, outcome);
         Assert.Null(item);
@@ -231,12 +213,12 @@ public class Zone241PersonalDungeonInstanceTests
     public void TryClaimGroundItem_TaggedItem_MatchingInstance_Succeeds()
     {
         var zone = ZoneTestKit.CreateZone(Zone241MapId, Zone241Options());
-        zone.SpawnGroundItem(8001, 1, 50, 0, 50, "Boss", "", GroundItemEntity.MonsterKillDropSort, instanceId: 9);
+        zone.SpawnGroundItem(8001, 1, 50, 0, 50, "Boss", "", GroundItemEntity.MonsterKillDropSort, 9);
 
         // "Boss" matches the recorded Master (rule 4: the recorded owner can always reclaim their own drop) --
         // the instance-equality gate is the mechanic under test here, not the ownership window.
         var outcome = zone.TryClaimGroundItem(1, 1u, "Boss", null, 50, 0, 50, out var item,
-            claimantInstanceId: 9);
+            9);
 
         Assert.Equal(GroundItemClaimOutcome.Success, outcome);
         Assert.NotNull(item);
@@ -256,8 +238,8 @@ public class Zone241PersonalDungeonInstanceTests
         zone.Post(ZoneCommand.Enter(ownerId, EnterData(ownerSession, Zone241MapId, 100, 100)));
         zone.Post(ZoneCommand.Enter(bystanderId, EnterData(bystanderSession, Zone241MapId, 105, 105)));
         zone.Tick(SimulationClock.LegacyTick); // registers both players (no quota, so the automatic Zone-241
-                                                // entry attempt fails harmlessly for both -- this test tags the
-                                                // owner's own instance id directly below instead)
+        // entry attempt fails harmlessly for both -- this test tags the
+        // owner's own instance id directly below instead)
 
         Assert.True(zone.TryGetPlayer(ownerId, out var ownerState));
         // Simulates an already-armed personal instance for the owner, matching what a real, quota-granted
@@ -282,13 +264,14 @@ public class Zone241PersonalDungeonInstanceTests
     [Fact]
     public void BattleInProgress_Broadcasts241Status_Every20Ticks_ToOwnerOnly()
     {
-        var zone = ZoneTestKit.CreateZone(Zone241MapId, Zone241Options(), worldData: BossWorldData(life: 999_999));
+        var zone = ZoneTestKit.CreateZone(Zone241MapId, Zone241Options(), worldData: BossWorldData(999_999));
         zone.PersonalDungeonBossCatalog = new FakeBossCatalog(BossMonsterId);
 
         var (session, pipe) = ZoneTestKit.CreateSession(1);
         const int characterId = 3;
-        zone.Post(ZoneCommand.Enter(characterId, EnterData(session, Zone241MapId, 100, 100, roundsRemaining: 1)));
-        zone.Tick(SimulationClock.LegacyTick); // tick call #1: enter + arm + summon (creation broadcast) -> BattleInProgress, dungeon tick counter at 1
+        zone.Post(ZoneCommand.Enter(characterId, EnterData(session, Zone241MapId, 100, 100, 1)));
+        zone.Tick(SimulationClock
+            .LegacyTick); // tick call #1: enter + arm + summon (creation broadcast) -> BattleInProgress, dungeon tick counter at 1
 
         ZoneTestKit.DrainOutbound(pipe); // discard the creation broadcast
 
@@ -302,12 +285,16 @@ public class Zone241PersonalDungeonInstanceTests
         var monsterFrameSize = FrameWriter.FrameSizeOf<MonsterReplicationResponse>();
         var statusFrameSize = FrameWriter.FrameSizeOf<ZoneWar241StatusResponse>();
 
-        for (var i = 0; i < 18; i++) // tick calls #2..#19 -- dungeon tick counter reaches 19, no 241-status cadence hit yet
+        for (var i = 0;
+             i < 18;
+             i++) // tick calls #2..#19 -- dungeon tick counter reaches 19, no 241-status cadence hit yet
             zone.Tick(SimulationClock.LegacyTick);
 
-        Assert.Equal(monsterFrameSize, ZoneTestKit.DrainOutbound(pipe).Length); // only the boss's own routine keep-alive
+        Assert.Equal(monsterFrameSize,
+            ZoneTestKit.DrainOutbound(pipe).Length); // only the boss's own routine keep-alive
 
-        zone.Tick(SimulationClock.LegacyTick); // tick call #20 -- dungeon tick counter reaches 20, 241-status cadence fires
+        zone.Tick(SimulationClock
+            .LegacyTick); // tick call #20 -- dungeon tick counter reaches 20, 241-status cadence fires
 
         Assert.Equal(statusFrameSize, ZoneTestKit.DrainOutbound(pipe).Length); // exactly the 241-status broadcast
     }
@@ -322,7 +309,7 @@ public class Zone241PersonalDungeonInstanceTests
 
         var (session, _) = ZoneTestKit.CreateSession(1);
         const int characterId = 5;
-        zone.Post(ZoneCommand.Enter(characterId, EnterData(session, Zone241MapId, 100, 100, roundsRemaining: 1)));
+        zone.Post(ZoneCommand.Enter(characterId, EnterData(session, Zone241MapId, 100, 100, 1)));
         zone.Tick(SimulationClock.LegacyTick); // enter + arm + summon
 
         Assert.True(zone.TryGetPlayer(characterId, out var state));
@@ -339,5 +326,23 @@ public class Zone241PersonalDungeonInstanceTests
         // The cleanup guard only ever fires while lifecycle == Summoning; by the time it runs here the state
         // has already moved to Success, so the boss's own dropped loot is faithfully NOT reclaimed.
         Assert.Equal(1, zone.GroundItemCount);
+    }
+
+    private sealed class FakeBossCatalog(int monsterId) : IPersonalDungeonBossCatalog
+    {
+        public bool TryGetBossMonsterId(int rebirthTier, out int resolvedMonsterId)
+        {
+            resolvedMonsterId = monsterId;
+            return true;
+        }
+    }
+
+    /// <summary>Always draws the maximum value so the guaranteed drop rolls succeed deterministically.</summary>
+    private sealed class MaxValueRandom : Random
+    {
+        public override int Next(int minValue, int maxValue)
+        {
+            return Math.Max(minValue, maxValue - 1);
+        }
     }
 }

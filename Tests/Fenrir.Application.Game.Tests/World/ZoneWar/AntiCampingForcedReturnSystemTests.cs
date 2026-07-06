@@ -22,7 +22,7 @@ public class AntiCampingForcedReturnSystemTests
     {
         var byMap = new Dictionary<short, AntiCampingMapGuardPoints>
         {
-            [mapId] = new AntiCampingMapGuardPoints([..points], null)
+            [mapId] = new([..points], null)
         };
         return new AntiCampingGuardPointCatalog(byMap);
     }
@@ -32,7 +32,7 @@ public class AntiCampingForcedReturnSystemTests
     {
         var byMap = new Dictionary<short, AntiCampingMapGuardPoints>
         {
-            [mapId] = new AntiCampingMapGuardPoints([..symbolPoints], tower)
+            [mapId] = new([..symbolPoints], tower)
         };
         return new AntiCampingGuardPointCatalog(byMap);
     }
@@ -124,7 +124,7 @@ public class AntiCampingForcedReturnSystemTests
         // radius -- proves the check is NOT horizontal-only (GetLengthXYZ, mapcheck.h:12-15).
         var catalog = CatalogWithSymbolPoints(GuardedMapId, new AntiCampingGuardPoint(100, 0, 100));
         var system = new AntiCampingForcedReturnSystem(catalog);
-        var (zone, state, _) = EnterPlayer(GuardedMapId, 100, 1000, 100);
+        var (zone, state, _) = EnterPlayer(GuardedMapId, 100, 1000);
 
         system.Simulate(zone, 1);
 

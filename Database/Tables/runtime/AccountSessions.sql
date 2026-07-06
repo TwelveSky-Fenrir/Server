@@ -5,7 +5,7 @@ CREATE TABLE runtime.AccountSessions
 (
     AccountId        INT              NOT NULL,
     ServerKind       TINYINT          NOT NULL, -- 0 = Login, 1 = Game
-    ShardId          TINYINT          NULL,     -- meaningful only when ServerKind = 1
+    ShardId          TINYINT NULL,              -- meaningful only when ServerKind = 1
     SessionToken     UNIQUEIDENTIFIER NOT NULL, -- minted once at Login-claim time, carried through runtime.SessionTickets
     SessionState     TINYINT          NOT NULL, -- 0 = Active, 1 = TearingDown
     KickRequested    BIT              NOT NULL,

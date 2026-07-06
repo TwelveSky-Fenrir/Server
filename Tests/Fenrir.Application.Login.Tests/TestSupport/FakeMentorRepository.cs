@@ -14,19 +14,6 @@ internal sealed class FakeMentorRepository : IMentorRepository
     /// <summary>Every characterId GetForCharacterAsync was called with, in call order -- proves ordering/short-circuit.</summary>
     public List<int> QueriedCharacterIds { get; } = [];
 
-    /// <summary>No character has any teacher/student bond at all.</summary>
-    public static FakeMentorRepository Empty()
-    {
-        return new FakeMentorRepository();
-    }
-
-    public static FakeMentorRepository With(int characterId, CharacterMentorDto mentor)
-    {
-        var repository = new FakeMentorRepository();
-        repository._mentorByCharacterId[characterId] = mentor;
-        return repository;
-    }
-
     public ValueTask<CharacterMentorDto?> GetForCharacterAsync(int characterId, CancellationToken ct)
     {
         QueriedCharacterIds.Add(characterId);
@@ -41,5 +28,18 @@ internal sealed class FakeMentorRepository : IMentorRepository
     public ValueTask ClearForCharacterAsync(int characterId, CancellationToken ct)
     {
         throw new NotSupportedException();
+    }
+
+    /// <summary>No character has any teacher/student bond at all.</summary>
+    public static FakeMentorRepository Empty()
+    {
+        return new FakeMentorRepository();
+    }
+
+    public static FakeMentorRepository With(int characterId, CharacterMentorDto mentor)
+    {
+        var repository = new FakeMentorRepository();
+        repository._mentorByCharacterId[characterId] = mentor;
+        return repository;
     }
 }

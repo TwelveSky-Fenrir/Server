@@ -132,7 +132,7 @@ public class TribeGuardCorridorCatalogTests
     public void TryGetGuardPostSlots_ReturnsTheConfiguredFiveSlotIndices()
     {
         var slots = ImmutableDictionary<(byte, byte), ImmutableArray<int>>.Empty
-            .Add((0, (byte)0), ImmutableArray.Create(500, 501, 502, 503, 504));
+            .Add((0, 0), ImmutableArray.Create(500, 501, 502, 503, 504));
         var catalog = CreateCatalog(slots);
 
         Assert.True(catalog.TryGetGuardPostSlots(0, 0, out var resolved));

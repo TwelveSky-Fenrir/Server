@@ -126,8 +126,8 @@ public class StoreItemTransferPolicyTests
     [Fact]
     public void Deposit_NonStackable_MovesWholeSlotAndIgnoresQuantity()
     {
-        var source = Stack(100, 1, enchant: 5, combine: 1, refine: 2, socket: 3, gem1: 7, gem2: 8, gem3: 9,
-            expireDate: 20260101, serial: 42);
+        var source = Stack(100, 1, 5, 1, 2, 3, 7, 8, 9,
+            20260101, 42);
 
         // requestedQuantity (999) is deliberately nonsensical -- non-stackable ignores it entirely.
         var result = StoreItemTransferPolicy.ResolveDepositFromInventory(
@@ -153,7 +153,7 @@ public class StoreItemTransferPolicyTests
     [Fact]
     public void Deposit_NonStackable_SocketUnsupported_ZeroesGemsButKeepsExpiry()
     {
-        var source = Stack(100, 1, gem1: 7, gem2: 8, gem3: 9, expireDate: 20260101);
+        var source = Stack(100, gem1: 7, gem2: 8, gem3: 9, expireDate: 20260101);
 
         var result = StoreItemTransferPolicy.ResolveDepositFromInventory(
             ContainerMatrix.InventoryPage0, 0, 0, ContainerMatrix.StorePage0, 0,
@@ -179,7 +179,7 @@ public class StoreItemTransferPolicyTests
     [Fact]
     public void Deposit_Stackable_PartialIntoEmptyDestination_SplitsAndZeroesDestinationValueAndSerial()
     {
-        var source = Stack(2, 10, enchant: 9, serial: 5);
+        var source = Stack(2, 10, 9, serial: 5);
 
         var result = StoreItemTransferPolicy.ResolveDepositFromInventory(
             ContainerMatrix.InventoryPage0, 0, 4, ContainerMatrix.StorePage0, 0,
@@ -266,7 +266,7 @@ public class StoreItemTransferPolicyTests
     {
         var result = StoreItemTransferPolicy.ResolveDepositFromInventory(
             ContainerMatrix.InventoryPage0, 0, 1, ContainerMatrix.StorePage0, 0,
-            Stack(2, 10), Stack(3, 1), true, false, true, true);
+            Stack(2, 10), Stack(3), true, false, true, true);
 
         Assert.Equal(StoreItemTransferPolicy.TransferOutcome.DestinationConflict, result.Outcome);
     }
@@ -468,8 +468,8 @@ public class StoreItemTransferPolicyTests
     [Fact]
     public void Rearrange_NonStackable_DestinationOccupied_SwapsInstead()
     {
-        var source = Stack(100, 1, enchant: 4);
-        var destination = Stack(200, 1, enchant: 9);
+        var source = Stack(100, 1, 4);
+        var destination = Stack(200, 1, 9);
 
         var result = StoreItemTransferPolicy.ResolveRearrangeWithinStore(
             ContainerMatrix.StorePage0, 0, 0, ContainerMatrix.StorePage0, 1,
@@ -484,7 +484,7 @@ public class StoreItemTransferPolicyTests
     [Fact]
     public void Rearrange_NonStackable_EmptyDestination_MovesWholeSlot()
     {
-        var source = Stack(100, 1, enchant: 4, gem1: 1, expireDate: 55, serial: 9);
+        var source = Stack(100, 1, 4, gem1: 1, expireDate: 55, serial: 9);
 
         // requestedQuantity (999) is deliberately nonsensical -- non-stackable ignores it entirely.
         var result = StoreItemTransferPolicy.ResolveRearrangeWithinStore(
@@ -547,8 +547,8 @@ public class StoreItemTransferPolicyTests
     [Fact]
     public void Rearrange_Stackable_MismatchedItem_FullStackMove_SwapsWholeRecords()
     {
-        var source = Stack(2, 20, enchant: 3, gem1: 1, expireDate: 111);
-        var destination = Stack(3, 5, enchant: 7, gem1: 2, expireDate: 222);
+        var source = Stack(2, 20, 3, gem1: 1, expireDate: 111);
+        var destination = Stack(3, 5, 7, gem1: 2, expireDate: 222);
 
         // requestedQuantity (20) equals source's entire stack -- the only way a mismatched item earns a swap.
         var result = StoreItemTransferPolicy.ResolveRearrangeWithinStore(

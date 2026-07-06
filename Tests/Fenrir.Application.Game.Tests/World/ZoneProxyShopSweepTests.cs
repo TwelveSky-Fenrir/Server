@@ -121,10 +121,10 @@ public class ZoneProxyShopSweepTests
     public void WrongZone_SweepNeverRuns_EvenForAnAlreadyExpiredEntry()
     {
         // Deliberately NOT ProxyShopZonePolicy.ZoneNumber.
-        var zone = ZoneTestKit.CreateZone((short)(ProxyShopZonePolicy.ZoneNumber + 1));
+        var zone = ZoneTestKit.CreateZone(ProxyShopZonePolicy.ZoneNumber + 1);
         var (session, pipe) = ZoneTestKit.CreateSession(1);
         zone.Post(ZoneCommand.Enter(1,
-            ZoneTestKit.EnterData(session, (short)(ProxyShopZonePolicy.ZoneNumber + 1), posX: 10f, posZ: 10f)));
+            ZoneTestKit.EnterData(session, ProxyShopZonePolicy.ZoneNumber + 1, posX: 10f, posZ: 10f)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
         ZoneTestKit.DrainOutbound(pipe);
 
@@ -140,7 +140,7 @@ public class ZoneProxyShopSweepTests
     public void NoNeighborsNearby_StillForceClosesAndQueuesTheWrite_JustSendsNoPacket()
     {
         var zone = ZoneTestKit.CreateZone(ProxyShopZonePolicy.ZoneNumber);
-        zone.RegisterProxyShop(Entry(10, Expired, x: 5000f, z: 5000f)); // far outside any AOI neighbor
+        zone.RegisterProxyShop(Entry(10, Expired, 5000f, 5000f)); // far outside any AOI neighbor
 
         zone.Tick(SimulationClock.ProxyShopRebroadcastInterval);
 

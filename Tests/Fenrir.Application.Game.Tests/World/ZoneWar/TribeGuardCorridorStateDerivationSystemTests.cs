@@ -62,7 +62,7 @@ public class TribeGuardCorridorStateDerivationSystemTests
     [Fact]
     public void HubZone_BootTick_ForcesOpenEveryOwnedTribesSegmentZero_RegardlessOfLiveness()
     {
-        var catalog = CreateCatalog(twoTribes: true);
+        var catalog = CreateCatalog(true);
         var (zone, state) = CreateZoneWithSystem(HubZoneId, catalog);
 
         zone.Tick(SimulationClock.LegacyTick);
@@ -98,7 +98,7 @@ public class TribeGuardCorridorStateDerivationSystemTests
     public void SecondTick_LiveGuardPost_ClosesAPreviouslyBootForcedOpenSegment()
     {
         var slots = ImmutableDictionary<(byte, byte), ImmutableArray<int>>.Empty
-            .Add(((byte)0, (byte)1), ImmutableArray.Create(10, 11, 12, 13, 14));
+            .Add((0, 1), ImmutableArray.Create(10, 11, 12, 13, 14));
         var catalog = CreateCatalog(guardPostSlots: slots);
         var (zone, state) = CreateZoneWithSystem(1, catalog); // owns segment (0,1)
 
@@ -115,7 +115,7 @@ public class TribeGuardCorridorStateDerivationSystemTests
     public void SecondTick_NoLiveGuardPosts_SegmentStaysOpen()
     {
         var slots = ImmutableDictionary<(byte, byte), ImmutableArray<int>>.Empty
-            .Add(((byte)0, (byte)1), ImmutableArray.Create(10, 11, 12, 13, 14));
+            .Add((0, 1), ImmutableArray.Create(10, 11, 12, 13, 14));
         var catalog = CreateCatalog(guardPostSlots: slots);
         var (zone, state) = CreateZoneWithSystem(1, catalog);
 
@@ -129,7 +129,7 @@ public class TribeGuardCorridorStateDerivationSystemTests
     public void GuardDeath_ReopensTheSegmentOnTheNextEvaluation()
     {
         var slots = ImmutableDictionary<(byte, byte), ImmutableArray<int>>.Empty
-            .Add(((byte)0, (byte)1), ImmutableArray.Create(10, 11, 12, 13, 14));
+            .Add((0, 1), ImmutableArray.Create(10, 11, 12, 13, 14));
         var catalog = CreateCatalog(guardPostSlots: slots);
         var (zone, state) = CreateZoneWithSystem(1, catalog);
 

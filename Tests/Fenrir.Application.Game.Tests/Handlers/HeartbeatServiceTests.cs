@@ -1,6 +1,5 @@
 using Fenrir.Application.Game.Abstractions.ZoneLifecycle;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game.Handlers;
 using Fenrir.Application.Game.Handlers.Handlers;
 using Fenrir.Application.Game.Services.ZoneLifecycle;
 using Fenrir.Application.Game.Tests.TestSupport;

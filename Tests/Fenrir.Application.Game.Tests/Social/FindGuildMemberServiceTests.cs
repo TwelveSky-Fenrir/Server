@@ -36,7 +36,7 @@ public class FindGuildMemberServiceTests
         var zones = ZoneTestKit.CreateRegistry();
         zones.Initialize([]);
         var service = new FindGuildMemberService(zones, directory);
-        var asker = MakePlayer(1, "Asker", guildId: null);
+        var asker = MakePlayer(1, "Asker", null);
 
         var result = await service.FindZoneAsync(asker, "Anyone", CancellationToken.None);
 
@@ -56,7 +56,7 @@ public class FindGuildMemberServiceTests
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
         var service = new FindGuildMemberService(zones, directory);
-        var asker = MakePlayer(1, "Asker", guildId: 10);
+        var asker = MakePlayer(1, "Asker", 10);
 
         var result = await service.FindZoneAsync(asker, "Target", CancellationToken.None);
 
@@ -68,12 +68,12 @@ public class FindGuildMemberServiceTests
     public async Task FindZoneAsync_SameShardMiss_FallsBackToDirectory_ReturnsItsMapId()
     {
         var directory = new FakeCharacterShardLocationRepository();
-        directory.Seed(new CharacterShardLocationDto(2, ShardId: 4, MapId: 88, AvatarName: "Target", Tribe: 0,
-            LastSeenUtc: DateTime.UtcNow));
+        directory.Seed(new CharacterShardLocationDto(2, 4, 88, "Target", 0,
+            DateTime.UtcNow));
         var zones = ZoneTestKit.CreateRegistry();
         zones.Initialize([]);
         var service = new FindGuildMemberService(zones, directory);
-        var asker = MakePlayer(1, "Asker", guildId: 10);
+        var asker = MakePlayer(1, "Asker", 10);
 
         var result = await service.FindZoneAsync(asker, "Target", CancellationToken.None);
 
@@ -88,7 +88,7 @@ public class FindGuildMemberServiceTests
         var zones = ZoneTestKit.CreateRegistry();
         zones.Initialize([]);
         var service = new FindGuildMemberService(zones, directory);
-        var asker = MakePlayer(1, "Asker", guildId: 10);
+        var asker = MakePlayer(1, "Asker", 10);
 
         var result = await service.FindZoneAsync(asker, "Nobody", CancellationToken.None);
 

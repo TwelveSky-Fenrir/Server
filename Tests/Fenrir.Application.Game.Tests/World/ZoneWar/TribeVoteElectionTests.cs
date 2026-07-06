@@ -73,7 +73,7 @@ public class TribeVoteElectionTests
         await election.OpenCandidacyWindowAsync(CancellationToken.None);
 
         Assert.Equal(TribeVotePhase.Candidacy, election.Phase);
-        Assert.Equal([(byte)0, (byte)1, (byte)2, (byte)3], repository.ClearCalls);
+        Assert.Equal([0, 1, 2, 3], repository.ClearCalls);
         Assert.Empty(await worldState.GetTribeVotesAsync(1, CancellationToken.None));
     }
 
@@ -83,7 +83,7 @@ public class TribeVoteElectionTests
         var worldState = CreateWorldState(out _);
         var election = new TribeVoteElection(worldState, new FakeTribeRepository(), CreateRegistry(),
             NullLogger<TribeVoteElection>.Instance);
-        var player = CreatePlayer(500, tribe: 1);
+        var player = CreatePlayer(500, 1);
 
         var outcome = await election.TryRegisterCandidacyAsync(player, 0, CancellationToken.None);
 
@@ -97,7 +97,7 @@ public class TribeVoteElectionTests
         var election = new TribeVoteElection(worldState, new FakeTribeRepository(), CreateRegistry(),
             NullLogger<TribeVoteElection>.Instance);
         await election.OpenCandidacyWindowAsync(CancellationToken.None);
-        var player = CreatePlayer(500, tribe: 1, level: 144);
+        var player = CreatePlayer(500, 1, 144);
 
         var outcome = await election.TryRegisterCandidacyAsync(player, 0, CancellationToken.None);
 
@@ -111,7 +111,7 @@ public class TribeVoteElectionTests
         var election = new TribeVoteElection(worldState, new FakeTribeRepository(), CreateRegistry(),
             NullLogger<TribeVoteElection>.Instance);
         await election.OpenCandidacyWindowAsync(CancellationToken.None);
-        var player = CreatePlayer(500, tribe: 1, contributionPoints: 999);
+        var player = CreatePlayer(500, 1, contributionPoints: 999);
 
         var outcome = await election.TryRegisterCandidacyAsync(player, 0, CancellationToken.None);
 
@@ -126,7 +126,7 @@ public class TribeVoteElectionTests
             NullLogger<TribeVoteElection>.Instance);
         await election.OpenCandidacyWindowAsync(CancellationToken.None);
         repository.VotesByTribe[1] = [new TribeVoteDto(1, 3, 500, 145, 1000, 0, DateTime.UtcNow)];
-        var player = CreatePlayer(500, tribe: 1);
+        var player = CreatePlayer(500, 1);
 
         var outcome = await election.TryRegisterCandidacyAsync(player, 0, CancellationToken.None);
 
@@ -141,7 +141,7 @@ public class TribeVoteElectionTests
             NullLogger<TribeVoteElection>.Instance);
         await election.OpenCandidacyWindowAsync(CancellationToken.None);
         repository.VotesByTribe[1] = [new TribeVoteDto(1, 0, 999, 150, 5000, 0, DateTime.UtcNow)];
-        var player = CreatePlayer(500, tribe: 1, contributionPoints: 5000); // equal, not strictly greater
+        var player = CreatePlayer(500, 1, contributionPoints: 5000); // equal, not strictly greater
 
         var outcome = await election.TryRegisterCandidacyAsync(player, 0, CancellationToken.None);
 
@@ -156,7 +156,7 @@ public class TribeVoteElectionTests
             NullLogger<TribeVoteElection>.Instance);
         await election.OpenCandidacyWindowAsync(CancellationToken.None);
         repository.VotesByTribe[1] = [new TribeVoteDto(1, 0, 999, 150, 1200, 0, DateTime.UtcNow)];
-        var player = CreatePlayer(500, tribe: 1, contributionPoints: 1201);
+        var player = CreatePlayer(500, 1, contributionPoints: 1201);
 
         var outcome = await election.TryRegisterCandidacyAsync(player, 0, CancellationToken.None);
 
@@ -173,7 +173,7 @@ public class TribeVoteElectionTests
         var worldState = CreateWorldState(out _);
         var election = new TribeVoteElection(worldState, new FakeTribeRepository(), CreateRegistry(),
             NullLogger<TribeVoteElection>.Instance);
-        var player = CreatePlayer(500, tribe: 1);
+        var player = CreatePlayer(500, 1);
 
         var outcome = await election.TryCastVoteAsync(player, 0, CancellationToken.None);
 
@@ -188,7 +188,7 @@ public class TribeVoteElectionTests
             NullLogger<TribeVoteElection>.Instance);
         await election.OpenCandidacyWindowAsync(CancellationToken.None);
         election.OpenVotingWindow();
-        var player = CreatePlayer(500, tribe: 1);
+        var player = CreatePlayer(500, 1);
 
         var outcome = await election.TryCastVoteAsync(player, 0, CancellationToken.None);
 
@@ -204,7 +204,7 @@ public class TribeVoteElectionTests
         await election.OpenCandidacyWindowAsync(CancellationToken.None);
         repository.VotesByTribe[1] = [new TribeVoteDto(1, 0, 999, 150, 1200, 0, DateTime.UtcNow)];
         election.OpenVotingWindow();
-        var voter = CreatePlayer(500, tribe: 1, level: 150, rebirthCount: 2);
+        var voter = CreatePlayer(500, 1, 150, rebirthCount: 2);
 
         var outcome = await election.TryCastVoteAsync(voter, 0, CancellationToken.None);
 
@@ -223,7 +223,7 @@ public class TribeVoteElectionTests
         await election.OpenCandidacyWindowAsync(CancellationToken.None);
         repository.VotesByTribe[1] = [new TribeVoteDto(1, 0, 999, 150, 1200, 0, DateTime.UtcNow)];
         election.OpenVotingWindow();
-        var voter = CreatePlayer(500, tribe: 1, level: 150);
+        var voter = CreatePlayer(500, 1, 150);
 
         Assert.Equal(TribeVoteCastOutcome.Cast, await election.TryCastVoteAsync(voter, 0, CancellationToken.None));
         Assert.Equal(TribeVoteCastOutcome.AlreadyVotedThisWindow,
@@ -241,7 +241,7 @@ public class TribeVoteElectionTests
         await election.OpenCandidacyWindowAsync(CancellationToken.None);
         repository.VotesByTribe[1] = [new TribeVoteDto(1, 0, 999, 150, 1200, 0, DateTime.UtcNow)];
         election.OpenVotingWindow();
-        var voter = CreatePlayer(500, tribe: 1, level: 150);
+        var voter = CreatePlayer(500, 1, 150);
         await election.TryCastVoteAsync(voter, 0, CancellationToken.None);
 
         election.OpenVotingWindow(); // a fresh cycle -- clears the per-window voted set
@@ -392,9 +392,9 @@ public class TribeVoteElectionTests
         Assert.Single(votes);
 
         Assert.Equal(TribeVoteCandidacyOutcome.WindowClosed,
-            await election.TryRegisterCandidacyAsync(CreatePlayer(1, tribe: 1), 1, CancellationToken.None));
+            await election.TryRegisterCandidacyAsync(CreatePlayer(1, 1), 1, CancellationToken.None));
         Assert.Equal(TribeVoteCastOutcome.WindowClosed,
-            await election.TryCastVoteAsync(CreatePlayer(2, tribe: 1), 0, CancellationToken.None));
+            await election.TryCastVoteAsync(CreatePlayer(2, 1), 0, CancellationToken.None));
     }
 
     [Fact]
@@ -448,7 +448,7 @@ public class TribeVoteElectionTests
         await election.ResetToIdleAsync(CancellationToken.None);
 
         Assert.Equal(TribeVotePhase.Closed, election.Phase);
-        Assert.Equal([(byte)0, (byte)1, (byte)2, (byte)3], repository.ClearCalls);
+        Assert.Equal([0, 1, 2, 3], repository.ClearCalls);
         Assert.Empty(await worldState.GetTribeVotesAsync(2, CancellationToken.None));
     }
 }

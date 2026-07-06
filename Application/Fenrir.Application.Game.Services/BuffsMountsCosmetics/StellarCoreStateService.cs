@@ -30,7 +30,7 @@ public sealed class StellarCoreStateService(
 
             case StellarCoreStateResolver.ResultKind.Select:
                 zone.PostStellarCoreCommand(new StellarCoreZoneCommand(characterId, result.NewCoreIndex));
-                return new StellarCoreStateResult(StellarCoreStateOutcome.Reply, 0);
+                return new StellarCoreStateResult(StellarCoreStateOutcome.Reply);
 
             case StellarCoreStateResolver.ResultKind.Equip:
             {
@@ -39,7 +39,7 @@ public sealed class StellarCoreStateService(
                 zone.PostStellarCoreCommand(new StellarCoreZoneCommand(characterId,
                     result.NewCoreIndex, result.NewCoreNumber, Life: maxLife, Mana: maxMana,
                     Broadcast: StellarCoreBroadcastKind.Equip));
-                return new StellarCoreStateResult(StellarCoreStateOutcome.Reply, 0);
+                return new StellarCoreStateResult(StellarCoreStateOutcome.Reply);
             }
 
             case StellarCoreStateResolver.ResultKind.Remove:
@@ -49,7 +49,7 @@ public sealed class StellarCoreStateService(
                 zone.PostStellarCoreCommand(new StellarCoreZoneCommand(characterId,
                     result.NewCoreIndex, 0, Life: maxLife, Mana: maxMana,
                     Broadcast: StellarCoreBroadcastKind.Remove));
-                return new StellarCoreStateResult(StellarCoreStateOutcome.Reply, 0);
+                return new StellarCoreStateResult(StellarCoreStateOutcome.Reply);
             }
 
             case StellarCoreStateResolver.ResultKind.ReturnToInventoryMismatch:

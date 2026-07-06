@@ -15,19 +15,6 @@ internal sealed class FakeGuildRepository : IGuildRepository
     /// <summary>Every characterId GetByCharacterAsync was called with, in call order -- proves ordering/short-circuit.</summary>
     public List<int> QueriedCharacterIds { get; } = [];
 
-    /// <summary>No character has any guild membership at all.</summary>
-    public static FakeGuildRepository Empty()
-    {
-        return new FakeGuildRepository();
-    }
-
-    public static FakeGuildRepository WithMembership(int characterId, CharacterGuildMembershipDto membership)
-    {
-        var repository = new FakeGuildRepository();
-        repository._membershipByCharacterId[characterId] = membership;
-        return repository;
-    }
-
     public ValueTask<CharacterGuildMembershipDto?> GetByCharacterAsync(int characterId, CancellationToken ct)
     {
         QueriedCharacterIds.Add(characterId);
@@ -125,5 +112,18 @@ internal sealed class FakeGuildRepository : IGuildRepository
     public ValueTask SetNoticeAsync(int guildId, byte noticeIndex, string text, CancellationToken ct)
     {
         throw new NotSupportedException();
+    }
+
+    /// <summary>No character has any guild membership at all.</summary>
+    public static FakeGuildRepository Empty()
+    {
+        return new FakeGuildRepository();
+    }
+
+    public static FakeGuildRepository WithMembership(int characterId, CharacterGuildMembershipDto membership)
+    {
+        var repository = new FakeGuildRepository();
+        repository._membershipByCharacterId[characterId] = membership;
+        return repository;
     }
 }

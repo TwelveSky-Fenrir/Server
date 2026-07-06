@@ -41,7 +41,7 @@ public class ZoneDuelEntryTests
         var zone = ZoneTestKit.CreateZone(1, duelRegistry: duels);
         var (session, _) = ZoneTestKit.CreateSession(2);
 
-        zone.Post(ZoneCommand.Enter(20, ZoneTestKit.EnterData(session, 1, name: "Target")));
+        zone.Post(ZoneCommand.Enter(20, ZoneTestKit.EnterData(session, 1, "Target")));
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
         // Neither the entering target nor the original (now-abandoned) challenger is left dangling -- two

@@ -1,12 +1,11 @@
 using System.Buffers.Binary;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game.Handlers;
 using Fenrir.Application.Game.Handlers.Handlers;
 using Fenrir.Application.Game.Services.FishingConsumables;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Network.Dispatch.Sessions;
-using Fenrir.Network.Serialization.Packets.Zone;
 using Fenrir.Network.Framing;
+using Fenrir.Network.Serialization.Packets.Zone;
 
 namespace Fenrir.Application.Game.Tests.Fishing;
 
@@ -49,7 +48,8 @@ public class FishingProgressHandlerTests
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
-        new FishingProgressHandler(new FishingProgressService()).Handle(new FishingProgressRequest { Sort = 2, FishingStep = 0 }, session);
+        new FishingProgressHandler(new FishingProgressService()).Handle(
+            new FishingProgressRequest { Sort = 2, FishingStep = 0 }, session);
 
         Assert.Equal(DisconnectReason.Faulted, session.DisconnectReason);
     }
@@ -59,7 +59,8 @@ public class FishingProgressHandlerTests
     {
         var (session, _, _, _) = SetUp();
 
-        new FishingProgressHandler(new FishingProgressService()).Handle(new FishingProgressRequest { Sort = 4, FishingStep = 0 }, session);
+        new FishingProgressHandler(new FishingProgressService()).Handle(
+            new FishingProgressRequest { Sort = 4, FishingStep = 0 }, session);
 
         Assert.Equal(DisconnectReason.Faulted, session.DisconnectReason);
     }
@@ -69,7 +70,8 @@ public class FishingProgressHandlerTests
     {
         var (session, _, _, _) = SetUp();
 
-        new FishingProgressHandler(new FishingProgressService()).Handle(new FishingProgressRequest { Sort = 3, FishingStep = 6 }, session);
+        new FishingProgressHandler(new FishingProgressService()).Handle(
+            new FishingProgressRequest { Sort = 3, FishingStep = 6 }, session);
 
         Assert.Equal(DisconnectReason.Faulted, session.DisconnectReason);
     }
@@ -79,7 +81,8 @@ public class FishingProgressHandlerTests
     {
         var (session, pipe, zone, state) = SetUp();
 
-        new FishingProgressHandler(new FishingProgressService()).Handle(new FishingProgressRequest { Sort = 3, FishingStep = 2 }, session);
+        new FishingProgressHandler(new FishingProgressService()).Handle(
+            new FishingProgressRequest { Sort = 3, FishingStep = 2 }, session);
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.Equal(2, state.FishingStep);
@@ -95,7 +98,8 @@ public class FishingProgressHandlerTests
     {
         var (session, pipe, zone, state) = SetUp();
 
-        new FishingProgressHandler(new FishingProgressService()).Handle(new FishingProgressRequest { Sort = 3, FishingStep = 4 }, session);
+        new FishingProgressHandler(new FishingProgressService()).Handle(
+            new FishingProgressRequest { Sort = 3, FishingStep = 4 }, session);
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.Equal(4, state.FishingStep);
@@ -116,7 +120,8 @@ public class FishingProgressHandlerTests
         state.FishingStep = 5;
         state.FishingCastAtUtc = DateTime.UtcNow.AddMinutes(-5);
 
-        new FishingProgressHandler(new FishingProgressService()).Handle(new FishingProgressRequest { Sort = 2, FishingStep = 0 }, session);
+        new FishingProgressHandler(new FishingProgressService()).Handle(
+            new FishingProgressRequest { Sort = 2, FishingStep = 0 }, session);
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.Equal(2, state.FishingStep);
@@ -132,7 +137,8 @@ public class FishingProgressHandlerTests
     {
         var (session, pipe, zone, state) = SetUp();
 
-        new FishingProgressHandler(new FishingProgressService()).Handle(new FishingProgressRequest { Sort = 2, FishingStep = 0 }, session);
+        new FishingProgressHandler(new FishingProgressService()).Handle(
+            new FishingProgressRequest { Sort = 2, FishingStep = 0 }, session);
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.Equal(0, state.FishingState);
@@ -151,7 +157,8 @@ public class FishingProgressHandlerTests
         state.FishingState = 1;
         state.FishingStep = 3;
 
-        new FishingProgressHandler(new FishingProgressService()).Handle(new FishingProgressRequest { Sort = 1, FishingStep = 0 }, session);
+        new FishingProgressHandler(new FishingProgressService()).Handle(
+            new FishingProgressRequest { Sort = 1, FishingStep = 0 }, session);
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.Equal(3, state.FishingStep);
@@ -167,7 +174,8 @@ public class FishingProgressHandlerTests
         state.FishingStep = 3;
         state.FishingCastAtUtc = DateTime.UtcNow;
 
-        new FishingProgressHandler(new FishingProgressService()).Handle(new FishingProgressRequest { Sort = 1, FishingStep = 0 }, session);
+        new FishingProgressHandler(new FishingProgressService()).Handle(
+            new FishingProgressRequest { Sort = 1, FishingStep = 0 }, session);
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.Equal(3, state.FishingStep);
@@ -183,7 +191,8 @@ public class FishingProgressHandlerTests
         state.FishingStep = 3;
         state.FishingCastAtUtc = DateTime.UtcNow.AddMinutes(-2);
 
-        new FishingProgressHandler(new FishingProgressService()).Handle(new FishingProgressRequest { Sort = 1, FishingStep = 0 }, session);
+        new FishingProgressHandler(new FishingProgressService()).Handle(
+            new FishingProgressRequest { Sort = 1, FishingStep = 0 }, session);
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.True(state.FishingStep is 4 or 5);

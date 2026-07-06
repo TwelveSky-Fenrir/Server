@@ -1,9 +1,13 @@
+using System.Collections.Immutable;
 using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.GameData;
 
 namespace Fenrir.Application.Game.Domain.Combat;
 
-/// <summary>Why a stun attempt (<c>mCase</c> 5, <c>ProcessAttack05</c>) was refused before rolling -- each is a silent, packet-less <c>return;</c> in the legacy.</summary>
+/// <summary>
+///     Why a stun attempt (<c>mCase</c> 5, <c>ProcessAttack05</c>) was refused before rolling -- each is a silent,
+///     packet-less <c>return;</c> in the legacy.
+/// </summary>
 public enum StunRejectReason
 {
     None,
@@ -77,7 +81,10 @@ public readonly record struct StunAttemptOutcome(
 /// </param>
 /// <param name="UsedSkillId">Wire <c>mAttackActionValue2</c>.</param>
 /// <param name="UsedSkillGradePoints">Wire <c>mAttackActionValue3</c> -- already the combined grade, not summed here.</param>
-/// <param name="AttackerAnimatingSkillNumber"><c>PlayerRuntimeState.ActionSkillNumber</c> -- what the echo check compares against.</param>
+/// <param name="AttackerAnimatingSkillNumber">
+///     <c>PlayerRuntimeState.ActionSkillNumber</c> -- what the echo check compares
+///     against.
+/// </param>
 /// <param name="AttackerAnimatingGradePoints">
 ///     <c>PlayerRuntimeState.ActionSkillGradeNum1 + ActionSkillGradeNum2</c> -- what the echo check compares
 ///     against.
@@ -90,7 +97,10 @@ public readonly record struct StunAttemptOutcome(
 /// <param name="DefenderStunResistGradePoints">
 ///     The matched learned skill's own <c>Grade</c> -- already a single combined value, not summed.
 /// </param>
-/// <param name="DefenderHasStunImmunityBuff">Buff slot 13 ("Stun Defense") active -- see <see cref="StunResolver" />'s remarks.</param>
+/// <param name="DefenderHasStunImmunityBuff">
+///     Buff slot 13 ("Stun Defense") active -- see <see cref="StunResolver" />'s
+///     remarks.
+/// </param>
 public readonly record struct StunAttemptRequest(
     CombatantSnapshot Attacker,
     CombatantSnapshot Defender,
@@ -146,13 +156,6 @@ public static class StunResolver
     /// <summary>The reserved "team stun" skill id (<c>mAttackActionValue2==80</c>).</summary>
     public const int TeamStunSkillId = 80;
 
-    /// <summary>
-    ///     The stun-resist skill family scanned among the defender's equipped/learned skills, first match wins
-    ///     (<c>S07_MyGame02.cpp:3609-3634</c>) -- also the only ids <c>ProcessAttack06</c>'s own echo check
-    ///     recognizes (see <see cref="UnstunResolver.StunResistSkillIds" />, the same triple).
-    /// </summary>
-    public static readonly System.Collections.Immutable.ImmutableArray<int> StunResistSkillIds = [5, 24, 43];
-
     /// <summary>"No action yet" placeholder action-state (CheckPossibleAttackTarget, avatar target rule).</summary>
     private const int NoActionYetSort = 0;
 
@@ -163,6 +166,13 @@ public static class StunResolver
     private const int TeamStunRollRange = 100;
 
     private const int OrdinaryStunRollRange = 500;
+
+    /// <summary>
+    ///     The stun-resist skill family scanned among the defender's equipped/learned skills, first match wins
+    ///     (<c>S07_MyGame02.cpp:3609-3634</c>) -- also the only ids <c>ProcessAttack06</c>'s own echo check
+    ///     recognizes (see <see cref="UnstunResolver.StunResistSkillIds" />, the same triple).
+    /// </summary>
+    public static readonly ImmutableArray<int> StunResistSkillIds = [5, 24, 43];
 
     public static StunAttemptOutcome Resolve(StunAttemptRequest request, TimeSpan zoneClock, IRandomSource rng)
     {
@@ -186,7 +196,7 @@ public static class StunResolver
             return StunAttemptOutcome.Reject(StunRejectReason.DefenderProtected);
 
         var authorized = (request.ZoneAllowsEnemyTribeAttack && attacker.Tribe != defender.Tribe) ||
-                          request.AttackerAndDefenderShareActiveDuel;
+                         request.AttackerAndDefenderShareActiveDuel;
         if (!authorized)
             return StunAttemptOutcome.Reject(StunRejectReason.NotAuthorized);
 

@@ -8,10 +8,10 @@ using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Services.ZoneLifecycle;
 using Fenrir.Application.Game.Tests.GameData;
 using Fenrir.Application.Game.Tests.TestSupport;
-using Fenrir.Network.Serialization.Packets.Zone;
 using Fenrir.Data.Abstractions.Commerce;
 using Fenrir.Data.Abstractions.Guilds;
 using Fenrir.Network.Dispatch.Sessions;
+using Fenrir.Network.Serialization.Packets.Zone;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Handlers;
@@ -426,7 +426,8 @@ public class UseInventoryItemServiceTests
     }
 
     [Fact]
-    public async Task ProxyShopRentalExtension_ExtendRentalPersistenceFails_RepliesResultOne_WithComputedExpiration_AndLeavesTheItemUntouched()
+    public async Task
+        ProxyShopRentalExtension_ExtendRentalPersistenceFails_RepliesResultOne_WithComputedExpiration_AndLeavesTheItemUntouched()
     {
         var (session, _, zone, state, characters, guilds, cash, eventLog) = SetUp();
         SeedInventory(zone, new ItemStack(ProxyShopOneDayItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1));
@@ -448,7 +449,8 @@ public class UseInventoryItemServiceTests
     }
 
     [Fact]
-    public async Task ProxyShopRentalExtension_ExtremeExistingExpiration_RepliesResultOne_WithInvalidDateSentinel_AndNoSideEffects()
+    public async Task
+        ProxyShopRentalExtension_ExtremeExistingExpiration_RepliesResultOne_WithInvalidDateSentinel_AndNoSideEffects()
     {
         var (session, _, zone, state, characters, guilds, cash, eventLog) = SetUp();
         SeedInventory(zone, new ItemStack(ProxyShopOneDayItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1));

@@ -16,11 +16,6 @@ internal sealed class FakeOfflineShopRepository : IOfflineShopRepository
     public bool ThrowOnExtendRental { get; set; }
     public int? LastExtendRentalNewShopDate { get; private set; }
 
-    public void SeedShop(OfflineShopRowDto shop)
-    {
-        _shop = shop;
-    }
-
     public ValueTask<(OfflineShopRowDto? Shop, IReadOnlyList<OfflineShopItemRowDto> Items)> GetByCharacterAsync(
         int characterId, CancellationToken ct)
     {
@@ -77,5 +72,10 @@ internal sealed class FakeOfflineShopRepository : IOfflineShopRepository
 
         LastExtendRentalNewShopDate = newShopDate;
         return ValueTask.CompletedTask;
+    }
+
+    public void SeedShop(OfflineShopRowDto shop)
+    {
+        _shop = shop;
     }
 }

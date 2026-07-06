@@ -16,20 +16,6 @@ internal sealed class FakeOfflineShopRepository : IOfflineShopRepository
     /// <summary>Every characterId GetByCharacterAsync was called with, in call order -- proves ordering/short-circuit.</summary>
     public List<int> QueriedCharacterIds { get; } = [];
 
-    /// <summary>No character has ever opened a shop.</summary>
-    public static FakeOfflineShopRepository Empty()
-    {
-        return new FakeOfflineShopRepository();
-    }
-
-    public static FakeOfflineShopRepository With(int characterId, OfflineShopRowDto? shop,
-        params OfflineShopItemRowDto[] items)
-    {
-        var repository = new FakeOfflineShopRepository();
-        repository._byCharacterId[characterId] = (shop, items);
-        return repository;
-    }
-
     public ValueTask<(OfflineShopRowDto? Shop, IReadOnlyList<OfflineShopItemRowDto> Items)> GetByCharacterAsync(
         int characterId, CancellationToken ct)
     {
@@ -88,5 +74,19 @@ internal sealed class FakeOfflineShopRepository : IOfflineShopRepository
     public ValueTask ExtendRentalAsync(int characterId, int newShopDate, CancellationToken ct)
     {
         throw new NotSupportedException();
+    }
+
+    /// <summary>No character has ever opened a shop.</summary>
+    public static FakeOfflineShopRepository Empty()
+    {
+        return new FakeOfflineShopRepository();
+    }
+
+    public static FakeOfflineShopRepository With(int characterId, OfflineShopRowDto? shop,
+        params OfflineShopItemRowDto[] items)
+    {
+        var repository = new FakeOfflineShopRepository();
+        repository._byCharacterId[characterId] = (shop, items);
+        return repository;
     }
 }

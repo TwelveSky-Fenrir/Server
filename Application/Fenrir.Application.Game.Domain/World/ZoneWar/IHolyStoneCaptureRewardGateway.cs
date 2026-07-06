@@ -22,14 +22,23 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 /// </summary>
 public interface IHolyStoneCaptureRewardGateway
 {
-    /// <summary>The capturing character's own reward -- contract: "two separate currency/rank-point grants... that both apply and add together."</summary>
-    void GrantCaptureReward(PlayerRuntimeState capturer);
+    /// <summary>
+    ///     The capturing character's own reward -- contract: "two separate currency/rank-point grants... that both apply
+    ///     and add together."
+    /// </summary>
+    public void GrantCaptureReward(PlayerRuntimeState capturer);
 
-    /// <summary>One tribemate's participation reward -- caller has already checked radius, reborn milestone, and capturer-exclusion.</summary>
-    void GrantParticipationReward(PlayerRuntimeState tribemate);
+    /// <summary>
+    ///     One tribemate's participation reward -- caller has already checked radius, reborn milestone, and
+    ///     capturer-exclusion.
+    /// </summary>
+    public void GrantParticipationReward(PlayerRuntimeState tribemate);
 
-    /// <summary>One tribemate's quest-progress advance -- caller has already checked tribe/online/non-dead; the quest-marker/turn-in-state gate itself lives here.</summary>
-    void AdvanceQuestProgress(PlayerRuntimeState tribemate);
+    /// <summary>
+    ///     One tribemate's quest-progress advance -- caller has already checked tribe/online/non-dead; the
+    ///     quest-marker/turn-in-state gate itself lives here.
+    /// </summary>
+    public void AdvanceQuestProgress(PlayerRuntimeState tribemate);
 }
 
 /// <summary>

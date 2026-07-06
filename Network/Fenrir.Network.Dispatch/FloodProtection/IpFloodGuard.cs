@@ -130,7 +130,7 @@ public sealed class IpFloodGuard(
         {
             await blockIpAsync(ipAddress, ct).ConfigureAwait(false);
         }
-        catch (Exception) when (ct.IsCancellationRequested == false)
+        catch (Exception) when (!ct.IsCancellationRequested)
         {
             // Persisting the block must never fault the accept/dispatch path that triggered it -- matches
             // legacy's own fire-and-forget SetSqlBlockIP (contract Error/failure semantics: no visible retry or

@@ -14,12 +14,19 @@ namespace Fenrir.IntegrationTests.Wire;
 public sealed class RawWireConnection : IAsyncDisposable
 {
     private readonly TcpClient _client;
-    private NetworkStream? _stream;
     private byte _outboundStreamKey;
+    private NetworkStream? _stream;
 
     private RawWireConnection(TcpClient client)
     {
         _client = client;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_stream is not null)
+            await _stream.DisposeAsync();
+        _client.Dispose();
     }
 
     public static async Task<RawWireConnection> ConnectAsync(int port, CancellationToken ct)
@@ -57,12 +64,5 @@ public sealed class RawWireConnection : IAsyncDisposable
         }
 
         return buffer;
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        if (_stream is not null)
-            await _stream.DisposeAsync();
-        _client.Dispose();
     }
 }

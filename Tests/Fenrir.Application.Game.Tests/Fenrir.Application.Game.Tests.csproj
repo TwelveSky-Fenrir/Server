@@ -36,8 +36,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Remove="obj_tribebanktax\Fenrir.Application.Game.Tests.csproj.nuget.dgspec.json" />
-    <None Remove="obj_tribebanktax\Fenrir.Application.Game.Tests.csproj.nuget.g.targets" />
+    <None Remove="obj_tribebanktax\Fenrir.Application.Game.Tests.csproj.nuget.dgspec.json"/>
+    <None Remove="obj_tribebanktax\Fenrir.Application.Game.Tests.csproj.nuget.g.targets"/>
   </ItemGroup>
 
 </Project>

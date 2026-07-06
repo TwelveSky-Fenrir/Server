@@ -9,10 +9,16 @@ public enum RuneStoneCraftOutcome
     /// <summary>Malformed input -- the caller must disconnect the session for this request; no reply is sent.</summary>
     Disconnect,
 
-    /// <summary>A well-formed request the business rules cleanly refused -- the caller replies with <see cref="RuneStoneCraftResult.ResultCode" /> and a packed-value field of 0.</summary>
+    /// <summary>
+    ///     A well-formed request the business rules cleanly refused -- the caller replies with
+    ///     <see cref="RuneStoneCraftResult.ResultCode" /> and a packed-value field of 0.
+    /// </summary>
     Refused,
 
-    /// <summary>The craft was applied -- the caller replies with <see cref="RuneStoneCraftResult.ResultCode" /> and <see cref="RuneStoneCraftResult.NewPackedStat" />.</summary>
+    /// <summary>
+    ///     The craft was applied -- the caller replies with <see cref="RuneStoneCraftResult.ResultCode" /> and
+    ///     <see cref="RuneStoneCraftResult.NewPackedStat" />.
+    /// </summary>
     Applied
 }
 
@@ -28,8 +34,14 @@ public enum RuneStoneCraftOutcome
 /// <param name="DestinationPage">0 or 1 -- which general inventory page holds the destination rune-core item.</param>
 /// <param name="DestinationSlot">0-63 -- the destination item's slot within <see cref="DestinationPage" />.</param>
 /// <param name="DestinationItemId">The destination slot's resolved catalog item id, or 0 if that slot is empty.</param>
-/// <param name="DestinationPackedStat">The destination item's current packed STR/DEX/VIT/INT value (see <see cref="RuneStoneStatCodec" />).</param>
-/// <param name="StatSlotSelector">The wire's raw "X position" field -- only meaningful when <see cref="SourceItemId" /> is <see cref="RuneStoneCraftCatalog.RerollOneStatItemId" />.</param>
+/// <param name="DestinationPackedStat">
+///     The destination item's current packed STR/DEX/VIT/INT value (see
+///     <see cref="RuneStoneStatCodec" />).
+/// </param>
+/// <param name="StatSlotSelector">
+///     The wire's raw "X position" field -- only meaningful when <see cref="SourceItemId" /> is
+///     <see cref="RuneStoneCraftCatalog.RerollOneStatItemId" />.
+/// </param>
 /// <param name="SecondInventoryPageAccessible">
 ///     Whether the character's second inventory page access has not expired. Caller-supplied because Fenrir
 ///     has no <c>wInventoryDate</c>-equivalent field anywhere yet -- same pre-existing gap
@@ -59,7 +71,8 @@ public readonly record struct RuneStoneCraftRequest(
 /// </param>
 /// <param name="LogSlotIndicator">
 ///     -1 ("no specific slot") for the 92296/92297 branches, or the 1-based stat position (1=STR/2=DEX/3=VIT/4=INT)
-///     for the 92298 branch. Meaningless when nothing was actually logged (every non-<see cref="RuneStoneCraftOutcome.Applied" />
+///     for the 92298 branch. Meaningless when nothing was actually logged (every non-
+///     <see cref="RuneStoneCraftOutcome.Applied" />
 ///     outcome).
 /// </param>
 public readonly record struct RuneStoneCraftResult(
@@ -68,10 +81,10 @@ public readonly record struct RuneStoneCraftResult(
     int NewPackedStat,
     int LogSlotIndicator)
 {
-    public bool Succeeded => Outcome == RuneStoneCraftOutcome.Applied;
-
     public static readonly RuneStoneCraftResult Disconnect =
         new(RuneStoneCraftOutcome.Disconnect, 0, 0, RuneStoneCraftCatalog.NoSpecificSlot);
+
+    public bool Succeeded => Outcome == RuneStoneCraftOutcome.Applied;
 }
 
 /// <summary>
@@ -221,7 +234,8 @@ public static class RuneStoneCraftResolver
 
     private static RuneStoneCraftResult RefusedSlot(int slotIndicator)
     {
-        return new RuneStoneCraftResult(RuneStoneCraftOutcome.Refused, RuneStoneCraftCatalog.ResultCodeSelectedStatEmpty,
+        return new RuneStoneCraftResult(RuneStoneCraftOutcome.Refused,
+            RuneStoneCraftCatalog.ResultCodeSelectedStatEmpty,
             0, slotIndicator);
     }
 }

@@ -2,13 +2,12 @@ using System.Buffers.Binary;
 using System.Collections.Immutable;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game.Handlers;
 using Fenrir.Application.Game.Handlers.Handlers;
 using Fenrir.Application.Game.Services.FishingConsumables;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Network.Dispatch.Sessions;
-using Fenrir.Network.Serialization.Packets.Zone;
 using Fenrir.Network.Framing;
+using Fenrir.Network.Serialization.Packets.Zone;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Fishing;
@@ -69,7 +68,8 @@ public class FishingCatchHandlerTests
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
-        var handler = new FishingCatchHandler(new FishingCatchService(new FakeCharacterRepository(), NullLogger<FishingCatchService>.Instance));
+        var handler = new FishingCatchHandler(new FishingCatchService(new FakeCharacterRepository(),
+            NullLogger<FishingCatchService>.Instance));
         await handler.HandleAsync(new FishingCatchRequest(), session, CancellationToken.None);
 
         Assert.Equal(DisconnectReason.Faulted, session.DisconnectReason);

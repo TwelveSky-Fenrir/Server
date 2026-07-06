@@ -16,6 +16,7 @@ public class PartyIdentityResolverTests
     public void RequesterIsLeader_ResolvesToOwnName_NoLookupNeeded()
     {
         var lookupCalled = false;
+
         string? TryResolve(int _)
         {
             lookupCalled = true;
@@ -63,7 +64,8 @@ public class PartyIdentityResolverTests
         Assert.Equal(PartyInviteOutcome.Sent, registry.TryInvite(10, 1, 0, 11, 1, 0));
         Assert.True(registry.TryAnswer(11, true, out _, out _));
 
-        var result = PartyIdentityResolver.ResolveCurrentPartyName(registry, 11, "Mate", id => id == 10 ? "Leader" : null);
+        var result =
+            PartyIdentityResolver.ResolveCurrentPartyName(registry, 11, "Mate", id => id == 10 ? "Leader" : null);
 
         Assert.Equal("Leader", result);
     }

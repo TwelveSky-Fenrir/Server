@@ -22,23 +22,6 @@ namespace Fenrir.Application.Game.Domain.World;
 public sealed partial class Zone
 {
     /// <summary>
-    ///     A single pending <c>game.EventLog</c> row for a death-related event (<see cref="ApplyDeath" /> /
-    ///     <see cref="ApplyDeathExperienceLoss" />) -- queued rather than awaited inline because
-    ///     <see cref="Tick" /> must stay fully synchronous and never block on SQL I/O, same posture as
-    ///     <c>Zone.Monsters.cs</c>'s own pending-money-grant queue. Drained from any thread by
-    ///     <c>Fenrir.Application.Game.Hosting.World.DeathEventLogFlushHost</c>, which resolves the actual
-    ///     <see cref="IEventLogRepository.LogAsync" /> call -- always under <see cref="EventLogCategory.Death" />,
-    ///     the single-row high-stakes path (deaths are explicitly enumerated there), never the high-frequency
-    ///     <c>BatchLogAsync</c>/<c>EventLogQueue</c> path reserved for low-stakes telemetry.
-    /// </summary>
-    public readonly record struct PendingDeathEventLog(
-        short EventCode,
-        int ActorCharacterId,
-        short? ShardId,
-        byte? Outcome,
-        string? Payload);
-
-    /// <summary>
     ///     <c>game.EventLog.EventCode</c> for a character death (any <see cref="DeathCause" />, including a
     ///     GM-forced one -- <see cref="ApplyDeath" /> logs unconditionally regardless of cause) -- an
     ///     app-owned numbering scheme scoped independently within <see cref="EventLogCategory.Death" /> (see
@@ -64,14 +47,14 @@ public sealed partial class Zone
     /// <summary><see cref="PendingDeathEventLog.Outcome" /> for the at-level-cap CP-loss branch.</summary>
     private const byte ContributionPointsLossOutcome = 1;
 
-    private readonly ConcurrentQueue<PendingDeathEventLog> _pendingDeathEventLogs = new();
-
     /// <summary>
     ///     Released once per queued row so <c>DeathEventLogFlushHost</c> can flush as soon as one arrives
     ///     instead of waiting up to a full flush interval -- same signal pattern as <c>Zone.Monsters.cs</c>'s
     ///     own <c>_moneyGrantSignal</c>.
     /// </summary>
     private readonly SemaphoreSlim _deathEventLogSignal = new(0, int.MaxValue);
+
+    private readonly ConcurrentQueue<PendingDeathEventLog> _pendingDeathEventLogs = new();
 
     /// <summary>
     ///     Queues a death-related <c>game.EventLog</c> row rather than awaiting
@@ -909,4 +892,21 @@ public sealed partial class Zone
             CheckChangeActionState = 0
         };
     }
+
+    /// <summary>
+    ///     A single pending <c>game.EventLog</c> row for a death-related event (<see cref="ApplyDeath" /> /
+    ///     <see cref="ApplyDeathExperienceLoss" />) -- queued rather than awaited inline because
+    ///     <see cref="Tick" /> must stay fully synchronous and never block on SQL I/O, same posture as
+    ///     <c>Zone.Monsters.cs</c>'s own pending-money-grant queue. Drained from any thread by
+    ///     <c>Fenrir.Application.Game.Hosting.World.DeathEventLogFlushHost</c>, which resolves the actual
+    ///     <see cref="IEventLogRepository.LogAsync" /> call -- always under <see cref="EventLogCategory.Death" />,
+    ///     the single-row high-stakes path (deaths are explicitly enumerated there), never the high-frequency
+    ///     <c>BatchLogAsync</c>/<c>EventLogQueue</c> path reserved for low-stakes telemetry.
+    /// </summary>
+    public readonly record struct PendingDeathEventLog(
+        short EventCode,
+        int ActorCharacterId,
+        short? ShardId,
+        byte? Outcome,
+        string? Payload);
 }

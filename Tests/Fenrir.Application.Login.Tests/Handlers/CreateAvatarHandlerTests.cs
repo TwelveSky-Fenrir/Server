@@ -1,13 +1,11 @@
 using Fenrir.Application.Login.Domain;
 using Fenrir.Application.Login.Domain.Avatars;
-using Fenrir.Application.Login.Handlers;
 using Fenrir.Application.Login.Handlers.Handlers;
 using Fenrir.Application.Login.Services.CreateAvatar;
 using Fenrir.Application.Login.Tests.TestSupport;
-using Fenrir.Network.Serialization.Packets.Login;
 using Fenrir.Data.Abstractions.Characters;
-using Fenrir.Data.Characters;
 using Fenrir.Network.Dispatch.Sessions;
+using Fenrir.Network.Serialization.Packets.Login;
 using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Login.Tests.Handlers;
@@ -18,17 +16,20 @@ public class CreateAvatarHandlerTests
 {
     private const int AccountId = 42;
 
-    private static CreateAvatarRequest ValidRequest(int weapon = 6) => new()
+    private static CreateAvatarRequest ValidRequest(int weapon = 6)
     {
-        AvatarPost = 0,
-        Tribe = 0,
-        PreviousTribe = 0,
-        Gender = 1,
-        Head = 2,
-        Face = 1,
-        Weapon = weapon,
-        AvatarName = "Hero"
-    };
+        return new CreateAvatarRequest
+        {
+            AvatarPost = 0,
+            Tribe = 0,
+            PreviousTribe = 0,
+            Gender = 1,
+            Head = 2,
+            Face = 1,
+            Weapon = weapon,
+            AvatarName = "Hero"
+        };
+    }
 
     [Fact]
     public async Task HandleAsync_ValidRequest_PersistsTheFullStarterKit()
@@ -344,7 +345,8 @@ public class CreateAvatarHandlerTests
         var characters = FakeCharacterRepository.WithNone();
         var starterKits = FakeStarterKitRepository.NobleDragonKit();
         var tribes = FakeTribeRepository.WithPoints((0, 100), (1, 0), (2, 0), (3, 0));
-        var handler = new CreateAvatarHandler(new CreateAvatarService(characters, starterKits, tribes, DefaultOptions()));
+        var handler =
+            new CreateAvatarHandler(new CreateAvatarService(characters, starterKits, tribes, DefaultOptions()));
         var (session, pipe) = CreateSessionInCharSelect();
 
         await handler.HandleAsync(ValidRequest(), session, CancellationToken.None);
@@ -364,7 +366,8 @@ public class CreateAvatarHandlerTests
         // Tribe 1 is dominant (150 points); ValidRequest asks for tribe 0, which this gate never touches --
         // an absolute floor on the leader's own total, not a margin/gap against the other tribes.
         var tribes = FakeTribeRepository.WithPoints((0, 10), (1, 150), (2, 0), (3, 0));
-        var handler = new CreateAvatarHandler(new CreateAvatarService(characters, starterKits, tribes, DefaultOptions()));
+        var handler =
+            new CreateAvatarHandler(new CreateAvatarService(characters, starterKits, tribes, DefaultOptions()));
         var (session, _) = CreateSessionInCharSelect();
 
         await handler.HandleAsync(ValidRequest(), session, CancellationToken.None);
@@ -379,7 +382,8 @@ public class CreateAvatarHandlerTests
         var characters = FakeCharacterRepository.WithNone();
         var starterKits = FakeStarterKitRepository.NobleDragonKit();
         var tribes = FakeTribeRepository.WithPoints((0, 99), (1, 0), (2, 0), (3, 0));
-        var handler = new CreateAvatarHandler(new CreateAvatarService(characters, starterKits, tribes, DefaultOptions()));
+        var handler =
+            new CreateAvatarHandler(new CreateAvatarService(characters, starterKits, tribes, DefaultOptions()));
         var (session, _) = CreateSessionInCharSelect();
 
         await handler.HandleAsync(ValidRequest(), session, CancellationToken.None);

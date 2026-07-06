@@ -13,7 +13,8 @@ public class AccountSessionReapHostTests
     [Fact]
     public async Task ReapOnceAsync_NothingStale_DoesNotThrow()
     {
-        var accountSessions = new FakeAccountSessionRepository { ReapResult = ImmutableArray<ReapedAccountSessionDto>.Empty };
+        var accountSessions = new FakeAccountSessionRepository
+            { ReapResult = ImmutableArray<ReapedAccountSessionDto>.Empty };
         var host = new AccountSessionReapHost(accountSessions, NullLogger<AccountSessionReapHost>.Instance);
 
         await host.ReapOnceAsync(CancellationToken.None);

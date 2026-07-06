@@ -61,8 +61,10 @@ public static class StoreItemTransferPolicy
         /// <summary>Source slot is empty, or its item id no longer resolves to a known item definition.</summary>
         SourceEmpty,
 
-        /// <summary>Stackable transfer: requested quantity is non-positive (other than rearrange's 0-means-whole-stack
-        /// case), &gt; 999, or &gt; the source's current quantity.</summary>
+        /// <summary>
+        ///     Stackable transfer: requested quantity is non-positive (other than rearrange's 0-means-whole-stack
+        ///     case), &gt; 999, or &gt; the source's current quantity.
+        /// </summary>
         InvalidQuantity,
 
         /// <summary>
@@ -71,22 +73,6 @@ public static class StoreItemTransferPolicy
         ///     deposit/withdraw: destination is already occupied (no implicit swap in those two directions).
         /// </summary>
         DestinationConflict
-    }
-
-    /// <summary>
-    ///     NewSource/NewDestination are the values to write back; null means "slot becomes empty".
-    ///     <see cref="IsNonStackableTransfer" /> tells the caller whether this move took the non-stackable
-    ///     whole-slot path -- deposit/withdraw only emit their <c>GL_624_STORESLOT_ITEM</c> audit-log call on that
-    ///     path (direction 1 for deposit, 2 for withdraw); rearrange never logs regardless and always reports
-    ///     <see langword="false" /> here.
-    /// </summary>
-    public readonly record struct TransferResult(
-        TransferOutcome Outcome,
-        ItemStack? NewSource,
-        ItemStack? NewDestination,
-        bool IsNonStackableTransfer)
-    {
-        public bool Succeeded => Outcome is TransferOutcome.Success or TransferOutcome.NoOp;
     }
 
     /// <summary>Maps <c>DefaultPData</c>'s raw 0/1 store page onto <see cref="ContainerMatrix" />'s StorePage0/StorePage1 ids.</summary>
@@ -106,7 +92,10 @@ public static class StoreItemTransferPolicy
         }
     }
 
-    /// <summary>Maps <c>DefaultPData</c>'s raw 0/1 inventory page onto <see cref="ContainerMatrix" />'s InventoryPage0/InventoryPage1 ids.</summary>
+    /// <summary>
+    ///     Maps <c>DefaultPData</c>'s raw 0/1 inventory page onto <see cref="ContainerMatrix" />'s
+    ///     InventoryPage0/InventoryPage1 ids.
+    /// </summary>
     public static bool TryResolveInventoryContainer(int rawPage, out byte container)
     {
         switch (rawPage)
@@ -334,5 +323,21 @@ public static class StoreItemTransferPolicy
     private static TransferResult Fail(TransferOutcome outcome)
     {
         return new TransferResult(outcome, null, null, false);
+    }
+
+    /// <summary>
+    ///     NewSource/NewDestination are the values to write back; null means "slot becomes empty".
+    ///     <see cref="IsNonStackableTransfer" /> tells the caller whether this move took the non-stackable
+    ///     whole-slot path -- deposit/withdraw only emit their <c>GL_624_STORESLOT_ITEM</c> audit-log call on that
+    ///     path (direction 1 for deposit, 2 for withdraw); rearrange never logs regardless and always reports
+    ///     <see langword="false" /> here.
+    /// </summary>
+    public readonly record struct TransferResult(
+        TransferOutcome Outcome,
+        ItemStack? NewSource,
+        ItemStack? NewDestination,
+        bool IsNonStackableTransfer)
+    {
+        public bool Succeeded => Outcome is TransferOutcome.Success or TransferOutcome.NoOp;
     }
 }

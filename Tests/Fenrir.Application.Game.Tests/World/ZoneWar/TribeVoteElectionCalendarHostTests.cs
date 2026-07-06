@@ -48,7 +48,7 @@ public class TribeVoteElectionCalendarHostTests
     [Fact]
     public void NotServerNumber37_IsNeverArmed_EvenWithVoteTribeEnabled()
     {
-        var host = CreateHost(CreateElection(), shardId: 1, voteTribeEnabled: true);
+        var host = CreateHost(CreateElection(), 1, true);
 
         Assert.False(host.IsArmed);
     }
@@ -56,7 +56,7 @@ public class TribeVoteElectionCalendarHostTests
     [Fact]
     public void ServerNumber37_WithoutVoteTribeEnabled_IsNotArmed()
     {
-        var host = CreateHost(CreateElection(), shardId: 37, voteTribeEnabled: false);
+        var host = CreateHost(CreateElection(), 37, false);
 
         Assert.False(host.IsArmed);
     }
@@ -64,7 +64,7 @@ public class TribeVoteElectionCalendarHostTests
     [Fact]
     public void ServerNumber37_WithVoteTribeEnabled_IsArmed()
     {
-        var host = CreateHost(CreateElection(), shardId: 37, voteTribeEnabled: true);
+        var host = CreateHost(CreateElection(), 37, true);
 
         Assert.True(host.IsArmed);
     }
@@ -73,7 +73,7 @@ public class TribeVoteElectionCalendarHostTests
     public async Task NotArmed_TickNeverAdvancesThePhase()
     {
         var election = CreateElection();
-        var host = CreateHost(election, shardId: 1, voteTribeEnabled: true);
+        var host = CreateHost(election, 1, true);
 
         await host.TickAsync(new DateTime(2026, 7, 6), CancellationToken.None);
 

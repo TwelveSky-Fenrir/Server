@@ -45,7 +45,8 @@ public readonly record struct RegularWarRewardGrant(
 /// <remarks>
 ///     Réf. C++ : Server/ts25zone/S07_MyGame01.cpp:5289-5413 (the full reward-payout participant loop) ;
 ///     :5333-5350 (server-120/164 CP bonus) ; :3092-3107 (allied-tribe win-side lookup, resolved by the caller
-///     and passed in as <paramref name="allyOfWinningTribe" /> -- see <see cref="Fenrir.Application.Game.Domain.World.WorldState.WorldStateService.GetAllyOf" />) ;
+///     and passed in as <paramref name="allyOfWinningTribe" /> -- see
+///     <see cref="Fenrir.Application.Game.Domain.World.WorldState.WorldStateService.GetAllyOf" />) ;
 ///     Server/ts25zone/S07_MyGame02.cpp:414-472 (<c>RW_Reward</c>, the top-3 leaderboard payout).
 /// </remarks>
 public static class RegularWarRewardCalculator
@@ -85,18 +86,18 @@ public static class RegularWarRewardCalculator
             {
                 builder.Add(new RegularWarRewardGrant(
                     participant.CharacterId,
-                    IsWinningSide: null,
-                    MoneyAmount: 0,
-                    ExperienceAmount: 0,
-                    CpBonusAmount: 0,
-                    HeroRankPoints: LosingOrDrawHeroRankPoints,
-                    LeaderboardCpAmount: leaderboardCp,
-                    RequestItemDrop: false));
+                    null,
+                    0,
+                    0,
+                    0,
+                    LosingOrDrawHeroRankPoints,
+                    leaderboardCp,
+                    false));
                 continue;
             }
 
             var isWinningSide = participant.Tribe == winningTribe ||
-                                 (allyOfWinningTribe is { } ally && participant.Tribe == ally);
+                                (allyOfWinningTribe is { } ally && participant.Tribe == ally);
 
             var baseMoney = rewardValues.GetMoneyReward(participant.RebirthTier);
             var baseExperience = rewardValues.GetExperienceReward(participant.Level);
@@ -111,12 +112,12 @@ public static class RegularWarRewardCalculator
             builder.Add(new RegularWarRewardGrant(
                 participant.CharacterId,
                 isWinningSide,
-                MoneyAmount: money > 0 ? money : 0,
-                ExperienceAmount: experience > 0 ? experience : 0,
-                CpBonusAmount: cpBonus,
-                HeroRankPoints: isWinningSide ? WinningHeroRankPoints : LosingOrDrawHeroRankPoints,
-                LeaderboardCpAmount: leaderboardCp,
-                RequestItemDrop: true));
+                money > 0 ? money : 0,
+                experience > 0 ? experience : 0,
+                cpBonus,
+                isWinningSide ? WinningHeroRankPoints : LosingOrDrawHeroRankPoints,
+                leaderboardCp,
+                true));
         }
 
         return builder.MoveToImmutable();

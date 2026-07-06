@@ -14,8 +14,8 @@ public class TribeQuotaRegistryTests
         var (sessionB, _) = ZoneTestKit.CreateSession(2);
         var now = DateTimeOffset.UtcNow;
 
-        registry.Record(sessionA, tribe: 1, accountId: 10, characterId: 100, now);
-        registry.Record(sessionB, tribe: 1, accountId: 11, characterId: 101, now);
+        registry.Record(sessionA, 1, 10, 100, now);
+        registry.Record(sessionB, 1, 11, 101, now);
 
         Assert.Equal(2, registry.CountForTribe(1));
         Assert.Equal(0, registry.CountForTribe(2));
@@ -34,7 +34,7 @@ public class TribeQuotaRegistryTests
 
         // Simulates the "declared tribe used only for the threshold check, upstream-resolved tribe recorded"
         // edge case: caller passes the resolved tribe (2), not whatever was declared on the wire.
-        registry.Record(session, tribe: 2, accountId: 10, characterId: 100, DateTimeOffset.UtcNow);
+        registry.Record(session, 2, 10, 100, DateTimeOffset.UtcNow);
 
         Assert.Equal(1, registry.CountForTribe(2));
         Assert.Equal(0, registry.CountForTribe(0));
@@ -45,7 +45,7 @@ public class TribeQuotaRegistryTests
     {
         var registry = new TribeQuotaRegistry();
 
-        Assert.False(registry.Release(sessionId: 999));
+        Assert.False(registry.Release(999));
         Assert.Equal(0, registry.Count);
     }
 
@@ -54,7 +54,7 @@ public class TribeQuotaRegistryTests
     {
         var registry = new TribeQuotaRegistry();
         var (session, _) = ZoneTestKit.CreateSession(1);
-        registry.Record(session, tribe: 0, accountId: 10, characterId: 100, DateTimeOffset.UtcNow);
+        registry.Record(session, 0, 10, 100, DateTimeOffset.UtcNow);
 
         Assert.True(registry.Release(session.SessionId));
         Assert.Equal(0, registry.Count);
@@ -71,7 +71,7 @@ public class TribeQuotaRegistryTests
         session.MarkInWorld();
 
         var registeredAt = DateTimeOffset.UtcNow - TimeSpan.FromMinutes(10);
-        registry.Record(session, tribe: 0, accountId: 10, characterId: 100, registeredAt);
+        registry.Record(session, 0, 10, 100, registeredAt);
 
         var idle = registry.SnapshotIdle(TempRegistrationIdleSweep.IdleTimeout, DateTimeOffset.UtcNow);
 
@@ -86,7 +86,7 @@ public class TribeQuotaRegistryTests
         session.MarkTicketConsumed(10, 100);
 
         var registeredAt = DateTimeOffset.UtcNow - (TempRegistrationIdleSweep.IdleTimeout - TimeSpan.FromSeconds(1));
-        registry.Record(session, tribe: 0, accountId: 10, characterId: 100, registeredAt);
+        registry.Record(session, 0, 10, 100, registeredAt);
 
         var idle = registry.SnapshotIdle(TempRegistrationIdleSweep.IdleTimeout, DateTimeOffset.UtcNow);
 
@@ -101,7 +101,7 @@ public class TribeQuotaRegistryTests
         session.MarkTicketConsumed(10, 100); // TicketConsumed -- never reached Registering/InWorld
 
         var registeredAt = DateTimeOffset.UtcNow - TempRegistrationIdleSweep.IdleTimeout;
-        registry.Record(session, tribe: 2, accountId: 10, characterId: 100, registeredAt);
+        registry.Record(session, 2, 10, 100, registeredAt);
 
         var idle = registry.SnapshotIdle(TempRegistrationIdleSweep.IdleTimeout, DateTimeOffset.UtcNow);
 

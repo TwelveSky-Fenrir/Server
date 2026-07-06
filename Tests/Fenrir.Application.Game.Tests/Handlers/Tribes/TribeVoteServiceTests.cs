@@ -7,11 +7,10 @@ using Fenrir.Application.Game.Handlers.Handlers.Tribes;
 using Fenrir.Application.Game.Services.Tribes;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Application.Game.Tests.World.WorldState;
-using Fenrir.Network.Serialization.Packets.Zone;
-using Fenrir.Data.Abstractions.Tribes;
 using Fenrir.Data.Abstractions.World;
 using Fenrir.Data.WriteBehind;
 using Fenrir.Network.Dispatch.Sessions;
+using Fenrir.Network.Serialization.Packets.Zone;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -21,8 +20,9 @@ public class TribeVoteServiceTests
 {
     private const int CharacterId = 42;
 
-    private static (ZoneClientSession Session, FakeDuplexPipe Pipe, PlayerRuntimeState State, TribeVoteElection Election, FakeWorldStateRepository Repository) Setup(
-        short level = 145, int contributionPoints = 1000, byte tribe = 1)
+    private static (ZoneClientSession Session, FakeDuplexPipe Pipe, PlayerRuntimeState State, TribeVoteElection Election
+        , FakeWorldStateRepository Repository) Setup(
+            short level = 145, int contributionPoints = 1000, byte tribe = 1)
     {
         var zone = ZoneTestKit.CreateZone(1);
         var (session, pipe) = ZoneTestKit.CreateSession(1);
@@ -116,7 +116,7 @@ public class TribeVoteServiceTests
     [Fact]
     public async Task Candidacy_LevelTooLow_Aborts()
     {
-        var (_, _, state, election, _) = Setup(level: 100);
+        var (_, _, state, election, _) = Setup(100);
         await election.OpenCandidacyWindowAsync(CancellationToken.None);
         var service = new TribeVoteService(election);
 

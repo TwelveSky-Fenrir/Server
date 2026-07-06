@@ -4,9 +4,10 @@
 CREATE PROCEDURE admin.usp_ServerQuota_GetMaxPlayers
     AS
 BEGIN
-    SET NOCOUNT ON;
+    SET
+NOCOUNT ON;
 
-    SELECT MaxPlayers
-    FROM admin.ServerQuota
-    WHERE Id = 1;
+SELECT MaxPlayers
+FROM admin.ServerQuota
+WHERE Id = 1;
 END;

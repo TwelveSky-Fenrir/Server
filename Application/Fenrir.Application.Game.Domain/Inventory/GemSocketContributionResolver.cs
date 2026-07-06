@@ -36,18 +36,18 @@ public enum GemSocketStatRequest
 ///     ServerDocs/12_ts25zone/12_MyGame03_PartieB.md §2.1 (<c>SOCKET_GEM_V2</c> layout and the
 ///     <c>GetSocketInfo</c>/<c>GetSocketType</c> pairing, cross-checked against a direct read).
 ///     <para>
-///     Only <see cref="GemSocketStatRequest.AttackPower"/> is <see cref="IsLiveInProduction"/> -- the other
-///     seven request codes are present in the legacy source but never compiled into the shipped server.
-///     Wiring this resolver's contribution into the C# stat calculator for anything other than AttackPower
-///     would be a deviation from legacy parity (a new feature the legacy never shipped), not a gap closure.
+///         Only <see cref="GemSocketStatRequest.AttackPower" /> is <see cref="IsLiveInProduction" /> -- the other
+///         seven request codes are present in the legacy source but never compiled into the shipped server.
+///         Wiring this resolver's contribution into the C# stat calculator for anything other than AttackPower
+///         would be a deviation from legacy parity (a new feature the legacy never shipped), not a gap closure.
 ///     </para>
 ///     <para>
-///     <see cref="GetSocketInfo"/>'s <c>socketValueLookup</c> delegate is injected, not a hardcoded table:
-///     the actual (requested-stat-type, gem-type, gem-tier) -&gt; value routing performed by the legacy's
-///     ~315-line <c>GetSocketType</c> switch was not transcribed into the originating contract -- only its
-///     shape was (route to one of two columns, <c>mValue03</c>/<c>mValue04</c>, of a
-///     <c>world.GemSockets</c>-shaped row keyed by gem type + tier). Do not hardcode a guessed mapping here;
-///     get a follow-up contract citing <c>GetSocketType</c>'s full body first.
+///         <see cref="GetSocketInfo" />'s <c>socketValueLookup</c> delegate is injected, not a hardcoded table:
+///         the actual (requested-stat-type, gem-type, gem-tier) -&gt; value routing performed by the legacy's
+///         ~315-line <c>GetSocketType</c> switch was not transcribed into the originating contract -- only its
+///         shape was (route to one of two columns, <c>mValue03</c>/<c>mValue04</c>, of a
+///         <c>world.GemSockets</c>-shaped row keyed by gem type + tier). Do not hardcode a guessed mapping here;
+///         get a follow-up contract citing <c>GetSocketType</c>'s full body first.
 ///     </para>
 ///     A (gem-type, gem-tier) combination absent from the real gem-socket table is an unguarded
 ///     null-pointer dereference (a crash) in the legacy server (S07_MyGame03.cpp:10440-10461,
@@ -61,14 +61,11 @@ public static class GemSocketContributionResolver
     /// <summary>SOCKET_GEM_V2's own cap -- t1..t5/g1..g5.</summary>
     public const int MaxSocketsPerItem = 5;
 
-    /// <summary>True only for <see cref="GemSocketStatRequest.AttackPower"/> -- see remarks.</summary>
+    /// <summary>True only for <see cref="GemSocketStatRequest.AttackPower" /> -- see remarks.</summary>
     public static bool IsLiveInProduction(GemSocketStatRequest statType)
     {
         return statType == GemSocketStatRequest.AttackPower;
     }
-
-    /// <summary>One active socket's (gem type, gem tier) pair -- SOCKET_GEM_V2's tN/gN fields.</summary>
-    public readonly record struct SocketEntry(byte GemType, byte GemTier);
 
     /// <summary>
     ///     Decodes <c>SOCKET_GEM_V2</c> (12 bytes packed little-endian into 3 ints: an unused byte, an
@@ -96,7 +93,7 @@ public static class GemSocketContributionResolver
     }
 
     /// <summary>
-    ///     Sums <paramref name="socketValueLookup"/> across every active socket, skipping any socket whose
+    ///     Sums <paramref name="socketValueLookup" /> across every active socket, skipping any socket whose
     ///     gem type is zero without invoking the delegate at all -- mirrors the legacy's own
     ///     <c>if (a2[i][0]) val += GetSocketType(...)</c> guard.
     /// </summary>
@@ -112,4 +109,7 @@ public static class GemSocketContributionResolver
 
         return total;
     }
+
+    /// <summary>One active socket's (gem type, gem tier) pair -- SOCKET_GEM_V2's tN/gN fields.</summary>
+    public readonly record struct SocketEntry(byte GemType, byte GemTier);
 }

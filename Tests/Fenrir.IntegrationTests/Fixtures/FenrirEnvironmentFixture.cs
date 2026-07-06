@@ -21,26 +21,27 @@ namespace Fenrir.IntegrationTests.Fixtures;
 /// </summary>
 public sealed class FenrirEnvironmentFixture : IAsyncLifetime
 {
-    private static readonly string[] NoArgs = [];
-
     public const byte ShardId = 1;
     public const short PrimaryMapId = 1;
     public const short SecondaryMapId = 2;
 
     public const string TestAccountLoginName = "e2ebot";
     public const string TestAccountPassword = "E2E-bot-p4ssw0rd!";
+    private static readonly string[] NoArgs = [];
+    private readonly StringBuilder _gameLog = new();
+    private readonly Lock _gameLogLock = new();
+    private readonly StringBuilder _loginLog = new();
+    private readonly Lock _loginLogLock = new();
 
     private DistributedApplication? _app;
-    private Process? _loginProcess;
     private Process? _gameProcess;
-    private readonly StringBuilder _loginLog = new();
-    private readonly StringBuilder _gameLog = new();
-    private readonly Lock _loginLogLock = new();
-    private readonly Lock _gameLogLock = new();
+    private Process? _loginProcess;
 
     public string ConnectionString { get; private set; } = string.Empty;
     public int LoginPort { get; private set; }
     public int GamePort { get; private set; }
+
+    public int TestAccountId { get; private set; }
 
     public async Task InitializeAsync()
     {
@@ -78,8 +79,6 @@ public sealed class FenrirEnvironmentFixture : IAsyncLifetime
         TestAccountId = accountId;
     }
 
-    public int TestAccountId { get; private set; }
-
     public async Task DisposeAsync()
     {
         TryKill(_gameProcess);
@@ -116,13 +115,15 @@ public sealed class FenrirEnvironmentFixture : IAsyncLifetime
                 await _app.StartAsync();
 
                 using (var readyCts = new CancellationTokenSource(TimeSpan.FromMinutes(3)))
+                {
                     await _app.ResourceNotifications.WaitForResourceHealthyAsync("FenrirDbIntegration",
                         readyCts.Token);
+                }
 
                 ConnectionString = await _app.GetConnectionStringAsync("FenrirDbIntegration") ??
-                                    throw new InvalidOperationException(
-                                        "The \"FenrirDbIntegration\" resource did not produce a connection " +
-                                        "string even though it just reported healthy.");
+                                   throw new InvalidOperationException(
+                                       "The \"FenrirDbIntegration\" resource did not produce a connection " +
+                                       "string even though it just reported healthy.");
 
                 await Task.Delay(TimeSpan.FromSeconds(5));
                 await ApplyManifestAsync();
@@ -267,12 +268,18 @@ public sealed class FenrirEnvironmentFixture : IAsyncLifetime
         process.OutputDataReceived += (_, args) =>
         {
             if (args.Data is null) return;
-            lock (logLock) log.AppendLine(args.Data);
+            lock (logLock)
+            {
+                log.AppendLine(args.Data);
+            }
         };
         process.ErrorDataReceived += (_, args) =>
         {
             if (args.Data is null) return;
-            lock (logLock) log.AppendLine(args.Data);
+            lock (logLock)
+            {
+                log.AppendLine(args.Data);
+            }
         };
 
         process.Start();
@@ -315,7 +322,9 @@ public sealed class FenrirEnvironmentFixture : IAsyncLifetime
     private static string Snapshot(StringBuilder log, Lock logLock)
     {
         lock (logLock)
+        {
             return log.ToString();
+        }
     }
 
     private static int ReserveEphemeralLoopbackPort()
@@ -333,7 +342,7 @@ public sealed class FenrirEnvironmentFixture : IAsyncLifetime
         try
         {
             if (!process.HasExited)
-                process.Kill(entireProcessTree: true);
+                process.Kill(true);
         }
         catch
         {

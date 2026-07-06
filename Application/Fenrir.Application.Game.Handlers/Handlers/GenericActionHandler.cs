@@ -105,7 +105,7 @@ public sealed class GenericActionHandler(
             // AccountId is guaranteed set alongside CharacterId (both written together by MarkTicketConsumed
             // before InWorld is reachable) -- same non-null posture as characterId above.
             var dropResult = await inventoryToWorldDropService.DropToWorldAsync(zone, state, characterId,
-                zoneSession.AccountId!.Value, dropMove, premiumPageAccessAllowed: true, cancellationToken);
+                zoneSession.AccountId!.Value, dropMove, true, cancellationToken);
             RespondDrop(session, zoneSession, sort, packet.Data, dropResult);
             return;
         }
@@ -164,8 +164,8 @@ public sealed class GenericActionHandler(
             // confirms an existing column is reused. secondInventoryPageAccessible has the same pre-existing
             // gap as the 209 branch above.
             var runeResult = await runeStoneCraftService.CraftAsync(runeMove.Page1, runeMove.Index1,
-                runeMove.Page2, runeMove.Index2, runeMove.XPost2, destinationPackedStat: 0,
-                secondInventoryPageAccessible: true, zone, state, characterId, cancellationToken);
+                runeMove.Page2, runeMove.Index2, runeMove.XPost2, 0,
+                true, zone, state, characterId, cancellationToken);
             RespondRune(session, zoneSession, sort, packet.Data, runeResult);
             return;
         }

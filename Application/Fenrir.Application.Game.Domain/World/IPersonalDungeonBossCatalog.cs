@@ -18,7 +18,7 @@ namespace Fenrir.Application.Game.Domain.World;
 /// </remarks>
 public interface IPersonalDungeonBossCatalog
 {
-    bool TryGetBossMonsterId(int rebirthTier, out int monsterId);
+    public bool TryGetBossMonsterId(int rebirthTier, out int monsterId);
 }
 
 /// <summary>

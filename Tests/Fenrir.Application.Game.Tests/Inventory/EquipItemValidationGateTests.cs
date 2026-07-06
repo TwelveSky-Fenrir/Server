@@ -133,12 +133,13 @@ public class EquipItemValidationGateTests
     [InlineData(53553, 6, true)]
     public void Evaluate_RebirthSixIds_GateExactlyAtSix(int itemId, int rebirth, bool expectSuccess)
     {
-        var candidate = Candidate(itemId: itemId);
+        var candidate = Candidate(itemId);
 
         var outcome = EquipItemValidationGate.Evaluate(candidate, 0, 0,
             EquipItemValidationGate.SkipSlotCheck, 100, rebirth);
 
-        Assert.Equal(expectSuccess ? EquipItemValidationGate.Outcome.Success : EquipItemValidationGate.Outcome.RebirthTooLow,
+        Assert.Equal(
+            expectSuccess ? EquipItemValidationGate.Outcome.Success : EquipItemValidationGate.Outcome.RebirthTooLow,
             outcome);
     }
 
@@ -149,12 +150,13 @@ public class EquipItemValidationGateTests
     [InlineData(86757, 12, true)]
     public void Evaluate_RebirthTwelveIds_GateExactlyAtTwelve(int itemId, int rebirth, bool expectSuccess)
     {
-        var candidate = Candidate(itemId: itemId);
+        var candidate = Candidate(itemId);
 
         var outcome = EquipItemValidationGate.Evaluate(candidate, 0, 0,
             EquipItemValidationGate.SkipSlotCheck, 100, rebirth);
 
-        Assert.Equal(expectSuccess ? EquipItemValidationGate.Outcome.Success : EquipItemValidationGate.Outcome.RebirthTooLow,
+        Assert.Equal(
+            expectSuccess ? EquipItemValidationGate.Outcome.Success : EquipItemValidationGate.Outcome.RebirthTooLow,
             outcome);
     }
 
@@ -165,12 +167,13 @@ public class EquipItemValidationGateTests
     [InlineData(87257, 12, true)]
     public void Evaluate_RebirthTwelveIdRanges_GateExactlyAtTwelve(int itemId, int rebirth, bool expectSuccess)
     {
-        var candidate = Candidate(itemId: itemId);
+        var candidate = Candidate(itemId);
 
         var outcome = EquipItemValidationGate.Evaluate(candidate, 0, 0,
             EquipItemValidationGate.SkipSlotCheck, 100, rebirth);
 
-        Assert.Equal(expectSuccess ? EquipItemValidationGate.Outcome.Success : EquipItemValidationGate.Outcome.RebirthTooLow,
+        Assert.Equal(
+            expectSuccess ? EquipItemValidationGate.Outcome.Success : EquipItemValidationGate.Outcome.RebirthTooLow,
             outcome);
     }
 
@@ -179,19 +182,20 @@ public class EquipItemValidationGateTests
     [InlineData(2305, 7, true)]
     public void Evaluate_RebirthSevenIds_GateExactlyAtSeven(int itemId, int rebirth, bool expectSuccess)
     {
-        var candidate = Candidate(itemId: itemId);
+        var candidate = Candidate(itemId);
 
         var outcome = EquipItemValidationGate.Evaluate(candidate, 0, 0,
             EquipItemValidationGate.SkipSlotCheck, 100, rebirth);
 
-        Assert.Equal(expectSuccess ? EquipItemValidationGate.Outcome.Success : EquipItemValidationGate.Outcome.RebirthTooLow,
+        Assert.Equal(
+            expectSuccess ? EquipItemValidationGate.Outcome.Success : EquipItemValidationGate.Outcome.RebirthTooLow,
             outcome);
     }
 
     [Fact]
     public void Evaluate_CheckSetItemThree_RequiresRebirthTwelve()
     {
-        var candidate = Candidate(itemId: 90000, checkSetItem: 3);
+        var candidate = Candidate(90000, checkSetItem: 3);
 
         var rejected = EquipItemValidationGate.Evaluate(candidate, 0, 0,
             EquipItemValidationGate.SkipSlotCheck, 100, 11);
@@ -205,7 +209,7 @@ public class EquipItemValidationGateTests
     [Fact]
     public void Evaluate_CheckSetItemOtherValue_NoRebirthGate()
     {
-        var candidate = Candidate(itemId: 90000, checkSetItem: 1);
+        var candidate = Candidate(90000, checkSetItem: 1);
 
         var outcome = EquipItemValidationGate.Evaluate(candidate, 0, 0,
             EquipItemValidationGate.SkipSlotCheck, 100, 0);
@@ -221,7 +225,7 @@ public class EquipItemValidationGateTests
     [InlineData(29)]
     public void Evaluate_ItemSortClassificationGatedCodes_RequireRebirthTwelve(int classification)
     {
-        var candidate = Candidate(itemId: 90000);
+        var candidate = Candidate(90000);
 
         var rejected = EquipItemValidationGate.Evaluate(candidate, classification, 0,
             EquipItemValidationGate.SkipSlotCheck, 100, 11);
@@ -235,7 +239,7 @@ public class EquipItemValidationGateTests
     [Fact]
     public void Evaluate_ItemSortClassificationUngatedCode_NoRebirthGate()
     {
-        var candidate = Candidate(itemId: 90000);
+        var candidate = Candidate(90000);
 
         var outcome = EquipItemValidationGate.Evaluate(candidate, 3, 0,
             EquipItemValidationGate.SkipSlotCheck, 100, 0);
@@ -274,7 +278,7 @@ public class EquipItemValidationGateTests
     {
         // Passes tribe/slot/level/rebirth but fails the final sort whitelist -- proves ordering: this must
         // still reject even though every earlier gate was satisfied.
-        var candidate = Candidate(itemId: 13553, sort: 99);
+        var candidate = Candidate(13553, sort: 99);
 
         var outcome = EquipItemValidationGate.Evaluate(candidate, 0, 0,
             EquipItemValidationGate.SkipSlotCheck, 100, 6);

@@ -65,26 +65,14 @@ namespace Fenrir.Application.Game.Domain.Inventory;
 /// </remarks>
 public static class PetBagItemTransferPolicy
 {
-    /// <summary>MAX_PET_BAG_SLOT_NUM-equivalent (DEFINE.h:393).</summary>
-    public const int BagSlotCount = 20;
-
-    public const int MaxBagSlotInclusive = BagSlotCount - 1;
-
-    /// <summary>Bag slots &gt;= this need the <c>aPetBagDate</c>-equivalent entitlement; slots 0-9 need nothing.</summary>
-    public const int UpperHalfStartSlot = 10;
-
-    /// <summary>
-    ///     The one catalog sort code, out of the broader 3-6 "mounts/companions/wings" family, ever accepted into the
-    ///     pet bag by Direction A/C (ServerDocs/12_ts25zone/11_MyGame03_PartieA.md:317-322).
-    /// </summary>
-    public const byte PetBagEligibleSort = 3;
-
     public enum TransferOutcome
     {
         Success,
 
-        /// <summary>Direction C only: same bag slot named as both source and destination -- bypasses every other
-        /// guard (pet-equipped, both entitlement gates, catalog lookups) entirely, per the legacy special case.</summary>
+        /// <summary>
+        ///     Direction C only: same bag slot named as both source and destination -- bypasses every other
+        ///     guard (pet-equipped, both entitlement gates, catalog lookups) entirely, per the legacy special case.
+        /// </summary>
         NoOp,
 
         SourceOutOfRange,
@@ -105,17 +93,35 @@ public static class PetBagItemTransferPolicy
         /// <summary>Source slot is empty, or (bag side) its stored id fails catalog lookup.</summary>
         SourceEmpty,
 
-        /// <summary>Direction A only: source's quantity is above zero, or its packed value field (Enchant/Combine/
-        /// Refine/Socket) is non-zero -- checked before the source's catalog sort code is even looked at.</summary>
+        /// <summary>
+        ///     Direction A only: source's quantity is above zero, or its packed value field (Enchant/Combine/
+        ///     Refine/Socket) is non-zero -- checked before the source's catalog sort code is even looked at.
+        /// </summary>
         SourceNotAtRest,
 
-        /// <summary>Direction A/C only: source's catalog sort code is not <see cref="PetBagEligibleSort" />. Direction
-        /// B never performs this check -- it unconditionally trusts the bag slot's stored id.</summary>
+        /// <summary>
+        ///     Direction A/C only: source's catalog sort code is not <see cref="PetBagEligibleSort" />. Direction
+        ///     B never performs this check -- it unconditionally trusts the bag slot's stored id.
+        /// </summary>
         SourceItemNotPetEligible,
 
         /// <summary>No merge, no overwrite, no swap exists for any of these three transfers.</summary>
         DestinationOccupied
     }
+
+    /// <summary>MAX_PET_BAG_SLOT_NUM-equivalent (DEFINE.h:393).</summary>
+    public const int BagSlotCount = 20;
+
+    public const int MaxBagSlotInclusive = BagSlotCount - 1;
+
+    /// <summary>Bag slots &gt;= this need the <c>aPetBagDate</c>-equivalent entitlement; slots 0-9 need nothing.</summary>
+    public const int UpperHalfStartSlot = 10;
+
+    /// <summary>
+    ///     The one catalog sort code, out of the broader 3-6 "mounts/companions/wings" family, ever accepted into the
+    ///     pet bag by Direction A/C (ServerDocs/12_ts25zone/11_MyGame03_PartieA.md:317-322).
+    /// </summary>
+    public const byte PetBagEligibleSort = 3;
 
     public static bool IsValidBagSlot(int slot)
     {
@@ -125,50 +131,6 @@ public static class PetBagItemTransferPolicy
     public static bool RequiresUpperHalfEntitlement(int bagSlot)
     {
         return bagSlot >= UpperHalfStartSlot;
-    }
-
-    /// <summary>
-    ///     NewGeneralInventorySlot is always <see langword="null" /> on success (ClearInventory's full reset);
-    ///     NewPetBagItemId is the catalog id to store in the destination bag slot, meaningful only when
-    ///     <see cref="Succeeded" />. ShouldEmitAuditLog is <see langword="true" /> exactly when Outcome is
-    ///     <see cref="TransferOutcome.Success" /> (Direction A always logs on success, no bypass path exists).
-    /// </summary>
-    public readonly record struct DepositResult(
-        TransferOutcome Outcome,
-        ItemStack? NewGeneralInventorySlot,
-        int NewPetBagItemId,
-        bool ShouldEmitAuditLog)
-    {
-        public bool Succeeded => Outcome is TransferOutcome.Success;
-    }
-
-    /// <summary>
-    ///     NewSourcePetBagItemId is always <see langword="null" /> on success (the bag slot reset to empty);
-    ///     NewGeneralInventorySlot is the populated destination slot, meaningful only when <see cref="Succeeded" />.
-    ///     ShouldEmitAuditLog mirrors <see cref="DepositResult.ShouldEmitAuditLog" />'s posture.
-    /// </summary>
-    public readonly record struct WithdrawResult(
-        TransferOutcome Outcome,
-        int? NewSourcePetBagItemId,
-        ItemStack? NewGeneralInventorySlot,
-        bool ShouldEmitAuditLog)
-    {
-        public bool Succeeded => Outcome is TransferOutcome.Success;
-    }
-
-    /// <summary>
-    ///     On <see cref="TransferOutcome.NoOp" />, both fields echo back whatever the caller passed in (same
-    ///     physical slot, so they're the same value) -- mirrors <see cref="SaveBankItemTransferPolicy" />'s own
-    ///     same-slot NoOp precedent: the caller must not treat a NoOp's fields as "clear the slot". Direction C never
-    ///     emits an audit-log call, on any path (verified directly -- the only one of the three cited functions with
-    ///     no logging call in its body), so unlike Deposit/Withdraw there is no ShouldEmitAuditLog field here.
-    /// </summary>
-    public readonly record struct RearrangeResult(
-        TransferOutcome Outcome,
-        int? NewSourcePetBagItemId,
-        int? NewDestinationPetBagItemId)
-    {
-        public bool Succeeded => Outcome is TransferOutcome.Success or TransferOutcome.NoOp;
     }
 
     /// <summary>tSort 254 -- general-inventory slot to pet-bag slot.</summary>
@@ -300,5 +262,49 @@ public static class PetBagItemTransferPolicy
     private static RearrangeResult RearrangeFail(TransferOutcome outcome)
     {
         return new RearrangeResult(outcome, null, null);
+    }
+
+    /// <summary>
+    ///     NewGeneralInventorySlot is always <see langword="null" /> on success (ClearInventory's full reset);
+    ///     NewPetBagItemId is the catalog id to store in the destination bag slot, meaningful only when
+    ///     <see cref="Succeeded" />. ShouldEmitAuditLog is <see langword="true" /> exactly when Outcome is
+    ///     <see cref="TransferOutcome.Success" /> (Direction A always logs on success, no bypass path exists).
+    /// </summary>
+    public readonly record struct DepositResult(
+        TransferOutcome Outcome,
+        ItemStack? NewGeneralInventorySlot,
+        int NewPetBagItemId,
+        bool ShouldEmitAuditLog)
+    {
+        public bool Succeeded => Outcome is TransferOutcome.Success;
+    }
+
+    /// <summary>
+    ///     NewSourcePetBagItemId is always <see langword="null" /> on success (the bag slot reset to empty);
+    ///     NewGeneralInventorySlot is the populated destination slot, meaningful only when <see cref="Succeeded" />.
+    ///     ShouldEmitAuditLog mirrors <see cref="DepositResult.ShouldEmitAuditLog" />'s posture.
+    /// </summary>
+    public readonly record struct WithdrawResult(
+        TransferOutcome Outcome,
+        int? NewSourcePetBagItemId,
+        ItemStack? NewGeneralInventorySlot,
+        bool ShouldEmitAuditLog)
+    {
+        public bool Succeeded => Outcome is TransferOutcome.Success;
+    }
+
+    /// <summary>
+    ///     On <see cref="TransferOutcome.NoOp" />, both fields echo back whatever the caller passed in (same
+    ///     physical slot, so they're the same value) -- mirrors <see cref="SaveBankItemTransferPolicy" />'s own
+    ///     same-slot NoOp precedent: the caller must not treat a NoOp's fields as "clear the slot". Direction C never
+    ///     emits an audit-log call, on any path (verified directly -- the only one of the three cited functions with
+    ///     no logging call in its body), so unlike Deposit/Withdraw there is no ShouldEmitAuditLog field here.
+    /// </summary>
+    public readonly record struct RearrangeResult(
+        TransferOutcome Outcome,
+        int? NewSourcePetBagItemId,
+        int? NewDestinationPetBagItemId)
+    {
+        public bool Succeeded => Outcome is TransferOutcome.Success or TransferOutcome.NoOp;
     }
 }

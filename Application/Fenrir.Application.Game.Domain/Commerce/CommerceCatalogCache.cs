@@ -56,8 +56,9 @@ public sealed class CommerceCatalogCache
     /// </summary>
     public const int InitialVersion = 0;
 
-    private readonly ILogger<CommerceCatalogCache> _logger;
     private readonly Lock _lock = new();
+
+    private readonly ILogger<CommerceCatalogCache> _logger;
 
     private ImmutableArray<BloodExchangeCatalogRowDto> _bloodCatalog = [];
     private int _bloodCatalogVersion = InitialVersion;
@@ -197,7 +198,10 @@ public sealed class CommerceCatalogCache
         }
     }
 
-    /// <summary>Blood-catalog half of <see cref="RefreshAllAsync" />. No CRC concept applies here -- see this type's own remarks.</summary>
+    /// <summary>
+    ///     Blood-catalog half of <see cref="RefreshAllAsync" />. No CRC concept applies here -- see this type's own
+    ///     remarks.
+    /// </summary>
     public async Task RefreshBloodCatalogAsync(IWorldDataRepository repository, CancellationToken ct)
     {
         ReadOnlyCollection<BloodExchangeCatalogRowDto> rows;

@@ -11,7 +11,8 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Validation;
 
 if (args.Length < 1)
 {
-    Console.Error.WriteLine("usage: Fenrir.Tools.LegacyDataImport <path-to-BuildEU33-DATA-dir> [--regenerate-seed <path-to-Database/Migrations/Seed/world>]");
+    Console.Error.WriteLine(
+        "usage: Fenrir.Tools.LegacyDataImport <path-to-BuildEU33-DATA-dir> [--regenerate-seed <path-to-Database/Migrations/Seed/world>]");
     return 1;
 }
 

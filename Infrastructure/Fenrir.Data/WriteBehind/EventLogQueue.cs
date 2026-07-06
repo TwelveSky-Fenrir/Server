@@ -79,16 +79,6 @@ public sealed class EventLogQueue : IEventLogQueue, IAsyncDisposable
         });
     }
 
-    /// <inheritdoc />
-    public bool Enqueue(EventLogEntryTvp entry)
-    {
-        if (_channel.Writer.TryWrite(entry))
-            return true;
-
-        _onDropped?.Invoke(1);
-        return false;
-    }
-
     /// <summary>Idempotent -- safe whether or not <see cref="RunAsync" /> ever started.</summary>
     public async ValueTask DisposeAsync()
     {
@@ -102,6 +92,16 @@ public sealed class EventLogQueue : IEventLogQueue, IAsyncDisposable
             await _loopExited.Task.ConfigureAwait(false);
 
         _shutdownCts.Dispose();
+    }
+
+    /// <inheritdoc />
+    public bool Enqueue(EventLogEntryTvp entry)
+    {
+        if (_channel.Writer.TryWrite(entry))
+            return true;
+
+        _onDropped?.Invoke(1);
+        return false;
     }
 
     /// <summary>

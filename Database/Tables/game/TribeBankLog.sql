@@ -8,11 +8,11 @@
 CREATE TABLE game.TribeBankLog
 (
     TribeBankLogId INT IDENTITY(1,1) NOT NULL,
-    TribeId        TINYINT      NOT NULL,
-    SlotIndex      TINYINT      NOT NULL,
-    CharacterId    INT          NOT NULL,
-    Delta          INT          NOT NULL,
-    BalanceAfter   INT          NOT NULL,
+    TribeId        TINYINT NOT NULL,
+    SlotIndex      TINYINT NOT NULL,
+    CharacterId    INT     NOT NULL,
+    Delta          INT     NOT NULL,
+    BalanceAfter   INT     NOT NULL,
     CreatedAtUtc   DATETIME2(3) NOT NULL CONSTRAINT DF_TribeBankLog_CreatedAtUtc DEFAULT SYSUTCDATETIME(),
     CONSTRAINT PK_TribeBankLog PRIMARY KEY CLUSTERED (TribeBankLogId),
     CONSTRAINT CK_TribeBankLog_SlotIndex CHECK (SlotIndex BETWEEN 0 AND 49),

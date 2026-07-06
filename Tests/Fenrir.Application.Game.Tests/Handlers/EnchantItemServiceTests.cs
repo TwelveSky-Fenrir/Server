@@ -24,7 +24,10 @@ public class EnchantItemServiceTests
 {
     private const int TargetItemId = 2000;
 
-    /// <summary>Standard material 633: TypeRequirement.None, ForcesGuaranteedSuccess, MoneyCost 0 (see EnchantMaterialCatalog).</summary>
+    /// <summary>
+    ///     Standard material 633: TypeRequirement.None, ForcesGuaranteedSuccess, MoneyCost 0 (see
+    ///     EnchantMaterialCatalog).
+    /// </summary>
     private const int GuaranteedSuccessMaterialId = 633;
 
     /// <summary>Standard material 1019: +1, 10,000 money, NOT guaranteed -- used only to exercise a paid AdjustMoney call.</summary>
@@ -90,7 +93,8 @@ public class EnchantItemServiceTests
         var service = CreateService(repo, eventLog);
 
         var result = await RunToCompletionAsync(
-            service.EnchantAsync(new EnchantItemRequest { Page1 = 0, Index1 = 0, Page2 = 0, Index2 = 1, Luck = 0 }, zone, state,
+            service.EnchantAsync(new EnchantItemRequest { Page1 = 0, Index1 = 0, Page2 = 0, Index2 = 1, Luck = 0 },
+                zone, state,
                 10, CancellationToken.None), zone);
 
         Assert.Null(session.DisconnectReason);

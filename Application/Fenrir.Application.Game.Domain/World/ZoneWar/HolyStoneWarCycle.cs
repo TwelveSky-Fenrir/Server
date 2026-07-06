@@ -7,7 +7,10 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 /// <summary>Where <see cref="HolyStoneWarCycle" /> currently sits in its cooldown/open/contest/challenge cycle.</summary>
 public enum HolyStoneWarPhase : byte
 {
-    /// <summary>Between wars -- counting down <see cref="HolyStoneWarCycle.CooldownRemaining" />, frozen while the Tribe Symbol Battle window is open.</summary>
+    /// <summary>
+    ///     Between wars -- counting down <see cref="HolyStoneWarCycle.CooldownRemaining" />, frozen while the Tribe
+    ///     Symbol Battle window is open.
+    /// </summary>
     Cooldown,
 
     /// <summary>Cooldown elapsed; counting the ten-simulated-minute "opens in N minutes" countdown plus one final minute.</summary>
@@ -100,15 +103,13 @@ public sealed class HolyStoneWarCycle(
     private readonly MinuteCountdown _minuteCountdown = new();
     private readonly IRandomSource _random = random ?? SystemRandomSource.Instance;
 
-    private int? _candidateCharacterId;
-
     /// <summary>Always starts here -- see class remarks on the war-counter pre-set behavior this reproduces.</summary>
     public HolyStoneWarPhase Phase { get; private set; } = HolyStoneWarPhase.Cooldown;
 
     public TimeSpan CooldownRemaining { get; private set; } = testMode ? TestModeCooldown : NormalCooldown;
 
     /// <summary>Non-null only while <see cref="Phase" /> is <see cref="HolyStoneWarPhase.ChallengePending" />.</summary>
-    public int? PendingCandidateCharacterId => _candidateCharacterId;
+    public int? PendingCandidateCharacterId { get; private set; }
 
     public void Tick(TimeSpan elapsed)
     {
@@ -188,7 +189,7 @@ public sealed class HolyStoneWarCycle(
             if (DistanceSquared(player.PosX, player.PosZ, site.StoneX, site.StoneZ) > captureRadiusSq)
                 continue;
 
-            _candidateCharacterId = player.CharacterId;
+            PendingCandidateCharacterId = player.CharacterId;
             Phase = HolyStoneWarPhase.ChallengePending;
             _minuteCountdown.Reset();
             // GAP: no cited wire sort for the "challenger approaches" notice -- logged only, see class remarks.
@@ -201,7 +202,8 @@ public sealed class HolyStoneWarCycle(
 
     private void AdvanceChallenge(TimeSpan elapsed)
     {
-        if (_candidateCharacterId is not { } candidateId || !zones.TryGet(site.MapId, out var zone) || zone is null)
+        if (PendingCandidateCharacterId is not { } candidateId || !zones.TryGet(site.MapId, out var zone) ||
+            zone is null)
         {
             CancelChallenge();
             return;
@@ -229,9 +231,9 @@ public sealed class HolyStoneWarCycle(
     {
         // GAP: no cited wire sort for the "challenger left/failed" notice -- logged only, see class remarks.
         logger.LogInformation("HolyStoneWar: challenger {CharacterId} left/failed -- resuming scan",
-            _candidateCharacterId);
+            PendingCandidateCharacterId);
 
-        _candidateCharacterId = null;
+        PendingCandidateCharacterId = null;
         Phase = HolyStoneWarPhase.Contest;
     }
 
@@ -248,7 +250,8 @@ public sealed class HolyStoneWarCycle(
         // which also forces the winning tribe's zone038-winner guard pool to resummon on every zone
         // (TribeGuardSpawner.ForceZone038WinnerResummon, wired inside AnnounceZone038Winner itself), satisfying
         // contract step 9 for real with no separate call needed here.
-        logger.LogInformation("HolyStoneWar: new holder tribe {WinningTribe}, captured by {CharacterName} ({CharacterId})",
+        logger.LogInformation(
+            "HolyStoneWar: new holder tribe {WinningTribe}, captured by {CharacterName} ({CharacterId})",
             capturer.Tribe, capturer.Name, capturer.CharacterId);
         broadcaster.AnnounceZone038Winner(capturer.Tribe);
 
@@ -264,7 +267,7 @@ public sealed class HolyStoneWarCycle(
 
         Phase = HolyStoneWarPhase.Cooldown;
         CooldownRemaining = testMode ? TestModeCooldown : NormalCooldown;
-        _candidateCharacterId = null;
+        PendingCandidateCharacterId = null;
         logger.LogInformation("HolyStoneWar: cycle reset -- cooldown armed for {Cooldown}", CooldownRemaining);
     }
 

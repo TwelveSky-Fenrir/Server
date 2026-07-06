@@ -29,7 +29,8 @@ public class ServerQuotaRefreshHostTests
         var quota = new FakeServerQuotaRepository { Exception = new InvalidOperationException("boom") };
         var host = CreateHost(state, quota, new FakeAccountSessionRepository());
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => host.InitializeAsync(CancellationToken.None).AsTask());
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            host.InitializeAsync(CancellationToken.None).AsTask());
     }
 
     [Fact]

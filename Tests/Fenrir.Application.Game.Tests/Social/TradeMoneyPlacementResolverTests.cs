@@ -27,9 +27,9 @@ public class TradeMoneyPlacementResolverTests
     public void ResolveToTradeOffer_ResultingTradeOfferExceedsCeiling_IsDestinationOverflow()
     {
         var result = TradeMoneyPlacementResolver.ResolveToTradeOffer(
-            onHandMoney: TradeMoneyPlacementResolver.MoneyCeiling,
-            tradeOfferMoney: TradeMoneyPlacementResolver.MoneyCeiling,
-            amount: 1);
+            TradeMoneyPlacementResolver.MoneyCeiling,
+            TradeMoneyPlacementResolver.MoneyCeiling,
+            1);
 
         Assert.Equal(TradeMoneyPlacementResolver.MoneyPlacementOutcome.DestinationOverflow, result.Outcome);
     }
@@ -38,9 +38,9 @@ public class TradeMoneyPlacementResolverTests
     public void ResolveToTradeOffer_ResultingTradeOfferExactlyAtCeiling_Succeeds()
     {
         var result = TradeMoneyPlacementResolver.ResolveToTradeOffer(
-            onHandMoney: TradeMoneyPlacementResolver.MoneyCeiling,
-            tradeOfferMoney: 0,
-            amount: TradeMoneyPlacementResolver.MoneyCeiling);
+            TradeMoneyPlacementResolver.MoneyCeiling,
+            0,
+            TradeMoneyPlacementResolver.MoneyCeiling);
 
         Assert.True(result.Succeeded);
         Assert.Equal(0, result.NewOnHandMoney);
@@ -79,9 +79,9 @@ public class TradeMoneyPlacementResolverTests
     public void ResolveFromTradeOffer_ResultingOnHandExceedsCeiling_IsDestinationOverflow()
     {
         var result = TradeMoneyPlacementResolver.ResolveFromTradeOffer(
-            tradeOfferMoney: TradeMoneyPlacementResolver.MoneyCeiling,
-            onHandMoney: TradeMoneyPlacementResolver.MoneyCeiling,
-            amount: 1);
+            TradeMoneyPlacementResolver.MoneyCeiling,
+            TradeMoneyPlacementResolver.MoneyCeiling,
+            1);
 
         Assert.Equal(TradeMoneyPlacementResolver.MoneyPlacementOutcome.DestinationOverflow, result.Outcome);
     }

@@ -9,7 +9,8 @@
 -- header comment); this seed follows the enum + world.Items' real item names instead.
 --
 -- All 24 elite item ids below already exist in world.Items (080_items.sql) under their real names.
-DELETE FROM world.StarterKitEquipment;
+DELETE
+FROM world.StarterKitEquipment;
 
 INSERT INTO world.StarterKitEquipment (PreviousTribe, EquipSlot, ItemId, RawWeaponCode)
 VALUES
@@ -41,4 +42,4 @@ VALUES
     (2, 5, 86599, NULL), -- Boots - Four Cardinal Striders
     (2, 7, 86503, 17),   -- Light Blade - Baihu's Fang
     (2, 7, 86527, 18),   -- Spear - Qing Long's Grace
-    (2, 7, 86551, 19);   -- Scepter - Zhu Que's Spirit
+    (2, 7, 86551, 19); -- Scepter - Zhu Que's Spirit

@@ -33,7 +33,10 @@ namespace Fenrir.Application.Game.Domain.Tribes;
 ///     tSort 11's own AOI-wide AVATAR_CHANGE_INFO_1 sort-14 notice (ContributionPoints/RebirthCount), sent once
 ///     both fields above are already applied to <see cref="PlayerRuntimeState" />.
 /// </param>
-/// <param name="LodRounds">Item 1434's banked "Life or Death" round counter -- see <see cref="PlayerRuntimeState.LodRounds" />.</param>
+/// <param name="LodRounds">
+///     Item 1434's banked "Life or Death" round counter -- see
+///     <see cref="PlayerRuntimeState.LodRounds" />.
+/// </param>
 /// <param name="ProtectForRefine">Preserve Charm -- see <see cref="PlayerRuntimeState.ProtectForRefine" />.</param>
 /// <param name="ProtectForDestroy">Protection Charm -- see <see cref="PlayerRuntimeState.ProtectForDestroy" />.</param>
 /// <param name="ProtectForCostume">Guardian Charm -- see <see cref="PlayerRuntimeState.ProtectForCostume" />.</param>

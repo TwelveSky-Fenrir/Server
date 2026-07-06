@@ -102,7 +102,7 @@ public class ClientSessionStateTests
     {
         var session = new ZoneClientSession(1, new FakeDuplexPipe());
 
-        session.MarkTicketConsumed(1, 10, sessionToken: null, accountGrade: 1);
+        session.MarkTicketConsumed(1, 10, null, 1);
 
         Assert.Equal((short)1, session.AccountGrade);
         Assert.True(session.IsGm);

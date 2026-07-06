@@ -57,7 +57,7 @@ public class QuestProgressServiceTests
 
     private static (ZoneClientSession Session, Zone Zone, PlayerRuntimeState State, FakeCharacterRepository
         Characters, FakeEventLogRepository EventLog, QuestProgressService Service) SetUp(
-        QuestRowDto quest, QuestRewardRowDto[] rewards, int killCounter)
+            QuestRowDto quest, QuestRewardRowDto[] rewards, int killCounter)
     {
         var rows = WorldDataTestRows.MinimalRows() with
         {
@@ -96,7 +96,7 @@ public class QuestProgressServiceTests
     public async Task Complete_WithItemReward_DepositsTheItem_AndLogsAnItemCreateAuditRow()
     {
         var reward = new QuestRewardRowDto(QuestId, 0, 6, RewardItemId, null);
-        var (_, zone, state, characters, eventLog, service) = SetUp(KillQuestAtStep3(), [reward], killCounter: 1);
+        var (_, zone, state, characters, eventLog, service) = SetUp(KillQuestAtStep3(), [reward], 1);
         var packet = new QuestProgressRequest { Sort = 2, Page1 = 0, Index1 = 0, XPost = 0, YPost = 0 };
 
         var result = await RunToCompletionAsync(
@@ -120,7 +120,7 @@ public class QuestProgressServiceTests
     public async Task Complete_MoneyOnlyReward_NoItemGranted_LogsNothing()
     {
         var moneyReward = new QuestRewardRowDto(QuestId, 0, 2, null, 1000);
-        var (_, zone, state, _, eventLog, service) = SetUp(KillQuestAtStep3(), [moneyReward], killCounter: 1);
+        var (_, zone, state, _, eventLog, service) = SetUp(KillQuestAtStep3(), [moneyReward], 1);
         var packet = new QuestProgressRequest { Sort = 2, Page1 = 0, Index1 = 0, XPost = 0, YPost = 0 };
 
         var result = await RunToCompletionAsync(
@@ -136,7 +136,7 @@ public class QuestProgressServiceTests
         // Page1 == -1 signals "no deposit slot" -- CompleteAsync skips the item grant entirely even though a
         // reward item is configured, so no item is ever created and nothing is logged.
         var reward = new QuestRewardRowDto(QuestId, 0, 6, RewardItemId, null);
-        var (_, zone, state, _, eventLog, service) = SetUp(KillQuestAtStep3(), [reward], killCounter: 1);
+        var (_, zone, state, _, eventLog, service) = SetUp(KillQuestAtStep3(), [reward], 1);
         var packet = new QuestProgressRequest { Sort = 2, Page1 = -1, Index1 = -1, XPost = 0, YPost = 0 };
 
         var result = await RunToCompletionAsync(
@@ -151,7 +151,7 @@ public class QuestProgressServiceTests
     {
         var reward = new QuestRewardRowDto(QuestId, 0, 6, RewardItemId, null);
         // killCounter (0) below Solution2 (1) -> end condition not met
-        var (_, zone, state, characters, eventLog, service) = SetUp(KillQuestAtStep3(), [reward], killCounter: 0);
+        var (_, zone, state, characters, eventLog, service) = SetUp(KillQuestAtStep3(), [reward], 0);
         var packet = new QuestProgressRequest { Sort = 2, Page1 = 0, Index1 = 0, XPost = 0, YPost = 0 };
 
         var result = await service.CompleteAsync(packet, state, zone, CharacterId, AccountId, CancellationToken.None);

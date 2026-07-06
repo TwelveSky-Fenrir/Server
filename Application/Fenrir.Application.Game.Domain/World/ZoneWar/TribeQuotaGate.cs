@@ -7,7 +7,8 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 ///     the character/map isn't even resolved yet at this point in the flow, so
 ///     <see cref="Domain.GameServerOptions.TribeQuotaGroup" /> models it as one operator-configured, per-shard
 ///     setting -- the same "Fenrir shards by map, not by numbered server instance" translation already used by
-///     <see cref="Domain.GameServerOptions.Zone241DungeonMapIds" />/<see cref="Domain.GameServerOptions.HolyStoneTerritoryMapIds" />,
+///     <see cref="Domain.GameServerOptions.Zone241DungeonMapIds" />/
+///     <see cref="Domain.GameServerOptions.HolyStoneTerritoryMapIds" />,
 ///     just collapsed to a single flag rather than a map-id set since no map identity exists yet to key one by.
 /// </summary>
 /// <remarks>
@@ -28,7 +29,10 @@ public enum TribeQuotaGroup : byte
     /// </summary>
     None = 0,
 
-    /// <summary>Three-way tribe split: declared tribe must be 0-2; each tribe capped at Capacity/3 temp-registered connections.</summary>
+    /// <summary>
+    ///     Three-way tribe split: declared tribe must be 0-2; each tribe capped at Capacity/3 temp-registered
+    ///     connections.
+    /// </summary>
     ThreeWay = 1,
 
     /// <summary>Four-way tribe split: declared tribe must be 0-3; each tribe capped at Capacity/4 temp-registered connections.</summary>
@@ -43,10 +47,16 @@ public enum TribeQuotaGroup : byte
     RvrInstancedNoGate = 3
 }
 
-/// <summary>Result of evaluating a TEMP_REGISTER_SEND attempt's tribe-population quota (see <see cref="TribeQuotaGate" />).</summary>
+/// <summary>
+///     Result of evaluating a TEMP_REGISTER_SEND attempt's tribe-population quota (see <see cref="TribeQuotaGate" />
+///     ).
+/// </summary>
 public enum TribeQuotaOutcome
 {
-    /// <summary>Population for the declared tribe is below (or at, per <see cref="TribeQuotaGate" />'s remarks) the threshold -- entry proceeds.</summary>
+    /// <summary>
+    ///     Population for the declared tribe is below (or at, per <see cref="TribeQuotaGate" />'s remarks) the threshold
+    ///     -- entry proceeds.
+    /// </summary>
     Accepted,
 
     /// <summary>
@@ -108,6 +118,8 @@ public static class TribeQuotaGate
             return TribeQuotaOutcome.Accepted;
 
         var threshold = maxConcurrentConnections / divisor;
-        return currentPopulationForDeclaredTribe >= threshold ? TribeQuotaOutcome.QuotaFull : TribeQuotaOutcome.Accepted;
+        return currentPopulationForDeclaredTribe >= threshold
+            ? TribeQuotaOutcome.QuotaFull
+            : TribeQuotaOutcome.Accepted;
     }
 }

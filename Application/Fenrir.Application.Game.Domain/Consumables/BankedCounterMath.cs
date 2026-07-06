@@ -16,9 +16,6 @@ namespace Fenrir.Application.Game.Domain.Consumables;
 /// </remarks>
 public static class BankedCounterMath
 {
-    /// <summary>The shared 2,000,000,000 ceiling nearly every banked counter in this document is checked against.</summary>
-    public const int GlobalCeiling = 2_000_000_000;
-
     public enum AddOutcome
     {
         Success,
@@ -27,6 +24,9 @@ public static class BankedCounterMath
         WouldExceedCeiling
     }
 
+    /// <summary>The shared 2,000,000,000 ceiling nearly every banked counter in this document is checked against.</summary>
+    public const int GlobalCeiling = 2_000_000_000;
+
     /// <summary>
     ///     <c>CheckOverMaximum</c> -- widens to 64-bit before comparing, so a bulk add of up to 999 units can
     ///     never silently wrap a 32-bit counter before the ceiling comparison happens. Use for every charm
@@ -34,7 +34,7 @@ public static class BankedCounterMath
     /// </summary>
     public static AddResult AddWideSafe(int current, long amount, int ceiling = GlobalCeiling)
     {
-        var projected = (long)current + amount;
+        var projected = current + amount;
         return projected > ceiling
             ? new AddResult(AddOutcome.WouldExceedCeiling, current)
             : new AddResult(AddOutcome.Success, (int)projected);

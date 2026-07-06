@@ -102,7 +102,8 @@ public class ZoneEventBroadcasterGuardSymbolTests
         var serverIndex = zone.MonstersSnapshot.Single().ServerIndex;
         zone.TryDamageMonster(serverIndex, 10_000, null, out _, out _);
         Assert.Equal(0, zone.MonsterCount);
-        ZoneTestKit.DrainOutbound(pipe); // discard the kill/death broadcast so the frame below is only the sort-39 announce
+        ZoneTestKit.DrainOutbound(
+            pipe); // discard the kill/death broadcast so the frame below is only the sort-39 announce
 
         broadcaster.AnnounceTribeSymbolBattleCountdown();
 

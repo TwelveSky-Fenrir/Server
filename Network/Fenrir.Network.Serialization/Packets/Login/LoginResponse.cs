@@ -3,7 +3,7 @@ using Fenrir.Network.Serialization.Wire;
 
 namespace Fenrir.Network.Serialization.Packets.Login;
 
-[FenrirPacket(FenrirServer.Login, FenrirDirection.Outgoing, Opcodes.Login.Outgoing.Login,
+[FenrirPacket(FenrirServer.Login, FenrirDirection.Outgoing, Opcodes.Login.Outgoing.Loggedin,
     Obfuscation = WireObfuscationMode.XorPacketGlobal, ExpectedSize = 693)]
 public readonly partial record struct LoginResponse : IOutgoingPacket
 {

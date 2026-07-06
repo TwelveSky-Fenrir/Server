@@ -44,7 +44,8 @@ public sealed record HolyStoneWarSite(
 /// </summary>
 /// <remarks>
 ///     Réf. C++ : Server/ts25zone/S07_MyGame01.cpp:4015-4287 (full state machine body) ; :2878-2893 (per-tick
-///     gate, boot-time server-number==38 gate -- translated as <c>GameServerOptions.ShardId</c> == 38 by
+///     gate, boot-time server-number==38 gate -- translated as "whichever live shard hosts
+///     <c>GameServerOptions.HolyStoneMapId</c>" by
 ///     <c>Fenrir.Application.Game.Hosting.World.ZoneWar.HolyStoneWarCycleHost</c>, this class's own driver;
 ///     this class itself has no shard-election concept, it simply always evaluates the configured
 ///     <see cref="HolyStoneWarSite" />) ; :793-819 (war-counter pre-set-so-no-immediate-war

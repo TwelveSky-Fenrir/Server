@@ -78,11 +78,22 @@ public sealed class GameServerOptions
 
     /// <summary>
     ///     Legacy per-instance <c>Zone.Server</c> INI key <c>VoteTribe</c> (Server/Header/ini.h:308-310): arms
-    ///     <c>Fenrir.Application.Game.Hosting.World.ZoneWar.TribeVoteElectionCalendarHost</c> on whichever shard
-    ///     is also configured as <see cref="ShardId" /> 37 (Server/ts25zone/S07_MyGame01.cpp:612-616's server-number
-    ///     gate) -- every other shard never runs that scheduler, regardless of this flag.
+    ///     <c>Fenrir.Application.Game.Hosting.World.ZoneWar.TribeVoteElectionCalendarHost</c> on whichever live
+    ///     shard currently hosts <see cref="VoteTribeMapId" /> -- every other shard never runs that scheduler,
+    ///     regardless of this flag. Legacy gates the equivalent on the single physical instance running server
+    ///     number 37 (Server/ts25zone/S07_MyGame01.cpp:612-616); Fenrir shards by map, not by a numbered
+    ///     server-instance-per-process, so "the shard hosting the designated map" is the natural translation.
     /// </summary>
     public bool VoteTribeEnabled { get; set; }
+
+    /// <summary>
+    ///     The map id this shard must host for <see cref="VoteTribeEnabled" /> to actually arm
+    ///     <c>TribeVoteElectionCalendarHost</c> -- see that flag's own remarks. Legacy's designated server
+    ///     number for this content is 37 (Server/ts25zone/S07_MyGame01.cpp:612-616); an operator configuring
+    ///     the real world should set this to whichever map id that content lives on. 0 (never a real hosted
+    ///     map) by default, matching <see cref="HolyStoneMapId" />'s own fail-safe convention.
+    /// </summary>
+    public short VoteTribeMapId { get; set; }
 
     /// <summary>
     ///     Legacy per-instance INI key <c>VoteTribeTest</c> (Server/Header/ini.h:308-310): when set alongside
@@ -94,14 +105,25 @@ public sealed class GameServerOptions
     public bool VoteTribeTestMode { get; set; }
 
     /// <summary>
-    ///     Legacy per-instance <c>Zone.Server</c> INI key <c>AllianceTribe</c> (Server/Header/ini.h:308): arms
-    ///     the alliance diplomacy ceremony (Server/ts25zone/S07_MyGame01.cpp:3764-4012's
-    ///     <c>Process_Allience_Server</c>) on whichever shard is also configured as <see cref="ShardId" /> 37 --
-    ///     same single-instance gate as <see cref="VoteTribeEnabled" />. Not yet consumed by any Hosting
-    ///     scheduler -- see <c>Fenrir.Application.Game.Domain.World.ZoneWar.AllianceDiplomacyCeremony</c>'s own
-    ///     remarks for why the per-tick driver is not wired up yet.
+    ///     Legacy per-instance <c>Zone.Server</c> INI key <c>AllianceTribe</c> (Server/Header/ini.h:308): will
+    ///     arm the alliance diplomacy ceremony (Server/ts25zone/S07_MyGame01.cpp:3764-4012's
+    ///     <c>Process_Allience_Server</c>) on whichever live shard currently hosts
+    ///     <see cref="AllianceTribeMapId" /> -- same map-id-keyed gate as <see cref="VoteTribeEnabled" />, once
+    ///     a driver exists. Not yet consumed by any Hosting scheduler -- see
+    ///     <c>Fenrir.Application.Game.Domain.World.ZoneWar.AllianceDiplomacyCeremony</c>'s own remarks for why
+    ///     the per-tick driver is not wired up yet.
     /// </summary>
     public bool AllianceTribeEnabled { get; set; }
+
+    /// <summary>
+    ///     The map id this shard must host for <see cref="AllianceTribeEnabled" /> to arm the (not yet built)
+    ///     alliance diplomacy ceremony driver. Legacy's designated server number for this content is 37
+    ///     (same physical instance as <see cref="VoteTribeMapId" />/<see cref="TribeSymbolBattleMapId" />),
+    ///     but each of these three systems gets its own independently-configurable map id rather than one
+    ///     shared field -- the three sharing a server number in legacy is an accident of its
+    ///     one-process-per-map architecture, not a game rule Fenrir must hard-code. 0 by default.
+    /// </summary>
+    public short AllianceTribeMapId { get; set; }
 
     /// <summary>
     ///     Map ids this shard's zones run the Zone-241 "LOD" personal-boss-chain dungeon content on. Legacy
@@ -117,18 +139,27 @@ public sealed class GameServerOptions
     /// <summary>
     ///     Legacy per-instance <c>Zone.Server</c> INI flag arming Zone037's scheduled Tribe Symbol Battle
     ///     open/close cycle (<c>Fenrir.Application.Game.Hosting.World.ZoneWar.TribeSymbolBattleSchedulerHost</c>)
-    ///     on whichever shard is also configured as <see cref="ShardId" /> 37
-    ///     (Server/ts25zone/S07_MyGame01.cpp:578-622's server-number gate) -- the same designated shard as
-    ///     <see cref="VoteTribeEnabled" />/<see cref="AllianceTribeEnabled" />, just a distinct feature flag;
-    ///     every other shard never runs that scheduler regardless of this flag.
+    ///     on whichever live shard currently hosts <see cref="TribeSymbolBattleMapId" />
+    ///     (Server/ts25zone/S07_MyGame01.cpp:578-622's legacy server-number-37 gate) -- the same designated
+    ///     content as <see cref="VoteTribeEnabled" />/<see cref="AllianceTribeEnabled" />, just a distinct
+    ///     feature flag and a distinct map-id field; every other shard never runs that scheduler regardless
+    ///     of this flag.
     /// </summary>
     public bool HolyStoneBattleEnabled { get; set; }
 
     /// <summary>
+    ///     The map id this shard must host for <see cref="HolyStoneBattleEnabled" /> to actually arm
+    ///     <c>TribeSymbolBattleSchedulerHost</c> -- see that flag's own remarks. 0 by default.
+    /// </summary>
+    public short TribeSymbolBattleMapId { get; set; }
+
+    /// <summary>
     ///     Legacy per-instance INI flag arming Zone038's Holy Stone possession-war cycle
-    ///     (<c>Fenrir.Application.Game.Hosting.World.ZoneWar.HolyStoneWarCycleHost</c>) on whichever shard is
-    ///     also configured as <see cref="ShardId" /> 38 (Server/ts25zone/S07_MyGame01.cpp:793-819's
-    ///     server-number gate).
+    ///     (<c>Fenrir.Application.Game.Hosting.World.ZoneWar.HolyStoneWarCycleHost</c>) on whichever live shard
+    ///     currently hosts <see cref="HolyStoneMapId" /> (Server/ts25zone/S07_MyGame01.cpp:793-819's legacy
+    ///     server-number-38 gate) -- <see cref="HolyStoneMapId" /> is dual-purpose, both this arm gate and the
+    ///     war cycle's own geometry/participation-radius site identity, rather than a second, independently
+    ///     configurable "which shard runs this" fact that could drift from the first.
     /// </summary>
     public bool HolyStoneWarEnabled { get; set; }
 
@@ -151,10 +182,12 @@ public sealed class GameServerOptions
 
     /// <summary>
     ///     Zone038: the map id the Holy Stone itself sits on, plus its fixed location and the two contest/
-    ///     participation radii around it. None of these are named by the translated behavior contract (only
-    ///     that a "fixed radius" and a "fixed location" exist) -- MapId 0 (never a real hosted map) and
-    ///     zero-sized radii by default, so the war cycle's contest/challenge phases simply find no zone/nobody
-    ///     in range to act on until an operator configures the real values.
+    ///     participation radii around it -- and, per <see cref="HolyStoneWarEnabled" />'s own remarks, also the
+    ///     arm gate for <c>HolyStoneWarCycleHost</c> (whichever live shard hosts this map runs the war cycle).
+    ///     None of these are named by the translated behavior contract (only that a "fixed radius" and a "fixed
+    ///     location" exist) -- MapId 0 (never a real hosted map) and zero-sized radii by default, so the war
+    ///     cycle's contest/challenge phases simply find no zone/nobody in range to act on until an operator
+    ///     configures the real values.
     /// </summary>
     public short HolyStoneMapId { get; set; }
 

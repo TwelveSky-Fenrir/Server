@@ -4,7 +4,7 @@ using Fenrir.Network.Serialization.Wire;
 
 namespace Fenrir.Network.Serialization.Packets.Login;
 
-[FenrirPacket(FenrirServer.Login, FenrirDirection.Incoming, Opcodes.Login.Incoming.Login, ExpectedSize = 457,
+[FenrirPacket(FenrirServer.Login, FenrirDirection.Incoming, Opcodes.Login.Incoming.Loggedin, ExpectedSize = 457,
     AllowedStates = [(byte)LoginSessionState.Connected, (byte)LoginSessionState.VersionOk])]
 public readonly partial record struct LoginRequest : IIncomingPacket<LoginRequest>
 {

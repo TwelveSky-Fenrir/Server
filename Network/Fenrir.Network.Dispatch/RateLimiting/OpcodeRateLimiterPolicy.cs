@@ -43,7 +43,7 @@ public static class OpcodeRateLimiterPolicy
     {
         return (server, opcode) switch
         {
-            (FenrirServer.Login, Opcodes.Login.Incoming.Login) => Auth,
+            (FenrirServer.Login, Opcodes.Login.Incoming.Loggedin) => Auth,
             (FenrirServer.Zone, Opcodes.Zone.Incoming.ZoneHandshake) => Auth,
             (FenrirServer.Zone, Opcodes.Zone.Incoming.EnterWorld) => Auth,
 

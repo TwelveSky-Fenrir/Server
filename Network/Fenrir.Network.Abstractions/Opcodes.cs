@@ -6,7 +6,7 @@ public static class Opcodes
     {
         public static class Incoming
         {
-            public const byte Login = 11;
+            public const byte Loggedin = 11;
             public const byte LoginKeepAlive = 12;
             public const byte CreateMousePin = 13;
             public const byte ChangeMousePin = 14;
@@ -24,7 +24,7 @@ public static class Opcodes
         public static class Outgoing
         {
             public const byte LoginGreeting = 0;
-            public const byte Login = 11;
+            public const byte Loggedin = 11;
             public const byte AvatarRoster = 12;
             public const byte CreateMousePin = 13;
             public const byte ChangeMousePin = 14;

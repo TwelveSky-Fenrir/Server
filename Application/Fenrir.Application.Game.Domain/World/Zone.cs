@@ -201,15 +201,42 @@ public sealed partial class Zone(
         DrainRuneSocketCommands();
         DrainAutoBuffCommands();
         var t1 = Stopwatch.GetTimestamp();
-        Simulate(_accumulator.Advance(elapsed));
+        var legacyTicksElapsed = _accumulator.Advance(elapsed);
+        Simulate(legacyTicksElapsed);
         var t2 = Stopwatch.GetTimestamp();
-        RebroadcastAvatars();
+
         // Claimed-item despawns first (so other players stop seeing it ASAP), then the 5 s keep-alives, then
-        // the 60 s expiry sweep.
+        // the 60 s expiry sweep -- runs every frame regardless of the gates below, exactly as before.
         DrainClaimedGroundItemDespawns();
-        RebroadcastMonsters();
-        RebroadcastGroundItems();
-        ExpireGroundItems();
+
+        var hasPlayers = !_players.IsEmpty;
+
+        // Legacy throttled avatar/monster/item keep-alive rebroadcasts and the ground-item expiry sweep to
+        // its own ~2 Hz tick (TimeLogic=500ms); Fenrir's 20 Hz network frame is 10x finer-grained than that,
+        // so gating this block on "at least one legacy tick elapsed" matches legacy's own cadence instead of
+        // redoing this work on 9 out of 10 frames for nothing. Every threshold this touches (3.5 s/5 s/5 s/
+        // 60 s) is at least 7x the legacy tick, so the worst-case added latency (~450 ms) is imperceptible
+        // against any of them. RebroadcastProxyShops is deliberately NOT included here even though it is also
+        // a periodic rebroadcast: its own force-close branch is documented as unconditional on any throttle
+        // (an expired shop must close the very first tick this sweep observes it), so it keeps running every
+        // frame, same as before.
+        if (legacyTicksElapsed > 0)
+        {
+            RebroadcastAvatars();
+
+            // A zone with nobody connected has an empty AOI grid -- no possible recipient anywhere in this
+            // zone for a monster/ground-item keep-alive, so these two calls (pure broadcast, no other side
+            // effect) are free to skip. ExpireGroundItems is deliberately NOT population-gated: it performs
+            // a real state mutation (removing expired items from this zone), not just a broadcast.
+            if (hasPlayers)
+            {
+                RebroadcastMonsters();
+                RebroadcastGroundItems();
+            }
+
+            ExpireGroundItems();
+        }
+
         RebroadcastProxyShops();
         AdvanceZone241PersonalDungeonInstances();
         TryFlushTribeBankTax();
@@ -220,7 +247,8 @@ public sealed partial class Zone(
         ZoneTickMetrics.StageDurationMs.Record(Stopwatch.GetElapsedTime(t1, t2).TotalMilliseconds, _mapTag,
             ZoneTickMetrics.SimulateStage);
         ZoneTickMetrics.StageDurationMs.Record(Stopwatch.GetElapsedTime(t2, t3).TotalMilliseconds, _mapTag,
-            ZoneTickMetrics.RebroadcastStage);
+            ZoneTickMetrics.RebroadcastStage,
+            hasPlayers ? ZoneTickMetrics.PopulationActiveTag : ZoneTickMetrics.PopulationIdleTag);
     }
 
     private void DrainInbox()

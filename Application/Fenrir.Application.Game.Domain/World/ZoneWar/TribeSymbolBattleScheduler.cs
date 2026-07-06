@@ -31,7 +31,8 @@ public enum TribeSymbolBattleSchedulePhase : byte
 /// <remarks>
 ///     Réf. C++ : Server/ts25zone/S07_MyGame01.cpp:3632-3762 (full open/close state machine) ;
 ///     :2663-2694 (per-tick invocation gate) ; :578-622 (boot-time server-number==37 gate and enabling
-///     configuration flag -- translated as <c>GameServerOptions.ShardId</c> == 37 by
+///     configuration flag -- translated as "whichever live shard hosts
+///     <c>GameServerOptions.TribeSymbolBattleMapId</c>" by
 ///     <c>Fenrir.Application.Game.Hosting.World.ZoneWar.TribeSymbolBattleSchedulerHost</c>, this class's own
 ///     driver; this class itself has no shard-election concept, it simply always evaluates) ;
 ///     Server/ts25center/S04_MyWork02.cpp:364-372,398-407 (the two broadcast notices that flip

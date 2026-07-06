@@ -12,8 +12,10 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Login.Tests.Handlers;
 
-// op22 CL_DEMAND_ZONE_SERVER_INFO_SEND -- audited bug: FirstOrDefault() over the shard directory ignored
-// which shard actually hosts the character's MapId (ADR-0012 point 4).
+// op22 CL_DEMAND_ZONE_SERVER_INFO_SEND -- previously audited bug (ADR-0012 point 4): FirstOrDefault() over the
+// shard directory ignored which shard actually hosts the character's MapId, silently mis-routing instead of
+// failing explicitly. Fixed in ZoneTransferService.ResolveShardForMapAsync; see the two "no shard hosts the
+// map" tests below for the current, explicit-failure behavior.
 public class ClDemandZoneServerInfoSendHandlerTests
 {
     private const short HostedMapId = 42;
@@ -78,7 +80,7 @@ public class ClDemandZoneServerInfoSendHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_NoShardHostsTheMap_FallsBackToFirstDirectoryEntry()
+    public async Task HandleAsync_NoShardHostsTheMap_RespondsWithGenericFailureAndMintsNoTicket()
     {
         var directory = new FakeGameServerDirectoryRepository(Shard1, Shard2);
         var shardMaps = new FakeShardMapAssignmentRepository(new Dictionary<byte, short[]>
@@ -88,15 +90,34 @@ public class ClDemandZoneServerInfoSendHandlerTests
         });
         var tickets = new FakeSessionTicketRepository();
         var handler = CreateHandler(directory, shardMaps, tickets);
-        var (session, pipe) = CreateSessionInCharSelect(out var sessionToken);
+        var (session, pipe) = CreateSessionInCharSelect(out _);
 
         await handler.HandleAsync(new ZoneTransferRequest { AvatarPost = 0 }, session, CancellationToken.None);
 
-        Assert.Equal((1, 501, (byte)1, 15, sessionToken, (short)0),
-            tickets.LastCreatedTicket);
+        Assert.Null(tickets.LastCreatedTicket);
+        Assert.Equal(LoginSessionState.CharSelect, session.State);
         await PacketAssert.AssertSentAsync(pipe, new ZoneTransferResponse
         {
-            Result = 0, Ip = Shard1.Host, Port = Shard1.Port, Zone = HostedMapId
+            Result = 1, Ip = "", Port = 0, Zone = 0
+        });
+    }
+
+    [Fact]
+    public async Task HandleAsync_NoLiveShardsAtAll_RespondsWithGenericFailureAndMintsNoTicket()
+    {
+        var directory = new FakeGameServerDirectoryRepository();
+        var shardMaps = new FakeShardMapAssignmentRepository(new Dictionary<byte, short[]>());
+        var tickets = new FakeSessionTicketRepository();
+        var handler = CreateHandler(directory, shardMaps, tickets);
+        var (session, pipe) = CreateSessionInCharSelect(out _);
+
+        await handler.HandleAsync(new ZoneTransferRequest { AvatarPost = 0 }, session, CancellationToken.None);
+
+        Assert.Null(tickets.LastCreatedTicket);
+        Assert.Equal(LoginSessionState.CharSelect, session.State);
+        await PacketAssert.AssertSentAsync(pipe, new ZoneTransferResponse
+        {
+            Result = 1, Ip = "", Port = 0, Zone = 0
         });
     }
 

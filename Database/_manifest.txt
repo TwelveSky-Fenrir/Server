@@ -350,6 +350,18 @@ Migrations/014_guild_money_event_log.sql
 # branch is what actually ships (see the migration file's own header comment for the full citation).
 Migrations/015_starter_kit_elite_grant.sql
 
+# Atomicity fix for 015's usp_Character_CreateWithStarterKit: its 5 write statements were never wrapped in
+# an explicit transaction, so a mid-sequence failure (e.g. a bad starter-kit item row) could leave a
+# committed Characters row with a partial/missing kit -- see the migration file's own header for the full
+# autocommit-mode/XACT_ABORT explanation.
+Migrations/016_starter_kit_create_atomicity.sql
+
+# usp_Character_Delete_CleanupChildTables missed admin.Bans/admin.Mutes (character-only rows) and
+# game.TribeBankLog -- all three carry a live FK on CharacterId that AvatarDeletionGate never precondition-
+# checks, so deleting a character that was ever banned/muted by CharacterId or ever touched a tribe bank
+# threw the same unhandled FK-violation the whole CleanupChildTables procedure exists to prevent.
+Migrations/017_character_delete_moderation_tribebank_cleanup.sql
+
 Migrations/Seed/001_dev_account.sql
 
 Migrations/Seed/world/060_levels.sql

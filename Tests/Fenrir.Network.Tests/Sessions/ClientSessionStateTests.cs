@@ -13,11 +13,11 @@ public class ClientSessionStateTests
     {
         var session = new LoginClientSession(1, new FakeDuplexPipe());
 
-        Assert.True(session.IsOpcodeAllowed(Opcodes.Login.Incoming.Login));
+        Assert.True(session.IsOpcodeAllowed(Opcodes.Login.Incoming.Loggedin));
 
         session.MarkCharSelect();
 
-        Assert.False(session.IsOpcodeAllowed(Opcodes.Login.Incoming.Login));
+        Assert.False(session.IsOpcodeAllowed(Opcodes.Login.Incoming.Loggedin));
     }
 
     // CreateAvatarRequest: AllowedStates = [Authenticated, CharSelect].

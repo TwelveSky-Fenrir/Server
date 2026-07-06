@@ -114,9 +114,17 @@ public sealed class ZoneTransferService(
                 return candidate;
         }
 
-        logger.LogWarning(
-            "No shard in admin.ShardMapAssignments hosts MapId {MapId} for character {CharacterId}; falling back to first live shard",
-            mapId, characterId);
-        return shards.FirstOrDefault();
+        // No live shard claims this map -- fail explicitly instead of guessing. Guessing (the previous
+        // shards.FirstOrDefault() fallback) silently misrouted the character to a shard that does not host
+        // their map, which the destination shard would then have had no sane way to honor.
+        if (shards.IsEmpty)
+            logger.LogWarning(
+                "No live shard is currently registered in runtime.GameServerDirectory; cannot route character {CharacterId} to MapId {MapId}",
+                characterId, mapId);
+        else
+            logger.LogWarning(
+                "Live shards exist but none of them claims MapId {MapId} in admin.ShardMapAssignments; cannot route character {CharacterId}",
+                mapId, characterId);
+        return null;
     }
 }

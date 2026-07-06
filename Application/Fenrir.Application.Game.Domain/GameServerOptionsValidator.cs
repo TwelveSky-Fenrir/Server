@@ -31,6 +31,20 @@ public sealed class GameServerOptionsValidator : IValidateOptions<GameServerOpti
             errors.Add(
                 $"Game:TempRegistrationIdleSweepIntervalSeconds must be positive (was {options.TempRegistrationIdleSweepIntervalSeconds}).");
 
+        // Each singleton RvR scheduler is armed by "does this shard host the designated map", not ShardId --
+        // an operator who flips the *Enabled flag on must also name which map arms it, or the scheduler is
+        // silently inert cluster-wide with no boot-time signal beyond SingletonRvrSchedulerGuard's warning.
+        if (options.VoteTribeEnabled && options.VoteTribeMapId == 0)
+            errors.Add("Game:VoteTribeMapId must be configured (nonzero) when Game:VoteTribeEnabled is true.");
+        if (options.HolyStoneBattleEnabled && options.TribeSymbolBattleMapId == 0)
+            errors.Add(
+                "Game:TribeSymbolBattleMapId must be configured (nonzero) when Game:HolyStoneBattleEnabled is true.");
+        if (options.HolyStoneWarEnabled && options.HolyStoneMapId == 0)
+            errors.Add("Game:HolyStoneMapId must be configured (nonzero) when Game:HolyStoneWarEnabled is true.");
+        if (options.AllianceTribeEnabled && options.AllianceTribeMapId == 0)
+            errors.Add(
+                "Game:AllianceTribeMapId must be configured (nonzero) when Game:AllianceTribeEnabled is true.");
+
         return errors.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(errors);
     }
 }

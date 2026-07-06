@@ -1,5 +1,6 @@
 using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Simulation;
+using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -10,24 +11,26 @@ namespace Fenrir.Application.Game.Hosting.World.ZoneWar;
 /// <summary>
 ///     Per-tick driver for <see cref="TribeVoteElectionCalendar" />: reads the real calendar day/hour every
 ///     zone-tick and applies whichever of <see cref="TribeVoteElection" />'s transitions the calendar decides,
-///     but only on the one shard configured as server number 37 with <c>VoteTribe</c> enabled -- every other
-///     shard's instance of this host is permanently inert.
+///     but only on whichever live shard currently hosts <see cref="GameServerOptions.VoteTribeMapId" /> with
+///     <c>VoteTribe</c> enabled -- every other shard's instance of this host is permanently inert.
 /// </summary>
 /// <remarks>
-///     Réf. C++ : Server/ts25zone/S07_MyGame01.cpp:612-616 -- the server-number-37 + <c>VoteTribe</c> arm
-///     gate, read once at zone startup and cached (<see cref="_armed" />/<see cref="_testMode" />), matching
-///     the legacy's own once-at-boot INI read. See <see cref="TribeVoteElectionCalendar" />'s own remarks for
-///     why, in production, this host only ever calls <see cref="TribeVoteElection.OpenCandidacyWindowAsync" />.
+///     Réf. C++ : Server/ts25zone/S07_MyGame01.cpp:612-616 -- legacy gates the equivalent on the single
+///     physical instance running server number 37; Fenrir shards by map, not by a numbered
+///     server-instance-per-process, so "the shard hosting the designated map" (read once at construction and
+///     cached, see <see cref="_armed" />/<see cref="_testMode" />) is the natural translation. See
+///     <see cref="TribeVoteElectionCalendar" />'s own remarks for why, in production, this host only ever
+///     calls <see cref="TribeVoteElection.OpenCandidacyWindowAsync" />.
 /// </remarks>
 public sealed class TribeVoteElectionCalendarHost(
     IOptions<GameServerOptions> options,
+    ZoneRegistry zoneRegistry,
     TribeVoteElection election,
     ILogger<TribeVoteElectionCalendarHost> logger) : BackgroundService
 {
-    /// <summary>Server/ts25zone/S07_MyGame01.cpp:612-616 -- the one physical instance this scheduler ever arms on.</summary>
-    public const int DesignatedShardId = 37;
+    private readonly bool _armed =
+        zoneRegistry.TryGet(options.Value.VoteTribeMapId, out _) && options.Value.VoteTribeEnabled;
 
-    private readonly bool _armed = options.Value.ShardId == DesignatedShardId && options.Value.VoteTribeEnabled;
     private readonly bool _testMode = options.Value.VoteTribeTestMode;
 
     /// <summary>True once at construction if this shard is both server number 37 and has VoteTribe enabled.</summary>
@@ -74,8 +77,8 @@ public sealed class TribeVoteElectionCalendarHost(
         if (!_armed)
         {
             logger.LogInformation(
-                "TribeVoteElectionCalendarHost is inert on this shard (ShardId={ShardId}, VoteTribeEnabled={VoteTribeEnabled})",
-                options.Value.ShardId, options.Value.VoteTribeEnabled);
+                "TribeVoteElectionCalendarHost is inert on this shard (designated map {MapId} not hosted here, or VoteTribeEnabled={VoteTribeEnabled})",
+                options.Value.VoteTribeMapId, options.Value.VoteTribeEnabled);
             return;
         }
 

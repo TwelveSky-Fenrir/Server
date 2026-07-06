@@ -6,6 +6,8 @@ using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.Monsters;
 using Fenrir.Application.Game.Domain.World.WorldState;
+using Fenrir.Application.Game.Domain.World.ZoneWar;
+using Fenrir.Application.Game.Hosting.World.ZoneWar;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.GameData.Extensions;
 using Fenrir.Application.Game.Handlers.Extensions;
@@ -22,6 +24,7 @@ using Fenrir.Network.Dispatch;
 using Fenrir.Network.Dispatch.RateLimiting;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.ServiceDefaults;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 var builder = Host.CreateApplicationBuilder(args);
@@ -88,6 +91,32 @@ await ShardPartitionGuard.EnsureNoOverlapAsync(shardId, hostedMaps,
     host.Services.GetRequiredService<IGameServerDirectoryRepository>(),
     host.Services.GetRequiredService<IShardMapAssignmentRepository>(),
     CancellationToken.None);
+
+// Complements the guard above: not "do two shards collide" (impossible to reach this line if so) but
+// "is any live shard actually hosting the map each singleton RvR scheduler is configured to run on".
+// Service-degradation risk (an inert scheduler), not data-corruption -- logged, never fatal.
+var gameOptions = host.Services.GetRequiredService<IOptions<GameServerOptions>>().Value;
+var unclaimedDesignatedMaps = await SingletonRvrSchedulerGuard.FindUnclaimedDesignatedMapsAsync(
+    [
+        new SingletonRvrSchedulerValidator.DesignatedMapClaim(nameof(TribeVoteElectionCalendarHost),
+            gameOptions.VoteTribeMapId),
+        new SingletonRvrSchedulerValidator.DesignatedMapClaim(nameof(TribeSymbolBattleSchedulerHost),
+            gameOptions.TribeSymbolBattleMapId),
+        new SingletonRvrSchedulerValidator.DesignatedMapClaim(nameof(HolyStoneWarCycleHost),
+            gameOptions.HolyStoneMapId)
+        // AllianceTribeMapId intentionally excluded -- AllianceDiplomacyCeremony has no Hosting driver yet
+        // (see its own remarks). Add it here the same day that driver ships.
+    ],
+    host.Services.GetRequiredService<IGameServerDirectoryRepository>(),
+    host.Services.GetRequiredService<IShardMapAssignmentRepository>(),
+    CancellationToken.None);
+
+var bootLogger = host.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Fenrir.GameServer.Boot");
+foreach (var gap in unclaimedDesignatedMaps)
+    bootLogger.LogWarning(
+        "No live shard currently hosts map {MapId}, the designated map for {SchedulerName} -- that scheduler " +
+        "is inert cluster-wide until admin.ShardMapAssignments assigns map {MapId} to some shard.",
+        gap.MapId, gap.SchedulerName, gap.MapId);
 
 host.Services.GetRequiredService<ZoneRegistry>().Initialize(hostedMaps);
 

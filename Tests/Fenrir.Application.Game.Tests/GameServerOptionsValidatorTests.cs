@@ -19,7 +19,15 @@ public class GameServerOptionsValidatorTests
         string? gameDataDirectory = "GameData",
         int heroRankingRolloverCheckIntervalMinutes = 60,
         int accountSessionPollIntervalSeconds = 20,
-        int tempRegistrationIdleSweepIntervalSeconds = 30)
+        int tempRegistrationIdleSweepIntervalSeconds = 30,
+        bool voteTribeEnabled = false,
+        short voteTribeMapId = 0,
+        bool holyStoneBattleEnabled = false,
+        short tribeSymbolBattleMapId = 0,
+        bool holyStoneWarEnabled = false,
+        short holyStoneMapId = 0,
+        bool allianceTribeEnabled = false,
+        short allianceTribeMapId = 0)
     {
         return new GameServerOptions
         {
@@ -34,7 +42,15 @@ public class GameServerOptionsValidatorTests
             GameDataDirectory = gameDataDirectory!,
             HeroRankingRolloverCheckIntervalMinutes = heroRankingRolloverCheckIntervalMinutes,
             AccountSessionPollIntervalSeconds = accountSessionPollIntervalSeconds,
-            TempRegistrationIdleSweepIntervalSeconds = tempRegistrationIdleSweepIntervalSeconds
+            TempRegistrationIdleSweepIntervalSeconds = tempRegistrationIdleSweepIntervalSeconds,
+            VoteTribeEnabled = voteTribeEnabled,
+            VoteTribeMapId = voteTribeMapId,
+            HolyStoneBattleEnabled = holyStoneBattleEnabled,
+            TribeSymbolBattleMapId = tribeSymbolBattleMapId,
+            HolyStoneWarEnabled = holyStoneWarEnabled,
+            HolyStoneMapId = holyStoneMapId,
+            AllianceTribeEnabled = allianceTribeEnabled,
+            AllianceTribeMapId = allianceTribeMapId
         };
     }
 
@@ -177,5 +193,81 @@ public class GameServerOptionsValidatorTests
 
         Assert.True(result.Failed);
         Assert.Contains(result.Failures!, f => f.Contains("Game:TempRegistrationIdleSweepIntervalSeconds"));
+    }
+
+    [Fact]
+    public void Validate_VoteTribeEnabledWithoutMapId_Fails()
+    {
+        var result = Validator.Validate(null, Options(voteTribeEnabled: true));
+
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures!, f => f.Contains("Game:VoteTribeMapId"));
+    }
+
+    [Fact]
+    public void Validate_VoteTribeEnabledWithMapId_Succeeds()
+    {
+        var result = Validator.Validate(null, Options(voteTribeEnabled: true, voteTribeMapId: 37));
+
+        Assert.True(result.Succeeded);
+    }
+
+    [Fact]
+    public void Validate_VoteTribeDisabled_SucceedsRegardlessOfMapId()
+    {
+        var result = Validator.Validate(null, Options(voteTribeMapId: 0));
+
+        Assert.True(result.Succeeded);
+    }
+
+    [Fact]
+    public void Validate_HolyStoneBattleEnabledWithoutMapId_Fails()
+    {
+        var result = Validator.Validate(null, Options(holyStoneBattleEnabled: true));
+
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures!, f => f.Contains("Game:TribeSymbolBattleMapId"));
+    }
+
+    [Fact]
+    public void Validate_HolyStoneBattleEnabledWithMapId_Succeeds()
+    {
+        var result = Validator.Validate(null, Options(holyStoneBattleEnabled: true, tribeSymbolBattleMapId: 37));
+
+        Assert.True(result.Succeeded);
+    }
+
+    [Fact]
+    public void Validate_HolyStoneWarEnabledWithoutMapId_Fails()
+    {
+        var result = Validator.Validate(null, Options(holyStoneWarEnabled: true));
+
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures!, f => f.Contains("Game:HolyStoneMapId"));
+    }
+
+    [Fact]
+    public void Validate_HolyStoneWarEnabledWithMapId_Succeeds()
+    {
+        var result = Validator.Validate(null, Options(holyStoneWarEnabled: true, holyStoneMapId: 38));
+
+        Assert.True(result.Succeeded);
+    }
+
+    [Fact]
+    public void Validate_AllianceTribeEnabledWithoutMapId_Fails()
+    {
+        var result = Validator.Validate(null, Options(allianceTribeEnabled: true));
+
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures!, f => f.Contains("Game:AllianceTribeMapId"));
+    }
+
+    [Fact]
+    public void Validate_AllianceTribeEnabledWithMapId_Succeeds()
+    {
+        var result = Validator.Validate(null, Options(allianceTribeEnabled: true, allianceTribeMapId: 37));
+
+        Assert.True(result.Succeeded);
     }
 }

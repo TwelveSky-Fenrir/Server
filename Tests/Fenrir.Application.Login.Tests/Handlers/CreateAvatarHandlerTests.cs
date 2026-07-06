@@ -152,6 +152,123 @@ public class CreateAvatarHandlerTests
         Assert.Null(session.DisconnectReason);
     }
 
+    // Adversarial gap fix: every other "elite equipment" assertion in this file went through NobleDragonKit
+    // (PreviousTribe 0) exclusively -- PreviousTribe 1 (Royal Serpent) and 2 (Grand Tiger) had no handler-level
+    // coverage at all asserting THEIR OWN elite item ids, even though the pass-through logic in
+    // CreateAvatarService (BuildEquipmentRows et al.) is generic across races and the
+    // "previousTribe is 0 or 1 or 2" weapon-validation gate (S04_MyWork02.cpp:739-838) was only ever exercised
+    // at value 0 (true branch) and 3/255 (false branch) -- never at 1 or 2. This closes both gaps at once: a
+    // regression that narrowed that gate to `previousTribe is 0` only, or one that let one race's item ids
+    // leak into another's flow, would go undetected without these two tests (mirrors
+    // StarterKitProcTests.GetByPreviousTribeAsync_RoyalSerpent_.../_GrandTiger_... at the DB layer, using the
+    // exact same seeded ids so a mismatch between the two layers would be self-evident).
+    [Fact]
+    public async Task HandleAsync_RoyalSerpentPreviousTribe_PersistsItsOwnEliteEquipmentNotNobleDragons()
+    {
+        var characters = FakeCharacterRepository.WithNone();
+        var starterKits = FakeStarterKitRepository.RoyalSerpentKit();
+        var handler = new CreateAvatarHandler(
+            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions()));
+        var (session, _) = CreateSessionInCharSelect();
+
+        var request = ValidRequest(12) with { Tribe = 1, PreviousTribe = 1 }; // raw code 12 -> Black Feast
+
+        await handler.HandleAsync(request, session, CancellationToken.None);
+
+        Assert.Null(session.DisconnectReason);
+        Assert.Equal(((byte)1, (short)6), starterKits.LastCall); // Tribe 1 -> mapcheck.h map 6; PreviousTribe threaded unchanged
+
+        var call = characters.LastCreateWithStarterKit;
+        Assert.NotNull(call);
+        Assert.Equal((byte)1, call!.Tribe);
+        Assert.Equal((short)6, call.MapId);
+        Assert.Equal(8, call.Equipment.Count);
+        Assert.Contains(call.Equipment, i => i is { Slot: 0, ItemId: 85671, Enchant: 45, Combine: 6 });
+        Assert.Contains(call.Equipment, i => i is { Slot: 2, ItemId: 85575, Enchant: 45, Combine: 6 });
+        Assert.Contains(call.Equipment, i => i is { Slot: 3, ItemId: 85623, Enchant: 45, Combine: 6 });
+        Assert.Contains(call.Equipment, i => i is { Slot: 4, ItemId: 85647, Enchant: 45, Combine: 6 });
+        Assert.Contains(call.Equipment, i => i is { Slot: 5, ItemId: 85599, Enchant: 45, Combine: 6 });
+        Assert.Contains(call.Equipment, i => i is { Slot: 7, ItemId: 85527, Enchant: 45, Combine: 6 });
+        Assert.DoesNotContain(call.Equipment, i => i is { Slot: 7, ItemId: 85503 });
+        Assert.DoesNotContain(call.Equipment, i => i is { Slot: 7, ItemId: 85551 });
+        // Guards against a seed/catalog mixup leaking Noble Dragon's ids into this race's flow.
+        Assert.DoesNotContain(call.Equipment, i => i.ItemId is 84671 or 84575 or 84623 or 84647 or 84599
+            or 84503 or 84527 or 84551);
+    }
+
+    [Fact]
+    public async Task HandleAsync_RoyalSerpentPreviousTribe_WeaponFromAnotherRace_AbortsWithoutCreating()
+    {
+        var characters = FakeCharacterRepository.WithNone();
+        var starterKits = FakeStarterKitRepository.RoyalSerpentKit();
+        var handler = new CreateAvatarHandler(
+            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions()));
+        var (session, pipe) = CreateSessionInCharSelect();
+
+        // 6 is a valid Noble Dragon weapon id, not one of Royal Serpent's (11/12/13) -- guards the
+        // "previousTribe is 0 or 1 or 2" weapon-validation gate at value 1 specifically, not just 0.
+        var request = ValidRequest(6) with { Tribe = 1, PreviousTribe = 1 };
+
+        await handler.HandleAsync(request, session, CancellationToken.None);
+
+        Assert.Null(characters.LastCreateWithStarterKit);
+        Assert.Equal(DisconnectReason.Malformed, session.DisconnectReason);
+        PacketAssert.AssertNothingSent(pipe);
+    }
+
+    [Fact]
+    public async Task HandleAsync_GrandTigerPreviousTribe_PersistsItsOwnEliteEquipmentNotTheOtherTwoRaces()
+    {
+        var characters = FakeCharacterRepository.WithNone();
+        var starterKits = FakeStarterKitRepository.GrandTigerKit();
+        var handler = new CreateAvatarHandler(
+            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions()));
+        var (session, _) = CreateSessionInCharSelect();
+
+        var request = ValidRequest(18) with { Tribe = 2, PreviousTribe = 2 }; // raw code 18 -> Qing Long's Grace
+
+        await handler.HandleAsync(request, session, CancellationToken.None);
+
+        Assert.Null(session.DisconnectReason);
+        Assert.Equal(((byte)2, (short)11), starterKits.LastCall); // Tribe 2 -> mapcheck.h map 11
+
+        var call = characters.LastCreateWithStarterKit;
+        Assert.NotNull(call);
+        Assert.Equal((byte)2, call!.Tribe);
+        Assert.Equal((short)11, call.MapId);
+        Assert.Equal(8, call.Equipment.Count);
+        Assert.Contains(call.Equipment, i => i is { Slot: 0, ItemId: 86671, Enchant: 45, Combine: 6 });
+        Assert.Contains(call.Equipment, i => i is { Slot: 2, ItemId: 86575, Enchant: 45, Combine: 6 });
+        Assert.Contains(call.Equipment, i => i is { Slot: 3, ItemId: 86623, Enchant: 45, Combine: 6 });
+        Assert.Contains(call.Equipment, i => i is { Slot: 4, ItemId: 86647, Enchant: 45, Combine: 6 });
+        Assert.Contains(call.Equipment, i => i is { Slot: 5, ItemId: 86599, Enchant: 45, Combine: 6 });
+        Assert.Contains(call.Equipment, i => i is { Slot: 7, ItemId: 86527, Enchant: 45, Combine: 6 });
+        Assert.DoesNotContain(call.Equipment, i => i is { Slot: 7, ItemId: 86503 });
+        Assert.DoesNotContain(call.Equipment, i => i is { Slot: 7, ItemId: 86551 });
+        Assert.DoesNotContain(call.Equipment, i => i.ItemId is 84671 or 84575 or 84623 or 84647 or 84599
+            or 84503 or 84527 or 84551 or 85671 or 85575 or 85623 or 85647 or 85599 or 85503 or 85527 or 85551);
+    }
+
+    [Fact]
+    public async Task HandleAsync_GrandTigerPreviousTribe_WeaponFromAnotherRace_AbortsWithoutCreating()
+    {
+        var characters = FakeCharacterRepository.WithNone();
+        var starterKits = FakeStarterKitRepository.GrandTigerKit();
+        var handler = new CreateAvatarHandler(
+            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions()));
+        var (session, pipe) = CreateSessionInCharSelect();
+
+        // 12 is a valid Royal Serpent weapon id, not one of Grand Tiger's (17/18/19) -- guards the same gate
+        // at value 2.
+        var request = ValidRequest(12) with { Tribe = 2, PreviousTribe = 2 };
+
+        await handler.HandleAsync(request, session, CancellationToken.None);
+
+        Assert.Null(characters.LastCreateWithStarterKit);
+        Assert.Equal(DisconnectReason.Malformed, session.DisconnectReason);
+        PacketAssert.AssertNothingSent(pipe);
+    }
+
     [Fact]
     public async Task HandleAsync_WeaponNotOneOfTheTribesThreeAlternatives_AbortsWithoutCreating()
     {
@@ -209,15 +326,19 @@ public class CreateAvatarHandlerTests
 
     // Server/ts25login/S04_MyWork02.cpp:739-838: the PreviousTribe/race switch has no case-3/default branch,
     // so a PreviousTribe outside 0-2 is a genuine legacy validation gap -- unlike every other field above, it
-    // is deliberately NOT range-checked, and the request is not rejected on this basis; only the weapon-matching
-    // rule is skipped, leaving the weapon-equip slot unassigned.
+    // is deliberately NOT range-checked, and the request is not rejected on this basis. Uses
+    // UnseededPreviousTribeKit (not NobleDragonKit) because the real world.usp_StarterKit_GetByPreviousTribe
+    // filters Equipment/Skills/Hotkeys on PreviousTribe and returns none of them for an unmatched value -- only
+    // Inventory is unconditional -- so this exercises "the whole elite catalog is missing", not merely "the
+    // weapon is missing" (NobleDragonKit would still hand back the other 5 elite-gear rows regardless of which
+    // PreviousTribe key is passed, masking the difference).
     [Theory]
     [InlineData(3)]
     [InlineData(255)]
     public async Task HandleAsync_PreviousTribeOutOfRange_CreatesNormallyWithNoWeaponEquipped(int previousTribe)
     {
         var characters = FakeCharacterRepository.WithNone();
-        var starterKits = FakeStarterKitRepository.NobleDragonKit();
+        var starterKits = FakeStarterKitRepository.UnseededPreviousTribeKit();
         var handler = new CreateAvatarHandler(
             new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions()));
         var (session, pipe) = CreateSessionInCharSelect();
@@ -227,9 +348,20 @@ public class CreateAvatarHandlerTests
         await handler.HandleAsync(request, session, CancellationToken.None);
 
         Assert.Null(session.DisconnectReason);
+        // The out-of-range value itself must still reach the repository call unchanged (not clamped/defaulted
+        // to a seeded race along the way) -- previously unasserted by this test.
+        Assert.Equal(((byte)previousTribe, (short)1), starterKits.LastCall);
         var call = characters.LastCreateWithStarterKit;
         Assert.NotNull(call);
         Assert.DoesNotContain(call!.Equipment, i => i.Slot == 7); // weapon-equip slot left unassigned
+        // No elite gear at all -- only the two universal grants (Cape + Pet) survive, since Equipment
+        // (unlike Inventory) is filtered by PreviousTribe in the real proc and comes back empty.
+        Assert.Equal(2, call.Equipment.Count);
+        Assert.Contains(call.Equipment, i => i is { Slot: 1, ItemId: 1407 });
+        Assert.Contains(call.Equipment, i => i is { Slot: 8, ItemId: 2300 });
+        Assert.Equal(4, call.Inventory.Count); // Inventory is unconditional, unlike Equipment/Skills/Hotkeys
+        Assert.Empty(call.Skills);
+        Assert.Empty(call.Hotkeys);
 
         var createdCharacter = await characters.GetForWorldEntryAsync(1000, CancellationToken.None);
         Assert.NotNull(createdCharacter);

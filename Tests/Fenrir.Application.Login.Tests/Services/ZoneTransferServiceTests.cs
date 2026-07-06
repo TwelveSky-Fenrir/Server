@@ -98,6 +98,58 @@ public class ZoneTransferServiceTests
         Assert.Null(characters.LastClampVitalsFloor);
     }
 
+    [Fact]
+    public async Task RequestZoneTransferAsync_NoLiveShardHostsTheMap_ReturnsShardUnavailableAndMintsNoTicket()
+    {
+        var characters = FakeCharacterRepository.With(Summary, WorldEntryWith(850, 320));
+        var otherShard = new ShardDirectoryEntryDto(2, "10.0.0.2", 30001, 0, 100, 0f);
+        var (service, tickets) = CreateServiceWithDirectory(characters, [otherShard],
+            new Dictionary<byte, short[]> { [2] = [(short)(HostedMapId + 1)] });
+
+        var result = await service.RequestZoneTransferAsync(AccountId, Summary.Slot, Guid.NewGuid(), 0,
+            CancellationToken.None);
+
+        Assert.Equal(ZoneTransferOutcome.ShardUnavailable, result.Outcome);
+        Assert.Equal("", result.Ip);
+        Assert.Equal(0, result.Port);
+        Assert.Equal(0, result.Zone);
+        Assert.Null(tickets.LastCreatedTicket);
+    }
+
+    [Fact]
+    public async Task RequestZoneTransferAsync_EmptyLiveShardDirectory_ReturnsShardUnavailableAndMintsNoTicket()
+    {
+        var characters = FakeCharacterRepository.With(Summary, WorldEntryWith(850, 320));
+        var (service, tickets) = CreateServiceWithDirectory(characters, [],
+            new Dictionary<byte, short[]>());
+
+        var result = await service.RequestZoneTransferAsync(AccountId, Summary.Slot, Guid.NewGuid(), 0,
+            CancellationToken.None);
+
+        Assert.Equal(ZoneTransferOutcome.ShardUnavailable, result.Outcome);
+        Assert.Null(tickets.LastCreatedTicket);
+    }
+
+    [Fact]
+    public async Task RequestZoneTransferAsync_MultipleLiveShardsNoneHostTheMap_ReturnsShardUnavailable()
+    {
+        var characters = FakeCharacterRepository.With(Summary, WorldEntryWith(850, 320));
+        var shard1 = new ShardDirectoryEntryDto(1, "10.0.0.1", 30000, 0, 100, 0f);
+        var shard2 = new ShardDirectoryEntryDto(2, "10.0.0.2", 30001, 0, 100, 0f);
+        var (service, tickets) = CreateServiceWithDirectory(characters, [shard1, shard2],
+            new Dictionary<byte, short[]>
+            {
+                [1] = [(short)(HostedMapId + 1)],
+                [2] = [(short)(HostedMapId + 2)]
+            });
+
+        var result = await service.RequestZoneTransferAsync(AccountId, Summary.Slot, Guid.NewGuid(), 0,
+            CancellationToken.None);
+
+        Assert.Equal(ZoneTransferOutcome.ShardUnavailable, result.Outcome);
+        Assert.Null(tickets.LastCreatedTicket);
+    }
+
     private static CharacterWorldEntryDto WorldEntryWith(int life, int mana)
     {
         return new CharacterWorldEntryDto(
@@ -116,5 +168,19 @@ public class ZoneTransferServiceTests
 
         return new ZoneTransferService(characters, directory, shardMaps, tickets, options,
             NullLogger<ZoneTransferService>.Instance);
+    }
+
+    private static (ZoneTransferService Service, FakeSessionTicketRepository Tickets) CreateServiceWithDirectory(
+        FakeCharacterRepository characters, ShardDirectoryEntryDto[] shards,
+        IReadOnlyDictionary<byte, short[]> hostedMapsByShard)
+    {
+        var directory = new FakeGameServerDirectoryRepository(shards);
+        var shardMaps = new FakeShardMapAssignmentRepository(hostedMapsByShard);
+        var tickets = new FakeSessionTicketRepository();
+        var options = Options.Create(new LoginServerOptions());
+
+        var service = new ZoneTransferService(characters, directory, shardMaps, tickets, options,
+            NullLogger<ZoneTransferService>.Instance);
+        return (service, tickets);
     }
 }

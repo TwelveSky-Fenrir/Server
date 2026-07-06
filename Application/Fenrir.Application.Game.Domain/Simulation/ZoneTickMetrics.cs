@@ -12,6 +12,15 @@ internal static class ZoneTickMetrics
     public static readonly KeyValuePair<string, object?> SimulateStage = new("stage", "simulate");
     public static readonly KeyValuePair<string, object?> RebroadcastStage = new("stage", "rebroadcast");
 
+    /// <summary>
+    ///     Tags the rebroadcast-stage record so the population-gated monster/ground-item keep-alive skip
+    ///     (<see cref="Zone.Tick" />) can be measured directly: the "idle" series should drop once that skip
+    ///     lands, while "active" stays statistically unchanged (its code path is untouched).
+    /// </summary>
+    public static readonly KeyValuePair<string, object?> PopulationIdleTag = new("population", "idle");
+
+    public static readonly KeyValuePair<string, object?> PopulationActiveTag = new("population", "active");
+
     private static readonly Meter Meter = new(MeterName);
 
     public static readonly Histogram<double> StageDurationMs = Meter.CreateHistogram<double>(

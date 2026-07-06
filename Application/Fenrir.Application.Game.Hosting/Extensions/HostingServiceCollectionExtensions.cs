@@ -175,8 +175,8 @@ public static class HostingServiceCollectionExtensions
         services.AddSingleton<RegularWarSchedulerHost>();
         services.AddHostedService(static provider => provider.GetRequiredService<RegularWarSchedulerHost>());
 
-        // Force-Leader election calendar -- inert everywhere except the one shard configured as server
-        // number 37 with VoteTribe enabled; see TribeVoteElectionCalendarHost's own remarks.
+        // Force-Leader election calendar -- inert everywhere except whichever live shard hosts the
+        // designated VoteTribeMapId with VoteTribe enabled; see TribeVoteElectionCalendarHost's own remarks.
         services.AddHostedService<TribeVoteElectionCalendarHost>();
 
         // TribeGuardSpawner/TribeSymbolSpawner (SummonGuard/SummonTribeSymbol) -- catalogs default to Empty

@@ -1,5 +1,6 @@
 using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Simulation;
+using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -8,31 +9,31 @@ using Microsoft.Extensions.Options;
 namespace Fenrir.Application.Game.Hosting.World.ZoneWar;
 
 /// <summary>
-///     Per-tick driver for <see cref="HolyStoneWarCycle" />, armed only on the one shard configured as server
-///     number 38 with <see cref="GameServerOptions.HolyStoneWarEnabled" /> set -- every other shard's instance
-///     of this host is permanently inert. Same shape as <see cref="TribeSymbolBattleSchedulerHost" />/
-///     <see cref="TribeVoteElectionCalendarHost" />.
+///     Per-tick driver for <see cref="HolyStoneWarCycle" />, armed only on whichever live shard currently
+///     hosts <see cref="GameServerOptions.HolyStoneMapId" /> with <see cref="GameServerOptions.HolyStoneWarEnabled" />
+///     set -- every other shard's instance of this host is permanently inert. Same shape as
+///     <see cref="TribeSymbolBattleSchedulerHost" />/<see cref="TribeVoteElectionCalendarHost" />.
 /// </summary>
 /// <remarks>
-///     Réf. C++ : Server/ts25zone/S07_MyGame01.cpp:793-819 (server-number-38 + enabling-flag gate).
+///     Réf. C++ : Server/ts25zone/S07_MyGame01.cpp:793-819 -- legacy gates the equivalent on server number 38;
+///     Fenrir shards by map, so "the shard hosting the designated map" is the natural translation.
 /// </remarks>
 public sealed class HolyStoneWarCycleHost(
     IOptions<GameServerOptions> options,
+    ZoneRegistry zoneRegistry,
     HolyStoneWarCycle cycle,
     ILogger<HolyStoneWarCycleHost> logger) : BackgroundService
 {
-    /// <summary>Server/ts25zone/S07_MyGame01.cpp:793-819 -- the one physical instance this scheduler ever arms on.</summary>
-    public const int DesignatedShardId = 38;
-
-    public bool IsArmed { get; } = options.Value.ShardId == DesignatedShardId && options.Value.HolyStoneWarEnabled;
+    public bool IsArmed { get; } =
+        zoneRegistry.TryGet(options.Value.HolyStoneMapId, out _) && options.Value.HolyStoneWarEnabled;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         if (!IsArmed)
         {
             logger.LogInformation(
-                "HolyStoneWarCycleHost is inert on this shard (ShardId={ShardId}, HolyStoneWarEnabled={Enabled})",
-                options.Value.ShardId, options.Value.HolyStoneWarEnabled);
+                "HolyStoneWarCycleHost is inert on this shard (designated map {MapId} not hosted here, or HolyStoneWarEnabled={Enabled})",
+                options.Value.HolyStoneMapId, options.Value.HolyStoneWarEnabled);
             return;
         }
 

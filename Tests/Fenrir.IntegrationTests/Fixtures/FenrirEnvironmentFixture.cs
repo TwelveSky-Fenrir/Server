@@ -51,7 +51,7 @@ public sealed class FenrirEnvironmentFixture : IAsyncLifetime
         GamePort = ReserveEphemeralLoopbackPort();
 
         _loginProcess = StartServerProcess(
-            OriginalBuildOutputDllPath(typeof(LoginConnectionHost).Assembly),
+            OriginalBuildOutputDllPath("Fenrir.LoginServer"),
             _loginLog, _loginLogLock,
             new Dictionary<string, string?>
             {
@@ -61,7 +61,7 @@ public sealed class FenrirEnvironmentFixture : IAsyncLifetime
         await WaitForServerReadyAsync(_loginProcess, LoginPort, "LoginServer", _loginLog, _loginLogLock);
 
         _gameProcess = StartServerProcess(
-            OriginalBuildOutputDllPath(typeof(GameConnectionHost).Assembly),
+            OriginalBuildOutputDllPath("Fenrir.GameServer"),
             _gameLog, _gameLogLock,
             new Dictionary<string, string?>
             {
@@ -239,13 +239,20 @@ public sealed class FenrirEnvironmentFixture : IAsyncLifetime
     ///     has no such fallback. Launching from each server's own original build output directory (same
     ///     Configuration/TFM as this test run) avoids the mismatch entirely.
     /// </summary>
-    private static string OriginalBuildOutputDllPath(Assembly serverAssembly)
+    /// <remarks>
+    ///     Takes the executable project's own name (under <c>Servers/</c>), not a type's declaring assembly:
+    ///     <see cref="LoginConnectionHost" />/<see cref="GameConnectionHost" /> live in the
+    ///     <c>Fenrir.Application.Login.Hosting</c>/<c>Fenrir.Application.Game.Hosting</c> class libraries those
+    ///     executables reference, not in the executables themselves, since the clean-architecture project split --
+    ///     deriving the path from <c>typeof(...).Assembly.GetName().Name</c> silently pointed at a nonexistent
+    ///     <c>Servers/Fenrir.Application.Login.Hosting/</c> directory.
+    /// </remarks>
+    private static string OriginalBuildOutputDllPath(string serverProjectName)
     {
         var tfmDir = new DirectoryInfo(AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar));
         var repoRoot = tfmDir.Parent!.Parent!.Parent!.Parent!.Parent!.FullName;
-        var assemblyName = serverAssembly.GetName().Name!;
-        return Path.Combine(repoRoot, "Servers", assemblyName, "bin", tfmDir.Parent.Name, tfmDir.Name,
-            assemblyName + ".dll");
+        return Path.Combine(repoRoot, "Servers", serverProjectName, "bin", tfmDir.Parent.Name, tfmDir.Name,
+            serverProjectName + ".dll");
     }
 
     private static Process StartServerProcess(string assemblyDllPath, StringBuilder log, Lock logLock,

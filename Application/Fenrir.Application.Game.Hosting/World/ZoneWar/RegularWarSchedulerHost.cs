@@ -30,13 +30,23 @@ namespace Fenrir.Application.Game.Hosting.World.ZoneWar;
 ///         though no map has ever been observed to reach <see cref="RegularWarPhase.ForcedReset" /> against a
 ///         real player yet.
 ///     </para>
+///     <para>
+///         Also reports each hosted map's freshly-ticked <see cref="RegularWarSchedule.Phase" /> to
+///         <see cref="RegularWarActiveMapTracker" /> every tick -- the Domain-owned, Hosting-updated shared
+///         state <see cref="Fenrir.Application.Game.Domain.World.Zone" />'s PvP kill-reward pipeline reads back
+///         to gate the Regular-War-host flat CP/War Point/Blood Point override. That tracker's own remarks
+///         explain why a small Domain-owned class, rather than this Hosting class directly, is the bridge
+///         Zone (Domain) can share without inverting the Domain -&gt; Hosting dependency direction.
+///     </para>
 /// </remarks>
 public sealed class RegularWarSchedulerHost(
     ZoneRegistry zones,
     WorldStateService worldState,
     IRegularWarEventSink sink,
-    IRegularWarRewardValueProvider rewardValues) : BackgroundService
+    IRegularWarRewardValueProvider rewardValues,
+    RegularWarActiveMapTracker? activeMapTracker = null) : BackgroundService
 {
+    private readonly RegularWarActiveMapTracker _activeMapTracker = activeMapTracker ?? new RegularWarActiveMapTracker();
     private readonly SimulationTickAccumulator _accumulator = new();
     private readonly Dictionary<short, RegularWarSchedule> _schedules = new();
 
@@ -78,6 +88,7 @@ public sealed class RegularWarSchedulerHost(
             var snapshot = BuildSnapshot(zone);
 
             var result = schedule.Tick(snapshot);
+            _activeMapTracker.ReportPhase(mapConfig.MapId, result.Phase);
 
             if (result.CountdownAnnounceValue is { } remaining)
                 sink.OnCountdownAnnounced(mapConfig.MapId, remaining);

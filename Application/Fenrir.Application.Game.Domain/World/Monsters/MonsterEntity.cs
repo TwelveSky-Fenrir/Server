@@ -1,3 +1,5 @@
+using Fenrir.Application.Game.Domain.Combat;
+
 namespace Fenrir.Application.Game.Domain.World.Monsters;
 
 /// <summary>
@@ -8,9 +10,18 @@ namespace Fenrir.Application.Game.Domain.World.Monsters;
 ///     <see cref="Life" /> is the one exception: <see cref="TakeDamage" /> is safe to call from any thread (a
 ///     future combat handler's own session thread), touching only the interlocked <c>_life</c>/
 ///     <c>_deathClaimed</c> fields, so it can never tear or corrupt the tick-owned fields.
+///     <see cref="RegisterAttackDamage" />/<see cref="SnapshotAttackDamage" /> share that same
+///     any-thread-safe posture, guarded by their own <see cref="_attackDamageLock" /> instead of an
+///     interlocked primitive since a whole entry (not a single scalar) is mutated per call.
 /// </remarks>
 public sealed class MonsterEntity
 {
+    /// <summary>Legacy <c>MAX_MONSTER_OBJECT_ATTACK_NUM</c> (<c>Server/Header/Protocol/DEFINE.h:603</c>).</summary>
+    private const int MaxAttackDamageEntries = 50;
+
+    private readonly List<MonsterAttackDamageEntry> _attackDamage = [];
+    private readonly Lock _attackDamageLock = new();
+
     private int _deathClaimed;
     private int _life;
 
@@ -66,19 +77,57 @@ public sealed class MonsterEntity
 
     /// <summary>
     ///     Bounded FIFO aggro list (legacy cap 50), populated by this monster's own proximity detection.
-    ///     Simplified vs. the legacy's parallel damage/length arrays: kill/loot attribution here is the
-    ///     explicit attacker id <see cref="TakeDamage" />'s caller supplies, not derived from this list.
+    ///     Distinct from the separate <see cref="RegisterAttackDamage" />/<see cref="SnapshotAttackDamage" />
+    ///     per-attacker damage-history table that actually drives kill/loot credit selection
+    ///     (<see cref="Zone.TryDamageMonster" />, <see cref="Zone.SelectMonsterKillCredit" />) -- this list is
+    ///     proximity-driven, not damage-driven, and is read by nothing for attribution purposes.
     /// </summary>
     public List<int> AggroCharacterIds { get; } = [];
 
     public TimeSpan LastRebroadcastAt { get; set; }
 
+    /// <summary>
+    ///     Legacy ticks accumulated since the last <c>SelectAvatarIndexForPossibleAttack</c> throttle-check
+    ///     attempt -- reset to 0 whenever <see cref="MonsterAiSystem" /> actually runs a detection scan
+    ///     (successful or not), matching legacy <c>mCheckDetectEnemyTime</c>'s "restarts on every attempt"
+    ///     semantics (<c>S07_MyGame05.cpp:127-131</c>). Starts at 0, so a freshly spawned monster's very first
+    ///     scan is still subject to the full throttle window, same as legacy's own zero-initialized timestamp.
+    /// </summary>
+    public int DetectionThrottleTicks { get; set; }
+
+    /// <summary>
+    ///     This instance's own rolled anti-clump pursuer cap (legacy <c>mSameTargetPostNum</c>) -- drawn once at
+    ///     spawn, uniformly, from <see cref="MonsterRowDto.FollowInfo1" />/<see cref="MonsterRowDto.FollowInfo2" />
+    ///     (<c>S10_MySummon.cpp:795</c>) and fixed for this instance's whole lifetime; a different,
+    ///     freshly-spawned instance of the same monster type can roll a different value. Consumed by
+    ///     <see cref="MonsterAiSystem" />'s anti-clump filter.
+    /// </summary>
+    public int PursuerCapacity { get; init; }
+
     /// <summary>Current HP -- safe to read from any thread (<see cref="Volatile.Read(ref int)" />).</summary>
     public int Life => Volatile.Read(ref _life);
 
+    /// <summary>Builds a freshly spawned instance, seeded at full life and parked at its own home point.</summary>
+    /// <param name="random">
+    ///     Draws the one-time <see cref="PursuerCapacity" /> roll -- defaults to the shared, thread-safe
+    ///     <see cref="SystemRandomSource" /> so every production spawn call site gets a real roll without
+    ///     having to thread a random source through; tests that need a deterministic capacity can pass one.
+    /// </param>
     public static MonsterEntity Create(int serverIndex, uint uniqueNumber, MonsterRowDto template, int spawnSlotId,
-        float homeX, float homeY, float homeZ, float leashRadius, int? instanceId = null)
+        float homeX, float homeY, float homeZ, float leashRadius, int? instanceId = null,
+        IRandomSource? random = null)
     {
+        var rng = random ?? SystemRandomSource.Instance;
+
+        // mSameTargetPostNum (S10_MySummon.cpp:795): uniform roll over [FollowInfo1, FollowInfo2] inclusive,
+        // once per spawned instance -- same "max not greater than min collapses to min" convention as
+        // MonsterSpawnScheduler.RollRespawnTicks.
+        var minPursuers = (int)template.FollowInfo1;
+        var maxPursuers = (int)template.FollowInfo2;
+        var pursuerCapacity = maxPursuers > minPursuers
+            ? minPursuers + rng.NextInt32(maxPursuers - minPursuers + 1)
+            : minPursuers;
+
         var entity = new MonsterEntity
         {
             ServerIndex = serverIndex,
@@ -93,7 +142,8 @@ public sealed class MonsterEntity
             PosX = homeX,
             PosY = homeY,
             PosZ = homeZ,
-            InstanceId = instanceId
+            InstanceId = instanceId,
+            PursuerCapacity = pursuerCapacity
         };
         entity._life = template.Life;
         return entity;
@@ -129,5 +179,63 @@ public sealed class MonsterEntity
 
         remainingLife = newLife;
         return newLife == 0 && Interlocked.CompareExchange(ref _deathClaimed, 1, 0) == 0;
+    }
+
+    /// <summary>
+    ///     Accrues one hit's damage onto <paramref name="attackerCharacterId" />'s own tracked entry (legacy
+    ///     <c>SetAttackInfoWithAvatar</c>, <c>Server/ts25zone/S07_MyGame05.cpp:1675-1720</c>), creating it at
+    ///     zero cumulative damage first if this is that identity+session pair's first tracked hit. Safe to
+    ///     call from any thread (see class remarks).
+    /// </summary>
+    /// <param name="attackerCharacterId">Identity half of the legacy identity+session slot key.</param>
+    /// <param name="sessionToken">
+    ///     Session half of the slot key -- see <see cref="MonsterAttackDamageEntry.SessionToken" />'s own
+    ///     remarks for why a <see cref="PlayerRuntimeState" /> reference fills this role.
+    /// </param>
+    /// <param name="damage">Negative/zero contributes no damage and registers no entry, same convention as <see cref="TakeDamage" />.</param>
+    internal void RegisterAttackDamage(int attackerCharacterId, object sessionToken, int damage)
+    {
+        if (damage <= 0)
+            return;
+
+        lock (_attackDamageLock)
+        {
+            var existing = _attackDamage.Find(e =>
+                e.CharacterId == attackerCharacterId && ReferenceEquals(e.SessionToken, sessionToken));
+
+            if (existing is not null)
+            {
+                existing.CumulativeDamage += damage;
+                return;
+            }
+
+            // FIFO eviction: once full, the oldest identity+session slot -- and its whole accumulated total
+            // -- is discarded to make room, never a partial/averaged carry-over (S07_MyGame05.cpp:1675-1720,
+            // MAX_MONSTER_OBJECT_ATTACK_NUM == 50).
+            if (_attackDamage.Count >= MaxAttackDamageEntries)
+                _attackDamage.RemoveAt(0);
+
+            _attackDamage.Add(new MonsterAttackDamageEntry
+            {
+                CharacterId = attackerCharacterId,
+                SessionToken = sessionToken,
+                CumulativeDamage = damage
+            });
+        }
+    }
+
+    /// <summary>
+    ///     Oldest-to-newest snapshot of every currently-tracked attacker's cumulative damage -- a copy, not a
+    ///     live view, so <see cref="Zone" />'s kill-credit scan never races a concurrent
+    ///     <see cref="RegisterAttackDamage" /> call from another thread. Oldest-first ordering is load-bearing:
+    ///     it is what lets a strictly-greater-than scan resolve an exact-tie in favor of the earliest-tracked
+    ///     entry, matching legacy's own comparison in <c>SelectAvatarIndexForMaxAttackDamage</c>.
+    /// </summary>
+    internal IReadOnlyList<MonsterAttackDamageEntry> SnapshotAttackDamage()
+    {
+        lock (_attackDamageLock)
+        {
+            return _attackDamage.ToArray();
+        }
     }
 }

@@ -16,18 +16,31 @@ public sealed record MonsterDropResult(long? Money, IReadOnlyList<DroppedItem> I
 ///     Generic monster death drop pipeline (<c>Server/ts25zone/S07_MyGame05.cpp:2664-2999</c>): money -&gt;
 ///     potions -&gt; general items (rare-table search) -&gt; quest item -&gt; extra items -&gt; unconditional
 ///     item-864 roll. The quest-item roll (<c>DROP_QUEST_ITEM</c>) is the one tier NOT gated by
-///     <see cref="IsEligible" /> in the source -- see <see cref="RollQuestItem" />. ~15 event/boss-specific
-///     blocks are also not ported; the reference build itself has them dead-code'd out behind commented-out
-///     <c>#define</c>s.
+///     <see cref="IsEligible" /> in the source -- see <see cref="RollQuestItem" />.
 /// </summary>
 /// <remarks>
-///     <c>item_drop</c>/<c>rare_drop</c> default 20.0, from <c>ServerInfo.ini</c>'s <c>ItemDropUpRatio=200</c>
-///     via <c>CreateRatio0(x) = x * 0.1f</c>. <c>user_drop</c> defaults 1.0; the zone-120 newbie bonus and the
-///     premium-account +1.0 bonus are not modeled -- constructor params exist so callers can supply the real
-///     values once those systems exist. The per-tribe <c>mTribeItemDropUpRatioInfo</c>/
-///     <c>mTribeItemDropUpRatioForMyoungInfo</c> modifiers (<c>S07_MyGame05.cpp:2713-2714</c>) are not applied
-///     here either -- <c>WorldInfo.TribeItemDropUpRatioInfo</c>/<c>TribeItemDropUpRatioForMyoungInfo</c> have
-///     no persisted source yet (<c>WorldStateTemplates</c> zeroes both), so there is nothing live to read.
+///     <para>
+///         Immediately BEFORE this pipeline (<c>Server/ts25zone/S07_MyGame05.cpp:2333-2662</c>, the section
+///         directly preceding <c>DROP_MONEY</c>) sits a separate, hardcoded per-monster-id boss/event drop
+///         tier -- <see cref="BossEventDropResolver" />, called by <c>MonsterSpawnScheduler.ProcessDeath</c>
+///         before it ever reaches this class. Only one block in that range (<c>mIndex==1400||1406</c>, "BOSS
+///         POPUP", <c>:2256-2331</c>) is genuinely dead/commented-out; the ~8 identifier matches
+///         <see cref="BossEventDropResolver" /> ports are live, unguarded <c>if</c> statements that run on
+///         every <c>ReleaseEU33</c> build -- this class's own doc comment previously (incorrectly) claimed the
+///         whole ~15-block range was dead code. Several of those identifiers <c>return</c> before ever
+///         reaching this class's own <see cref="Roll" />, which is why <c>MonsterSpawnScheduler.ProcessDeath</c>
+///         may skip calling <see cref="Roll" /> entirely for a given kill -- see
+///         <see cref="BossEventDropResolver" />'s own remarks for exactly which identifiers do and don't.
+///     </para>
+///     <para>
+///         <c>item_drop</c>/<c>rare_drop</c> default 20.0, from <c>ServerInfo.ini</c>'s <c>ItemDropUpRatio=200</c>
+///         via <c>CreateRatio0(x) = x * 0.1f</c>. <c>user_drop</c> defaults 1.0; the zone-120 newbie bonus and the
+///         premium-account +1.0 bonus are not modeled -- constructor params exist so callers can supply the real
+///         values once those systems exist. The per-tribe <c>mTribeItemDropUpRatioInfo</c>/
+///         <c>mTribeItemDropUpRatioForMyoungInfo</c> modifiers (<c>S07_MyGame05.cpp:2713-2714</c>) are not applied
+///         here either -- <c>WorldInfo.TribeItemDropUpRatioInfo</c>/<c>TribeItemDropUpRatioForMyoungInfo</c> have
+///         no persisted source yet (<c>WorldStateTemplates</c> zeroes both), so there is nothing live to read.
+///     </para>
 /// </remarks>
 public sealed class MonsterDropRoller(
     WorldDataCache worldData,

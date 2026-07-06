@@ -227,7 +227,10 @@ public class Zone241PersonalDungeonInstanceTests
     [Fact]
     public void MonsterAiSystem_TaggedBoss_NeverAggroesOutOfInstanceAvatar_ButCanAggroTheOwner()
     {
-        var ai = new MonsterAiSystem();
+        // Detection now includes a 50% per-candidate coin flip (SelectAvatarIndexForPossibleAttack,
+        // S07_MyGame05.cpp:208-213) -- ScriptedRandomSource(0) always resolves it to a guaranteed success so
+        // this test stays deterministic instead of flaking on an unlucky flip.
+        var ai = new MonsterAiSystem(new ScriptedRandomSource(0));
         var zone = ZoneTestKit.CreateZone(Zone241MapId, Zone241Options(),
             simulationSystems: [ai]);
 
@@ -255,7 +258,8 @@ public class Zone241PersonalDungeonInstanceTests
         boss.AiState = MonsterAiState.Decision;
         zone.SpawnMonster(boss);
 
-        zone.Tick(SimulationClock.LegacyTick); // AI decision runs -- only the tagged owner is an eligible target
+        zone.Tick(SimulationClock.LegacyTick); // 1st AI pass -- 1-second detection throttle blocks the very first check (S07_MyGame05.cpp:127-131)
+        zone.Tick(SimulationClock.LegacyTick); // 2nd AI pass -- throttle elapsed; only the tagged owner is an eligible target
 
         Assert.Equal(ownerId, boss.TargetCharacterId);
         Assert.NotEqual(bystanderId, boss.TargetCharacterId);

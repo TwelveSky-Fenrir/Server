@@ -9,6 +9,7 @@ using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.Social.Duel;
 using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.World.WorldState;
+using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Data.WriteBehind;
 using Microsoft.Extensions.Logging;
@@ -31,6 +32,7 @@ public sealed class ZoneRegistry
     private readonly GameServerOptions _options;
     private readonly PartyRegistry? _partyRegistry;
     private readonly QuestCatalog _questCatalog;
+    private readonly RegularWarActiveMapTracker? _regularWarActiveMapTracker;
     private readonly ImmutableArray<ISimulationSystem> _systems;
     private readonly TowerWarState? _towerWar;
     private readonly WorldDataCache _worldData;
@@ -44,7 +46,8 @@ public sealed class ZoneRegistry
         KillCooldownTracker? killCooldownTracker = null, TowerWarState? towerWar = null,
         WorldStateService? worldState = null, PartyRegistry? partyRegistry = null,
         DuelRegistry? duelRegistry = null, HeroRankPointAccumulator? heroRankPointAccumulator = null,
-        ICharacterShardLocationRepository? characterShardLocations = null)
+        ICharacterShardLocationRepository? characterShardLocations = null,
+        RegularWarActiveMapTracker? regularWarActiveMapTracker = null)
     {
         _options = options.Value;
         _movementRules = movementRules;
@@ -86,6 +89,12 @@ public sealed class ZoneRegistry
         // directory -- every zone shares this same process-wide repository so a true disconnect on any
         // hosted map can clean up its own row (see Zone.PlayerLifecycle.cs's HandleLeave).
         _characterShardLocations = characterShardLocations;
+
+        // Optional: null only in test call sites that don't exercise the Regular-War-host CP/War Point/Blood
+        // Point kill-reward override (Zone.Combat.cs's ApplyRegularWarCpOverride) -- every zone shares the same
+        // process-wide RegularWarActiveMapTracker singleton that RegularWarSchedulerHost (Hosting) updates once
+        // per tick for every map it hosts.
+        _regularWarActiveMapTracker = regularWarActiveMapTracker;
     }
 
     /// <summary>Every hosted zone, in no particular order — the tick host launches one loop per entry.</summary>
@@ -118,7 +127,8 @@ public sealed class ZoneRegistry
                 questCatalog: _questCatalog, killCooldownTracker: _killCooldownTracker, towerWar: _towerWar,
                 worldState: _worldState, partyRegistry: _partyRegistry, duelRegistry: _duelRegistry,
                 heroRankPointAccumulator: _heroRankPointAccumulator,
-                characterShardLocations: _characterShardLocations));
+                characterShardLocations: _characterShardLocations,
+                regularWarActiveMapTracker: _regularWarActiveMapTracker));
     }
 
     public bool TryGet(short mapId, [NotNullWhen(true)] out Zone? zone)

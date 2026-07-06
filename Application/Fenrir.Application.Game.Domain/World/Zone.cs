@@ -10,6 +10,7 @@ using Fenrir.Application.Game.Domain.Social.Duel;
 using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.World.Geometry;
 using Fenrir.Application.Game.Domain.World.WorldState;
+using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Data.WriteBehind;
 using Fenrir.Network.Dispatch.Sessions;
@@ -59,7 +60,8 @@ public sealed partial class Zone(
     DuelRegistry? duelRegistry = null,
     HeroRankPointAccumulator? heroRankPointAccumulator = null,
     ICharacterShardLocationRepository? characterShardLocations = null,
-    TribeBankTaxAccumulator? tribeBankTax = null) : IZoneActor
+    TribeBankTaxAccumulator? tribeBankTax = null,
+    RegularWarActiveMapTracker? regularWarActiveMapTracker = null) : IZoneActor
 {
     private readonly SimulationTickAccumulator _accumulator = new();
 

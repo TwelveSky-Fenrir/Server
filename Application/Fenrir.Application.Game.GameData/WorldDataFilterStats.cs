@@ -11,5 +11,6 @@ public sealed record WorldDataFilterStats(
     int SpawnRegionsWithoutMonster)
 {
     public int TotalDiscarded =>
-        PortalsWithoutDestination + NpcPlacementsWithoutNpc + SpawnRegionsWithoutZone + SpawnRegionsWithoutMonster;
+        PortalsWithoutDestination + NpcPlacementsWithoutNpc +
+        SpawnRegionsWithoutZone + SpawnRegionsWithoutMonster;
 }

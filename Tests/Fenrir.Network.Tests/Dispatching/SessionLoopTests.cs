@@ -211,6 +211,26 @@ public sealed class SessionLoopTests
         Assert.Equal(DisconnectReason.RateLimited, session.DisconnectReason);
     }
 
+    // Contract: a handler exception must not propagate out of RunAsync uncaught -- it is recorded as
+    // DisconnectReason.Faulted and the loop ends cleanly, the same posture as the other violation paths
+    // above (unknown opcode/state violation/rate limit), instead of surfacing only as an unplanned
+    // exception at the connection host with no disconnect-reason bookkeeping at all.
+    [Fact]
+    public async Task RunAsync_HandlerThrows_AbortsWithFaultedAndLoopEndsCleanlyWithoutPropagating()
+    {
+        var pipe = new FakeDuplexPipe();
+        var session = InWorldZoneSession(10, pipe);
+        var dispatcher = new ThrowingFrameDispatcher(new InvalidOperationException("boom"));
+        var loopTask = SessionLoop.RunAsync(session, dispatcher, null, null, CancellationToken.None);
+
+        var frame = BuildClientFrame(HeartbeatRequest.Opcode, HeartbeatRequest.PayloadSize);
+        await pipe.PeerToSession.WriteAsync(frame);
+
+        await AwaitLoopAsync(loopTask);
+
+        Assert.Equal(DisconnectReason.Faulted, session.DisconnectReason);
+    }
+
     [Fact]
     public async Task RunAsync_ClientClosesWithoutSendingAnything_EndsWithClientClosedAndNoException()
     {

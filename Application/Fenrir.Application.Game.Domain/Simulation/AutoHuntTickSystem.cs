@@ -3,8 +3,10 @@ using System.Collections.Immutable;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Data.WriteBehind;
+using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Domain.Simulation;
 
@@ -41,13 +43,24 @@ namespace Fenrir.Application.Game.Domain.Simulation;
 ///         </item>
 ///         <item>
 ///             The zone-type-flag/no-mana escalation branch (<c>mCheckZone126TypeServer</c>'s "kick after 1000
-///             failed ticks") -- no zone-type-flag system exists anywhere in Fenrir yet, and legacy itself only
-///             exercises the escalation on what BotBuff calls a "test server" configuration; an ordinary
-///             insufficient-mana slot is simply skipped here instead.
+///             failed ticks") -- distinct from the RvR/event zone-server-type gate now modeled below (see
+///             <see cref="IsSuppressedByZoneServerType" />), this is a separate zone-126-only "test server"
+///             escalation legacy itself only exercises under that configuration; an ordinary insufficient-mana
+///             slot is simply skipped here instead of ever escalating to a kick.
+///         </item>
+///         <item>
+///             <c>mCheckZone053TypeServer</c> ("Stone War"), the fourth term of that same gate -- deliberately
+///             never checked, because its own legacy initialization is compiled only under a build macro never
+///             defined in any shipped configuration (Server/ts25zone/S07_MyGame01.cpp:731-791;
+///             ServerDocs/12_ts25zone/09_MyGame01_PartieB.md:113-119), so the flag can never be true in
+///             production -- there is no live behavior here to reproduce, only dead code to skip.
 ///         </item>
 ///     </list>
 /// </remarks>
-public sealed class AutoHuntTickSystem(WorldDataCache worldData, DirtyTracker<int> dirtyTracker) : ISimulationSystem
+public sealed class AutoHuntTickSystem(
+    WorldDataCache worldData,
+    DirtyTracker<int> dirtyTracker,
+    IOptions<GameServerOptions> options) : ISimulationSystem
 {
     /// <summary>FEQUIP_TYPE::EWEAPON slot index -- same convention as AutoHuntToggleHandler/Zone.ApplySkillCast.</summary>
     private const byte WeaponSlot = 7;
@@ -92,6 +105,11 @@ public sealed class AutoHuntTickSystem(WorldDataCache worldData, DirtyTracker<in
         if (state.IsDead || state.PshopOpen || state.Mana < 1 || state.IsStunned)
             return;
 
+        // Same guard line also wraps BotBuff()/BotHotKey() in a four-way zone-server-type gate -- see
+        // IsSuppressedByZoneServerType's own remarks for exactly which of the four can ever be true.
+        if (IsSuppressedByZoneServerType(zone))
+            return;
+
         // aBotSkillNum: only the first 2 configured slots, or all 8 while a "continuous auto-buff" cash-shop
         // timer is active (AutoBuffTime, CZ_CONTINUE_SKILL_USE_SEND op95 -- see ContinueSkillUseHandler).
         var slotCount = state.AutoBuffTime >= GameDate.Today() ? 8 : 2;
@@ -128,6 +146,50 @@ public sealed class AutoHuntTickSystem(WorldDataCache worldData, DirtyTracker<in
             ApplyBuffWrites(zone, state, result.BuffWrites);
             return; // BotBuff's own `break` -- at most one auto-cast per legacy tick.
         }
+    }
+
+    /// <summary>
+    ///     BotBuff/BotHotKey's own four-way zone-server-type gate (S07_MyGame04.cpp:341-350;
+    ///     ServerDocs/12_ts25zone/13_MyGame04_06_07_Avatar_Item_Tick.md §2.3): the entire auto-hunt
+    ///     buff-cast/hotkey-refill routine is suppressed outright on a Regular War, Stone War, Sacred-Stone
+    ///     ("zone 038"), or Rebirth-chain instance zone. Each term is a static, per-map identity fixed at legacy
+    ///     zone-server boot from that process's own configured server number -- never a dynamic "war currently in
+    ///     progress" toggle -- so this reads existing per-map/per-shard classification rather than tracking
+    ///     anything new over time:
+    ///     <list type="bullet">
+    ///         <item>
+    ///             Regular War (zone 049): true for any of the 11 <see cref="RegularWarMapCatalog.ConfiguredMaps" />
+    ///             (Server/ts25zone/S07_MyGame01.cpp:647-698, the only write site to this flag in the codebase).
+    ///         </item>
+    ///         <item>
+    ///             Stone War (zone 053): omitted -- its own initialization is compiled only under a build macro
+    ///             never defined in any shipped configuration (Server/ts25zone/S07_MyGame01.cpp:731-791;
+    ///             ServerDocs/12_ts25zone/09_MyGame01_PartieB.md:113-119), so the flag can never be true in
+    ///             production.
+    ///         </item>
+    ///         <item>
+    ///             Sacred Stone / "zone 038" (Server/ts25zone/S07_MyGame01.cpp:793-818;
+    ///             ServerDocs/12_ts25zone/08_MyGame01_PartieA.md:428 -- distinct from Stone War above): true only
+    ///             when this zone is the shard's designated <see cref="GameServerOptions.HolyStoneMapId" /> AND
+    ///             <see cref="GameServerOptions.HolyStoneWarEnabled" /> is armed -- the map id alone is not
+    ///             enough, matching legacy's own two-independent-conditions requirement.
+    ///         </item>
+    ///         <item>
+    ///             Rebirth-chain (zone 241): <see cref="Zone.IsZone241TypeZone" />
+    ///             (Server/ts25zone/S07_MyGame01.cpp:1209-1256; the per-tick re-assertion at :2694-2701 is the
+    ///             same static value, not a dynamic re-check).
+    ///         </item>
+    ///     </list>
+    /// </summary>
+    private bool IsSuppressedByZoneServerType(Zone zone)
+    {
+        if (RegularWarMapCatalog.TryGet(zone.MapId, out _))
+            return true;
+
+        if (options.Value.HolyStoneWarEnabled && zone.MapId == options.Value.HolyStoneMapId)
+            return true;
+
+        return zone.IsZone241TypeZone;
     }
 
     private static bool IsAlreadyActive(PlayerRuntimeState state, ImmutableArray<int> gateSlots)

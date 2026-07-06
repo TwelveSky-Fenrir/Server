@@ -301,6 +301,47 @@ public class CreateAvatarHandlerTests
         PacketAssert.AssertNothingSent(pipe);
     }
 
+    // Adversarial gap fix: CreateAvatarService's own remarks document that creation deliberately never
+    // cross-checks Tribe against PreviousTribe (Server/ts25login/S04_MyWork02.cpp:582-751) -- only
+    // EnterWorldService's zone-entry gate does (see EnterWorldServiceTests.
+    // HandleAsync_TribeAndPreviousTribeInternallyInconsistent_AbortsSession's (Tribe:0, PreviousTribe:1) case,
+    // which this exact combination would fail). Every other test in this file keeps the two fields equal (or
+    // uses the documented fourth-faction exception), so none of them would catch a regression that started
+    // rejecting -- or silently coercing -- a genuinely mismatched, both-main-faction pair at creation time.
+    // This proves the two fields are honored independently: spawn map follows Tribe, starter kit follows
+    // PreviousTribe, and the mismatch itself is not a creation-time failure.
+    [Fact]
+    public async Task HandleAsync_TribeAndPreviousTribeMismatchedWithinMainFactionRange_CreatesNormallyWithNoCrossValidation()
+    {
+        var characters = FakeCharacterRepository.WithNone();
+        var starterKits = FakeStarterKitRepository.RoyalSerpentKit();
+        var handler = new CreateAvatarHandler(
+            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions(),
+                NullLogger<CreateAvatarService>.Instance),
+            NullLogger<CreateAvatarHandler>.Instance);
+        var (session, _) = CreateSessionInCharSelect();
+
+        // Tribe 0 (Noble Dragon nation) with PreviousTribe 1 (Royal Serpent starter-kit template) -- a
+        // legitimately mismatched, both-in-range pair the legacy engine never rejects at creation.
+        var request = ValidRequest(12) with { Tribe = 0, PreviousTribe = 1 }; // raw code 12 -> Black Feast
+
+        await handler.HandleAsync(request, session, CancellationToken.None);
+
+        Assert.Null(session.DisconnectReason);
+        // PreviousTribe (1) selects the starter kit; MapId (1) still follows Tribe (0) -- the two lookups are
+        // independent.
+        Assert.Equal(((byte)1, (short)1), starterKits.LastCall);
+
+        var call = characters.LastCreateWithStarterKit;
+        Assert.NotNull(call);
+        Assert.Equal((byte)0, call!.Tribe);
+        Assert.Equal((short)1, call.MapId);
+        Assert.Equal((byte)1, call.PreviousTribe);
+        // Royal Serpent's own elite weapon persisted (not Noble Dragon's), confirming the kit selection
+        // followed PreviousTribe, not the mismatched Tribe.
+        Assert.Contains(call.Equipment, i => i is { Slot: 7, ItemId: 85527, Enchant: 45, Combine: 6 });
+    }
+
     [Fact]
     public async Task HandleAsync_WeaponNotOneOfTheTribesThreeAlternatives_AbortsWithoutCreating()
     {
@@ -661,6 +702,51 @@ public class CreateAvatarHandlerTests
         };
         await PacketAssert.AssertSentAsync(pipe,
             new CreateAvatarResponse { Result = 0, AvatarInfo = expectedAvatarInfo });
+    }
+
+    // Adversarial gap fix: HandleAsync_TribeThree_ToggleOperatorEnabled_CreatesNormally above only ever
+    // exercises Tribe 3 with PreviousTribe left at its request default of 0 (Noble Dragon) -- the other two
+    // legitimate fourth-faction origins (PreviousTribe 1/Royal Serpent, 2/Grand Tiger -- Server/ts25zone/
+    // S04_MyWork02.cpp:880-901's own "transferred in from an original tribe" case) had no coverage at all
+    // proving THEIR starter kit, not Noble Dragon's, gets threaded through for a Tribe-3 character. Mirrors
+    // the per-race coverage the three HandleAsync_*PreviousTribe_PersistsItsOwnEliteEquipment... tests above
+    // already give the main-faction tribes.
+    [Theory]
+    [InlineData((byte)0, 6, 84527)] // Noble Dragon origin (raw code 6 -> Blade of the Moon)
+    [InlineData((byte)1, 12, 85527)] // Royal Serpent origin (raw code 12 -> Black Feast)
+    [InlineData((byte)2, 18, 86527)] // Grand Tiger origin (raw code 18 -> Qing Long's Grace)
+    public async Task HandleAsync_TribeThree_EachPreviousTribeOrigin_CreatesNormallyUsingThatOriginsStarterKit(
+        byte previousTribe, int weapon, int expectedWeaponItemId)
+    {
+        var characters = FakeCharacterRepository.WithNone();
+        var starterKits = previousTribe switch
+        {
+            0 => FakeStarterKitRepository.NobleDragonKit(),
+            1 => FakeStarterKitRepository.RoyalSerpentKit(),
+            _ => FakeStarterKitRepository.GrandTigerKit()
+        };
+        var handler = new CreateAvatarHandler(
+            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(),
+                Options.Create(new LoginServerOptions { EnableFourthFaction = true }),
+                NullLogger<CreateAvatarService>.Instance),
+            NullLogger<CreateAvatarHandler>.Instance);
+        var (session, _) = CreateSessionInCharSelect();
+
+        var request = ValidRequest(weapon) with { Tribe = 3, PreviousTribe = previousTribe };
+
+        await handler.HandleAsync(request, session, CancellationToken.None);
+
+        Assert.Null(session.DisconnectReason);
+        // Tribe 3 always maps to spawn map 140 regardless of which origin tribe supplied the starter kit.
+        Assert.Equal((previousTribe, (short)140), starterKits.LastCall);
+
+        var call = characters.LastCreateWithStarterKit;
+        Assert.NotNull(call);
+        Assert.Equal((byte)3, call!.Tribe);
+        Assert.Equal((short)140, call.MapId);
+        Assert.Equal(previousTribe, call.PreviousTribe);
+        Assert.Contains(call.Equipment,
+            i => i is { Slot: 7, Enchant: 45, Combine: 6 } && i.ItemId == expectedWeaponItemId);
     }
 
     // EnableFourthFaction defaults to false, matching legacy's own unconditional shipped behavior (see

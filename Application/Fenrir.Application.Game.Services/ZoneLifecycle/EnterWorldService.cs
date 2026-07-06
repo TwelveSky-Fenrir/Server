@@ -134,249 +134,291 @@ public sealed class EnterWorldService(
             return;
         }
 
-        var equipmentContainer = BuildEquipmentContainer(bundle.Items);
-        var attributes = new CharacterBaseAttributes(character.StatVit, character.StatStr, character.StatInt,
-            character.StatDex, character.Level, character.Tribe, character.Title, character.Halo,
-            character.RebirthCount);
-
-        var petItemId = PetSlots.ResolveEquippedPetItemId(bundle.Items);
-        var petContribution = PetGrowthCalculator.Compute(petItemId, character.PetGrowth, character.PetActivity,
-            worldData.ItemsById);
-
-        var stats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData,
-            pet: petContribution);
-
-        // Loaded once here and cached on PlayerRuntimeState -- never re-queried per chat message afterwards.
-        var isMutedTask = mutes.IsActiveForCharacterAsync(characterId, cancellationToken);
-        var guildTask = guilds.GetByCharacterAsync(characterId, cancellationToken);
-        var tribeRoleTask = tribes.GetRoleForCharacterAsync(characterId, cancellationToken);
-        var friendsTask = friends.GetByCharacterAsync(characterId, cancellationToken);
-        var mentorTask = mentors.GetForCharacterAsync(characterId, cancellationToken);
-
-        // Cross-shard character-location directory (runtime.CharacterShardLocation): a same-shard-miss
-        // fallback for whisper/friend-locate/guild-find. Per-connection, once-per-world-entry cost, not a
-        // tick or per-packet hot path, so an extra awaited stored-procedure call here alongside the others is
-        // unremarkable. Intra-shard zone-to-zone handoffs never call this again -- ShardId never changes on a
-        // same-shard hop, and MapId staleness for a character who has since wandered to another map on the
-        // SAME shard is an accepted bound (this directory is a same-shard-miss fallback only).
-        var shardLocationUpsertTask = characterShardLocations.UpsertAsync(characterId, options.Value.ShardId,
-            character.MapId, character.Name, character.Tribe, cancellationToken);
-
-        await Task.WhenAll(isMutedTask.AsTask(), guildTask.AsTask(), tribeRoleTask.AsTask(),
-            friendsTask.AsTask(), mentorTask.AsTask(), shardLocationUpsertTask.AsTask());
-
-        var isMuted = isMutedTask.Result;
-        var guildMembership = guildTask.Result;
-        var tribeRole = tribeRoleTask.Result;
-        var friendRows = friendsTask.Result;
-        var mentorBond = mentorTask.Result;
-
-        var guildRoleWire = guildMembership is { } gm ? GuildRoleCodec.DbRoleToWire(gm.Role) : 0;
-        var friendNameBySlot = friendRows.ToDictionary(f => f.Slot, f => f.FriendName);
-        var friendIdBySlot = friendRows.ToDictionary(f => f.Slot, f => f.FriendCharacterId);
-        var socialSnapshot = new AvatarSocialSnapshot(
-            friendNameBySlot,
-            mentorBond?.TeacherName ?? "",
-            mentorBond?.StudentName ?? "",
-            guildMembership?.GuildName ?? "",
-            guildRoleWire,
-            guildMembership?.CallName ?? "");
-
-        var registerRecv = new EnterWorldResponse
+        // Fenrir-only failure boundary -- no Server/ citation applies (there is no legacy counterpart to
+        // mirror here; this segment's shape is purely a Fenrir C# call-chain composition concern). Before
+        // this try/catch, any exception raised anywhere from here through zone.Post() below -- equipment/
+        // stat computation, the six-way concurrent repository batch, either response send, or the Post
+        // itself -- propagated uncaught up through ZoneFrameDispatcher/SessionLoop/GameConnectionHost with
+        // no account/character context anywhere in the trail. CompleteWorldEntryAsync is kept as a local
+        // function (rather than reindenting this whole segment in place) purely so the try/catch below reads
+        // as this segment's single failure boundary without an oversized reindentation diff.
+        async ValueTask CompleteWorldEntryAsync()
         {
-            // A brand-new character legitimately has no buff rows yet (creation never writes any); a
-            // returning character's own persisted snapshot must ride along here instead of a flat zero.
-            AvatarInfo = AvatarInfoFactory.CreateForCharacter(character, bundle.Items, socialSnapshot),
-            BuffInfo = BuildBuffInfo(bundle.Buffs)
-        };
-        zoneSession.SendRaw(ZoneMessageFactory.Encode(in registerRecv));
+            var equipmentContainer = BuildEquipmentContainer(bundle.Items);
+            var attributes = new CharacterBaseAttributes(character.StatVit, character.StatStr, character.StatInt,
+                character.StatDex, character.Level, character.Tribe, character.Title, character.Halo,
+                character.RebirthCount);
 
-        var broadcastWorldInfo = new WorldSnapshotResponse
-        {
-            WorldInfo = WorldStateProjection.Apply(
-                GuildRankingProjection.Apply(WorldStateTemplates.ZeroedWorldInfo, guildRanking.Top), worldState),
-            // No repository currently projects tribe master/sub-master NAMES or the vote/honor-rank rosters
-            // (ITribeRepository only ever returns CharacterIds) -- the zeroed template is the correct
-            // placeholder until that surface exists, not a regression introduced here.
-            TribeInfo = WorldStateTemplates.ZeroedTribeInfo
-        };
-        zoneSession.SendRaw(ZoneMessageFactory.Encode(in broadcastWorldInfo));
+            var petItemId = PetSlots.ResolveEquippedPetItemId(bundle.Items);
+            var petContribution = PetGrowthCalculator.Compute(petItemId, character.PetGrowth, character.PetActivity,
+                worldData.ItemsById);
 
-        // Self-spawn: Zone doesn't know this player exists yet (ZoneCommand.Enter below is only posted, not ticked).
-        zoneSession.Send(new AvatarActionResponse
-        {
-            ServerIndex = characterId,
-            UniqueNumber = unchecked((uint)characterId),
-            Data = new ObjectForAvatar
+            var stats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData,
+                pet: petContribution);
+
+            // Loaded once here and cached on PlayerRuntimeState -- never re-queried per chat message afterwards.
+            var isMutedTask = mutes.IsActiveForCharacterAsync(characterId, cancellationToken);
+            var guildTask = guilds.GetByCharacterAsync(characterId, cancellationToken);
+            var tribeRoleTask = tribes.GetRoleForCharacterAsync(characterId, cancellationToken);
+            var friendsTask = friends.GetByCharacterAsync(characterId, cancellationToken);
+            var mentorTask = mentors.GetForCharacterAsync(characterId, cancellationToken);
+
+            // Cross-shard character-location directory (runtime.CharacterShardLocation): a same-shard-miss
+            // fallback for whisper/friend-locate/guild-find. Per-connection, once-per-world-entry cost, not a
+            // tick or per-packet hot path, so an extra awaited stored-procedure call here alongside the others is
+            // unremarkable. Intra-shard zone-to-zone handoffs never call this again -- ShardId never changes on a
+            // same-shard hop, and MapId staleness for a character who has since wandered to another map on the
+            // SAME shard is an accepted bound (this directory is a same-shard-miss fallback only).
+            var shardLocationUpsertTask = characterShardLocations.UpsertAsync(characterId, options.Value.ShardId,
+                character.MapId, character.Name, character.Tribe, cancellationToken);
+
+            await Task.WhenAll(isMutedTask.AsTask(), guildTask.AsTask(), tribeRoleTask.AsTask(),
+                friendsTask.AsTask(), mentorTask.AsTask(), shardLocationUpsertTask.AsTask());
+
+            var isMuted = isMutedTask.Result;
+            var guildMembership = guildTask.Result;
+            var tribeRole = tribeRoleTask.Result;
+            var friendRows = friendsTask.Result;
+            var mentorBond = mentorTask.Result;
+
+            var guildRoleWire = guildMembership is { } gm ? GuildRoleCodec.DbRoleToWire(gm.Role) : 0;
+            var friendNameBySlot = friendRows.ToDictionary(f => f.Slot, f => f.FriendName);
+            var friendIdBySlot = friendRows.ToDictionary(f => f.Slot, f => f.FriendCharacterId);
+            var socialSnapshot = new AvatarSocialSnapshot(
+                friendNameBySlot,
+                mentorBond?.TeacherName ?? "",
+                mentorBond?.StudentName ?? "",
+                guildMembership?.GuildName ?? "",
+                guildRoleWire,
+                guildMembership?.CallName ?? "");
+
+            // Legacy parity note (do not gate this pair behind ZoneReadyRequest/op13): Server/ts25zone/
+            // S04_MyWork02.cpp:979-980 sends ZCP_REGISTER_AVATAR_RECV (op12 response) and
+            // ZCP_BROADCAST_WORLD_INFO (op13-numbered response) back to back, unconditionally, inside the SAME
+            // op12 (P_REGISTER_AVATAR_SEND) handler -- neither waits on the client's own op13
+            // (CZ_CLIENT_OK_FOR_ZONE_SEND), which per ZoneReadyHandler/ZoneReadyService never sends a response
+            // packet under any branch. ServerDocs/19_Header_Lib/03_Protocol_Liaisons_Client_Zone.md's sequence
+            // diagram groups these by opcode number, not causal order -- Server/ wins that disagreement. Both
+            // sends below must stay unconditional and synchronous with this handler's own success path.
+            var registerRecv = new EnterWorldResponse
             {
-                // Legacy sources both from the character's own persisted record at this exact moment (not a
-                // fixed value -- visibility can change between sessions), S04_MyWork02.cpp:999-1000; no
-                // VisibleState/SpecialState column exists anywhere in game.Characters yet to source from, so
-                // this remains a flat 0 pending a database-engineer schema addition, not a silent regression.
-                VisibleState = 0,
-                SpecialState = 0,
-                KillOtherTribe = 0,
-                GoodFellow = 0,
-                GuildName = socialSnapshot.GuildName,
-                GuildRole = socialSnapshot.GuildRoleWire,
-                CallName = socialSnapshot.CallName,
-                // Legacy zeroes this only for a guild-less character; a real guild member's mark-effect
-                // value has no source anywhere in the current guild repository surface yet (no MarkEffect
-                // column/DTO field exists) -- flagged, not silently assumed correct.
-                GuildMarkEffect = 0,
-                Name = character.Name,
-                Tribe = character.Tribe,
-                // The Noble Dragon/Royal Serpent/Grand Tiger starter-kit template (0-2), genuinely independent
-                // of Tribe -- now a real persisted column (Migrations/018), no longer synthesized as 0.
-                PreviousTribe = character.PreviousTribe,
-                Gender = character.Gender,
-                HeadType = character.HeadType,
-                FaceType = character.FaceType,
-                Level1 = character.Level,
-                Level2 = character.Level2,
-                EquipForView = EquipmentViewCodec.BuildEquipForView(bundle.Items),
-                // character.MountItemId/MountSlotIndex are readable since Migrations/018, but the legacy's
-                // exact "currently mounted" condition (S04_MyWork02.cpp:935-940) isn't confirmed yet -- needs
-                // a legacy-behavior-translator contract before this stops being a flat 0.
-                AnimalNumber = 0,
-                Title = character.Title,
-                Halo = character.Halo,
-                RebirthNum = character.RebirthCount,
-                BattleTeam = 0,
-                Action = new ActionInfo
+                // A brand-new character legitimately has no buff rows yet (creation never writes any); a
+                // returning character's own persisted snapshot must ride along here instead of a flat zero.
+                AvatarInfo = AvatarInfoFactory.CreateForCharacter(character, bundle.Items, socialSnapshot),
+                BuffInfo = BuildBuffInfo(bundle.Buffs)
+            };
+            zoneSession.SendRaw(ZoneMessageFactory.Encode(in registerRecv));
+
+            var broadcastWorldInfo = new WorldSnapshotResponse
+            {
+                WorldInfo = WorldStateProjection.Apply(
+                    GuildRankingProjection.Apply(WorldStateTemplates.ZeroedWorldInfo, guildRanking.Top), worldState),
+                // No repository currently projects tribe master/sub-master NAMES or the vote/honor-rank rosters
+                // (ITribeRepository only ever returns CharacterIds) -- the zeroed template is the correct
+                // placeholder until that surface exists, not a regression introduced here.
+                TribeInfo = WorldStateTemplates.ZeroedTribeInfo
+            };
+            zoneSession.SendRaw(ZoneMessageFactory.Encode(in broadcastWorldInfo));
+
+            // Self-spawn: Zone doesn't know this player exists yet (ZoneCommand.Enter below is only posted, not ticked).
+            zoneSession.Send(new AvatarActionResponse
+            {
+                ServerIndex = characterId,
+                UniqueNumber = unchecked((uint)characterId),
+                Data = new ObjectForAvatar
                 {
-                    Type = 0,
-                    Sort = 0,
-                    Frame = 0,
-                    Location = [character.PosX, character.PosY, character.PosZ],
-                    TargetLocation = [character.PosX, character.PosY, character.PosZ],
-                    Front = character.Heading,
-                    TargetFront = character.Heading,
-                    PetLocation = new float[3],
-                    PetTargetLocation = new float[3],
-                    PetFront = 0,
-                    PetSort = 0,
-                    TargetObjectSort = 0,
-                    TargetObjectIndex = 0,
-                    TargetObjectUniqueNumber = 0,
-                    SkillNumber = 0,
-                    SkillGradeNum1 = 0,
-                    SkillGradeNum2 = 0,
-                    SkillValue = 0
+                    // Legacy sources both from the character's own persisted record at this exact moment (not a
+                    // fixed value -- visibility can change between sessions), S04_MyWork02.cpp:999-1000; no
+                    // VisibleState/SpecialState column exists anywhere in game.Characters yet to source from, so
+                    // this remains a flat 0 pending a database-engineer schema addition, not a silent regression.
+                    VisibleState = 0,
+                    SpecialState = 0,
+                    KillOtherTribe = 0,
+                    GoodFellow = 0,
+                    GuildName = socialSnapshot.GuildName,
+                    GuildRole = socialSnapshot.GuildRoleWire,
+                    CallName = socialSnapshot.CallName,
+                    // Legacy zeroes this only for a guild-less character; a real guild member's mark-effect
+                    // value has no source anywhere in the current guild repository surface yet (no MarkEffect
+                    // column/DTO field exists) -- flagged, not silently assumed correct.
+                    GuildMarkEffect = 0,
+                    Name = character.Name,
+                    Tribe = character.Tribe,
+                    // The Noble Dragon/Royal Serpent/Grand Tiger starter-kit template (0-2), genuinely independent
+                    // of Tribe -- now a real persisted column (Migrations/018), no longer synthesized as 0.
+                    PreviousTribe = character.PreviousTribe,
+                    Gender = character.Gender,
+                    HeadType = character.HeadType,
+                    FaceType = character.FaceType,
+                    Level1 = character.Level,
+                    Level2 = character.Level2,
+                    EquipForView = EquipmentViewCodec.BuildEquipForView(bundle.Items),
+                    // character.MountItemId/MountSlotIndex are readable since Migrations/018, but the legacy's
+                    // exact "currently mounted" condition (S04_MyWork02.cpp:935-940) isn't confirmed yet -- needs
+                    // a legacy-behavior-translator contract before this stops being a flat 0.
+                    AnimalNumber = 0,
+                    Title = character.Title,
+                    Halo = character.Halo,
+                    RebirthNum = character.RebirthCount,
+                    BattleTeam = 0,
+                    Action = new ActionInfo
+                    {
+                        Type = 0,
+                        Sort = 0,
+                        Frame = 0,
+                        Location = [character.PosX, character.PosY, character.PosZ],
+                        TargetLocation = [character.PosX, character.PosY, character.PosZ],
+                        Front = character.Heading,
+                        TargetFront = character.Heading,
+                        PetLocation = new float[3],
+                        PetTargetLocation = new float[3],
+                        PetFront = 0,
+                        PetSort = 0,
+                        TargetObjectSort = 0,
+                        TargetObjectIndex = 0,
+                        TargetObjectUniqueNumber = 0,
+                        SkillNumber = 0,
+                        SkillGradeNum1 = 0,
+                        SkillGradeNum2 = 0,
+                        SkillValue = 0
+                    },
+                    MaxLifeValue = character.MaxLife,
+                    LifeValue = character.Life,
+                    MaxManaValue = character.MaxMana,
+                    ManaValue = character.Mana,
+                    EffectValueForView = BuildEffectValueForView(bundle.Buffs),
+                    // Legacy copies the character's own persisted party name here (S04_MyWork02.cpp:1036), not
+                    // blank -- no party-name column/DTO field is persisted anywhere on the Fenrir side yet
+                    // (PartyRegistry is in-memory-only and does not survive a reconnect), so this stays "" pending
+                    // a database-engineer schema addition, not a silent regression.
+                    PartyName = "",
+                    DuelState = new int[3],
+                    PShopState = 0,
+                    PShopName = "",
+                    CostumeNumber = 0,
+                    BufEffectTimeState = 0,
+                    BufSort = 0,
+                    AutoState = 0,
+                    FishingState = 0,
+                    FishingStep = 0,
+                    FishingPoint = new float[3],
+                    RankPoint = 0,
+                    TargetState = 0,
+                    AnimalAbsorbState = 0,
+                    PetValid = 0,
+                    Unk1 = 0,
+                    // Top-level PetLocation (distinct from Action.PetLocation above): legacy sets this to the
+                    // avatar's own current position, not zero (S04_MyWork02.cpp:1058-1060).
+                    PetLocation = [character.PosX, character.PosY, character.PosZ],
+                    PetFrame = 0,
+                    Unk624 = 0,
+                    Unk625 = 0,
+                    UniqueSkillNumber = 0,
+                    UniqueSkillBuffTime = 0,
+                    CostumeState = 0,
+                    StellarCoreNumber = 0
                 },
-                MaxLifeValue = character.MaxLife,
-                LifeValue = character.Life,
-                MaxManaValue = character.MaxMana,
-                ManaValue = character.Mana,
-                EffectValueForView = BuildEffectValueForView(bundle.Buffs),
-                // Legacy copies the character's own persisted party name here (S04_MyWork02.cpp:1036), not
-                // blank -- no party-name column/DTO field is persisted anywhere on the Fenrir side yet
-                // (PartyRegistry is in-memory-only and does not survive a reconnect), so this stays "" pending
-                // a database-engineer schema addition, not a silent regression.
-                PartyName = "",
-                DuelState = new int[3],
-                PShopState = 0,
-                PShopName = "",
-                CostumeNumber = 0,
-                BufEffectTimeState = 0,
-                BufSort = 0,
-                AutoState = 0,
-                FishingState = 0,
-                FishingStep = 0,
-                FishingPoint = new float[3],
-                RankPoint = 0,
-                TargetState = 0,
-                AnimalAbsorbState = 0,
-                PetValid = 0,
-                Unk1 = 0,
-                // Top-level PetLocation (distinct from Action.PetLocation above): legacy sets this to the
-                // avatar's own current position, not zero (S04_MyWork02.cpp:1058-1060).
-                PetLocation = [character.PosX, character.PosY, character.PosZ],
-                PetFrame = 0,
-                Unk624 = 0,
-                Unk625 = 0,
-                UniqueSkillNumber = 0,
-                UniqueSkillBuffTime = 0,
-                CostumeState = 0,
-                StellarCoreNumber = 0
-            },
-            CheckChangeActionState = 0
-        });
+                CheckChangeActionState = 0
+            });
 
-        var entered = zone.Post(ZoneCommand.Enter(characterId, new PlayerEnterData(
-            zoneSession,
-            character.Name,
-            character.Tribe,
-            character.Gender,
-            character.HeadType,
-            character.FaceType,
-            character.Level,
-            character.MapId,
-            character.PosX,
-            character.PosY,
-            character.PosZ,
-            character.Heading,
-            character.Life,
-            character.MaxLife,
-            character.Mana,
-            character.MaxMana,
-            character.FlushSequence,
-            Items: bundle.Items,
-            Stats: stats,
-            IsMuted: isMuted,
-            GuildId: guildMembership?.GuildId,
-            GuildName: socialSnapshot.GuildName,
-            GuildRoleDb: guildMembership?.Role ?? 0,
-            TribeRole: tribeRole,
-            FriendsBySlot: friendIdBySlot,
-            Skills: bundle.Skills,
-            TeacherCharacterId: mentorBond?.TeacherCharacterId,
-            StudentCharacterId: mentorBond?.StudentCharacterId,
-            QuestProgress: new QuestProgress(character.QuestStepPermanent, character.QuestActiveId,
-                character.QuestSort, character.QuestTargetPhase, character.QuestKillCounter),
-            MissionJoinWar: character.JoinWar,
-            MissionKillOtherTribe: character.MissionKillOtherTribe,
-            MissionKillMonster: character.MissionKillMonster,
-            MissionPlayTime: character.MissionPlayTime,
-            AutoHuntEnabled: character.AutoHuntEnabled,
-            AutoHuntConfig: character.AutoHuntConfig is { } configBytes &&
-                            AutoHunt.TryRead(configBytes, out var autoHunt)
-                ? autoHunt
-                : null,
-            AutoLifeRatio: character.AutoLifeRatio,
-            AutoManaRatio: character.AutoManaRatio,
-            PetGrowth: character.PetGrowth,
-            PetActivity: character.PetActivity,
-            StatVit: character.StatVit,
-            StatStr: character.StatStr,
-            StatInt: character.StatInt,
-            StatDex: character.StatDex,
-            StatPoints: character.StatPoints,
-            Title: character.Title,
-            Halo: character.Halo,
-            RebirthCount: character.RebirthCount,
-            Experience: character.Experience,
-            ContributionPoints: character.ContributionPoints,
-            TeacherPoint: character.TeacherPoint,
-            Level2: character.Level2,
-            Exp2: character.Exp2)));
+            var entered = zone.Post(ZoneCommand.Enter(characterId, new PlayerEnterData(
+                zoneSession,
+                character.Name,
+                character.Tribe,
+                character.Gender,
+                character.HeadType,
+                character.FaceType,
+                character.Level,
+                character.MapId,
+                character.PosX,
+                character.PosY,
+                character.PosZ,
+                character.Heading,
+                character.Life,
+                character.MaxLife,
+                character.Mana,
+                character.MaxMana,
+                character.FlushSequence,
+                Items: bundle.Items,
+                Stats: stats,
+                IsMuted: isMuted,
+                GuildId: guildMembership?.GuildId,
+                GuildName: socialSnapshot.GuildName,
+                GuildRoleDb: guildMembership?.Role ?? 0,
+                TribeRole: tribeRole,
+                FriendsBySlot: friendIdBySlot,
+                Skills: bundle.Skills,
+                TeacherCharacterId: mentorBond?.TeacherCharacterId,
+                StudentCharacterId: mentorBond?.StudentCharacterId,
+                QuestProgress: new QuestProgress(character.QuestStepPermanent, character.QuestActiveId,
+                    character.QuestSort, character.QuestTargetPhase, character.QuestKillCounter),
+                MissionJoinWar: character.JoinWar,
+                MissionKillOtherTribe: character.MissionKillOtherTribe,
+                MissionKillMonster: character.MissionKillMonster,
+                MissionPlayTime: character.MissionPlayTime,
+                AutoHuntEnabled: character.AutoHuntEnabled,
+                AutoHuntConfig: character.AutoHuntConfig is { } configBytes &&
+                                AutoHunt.TryRead(configBytes, out var autoHunt)
+                    ? autoHunt
+                    : null,
+                AutoLifeRatio: character.AutoLifeRatio,
+                AutoManaRatio: character.AutoManaRatio,
+                PetGrowth: character.PetGrowth,
+                PetActivity: character.PetActivity,
+                StatVit: character.StatVit,
+                StatStr: character.StatStr,
+                StatInt: character.StatInt,
+                StatDex: character.StatDex,
+                StatPoints: character.StatPoints,
+                Title: character.Title,
+                Halo: character.Halo,
+                RebirthCount: character.RebirthCount,
+                Experience: character.Experience,
+                ContributionPoints: character.ContributionPoints,
+                TeacherPoint: character.TeacherPoint,
+                Level2: character.Level2,
+                Exp2: character.Exp2)));
 
-        // A dropped Enter is never replayed -- the character would stay permanently invisible despite the two
-        // packets above already telling the client registration succeeded, so treat it as fatal.
-        if (!entered)
-        {
-            logger.LogError("Zone {MapId} inbox full: dropped Enter for character {CharacterId} -- aborting session",
-                zone.MapId, characterId);
-            zoneSession.Abort(DisconnectReason.Faulted);
-            return;
+            // A dropped Enter is never replayed -- the character would stay permanently invisible despite the two
+            // packets above already telling the client registration succeeded, so treat it as fatal.
+            if (!entered)
+            {
+                logger.LogError("Zone {MapId} inbox full: dropped Enter for character {CharacterId} -- aborting session",
+                    zone.MapId, characterId);
+                zoneSession.Abort(DisconnectReason.Faulted);
+                return;
+            }
+
+            zoneSession.CurrentZone = zone;
+            zoneSession.MarkRegistering();
+
+            logger.LogInformation(
+                "Character {CharacterId} (account {AccountId}) entered world on map {MapId} -- awaiting zone-ready",
+                characterId, accountId, character.MapId);
         }
 
-        zoneSession.CurrentZone = zone;
-        zoneSession.MarkRegistering();
-
-        logger.LogInformation(
-            "Character {CharacterId} (account {AccountId}) entered world on map {MapId} -- awaiting zone-ready",
-            characterId, accountId, character.MapId);
+        try
+        {
+            await CompleteWorldEntryAsync();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // Distinct from every explicit Abort(DisconnectReason.Faulted) call above and inside
+            // CompleteWorldEntryAsync (firewall/ban/ticket-mismatch/tribe-consistency/map-not-hosted/dropped-
+            // Enter): those are all validated precondition rejections with no exception involved.
+            // ProcessingFault instead marks "an unhandled exception actually reached here", carrying the
+            // account/character/map context that the generic SessionLoop/GameConnectionHost catches above this
+            // one can never have, and is the same idempotent Abort() every other rejection path in this
+            // service already uses (see ClientSession.Abort's own remarks) -- calling it here does not race or
+            // conflict with the CompleteWorldEntryAsync's own explicit Abort(Faulted) on the dropped-Enter
+            // path, since that path already returned before any exception could reach this catch.
+            logger.LogError(ex,
+                "Enter-world processing faulted for account {AccountId} character {CharacterId} on map {MapId} -- " +
+                "the client may already hold a partial handshake if some of the three response payloads were " +
+                "already sent; aborting session",
+                accountId, characterId, character.MapId);
+            zoneSession.Abort(DisconnectReason.ProcessingFault);
+        }
     }
 
     /// <summary>

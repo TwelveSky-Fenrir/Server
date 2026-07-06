@@ -54,7 +54,10 @@ public class MonsterAiSystemTests
     private static Zone CreateZone(WorldDataCache cache)
     {
         var scheduler = new MonsterSpawnScheduler(cache, static () => new ZeroScatterRandom());
-        var ai = new MonsterAiSystem();
+        // Detection now includes a 50% per-candidate coin flip (SelectAvatarIndexForPossibleAttack,
+        // S07_MyGame05.cpp:208-213) -- ScriptedRandomSource(0) always resolves it to a guaranteed success so
+        // these tests stay deterministic instead of flaking on an unlucky flip.
+        var ai = new MonsterAiSystem(new ScriptedRandomSource(0));
         var options = new GameServerOptions { AoiCellSize = 100_000f };
         return ZoneTestKit.CreateZone(1, options, simulationSystems: [scheduler, ai], worldData: cache);
     }
@@ -140,7 +143,8 @@ public class MonsterAiSystemTests
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1, "Target", 10, posZ: 0)));
 
         zone.Tick(SimulationClock.LegacyTick); // spawn (FrameInfo1=1 -> Decision already this same tick's next pass)
-        zone.Tick(SimulationClock.LegacyTick); // Decision detects -> Chase
+        zone.Tick(SimulationClock.LegacyTick); // Decision: 1-second detection throttle blocks the very first check (mCheckDetectEnemyTime, S07_MyGame05.cpp:127-131) -- stays Decision
+        zone.Tick(SimulationClock.LegacyTick); // Decision: throttle window elapsed -> detects -> Chase
         zone.Tick(SimulationClock.LegacyTick); // Chase: already in range -> AttackWindup, StateTicks=0
         Assert.True(zone.TryGetMonster(1, out var monster));
         Assert.Equal(MonsterAiState.AttackWindup, monster!.AiState);

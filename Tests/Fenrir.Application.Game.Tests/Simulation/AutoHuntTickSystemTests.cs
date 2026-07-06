@@ -1,5 +1,6 @@
 using System.Collections.Frozen;
 using System.Collections.Immutable;
+using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.Skills;
@@ -21,15 +22,20 @@ public class AutoHuntTickSystemTests
 {
     private static (Zone Zone, PlayerRuntimeState State) SetUp(
         FrozenDictionary<int, SkillDefinition>? skillsById = null,
-        FrozenDictionary<int, ItemDefinition>? itemsById = null)
+        FrozenDictionary<int, ItemDefinition>? itemsById = null,
+        short mapId = 1,
+        GameServerOptions? options = null)
     {
         var worldData = ZoneTestKit.EmptyWorldData(skillsById: skillsById, itemsById: itemsById);
         var dirtyTracker = new DirtyTracker<int>();
-        var zone = ZoneTestKit.CreateZone(1, dirtyTracker: dirtyTracker,
-            simulationSystems: [new AutoHuntTickSystem(worldData, dirtyTracker)], worldData: worldData);
+        var opts = options ?? ZoneTestKit.Options();
+        var optionsWrapper = Microsoft.Extensions.Options.Options.Create(opts);
+        var zone = ZoneTestKit.CreateZone(mapId, opts, dirtyTracker: dirtyTracker,
+            simulationSystems: [new AutoHuntTickSystem(worldData, dirtyTracker, optionsWrapper)],
+            worldData: worldData);
 
         var (session, _) = ZoneTestKit.CreateSession(1);
-        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1)));
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, mapId)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.True(zone.TryGetPlayer(10, out var state));
@@ -333,6 +339,116 @@ public class AutoHuntTickSystemTests
 
         Assert.Equal(manaBefore, state.Mana);
         Assert.Equal(0, state.Buffs.Buff[9 * 2]);
+    }
+
+    /// <summary>
+    ///     BotBuff/BotHotKey's own four-way zone-server-type gate (S07_MyGame04.cpp:341-350) -- Regular War term:
+    ///     any of the 11 configured Regular War (zone 049) maps suppresses the auto-cast outright, statically,
+    ///     for the whole time the avatar is connected there.
+    /// </summary>
+    [Fact]
+    public void RegularWarMap_DoesNothing()
+    {
+        var skillsById = new Dictionary<int, SkillDefinition> { [82] = HolyShieldSkill(10, 30, 20, 40) }
+            .ToFrozenDictionary();
+        var (zone, state) = SetUp(skillsById, mapId: 49); // one of RegularWarMapCatalog.ConfiguredMaps
+        var manaBefore = state.Mana;
+
+        state.AutoHuntEnabled = true;
+        state.AutoHuntConfig = Config(82, 10);
+        state.LearnedSkills = ImmutableDictionary<byte, LearnedSkill>.Empty.Add(0, new LearnedSkill(82, 10));
+
+        zone.Tick(SimulationClock.LegacyTick);
+
+        Assert.Equal(manaBefore, state.Mana);
+        Assert.Equal(0, state.Buffs.Buff[9 * 2]);
+    }
+
+    /// <summary>Sacred-Stone/"zone 038" term: armed only when both the designated map id AND HolyStoneWarEnabled match.</summary>
+    [Fact]
+    public void HolyStoneMapArmed_DoesNothing()
+    {
+        var skillsById = new Dictionary<int, SkillDefinition> { [82] = HolyShieldSkill(10, 30, 20, 40) }
+            .ToFrozenDictionary();
+        var options = ZoneTestKit.Options();
+        options.HolyStoneMapId = 38;
+        options.HolyStoneWarEnabled = true;
+        var (zone, state) = SetUp(skillsById, mapId: 38, options: options);
+        var manaBefore = state.Mana;
+
+        state.AutoHuntEnabled = true;
+        state.AutoHuntConfig = Config(82, 10);
+        state.LearnedSkills = ImmutableDictionary<byte, LearnedSkill>.Empty.Add(0, new LearnedSkill(82, 10));
+
+        zone.Tick(SimulationClock.LegacyTick);
+
+        Assert.Equal(manaBefore, state.Mana);
+        Assert.Equal(0, state.Buffs.Buff[9 * 2]);
+    }
+
+    /// <summary>
+    ///     The Sacred-Stone map id alone, without <see cref="GameServerOptions.HolyStoneWarEnabled" /> armed, does
+    ///     NOT suppress -- the two conditions are independent, matching legacy's own two-condition requirement.
+    /// </summary>
+    [Fact]
+    public void HolyStoneMapIdWithoutArmedFlag_StillCasts()
+    {
+        var skillsById = new Dictionary<int, SkillDefinition> { [82] = HolyShieldSkill(10, 30, 20, 40) }
+            .ToFrozenDictionary();
+        var options = ZoneTestKit.Options();
+        options.HolyStoneMapId = 38;
+        options.HolyStoneWarEnabled = false;
+        var (zone, state) = SetUp(skillsById, mapId: 38, options: options);
+        var manaBefore = state.Mana;
+
+        state.AutoHuntEnabled = true;
+        state.AutoHuntConfig = Config(82, 10);
+        state.LearnedSkills = ImmutableDictionary<byte, LearnedSkill>.Empty.Add(0, new LearnedSkill(82, 10));
+
+        zone.Tick(SimulationClock.LegacyTick);
+
+        Assert.Equal(manaBefore - 30, state.Mana);
+        Assert.Equal(168, state.Buffs.Buff[9 * 2]);
+    }
+
+    /// <summary>Rebirth-chain (zone 241) term: any map configured in Zone241DungeonMapIds suppresses.</summary>
+    [Fact]
+    public void Zone241DungeonMap_DoesNothing()
+    {
+        var skillsById = new Dictionary<int, SkillDefinition> { [82] = HolyShieldSkill(10, 30, 20, 40) }
+            .ToFrozenDictionary();
+        var options = ZoneTestKit.Options();
+        options.Zone241DungeonMapIds = new HashSet<short> { 325 };
+        var (zone, state) = SetUp(skillsById, mapId: 325, options: options);
+        var manaBefore = state.Mana;
+
+        state.AutoHuntEnabled = true;
+        state.AutoHuntConfig = Config(82, 10);
+        state.LearnedSkills = ImmutableDictionary<byte, LearnedSkill>.Empty.Add(0, new LearnedSkill(82, 10));
+
+        zone.Tick(SimulationClock.LegacyTick);
+
+        Assert.Equal(manaBefore, state.Mana);
+        Assert.Equal(0, state.Buffs.Buff[9 * 2]);
+    }
+
+    /// <summary>An ordinary map matching none of the four zone-server types is unaffected by this gate.</summary>
+    [Fact]
+    public void OrdinaryMap_UnaffectedByZoneServerTypeGate()
+    {
+        var skillsById = new Dictionary<int, SkillDefinition> { [82] = HolyShieldSkill(10, 30, 20, 40) }
+            .ToFrozenDictionary();
+        var (zone, state) = SetUp(skillsById, mapId: 1);
+        var manaBefore = state.Mana;
+
+        state.AutoHuntEnabled = true;
+        state.AutoHuntConfig = Config(82, 10);
+        state.LearnedSkills = ImmutableDictionary<byte, LearnedSkill>.Empty.Add(0, new LearnedSkill(82, 10));
+
+        zone.Tick(SimulationClock.LegacyTick);
+
+        Assert.Equal(manaBefore - 30, state.Mana);
+        Assert.Equal(168, state.Buffs.Buff[9 * 2]);
     }
 
     [Fact]

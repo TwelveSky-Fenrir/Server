@@ -1,3 +1,4 @@
+using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Simulation;
 
 namespace Fenrir.Application.Game.Domain.World.Monsters;
@@ -37,9 +38,21 @@ namespace Fenrir.Application.Game.Domain.World.Monsters;
 ///             cluster's touched files this round. The state's own tick-countdown behavior is fully implemented
 ///             and tested; only the trigger is a follow-up.
 ///         </item>
+///         <item>
+///             <see cref="TryAcquireTarget" />'s candidate-eligibility filter does not exclude a mid-zone-transfer
+///             or "hiding" avatar (legacy <c>IsMovingZone()</c>/<c>IsHiding()</c>, <c>S07_MyGame05.cpp:144-151</c>):
+///             Fenrir's in-process zone handoff removes a player from this zone's own player map/AOI grid before
+///             the target zone ever adds them, so there is no observable window where a mid-transfer player
+///             could appear as a candidate here; a "hiding" state has no equivalent anywhere in
+///             <see cref="PlayerRuntimeState" /> yet (a separate, unimplemented gameplay feature), so that
+///             exclusion is simply not modeled. The action-sort-state-0/33 exclusion (<c>:156-159</c>) and the
+///             dead, never-compiled tribe-guard block (<c>:160-167</c>, <c>//#define USE_WAR_GUARD</c>) are
+///             likewise not ported -- the former has no cataloged Fenrir equivalent state, the latter is
+///             correctly never-real legacy behavior in the first place.
+///         </item>
 ///     </list>
 /// </remarks>
-public sealed class MonsterAiSystem : ISimulationSystem
+public sealed class MonsterAiSystem(IRandomSource? random = null) : ISimulationSystem
 {
     /// <summary>One legacy tick's worth of movement time, matching the report's own "vitesse × dTime" with dTime ≈ 0.5 s.</summary>
     private const float TickSeconds = SimulationClock.LegacyTickMilliseconds / 1000f;
@@ -47,15 +60,29 @@ public sealed class MonsterAiSystem : ISimulationSystem
     /// <summary>Close enough to "arrived" that jitter/overshoot never leaves a monster oscillating around its destination.</summary>
     private const float ArrivalEpsilon = 1f;
 
+    /// <summary>
+    ///     Draws <c>SelectAvatarIndexForPossibleAttack</c>'s per-candidate coin flip (<c>rand_mir()%2==0</c>,
+    ///     <c>S07_MyGame05.cpp:208-213</c>). One shared instance across every zone this DI singleton ticks for
+    ///     (see <c>DomainServiceCollectionExtensions</c>'s registration) -- safe because the default
+    ///     <see cref="SystemRandomSource" /> wraps the thread-safe <see cref="Random.Shared" />.
+    /// </summary>
+    private readonly IRandomSource _random = random ?? SystemRandomSource.Instance;
+
     public void Simulate(Zone zone, int legacyTicksElapsed)
     {
         var dt = TickSeconds * legacyTicksElapsed;
 
-        foreach (var monster in zone.MonstersSnapshot)
-            Update(zone, monster, dt);
+        // Captured once per call and threaded down to the anti-clump pursuer count instead of re-reading
+        // zone.MonstersSnapshot per candidate: the property itself already allocates a snapshot, so re-fetching
+        // it inside a per-candidate check would multiply that allocation by candidate count x monster count.
+        var monsters = zone.MonstersSnapshot;
+
+        foreach (var monster in monsters)
+            Update(zone, monster, dt, legacyTicksElapsed, monsters);
     }
 
-    private void Update(Zone zone, MonsterEntity monster, float dt)
+    private void Update(Zone zone, MonsterEntity monster, float dt, int legacyTicksElapsed,
+        IEnumerable<MonsterEntity> allMonsters)
     {
         switch (monster.AiState)
         {
@@ -70,7 +97,7 @@ public sealed class MonsterAiSystem : ISimulationSystem
                 break;
 
             case MonsterAiState.Decision:
-                RunDecision(zone, monster);
+                RunDecision(zone, monster, legacyTicksElapsed, allMonsters);
                 break;
 
             case MonsterAiState.Patrol:
@@ -83,8 +110,8 @@ public sealed class MonsterAiSystem : ISimulationSystem
                 }
                 else
                 {
-                    TryAcquireTarget(zone,
-                        monster); // re-checked every tick -- a wandering monster can still be aggroed
+                    TryAcquireTarget(zone, monster, legacyTicksElapsed,
+                        allMonsters); // re-checked every tick -- a wandering monster can still be aggroed
                 }
 
                 break;
@@ -143,9 +170,10 @@ public sealed class MonsterAiSystem : ISimulationSystem
         }
     }
 
-    private void RunDecision(Zone zone, MonsterEntity monster)
+    private void RunDecision(Zone zone, MonsterEntity monster, int legacyTicksElapsed,
+        IEnumerable<MonsterEntity> allMonsters)
     {
-        if (TryAcquireTarget(zone, monster))
+        if (TryAcquireTarget(zone, monster, legacyTicksElapsed, allMonsters))
             return;
 
         if (DistanceSquared(monster.PosX, monster.PosZ, monster.HomeX, monster.HomeZ) >
@@ -156,16 +184,32 @@ public sealed class MonsterAiSystem : ISimulationSystem
 
     /// <summary>
     ///     <c>SelectAvatarIndexForPossibleAttack</c> (<c>S07_MyGame05.cpp:113-216</c>): proactive aggro gated to
-    ///     <c>mAttackType ∈ {1,3,6}</c>; detection radius is <see cref="Fenrir.Data.World.MonsterRowDto.RadiusInfo2" />,
-    ///     not <see cref="Fenrir.Data.World.MonsterRowDto.RadiusInfo1" /> (the smaller melee-range radius
-    ///     <see cref="RunChase" /> uses for the attack-windup transition) -- do not swap these two.
+    ///     <c>mAttackType ∈ {1,3,6}</c>, throttled to once every <see cref="SimulationClock.MonsterDetectionThrottleLegacyTicks" />
+    ///     legacy ticks (~1 s, <c>mCheckDetectEnemyTime</c>, resets on every attempted check -- successful or
+    ///     not), with detection radius <see cref="Fenrir.Data.World.MonsterRowDto.RadiusInfo2" /> (not
+    ///     <see cref="Fenrir.Data.World.MonsterRowDto.RadiusInfo1" />, the smaller melee-range radius
+    ///     <see cref="RunChase" /> uses for the attack-windup transition -- do not swap these two), gated to at
+    ///     least 1, a per-candidate anti-clump pursuer cap, and a 50% coin flip.
     /// </summary>
-    private bool TryAcquireTarget(Zone zone, MonsterEntity monster)
+    private bool TryAcquireTarget(Zone zone, MonsterEntity monster, int legacyTicksElapsed,
+        IEnumerable<MonsterEntity> allMonsters)
     {
         if (monster.Template.AttackType is not (1 or 3 or 6))
             return false;
 
+        // 1-second detection throttle (mCheckDetectEnemyTime, S07_MyGame05.cpp:127-131): restarts on every
+        // attempted check, whether or not it ends up finding a candidate -- a monster that rolls no target
+        // this pass must wait a full window again, even with a valid target still in range the whole time.
+        monster.DetectionThrottleTicks += legacyTicksElapsed;
+        if (monster.DetectionThrottleTicks < SimulationClock.MonsterDetectionThrottleLegacyTicks)
+            return false;
+
+        monster.DetectionThrottleTicks = 0;
+
         var detectionRadius = monster.Template.RadiusInfo2;
+        if (detectionRadius <= 0)
+            return false; // S07_MyGame05.cpp:132-135 -- a non-positive configured radius never detects anyone
+
         var detectionRadiusSq = (float)detectionRadius * detectionRadius;
 
         foreach (var characterId in zone.NeighborsOfPosition(monster.PosX, monster.PosZ))
@@ -181,6 +225,19 @@ public sealed class MonsterAiSystem : ISimulationSystem
             if (DistanceSquared(monster.PosX, monster.PosZ, player.PosX, player.PosZ) > detectionRadiusSq)
                 continue;
 
+            // Anti-clump cap (S07_MyGame05.cpp:186-207): count every OTHER live monster already chasing or
+            // winding up an attack against this exact candidate; refuse to add another pursuer once that
+            // count exceeds this monster's own rolled capacity minus one (MonsterEntity.PursuerCapacity,
+            // rolled once at spawn -- S10_MySummon.cpp:795).
+            if (CountOtherPursuers(allMonsters, monster, characterId) > monster.PursuerCapacity - 1)
+                continue;
+
+            // Coin flip (S07_MyGame05.cpp:208-213): only a 50% roll actually selects this candidate -- a lost
+            // flip skips it for the rest of THIS call; it is never revisited until the next throttle-permitted
+            // check (a full window later).
+            if (_random.NextInt32(2) != 0)
+                continue;
+
             monster.TargetCharacterId = characterId;
             RecordAggro(monster, characterId);
             monster.AiState = MonsterAiState.Chase;
@@ -189,6 +246,33 @@ public sealed class MonsterAiSystem : ISimulationSystem
         }
 
         return false;
+    }
+
+    /// <summary>
+    ///     Anti-clump pursuer count (S07_MyGame05.cpp:186-207): every OTHER live monster already locked onto
+    ///     <paramref name="candidateCharacterId" /> while chasing or winding up an attack (legacy aSort 4/5).
+    ///     <see cref="MonsterAiState.RangedAttackWindup" /> counts as "attacking" too -- Fenrir splits legacy's
+    ///     single ranged-attack behavior into its own state, but it is the same actively-engaged-with-target
+    ///     phase an anti-clump count is meant to capture.
+    /// </summary>
+    private static int CountOtherPursuers(IEnumerable<MonsterEntity> allMonsters, MonsterEntity monster,
+        int candidateCharacterId)
+    {
+        var count = 0;
+        foreach (var other in allMonsters)
+        {
+            if (other.ServerIndex == monster.ServerIndex)
+                continue;
+
+            if (other.AiState is not (MonsterAiState.Chase or MonsterAiState.AttackWindup
+                or MonsterAiState.RangedAttackWindup))
+                continue;
+
+            if (other.TargetCharacterId == candidateCharacterId)
+                count++;
+        }
+
+        return count;
     }
 
     /// <summary>Bounded FIFO, oldest purged first (legacy cap 50).</summary>

@@ -93,10 +93,24 @@ public sealed class GameConnectionHost(
                 SessionLoop.RunAsync(zoneSession, dispatcher, rateLimiter, ipFloodGuard, ct, logger)
             ).ConfigureAwait(false);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            logger.LogDebug(ex, "Zone session {SessionId} ended", zoneSession.SessionId);
+            // The only point in this whole per-connection chain that catches every exception type.
+            // SessionLoop's own dispatch try/catch (Network/Fenrir.Network.Dispatch/SessionLoop.cs) already
+            // turns an in-handler fault into a logged (LogError), reason-recorded Abort() before returning
+            // cleanly, so anything still reaching here bypassed that guard entirely -- e.g. a fault
+            // decoding a frame outside FrameDecoder's own ProtocolViolationException branch, or elsewhere
+            // in SessionLoop.RunAsync's own read loop. Logging this at Debug would vanish below
+            // GameServer's configured Information floor (Servers/Fenrir.GameServer/appsettings.json's
+            // Logging:LogLevel:Default) with zero trace anywhere -- log it loudly instead so an unhandled
+            // fault is never silently indistinguishable from an ordinary disconnect.
+            logger.LogError(ex, "Zone session {SessionId} ended abnormally due to an unhandled exception",
+                zoneSession.SessionId);
         }
+        // OperationCanceledException falls through uncaught: it is an expected shutdown/external-abort
+        // signal (matching SessionLoop.RunAsync's own posture), not a fault, and is swallowed without
+        // logging by FenrirTcpListener.RunAcceptedAsync one level up -- the cleanup block below still
+        // runs unconditionally either way, since `finally` executes regardless of how this try exits.
         finally
         {
             if (remoteIp is not null)

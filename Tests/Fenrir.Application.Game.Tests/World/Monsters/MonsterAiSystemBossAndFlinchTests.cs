@@ -51,7 +51,10 @@ public class MonsterAiSystemBossAndFlinchTests
     private static Zone CreateZone(WorldDataCache cache)
     {
         var scheduler = new MonsterSpawnScheduler(cache, static () => new ZeroScatterRandom());
-        var ai = new MonsterAiSystem();
+        // Detection now includes a 50% per-candidate coin flip (SelectAvatarIndexForPossibleAttack,
+        // S07_MyGame05.cpp:208-213) -- ScriptedRandomSource(0) always resolves it to a guaranteed success so
+        // these tests stay deterministic instead of flaking on an unlucky flip.
+        var ai = new MonsterAiSystem(new ScriptedRandomSource(0));
         var options = new GameServerOptions { AoiCellSize = 100_000f };
         return ZoneTestKit.CreateZone(1, options, simulationSystems: [scheduler, ai], worldData: cache);
     }

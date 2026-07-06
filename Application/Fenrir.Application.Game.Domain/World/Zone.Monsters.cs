@@ -75,10 +75,31 @@ public sealed partial class Zone
     }
 
     /// <summary>
+    ///     Legacy <c>mDATA.mIndex</c> values that unconditionally override <see cref="SelectMonsterKillCredit" />
+    ///     to the killing blow's own attacker regardless of what the ordinary damage-based path would have
+    ///     picked (<c>Server/ts25zone/S07_MyGame02.cpp:2802-2828</c>). Monster 561 in the same source block is
+    ///     a confirmed-unrelated branch (<c>BossWarDrop</c>) and does not belong here.
+    /// </summary>
+    private static bool IsKillingBlowOverrideMonster(int monsterId)
+    {
+        return monsterId is 746 or 777 or 1407 or 1408 or 1404;
+    }
+
+    /// <summary>
     ///     Safe from any thread (see <see cref="MonsterEntity.TakeDamage" />'s remarks). On the killing blow,
     ///     atomically removes the monster from the live pool and queues a <see cref="DeadMonsterEvent" /> for
     ///     this zone's own next tick to process -- never processed inline here.
     /// </summary>
+    /// <remarks>
+    ///     Every hit -- not just the killing one -- accrues onto <paramref name="attackerCharacterId" />'s own
+    ///     tracked damage-history entry on <paramref name="serverIndex" />'s <see cref="MonsterEntity" />
+    ///     (legacy <c>SetAttackInfoWithAvatar</c>, <c>S07_MyGame05.cpp:1675-1720</c>) before the HP mutation
+    ///     below, so a killing hit's own damage is already counted by the time
+    ///     <see cref="SelectMonsterKillCredit" /> runs. Only resolvable-in-<see cref="_players" /> attackers are
+    ///     tracked at all -- an unresolvable <paramref name="attackerCharacterId" /> (environment damage, a
+    ///     stale/disconnected id) contributes no entry, matching legacy's own "no tracked attacker, no credit"
+    ///     outcome.
+    /// </remarks>
     public bool TryDamageMonster(int serverIndex, int amount, int? attackerCharacterId, out bool died,
         out int remainingLife)
     {
@@ -89,14 +110,99 @@ public sealed partial class Zone
             return false;
         }
 
+        if (attackerCharacterId is { } attackerId && _players.TryGetValue(attackerId, out var attackerState))
+            monster.RegisterAttackDamage(attackerId, attackerState, amount);
+
         died = monster.TakeDamage(amount, out remainingLife);
         if (died)
         {
             _monsters.TryRemove(serverIndex, out _);
-            _deadMonsters.Enqueue(new DeadMonsterEvent(monster, attackerCharacterId));
+            var creditedCharacterId = SelectMonsterKillCredit(monster, attackerCharacterId);
+            _deadMonsters.Enqueue(new DeadMonsterEvent(monster, creditedCharacterId));
         }
 
         return true;
+    }
+
+    /// <summary>
+    ///     <c>ProcessAttack03</c>'s kill-credit dispatch on <c>mSpecialSortNumber</c>
+    ///     (<c>S07_MyGame02.cpp:2794-2830</c>): the five hardcoded boss ids
+    ///     (<see cref="IsKillingBlowOverrideMonster" />) always credit the killing blow
+    ///     (<paramref name="killingBlowAttackerId" />); every other monster -- the "ordinary" category, the
+    ///     vast majority, the default/fallthrough result of legacy's own <c>ReturnSpecialSortNumber</c>
+    ///     (<c>Server/ts25zone/S10_MySummon.cpp:612-647</c>) -- instead credits whichever tracked attacker dealt
+    ///     the single highest cumulative damage, via <see cref="SelectDamageBasedKillCredit" />. A null result
+    ///     (no eligible damage-history entry, or none tracked at all) leaves the kill fully unattributed --
+    ///     <see cref="Monsters.MonsterSpawnScheduler.ProcessDeath" /> already gates both the loot-drop and
+    ///     experience-grant calls on this being non-null, matching legacy's own <c>tSelectAvatarIndex == -1</c>
+    ///     gate (<c>S07_MyGame02.cpp:2830</c>, reused at <c>:3173-3176</c> for experience).
+    /// </summary>
+    /// <remarks>
+    ///     Categories other than "ordinary" that legacy also accumulates this same damage table for (e.g.
+    ///     category 6, <c>S07_MyGame02.cpp:2459-2468</c>) have no matching case in legacy's own death-time
+    ///     dispatch either (<c>S07_MyGame02.cpp:2794-2799</c>) -- Fenrir does not model
+    ///     <c>mSpecialSortNumber</c> as its own field today, so every monster other than the five override ids
+    ///     is treated as "ordinary" here. This intentionally does not chase down every legacy category (an open
+    ///     question the source contract itself flags as unresolved, not something to guess at); it is exactly
+    ///     the fix this method exists for, and it does not disturb the two categories Fenrir already
+    ///     special-cases through entirely separate mechanisms that never consult this table -- the tribe-symbol
+    ///     "Holy Stone" per-faction accumulator (<see cref="Monsters.MonsterSpawnScheduler.ProcessDeath" />'s own
+    ///     tribe-symbol branch) and tower guardians (identified by their own reserved negative
+    ///     <see cref="MonsterEntity.ServerIndex" /> range, see <see cref="ApplyPvmAttack" />'s remarks).
+    ///     <para>
+    ///         The one extra tribe-state side effect the source contract notes as unique to override id 1407 is
+    ///         deliberately not modeled: it needs a piece of round-scoped state no Fenrir equivalent has been
+    ///         identified for yet.
+    ///     </para>
+    /// </remarks>
+    private int? SelectMonsterKillCredit(MonsterEntity monster, int? killingBlowAttackerId)
+    {
+        if (killingBlowAttackerId is { } blowAttacker && IsKillingBlowOverrideMonster(monster.Template.MonsterId))
+            return blowAttacker;
+
+        return SelectDamageBasedKillCredit(monster);
+    }
+
+    /// <summary>
+    ///     <c>SelectAvatarIndexForMaxAttackDamage</c> (<c>S07_MyGame05.cpp:1723-1780</c>): the single highest
+    ///     cumulative-damage entry among every still-eligible tracked attacker, or null if none qualify. The
+    ///     strictly-greater-than comparison means an exact tie is won by whichever entry was tracked first --
+    ///     <see cref="MonsterEntity.SnapshotAttackDamage" /> preserves oldest-to-newest order, and only a strict
+    ///     improvement ever replaces the current leader.
+    /// </summary>
+    private int? SelectDamageBasedKillCredit(MonsterEntity monster)
+    {
+        int? bestCharacterId = null;
+        long? bestDamage = null;
+
+        foreach (var entry in monster.SnapshotAttackDamage())
+        {
+            // Not resolvable in _players == not session-ready, or gone (logged out / mid zone-transfer):
+            // Fenrir's _players only ever holds a fully-entered, non-transferring player (see HandleEnter), so
+            // a missing lookup here already collapses legacy's separate isReady/isTransferringZone checks into
+            // a single absence check.
+            if (!_players.TryGetValue(entry.CharacterId, out var candidate))
+                continue;
+
+            // Stale slot: a different login has since re-entered under this same character id (HandleEnter
+            // always builds a fresh PlayerRuntimeState), so this entry no longer belongs to a live session.
+            if (!ReferenceEquals(candidate, entry.SessionToken))
+                continue;
+
+            if (candidate.IsDead)
+                continue;
+
+            // Hidden/stealthed re-check is NOT modeled: PlayerRuntimeState has no stealth/hide state yet, so
+            // this fifth legacy eligibility check cannot be applied today -- a documented gap, not a bug.
+
+            if (bestDamage is null || entry.CumulativeDamage > bestDamage.Value)
+            {
+                bestDamage = entry.CumulativeDamage;
+                bestCharacterId = entry.CharacterId;
+            }
+        }
+
+        return bestCharacterId;
     }
 
     public bool TryDequeueDeadMonster(out DeadMonsterEvent? deadMonster)
@@ -112,6 +218,28 @@ public sealed partial class Zone
     {
         monster.AiState = MonsterAiState.Dead;
         BroadcastMonsterAction(monster, 0);
+    }
+
+    /// <summary>
+    ///     Identifier-1407 "Elite Boss" kill announcement (<c>World.Loot.BossEventDropResolver</c>) --
+    ///     <c>U_ZONE_BROADCAST_FOR_CENTER_SEND(2003, ...)</c> has no receiving Center process in Fenrir's
+    ///     two-executable topology, the same collapse <see cref="ApplyTowerGuardianHitSideEffects" />'s own Center
+    ///     hop (broadcast code 754) already uses -- logged rather than sent; no further modeled client-facing
+    ///     consequence exists today.
+    /// </summary>
+    /// <remarks>
+    ///     The source behavior contract this ports flags an open question: this exact broadcast may fire TWICE
+    ///     per kill in the legacy source (once unconditionally near the top of <c>ProcessForDropItem</c>,
+    ///     <c>Server/ts25zone/S07_MyGame05.cpp:2090-2099</c>, and again inside the guaranteed-drop block,
+    ///     <c>:2509-2529</c>) -- only the second, drop-tier-scoped firing is reproduced here; the first was
+    ///     outside this method's own source contract and needs <c>cpp-zone-gameplay-analyst</c> re-verification
+    ///     before a second call site is added.
+    /// </remarks>
+    public void AnnounceEliteBossDefeated(byte killerTribe, string killerName)
+    {
+        logger.LogInformation(
+            "Elite Boss defeated (Center broadcast 2003): killerTribe={KillerTribe} killerName={KillerName} zone={MapId}",
+            killerTribe, killerName, MapId);
     }
 
     /// <summary>

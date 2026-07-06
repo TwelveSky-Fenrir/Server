@@ -32,5 +32,18 @@ public enum DisconnectReason
     ///     that completed the tribe-quota handshake but never followed up with avatar-selection/ready within
     ///     three minutes (Server/ts25zone/S07_MyGame01.cpp:1963-1990).
     /// </summary>
-    IdleTimeout
+    IdleTimeout,
+
+    /// <summary>
+    ///     Torn down because an unhandled exception reached a request-processing failure boundary after that
+    ///     request's own precondition/anti-tamper checks had already passed (e.g. EnterWorldService.HandleAsync's
+    ///     CompleteWorldEntryAsync segment, from equipment/stat computation through posting the world-entry
+    ///     command). Distinct from <see cref="Faulted" />, which covers an explicit, already-validated
+    ///     precondition rejection (firewall/ban/ticket mismatch/dropped zone command/etc.) with no exception
+    ///     involved -- this value exists purely so operators can tell "a real bug/transient failure fired mid-
+    ///     processing" apart from "the request was rejected as designed" in the disconnect-reason metric. No
+    ///     Server/ citation applies: this is a Fenrir-only call-chain exception-handling gap, not a legacy
+    ///     behavior being mirrored.
+    /// </summary>
+    ProcessingFault
 }

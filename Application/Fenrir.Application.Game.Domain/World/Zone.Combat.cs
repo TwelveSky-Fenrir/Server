@@ -21,6 +21,21 @@ public sealed partial class Zone
     /// </summary>
     private const int CombinedLevelGapCap = 13;
 
+    /// <summary>
+    ///     War Point stat-update code for <c>AvatarStatUpdateResponse</c> (the "S9xxUPDATE_..." family already
+    ///     documented on that packet's own <c>Sort</c> field, e.g. <c>S904UPDATE_HERO_POINT</c>) --
+    ///     <c>S905UPDATE_WAR_POINT</c> per the source behavior contract's own naming, extrapolated to the literal
+    ///     905 by that exact same numeric-prefix convention rather than independently re-verified against a
+    ///     <c>DEFINE.h</c> line; flag for re-verification if byte-exact parity on this one code is required.
+    /// </summary>
+    private const int WarPointStatSort = 905;
+
+    /// <summary>
+    ///     DS/Blood Point avatar-change-info sort (<c>SendDSPoint</c>, <c>Server/ts25zone/S07_MyGame03.cpp:2354-2361</c>)
+    ///     -- confirmed 300.
+    /// </summary>
+    private const int BloodPointAvatarChangeInfoSort = 300;
+
     /// <summary>Raw, unvalidated CZ_PROCESS_ATTACK_SEND requests, resolved entirely on the tick thread (zero-SQL combat).</summary>
     private readonly Channel<CombatCommand> _combatInbox = Channel.CreateBounded<CombatCommand>(
         new BoundedChannelOptions(4096) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
@@ -28,10 +43,17 @@ public sealed partial class Zone
     /// <summary>
     ///     Independent 2-minute same-victim-pair cooldown for the FFA-335 flat CP override (step 5 of the
     ///     source contract) -- deliberately a SEPARATE table from <see cref="_killCooldownTracker" /> (the main
-    ///     C05 anti-farm gate) and from the not-yet-modeled Regular-War-host override's own table, matching
+    ///     C05 anti-farm gate) and from <see cref="_regularWarCpOverrideCooldown" />'s own table, matching
     ///     "using its own separate cooldown-state table" in the source contract.
     /// </summary>
     private readonly KillCooldownTracker _ffaCpOverrideCooldown = new();
+
+    /// <summary>
+    ///     Independent 2-minute same-victim-pair cooldown for the Regular-War-host flat CP/War Point/Blood Point
+    ///     override -- its own table, entirely separate from <see cref="_ffaCpOverrideCooldown" /> and
+    ///     <see cref="_killCooldownTracker" />: a pair's cooldown state in one override never affects the others.
+    /// </summary>
+    private readonly KillCooldownTracker _regularWarCpOverrideCooldown = new();
 
     /// <summary>
     ///     Process-wide PvP anti-farm gate (C05) -- shared across every <see cref="Zone" /> via
@@ -161,8 +183,9 @@ public sealed partial class Zone
     ///     <see cref="PlayerRuntimeState.MissionKillOtherTribe" /> (clamped at
     ///     <see cref="KillCooldownTracker.MissionKillOtherTribeCap" />, and now gated per-zone -- see
     ///     <see cref="PvpKillRewardZoneCatalog" />), the tower CP-for-PvP bonus (<see cref="ApplyTowerCpForPvpBonus" />),
-    ///     the CP formula/FFA-override (<see cref="ApplyPvpKillContributionPointFormula" />), hero-rank points
-    ///     (<see cref="ApplyPvpKillHeroPoints" />), and character EXP (<see cref="ApplyPvpKillExperience" />).
+    ///     the CP formula and its Regular-War-host/FFA-335 flat-amount overrides
+    ///     (<see cref="ApplyPvpKillContributionPointFormula" />), hero-rank points (<see cref="ApplyPvpKillHeroPoints" />),
+    ///     and character EXP (<see cref="ApplyPvpKillExperience" />).
     /// </summary>
     /// <remarks>
     ///     <para>
@@ -171,13 +194,13 @@ public sealed partial class Zone
     ///         contract didn't have -- see <see cref="PvpKillRewardZoneCatalog" />'s remarks), same-IP gating
     ///         (no session-level IP address is exposed through <see cref="Fenrir.Network.Abstractions.IPacketSession" />
     ///         today), the event-popup kill counter (a separate reward channel this contract's source describes
-    ///         but no popup-event state exists in Fenrir yet), the Regular-War-host CP override (no
-    ///         scheduled-event state exists yet -- only the FFA-335 override is wired), the guild-level counter
-    ///         (no guild-membership field existed on <see cref="PlayerRuntimeState" /> when this contract's
-    ///         numeric constants were authored), and the double-kill-charge CP top-up / double-EXP-charge /
-    ///         warrior-scroll-buff / premium-status bonuses (none of these buffs have an identified slot in
-    ///         Fenrir yet -- <see cref="PvpKillContributionPointCalculator" />/<see cref="PvpKillExperienceCalculator" />
-    ///         accept them as parameters for when they do).
+    ///         but no popup-event state exists in Fenrir yet), the guild-level counter (no guild-membership
+    ///         field existed on <see cref="PlayerRuntimeState" /> when this contract's numeric constants were
+    ///         authored), and the double-kill-charge CP top-up / double-EXP-charge / warrior-scroll-buff /
+    ///         premium-status bonuses (none of these buffs have an identified slot in Fenrir yet -- see
+    ///         <see cref="PvpKillContributionPointCalculator" />/<see cref="PvpKillExperienceCalculator" />, which
+    ///         accept them as parameters for when they do). The Regular-War-host CP override, including its War
+    ///         Point/Blood Point grants, is fully wired (see <see cref="ApplyRegularWarCpOverride" />).
     ///     </para>
     ///     <para>
     ///         <paramref name="isStunTrigger" /> is the "stun vs. not" collapse of the legacy's three-value
@@ -233,10 +256,13 @@ public sealed partial class Zone
     /// </summary>
     /// <remarks>
     ///     Legacy additionally bypasses this whole award path during the Regular War RvR event
-    ///     (<c>mGAME.mCheckZone049TypeServer</c>) -- that event doesn't exist as live Fenrir zone state yet, so
-    ///     an enemy-tribe kill in a (currently unmodeled) Regular-War-host zone still grants this bonus here.
-    ///     Only the tower term itself is reproduced: the other additive CP modifiers legacy folds into the
-    ///     same <c>tCPAddNum1</c> accumulator are handled separately by
+    ///     (<c>mGAME.mCheckZone049TypeServer</c>). <see cref="regularWarActiveMapTracker" /> now exposes that
+    ///     state to <see cref="Zone" /> (see <see cref="ApplyRegularWarCpOverride" />), but this specific bypass
+    ///     was outside the source contract this method's own gap note was written from -- not applying it here
+    ///     is still a documented gap, no longer because the state is unavailable, but because reproducing the
+    ///     bypass itself needs its own separately-cited behavior contract. Only the tower term itself is
+    ///     reproduced: the other additive CP modifiers legacy folds into the same <c>tCPAddNum1</c> accumulator
+    ///     are handled separately by
     ///     <see cref="ApplyPvpKillContributionPointFormula" />/<see cref="PvpKillContributionPointCalculator" />.
     /// </remarks>
     private void ApplyTowerCpForPvpBonus(PlayerRuntimeState attackerState)
@@ -247,13 +273,22 @@ public sealed partial class Zone
     }
 
     /// <summary>
-    ///     CP-formula grant (step 1/6 of the source contract) and its FFA-335 override (step 5) --
-    ///     <see cref="PvpKillContributionPointCalculator" /> owns every constant/formula piece; this method only
-    ///     resolves which path applies and performs the actual grant through <see cref="GrantContributionPoints" />.
+    ///     CP-formula grant (step 1/6 of the source contract) and its two dedicated flat-amount overrides
+    ///     (Regular-War-host and FFA-335, step 5) -- <see cref="PvpKillContributionPointCalculator" /> owns every
+    ///     constant/formula piece; this method only resolves which path applies and performs the actual grant
+    ///     through <see cref="GrantContributionPoints" />.
     /// </summary>
     private void ApplyPvpKillContributionPointFormula(PlayerRuntimeState attackerState,
         PlayerRuntimeState defenderState, PvpKillZoneRewardProfile profile)
     {
+        // Mutually exclusive with the FFA-335 branch below by construction: MapId can never equal both
+        // PvpKillRewardZoneCatalog.FfaMapNumber and one of RegularWarMapCatalog's 11 configured maps.
+        if (regularWarActiveMapTracker?.IsBattleInProgress(MapId) == true)
+        {
+            ApplyRegularWarCpOverride(attackerState, defenderState);
+            return; // always suppresses the generic grant below for this kill, same as the FFA branch does.
+        }
+
         if (MapId == PvpKillRewardZoneCatalog.FfaMapNumber)
         {
             // Own independent 2-minute same-pair cooldown, separate from the C05 tracker above -- always
@@ -287,6 +322,46 @@ public sealed partial class Zone
 
         // Double-kill-charge top-up (a second helping of the same computed amount, consuming one charge) is
         // deliberately not modeled: no buff slot for a "double-kill charge" is identified in Fenrir yet.
+    }
+
+    /// <summary>
+    ///     Regular-War-host flat CP/War Point/Blood Point kill-reward override (<c>RegularWar_ProcessKillReward</c>,
+    ///     S07_MyGame03.cpp:2402-2457): fires only while <see cref="regularWarActiveMapTracker" /> reports this
+    ///     zone's Regular War schedule as actively in its capture/score window
+    ///     (<see cref="Fenrir.Application.Game.Domain.World.ZoneWar.RegularWarPhase.Active" />). Its only caller
+    ///     already guarantees attacker/defender are non-null, distinct, and resolved from <see cref="_players" />
+    ///     -- which, by construction (see <see cref="HandleEnter" />), means both are already fully entered and
+    ///     "ready," matching the source contract's ready-state precondition without a separate flag to check.
+    ///     Fenrir also has no bounded per-session slot array to range-check (<see cref="_players" /> is keyed by
+    ///     <see cref="PlayerRuntimeState.CharacterId" />, not a fixed 0-999 slot index), so the source contract's
+    ///     slot-range guard has no unmodeled Fenrir equivalent to reproduce.
+    /// </summary>
+    /// <remarks>
+    ///     War Point and Blood Point/DS Point are now granted here via <see cref="GrantWarPoints" />/
+    ///     <see cref="GrantBloodPoints" /> (previously undeliverable: <see cref="PlayerRuntimeState" /> had no
+    ///     backing counter for either currency -- the wire protocol already reserved <c>AvatarInfo.WarPoint</c>/
+    ///     <c>AvatarInfo.BloodCoin</c>, but <c>AvatarInfoTemplates</c> still hardcodes both to 0, since neither is
+    ///     hydrated from a persisted source yet -- see <see cref="PlayerRuntimeState.WarPoint" />'s own remarks).
+    ///     <see cref="PvpKillContributionPointCalculator.RegularWarOverrideWarPointAmount" />/
+    ///     <see cref="PvpKillContributionPointCalculator.RegularWarOverrideBloodPointAmount" /> are the confirmed
+    ///     +2/+2 legacy amounts. Per the source contract, both grants are unconditional -- never gated by the CP
+    ///     cap-clamp below, and (unlike the CP grant) not re-clamped by <see cref="PvpKillContributionPointCalculator.ClampGrant" />
+    ///     either, since no comparable War Point/Blood Point cap was ever given by that contract.
+    /// </remarks>
+    private void ApplyRegularWarCpOverride(PlayerRuntimeState attackerState, PlayerRuntimeState defenderState)
+    {
+        if (!_regularWarCpOverrideCooldown.TryRegisterKill(attackerState.CharacterId, defenderState.CharacterId,
+                DateTime.UtcNow, PvpKillContributionPointCalculator.FlatOverrideCooldown))
+            return;
+
+        var granted = PvpKillContributionPointCalculator.ClampGrant(attackerState.ContributionPoints,
+            PvpKillContributionPointCalculator.RegularWarOverrideFlatCpAmount,
+            PvpKillContributionPointCalculator.PlaceholderHardCap);
+        GrantContributionPoints(attackerState.CharacterId, granted);
+
+        GrantWarPoints(attackerState.CharacterId, PvpKillContributionPointCalculator.RegularWarOverrideWarPointAmount);
+        GrantBloodPoints(attackerState.CharacterId,
+            PvpKillContributionPointCalculator.RegularWarOverrideBloodPointAmount);
     }
 
     /// <summary>
@@ -353,6 +428,54 @@ public sealed partial class Zone
 
         state.ContributionPoints = Math.Max(0, state.ContributionPoints + amount);
         state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
+    }
+
+    /// <summary>
+    ///     War Point grant -- shared by <see cref="ApplyRegularWarCpOverride" /> (<c>RegularWar_AddWarPoint</c>,
+    ///     <c>Server/ts25zone/S07_MyGame03.cpp:2453</c>) and <c>MonsterSpawnScheduler</c>'s boss/event drop tier
+    ///     (<c>World.Loot.BossEventDropResolver</c>, identifiers 746/9001) -- the first two callers of what had
+    ///     been, until now, an entirely unmodeled currency (no backing counter existed on
+    ///     <see cref="PlayerRuntimeState" />). Pushes a single <see cref="WarPointStatSort" />-coded
+    ///     <c>AvatarStatUpdateResponse</c> to the granted character's own client only, never AOI-broadcast --
+    ///     matching every other <c>AvatarStatUpdateResponse</c> emission in this codebase
+    ///     (<c>DrinkBottleHandler</c>/<c>RankBuffHandler</c>/<c>PlaytimeBuffHandler</c>).
+    /// </summary>
+    public void GrantWarPoints(int characterId, int amount)
+    {
+        if (amount == 0 || !_players.TryGetValue(characterId, out var state))
+            return;
+
+        state.WarPoint += amount;
+        state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
+        state.Session.Send(new AvatarStatUpdateResponse
+            { Sort = WarPointStatSort, Value = state.WarPoint, Value2 = 0 });
+    }
+
+    /// <summary>
+    ///     DS/Blood Point grant (legacy <c>aBloodCoin</c>) -- <c>SendDSPoint</c>
+    ///     (<c>Server/ts25zone/S07_MyGame03.cpp:2354-2361</c>): increments <c>aBloodCoin</c>, pushes
+    ///     <see cref="BloodPointAvatarChangeInfoSort" /> to the granted character's own client only -- a single
+    ///     <c>AvatarStateFlagResponse</c> send, NOT the AOI-wide <see cref="BroadcastAvatarStateFlag" /> fan-out
+    ///     every other sort on that packet type in this codebase uses; "Send", not "Broadcast", matches the
+    ///     legacy function's own name and this behavior's own source contract ("pushed to the killer's own
+    ///     client").
+    /// </summary>
+    public void GrantBloodPoints(int characterId, int amount)
+    {
+        if (amount == 0 || !_players.TryGetValue(characterId, out var state))
+            return;
+
+        state.BloodCoin += amount;
+        state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
+        state.Session.Send(new AvatarStateFlagResponse
+        {
+            ServerIndex = state.CharacterId,
+            UniqueNumber = state.UniqueNumber,
+            Sort = BloodPointAvatarChangeInfoSort,
+            Value01 = state.BloodCoin,
+            Value02 = 0,
+            Value03 = 0
+        });
     }
 
     /// <summary>

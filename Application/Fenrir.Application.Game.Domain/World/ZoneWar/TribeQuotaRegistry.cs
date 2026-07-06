@@ -78,7 +78,10 @@ public sealed class TribeQuotaRegistry
     /// <summary>
     ///     Every recorded connection that has not yet reached <see cref="ZoneSessionState.InWorld" /> and was
     ///     registered at least <paramref name="idleTimeout" /> ago as of <paramref name="nowUtc" /> -- the
-    ///     abandoned-registration set <see cref="TempRegistrationIdleSweep" /> forcibly disconnects.
+    ///     abandoned-registration set <see cref="TempRegistrationIdleSweep" /> forcibly disconnects. Reaching
+    ///     op12 (EnterWorldRequest) alone does not exclude a connection from this scan -- only op13
+    ///     (ZoneReadyRequest) flips <see cref="ZoneSessionState" /> to InWorld; see
+    ///     <see cref="TempRegistrationIdleSweep" />'s own remarks for the verified citation.
     /// </summary>
     public IReadOnlyList<TribeQuotaEntry> SnapshotIdle(TimeSpan idleTimeout, DateTimeOffset nowUtc)
     {

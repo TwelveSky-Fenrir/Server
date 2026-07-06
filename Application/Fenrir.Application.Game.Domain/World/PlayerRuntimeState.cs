@@ -98,6 +98,25 @@ public sealed partial class PlayerRuntimeState
     public int TeacherPoint { get; set; }
 
     /// <summary>
+    ///     War Point stat -- wire-exposed via <c>AvatarInfo.WarPoint</c> (still always sent as 0 from
+    ///     <c>AvatarInfoTemplates</c>, since this field isn't hydrated from a persisted source at zone entry
+    ///     yet). Granted only via <see cref="Zone.GrantWarPoints" /> -- the Regular-War-host kill-reward override
+    ///     (<c>Zone.ApplyRegularWarCpOverride</c>) and the boss/event monster-drop tier
+    ///     (<c>World.Loot.BossEventDropResolver</c>, identifiers 746/9001). Not yet persisted: no
+    ///     <c>game.Characters</c> column/repository DTO carries this field today, so it resets to 0 on every
+    ///     zone (re)entry until a follow-up adds one -- same "not modeled" posture
+    ///     <c>World.Npcs.NpcShopPolicy</c>'s own remarks describe for the separate WarPoint-shop branch.
+    /// </summary>
+    public int WarPoint { get; set; }
+
+    /// <summary>
+    ///     DS/Blood Point stat (legacy <c>aBloodCoin</c>) -- wire-exposed via <c>AvatarInfo.BloodCoin</c> (same
+    ///     "always sent as 0, not yet persisted" posture as <see cref="WarPoint" />). Granted only via
+    ///     <see cref="Zone.GrantBloodPoints" />.
+    /// </summary>
+    public int BloodCoin { get; set; }
+
+    /// <summary>
     ///     Cached output of <see cref="StatCalculator.ComputeEffectiveStats" /> -- null until first computed.
     ///     Recompute only on an equipment/buff/level/title/halo change event, never once per tick.
     /// </summary>

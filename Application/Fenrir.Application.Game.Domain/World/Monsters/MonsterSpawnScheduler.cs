@@ -49,11 +49,21 @@ internal sealed class MonsterZoneSpawnState
 ///         (<see cref="RollRespawnTicks" />'s monster-746 fixed cooldown, and <see cref="MonsterBossRespawnTracker" />'s
 ///         disk-persisted deadline for the 5 monsters 564-568) and the tribe/monster-symbol "Holy Stone" report
 ///         on kill (<see cref="ProcessDeath" />). Not ported: <c>SummonBossMonster</c> (a separate boss-table
-///         state machine) and <c>SummonGuard</c>/<c>SummonTribeSymbol</c> (hardcoded per-tribe-territory
-///         coordinates that depend on an unmodeled territory-ownership system) -- both summon their monsters
-///         outside <c>world.MonsterSpawnRegions</c> entirely, so neither is reachable from this scheduler's own
-///         per-region pool. The dungeon <c>mNumber</c>-forced-to-20 instance-population override is also not
-///         ported: it depends on a dungeon/instance flag this schema does not catalog on <c>world.Zones</c> yet.
+///         state machine, <c>Server/ts25zone/S10_MySummon.cpp:1066-1216</c>) and <c>SummonGuard</c>/<c>SummonTribeSymbol</c>
+///         (hardcoded per-tribe-territory coordinates that depend on an unmodeled territory-ownership system) --
+///         both summon their monsters outside <c>world.MonsterSpawnRegions</c> entirely, so neither is reachable
+///         from this scheduler's own per-region pool. The dungeon <c>mNumber</c>-forced-to-20 instance-population
+///         override (<c>Server/ts25zone/S10_MySummon.cpp:561-573</c>: dungeon zones requesting 5-19 copies of a
+///         monster with ID &lt; 500 get bumped to 20) is also not ported: it depends on a dungeon/instance flag
+///         this schema does not catalog on <c>world.Zones</c> yet. Since boss-sourced rows
+///         (<c>Z0NN_SUMMONBOSSMONSTER.WREGION</c>) still ride in this same per-region pool rather than a
+///         separate boss table, the boss-file-specific load-time adjustments legacy applies before
+///         <c>SummonBossMonster</c> ever runs -- silently dropping the last row of an odd-count boss file, and
+///         stamping a shared "last summon" timestamp only when the boss file yielded at least one row
+///         (<c>Server/ts25zone/S10_MySummon.cpp:485-492,600-610</c>) -- are deferred alongside
+///         <c>SummonBossMonster</c> itself, since neither has an observable effect without that state machine's
+///         own port. <see cref="RegularMonsterTableCapacity" />'s overflow discard, below, is the one WREGION
+///         load-time side effect from that same range this scheduler does reproduce today.
 ///     </para>
 ///     <para>
 ///         <paramref name="zoneEventBroadcaster" /> is <see cref="Lazy{T}" />, not a direct reference, because
@@ -82,6 +92,36 @@ public sealed class MonsterSpawnScheduler(
     private readonly Func<Random> _randomFactory = randomFactory ?? (static () => new Random());
 
     private readonly ConcurrentDictionary<short, MonsterZoneSpawnState> _stateByZone = new();
+
+    /// <summary>
+    ///     "Demon Lord" (<see cref="BossEventDropResolver.DemonLordMonsterId" />) process-wide kill tally --
+    ///     legacy's own function-local static counter (<c>Server/ts25zone/S07_MyGame05.cpp:2356-2394</c>), shared
+    ///     across every zone/instance of this monster and every killer server-process-wide, never reset except by
+    ///     a process restart. This scheduler is itself the one process-wide DI singleton every zone shares (see
+    ///     class remarks), so a plain instance field here has the exact same lifetime/sharing semantics as the
+    ///     legacy static -- incremented via <see cref="Interlocked.Increment(ref int)" /> since different zones'
+    ///     kills of this monster can race each other on separate tick threads.
+    /// </summary>
+    private int _demonLordKillTally;
+
+    /// <summary>
+    ///     Legacy's <c>END_NORMAL_MONSTER_OBJECT_NUM</c> (<c>Server/ts25zone/S01_MainApplication.cpp:38-57</c>,
+    ///     per <c>ServerDocs/12_ts25zone/21_MyWorld_MySummon_Navmesh_Spawn.md</c> &#167;3.3): the running total of
+    ///     every <c>world.MonsterSpawnRegions</c> row's slot count that <c>LoadRegionInfo_1</c> checks against
+    ///     before committing a zone's spawn table, discarding the WHOLE table back to empty rather than
+    ///     truncating it the moment the total crosses this ceiling (<c>Server/ts25zone/S10_MySummon.cpp:575-580</c>).
+    ///     Legacy additionally resizes this ceiling per physical server number at boot -- doubled for the five
+    ///     "_FIX" dungeon variants (39/144/145/313/74), collapsed to 1000 for instance-zone shards (241-330), to
+    ///     1 for FFA maps (<c>Server/ts25zone/S02_MyServer.cpp:140-227</c>) -- which Fenrir does not model (no
+    ///     equivalent per-shard object-pool resizing concept exists here), so this is always the un-resized base
+    ///     default. Applied to a zone's whole combined spawn-region pool rather than a "regular-monster-only"
+    ///     subset, because <see cref="BuildState" /> -- like the rest of this scheduler, see its own class
+    ///     remarks -- does not separate boss-sourced rows (<c>Z0NN_SUMMONBOSSMONSTER.WREGION</c>) into a
+    ///     distinct table the way legacy's <c>LoadRegionInfo_2</c> does; every live zone's seeded row total sits
+    ///     nowhere near this ceiling, so the discard branch below is expected to be dead in steady state, same
+    ///     as legacy's own experience of the check.
+    /// </summary>
+    private const int RegularMonsterTableCapacity = 3400;
 
     public void Simulate(Zone zone, int legacyTicksElapsed)
     {
@@ -125,34 +165,46 @@ public sealed class MonsterSpawnScheduler(
             ? zoneDef.MonsterSpawnRegions
             : [];
 
-        var slots = new List<MonsterSpawnSlot>();
-        var nextServerIndex = 1;
-        var now = DateTime.UtcNow;
+        var resolved = new List<(MonsterSpawnRegionRowDto Region, MonsterRowDto Monster)>();
+        var totalRequested = 0;
         foreach (var region in regions)
         {
             if (region.MonsterId is not { } monsterId ||
                 !worldData.MonstersById.TryGetValue(monsterId, out var monsterDefinition))
                 continue; // the cache is already filtered of these (WorldDataFilterStats) -- defensive only
 
-            var slotCount = Math.Max(0, region.Number);
-            for (var i = 0; i < slotCount; i++)
-            {
-                var slot = new MonsterSpawnSlot
-                {
-                    Region = region,
-                    Monster = monsterDefinition.Monster,
-                    ServerIndex = nextServerIndex++
-                };
-
-                // A restart must resume a persisted boss's cooldown instead of popping it back in at tick 1 --
-                // see MonsterBossRespawnTracker's own remarks.
-                if (IsPersistedBossMonster(monsterId) && bossRespawnTracker is { } tracker &&
-                    tracker.TryGetNextSpawnUtc(region.MonsterSpawnRegionId, out var dueAtUtc))
-                    slot.RespawnTicksRemaining = SimulationClock.ToWholeLegacyTicks(dueAtUtc - now);
-
-                slots.Add(slot);
-            }
+            resolved.Add((region, monsterDefinition.Monster));
+            totalRequested += Math.Max(0, region.Number);
         }
+
+        var slots = new List<MonsterSpawnSlot>();
+        var nextServerIndex = 1;
+        var now = DateTime.UtcNow;
+
+        // RegularMonsterTableCapacity overflow discards the whole zone's table rather than truncating it --
+        // see that constant's own remarks.
+        if (totalRequested <= RegularMonsterTableCapacity)
+            foreach (var (region, monster) in resolved)
+            {
+                var slotCount = Math.Max(0, region.Number);
+                for (var i = 0; i < slotCount; i++)
+                {
+                    var slot = new MonsterSpawnSlot
+                    {
+                        Region = region,
+                        Monster = monster,
+                        ServerIndex = nextServerIndex++
+                    };
+
+                    // A restart must resume a persisted boss's cooldown instead of popping it back in at tick 1 --
+                    // see MonsterBossRespawnTracker's own remarks.
+                    if (IsPersistedBossMonster(monster.MonsterId) && bossRespawnTracker is { } tracker &&
+                        tracker.TryGetNextSpawnUtc(region.MonsterSpawnRegionId, out var dueAtUtc))
+                        slot.RespawnTicksRemaining = SimulationClock.ToWholeLegacyTicks(dueAtUtc - now);
+
+                    slots.Add(slot);
+                }
+            }
 
         var random = _randomFactory();
         return new MonsterZoneSpawnState
@@ -282,10 +334,37 @@ public sealed class MonsterSpawnScheduler(
             killer.QuestTargetPhase, killer.QuestKillCounter);
 
         var luck = (killer.Stats?.Luck ?? 0) * 10;
-        var result = state.DropRoller.Roll(monsterDefinition, killer.Level, killer.Tribe, luck, killerQuest,
-            KillerHasItem);
 
-        if (result.Money is { } amount)
+        // Boss/event drop tier (BossEventDropResolver, Server/ts25zone/S07_MyGame05.cpp:2333-2662) resolves
+        // first, immediately before the generic pipeline -- see its own remarks and MonsterDropRoller's class
+        // remarks for the ordering this ports. BossDropOutcome.None (a no-op) for every monster id outside its
+        // fixed set, so this is dead weight for the overwhelming majority of kills.
+        var demonLordKillTally = monster.Template.MonsterId == BossEventDropResolver.DemonLordMonsterId
+            ? Interlocked.Increment(ref _demonLordKillTally)
+            : 0;
+        var bossOutcome = BossEventDropResolver.Resolve(monster.Template.MonsterId, demonLordKillTally, state.Random,
+            worldData);
+
+        ApplyBossDropSideEffects(zone, killer, bossOutcome);
+
+        long? money;
+        IReadOnlyList<DroppedItem> genericItems;
+        if (bossOutcome.SkipGenericTiers)
+        {
+            // Several identifiers (287, 564-568, 1407) `return` before ever reaching DROP_MONEY in the legacy
+            // source -- the whole generic pipeline, including money, must not run for this kill.
+            money = null;
+            genericItems = [];
+        }
+        else
+        {
+            var result = state.DropRoller.Roll(monsterDefinition, killer.Level, killer.Tribe, luck, killerQuest,
+                KillerHasItem);
+            money = result.Money;
+            genericItems = result.Items;
+        }
+
+        if (money is { } amount)
         {
             zone.QueueMoneyGrant(killer.CharacterId, amount);
 
@@ -294,16 +373,43 @@ public sealed class MonsterSpawnScheduler(
             zone.CreditMonsterKillTribeTax(killer.Tribe, amount);
         }
 
-        if (result.Items.Count == 0)
+        foreach (var publicItem in bossOutcome.PublicItems)
+            // Ownerless/public loot (identifier 576's Labyrinth Key): empty master/party name makes it
+            // immediately claimable by anyone (GroundItemEntity.IsClaimableBy rule 3), unlike every other drop
+            // in this method which is attributed to the killer below.
+            zone.SpawnGroundItem(publicItem.ItemId, publicItem.Quantity, monster.PosX, monster.PosY, monster.PosZ,
+                "", "", 0, monster.InstanceId);
+
+        if (bossOutcome.Items.Count == 0 && genericItems.Count == 0)
             return;
 
         var (partyName, dropSort) = ResolvePartyDrop(zone, killer, partyMemberIds);
-        foreach (var item in result.Items)
+        foreach (var item in bossOutcome.Items.Concat(genericItems))
             // Zone-241 "LOD" personal-dungeon loot tag (Server/ts25zone/S07_MyGame03.cpp:599): a dying
             // personal boss carries its own instance id (Zone.SummonPersonalBoss); every ordinary monster's
             // InstanceId is null, so this is a no-op tag for every non-personal-instance drop.
             zone.SpawnGroundItem(item.ItemId, item.Quantity, monster.PosX, monster.PosY, monster.PosZ,
                 killer.Name, partyName, dropSort, monster.InstanceId);
+    }
+
+    /// <summary>
+    ///     Applies <see cref="BossEventDropResolver" />'s CP/War Point/Blood Point grants and the identifier-1407
+    ///     kill announcement -- the parts of its outcome that need <see cref="Zone" /> I/O rather than plain data,
+    ///     which is why they aren't folded into the (pure) resolver itself.
+    /// </summary>
+    private static void ApplyBossDropSideEffects(Zone zone, PlayerRuntimeState killer, BossDropOutcome outcome)
+    {
+        if (outcome.ContributionPointsGranted != 0)
+            zone.GrantContributionPoints(killer.CharacterId, outcome.ContributionPointsGranted);
+
+        if (outcome.WarPointsGranted != 0)
+            zone.GrantWarPoints(killer.CharacterId, outcome.WarPointsGranted);
+
+        if (outcome.BloodPointsGranted != 0)
+            zone.GrantBloodPoints(killer.CharacterId, outcome.BloodPointsGranted);
+
+        if (outcome.AnnounceEliteBossDefeat)
+            zone.AnnounceEliteBossDefeated(killer.Tribe, killer.Name);
     }
 
     /// <summary>

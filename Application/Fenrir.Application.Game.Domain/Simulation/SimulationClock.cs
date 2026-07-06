@@ -18,6 +18,14 @@ public static class SimulationClock
     /// <summary>Monster respawn-scan cadence: every 20 legacy ticks (~10 s). Consumed by MonsterSpawnScheduler.</summary>
     public const int MonsterRespawnScanLegacyTicks = 20;
 
+    /// <summary>
+    ///     Monster proactive-aggro detection-check throttle (<c>mCheckDetectEnemyTime</c>,
+    ///     <c>S07_MyGame05.cpp:127-131</c>): a detection scan may run at most once every 2 legacy ticks (~1 s),
+    ///     restarting on every attempted check -- successful or not, not just on an actual acquisition. Consumed
+    ///     by MonsterAiSystem.
+    /// </summary>
+    public const int MonsterDetectionThrottleLegacyTicks = 2;
+
     /// <summary>Pet activity decay cadence: -1 every 60 legacy ticks (30 s). Consumed by PetActivitySystem.</summary>
     public const int PetActivityDecayLegacyTicks = 60;
 

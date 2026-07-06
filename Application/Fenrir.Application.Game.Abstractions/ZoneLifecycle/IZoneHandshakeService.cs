@@ -5,6 +5,18 @@ namespace Fenrir.Application.Game.Abstractions.ZoneLifecycle;
 
 public enum ZoneHandshakeOutcome
 {
+    /// <summary>
+    ///     The session ticket the LoginServer minted for this AccountId (ADR-0005) is absent, expired, or
+    ///     scoped to a different shard than the one it is being consumed against -- the closest structural
+    ///     analog to legacy's <c>RegisterUserForZone_00</c> failure (account not currently tracked as logged
+    ///     in at all, or tracked but not in the "told to enter a zone" state;
+    ///     Server/ts25playuser/S07_MyGame01.cpp:1049-1060). Legacy answers that failure with a silent
+    ///     <c>Quit()</c> and zero response bytes (Server/ts25zone/S04_MyWork02.cpp:728-733) -- never the
+    ///     explicit response it reserves for a quota-full/server-state-gate rejection (see
+    ///     <see cref="QuotaFull" />). Resolved product-decision boundary: this outcome now carries the same
+    ///     silent-disconnect posture forward, rather than being grouped with <see cref="QuotaFull" />'s
+    ///     explicit, open-connection response -- no response packet, the connection is simply dropped.
+    /// </summary>
     Rejected,
 
     Accepted,
@@ -29,9 +41,10 @@ public enum ZoneHandshakeOutcome
 
     /// <summary>
     ///     The declared tribe's currently-temp-registered population already meets this shard's configured
-    ///     tribe-quota threshold. A generic rejection response is sent -- the same indicator used for every
-    ///     rejection reachable through this path (see <see cref="Rejected" />) -- and the connection stays open,
-    ///     retry-able.
+    ///     tribe-quota threshold. Mirrors legacy's own quota-full/server-state-gate branches
+    ///     (Server/ts25zone/S04_MyWork02.cpp:630-635, :678-683) -- the one failure class on this packet legacy
+    ///     answers with an explicit response instead of a silent disconnect: a generic Result=1 rejection
+    ///     response is sent and the connection stays open, retry-able.
     /// </summary>
     QuotaFull
 }

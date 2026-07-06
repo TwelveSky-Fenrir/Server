@@ -225,6 +225,7 @@ public class WorldDataCacheBuilderTests
     [InlineData("world.Items")]
     [InlineData("world.Monsters")]
     [InlineData("world.Zones")]
+    [InlineData("world.ZonePortals")]
     [InlineData("world.Levels")]
     [InlineData("world.Skills")]
     public void Build_Throws_WhenACriticalDatasetIsEmpty(string dataset)
@@ -234,6 +235,7 @@ public class WorldDataCacheBuilderTests
             "world.Items" => MinimalRows() with { Items = [] },
             "world.Monsters" => MinimalRows() with { Monsters = [] },
             "world.Zones" => MinimalRows() with { Zones = [] },
+            "world.ZonePortals" => MinimalRows() with { ZonePortals = [] },
             "world.Levels" => MinimalRows() with { Levels = [] },
             "world.Skills" => MinimalRows() with { Skills = [] },
             _ => throw new ArgumentOutOfRangeException(nameof(dataset))

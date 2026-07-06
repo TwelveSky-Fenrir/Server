@@ -10,6 +10,7 @@ using Fenrir.Application.Game.Domain.Social.Duel;
 using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.WorldState;
+using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Tests.World.WorldState;
 using Fenrir.Data.Abstractions.Runtime;
@@ -37,14 +38,16 @@ internal static class ZoneTestKit
         KillCooldownTracker? killCooldownTracker = null, TowerWarState? towerWar = null,
         WorldStateService? worldState = null, PartyRegistry? partyRegistry = null,
         DuelRegistry? duelRegistry = null, ICharacterShardLocationRepository? characterShardLocations = null,
-        TribeBankTaxAccumulator? tribeBankTax = null)
+        TribeBankTaxAccumulator? tribeBankTax = null,
+        RegularWarActiveMapTracker? regularWarActiveMapTracker = null)
     {
         var opts = options ?? Options();
         return new Zone(mapId, opts, new MovementRules(Microsoft.Extensions.Options.Options.Create(opts)),
             dirtyTracker ?? new DirtyTracker<int>(), simulationSystems ?? [], NullLogger<Zone>.Instance,
             worldData ?? EmptyWorldData(), randomSource, killCooldownTracker: killCooldownTracker,
             towerWar: towerWar, worldState: worldState, partyRegistry: partyRegistry, duelRegistry: duelRegistry,
-            characterShardLocations: characterShardLocations, tribeBankTax: tribeBankTax);
+            characterShardLocations: characterShardLocations, tribeBankTax: tribeBankTax,
+            regularWarActiveMapTracker: regularWarActiveMapTracker);
     }
 
     public static (ZoneClientSession Session, FakeDuplexPipe Pipe) CreateSession(long sessionId)

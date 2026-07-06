@@ -79,7 +79,10 @@ public sealed class ZoneHandshakeService(
 
         var consumed = await tickets.ConsumeAsync(accountId, cancellationToken);
 
-        // Refuse absent/expired/wrong-shard tickets identically (Result=1) so we don't leak which failure occurred.
+        // Refuse absent/expired/wrong-shard tickets identically -- the closest structural analog to legacy's
+        // RegisterUserForZone_00 failure, so ZoneHandshakeHandler now answers this with the same silent-drop
+        // posture legacy uses there (see ZoneHandshakeOutcome.Rejected's own remarks), not QuotaFull's explicit
+        // Result=1.
         if (consumed is null || consumed.ShardId != options.Value.ShardId)
         {
             logger?.LogWarning(

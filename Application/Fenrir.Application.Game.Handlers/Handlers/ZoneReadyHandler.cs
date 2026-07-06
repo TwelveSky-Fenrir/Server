@@ -21,6 +21,14 @@ namespace Fenrir.Application.Game.Handlers.Handlers;
 ///     it activates the moment anything re-admits op13 later in a session's life, exactly like legacy's own
 ///     zone-transfer resend. Same "real but not yet reachable" posture as several other guards in
 ///     <see cref="PlayerRuntimeState" /> (e.g. MissionJoinWar).
+///
+///     This handler never sends any response packet, on any branch -- matching Server/ts25zone/
+///     S04_MyWork02.cpp:1213-1291, where CLIENT_OK_FOR_ZONE_SEND has no outbound send anywhere in its body.
+///     In particular, the avatar snapshot (EnterWorldResponse) and world/tribe broadcast
+///     (WorldSnapshotResponse) are NOT sent from here: both already went out, unconditionally, inside the
+///     op12 (EnterWorldRequest) handler that preceded this one -- see EnterWorldService's own remarks at its
+///     two SendRaw calls. Do not add a send here to "complete the handshake"; that would both duplicate an
+///     already-sent pair and reintroduce the exact op13-gating defect this comment exists to prevent.
 /// </remarks>
 public sealed class ZoneReadyHandler(IZoneReadyService service, ILogger<ZoneReadyHandler>? logger = null)
     : IInlinePacketHandler<ZoneReadyRequest>

@@ -33,7 +33,11 @@ internal static class WorldDataTestRows
             1, 0, 0, 0, 100,
             0, 0, 0, 0, 0, 0,
             0, 0, 0, 0,
-            0, 0, 0, 0, 0,
+            // FollowInfo1/2 (anti-clump pursuer-cap bounds, S10_MySummon.cpp:795) default to a small non-zero
+            // range rather than 0 -- MonsterEntity.Create rolls MonsterEntity.PursuerCapacity from these, and a
+            // 0 cap would make MonsterAiSystem's anti-clump filter refuse every candidate for every test that
+            // doesn't override these fields.
+            0, 0, 0, 5, 5,
             0, 0,
             0, 0, 0, 0, 0, 0,
             0, 0, 0, 0, 0, 0,
@@ -136,7 +140,7 @@ internal static class WorldDataTestRows
             QuestSpeeches = [],
             Levels = [Level(1)],
             Zones = [Zone(1)],
-            ZonePortals = [],
+            ZonePortals = [Portal(1, 0, 1)],
             ZoneSpawnPoints = [],
             ZoneNpcSpawns = [],
             MonsterSpawnRegions = [],

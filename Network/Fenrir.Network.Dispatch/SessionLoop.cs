@@ -9,7 +9,11 @@ using Microsoft.Extensions.Logging;
 namespace Fenrir.Network.Dispatch;
 
 // Any malformed frame/unknown opcode/illegal state/rate-limit breach ends the session — matches the
-// legacy server's own "any violation closes the socket" posture.
+// legacy server's own "any violation closes the socket" posture. An uncaught handler exception is
+// treated the same way (see the dispatch try/catch below): neither ZoneFrameDispatcher nor
+// LoginFrameDispatcher wraps its own MessageDispatcher calls, so this is the one place shared by both
+// servers where such an exception can be caught, logged with full context, and turned into a clean,
+// reason-recorded session teardown instead of an unplanned propagation all the way out of RunAsync.
 public static class SessionLoop
 {
     public static async Task RunAsync(
@@ -123,8 +127,31 @@ public static class SessionLoop
                 return new BufferOutcome(remaining.Start, remaining.End, true);
             }
 
-            await dispatcher.DispatchAsync(frameServer, frameOpcode, framePayload, session, cancellationToken)
-                .ConfigureAwait(false);
+            try
+            {
+                await dispatcher.DispatchAsync(frameServer, frameOpcode, framePayload, session, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                // Cooperative cancellation (server shutdown, or an external Abort() racing this dispatch) is
+                // not a handler fault -- let it propagate so RunAsync's own catch handles it as a clean shutdown.
+                throw;
+            }
+            catch (Exception ex)
+            {
+                // No packet handler is allowed to bring down the whole session loop uncaught. Without this,
+                // the exception would propagate through ZoneFrameDispatcher/LoginFrameDispatcher (neither
+                // wraps its own MessageDispatcher calls) and out of RunAsync itself, surfacing only as a
+                // Debug-level "session ended" log at the connection host with no disconnect-reason recorded
+                // at all -- unlike every other violation in this loop. Treat it the same way: log loudly here,
+                // record a reason, and end the session cleanly instead of letting the stack unwind uncontrolled.
+                logger?.LogError(ex,
+                    "Session {SessionId} ({RemoteEndPoint}): unhandled exception dispatching {Server} opcode {Opcode} -- aborting",
+                    session.SessionId, session.RemoteEndPoint, frameServer, frameOpcode);
+                session.Abort(DisconnectReason.Faulted);
+                return new BufferOutcome(remaining.Start, remaining.End, true);
+            }
         }
     }
 

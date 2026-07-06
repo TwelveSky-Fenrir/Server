@@ -80,6 +80,13 @@ public static class DomainServiceCollectionExtensions
 
         services.AddSingleton<ZoneRegistry>();
 
+        // Domain-owned shared state for "is Regular War (Zone049) currently in its capture/score window on
+        // this map" -- written once per tick by Fenrir.Application.Game.Hosting's RegularWarSchedulerHost, read
+        // by every Zone via ZoneRegistry to gate the Regular-War-host CP/War Point/Blood Point kill-reward
+        // override (Zone.Combat.cs's ApplyRegularWarCpOverride). See RegularWarActiveMapTracker's own remarks
+        // for why this small Domain class -- not RegularWarSchedulerHost itself -- is the bridge.
+        services.AddSingleton<RegularWarActiveMapTracker>();
+
         // Process-wide singletons: a party/duel/trade/friend-ask/mentor-ask negotiation can span multiple Zone actors.
         services.AddSingleton<PartyRegistry>();
         services.AddSingleton<FriendRegistry>();

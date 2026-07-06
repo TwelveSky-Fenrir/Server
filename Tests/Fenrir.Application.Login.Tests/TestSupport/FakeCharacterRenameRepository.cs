@@ -3,7 +3,7 @@ using Fenrir.Data.Abstractions.Characters;
 namespace Fenrir.Application.Login.Tests.TestSupport;
 
 // In-memory stand-in for ICharacterRenameRepository: drives every game.usp_Character_Rename outcome
-// (0/2/102, plus a simulated engine error) without a SQL container.
+// (0/2/102/-1, plus a simulated engine error) without a SQL container.
 internal sealed class FakeCharacterRenameRepository : ICharacterRenameRepository
 {
     private readonly Exception? _fault;
@@ -15,11 +15,16 @@ internal sealed class FakeCharacterRenameRepository : ICharacterRenameRepository
         _fault = fault;
     }
 
-    public (int AccountId, byte Slot, string NewName)? LastCall { get; private set; }
-
-    public ValueTask<int> RenameAsync(int accountId, byte slot, string newName, CancellationToken ct)
+    public (int AccountId, byte Slot, string NewName, byte ItemContainer, byte ItemSlot)? LastCall
     {
-        LastCall = (accountId, slot, newName);
+        get;
+        private set;
+    }
+
+    public ValueTask<int> RenameAndConsumeItemAsync(int accountId, byte slot, string newName, byte itemContainer,
+        byte itemSlot, CancellationToken ct)
+    {
+        LastCall = (accountId, slot, newName, itemContainer, itemSlot);
         return _fault is not null
             ? throw _fault
             : ValueTask.FromResult(_result);

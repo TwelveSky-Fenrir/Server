@@ -32,6 +32,11 @@ public enum LoginOutcome
 ///     <c>usp_AccountSession_ClaimOrSignalKick</c> minted for this login epoch (runtime.AccountSessions), carried
 ///     into the zone-transfer ticket so the game-side handshake can prove it's completing the same login.
 /// </param>
+/// <param name="AccountGrade">
+///     Populated only on <see cref="LoginOutcome.Success" /> -- the account-grade fact read straight off
+///     <c>AuthenticateAccountDto</c> (legacy <c>uUserSort</c>), carried into <c>LoginClientSession.AccountGrade</c>
+///     and from there into the zone-transfer ticket, so the Zone session never has to re-query auth.Accounts for it.
+/// </param>
 public sealed record LoginResult(
     LoginOutcome Outcome,
     int ResultCode,
@@ -41,7 +46,8 @@ public sealed record LoginResult(
     bool RequirePin,
     string PinMask,
     ImmutableArray<CharacterSummaryDto> Characters,
-    Guid? SessionToken = null)
+    Guid? SessionToken = null,
+    short AccountGrade = 0)
 {
     public static LoginResult RateLimitedResult { get; } =
         new(LoginOutcome.RateLimited, 0, "", false, 0, false, "", []);

@@ -506,6 +506,66 @@ public sealed partial class Zone
             changed = true;
         }
 
+        if (command.LodRounds is { } lodRounds)
+        {
+            state.LodRounds = lodRounds;
+            changed = true;
+        }
+
+        if (command.ProtectForRefine is { } protectForRefine)
+        {
+            state.ProtectForRefine = protectForRefine;
+            changed = true;
+        }
+
+        if (command.ProtectForDestroy is { } protectForDestroy)
+        {
+            state.ProtectForDestroy = protectForDestroy;
+            changed = true;
+        }
+
+        if (command.ProtectForCostume is { } protectForCostume)
+        {
+            state.ProtectForCostume = protectForCostume;
+            changed = true;
+        }
+
+        if (command.ProtectForDestroy2 is { } protectForDestroy2)
+        {
+            state.ProtectForDestroy2 = protectForDestroy2;
+            changed = true;
+        }
+
+        if (command.ImproveItemValue is { } improveItemValue)
+        {
+            state.ImproveItemValue = improveItemValue;
+            changed = true;
+        }
+
+        if (command.AddItemValue is { } addItemValue)
+        {
+            state.AddItemValue = addItemValue;
+            changed = true;
+        }
+
+        if (command.HighItemValue is { } highItemValue)
+        {
+            state.HighItemValue = highItemValue;
+            changed = true;
+        }
+
+        if (command.DropItemTime is { } dropItemTime)
+        {
+            state.DropItemTime = dropItemTime;
+            changed = true;
+        }
+
+        if (command.TaiyanKeyTimer is { } taiyanKeyTimer)
+        {
+            state.TaiyanKeyTimer = taiyanKeyTimer;
+            changed = true;
+        }
+
         if (changed)
             state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
 

@@ -3,9 +3,15 @@ using CaeriusNet.Attributes.Dto;
 
 namespace Fenrir.Data.Abstractions.Characters;
 
-/// <summary>RS0 of usp_StarterKit_GetByPreviousTribe -- one row per fixed equip slot, plus the 3 weapon alternatives.</summary>
+/// <summary>
+///     RS0 of usp_StarterKit_GetByPreviousTribe -- one row per fixed equip slot (Amulet/Armor/Gloves/Ring/
+///     Boots, unconditional per-race grants), plus the 3 weapon alternatives. RawWeaponCode is null for the
+///     unconditional grants; for a Weapon row (EquipSlot 7) it holds the raw client-selectable code that must
+///     match CreateAvatarRequest.Weapon before ItemId (the elite weapon) is granted -- see
+///     CreateAvatarService.TryResolveWeaponItemId.
+/// </summary>
 [GenerateDto]
-public sealed partial record StarterKitEquipmentRowDto(byte EquipSlot, int ItemId);
+public sealed partial record StarterKitEquipmentRowDto(byte EquipSlot, int ItemId, byte? RawWeaponCode);
 
 /// <summary>RS1 -- tribe-independent, always the same 4 rows.</summary>
 [GenerateDto]

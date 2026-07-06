@@ -16,6 +16,7 @@ using Fenrir.Network.Serialization.Packets.Shared;
 using Fenrir.Network.Serialization.Packets.Zone;
 using Fenrir.Network.Serialization.Wire;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Services.ZoneLifecycle;
 
@@ -31,6 +32,8 @@ public sealed class EnterWorldService(
     ITribeRepository tribes,
     IFriendRepository friends,
     IMentorRepository mentors,
+    ICharacterShardLocationRepository characterShardLocations,
+    IOptions<GameServerOptions> options,
     ILogger<EnterWorldService> logger) : IEnterWorldService
 {
     public async ValueTask HandleAsync(EnterWorldRequest packet, ZoneClientSession zoneSession,
@@ -114,8 +117,18 @@ public sealed class EnterWorldService(
         var tribeRoleTask = tribes.GetRoleForCharacterAsync(characterId, cancellationToken);
         var friendsTask = friends.GetByCharacterAsync(characterId, cancellationToken);
         var mentorTask = mentors.GetForCharacterAsync(characterId, cancellationToken);
+
+        // Cross-shard character-location directory (runtime.CharacterShardLocation): a same-shard-miss
+        // fallback for whisper/friend-locate/guild-find. Per-connection, once-per-world-entry cost, not a
+        // tick or per-packet hot path, so an extra awaited stored-procedure call here alongside the others is
+        // unremarkable. Intra-shard zone-to-zone handoffs never call this again -- ShardId never changes on a
+        // same-shard hop, and MapId staleness for a character who has since wandered to another map on the
+        // SAME shard is an accepted bound (this directory is a same-shard-miss fallback only).
+        var shardLocationUpsertTask = characterShardLocations.UpsertAsync(characterId, options.Value.ShardId,
+            character.MapId, character.Name, character.Tribe, cancellationToken);
+
         await Task.WhenAll(isMutedTask.AsTask(), guildTask.AsTask(), tribeRoleTask.AsTask(),
-            friendsTask.AsTask(), mentorTask.AsTask());
+            friendsTask.AsTask(), mentorTask.AsTask(), shardLocationUpsertTask.AsTask());
 
         var isMuted = isMutedTask.Result;
         var guildMembership = guildTask.Result;

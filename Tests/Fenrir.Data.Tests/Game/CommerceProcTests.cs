@@ -194,6 +194,44 @@ public class CommerceProcTests
     }
 
     [Fact]
+    public async Task Gift_Enqueue_InsertsAPendingGiftRowAndAMatchingGiftLogRow_AndReturnsTheNewGiftId()
+    {
+        var accountId = await CreateAccountAsync();
+        var itemId = await MinItemIdAsync();
+
+        var giftId = await _gifts.EnqueueAsync(accountId, itemId, 3, 7, CancellationToken.None);
+
+        Assert.Equal((byte)0,
+            await ScalarAsync<byte>($"SELECT Status FROM game.Gifts WHERE GiftId={giftId};"));
+        Assert.Equal(itemId,
+            await ScalarAsync<int>($"SELECT ProductId FROM game.Gifts WHERE GiftId={giftId};"));
+        Assert.Equal(3, await ScalarAsync<int>($"SELECT Quantity FROM game.Gifts WHERE GiftId={giftId};"));
+        Assert.Equal(7, await ScalarAsync<int>($"SELECT Value FROM game.Gifts WHERE GiftId={giftId};"));
+
+        Assert.Equal(1, await ScalarAsync<int>(
+            $"SELECT COUNT(*) FROM game.GiftLog WHERE AccountId={accountId} AND ProductId={itemId} AND Quantity=3 AND Value=7;"));
+
+        var pending = await _gifts.GetPendingByAccountAsync(accountId, CancellationToken.None);
+        Assert.Contains(pending, g => g.GiftId == giftId);
+    }
+
+    [Fact]
+    public async Task Gift_Enqueue_CopiesQuantityAndValueThroughUnvalidated_AndAllowsANullProductId()
+    {
+        // Matches the "mint one gift" contract this is modeled on: no positivity/upper-bound check is
+        // observed anywhere in the legacy shape it was designed after (Server/ts25playuser/S08_MyDB.cpp:331-381,
+        // itself dead code -- see IGiftRepository.EnqueueAsync's remarks), and usp_Gift_Enqueue enforces none
+        // either.
+        var accountId = await CreateAccountAsync();
+
+        var giftId = await _gifts.EnqueueAsync(accountId, null, -5, 0, CancellationToken.None);
+
+        Assert.Equal(1, await ScalarAsync<int>(
+            $"SELECT COUNT(*) FROM game.Gifts WHERE GiftId={giftId} AND ProductId IS NULL;"));
+        Assert.Equal(-5, await ScalarAsync<int>($"SELECT Quantity FROM game.Gifts WHERE GiftId={giftId};"));
+    }
+
+    [Fact]
     public async Task
         OfflineShop_FullLifecycle_OpenRemovesItemsFromInventory_PurchaseCreditsSeller_WithdrawCreditsCharacter()
     {

@@ -173,6 +173,11 @@ public sealed class MonsterAiSystem : ISimulationSystem
             if (!zone.TryGetPlayer(characterId, out var player) || player is null || player.IsDead)
                 continue;
 
+            // Zone-241 "LOD" personal-instance aggro-eligibility filter (Server/ts25zone/S07_MyGame05.cpp:169-177,565):
+            // a tagged personal boss (monster.InstanceId non-null) never considers an avatar outside its own instance.
+            if (monster.InstanceId is { } requiredInstanceId && player.DungeonInstanceId != requiredInstanceId)
+                continue;
+
             if (DistanceSquared(monster.PosX, monster.PosZ, player.PosX, player.PosZ) > detectionRadiusSq)
                 continue;
 

@@ -1,6 +1,8 @@
+using System.Net;
 using Fenrir.Network.Serialization.Packets.Zone;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch;
+using Fenrir.Network.Dispatch.FloodProtection;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Wire;
 using Fenrir.Network.Tests.Sessions;
@@ -20,7 +22,7 @@ public sealed class SessionLoopTests
         var pipe = new FakeDuplexPipe();
         var session = InWorldZoneSession(1, pipe);
         var dispatcher = new RecordingFrameDispatcher();
-        var loopTask = SessionLoop.RunAsync(session, dispatcher, null, CancellationToken.None);
+        var loopTask = SessionLoop.RunAsync(session, dispatcher, null, null, CancellationToken.None);
 
         var frame = BuildClientFrame(HeartbeatRequest.Opcode, HeartbeatRequest.PayloadSize);
         await pipe.PeerToSession.WriteAsync(frame);
@@ -43,7 +45,7 @@ public sealed class SessionLoopTests
         var pipe = new FakeDuplexPipe();
         var session = InWorldZoneSession(2, pipe);
         var dispatcher = new RecordingFrameDispatcher();
-        var loopTask = SessionLoop.RunAsync(session, dispatcher, null, CancellationToken.None);
+        var loopTask = SessionLoop.RunAsync(session, dispatcher, null, null, CancellationToken.None);
 
         var frame = BuildClientFrame(HeartbeatRequest.Opcode, HeartbeatRequest.PayloadSize, 0x40);
 
@@ -74,7 +76,7 @@ public sealed class SessionLoopTests
         var pipe = new FakeDuplexPipe();
         var session = new ZoneClientSession(3, pipe); // Connected, not TicketConsumed
         var dispatcher = new RecordingFrameDispatcher();
-        var loopTask = SessionLoop.RunAsync(session, dispatcher, null, CancellationToken.None);
+        var loopTask = SessionLoop.RunAsync(session, dispatcher, null, null, CancellationToken.None);
 
         // EnterWorld is only allowed once TicketConsumed -> illegal here.
         var frame = BuildClientFrame(EnterWorldRequest.Opcode, EnterWorldRequest.PayloadSize);
@@ -92,7 +94,7 @@ public sealed class SessionLoopTests
         var pipe = new FakeDuplexPipe();
         var session = new ZoneClientSession(4, pipe);
         var dispatcher = new RecordingFrameDispatcher();
-        var loopTask = SessionLoop.RunAsync(session, dispatcher, null, CancellationToken.None);
+        var loopTask = SessionLoop.RunAsync(session, dispatcher, null, null, CancellationToken.None);
 
         // Opcode 250 is unregistered -> FrameDecoder's ProtocolViolationException must be swallowed here.
         var header = new byte[WireHeaderSizes.ClientPacketSize];
@@ -105,13 +107,100 @@ public sealed class SessionLoopTests
         Assert.Equal(DisconnectReason.UnknownOpcode, session.DisconnectReason);
     }
 
+    // Trigger B integration (contract): SessionLoop's own ProtocolViolationException handling is the sole
+    // production call site of IpFloodGuard.RecordProtocolViolationAsync.
+    [Fact]
+    public async Task RunAsync_UnknownOpcode_FloodGuardBelowThreshold_StillAbortsWithUnknownOpcodeAndDoesNotBlock()
+    {
+        var pipe = new FakeDuplexPipe();
+        var remoteEndPoint = new IPEndPoint(IPAddress.Parse("10.0.0.7"), 4000);
+        var session = new ZoneClientSession(7, pipe, remoteEndPoint);
+        var registry = new SessionRegistry();
+        registry.Register(session);
+        var blockedIps = new List<string>();
+        var floodGuard = new IpFloodGuard(40, 30, (ip, _) =>
+        {
+            blockedIps.Add(ip);
+            return ValueTask.CompletedTask;
+        }, registry);
+        var dispatcher = new RecordingFrameDispatcher();
+        var loopTask = SessionLoop.RunAsync(session, dispatcher, null, floodGuard, CancellationToken.None);
+
+        var header = new byte[WireHeaderSizes.ClientPacketSize];
+        header[8] = 250;
+        await pipe.PeerToSession.WriteAsync(header);
+
+        await AwaitLoopAsync(loopTask);
+
+        Assert.Empty(dispatcher.Records);
+        Assert.Equal(DisconnectReason.UnknownOpcode, session.DisconnectReason);
+        Assert.Empty(blockedIps);
+    }
+
+    [Fact]
+    public async Task RunAsync_UnknownOpcode_TripsProtocolViolationThreshold_AbortsWithIpBlockedAndPersistsBlock()
+    {
+        var pipe = new FakeDuplexPipe();
+        var remoteEndPoint = new IPEndPoint(IPAddress.Parse("10.0.0.8"), 4000);
+        var session = new ZoneClientSession(8, pipe, remoteEndPoint);
+        var registry = new SessionRegistry();
+        registry.Register(session);
+        var blockedIps = new List<string>();
+        // Threshold 1: a single violation must already trip it (Trigger B's >= boundary).
+        var floodGuard = new IpFloodGuard(40, 1, (ip, _) =>
+        {
+            blockedIps.Add(ip);
+            return ValueTask.CompletedTask;
+        }, registry);
+        var dispatcher = new RecordingFrameDispatcher();
+        var loopTask = SessionLoop.RunAsync(session, dispatcher, null, floodGuard, CancellationToken.None);
+
+        var header = new byte[WireHeaderSizes.ClientPacketSize];
+        header[8] = 250;
+        await pipe.PeerToSession.WriteAsync(header);
+
+        await AwaitLoopAsync(loopTask);
+
+        Assert.Empty(dispatcher.Records);
+        // The flood block (which aborts every session sharing the IP, this one included) beats SessionLoop's
+        // own subsequent Abort(UnknownOpcode) to the punch -- Abort is idempotent, so IpBlocked sticks.
+        Assert.Equal(DisconnectReason.IpBlocked, session.DisconnectReason);
+        Assert.Equal(["10.0.0.8"], blockedIps);
+    }
+
+    [Fact]
+    public async Task RunAsync_UnknownOpcode_NoRemoteEndPoint_FloodGuardNeverCalled()
+    {
+        var pipe = new FakeDuplexPipe();
+        var session = new ZoneClientSession(9, pipe); // no RemoteEndPoint, e.g. a non-socket-backed transport
+        var registry = new SessionRegistry();
+        var blockedIps = new List<string>();
+        var floodGuard = new IpFloodGuard(40, 1, (ip, _) =>
+        {
+            blockedIps.Add(ip);
+            return ValueTask.CompletedTask;
+        }, registry);
+        var dispatcher = new RecordingFrameDispatcher();
+        var loopTask = SessionLoop.RunAsync(session, dispatcher, null, floodGuard, CancellationToken.None);
+
+        var header = new byte[WireHeaderSizes.ClientPacketSize];
+        header[8] = 250;
+        await pipe.PeerToSession.WriteAsync(header);
+
+        await AwaitLoopAsync(loopTask);
+
+        Assert.Equal(DisconnectReason.UnknownOpcode, session.DisconnectReason);
+        Assert.Empty(blockedIps);
+    }
+
     [Fact]
     public async Task RunAsync_RateLimiterRejects_AbortsWithRateLimitedAndNeverDispatchesThatFrame()
     {
         var pipe = new FakeDuplexPipe();
         var session = InWorldZoneSession(5, pipe);
         var dispatcher = new RecordingFrameDispatcher();
-        var loopTask = SessionLoop.RunAsync(session, dispatcher, new AlwaysRejectRateLimiter(), CancellationToken.None);
+        var loopTask =
+            SessionLoop.RunAsync(session, dispatcher, new AlwaysRejectRateLimiter(), null, CancellationToken.None);
 
         var frame = BuildClientFrame(HeartbeatRequest.Opcode, HeartbeatRequest.PayloadSize);
         await pipe.PeerToSession.WriteAsync(frame);
@@ -128,7 +217,7 @@ public sealed class SessionLoopTests
         var pipe = new FakeDuplexPipe();
         var session = new ZoneClientSession(6, pipe);
         var dispatcher = new RecordingFrameDispatcher();
-        var loopTask = SessionLoop.RunAsync(session, dispatcher, null, CancellationToken.None);
+        var loopTask = SessionLoop.RunAsync(session, dispatcher, null, null, CancellationToken.None);
 
         await pipe.PeerToSession.CompleteAsync();
 

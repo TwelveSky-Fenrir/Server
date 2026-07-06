@@ -4,6 +4,8 @@ using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Pets;
 using Fenrir.Application.Game.Domain.Quests;
 using Fenrir.Application.Game.Domain.Skills;
+using Fenrir.Application.Game.Domain.Social.Party;
+using Fenrir.Application.Game.Domain.Stats;
 using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.Loot;
@@ -20,6 +22,7 @@ public sealed class GenericActionService(
     ICharacterRepository characters,
     WorldDataCache worldData,
     QuestCatalog questCatalog,
+    PartyRegistry partyRegistry,
     ILogger<GenericActionService> logger)
     : IGenericActionService
 {
@@ -57,6 +60,35 @@ public sealed class GenericActionService(
 
         if (resolved.Outcome == ContainerMatrix.MoveOutcome.NoOp)
             return GenericActionResult.Succeeded;
+
+        // tSort 210 (Inventory->Equip) only: CheckPossibleEquipItem's tribe/slot-tag/level/rebirth/final-category
+        // gate. Not applied to 208/213 -- neither ordinary inventory rearrange nor unequip re-checks equip
+        // legality in the legacy (Server/ts25zone/S04_MyWork05.cpp:1234-1306 is the InventoryToEquip-only call
+        // site). resolved.Succeeded already guarantees sourceStack is non-null here.
+        if (toContainer == ContainerMatrix.Equipment)
+        {
+            EquipItemValidationGate.EquipCandidate? candidate = null;
+            if (worldData.ItemsById.TryGetValue(sourceStack!.Value.ItemId, out var equipDefinition))
+            {
+                var equipRow = equipDefinition.Item;
+                candidate = new EquipItemValidationGate.EquipCandidate(equipRow.ItemId, equipRow.EquipInfo1,
+                    equipRow.EquipInfo2, equipRow.LevelLimit, equipRow.MartialLevelLimit, equipRow.CheckSetItem,
+                    equipRow.Sort);
+            }
+
+            // itemSortClassification stands in for the legacy ReturnItemSort(...) helper: its own derivation
+            // logic is outside EquipItemValidationGate's citation range (see that type's own remarks), so 0 is
+            // passed as a documented placeholder rather than a guessed formula -- it never matches any of the
+            // hardcoded rebirth-12 classification codes, meaning only that one sub-check of the overall
+            // rebirth gate is skipped here; tribe/slot-tag/level/final-category and the per-item-id/CheckSetItem
+            // rebirth gates all run for real (including ItemNotFound when the item id itself doesn't resolve).
+            // Flagged for a follow-up legacy finding, not guessed at.
+            var equipOutcome = EquipItemValidationGate.Evaluate(candidate, itemSortClassification: 0,
+                state.PreviousTribe, move.Index2, state.Level + state.Level2, state.RebirthCount);
+
+            if (equipOutcome != EquipItemValidationGate.Outcome.Success)
+                return GenericActionResult.Aborted;
+        }
 
         var projected = ContainerMatrix.ApplyMove(resolved, fromContainer, move.Index1,
             state.Inventory.GetContainer(fromContainer), toContainer, move.Index2,
@@ -116,8 +148,15 @@ public sealed class GenericActionService(
             move.XPost2 is < 0 or > 7 || move.YPost2 is < 0 or > 7)
             return GenericActionResult.Aborted;
 
+        // Resolved live from PartyRegistry at claim time (never a hardcoded absent value) -- see
+        // PartyIdentityResolver's own remarks and GroundItemEntity.IsClaimableBy's rule 5/6 citations for why
+        // this must be the claimant's real current party identity, not null, for a partied claim to ever
+        // succeed.
+        var claimantPartyName = PartyIdentityResolver.ResolveCurrentPartyName(partyRegistry, characterId,
+            state.Name, memberId => zone.TryGetPlayer(memberId, out var member) ? member?.Name : null);
+
         var claimOutcome = zone.TryClaimGroundItem(move.Page1, unchecked((uint)move.Index1), state.Name,
-            null, state.PosX, state.PosY, state.PosZ, out var groundItem);
+            claimantPartyName, state.PosX, state.PosY, state.PosZ, out var groundItem);
 
         if (claimOutcome != GroundItemClaimOutcome.Success || groundItem is null)
             return GenericActionResult.Failed;
@@ -402,6 +441,62 @@ public sealed class GenericActionService(
                 cancellationToken))
             logger.LogError(
                 "Zone {MapId} tribe-progress inbox full: dropped CP mirror for character {CharacterId} after NPC-shop-buy",
+                zone.MapId, characterId);
+
+        return GenericActionResult.Succeeded;
+    }
+
+    /// <summary>
+    ///     tSort 206 -- spends unspent stat points (aStatPoint) to raise Strength/Dexterity/Vitality/Intelligence.
+    ///     Every rejection is a bare <see cref="GenericActionResult.Aborted" />: the legacy disconnects the
+    ///     session for any illegal category code or unaffordable amount here, never a soft failure reply. Not
+    ///     yet reachable from <c>GenericActionHandler</c>'s dispatch switch -- see <see cref="IGenericActionService.AllocateStatPointAsync" />.
+    /// </summary>
+    /// <remarks>
+    ///     Réf. C++ : Server/ts25zone/S04_MyWork05.cpp:705-791 (<c>ProcessForStatPlus</c> -- debit, attribute
+    ///     increment, and terminal <c>SetBasicAbilityFromEquip</c> call, all completing as one unit once the
+    ///     category code is legal and affordable) ; Server/ts25zone/S07_MyGame04.cpp:158-183
+    ///     (<c>SetBasicAbilityFromEquip</c>'s refreshed field list -- mirrored here by
+    ///     <see cref="EquipmentService.RecomputeStats" />; the mount/costume/stellar-core inputs it also reads
+    ///     are not modeled by <see cref="StatCalculator" /> yet, same documented gap as that type's own remarks)
+    ///     ; Server/ts25zone/S05_MyTransfer.cpp:544-559 (the acknowledgment echoes the raw request payload
+    ///     unmodified -- this method never touches the wire payload itself, matching that). No stored-procedure
+    ///     write happens here, matching the legacy's own lack of one for this tSort: the mutation is mirrored
+    ///     onto <see cref="PlayerRuntimeState" /> via the same already-established <see cref="TribeProgressZoneCommand" />
+    ///     channel <see cref="BuyFromNpcShopAsync" /> already uses for its own CP debit, which marks the
+    ///     character dirty for the next write-behind progress flush.
+    /// </remarks>
+    public async ValueTask<GenericActionResult> AllocateStatPointAsync(int statSort, int addValue, Zone zone,
+        PlayerRuntimeState state, int characterId, CancellationToken cancellationToken)
+    {
+        var resolved = StatAllocationResolver.Resolve(statSort, addValue, state.StatPoints);
+        if (!resolved.Succeeded)
+            return GenericActionResult.Aborted;
+
+        var newVit = state.StatVit + (resolved.Stat == StatAllocationResolver.BaseStat.Vitality ? resolved.Amount : 0);
+        var newStr = state.StatStr + (resolved.Stat == StatAllocationResolver.BaseStat.Strength ? resolved.Amount : 0);
+        var newInt = state.StatInt +
+                     (resolved.Stat == StatAllocationResolver.BaseStat.Intelligence ? resolved.Amount : 0);
+        var newDex = state.StatDex + (resolved.Stat == StatAllocationResolver.BaseStat.Dexterity ? resolved.Amount : 0);
+
+        var attributes = new CharacterBaseAttributes(newVit, newStr, newInt, newDex, state.Level, state.Tribe,
+            state.Title, state.Halo, state.RebirthCount);
+        var equipmentContainer = state.Inventory.GetContainer(ContainerMatrix.Equipment);
+
+        var petItemId = equipmentContainer.TryGetValue(PetSlots.EquipmentSlot, out var petStack)
+            ? petStack.ItemId
+            : 0;
+        var petContribution = PetGrowthCalculator.Compute(petItemId, state.PetGrowth, state.PetActivity,
+            worldData.ItemsById);
+
+        var updatedStats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData, state.Buffs,
+            petContribution);
+
+        if (!await zone.PostTribeProgressCommandAndWaitAsync(new TribeProgressZoneCommand(characterId,
+                    StatVit: newVit, StatStr: newStr, StatInt: newInt, StatDex: newDex,
+                    StatPoints: resolved.NewStatPoints, UpdatedStats: updatedStats), cancellationToken))
+            logger.LogError(
+                "Zone {MapId} tribe-progress inbox full: dropped stat-allocation mirror for character {CharacterId}",
                 zone.MapId, characterId);
 
         return GenericActionResult.Succeeded;

@@ -31,4 +31,31 @@ public class TowerZoneIndexTableTests
     {
         Assert.Equal(-1, TowerZoneIndexTable.GetTowerIndex(zoneNumber));
     }
+
+    [Theory]
+    [InlineData(2, (byte)0)]
+    [InlineData(3, (byte)0)]
+    [InlineData(4, (byte)0)]
+    [InlineData(7, (byte)1)]
+    [InlineData(8, (byte)1)]
+    [InlineData(9, (byte)1)]
+    [InlineData(12, (byte)2)]
+    [InlineData(13, (byte)2)]
+    [InlineData(14, (byte)2)]
+    [InlineData(141, (byte)3)]
+    [InlineData(142, (byte)3)]
+    [InlineData(143, (byte)3)]
+    public void GetOwningTribe_KnownTowerZone_MapsToTheThirdOfTwelveItFallsInto(int zoneNumber, byte expectedTribe)
+    {
+        Assert.Equal(expectedTribe, TowerZoneIndexTable.GetOwningTribe(zoneNumber));
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(0)]
+    [InlineData(140)]
+    public void GetOwningTribe_UnknownZone_ReturnsNull(int zoneNumber)
+    {
+        Assert.Null(TowerZoneIndexTable.GetOwningTribe(zoneNumber));
+    }
 }

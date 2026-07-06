@@ -15,6 +15,29 @@ internal sealed class FakeGuildRepository : IGuildRepository
     private readonly Dictionary<int, List<GuildRosterRowDto>> _rosters = new();
 
     public bool ThrowOnSetBuff { get; set; }
+    public bool ThrowOnCreateAndDebitMoney { get; set; }
+    public bool ThrowOnUpgradeAndDebitMoney { get; set; }
+
+    private int _nextGuildId = 1;
+
+    public (string Name, int MasterCharacterId, long DeltaMoney, int DeltaBigMoney)? LastCreateAndDebitMoney
+    {
+        get;
+        private set;
+    }
+
+    public (int GuildId, int Grade, int CharacterId, long DeltaMoney, int DeltaBigMoney)? LastUpgradeAndDebitMoney
+    {
+        get;
+        private set;
+    }
+
+    /// <summary>
+    ///     GuildId/CharacterId DisbandAsync was last called with -- proves GuildActionService.DisbandGuildAsync
+    ///     threads the acting master's characterId through (usp_Guild_Disband needs it to attribute the
+    ///     guild-money audit row it now writes; see IGuildRepository.DisbandAsync's own doc comment).
+    /// </summary>
+    public (int GuildId, int CharacterId)? LastDisband { get; private set; }
 
     public (int GuildId, int BuffType, int BuffState, int BuffTime, long BuffTimeForDiff)? LastSetBuff
     {
@@ -93,9 +116,28 @@ internal sealed class FakeGuildRepository : IGuildRepository
         throw new NotImplementedException();
     }
 
-    public ValueTask DisbandAsync(int guildId, CancellationToken ct)
+    public ValueTask<int> CreateAndDebitMoneyAsync(string name, int masterCharacterId, long deltaMoney,
+        int deltaBigMoney, CancellationToken ct)
     {
-        throw new NotImplementedException();
+        if (ThrowOnCreateAndDebitMoney)
+            throw new InvalidOperationException("Simulated SQL failure");
+
+        LastCreateAndDebitMoney = (name, masterCharacterId, deltaMoney, deltaBigMoney);
+
+        var guildId = _nextGuildId++;
+        _guilds[guildId] = new GuildSummaryDto(guildId, name, Grade: 1, MasterCharacterId: masterCharacterId,
+            Points: 0, BuffType: 0, BuffState: 0, BuffTime: 0, BuffTimeForDiff: 0, Logo: 0,
+            CreatedAtUtc: DateTime.UtcNow, MemberCount: 1);
+
+        return ValueTask.FromResult(guildId);
+    }
+
+    public ValueTask DisbandAsync(int guildId, int characterId, CancellationToken ct)
+    {
+        LastDisband = (guildId, characterId);
+        _guilds.Remove(guildId);
+
+        return ValueTask.CompletedTask;
     }
 
     public ValueTask AddMemberAsync(int guildId, int characterId, CancellationToken ct)
@@ -145,6 +187,20 @@ internal sealed class FakeGuildRepository : IGuildRepository
     public ValueTask SetGradeAsync(int guildId, int grade, CancellationToken ct)
     {
         throw new NotImplementedException();
+    }
+
+    public ValueTask UpgradeAndDebitMoneyAsync(int guildId, int grade, int characterId, long deltaMoney,
+        int deltaBigMoney, CancellationToken ct)
+    {
+        if (ThrowOnUpgradeAndDebitMoney)
+            throw new InvalidOperationException("Simulated SQL failure");
+
+        LastUpgradeAndDebitMoney = (guildId, grade, characterId, deltaMoney, deltaBigMoney);
+
+        if (_guilds.TryGetValue(guildId, out var guild))
+            _guilds[guildId] = guild with { Grade = grade };
+
+        return ValueTask.CompletedTask;
     }
 
     public ValueTask SetNoticeAsync(int guildId, byte noticeIndex, string text, CancellationToken ct)

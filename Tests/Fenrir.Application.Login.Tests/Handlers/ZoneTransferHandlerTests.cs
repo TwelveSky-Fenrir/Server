@@ -48,13 +48,34 @@ public class ClDemandZoneServerInfoSendHandlerTests
 
         await handler.HandleAsync(new ZoneTransferRequest { AvatarPost = 0 }, session, CancellationToken.None);
 
-        Assert.Equal((1, 501, (byte)2, 15, sessionToken),
+        Assert.Equal((1, 501, (byte)2, 15, sessionToken, (short)0),
             tickets.LastCreatedTicket);
         Assert.Equal(LoginSessionState.HandoverIssued, session.State);
         await PacketAssert.AssertSentAsync(pipe, new ZoneTransferResponse
         {
             Result = 0, Ip = Shard2.Host, Port = Shard2.Port, Zone = HostedMapId
         });
+    }
+
+    // GM-BLOCK precondition: the Login-side account-grade fact (legacy uUserSort) must ride the same
+    // handover ticket as the character/shard, never re-queried by the Zone session.
+    [Fact]
+    public async Task HandleAsync_GmAccount_CarriesAccountGradeIntoTheMintedTicket()
+    {
+        var directory = new FakeGameServerDirectoryRepository(Shard1, Shard2);
+        var shardMaps = new FakeShardMapAssignmentRepository(new Dictionary<byte, short[]>
+        {
+            [1] = [1],
+            [2] = [HostedMapId]
+        });
+        var tickets = new FakeSessionTicketRepository();
+        var handler = CreateHandler(directory, shardMaps, tickets);
+        var (session, _) = CreateSessionInCharSelect(out var sessionToken, accountGrade: 1);
+
+        await handler.HandleAsync(new ZoneTransferRequest { AvatarPost = 0 }, session, CancellationToken.None);
+
+        Assert.Equal((1, 501, (byte)2, 15, sessionToken, (short)1),
+            tickets.LastCreatedTicket);
     }
 
     [Fact]
@@ -72,7 +93,7 @@ public class ClDemandZoneServerInfoSendHandlerTests
 
         await handler.HandleAsync(new ZoneTransferRequest { AvatarPost = 0 }, session, CancellationToken.None);
 
-        Assert.Equal((1, 501, (byte)1, 15, sessionToken),
+        Assert.Equal((1, 501, (byte)1, 15, sessionToken, (short)0),
             tickets.LastCreatedTicket);
         await PacketAssert.AssertSentAsync(pipe, new ZoneTransferResponse
         {
@@ -89,11 +110,12 @@ public class ClDemandZoneServerInfoSendHandlerTests
             NullLogger<ZoneTransferService>.Instance));
     }
 
-    private static (LoginClientSession Session, FakeDuplexPipe Pipe) CreateSessionInCharSelect(out Guid sessionToken)
+    private static (LoginClientSession Session, FakeDuplexPipe Pipe) CreateSessionInCharSelect(out Guid sessionToken,
+        short accountGrade = 0)
     {
         var pipe = new FakeDuplexPipe();
         var session = new LoginClientSession(1, pipe);
-        session.MarkAuthenticated(1);
+        session.MarkAuthenticated(1, accountGrade);
         sessionToken = Guid.NewGuid();
         session.MarkAccountSessionToken(sessionToken);
         session.MarkCharSelect();

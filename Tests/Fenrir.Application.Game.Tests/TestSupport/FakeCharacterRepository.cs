@@ -66,7 +66,16 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
         throw new NotImplementedException();
     }
 
+    /// <summary>Scripted return for <see cref="GetForWorldEntryAsync" /> -- null (the default) exercises the "character vanished" fallback path some callers (e.g. ZoneHandshakeService) defend against.</summary>
+    public CharacterWorldEntryDto? WorldEntryToReturn { get; set; }
+
     public ValueTask<CharacterWorldEntryDto?> GetForWorldEntryAsync(int characterId, CancellationToken ct)
+    {
+        return ValueTask.FromResult(WorldEntryToReturn);
+    }
+
+    public ValueTask ClampVitalsFloorAsync(int characterId, long flushSequence, int life, int mana,
+        CancellationToken ct)
     {
         throw new NotImplementedException();
     }
@@ -141,12 +150,19 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
         throw new NotImplementedException();
     }
 
+    /// <summary>Every call ever made to <see cref="ApplyQuestTransitionAsync" />, most-recent last -- append-only.</summary>
+    public List<(int CharacterId, int StepPermanent, int ActiveQuestId, int QSort, int TargetPhase, int KillCounter,
+        long DeltaMoney, byte? Container1, IReadOnlyList<CharacterItemSlotTvp> Items1, byte? Container2,
+        IReadOnlyList<CharacterItemSlotTvp> Items2)> QuestTransitions { get; } = [];
+
     public ValueTask ApplyQuestTransitionAsync(int characterId, int stepPermanent, int activeQuestId, int qSort,
         int targetPhase, int killCounter, long deltaMoney, byte? container1,
         IReadOnlyList<CharacterItemSlotTvp> items1, byte? container2, IReadOnlyList<CharacterItemSlotTvp> items2,
         CancellationToken ct)
     {
-        throw new NotImplementedException();
+        QuestTransitions.Add((characterId, stepPermanent, activeQuestId, qSort, targetPhase, killCounter, deltaMoney,
+            container1, items1, container2, items2));
+        return ValueTask.CompletedTask;
     }
 
     public ValueTask ApplyDailyMissionClaimAsync(int characterId, int joinWar, int killOtherTribe, int killMonster,
@@ -172,6 +188,11 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
     }
 
     public ValueTask<int?> GetIdByNameAsync(string name, CancellationToken ct)
+    {
+        throw new NotImplementedException();
+    }
+
+    public ValueTask<int?> GetItemIdAtSlotAsync(int characterId, byte container, byte slot, CancellationToken ct)
     {
         throw new NotImplementedException();
     }

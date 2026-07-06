@@ -12,7 +12,6 @@ namespace Fenrir.Application.Game.Services.Guilds;
 public sealed class GuildActionService(
     ZoneRegistry zones,
     IGuildRepository guilds,
-    ICharacterRepository characters,
     GuildInviteRegistry invites,
     ILogger<GuildActionService> logger) : IGuildActionService
 {
@@ -32,28 +31,17 @@ public sealed class GuildActionService(
         int guildId;
         try
         {
-            // Guild created before money is debited; a failed debit below rolls it back rather than
-            // leaving an unpaid guild (Fenrir has no cached Money field to pre-check against).
-            guildId = await guilds.CreateAsync(name, characterId, ct);
+            // Guild creation, the creation-cost debit, and a guild-money audit-log row (game.EventLog,
+            // Category=GuildMoney) all commit atomically in usp_Guild_CreateAndDebitMoney -- no app-level
+            // compensation needed (Fenrir has no cached Money field to pre-check against, so an
+            // insufficient-balance failure is only discovered inside this same round trip).
+            guildId = await guilds.CreateAndDebitMoneyAsync(name, characterId, -CreateGuildMoneyCost, 0, ct);
         }
         catch (Exception ex)
         {
             logger.LogInformation(ex, "Character {CharacterId} guild create failed for name {GuildName}",
                 characterId, name);
             return GuildActionResult.Success(1, GuildInfoProjection.Empty(), 1);
-        }
-
-        try
-        {
-            await characters.AdjustMoneyAsync(characterId, -CreateGuildMoneyCost, 0, ct);
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex,
-                "Character {CharacterId} guild create money debit failed -- rolling back guild {GuildId}",
-                characterId, guildId);
-            await guilds.DisbandAsync(guildId, ct);
-            return GuildActionResult.Aborted;
         }
 
         var info = await BuildGuildInfoAsync(guildId, ct);
@@ -151,7 +139,9 @@ public sealed class GuildActionService(
         if (roster.Count != 1)
             return GuildActionResult.Success(6, GuildInfoProjection.Empty(), 2);
 
-        await guilds.DisbandAsync(guildId, ct);
+        // Deletes the guild/members/notices and writes a guild-money audit-log row (game.EventLog,
+        // Category=GuildMoney, DeltaMoney=0) atomically -- see usp_Guild_Disband's own doc comment.
+        await guilds.DisbandAsync(guildId, characterId, ct);
 
         await zone.PostGuildCommandAndWaitAsync(new GuildMembershipZoneCommand(characterId, null, "", 0, ""), ct);
 
@@ -184,30 +174,18 @@ public sealed class GuildActionService(
         if (requiredLevel < 0 || state.Level < requiredLevel)
             return GuildActionResult.Aborted;
 
-        var previousGrade = guild.Grade;
         try
         {
-            // Grade incremented before money is debited; a failed debit below rolls it back.
-            await guilds.SetGradeAsync(guildId, previousGrade + 1, ct);
+            // Grade increment, the upgrade-cost debit, and a guild-money audit-log row (game.EventLog,
+            // Category=GuildMoney) all commit atomically in usp_Guild_UpgradeAndDebitMoney -- no app-level
+            // compensation needed.
+            await guilds.UpgradeAndDebitMoneyAsync(guildId, guild.Grade + 1, characterId, -cost, 0, ct);
         }
         catch (Exception ex)
         {
             logger.LogInformation(ex, "Character {CharacterId} guild upgrade failed for guild {GuildId}",
                 characterId, guildId);
             return GuildActionResult.Success(7, GuildInfoProjection.Empty(), 1);
-        }
-
-        try
-        {
-            await characters.AdjustMoneyAsync(characterId, -cost, 0, ct);
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex,
-                "Character {CharacterId} guild upgrade money debit failed -- rolling back guild {GuildId} to grade {PreviousGrade}",
-                characterId, guildId, previousGrade);
-            await guilds.SetGradeAsync(guildId, previousGrade, ct);
-            return GuildActionResult.Aborted;
         }
 
         return GuildActionResult.Success(7, await BuildGuildInfoAsync(guildId, ct));

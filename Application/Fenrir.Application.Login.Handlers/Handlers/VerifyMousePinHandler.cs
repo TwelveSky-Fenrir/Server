@@ -7,7 +7,9 @@ namespace Fenrir.Application.Login.Handlers.Handlers;
 
 /// <summary>
 ///     op15 CL_LOGIN_MOUSE_PASSWORD_SEND — mismatch replies Result=1 and counts a strike; 3rd consecutive strike
-///     disconnects (legacy GL_504).
+///     disconnects (legacy GL_504). Every mismatch is recorded as a game.EventLog AccountSecurity row (the
+///     strike that crosses <see cref="MaxPinFailures" /> is flagged as a lockout); this audit trail is a new
+///     Fenrir observability addition with no legacy analog, not a reproduced legacy behavior.
 /// </summary>
 public sealed class VerifyMousePinHandler(IVerifyMousePinService verifyMousePinService)
     : IAsyncPacketHandler<VerifyMousePinRequest>
@@ -35,7 +37,11 @@ public sealed class VerifyMousePinHandler(IVerifyMousePinService verifyMousePinS
                 return;
             case VerifyMousePinOutcome.WrongPassword:
                 session.Send(new VerifyMousePinResponse { Result = 1 });
-                if (loginSession.RegisterPinFailure() >= MaxPinFailures)
+                var failureCount = loginSession.RegisterPinFailure();
+                var lockedOut = failureCount >= MaxPinFailures;
+                await verifyMousePinService.LogFailedAttemptAsync(accountId, failureCount, lockedOut,
+                    cancellationToken);
+                if (lockedOut)
                     loginSession.Abort(DisconnectReason.StateViolation);
                 return;
             default:

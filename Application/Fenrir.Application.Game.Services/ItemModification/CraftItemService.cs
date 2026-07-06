@@ -4,6 +4,7 @@ using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Crafting;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Data.Abstractions.Game;
 using Fenrir.Network.Serialization.Packets.Zone;
 using Microsoft.Extensions.Logging;
 
@@ -15,14 +16,31 @@ namespace Fenrir.Application.Game.Services.ItemModification;
 /// </summary>
 public sealed class CraftItemService(
     ICharacterRepository characters,
+    IEventLogRepository eventLog,
     ILogger<CraftItemService> logger)
     : ICraftItemService
 {
+    /// <summary>
+    ///     game.EventLog.EventCode for a Jade Upgrade craft (MK_* sort <see cref="CraftRecipeCatalog.JadeUpgradeSort" />)
+    ///     minting a Red Jade -- scoped independently within <see cref="EventLogCategory.ItemCreate" />; EventCode
+    ///     is only ever caller-interpreted alongside its Category (see game.EventLog.sql's own "app-owned
+    ///     numbering scheme" comment), so this does not collide with any other family's numbering, including
+    ///     <see cref="AdvancedElixirEventCode" /> below.
+    /// </summary>
+    private const short JadeUpgradeEventCode = 1;
+
+    /// <summary>
+    ///     game.EventLog.EventCode for an Advanced Elixir craft (MK_* sort
+    ///     <see cref="CraftRecipeCatalog.AdvancedElixirSort" />) minting a random [801,806] item, scoped
+    ///     independently within <see cref="EventLogCategory.ItemCreate" />.
+    /// </summary>
+    private const short AdvancedElixirEventCode = 2;
+
     private static readonly byte[] InventoryPagesInScanOrder =
         [ContainerMatrix.InventoryPage0, ContainerMatrix.InventoryPage1];
 
     public async ValueTask<JadeUpgradeResult> ResolveJadeUpgradeAsync(CraftItemRequest packet, Zone zone,
-        PlayerRuntimeState state, int characterId, CancellationToken cancellationToken)
+        PlayerRuntimeState state, int characterId, int accountId, CancellationToken cancellationToken)
     {
         var page1 = packet.Page1;
         var index1 = packet.Index1;
@@ -66,6 +84,11 @@ public sealed class CraftItemService(
                 ToTvps(projected2), cancellationToken);
         }
 
+        // Logged only once the container replace(s) above have durably committed -- an ItemCreate row must
+        // never assert a mint that the DB write didn't actually persist.
+        await eventLog.LogAsync(JadeUpgradeEventCode, EventLogCategory.ItemCreate, accountId, characterId,
+            null, null, null, null, null, result.ItemId, result.Quantity, 1, null, cancellationToken);
+
         var containers = page1 == page2
             ? ImmutableArray.Create(new InventoryContainerSnapshot((byte)page1, projected1))
             : ImmutableArray.Create(
@@ -82,7 +105,7 @@ public sealed class CraftItemService(
     }
 
     public async ValueTask<AdvancedElixirResult> ResolveAdvancedElixirAsync(CraftItemRequest packet, Zone zone,
-        PlayerRuntimeState state, int characterId, CancellationToken cancellationToken)
+        PlayerRuntimeState state, int characterId, int accountId, CancellationToken cancellationToken)
     {
         var page1 = packet.Page1;
         var index1 = packet.Index1;
@@ -141,6 +164,15 @@ public sealed class CraftItemService(
                 cancellationToken);
             containers = ImmutableArray.Create(new InventoryContainerSnapshot((byte)page1,
                 projectedMaterialContainer));
+        }
+
+        // Only the roll's success path actually mints a new item -- the 80% failure case still consumes the
+        // material (see CraftResolver's own remarks) but creates nothing, so it gets no ItemCreate row.
+        if (resolved.Outcome == CraftResolver.ElixirOutcome.Success)
+        {
+            var created = newItemStack!.Value;
+            await eventLog.LogAsync(AdvancedElixirEventCode, EventLogCategory.ItemCreate, accountId, characterId,
+                null, null, null, null, null, created.ItemId, created.Quantity, 1, null, cancellationToken);
         }
 
         if (!await zone.PostInventoryCommandAndWaitAsync(new InventoryZoneCommand(characterId, containers, null),

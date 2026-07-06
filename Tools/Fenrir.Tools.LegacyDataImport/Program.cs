@@ -1,16 +1,30 @@
+using Fenrir.Tools.LegacyDataImport.Legacy.Seeding;
 using Fenrir.Tools.LegacyDataImport.Legacy.Validation;
 
 // One-off migration/verification tool: decodes every legacy BuildEU33 static-data source and cross-validates
 // each against legacy CSV exports, as ground truth before the SQL Server schema/seed phase.
 // Usage: dotnet run --project Tools/Fenrir.Tools.LegacyDataImport -- <path-to-BuildEU33-DATA-dir>
+//
+// Seed regeneration (writes Database/Migrations/Seed/world/080_items.sql and 090_monsters.sql from the
+// current reader/patch logic -- run this after changing ItemReader/MonsterReader's ApplyRuntimePatches):
+// Usage: dotnet run --project Tools/Fenrir.Tools.LegacyDataImport -- <path-to-BuildEU33-DATA-dir> --regenerate-seed <path-to-Database/Migrations/Seed/world>
 
 if (args.Length < 1)
 {
-    Console.Error.WriteLine("usage: Fenrir.Tools.LegacyDataImport <path-to-BuildEU33-DATA-dir>");
+    Console.Error.WriteLine("usage: Fenrir.Tools.LegacyDataImport <path-to-BuildEU33-DATA-dir> [--regenerate-seed <path-to-Database/Migrations/Seed/world>]");
     return 1;
 }
 
 var dataDirectory = args[0];
+
+if (args.Length >= 3 && args[1] == "--regenerate-seed")
+{
+    var seedWorldDirectory = args[2];
+    ItemSeedGenerator.Generate(dataDirectory, Path.Combine(seedWorldDirectory, "080_items.sql"));
+    MonsterSeedGenerator.Generate(dataDirectory, Path.Combine(seedWorldDirectory, "090_monsters.sql"));
+    return 0;
+}
+
 var failures = 0;
 
 RunSection("Item", () => ItemValidation.Run(dataDirectory));

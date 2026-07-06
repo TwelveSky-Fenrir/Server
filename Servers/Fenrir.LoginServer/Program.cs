@@ -1,6 +1,7 @@
 using Fenrir.Application.Login.Domain;
 using Fenrir.Application.Login.Domain.Extensions;
 using Fenrir.Application.Login.Handlers.Extensions;
+using Fenrir.Application.Login.Hosting;
 using Fenrir.Application.Login.Hosting.Extensions;
 using Fenrir.Application.Login.Services.Extensions;
 using Fenrir.Data;
@@ -27,4 +28,11 @@ var host = builder.Build();
 // Must run before LoginConnectionHost starts accepting connections: MessageDispatcher resolves handlers through this provider.
 PacketHandlerHub.Initialize(host.Services);
 
-host.Run();
+// Must run before LoginConnectionHost starts accepting connections: the maintenance-lockdown/server-full quota
+// gates (LoginService.LoginAsync) read LoginCapacityState synchronously on every login attempt, so it must
+// already hold a real admin.ServerQuota.MaxPlayers value by the time the first connection can send one. A
+// failed read here is fatal startup (matches legacy MyGame::Init's own fatal-on-failure treatment), unlike
+// ServerQuotaRefreshHost's later recurring re-reads.
+await host.Services.GetRequiredService<ServerQuotaRefreshHost>().InitializeAsync(CancellationToken.None);
+
+await host.RunAsync();

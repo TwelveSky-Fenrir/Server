@@ -6,10 +6,16 @@ using Fenrir.Network.Serialization.Packets.Zone;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
-/// <summary>CZ_FRIEND_FIND_SEND (opcode 57) -- friend lookup is process-wide (unlike FriendAsk's own-zone-only search).</summary>
-public sealed class FriendLocateHandler(IFriendService friendService) : IInlinePacketHandler<FriendLocateRequest>
+/// <summary>
+///     CZ_FRIEND_FIND_SEND (opcode 57) -- friend lookup is process-wide (unlike FriendAsk's own-zone-only
+///     search), falling back to the cross-shard character-location directory on a same-shard miss. Async
+///     (not inline): the fallback is an awaited DB call on the miss branch, and both handler kinds already
+///     run on the per-connection session loop, never the zone tick.
+/// </summary>
+public sealed class FriendLocateHandler(IFriendService friendService) : IAsyncPacketHandler<FriendLocateRequest>
 {
-    public void Handle(in FriendLocateRequest packet, IPacketSession session)
+    public async ValueTask HandleAsync(FriendLocateRequest packet, IPacketSession session,
+        CancellationToken cancellationToken)
     {
         var zoneSession = (ZoneClientSession)session;
 
@@ -20,7 +26,7 @@ public sealed class FriendLocateHandler(IFriendService friendService) : IInlineP
         if (!zone.TryGetPlayer(characterId, out var asker) || asker is null)
             return;
 
-        var result = friendService.Locate(asker, packet.Index);
+        var result = await friendService.LocateAsync(asker, packet.Index, cancellationToken).ConfigureAwait(false);
 
         switch (result.Kind)
         {

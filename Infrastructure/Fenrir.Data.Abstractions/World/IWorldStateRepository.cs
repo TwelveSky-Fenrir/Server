@@ -25,9 +25,33 @@ public interface IWorldStateRepository
     public ValueTask UpdateAsync(byte? zone038WinTribe, int? zone038WinTribeTime, bool tribeSymbolBattle,
         byte? monsterSymbol, int? monsterSymbolEndTime, byte? highTribe, short updateTribePoint, CancellationToken ct);
 
-    /// <summary>Replaces one tribe's WorldStateTribes row (game.usp_WorldStateTribe_Update).</summary>
+    /// <summary>
+    ///     Replaces one tribe's WorldStateTribes row, including Points (game.usp_WorldStateTribe_Update). Kept
+    ///     for <c>WorldStateService.SetTribePoints</c>'s rare admin/reset use -- unlike
+    ///     <see cref="AddTribePointsAsync" />, this is a whole-row absolute overwrite, never called from the
+    ///     periodic write-behind flush itself (see <see cref="UpdateTribeSymbolStateAsync" />/
+    ///     <see cref="AddTribePointsAsync" /> for the two calls that flush actually makes every cycle).
+    /// </summary>
     public ValueTask UpdateTribeAsync(byte tribeId, DateTime? symbolDate, bool hasSymbol, int points, bool isClosed,
         CancellationToken ct);
+
+    /// <summary>
+    ///     Replaces one tribe's WorldStateTribes row EXCEPT Points (game.usp_WorldStateTribe_UpdateSymbolState).
+    ///     Safe as a plain overwrite because every production caller of these fields (SymbolDate/HasSymbol/
+    ///     IsClosed) is <c>ZoneEventBroadcaster</c> acting for one specific zone, and ADR-0012 guarantees at
+    ///     most one shard hosts that zone at a time -- called every write-behind flush cycle for every tribe,
+    ///     unconditionally, mirroring the legacy's own blind per-tick rewrite.
+    /// </summary>
+    public ValueTask UpdateTribeSymbolStateAsync(byte tribeId, DateTime? symbolDate, bool hasSymbol, bool isClosed,
+        CancellationToken ct);
+
+    /// <summary>
+    ///     Additive at the DB (game.usp_WorldStateTribe_AddPoints): <paramref name="delta" /> is summed onto
+    ///     the row's current Points regardless of interleaving with another shard's own concurrent delta --
+    ///     the one WorldStateTribes field genuinely meant to be written from every shard at once (RvR
+    ///     kill-scoring). Never overwrites the whole row like <see cref="UpdateTribeAsync" />.
+    /// </summary>
+    public ValueTask AddTribePointsAsync(byte tribeId, int delta, CancellationToken ct);
 
     /// <summary>Idempotent upsert of one (from, to) alliance offer pair (game.usp_WorldStateAllianceOffer_Set).</summary>
     public ValueTask SetAllianceOfferAsync(byte fromTribeId, byte toTribeId, bool isAccepted, CancellationToken ct);

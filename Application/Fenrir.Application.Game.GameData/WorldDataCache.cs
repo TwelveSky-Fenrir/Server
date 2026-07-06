@@ -36,7 +36,14 @@ public sealed class WorldDataCache
     /// <summary>Gem-socket definitions by GemSocketId (world.GemSockets).</summary>
     public required FrozenDictionary<int, GemSocketRowDto> GemSocketsById { get; init; }
 
-    /// <summary>Blood-exchange catalog in BloodExchangeSlot order (world.BloodExchangeCatalog, 3 real rows).</summary>
+    /// <summary>
+    ///     Blood-exchange catalog in BloodExchangeSlot order (world.BloodExchangeCatalog, 3 real rows), as of
+    ///     this boot -- never mutated afterwards, per this type's own contract. A live reader (purchase
+    ///     resolution, CZ_DEMAND_BLOOD_MARK_SEND) must instead read
+    ///     <see cref="Domain.Commerce.CommerceCatalogCache.BloodExchangeCatalog" />, which is hot-reloaded
+    ///     periodically; this field only still exists for <see cref="WorldDataLoader" />'s own boot-diagnostics
+    ///     logging.
+    /// </summary>
     public required ImmutableArray<BloodExchangeCatalogRowDto> BloodExchangeCatalog { get; init; }
 
     /// <summary>GM event definitions (world.EventDefinitions -- empty in the legacy dump, loaded for day-one parity).</summary>
@@ -52,9 +59,17 @@ public sealed class WorldDataCache
         init;
     }
 
-    /// <summary>Computed once from <see cref="ItemMallProductsById" /> at boot -- see <see cref="CashCatalogBuilder" />.</summary>
+    /// <summary>
+    ///     Computed once from <see cref="ItemMallProductsById" /> at boot -- see <see cref="CashCatalogBuilder" />.
+    ///     Never mutated afterwards, per this type's own contract. A live reader (purchase resolution,
+    ///     CZ_GET_CASH_ITEM_INFO_SEND) must instead read <see cref="Domain.Commerce.CommerceCatalogCache.CashCatalog" />,
+    ///     which is hot-reloaded periodically.
+    /// </summary>
     public required CashCatalogBuilder.CashCatalog CashCatalog { get; init; }
 
-    /// <summary>ZC_GET_CASH_ITEM_INFO_RECV.Version.</summary>
+    /// <summary>
+    ///     ZC_GET_CASH_ITEM_INFO_RECV.Version, as of this boot -- see <see cref="CashCatalog" />'s own remarks;
+    ///     <see cref="Domain.Commerce.CommerceCatalogCache.CashCatalogVersion" /> is the live value.
+    /// </summary>
     public required int CashCatalogVersion { get; init; }
 }

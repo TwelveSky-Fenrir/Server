@@ -224,15 +224,114 @@ public class GuildProcTests
         await ExecProcAsync("game.usp_GuildNotice_Set",
             ("GuildId", guildId), ("NoticeIndex", (byte)0), ("Text", "farewell"));
 
-        await ExecProcAsync("game.usp_Guild_Disband", ("GuildId", guildId));
+        await ExecProcAsync("game.usp_Guild_Disband", ("GuildId", guildId), ("CharacterId", masterId));
 
         Assert.Equal(0, await ScalarAsync<int>($"SELECT COUNT(*) FROM game.Guilds WHERE GuildId = {guildId};"));
         Assert.Equal(0, await ScalarAsync<int>($"SELECT COUNT(*) FROM game.GuildMembers WHERE GuildId = {guildId};"));
         Assert.Equal(0, await ScalarAsync<int>($"SELECT COUNT(*) FROM game.GuildNotices WHERE GuildId = {guildId};"));
 
         var again = await Assert.ThrowsAsync<SqlException>(() =>
-            ExecProcAsync("game.usp_Guild_Disband", ("GuildId", guildId)));
+            ExecProcAsync("game.usp_Guild_Disband", ("GuildId", guildId), ("CharacterId", masterId)));
         Assert.Equal(50235, again.Number);
+    }
+
+    // Guild-money-movement event logging (not legacy parity -- see Database/Migrations/
+    // 014_guild_money_event_log.sql for the full rationale and legacy citations): usp_Guild_CreateAndDebitMoney/
+    // usp_Guild_UpgradeAndDebitMoney/usp_Guild_Disband each write one game.EventLog row (Category=11,
+    // GuildMoney) in the same transaction as the mutation they perform.
+    [Fact]
+    public async Task Guild_CreateAndDebitMoney_WritesAGuildMoneyEventLogRow_WithTheDebitedAmount()
+    {
+        var masterId = await CreateCharacterWithMoneyAsync(10_000_000);
+        var accountId = await ScalarAsync<int>($"SELECT AccountId FROM game.Characters WHERE CharacterId = {masterId};");
+        var name = NewGuildName();
+
+        var guildId = await CreateAndDebitMoneyAsync(name, masterId, -10_000_000, 0);
+
+        await using var connection = new SqlConnection(_connectionString);
+        await connection.OpenAsync();
+        await using var command = new SqlCommand(
+            "SELECT TOP 1 EventCode, Category, ActorAccountId, ActorCharacterId, DeltaMoney, Outcome, Payload " +
+            "FROM game.EventLog WHERE ActorCharacterId = @CharacterId ORDER BY EventLogId DESC;", connection);
+        command.Parameters.AddWithValue("CharacterId", masterId);
+        await using var reader = await command.ExecuteReaderAsync();
+
+        Assert.True(await reader.ReadAsync());
+        Assert.Equal(1, reader.GetInt16(reader.GetOrdinal("EventCode")));
+        Assert.Equal(11, reader.GetByte(reader.GetOrdinal("Category")));
+        Assert.Equal(accountId, reader.GetInt32(reader.GetOrdinal("ActorAccountId")));
+        Assert.Equal(masterId, reader.GetInt32(reader.GetOrdinal("ActorCharacterId")));
+        Assert.Equal(-10_000_000L, reader.GetInt64(reader.GetOrdinal("DeltaMoney")));
+        Assert.Equal(1, reader.GetByte(reader.GetOrdinal("Outcome")));
+        var payload = reader.GetString(reader.GetOrdinal("Payload"));
+        Assert.Contains($"GuildId={guildId}", payload);
+        Assert.Contains("Grade=1", payload);
+    }
+
+    [Fact]
+    public async Task Guild_UpgradeAndDebitMoney_WritesAGuildMoneyEventLogRow_WithTheResultingGrade()
+    {
+        var masterId = await CreateCharacterWithMoneyAsync(20_000_000);
+        var guildId = await CreateGuildAsync(NewGuildName(), masterId);
+
+        await ExecProcAsync("game.usp_Guild_UpgradeAndDebitMoney",
+            ("GuildId", guildId), ("Grade", 2), ("CharacterId", masterId), ("DeltaMoney", -20_000_000L),
+            ("DeltaBigMoney", 0));
+
+        await using var connection = new SqlConnection(_connectionString);
+        await connection.OpenAsync();
+        await using var command = new SqlCommand(
+            "SELECT TOP 1 EventCode, Category, ActorCharacterId, DeltaMoney, Outcome, Payload " +
+            "FROM game.EventLog WHERE ActorCharacterId = @CharacterId ORDER BY EventLogId DESC;", connection);
+        command.Parameters.AddWithValue("CharacterId", masterId);
+        await using var reader = await command.ExecuteReaderAsync();
+
+        Assert.True(await reader.ReadAsync());
+        Assert.Equal(2, reader.GetInt16(reader.GetOrdinal("EventCode")));
+        Assert.Equal(11, reader.GetByte(reader.GetOrdinal("Category")));
+        Assert.Equal(-20_000_000L, reader.GetInt64(reader.GetOrdinal("DeltaMoney")));
+        Assert.Equal(1, reader.GetByte(reader.GetOrdinal("Outcome")));
+        Assert.Contains("Grade=2", reader.GetString(reader.GetOrdinal("Payload")));
+    }
+
+    [Fact]
+    public async Task Guild_Disband_WritesAZeroDeltaGuildMoneyEventLogRow()
+    {
+        var masterId = await CreateCharacterAsync();
+        var guildId = await CreateGuildAsync(NewGuildName(), masterId);
+        await ExecProcAsync("game.usp_Guild_SetGrade", ("GuildId", guildId), ("Grade", 3));
+
+        await ExecProcAsync("game.usp_Guild_Disband", ("GuildId", guildId), ("CharacterId", masterId));
+
+        await using var connection = new SqlConnection(_connectionString);
+        await connection.OpenAsync();
+        await using var command = new SqlCommand(
+            "SELECT TOP 1 EventCode, Category, ActorCharacterId, DeltaMoney, Outcome, Payload " +
+            "FROM game.EventLog WHERE ActorCharacterId = @CharacterId ORDER BY EventLogId DESC;", connection);
+        command.Parameters.AddWithValue("CharacterId", masterId);
+        await using var reader = await command.ExecuteReaderAsync();
+
+        Assert.True(await reader.ReadAsync());
+        Assert.Equal(3, reader.GetInt16(reader.GetOrdinal("EventCode")));
+        Assert.Equal(11, reader.GetByte(reader.GetOrdinal("Category")));
+        Assert.Equal(0L, reader.GetInt64(reader.GetOrdinal("DeltaMoney")));
+        Assert.Equal(1, reader.GetByte(reader.GetOrdinal("Outcome")));
+        var payload = reader.GetString(reader.GetOrdinal("Payload"));
+        Assert.Contains($"GuildId={guildId}", payload);
+        Assert.Contains("Grade=3", payload);
+    }
+
+    [Fact]
+    public async Task Guild_CreateAndDebitMoney_InsufficientBalance_WritesNoEventLogRow()
+    {
+        var masterId = await CreateCharacterAsync();
+
+        await Assert.ThrowsAsync<SqlException>(() => CreateAndDebitMoneyAsync(NewGuildName(), masterId,
+            -10_000_000, 0));
+
+        var count = await ScalarAsync<int>(
+            $"SELECT COUNT(*) FROM game.EventLog WHERE ActorCharacterId = {masterId} AND Category = 11;");
+        Assert.Equal(0, count);
     }
 
     [Fact]
@@ -301,6 +400,30 @@ public class GuildProcTests
             1, 0f, 0f, 0f,
             100, 100, 50, 50,
             CancellationToken.None);
+    }
+
+    /// <summary>A fresh character topped up with <paramref name="money" /> -- fresh characters start at Money=0.</summary>
+    private async Task<int> CreateCharacterWithMoneyAsync(long money)
+    {
+        var characterId = await CreateCharacterAsync();
+        await _characters.AdjustMoneyAsync(characterId, money, 0, CancellationToken.None);
+        return characterId;
+    }
+
+    private async Task<int> CreateAndDebitMoneyAsync(string name, int masterCharacterId, long deltaMoney,
+        int deltaBigMoney)
+    {
+        await using var connection = new SqlConnection(_connectionString);
+        await connection.OpenAsync();
+        await using var command = new SqlCommand("game.usp_Guild_CreateAndDebitMoney", connection)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+        command.Parameters.AddWithValue("Name", name);
+        command.Parameters.AddWithValue("MasterCharacterId", masterCharacterId);
+        command.Parameters.AddWithValue("DeltaMoney", deltaMoney);
+        command.Parameters.AddWithValue("DeltaBigMoney", deltaBigMoney);
+        return (int)(await command.ExecuteScalarAsync())!;
     }
 
     private async Task<int> CreateGuildAsync(string name, int masterCharacterId)

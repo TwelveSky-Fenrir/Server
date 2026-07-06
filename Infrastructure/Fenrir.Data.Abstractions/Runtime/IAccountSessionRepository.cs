@@ -71,4 +71,14 @@ public interface IAccountSessionRepository
     ///     paths. Called from a single unsharded timer (Login side).
     /// </summary>
     public ValueTask<ImmutableArray<ReapedAccountSessionDto>> ReapStaleAsync(CancellationToken ct);
+
+    /// <summary>
+    ///     usp_AccountSession_GetActiveCount: a plain COUNT(*) across every row regardless of ServerKind/ShardId --
+    ///     the cluster-wide "concurrent player" tally the login-time server-full quota gate reads (every zone's
+    ///     Game-side rows plus every Login-side row for an account registered but not yet moved into a zone).
+    ///     Fenrir's stand-in for the legacy session-broker process (<c>ts25playuser</c>'s zero-argument
+    ///     <c>ReturnPresentUserNum</c>): this table is already the single cross-process authority for "does this
+    ///     account have a session, and where", so a fresh broker process isn't needed to answer "how many".
+    /// </summary>
+    public ValueTask<int> GetActiveSessionCountAsync(CancellationToken ct);
 }

@@ -27,6 +27,9 @@ public sealed class GameServerOptionsValidator : IValidateOptions<GameServerOpti
         if (options.AccountSessionPollIntervalSeconds <= 0)
             errors.Add(
                 $"Game:AccountSessionPollIntervalSeconds must be positive (was {options.AccountSessionPollIntervalSeconds}).");
+        if (options.TempRegistrationIdleSweepIntervalSeconds <= 0)
+            errors.Add(
+                $"Game:TempRegistrationIdleSweepIntervalSeconds must be positive (was {options.TempRegistrationIdleSweepIntervalSeconds}).");
 
         return errors.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(errors);
     }

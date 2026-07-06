@@ -18,9 +18,18 @@ namespace Fenrir.Application.Game.Services.ItemModification;
 public sealed class EnchantItemService(
     ICharacterRepository characters,
     WorldDataCache worldData,
+    IEventLogQueue eventLogQueue,
     ILogger<EnchantItemService> logger)
     : IEnchantItemService
 {
+    /// <summary>
+    ///     game.EventLog.EventCode for an enchant attempt -- the wire opcode (op24) itself, since
+    ///     EventLogCategory.Enchant is shared by every item-enhancement opcode in this namespace and EventCode
+    ///     is only ever caller-interpreted alongside Category (see game.EventLog.sql's own "app-owned
+    ///     numbering scheme" comment).
+    /// </summary>
+    private const short EnchantEventCode = 24;
+
     public async ValueTask<EnchantItemResult> EnchantAsync(EnchantItemRequest packet, Zone zone,
         PlayerRuntimeState state, int characterId, CancellationToken cancellationToken)
     {
@@ -103,6 +112,16 @@ public sealed class EnchantItemService(
             return new EnchantItemResult(EnchantItemOutcome.Rejected, 0, 0, 0);
         }
 
+        var resultCode = MapResultCode(resolved.Outcome);
+
+        if (!eventLogQueue.Enqueue(new EventLogEntryTvp(EnchantEventCode, (byte)EventLogCategory.Enchant, null,
+                characterId, null, null, null, -(long)resolved.Cost, null, target.ItemId, target.Quantity,
+                (byte)resultCode, $"Serial={target.Serial};From={target.Enchant};To={resolved.NewEnchant};Material={material.ItemId}",
+                DateTime.UtcNow)))
+            logger.LogWarning(
+                "game.EventLog write-behind queue full: dropped enchant-attempt audit row for character {CharacterId}",
+                characterId);
+
         var containers = page1 == page2
             ? ImmutableArray.Create(new InventoryContainerSnapshot((byte)page1, projectedTargetContainer))
             : ImmutableArray.Create(
@@ -115,8 +134,7 @@ public sealed class EnchantItemService(
                 "Zone {MapId} inventory inbox full: dropped enchant mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
                 zone.MapId, characterId);
 
-        return new EnchantItemResult(EnchantItemOutcome.Applied, MapResultCode(resolved.Outcome), resolved.Cost,
-            resolved.NewEnchant);
+        return new EnchantItemResult(EnchantItemOutcome.Applied, resultCode, resolved.Cost, resolved.NewEnchant);
     }
 
     /// <summary>ZC_IMPROVE_ITEM_RECV codes: 0 success, 1 fail, 2 destroyed, 3 reset-to-+40, 4 protected.</summary>

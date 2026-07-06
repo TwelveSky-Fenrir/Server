@@ -1,4 +1,5 @@
 using Fenrir.Application.Login.Abstractions.RenameAvatar;
+using Fenrir.Application.Login.Domain.Avatars;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Login;
@@ -6,12 +7,18 @@ using Fenrir.Network.Serialization.Packets.Login;
 namespace Fenrir.Application.Login.Handlers.Handlers;
 
 /// <summary>
-///     op19 CL_CHANGE_AVATAR_NAME_SEND — result codes forwarded verbatim from game.usp_Character_Rename (0 ok, 2 name
-///     taken/unchanged, 102 slot missing, 101 SQL error).
+///     op19 CL_CHANGE_AVATAR_NAME_SEND — result codes: 0 renamed, 2 name unchanged/taken, 3 tribe
+///     role/guild/friend/teacher/student refusal (no further detail distinguishing which), 101 SQL error,
+///     102 slot vanished. A rename-scroll (item 1133) mismatch at the claimed (Page, Index) slot gets no
+///     response at all -- same silent-disconnect treatment as the structural/charset checks below.
 /// </summary>
 /// <remarks>
-///     Rename-scroll item 1133 not verified/consumed (no character inventory persistence yet); tribe/guild/friend/teacher
-///     Result=3 refusal not reproduced (those relations don't exist for login-visible characters yet).
+///     Réf. C++ : Server/ts25login/S04_MyWork02.cpp:1310-1349 (slot/name/page/index precondition sequence
+///     culminating in the <see cref="AvatarNameValidator" /> whitelist call at l.1345, then the item-1133
+///     gate at l.1340-1344 -- both silent-disconnect outcomes) ; Server/Header/safestring.h:43-81
+///     (CheckNameString itself) ; Server/ts25login/S04_MyWork02.cpp:1358-1385 (the five relationship
+///     refusals, all collapsing to Result=3 -- see RenameAvatarService/AvatarRenameGate for the per-rule
+///     citations and ordering).
 /// </remarks>
 public sealed class RenameAvatarHandler(IRenameAvatarService renameAvatarService)
     : IAsyncPacketHandler<RenameAvatarRequest>
@@ -30,15 +37,42 @@ public sealed class RenameAvatarHandler(IRenameAvatarService renameAvatarService
         if (packet.AvatarPost is < 0 or > MaxAvatarPost ||
             packet.ChangeAvatarName.Length == 0 ||
             packet.Page is < 0 or >= InventoryPageCount ||
-            packet.Index is < 0 or >= InventorySlotCount)
+            packet.Index is < 0 or >= InventorySlotCount ||
+            !AvatarNameValidator.HasOnlyWhitelistedCharacters(packet.ChangeAvatarName))
         {
             loginSession.Abort(DisconnectReason.Malformed);
             return;
         }
 
         var result = await renameAvatarService.RenameAvatarAsync(accountId, (byte)packet.AvatarPost,
-            packet.ChangeAvatarName, cancellationToken);
+            packet.ChangeAvatarName, (byte)packet.Page, (byte)packet.Index, cancellationToken);
 
-        session.Send(new RenameAvatarResponse { Result = result });
+        switch (result.Outcome)
+        {
+            case RenameAvatarOutcome.Success:
+                session.Send(new RenameAvatarResponse { Result = 0 });
+                return;
+            case RenameAvatarOutcome.NameTaken:
+                session.Send(new RenameAvatarResponse { Result = 2 });
+                return;
+            case RenameAvatarOutcome.TribeRoleRefusal:
+            case RenameAvatarOutcome.GuildMembershipRefusal:
+            case RenameAvatarOutcome.FriendListRefusal:
+            case RenameAvatarOutcome.TeacherBondRefusal:
+            case RenameAvatarOutcome.StudentBondRefusal:
+                session.Send(new RenameAvatarResponse { Result = 3 });
+                return;
+            case RenameAvatarOutcome.SqlError:
+                session.Send(new RenameAvatarResponse { Result = 101 });
+                return;
+            case RenameAvatarOutcome.SlotMissing:
+                session.Send(new RenameAvatarResponse { Result = 102 });
+                return;
+            case RenameAvatarOutcome.ItemMismatch:
+                loginSession.Abort(DisconnectReason.Malformed);
+                return;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(result), result.Outcome, null);
+        }
     }
 }

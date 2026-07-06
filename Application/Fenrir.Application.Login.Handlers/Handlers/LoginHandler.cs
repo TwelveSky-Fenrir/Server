@@ -7,9 +7,10 @@ using Fenrir.Network.Serialization.Packets.Login;
 namespace Fenrir.Application.Login.Handlers.Handlers;
 
 /// <summary>
-///     op11 CL_LOGIN_SEND — IP rate limit, then the application firewall, then version, then MAC restriction, then
-///     auth run in that order so an over-budget/blocked/incompatible/banned-PC attempt never reaches Argon2id/SQL
-///     account lookup.
+///     op11 CL_LOGIN_SEND — IP rate limit, then maintenance lockdown, then server-full quota, then the
+///     application firewall, then version, then MAC restriction, then auth run in that order so an
+///     under-maintenance/over-capacity/over-budget/blocked/incompatible/banned-PC attempt never reaches
+///     Argon2id/SQL account lookup. See <c>LoginService</c>'s own remarks for the maintenance/quota citation.
 /// </summary>
 public sealed class LoginHandler(ILoginService loginService) : IAsyncPacketHandler<LoginRequest>
 {
@@ -39,7 +40,7 @@ public sealed class LoginHandler(ILoginService loginService) : IAsyncPacketHandl
                 LoginTrain.SendFailure(session, result.ResultCode, packet.Id, result.ResultString);
                 return;
             default:
-                loginSession.MarkAuthenticated(result.AccountId);
+                loginSession.MarkAuthenticated(result.AccountId, result.AccountGrade);
                 loginSession.MarkAccountSessionToken(result.SessionToken!.Value);
                 if (result.RequirePin)
                     loginSession.MarkPinRequired();

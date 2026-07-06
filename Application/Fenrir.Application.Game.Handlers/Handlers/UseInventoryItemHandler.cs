@@ -8,15 +8,12 @@ using Fenrir.Network.Serialization.Packets.Zone;
 namespace Fenrir.Application.Game.Handlers.Handlers;
 
 /// <summary>
-///     op23, CZ_USE_INVENTORY_ITEM_SEND -- three families out of the ~6300-line legacy switch are modeled:
-///     the Bottle family (iSort==26, S04_MyWork03.cpp:2448, via <c>BottleResolver.ResolveAcquire</c>)
-///     and two members of the iSort==3 grab-bag of "right-click, single-purpose" items -- world.Items itself
-///     shows iSort==3 covers wildly different behaviors (Guild Emblem register, Guild Boss Box loot roll,
-///     Guild Scroll recharge, Faction Transfer Scroll) per specific ItemId, not per sort, so
-///     <see cref="IUseInventoryItemService" /> dispatches on the item id itself. Every other iSort/iIndex
-///     family (mounts, skills, costumes, cash-shop timers, the rest of the iSort==3 bucket...) still replies
-///     with a clean Result=1 failure -- out of scope for this pass (see the recon report's own Batch A
-///     conclusion).
+///     op23, CZ_USE_INVENTORY_ITEM_SEND -- see <see cref="IUseInventoryItemService" />'s own remarks for the
+///     full, currently-growing list of modeled item-id families. world.Items itself shows iSort==3 alone
+///     covers wildly different behaviors (Guild Emblem register, Guild Boss Box loot roll, Guild Scroll
+///     recharge, Faction Transfer Scroll) per specific ItemId, not per sort, so
+///     <see cref="IUseInventoryItemService" /> dispatches on the item id itself throughout. Every unmodeled
+///     iSort/iIndex family still replies with a clean Result=1 failure rather than a disconnect.
 /// </summary>
 /// <remarks>
 ///     Not modeled: the per-tick anti-flood throttle (mTickForUseInventoryItem) and the page-1
@@ -32,6 +29,7 @@ public sealed class UseInventoryItemHandler(IUseInventoryItemService service)
     {
         var zoneSession = (ZoneClientSession)session;
         var characterId = zoneSession.CharacterId!.Value;
+        var accountId = zoneSession.AccountId!.Value;
 
         if (zoneSession.CurrentZone is not Zone zone || !zone.TryGetPlayer(characterId, out var state) ||
             state is null)
@@ -50,8 +48,8 @@ public sealed class UseInventoryItemHandler(IUseInventoryItemService service)
         await state.EconomyActionLock.WaitAsync(cancellationToken);
         try
         {
-            var response = await service.ResolveAsync(zone, state, characterId, (byte)page, (byte)index,
-                cancellationToken);
+            var response = await service.ResolveAsync(zone, state, characterId, accountId, (byte)page, (byte)index,
+                packet.Value, cancellationToken);
             session.Send(response);
         }
         finally

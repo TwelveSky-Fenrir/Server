@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using Fenrir.Application.Game.Domain.Inventory;
+using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.Quests;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.Social.Party;
@@ -69,7 +70,8 @@ public sealed class MonsterSpawnScheduler(
     Func<Random>? randomFactory = null,
     PartyRegistry? partyRegistry = null,
     Lazy<ZoneEventBroadcaster>? zoneEventBroadcaster = null,
-    MonsterBossRespawnTracker? bossRespawnTracker = null)
+    MonsterBossRespawnTracker? bossRespawnTracker = null,
+    TowerWarState? towerWar = null)
     : ISimulationSystem
 {
     /// <summary>
@@ -263,9 +265,12 @@ public sealed class MonsterSpawnScheduler(
 
         var partyMemberIds = partyRegistry?.GetMembers(killer.CharacterId);
         zone.GrantMonsterKillExperience(killer.CharacterId, monster.Template.RealLevel,
-            monster.Template.GeneralExperience, partyMemberIds);
+            monster.Template.GeneralExperience, partyMemberIds,
+            monsterPatExperience: monster.Template.PatExperience, monsterLifeValue: monster.Template.Life);
 
         zone.ApplyQuestKillProgress(killer.CharacterId, monster.Template.MonsterId);
+
+        ApplyTowerCpForPvmMilestone(zone, killer, monster.Template.RealLevel);
 
         bool KillerHasItem(int itemId)
         {
@@ -281,15 +286,24 @@ public sealed class MonsterSpawnScheduler(
             KillerHasItem);
 
         if (result.Money is { } amount)
+        {
             zone.QueueMoneyGrant(killer.CharacterId, amount);
+
+            // Tribe bank 9% tax: additional to, never subtracted from, the killer's own award above -- see
+            // Zone.TribeBankTax.cs / TribeBankTaxAccumulator.CreditMonsterKillCurrencyTax's own remarks.
+            zone.CreditMonsterKillTribeTax(killer.Tribe, amount);
+        }
 
         if (result.Items.Count == 0)
             return;
 
         var (partyName, dropSort) = ResolvePartyDrop(zone, killer, partyMemberIds);
         foreach (var item in result.Items)
+            // Zone-241 "LOD" personal-dungeon loot tag (Server/ts25zone/S07_MyGame03.cpp:599): a dying
+            // personal boss carries its own instance id (Zone.SummonPersonalBoss); every ordinary monster's
+            // InstanceId is null, so this is a no-op tag for every non-personal-instance drop.
             zone.SpawnGroundItem(item.ItemId, item.Quantity, monster.PosX, monster.PosY, monster.PosZ,
-                killer.Name, partyName, dropSort);
+                killer.Name, partyName, dropSort, monster.InstanceId);
     }
 
     /// <summary>
@@ -316,6 +330,26 @@ public sealed class MonsterSpawnScheduler(
         return zone.TryGetPlayer(leaderId, out var leader) && leader is not null
             ? (leader.Name, 1)
             : (killer.Name, 1);
+    }
+
+    /// <summary>
+    ///     Tower CP-for-PvM consumption hook (<c>ProcessAttack03</c>'s post-kill CP milestone section,
+    ///     <see cref="TowerCpForPvmMilestone" />): advances the killer's personal 1000-kill counter regardless of
+    ///     whether <paramref name="killer" />'s tribe currently owns a CP tower, and on the 1000th kill grants
+    ///     <see cref="TowerCpForPvmMilestone.BaseKillCp" /> plus that tribe's flat CP-for-PvM tower bonus (0 if
+    ///     <see cref="towerWar" /> is unavailable, e.g. some test call sites).
+    /// </summary>
+    private void ApplyTowerCpForPvmMilestone(Zone zone, PlayerRuntimeState killer, int monsterRealLevel)
+    {
+        var registration = TowerCpForPvmMilestone.RegisterKill(killer.TowerCpMilestoneCounter, killer.Level,
+            killer.Level2, monsterRealLevel);
+        killer.TowerCpMilestoneCounter = registration.UpdatedCounter;
+
+        if (!registration.MilestoneReached)
+            return;
+
+        var towerBonus = towerWar?.GetTribeBonus(killer.Tribe).CpForPvmBonus ?? 0;
+        zone.GrantContributionPoints(killer.CharacterId, TowerCpForPvmMilestone.ComputeReward(towerBonus));
     }
 
     /// <summary>

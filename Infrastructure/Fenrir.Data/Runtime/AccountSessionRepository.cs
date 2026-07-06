@@ -114,6 +114,16 @@ public sealed record AccountSessionRepository(ICaeriusNetDbContext Db) : IAccoun
         return await Db.QueryAsImmutableArrayAsync<ReapedAccountSessionDto>(sp, ct);
     }
 
+    /// <summary>Never cached: ServerQuotaRefreshHost controls the refresh cadence (~1s), not this repository.</summary>
+    public async ValueTask<int> GetActiveSessionCountAsync(CancellationToken ct)
+    {
+        var sp = new StoredProcedureParametersBuilder("runtime", "usp_AccountSession_GetActiveCount", 1,
+                CommandTimeoutSeconds)
+            .Build();
+
+        return await Db.ExecuteScalarAsync<int>(sp, ct);
+    }
+
     private static bool IsClaimWriteConflict(int errorNumber) =>
         errorNumber is ErrorWriteConflict or ErrorDependencyFailure or ErrorCommitDependencyAborted;
 }

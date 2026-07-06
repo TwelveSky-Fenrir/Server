@@ -31,16 +31,20 @@ public sealed partial class Zone
 
     public int GroundItemCount => _groundItems.Count;
 
-    /// <summary>Tick-owned caller only (<see cref="Monsters.MonsterSpawnScheduler" />).</summary>
+    /// <summary>
+    ///     Tick-owned caller only (<see cref="Monsters.MonsterSpawnScheduler" />). <paramref name="instanceId" />
+    ///     is Side effect #3's Zone-241 drop tag (Server/ts25zone/S07_MyGame03.cpp:599) -- null for every
+    ///     ordinary drop.
+    /// </summary>
     public void SpawnGroundItem(int itemId, int quantity, float posX, float posY, float posZ, string master,
-        string partyName, int dropSort)
+        string partyName, int dropSort, int? instanceId = null)
     {
         var index = Interlocked.Increment(ref _groundItemServerIndexSeed);
         var uniqueNumber = unchecked((uint)Interlocked.Increment(ref _groundItemUniqueNumberSeed));
 
         var entity = new GroundItemEntity(index, uniqueNumber, itemId, quantity, 0, 0, posX,
             posY, posZ, TruncateName(master), TruncateName(partyName), dropSort, _clock, 0,
-            0, 0);
+            0, 0, instanceId);
 
         _groundItems[index] = entity;
         _groundItemLastRebroadcast[index] = _clock;
@@ -60,10 +64,20 @@ public sealed partial class Zone
     ///     needs <see cref="_grid" />, tick-thread-only) -- see <see cref="_claimedGroundItemDespawns" />.
     /// </summary>
     public GroundItemClaimOutcome TryClaimGroundItem(int serverIndex, uint expectedUniqueNumber, string claimantName,
-        string? claimantPartyName, float claimantX, float claimantY, float claimantZ, out GroundItemEntity? item)
+        string? claimantPartyName, float claimantX, float claimantY, float claimantZ, out GroundItemEntity? item,
+        int? claimantInstanceId = null)
     {
         if (!_groundItems.TryGetValue(serverIndex, out var snapshot) ||
             snapshot.UniqueNumber != expectedUniqueNumber)
+        {
+            item = null;
+            return GroundItemClaimOutcome.NotFound;
+        }
+
+        // Side effect #4's pickup gate (Server/ts25zone/S04_MyWork05.cpp:289-297): a mismatch is silently
+        // refused, indistinguishable on the wire from "item no longer there" -- reuses NotFound rather than a
+        // dedicated outcome, matching that documented collapse exactly.
+        if (!IsVisibleAcrossDungeonInstance(snapshot.InstanceId, claimantInstanceId))
         {
             item = null;
             return GroundItemClaimOutcome.NotFound;
@@ -160,7 +174,8 @@ public sealed partial class Zone
                 try
                 {
                     if (_players.TryGetValue(id, out var recipient) &&
-                        recipient.Session is ClientSession clientSession)
+                        recipient.Session is ClientSession clientSession &&
+                        IsVisibleAcrossDungeonInstance(item.InstanceId, recipient.DungeonInstanceId))
                         clientSession.SendRaw(span);
                 }
                 catch (Exception ex)

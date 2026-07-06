@@ -28,9 +28,10 @@ namespace Fenrir.Application.Game.Domain.Simulation;
 ///             own investigation, not something to fake here.
 ///         </item>
 ///         <item>
-///             <c>mCheckStun</c> and the mid-animation <c>aAction.aSort</c> (41/60-68/75) gate -- Fenrir has no
-///             stun state and no multi-tick cast-animation state machine (a buff applies instantly, same as
-///             every manual op30 cast), so there is nothing equivalent to gate on.
+///             The mid-animation <c>aAction.aSort</c> (41/60-68/75) gate -- Fenrir has no multi-tick
+///             cast-animation state machine (a buff applies instantly, same as every manual op30 cast), so
+///             there is nothing equivalent to gate on. <c>mCheckStun</c> itself IS now modeled and gated on
+///             below (<see cref="World.PlayerRuntimeState.IsStunned" />) -- this bullet no longer covers it.
 ///         </item>
 ///         <item>
 ///             <c>MyFactor::GetBonusSkillValue</c>'s equipment-derived skill-grade bonus -- already a
@@ -86,8 +87,9 @@ public sealed class AutoHuntTickSystem(WorldDataCache worldData, DirtyTracker<in
         if (!state.AutoHuntEnabled || state.AutoHuntConfig is not { } config)
             return;
 
-        // BotBuff's own top-level gates: mCheckDeath, aPShopState == 1, aManaValue < 1.
-        if (state.IsDead || state.PshopOpen || state.Mana < 1)
+        // BotBuff's own top-level gates: mCheckDeath, aPShopState == 1, aManaValue < 1, !mCheckStun
+        // (S07_MyGame04.cpp:341, "!mCheckStun" -- previously undocumented as a real gap, now modeled).
+        if (state.IsDead || state.PshopOpen || state.Mana < 1 || state.IsStunned)
             return;
 
         // aBotSkillNum: only the first 2 configured slots, or all 8 while a "continuous auto-buff" cash-shop

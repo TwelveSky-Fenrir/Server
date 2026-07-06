@@ -1,3 +1,5 @@
+using Fenrir.Application.Game.Domain.World.ZoneWar;
+
 namespace Fenrir.Application.Game.Domain;
 
 /// <summary>
@@ -53,4 +55,135 @@ public sealed class GameServerOptions
     ///     session for has been flagged for kick in <c>runtime.AccountSessions</c> (a newer login elsewhere).
     /// </summary>
     public int AccountSessionPollIntervalSeconds { get; set; } = 20;
+
+    /// <summary>
+    ///     Trigger A of <c>Fenrir.Network.Dispatch.FloodProtection.IpFloodGuard</c>: max concurrent connections
+    ///     from one IP to this shard before it's persistently blocked (<c>admin.FirewallRules</c>). Legacy
+    ///     hardcodes this to 40 as a compile-time <c>#define</c> (<c>MAX_CONNECTIONS_PER_IP</c>,
+    ///     <c>Server/Header/enter_count.cpp:5</c>); Fenrir makes it operator-configurable instead, per that
+    ///     feature's own explicit "strict improvement" mandate.
+    /// </summary>
+    public int MaxConnectionsPerIp { get; set; } = 40;
+
+    /// <summary>
+    ///     Trigger B of <c>Fenrir.Network.Dispatch.FloodProtection.IpFloodGuard</c>: max unrecognized-opcode
+    ///     protocol violations from one IP within a rolling wall-clock hour before it's persistently blocked.
+    ///     Legacy hardcodes this to 30 (<c>MAX_ERROR_PACKET_PER_IP</c>, <c>Server/Header/enter_count.cpp:6</c>),
+    ///     but legacy's own escalation function has been dead code (no live call site) since before the current
+    ///     unknown-opcode handling was written -- see <see cref="MaxConnectionsPerIp" />'s sibling type's own
+    ///     remarks. This threshold is therefore NEW behavior beyond legacy parity, not a reproduction of a
+    ///     currently-live legacy limit.
+    /// </summary>
+    public int MaxProtocolViolationsPerIpPerHour { get; set; } = 30;
+
+    /// <summary>
+    ///     Legacy per-instance <c>Zone.Server</c> INI key <c>VoteTribe</c> (Server/Header/ini.h:308-310): arms
+    ///     <c>Fenrir.Application.Game.Hosting.World.ZoneWar.TribeVoteElectionCalendarHost</c> on whichever shard
+    ///     is also configured as <see cref="ShardId" /> 37 (Server/ts25zone/S07_MyGame01.cpp:612-616's server-number
+    ///     gate) -- every other shard never runs that scheduler, regardless of this flag.
+    /// </summary>
+    public bool VoteTribeEnabled { get; set; }
+
+    /// <summary>
+    ///     Legacy per-instance INI key <c>VoteTribeTest</c> (Server/Header/ini.h:308-310): when set alongside
+    ///     <see cref="VoteTribeEnabled" />, the legacy's own hour-compressed test calendar is entirely
+    ///     commented-out dead code (Server/ts25zone/S07_MyGame01.cpp:3583-3629), so the faithful behavior is a
+    ///     complete no-op -- <see cref="Hosting.World.ZoneWar.TribeVoteElectionCalendarHost" /> never advances
+    ///     the election cycle while this is true.
+    /// </summary>
+    public bool VoteTribeTestMode { get; set; }
+
+    /// <summary>
+    ///     Legacy per-instance <c>Zone.Server</c> INI key <c>AllianceTribe</c> (Server/Header/ini.h:308): arms
+    ///     the alliance diplomacy ceremony (Server/ts25zone/S07_MyGame01.cpp:3764-4012's
+    ///     <c>Process_Allience_Server</c>) on whichever shard is also configured as <see cref="ShardId" /> 37 --
+    ///     same single-instance gate as <see cref="VoteTribeEnabled" />. Not yet consumed by any Hosting
+    ///     scheduler -- see <c>Fenrir.Application.Game.Domain.World.ZoneWar.AllianceDiplomacyCeremony</c>'s own
+    ///     remarks for why the per-tick driver is not wired up yet.
+    /// </summary>
+    public bool AllianceTribeEnabled { get; set; }
+
+    /// <summary>
+    ///     Map ids this shard's zones run the Zone-241 "LOD" personal-boss-chain dungeon content on. Legacy
+    ///     arms this per-process at boot from <c>mSERVER_INFO.mServerNumber</c> falling in 325-330
+    ///     (Server/ts25zone/S07_MyGame03.cpp:5946-5960,6240-6242; Server/ts25zone/S04_MyWork02.cpp:1143) --
+    ///     Fenrir shards by map, not by a numbered server-instance-per-process, so this operator-configured
+    ///     map-id set is the natural translation of that same one-time-at-boot gate. Empty by default: the
+    ///     content is entirely inert (the per-avatar instance struct still exists on every
+    ///     <see cref="World.PlayerRuntimeState" /> but is never armed) until an operator lists a map id here.
+    /// </summary>
+    public ISet<short> Zone241DungeonMapIds { get; set; } = new HashSet<short>();
+
+    /// <summary>
+    ///     Legacy per-instance <c>Zone.Server</c> INI flag arming Zone037's scheduled Tribe Symbol Battle
+    ///     open/close cycle (<c>Fenrir.Application.Game.Hosting.World.ZoneWar.TribeSymbolBattleSchedulerHost</c>)
+    ///     on whichever shard is also configured as <see cref="ShardId" /> 37
+    ///     (Server/ts25zone/S07_MyGame01.cpp:578-622's server-number gate) -- the same designated shard as
+    ///     <see cref="VoteTribeEnabled" />/<see cref="AllianceTribeEnabled" />, just a distinct feature flag;
+    ///     every other shard never runs that scheduler regardless of this flag.
+    /// </summary>
+    public bool HolyStoneBattleEnabled { get; set; }
+
+    /// <summary>
+    ///     Legacy per-instance INI flag arming Zone038's Holy Stone possession-war cycle
+    ///     (<c>Fenrir.Application.Game.Hosting.World.ZoneWar.HolyStoneWarCycleHost</c>) on whichever shard is
+    ///     also configured as <see cref="ShardId" /> 38 (Server/ts25zone/S07_MyGame01.cpp:793-819's
+    ///     server-number gate).
+    /// </summary>
+    public bool HolyStoneWarEnabled { get; set; }
+
+    /// <summary>
+    ///     Shared "server test mode" bypass the translated behavior contract describes identically for both
+    ///     Zone037 (skips the day-of-week gate; the fixed-hour gate still applies) and Zone038 (shortens the
+    ///     between-war cooldown from three simulated hours to one) -- modeled as one flag rather than two
+    ///     distinctly-named ones since both citations use the same generic "server test mode configuration
+    ///     flag" wording and live in the same source range (Server/ts25zone/S07_MyGame01.cpp:3632-4287).
+    /// </summary>
+    public bool HolyStoneTestMode { get; set; }
+
+    /// <summary>
+    ///     The three fixed days of the week Zone037 restricts its open/close schedule to outside
+    ///     <see cref="HolyStoneTestMode" />. Not named by the translated behavior contract (only "one of three
+    ///     fixed days" is stated) -- empty by default, which fails safe (the schedule simply never fires
+    ///     outside test mode) rather than guessing which three days.
+    /// </summary>
+    public ISet<DayOfWeek> HolyStoneBattleDays { get; set; } = new HashSet<DayOfWeek>();
+
+    /// <summary>
+    ///     Zone038: the map id the Holy Stone itself sits on, plus its fixed location and the two contest/
+    ///     participation radii around it. None of these are named by the translated behavior contract (only
+    ///     that a "fixed radius" and a "fixed location" exist) -- MapId 0 (never a real hosted map) and
+    ///     zero-sized radii by default, so the war cycle's contest/challenge phases simply find no zone/nobody
+    ///     in range to act on until an operator configures the real values.
+    /// </summary>
+    public short HolyStoneMapId { get; set; }
+
+    public float HolyStoneX { get; set; }
+    public float HolyStoneZ { get; set; }
+    public float HolyStoneCaptureRadius { get; set; } = 1f;
+    public float HolyStoneParticipationRadius { get; set; } = 1f;
+
+    /// <summary>
+    ///     Zone039: the fixed, small set of territory map ids around the Holy Stone this shard hosts, if any --
+    ///     same "Fenrir shards by map, not by a numbered server instance" translation as
+    ///     <see cref="Zone241DungeonMapIds" />. Empty by default: the eviction sweep simply finds no zone to
+    ///     scan until an operator lists the real map ids here.
+    /// </summary>
+    public ISet<short> HolyStoneTerritoryMapIds { get; set; } = new HashSet<short>();
+
+    /// <summary>
+    ///     Which per-map tribe-population quota rule this shard enforces on TEMP_REGISTER_SEND
+    ///     (op11/ZoneHandshake) admission -- see <see cref="TribeQuotaGroup" />'s own remarks for the map-group
+    ///     translation and citations. <c>None</c> by default: fails safe, no quota enforced, until an operator
+    ///     declares which group this shard's hosted map(s) belong to.
+    /// </summary>
+    public TribeQuotaGroup TribeQuotaGroup { get; set; } = TribeQuotaGroup.None;
+
+    /// <summary>
+    ///     How often <c>TempRegistrationIdleSweepHost</c> polls for a TEMP_REGISTER_SEND (op11) connection that
+    ///     never followed up with avatar-selection/ready within <see cref="TempRegistrationIdleSweep.IdleTimeout" />'s
+    ///     three-minute window (Server/ts25zone/S07_MyGame01.cpp:1963-1990). A poll cadence, not the timeout
+    ///     itself -- a real forced-disconnect never lags the three-minute cutoff by more than one cycle.
+    /// </summary>
+    public int TempRegistrationIdleSweepIntervalSeconds { get; set; } = 30;
 }

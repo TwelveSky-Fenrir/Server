@@ -3,7 +3,9 @@ using Fenrir.Application.Game.Abstractions.Chat;
 using Fenrir.Application.Game.Abstractions.Commerce;
 using Fenrir.Application.Game.Abstractions.FishingConsumables;
 using Fenrir.Application.Game.Abstractions.GenericAction;
+using Fenrir.Application.Game.Abstractions.Gm;
 using Fenrir.Application.Game.Abstractions.Guilds;
+using Fenrir.Application.Game.Abstractions.Inventory;
 using Fenrir.Application.Game.Abstractions.ItemModification;
 using Fenrir.Application.Game.Abstractions.Progression;
 using Fenrir.Application.Game.Abstractions.Quests;
@@ -15,7 +17,9 @@ using Fenrir.Application.Game.Services.Chat;
 using Fenrir.Application.Game.Services.Commerce;
 using Fenrir.Application.Game.Services.FishingConsumables;
 using Fenrir.Application.Game.Services.GenericAction;
+using Fenrir.Application.Game.Services.Gm;
 using Fenrir.Application.Game.Services.Guilds;
+using Fenrir.Application.Game.Services.Inventory;
 using Fenrir.Application.Game.Services.ItemModification;
 using Fenrir.Application.Game.Services.Progression;
 using Fenrir.Application.Game.Services.Quests;
@@ -43,6 +47,8 @@ public static class ServicesServiceCollectionExtensions
         AddFishingConsumablesServices(services);
         AddBuffsMountsCosmeticsServices(services);
         AddZoneLifecycleServices(services);
+        AddGmServices(services);
+        AddInventoryServices(services);
 
         return services;
     }
@@ -152,6 +158,7 @@ public static class ServicesServiceCollectionExtensions
         services.AddSingleton<IEnchantItemService, EnchantItemService>();
         services.AddSingleton<IRerollItemService, RerollItemService>();
         services.AddSingleton<IRuneSocketService, RuneSocketService>();
+        services.AddSingleton<IRuneStoneCraftService, RuneStoneCraftService>();
         services.AddSingleton<ISkyUpgradeItemService, SkyUpgradeItemService>();
         services.AddSingleton<IUpgradeCapeService, UpgradeCapeService>();
         services.AddSingleton<IUpgradeItemRankService, UpgradeItemRankService>();
@@ -190,5 +197,20 @@ public static class ServicesServiceCollectionExtensions
         services.AddSingleton<IZoneMoveService, ZoneMoveService>();
         services.AddSingleton<IZoneReadyService, ZoneReadyService>();
         services.AddSingleton<IAttackService, AttackService>();
+    }
+
+    private static void AddGmServices(IServiceCollection services)
+    {
+        services.AddSingleton<IGmBlockAvatarService, GmBlockAvatarService>();
+    }
+
+    /// <summary>
+    ///     tSort 209 (CZ_PROCESS_DATA_SEND, "drop item from inventory to world") -- not yet reachable from
+    ///     GenericActionHandler's own dispatch switch; wiring that up is a separate integration step, see
+    ///     IInventoryToWorldDropService's own remarks.
+    /// </summary>
+    private static void AddInventoryServices(IServiceCollection services)
+    {
+        services.AddSingleton<IInventoryToWorldDropService, InventoryToWorldDropService>();
     }
 }

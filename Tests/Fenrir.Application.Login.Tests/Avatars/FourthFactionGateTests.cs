@@ -1,0 +1,32 @@
+using Fenrir.Application.Login.Domain.Avatars;
+
+namespace Fenrir.Application.Login.Tests.Avatars;
+
+// op17's fourth-faction (Tribe value 3) creation exclusion -- LNW33-gated in legacy, always active in the
+// sole production-shipped build (ReleaseEU33). Réf. C++ : Server/ts25login/S04_MyWork02.cpp:635-646.
+public class FourthFactionGateTests
+{
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void BlocksCreation_TribeZeroToTwo_NeverBlocksRegardlessOfToggle(byte tribe)
+    {
+        Assert.False(FourthFactionGate.BlocksCreation(tribe, enableFourthFaction: false));
+        Assert.False(FourthFactionGate.BlocksCreation(tribe, enableFourthFaction: true));
+    }
+
+    [Fact]
+    public void BlocksCreation_TribeThree_ToggleInDefaultDisabledState_Blocks()
+    {
+        Assert.True(FourthFactionGate.BlocksCreation(FourthFactionGate.FourthFactionTribe,
+            enableFourthFaction: false));
+    }
+
+    [Fact]
+    public void BlocksCreation_TribeThree_ToggleOperatorEnabled_DoesNotBlock()
+    {
+        Assert.False(FourthFactionGate.BlocksCreation(FourthFactionGate.FourthFactionTribe,
+            enableFourthFaction: true));
+    }
+}

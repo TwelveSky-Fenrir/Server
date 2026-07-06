@@ -7,6 +7,13 @@ namespace Fenrir.Data.Abstractions.Characters;
 [GenerateDto]
 public sealed partial record CharacterIdDto(int CharacterId);
 
+/// <summary>
+///     One-row result of usp_CharacterItem_GetIdAtSlot -- the ItemId currently occupying one (Container, Slot)
+///     pair. Row-absent (mapped to a null return by the repository) means the slot is empty.
+/// </summary>
+[GenerateDto]
+public sealed partial record CharacterItemIdDto(int ItemId);
+
 // game.usp_Character_GetByAccount; ordinal-mapped, ctor order must match the SELECT.
 [GenerateDto]
 public sealed partial record CharacterSummaryDto(

@@ -35,4 +35,9 @@
     <ProjectReference Include="..\..\Network\Fenrir.Network.Abstractions\Fenrir.Network.Abstractions.csproj"/>
   </ItemGroup>
 
+  <ItemGroup>
+    <None Remove="obj_tribebanktax\Fenrir.Application.Game.Tests.csproj.nuget.dgspec.json" />
+    <None Remove="obj_tribebanktax\Fenrir.Application.Game.Tests.csproj.nuget.g.targets" />
+  </ItemGroup>
+
 </Project>

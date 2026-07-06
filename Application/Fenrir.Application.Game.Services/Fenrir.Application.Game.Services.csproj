@@ -20,6 +20,7 @@
     <Using Include="Fenrir.Data.Abstractions.Admin"/>
     <Using Include="Fenrir.Data.Abstractions.Characters"/>
     <Using Include="Fenrir.Data.Abstractions.Commerce"/>
+    <Using Include="Fenrir.Data.Abstractions.Game"/>
     <Using Include="Fenrir.Data.Abstractions.Guilds"/>
     <Using Include="Fenrir.Data.Abstractions.Progression"/>
     <Using Include="Fenrir.Data.Abstractions.Runtime"/>

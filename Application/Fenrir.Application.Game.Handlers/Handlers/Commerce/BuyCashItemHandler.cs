@@ -8,7 +8,7 @@ namespace Fenrir.Application.Game.Handlers.Handlers.Commerce;
 
 /// <summary>
 ///     CZ_BUY_CASH_ITEM_SEND (opcode 42) -- purchase a cash-shop item. Price and granted item/quantity are
-///     resolved entirely from <see cref="Fenrir.Application.Game.GameData.WorldDataCache.CashCatalog" />'s
+///     resolved entirely from <see cref="Fenrir.Application.Game.Domain.Commerce.CommerceCatalogCache.CashCatalog" />'s
 ///     <c>CostInfoIndex</c> lookup -- the client's submitted <c>Value[6]</c> is never trusted, only echoed back.
 /// </summary>
 public sealed class BuyCashItemHandler(IBuyCashItemService service) : IAsyncPacketHandler<BuyCashItemRequest>

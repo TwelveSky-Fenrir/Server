@@ -38,7 +38,7 @@ public sealed class CloseShopStallHandler(ICloseShopStallService service)
                     session.Send(r);
                 break;
             case 2:
-                await service.CloseOfflineShopAsync(characterId, cancellationToken);
+                await service.CloseOfflineShopAsync(characterId, zone, cancellationToken);
                 break;
         }
     }

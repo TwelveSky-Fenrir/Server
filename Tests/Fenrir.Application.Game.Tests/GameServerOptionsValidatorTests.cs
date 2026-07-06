@@ -18,7 +18,8 @@ public class GameServerOptionsValidatorTests
         int capacity = 300,
         string? gameDataDirectory = "GameData",
         int heroRankingRolloverCheckIntervalMinutes = 60,
-        int accountSessionPollIntervalSeconds = 20)
+        int accountSessionPollIntervalSeconds = 20,
+        int tempRegistrationIdleSweepIntervalSeconds = 30)
     {
         return new GameServerOptions
         {
@@ -32,7 +33,8 @@ public class GameServerOptionsValidatorTests
             Capacity = capacity,
             GameDataDirectory = gameDataDirectory!,
             HeroRankingRolloverCheckIntervalMinutes = heroRankingRolloverCheckIntervalMinutes,
-            AccountSessionPollIntervalSeconds = accountSessionPollIntervalSeconds
+            AccountSessionPollIntervalSeconds = accountSessionPollIntervalSeconds,
+            TempRegistrationIdleSweepIntervalSeconds = tempRegistrationIdleSweepIntervalSeconds
         };
     }
 
@@ -164,5 +166,16 @@ public class GameServerOptionsValidatorTests
 
         Assert.True(result.Failed);
         Assert.Contains(result.Failures!, f => f.Contains("Game:AccountSessionPollIntervalSeconds"));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void Validate_TempRegistrationIdleSweepIntervalSecondsNotPositive_Fails(int intervalSeconds)
+    {
+        var result = Validator.Validate(null, Options(tempRegistrationIdleSweepIntervalSeconds: intervalSeconds));
+
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures!, f => f.Contains("Game:TempRegistrationIdleSweepIntervalSeconds"));
     }
 }

@@ -8,8 +8,6 @@ namespace Fenrir.Application.Game.Services.Social;
 /// <inheritdoc cref="IDuelService" />
 public sealed class DuelService(ZoneRegistry zones, DuelRegistry duels) : IDuelService
 {
-    private const int DurationSeconds = 180;
-
     public DuelAskResultKind Ask(Zone zone, PlayerRuntimeState challenger, string targetAvatarName, int sort)
     {
         if (zone.MapId == 124)
@@ -25,6 +23,8 @@ public sealed class DuelService(ZoneRegistry zones, DuelRegistry duels) : IDuelS
 
         switch (duels.TryAsk(challenger.CharacterId, target.CharacterId, sort == 1))
         {
+            case DuelAskOutcome.ChallengerAlreadyDueling:
+                return DuelAskResultKind.ChallengerAlreadyDueling;
             case DuelAskOutcome.ChallengerBusy:
                 return DuelAskResultKind.ChallengerBusy;
             case DuelAskOutcome.TargetBusy:
@@ -65,17 +65,20 @@ public sealed class DuelService(ZoneRegistry zones, DuelRegistry duels) : IDuelS
 
         var eatDrugState = duel.NoPotions ? 1 : 0;
 
+        // duel.RemainingTicks is the single source of truth for the 180-legacy-tick countdown (see
+        // DuelRegistry.DurationTicks/ActiveDuel.RemainingTicks's own remarks) -- freshly seeded by TryStart,
+        // never a separately-duplicated literal here.
         playerA.Session.Send(new DuelStartResponse
         {
             DuelState = [1, duel.UniqueNumber, 1],
-            RemainTime = DurationSeconds,
+            RemainTime = duel.RemainingTicks,
             EatDrugState = eatDrugState
         });
 
         playerB.Session.Send(new DuelStartResponse
         {
             DuelState = [1, duel.UniqueNumber, 2],
-            RemainTime = DurationSeconds,
+            RemainTime = duel.RemainingTicks,
             EatDrugState = eatDrugState
         });
     }

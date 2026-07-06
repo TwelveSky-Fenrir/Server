@@ -77,6 +77,42 @@ public class ZoneHandoffTests
     }
 
     [Fact]
+    public void Leave_WithHandoffTarget_CarriesTheRememberedCashCatalogVersionThrough()
+    {
+        // A client mid cash-catalog-notify window must not silently lose that state on an in-process map
+        // transfer -- see PlayerRuntimeState.KnownCashCatalogVersion's own remarks.
+        var dirtyTracker = new DirtyTracker<int>();
+        var source = ZoneTestKit.CreateZone(1, dirtyTracker: dirtyTracker);
+        var target = ZoneTestKit.CreateZone(2, dirtyTracker: dirtyTracker);
+        var (session, _) = ZoneTestKit.CreateSession(1);
+
+        source.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1)));
+        source.Tick(TimeSpan.FromMilliseconds(50));
+        Assert.True(source.TryGetPlayer(10, out var before));
+        before!.KnownCashCatalogVersion = 42;
+
+        source.Post(ZoneCommand.Leave(10, target));
+        source.Tick(TimeSpan.FromMilliseconds(50));
+        target.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.True(target.TryGetPlayer(10, out var after));
+        Assert.Equal(42, after!.KnownCashCatalogVersion);
+    }
+
+    [Fact]
+    public void Enter_OnAFreshLogin_StartsAtTheCashCatalogVersionUnknownSentinel_NotZero()
+    {
+        var zone = ZoneTestKit.CreateZone(1);
+        var (session, _) = ZoneTestKit.CreateSession(1);
+
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.True(zone.TryGetPlayer(10, out var state));
+        Assert.Equal(PlayerRuntimeState.CashCatalogVersionUnknown, state!.KnownCashCatalogVersion);
+    }
+
+    [Fact]
     public void Leave_WithHandoffTarget_RepointsTheSessionsCurrentZone()
     {
         var dirtyTracker = new DirtyTracker<int>();
@@ -149,5 +185,59 @@ public class ZoneHandoffTests
 
         Assert.False(zone.TryGetPlayer(10, out _));
         Assert.Equal(0, zone.PlayerCount);
+    }
+
+    [Fact]
+    public void Leave_WithoutHandoffTarget_RemovesFromTheCrossShardLocationDirectory_ScopedToThisShard()
+    {
+        var characterShardLocations = new FakeCharacterShardLocationRepository();
+        var options = ZoneTestKit.Options();
+        options.ShardId = 7;
+        var zone = ZoneTestKit.CreateZone(1, options: options, characterShardLocations: characterShardLocations);
+        var (session, _) = ZoneTestKit.CreateSession(1);
+
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        zone.Post(ZoneCommand.Leave(10));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.Contains(characterShardLocations.RemoveCalls, c => c.CharacterId == 10 && c.ShardId == 7);
+    }
+
+    [Fact]
+    public void Leave_WithHandoffTarget_NeverTouchesTheCrossShardLocationDirectory()
+    {
+        // ShardId never changes on a same-shard hop -- an in-process handoff must not clean up the directory
+        // row at all, only a true disconnect does.
+        var characterShardLocations = new FakeCharacterShardLocationRepository();
+        var source = ZoneTestKit.CreateZone(1, characterShardLocations: characterShardLocations);
+        var target = ZoneTestKit.CreateZone(2);
+        var (session, _) = ZoneTestKit.CreateSession(1);
+
+        source.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1)));
+        source.Tick(TimeSpan.FromMilliseconds(50));
+
+        source.Post(ZoneCommand.Leave(10, target));
+        source.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.Empty(characterShardLocations.RemoveCalls);
+    }
+
+    [Fact]
+    public void Leave_WithoutHandoffTarget_AndNoCharacterShardLocationRepositoryConfigured_NeverThrows()
+    {
+        // Matches every other existing test zone in this file: characterShardLocations left null (a Zone
+        // must tolerate not being wired up to the cross-shard directory at all, e.g. in tests).
+        var zone = ZoneTestKit.CreateZone(1);
+        var (session, _) = ZoneTestKit.CreateSession(1);
+
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        zone.Post(ZoneCommand.Leave(10));
+        zone.Tick(TimeSpan.FromMilliseconds(50)); // must not throw
+
+        Assert.False(zone.TryGetPlayer(10, out _));
     }
 }

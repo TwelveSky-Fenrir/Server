@@ -34,4 +34,9 @@
                       ReferenceOutputAssembly="false"/>
   </ItemGroup>
 
+  <ItemGroup>
+    <None Remove="obj_tribebanktax\Fenrir.Network.Serialization.csproj.nuget.dgspec.json" />
+    <None Remove="obj_tribebanktax\Fenrir.Network.Serialization.csproj.nuget.g.props" />
+  </ItemGroup>
+
 </Project>

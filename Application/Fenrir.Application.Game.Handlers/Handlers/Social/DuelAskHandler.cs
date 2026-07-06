@@ -31,6 +31,11 @@ public sealed class DuelAskHandler(IDuelService duelService) : IInlinePacketHand
             case DuelAskResultKind.TribeMismatch:
                 zoneSession.Abort(DisconnectReason.Faulted);
                 return;
+            case DuelAskResultKind.ChallengerAlreadyDueling:
+                // A desynced/leaked is-dueling flag on the requester's own side -- not an ordinary "busy"
+                // rejection, see DuelAskResultKind.ChallengerAlreadyDueling's own remarks.
+                zoneSession.Abort(DisconnectReason.Faulted);
+                return;
             case DuelAskResultKind.ChallengerBusy:
                 session.Send(new DuelAnswerResponse { Answer = 3 });
                 return;

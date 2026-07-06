@@ -6,11 +6,17 @@ using Fenrir.Network.Serialization.Packets.Zone;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
-/// <summary>CZ_GUILD_FIND_SEND (opcode 78) -- lookup is process-wide via <see cref="ZoneRegistry" />.</summary>
+/// <summary>
+///     CZ_GUILD_FIND_SEND (opcode 78) -- lookup is process-wide via <see cref="ZoneRegistry" />, falling back
+///     to the cross-shard character-location directory on a same-shard miss. Async (not inline): the
+///     fallback is an awaited DB call on the miss branch, and both handler kinds already run on the
+///     per-connection session loop, never the zone tick.
+/// </summary>
 public sealed class FindGuildMemberHandler(IFindGuildMemberService findGuildMemberService)
-    : IInlinePacketHandler<FindGuildMemberRequest>
+    : IAsyncPacketHandler<FindGuildMemberRequest>
 {
-    public void Handle(in FindGuildMemberRequest packet, IPacketSession session)
+    public async ValueTask HandleAsync(FindGuildMemberRequest packet, IPacketSession session,
+        CancellationToken cancellationToken)
     {
         var zoneSession = (ZoneClientSession)session;
 
@@ -21,7 +27,8 @@ public sealed class FindGuildMemberHandler(IFindGuildMemberService findGuildMemb
         if (!zone.TryGetPlayer(characterId, out var asker) || asker is null)
             return;
 
-        var result = findGuildMemberService.FindZone(asker, packet.AvatarName);
+        var result = await findGuildMemberService.FindZoneAsync(asker, packet.AvatarName, cancellationToken)
+            .ConfigureAwait(false);
         if (!result.HasGuild)
             return; // No guild: silent return, not Quit (matches legacy's bare return).
 

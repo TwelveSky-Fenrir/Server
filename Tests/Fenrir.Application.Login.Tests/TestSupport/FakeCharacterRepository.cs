@@ -10,6 +10,7 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
 {
     private readonly List<CharacterSummaryDto> _summaries;
     private readonly Dictionary<int, CharacterWorldEntryDto> _worldEntriesByCharacterId;
+    private readonly Dictionary<(int CharacterId, byte Container, byte Slot), int> _itemIdBySlot = new();
     private int _nextCharacterId = 1000;
 
     private FakeCharacterRepository(IEnumerable<CharacterSummaryDto> summaries,
@@ -24,6 +25,24 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
 
     /// <summary>Every argument CreateAvatarHandler passed to the most recent CreateWithStarterKitAsync call.</summary>
     public CreateWithStarterKitCall? LastCreateWithStarterKit { get; private set; }
+
+    /// <summary>Every (characterId, container, slot) tuple GetItemIdAtSlotAsync was queried with, in call order.</summary>
+    public List<(int CharacterId, byte Container, byte Slot)> QueriedItemSlots { get; } = [];
+
+    /// <summary>Seeds one occupied item slot for <see cref="GetItemIdAtSlotAsync" /> -- RenameAvatarService tests.</summary>
+    public FakeCharacterRepository WithItemAtSlot(int characterId, byte container, byte slot, int itemId)
+    {
+        _itemIdBySlot[(characterId, container, slot)] = itemId;
+        return this;
+    }
+
+    public ValueTask<int?> GetItemIdAtSlotAsync(int characterId, byte container, byte slot, CancellationToken ct)
+    {
+        QueriedItemSlots.Add((characterId, container, slot));
+        return ValueTask.FromResult<int?>(_itemIdBySlot.TryGetValue((characterId, container, slot), out var itemId)
+            ? itemId
+            : null);
+    }
 
     public ValueTask<ReadOnlyCollection<CharacterSummaryDto>> GetByAccountAsync(int accountId, CancellationToken ct)
     {
@@ -64,14 +83,33 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
         return ValueTask.FromResult(characterId);
     }
 
+    /// <summary>Every (accountId, slot) pair passed to DeleteAsync, in call order -- for DeleteAvatarService tests.</summary>
+    public List<(int AccountId, byte Slot)> DeleteCalls { get; } = [];
+
     public ValueTask DeleteAsync(int accountId, byte slot, CancellationToken ct)
     {
-        throw new NotSupportedException();
+        DeleteCalls.Add((accountId, slot));
+        _summaries.RemoveAll(s => s.Slot == slot);
+        return ValueTask.CompletedTask;
     }
 
     public ValueTask PersistPositionsAsync(IReadOnlyList<CharacterPositionTvp> rows, CancellationToken ct)
     {
         throw new NotSupportedException();
+    }
+
+    /// <summary>Every argument the most recent ClampVitalsFloorAsync call received, for ZoneTransferService tests.</summary>
+    public ClampVitalsFloorCall? LastClampVitalsFloor { get; private set; }
+
+    public ValueTask ClampVitalsFloorAsync(int characterId, long flushSequence, int life, int mana,
+        CancellationToken ct)
+    {
+        LastClampVitalsFloor = new ClampVitalsFloorCall(characterId, flushSequence, life, mana);
+
+        if (_worldEntriesByCharacterId.TryGetValue(characterId, out var existing))
+            _worldEntriesByCharacterId[characterId] = existing with { Life = life, Mana = mana };
+
+        return ValueTask.CompletedTask;
     }
 
     public ValueTask<CharacterWorldEntryBundle?> GetWorldEntryBundleAsync(int characterId, CancellationToken ct)
@@ -205,7 +243,18 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
     {
         return new FakeCharacterRepository([], []);
     }
+
+    /// <summary>
+    ///     One or more character-select-screen rows with no backing world-entry data -- for DeleteAvatarService
+    ///     tests, which only ever read the roster (to resolve a slot to a CharacterId/Tribe) and call DeleteAsync.
+    /// </summary>
+    public static FakeCharacterRepository WithSummaries(params CharacterSummaryDto[] summaries)
+    {
+        return new FakeCharacterRepository(summaries, []);
+    }
 }
+
+internal sealed record ClampVitalsFloorCall(int CharacterId, long FlushSequence, int Life, int Mana);
 
 internal sealed record CreateWithStarterKitCall(
     int AccountId,

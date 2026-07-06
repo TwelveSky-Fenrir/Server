@@ -136,7 +136,7 @@ public class GuildActionServiceBroadcastTests
 
     private static GuildActionService CreateService(ZoneRegistry zones, FakeGuildRepository guilds)
     {
-        return new GuildActionService(zones, guilds, new FakeCharacterRepository(), new GuildInviteRegistry(),
+        return new GuildActionService(zones, guilds, new GuildInviteRegistry(),
             NullLogger<GuildActionService>.Instance);
     }
 

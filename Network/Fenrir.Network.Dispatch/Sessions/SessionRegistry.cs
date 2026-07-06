@@ -47,6 +47,25 @@ public sealed class SessionRegistry
         return [.._accountToSession.Keys];
     }
 
+    /// <summary>
+    ///     Every currently-registered session whose captured <see cref="ClientSession.RemoteEndPoint" /> address
+    ///     matches <paramref name="ipAddress" /> by exact string equality -- mirrors legacy's own
+    ///     <c>IsMatchString</c>/<c>strcmp</c> matching (no CIDR/prefix/wildcard matching exists in the legacy
+    ///     source this mirrors either). Used by <see cref="FloodProtection.IpFloodGuard" /> to kick every session
+    ///     sharing an IP once that IP trips a flood threshold -- a rare, defensive event, not a hot path, so a
+    ///     plain scan is fine here.
+    /// </summary>
+    public ImmutableArray<ClientSession> SnapshotByRemoteAddress(string ipAddress)
+    {
+        var builder = ImmutableArray.CreateBuilder<ClientSession>();
+
+        foreach (var session in _sessions.Values)
+            if (session.RemoteEndPoint?.Address.ToString() == ipAddress)
+                builder.Add(session);
+
+        return builder.ToImmutable();
+    }
+
     public void Unregister(long sessionId)
     {
         _sessions.TryRemove(sessionId, out _);

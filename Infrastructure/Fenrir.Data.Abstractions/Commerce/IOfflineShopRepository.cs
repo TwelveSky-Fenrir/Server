@@ -30,4 +30,12 @@ public interface IOfflineShopRepository
     public ValueTask<ProxyShopNameRowDto?> GetProxyShopNameAsync(int characterId, CancellationToken ct);
 
     public ValueTask SetProxyShopNameAsync(int characterId, string shopName, CancellationToken ct);
+
+    /// <summary>
+    ///     Extends a proxy shop's rental expiration (game.OfflineShops.ShopDate) to a freshly computed
+    ///     compact-date value. Succeeds identically whether a matching row was updated or none exists at all
+    ///     (no <c>@@ROWCOUNT</c> guard) -- mirrors the legacy's own "reports success with nothing persisted"
+    ///     behavior for a character with no persisted shop record (Server/ts25extra/S08_MyDB.cpp:1085-1106).
+    /// </summary>
+    public ValueTask ExtendRentalAsync(int characterId, int newShopDate, CancellationToken ct);
 }

@@ -9,11 +9,12 @@ namespace Fenrir.Application.Game.Domain.Combat;
 ///     answer <c>ZPP_ZONE_CHECK_KILL_FOR_PLAYUSER_SEND</c> (opcode 43) before a PvP kill's reward was granted.
 /// </summary>
 /// <remarks>
-///     Only the cooldown gate itself is reimplemented here -- see
-///     <see cref="Zone" />'s PvP-kill hook for what reward it currently unlocks
-///     (today: only <see cref="PlayerRuntimeState.MissionKillOtherTribe" />) and what
-///     it deliberately does not (CP/EXP/drop -- a separate, not-yet-built pipeline;
-///     <c>16_full_opcode_gap_inventory.md</c> §4 C05).
+///     Only the cooldown gate itself is reimplemented here -- see <see cref="Zone" />'s
+///     <c>ApplyPvpKillRewards</c> for the full reward pipeline this now gates (CP formula/FFA-override,
+///     hero-rank points, EXP, and the per-zone-gated <see cref="PlayerRuntimeState.MissionKillOtherTribe" />)
+///     and <c>Fenrir.Application.Game.Domain.Combat.PvpKillRewardZoneCatalog</c>'s own remarks for what still
+///     isn't modeled (item-drop payload, same-IP gating, the event-popup counter, the Regular-War-host CP
+///     override, the guild-level counter).
 ///     <para>
 ///         Directional and per ordered pair, exactly like the legacy's nested attacker -&gt; defenser -&gt; last-kill-tick
 ///         map: repeatedly farming the same victim is gated, but the victim killing the farmer back is a separate

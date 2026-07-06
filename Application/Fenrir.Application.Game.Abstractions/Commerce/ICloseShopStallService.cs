@@ -14,7 +14,8 @@ public interface ICloseShopStallService
 
     /// <summary>
     ///     Closes the offline/deputy shop (ShopState only -- items/money stay attached). No unicast reply is ever
-    ///     sent for this, matching the legacy.
+    ///     sent for this, matching the legacy. Also removes it from <paramref name="zone" />'s periodic-broadcast
+    ///     table (<see cref="Zone.RemoveProxyShop" />) so it stops being re-announced the very next tick.
     /// </summary>
-    public ValueTask CloseOfflineShopAsync(int characterId, CancellationToken cancellationToken);
+    public ValueTask CloseOfflineShopAsync(int characterId, Zone zone, CancellationToken cancellationToken);
 }

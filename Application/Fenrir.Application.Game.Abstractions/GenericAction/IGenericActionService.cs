@@ -53,4 +53,14 @@ public interface IGenericActionService
 
     public ValueTask<GenericActionResult> BuyFromNpcShopAsync(Zone zone, PlayerRuntimeState state, int characterId,
         DefaultPData move, CancellationToken cancellationToken);
+
+    /// <summary>
+    ///     tSort 206 -- spend unspent stat points (aStatPoint) to raise Strength/Dexterity/Vitality/Intelligence.
+    ///     Not yet reachable from <c>GenericActionHandler</c>'s dispatch switch; wiring it up (including reading
+    ///     <c>tStatSort</c>/<c>tAddValue</c> off the wire payload) is a separate integration step.
+    /// </summary>
+    /// <param name="statSort">tStatSort, the wire category code -- legal range 1-12 (see StatAllocationResolver).</param>
+    /// <param name="addValue">tAddValue, only meaningful for category codes 9-12.</param>
+    public ValueTask<GenericActionResult> AllocateStatPointAsync(int statSort, int addValue, Zone zone,
+        PlayerRuntimeState state, int characterId, CancellationToken cancellationToken);
 }

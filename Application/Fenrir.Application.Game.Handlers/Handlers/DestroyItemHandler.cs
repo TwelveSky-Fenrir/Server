@@ -19,6 +19,7 @@ public sealed class DestroyItemHandler(IDestroyItemService destroyItemService)
     {
         var zoneSession = (ZoneClientSession)session;
         var characterId = zoneSession.CharacterId!.Value;
+        var accountId = zoneSession.AccountId!.Value;
 
         if (zoneSession.CurrentZone is not Zone zone || !zone.TryGetPlayer(characterId, out var state) ||
             state is null)
@@ -27,7 +28,8 @@ public sealed class DestroyItemHandler(IDestroyItemService destroyItemService)
         await state.EconomyActionLock.WaitAsync(cancellationToken);
         try
         {
-            var result = await destroyItemService.DestroyAsync(packet, zone, state, characterId, cancellationToken);
+            var result = await destroyItemService.DestroyAsync(packet, zone, state, characterId, accountId,
+                cancellationToken);
 
             if (result.Outcome != DestroyItemOutcome.Applied)
             {

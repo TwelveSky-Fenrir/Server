@@ -49,9 +49,13 @@ internal sealed class FakeTribeRepository : ITribeRepository
         throw new NotSupportedException();
     }
 
+    public List<(byte TribeId, int CharacterId)> ClearSubMasterCalls { get; } = [];
+
     public ValueTask ClearSubMasterAsync(byte tribeId, int characterId, CancellationToken ct)
     {
-        throw new NotSupportedException();
+        ClearSubMasterCalls.Add((tribeId, characterId));
+        SubMasters.RemoveAll(s => s.TribeId == tribeId && s.CharacterId == characterId);
+        return ValueTask.CompletedTask;
     }
 
     public ValueTask<ReadOnlyCollection<TribeBankSlotDto>> GetBankAsync(byte tribeId, CancellationToken ct)

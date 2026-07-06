@@ -1,4 +1,5 @@
 using Fenrir.Application.Game.Abstractions.Commerce;
+using Fenrir.Application.Game.Domain.Commerce;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
@@ -13,7 +14,8 @@ namespace Fenrir.Application.Game.Handlers.Handlers.Commerce;
 /// </summary>
 public sealed class OpenShopStallHandler(IOpenShopStallService service) : IAsyncPacketHandler<OpenShopStallRequest>
 {
-    public const short PshopZoneNumber = 37;
+    /// <summary>Single source of truth: <see cref="ProxyShopZonePolicy.ZoneNumber" />; see its remarks.</summary>
+    public const short PshopZoneNumber = ProxyShopZonePolicy.ZoneNumber;
 
     public async ValueTask HandleAsync(OpenShopStallRequest packet, IPacketSession session,
         CancellationToken cancellationToken)

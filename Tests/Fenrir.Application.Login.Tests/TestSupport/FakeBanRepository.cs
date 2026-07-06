@@ -14,4 +14,10 @@ internal sealed class FakeBanRepository(bool accountBanned = false) : IBanReposi
     {
         throw new NotSupportedException();
     }
+
+    public ValueTask<int> CreateAsync(int? accountId, int? characterId, BanReason reason, DateTime? expiresAtUtc,
+        CancellationToken ct)
+    {
+        throw new NotSupportedException();
+    }
 }

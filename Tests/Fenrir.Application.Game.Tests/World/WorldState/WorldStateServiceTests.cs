@@ -267,6 +267,65 @@ public class WorldStateServiceTests
         Assert.Throws<ArgumentException>(() => service.SetAllianceOffer(1, 1, true));
     }
 
+    [Fact]
+    public void GetAllyOf_NoAcceptedOfferInvolvingTheTribe_ReturnsNull()
+    {
+        var (service, _) = CreateInitialized();
+        service.SetAllianceOffer(0, 1, false); // proposed, not yet accepted
+
+        Assert.Null(service.GetAllyOf(0));
+        Assert.Null(service.GetAllyOf(1));
+    }
+
+    [Fact]
+    public void GetAllyOf_AcceptedOffer_ReturnsTheOtherTribe_FromEitherDirection()
+    {
+        var (service, _) = CreateInitialized();
+        service.SetAllianceOffer(0, 2, true);
+
+        Assert.Equal((byte?)2, service.GetAllyOf(0));
+        Assert.Equal((byte?)0, service.GetAllyOf(2));
+    }
+
+    [Fact]
+    public void GetAllyOf_NeverReturnsTheTribeItselfEvenIfAskedForItsOwnOffer()
+    {
+        // Regression guard for the exact fact TowerFriendlyFireGate's own fix rests on: a real ally lookup
+        // can never be reflexive.
+        var (service, _) = CreateInitialized();
+        service.SetAllianceOffer(0, 2, true);
+
+        Assert.NotEqual((byte?)0, service.GetAllyOf(0));
+        Assert.NotEqual((byte?)2, service.GetAllyOf(2));
+    }
+
+    [Fact]
+    public void GetAllyOf_TribeInNoActivePair_ReturnsNull_EvenWhenOtherPairsAreActive()
+    {
+        var (service, _) = CreateInitialized();
+        service.SetAllianceOffer(0, 2, true);
+
+        Assert.Null(service.GetAllyOf(1));
+        Assert.Null(service.GetAllyOf(3));
+    }
+
+    [Fact]
+    public void GetAllyOf_OutOfRangeTribeId_Throws()
+    {
+        var (service, _) = CreateInitialized();
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => service.GetAllyOf(4));
+    }
+
+    [Fact]
+    public void GetAllyOf_BeforeInitialize_Throws()
+    {
+        var repository = new FakeWorldStateRepository();
+        var service = new WorldStateService(repository, NullLogger<WorldStateService>.Instance);
+
+        Assert.Throws<InvalidOperationException>(() => service.GetAllyOf(0));
+    }
+
     [Theory]
     [InlineData(4)]
     [InlineData(200)]
@@ -288,24 +347,52 @@ public class WorldStateServiceTests
 
         Assert.Equal(0, repository.UpdateCallCount);
         Assert.Empty(repository.TribeUpdateCalls);
+        Assert.Empty(repository.SymbolStateUpdateCalls);
+        Assert.Empty(repository.TribePointsDeltaCalls);
     }
 
     [Fact]
-    public async Task FlushIfDirtyAsync_WhenDirty_PersistsWorldAndAllFourTribesAndOffers_ThenClearsDirty()
+    public async Task FlushIfDirtyAsync_WhenDirty_PersistsWorldAndAllFourTribeSymbolStatesAndOffers_ThenClearsDirty()
     {
         var (service, repository) = CreateInitialized();
         service.SetZone038Winner(2);
-        service.AddTribePoints(1, 30);
         service.SetAllianceOffer(0, 3, true);
 
         await service.FlushIfDirtyAsync(CancellationToken.None);
 
         Assert.Equal(1, repository.UpdateCallCount);
         Assert.Equal((byte?)2, repository.LastWorldUpdate!.Value.Zone038WinTribe);
-        Assert.Equal(4, repository.TribeUpdateCalls.Count); // every tribe re-persisted, matching the legacy's blind rewrite
-        Assert.Contains(repository.TribeUpdateCalls, c => c.TribeId == 1 && c.Points == 30);
+        // Every tribe's symbol state re-persisted every cycle, matching the legacy's blind rewrite -- but
+        // never via the old whole-row UpdateTribeAsync (that stays reserved for SetTribePoints's admin path).
+        Assert.Equal(4, repository.SymbolStateUpdateCalls.Count);
+        Assert.Empty(repository.TribeUpdateCalls);
         Assert.Contains(repository.AllianceOfferCalls, c => c is { From: 0, To: 3, IsAccepted: true });
         Assert.False(service.IsDirty);
+    }
+
+    [Fact]
+    public async Task FlushIfDirtyAsync_WhenPointsAreDirty_CallsAddTribePointsAsync_WithTheSummedDelta_NotTheAbsoluteValue()
+    {
+        var (service, repository) = CreateInitialized();
+        service.AddTribePoints(1, 10);
+        service.AddTribePoints(1, 20);
+
+        await service.FlushIfDirtyAsync(CancellationToken.None);
+
+        Assert.Single(repository.TribePointsDeltaCalls, c => c.TribeId == 1 && c.Delta == 30);
+        Assert.False(service.IsDirty);
+    }
+
+    [Fact]
+    public async Task FlushIfDirtyAsync_TribesWithNoPendingDelta_NeverCallAddTribePointsAsync()
+    {
+        var (service, repository) = CreateInitialized();
+        service.AddTribePoints(1, 10);
+
+        await service.FlushIfDirtyAsync(CancellationToken.None);
+
+        Assert.Single(repository.TribePointsDeltaCalls);
+        Assert.DoesNotContain(repository.TribePointsDeltaCalls, c => c.TribeId != 1);
     }
 
     [Fact]
@@ -319,6 +406,171 @@ public class WorldStateServiceTests
 
         Assert.True(service.IsDirty);
         Assert.Equal(0, repository.UpdateCallCount);
+    }
+
+    [Fact]
+    public async Task FlushIfDirtyAsync_PointDeltaFlushFailure_CompensatesTheExactAmount_ForNextIntervalToRetry()
+    {
+        var (service, repository) = CreateInitialized();
+        service.AddTribePoints(2, 42);
+        repository.ThrowOnAddTribePoints = true;
+
+        await service.FlushIfDirtyAsync(CancellationToken.None); // must not throw
+
+        Assert.True(service.IsDirty);
+
+        // Retry: the exact delta must still be there, not lost and not doubled.
+        repository.ThrowOnAddTribePoints = false;
+        await service.FlushIfDirtyAsync(CancellationToken.None);
+
+        Assert.Single(repository.TribePointsDeltaCalls, c => c.TribeId == 2 && c.Delta == 42);
+    }
+
+    [Fact]
+    public async Task SetTribePoints_ThenFlush_ReachesTheDbViaTheAdditiveDeltaPath_NotTheAbsoluteOverwrite()
+    {
+        var (service, repository) = CreateInitialized();
+
+        service.SetTribePoints(0, 500);
+        await service.FlushIfDirtyAsync(CancellationToken.None);
+
+        // Local cache still shows the absolute value...
+        Assert.Equal(500, service.GetTribe(0).Points);
+        // ...but it reached the DB as a delta against the previous baseline (0 -> 500 == +500), via the same
+        // concurrency-safe additive proc AddTribePoints uses -- never the whole-row UpdateTribeAsync.
+        Assert.Contains(repository.TribePointsDeltaCalls, c => c.TribeId == 0 && c.Delta == 500);
+        Assert.Empty(repository.TribeUpdateCalls);
+    }
+
+    [Fact]
+    public async Task ReconcileAsync_MergesDbPointsTotal_WithLocallyPendingDelta_NeverLosingEither()
+    {
+        var (service, repository) = CreateInitialized();
+
+        // Simulate another shard having already pushed the DB tribe-0 total to 100 via its own flush.
+        repository.Tribes[0] = repository.Tribes[0] with { Points = 100 };
+
+        // This shard has its own not-yet-flushed local delta.
+        service.AddTribePoints(0, 7);
+
+        await service.ReconcileAsync(CancellationToken.None);
+
+        Assert.Equal(107, service.GetTribe(0).Points);
+    }
+
+    [Fact]
+    public async Task ReconcileAsync_ScalarFieldsUnchangedSinceRead_SwapsInFreshDbValues()
+    {
+        var (service, repository) = CreateInitialized();
+        repository.Row = repository.Row with { Zone038WinTribe = 2, Zone038WinTribeTime = 1234 };
+
+        await service.ReconcileAsync(CancellationToken.None);
+
+        Assert.Equal((byte?)2, service.World.Zone038WinTribe);
+        Assert.Equal(1234, service.World.Zone038WinTribeTime);
+    }
+
+    [Fact]
+    public async Task ReconcileAsync_LocalScalarMutationDuringRead_NeverStompedByTheStaleRead()
+    {
+        // A repository whose GetAsync mutates the service mid-read, simulating a genuinely concurrent local
+        // mutation racing the reconcile's own DB round trip.
+        var repository = new RaceOnGetAsyncRepository();
+        var service = new WorldStateService(repository, NullLogger<WorldStateService>.Instance);
+        await service.InitializeAsync(CancellationToken.None);
+        repository.ServiceUnderTest = service;
+        repository.Row = repository.Row with { Zone038WinTribe = 1 }; // the "stale" DB value
+
+        await service.ReconcileAsync(CancellationToken.None);
+
+        // The concurrent local mutation (tribe 3) must win -- the stale DB read (tribe 1) must never overwrite it.
+        Assert.Equal((byte?)3, service.World.Zone038WinTribe);
+    }
+
+    [Fact]
+    public async Task ReconcileAsync_RepositoryFailure_NeverThrows_AndLeavesCacheUntouched()
+    {
+        var (service, repository) = CreateInitialized();
+        service.SetZone038Winner(2);
+        repository.ThrowOnGet = true;
+
+        await service.ReconcileAsync(CancellationToken.None); // must not throw
+
+        Assert.Equal((byte?)2, service.World.Zone038WinTribe); // untouched by the failed reconcile
+    }
+
+    [Fact]
+    public async Task ReconcileAsync_BeforeInitialize_IsANoOp_NotAThrow()
+    {
+        var repository = new FakeWorldStateRepository();
+        var service = new WorldStateService(repository, NullLogger<WorldStateService>.Instance);
+
+        await service.ReconcileAsync(CancellationToken.None); // must not throw despite never having initialized
+    }
+
+    /// <summary>
+    ///     Wraps a plain <see cref="FakeWorldStateRepository" /> (composition, not inheritance -- the fake is
+    ///     sealed) and mutates the service's own WorldState mid-<see cref="GetAsync" />, simulating a race with
+    ///     <see cref="WorldStateService.ReconcileAsync" />'s own read.
+    /// </summary>
+    private sealed class RaceOnGetAsyncRepository : IWorldStateRepository
+    {
+        private readonly FakeWorldStateRepository _inner = new();
+
+        public WorldStateService? ServiceUnderTest { get; set; }
+
+        public WorldStateRowDto Row
+        {
+            get => _inner.Row;
+            set => _inner.Row = value;
+        }
+
+        public ValueTask EnsureInitializedAsync(CancellationToken ct) => _inner.EnsureInitializedAsync(ct);
+
+        public async ValueTask<(WorldStateRowDto? Row, ReadOnlyCollection<WorldStateTribeDto> Tribes,
+                ReadOnlyCollection<WorldStateAllianceOfferDto> AllianceOffers)>
+            GetAsync(CancellationToken ct)
+        {
+            // Null during the service's own InitializeAsync (set only afterward, by the test) -- the race
+            // being simulated is specifically with ReconcileAsync's own read, not the boot-time load.
+            ServiceUnderTest?.SetZone038Winner(3);
+            return await _inner.GetAsync(ct);
+        }
+
+        public ValueTask UpdateAsync(byte? zone038WinTribe, int? zone038WinTribeTime, bool tribeSymbolBattle,
+            byte? monsterSymbol, int? monsterSymbolEndTime, byte? highTribe, short updateTribePoint,
+            CancellationToken ct) =>
+            _inner.UpdateAsync(zone038WinTribe, zone038WinTribeTime, tribeSymbolBattle, monsterSymbol,
+                monsterSymbolEndTime, highTribe, updateTribePoint, ct);
+
+        public ValueTask UpdateTribeAsync(byte tribeId, DateTime? symbolDate, bool hasSymbol, int points,
+            bool isClosed, CancellationToken ct) =>
+            _inner.UpdateTribeAsync(tribeId, symbolDate, hasSymbol, points, isClosed, ct);
+
+        public ValueTask UpdateTribeSymbolStateAsync(byte tribeId, DateTime? symbolDate, bool hasSymbol,
+            bool isClosed, CancellationToken ct) =>
+            _inner.UpdateTribeSymbolStateAsync(tribeId, symbolDate, hasSymbol, isClosed, ct);
+
+        public ValueTask AddTribePointsAsync(byte tribeId, int delta, CancellationToken ct) =>
+            _inner.AddTribePointsAsync(tribeId, delta, ct);
+
+        public ValueTask SetAllianceOfferAsync(byte fromTribeId, byte toTribeId, bool isAccepted,
+            CancellationToken ct) =>
+            _inner.SetAllianceOfferAsync(fromTribeId, toTribeId, isAccepted, ct);
+
+        public ValueTask<ReadOnlyCollection<TribeVoteDto>> GetTribeVotesAsync(byte tribeId, CancellationToken ct) =>
+            _inner.GetTribeVotesAsync(tribeId, ct);
+
+        public ValueTask RegisterTribeVoteCandidateAsync(byte tribeId, byte slotIndex, int candidateCharacterId,
+            short candidateLevel, int killOtherTribeCount, CancellationToken ct) =>
+            _inner.RegisterTribeVoteCandidateAsync(tribeId, slotIndex, candidateCharacterId, candidateLevel,
+                killOtherTribeCount, ct);
+
+        public ValueTask AddTribeVotePointsAsync(byte tribeId, byte slotIndex, int points, CancellationToken ct) =>
+            _inner.AddTribeVotePointsAsync(tribeId, slotIndex, points, ct);
+
+        public ValueTask ClearTribeVotesAsync(byte tribeId, CancellationToken ct) =>
+            _inner.ClearTribeVotesAsync(tribeId, ct);
     }
 
     [Fact]
@@ -369,6 +621,12 @@ public class WorldStateServiceTests
 
         public ValueTask UpdateTribeAsync(byte tribeId, DateTime? symbolDate, bool hasSymbol, int points,
             bool isClosed, CancellationToken ct) => ValueTask.CompletedTask;
+
+        public ValueTask UpdateTribeSymbolStateAsync(byte tribeId, DateTime? symbolDate, bool hasSymbol,
+            bool isClosed, CancellationToken ct) => ValueTask.CompletedTask;
+
+        public ValueTask AddTribePointsAsync(byte tribeId, int delta, CancellationToken ct) =>
+            ValueTask.CompletedTask;
 
         public ValueTask SetAllianceOfferAsync(byte fromTribeId, byte toTribeId, bool isAccepted,
             CancellationToken ct) => ValueTask.CompletedTask;

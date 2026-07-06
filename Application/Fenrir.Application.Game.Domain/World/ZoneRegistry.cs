@@ -3,8 +3,12 @@ using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Movement;
+using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.Quests;
 using Fenrir.Application.Game.Domain.Simulation;
+using Fenrir.Application.Game.Domain.Social.Duel;
+using Fenrir.Application.Game.Domain.Social.Party;
+using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Data.WriteBehind;
 using Microsoft.Extensions.Logging;
@@ -24,14 +28,23 @@ public sealed class ZoneRegistry
     private readonly GameServerOptions _options;
     private readonly QuestCatalog _questCatalog;
     private readonly ImmutableArray<ISimulationSystem> _systems;
+    private readonly TowerWarState? _towerWar;
     private readonly WorldDataCache _worldData;
+    private readonly WorldStateService? _worldState;
     private readonly ILogger<Zone> _zoneLogger;
+    private readonly PartyRegistry? _partyRegistry;
+    private readonly DuelRegistry? _duelRegistry;
+    private readonly HeroRankPointAccumulator? _heroRankPointAccumulator;
+    private readonly ICharacterShardLocationRepository? _characterShardLocations;
     private FrozenDictionary<short, Zone> _zones = FrozenDictionary<short, Zone>.Empty;
 
     public ZoneRegistry(IOptions<GameServerOptions> options, MovementRules movementRules,
         DirtyTracker<int> dirtyTracker, ILogger<Zone> zoneLogger, WorldDataCache worldData,
         IEnumerable<ISimulationSystem> simulationSystems, QuestCatalog? questCatalog = null,
-        KillCooldownTracker? killCooldownTracker = null)
+        KillCooldownTracker? killCooldownTracker = null, TowerWarState? towerWar = null,
+        WorldStateService? worldState = null, PartyRegistry? partyRegistry = null,
+        DuelRegistry? duelRegistry = null, HeroRankPointAccumulator? heroRankPointAccumulator = null,
+        ICharacterShardLocationRepository? characterShardLocations = null)
     {
         _options = options.Value;
         _movementRules = movementRules;
@@ -48,6 +61,31 @@ public sealed class ZoneRegistry
         // Shared process-wide across every zone (C05 anti-farm gate) -- a PvP kill farmed across a zone handoff
         // still hits the same tracker instance instead of each zone starting a fresh cooldown clock.
         _killCooldownTracker = killCooldownTracker ?? new KillCooldownTracker();
+
+        // Optional: null only in test call sites that don't exercise tower rewards -- every zone shares the
+        // same process-wide TowerWarState singleton the tower-siege lifecycle already depends on.
+        _towerWar = towerWar;
+
+        // Optional: null only in test call sites that don't exercise tower/alliance combat gating -- every
+        // zone shares the same process-wide WorldStateService singleton the RvR alliance state already
+        // depends on (see Zone.Combat.cs's tower-guardian friendly-fire gate).
+        _worldState = worldState;
+
+        // Optional: null only in test call sites that don't exercise the stun request's team-stun/duel gates
+        // (Zone.Stun.cs) -- every zone shares the same process-wide PartyRegistry/DuelRegistry singleton
+        // every other social feature already depends on.
+        _partyRegistry = partyRegistry;
+        _duelRegistry = duelRegistry;
+
+        // Optional: null only in test call sites that don't exercise the PvP-kill hero-point grant -- every
+        // zone shares the same process-wide HeroRankPointAccumulator singleton so a farmed kill in one zone
+        // and its later flush aren't split across independent trackers.
+        _heroRankPointAccumulator = heroRankPointAccumulator;
+
+        // Optional: null only in test call sites that don't exercise the cross-shard character-location
+        // directory -- every zone shares this same process-wide repository so a true disconnect on any
+        // hosted map can clean up its own row (see Zone.PlayerLifecycle.cs's HandleLeave).
+        _characterShardLocations = characterShardLocations;
     }
 
     /// <summary>Every hosted zone, in no particular order — the tick host launches one loop per entry.</summary>
@@ -77,7 +115,10 @@ public sealed class ZoneRegistry
         _zones = maps.ToFrozenDictionary(
             mapId => mapId,
             mapId => new Zone(mapId, _options, _movementRules, _dirtyTracker, _systems, _zoneLogger, _worldData,
-                questCatalog: _questCatalog, killCooldownTracker: _killCooldownTracker));
+                questCatalog: _questCatalog, killCooldownTracker: _killCooldownTracker, towerWar: _towerWar,
+                worldState: _worldState, partyRegistry: _partyRegistry, duelRegistry: _duelRegistry,
+                heroRankPointAccumulator: _heroRankPointAccumulator,
+                characterShardLocations: _characterShardLocations));
     }
 
     public bool TryGet(short mapId, [NotNullWhen(true)] out Zone? zone)

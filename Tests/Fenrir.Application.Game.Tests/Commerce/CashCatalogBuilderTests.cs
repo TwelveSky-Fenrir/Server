@@ -125,4 +125,27 @@ public class CashCatalogBuilderTests
 
         Assert.Equal(0, version);
     }
+
+    [Fact]
+    public void ResolveCrc_ReturnsTheDedicatedSentinelRowsItemId_DistinctFromTheVersionRow()
+    {
+        var crc = CashCatalogBuilder.ResolveCrc([
+            Product(1, 1, 100, 0, 20, true),
+            Product(100000, 5, 6, 0, 0, true), // version sentinel -- must not be mistaken for the CRC row
+            Product(100001, 5, 99, 0, 0, true) // CRC sentinel
+        ]);
+
+        Assert.Equal(99, crc);
+    }
+
+    [Fact]
+    public void ResolveCrc_NoSentinelRow_ReturnsZero()
+    {
+        var crc = CashCatalogBuilder.ResolveCrc([
+            Product(1, 1, 100, 0, 20, true),
+            Product(100000, 5, 6, 0, 0, true)
+        ]);
+
+        Assert.Equal(0, crc);
+    }
 }

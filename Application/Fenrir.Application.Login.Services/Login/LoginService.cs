@@ -2,6 +2,8 @@ using System.Net;
 using Fenrir.Application.Login.Abstractions.Login;
 using Fenrir.Application.Login.Domain;
 using Fenrir.Application.Login.Domain.RateLimiting;
+using Fenrir.Application.Login.Domain.Security;
+using Fenrir.Data.Abstractions.Game;
 using Fenrir.Data.Abstractions.Runtime;
 using Fenrir.Data.Security;
 using Fenrir.Network.Dispatch.Sessions;
@@ -11,24 +13,41 @@ using Microsoft.Extensions.Options;
 namespace Fenrir.Application.Login.Services.Login;
 
 /// <summary>
-///     op11 CL_LOGIN_SEND business logic -- IP rate limit, then the application firewall, then version, then MAC
-///     restriction, then auth run in that order so an over-budget/blocked/incompatible/banned-PC attempt never
-///     reaches Argon2id/SQL account lookup.
+///     op11 CL_LOGIN_SEND business logic -- IP rate limit (Fenrir-only, no legacy analog), then maintenance
+///     lockdown, then server-full quota, then the application firewall, then version, then MAC restriction,
+///     then auth, then the device anti-spoofing gate, run in that order so an under-maintenance/over-capacity/
+///     over-budget/blocked/incompatible/banned-PC/spoofed-device attempt never reaches Argon2id/SQL account
+///     lookup (or, for the spoofing gate, never reaches PIN/session-claim) unnecessarily.
 /// </summary>
+/// <remarks>
+///     Réf. C++ (maintenance/quota) : Server/ts25login/S04_MyWork02.cpp:149-154 (maintenance, tResult=1) et
+///     :155-160 (quota serveur plein, tResult=3) -- les deux premiers contrôles du handler legacy, avant même le
+///     contrôle de version (:161-166) ; voir <see cref="LoginCapacityGate" />/<see cref="LoginCapacityState" />
+///     pour le détail et Fenrir.Application.Login.Hosting.ServerQuotaRefreshHost pour le rafraîchissement
+///     continu (~1s) de cet état, jamais relu en ligne dans ce chemin de requête. Le rate limiter IP ci-dessus
+///     reste volontairement en premier malgré cet ordre legacy : c'est un ajout Fenrir sans équivalent legacy,
+///     protégeant contre le flood indépendamment de l'état maintenance/quota.
+///     Réf. C++ (device anti-spoofing gate) : see <see cref="DeviceSpoofingGuard" />'s own remarks for the full
+///     citation range (Server/ts25login/S08_MyDB.cpp:497-507 and siblings).
+/// </remarks>
 public sealed class LoginService(
     IAccountRepository accounts,
     IAccountPinRepository pins,
     ICharacterRepository characters,
     LoginIpRateLimiter ipRateLimiter,
+    LoginCapacityState capacity,
     ApplicationFirewall firewall,
     IBanRepository bans,
     IMacRestrictionRepository macRestrictions,
     IOptions<LoginServerOptions> options,
     SessionRegistry registry,
-    IAccountSessionRepository accountSessions) : ILoginService
+    IAccountSessionRepository accountSessions,
+    IEventLogRepository eventLog) : ILoginService
 {
     // Legacy tResult codes actually producible by Fenrir's flows (S04_MyWork02.cpp W_LOGIN_SEND / S08_MyDB Login):
+    private const int ResultMaintenance = 1; // MyGame::mMaxPlayerNum == 0 (S04_MyWork02.cpp:149-154)
     private const int ResultIpBlocked = 2; // MyDB::CheckGMIP/CheckBanIP (S04_MyWork02.cpp:195-215)
+    private const int ResultServerFull = 3; // MyGame::mPresentPlayerNum >= mMaxPlayerNum (S04_MyWork02.cpp:155-160)
     private const int ResultVersionMismatch = 4; // tVersion != mServerVersion
     private const int ResultUnknownAccount = 6; // mDB.Login: account not found
     private const int ResultWrongPassword = 7; // mDB.Login: password mismatch
@@ -43,10 +62,28 @@ public sealed class LoginService(
     private const int ResultAlreadyConnected = 8;
 
     private const int ResultBlocked = 9; // mDB.Login: uBlockInfo >= today (ban); Fenrir lockout maps here too
-    private const int ResultCustomMessage = 10000; // mDB.Login: macinfo mac_limit < 1 ("Your PC has been banned.")
+
+    // mDB.Login: shared "free-text application message" result code -- also carries the "Protect Spoofed"
+    // gate's "Invalid devices!" message (Server/ts25login/S08_MyDB.cpp:497-507) alongside the unrelated
+    // macinfo mac_limit < 1 case below; the legacy client has no finer-grained handling to distinguish them.
+    private const int ResultCustomMessage = 10000;
+
     private const int ResultSuccess = 0;
 
     private const string MacBannedMessage = "Your PC has been banned.";
+    private const string InvalidDevicesMessage = "Invalid devices!";
+
+    /// <summary>
+    ///     game.EventLog.EventCode for a successful authentication (Category=Session) -- an app-owned numbering
+    ///     scheme with no central catalog yet (see game.EventLog.sql's own "app-owned numbering scheme" comment).
+    ///     Scoped within EventLogCategory.Session alongside the other three session-lifecycle events wired so
+    ///     far: Fenrir.Application.Login.Hosting.LoginConnectionHost's LoginSessionEndedEventCode (2),
+    ///     Fenrir.Application.Game.Services.ZoneLifecycle.ZoneHandshakeService's ZoneTransferAcceptedEventCode
+    ///     (3), and Fenrir.Application.Game.Hosting.GameConnectionHost's LogoutEventCode (4) -- a future central
+    ///     event-code registry should supersede these four rather than silently reusing one of their numeric
+    ///     values for something unrelated.
+    /// </summary>
+    private const short LoginSucceededEventCode = 1;
 
     /// <summary>
     ///     Fixed reference hash so the "account not found" path pays the same Argon2id cost as a real verify
@@ -60,6 +97,18 @@ public sealed class LoginService(
     {
         if (!ipRateLimiter.TryConsume(remoteEndPoint))
             return LoginResult.RateLimitedResult;
+
+        // Maintenance lockdown / server-full quota: the two earliest gates in the legacy handler, evaluated
+        // before every other check below (including the firewall/version/MAC/auth gates none of which the
+        // legacy source ran this early). Both read only continuously-refreshed server-wide state -- no packet
+        // field, no database round trip on this request path itself (ServerQuotaRefreshHost owns that).
+        switch (LoginCapacityGate.Evaluate(capacity.MaxPlayers, capacity.CurrentPlayers))
+        {
+            case LoginCapacityOutcome.Maintenance:
+                return Failure(ResultMaintenance, "", false);
+            case LoginCapacityOutcome.ServerFull:
+                return Failure(ResultServerFull, "", false);
+        }
 
         // Checked ahead of Argon2id/SQL (unlike legacy, which only ran this after a successful mDB.Login): an
         // already-known-bad IP shouldn't get a free password-guessing attempt against any account.
@@ -83,6 +132,15 @@ public sealed class LoginService(
             return Failure(result, "", true);
 
         var accountId = account!.AccountId;
+
+        // "Protect Spoofed" anti-spoofing gate: runs after the account row is located, the password has
+        // matched, and the block/ban check has already passed (see AuthenticateConstantTimeAsync above) --
+        // the same point the legacy routine evaluates it at. Re-arms VersionOk like every other post-auth-
+        // success failure (ConflictLogin/ConflictGameKicked/ConflictTearingDown below do the same).
+        var remoteIp = remoteEndPoint?.Address.ToString();
+        if (DeviceSpoofingGuard.IsSpoofedDeviceTuple(account.AccountGrade, macAddress, packet.Adapter.AdapterName,
+                remoteIp))
+            return Failure(ResultCustomMessage, InvalidDevicesMessage, true);
 
         // "****" (PIN exists) vs "" (must create) is what the legacy client keys the op13/op15 choice on.
         var storedPin = await pins.GetAsync(accountId, cancellationToken);
@@ -123,8 +181,13 @@ public sealed class LoginService(
 
         var chars = await characters.GetByAccountAsync(accountId, cancellationToken);
 
+        // Session-lifecycle audit row: this is the "Login" leg (see LoginSucceededEventCode's remarks for the
+        // other three legs). No character is chosen yet at this point in the flow, so ActorCharacterId is null.
+        await eventLog.LogAsync(LoginSucceededEventCode, EventLogCategory.Session, accountId, null, null, null,
+            null, null, null, null, null, 1, remoteIp is null ? null : $"RemoteIp={remoteIp}", cancellationToken);
+
         return new LoginResult(LoginOutcome.Success, ResultSuccess, "", false, accountId, requirePin, pinMask,
-            [..chars], newToken);
+            [..chars], newToken, account.AccountGrade);
     }
 
     /// <summary>

@@ -14,7 +14,7 @@ public sealed record SessionTicketRepository(ICaeriusNetDbContext Db) : ISession
     private const int CommandTimeoutSeconds = 5;
 
     public ValueTask CreateAsync(int accountId, int characterId, byte shardId, int ttlSeconds, Guid sessionToken,
-        CancellationToken ct)
+        short accountGrade, CancellationToken ct)
     {
         var parameters =
             new StoredProcedureParametersBuilder("runtime", "usp_SessionTicket_Create", 0, CommandTimeoutSeconds)
@@ -23,6 +23,7 @@ public sealed record SessionTicketRepository(ICaeriusNetDbContext Db) : ISession
                 .AddParameter("ShardId", shardId, SqlDbType.TinyInt)
                 .AddParameter("TtlSeconds", ttlSeconds, SqlDbType.Int)
                 .AddParameter("SessionToken", sessionToken, SqlDbType.UniqueIdentifier)
+                .AddParameter("AccountGrade", accountGrade, SqlDbType.SmallInt)
                 .Build();
 
         return Db.ExecuteAsync(parameters, ct);

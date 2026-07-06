@@ -21,6 +21,7 @@ public sealed class CraftItemHandler(ICraftItemService craftItemService)
     {
         var zoneSession = (ZoneClientSession)session;
         var characterId = zoneSession.CharacterId!.Value;
+        var accountId = zoneSession.AccountId!.Value;
 
         if (zoneSession.CurrentZone is not Zone zone || !zone.TryGetPlayer(characterId, out var state) ||
             state is null)
@@ -35,7 +36,7 @@ public sealed class CraftItemHandler(ICraftItemService craftItemService)
                 case CraftRecipeCatalog.JadeUpgradeSort:
                 {
                     var result = await craftItemService.ResolveJadeUpgradeAsync(packet, zone, state, characterId,
-                        cancellationToken);
+                        accountId, cancellationToken);
 
                     if (result.Outcome != JadeUpgradeOutcome.Applied)
                     {
@@ -54,7 +55,7 @@ public sealed class CraftItemHandler(ICraftItemService craftItemService)
                 case CraftRecipeCatalog.AdvancedElixirSort:
                 {
                     var result = await craftItemService.ResolveAdvancedElixirAsync(packet, zone, state, characterId,
-                        cancellationToken);
+                        accountId, cancellationToken);
 
                     if (result.Outcome == AdvancedElixirOutcome.Rejected)
                     {

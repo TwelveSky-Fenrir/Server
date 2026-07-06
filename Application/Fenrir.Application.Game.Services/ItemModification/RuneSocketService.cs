@@ -15,9 +15,26 @@ namespace Fenrir.Application.Game.Services.ItemModification;
 /// </summary>
 public sealed class RuneSocketService(
     ICharacterRepository characters,
+    IEventLogQueue eventLogQueue,
     ILogger<RuneSocketService> logger)
     : IRuneSocketService
 {
+    /// <summary>
+    ///     game.EventLog.EventCode for a rune-insert attempt -- the wire opcode (op157) itself. See
+    ///     <see cref="RuneRemoveEventCode" /> for why remove gets its own, distinct code within the same
+    ///     opcode/Category pair.
+    /// </summary>
+    private const short RuneInsertEventCode = 157;
+
+    /// <summary>
+    ///     game.EventLog.EventCode for a rune-remove attempt -- op157's sort=1 sub-action. Insert and remove
+    ///     are opposite, independently interesting operations for audit purposes, so each gets its own
+    ///     EventCode rather than sharing op157's number and relying on Outcome/Payload alone to disambiguate --
+    ///     same "app-owned numbering scheme, caller-interpreted alongside Category" posture as every other
+    ///     EventCode in this codebase.
+    /// </summary>
+    private const short RuneRemoveEventCode = 158;
+
     public async ValueTask<RuneInsertResult> InsertAsync(RuneSocketRequest packet, Zone zone,
         PlayerRuntimeState state, int characterId, CancellationToken cancellationToken)
     {
@@ -39,6 +56,14 @@ public sealed class RuneSocketService(
 
         await characters.ReplaceContainerAsync(characterId, (byte)packet.Page, ToTvps(projectedContainer),
             cancellationToken);
+
+        if (!eventLogQueue.Enqueue(new EventLogEntryTvp(RuneInsertEventCode, (byte)EventLogCategory.Enchant, null,
+                characterId, null, null, null, null, null, sourceStack.ItemId, 1, 0,
+                $"RuneIndex={packet.RuneIndex};Serial={sourceStack.Serial};ClientItemIndex={packet.ItemIndex}",
+                DateTime.UtcNow)))
+            logger.LogWarning(
+                "game.EventLog write-behind queue full: dropped rune-insert audit row for character {CharacterId}",
+                characterId);
 
         if (!await zone.PostRuneSocketCommandAndWaitAsync(
                 new RuneSocketZoneCommand(characterId, packet.RuneIndex, packet.ItemIndex, packedStat, null),
@@ -80,6 +105,13 @@ public sealed class RuneSocketService(
 
         await characters.ReplaceContainerAsync(characterId, container, ToTvps(projectedContainer),
             cancellationToken);
+
+        if (!eventLogQueue.Enqueue(new EventLogEntryTvp(RuneRemoveEventCode, (byte)EventLogCategory.Enchant, null,
+                characterId, null, null, null, null, null, resolved.ItemId, 1, 0,
+                $"RuneIndex={packet.RuneIndex};Container={container};Slot={slot}", DateTime.UtcNow)))
+            logger.LogWarning(
+                "game.EventLog write-behind queue full: dropped rune-remove audit row for character {CharacterId}",
+                characterId);
 
         if (!await zone.PostRuneSocketCommandAndWaitAsync(
                 new RuneSocketZoneCommand(characterId, packet.RuneIndex, null, null, null), cancellationToken))

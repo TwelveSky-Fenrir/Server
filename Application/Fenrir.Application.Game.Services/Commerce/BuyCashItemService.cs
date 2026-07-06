@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using Fenrir.Application.Game.Abstractions.Commerce;
+using Fenrir.Application.Game.Domain.Commerce;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.GameData;
@@ -11,6 +12,7 @@ namespace Fenrir.Application.Game.Services.Commerce;
 public sealed class BuyCashItemService(
     ICashRepository cash,
     WorldDataCache worldData,
+    CommerceCatalogCache catalog,
     ILogger<BuyCashItemService> logger) : IBuyCashItemService
 {
     // Shared "shop-specific" error code, reused across cash-shop-family rejects.
@@ -19,11 +21,12 @@ public sealed class BuyCashItemService(
     public async ValueTask<BuyCashItemResponse?> ResolveAndApplyAsync(BuyCashItemRequest packet, Zone zone,
         PlayerRuntimeState state, int characterId, int accountId, CancellationToken cancellationToken)
     {
+        var costInfo = catalog.CashCatalog.CostInfoByIndex;
         var index = packet.CostInfoIndex;
-        if (index < 0 || index >= worldData.CashCatalog.CostInfoByIndex.Length)
+        if (index < 0 || index >= costInfo.Length)
             return null;
 
-        var entry = worldData.CashCatalog.CostInfoByIndex[index];
+        var entry = costInfo[index];
         if (!entry.IsAssigned || !worldData.ItemsById.TryGetValue(entry.ItemId, out var itemDefinition))
             return null;
 

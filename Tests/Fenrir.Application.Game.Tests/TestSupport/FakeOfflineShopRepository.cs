@@ -1,0 +1,81 @@
+using Fenrir.Data.Abstractions.Characters;
+using Fenrir.Data.Abstractions.Commerce;
+
+namespace Fenrir.Application.Game.Tests.TestSupport;
+
+/// <summary>
+///     In-memory stand-in for IOfflineShopRepository: only the shop-lookup/rental-extension surface used by
+///     <c>UseInventoryItemServiceTests</c>' proxy-shop-rental-extension coverage is exercised here; every
+///     other member is out of scope for this test project (offline-shop lifecycle itself has its own
+///     coverage elsewhere).
+/// </summary>
+internal sealed class FakeOfflineShopRepository : IOfflineShopRepository
+{
+    private OfflineShopRowDto? _shop;
+
+    public bool ThrowOnExtendRental { get; set; }
+    public int? LastExtendRentalNewShopDate { get; private set; }
+
+    public void SeedShop(OfflineShopRowDto shop)
+    {
+        _shop = shop;
+    }
+
+    public ValueTask<(OfflineShopRowDto? Shop, IReadOnlyList<OfflineShopItemRowDto> Items)> GetByCharacterAsync(
+        int characterId, CancellationToken ct)
+    {
+        return ValueTask.FromResult<(OfflineShopRowDto?, IReadOnlyList<OfflineShopItemRowDto>)>((_shop, []));
+    }
+
+    public ValueTask OpenAndReplaceContainersAsync(int characterId, short? zoneNumber, int shopDate,
+        string shopName, int locationX, int locationY, int locationZ, IReadOnlyList<OfflineShopItemSlotTvp> items,
+        IReadOnlyList<CharacterItemSlotTvp> inventoryPage0, IReadOnlyList<CharacterItemSlotTvp> inventoryPage1,
+        CancellationToken ct)
+    {
+        throw new NotImplementedException();
+    }
+
+    public ValueTask SetStateAsync(int characterId, byte shopState, CancellationToken ct)
+    {
+        throw new NotImplementedException();
+    }
+
+    public ValueTask RetrieveItemAndReplaceContainerAsync(int characterId, short slotIndex, int expectedItemId,
+        int expectedQuantity, int expectedValue, byte container, IReadOnlyList<CharacterItemSlotTvp> items,
+        CancellationToken ct)
+    {
+        throw new NotImplementedException();
+    }
+
+    public ValueTask ExecutePurchaseAsync(int sellerCharacterId, short slotIndex, int expectedItemId,
+        int expectedQuantity, int expectedValue, int price, int buyerCharacterId, byte buyerContainer,
+        IReadOnlyList<CharacterItemSlotTvp> buyerItems, CancellationToken ct)
+    {
+        throw new NotImplementedException();
+    }
+
+    public ValueTask WithdrawMoneyAsync(int characterId, int expectedMoney, int expectedBigMoney,
+        CancellationToken ct)
+    {
+        throw new NotImplementedException();
+    }
+
+    public ValueTask<ProxyShopNameRowDto?> GetProxyShopNameAsync(int characterId, CancellationToken ct)
+    {
+        throw new NotImplementedException();
+    }
+
+    public ValueTask SetProxyShopNameAsync(int characterId, string shopName, CancellationToken ct)
+    {
+        throw new NotImplementedException();
+    }
+
+    public ValueTask ExtendRentalAsync(int characterId, int newShopDate, CancellationToken ct)
+    {
+        if (ThrowOnExtendRental)
+            throw new InvalidOperationException("Simulated SQL failure");
+
+        LastExtendRentalNewShopDate = newShopDate;
+        return ValueTask.CompletedTask;
+    }
+}

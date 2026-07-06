@@ -2,64 +2,173 @@ using Fenrir.Application.Login.Handlers;
 using Fenrir.Application.Login.Handlers.Handlers;
 using Fenrir.Application.Login.Services.RenameAvatar;
 using Fenrir.Application.Login.Tests.TestSupport;
+using Fenrir.Data.Abstractions.Characters;
+using Fenrir.Data.Abstractions.Guilds;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Login;
 
 namespace Fenrir.Application.Login.Tests.Handlers;
 
-// op19 CL_CHANGE_AVATAR_NAME_SEND -- legacy result codes (0/2/101/102) are forwarded verbatim from
-// game.usp_Character_Rename; structural bounds violations Quit().
+// op19 CL_CHANGE_AVATAR_NAME_SEND -- item-1133 gate, five relationship refusals (Result=3, collapsed),
+// legacy result codes (0/2/101/102) forwarded verbatim from game.usp_Character_Rename, and the
+// structural/charset preconditions that Quit() outright. A successful rename (Result=0) is also recorded
+// as a game.EventLog AccountSecurity row; every other path writes nothing.
 public class ClChangeAvatarNameSendHandlerTests
 {
     private const int AccountId = 42;
+    private const int CharacterId = 1000;
+    private const byte Slot = 0;
+    private const byte Tribe = 1;
+    private const byte ItemContainer = 0;
+    private const byte ItemSlot = 5;
+    private const int RenameScrollItemId = 1133;
+
+    private static CharacterSummaryDto Summary => new(CharacterId, Slot, "Hero", Tribe, 0, 0, 0, 10);
+
+    private static RenameAvatarRequest Request(int avatarPost = Slot, string name = "NewName",
+        int page = ItemContainer, int index = ItemSlot) => new()
+    {
+        AvatarPost = avatarPost,
+        ChangeAvatarName = name,
+        Page = page,
+        Index = index
+    };
+
+    private static RenameAvatarHandler BuildHandler(
+        FakeCharacterRepository characters,
+        FakeCharacterRenameRepository? renames = null,
+        FakeTribeRepository? tribes = null,
+        FakeWorldStateRepository? worldState = null,
+        FakeGuildRepository? guilds = null,
+        FakeFriendRepository? friends = null,
+        FakeMentorRepository? mentors = null,
+        FakeEventLogRepository? eventLog = null)
+    {
+        var service = new RenameAvatarService(
+            characters,
+            tribes ?? FakeTribeRepository.Empty(),
+            worldState ?? FakeWorldStateRepository.Empty(),
+            guilds ?? FakeGuildRepository.Empty(),
+            friends ?? FakeFriendRepository.Empty(),
+            mentors ?? FakeMentorRepository.Empty(),
+            renames ?? FakeCharacterRenameRepository.ReturningResult(0),
+            eventLog ?? new FakeEventLogRepository());
+        return new RenameAvatarHandler(service);
+    }
+
+    private static FakeCharacterRepository CharactersWithRenameScroll()
+    {
+        return FakeCharacterRepository.WithSummaries(Summary)
+            .WithItemAtSlot(CharacterId, ItemContainer, ItemSlot, RenameScrollItemId);
+    }
 
     [Fact]
-    public async Task HandleAsync_RenameSucceeds_RepliesResultZero()
+    public async Task HandleAsync_RenameSucceeds_RepliesResultZeroAndLogsEvent()
     {
+        var characters = CharactersWithRenameScroll();
         var renames = FakeCharacterRenameRepository.ReturningResult(0);
-        var handler = new RenameAvatarHandler(new RenameAvatarService(renames));
+        var eventLog = new FakeEventLogRepository();
+        var handler = BuildHandler(characters, renames, eventLog: eventLog);
         var (session, pipe) = CreateSessionInCharSelect();
 
-        await handler.HandleAsync(
-            new RenameAvatarRequest { AvatarPost = 1, ChangeAvatarName = "NewName", Page = 0, Index = 5 },
-            session, CancellationToken.None);
+        await handler.HandleAsync(Request(), session, CancellationToken.None);
 
         Assert.NotNull(renames.LastCall);
         Assert.Equal(AccountId, renames.LastCall.Value.AccountId);
-        Assert.Equal((byte)1, renames.LastCall.Value.Slot);
+        Assert.Equal(Slot, renames.LastCall.Value.Slot);
         Assert.Equal("NewName", renames.LastCall.Value.NewName);
         await PacketAssert.AssertSentAsync(pipe, new RenameAvatarResponse { Result = 0 });
         Assert.Null(session.DisconnectReason);
+        Assert.Single(eventLog.LoggedEvents);
     }
 
     [Theory]
-    [InlineData(2)] // name taken / new == current
+    [InlineData(2)] // name taken / unchanged
     [InlineData(102)] // slot vanished
     public async Task HandleAsync_ProcReturnsLegacyFailureCode_ForwardsItVerbatim(int code)
     {
+        var characters = CharactersWithRenameScroll();
         var renames = FakeCharacterRenameRepository.ReturningResult(code);
-        var handler = new RenameAvatarHandler(new RenameAvatarService(renames));
+        var eventLog = new FakeEventLogRepository();
+        var handler = BuildHandler(characters, renames, eventLog: eventLog);
         var (session, pipe) = CreateSessionInCharSelect();
 
-        await handler.HandleAsync(
-            new RenameAvatarRequest { AvatarPost = 0, ChangeAvatarName = "Name", Page = 0, Index = 0 }, session,
-            CancellationToken.None);
+        await handler.HandleAsync(Request(), session, CancellationToken.None);
 
         await PacketAssert.AssertSentAsync(pipe, new RenameAvatarResponse { Result = code });
+        Assert.Empty(eventLog.LoggedEvents);
+        Assert.Null(session.DisconnectReason);
     }
 
     [Fact]
     public async Task HandleAsync_RepositoryThrows_RepliesResult101WithoutDisconnecting()
     {
+        var characters = CharactersWithRenameScroll();
         var renames = FakeCharacterRenameRepository.Throwing(new InvalidOperationException("boom"));
-        var handler = new RenameAvatarHandler(new RenameAvatarService(renames));
+        var eventLog = new FakeEventLogRepository();
+        var handler = BuildHandler(characters, renames, eventLog: eventLog);
         var (session, pipe) = CreateSessionInCharSelect();
 
-        await handler.HandleAsync(
-            new RenameAvatarRequest { AvatarPost = 0, ChangeAvatarName = "Name", Page = 0, Index = 0 }, session,
-            CancellationToken.None);
+        await handler.HandleAsync(Request(), session, CancellationToken.None);
 
         await PacketAssert.AssertSentAsync(pipe, new RenameAvatarResponse { Result = 101 });
+        Assert.Null(session.DisconnectReason);
+        Assert.Empty(eventLog.LoggedEvents);
+    }
+
+    [Fact]
+    public async Task HandleAsync_NoCharacterAtSlot_RepliesResult102WithoutCallingRenameRepository()
+    {
+        var characters = FakeCharacterRepository.WithNone();
+        var renames = FakeCharacterRenameRepository.ReturningResult(0);
+        var handler = BuildHandler(characters, renames);
+        var (session, pipe) = CreateSessionInCharSelect();
+
+        await handler.HandleAsync(Request(), session, CancellationToken.None);
+
+        await PacketAssert.AssertSentAsync(pipe, new RenameAvatarResponse { Result = 102 });
+        Assert.Null(renames.LastCall);
+        Assert.Null(session.DisconnectReason);
+    }
+
+    // Server/ts25login/S04_MyWork02.cpp:1340-1344: the claimed (Page, Index) slot must hold exactly item
+    // 1133. Any other value -- including an empty slot -- disconnects with no response at all.
+    [Theory]
+    [InlineData(null)] // empty slot
+    [InlineData(4321)] // some other item
+    public async Task HandleAsync_ItemAtSlotIsNotRenameScroll_AbortsWithoutReplying(int? itemIdAtSlot)
+    {
+        var characters = FakeCharacterRepository.WithSummaries(Summary);
+        if (itemIdAtSlot is { } id)
+            characters.WithItemAtSlot(CharacterId, ItemContainer, ItemSlot, id);
+        var renames = FakeCharacterRenameRepository.ReturningResult(0);
+        var handler = BuildHandler(characters, renames);
+        var (session, pipe) = CreateSessionInCharSelect();
+
+        await handler.HandleAsync(Request(), session, CancellationToken.None);
+
+        Assert.Equal(DisconnectReason.Malformed, session.DisconnectReason);
+        Assert.Null(renames.LastCall);
+        PacketAssert.AssertNothingSent(pipe);
+    }
+
+    // Server/ts25login/S04_MyWork02.cpp:1358-1385: all five relationship refusals collapse to the same
+    // Result=3 response, indistinguishable to the client. One representative case (guild membership) is
+    // exercised at the handler level; RenameAvatarServiceTests covers all five plus their fixed ordering.
+    [Fact]
+    public async Task HandleAsync_GuildMember_RepliesResultThreeWithoutRenaming()
+    {
+        var characters = CharactersWithRenameScroll();
+        var membership = new CharacterGuildMembershipDto(1, "Guild", 0, "Rookie");
+        var guilds = FakeGuildRepository.WithMembership(CharacterId, membership);
+        var renames = FakeCharacterRenameRepository.ReturningResult(0);
+        var handler = BuildHandler(characters, renames, guilds: guilds);
+        var (session, pipe) = CreateSessionInCharSelect();
+
+        await handler.HandleAsync(Request(), session, CancellationToken.None);
+
+        await PacketAssert.AssertSentAsync(pipe, new RenameAvatarResponse { Result = 3 });
+        Assert.Null(renames.LastCall);
         Assert.Null(session.DisconnectReason);
     }
 
@@ -72,13 +181,34 @@ public class ClChangeAvatarNameSendHandlerTests
     public async Task HandleAsync_StructuralViolation_AbortsWithoutCallingRepository(int avatarPost, string name,
         int page, int index)
     {
+        var characters = CharactersWithRenameScroll();
         var renames = FakeCharacterRenameRepository.ReturningResult(0);
-        var handler = new RenameAvatarHandler(new RenameAvatarService(renames));
+        var handler = BuildHandler(characters, renames);
         var (session, pipe) = CreateSessionInCharSelect();
 
-        await handler.HandleAsync(
-            new RenameAvatarRequest { AvatarPost = avatarPost, ChangeAvatarName = name, Page = page, Index = index },
-            session, CancellationToken.None);
+        await handler.HandleAsync(Request(avatarPost, name, page, index), session, CancellationToken.None);
+
+        Assert.Null(renames.LastCall);
+        Assert.Equal(DisconnectReason.Malformed, session.DisconnectReason);
+        PacketAssert.AssertNothingSent(pipe);
+    }
+
+    // CheckNameString (Server/Header/safestring.h:43-81): unlike creation, a whitelist violation here
+    // disconnects with no response -- the same treatment as the structural checks above (S04_MyWork02.cpp
+    // l.1345).
+    [Theory]
+    [InlineData("New Name")] // space
+    [InlineData("New_Name")] // underscore
+    [InlineData("New-Name")] // hyphen
+    [InlineData("Nômme")] // accented Latin byte
+    public async Task HandleAsync_NewNameWithDisallowedCharacters_AbortsWithoutCallingRepository(string name)
+    {
+        var characters = CharactersWithRenameScroll();
+        var renames = FakeCharacterRenameRepository.ReturningResult(0);
+        var handler = BuildHandler(characters, renames);
+        var (session, pipe) = CreateSessionInCharSelect();
+
+        await handler.HandleAsync(Request(name: name), session, CancellationToken.None);
 
         Assert.Null(renames.LastCall);
         Assert.Equal(DisconnectReason.Malformed, session.DisconnectReason);

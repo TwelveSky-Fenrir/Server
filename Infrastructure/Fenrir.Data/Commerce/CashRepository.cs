@@ -38,4 +38,21 @@ public sealed record CashRepository(ICaeriusNetDbContext Db) : ICashRepository
 
         return await Db.ExecuteScalarAsync<int>(builder.Build(), ct);
     }
+
+    /// <summary>
+    ///     Atomic cash credit (balance increment + game.CashLog audit row); throws SQL 50241 for a
+    ///     non-positive amount. No result set is returned by usp_Cash_Credit -- callers that need the
+    ///     post-credit balance should follow up with <see cref="GetBalanceAsync" />.
+    /// </summary>
+    public async ValueTask CreditAsync(int accountId, int amount, byte reason, int? productId, CancellationToken ct)
+    {
+        var sp = new StoredProcedureParametersBuilder("game", "usp_Cash_Credit", 0)
+            .AddParameter("AccountId", accountId, SqlDbType.Int)
+            .AddParameter("Amount", amount, SqlDbType.Int)
+            .AddParameter("Reason", reason, SqlDbType.TinyInt)
+            .AddParameter("ProductId", (object?)productId ?? DBNull.Value, SqlDbType.Int)
+            .Build();
+
+        await Db.ExecuteAsync(sp, ct);
+    }
 }

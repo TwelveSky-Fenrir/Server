@@ -5,20 +5,26 @@ using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Shared;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Chat;
 
 /// <summary>
 ///     CZ_SECRET_CHAT_SEND (opcode 39). Cross-tribe gating is commented out in this fork -- inter-tribe
 ///     whispers pass. Target resolved process-wide (unlike duel/trade/friend/mentor/party's same-zone-only
-///     lookup, see <see cref="ZoneRegistry.TryGetPlayerAndZoneByName" />). No mute gate applies here.
+///     lookup, see <see cref="ZoneRegistry.TryGetPlayerAndZoneByName" />), falling back to the cross-shard
+///     character-location directory on a same-shard miss. No mute gate applies here. Async (not inline):
+///     the cross-shard fallback is an awaited DB call on the miss branch, and both handler kinds already run
+///     on the per-connection session loop, never the zone tick (<c>SessionLoop.ProcessBufferAsync</c>).
 /// </summary>
-public sealed class WhisperHandler(IWhisperService whisperService) : IInlinePacketHandler<WhisperRequest>
+public sealed class WhisperHandler(IWhisperService whisperService, ILogger<WhisperHandler> logger)
+    : IAsyncPacketHandler<WhisperRequest>
 {
     // Socket is a reference-type array; a bare `default` would leave it null and crash the wire writer.
     private static readonly ItemLinkInfo EmptyLink = new() { Index = 0, Activity = 0, Value = 0, Socket = new int[3] };
 
-    public void Handle(in WhisperRequest packet, IPacketSession session)
+    public async ValueTask HandleAsync(WhisperRequest packet, IPacketSession session,
+        CancellationToken cancellationToken)
     {
         var zoneSession = (ZoneClientSession)session;
 
@@ -35,7 +41,8 @@ public sealed class WhisperHandler(IWhisperService whisperService) : IInlinePack
         if (!zone.TryGetPlayer(characterId, out var sender) || sender is null)
             return;
 
-        var resolution = whisperService.Resolve(sender, packet.AvatarName);
+        var resolution = await whisperService.ResolveAsync(sender, packet.AvatarName, cancellationToken)
+            .ConfigureAwait(false);
 
         switch (resolution.Outcome)
         {
@@ -43,6 +50,25 @@ public sealed class WhisperHandler(IWhisperService whisperService) : IInlinePack
                 return;
 
             case WhisperOutcome.TargetNotFound:
+                session.Send(new WhisperResponse
+                {
+                    Result = 1,
+                    ZoneNumber = 0,
+                    AvatarName = packet.AvatarName,
+                    Content = "",
+                    AuthType = 0,
+                    Link = EmptyLink
+                });
+                return;
+
+            case WhisperOutcome.TargetOnAnotherShard:
+                // No inter-shard relay exists yet (see IWhisperService's own remarks) -- the M1 wire protocol
+                // has no distinct "can't deliver yet" Result value, so this degrades to the same code the
+                // client already understands as "target not found," but is logged distinctly here so the gap
+                // stays visible in telemetry instead of looking identical to a genuinely offline target.
+                logger.LogInformation(
+                    "Whisper from {SenderName} to {TargetName} could not be delivered: target is on shard {ShardId} (map {MapId}), and no inter-shard relay exists yet",
+                    sender.Name, packet.AvatarName, resolution.OtherShardId, resolution.OtherMapId);
                 session.Send(new WhisperResponse
                 {
                     Result = 1,

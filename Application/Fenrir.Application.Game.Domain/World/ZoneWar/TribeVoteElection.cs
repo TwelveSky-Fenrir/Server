@@ -7,14 +7,29 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 /// <summary>The per-cycle Force Leader election window, mirroring legacy <c>mWorldInfo-&gt;mTribeVoteState</c>.</summary>
 public enum TribeVotePhase : byte
 {
-    /// <summary>Default/reset state (legacy 0) -- CZ_TRIBE_VOTE_SEND sort 1 and 3 both reject.</summary>
+    /// <summary>Default/reset/idle state (legacy 0) -- CZ_TRIBE_VOTE_SEND sort 1 and 3 both reject.</summary>
     Closed = 0,
 
-    /// <summary>Legacy 1 -- sort 1 (candidacy) accepted, sort 3 (vote) rejected.</summary>
+    /// <summary>Legacy 1, "registration-open" -- sort 1 (candidacy) accepted, sort 3 (vote) rejected.</summary>
     Candidacy = 1,
 
-    /// <summary>Legacy 2 -- sort 3 (vote) accepted, sort 1 (candidacy) rejected.</summary>
-    Voting = 2
+    /// <summary>Legacy 2, "voting-open" -- sort 3 (vote) accepted, sort 1 (candidacy) rejected.</summary>
+    Voting = 2,
+
+    /// <summary>
+    ///     Legacy 3 (tSort 54, TRIBE_WORK "close voting"): voting has closed but results are not tallied yet
+    ///     -- sort 1 and 3 both reject, same as <see cref="Closed" />, but distinguished here so
+    ///     <see cref="TribeVoteElectionCalendar" />'s own "already at this bucket" idempotency checks can tell
+    ///     it apart from a fresh/idle cycle.
+    /// </summary>
+    VotingClosed = 3,
+
+    /// <summary>
+    ///     Legacy 4 (tSort 55, TRIBE_WORK "announce results"): the Force Leader tally has run -- sort 1 and 3
+    ///     both reject, same as <see cref="Closed" />, distinguished for the same reason as
+    ///     <see cref="VotingClosed" />.
+    /// </summary>
+    ResultsAnnounced = 4
 }
 
 /// <summary>Result of <see cref="TribeVoteElection.TryRegisterCandidacyAsync" />.</summary>
@@ -48,13 +63,26 @@ public enum TribeVoteCastOutcome
 ///     the per-tribe candidacy/voting window CZ_TRIBE_VOTE_SEND (opcode 83) gates on, plus the tally that
 ///     appoints the winning candidate as Force Leader (game.Tribes.MasterCharacterId).
 ///     <para>
-///         The phase itself is intentionally process-local/ephemeral, matching the legacy's own shared-memory
-///         <c>mTribeVoteState</c> (never a persisted column): nothing in Fenrir yet schedules when a cycle
-///         opens/closes (same class of gap as <see cref="Progression.TowerWarState" />'s tower-siege trigger),
-///         so <see cref="OpenCandidacyWindowAsync" />/<see cref="OpenVotingWindow" />/
-///         <see cref="TallyForceLeaderAsync" /> are real, production-ready API waiting for whichever future
-///         GM-command/scheduled-job surface decides to drive a cycle -- the register/vote/tally mechanics
-///         underneath are already fully functional today.
+///         Driven automatically by <c>Fenrir.Application.Game.Hosting.World.ZoneWar.TribeVoteElectionCalendarHost</c>,
+///         which reads real day/hour and asks <see cref="TribeVoteElectionCalendar" /> (S07_MyGame01.cpp:3530-3630)
+///         which of this class's transitions to apply each tick, on whichever instance is configured as server
+///         number 37 with <c>VoteTribe</c> enabled. See that calendar class's own remarks for the always-true
+///         <c>day &gt;= 1</c> bug it faithfully reproduces: only <see cref="OpenCandidacyWindowAsync" /> is ever
+///         automatically reachable in production; <see cref="OpenVotingWindow" />/<see cref="CloseVotingWindow" />/
+///         <see cref="AnnounceResultsAsync" />/<see cref="ResetToIdleAsync" /> remain real, correct, directly
+///         callable transitions (e.g. for a future GM command) even though the calendar never reaches them itself.
+///     </para>
+///     <para>
+///         GAP: unlike the legacy's own <c>mTribeVoteState</c>, which is part of the durably-persisted WORLD_INFO
+///         row (Server/ts25center/S07_MyGame01.cpp:146-156, S08_MyDB.cpp:17-54's <c>GetWorldInfo</c> -- reloaded
+///         on every ts25center restart, never reset to idle by a reboot), <see cref="Phase" /> here is
+///         in-process memory only and resets to <see cref="TribeVotePhase.Closed" /> on every Fenrir GameServer
+///         restart. Wiring it to <c>game.WorldState</c> (a new column alongside <c>TribeSymbolBattle</c>, plus
+///         <c>IWorldStateRepository</c>/stored-procedure support) is a fenrir-database-engineer follow-up, out
+///         of scope for the Domain/Hosting-only change that introduced the calendar scheduler above -- flagged
+///         here rather than silently left inconsistent with the legacy's durability guarantee. The candidate
+///         lists and Force Leader/sub-leader appointments this class mutates ARE already fully durable
+///         (game.TribeVotes / game.Tribes / game.TribeSubMasters) -- only the phase counter has this gap.
 ///     </para>
 /// </summary>
 public sealed class TribeVoteElection(
@@ -248,5 +276,78 @@ public sealed class TribeVoteElection(
             _cycleId, tribeId, winner?.CandidateCharacterId);
 
         return winner?.CandidateCharacterId;
+    }
+
+    /// <summary>tSort 54: closes voting for every tribe without tallying -- candidate lists and tallies are untouched.</summary>
+    public void CloseVotingWindow()
+    {
+        using var scope = logger.BeginScope("TribeVoteCycle {TribeVoteCycleId}", _cycleId);
+
+        lock (_lock)
+        {
+            _phase = TribeVotePhase.VotingClosed;
+        }
+
+        logger.LogInformation("Tribe vote cycle {TribeVoteCycleId} closed voting, awaiting results", _cycleId);
+    }
+
+    /// <summary>
+    ///     tSort 55: tallies every tribe's Force Leader (see <see cref="TallyForceLeaderAsync" />) and then
+    ///     unconditionally wipes every tribe's sub-leader roster -- S04_MyWork02.cpp:507-551's own
+    ///     unconditional sub-master clear alongside the elect logic, regardless of whether a tribe actually got
+    ///     a new leader out of the tally.
+    /// </summary>
+    public async ValueTask AnnounceResultsAsync(CancellationToken ct)
+    {
+        using var scope = logger.BeginScope("TribeVoteCycle {TribeVoteCycleId}", _cycleId);
+
+        for (byte tribeId = 0; tribeId < WorldStateService.TribeCount; tribeId++)
+        {
+            await TallyForceLeaderAsync(tribeId, ct).ConfigureAwait(false);
+            await ClearSubMastersAsync(tribeId, ct).ConfigureAwait(false);
+        }
+
+        lock (_lock)
+        {
+            _phase = TribeVotePhase.ResultsAnnounced;
+        }
+
+        logger.LogInformation(
+            "Tribe vote cycle {TribeVoteCycleId} announced results for all {TribeCount} tribes",
+            _cycleId, WorldStateService.TribeCount);
+    }
+
+    /// <summary>
+    ///     tSort 56: resets every tribe back to idle, wiping every candidate slot exactly like
+    ///     <see cref="OpenCandidacyWindowAsync" /> does for a fresh cycle -- the tail end of the current cycle
+    ///     rather than the start of a new one, so this keeps (rather than mints) <see cref="_cycleId" />.
+    /// </summary>
+    public async ValueTask ResetToIdleAsync(CancellationToken ct)
+    {
+        using var scope = logger.BeginScope("TribeVoteCycle {TribeVoteCycleId}", _cycleId);
+
+        for (byte tribeId = 0; tribeId < WorldStateService.TribeCount; tribeId++)
+            await worldState.ResetTribeVotesAsync(tribeId, ct).ConfigureAwait(false);
+
+        lock (_lock)
+        {
+            _phase = TribeVotePhase.Closed;
+            _votedThisWindow.Clear();
+        }
+
+        logger.LogInformation("Tribe vote cycle {TribeVoteCycleId} reset to idle", _cycleId);
+    }
+
+    private async ValueTask ClearSubMastersAsync(byte tribeId, CancellationToken ct)
+    {
+        var subMasters = await tribes.GetSubMastersAsync(tribeId, ct).ConfigureAwait(false);
+
+        foreach (var subMaster in subMasters)
+        {
+            await tribes.ClearSubMasterAsync(tribeId, subMaster.CharacterId, ct).ConfigureAwait(false);
+
+            if (zones.TryGetPlayerAndZone(subMaster.CharacterId, out _, out var zone))
+                zone.PostTribeProgressCommand(new TribeProgressZoneCommand(subMaster.CharacterId, TribeRole: 0));
+        }
     }
 }

@@ -5,6 +5,7 @@ using Fenrir.Data.Abstractions.Accounts;
 using Fenrir.Data.Abstractions.Characters;
 using Fenrir.Data.Accounts;
 using Fenrir.Data.Characters;
+using Fenrir.Data.Social;
 using Fenrir.Data.Tests.Fixtures;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,6 +19,8 @@ public class CharacterRepositoryTests
 {
     private readonly IAccountRepository _accounts;
     private readonly ICharacterRepository _characters;
+    private readonly string _connectionString;
+    private readonly MentorRepository _mentors;
 
     public CharacterRepositoryTests(SqlServerFixture fixture)
     {
@@ -29,6 +32,8 @@ public class CharacterRepositoryTests
         var db = services.BuildServiceProvider().GetRequiredService<ICaeriusNetDbContext>();
         _accounts = new AccountRepository(db);
         _characters = new CharacterRepository(db);
+        _mentors = new MentorRepository(db);
+        _connectionString = fixture.ConnectionString;
     }
 
     [Fact]
@@ -107,6 +112,82 @@ public class CharacterRepositoryTests
         var ex = await Record.ExceptionAsync(() =>
             _characters.DeleteAsync(accountId, 0, CancellationToken.None).AsTask());
         Assert.Null(ex);
+    }
+
+    // Regression test: usp_Character_Delete used to be a bare `DELETE FROM game.Characters`, which threw an
+    // FK-violation error for any character owning even one item/skill/hotkey row -- i.e. virtually every real
+    // character -- instead of ever completing. This seeds every normalized child table (including the two
+    // legacy ranking-adjacent tables, HeroRankCur/ProxyInfo analogues, and a mentor bond another character
+    // still holds pointing at this one) and asserts the delete both succeeds and leaves nothing orphaned.
+    [Fact]
+    public async Task DeleteAsync_WithEveryNormalizedChildRowPopulated_CleansUpAllOfThem_WithoutAnFkViolation()
+    {
+        var accountId = await CreateTestAccountAsync();
+        var name = NewCharacterName();
+
+        var friendId = await CreateCharacterAsync(await CreateTestAccountAsync(), 0);
+        var studentId = await CreateCharacterAsync(await CreateTestAccountAsync(), 0);
+
+        var characterId = await _characters.CreateWithStarterKitAsync(
+            accountId, 0, name, 0, 0, 1, 1,
+            1, 0f, 0f, 0f,
+            100, 100, 50, 50,
+            0, 0,
+            [new CharacterItemSlotTvp(2, 8, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0)],
+            [new CharacterItemSlotTvp(0, 1026, 999, 0, 0, 0, 0, 0, 0, 0, 0, 0)],
+            [new CharacterSkillSlotTvp(0, 1, 1)],
+            [new CharacterHotkeySlotTvp(0, 0, 1, 1, 1)],
+            CancellationToken.None);
+
+        // CharacterBuffs/CharacterQuests/CharacterFriends/HeroRankings/OfflineShops have no dedicated
+        // repository seed path exercised elsewhere that fits this test's needs -- seed them directly.
+        await ExecAsync($"""
+                          INSERT INTO game.CharacterBuffs (CharacterId, SlotIndex, Value, RemainingLegacyTicks)
+                          VALUES ({characterId}, 0, 5, 100);
+                          """);
+        await ExecAsync($"""
+                          INSERT INTO game.CharacterQuests (CharacterId, StepPermanent, ActiveQuestId, QSort, TargetPhase, KillCounter)
+                          VALUES ({characterId}, 1, 2, 3, 4, 5);
+                          """);
+        await ExecAsync($"""
+                          INSERT INTO game.CharacterFriends (CharacterId, Slot, FriendCharacterId)
+                          VALUES ({characterId}, 0, {friendId});
+                          """);
+        await ExecAsync($"""
+                          INSERT INTO game.HeroRankings (CharacterId, PeriodKind, Points)
+                          VALUES ({characterId}, 0, 100);
+                          """);
+        await ExecAsync($"""
+                          INSERT INTO game.OfflineShops (CharacterId, ZoneNumber, ShopState, Money, BigMoney)
+                          VALUES ({characterId}, NULL, 0, 0, 0);
+                          """);
+
+        // Another character's TeacherCharacterId now points at this one -- FK_Characters_TeacherCharacter
+        // would otherwise block the delete outright.
+        await _mentors.BondAsync(characterId, studentId, CancellationToken.None);
+
+        var deleteEx = await Record.ExceptionAsync(() =>
+            _characters.DeleteAsync(accountId, 0, CancellationToken.None).AsTask());
+        Assert.Null(deleteEx);
+
+        Assert.Empty(await _characters.GetByAccountAsync(accountId, CancellationToken.None));
+
+        Assert.Equal(0, await ScalarAsync<int>($"SELECT COUNT(*) FROM game.CharacterItems WHERE CharacterId = {characterId};"));
+        Assert.Equal(0, await ScalarAsync<int>($"SELECT COUNT(*) FROM game.CharacterSkills WHERE CharacterId = {characterId};"));
+        Assert.Equal(0, await ScalarAsync<int>($"SELECT COUNT(*) FROM game.CharacterHotkeys WHERE CharacterId = {characterId};"));
+        Assert.Equal(0, await ScalarAsync<int>($"SELECT COUNT(*) FROM game.CharacterBuffs WHERE CharacterId = {characterId};"));
+        Assert.Equal(0, await ScalarAsync<int>($"SELECT COUNT(*) FROM game.CharacterQuests WHERE CharacterId = {characterId};"));
+        Assert.Equal(0, await ScalarAsync<int>(
+            $"SELECT COUNT(*) FROM game.CharacterFriends WHERE CharacterId = {characterId} OR FriendCharacterId = {characterId};"));
+        Assert.Equal(0, await ScalarAsync<int>($"SELECT COUNT(*) FROM game.HeroRankings WHERE CharacterId = {characterId};"));
+        Assert.Equal(0, await ScalarAsync<int>($"SELECT COUNT(*) FROM game.OfflineShops WHERE CharacterId = {characterId};"));
+        Assert.Equal(0, await ScalarAsync<int>($"SELECT COUNT(*) FROM game.OfflineShopItems WHERE CharacterId = {characterId};"));
+
+        // The surviving student's own TeacherCharacterId pointer, which pointed at the now-deleted
+        // character, must have been severed rather than left dangling or blocking the delete.
+        var studentTeacherId = await ScalarAsync<object>(
+            $"SELECT TeacherCharacterId FROM game.Characters WHERE CharacterId = {studentId};");
+        Assert.Equal(DBNull.Value, studentTeacherId);
     }
 
     [Fact]
@@ -238,5 +319,21 @@ public class CharacterRepositoryTests
     private static string NewCharacterName()
     {
         return $"T{Guid.NewGuid():N}"[..8];
+    }
+
+    private async Task ExecAsync(string sql)
+    {
+        await using var connection = new SqlConnection(_connectionString);
+        await connection.OpenAsync();
+        await using var command = new SqlCommand(sql, connection);
+        await command.ExecuteNonQueryAsync();
+    }
+
+    private async Task<T> ScalarAsync<T>(string sql)
+    {
+        await using var connection = new SqlConnection(_connectionString);
+        await connection.OpenAsync();
+        await using var command = new SqlCommand(sql, connection);
+        return (T)(await command.ExecuteScalarAsync())!;
     }
 }

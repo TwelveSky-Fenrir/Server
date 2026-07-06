@@ -83,11 +83,33 @@ public sealed record GuildRepository(ICaeriusNetDbContext Db) : IGuildRepository
         return await Db.ExecuteScalarAsync<int>(sp, ct);
     }
 
-    /// <summary>GUILD_WORK tSort 6 -- delete a guild and everything hanging off it.</summary>
-    public async ValueTask DisbandAsync(int guildId, CancellationToken ct)
+    /// <summary>
+    ///     GUILD_WORK tSort 1 -- create the guild, enroll its master, and debit the creation cost atomically
+    ///     (game.usp_Guild_CreateAndDebitMoney). No caller-side compensation needed: a failed debit means the
+    ///     whole transaction, including the guild row, never commits. Returns the new GuildId.
+    /// </summary>
+    public async ValueTask<int> CreateAndDebitMoneyAsync(string name, int masterCharacterId, long deltaMoney,
+        int deltaBigMoney, CancellationToken ct)
+    {
+        var sp = new StoredProcedureParametersBuilder("game", "usp_Guild_CreateAndDebitMoney", 1)
+            .AddParameter("Name", name, SqlDbType.NVarChar, 12)
+            .AddParameter("MasterCharacterId", masterCharacterId, SqlDbType.Int)
+            .AddParameter("DeltaMoney", deltaMoney, SqlDbType.BigInt)
+            .AddParameter("DeltaBigMoney", deltaBigMoney, SqlDbType.Int)
+            .Build();
+
+        return await Db.ExecuteScalarAsync<int>(sp, ct);
+    }
+
+    /// <summary>
+    ///     GUILD_WORK tSort 6 -- delete a guild and everything hanging off it, plus one guild-money audit row
+    ///     (see game.usp_Guild_Disband's own doc comment / Database/Migrations/014_guild_money_event_log.sql).
+    /// </summary>
+    public async ValueTask DisbandAsync(int guildId, int characterId, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Guild_Disband", 0)
             .AddParameter("GuildId", guildId, SqlDbType.Int)
+            .AddParameter("CharacterId", characterId, SqlDbType.Int)
             .Build();
 
         await Db.ExecuteAsync(sp, ct);
@@ -171,6 +193,25 @@ public sealed record GuildRepository(ICaeriusNetDbContext Db) : IGuildRepository
         var sp = new StoredProcedureParametersBuilder("game", "usp_Guild_SetGrade", 0)
             .AddParameter("GuildId", guildId, SqlDbType.Int)
             .AddParameter("Grade", grade, SqlDbType.Int)
+            .Build();
+
+        await Db.ExecuteAsync(sp, ct);
+    }
+
+    /// <summary>
+    ///     GUILD_WORK tSort 7 -- set the guild's grade and debit the character's upgrade cost atomically
+    ///     (game.usp_Guild_UpgradeAndDebitMoney). No caller-side compensation needed: a failed debit means the
+    ///     grade update never commits either.
+    /// </summary>
+    public async ValueTask UpgradeAndDebitMoneyAsync(int guildId, int grade, int characterId, long deltaMoney,
+        int deltaBigMoney, CancellationToken ct)
+    {
+        var sp = new StoredProcedureParametersBuilder("game", "usp_Guild_UpgradeAndDebitMoney", 0)
+            .AddParameter("GuildId", guildId, SqlDbType.Int)
+            .AddParameter("Grade", grade, SqlDbType.Int)
+            .AddParameter("CharacterId", characterId, SqlDbType.Int)
+            .AddParameter("DeltaMoney", deltaMoney, SqlDbType.BigInt)
+            .AddParameter("DeltaBigMoney", deltaBigMoney, SqlDbType.Int)
             .Build();
 
         await Db.ExecuteAsync(sp, ct);

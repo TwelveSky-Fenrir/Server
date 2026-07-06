@@ -19,6 +19,7 @@ public static class DomainServiceCollectionExtensions
         services.AddOptions<LoginServerOptions>().ValidateOnStart();
 
         services.AddSingleton<LoginIpRateLimiter>();
+        services.AddSingleton<LoginCapacityState>();
 
         return services;
     }

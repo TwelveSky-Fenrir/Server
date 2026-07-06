@@ -62,4 +62,16 @@ internal sealed class FakeAccountSessionRepository : IAccountSessionRepository
     {
         return ValueTask.FromResult(ReapResult);
     }
+
+    public int ActiveSessionCount { get; set; }
+    public int ActiveSessionCountCallCount { get; private set; }
+    public Exception? ActiveSessionCountException { get; set; }
+
+    public ValueTask<int> GetActiveSessionCountAsync(CancellationToken ct)
+    {
+        ActiveSessionCountCallCount++;
+        return ActiveSessionCountException is null
+            ? ValueTask.FromResult(ActiveSessionCount)
+            : throw ActiveSessionCountException;
+    }
 }

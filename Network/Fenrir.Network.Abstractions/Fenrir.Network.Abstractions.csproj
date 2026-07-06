@@ -6,4 +6,11 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <None Remove="obj_tribebanktax\project.assets.json" />
+    <None Remove="obj_tribebanktax\Fenrir.Network.Abstractions.csproj.nuget.dgspec.json" />
+    <None Remove="obj_tribebanktax\Fenrir.Network.Abstractions.csproj.nuget.g.props" />
+    <None Remove="obj_tribebanktax\Fenrir.Network.Abstractions.csproj.nuget.g.targets" />
+  </ItemGroup>
+
 </Project>

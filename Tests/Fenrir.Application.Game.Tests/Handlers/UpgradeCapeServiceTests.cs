@@ -4,6 +4,7 @@ using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Services.ItemModification;
 using Fenrir.Application.Game.Tests.TestSupport;
+using Fenrir.Data.Abstractions.Game;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -33,7 +34,7 @@ public class UpgradeCapeServiceTests
     }
 
     private static (ZoneClientSession Session, FakeDuplexPipe Pipe, Zone Zone, PlayerRuntimeState State,
-        FakeCharacterRepository Repository) SetUp()
+        FakeCharacterRepository Repository, FakeEventLogQueue EventLog) SetUp()
     {
         var zone = ZoneTestKit.CreateZone(1);
         var (session, pipe) = ZoneTestKit.CreateSession(1);
@@ -43,7 +44,7 @@ public class UpgradeCapeServiceTests
         zone.Tick(TimeSpan.FromMilliseconds(50));
         ZoneTestKit.DrainOutbound(pipe);
         Assert.True(zone.TryGetPlayer(10, out var state));
-        return (session, pipe, zone, state!, new FakeCharacterRepository());
+        return (session, pipe, zone, state!, new FakeCharacterRepository(), new FakeEventLogQueue());
     }
 
     private static void SeedInventory(Zone zone, ItemStack target, ItemStack material)
@@ -61,10 +62,10 @@ public class UpgradeCapeServiceTests
         // UpgradeCapeService rolls via SystemRandomSource.Instance (no DI seam, matching EnchantItemHandler's
         // own precedent) -- success/failure branch fidelity (including the all-zero Value on failure) is
         // covered deterministically by CapeUpgradeResolverTests.
-        var (session, _, zone, state, repo) = SetUp();
+        var (session, _, zone, state, repo, eventLog) = SetUp();
         SeedInventory(zone, new ItemStack(1401, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1),
             new ItemStack(984, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0));
-        var service = new UpgradeCapeService(repo, NullLogger<UpgradeCapeService>.Instance);
+        var service = new UpgradeCapeService(repo, eventLog, NullLogger<UpgradeCapeService>.Instance);
 
         var result = await RunToCompletionAsync(
             service.UpgradeAsync(new UpgradeCapeRequest { Page1 = 0, Index1 = 0, Page2 = 0, Index2 = 1 }, zone, state,
@@ -77,15 +78,25 @@ public class UpgradeCapeServiceTests
 
         var items = repo.LastAdjustMoneyAndReplaceContainer.Value.Items;
         Assert.DoesNotContain(items, i => i.Slot == 1);
+
+        // A real attempt (success or failure) always logs exactly one Category=Enchant, EventCode=127 row --
+        // outcome is coin-flip so only the shape is asserted here, not the Outcome byte's specific value.
+        var logged = Assert.Single(eventLog.Enqueued);
+        Assert.Equal(127, logged.EventCode);
+        Assert.Equal((byte)EventLogCategory.Enchant, logged.Category);
+        Assert.Equal(10, logged.ActorCharacterId);
+        Assert.Equal(-20_000_000, logged.DeltaMoney);
+        Assert.Equal(1401, logged.ItemId);
+        Assert.True(logged.Outcome is 0 or 1);
     }
 
     [Fact]
     public async Task InvalidTargetItem_Rejected()
     {
-        var (_, _, zone, state, repo) = SetUp();
+        var (_, _, zone, state, repo, eventLog) = SetUp();
         SeedInventory(zone, new ItemStack(9999, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1),
             new ItemStack(984, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0));
-        var service = new UpgradeCapeService(repo, NullLogger<UpgradeCapeService>.Instance);
+        var service = new UpgradeCapeService(repo, eventLog, NullLogger<UpgradeCapeService>.Instance);
 
         var result = await service.UpgradeAsync(
             new UpgradeCapeRequest { Page1 = 0, Index1 = 0, Page2 = 0, Index2 = 1 }, zone, state, 10,
@@ -93,36 +104,39 @@ public class UpgradeCapeServiceTests
 
         Assert.Equal(UpgradeCapeOutcome.Rejected, result.Outcome);
         Assert.Null(repo.LastAdjustMoneyAndReplaceContainer);
+        Assert.Empty(eventLog.Enqueued);
     }
 
     [Fact]
     public async Task InvalidMaterial_Rejected()
     {
-        var (_, _, zone, state, repo) = SetUp();
+        var (_, _, zone, state, repo, eventLog) = SetUp();
         SeedInventory(zone, new ItemStack(1401, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1),
             new ItemStack(12345, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0));
-        var service = new UpgradeCapeService(repo, NullLogger<UpgradeCapeService>.Instance);
+        var service = new UpgradeCapeService(repo, eventLog, NullLogger<UpgradeCapeService>.Instance);
 
         var result = await service.UpgradeAsync(
             new UpgradeCapeRequest { Page1 = 0, Index1 = 0, Page2 = 0, Index2 = 1 }, zone, state, 10,
             CancellationToken.None);
 
         Assert.Equal(UpgradeCapeOutcome.Rejected, result.Outcome);
+        Assert.Empty(eventLog.Enqueued);
     }
 
     [Fact]
     public async Task InsufficientFunds_TreatedAsRejected()
     {
-        var (_, _, zone, state, repo) = SetUp();
+        var (_, _, zone, state, repo, eventLog) = SetUp();
         SeedInventory(zone, new ItemStack(1401, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1),
             new ItemStack(984, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0));
         repo.ThrowOnAdjustMoney = true;
-        var service = new UpgradeCapeService(repo, NullLogger<UpgradeCapeService>.Instance);
+        var service = new UpgradeCapeService(repo, eventLog, NullLogger<UpgradeCapeService>.Instance);
 
         var result = await service.UpgradeAsync(
             new UpgradeCapeRequest { Page1 = 0, Index1 = 0, Page2 = 0, Index2 = 1 }, zone, state, 10,
             CancellationToken.None);
 
         Assert.Equal(UpgradeCapeOutcome.Rejected, result.Outcome);
+        Assert.Empty(eventLog.Enqueued);
     }
 }

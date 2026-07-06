@@ -30,8 +30,8 @@ public interface ICraftItemService
 {
     public ValueTask<JadeUpgradeResult> ResolveJadeUpgradeAsync(CraftItemRequest packet, Zone zone,
         PlayerRuntimeState state,
-        int characterId, CancellationToken cancellationToken);
+        int characterId, int accountId, CancellationToken cancellationToken);
 
     public ValueTask<AdvancedElixirResult> ResolveAdvancedElixirAsync(CraftItemRequest packet, Zone zone,
-        PlayerRuntimeState state, int characterId, CancellationToken cancellationToken);
+        PlayerRuntimeState state, int characterId, int accountId, CancellationToken cancellationToken);
 }

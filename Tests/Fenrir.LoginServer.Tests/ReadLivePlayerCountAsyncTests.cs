@@ -3,6 +3,7 @@ using Fenrir.Application.Login.Domain;
 using Fenrir.Application.Login.Hosting;
 using Fenrir.Data.Abstractions.Runtime;
 using Fenrir.LoginServer.Tests.TestSupport;
+using Fenrir.Network.Dispatch.FloodProtection;
 using Fenrir.Network.Dispatch.Sessions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -50,8 +51,8 @@ public class ReadLivePlayerCountAsyncTests
 
     private static LoginConnectionHost CreateHost(IGameServerDirectoryRepository directory)
     {
-        // dispatcher/rateLimiter are never touched by ReadLivePlayerCountAsync -- only Greet()'s I/O-pump
-        // continuation (not exercised here) would need them.
+        // dispatcher/rateLimiter/ipFloodGuard are never touched by ReadLivePlayerCountAsync -- only Greet()'s
+        // I/O-pump continuation (not exercised here) would need them.
         return new LoginConnectionHost(
             Options.Create(new LoginServerOptions()),
             dispatcher: null!,
@@ -59,6 +60,9 @@ public class ReadLivePlayerCountAsyncTests
             new SessionRegistry(),
             directory,
             new FakeAccountSessionRepository(),
+            new FakeEventLogRepository(),
+            new IpFloodGuard(int.MaxValue, int.MaxValue, static (_, _) => ValueTask.CompletedTask,
+                new SessionRegistry()),
             NullLogger<LoginConnectionHost>.Instance);
     }
 }

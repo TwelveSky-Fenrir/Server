@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using Fenrir.Application.Game.Abstractions.Commerce;
+using Fenrir.Application.Game.Domain.Commerce;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.GameData;
@@ -11,6 +12,7 @@ namespace Fenrir.Application.Game.Services.Commerce;
 public sealed class BuyBloodMarkItemService(
     ICharacterRepository characters,
     WorldDataCache worldData,
+    CommerceCatalogCache catalog,
     ILogger<BuyBloodMarkItemService> logger) : IBuyBloodMarkItemService
 {
     private const int ShopSpecificError = 60704;
@@ -18,7 +20,7 @@ public sealed class BuyBloodMarkItemService(
     public async ValueTask<BuyBloodMarkItemResponse?> ResolveAndApplyAsync(BuyBloodMarkItemRequest packet, Zone zone,
         PlayerRuntimeState state, int characterId, CancellationToken cancellationToken)
     {
-        var bloodShop = BloodShopBuilder.Build(worldData.BloodExchangeCatalog, worldData.ItemsById);
+        var bloodShop = BloodShopBuilder.Build(catalog.BloodExchangeCatalog, worldData.ItemsById);
 
         if (packet.BloodIndex < 0 || packet.BloodIndex >= bloodShop.BloodNum)
             return null;

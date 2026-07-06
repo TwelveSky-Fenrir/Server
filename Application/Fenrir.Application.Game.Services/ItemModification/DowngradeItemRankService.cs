@@ -18,9 +18,22 @@ namespace Fenrir.Application.Game.Services.ItemModification;
 public sealed class DowngradeItemRankService(
     ICharacterRepository characters,
     WorldDataCache worldData,
+    IEventLogQueue eventLogQueue,
     ILogger<DowngradeItemRankService> logger)
     : IDowngradeItemRankService
 {
+    /// <summary>
+    ///     game.EventLog.EventCode for a downgrade-rank attempt -- the wire opcode (op28) itself, same
+    ///     "app-owned numbering scheme, caller-interpreted alongside Category" posture as every other
+    ///     EventCode in this codebase.
+    /// </summary>
+    private const short DowngradeItemRankEventCode = 28;
+
+    /// <summary>game.EventLog.Outcome for this EventCode: 0 success, 1 failed.</summary>
+    private const byte SuccessOutcome = 0;
+
+    private const byte FailedOutcome = 1;
+
     public async ValueTask<DowngradeItemRankResult> DowngradeAsync(DowngradeItemRankRequest packet, Zone zone,
         PlayerRuntimeState state, int characterId, CancellationToken cancellationToken)
     {
@@ -97,6 +110,15 @@ public sealed class DowngradeItemRankService(
                 characterId);
             return new DowngradeItemRankResult(DowngradeItemRankOutcome.Rejected, false, 0, [0, 0, 0, 0, 0, 0]);
         }
+
+        if (!eventLogQueue.Enqueue(new EventLogEntryTvp(DowngradeItemRankEventCode, (byte)EventLogCategory.Enchant,
+                null, characterId, null, null, null, -(long)resolved.Cost, null, target.ItemId, target.Quantity,
+                succeeded ? SuccessOutcome : FailedOutcome,
+                $"Serial={target.Serial};Material={material.ItemId};ResultItemId={(succeeded ? resolved.ResultItemId : target.ItemId)}",
+                DateTime.UtcNow)))
+            logger.LogWarning(
+                "game.EventLog write-behind queue full: dropped downgrade-item-rank audit row for character {CharacterId}",
+                characterId);
 
         var value = succeeded
             ? new[]

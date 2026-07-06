@@ -72,4 +72,23 @@ public class BloodShopBuilderTests
 
         Assert.Equal(0, shop.Data[0].ItemId);
     }
+
+    [Fact]
+    public void ResolveVersion_ReturnsTheSentinelSlot100000sItemId()
+    {
+        var version = BloodShopBuilder.ResolveVersion([
+            new BloodExchangeCatalogRowDto(1, 12, 5, 0),
+            new BloodExchangeCatalogRowDto(100000, 6, 0, 0)
+        ]);
+
+        Assert.Equal(6, version);
+    }
+
+    [Fact]
+    public void ResolveVersion_NoSentinelRow_ReturnsZero()
+    {
+        var version = BloodShopBuilder.ResolveVersion([new BloodExchangeCatalogRowDto(1, 12, 5, 0)]);
+
+        Assert.Equal(0, version);
+    }
 }

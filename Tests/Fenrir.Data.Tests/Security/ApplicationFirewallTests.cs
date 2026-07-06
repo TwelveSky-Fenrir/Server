@@ -70,6 +70,11 @@ public class ApplicationFirewallTests
         {
             return ValueTask.FromResult(blocked);
         }
+
+        public ValueTask BlockAsync(string ipAddress, CancellationToken ct)
+        {
+            return ValueTask.CompletedTask;
+        }
     }
 
     private sealed class FakeGmAllowlistRepository(bool allowed) : IGmAllowlistRepository

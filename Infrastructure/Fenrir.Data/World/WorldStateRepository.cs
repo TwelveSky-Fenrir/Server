@@ -61,6 +61,29 @@ public sealed record WorldStateRepository(ICaeriusNetDbContext Db) : IWorldState
         await Db.ExecuteAsync(sp, ct);
     }
 
+    public async ValueTask UpdateTribeSymbolStateAsync(byte tribeId, DateTime? symbolDate, bool hasSymbol,
+        bool isClosed, CancellationToken ct)
+    {
+        var sp = new StoredProcedureParametersBuilder("game", "usp_WorldStateTribe_UpdateSymbolState", 0)
+            .AddParameter("TribeId", tribeId, SqlDbType.TinyInt)
+            .AddParameter("SymbolDate", (object?)symbolDate ?? DBNull.Value, SqlDbType.DateTime2)
+            .AddParameter("HasSymbol", hasSymbol, SqlDbType.Bit)
+            .AddParameter("IsClosed", isClosed, SqlDbType.Bit)
+            .Build();
+
+        await Db.ExecuteAsync(sp, ct);
+    }
+
+    public async ValueTask AddTribePointsAsync(byte tribeId, int delta, CancellationToken ct)
+    {
+        var sp = new StoredProcedureParametersBuilder("game", "usp_WorldStateTribe_AddPoints", 0)
+            .AddParameter("TribeId", tribeId, SqlDbType.TinyInt)
+            .AddParameter("Delta", delta, SqlDbType.Int)
+            .Build();
+
+        await Db.ExecuteAsync(sp, ct);
+    }
+
     public async ValueTask SetAllianceOfferAsync(byte fromTribeId, byte toTribeId, bool isAccepted,
         CancellationToken ct)
     {

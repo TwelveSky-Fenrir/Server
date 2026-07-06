@@ -1,7 +1,9 @@
 using System.Collections.Immutable;
+using System.Data;
 using CaeriusNet.Abstractions;
 using CaeriusNet.Builders;
 using CaeriusNet.Commands.Reads;
+using CaeriusNet.Commands.Writes;
 using Fenrir.Data.Abstractions.Security;
 
 namespace Fenrir.Data.Security;
@@ -30,6 +32,22 @@ public sealed record FirewallRuleRepository(ICaeriusNetDbContext Db) : IFirewall
                 return true;
 
         return false;
+    }
+
+    /// <summary>
+    ///     See this method's own remarks on <see cref="IFirewallRuleRepository" /> for why this upserts rather
+    ///     than inserts. The 2-second <see cref="GetAllAsync" /> cache means a freshly-blocked IP may still read
+    ///     as allowed for up to that long afterward -- an accepted trade-off already established by
+    ///     <see cref="IsBlockedAsync" />, not something this write needs to invalidate/bypass.
+    /// </summary>
+    public async ValueTask BlockAsync(string ipAddress, CancellationToken ct)
+    {
+        var sp = new StoredProcedureParametersBuilder("admin", "usp_FirewallRule_Upsert", 2)
+            .AddParameter("IpAddress", ipAddress, SqlDbType.VarChar)
+            .AddParameter("RuleType", RuleTypeAnyBlock, SqlDbType.TinyInt)
+            .Build();
+
+        await Db.ExecuteAsync(sp, ct).ConfigureAwait(false);
     }
 
     /// <summary>

@@ -57,4 +57,9 @@ internal sealed class FakeAccountSessionRepository : IAccountSessionRepository
     {
         throw new NotSupportedException("Reaping runs only from the single unsharded Login-side timer.");
     }
+
+    public ValueTask<int> GetActiveSessionCountAsync(CancellationToken ct)
+    {
+        throw new NotSupportedException("Not exercised by the Game-side test suites in this project.");
+    }
 }

@@ -312,6 +312,29 @@ public class AutoHuntTickSystemTests
         Assert.Equal(manaBefore, state.Mana);
     }
 
+    /// <summary>
+    ///     BotBuff's own <c>!mCheckStun</c> top-level gate (S07_MyGame04.cpp:341) -- previously undocumented as a
+    ///     real gap (no stun state existed), now modeled via <see cref="PlayerRuntimeState.IsStunned" />.
+    /// </summary>
+    [Fact]
+    public void Stunned_DoesNothing()
+    {
+        var skillsById = new Dictionary<int, SkillDefinition> { [82] = HolyShieldSkill(10, 30, 20, 40) }
+            .ToFrozenDictionary();
+        var (zone, state) = SetUp(skillsById: skillsById);
+        var manaBefore = state.Mana;
+
+        state.AutoHuntEnabled = true;
+        state.AutoHuntConfig = Config(82, 10);
+        state.LearnedSkills = ImmutableDictionary<byte, LearnedSkill>.Empty.Add(0, new LearnedSkill(82, 10));
+        state.IsStunned = true;
+
+        zone.Tick(SimulationClock.LegacyTick);
+
+        Assert.Equal(manaBefore, state.Mana);
+        Assert.Equal(0, state.Buffs.Buff[9 * 2]);
+    }
+
     [Fact]
     public void OnlyOneBuffCastPerLegacyTick()
     {

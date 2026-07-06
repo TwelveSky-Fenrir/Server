@@ -130,7 +130,13 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         return await Db.ExecuteScalarAsync<int>(builder.Build(), ct);
     }
 
-    /// <summary>Deletes the character occupying (AccountId, Slot) -- CL_DELETE_AVATAR_SEND's target.</summary>
+    /// <summary>
+    ///     Deletes the character occupying (AccountId, Slot) -- CL_DELETE_AVATAR_SEND's target. Idempotent on
+    ///     an already-empty slot (no-op, no error). The procedure itself also deletes every normalized child
+    ///     row (items/skills/hotkeys/buffs/quest state/friends, plus the HeroRankings/OfflineShops rows that
+    ///     mirror legacy's unconditional HeroRankCur/ProxyInfo cleanup) so the delete never fails with an FK
+    ///     violation -- see usp_Character_Delete_CleanupChildTables.sql's own header for the full rationale.
+    /// </summary>
     public async ValueTask DeleteAsync(int accountId, byte slot, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_Delete", 0)
@@ -162,6 +168,23 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
 
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_PersistBatch", 0)
             .AddTvpParameter("Positions", rows)
+            .Build();
+
+        await Db.ExecuteAsync(sp, ct);
+    }
+
+    /// <summary>
+    ///     Narrow Life/Mana floor-clamp write; see <see cref="ICharacterRepository.ClampVitalsFloorAsync" />'s own
+    ///     doc for why this is a two-column update rather than a route through <see cref="PersistProgressAsync" />.
+    /// </summary>
+    public async ValueTask ClampVitalsFloorAsync(int characterId, long flushSequence, int life, int mana,
+        CancellationToken ct)
+    {
+        var sp = new StoredProcedureParametersBuilder("game", "usp_Character_ClampVitalsFloor", 0)
+            .AddParameter("CharacterId", characterId, SqlDbType.Int)
+            .AddParameter("FlushSequence", flushSequence, SqlDbType.BigInt)
+            .AddParameter("Life", life, SqlDbType.Int)
+            .AddParameter("Mana", mana, SqlDbType.Int)
             .Build();
 
         await Db.ExecuteAsync(sp, ct);
@@ -455,6 +478,19 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
 
         var row = await Db.FirstQueryAsync<CharacterIdDto>(sp, ct);
         return row?.CharacterId;
+    }
+
+    /// <summary>Targeted single-slot read (game.usp_CharacterItem_GetIdAtSlot); null if the slot is empty.</summary>
+    public async ValueTask<int?> GetItemIdAtSlotAsync(int characterId, byte container, byte slot, CancellationToken ct)
+    {
+        var sp = new StoredProcedureParametersBuilder("game", "usp_CharacterItem_GetIdAtSlot", 1)
+            .AddParameter("CharacterId", characterId, SqlDbType.Int)
+            .AddParameter("Container", container, SqlDbType.TinyInt)
+            .AddParameter("Slot", slot, SqlDbType.TinyInt)
+            .Build();
+
+        var row = await Db.FirstQueryAsync<CharacterItemIdDto>(sp, ct);
+        return row?.ItemId;
     }
 
     /// <summary>

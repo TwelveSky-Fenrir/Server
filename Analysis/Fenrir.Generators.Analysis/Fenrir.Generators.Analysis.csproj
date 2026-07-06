@@ -21,4 +21,8 @@
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all"/>
   </ItemGroup>
 
+  <ItemGroup>
+    <None Remove="obj_tribebanktax\Fenrir.Generators.Analysis.csproj.nuget.g.props" />
+  </ItemGroup>
+
 </Project>

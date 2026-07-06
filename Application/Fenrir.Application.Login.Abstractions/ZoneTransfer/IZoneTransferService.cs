@@ -17,6 +17,11 @@ public interface IZoneTransferService
     ///     <c>usp_AccountSession_TransitionToGame</c> can verify the Game-side world-entry claim is for the same
     ///     login epoch.
     /// </param>
+    /// <param name="accountGrade">
+    ///     <c>LoginClientSession.AccountGrade</c> (legacy <c>uUserSort</c>); carried into the minted
+    ///     <c>SessionTicket</c> so the Zone session inherits the GM-elevation fact without ever re-querying
+    ///     auth.Accounts itself.
+    /// </param>
     public ValueTask<ZoneTransferResult> RequestZoneTransferAsync(int accountId, byte avatarPost, Guid sessionToken,
-        CancellationToken cancellationToken);
+        short accountGrade, CancellationToken cancellationToken);
 }

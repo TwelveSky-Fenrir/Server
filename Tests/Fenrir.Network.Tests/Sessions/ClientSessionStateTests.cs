@@ -83,4 +83,48 @@ public class ClientSessionStateTests
 
         Assert.Equal(token, session.AccountSessionToken);
     }
+
+    // GM-BLOCK precondition: every pre-existing 2/3-arg MarkTicketConsumed call site must default AccountGrade
+    // to 0 (not elevated) rather than fail to compile or silently misbehave.
+    [Fact]
+    public void Zone_MarkTicketConsumed_TwoArgOverload_LeavesAccountGradeZero_AndIsGmFalse()
+    {
+        var session = new ZoneClientSession(1, new FakeDuplexPipe());
+
+        session.MarkTicketConsumed(1, 10);
+
+        Assert.Equal((short)0, session.AccountGrade);
+        Assert.False(session.IsGm);
+    }
+
+    [Fact]
+    public void Zone_MarkTicketConsumed_WithGmGrade_SetsAccountGrade_AndIsGmTrue()
+    {
+        var session = new ZoneClientSession(1, new FakeDuplexPipe());
+
+        session.MarkTicketConsumed(1, 10, sessionToken: null, accountGrade: 1);
+
+        Assert.Equal((short)1, session.AccountGrade);
+        Assert.True(session.IsGm);
+    }
+
+    [Fact]
+    public void Login_MarkAuthenticated_TwoArgCallSite_LeavesAccountGradeZero()
+    {
+        var session = new LoginClientSession(1, new FakeDuplexPipe());
+
+        session.MarkAuthenticated(1);
+
+        Assert.Equal((short)0, session.AccountGrade);
+    }
+
+    [Fact]
+    public void Login_MarkAuthenticated_WithGmGrade_SetsAccountGrade()
+    {
+        var session = new LoginClientSession(1, new FakeDuplexPipe());
+
+        session.MarkAuthenticated(1, 1);
+
+        Assert.Equal((short)1, session.AccountGrade);
+    }
 }

@@ -1,5 +1,6 @@
 using System.Buffers;
 using Fenrir.Network.Abstractions;
+using Fenrir.Network.Dispatch.FloodProtection;
 using Fenrir.Network.Dispatch.RateLimiting;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Framing;
@@ -14,6 +15,7 @@ public static class SessionLoop
         ClientSession session,
         IFrameDispatcher dispatcher,
         ISessionRateLimiter? rateLimiter,
+        IpFloodGuard? ipFloodGuard,
         CancellationToken cancellationToken)
     {
         var reader = session.Transport.Input;
@@ -28,7 +30,8 @@ public static class SessionLoop
                     break; // Abort() called (externally or by a previous iteration) — reason already recorded
 
                 var outcome =
-                    await ProcessBufferAsync(session, dispatcher, rateLimiter, result.Buffer, cancellationToken)
+                    await ProcessBufferAsync(session, dispatcher, rateLimiter, ipFloodGuard, result.Buffer,
+                            cancellationToken)
                         .ConfigureAwait(false);
 
                 reader.AdvanceTo(outcome.Consumed, outcome.Examined);
@@ -55,6 +58,7 @@ public static class SessionLoop
         ClientSession session,
         IFrameDispatcher dispatcher,
         ISessionRateLimiter? rateLimiter,
+        IpFloodGuard? ipFloodGuard,
         ReadOnlySequence<byte> buffer,
         CancellationToken cancellationToken)
     {
@@ -77,6 +81,14 @@ public static class SessionLoop
             }
             catch (ProtocolViolationException)
             {
+                // Trigger B (contract): an unrecognized opcode from an already-connected session is the
+                // protocol-violation flood counter's input. Guard is optional so unit tests exercising just
+                // FrameDecoder/state-gate/rate-limit behavior don't need one wired up.
+                if (ipFloodGuard is not null && session.RemoteEndPoint is not null)
+                    await ipFloodGuard
+                        .RecordProtocolViolationAsync(session.RemoteEndPoint.Address.ToString(), cancellationToken)
+                        .ConfigureAwait(false);
+
                 session.Abort(DisconnectReason.UnknownOpcode);
                 return new BufferOutcome(remaining.Start, remaining.End, true);
             }

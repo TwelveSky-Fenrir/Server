@@ -38,10 +38,10 @@ public partial class PlayerRuntimeState
 
     /// <summary>
     ///     Legacy <c>aMissionDate.aKillOtherTribe</c> -- a separate counter from <see cref="ContributionPoints" />,
-    ///     gates the daily-mission claim (&gt;= 10). Incremented by <c>Zone.ApplyPvpKillMissionProgress</c>, gated
-    ///     by <see cref="KillCooldownTracker" /> so repeat-farming one victim only
-    ///     counts once per cooldown window (C05); the CP/EXP/drop side of a PvP kill's reward is still not
-    ///     implemented.
+    ///     gates the daily-mission claim (&gt;= 10). Incremented by <c>Zone.ApplyPvpKillRewards</c>, gated by
+    ///     <see cref="KillCooldownTracker" /> (C05, repeat-farming one victim only counts once per cooldown
+    ///     window) AND, per <c>PvpKillRewardZoneCatalog</c>, by the killing zone's own reward profile -- not
+    ///     every zone grants daily-mission progress (e.g. the FFA map never does).
     /// </summary>
     public int MissionKillOtherTribe { get; set; }
 
@@ -56,4 +56,17 @@ public partial class PlayerRuntimeState
     ///     <see cref="MissionKillMonster" />.
     /// </summary>
     public int MissionPlayTime { get; set; }
+
+    /// <summary>
+    ///     Zone-side, in-memory running mirror of hero-rank points earned this session via
+    ///     <c>Zone.ApplyPvpKillHeroPoints</c> (<c>MyCenterCom::AddHeroRankPoint</c>,
+    ///     S06_MyUpperCom02.cpp:774-820) -- incremented synchronously the instant a grant happens, while the
+    ///     durable game.HeroRankings row is updated later by
+    ///     <see cref="Fenrir.Application.Game.Domain.Progression.HeroRankPointAccumulator" />'s periodic flush.
+    ///     Starts at 0 for every session:
+    ///     hydrating this from the character's pre-existing Current-period total at world entry is not wired
+    ///     yet, so this mirror under-reports a character's true lifetime Current-period score until that
+    ///     lands -- it only ever reflects points earned since the last world entry.
+    /// </summary>
+    public int HeroRankPoints { get; set; }
 }

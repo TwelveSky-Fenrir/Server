@@ -226,7 +226,8 @@ public sealed partial class Zone
                 try
                 {
                     if (_players.TryGetValue(id, out var recipient) &&
-                        recipient.Session is ClientSession clientSession)
+                        recipient.Session is ClientSession clientSession &&
+                        IsVisibleAcrossDungeonInstance(monster.InstanceId, recipient.DungeonInstanceId))
                         clientSession.SendRaw(span);
                 }
                 catch (Exception ex)

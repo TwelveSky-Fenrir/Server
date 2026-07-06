@@ -50,7 +50,13 @@ public interface IFriendService
 
     public void Cancel(int askerId);
 
-    public FriendLocateResult Locate(PlayerRuntimeState asker, int index);
+    /// <summary>
+    ///     Same-shard lookup first (<see cref="ZoneRegistry.TryGetPlayer" />), falling back to the cross-shard
+    ///     character-location directory on a miss and re-applying the same same-tribe gate against the
+    ///     directory row's own denormalized <c>Tribe</c> column -- no second query needed.
+    /// </summary>
+    public ValueTask<FriendLocateResult> LocateAsync(PlayerRuntimeState asker, int index,
+        CancellationToken cancellationToken);
 
     public ValueTask<FriendAddResult>
         AddAsync(PlayerRuntimeState state, int index, CancellationToken cancellationToken);

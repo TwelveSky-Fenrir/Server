@@ -19,6 +19,14 @@ public sealed class LoginClientSession(long sessionId, IDuplexPipe transport, IP
     public int? AccountId { get; private set; }
 
     /// <summary>
+    ///     Set by <see cref="MarkAuthenticated" /> — the account-grade fact (legacy <c>uUserSort</c>,
+    ///     Server/ts25login/S08_MyDB.cpp:244-245), loaded once at authentication and never re-queried per action.
+    ///     Zero (the default) means not elevated. Carried into the zone-transfer ticket
+    ///     (<c>ZoneTransferHandler</c>) so the Zone session inherits it too.
+    /// </summary>
+    public short AccountGrade { get; private set; }
+
+    /// <summary>
     ///     Legacy <c>mSecondLoginTryNum</c>: consecutive mouse-PIN mismatches; the third disconnects.
     /// </summary>
     public int PinFailureCount { get; private set; }
@@ -40,9 +48,12 @@ public sealed class LoginClientSession(long sessionId, IDuplexPipe transport, IP
         State = LoginSessionState.VersionOk;
     }
 
-    public void MarkAuthenticated(int accountId)
+    // accountGrade is optional so every existing call site that never dealt with GM elevation keeps
+    // compiling unchanged; LoginService's success branch always supplies the real value.
+    public void MarkAuthenticated(int accountId, short accountGrade = 0)
     {
         AccountId = accountId;
+        AccountGrade = accountGrade;
         State = LoginSessionState.Authenticated;
     }
 

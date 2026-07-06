@@ -1,3 +1,4 @@
+using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Serialization.Packets.Zone;
 
 namespace Fenrir.Application.Game.Abstractions.Commerce;
@@ -8,5 +9,10 @@ namespace Fenrir.Application.Game.Abstractions.Commerce;
 /// </summary>
 public interface IGetCashCatalogService
 {
-    public GetCashCatalogResponse GetCatalog();
+    /// <summary>
+    ///     <paramref name="state" /> is null only if the requesting session couldn't be resolved to a live
+    ///     zone player (a benign race around world-entry/transfer); the catalog is still returned, but
+    ///     <see cref="PlayerRuntimeState.KnownCashCatalogVersion" /> then has nothing to record onto.
+    /// </summary>
+    public GetCashCatalogResponse GetCatalog(PlayerRuntimeState? state);
 }

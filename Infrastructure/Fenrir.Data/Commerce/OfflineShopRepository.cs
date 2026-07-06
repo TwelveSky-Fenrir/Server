@@ -133,4 +133,15 @@ public sealed record OfflineShopRepository(ICaeriusNetDbContext Db) : IOfflineSh
 
         await Db.ExecuteAsync(sp, ct);
     }
+
+    /// <summary>No CAS/ROWCOUNT guard by design -- see the interface doc for why a no-op update is a success.</summary>
+    public async ValueTask ExtendRentalAsync(int characterId, int newShopDate, CancellationToken ct)
+    {
+        var sp = new StoredProcedureParametersBuilder("game", "usp_OfflineShop_ExtendRental", 0)
+            .AddParameter("CharacterId", characterId, SqlDbType.Int)
+            .AddParameter("ShopDate", newShopDate, SqlDbType.Int)
+            .Build();
+
+        await Db.ExecuteAsync(sp, ct);
+    }
 }

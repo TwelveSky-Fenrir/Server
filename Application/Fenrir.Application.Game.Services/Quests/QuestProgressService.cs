@@ -4,6 +4,7 @@ using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Quests;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.GameData;
+using Fenrir.Data.Abstractions.Game;
 using Fenrir.Network.Serialization.Packets.Zone;
 using Microsoft.Extensions.Logging;
 
@@ -11,11 +12,20 @@ namespace Fenrir.Application.Game.Services.Quests;
 
 public sealed class QuestProgressService(
     ICharacterRepository characters,
+    IEventLogRepository eventLog,
     WorldDataCache worldData,
     QuestCatalog questCatalog,
     ILogger<QuestProgressService> logger)
     : IQuestProgressService
 {
+    /// <summary>
+    ///     game.EventLog.EventCode for a quest-completion item reward (tSort 2, "mission completed" -- see
+    ///     <see cref="CompleteAsync" />), scoped independently within <see cref="EventLogCategory.ItemCreate" />;
+    ///     EventCode is only ever caller-interpreted alongside its Category (see game.EventLog.sql's own
+    ///     "app-owned numbering scheme" comment).
+    /// </summary>
+    private const short QuestRewardEventCode = 1;
+
     public async ValueTask<QuestActionResult> AcceptAsync(QuestProgressRequest packet, PlayerRuntimeState state,
         Zone zone, int characterId, CancellationToken ct)
     {
@@ -48,7 +58,7 @@ public sealed class QuestProgressService(
     }
 
     public async ValueTask<QuestActionResult> CompleteAsync(QuestProgressRequest packet, PlayerRuntimeState state,
-        Zone zone, int characterId, CancellationToken ct)
+        Zone zone, int characterId, int accountId, CancellationToken ct)
     {
         var edits = new ContainerEdits(state);
 
@@ -69,6 +79,8 @@ public sealed class QuestProgressService(
         if (!result.Success)
             return new QuestActionResult(false);
 
+        var itemRewardGranted = false;
+
         if (packet.Page1 != -1)
         {
             if (!TryValidateDepositSlot(packet.Page1, packet.Index1, packet.XPost, packet.YPost, edits,
@@ -78,8 +90,11 @@ public sealed class QuestProgressService(
             // Skip the deposit when no reward item is configured: an ItemId of 0 would be misread as an
             // empty slot by Fenrir's presence-keyed container model.
             if (result.RewardItemId > 0)
+            {
                 edits.Deposit(container, slot,
                     new ItemStack(result.RewardItemId, result.RewardItemQuantity, 0, 0, 0, 0, 0, 0, 0, 0, 0));
+                itemRewardGranted = true;
+            }
         }
 
         if (result.DeleteItemId > 0)
@@ -87,6 +102,12 @@ public sealed class QuestProgressService(
 
         await PersistAndMirrorAsync(zone, characterId, result.NewProgress, result.MoneyReward,
             result.ExperienceReward, result.ContributionPointsReward, result.TeacherPointReward, edits, ct);
+
+        // Logged only once the quest-transition/container write above has durably committed, and only when a
+        // reward item was actually deposited -- a money/CP/XP-only completion mints nothing to audit here.
+        if (itemRewardGranted)
+            await eventLog.LogAsync(QuestRewardEventCode, EventLogCategory.ItemCreate, accountId, characterId,
+                null, null, null, null, null, result.RewardItemId, result.RewardItemQuantity, 1, null, ct);
 
         return new QuestActionResult(true);
     }

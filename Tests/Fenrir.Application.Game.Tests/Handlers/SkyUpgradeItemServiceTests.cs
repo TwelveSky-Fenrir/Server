@@ -7,6 +7,7 @@ using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Services.ItemModification;
 using Fenrir.Application.Game.Tests.GameData;
 using Fenrir.Application.Game.Tests.TestSupport;
+using Fenrir.Data.Abstractions.Game;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -39,7 +40,7 @@ public class SkyUpgradeItemServiceTests
     }
 
     private static (ZoneClientSession Session, FakeDuplexPipe Pipe, Zone Zone, PlayerRuntimeState State,
-        FakeCharacterRepository Repository) SetUp()
+        FakeCharacterRepository Repository, FakeEventLogQueue EventLog) SetUp()
     {
         var zone = ZoneTestKit.CreateZone(1);
         var (session, pipe) = ZoneTestKit.CreateSession(1);
@@ -49,7 +50,7 @@ public class SkyUpgradeItemServiceTests
         zone.Tick(TimeSpan.FromMilliseconds(50));
         ZoneTestKit.DrainOutbound(pipe);
         Assert.True(zone.TryGetPlayer(10, out var state));
-        return (session, pipe, zone, state!, new FakeCharacterRepository());
+        return (session, pipe, zone, state!, new FakeCharacterRepository(), new FakeEventLogQueue());
     }
 
     private static void SeedInventory(Zone zone, ItemStack target, ItemStack material)
@@ -61,14 +62,14 @@ public class SkyUpgradeItemServiceTests
         zone.Tick(TimeSpan.FromMilliseconds(50));
     }
 
-    private static SkyUpgradeItemService CreateService(FakeCharacterRepository characters)
+    private static SkyUpgradeItemService CreateService(FakeCharacterRepository characters, FakeEventLogQueue eventLog)
     {
         var itemsById = new Dictionary<int, ItemDefinition>
         {
             [WarlordItemId] = new(WorldDataTestRows.Item(WarlordItemId) with { Sort = 7, CheckSetItem = 2 }, [])
         }.ToFrozenDictionary();
 
-        return new SkyUpgradeItemService(characters, ZoneTestKit.EmptyWorldData(itemsById),
+        return new SkyUpgradeItemService(characters, ZoneTestKit.EmptyWorldData(itemsById), eventLog,
             NullLogger<SkyUpgradeItemService>.Instance);
     }
 
@@ -80,10 +81,10 @@ public class SkyUpgradeItemServiceTests
         // SkyUpgradeResolverTests. This asserts only what's true on BOTH outcomes: money is always deducted and
         // the material is always consumed (S04_MyWork02.cpp:12862's own unconditional placement of both before
         // the roll).
-        var (session, _, zone, state, repo) = SetUp();
+        var (session, _, zone, state, repo, eventLog) = SetUp();
         SeedInventory(zone, new ItemStack(WarlordItemId, 1, 30, 0, 0, 0, 0, 0, 0, 0, 1),
             new ItemStack(501, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0));
-        var service = CreateService(repo);
+        var service = CreateService(repo, eventLog);
 
         var result = await RunToCompletionAsync(
             service.UpgradeAsync(new SkyUpgradeItemRequest { Page1 = 0, Index1 = 0, Page2 = 0, Index2 = 1 }, zone,
@@ -96,16 +97,24 @@ public class SkyUpgradeItemServiceTests
 
         var items = repo.LastAdjustMoneyAndReplaceContainer.Value.Items;
         Assert.DoesNotContain(items, i => i.Slot == 1);
+
+        var logged = Assert.Single(eventLog.Enqueued);
+        Assert.Equal(93, logged.EventCode);
+        Assert.Equal((byte)EventLogCategory.Enchant, logged.Category);
+        Assert.Equal(10, logged.ActorCharacterId);
+        Assert.Equal(-50_000_000, logged.DeltaMoney);
+        Assert.Equal(WarlordItemId, logged.ItemId);
+        Assert.True(logged.Outcome is 0 or 1);
     }
 
     [Fact]
     public async Task RejectedPrecondition_Rejected()
     {
-        var (_, _, zone, state, repo) = SetUp();
+        var (_, _, zone, state, repo, eventLog) = SetUp();
         // Enchant below the required +30 threshold.
         SeedInventory(zone, new ItemStack(WarlordItemId, 1, 10, 0, 0, 0, 0, 0, 0, 0, 1),
             new ItemStack(501, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0));
-        var service = CreateService(repo);
+        var service = CreateService(repo, eventLog);
 
         var result = await service.UpgradeAsync(
             new SkyUpgradeItemRequest { Page1 = 0, Index1 = 0, Page2 = 0, Index2 = 1 }, zone, state, 10,
@@ -113,21 +122,23 @@ public class SkyUpgradeItemServiceTests
 
         Assert.Equal(SkyUpgradeItemOutcome.Rejected, result.Outcome);
         Assert.Null(repo.LastAdjustMoneyAndReplaceContainer);
+        Assert.Empty(eventLog.Enqueued);
     }
 
     [Fact]
     public async Task InsufficientFunds_TreatedAsRejected()
     {
-        var (_, _, zone, state, repo) = SetUp();
+        var (_, _, zone, state, repo, eventLog) = SetUp();
         SeedInventory(zone, new ItemStack(WarlordItemId, 1, 30, 0, 0, 0, 0, 0, 0, 0, 1),
             new ItemStack(501, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0));
         repo.ThrowOnAdjustMoney = true;
-        var service = CreateService(repo);
+        var service = CreateService(repo, eventLog);
 
         var result = await service.UpgradeAsync(
             new SkyUpgradeItemRequest { Page1 = 0, Index1 = 0, Page2 = 0, Index2 = 1 }, zone, state, 10,
             CancellationToken.None);
 
         Assert.Equal(SkyUpgradeItemOutcome.Rejected, result.Outcome);
+        Assert.Empty(eventLog.Enqueued);
     }
 }

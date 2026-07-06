@@ -46,6 +46,12 @@ public enum TowerSiegePhase : byte
 ///         transient and simply restart on a reboot (a live guardian <c>MonsterEntity</c> never survives a
 ///         process restart either, so there is nothing meaningful to resume mid-cooldown).
 ///     </para>
+///     <para>
+///         <see cref="RecomputeTribeBonuses" />/<see cref="GetTribeBonus" /> are a second, independent
+///         concern layered on the same packed state: the per-tribe Silver/CP-for-PvM/CP-for-PvP/XP reward
+///         bonus table (legacy <c>UpdateTowerBonus</c>), never persisted (purely derived from
+///         <see cref="GetPackedState" /> every tick, see <see cref="TowerRewardBonusTable" />).
+///     </para>
 /// </summary>
 public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
 {
@@ -60,11 +66,33 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
 
     private readonly byte?[] _controllingTribe = new byte?[TowerCount];
     private readonly bool[] _dirty = new bool[TowerCount];
+
+    /// <summary>One-shot per guardian lifetime, reset alongside everything else in <see cref="CompleteUpgrade" />.</summary>
+    private readonly bool[] _firstAttackRecorded = new bool[TowerCount];
+
+    private readonly DateTime?[] _firstAttackAtUtc = new DateTime?[TowerCount];
+    private readonly DateTime?[] _lastAttackAtUtc = new DateTime?[TowerCount];
     private readonly Lock _lock = new();
     private readonly int[] _packedState = new int[TowerCount];
     private readonly int[] _pendingPackedState = new int[TowerCount];
     private readonly byte?[] _pendingTribe = new byte?[TowerCount];
     private readonly DateTime?[] _siegeStartedAtUtc = new DateTime?[TowerCount];
+
+    /// <summary>
+    ///     Latest <see cref="TowerRewardBonusTable.Recompute" /> result, one entry per tribe (0-3) --
+    ///     refreshed once per tick by <see cref="TowerRewardBonusSystem" />, read by
+    ///     <see cref="World.Zone" />'s tower-reward consumption hooks. All-zero until the first recompute.
+    /// </summary>
+    private TowerTribeRewardBonus[] _tribeBonus = new TowerTribeRewardBonus[TowerRewardBonusTable.TribeCount];
+
+    /// <summary>
+    ///     The client-facing "under siege" broadcast flag -- cleared by every allowed, landed guardian hit (see
+    ///     <see cref="RecordGuardianHit" />). Nothing in this cluster ever sets it back to true: that's the
+    ///     adjacent ~30 s idle-tick timer (S07_MyGame05.cpp:844-863), out of scope here -- see
+    ///     <see cref="Progression.TowerFriendlyFireGate" />'s remarks.
+    /// </summary>
+    private readonly bool[] _underAttack = new bool[TowerCount];
+
     private readonly bool[] _valid = new bool[TowerCount];
 
     public int GetPackedState(int towerIndex)
@@ -124,6 +152,35 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
     }
 
     /// <summary>
+    ///     Recomputes every tribe's Silver/CP-for-PvM/CP-for-PvP/XP tower bonus from the 12 towers' current
+    ///     packed state -- legacy's <c>ResetTowerBonus</c> + <c>UpdateTowerBonus</c>, called once per tick by
+    ///     <see cref="TowerRewardBonusSystem" /> (unconditionally, for every zone -- not gated to the 12
+    ///     tower-hosting ones, matching legacy's own per-process cadence). See
+    ///     <see cref="TowerRewardBonusTable" />'s remarks for the overwrite-not-additive semantics.
+    /// </summary>
+    public void RecomputeTribeBonuses()
+    {
+        lock (_lock)
+        {
+            var recomputed = TowerRewardBonusTable.Recompute(_packedState);
+            recomputed.CopyTo(_tribeBonus);
+        }
+    }
+
+    /// <summary>
+    ///     This tribe's tower bonus as of the last <see cref="RecomputeTribeBonuses" /> call --
+    ///     <see cref="TowerTribeRewardBonus.None" /> for any tribe outside 0-3 (<c>MAX_TRIBE_NUM</c>) or before
+    ///     the first recompute.
+    /// </summary>
+    public TowerTribeRewardBonus GetTribeBonus(byte tribe)
+    {
+        lock (_lock)
+        {
+            return tribe < _tribeBonus.Length ? _tribeBonus[tribe] : TowerTribeRewardBonus.None;
+        }
+    }
+
+    /// <summary>
     ///     Reserved <c>MonsterEntity.ServerIndex</c> for a tower's guardian: negative, so it can never collide
     ///     with <c>MonsterSpawnScheduler</c>'s own positive, per-zone slot indices (legacy's counterpart is the
     ///     shmMONSTER_OBJECT reserved <c>START_SPECIAL_MONSTER_OBJECT_NUM..END_SPECIAL_MONSTER_OBJECT_NUM</c> range).
@@ -131,6 +188,60 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
     public static int GuardianServerIndex(int towerIndex)
     {
         return -(towerIndex + 1);
+    }
+
+    /// <summary>True while this tower's "under siege" broadcast flag is set -- see <see cref="_underAttack" />'s remarks.</summary>
+    public bool IsUnderAttack(int towerIndex)
+    {
+        lock (_lock)
+        {
+            return _underAttack[towerIndex];
+        }
+    }
+
+    /// <summary>UTC moment of this guardian instance's first landed hit since it was last (re)spawned, if any.</summary>
+    public DateTime? GetFirstAttackAtUtc(int towerIndex)
+    {
+        lock (_lock)
+        {
+            return _firstAttackAtUtc[towerIndex];
+        }
+    }
+
+    /// <summary>UTC moment of this guardian instance's most recent landed hit, if any.</summary>
+    public DateTime? GetLastAttackAtUtc(int towerIndex)
+    {
+        lock (_lock)
+        {
+            return _lastAttackAtUtc[towerIndex];
+        }
+    }
+
+    /// <summary>
+    ///     Legacy <c>SetAttackTower(0)</c> + <c>mTowerPostTick</c> refresh (S07_MyGame02.cpp:2146-2147): call
+    ///     once per allowed, landed hit against this tower's guardian (never on a miss, never on a
+    ///     gate-rejected attack -- see <see cref="Progression.TowerFriendlyFireGate" />). Unconditionally clears
+    ///     the "under siege" broadcast flag and refreshes the last-attack timestamp on every call.
+    /// </summary>
+    /// <returns>
+    ///     True only for the very first landed hit against this particular guardian instance since it was last
+    ///     (re)spawned (<see cref="CompleteUpgrade" /> resets the underlying flag) -- callers use that to gate
+    ///     the one-time Center notification + full tower-state rebroadcast (S07_MyGame02.cpp:2148-2153).
+    /// </returns>
+    public bool RecordGuardianHit(int towerIndex, DateTime utcNow)
+    {
+        lock (_lock)
+        {
+            _underAttack[towerIndex] = false;
+            _lastAttackAtUtc[towerIndex] = utcNow;
+
+            if (_firstAttackRecorded[towerIndex])
+                return false;
+
+            _firstAttackRecorded[towerIndex] = true;
+            _firstAttackAtUtc[towerIndex] = utcNow;
+            return true;
+        }
     }
 
     /// <summary>Raw setter for tests/seeding -- production code drives towers through the methods below instead.</summary>
@@ -179,6 +290,13 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
             _valid[towerIndex] = true;
             _siegeStartedAtUtc[towerIndex] = null;
             _dirty[towerIndex] = true;
+
+            // A freshly (re)spawned guardian instance starts its own hit bookkeeping over -- legacy resets the
+            // same one-shot flag whenever a new guardian is summoned (S10_MySummon.cpp:2218-2220).
+            _underAttack[towerIndex] = false;
+            _firstAttackRecorded[towerIndex] = false;
+            _firstAttackAtUtc[towerIndex] = null;
+            _lastAttackAtUtc[towerIndex] = null;
         }
     }
 

@@ -1,4 +1,5 @@
 using Fenrir.Application.Game.Domain.Combat;
+using Fenrir.Application.Game.Domain.Commerce;
 using Fenrir.Application.Game.Domain.Guilds;
 using Fenrir.Application.Game.Domain.Movement;
 using Fenrir.Application.Game.Domain.Progression;
@@ -11,6 +12,7 @@ using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.Monsters;
+using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Data.WriteBehind;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -44,13 +46,37 @@ public static class DomainServiceCollectionExtensions
         // Registration order IS simulation order within a zone's tick: buffs must expire before meditation regen
         // reads a (possibly just-cleared) sit-skill, and before auto-hunt decides which configured buff is still
         // active; monster AI runs before that tick's respawn scan.
+
+        // FIX_HSB_POS_BUG's anti-camping forced-return check -- registered first (ahead of every other
+        // per-avatar system, including BuffExpirySystem below) for the same tick-order-fidelity reason
+        // DeathGateTickSystem is registered last: the legacy check runs before any other per-avatar tick work
+        // in the same pass (S07_MyGame01.cpp:2031-2038's outer loop). AntiCampingGuardPointCatalog.Empty
+        // makes every map a documented no-op until the real per-map coordinate table is supplied -- see that
+        // class's own GAP remarks.
+        services.AddSingleton(AntiCampingGuardPointCatalog.Empty);
+        services.AddSingleton<ISimulationSystem, AntiCampingForcedReturnSystem>();
+
         services.AddSingleton<ISimulationSystem, BuffExpirySystem>();
+        services.AddSingleton<ISimulationSystem, StunCountdownSystem>();
         services.AddSingleton<ISimulationSystem, AutoHuntTickSystem>();
         services.AddSingleton<ISimulationSystem, MeditationRegenSystem>();
         services.AddSingleton<ISimulationSystem, MonsterAiSystem>();
         services.AddSingleton<ISimulationSystem, MonsterSpawnScheduler>();
         services.AddSingleton<ISimulationSystem, TowerGuardianSystem>();
+        services.AddSingleton<ISimulationSystem, TowerRewardBonusSystem>();
         services.AddSingleton<ISimulationSystem, PetActivitySystem>();
+        services.AddSingleton<ISimulationSystem, CashCatalogStaleNotifySystem>();
+
+        // Active-duel death/departure/180-tick-timeout resolution (DuelMaintenanceSystem) -- reads
+        // IsDead/player-presence state that every combat/movement command already settled during this same
+        // tick's DrainInbox stage, so ordering relative to the systems above doesn't matter; kept ahead of
+        // DeathGateTickSystem only because that one is deliberately last (see its own comment below).
+        services.AddSingleton<ISimulationSystem, DuelMaintenanceSystem>();
+
+        // Registered last: it can end a session outright (the 50-tick mProtect_ReviveHack force-quit safety
+        // valve), so every other system's per-tick mutation for a about-to-be-quit player should already have
+        // landed before that happens.
+        services.AddSingleton<ISimulationSystem, DeathGateTickSystem>();
 
         services.AddSingleton<ZoneRegistry>();
 
@@ -63,9 +89,17 @@ public static class DomainServiceCollectionExtensions
         services.AddSingleton<GuildInviteRegistry>();
         services.AddSingleton<TowerWarState>();
 
+        // PvP-kill hero-rank point write-behind (step 8 of the PvP-kill reward pipeline) -- shared across every
+        // Zone via ZoneRegistry, flushed periodically by HeroRankPointsWriteBehindHost in Fenrir.Application.Game.Hosting.
+        services.AddSingleton<HeroRankPointAccumulator>();
+
         // C08: RvR ranking-board cache (GuildRankingCache.Top is read synchronously by EnterWorldHandler/
         // ZoneMoveHandler); kept warm by a periodic refresh registered in Fenrir.Application.Game.Hosting.
         services.AddSingleton<GuildRankingCache>();
+
+        // Live cash-shop/blood-exchange catalog cache (CashCatalogStaleNotifySystem above reads it every
+        // legacy tick); kept warm by CommerceCatalogRefreshHost, registered in Fenrir.Application.Game.Hosting.
+        services.AddSingleton<CommerceCatalogCache>();
 
         return services;
     }

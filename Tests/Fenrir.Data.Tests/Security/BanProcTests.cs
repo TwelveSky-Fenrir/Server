@@ -1,4 +1,3 @@
-using System.Data;
 using System.Security.Cryptography;
 using CaeriusNet.Abstractions;
 using CaeriusNet.Builders;
@@ -25,7 +24,6 @@ public class BanProcTests
     private readonly IAccountRepository _accounts;
     private readonly IBanRepository _bans;
     private readonly ICharacterRepository _characters;
-    private readonly string _connectionString;
 
     public BanProcTests(SqlServerFixture fixture)
     {
@@ -38,7 +36,6 @@ public class BanProcTests
         _accounts = new AccountRepository(db);
         _characters = new CharacterRepository(db);
         _bans = new BanRepository(db);
-        _connectionString = fixture.ConnectionString;
     }
 
     [Fact]
@@ -83,6 +80,44 @@ public class BanProcTests
         Assert.Equal(50301, targetless.Number);
     }
 
+    // GM-BLOCK (item A): IBanRepository.CreateAsync is the new create path -- covers the BanId it returns and
+    // the GmManualBlock reason mapping legacy's own 603 doesn't fit into admin.Bans.Reason's TINYINT column.
+    [Fact]
+    public async Task CreateAsync_ReturnsANewBanId_AndTheBanIsThenVisibleAsActive()
+    {
+        var (accountId, characterId) = await CreateCharacterAsync();
+
+        var banId = await _bans.CreateAsync(accountId, characterId, BanReason.GmManualBlock,
+            DateTime.UtcNow.AddDays(365 * 30), CancellationToken.None);
+
+        Assert.True(banId > 0);
+        Assert.True(await _bans.IsActiveForAccountAsync(accountId, CancellationToken.None));
+        Assert.True(await _bans.IsActiveForCharacterAsync(characterId, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task CreateAsync_CalledTwiceForTheSameTarget_InsertsTwoIndependentRows()
+    {
+        // Not idempotent: a ban log, not a single-row-per-target flag (usp_Ban_Create's own remarks).
+        var (accountId, characterId) = await CreateCharacterAsync();
+
+        var first = await _bans.CreateAsync(accountId, characterId, BanReason.GmManualBlock, null,
+            CancellationToken.None);
+        var second = await _bans.CreateAsync(accountId, characterId, BanReason.GmManualBlock, null,
+            CancellationToken.None);
+
+        Assert.NotEqual(first, second);
+    }
+
+    [Fact]
+    public async Task CreateAsync_NeitherAccountNorCharacterGiven_Throws50301()
+    {
+        var ex = await Assert.ThrowsAsync<SqlException>(() =>
+            _bans.CreateAsync(null, null, BanReason.GmManualBlock, null, CancellationToken.None).AsTask());
+
+        Assert.Equal(50301, ex.Number);
+    }
+
     private async Task<(int AccountId, int CharacterId)> CreateCharacterAsync()
     {
         var accountId = await _accounts.CreateAsync($"bantest-{Guid.NewGuid():N}",
@@ -98,18 +133,12 @@ public class BanProcTests
         return (accountId, characterId);
     }
 
+    // Routed through the repository (rather than a raw SqlCommand) now that IBanRepository.CreateAsync exists --
+    // exercises the exact same call path GmBlockAvatarService uses. reason is a plain byte here (not BanReason)
+    // since these pre-existing tests need arbitrary distinct values to prove independent ban rows, not a real
+    // domain reason.
     private async Task CreateBanAsync(int? accountId, int? characterId, byte reason, DateTime? expiresAtUtc)
     {
-        await using var connection = new SqlConnection(_connectionString);
-        await connection.OpenAsync();
-        await using var command = new SqlCommand("admin.usp_Ban_Create", connection)
-        {
-            CommandType = CommandType.StoredProcedure
-        };
-        command.Parameters.AddWithValue("AccountId", (object?)accountId ?? DBNull.Value);
-        command.Parameters.AddWithValue("CharacterId", (object?)characterId ?? DBNull.Value);
-        command.Parameters.AddWithValue("Reason", reason);
-        command.Parameters.AddWithValue("ExpiresAtUtc", (object?)expiresAtUtc ?? DBNull.Value);
-        await command.ExecuteScalarAsync();
+        await _bans.CreateAsync(accountId, characterId, (BanReason)reason, expiresAtUtc, CancellationToken.None);
     }
 }

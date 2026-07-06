@@ -23,9 +23,13 @@ public interface IQuestProgressService
     public ValueTask<QuestActionResult> AcceptAsync(QuestProgressRequest packet, PlayerRuntimeState state, Zone zone,
         int characterId, CancellationToken ct);
 
-    /// <summary>tSort 2, "mission completed".</summary>
+    /// <summary>
+    ///     tSort 2, "mission completed". Takes <paramref name="accountId" /> (unlike its four siblings) because
+    ///     a reward-item grant here is logged to game.EventLog (Category=ItemCreate), which records the actor's
+    ///     account alongside the character, matching every other ItemCreate call site.
+    /// </summary>
     public ValueTask<QuestActionResult> CompleteAsync(QuestProgressRequest packet, PlayerRuntimeState state, Zone zone,
-        int characterId, CancellationToken ct);
+        int characterId, int accountId, CancellationToken ct);
 
     /// <summary>
     ///     tSort 3, "mission receive" -- does not mutate quest state at all, only deposits an item; reuses

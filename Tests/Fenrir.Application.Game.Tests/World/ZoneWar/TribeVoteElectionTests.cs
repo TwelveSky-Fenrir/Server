@@ -374,4 +374,81 @@ public class TribeVoteElectionTests
         Assert.Equal((byte)1, tallyScope.Single(p => p.Key == "TribeId").Value);
         Assert.Contains(logger.Entries, e => e.Message.Contains("winner=555", StringComparison.Ordinal));
     }
+
+    [Fact]
+    public async Task CloseVotingWindow_RejectsBothCandidacyAndVoting_ButLeavesCandidateListsAlone()
+    {
+        var worldState = CreateWorldState(out var repository);
+        var election = new TribeVoteElection(worldState, new FakeTribeRepository(), CreateRegistry(),
+            NullLogger<TribeVoteElection>.Instance);
+        await election.OpenCandidacyWindowAsync(CancellationToken.None);
+        repository.VotesByTribe[1] = [new TribeVoteDto(1, 0, 999, 150, 1200, 3, DateTime.UtcNow)];
+        election.OpenVotingWindow();
+
+        election.CloseVotingWindow();
+
+        Assert.Equal(TribeVotePhase.VotingClosed, election.Phase);
+        var votes = await worldState.GetTribeVotesAsync(1, CancellationToken.None);
+        Assert.Single(votes);
+
+        Assert.Equal(TribeVoteCandidacyOutcome.WindowClosed,
+            await election.TryRegisterCandidacyAsync(CreatePlayer(1, tribe: 1), 1, CancellationToken.None));
+        Assert.Equal(TribeVoteCastOutcome.WindowClosed,
+            await election.TryCastVoteAsync(CreatePlayer(2, tribe: 1), 0, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task AnnounceResultsAsync_TalliesEveryTribe_AndClearsEverySubMasterRoster()
+    {
+        var worldState = CreateWorldState(out var repository);
+        var tribeRepository = new FakeTribeRepository
+        {
+            Tribes =
+            [
+                new TribeSummaryDto(0, null, null), new TribeSummaryDto(1, null, null),
+                new TribeSummaryDto(2, null, null), new TribeSummaryDto(3, null, null)
+            ]
+        };
+        tribeRepository.SubMasters.Add(new TribeSubMasterDto(0, 0, 777));
+        tribeRepository.SubMasters.Add(new TribeSubMasterDto(2, 1, 888));
+        var election = new TribeVoteElection(worldState, tribeRepository, CreateRegistry(),
+            NullLogger<TribeVoteElection>.Instance);
+        // Seeded after OpenCandidacyWindowAsync, which unconditionally wipes every tribe's previous-cycle
+        // votes (see OpenCandidacyWindowAsync_ClearsEveryTribesVotesAndOpensCandidacy) -- seeding earlier
+        // would have the candidacy window immediately erase these candidates before the tally ever runs.
+        await election.OpenCandidacyWindowAsync(CancellationToken.None);
+        repository.VotesByTribe[0] = [new TribeVoteDto(0, 0, 100, 150, 1000, 5, DateTime.UtcNow)];
+        repository.VotesByTribe[1] = [new TribeVoteDto(1, 0, 200, 150, 1000, 9, DateTime.UtcNow)];
+        election.OpenVotingWindow();
+        election.CloseVotingWindow();
+
+        await election.AnnounceResultsAsync(CancellationToken.None);
+
+        Assert.Equal(TribeVotePhase.ResultsAnnounced, election.Phase);
+        Assert.Equal(100, tribeRepository.SetMasterCalls.Single(c => c.TribeId == 0).NewMasterCharacterId);
+        Assert.Equal(200, tribeRepository.SetMasterCalls.Single(c => c.TribeId == 1).NewMasterCharacterId);
+        Assert.Null(tribeRepository.SetMasterCalls.Single(c => c.TribeId == 2).NewMasterCharacterId);
+        Assert.Null(tribeRepository.SetMasterCalls.Single(c => c.TribeId == 3).NewMasterCharacterId);
+    }
+
+    [Fact]
+    public async Task ResetToIdleAsync_ClearsEveryTribesVotes_AndReturnsToClosed()
+    {
+        var worldState = CreateWorldState(out var repository);
+        var election = new TribeVoteElection(worldState, new FakeTribeRepository(), CreateRegistry(),
+            NullLogger<TribeVoteElection>.Instance);
+        // Seeded after the phase transitions (rather than OpenCandidacyWindowAsync-then-seed) so this test's
+        // own ClearCalls assertion below observes only ResetToIdleAsync's own clear pass, not a second one
+        // from OpenCandidacyWindowAsync's identical per-tribe clear (see
+        // OpenCandidacyWindowAsync_ClearsEveryTribesVotesAndOpensCandidacy for that behavior in isolation).
+        election.OpenVotingWindow();
+        repository.VotesByTribe[2] = [new TribeVoteDto(2, 0, 500, 150, 1200, 3, DateTime.UtcNow)];
+        election.CloseVotingWindow();
+
+        await election.ResetToIdleAsync(CancellationToken.None);
+
+        Assert.Equal(TribeVotePhase.Closed, election.Phase);
+        Assert.Equal([(byte)0, (byte)1, (byte)2, (byte)3], repository.ClearCalls);
+        Assert.Empty(await worldState.GetTribeVotesAsync(2, CancellationToken.None));
+    }
 }

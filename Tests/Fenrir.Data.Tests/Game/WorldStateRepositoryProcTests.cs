@@ -126,6 +126,50 @@ public class WorldStateRepositoryProcTests
     }
 
     [Fact]
+    public async Task UpdateTribeSymbolStateAsync_ReplacesSymbolFields_WithoutTouchingPoints()
+    {
+        await _repository.EnsureInitializedAsync(CancellationToken.None);
+        var (_, before, _) = await _repository.GetAsync(CancellationToken.None);
+        var pointsBefore = before.Single(t => t.TribeId == 3).Points;
+        var symbolDate = new DateTime(2026, 2, 1, 6, 7, 8, DateTimeKind.Utc);
+
+        await _repository.UpdateTribeSymbolStateAsync(3, symbolDate, hasSymbol: false, isClosed: true,
+            CancellationToken.None);
+
+        var (_, after, _) = await _repository.GetAsync(CancellationToken.None);
+        var updated = Assert.Single(after, t => t.TribeId == 3);
+
+        Assert.Equal(symbolDate, updated.SymbolDate);
+        Assert.False(updated.HasSymbol);
+        Assert.True(updated.IsClosed);
+        // Points is deliberately excluded from this proc -- untouched by this call, unlike UpdateTribeAsync.
+        Assert.Equal(pointsBefore, updated.Points);
+    }
+
+    [Fact]
+    public async Task AddTribePointsAsync_AddsToExistingTotal_WithoutTouchingSymbolStateFields()
+    {
+        await _repository.EnsureInitializedAsync(CancellationToken.None);
+        var symbolDate = new DateTime(2026, 3, 1, 1, 1, 1, DateTimeKind.Utc);
+        await _repository.UpdateTribeSymbolStateAsync(1, symbolDate, hasSymbol: true, isClosed: false,
+            CancellationToken.None);
+        var (_, before, _) = await _repository.GetAsync(CancellationToken.None);
+        var pointsBefore = before.Single(t => t.TribeId == 1).Points;
+
+        await _repository.AddTribePointsAsync(1, 15, CancellationToken.None);
+        await _repository.AddTribePointsAsync(1, -3, CancellationToken.None);
+
+        var (_, after, _) = await _repository.GetAsync(CancellationToken.None);
+        var updated = Assert.Single(after, t => t.TribeId == 1);
+
+        Assert.Equal(pointsBefore + 15 - 3, updated.Points);
+        // Symbol-state fields untouched by this proc, unlike UpdateTribeAsync's whole-row overwrite.
+        Assert.Equal(symbolDate, updated.SymbolDate);
+        Assert.True(updated.HasSymbol);
+        Assert.False(updated.IsClosed);
+    }
+
+    [Fact]
     public async Task SetAllianceOfferAsync_UpsertsTheSamePair_InsteadOfDuplicating()
     {
         await _repository.EnsureInitializedAsync(CancellationToken.None);

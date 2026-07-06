@@ -1,4 +1,5 @@
 using Fenrir.Application.Game.Domain;
+using Fenrir.Application.Game.Domain.Commerce;
 using Fenrir.Application.Game.Domain.Extensions;
 using Fenrir.Application.Game.Domain.Guilds;
 using Fenrir.Application.Game.Domain.Progression;
@@ -45,6 +46,12 @@ PacketHandlerHub.Initialize(host.Services);
 // Hosted services only start inside host.Run(), so awaiting this here guarantees the world.* reference-data
 // cache is populated before the first connection -- a SQL failure aborts startup instead of serving an empty world.
 await host.Services.GetRequiredService<WorldDataLoader>().InitializeAsync(CancellationToken.None);
+
+// Same rationale again: mirrors legacy MyGame::Init's own one-shot synchronous InitItemMall/InitBloodShop
+// pass -- without this, the first CZ_GET_CASH_ITEM_INFO_SEND/CZ_DEMAND_BLOOD_MARK_SEND of the shard's life
+// would see an empty catalog until CommerceCatalogRefreshHost's first periodic pass caught up.
+await host.Services.GetRequiredService<CommerceCatalogCache>()
+    .RefreshAllAsync(host.Services.GetRequiredService<IWorldDataRepository>(), CancellationToken.None);
 
 // Same rationale: RvR world state (tribe symbols/points/gate/alliance offers) must be loaded before any
 // zone actor or handler can read/mutate it.

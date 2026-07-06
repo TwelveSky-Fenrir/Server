@@ -1,11 +1,14 @@
 using System.Buffers;
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Inventory;
+using Fenrir.Application.Game.Domain.Movement;
 using Fenrir.Application.Game.Domain.Pets;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.Stats;
+using Fenrir.Data.Abstractions.Game;
 using Fenrir.Data.WriteBehind;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
@@ -18,6 +21,93 @@ namespace Fenrir.Application.Game.Domain.World;
 
 public sealed partial class Zone
 {
+    /// <summary>
+    ///     A single pending <c>game.EventLog</c> row for a death-related event (<see cref="ApplyDeath" /> /
+    ///     <see cref="ApplyDeathExperienceLoss" />) -- queued rather than awaited inline because
+    ///     <see cref="Tick" /> must stay fully synchronous and never block on SQL I/O, same posture as
+    ///     <c>Zone.Monsters.cs</c>'s own pending-money-grant queue. Drained from any thread by
+    ///     <c>Fenrir.Application.Game.Hosting.World.DeathEventLogFlushHost</c>, which resolves the actual
+    ///     <see cref="IEventLogRepository.LogAsync" /> call -- always under <see cref="EventLogCategory.Death" />,
+    ///     the single-row high-stakes path (deaths are explicitly enumerated there), never the high-frequency
+    ///     <c>BatchLogAsync</c>/<c>EventLogQueue</c> path reserved for low-stakes telemetry.
+    /// </summary>
+    public readonly record struct PendingDeathEventLog(
+        short EventCode,
+        int ActorCharacterId,
+        short? ShardId,
+        byte? Outcome,
+        string? Payload);
+
+    /// <summary>
+    ///     <c>game.EventLog.EventCode</c> for a character death (any <see cref="DeathCause" />, including a
+    ///     GM-forced one -- <see cref="ApplyDeath" /> logs unconditionally regardless of cause) -- an
+    ///     app-owned numbering scheme scoped independently within <see cref="EventLogCategory.Death" /> (see
+    ///     <c>game.EventLog.sql</c>'s own "app-owned numbering scheme" comment; EventCode is only ever
+    ///     caller-interpreted alongside its Category, so reusing small values across categories is safe). The
+    ///     cause itself rides in the row's Outcome byte (the <see cref="DeathCause" /> enum's own numeric
+    ///     value) rather than a distinct EventCode per cause, so an investigation query can isolate "every
+    ///     death" without also filtering by cause.
+    /// </summary>
+    private const short CharacterDeathEventCode = 1;
+
+    /// <summary>
+    ///     <c>game.EventLog.EventCode</c> for the XP-loss (or, at the level cap, CP-loss) consequence of a
+    ///     monster-kill death -- see <see cref="ApplyDeathExperienceLoss" />. Distinct from
+    ///     <see cref="CharacterDeathEventCode" /> so an investigation query can isolate "did this death cost
+    ///     experience/CP" without parsing Payload.
+    /// </summary>
+    private const short DeathExperienceLossEventCode = 2;
+
+    /// <summary><see cref="PendingDeathEventLog.Outcome" /> for the ordinary XP-range loss branch.</summary>
+    private const byte ExperienceLossOutcome = 0;
+
+    /// <summary><see cref="PendingDeathEventLog.Outcome" /> for the at-level-cap CP-loss branch.</summary>
+    private const byte ContributionPointsLossOutcome = 1;
+
+    private readonly ConcurrentQueue<PendingDeathEventLog> _pendingDeathEventLogs = new();
+
+    /// <summary>
+    ///     Released once per queued row so <c>DeathEventLogFlushHost</c> can flush as soon as one arrives
+    ///     instead of waiting up to a full flush interval -- same signal pattern as <c>Zone.Monsters.cs</c>'s
+    ///     own <c>_moneyGrantSignal</c>.
+    /// </summary>
+    private readonly SemaphoreSlim _deathEventLogSignal = new(0, int.MaxValue);
+
+    /// <summary>
+    ///     Queues a death-related <c>game.EventLog</c> row rather than awaiting
+    ///     <see cref="IEventLogRepository.LogAsync" /> inline -- see <see cref="PendingDeathEventLog" />'s own
+    ///     remarks for why.
+    /// </summary>
+    private void QueueDeathEventLog(short eventCode, int characterId, byte? outcome, string? payload)
+    {
+        _pendingDeathEventLogs.Enqueue(new PendingDeathEventLog(eventCode, characterId, options.ShardId, outcome,
+            payload));
+        _deathEventLogSignal.Release();
+    }
+
+    /// <summary>
+    ///     Resolves as soon as a death-related event-log row is queued (or immediately, if one is already
+    ///     pending un-awaited) -- lets <c>DeathEventLogFlushHost</c> race this against its own periodic timer
+    ///     via <see cref="Task.WhenAny(Task[])" /> rather than only ever waking up on the timer's fixed cadence.
+    /// </summary>
+    public Task WaitForDeathEventLogAsync(CancellationToken ct)
+    {
+        return _deathEventLogSignal.WaitAsync(ct);
+    }
+
+    /// <summary>Callable from any thread; the only intended caller is <c>DeathEventLogFlushHost</c>.</summary>
+    public IReadOnlyList<PendingDeathEventLog> DrainPendingDeathEventLogs()
+    {
+        if (_pendingDeathEventLogs.IsEmpty)
+            return [];
+
+        List<PendingDeathEventLog>? entries = null;
+        while (_pendingDeathEventLogs.TryDequeue(out var entry))
+            (entries ??= []).Add(entry);
+
+        return (IReadOnlyList<PendingDeathEventLog>?)entries ?? [];
+    }
+
     /// <summary>
     ///     Keep-alive rebroadcast: re-emits every avatar's current state to its surroundings every 3.5 s even
     ///     when idle, so late-arriving or packet-lossy neighbors converge.
@@ -40,6 +130,11 @@ public sealed partial class Zone
 
     private void HandleEnter(int characterId, PlayerEnterData data)
     {
+        // Unconditional force-clear of any stale duel-related state (is-dueling indicator, duel id, side
+        // marker, negotiation state) on every zone entry, independent of DuelMaintenanceSystem's own
+        // tick-based cleanup -- see DuelRegistry.ForceClearOnZoneEntry's own remarks.
+        _duelRegistry.ForceClearOnZoneEntry(characterId);
+
         var state = new PlayerRuntimeState
         {
             CharacterId = characterId,
@@ -62,9 +157,14 @@ public sealed partial class Zone
             FlushSequence = data.FlushSequence,
             LastMoveUtc = DateTime.UtcNow,
             LastAvatarRebroadcastAt = _clock,
-            // Carried through an in-process handoff so a player mid-death who transfers zones before the
-            // auto-revive fires doesn't silently come back "alive" with 0 HP on arrival.
+            // Death-gate state carried through an in-process handoff so a player mid-death who transfers
+            // zones doesn't silently come back "alive" with 0 HP on arrival, nor lose/prematurely-clear their
+            // territorial-eligibility/anti-abuse tick counters.
             IsDead = data.IsDead,
+            TicksSinceDeath = data.TicksSinceDeath,
+            ReviveHackFlag = data.ReviveHackFlag,
+            CanUseConsumables = data.CanUseConsumables,
+            DeathSubCounter = data.DeathSubCounter,
             StatVit = data.StatVit,
             StatStr = data.StatStr,
             StatInt = data.StatInt,
@@ -87,11 +187,16 @@ public sealed partial class Zone
             // No rebirth/tribe-transition system populates a real "previous tribe" yet -- defaults to the
             // character's current tribe (a "never transferred" inference).
             PreviousTribe = data.Tribe,
-            // This zone's own clock plus whatever remained of the revive timer in the source zone.
-            ReviveAtZoneClock = _clock + (data.ReviveRemaining ?? TimeSpan.Zero),
             // The only write site for this field: a one-shot ~10s combat grace period starting now, for every
             // arrival. Combat code must never write this field again after today.
-            ZoneEntryAtZoneClock = _clock
+            ZoneEntryAtZoneClock = _clock,
+            // Carried through an in-process handoff so a client mid cash-catalog-notify window doesn't
+            // silently lose that state on a map transfer -- see PlayerRuntimeState.KnownCashCatalogVersion's
+            // own remarks. Defaults to CashCatalogVersionUnknown for a brand-new login.
+            KnownCashCatalogVersion = data.KnownCashCatalogVersion,
+            // Zone-241 "LOD" personal-dungeon quota -- see PlayerRuntimeState.DungeonInstanceRoundsRemaining's
+            // own remarks (always 0 today, no persisted source wired up yet).
+            DungeonInstanceRoundsRemaining = data.DungeonInstanceRoundsRemaining
         };
 
         // Items/Stats are already-computed data handed down through the command -- a plain copy, never a
@@ -163,6 +268,11 @@ public sealed partial class Zone
                 SendAvatarAction(state.Session, other);
 
         BroadcastAvatarAction(others, state);
+
+        // Trigger 2 (Server/ts25zone/S04_MyWork02.cpp:1142-1194): unconditional re-arm + personal-boss summon
+        // attempt on every entry into a Zone-241-type zone, whether a fresh login or an in-process handoff.
+        if (IsZone241TypeZone)
+            TryEnterZone241PersonalInstance(characterId);
     }
 
     private void HandleLeave(int characterId, Zone? handoffTarget, (float X, float Y, float Z)? handoffPosition = null)
@@ -173,14 +283,23 @@ public sealed partial class Zone
         _grid.Remove(characterId, state.CurrentCell);
 
         if (handoffTarget is null)
+        {
             // Plain leave (disconnect). No despawn/logout opcode exists in the M1 client protocol -- nearby
             // clients simply stop receiving updates for this entity. A documented gap, not an oversight.
+            if (characterShardLocations is not null)
+                // Fire-and-forget: this method runs on the zone's own tick thread, which must never block on
+                // inbound or outbound I/O (see this class's own header remarks). A failed/slow remove just
+                // means the cross-shard directory keeps pointing at this shard/map for a bit longer -- every
+                // reader already filters by this shard's own heartbeat freshness, so a stuck row is bounded,
+                // never permanent, and never blocks this or any other player's tick.
+                _ = CleanupShardLocationAsync(characterId);
             return;
+        }
 
         // In-process map transfer: the live state is snapshotted into the Enter command and travels inside
         // it -- this zone has already forgotten the player (TryRemove above), so the character never exists
         // in two zones at once.
-        var enterData = ZoneTransfer.CreateEnterData(state, handoffTarget.MapId, _clock, handoffPosition);
+        var enterData = ZoneTransfer.CreateEnterData(state, handoffTarget.MapId, handoffPosition);
 
         if (!handoffTarget.Post(ZoneCommand.Enter(characterId, enterData)))
         {
@@ -201,11 +320,36 @@ public sealed partial class Zone
     }
 
     /// <summary>
+    ///     Best-effort cross-shard-directory cleanup for a true disconnect (never an in-process handoff --
+    ///     <see cref="HandleLeave" />'s handoff branch never calls this, since <c>ShardId</c> doesn't change on
+    ///     a same-shard hop). Deliberately awaited nowhere: <see cref="HandleLeave" /> runs on this zone's own
+    ///     tick thread and must return immediately regardless of how long the remove takes. Any failure is
+    ///     logged and otherwise swallowed -- a stuck row degrades to a bounded staleness window (every reader
+    ///     already filters on this shard's own heartbeat freshness), never a thrown exception reaching the
+    ///     tick loop.
+    /// </summary>
+    private async Task CleanupShardLocationAsync(int characterId)
+    {
+        try
+        {
+            await characterShardLocations!.RemoveAsync(characterId, options.ShardId, CancellationToken.None)
+                .ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex,
+                "Zone {MapId}: failed to remove character {CharacterId} from the cross-shard location directory",
+                MapId, characterId);
+        }
+    }
+
+    /// <summary>
     ///     Kills <paramref name="characterId" /> in this zone: Life -&gt; 0, <see cref="PlayerRuntimeState.IsDead" />
-    ///     set, and an automatic revive scheduled <see cref="SimulationClock.DeathReviveDelay" /> later. Public
-    ///     and characterId-addressed so the combat handler never needs its own <see cref="PlayerRuntimeState" />
-    ///     reference -- only this zone's own tick may construct/mutate one. A no-op if the character is not
-    ///     tracked here, or already dead (so a duplicate killing blow never re-arms the revive timer).
+    ///     set, and the territorial revive-eligibility gate armed (<see cref="DeathGateTickSystem" /> grants it
+    ///     back via <see cref="GrantReviveEligibility" /> once eligible). Public and characterId-addressed so
+    ///     the combat handler never needs its own <see cref="PlayerRuntimeState" /> reference -- only this
+    ///     zone's own tick may construct/mutate one. A no-op if the character is not tracked here, or already
+    ///     dead (so a duplicate killing blow never re-arms the death-gate timers).
     /// </summary>
     /// <remarks>
     ///     XP penalty on death is applied here, but only for <see cref="DeathCause.MonsterKill" /> -- a PvP
@@ -227,12 +371,40 @@ public sealed partial class Zone
 
         state.Life = 0;
         state.IsDead = true;
-        state.ReviveAtZoneClock = _clock + SimulationClock.DeathReviveDelay;
+        state.TicksSinceDeath = 0;
+
+        // mProtect_ReviveHack (S07_MyGame04.cpp:1617-1624): armed for every cause except a private duel.
+        state.ReviveHackFlag = cause != DeathCause.Duel;
+        state.CanUseConsumables = false;
+        state.DeathSubCounter = ReviveEligibilityRules.DeathSubCounterBaseline;
 
         state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
 
+        // Logged unconditionally, regardless of cause -- covers PvP/monster-kill/stun-lock/duel deaths and
+        // any GM-forced kill (which simply calls this with the default Unknown cause) alike. Queued rather
+        // than awaited inline; see PendingDeathEventLog's own remarks for why.
+        QueueDeathEventLog(CharacterDeathEventCode, characterId, (byte)cause, $"Cause={cause};Level={state.Level}");
+
         if (cause == DeathCause.MonsterKill)
             ApplyDeathExperienceLoss(state);
+
+        // ProcessForDeath unconditionally purges buffs on every death (ProcessForDeleteNormalBuffEffectValue,
+        // S07_MyGame04.cpp:1617-1658, the same shared entry point Zone.Stun.cs's team-stun-lock force-kill
+        // also routes through) -- so this applies to every DeathCause, not just the stun-lock one. When the
+        // victim was stunned, that state is cleared too; the repeated-stun counter itself is deliberately
+        // left untouched here (only a cure or natural expiry resets it -- see Zone.Stun.cs's ClearStun).
+        // CanUseConsumables is deliberately NOT restored here even though the stun-clear path normally does
+        // that: the character is dead, and the death-gate above (mProtect_ReviveHack) owns that flag until
+        // GrantReviveEligibility restores it -- letting the stun-clear's own restore win here would let a
+        // character who happened to die while stunned immediately use potions despite being dead.
+        if (state.IsStunned)
+        {
+            state.IsStunned = false;
+            state.StunDurationSeconds = 0;
+            state.StunCountdownAccumulatorTicks = 0;
+        }
+
+        ClearAllBuffs(state);
 
         // Death pose (aAction.aSort = 12) so nearby clients see the character fall immediately. Self is
         // excluded: the combat handler tells the dying player's own client via combat-result packets instead.
@@ -263,6 +435,30 @@ public sealed partial class Zone
     }
 
     /// <summary>
+    ///     Zeroes every occupied <see cref="PlayerRuntimeState.Buffs" /> slot and broadcasts the change --
+    ///     shares <see cref="Simulation.BuffExpirySystem" />'s own per-slot clearing convention (rather than
+    ///     duplicating a fresh one) so a bulk clear and a natural per-tick expiry always look identical on the
+    ///     wire.
+    /// </summary>
+    private void ClearAllBuffs(PlayerRuntimeState state)
+    {
+        int[]? changedSlots = null;
+
+        for (var slot = 0; slot < 35; slot++)
+        {
+            if (state.Buffs.Buff[slot * 2] == 0 && state.Buffs.Buff[slot * 2 + 1] == 0)
+                continue;
+
+            state.Buffs.Buff[slot * 2] = 0;
+            state.Buffs.Buff[slot * 2 + 1] = 0;
+            (changedSlots ??= new int[35])[slot] = 1;
+        }
+
+        if (changedSlots is not null)
+            RecomputeStatsAndBroadcastBuffs(state, changedSlots);
+    }
+
+    /// <summary>
     ///     The MvP XP-loss branch of <see cref="ApplyDeath" /> (<c>S07_MyGame02.cpp:3445-3489</c>): refuses
     ///     below level 10 or at/above the level cap (loses CP instead, <see cref="ExperienceFormulas.CpLossAtLevelCap" />).
     ///     A level outside the catalog contributes 0 (no loss).
@@ -276,6 +472,8 @@ public sealed partial class Zone
             case >= ExperienceFormulas.MaxLimitLevel:
                 state.ContributionPoints -= ExperienceFormulas.CpLossAtLevelCap;
                 state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
+                QueueDeathEventLog(DeathExperienceLossEventCode, state.CharacterId, ContributionPointsLossOutcome,
+                    $"Kind=ContributionPoints;Loss={ExperienceFormulas.CpLossAtLevelCap};Level={state.Level}");
                 return;
         }
 
@@ -288,44 +486,37 @@ public sealed partial class Zone
 
         state.Experience -= loss;
         state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
-    }
 
-    /// <summary>Sweeps every dead player whose scheduled revive (<see cref="ApplyDeath" />) is due this tick.</summary>
-    private void ProcessPendingRevives()
-    {
-        List<(int CharacterId, PlayerRuntimeState State)>? due = null;
-
-        foreach (var (characterId, state) in _players)
-        {
-            if (!state.IsDead || _clock < state.ReviveAtZoneClock)
-                continue;
-
-            (due ??= []).Add((characterId, state));
-        }
-
-        if (due is null)
-            return;
-
-        foreach (var (characterId, state) in due)
-            Revive(characterId, state);
+        QueueDeathEventLog(DeathExperienceLossEventCode, state.CharacterId, ExperienceLossOutcome,
+            $"Kind=Experience;Loss={loss};Level={state.Level}");
     }
 
     /// <summary>
-    ///     Executes a due revive: HP forced to 1 regardless of MaxLife, in place (same zone/position) -- the
-    ///     legacy only auto-clears the death flag locally; an actual "return to town" transfer is always
-    ///     client-driven (CZ_DEMAND_ZONE_SERVER_INFO_2), already handled by <c>ZoneMoveHandler</c>. A prior
-    ///     version of this auto-timer also teleported to a hardcoded tribe capital, which silently misfired on
-    ///     a player revived mid zone-handoff; reviving in place removes that bug class by construction.
+    ///     Grants territorial revive-eligibility (side effect 1, <c>S07_MyGame04.cpp:257-327</c>): called by
+    ///     <see cref="DeathGateTickSystem" /> once its own recheck succeeds for a player who has been dead at
+    ///     least <see cref="SimulationClock.ReviveEligibilityLegacyTicks" /> legacy ticks. Clears every
+    ///     death-gate flag together (anti-abuse flag off, potions re-permitted, death-in-progress flag off,
+    ///     death sub-counter reset) and forces HP to 1 regardless of MaxLife, in place (same zone/position) --
+    ///     the legacy only auto-clears state locally; an actual "return to town" transfer is always
+    ///     client-driven (CZ_DEMAND_ZONE_SERVER_INFO_2), already handled by <c>ZoneMoveHandler</c>, never this
+    ///     path. A no-op if the character is not (or no longer) dead.
     /// </summary>
-    private void Revive(int characterId, PlayerRuntimeState state)
+    public void GrantReviveEligibility(PlayerRuntimeState state)
     {
+        if (!state.IsDead)
+            return;
+
         state.IsDead = false;
         state.Life = 1;
+        state.ReviveHackFlag = false;
+        state.CanUseConsumables = true;
+        state.TicksSinceDeath = 0;
+        state.DeathSubCounter = ReviveEligibilityRules.DeathSubCounterBaseline;
 
         state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
 
         SendAvatarAction(state.Session, state);
-        var neighbors = _grid.Neighbors(state.CurrentCell).Where(id => id != characterId).ToArray();
+        var neighbors = _grid.Neighbors(state.CurrentCell).Where(id => id != state.CharacterId).ToArray();
         BroadcastAvatarAction(neighbors, state);
     }
 
@@ -333,6 +524,31 @@ public sealed partial class Zone
     {
         if (!_players.TryGetValue(characterId, out var state))
             return;
+
+        // Anti-stun-hack veto (W_AVATAR_ACTION_SEND's server-side hardening, S04_MyWork02.cpp:1293 context,
+        // veto logic :1329-1338): while stunned, only an action whose own Sort echoes the stun pose itself
+        // (11) passes through; every other action-state request is discarded and the character's current
+        // stun pose is re-broadcast instead of ever being applied -- not merely client-side animation
+        // locking. Runs ahead of every other gate below (including the motion whitelist) since a stunned
+        // character must never be disconnected or corrected for an action that was always going to be
+        // vetoed anyway.
+        if (state.IsStunned && action.Sort != StunActionSort)
+        {
+            BroadcastStunActionState(state, state.StunDurationSeconds);
+            return;
+        }
+
+        // CheckValidCharacterMotionForSend: an (Sort, Type) pair outside the whitelist is a hostile-client
+        // signal (a real client only ever sends a legal combination), not an ordinary business-rule failure --
+        // the whole session is torn down, matching every other malformed-input handler in this class. Runs
+        // ahead of MovementRules.IsPlausible below (a Fenrir-only anti-speed-hack addition with no legacy
+        // analogue) since this is validating the packet's shape, not its claimed position.
+        if (!CharacterMotionWhitelist.TryEvaluate(action.Sort, action.Type, out var motion))
+        {
+            if (state.Session is ClientSession client)
+                client.Abort(DisconnectReason.Faulted);
+            return;
+        }
 
         var now = DateTime.UtcNow;
 
@@ -357,6 +573,18 @@ public sealed partial class Zone
         state.ActionSkillNumber = action.SkillNumber;
         state.ActionSkillGradeNum1 = action.SkillGradeNum1;
         state.ActionSkillGradeNum2 = action.SkillGradeNum2;
+
+        // CheckValidCharacterMotionForSend's own side effects: unconditionally replace whatever the previous
+        // action left here and start a fresh attack sub-packet budget, even if the previous action's own
+        // budget wasn't yet exhausted. Applied alongside ActionSort (not immediately after the whitelist check
+        // above) rather than right where the check itself runs, so the two always change together -- an
+        // action MovementRules rejects never touches ActionSort either, and letting these fall out of step
+        // would let AttackPacketBudget's replay guard (compared against ActionSort) wrongly reject sub-packets
+        // for an action that was never actually recorded as current.
+        state.AttackBudgetEnforced = motion.AttackBudgetEnforced;
+        state.AttackFamilyTag = motion.AttackFamilyTag;
+        state.AttackSubPacketCeiling = motion.AttackSubPacketCeiling;
+        state.AttackSubPacketsUsed = 0;
 
         var newCell = _grid.CellOf(state.PosX, state.PosZ);
         _grid.Move(characterId, state.CurrentCell, newCell);
@@ -551,7 +779,8 @@ public sealed partial class Zone
                 try
                 {
                     if (_players.TryGetValue(id, out var recipient) &&
-                        recipient.Session is ClientSession clientSession)
+                        recipient.Session is ClientSession clientSession &&
+                        !IsAvatarBroadcastSuppressed(recipient))
                         clientSession.SendRaw(span);
                 }
                 catch (Exception ex)
@@ -564,6 +793,24 @@ public sealed partial class Zone
         {
             ArrayPool<byte>.Shared.Return(rented);
         }
+    }
+
+    /// <summary>
+    ///     Companion filter (side effect 3, S07_MyGame03.cpp:809-833/857-880 Broadcast11, :893-935/954-978
+    ///     Broadcast22): a recipient still flagged from an unresolved death, 30+ ticks in, silently receives
+    ///     nothing from this broadcast -- except on <see cref="ReviveEligibilityZones.BroadcastSuppressionExemptZoneId" />,
+    ///     where the suppression itself is disabled (S07_MyGame01.cpp:508-522, ZONE124 macro unconditionally
+    ///     defined at H07_MyGame.h:19). Scoped to <see cref="BroadcastAvatarAction" /> only -- the general
+    ///     avatar-state proximity fan-out the legacy's Broadcast11/22 map to -- not every other packet kind a
+    ///     zone sends (e.g. <see cref="BroadcastAttackResult" />, buff-state sends).
+    /// </summary>
+    private bool IsAvatarBroadcastSuppressed(PlayerRuntimeState recipient)
+    {
+        if (MapId == ReviveEligibilityZones.BroadcastSuppressionExemptZoneId)
+            return false;
+
+        return recipient.ReviveHackFlag &&
+               recipient.TicksSinceDeath >= SimulationClock.DeathBroadcastSuppressionLegacyTicks;
     }
 
     private static AvatarActionResponse BuildAvatarActionRecv(PlayerRuntimeState state)

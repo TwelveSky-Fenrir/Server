@@ -1,11 +1,13 @@
 using Fenrir.Application.Login.Abstractions.VerifyMousePin;
 using Fenrir.Application.Login.Domain.Pins;
+using Fenrir.Application.Login.Services.AccountSecurity;
 using Fenrir.Data.Security;
 
 namespace Fenrir.Application.Login.Services.VerifyMousePin;
 
 /// <summary>op15 CL_LOGIN_MOUSE_PASSWORD_SEND business logic: verifies the stored PIN against the client's input.</summary>
-public sealed class VerifyMousePinService(IAccountPinRepository pins) : IVerifyMousePinService
+public sealed class VerifyMousePinService(IAccountPinRepository pins, IEventLogRepository eventLog)
+    : IVerifyMousePinService
 {
     public async ValueTask<VerifyMousePinResult> VerifyMousePinAsync(int accountId, string mousePasswordInput,
         CancellationToken cancellationToken)
@@ -22,5 +24,16 @@ public sealed class VerifyMousePinService(IAccountPinRepository pins) : IVerifyM
             return new VerifyMousePinResult(VerifyMousePinOutcome.WrongPassword);
 
         return new VerifyMousePinResult(VerifyMousePinOutcome.Success);
+    }
+
+    public async ValueTask LogFailedAttemptAsync(int accountId, int failureCount, bool lockedOut,
+        CancellationToken cancellationToken)
+    {
+        var eventCode = lockedOut
+            ? AccountSecurityEventCodes.MousePinLockout
+            : AccountSecurityEventCodes.MousePinMismatch;
+
+        await eventLog.LogAsync(eventCode, EventLogCategory.AccountSecurity, accountId, null, null, null, null,
+            null, null, null, null, (byte)failureCount, null, cancellationToken);
     }
 }

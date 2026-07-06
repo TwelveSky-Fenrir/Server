@@ -6,7 +6,8 @@ using Fenrir.Network.Serialization.Packets.Zone;
 namespace Fenrir.Application.Game.Services.Social;
 
 /// <inheritdoc cref="IFriendService" />
-public sealed class FriendService(ZoneRegistry zones, FriendRegistry friends, IFriendRepository repository)
+public sealed class FriendService(ZoneRegistry zones, FriendRegistry friends, IFriendRepository repository,
+    ICharacterShardLocationRepository characterShardLocations)
     : IFriendService
 {
     private const int MaxFriends = 10;
@@ -58,7 +59,8 @@ public sealed class FriendService(ZoneRegistry zones, FriendRegistry friends, IF
             target.Session.Send(new FriendCancelResponse());
     }
 
-    public FriendLocateResult Locate(PlayerRuntimeState asker, int index)
+    public async ValueTask<FriendLocateResult> LocateAsync(PlayerRuntimeState asker, int index,
+        CancellationToken cancellationToken)
     {
         if (index is < 0 or >= MaxFriends)
             return new FriendLocateResult(FriendLocateResultKind.IndexOutOfRange);
@@ -66,10 +68,17 @@ public sealed class FriendService(ZoneRegistry zones, FriendRegistry friends, IF
         if (!asker.Friends.TryGetValue((byte)index, out var friendId))
             return new FriendLocateResult(FriendLocateResultKind.SlotEmpty);
 
-        var zoneNumber = -1;
-        if (zones.TryGetPlayer(friendId, out var friend) && friend.Tribe == asker.Tribe)
-            zoneNumber = friend.MapId;
+        if (zones.TryGetPlayer(friendId, out var friend))
+            return new FriendLocateResult(FriendLocateResultKind.Found,
+                friend.Tribe == asker.Tribe ? friend.MapId : -1);
 
+        // Same-shard miss -- fall back to the cross-shard directory, re-applying the same same-tribe gate
+        // against the row's own denormalized Tribe column (no second query needed). A deliberate,
+        // low-frequency player action (a friend-locate ping), not a per-tick path.
+        var remote = await characterShardLocations.FindByCharacterIdAsync(friendId, cancellationToken)
+            .ConfigureAwait(false);
+
+        var zoneNumber = remote is { } row && row.Tribe == asker.Tribe ? row.MapId : -1;
         return new FriendLocateResult(FriendLocateResultKind.Found, zoneNumber);
     }
 

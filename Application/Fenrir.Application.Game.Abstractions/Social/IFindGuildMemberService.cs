@@ -11,5 +11,12 @@ public readonly record struct FindGuildMemberResult(bool HasGuild, int ZoneNumbe
 /// <summary>Business logic behind CZ_GUILD_FIND_SEND.</summary>
 public interface IFindGuildMemberService
 {
-    public FindGuildMemberResult FindZone(PlayerRuntimeState asker, string avatarName);
+    /// <summary>
+    ///     Same-shard lookup first (<see cref="ZoneRegistry.TryGetPlayerByName" />), falling back to the
+    ///     cross-shard character-location directory on a miss -- this opcode only ever needs a
+    ///     <c>ZoneNumber</c> reply, so the directory's <c>MapId</c> answers it directly with no live delivery
+    ///     required (unlike whisper).
+    /// </summary>
+    public ValueTask<FindGuildMemberResult> FindZoneAsync(PlayerRuntimeState asker, string avatarName,
+        CancellationToken cancellationToken);
 }

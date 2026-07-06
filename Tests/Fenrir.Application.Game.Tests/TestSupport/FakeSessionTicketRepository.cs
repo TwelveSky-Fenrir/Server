@@ -9,7 +9,7 @@ internal sealed class FakeSessionTicketRepository : ISessionTicketRepository
     public ConsumedTicketDto? TicketToReturn { get; set; }
 
     public ValueTask CreateAsync(int accountId, int characterId, byte shardId, int ttlSeconds, Guid sessionToken,
-        CancellationToken ct)
+        short accountGrade, CancellationToken ct)
     {
         throw new NotSupportedException();
     }

@@ -15,6 +15,13 @@ public static class OpcodeRateLimiterPolicy
     private static readonly (int Capacity, double TokensPerSecond) Heartbeat = (2, 1d / 5d);
 
     /// <summary>
+    ///     Rare, powerful, DB-hitting admin/GM commands (e.g. GM-BLOCK) -- kept as its own named budget rather
+    ///     than folded into <see cref="Auth" /> even though the numbers currently match, since operators retune
+    ///     GM-tier commands independently of the login/handshake path as more of them are added.
+    /// </summary>
+    private static readonly (int Capacity, double TokensPerSecond) GmAction = (3, 1d / 5d);
+
+    /// <summary>
     ///     Everything else in the reference burst of 3 is widened to 5 since one bucket covers several
     ///     low-frequency opcodes.
     /// </summary>
@@ -26,6 +33,7 @@ public static class OpcodeRateLimiterPolicy
         _ = new TokenBucket(Auth.Capacity, Auth.TokensPerSecond);
         _ = new TokenBucket(Movement.Capacity, Movement.TokensPerSecond);
         _ = new TokenBucket(Heartbeat.Capacity, Heartbeat.TokensPerSecond);
+        _ = new TokenBucket(GmAction.Capacity, GmAction.TokensPerSecond);
         _ = new TokenBucket(Default.Capacity, Default.TokensPerSecond);
     }
 
@@ -43,6 +51,8 @@ public static class OpcodeRateLimiterPolicy
             (FenrirServer.Zone, Opcodes.Zone.Incoming.AvatarActionResume) => Movement,
 
             (FenrirServer.Zone, Opcodes.Zone.Incoming.Heartbeat) => Heartbeat,
+
+            (FenrirServer.Zone, Opcodes.Zone.Incoming.GmBlockAvatar) => GmAction,
 
             _ => Default
         };

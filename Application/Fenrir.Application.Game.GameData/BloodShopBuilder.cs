@@ -46,4 +46,19 @@ public static class BloodShopBuilder
 
         return new BloodShop { BloodNum = MaxBloodSlots, Data = data };
     }
+
+    /// <summary>
+    ///     Version is the ItemId of the BloodExchangeSlot=100000 sentinel row (repurposed column, not a real
+    ///     item -- same convention as <see cref="CashCatalogBuilder.ResolveVersion" />); 0 if absent. Unlike
+    ///     world.ItemMallProducts, this table has no secondary "type" column, so the reserved slot number alone
+    ///     identifies the sentinel row.
+    /// </summary>
+    public static int ResolveVersion(IEnumerable<BloodExchangeCatalogRowDto> rows)
+    {
+        foreach (var row in rows)
+            if (row.BloodExchangeSlot == 100000)
+                return row.ItemId ?? 0;
+
+        return 0;
+    }
 }

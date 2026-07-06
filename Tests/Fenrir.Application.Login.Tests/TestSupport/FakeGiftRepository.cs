@@ -9,6 +9,7 @@ internal sealed class FakeGiftRepository : IGiftRepository
 {
     private readonly Exception? _claimFault;
     private readonly List<PendingGiftDto> _pending;
+    private int _nextGiftId = 1;
 
     public FakeGiftRepository(IEnumerable<PendingGiftDto> pending, Exception? claimFault = null)
     {
@@ -17,6 +18,8 @@ internal sealed class FakeGiftRepository : IGiftRepository
     }
 
     public int? LastClaimedGiftId { get; private set; }
+
+    public List<(int AccountId, int? ProductId, int Quantity, int Value)> Enqueued { get; } = [];
 
     public ValueTask<ReadOnlyCollection<PendingGiftDto>> GetPendingByAccountAsync(int accountId, CancellationToken ct)
     {
@@ -27,6 +30,14 @@ internal sealed class FakeGiftRepository : IGiftRepository
     {
         LastClaimedGiftId = giftId;
         return _claimFault is not null ? throw _claimFault : ValueTask.FromResult((short)0);
+    }
+
+    public ValueTask<int> EnqueueAsync(int accountId, int? productId, int quantity, int value, CancellationToken ct)
+    {
+        Enqueued.Add((accountId, productId, quantity, value));
+        var giftId = _nextGiftId++;
+        _pending.Add(new PendingGiftDto(giftId, productId, quantity, value, DateTime.UtcNow));
+        return ValueTask.FromResult(giftId);
     }
 
     public static FakeGiftRepository WithPending(params (int GiftId, int? ProductId)[] gifts)

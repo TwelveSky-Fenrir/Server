@@ -89,7 +89,11 @@ public class GuildBuffDecayHostTests
         public ValueTask<int> CreateAsync(string name, int masterCharacterId, CancellationToken ct) =>
             throw new NotSupportedException();
 
-        public ValueTask DisbandAsync(int guildId, CancellationToken ct) => throw new NotSupportedException();
+        public ValueTask<int> CreateAndDebitMoneyAsync(string name, int masterCharacterId, long deltaMoney,
+            int deltaBigMoney, CancellationToken ct) => throw new NotSupportedException();
+
+        public ValueTask DisbandAsync(int guildId, int characterId, CancellationToken ct) =>
+            throw new NotSupportedException();
 
         public ValueTask AddMemberAsync(int guildId, int characterId, CancellationToken ct) =>
             throw new NotSupportedException();
@@ -111,6 +115,9 @@ public class GuildBuffDecayHostTests
 
         public ValueTask SetGradeAsync(int guildId, int grade, CancellationToken ct) =>
             throw new NotSupportedException();
+
+        public ValueTask UpgradeAndDebitMoneyAsync(int guildId, int grade, int characterId, long deltaMoney,
+            int deltaBigMoney, CancellationToken ct) => throw new NotSupportedException();
 
         public ValueTask SetBuffAsync(int guildId, int buffType, int buffState, int buffTime, long buffTimeForDiff,
             CancellationToken ct) => throw new NotSupportedException();

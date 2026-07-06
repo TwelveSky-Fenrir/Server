@@ -21,6 +21,16 @@ public sealed class MonsterEntity
     /// <summary>Back-reference so a death event can tell <see cref="MonsterSpawnScheduler" /> which slot to respawn.</summary>
     public required int SpawnSlotId { get; init; }
 
+    /// <summary>
+    ///     Zone-241 "LOD" personal-dungeon tag (legacy <c>DUNGEON_INSTANCE::mID</c>, threaded onto the monster
+    ///     at summon time) -- null for every ordinary world/region monster. Non-null only for a personal boss
+    ///     created via <see cref="Zone.SummonPersonalBoss" />, and equal to the owning avatar's own
+    ///     <see cref="PlayerRuntimeState.DungeonInstanceId" />. Broadcast/targeting/pickup filter on this field
+    ///     rather than maintaining a membership list (legacy's own list-based <c>AddMonster</c> is dead code --
+    ///     see <c>Zone.DungeonInstance.cs</c>'s remarks).
+    /// </summary>
+    public int? InstanceId { get; init; }
+
     public float PosX { get; set; }
     public float PosY { get; set; }
     public float PosZ { get; set; }
@@ -67,7 +77,7 @@ public sealed class MonsterEntity
     public int Life => Volatile.Read(ref _life);
 
     public static MonsterEntity Create(int serverIndex, uint uniqueNumber, MonsterRowDto template, int spawnSlotId,
-        float homeX, float homeY, float homeZ, float leashRadius)
+        float homeX, float homeY, float homeZ, float leashRadius, int? instanceId = null)
     {
         var entity = new MonsterEntity
         {
@@ -82,7 +92,8 @@ public sealed class MonsterEntity
             MaxLife = template.Life,
             PosX = homeX,
             PosY = homeY,
-            PosZ = homeZ
+            PosZ = homeZ,
+            InstanceId = instanceId
         };
         entity._life = template.Life;
         return entity;

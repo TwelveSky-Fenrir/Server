@@ -45,19 +45,28 @@ public class ZonePvpKillMissionProgressTests
 
     /// <summary>One attacker (tribe 0) plus <paramref name="defenderIds" /> defenders (tribe 1), past both
     /// zone-entry protect windows and combat-ready.</summary>
+    /// <remarks>
+    ///     Map id 49 (not 1): still PvP-enabled (<see cref="ZonePvpZoneCatalog.AllowsEnemyTribeAttack" />) but
+    ///     outside every territorial revive-eligibility block, so <see cref="DeathGateTickSystem" /> grants
+    ///     revive-eligibility unconditionally past the 10-tick mark regardless of either combatant's tribe --
+    ///     matching this suite's own pre-existing "auto-revive after the delay" expectations without needing to
+    ///     model faction alignment/alliance state just for these PvP-reward-pipeline assertions.
+    /// </remarks>
     private static Zone SetUpZone(int attackerId, params int[] defenderIds)
     {
-        var zone = ZoneTestKit.CreateZone(1, randomSource: new ScriptedRandomSource(0, 0));
+        var worldState = ZoneTestKit.CreateWorldState();
+        var zone = ZoneTestKit.CreateZone(49, randomSource: new ScriptedRandomSource(0, 0), worldState: worldState,
+            simulationSystems: [new DeathGateTickSystem(worldState)]);
 
         var (attackerSession, _) = ZoneTestKit.CreateSession(attackerId);
         zone.Post(ZoneCommand.Enter(attackerId,
-            ZoneTestKit.EnterData(attackerSession, 1, "Attacker", tribe: 0)));
+            ZoneTestKit.EnterData(attackerSession, 49, "Attacker", tribe: 0)));
 
         foreach (var defenderId in defenderIds)
         {
             var (defenderSession, _) = ZoneTestKit.CreateSession(defenderId);
             zone.Post(ZoneCommand.Enter(defenderId,
-                ZoneTestKit.EnterData(defenderSession, 1, $"Defender{defenderId}", tribe: 1)));
+                ZoneTestKit.EnterData(defenderSession, 49, $"Defender{defenderId}", tribe: 1)));
         }
 
         zone.Tick(TimeSpan.FromMilliseconds(50));
@@ -114,8 +123,9 @@ public class ZonePvpKillMissionProgressTests
         Assert.Equal(1, attacker!.MissionKillOtherTribe);
         Assert.True(defender.IsDead);
 
-        // auto-revive, then bring the same victim back down to a killing blow again
-        zone.Tick(SimulationClock.DeathReviveDelay + TimeSpan.FromSeconds(1));
+        // revive-eligibility grant (unconditional on this map, see SetUpZone's remarks), then bring the same
+        // victim back down to a killing blow again
+        zone.Tick(SimulationClock.ReviveEligibilityDelay + TimeSpan.FromSeconds(1));
         Assert.False(defender.IsDead);
         defender.Life = 1;
 

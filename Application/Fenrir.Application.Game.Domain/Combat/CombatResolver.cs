@@ -10,10 +10,13 @@ namespace Fenrir.Application.Game.Domain.Combat;
 ///     (S07_MyGame02.cpp:886-1416). Never mutates state itself; caller applies the outcome.
 /// </summary>
 /// <remarks>
-///     Not implemented: duel (<c>mCase</c> 1), PvM/MvP/stun (handled elsewhere or unmodeled), Holy Shield, PvP kill
-///     rewards -- a PvP kill here only applies HP death, no CP/XP/drop to the killer. The caller
-///     (<c>Zone.ApplyCombatCommand</c>) does gate a small slice of the reward, <c>MissionKillOtherTribe</c>, behind
-///     <see cref="KillCooldownTracker" /> (C05); CP/XP/drop remain unimplemented.
+///     Not implemented: duel (<c>mCase</c> 1), Holy Shield (reflect-kill crediting the reflecting side is not
+///     modeled -- only the direct kill in <c>Zone.ApplyCombatCommand</c> reaches the reward pipeline). PvM/MvP/
+///     stun are handled elsewhere (<c>Zone.ApplyPvmAttack</c>/<c>Zone.Stun.cs</c>). A qualifying kill here does
+///     reach the PvP-kill reward pipeline (<c>Zone.ApplyPvpKillRewards</c>: CP formula/FFA-override, hero-rank
+///     points, EXP, <c>MissionKillOtherTribe</c>), gated end-to-end behind <see cref="KillCooldownTracker" />
+///     (C05) -- item-drop payload and the event-popup counter remain unimplemented (see
+///     <c>PvpKillRewardZoneCatalog</c>'s own remarks).
 ///     Also not implemented: the tribe "Formation Skill" x1.1 ATK/DEF modifier gated on
 ///     <c>mWorldInfo->mTribeMasterCallAbility[tribe]</c> (S07_MyGame02.cpp:1071-1079) -- that world-scope buff state isn't
 ///     wired up anywhere yet (see <see cref="Fenrir.Application.Game.Handlers.Tribes.TribeActionHandler" /> tSort 5, which

@@ -3,6 +3,7 @@ using System.Data;
 using CaeriusNet.Abstractions;
 using CaeriusNet.Builders;
 using CaeriusNet.Commands.Reads;
+using CaeriusNet.Commands.Writes;
 using Fenrir.Data.Abstractions.Accounts;
 
 namespace Fenrir.Data.Accounts;
@@ -33,5 +34,23 @@ public sealed record GiftRepository(ICaeriusNetDbContext Db) : IGiftRepository
 
         var result = await Db.FirstQueryAsync<GiftClaimResultDto>(sp, ct);
         return result!.SlotIndex;
+    }
+
+    /// <summary>
+    ///     Mints one pending gift for a single named account. See <see cref="IGiftRepository.EnqueueAsync" /> for
+    ///     why this deliberately has no broadcast mode and no validation of <paramref name="productId" />,
+    ///     <paramref name="quantity" />, or <paramref name="value" />.
+    /// </summary>
+    public async ValueTask<int> EnqueueAsync(int accountId, int? productId, int quantity, int value,
+        CancellationToken ct)
+    {
+        var sp = new StoredProcedureParametersBuilder("game", "usp_Gift_Enqueue", 1)
+            .AddParameter("AccountId", accountId, SqlDbType.Int)
+            .AddParameter("ProductId", (object?)productId ?? DBNull.Value, SqlDbType.Int)
+            .AddParameter("Quantity", quantity, SqlDbType.Int)
+            .AddParameter("Value", value, SqlDbType.Int)
+            .Build();
+
+        return await Db.ExecuteScalarAsync<int>(sp, ct);
     }
 }

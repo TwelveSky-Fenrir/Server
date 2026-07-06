@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using Fenrir.Application.Game.Abstractions.Commerce;
+using Fenrir.Application.Game.Domain.Commerce;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.Social.Pshop;
@@ -124,6 +125,12 @@ public sealed class OpenShopStallService(
         }
 
         var response = new OpenShopStallResponse { Result = 0, PshopInfo = listing };
+
+        // Zone.RebroadcastProxyShops's periodic-broadcast table entry -- independent of PlayerRuntimeState
+        // since this shop must keep advertising after its owner disconnects (see
+        // ProxyShopBroadcastEntry's remarks).
+        zone.RegisterProxyShop(new ProxyShopBroadcastEntry(characterId, unchecked((int)listing.UniqueNumber),
+            state.Name, listing.Name, state.PosX, state.PosY, state.PosZ, shopDate));
 
         var containers = ImmutableArray.Create(
             new InventoryContainerSnapshot(ContainerMatrix.InventoryPage0, page0),

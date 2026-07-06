@@ -167,6 +167,65 @@ public class TowerWarStateTests
     }
 
     [Fact]
+    public void RecordGuardianHit_FirstCall_ReturnsTrue_ClearsUnderAttack_AndSetsBothTimestamps()
+    {
+        var state = new TowerWarState();
+        var now = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        var isFirstHit = state.RecordGuardianHit(3, now);
+
+        Assert.True(isFirstHit);
+        Assert.False(state.IsUnderAttack(3));
+        Assert.Equal(now, state.GetFirstAttackAtUtc(3));
+        Assert.Equal(now, state.GetLastAttackAtUtc(3));
+    }
+
+    [Fact]
+    public void RecordGuardianHit_SecondCall_ReturnsFalse_ButStillRefreshesLastAttackTimestamp_NotFirst()
+    {
+        var state = new TowerWarState();
+        var first = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var second = first + TimeSpan.FromMinutes(1);
+
+        Assert.True(state.RecordGuardianHit(3, first));
+        var isFirstHit = state.RecordGuardianHit(3, second);
+
+        Assert.False(isFirstHit);
+        Assert.Equal(first, state.GetFirstAttackAtUtc(3)); // one-shot -- never overwritten again
+        Assert.Equal(second, state.GetLastAttackAtUtc(3)); // refreshed on every landed hit
+    }
+
+    [Fact]
+    public void RecordGuardianHit_OnlyTouchesTheAddressedTower()
+    {
+        var state = new TowerWarState();
+
+        state.RecordGuardianHit(3, DateTime.UtcNow);
+
+        Assert.Null(state.GetFirstAttackAtUtc(4));
+        Assert.Null(state.GetLastAttackAtUtc(4));
+    }
+
+    [Fact]
+    public void CompleteUpgrade_ResetsGuardianHitBookkeeping_ForTheFreshlyRespawnedGuardian()
+    {
+        var state = new TowerWarState();
+        state.SetTowerState(3, 201, true);
+        state.RecordGuardianHit(3, DateTime.UtcNow);
+        Assert.NotNull(state.GetFirstAttackAtUtc(3));
+
+        state.BeginUpgrade(3, 401, controllingTribeId: 2);
+        state.CompleteUpgrade(3);
+
+        Assert.Null(state.GetFirstAttackAtUtc(3));
+        Assert.Null(state.GetLastAttackAtUtc(3));
+        Assert.False(state.IsUnderAttack(3));
+
+        // The new guardian instance's own first hit is "first" again.
+        Assert.True(state.RecordGuardianHit(3, DateTime.UtcNow));
+    }
+
+    [Fact]
     public async Task InitializeAsync_BootstrapsThenHydrates_BuiltTowersResumeIntoBuilding()
     {
         var repository = new FakeTowerRepository
@@ -238,5 +297,56 @@ public class TowerWarStateTests
         await state.FlushDirtyAsync(repository, CancellationToken.None); // retried and now succeeds
 
         Assert.Single(repository.SetProgressCalls);
+    }
+
+    [Fact]
+    public void GetTribeBonus_BeforeAnyRecompute_IsAllZeroForEveryTribe()
+    {
+        var state = new TowerWarState();
+
+        for (byte tribe = 0; tribe < 4; tribe++)
+            Assert.Equal(TowerTribeRewardBonus.None, state.GetTribeBonus(tribe));
+    }
+
+    [Fact]
+    public void GetTribeBonus_OutOfRangeTribe_ReturnsNone_NeverThrows()
+    {
+        var state = new TowerWarState();
+        state.SetTowerState(0, 801, true);
+        state.RecomputeTribeBonuses();
+
+        Assert.Equal(TowerTribeRewardBonus.None, state.GetTribeBonus(4));
+        Assert.Equal(TowerTribeRewardBonus.None, state.GetTribeBonus(255));
+    }
+
+    [Fact]
+    public void RecomputeTribeBonuses_ReadsPackedStateDirectly_RegardlessOfSiegePhase()
+    {
+        var state = new TowerWarState();
+        // Tribe 0, level 4 XP-less Silver tower (type 1): raw packed level digit is always 2/4/6/8 for
+        // built levels 1-4 respectively (DecodeLevel's own remarks, MyGame::GetTowerState) -- 801, not 401.
+        state.SetTowerState(0, 801, true);
+        state.BeginSiege(0, DateTime.UtcNow); // guardian just died -- packedState is untouched by this
+
+        state.RecomputeTribeBonuses();
+
+        // Still reports the full level-4 Silver bonus during the destroy cooldown -- packedState (Fenrir's
+        // mirror of the legacy shared mTowerInfo->mState1Tower[]) isn't zeroed until CompleteDestruction.
+        Assert.Equal(0.20f, state.GetTribeBonus(0).SilverRatio);
+    }
+
+    [Fact]
+    public void RecomputeTribeBonuses_CalledAgainAfterCompleteDestruction_DropsBackToZero()
+    {
+        var state = new TowerWarState();
+        state.SetTowerState(0, 801, true); // level 4 (raw digit 8, see DecodeLevel's 2/4/6/8 remarks)
+        state.RecomputeTribeBonuses();
+        Assert.Equal(0.20f, state.GetTribeBonus(0).SilverRatio);
+
+        state.BeginSiege(0, DateTime.UtcNow);
+        state.CompleteDestruction(0);
+        state.RecomputeTribeBonuses();
+
+        Assert.Equal(TowerTribeRewardBonus.None, state.GetTribeBonus(0));
     }
 }

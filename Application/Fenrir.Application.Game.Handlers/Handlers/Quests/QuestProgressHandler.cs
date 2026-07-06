@@ -23,6 +23,7 @@ public sealed class QuestProgressHandler(IQuestProgressService questProgressServ
     {
         var zoneSession = (ZoneClientSession)session;
         var characterId = zoneSession.CharacterId!.Value;
+        var accountId = zoneSession.AccountId!.Value;
 
         if (zoneSession.CurrentZone is not Zone zone || !zone.TryGetPlayer(characterId, out var state) ||
             state is null)
@@ -31,7 +32,7 @@ public sealed class QuestProgressHandler(IQuestProgressService questProgressServ
         await state.EconomyActionLock.WaitAsync(cancellationToken);
         try
         {
-            await DispatchAsync(packet, zoneSession, zone, state, characterId, cancellationToken);
+            await DispatchAsync(packet, zoneSession, zone, state, characterId, accountId, cancellationToken);
         }
         finally
         {
@@ -40,12 +41,12 @@ public sealed class QuestProgressHandler(IQuestProgressService questProgressServ
     }
 
     private async ValueTask DispatchAsync(QuestProgressRequest packet, ZoneClientSession zoneSession, Zone zone,
-        PlayerRuntimeState state, int characterId, CancellationToken ct)
+        PlayerRuntimeState state, int characterId, int accountId, CancellationToken ct)
     {
         QuestActionResult? result = packet.Sort switch
         {
             1 => await questProgressService.AcceptAsync(packet, state, zone, characterId, ct),
-            2 => await questProgressService.CompleteAsync(packet, state, zone, characterId, ct),
+            2 => await questProgressService.CompleteAsync(packet, state, zone, characterId, accountId, ct),
             3 => await questProgressService.ReceiveAsync(packet, state, zone, characterId, ct),
             4 => await questProgressService.ExchangeAsync(packet, state, zone, characterId, ct),
             5 => await questProgressService.AbandonAsync(packet, state, zone, characterId, ct),

@@ -18,9 +18,22 @@ namespace Fenrir.Application.Game.Services.ItemModification;
 public sealed class SkyUpgradeItemService(
     ICharacterRepository characters,
     WorldDataCache worldData,
+    IEventLogQueue eventLogQueue,
     ILogger<SkyUpgradeItemService> logger)
     : ISkyUpgradeItemService
 {
+    /// <summary>
+    ///     game.EventLog.EventCode for a sky-upgrade attempt -- the wire opcode (op93) itself, same
+    ///     "app-owned numbering scheme, caller-interpreted alongside Category" posture as every other
+    ///     EventCode in this codebase.
+    /// </summary>
+    private const short SkyUpgradeItemEventCode = 93;
+
+    /// <summary>game.EventLog.Outcome for this EventCode: 0 success, 1 failed.</summary>
+    private const byte SuccessOutcome = 0;
+
+    private const byte FailedOutcome = 1;
+
     public async ValueTask<SkyUpgradeItemResult> UpgradeAsync(SkyUpgradeItemRequest packet, Zone zone,
         PlayerRuntimeState state, int characterId, CancellationToken cancellationToken)
     {
@@ -92,6 +105,15 @@ public sealed class SkyUpgradeItemService(
                 characterId);
             return new SkyUpgradeItemResult(SkyUpgradeItemOutcome.Rejected, false, [0, 0, 0, 0, 0, 0]);
         }
+
+        if (!eventLogQueue.Enqueue(new EventLogEntryTvp(SkyUpgradeItemEventCode, (byte)EventLogCategory.Enchant,
+                null, characterId, null, null, null, -(long)SkyUpgradeResolver.Cost, null, target.ItemId,
+                target.Quantity, resolved.Succeeded ? SuccessOutcome : FailedOutcome,
+                $"Serial={target.Serial};Material={material.ItemId};NewItemId={(resolved.Succeeded ? resolved.NewItemId : target.ItemId)}",
+                DateTime.UtcNow)))
+            logger.LogWarning(
+                "game.EventLog write-behind queue full: dropped sky-upgrade audit row for character {CharacterId}",
+                characterId);
 
         var packedValue = ItemValueCodec.Encode(newTargetStack.Enchant, newTargetStack.Combine,
             newTargetStack.Refine, newTargetStack.Socket);

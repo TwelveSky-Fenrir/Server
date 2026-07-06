@@ -53,4 +53,24 @@ public sealed record HeroRankingRepository(ICaeriusNetDbContext Db) : IHeroRanki
         var sp = new StoredProcedureParametersBuilder("game", "usp_HeroRanking_Rollover", 1).Build();
         return await Db.ExecuteScalarAsync<bool>(sp, ct);
     }
+
+    /// <summary>
+    ///     usp_HeroRanking_AddPoints does the accumulate atomically in SQL (<c>Points = Points + @Delta</c>),
+    ///     unlike <see cref="MarkRewardClaimedAsync" />'s whole-row overwrite -- see that proc's own header
+    ///     comment and <see cref="Fenrir.Data.Abstractions.Progression.IHeroRankingRepository.AddPointsAsync" />'s
+    ///     remarks for why this distinction matters for a per-kill grant.
+    /// </summary>
+    public async ValueTask<int> AddPointsAsync(int characterId, byte periodKind, int delta, byte? tribeId,
+        int? level, CancellationToken ct)
+    {
+        var sp = new StoredProcedureParametersBuilder("game", "usp_HeroRanking_AddPoints", 0)
+            .AddParameter("CharacterId", characterId, SqlDbType.Int)
+            .AddParameter("PeriodKind", periodKind, SqlDbType.TinyInt)
+            .AddParameter("Delta", delta, SqlDbType.Int)
+            .AddParameter("TribeId", (object?)tribeId ?? DBNull.Value, SqlDbType.TinyInt)
+            .AddParameter("Level", (object?)level ?? DBNull.Value, SqlDbType.Int)
+            .Build();
+
+        return await Db.ExecuteScalarAsync<int>(sp, ct);
+    }
 }

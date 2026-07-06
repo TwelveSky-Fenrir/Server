@@ -10,7 +10,14 @@ public enum DuelAskResultKind
     TribeMismatch,
     ChallengerBusy,
     TargetBusy,
-    Sent
+    Sent,
+
+    /// <summary>
+    ///     The requester's own is-dueling indicator is still set (an Active duel that never cleared) --
+    ///     treated as a desynced client state, not an ordinary busy reply: the requester's own session is
+    ///     terminated instead of answered (Server/ts25zone/S04_MyWork02.cpp:8259-8263).
+    /// </summary>
+    ChallengerAlreadyDueling
 }
 
 /// <summary>Business logic behind the CZ_DUEL_* opcode family, extracted from the Duel*Handlers.</summary>

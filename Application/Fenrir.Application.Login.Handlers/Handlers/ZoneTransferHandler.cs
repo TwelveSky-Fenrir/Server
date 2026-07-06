@@ -24,7 +24,7 @@ public sealed class ZoneTransferHandler(IZoneTransferService zoneTransferService
         var sessionToken = loginSession.AccountSessionToken!.Value;
 
         var result = await zoneTransferService.RequestZoneTransferAsync(accountId, (byte)packet.AvatarPost,
-            sessionToken, cancellationToken);
+            sessionToken, loginSession.AccountGrade, cancellationToken);
 
         if (result.Outcome != ZoneTransferOutcome.Success)
         {

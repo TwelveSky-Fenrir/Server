@@ -95,7 +95,6 @@ public sealed record PlayerEnterData(
     int MaxMana,
     long FlushSequence,
     bool IsDead = false,
-    TimeSpan? ReviveRemaining = null,
     IReadOnlyList<CharacterItemSlotDto>? Items = null,
     EffectiveStats? Stats = null,
     bool IsMuted = false,
@@ -138,4 +137,19 @@ public sealed record PlayerEnterData(
     // Same "must travel here or it silently resets" posture as the block above -- see
     // PlayerRuntimeState.Level2/Exp2's own remarks.
     short Level2 = 0,
-    int Exp2 = 0);
+    int Exp2 = 0,
+    // Defaults to PlayerRuntimeState.CashCatalogVersionUnknown -- correct for a brand-new login. An
+    // in-process zone transfer must pass the source PlayerRuntimeState's own value instead, or a client mid-
+    // notify window would silently lose its "please re-ask" state on every map hop -- see
+    // ZoneTransfer.CreateEnterData and PlayerRuntimeState.KnownCashCatalogVersion's own remarks.
+    int KnownCashCatalogVersion = PlayerRuntimeState.CashCatalogVersionUnknown,
+    // Death-gate state (PlayerRuntimeState.TicksSinceDeath/ReviveHackFlag/DeathSubCounter) -- must travel here
+    // too, or a player mid-death who transfers zones would silently lose their territorial-eligibility/
+    // anti-abuse tick counters. CanUseConsumables defaults true (matches a fresh login/non-dead arrival).
+    int TicksSinceDeath = 0,
+    bool ReviveHackFlag = false,
+    bool CanUseConsumables = true,
+    int DeathSubCounter = 0,
+    // Zone-241 "LOD" personal-dungeon quota -- see PlayerRuntimeState.DungeonInstanceRoundsRemaining's own
+    // remarks (no persisted source populates a non-zero value yet).
+    int DungeonInstanceRoundsRemaining = 0);

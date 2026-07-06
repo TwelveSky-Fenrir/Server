@@ -59,6 +59,15 @@ public interface ICharacterRepository
 
     public ValueTask PersistPositionsAsync(IReadOnlyList<CharacterPositionTvp> rows, CancellationToken ct);
 
+    /// <summary>
+    ///     Narrow Life/Mana floor-clamp write (login-tail realignment guard) -- see
+    ///     <c>Fenrir.Application.Login.Domain.Avatars.AvatarVitalsFloor</c> for the exact floor values and legacy
+    ///     citation. Idempotent on the same per-character FlushSequence guard as
+    ///     <see cref="PersistPositionsAsync" />/<see cref="PersistProgressAsync" />.
+    /// </summary>
+    public ValueTask ClampVitalsFloorAsync(int characterId, long flushSequence, int life, int mana,
+        CancellationToken ct);
+
     public ValueTask<CharacterWorldEntryBundle?> GetWorldEntryBundleAsync(int characterId, CancellationToken ct);
 
     public ValueTask ReplaceContainerAsync(int characterId, byte container,
@@ -107,6 +116,14 @@ public interface ICharacterRepository
     public ValueTask SetPetGrowthAsync(int characterId, int petGrowth, byte petActivity, CancellationToken ct);
 
     public ValueTask<int?> GetIdByNameAsync(string name, CancellationToken ct);
+
+    /// <summary>
+    ///     Targeted single-slot read: the ItemId currently at (<paramref name="container" />,
+    ///     <paramref name="slot" />) for this character, or null if that slot is empty. Used by op19's rename-
+    ///     scroll gate (CL_CHANGE_AVATAR_NAME_SEND) -- a full container/world-entry read would be wasteful for
+    ///     checking a single claimed slot.
+    /// </summary>
+    public ValueTask<int?> GetItemIdAtSlotAsync(int characterId, byte container, byte slot, CancellationToken ct);
 
     public ValueTask<RewardClaimStateDto?> GetRewardClaimStateAsync(int characterId, int todayDate,
         CancellationToken ct);

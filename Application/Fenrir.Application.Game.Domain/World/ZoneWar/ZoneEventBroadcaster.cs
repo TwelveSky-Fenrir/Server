@@ -24,24 +24,61 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 public sealed class ZoneEventBroadcaster(
     WorldStateService worldState,
     ZoneRegistry zones,
-    ILogger<ZoneEventBroadcaster> logger)
+    ILogger<ZoneEventBroadcaster> logger,
+    TribeGuardSpawner? guardSpawner = null,
+    TribeSymbolSpawner? symbolSpawner = null)
 {
     private const int DataSize = 130;
 
-    /// <summary>tSort 38 (S04_MyWork02.cpp case 38 equivalent): a tribe has just decided Zone038.</summary>
+    /// <summary>
+    ///     tSort 38 (S04_MyWork02.cpp case 38 equivalent): a tribe has just decided Zone038. Also forces the
+    ///     zone038-winner guard pool to resummon on every zone, mirroring <c>SummonGuard(TRUE, TRUE)</c> being
+    ///     called directly at this exact state transition (<c>S07_MyGame01.cpp:4200-4202</c>).
+    /// </summary>
     public void AnnounceZone038Winner(byte tribeId)
     {
         worldState.SetZone038Winner(tribeId);
         Broadcast(38, tribeId);
+
+        if (guardSpawner is not null)
+            foreach (var zone in zones.Zones)
+                guardSpawner.ForceZone038WinnerResummon(zone);
     }
 
-    /// <summary>tSort 40: the tribe-symbol (HSB) battle window opens; every tribe starts back on its own symbol.</summary>
+    /// <summary>
+    ///     Broadcast case 39 ("hsb countdown", <c>S07_MyGame08.cpp:219-222</c>): forces the ordinary guard pool
+    ///     to resummon on every zone. No <see cref="WorldStateService" /> field changes for this case -- it is
+    ///     purely a client notice plus a forced guard re-evaluation.
+    /// </summary>
+    public void AnnounceTribeSymbolBattleCountdown()
+    {
+        Broadcast(39);
+
+        if (guardSpawner is not null)
+            foreach (var zone in zones.Zones)
+                guardSpawner.ForceOrdinaryResummon(zone);
+    }
+
+    /// <summary>
+    ///     tSort 40: the tribe-symbol (HSB) battle window opens; every tribe starts back on its own symbol.
+    ///     Broadcast case 40 ("hsb start", <c>S07_MyGame08.cpp:223-231</c>) also calls <c>SummonTribeSymbol()</c>
+    ///     then <c>SummonGuard(FALSE, TRUE)</c> on every zone -- reproduced here as an immediate symbol
+    ///     re-evaluation followed by a forced ordinary-pool guard resummon.
+    /// </summary>
     public void AnnounceTribeSymbolBattleStarted()
     {
         using var scope = logger.BeginScope("SymbolBattle {SymbolBattlePhase}", "Started");
 
         worldState.StartTribeSymbolBattle();
         Broadcast(40);
+
+        if (symbolSpawner is not null)
+            foreach (var zone in zones.Zones)
+                symbolSpawner.EvaluateNow(zone);
+
+        if (guardSpawner is not null)
+            foreach (var zone in zones.Zones)
+                guardSpawner.ForceOrdinaryResummon(zone);
 
         logger.LogInformation("Tribe symbol battle opened; every tribe reset to its own symbol");
     }
@@ -85,6 +122,51 @@ public sealed class ZoneEventBroadcaster(
     {
         worldState.SetAllianceOffer(fromTribeId, toTribeId, isAccepted);
         Broadcast(46, fromTribeId, toTribeId, isAccepted ? 1 : 0);
+    }
+
+    /// <summary>
+    ///     tSort 47: an existing alliance between <paramref name="tribeA" /> and <paramref name="tribeB" /> is
+    ///     dissolved -- either by <see cref="ZoneWar.AllianceDiplomacyCeremony" />'s already-allied-negotiation
+    ///     completing, or by the separate alliance-stone-destruction mechanism (S04_MyWork02.cpp:427-448).
+    /// </summary>
+    public void AnnounceAllianceDissolved(byte tribeA, byte tribeB)
+    {
+        worldState.DissolveAlliance(tribeA, tribeB);
+        Broadcast(47, tribeA, tribeB);
+    }
+
+    /// <summary>
+    ///     tSort 1234: the flag-triggered, high-tribe-biased tribe-point recompute has just been persisted
+    ///     successfully -- fan out the 4 freshly computed totals to every connected zone-server link exactly as
+    ///     read (already applied to <see cref="WorldStateService" /> and the DB by the caller; this method does
+    ///     not itself mutate any world state, unlike every other <c>Announce*</c> method on this class). Every
+    ///     zone that receives this hop re-broadcasts the identical sort/payload to its own locally connected,
+    ///     fully-logged-in, not-transferring player connections regardless of whether it recognizes tSort 1234
+    ///     in its own dispatch (it does not -- there is no reachable case for it) -- reproduced here simply by
+    ///     using the same <see cref="Broadcast" /> fan-out every other RvR sort in this class already uses,
+    ///     since Fenrir collapses the legacy's separate center-&gt;zone and zone-&gt;client hops into one process.
+    ///     A no-op with no error if no zone currently has any connected player (contract: "no connected zone
+    ///     links at broadcast time").
+    /// </summary>
+    /// <remarks>
+    ///     Réf. C++ : Server/ts25center/S07_MyGame01.cpp:253-266 -- builds the tSort=1234 payload (4 totals at
+    ///     the front of a zero-filled buffer) and calls <c>BroadcastZone</c> ; :278-288
+    ///     (<c>MyGame::BroadcastZone</c>) -- fan-out to every connected zone-server link ;
+    ///     Server/ts25zone/UpperCom/S06_MyUpperCom02.cpp:269-276,328-332 -- zone-side receipt and hand-off to
+    ///     <c>MyGame::ProcessForBroadcastInfo</c> ; Server/ts25zone/S07_MyGame08.cpp:10-67,1310-1353 -- the
+    ///     zone-side dispatch switch has no case for 1234 and no default label, yet unconditionally re-broadcasts
+    ///     the same sort/payload to every local client afterward regardless of which case (if any) matched ;
+    ///     Server/ts25zone/S07_MyGame03.cpp:777-794 (<c>MyUtil::BroadcastServer</c>) -- the local client fan-out
+    ///     used by that unconditional trailer ; Server/Header/Protocol/DEFINE.h:69,377-381
+    ///     (<c>USE_ITEM_LINK_V2</c> unconditional, <c>MAX_TRIBE_NUM</c> = 4) -- the 130-byte payload
+    ///     (<see cref="DataSize" />) and the 4-total domain.
+    /// </remarks>
+    public void AnnounceTribePointTotals(IReadOnlyList<int> totals)
+    {
+        if (totals.Count != WorldStateService.TribeCount)
+            throw new ArgumentException($"Expected exactly {WorldStateService.TribeCount} totals.", nameof(totals));
+
+        Broadcast(1234, totals[0], totals[1], totals[2], totals[3]);
     }
 
     private void Broadcast(int sort, params ReadOnlySpan<int> fields)

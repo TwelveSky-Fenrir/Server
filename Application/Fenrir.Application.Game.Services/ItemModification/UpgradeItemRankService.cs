@@ -18,9 +18,22 @@ namespace Fenrir.Application.Game.Services.ItemModification;
 public sealed class UpgradeItemRankService(
     ICharacterRepository characters,
     WorldDataCache worldData,
+    IEventLogQueue eventLogQueue,
     ILogger<UpgradeItemRankService> logger)
     : IUpgradeItemRankService
 {
+    /// <summary>
+    ///     game.EventLog.EventCode for an upgrade-rank attempt -- the wire opcode (op27) itself, same
+    ///     "app-owned numbering scheme, caller-interpreted alongside Category" posture as every other
+    ///     EventCode in this codebase.
+    /// </summary>
+    private const short UpgradeItemRankEventCode = 27;
+
+    /// <summary>game.EventLog.Outcome for this EventCode: 0 success, 1 failed.</summary>
+    private const byte SuccessOutcome = 0;
+
+    private const byte FailedOutcome = 1;
+
     public async ValueTask<UpgradeItemRankResult> UpgradeAsync(UpgradeItemRankRequest packet, Zone zone,
         PlayerRuntimeState state, int characterId, CancellationToken cancellationToken)
     {
@@ -100,6 +113,15 @@ public sealed class UpgradeItemRankService(
                 characterId);
             return new UpgradeItemRankResult(UpgradeItemRankOutcome.Rejected, false, 0, [0, 0, 0, 0, 0, 0]);
         }
+
+        if (!eventLogQueue.Enqueue(new EventLogEntryTvp(UpgradeItemRankEventCode, (byte)EventLogCategory.Enchant,
+                null, characterId, null, null, null, -(long)resolved.Cost, null, target.ItemId, target.Quantity,
+                succeeded ? SuccessOutcome : FailedOutcome,
+                $"Serial={target.Serial};Material={material.ItemId};ResultItemId={(succeeded ? resolved.ResultItemId : target.ItemId)}",
+                DateTime.UtcNow)))
+            logger.LogWarning(
+                "game.EventLog write-behind queue full: dropped upgrade-item-rank audit row for character {CharacterId}",
+                characterId);
 
         var value = succeeded
             ? new[]

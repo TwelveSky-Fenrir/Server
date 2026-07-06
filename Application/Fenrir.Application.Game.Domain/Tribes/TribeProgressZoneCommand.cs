@@ -33,6 +33,16 @@ namespace Fenrir.Application.Game.Domain.Tribes;
 ///     tSort 11's own AOI-wide AVATAR_CHANGE_INFO_1 sort-14 notice (ContributionPoints/RebirthCount), sent once
 ///     both fields above are already applied to <see cref="PlayerRuntimeState" />.
 /// </param>
+/// <param name="LodRounds">Item 1434's banked "Life or Death" round counter -- see <see cref="PlayerRuntimeState.LodRounds" />.</param>
+/// <param name="ProtectForRefine">Preserve Charm -- see <see cref="PlayerRuntimeState.ProtectForRefine" />.</param>
+/// <param name="ProtectForDestroy">Protection Charm -- see <see cref="PlayerRuntimeState.ProtectForDestroy" />.</param>
+/// <param name="ProtectForCostume">Guardian Charm -- see <see cref="PlayerRuntimeState.ProtectForCostume" />.</param>
+/// <param name="ProtectForDestroy2">Absolute Craft Ticket -- see <see cref="PlayerRuntimeState.ProtectForDestroy2" />.</param>
+/// <param name="ImproveItemValue">Lucky Enchant Scroll -- see <see cref="PlayerRuntimeState.ImproveItemValue" />.</param>
+/// <param name="AddItemValue">Lucky Combine Scroll -- see <see cref="PlayerRuntimeState.AddItemValue" />.</param>
+/// <param name="HighItemValue">Lucky Upgrade Scroll -- see <see cref="PlayerRuntimeState.HighItemValue" />.</param>
+/// <param name="DropItemTime">Lucky Drop Scroll -- see <see cref="PlayerRuntimeState.DropItemTime" />.</param>
+/// <param name="TaiyanKeyTimer">Taiyan Key -- see <see cref="PlayerRuntimeState.TaiyanKeyTimer" />.</param>
 /// <param name="Applied">
 ///     Completed once actually mirrored -- see InventoryZoneCommand.Applied for why this matters while
 ///     EconomyActionLock is held.
@@ -60,6 +70,16 @@ public readonly record struct TribeProgressZoneCommand(
     int? Exp2 = null,
     int? RebirthCount = null,
     bool RebirthBroadcast = false,
+    int? LodRounds = null,
+    int? ProtectForRefine = null,
+    int? ProtectForDestroy = null,
+    int? ProtectForCostume = null,
+    int? ProtectForDestroy2 = null,
+    int? ImproveItemValue = null,
+    int? AddItemValue = null,
+    int? HighItemValue = null,
+    int? DropItemTime = null,
+    int? TaiyanKeyTimer = null,
     TaskCompletionSource? Applied = null);
 
 /// <summary>One ground-item drop request -- see TribeProgressZoneCommand.DropItems.</summary>

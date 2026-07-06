@@ -19,5 +19,5 @@ public readonly record struct DestroyItemResult(
 public interface IDestroyItemService
 {
     public ValueTask<DestroyItemResult> DestroyAsync(DestroyItemRequest packet, Zone zone, PlayerRuntimeState state,
-        int characterId, CancellationToken cancellationToken);
+        int characterId, int accountId, CancellationToken cancellationToken);
 }

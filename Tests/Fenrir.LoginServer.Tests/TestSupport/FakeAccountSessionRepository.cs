@@ -40,4 +40,9 @@ internal sealed class FakeAccountSessionRepository : IAccountSessionRepository
     {
         throw new NotSupportedException();
     }
+
+    public ValueTask<int> GetActiveSessionCountAsync(CancellationToken ct)
+    {
+        throw new NotSupportedException();
+    }
 }

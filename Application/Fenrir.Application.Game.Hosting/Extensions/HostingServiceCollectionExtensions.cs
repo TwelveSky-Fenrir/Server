@@ -1,15 +1,27 @@
+using Fenrir.Application.Game.Domain;
+using Fenrir.Application.Game.Domain.Simulation;
+using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.Monsters;
 using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
+using Fenrir.Application.Game.Hosting.Commerce;
+using Fenrir.Application.Game.Hosting.EventLog;
 using Fenrir.Application.Game.Hosting.Guilds;
 using Fenrir.Application.Game.Hosting.Progression;
 using Fenrir.Application.Game.Hosting.World;
 using Fenrir.Application.Game.Hosting.World.Monsters;
 using Fenrir.Application.Game.Hosting.World.WorldState;
 using Fenrir.Application.Game.Hosting.World.ZoneWar;
+using Fenrir.Data.Abstractions.Game;
+using Fenrir.Data.Abstractions.Security;
 using Fenrir.Data.World;
 using Fenrir.Data.WriteBehind;
+using Fenrir.Network.Dispatch.FloodProtection;
+using Fenrir.Network.Dispatch.Sessions;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Hosting.Extensions;
 
@@ -28,14 +40,28 @@ public static class HostingServiceCollectionExtensions
 
         services.AddHostedService<TowerWarWriteBehindHost>();
 
+        // PvP-kill hero-rank point write-behind (step 8 of the PvP-kill reward pipeline) -- HeroRankPointAccumulator
+        // itself is registered in Fenrir.Application.Game.Domain's AddGameDomain.
+        services.AddHostedService<HeroRankPointsWriteBehindHost>();
+
         // C08: guild buff reserve decay (BuffTime counts down over real time -- see GuildBuffDecayHost's remarks
         // for why this is a plain BackgroundService rather than an ISimulationSystem) and the RvR ranking-board
         // cache refresh (seeded once in Program.cs before ZoneConnectionHost starts accepting connections).
         services.AddHostedService<GuildBuffDecayHost>();
         services.AddHostedService<GuildRankingRefreshHost>();
 
+        // Cash-shop/blood-exchange catalog reload (seeded once in Program.cs before ZoneConnectionHost starts
+        // accepting connections, same "initial fill in Program.cs, this host only covers refreshes after
+        // that" shape as GuildRankingRefreshHost above).
+        services.AddHostedService<CommerceCatalogRefreshHost>();
+
         services.AddHostedService<ZoneTickHost>();
         services.AddHostedService<MonsterLootFlushHost>();
+        services.AddHostedService<ProxyShopExpiryFlushHost>();
+
+        // Death/XP-loss/CP-loss audit trail (Category=Death) -- write-behind twin of MonsterLootFlushHost for
+        // Zone.ApplyDeath/Zone.ApplyDeathExperienceLoss's own queued rows (Zone.QueueDeathEventLog).
+        services.AddHostedService<DeathEventLogFlushHost>();
 
         // ProgressWriteBehindHost is a plain singleton, NOT its own BackgroundService/IWriteBehindFlusher --
         // see its own remarks for why a second, independently-timed drain of the SAME shared DirtyTracker<int>
@@ -55,6 +81,25 @@ public static class HostingServiceCollectionExtensions
         // Cross-process duplicate-login kick/refusal, Game-side half -- see AccountSessionKickPollHost's remarks.
         services.AddHostedService<AccountSessionKickPollHost>();
 
+        // Same "one instance, three registrations" pattern as PositionWriteBehindHost above: *.Services
+        // producers (enchant/refine/socket/rune per-attempt logging) consume IEventLogQueue only.
+        services.AddSingleton<EventLogFlushHost>();
+        services.AddSingleton<IEventLogQueue>(sp => sp.GetRequiredService<EventLogFlushHost>());
+        services.AddHostedService(sp => sp.GetRequiredService<EventLogFlushHost>());
+
+        services.AddSingleton(sp =>
+        {
+            var opts = sp.GetRequiredService<IOptions<GameServerOptions>>().Value;
+            var firewallRules = sp.GetRequiredService<IFirewallRuleRepository>();
+            var registry = sp.GetRequiredService<SessionRegistry>();
+
+            return new IpFloodGuard(
+                opts.MaxConnectionsPerIp,
+                opts.MaxProtocolViolationsPerIpPerHour,
+                firewallRules.BlockAsync,
+                registry);
+        });
+
         return services;
     }
 
@@ -69,6 +114,27 @@ public static class HostingServiceCollectionExtensions
         services.AddSingleton<WorldStateService>();
         services.AddSingleton<WorldStateWriteBehindHost>();
         services.AddHostedService(static provider => provider.GetRequiredService<WorldStateWriteBehindHost>());
+
+        // Tribe bank income tax sweep (1% NPC-service / 9% monster-kill-currency, 10-minute per-zone flush) --
+        // TryAddSingleton so a future Commerce/database-engineer workflow can register the real slot-scan/cap-
+        // fallback persistent gateway ahead of this call and have it win, without editing this file (same
+        // pattern as AddHolyStoneScheduling's own reward/forced-return gateways).
+        services.TryAddSingleton<ITribeBankTaxSweepGateway, LoggingOnlyTribeBankTaxSweepGateway>();
+        services.AddHostedService<TribeBankTaxSweepFlushHost>();
+
+        // Tribe-point level/rebirth-based recompute + favored-tribe rank-bonus ladder (both share the same
+        // ts25center-equivalent every-6th-tick gate) -- TryAddSingleton so a future database-engineer workflow
+        // can register the real character/avatar roster-scan gateway ahead of this call and have it win,
+        // without editing this file (same pattern as ITribeBankTaxSweepGateway above).
+        services.TryAddSingleton<ITribePointRosterGateway, LoggingOnlyTribePointRosterGateway>();
+        services.AddSingleton<TribePointLevelRecomputeService>();
+
+        // FavoredTribeRankBonusLadderService now also depends on ZoneEventBroadcaster (tSort=1234 broadcast on
+        // a successful flag-triggered recompute) -- registered by AddZoneWar below in this same AddGameHosting
+        // call, so plain constructor injection resolves it fine regardless of registration order (DI resolves
+        // lazily on first use, not at AddSingleton call time).
+        services.AddSingleton<FavoredTribeRankBonusLadderService>();
+        services.AddHostedService<TribePointRecomputeHost>();
     }
 
     /// <summary>
@@ -80,6 +146,15 @@ public static class HostingServiceCollectionExtensions
         services.AddSingleton<TribeVoteElection>();
         services.AddSingleton<ZoneEventBroadcaster>();
 
+        // Center-ingestion counterpart to ZoneEventBroadcaster above: the ~150-way ZONE_BROADCAST_FOR_CENTER_SEND
+        // event-code family that class's own remarks say it does NOT cover. ZoneCenterSiegeState is a plain,
+        // not-yet-persisted in-memory singleton (same "no backing table yet" posture WorldStateService's own
+        // remarks already flag for these exact WorldInfo fields) -- no write-behind host needed for it, see
+        // ZoneCenterBroadcastIngestor's own remarks for why. Real API, not yet called by anything (no producer
+        // wired up in this cluster), same posture as ZoneWarTickService before anything calls StartWar.
+        services.AddSingleton<ZoneCenterSiegeState>();
+        services.AddSingleton<ZoneCenterBroadcastIngestor>();
+
         // Registered as a factory (opaque to the DI container's constructor-graph cycle check) so that
         // MonsterSpawnScheduler -- an ISimulationSystem that ZoneRegistry itself resolves at construction
         // time -- can depend on ZoneEventBroadcaster without the container seeing a same-graph cycle back
@@ -90,6 +165,115 @@ public static class HostingServiceCollectionExtensions
 
         services.AddSingleton<ZoneWarTickService>();
         services.AddHostedService(static provider => provider.GetRequiredService<ZoneWarTickService>());
+
+        // Regular War (Zone049) schedule/capture/victory/reward engine -- LoggingRegularWarEventSink and
+        // UnavailableRegularWarRewardValueProvider are the safe, currently-inert defaults; see their own
+        // remarks for why this host is nonetheless registered and running unconditionally (same posture as
+        // ZoneWarTickService above before anything calls StartWar).
+        services.AddSingleton<IRegularWarEventSink, LoggingRegularWarEventSink>();
+        services.AddSingleton<IRegularWarRewardValueProvider, UnavailableRegularWarRewardValueProvider>();
+        services.AddSingleton<RegularWarSchedulerHost>();
+        services.AddHostedService(static provider => provider.GetRequiredService<RegularWarSchedulerHost>());
+
+        // Force-Leader election calendar -- inert everywhere except the one shard configured as server
+        // number 37 with VoteTribe enabled; see TribeVoteElectionCalendarHost's own remarks.
+        services.AddHostedService<TribeVoteElectionCalendarHost>();
+
+        // TribeGuardSpawner/TribeSymbolSpawner (SummonGuard/SummonTribeSymbol) -- catalogs default to Empty
+        // (a documented no-op) until the real per-map/tribe coordinate tables are supplied; see both
+        // classes' own remarks. Registered both as their own concrete type (ZoneEventBroadcaster's forced-
+        // resummon hooks resolve them directly) and as ISimulationSystem (their own periodic/boot-pass
+        // evaluation), same "one instance, two registrations" pattern as PositionWriteBehindHost above.
+        services.AddSingleton(GuardPostCatalog.Empty);
+        services.AddSingleton(TribeSymbolCatalog.Empty);
+        services.AddSingleton<TribeGuardOptions>();
+        services.AddSingleton<TribeGuardSpawner>();
+        services.AddSingleton<ISimulationSystem>(sp => sp.GetRequiredService<TribeGuardSpawner>());
+        services.AddSingleton<TribeSymbolSpawner>();
+        services.AddSingleton<ISimulationSystem>(sp => sp.GetRequiredService<TribeSymbolSpawner>());
+
+        // Tribe-guard CORRIDOR gate (mTribeGuardState[4][4], MyGame::ProcessForGuardState) -- an entirely
+        // different mechanic from TribeGuardSpawner/GuardPostCatalog above (that one is MySummon::SummonGuard's
+        // capital-guard spawner); this one only tracks per-checkpoint passability and re-derives it every tick,
+        // with no spawning of its own. TribeGuardCorridorCatalog.Empty is the same documented "safe no-op until
+        // the real sixteen-zone/hub table is supplied" posture as GuardPostCatalog.Empty above. Registered both
+        // as its own concrete type (a future ZoneMoveService corridor-check wiring resolves TribeGuardCorridorState/
+        // TribeGuardCorridorGate directly) and as ISimulationSystem, same "one instance, two registrations"
+        // pattern as TribeGuardSpawner above.
+        services.AddSingleton(TribeGuardCorridorCatalog.Empty);
+        services.AddSingleton<TribeGuardCorridorState>();
+        services.AddSingleton<TribeGuardCorridorStateDerivationSystem>();
+        services.AddSingleton<ISimulationSystem>(sp =>
+            sp.GetRequiredService<TribeGuardCorridorStateDerivationSystem>());
+
+        // AllianceDiplomacyCeremony itself is NOT registered here yet -- it needs a per-tick post-occupant
+        // scanner and a cited negotiation-duration constant, neither of which exist yet (see that class's own
+        // GAP 1/GAP 2 remarks); only its durable-state dependency is wired up so those are ready once it is.
+        services.AddSingleton<AllianceCooldownTracker>();
+
+        // TEMP_REGISTER_SEND (op11/ZoneHandshake) tribe-population quota gate: the process-wide directory
+        // (TribeQuotaRegistry, also consumed directly by GameConnectionHost's connection-teardown path) plus
+        // the idle-timeout sweep that forcibly disconnects an abandoned registration after three minutes.
+        services.AddSingleton<TribeQuotaRegistry>();
+        services.AddSingleton<TempRegistrationIdleSweep>();
+        services.AddHostedService<TempRegistrationIdleSweepHost>();
+
+        AddHolyStoneScheduling(services);
+    }
+
+    /// <summary>
+    ///     The Zone037/038/039 Holy Stone territory scheduler trio -- see each Domain class's own remarks for
+    ///     which numeric/geometry constants the translated behavior contract left unspecified (bound here from
+    ///     <see cref="GameServerOptions" />'s own <c>HolyStone*</c> properties, defaulting to inert rather than
+    ///     a guessed real value). <c>TryAddSingleton</c> for the reward/forced-return gateways lets a future
+    ///     Combat/Commerce/GM-tooling workflow register its own real implementation ahead of this call and have
+    ///     it win, without editing this file.
+    /// </summary>
+    private static void AddHolyStoneScheduling(IServiceCollection services)
+    {
+        services.TryAddSingleton<IHolyStoneCaptureRewardGateway, LoggingOnlyHolyStoneCaptureRewardGateway>();
+        services.TryAddSingleton<IHolyStoneForcedReturnGateway, LoggingOnlyHolyStoneForcedReturnGateway>();
+
+        services.AddSingleton(sp =>
+        {
+            var opts = sp.GetRequiredService<IOptions<GameServerOptions>>().Value;
+            return new TribeSymbolBattleScheduler(
+                sp.GetRequiredService<WorldStateService>(),
+                sp.GetRequiredService<ZoneEventBroadcaster>(),
+                sp.GetRequiredService<ILogger<TribeSymbolBattleScheduler>>(),
+                new HashSet<DayOfWeek>(opts.HolyStoneBattleDays),
+                opts.HolyStoneTestMode);
+        });
+        services.AddHostedService<TribeSymbolBattleSchedulerHost>();
+
+        services.AddSingleton(sp =>
+        {
+            var opts = sp.GetRequiredService<IOptions<GameServerOptions>>().Value;
+            var site = new HolyStoneWarSite(opts.HolyStoneMapId, opts.HolyStoneX, opts.HolyStoneZ,
+                opts.HolyStoneCaptureRadius, opts.HolyStoneParticipationRadius);
+
+            return new HolyStoneWarCycle(
+                sp.GetRequiredService<WorldStateService>(),
+                sp.GetRequiredService<ZoneEventBroadcaster>(),
+                sp.GetRequiredService<ZoneRegistry>(),
+                sp.GetRequiredService<IHolyStoneCaptureRewardGateway>(),
+                sp.GetRequiredService<ILogger<HolyStoneWarCycle>>(),
+                site,
+                testMode: opts.HolyStoneTestMode);
+        });
+        services.AddHostedService<HolyStoneWarCycleHost>();
+
+        services.AddSingleton(sp =>
+        {
+            var opts = sp.GetRequiredService<IOptions<GameServerOptions>>().Value;
+            return new HolyStoneTerritoryEvictionSweep(
+                sp.GetRequiredService<WorldStateService>(),
+                sp.GetRequiredService<ZoneRegistry>(),
+                opts.HolyStoneTerritoryMapIds.ToArray(),
+                sp.GetRequiredService<IHolyStoneForcedReturnGateway>(),
+                sp.GetRequiredService<ILogger<HolyStoneTerritoryEvictionSweep>>());
+        });
+        services.AddHostedService<HolyStoneTerritoryEvictionSweepHost>();
     }
 
     /// <summary>

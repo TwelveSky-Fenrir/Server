@@ -4,6 +4,7 @@ using Fenrir.Application.Game.Domain.Forge;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.GameData;
+using Fenrir.Data.Abstractions.Game;
 using Fenrir.Network.Serialization.Packets.Zone;
 using Microsoft.Extensions.Logging;
 
@@ -16,11 +17,31 @@ namespace Fenrir.Application.Game.Services.ItemModification;
 public sealed class DestroyItemService(
     ICharacterRepository characters,
     WorldDataCache worldData,
+    IEventLogRepository eventLog,
     ILogger<DestroyItemService> logger)
     : IDestroyItemService
 {
+    /// <summary>
+    ///     game.EventLog.EventCode for a successful rare-item destroy-into-stone dissolution -- an app-owned
+    ///     numbering scheme with no central catalog yet (first Application-layer caller of
+    ///     <see cref="IEventLogRepository" /> under <see cref="EventLogCategory.ItemDestroy" />; see
+    ///     game.EventLog.sql's own "EventCode is an app-owned numbering scheme" comment). Picked as an
+    ///     arbitrary small value scoped to this one path; a future central event-code registry should
+    ///     supersede this constant rather than silently reusing its numeric value for something unrelated.
+    /// </summary>
+    private const short DestroyItemEventCode = 1;
+
+    /// <summary>
+    ///     game.EventLog.Outcome for this event code -- caller/EventCode-defined (see
+    ///     game.EventLog.sql's own "Outcome is likewise a caller/EventCode-defined code" comment), not a
+    ///     fixed global enum. 1 marks success, matching <c>UseInventoryItemService</c>'s own
+    ///     GpTicketRedeemedEventCode precedent; only the success path is logged here (a rejected destroy
+    ///     never reaches SQL, so there is nothing durable to audit).
+    /// </summary>
+    private const byte SuccessOutcome = 1;
+
     public async ValueTask<DestroyItemResult> DestroyAsync(DestroyItemRequest packet, Zone zone,
-        PlayerRuntimeState state, int characterId, CancellationToken cancellationToken)
+        PlayerRuntimeState state, int characterId, int accountId, CancellationToken cancellationToken)
     {
         var page1 = packet.Page1;
         var index1 = packet.Index1;
@@ -56,6 +77,11 @@ public sealed class DestroyItemService(
                 characterId);
             return new DestroyItemResult(DestroyItemOutcome.Rejected, 0, 0, 0, 0);
         }
+
+        await eventLog.LogAsync(DestroyItemEventCode, EventLogCategory.ItemDestroy, accountId, characterId,
+            null, null, null, resolved.Money, null, target.ItemId, target.Quantity, SuccessOutcome,
+            $"StoneItemId={resolved.StoneItemId};StoneQuantity={quantity};Enchant={target.Enchant};Serial={target.Serial}",
+            cancellationToken);
 
         var containers = ImmutableArray.Create(new InventoryContainerSnapshot((byte)page1, projected));
 

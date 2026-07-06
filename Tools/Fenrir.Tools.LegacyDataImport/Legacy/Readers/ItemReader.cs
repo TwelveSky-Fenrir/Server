@@ -3,9 +3,15 @@ using Fenrir.Tools.LegacyDataImport.Legacy.Records;
 namespace Fenrir.Tools.LegacyDataImport.Legacy.Readers;
 
 /// <summary>
-///     Parses <c>005_00002.IMG</c> and replays <c>MyShm::Load_Item</c>'s per-load patches (S15_MyShare.cpp:422-514):
-///     zeroed retired slots, the sell-lock range, elite-exchange-lock. Does NOT replay <c>SetInw33Item</c>
-///     (already baked into the file) or <c>ChangeItemSort</c> remaps (itemsort99.h; display-only, not core stats).
+///     Parses <c>005_00002.IMG</c> and replays <c>MyShm::Load_Item</c>'s per-load patches
+///     (S15_MyShare.cpp:422-514, 1192-1269): zeroed retired slots, the 2021.04.10 "no drop"
+///     <c>CheckMonsterDrop</c> catalog fix, and the elite-exchange-lock. Does NOT replay <c>SetInw33Item</c>
+///     (already baked into the file), <c>ChangeItemSort</c> remaps (itemsort99.h; display-only, not core
+///     stats), or the <c>USE_CUSTOME_CREATE</c> sell-lock override for items 74200-74223
+///     (S15_MyShare.cpp:463-469) -- that macro is defined only in the non-<c>M33</c> <c>#else</c> branch
+///     (Header/Protocol/DEFINE.h:21-51) and both real build configurations, <c>ReleaseM33</c> and
+///     <c>ReleaseEU33</c>, define <c>M33</c> unconditionally (ts25latest_config.props:4-12), so it never
+///     compiles into any shipped binary.
 /// </summary>
 internal static class ItemReader
 {
@@ -17,6 +23,39 @@ internal static class ItemReader
 
     private const int Ielite = 4;
     private static readonly int[] ElitesExchangeLockSorts = [13, 14, 15, 9, 12, 10, 11, 7];
+
+    /// <summary>
+    ///     2021.04.10 "no drop" fix (S15_MyShare.cpp:1192-1253): these identifiers have <c>CheckMonsterDrop</c>
+    ///     forced to 1, unconditionally. Identifiers 1072-1074 are deliberately excluded here -- they sit
+    ///     inside the same source switch-statement but gated by <c>#ifdef NO_DROP_MONEY_BAR</c>, which is never
+    ///     <c>#define</c>'d anywhere under <c>Server/</c>, so that sub-case is dead code in every real build.
+    ///     Also includes the immediately-adjacent <c>#elif defined MG5ORIGIN</c> extension
+    ///     (S15_MyShare.cpp:1259-1267): identifiers 7001-7027 and 17001-17133. <c>MG5ORIGIN</c> is defined
+    ///     unconditionally outside any build-configuration branch (Header/Protocol/DEFINE.h:18), so it is
+    ///     active in every real build including ReleaseEU33 -- unlike the sibling <c>#ifdef PWSEA</c> branch
+    ///     (identifiers 7000-7425), which is commented out at its definition site and therefore excluded here
+    ///     as dead code.
+    /// </summary>
+    private static bool IsNoDropForcedOne(int index)
+    {
+        return index is 706 or 708 or 709 or 710 or 711
+            or (>= 865 and <= 885)
+            or 983
+            or (>= 1079 and <= 1091)
+            or 1125 or 1369 or 1989
+            or (>= 2001 and <= 2004)
+            or (>= 7001 and <= 7027)
+            or (>= 17001 and <= 17133);
+    }
+
+    /// <summary>
+    ///     2021.04.10 "no drop" fix (S15_MyShare.cpp:1249-1252): these identifiers have <c>CheckMonsterDrop</c>
+    ///     forced to 2, unconditionally.
+    /// </summary>
+    private static bool IsNoDropForcedTwo(int index)
+    {
+        return index is 611 or 612;
+    }
 
     /// <summary>Raw parse, no patches -- matches a raw <c>ts25ztool export item</c> CSV dump.</summary>
     public static IReadOnlyList<ItemRecord> ReadAllRaw(string dataDirectory)
@@ -105,8 +144,10 @@ internal static class ItemReader
         if (item.Index is >= 89501 and < 89563 or 99001)
             item = item with { Index = 0 };
 
-        if (item.Index is >= 74200 and <= 74223)
-            item = item with { SellCost = 1, CheckNpcSell = 2 };
+        if (IsNoDropForcedTwo(item.Index))
+            item = item with { CheckMonsterDrop = 2 };
+        else if (IsNoDropForcedOne(item.Index))
+            item = item with { CheckMonsterDrop = 1 };
 
         if (item.Type == Ielite && ElitesExchangeLockSorts.Contains(item.Sort))
             item = item with { CheckExchange = 2 };

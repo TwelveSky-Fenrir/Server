@@ -3,9 +3,13 @@ using System.Diagnostics;
 using System.Threading.Channels;
 using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Movement;
+using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.Quests;
 using Fenrir.Application.Game.Domain.Simulation;
+using Fenrir.Application.Game.Domain.Social.Duel;
+using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.World.Geometry;
+using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Data.WriteBehind;
 using Fenrir.Network.Dispatch.Sessions;
@@ -21,7 +25,8 @@ namespace Fenrir.Application.Game.Domain.World;
 /// <remarks>
 ///     The tick runs in stages: drain inbox -&gt; simulate (whole 500 ms legacy ticks via
 ///     <see cref="SimulationTickAccumulator" />) -&gt; periodic keep-alive rebroadcast (avatars every 3.5 s,
-///     monsters/items every 5 s, see <see cref="SimulationClock" />).
+///     monsters/items every 5 s, then the proxy-shop sweep, per-shop every 5 s, see
+///     <see cref="SimulationClock" /> and <c>Zone.ProxyShops.cs</c>).
 /// </remarks>
 /// <remarks>
 ///     This class is split across several partial files by concern, all in this same folder:
@@ -29,10 +34,13 @@ namespace Fenrir.Application.Game.Domain.World;
 ///     <c>Zone.GroundItems.cs</c> (ground-item spawn/claim/expiry), <c>Zone.Combat.cs</c> (attack resolution +
 ///     kill hooks), <c>Zone.Chat.cs</c> (local/shout/tribe chat), <c>Zone.PlayerLifecycle.cs</c>
 ///     (enter/leave/move/death/revive/skill-cast + avatar-action broadcast), <c>Zone.EconomyMirrors.cs</c>
-///     (already-SQL-durable inventory/skill/mentor/guild/tribe/quest/mission mirrors), and
+///     (already-SQL-durable inventory/skill/mentor/guild/tribe/quest/mission mirrors),
 ///     <c>Zone.CosmeticMirrors.cs</c> (drink-bottle/hero-ranking/fishing/mount/costume/stellar-core/avatar-buff/
-///     rune-socket/auto-buff/pshop mirrors). This file keeps the constructor, the fields/state shared across
-///     several of those concerns (the AOI grid, the player map, the tick clock, RNG), and the tick loop itself.
+///     rune-socket/auto-buff/pshop mirrors), <c>Zone.ProxyShops.cs</c> (the offline/deputy shop periodic
+///     radius rebroadcast + expiry force-close sweep), and <c>Zone.TribeBankTax.cs</c> (the 1%/9% tribe-bank
+///     income tax accumulator and its 10-minute sweep). This file keeps the constructor, the fields/state
+///     shared across several of those concerns (the AOI grid, the player map, the tick clock, RNG), and the
+///     tick loop itself.
 /// </remarks>
 public sealed partial class Zone(
     short mapId,
@@ -44,9 +52,36 @@ public sealed partial class Zone(
     WorldDataCache worldData,
     IRandomSource? randomSource = null,
     QuestCatalog? questCatalog = null,
-    KillCooldownTracker? killCooldownTracker = null) : IZoneActor
+    KillCooldownTracker? killCooldownTracker = null,
+    TowerWarState? towerWar = null,
+    WorldStateService? worldState = null,
+    PartyRegistry? partyRegistry = null,
+    DuelRegistry? duelRegistry = null,
+    HeroRankPointAccumulator? heroRankPointAccumulator = null,
+    ICharacterShardLocationRepository? characterShardLocations = null,
+    TribeBankTaxAccumulator? tribeBankTax = null) : IZoneActor
 {
     private readonly SimulationTickAccumulator _accumulator = new();
+
+    /// <summary>
+    ///     Process-wide party authority (team-stun's exact-5-member gate, <see cref="ApplyStunAttack" />) --
+    ///     defaults to a private instance in tests so each test zone starts with a clean, empty party roster.
+    /// </summary>
+    private readonly PartyRegistry _partyRegistry = partyRegistry ?? new PartyRegistry();
+
+    /// <summary>
+    ///     Process-wide 1v1 duel authority (the stun request's duel-exception tribe gate,
+    ///     <see cref="ApplyStunAttack" />) -- defaults to a private instance in tests, same posture as
+    ///     <see cref="_partyRegistry" />.
+    /// </summary>
+    private readonly DuelRegistry _duelRegistry = duelRegistry ?? new DuelRegistry();
+
+    /// <summary>
+    ///     Process-wide write-behind for hero-rank points granted by <see cref="ApplyPvpKillHeroPoints" /> --
+    ///     defaults to a private instance in tests, same posture as <see cref="_partyRegistry" />.
+    /// </summary>
+    private readonly HeroRankPointAccumulator _heroRankPointAccumulator =
+        heroRankPointAccumulator ?? new HeroRankPointAccumulator();
 
     private readonly AoiGrid _grid = new(options.AoiCellSize);
 
@@ -168,7 +203,6 @@ public sealed partial class Zone(
         var t1 = Stopwatch.GetTimestamp();
         Simulate(_accumulator.Advance(elapsed));
         var t2 = Stopwatch.GetTimestamp();
-        ProcessPendingRevives();
         RebroadcastAvatars();
         // Claimed-item despawns first (so other players stop seeing it ASAP), then the 5 s keep-alives, then
         // the 60 s expiry sweep.
@@ -176,6 +210,9 @@ public sealed partial class Zone(
         RebroadcastMonsters();
         RebroadcastGroundItems();
         ExpireGroundItems();
+        RebroadcastProxyShops();
+        AdvanceZone241PersonalDungeonInstances();
+        TryFlushTribeBankTax();
         var t3 = Stopwatch.GetTimestamp();
 
         ZoneTickMetrics.StageDurationMs.Record(Stopwatch.GetElapsedTime(t0, t1).TotalMilliseconds, _mapTag,

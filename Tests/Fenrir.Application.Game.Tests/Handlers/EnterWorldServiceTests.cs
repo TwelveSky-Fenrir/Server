@@ -10,6 +10,7 @@ using Fenrir.Network.Serialization.Packets.Shared;
 using Fenrir.Network.Serialization.Packets.Zone;
 using Fenrir.Data.Abstractions.Admin;
 using Fenrir.Data.Abstractions.Guilds;
+using Fenrir.Data.Abstractions.Runtime;
 using Fenrir.Data.Abstractions.Social;
 using Fenrir.Data.Security;
 using Fenrir.Data.WriteBehind;
@@ -80,6 +81,8 @@ public class EnterWorldServiceTests
             new FakeTribeRepository(),
             new ThrowingFriendRepository(),
             new ThrowingMentorRepository(),
+            new ThrowingCharacterShardLocationRepository(),
+            Options.Create(options),
             NullLogger<EnterWorldService>.Instance);
     }
 
@@ -163,7 +166,13 @@ public class EnterWorldServiceTests
             throw new NotSupportedException();
         }
 
-        public ValueTask DisbandAsync(int guildId, CancellationToken ct)
+        public ValueTask<int> CreateAndDebitMoneyAsync(string name, int masterCharacterId, long deltaMoney,
+            int deltaBigMoney, CancellationToken ct)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask DisbandAsync(int guildId, int characterId, CancellationToken ct)
         {
             throw new NotSupportedException();
         }
@@ -199,6 +208,12 @@ public class EnterWorldServiceTests
         }
 
         public ValueTask SetGradeAsync(int guildId, int grade, CancellationToken ct)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask UpgradeAndDebitMoneyAsync(int guildId, int grade, int characterId, long deltaMoney,
+            int deltaBigMoney, CancellationToken ct)
         {
             throw new NotSupportedException();
         }
@@ -247,6 +262,30 @@ public class EnterWorldServiceTests
         }
 
         public ValueTask ClearForCharacterAsync(int characterId, CancellationToken ct)
+        {
+            throw new NotSupportedException();
+        }
+    }
+
+    private sealed class ThrowingCharacterShardLocationRepository : ICharacterShardLocationRepository
+    {
+        public ValueTask UpsertAsync(int characterId, byte shardId, short mapId, string avatarName, byte tribe,
+            CancellationToken ct)
+        {
+            throw new InvalidOperationException("Must not be reached once world-entry is already rejected.");
+        }
+
+        public ValueTask RemoveAsync(int characterId, byte shardId, CancellationToken ct)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask<CharacterShardLocationDto?> FindByNameAsync(string avatarName, CancellationToken ct)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask<CharacterShardLocationDto?> FindByCharacterIdAsync(int characterId, CancellationToken ct)
         {
             throw new NotSupportedException();
         }

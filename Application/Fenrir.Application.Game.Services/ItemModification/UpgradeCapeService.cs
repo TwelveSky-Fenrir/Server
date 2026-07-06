@@ -16,9 +16,22 @@ namespace Fenrir.Application.Game.Services.ItemModification;
 /// </summary>
 public sealed class UpgradeCapeService(
     ICharacterRepository characters,
+    IEventLogQueue eventLogQueue,
     ILogger<UpgradeCapeService> logger)
     : IUpgradeCapeService
 {
+    /// <summary>
+    ///     game.EventLog.EventCode for a cape-upgrade attempt -- the wire opcode (op127) itself, same
+    ///     "app-owned numbering scheme, caller-interpreted alongside Category" posture as every other
+    ///     EventCode in this codebase.
+    /// </summary>
+    private const short UpgradeCapeEventCode = 127;
+
+    /// <summary>game.EventLog.Outcome for this EventCode: 0 success, 1 failed.</summary>
+    private const byte SuccessOutcome = 0;
+
+    private const byte FailedOutcome = 1;
+
     public async ValueTask<UpgradeCapeResult> UpgradeAsync(UpgradeCapeRequest packet, Zone zone,
         PlayerRuntimeState state, int characterId, CancellationToken cancellationToken)
     {
@@ -88,6 +101,15 @@ public sealed class UpgradeCapeService(
                 characterId);
             return new UpgradeCapeResult(UpgradeCapeOutcome.Rejected, false, [0, 0, 0, 0, 0, 0]);
         }
+
+        if (!eventLogQueue.Enqueue(new EventLogEntryTvp(UpgradeCapeEventCode, (byte)EventLogCategory.Enchant, null,
+                characterId, null, null, null, -(long)CapeUpgradeResolver.Cost, null, target.ItemId, target.Quantity,
+                resolved.Succeeded ? SuccessOutcome : FailedOutcome,
+                $"Serial={target.Serial};Material={material.ItemId};NewItemId={(resolved.Succeeded ? resolved.NewItemId : target.ItemId)}",
+                DateTime.UtcNow)))
+            logger.LogWarning(
+                "game.EventLog write-behind queue full: dropped cape-upgrade audit row for character {CharacterId}",
+                characterId);
 
         var containers = page1 == page2
             ? ImmutableArray.Create(new InventoryContainerSnapshot((byte)page1, projectedTargetContainer))

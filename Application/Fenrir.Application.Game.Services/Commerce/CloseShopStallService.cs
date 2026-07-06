@@ -15,8 +15,9 @@ public sealed class CloseShopStallService(IOfflineShopRepository offlineShops) :
         return new CloseShopStallResponse { Result = 1 };
     }
 
-    public async ValueTask CloseOfflineShopAsync(int characterId, CancellationToken cancellationToken)
+    public async ValueTask CloseOfflineShopAsync(int characterId, Zone zone, CancellationToken cancellationToken)
     {
         await offlineShops.SetStateAsync(characterId, 0, cancellationToken);
+        zone.RemoveProxyShop(characterId);
     }
 }

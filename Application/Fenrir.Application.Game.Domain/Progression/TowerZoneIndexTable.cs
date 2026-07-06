@@ -23,4 +23,23 @@ public static class TowerZoneIndexTable
             _ => -1
         };
     }
+
+    /// <summary>
+    ///     The tribe that permanently owns this zone's tower slot -- structural, derived purely from which
+    ///     third of the twelve-slot table (S07_MyGame01.cpp:1339-1356) <paramref name="zoneNumber" />'s own
+    ///     <see cref="GetTowerIndex" /> falls into: slots 0-2 belong to tribe 0, 3-5 to tribe 1, 6-8 to tribe 2,
+    ///     9-11 to tribe 3 (S07_MyGame02.cpp:2119-2141's <c>towerTribe</c> resolution table). Null if
+    ///     <paramref name="zoneNumber" /> hosts no recognized tower slot at all.
+    /// </summary>
+    /// <remarks>
+    ///     Deliberately NOT <c>TowerWarState.GetControllingTribe</c> -- the legacy re-derives ownership from
+    ///     the server-number table every time this is needed, never from the tower's own current-owner state,
+    ///     which this schema doesn't even reassign once built (see <see cref="TowerFriendlyFireGate" />'s
+    ///     remarks for why that distinction matters).
+    /// </remarks>
+    public static byte? GetOwningTribe(int zoneNumber)
+    {
+        var towerIndex = GetTowerIndex(zoneNumber);
+        return towerIndex < 0 ? null : (byte)(towerIndex / 3);
+    }
 }

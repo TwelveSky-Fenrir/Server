@@ -83,6 +83,25 @@ public static class CashCatalogBuilder
     }
 
     /// <summary>
+    ///     Fenrir-chosen CRC sentinel slot (ItemMallProductId=100001/ProductType=5), mirroring
+    ///     <see cref="ResolveVersion" />'s existing 100000/5 convention. The behavior contract this ports
+    ///     (cash/blood catalog hot-reload) only describes "a second, separate reserved row, same type" for the
+    ///     client CRC without giving its literal row number, so this specific slot number is a Fenrir-side
+    ///     design choice, not a verified legacy literal -- and no seed row reserves it yet in
+    ///     world.ItemMallProducts, so this always resolves to 0 today until a seed row is added. That is
+    ///     harmless: see <see cref="Fenrir.Application.Game.Domain.Commerce.CommerceCatalogCache" />'s own
+    ///     remarks for why nothing downstream currently consumes this value.
+    /// </summary>
+    public static int ResolveCrc(IEnumerable<ItemMallProductRowDto> products)
+    {
+        foreach (var product in products)
+            if (product.ItemMallProductId == 100001 && product.ProductType == 5)
+                return product.ItemId ?? 0;
+
+        return 0;
+    }
+
+    /// <summary>
     ///     <see cref="ItemMallProductId" /> is a Fenrir-only addition for game.CashLog's audit trail -- never sent on the
     ///     wire.
     /// </summary>

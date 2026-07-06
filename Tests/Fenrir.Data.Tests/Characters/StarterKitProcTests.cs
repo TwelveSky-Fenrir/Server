@@ -40,13 +40,16 @@ public class StarterKitProcTests
     {
         var bundle = await _starterKits.GetByPreviousTribeAsync(0, 1, CancellationToken.None);
 
-        Assert.Equal(6, bundle.Equipment.Count); // Armor+Gloves+Boots + 3 weapon alternatives
-        Assert.Contains(bundle.Equipment, e => e is { EquipSlot: 2, ItemId: 8 });
-        Assert.Contains(bundle.Equipment, e => e is { EquipSlot: 3, ItemId: 9 });
-        Assert.Contains(bundle.Equipment, e => e is { EquipSlot: 5, ItemId: 10 });
-        Assert.Contains(bundle.Equipment, e => e is { EquipSlot: 7, ItemId: 5 });
-        Assert.Contains(bundle.Equipment, e => e is { EquipSlot: 7, ItemId: 6 });
-        Assert.Contains(bundle.Equipment, e => e is { EquipSlot: 7, ItemId: 7 });
+        // G12 Elite Normal Set: Amulet+Armor+Gloves+Ring+Boots + 3 weapon alternatives (raw code -> elite id).
+        Assert.Equal(8, bundle.Equipment.Count);
+        Assert.Contains(bundle.Equipment, e => e is { EquipSlot: 0, ItemId: 84671, RawWeaponCode: null });
+        Assert.Contains(bundle.Equipment, e => e is { EquipSlot: 2, ItemId: 84575, RawWeaponCode: null });
+        Assert.Contains(bundle.Equipment, e => e is { EquipSlot: 3, ItemId: 84623, RawWeaponCode: null });
+        Assert.Contains(bundle.Equipment, e => e is { EquipSlot: 4, ItemId: 84647, RawWeaponCode: null });
+        Assert.Contains(bundle.Equipment, e => e is { EquipSlot: 5, ItemId: 84599, RawWeaponCode: null });
+        Assert.Contains(bundle.Equipment, e => e is { EquipSlot: 7, ItemId: 84503, RawWeaponCode: 5 });
+        Assert.Contains(bundle.Equipment, e => e is { EquipSlot: 7, ItemId: 84527, RawWeaponCode: 6 });
+        Assert.Contains(bundle.Equipment, e => e is { EquipSlot: 7, ItemId: 84551, RawWeaponCode: 7 });
 
         Assert.Equal(4, bundle.Inventory.Count);
         Assert.Contains(bundle.Inventory, i => i is { SlotIndex: 0, ItemId: 1026, Quantity: 999 });
@@ -72,8 +75,8 @@ public class StarterKitProcTests
     {
         var bundle = await _starterKits.GetByPreviousTribeAsync(1, 6, CancellationToken.None);
 
-        Assert.Contains(bundle.Equipment, e => e is { EquipSlot: 2, ItemId: 14 });
-        Assert.Contains(bundle.Equipment, e => e is { EquipSlot: 7, ItemId: 11 });
+        Assert.Contains(bundle.Equipment, e => e is { EquipSlot: 2, ItemId: 85575 });
+        Assert.Contains(bundle.Equipment, e => e is { EquipSlot: 7, ItemId: 85503, RawWeaponCode: 11 });
         Assert.Contains(bundle.Skills, s => s is { SlotIndex: 0, SkillId: 20, Grade: 1 });
         Assert.Contains(bundle.Hotkeys, h => h is { Page: 0, KeyIndex: 0, Sort: 20 });
 
@@ -132,6 +135,17 @@ public class StarterKitProcTests
         Assert.Equal(welcomeBuffUntilDate, bundle.Character.AutoBuffTime);
         Assert.Equal(premiumUntilUnixSeconds, bundle.Character.PremiumExpireUtc);
 
+        // Server/ts25login/S04_MyWork02.cpp:1100-1120 (USE_CUSTOME_CREATE, force-defined for this whole file --
+        // see Migrations/015_starter_kit_elite_grant.sql's header comment): starting level/rebirth/experience/
+        // stat-skill-point grant, literal in usp_Character_CreateWithStarterKit regardless of tribe/kit contents.
+        Assert.Equal(145, bundle.Character.Level);
+        Assert.Equal(12, bundle.Character.Level2);
+        Assert.Equal(0, bundle.Character.RebirthCount);
+        Assert.Equal(2_000_000_000L, bundle.Character.Experience);
+        Assert.Equal(0, bundle.Character.Exp2);
+        Assert.Equal(3175, bundle.Character.StatPoints);
+        Assert.Equal(10000, bundle.Character.SkillPoints);
+
         Assert.Equal(3, bundle.Items.Count(i => i.Container == 2));
         Assert.Contains(bundle.Items, i => i is { Container: 2, Slot: 7, ItemId: 6 });
         Assert.Contains(bundle.Items, i => i is { Container: 2, Slot: 1, ItemId: 1407, Enchant: 40 });
@@ -142,6 +156,22 @@ public class StarterKitProcTests
 
         Assert.Single(bundle.Hotkeys);
         Assert.Contains(bundle.Hotkeys, h => h is { Page: 0, KeyIndex: 0, Sort: 1 });
+
+        // Starting mount (S04_MyWork02.cpp:1174-1179) -- game.Characters.Mount* columns aren't projected by
+        // usp_Character_GetForWorldEntry yet (no consumer reads them), so this reads them directly.
+        await using var connection = new SqlConnection(_connectionString);
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            "SELECT MountItemId, MountExpActivity, MountPower, MountSlotIndex, MountTime FROM game.Characters WHERE CharacterId = @CharacterId";
+        command.Parameters.AddWithValue("@CharacterId", characterId);
+        await using var reader = await command.ExecuteReaderAsync();
+        Assert.True(await reader.ReadAsync());
+        Assert.Equal(1301, reader.GetInt32(0));
+        Assert.Equal(0, reader.GetInt32(1));
+        Assert.Equal(5, reader.GetInt32(2));
+        Assert.Equal(0, reader.GetInt32(3));
+        Assert.Equal(99999999, reader.GetInt32(4));
     }
 
     [Fact]

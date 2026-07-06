@@ -51,6 +51,7 @@
     <Project Path="Tests/Fenrir.LoginServer.Tests/Fenrir.LoginServer.Tests.csproj" />
     <Project Path="Tests/Fenrir.Network.Serialization.Tests/Fenrir.Network.Serialization.Tests.csproj" />
     <Project Path="Tests/Fenrir.Network.Tests/Fenrir.Network.Tests.csproj" />
+    <Project Path="Tests/Fenrir.Tools.LegacyDataImport.Tests/Fenrir.Tools.LegacyDataImport.Tests.csproj" />
   </Folder>
 
   <Folder Name="/Tools/">

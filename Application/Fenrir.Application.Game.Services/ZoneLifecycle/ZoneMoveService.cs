@@ -3,6 +3,7 @@ using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Avatars;
 using Fenrir.Application.Game.Domain.Guilds;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Shared;
@@ -17,6 +18,7 @@ public sealed class ZoneMoveService(
     ZoneRegistry zones,
     WorldDataCache worldData,
     GuildRankingCache guildRanking,
+    WorldStateService worldState,
     IOptions<GameServerOptions> options,
     ILogger<ZoneMoveService> logger) : IZoneMoveService
 {
@@ -73,6 +75,18 @@ public sealed class ZoneMoveService(
         // above and this lookup (disconnect/another handoff) -- nothing to transfer.
         if (!sourceZone.TryGetPlayer(characterId, out var state) || state is null)
             return ValueTask.CompletedTask;
+
+        // mProtect_ReviveHack companion check (S04_MyWork02.cpp:2017-2064): a session still flagged from an
+        // unresolved death is kicked outright on any zone-transfer attempt, unless the destination is zone 38
+        // -- see ZoneTransferAntiAbuseRules' own remarks for why this alliance wording deliberately differs
+        // from the tick-loop gate's.
+        if (state.ReviveHackFlag &&
+            !ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(sourceZone.MapId, targetZoneNumber, state.Tribe,
+                worldState.GetAllyOf))
+        {
+            zoneSession.Abort(DisconnectReason.StateViolation);
+            return ValueTask.CompletedTask;
+        }
 
         var spawnPoint = targetDefinition.FindSpawnPointFrom(sourceZone.MapId);
         var (posX, posY, posZ) = spawnPoint is null

@@ -1,12 +1,15 @@
 using System.Net;
 using System.Security.Cryptography;
 using Fenrir.Application.Login.Domain;
+using Fenrir.Data.Abstractions.Game;
 using Fenrir.Data.Abstractions.Runtime;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch;
+using Fenrir.Network.Dispatch.FloodProtection;
 using Fenrir.Network.Dispatch.RateLimiting;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Login;
+using Fenrir.Network.Serialization.Wire;
 using Fenrir.Network.Transport;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -25,8 +28,17 @@ public sealed class LoginConnectionHost(
     SessionRegistry registry,
     IGameServerDirectoryRepository directory,
     IAccountSessionRepository accountSessions,
+    IEventLogRepository eventLog,
+    IpFloodGuard ipFloodGuard,
     ILogger<LoginConnectionHost> logger) : BackgroundService
 {
+    /// <summary>
+    ///     game.EventLog.EventCode for a login-side session ending (Category=Session) -- see
+    ///     Fenrir.Application.Login.Services.Login.LoginService's LoginSucceededEventCode remarks for the full
+    ///     four-code cross-reference within this category.
+    /// </summary>
+    private const short LoginSessionEndedEventCode = 2;
+
     private FenrirTcpListener<LoginClientSession>? _listener;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -53,13 +65,24 @@ public sealed class LoginConnectionHost(
     {
         registry.Register(loginSession);
 
+        // Captured once: RemoteEndPoint is fixed at accept time (SocketConnection's own remark), and both the
+        // acquire and the matching release below must key on the exact same string.
+        var remoteIp = loginSession.RemoteEndPoint?.Address.ToString();
+
         try
         {
+            // Trigger A (contract): the concurrent-connection gauge must already be incremented and read back
+            // before any connect-acknowledgement is sent (Server/ts25login/S03_MyUser.cpp:194-209's early-return
+            // ordering) -- so this runs before GreetAsync, not after.
+            if (remoteIp is not null &&
+                !await ipFloodGuard.TryAcquireConnectionAsync(remoteIp, ct).ConfigureAwait(false))
+                return; // IP just got persistently blocked and every session sharing it (this one included) aborted
+
             await GreetAsync(loginSession, connection, ct).ConfigureAwait(false);
 
             await Task.WhenAll(
                 connection.RunIOAsync(ct),
-                SessionLoop.RunAsync(loginSession, dispatcher, rateLimiter, ct)
+                SessionLoop.RunAsync(loginSession, dispatcher, rateLimiter, ipFloodGuard, ct)
             ).ConfigureAwait(false);
         }
         catch (Exception ex)
@@ -68,8 +91,14 @@ public sealed class LoginConnectionHost(
         }
         finally
         {
+            if (remoteIp is not null)
+                ipFloodGuard.ReleaseConnection(remoteIp);
+
             if (loginSession.AccountId is { } accountId)
+            {
                 await TearDownAccountSessionAsync(accountId, loginSession.AccountSessionToken).ConfigureAwait(false);
+                await LogLoginSessionEndedAsync(accountId, loginSession.State).ConfigureAwait(false);
+            }
 
             registry.Unregister(loginSession.SessionId);
             rateLimiter.Remove(loginSession.SessionId);
@@ -96,6 +125,29 @@ public sealed class LoginConnectionHost(
         {
             logger.LogWarning(ex, "Failed to tear down runtime.AccountSessions row for account {AccountId}",
                 accountId);
+        }
+    }
+
+    /// <summary>
+    ///     Best-effort game.EventLog audit row for this login-side session ending -- must never throw out of a
+    ///     connection-teardown path, same posture as <see cref="TearDownAccountSessionAsync" /> above. Outcome=1
+    ///     when the session reached <see cref="LoginSessionState.HandoverIssued" /> (the normal path: the client
+    ///     already received its zone-transfer ticket and is expected to reconnect to a GameServer shard next,
+    ///     see <c>ZoneTransferHandler</c>) vs Outcome=0 for every earlier state (an authenticated session that
+    ///     dropped before completing character selection/handoff).
+    /// </summary>
+    private async ValueTask LogLoginSessionEndedAsync(int accountId, LoginSessionState finalState)
+    {
+        try
+        {
+            var outcome = (byte)(finalState == LoginSessionState.HandoverIssued ? 1 : 0);
+            await eventLog.LogAsync(LoginSessionEndedEventCode, EventLogCategory.Session, accountId, null, null,
+                null, null, null, null, null, null, outcome, $"FinalState={finalState}", CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex,
+                "Failed to write game.EventLog row for login session end (account {AccountId})", accountId);
         }
     }
 

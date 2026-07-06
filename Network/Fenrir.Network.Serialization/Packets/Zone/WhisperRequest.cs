@@ -9,7 +9,7 @@ namespace Fenrir.Network.Serialization.Packets.Zone;
 ///     pass through).
 /// </summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.Whisper, ExpectedSize = 107,
-    AllowedStates = [(byte)ZoneSessionState.InWorld])]
+    AllowedStates = [(byte)ZoneSessionState.Registering, (byte)ZoneSessionState.InWorld])]
 public readonly partial record struct WhisperRequest : IIncomingPacket<WhisperRequest>
 {
     /// <summary>Recipient's avatar name.</summary>

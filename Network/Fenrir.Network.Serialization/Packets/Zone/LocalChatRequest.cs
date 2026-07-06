@@ -6,7 +6,7 @@ namespace Fenrir.Network.Serialization.Packets.Zone;
 
 /// <summary>This fork intercepts GM commands (where/ygdrop/lab/boss) embedded in the chat text.</summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.LocalChat, ExpectedSize = 94,
-    AllowedStates = [(byte)ZoneSessionState.InWorld])]
+    AllowedStates = [(byte)ZoneSessionState.Registering, (byte)ZoneSessionState.InWorld])]
 public readonly partial record struct LocalChatRequest : IIncomingPacket<LocalChatRequest>
 {
     [FixedString(61)] public required string Content { get; init; }

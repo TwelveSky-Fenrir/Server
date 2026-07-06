@@ -6,7 +6,7 @@ namespace Fenrir.Network.Serialization.Packets.Zone;
 
 // Sort: 1 = personal shop, 2 = proxy shop (else disconnect); proxy only enabled on zone 37 in EU33.
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.OpenShopStall, ExpectedSize = 1245,
-    AllowedStates = [(byte)ZoneSessionState.InWorld])]
+    AllowedStates = [(byte)ZoneSessionState.Registering, (byte)ZoneSessionState.InWorld])]
 public readonly partial record struct OpenShopStallRequest : IIncomingPacket<OpenShopStallRequest>
 {
     public required int Sort { get; init; }

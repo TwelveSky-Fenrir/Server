@@ -5,7 +5,7 @@ namespace Fenrir.Network.Serialization.Packets.Zone;
 
 // Page1/Index1 = seller's stall slot; Page2/Index2/XPost2/YPost2 = buyer's destination slot.
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.BuyShopItem, ExpectedSize = 54,
-    AllowedStates = [(byte)ZoneSessionState.InWorld])]
+    AllowedStates = [(byte)ZoneSessionState.Registering, (byte)ZoneSessionState.InWorld])]
 public readonly partial record struct BuyShopItemRequest : IIncomingPacket<BuyShopItemRequest>
 {
     public required uint UniqueNumber { get; init; }

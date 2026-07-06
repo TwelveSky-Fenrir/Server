@@ -12,7 +12,7 @@ namespace Fenrir.Network.Serialization.Packets.Zone;
 ///     (deliberately asymmetric) response shape.
 /// </summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.GmBlockAvatar, ExpectedSize = 22,
-    AllowedStates = [(byte)ZoneSessionState.InWorld])]
+    AllowedStates = [(byte)ZoneSessionState.Registering, (byte)ZoneSessionState.InWorld])]
 public readonly partial record struct GmBlockAvatarRequest : IIncomingPacket<GmBlockAvatarRequest>
 {
     [FixedString(13)] public required string AvatarName { get; init; }

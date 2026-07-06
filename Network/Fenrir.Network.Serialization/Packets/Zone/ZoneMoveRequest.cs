@@ -8,7 +8,7 @@ namespace Fenrir.Network.Serialization.Packets.Zone;
 ///     model as a session flag, not a <see cref="ZoneSessionState" />.
 /// </summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.ZoneMove,
-    ExpectedSize = 21, AllowedStates = [(byte)ZoneSessionState.InWorld])]
+    ExpectedSize = 21, AllowedStates = [(byte)ZoneSessionState.Registering, (byte)ZoneSessionState.InWorld])]
 public readonly partial record struct ZoneMoveRequest : IIncomingPacket<ZoneMoveRequest>
 {
     /// <summary>

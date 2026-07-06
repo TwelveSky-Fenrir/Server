@@ -400,8 +400,20 @@ Migrations/022_account_session_mark_tearing_down_gate.sql
 # usp_AccountSession_ClaimOrSignalKick's Game-side branch now cross-checks runtime.GameServerDirectory's
 # 15-second heartbeat-staleness threshold (already used elsewhere in this schema) and fast-clears/reclaims a
 # row whose owning shard is provably dead instead of only flagging KickRequested for a process that will
-# never service it; see the migration file itself for the full citation and fix rationale.
+# never service it; hardened this session to a 60-second (not 15-second) heartbeat-staleness threshold for
+# this specific branch, since it takes a destructive/non-reversible action (reassigning session ownership)
+# unlike the read-side 15-second cutoffs used elsewhere -- see the migration file itself for the full citation
+# and fix rationale.
 Migrations/023_account_session_dead_shard_fast_reclaim.sql
+
+# tribe-role-scalar-type-fix: game.usp_TribeRole_GetForCharacter's CASE expression returned untyped INT
+# literals, which CaeriusNet's Db.ExecuteScalarAsync<byte> read in TribeRepository.GetRoleForCharacterAsync
+# then failed to unbox to byte (InvalidCastException) on every single call -- i.e. on every EnterWorldService
+# world entry, for every character. This is the confirmed root cause of the "client stuck at loading 100%,
+# then idle-timeout disconnect" symptom investigated across this whole session: EnterWorldRequest genuinely
+# was received and processed, but always threw here and aborted the session before the client ever saw a
+# successful response; see the migration file itself for the full citation and fix rationale.
+Migrations/024_tribe_role_scalar_type_fix.sql
 
 Migrations/Seed/001_dev_account.sql
 

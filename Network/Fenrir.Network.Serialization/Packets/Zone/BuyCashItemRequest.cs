@@ -5,7 +5,7 @@ namespace Fenrir.Network.Serialization.Packets.Zone;
 
 // Version must match the server's cash catalog version; Quit() if two purchases arrive < 200ms apart.
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.BuyCashItem, ExpectedSize = 49,
-    AllowedStates = [(byte)ZoneSessionState.InWorld])]
+    AllowedStates = [(byte)ZoneSessionState.Registering, (byte)ZoneSessionState.InWorld])]
 public readonly partial record struct BuyCashItemRequest : IIncomingPacket<BuyCashItemRequest>
 {
     public required int CostInfoIndex { get; init; }

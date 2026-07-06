@@ -8,7 +8,7 @@ namespace Fenrir.Network.Serialization.Packets.Zone;
 ///     disconnect trap.
 /// </summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.GetProxyShop,
-    ExpectedSize = 30, AllowedStates = [(byte)ZoneSessionState.InWorld])]
+    ExpectedSize = 30, AllowedStates = [(byte)ZoneSessionState.Registering, (byte)ZoneSessionState.InWorld])]
 public readonly partial record struct GetProxyShopRequest : IIncomingPacket<GetProxyShopRequest>
 {
     public required int Sort { get; init; }

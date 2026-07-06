@@ -43,7 +43,7 @@ builder.AddProject<Fenrir_LoginServer>("login-server")
 // identifiers from that seed table must appear below -- this list is hand-maintained and nothing
 // reconciles it against admin.ShardMapAssignments automatically.
 const int gameBasePort = 1100;
-byte[] shardIds = [1, 2];
+byte[] shardIds = [1];
 
 foreach (var shardId in shardIds)
 {

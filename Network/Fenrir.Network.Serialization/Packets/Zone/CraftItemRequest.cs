@@ -5,7 +5,7 @@ namespace Fenrir.Network.Serialization.Packets.Zone;
 
 // Sort is an MK_* recipe constant; unknown Sort -> Quit().
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.CraftItem, ExpectedSize = 45,
-    AllowedStates = [(byte)ZoneSessionState.InWorld])]
+    AllowedStates = [(byte)ZoneSessionState.Registering, (byte)ZoneSessionState.InWorld])]
 public readonly partial record struct CraftItemRequest : IIncomingPacket<CraftItemRequest>
 {
     public required int Sort { get; init; }

@@ -8,7 +8,7 @@ namespace Fenrir.Network.Serialization.Packets.Zone;
 ///     state.
 /// </summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.ZoneTransferCancel, ExpectedSize = 9,
-    AllowedStates = [(byte)ZoneSessionState.InWorld])]
+    AllowedStates = [(byte)ZoneSessionState.Registering, (byte)ZoneSessionState.InWorld])]
 public readonly partial record struct ZoneTransferCancelRequest : IIncomingPacket<ZoneTransferCancelRequest>
 {
 }

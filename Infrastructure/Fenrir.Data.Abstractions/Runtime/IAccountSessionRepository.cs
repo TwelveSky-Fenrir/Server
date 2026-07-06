@@ -13,7 +13,19 @@ public enum AccountSessionClaimOutcome : byte
     Registered = 0,
     ConflictLogin = 1,
     ConflictGameKicked = 2,
-    ConflictTearingDown = 3
+    ConflictTearingDown = 3,
+
+    /// <summary>
+    ///     The existing row was Game-side (steady state, not mid-teardown) but its own ShardId had no live
+    ///     entry in runtime.GameServerDirectory (or one whose heartbeat exceeded the established 15-second
+    ///     staleness threshold) -- the shard is provably dead, so usp_AccountSession_ClaimOrSignalKick fast-
+    ///     cleared the row and registered this claim in its place immediately, instead of merely flagging
+    ///     KickRequested for a process that will never service it (see
+    ///     Database/Migrations/023_account_session_dead_shard_fast_reclaim.sql). PreviousShardId carries the
+    ///     dead shard's id for logging. The caller should treat this exactly like <see cref="Registered" />
+    ///     (the login proceeds) while logging the distinction for operational visibility.
+    /// </summary>
+    ReclaimedDeadShard = 4
 }
 
 /// <summary>
@@ -27,12 +39,23 @@ public interface IAccountSessionRepository
 {
     /// <summary>
     ///     usp_AccountSession_ClaimOrSignalKick: reads the existing row and, in the same atomic block, performs the
-    ///     correct side effect (register, clear a stale Login row, flag a live Game row for kick, or refuse a
-    ///     tearing-down row) so two near-simultaneous logins for the same account can't both win. The loser of a
-    ///     genuine race gets a native-compiled write-write conflict from SQL Server itself (error 41302, or a
-    ///     dependency failure 41305/41325); the implementation retries a small bounded number of times on those
-    ///     specific errors before letting them propagate.
+    ///     correct side effect (register, clear a stale Login row, fast-reclaim a Game row whose owning shard is
+    ///     provably dead, flag a still-live Game row for kick, or refuse a tearing-down row) so two near-simultaneous
+    ///     logins for the same account can't both win. The loser of a genuine race gets a native-compiled
+    ///     write-write conflict from SQL Server itself (error 41302, or a dependency failure 41305/41325); the
+    ///     implementation retries a small bounded number of times on those specific errors before letting them
+    ///     propagate. Each retry passes its own 1-based attempt number so the procedure can tell a row just
+    ///     committed by a genuinely concurrent winner (only ever seen on a retry, since that is the only way to
+    ///     reach one) apart from a truly stale row abandoned by an unrelated earlier session (only ever seen on the
+    ///     first attempt) -- see Migrations/020_account_session_claim_race_fix.sql for the race this closes.
     /// </summary>
+    /// <remarks>
+    ///     Since Database/Migrations/023_account_session_dead_shard_fast_reclaim.sql, the Game-side branch first
+    ///     cross-checks runtime.GameServerDirectory's heartbeat for the row's own ShardId (the same 15-second
+    ///     staleness threshold usp_GameServer_GetDirectory/usp_CharacterShardLocation_FindByCharacterId already
+    ///     use) before falling back to the old flag-for-kick behavior -- see
+    ///     <see cref="AccountSessionClaimOutcome.ReclaimedDeadShard" />.
+    /// </remarks>
     public ValueTask<AccountSessionClaimDto> ClaimOrSignalKickAsync(int accountId, Guid newSessionToken,
         CancellationToken ct);
 
@@ -44,8 +67,17 @@ public interface IAccountSessionRepository
     public ValueTask<bool> TransitionToGameAsync(int accountId, Guid expectedSessionToken, byte shardId,
         CancellationToken ct);
 
-    /// <summary>usp_AccountSession_MarkTearingDown: best-effort, no-op if the row is already gone.</summary>
-    public ValueTask MarkTearingDownAsync(int accountId, CancellationToken ct);
+    /// <summary>
+    ///     usp_AccountSession_MarkTearingDown: idempotent no-op gated on (ServerKind, ShardId, SessionToken) all
+    ///     matching -- identical ownership match to <see cref="ClearIfOwnerAsync" />, the step immediately
+    ///     following it in every caller's teardown sequence. A row already reassigned to a different owner by an
+    ///     independent event (most commonly this same account's Game-side world-entry claim completing
+    ///     concurrently with a Login-side disconnect) is left untouched instead of being marked tearing-down out
+    ///     from under its new owner (see Migrations/022_account_session_mark_tearing_down_gate.sql for the race
+    ///     this closes).
+    /// </summary>
+    public ValueTask MarkTearingDownAsync(int accountId, AccountSessionServerKind serverKind, byte? shardId,
+        Guid sessionToken, CancellationToken ct);
 
     /// <summary>
     ///     usp_AccountSession_ClearIfOwner: idempotent delete gated on (ServerKind, ShardId, SessionToken) all

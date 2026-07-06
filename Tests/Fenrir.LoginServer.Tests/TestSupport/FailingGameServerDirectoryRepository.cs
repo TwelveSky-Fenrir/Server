@@ -12,8 +12,19 @@ internal sealed class FailingGameServerDirectoryRepository : IGameServerDirector
         throw new InvalidOperationException("Simulated runtime.GameServerDirectory outage.");
     }
 
+    public ValueTask<ImmutableArray<ShardDirectoryEntryDto>> GetDirectoryAsync(int stalenessCutoffSeconds,
+        CancellationToken ct)
+    {
+        throw new InvalidOperationException("Simulated runtime.GameServerDirectory outage.");
+    }
+
     public ValueTask HeartbeatAsync(byte shardId, string host, int port, int ccu, int capacity, float tickP99Ms,
         CancellationToken ct)
+    {
+        throw new NotSupportedException();
+    }
+
+    public ValueTask MarkUnreachableAsync(byte shardId, CancellationToken ct)
     {
         throw new NotSupportedException();
     }

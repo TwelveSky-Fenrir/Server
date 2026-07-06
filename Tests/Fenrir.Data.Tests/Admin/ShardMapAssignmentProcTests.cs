@@ -54,6 +54,21 @@ public class ShardMapAssignmentProcTests
         Assert.Equal([305, 310], maps);
     }
 
+    // gameserver-directory-heartbeat-liveness: GetAllAssignmentsAsync is the liveness-independent read
+    // ShardPartitionGuard needs so a boot-time overlap check does not depend on runtime.GameServerDirectory
+    // heartbeat timing -- see ShardPartitionGuardTests for the guard-level cold-boot scenario this backs.
+    [Fact]
+    public async Task GetAllAssignments_IncludesEveryShardRegardlessOfLiveness()
+    {
+        await InsertAssignmentAsync(78, 320);
+        await InsertAssignmentAsync(79, 321);
+
+        var rows = await _repository.GetAllAssignmentsAsync(CancellationToken.None);
+
+        Assert.Contains(rows, row => row.ShardId == 78 && row.MapId == 320);
+        Assert.Contains(rows, row => row.ShardId == 79 && row.MapId == 321);
+    }
+
     private async Task InsertAssignmentAsync(byte shardId, short mapId)
     {
         await using var connection = new SqlConnection(_connectionString);

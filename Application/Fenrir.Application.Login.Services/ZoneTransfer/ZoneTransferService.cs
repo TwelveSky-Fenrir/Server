@@ -59,6 +59,7 @@ public sealed class ZoneTransferService(
     IGameServerDirectoryRepository directory,
     IShardMapAssignmentRepository shardMapAssignments,
     ISessionTicketRepository tickets,
+    IShardReachabilityProbe reachabilityProbe,
     IOptions<LoginServerOptions> options,
     ILogger<ZoneTransferService> logger) : IZoneTransferService
 {
@@ -97,6 +98,21 @@ public sealed class ZoneTransferService(
             logger.LogWarning(
                 "Zone transfer rejected: no shard available for character {CharacterId} (account {AccountId}, MapId {MapId})",
                 character.CharacterId, accountId, character.MapId);
+            return new ZoneTransferResult(ZoneTransferOutcome.ShardUnavailable, "", 0, 0);
+        }
+
+        // The directory row only proves shard {shard.ShardId} heartbeated within the last ~17s (15s SQL
+        // freshness window + up to 2s of the repository's own read-cache reuse) -- not that it is still alive
+        // right now. Without this probe, a shard that crashed inside that window would still get a ticket
+        // minted for it, handing the client a dead Host:Port with no recovery (a genuine dead-end handoff).
+        if (!await reachabilityProbe.IsReachableAsync(shard.Host, shard.Port, cancellationToken))
+        {
+            logger.LogWarning(
+                "Zone transfer rejected: shard {ShardId} ({Host}:{Port}) failed a reachability probe for character {CharacterId} (account {AccountId}, MapId {MapId}); likely crashed within the directory staleness window -- evicting its row",
+                shard.ShardId, shard.Host, shard.Port, character.CharacterId, accountId, character.MapId);
+            // Evict immediately rather than letting every other concurrent/subsequent request racing this
+            // same dead shard wait out the same ~17s window on its own -- see MarkUnreachableAsync's remarks.
+            await directory.MarkUnreachableAsync(shard.ShardId, cancellationToken);
             return new ZoneTransferResult(ZoneTransferOutcome.ShardUnavailable, "", 0, 0);
         }
 

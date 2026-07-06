@@ -24,7 +24,8 @@ public sealed class GameServerDirectoryRepositoryTests : IDisposable
             .Build();
 
         _provider = services.BuildServiceProvider();
-        _repository = new GameServerDirectoryRepository(_provider.GetRequiredService<ICaeriusNetDbContext>());
+        _repository = new GameServerDirectoryRepository(_provider.GetRequiredService<ICaeriusNetDbContext>(),
+            _provider.GetRequiredService<ICaeriusNetCache>());
     }
 
     public void Dispose()
@@ -68,5 +69,26 @@ public sealed class GameServerDirectoryRepositoryTests : IDisposable
         Assert.Equal("shard-251-new.internal", entry.Host);
         Assert.Equal(7352, entry.Port);
         Assert.Equal(40, entry.Ccu);
+    }
+
+    // gameserver-directory-heartbeat-liveness: usp_GameServer_GetDirectory's staleness cutoff used to be a
+    // bare hardcoded -15s literal with no way to observe it from a test short of actually waiting 15+ seconds.
+    // It's now an explicit @StalenessCutoffSeconds parameter (GameServerDirectoryDefaults.StalenessCutoffSeconds
+    // = 15 by default) -- this proves the SQL-side filter genuinely reads the caller-supplied value rather than
+    // still being pinned to the old literal, using a deliberately narrow cutoff so the test stays fast.
+    [Fact]
+    public async Task GetDirectoryAsync_WithNarrowerCallerSuppliedCutoff_ExcludesAnEntryStillInsideTheDefaultWindow()
+    {
+        const byte shardId = 252;
+
+        await _repository.HeartbeatAsync(shardId, "shard-252.internal", 7354, 3, 500, 1.5f, CancellationToken.None);
+        await Task.Delay(CacheBypassDelay);
+
+        // 2.5s have elapsed: well inside the shipped 15s default, but past a caller-supplied 1s cutoff.
+        var withDefaultCutoff = await _repository.GetDirectoryAsync(CancellationToken.None);
+        Assert.Contains(withDefaultCutoff, e => e.ShardId == shardId);
+
+        var withNarrowCutoff = await _repository.GetDirectoryAsync(1, CancellationToken.None);
+        Assert.DoesNotContain(withNarrowCutoff, e => e.ShardId == shardId);
     }
 }

@@ -149,6 +149,7 @@ StoredProcedures/runtime/usp_SessionTicket_Consume.sql
 StoredProcedures/runtime/usp_SessionTicket_Purge.sql
 StoredProcedures/runtime/usp_GameServer_Heartbeat.sql
 StoredProcedures/runtime/usp_GameServer_GetDirectory.sql
+StoredProcedures/runtime/usp_GameServer_MarkUnreachable.sql
 
 # Cross-shard character-location directory (same-shard-miss fallback for whisper/friend-locate/guild-find)
 StoredProcedures/runtime/usp_CharacterShardLocation_Upsert.sql
@@ -319,6 +320,7 @@ StoredProcedures/admin/usp_GmAllowlist_GetAll.sql
 StoredProcedures/admin/usp_MacRestriction_Add.sql
 StoredProcedures/admin/usp_MacRestriction_GetAll.sql
 StoredProcedures/admin/usp_ShardMapAssignment_GetForShard.sql
+StoredProcedures/admin/usp_ShardMapAssignment_GetAll.sql
 StoredProcedures/admin/usp_GameSettings_Get.sql
 StoredProcedures/admin/usp_ServerQuota_GetMaxPlayers.sql
 
@@ -373,6 +375,33 @@ Migrations/018_character_previous_tribe_and_mount_readpath.sql
 # self-consistency gate (EnterWorldService.HandleAsync) then permanently disconnects on every future login --
 # see the migration file's own header for the full citation.
 Migrations/019_character_previous_tribe_backfill.sql
+
+# Corrective fix for a genuine simultaneous-fresh-login race in usp_AccountSession_ClaimOrSignalKick that
+# could silently delete a legitimate winner's just-registered runtime.AccountSessions row, later causing its
+# own zone-entry to be wrongly rejected as superseded by a newer login that never actually happened -- see
+# the migration file itself for the full citation and fix rationale.
+Migrations/020_account_session_claim_race_fix.sql
+
+# gameserver-directory-heartbeat-liveness: usp_GameServer_GetDirectory's 15s staleness cutoff was a bare
+# literal, not derived from or validated against Game:HeartbeatIntervalSeconds -- replaces it with an explicit
+# @StalenessCutoffSeconds parameter (still defaulting to 15, so every existing caller is unaffected); see the
+# migration file itself for the full citation.
+Migrations/021_gameserver_directory_configurable_staleness_cutoff.sql
+
+# account-session-teardown-ownership-gate (Blocker): usp_AccountSession_MarkTearingDown had no ServerKind/
+# ShardId/SessionToken match at all, unlike its sibling usp_AccountSession_ClearIfOwner one statement later in
+# the same teardown sequence -- an ordinary Login-to-Game handoff race could either wrongly reject a legitimate
+# player as SessionSuperseded or permanently poison a live Game-owned row into ConflictTearingDown; see the
+# migration file itself for the full citation and fix rationale.
+Migrations/022_account_session_mark_tearing_down_gate.sql
+
+# accountsessions-transition-race-safety (Major, distinct from 020's Blocker-severity race): a crashed
+# GameServer/shard leaves a legitimate reconnect blocked for up to ~6-7 minutes with no fast path --
+# usp_AccountSession_ClaimOrSignalKick's Game-side branch now cross-checks runtime.GameServerDirectory's
+# 15-second heartbeat-staleness threshold (already used elsewhere in this schema) and fast-clears/reclaims a
+# row whose owning shard is provably dead instead of only flagging KickRequested for a process that will
+# never service it; see the migration file itself for the full citation and fix rationale.
+Migrations/023_account_session_dead_shard_fast_reclaim.sql
 
 Migrations/Seed/001_dev_account.sql
 

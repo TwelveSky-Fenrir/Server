@@ -125,9 +125,10 @@ public class ClDemandZoneServerInfoSendHandlerTests
         FakeShardMapAssignmentRepository shardMaps, FakeSessionTicketRepository tickets)
     {
         var characters = FakeCharacterRepository.With(Summary, WorldEntry);
+        var reachability = new FakeShardReachabilityProbe();
         var options = Options.Create(new LoginServerOptions());
         return new ZoneTransferHandler(
-            new ZoneTransferService(characters, directory, shardMaps, tickets, options,
+            new ZoneTransferService(characters, directory, shardMaps, tickets, reachability, options,
                 NullLogger<ZoneTransferService>.Instance),
             NullLogger<ZoneTransferHandler>.Instance);
     }

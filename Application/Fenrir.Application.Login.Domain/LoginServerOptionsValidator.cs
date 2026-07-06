@@ -15,6 +15,9 @@ public sealed class LoginServerOptionsValidator : IValidateOptions<LoginServerOp
             errors.Add($"Login:ExpectedClientVersion must be positive (was {options.ExpectedClientVersion}).");
         if (options.TicketTtlSeconds <= 0)
             errors.Add($"Login:TicketTtlSeconds must be positive (was {options.TicketTtlSeconds}).");
+        if (options.ShardReachabilityProbeTimeoutMilliseconds <= 0)
+            errors.Add(
+                $"Login:ShardReachabilityProbeTimeoutMilliseconds must be positive (was {options.ShardReachabilityProbeTimeoutMilliseconds}).");
         if (options.MaxPlayerNum <= 0) errors.Add($"Login:MaxPlayerNum must be positive (was {options.MaxPlayerNum}).");
 
         return errors.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(errors);

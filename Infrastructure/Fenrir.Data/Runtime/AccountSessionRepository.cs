@@ -30,10 +30,15 @@ public sealed record AccountSessionRepository(ICaeriusNetDbContext Db) : IAccoun
     {
         for (var attempt = 1;; attempt++)
         {
+            // AttemptNumber > 1 is only ever reachable below because our own previous attempt's INSERT for
+            // this exact accountId already lost a write-write conflict against a concurrent claim -- it lets
+            // the procedure tell "row just committed by that concurrent winner" apart from "genuinely stale
+            // row abandoned by an unrelated earlier session" instead of deleting the winner's row outright.
             var sp = new StoredProcedureParametersBuilder("runtime", "usp_AccountSession_ClaimOrSignalKick", 1,
                     CommandTimeoutSeconds)
                 .AddParameter("AccountId", accountId, SqlDbType.Int)
                 .AddParameter("NewSessionToken", newSessionToken, SqlDbType.UniqueIdentifier)
+                .AddParameter("AttemptNumber", (byte)attempt, SqlDbType.TinyInt)
                 .Build();
 
             try
@@ -62,11 +67,15 @@ public sealed record AccountSessionRepository(ICaeriusNetDbContext Db) : IAccoun
         return await Db.ExecuteScalarAsync<bool>(sp, ct);
     }
 
-    public async ValueTask MarkTearingDownAsync(int accountId, CancellationToken ct)
+    public async ValueTask MarkTearingDownAsync(int accountId, AccountSessionServerKind serverKind, byte? shardId,
+        Guid sessionToken, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("runtime", "usp_AccountSession_MarkTearingDown", 0,
                 CommandTimeoutSeconds)
             .AddParameter("AccountId", accountId, SqlDbType.Int)
+            .AddParameter("ServerKind", (byte)serverKind, SqlDbType.TinyInt)
+            .AddParameter("ShardId", (object?)shardId ?? DBNull.Value, SqlDbType.TinyInt)
+            .AddParameter("SessionToken", sessionToken, SqlDbType.UniqueIdentifier)
             .Build();
 
         await Db.ExecuteAsync(sp, ct);

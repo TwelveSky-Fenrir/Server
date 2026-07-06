@@ -202,6 +202,16 @@ public sealed class LoginService(
                     "Login rejected: account {AccountId} has a live Game session ({Outcome}); retry once it clears",
                     accountId, (AccountSessionClaimOutcome)claim.Outcome);
                 return Failure(ResultAlreadyConnected, "", true);
+            case AccountSessionClaimOutcome.ReclaimedDeadShard:
+                // usp_AccountSession_ClaimOrSignalKick found the account's previous Game-side row pointing at a
+                // shard whose runtime.GameServerDirectory heartbeat had gone stale (or vanished outright) and
+                // fast-cleared + reclaimed it immediately, rather than leaving it for AccountSessionReapHost's
+                // 6-minute sweep to eventually notice -- proceed exactly like Registered, just logged distinctly
+                // for operational visibility (see Database/Migrations/023_account_session_dead_shard_fast_reclaim.sql).
+                logger.LogWarning(
+                    "Login reclaimed account {AccountId}: its previous shard {ShardId} had a stale/missing heartbeat and was treated as dead rather than waiting for the reap sweep",
+                    accountId, claim.PreviousShardId);
+                break;
         }
 
         // Evicts any previous login session for this account still held locally (legacy playuser-result-4 local

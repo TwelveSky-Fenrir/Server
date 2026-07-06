@@ -103,7 +103,7 @@ public class ZoneTransferServiceTests
     {
         var characters = FakeCharacterRepository.With(Summary, WorldEntryWith(850, 320));
         var otherShard = new ShardDirectoryEntryDto(2, "10.0.0.2", 30001, 0, 100, 0f);
-        var (service, tickets) = CreateServiceWithDirectory(characters, [otherShard],
+        var (service, tickets, _, _) = CreateServiceWithDirectory(characters, [otherShard],
             new Dictionary<byte, short[]> { [2] = [(short)(HostedMapId + 1)] });
 
         var result = await service.RequestZoneTransferAsync(AccountId, Summary.Slot, Guid.NewGuid(), 0,
@@ -120,7 +120,7 @@ public class ZoneTransferServiceTests
     public async Task RequestZoneTransferAsync_EmptyLiveShardDirectory_ReturnsShardUnavailableAndMintsNoTicket()
     {
         var characters = FakeCharacterRepository.With(Summary, WorldEntryWith(850, 320));
-        var (service, tickets) = CreateServiceWithDirectory(characters, [],
+        var (service, tickets, _, _) = CreateServiceWithDirectory(characters, [],
             new Dictionary<byte, short[]>());
 
         var result = await service.RequestZoneTransferAsync(AccountId, Summary.Slot, Guid.NewGuid(), 0,
@@ -136,7 +136,7 @@ public class ZoneTransferServiceTests
         var characters = FakeCharacterRepository.With(Summary, WorldEntryWith(850, 320));
         var shard1 = new ShardDirectoryEntryDto(1, "10.0.0.1", 30000, 0, 100, 0f);
         var shard2 = new ShardDirectoryEntryDto(2, "10.0.0.2", 30001, 0, 100, 0f);
-        var (service, tickets) = CreateServiceWithDirectory(characters, [shard1, shard2],
+        var (service, tickets, _, _) = CreateServiceWithDirectory(characters, [shard1, shard2],
             new Dictionary<byte, short[]>
             {
                 [1] = [(short)(HostedMapId + 1)],
@@ -148,6 +148,45 @@ public class ZoneTransferServiceTests
 
         Assert.Equal(ZoneTransferOutcome.ShardUnavailable, result.Outcome);
         Assert.Null(tickets.LastCreatedTicket);
+    }
+
+    // gameserver-directory-heartbeat-liveness: the shard directory only proves a heartbeat within the last
+    // ~17s, not that the shard is still alive right now -- a crashed shard would otherwise still get a
+    // ticket minted for it. This is the dead-end-handoff fix: a failed TCP reachability probe on the
+    // resolved shard must reject exactly like "no shard claims this map" (no ticket) and proactively evict
+    // the dead shard's directory row instead of waiting for it to age out on its own.
+    [Fact]
+    public async Task RequestZoneTransferAsync_ResolvedShardFailsReachabilityProbe_ReturnsShardUnavailableMintsNoTicketAndEvictsTheShard()
+    {
+        var characters = FakeCharacterRepository.With(Summary, WorldEntryWith(850, 320));
+        var (service, tickets, directory, reachability) = CreateServiceWithDirectory(characters, [Shard],
+            new Dictionary<byte, short[]> { [Shard.ShardId] = [HostedMapId] });
+        reachability.MarkUnreachable(Shard.Host, Shard.Port);
+
+        var result = await service.RequestZoneTransferAsync(AccountId, Summary.Slot, Guid.NewGuid(), 0,
+            CancellationToken.None);
+
+        Assert.Equal(ZoneTransferOutcome.ShardUnavailable, result.Outcome);
+        Assert.Equal("", result.Ip);
+        Assert.Equal(0, result.Port);
+        Assert.Equal(0, result.Zone);
+        Assert.Null(tickets.LastCreatedTicket);
+        Assert.Contains(Shard.ShardId, directory.MarkedUnreachableShardIds);
+    }
+
+    [Fact]
+    public async Task RequestZoneTransferAsync_ResolvedShardPassesReachabilityProbe_MintsTicketAndNeverMarksItUnreachable()
+    {
+        var characters = FakeCharacterRepository.With(Summary, WorldEntryWith(850, 320));
+        var (service, tickets, directory, _) = CreateServiceWithDirectory(characters, [Shard],
+            new Dictionary<byte, short[]> { [Shard.ShardId] = [HostedMapId] });
+
+        var result = await service.RequestZoneTransferAsync(AccountId, Summary.Slot, Guid.NewGuid(), 0,
+            CancellationToken.None);
+
+        Assert.Equal(ZoneTransferOutcome.Success, result.Outcome);
+        Assert.NotNull(tickets.LastCreatedTicket);
+        Assert.Empty(directory.MarkedUnreachableShardIds);
     }
 
     private static CharacterWorldEntryDto WorldEntryWith(int life, int mana)
@@ -164,23 +203,27 @@ public class ZoneTransferServiceTests
         var directory = new FakeGameServerDirectoryRepository(Shard);
         var shardMaps = new FakeShardMapAssignmentRepository(new Dictionary<byte, short[]> { [1] = [HostedMapId] });
         var tickets = new FakeSessionTicketRepository();
+        var reachability = new FakeShardReachabilityProbe();
         var options = Options.Create(new LoginServerOptions());
 
-        return new ZoneTransferService(characters, directory, shardMaps, tickets, options,
+        return new ZoneTransferService(characters, directory, shardMaps, tickets, reachability, options,
             NullLogger<ZoneTransferService>.Instance);
     }
 
-    private static (ZoneTransferService Service, FakeSessionTicketRepository Tickets) CreateServiceWithDirectory(
-        FakeCharacterRepository characters, ShardDirectoryEntryDto[] shards,
-        IReadOnlyDictionary<byte, short[]> hostedMapsByShard)
+    private static (ZoneTransferService Service, FakeSessionTicketRepository Tickets,
+        FakeGameServerDirectoryRepository Directory, FakeShardReachabilityProbe Reachability)
+        CreateServiceWithDirectory(
+            FakeCharacterRepository characters, ShardDirectoryEntryDto[] shards,
+            IReadOnlyDictionary<byte, short[]> hostedMapsByShard)
     {
         var directory = new FakeGameServerDirectoryRepository(shards);
         var shardMaps = new FakeShardMapAssignmentRepository(hostedMapsByShard);
         var tickets = new FakeSessionTicketRepository();
+        var reachability = new FakeShardReachabilityProbe();
         var options = Options.Create(new LoginServerOptions());
 
-        var service = new ZoneTransferService(characters, directory, shardMaps, tickets, options,
+        var service = new ZoneTransferService(characters, directory, shardMaps, tickets, reachability, options,
             NullLogger<ZoneTransferService>.Instance);
-        return (service, tickets);
+        return (service, tickets, directory, reachability);
     }
 }

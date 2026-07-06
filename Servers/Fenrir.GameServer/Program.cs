@@ -86,7 +86,11 @@ if (hostedMaps.Count == 0)
         $"No maps assigned to shard {shardId} in admin.ShardMapAssignments -- a GameServer hosting no world is always a configuration mistake.");
 
 // ADR-0012 rule 1: a shard is a disjoint map partition, never a replica. Must run before ZoneRegistry.Initialize
-// so a colliding shard fails fast at boot instead of silently duplicating a Zone another live shard already hosts.
+// so a colliding shard fails fast at boot instead of silently duplicating a Zone another shard already hosts --
+// "another shard" here means either a currently-live one (cross-checked via runtime.GameServerDirectory) or one
+// merely configured in admin.ShardMapAssignments but not yet live, which matters because this shard's own
+// heartbeat (below, inside host.RunAsync()) has not started yet either: on a whole fleet cold-booting together,
+// no shard would otherwise be visible to any other shard's check at this exact moment.
 await ShardPartitionGuard.EnsureNoOverlapAsync(shardId, hostedMaps,
     host.Services.GetRequiredService<IGameServerDirectoryRepository>(),
     host.Services.GetRequiredService<IShardMapAssignmentRepository>(),

@@ -19,7 +19,8 @@ internal sealed class FakeAccountSessionRepository : IAccountSessionRepository
         throw new NotSupportedException();
     }
 
-    public ValueTask MarkTearingDownAsync(int accountId, CancellationToken ct)
+    public ValueTask MarkTearingDownAsync(int accountId, AccountSessionServerKind serverKind, byte? shardId,
+        Guid sessionToken, CancellationToken ct)
     {
         throw new NotSupportedException();
     }

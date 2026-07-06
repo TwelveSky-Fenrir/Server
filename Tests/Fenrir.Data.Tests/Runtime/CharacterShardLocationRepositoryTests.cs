@@ -30,7 +30,7 @@ public sealed class CharacterShardLocationRepositoryTests : IDisposable
         _provider = services.BuildServiceProvider();
         var db = _provider.GetRequiredService<ICaeriusNetDbContext>();
         _repository = new CharacterShardLocationRepository(db);
-        _directory = new GameServerDirectoryRepository(db);
+        _directory = new GameServerDirectoryRepository(db, _provider.GetRequiredService<ICaeriusNetCache>());
     }
 
     public void Dispose()

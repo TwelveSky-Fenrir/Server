@@ -18,4 +18,14 @@ public sealed record ShardMapAssignmentRepository(ICaeriusNetDbContext Db) : ISh
         var rows = await Db.QueryAsReadOnlyCollectionAsync<ShardMapAssignmentRowDto>(sp, ct);
         return rows.Select(row => row.MapId).ToArray();
     }
+
+    // Liveness-independent: no @ShardId parameter, returns every row in the table. See ShardPartitionGuard
+    // for why a boot-time overlap check needs this in addition to the per-shard lookup above.
+    public async ValueTask<IReadOnlyList<ShardMapAssignmentDto>> GetAllAssignmentsAsync(CancellationToken ct)
+    {
+        var sp = new StoredProcedureParametersBuilder("admin", "usp_ShardMapAssignment_GetAll", 16).Build();
+
+        var rows = await Db.QueryAsReadOnlyCollectionAsync<ShardMapAssignmentDto>(sp, ct);
+        return rows.ToArray();
+    }
 }

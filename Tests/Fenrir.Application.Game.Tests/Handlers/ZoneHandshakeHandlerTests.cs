@@ -73,8 +73,11 @@ public class ZoneHandshakeHandlerTests
         Assert.Equal([], ZoneTestKit.DrainOutbound(pipe));
     }
 
+    // Absent/expired/wrong-shard ticket -- the closest analog to legacy's RegisterUserForZone_00 failure,
+    // which legacy always answers with a silent Quit() and zero response bytes, never QuotaFull's explicit
+    // Result=1 (see ZoneHandshakeOutcome.Rejected's own remarks for the resolved product-decision boundary).
     [Fact]
-    public async Task HandleAsync_Rejected_SendsGenericFailure_AndDoesNotAbort()
+    public async Task HandleAsync_Rejected_AbortsSilently_NoResponseSent_AndDoesNotAssociateAccount()
     {
         var registry = new SessionRegistry();
         var handler = new ZoneHandshakeHandler(
@@ -84,14 +87,18 @@ public class ZoneHandshakeHandlerTests
         await handler.HandleAsync(new ZoneHandshakeRequest { Id = "irrelevant", Tribe = 0, UserSort = 0 }, session,
             CancellationToken.None);
 
-        Assert.Null(session.DisconnectReason);
-        await PacketAssert.AssertSentAsync(pipe, new ZoneHandshakeResponse { Result = 1 });
+        Assert.Equal(DisconnectReason.Faulted, session.DisconnectReason);
+        Assert.Null(session.AccountId);
+        Assert.False(registry.TryGetByAccount(AccountId, out _));
+        Assert.Equal([], ZoneTestKit.DrainOutbound(pipe));
     }
 
-    // Tribe-population quota gate: full quota is a normal, retry-able rejection -- same wire shape as a
-    // rejected ticket (Result=1), never an abort.
+    // Tribe-population quota gate: full quota is a normal, retry-able rejection (Result=1, no abort) --
+    // mirrors legacy's own quota-full/server-state-gate branches, the one failure class on this packet
+    // legacy answers with a response instead of a silent disconnect. Distinct from Rejected above, which
+    // gets the silent-drop treatment instead.
     [Fact]
-    public async Task HandleAsync_QuotaFull_SendsTheSameGenericFailure_AndDoesNotAbort()
+    public async Task HandleAsync_QuotaFull_SendsGenericFailure_AndDoesNotAbort()
     {
         var registry = new SessionRegistry();
         var handler = new ZoneHandshakeHandler(

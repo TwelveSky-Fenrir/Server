@@ -25,6 +25,19 @@ public sealed class GameServerOptions
     /// <summary>Advertised to LoginServer via the directory heartbeat; not a client-visible legacy value.</summary>
     public string PublicHost { get; set; } = "127.0.0.1";
 
+    /// <summary>
+    ///     Time-to-live, in seconds, for the destination-shard-scoped <c>runtime.SessionTickets</c> row
+    ///     <c>Fenrir.Application.Game.Services.ZoneLifecycle.ZoneMoveService</c> mints via
+    ///     <c>ISessionTicketRepository.CreateAsync</c> when a zone-move request resolves to a map hosted by a
+    ///     different live shard than this one -- the GameServer-side counterpart of
+    ///     <c>Fenrir.Application.Login.Domain.LoginServerOptions.TicketTtlSeconds</c> (same ticket-row shape,
+    ///     just minted by the other process for the reverse-direction, Game-&gt;Game handoff instead of
+    ///     Login-&gt;Game). Same default as the Login-side setting: long enough for an immediate client
+    ///     reconnect to the destination shard, short enough that an abandoned handoff never leaves a stale
+    ///     row lingering.
+    /// </summary>
+    public int TicketTtlSeconds { get; set; } = 15;
+
     public int TickRateHz { get; set; } = 20;
 
     /// <summary>Interest-management cell size (view radius).</summary>

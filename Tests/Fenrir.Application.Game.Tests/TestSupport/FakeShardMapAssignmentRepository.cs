@@ -1,9 +1,10 @@
 using Fenrir.Data.Abstractions.Admin;
 
-namespace Fenrir.Application.Login.Tests.TestSupport;
+namespace Fenrir.Application.Game.Tests.TestSupport;
 
-// In-memory stand-in for IShardMapAssignmentRepository, keyed exactly like admin.ShardMapAssignments (one
-// disjoint list of MapIds per ShardId).
+// In-memory stand-in for IShardMapAssignmentRepository, mirroring Fenrir.Application.Login.Tests.TestSupport's
+// own fake of the same interface: keyed exactly like admin.ShardMapAssignments (one disjoint list of MapIds
+// per ShardId).
 internal sealed class FakeShardMapAssignmentRepository(IReadOnlyDictionary<byte, short[]> hostedMapsByShard)
     : IShardMapAssignmentRepository
 {

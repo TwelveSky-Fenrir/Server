@@ -15,6 +15,9 @@ internal sealed class FakeAccountSessionRepository : IAccountSessionRepository
     public List<int> TearingDownAccountIds { get; } = [];
 
     public List<(int AccountId, AccountSessionServerKind ServerKind, byte? ShardId, Guid SessionToken)>
+        TearingDownOwners { get; } = [];
+
+    public List<(int AccountId, AccountSessionServerKind ServerKind, byte? ShardId, Guid SessionToken)>
         ClearedOwners { get; } = [];
 
     public List<(AccountSessionServerKind ServerKind, byte? ShardId, IReadOnlyCollection<int> AccountIds)>
@@ -33,9 +36,11 @@ internal sealed class FakeAccountSessionRepository : IAccountSessionRepository
         return ValueTask.FromResult(TransitionResult);
     }
 
-    public ValueTask MarkTearingDownAsync(int accountId, CancellationToken ct)
+    public ValueTask MarkTearingDownAsync(int accountId, AccountSessionServerKind serverKind, byte? shardId,
+        Guid sessionToken, CancellationToken ct)
     {
         TearingDownAccountIds.Add(accountId);
+        TearingDownOwners.Add((accountId, serverKind, shardId, sessionToken));
         return ValueTask.CompletedTask;
     }
 

@@ -35,6 +35,7 @@ public static class LoginServicesServiceCollectionExtensions
         services.AddSingleton<IDeleteAvatarService, DeleteAvatarService>();
         services.AddSingleton<IRenameAvatarService, RenameAvatarService>();
         services.AddSingleton<ICreateAvatarService, CreateAvatarService>();
+        services.AddSingleton<IShardReachabilityProbe, TcpShardReachabilityProbe>();
         services.AddSingleton<IZoneTransferService, ZoneTransferService>();
         services.AddSingleton<ILoginService, LoginService>();
 

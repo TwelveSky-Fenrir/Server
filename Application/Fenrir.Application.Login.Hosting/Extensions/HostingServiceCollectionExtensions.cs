@@ -19,6 +19,11 @@ public static class HostingServiceCollectionExtensions
         services.AddHostedService<AccountSessionLivenessHost>();
         services.AddHostedService<AccountSessionReapHost>();
 
+        // Sweeps runtime.SessionTickets rows left behind by a zone-transfer handshake that never completed
+        // (client crash, dropped Login<->Game connection); the table is memory-optimized/SCHEMA_ONLY with no
+        // cleanup of its own besides this timer and the create/consume paths' own supersede/always-delete behavior.
+        services.AddHostedService<SessionTicketPurgeHost>();
+
         // Keeps LoginCapacityState fresh for the CL_LOGIN_SEND maintenance-lockdown/server-full quota gates.
         // Registered as its own concrete singleton (not just AddHostedService<T>) so Program.cs can resolve it
         // directly and call InitializeAsync() once, synchronously, before the host starts accepting connections

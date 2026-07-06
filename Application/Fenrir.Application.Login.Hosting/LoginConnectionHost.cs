@@ -133,16 +133,23 @@ public sealed class LoginConnectionHost(
 
     /// <summary>
     ///     Best-effort cross-process cleanup of this account's <c>runtime.AccountSessions</c> row -- must never
-    ///     throw out of a connection-teardown path. <see cref="IAccountSessionRepository.ClearIfOwnerAsync" />
-    ///     idempotently no-ops if the row already moved on (e.g. a newer login already replaced it).
+    ///     throw out of a connection-teardown path. Both <see cref="IAccountSessionRepository.MarkTearingDownAsync" />
+    ///     and <see cref="IAccountSessionRepository.ClearIfOwnerAsync" /> are gated on this connection's own
+    ///     (ServerKind, ShardId, SessionToken) ownership and idempotently no-op if the row already moved on (e.g. a
+    ///     concurrent Game-side world-entry claim for the same account already reassigned it) -- neither call can
+    ///     affect a row this connection no longer owns.
     /// </summary>
     private async ValueTask TearDownAccountSessionAsync(int accountId, Guid? sessionToken)
     {
         try
         {
-            await accountSessions.MarkTearingDownAsync(accountId, CancellationToken.None).ConfigureAwait(false);
+            var resolvedToken = sessionToken ?? default;
             await accountSessions
-                .ClearIfOwnerAsync(accountId, AccountSessionServerKind.Login, null, sessionToken ?? default,
+                .MarkTearingDownAsync(accountId, AccountSessionServerKind.Login, null, resolvedToken,
+                    CancellationToken.None)
+                .ConfigureAwait(false);
+            await accountSessions
+                .ClearIfOwnerAsync(accountId, AccountSessionServerKind.Login, null, resolvedToken,
                     CancellationToken.None)
                 .ConfigureAwait(false);
         }

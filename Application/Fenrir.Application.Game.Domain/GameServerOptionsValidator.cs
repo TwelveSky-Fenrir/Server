@@ -12,6 +12,8 @@ public sealed class GameServerOptionsValidator : IValidateOptions<GameServerOpti
         if (options.Port is <= 0 or > 65535) errors.Add($"Game:Port must be between 1 and 65535 (was {options.Port}).");
         if (options.ShardId == 0) errors.Add("Game:ShardId must be non-zero.");
         if (string.IsNullOrWhiteSpace(options.PublicHost)) errors.Add("Game:PublicHost must not be empty.");
+        if (options.TicketTtlSeconds <= 0)
+            errors.Add($"Game:TicketTtlSeconds must be positive (was {options.TicketTtlSeconds}).");
         if (string.IsNullOrWhiteSpace(options.GameDataDirectory))
             errors.Add("Game:GameDataDirectory must not be empty.");
         if (options.TickRateHz <= 0) errors.Add($"Game:TickRateHz must be positive (was {options.TickRateHz}).");

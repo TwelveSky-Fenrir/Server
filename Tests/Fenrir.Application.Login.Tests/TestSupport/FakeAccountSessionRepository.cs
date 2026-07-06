@@ -18,6 +18,13 @@ internal sealed class FakeAccountSessionRepository : IAccountSessionRepository
     public int ClaimCallCount { get; private set; }
     public int? LastTearingDownAccountId { get; private set; }
 
+    public (int AccountId, AccountSessionServerKind ServerKind, byte? ShardId, Guid SessionToken)?
+        LastTearingDownOwner
+    {
+        get;
+        private set;
+    }
+
     public (int AccountId, AccountSessionServerKind ServerKind, byte? ShardId, Guid SessionToken)? LastClearedOwner
     {
         get;
@@ -44,9 +51,11 @@ internal sealed class FakeAccountSessionRepository : IAccountSessionRepository
         return ValueTask.FromResult(TransitionResult);
     }
 
-    public ValueTask MarkTearingDownAsync(int accountId, CancellationToken ct)
+    public ValueTask MarkTearingDownAsync(int accountId, AccountSessionServerKind serverKind, byte? shardId,
+        Guid sessionToken, CancellationToken ct)
     {
         LastTearingDownAccountId = accountId;
+        LastTearingDownOwner = (accountId, serverKind, shardId, sessionToken);
         return ValueTask.CompletedTask;
     }
 

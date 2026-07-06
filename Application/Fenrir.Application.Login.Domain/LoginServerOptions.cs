@@ -16,6 +16,17 @@ public sealed class LoginServerOptions
 
     public int TicketTtlSeconds { get; set; } = 15;
 
+    /// <summary>
+    ///     Max time <c>Fenrir.Application.Login.Services.ZoneTransfer.TcpShardReachabilityProbe</c> waits for a
+    ///     TCP connect to succeed against a candidate shard's Host:Port before
+    ///     <c>Fenrir.Application.Login.Services.ZoneTransfer.ZoneTransferService</c> gives up on it and reports
+    ///     <c>ShardUnavailable</c> instead of minting a ticket that would hand the client a dead address. The
+    ///     shard directory alone only proves a recent heartbeat (up to ~17s stale, accounting for the SQL
+    ///     freshness window plus the directory repository's own read cache) -- not that the shard is still
+    ///     alive right now.
+    /// </summary>
+    public int ShardReachabilityProbeTimeoutMilliseconds { get; set; } = 750;
+
     /// <summary>Reported to client as tMaxPlayerNum; informational only, not enforced as a hard cap in M1.</summary>
     public int MaxPlayerNum { get; set; } = 1000;
 

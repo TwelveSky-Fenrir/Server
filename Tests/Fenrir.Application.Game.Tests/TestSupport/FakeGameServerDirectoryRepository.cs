@@ -1,10 +1,11 @@
 using System.Collections.Immutable;
 using Fenrir.Data.Abstractions.Runtime;
 
-namespace Fenrir.LoginServer.Tests.TestSupport;
+namespace Fenrir.Application.Game.Tests.TestSupport;
 
-// In-memory stand-in for IGameServerDirectoryRepository: HeartbeatAsync is a GameServer-side concern, never
-// exercised from LoginConnectionHost.
+// In-memory stand-in for IGameServerDirectoryRepository, mirroring
+// Fenrir.Application.Login.Tests.TestSupport's own fake of the same interface: HeartbeatAsync is exercised via
+// GameServerDirectoryHeartbeat (Hosting), never from a *.Services unit test.
 internal sealed class FakeGameServerDirectoryRepository(params ShardDirectoryEntryDto[] shards)
     : IGameServerDirectoryRepository
 {
@@ -26,8 +27,8 @@ internal sealed class FakeGameServerDirectoryRepository(params ShardDirectoryEnt
         throw new NotSupportedException();
     }
 
-    // MarkUnreachableAsync is a ZoneTransferService concern (Login.Services), never exercised from
-    // LoginConnectionHost's live-player-count read under test here.
+    // MarkUnreachableAsync is a ZoneTransferService (Login.Services) concern, never exercised from a
+    // *.Services unit test in this project.
     public ValueTask MarkUnreachableAsync(byte shardId, CancellationToken ct)
     {
         throw new NotSupportedException();

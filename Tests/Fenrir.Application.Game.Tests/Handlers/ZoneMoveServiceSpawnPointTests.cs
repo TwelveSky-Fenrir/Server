@@ -37,6 +37,8 @@ public class ZoneMoveServiceSpawnPointTests
 
         var worldState = ZoneTestKit.CreateWorldState();
         var service = new ZoneMoveService(zones, worldData, new GuildRankingCache(), worldState,
+            new FakeGameServerDirectoryRepository(), new FakeShardMapAssignmentRepository(new Dictionary<byte, short[]>()),
+            new FakeSessionTicketRepository(),
             Options.Create(new GameServerOptions()), NullLogger<ZoneMoveService>.Instance);
 
         var (session, _) = ZoneTestKit.CreateSession(1);

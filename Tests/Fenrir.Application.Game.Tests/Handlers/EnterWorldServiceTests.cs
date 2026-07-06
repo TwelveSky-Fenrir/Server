@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Collections.ObjectModel;
 using System.Net;
 using System.Text;
@@ -21,6 +22,7 @@ using Fenrir.Data.Security;
 using Fenrir.Data.WriteBehind;
 using Fenrir.Network.Compression;
 using Fenrir.Network.Dispatch.Sessions;
+using Fenrir.Network.Framing;
 using Fenrir.Network.Serialization.Packets.Shared;
 using Fenrir.Network.Serialization.Packets.Zone;
 using Fenrir.Network.Serialization.Wire;
@@ -126,8 +128,7 @@ public class EnterWorldServiceTests
                 AvatarSocialSnapshot.Empty),
             BuffInfo = ExpectedBuffInfo(buffs)
         };
-        var enterWorldActual = await PacketAssert.ReadSentBytesAsync(pipe);
-        Assert.Equal(ZoneMessageFactory.Encode(in expectedEnterWorld), enterWorldActual);
+        var expectedEnterWorldBytes = ZoneMessageFactory.Encode(in expectedEnterWorld);
 
         // 2) WorldSnapshotResponse: WorldInfo must reflect the live WorldStateService snapshot, not zeros.
         var expectedWorldSnapshot = new WorldSnapshotResponse
@@ -136,14 +137,33 @@ public class EnterWorldServiceTests
                 GuildRankingProjection.Apply(WorldStateTemplates.ZeroedWorldInfo, guildRanking.Top), worldState),
             TribeInfo = WorldStateTemplates.ZeroedTribeInfo
         };
-        var worldSnapshotActual = await PacketAssert.ReadSentBytesAsync(pipe);
-        Assert.Equal(ZoneMessageFactory.Encode(in expectedWorldSnapshot), worldSnapshotActual);
+        var expectedWorldSnapshotBytes = ZoneMessageFactory.Encode(in expectedWorldSnapshot);
+
+        var selfSpawnFrameSize = FrameWriter.FrameSizeOf<AvatarActionResponse>();
+
+        // HandleAsync sends all three messages back-to-back with no `await` between them, so by the time
+        // control returns here every byte is already sitting in the pipe -- a single ReadAsync() call can
+        // therefore non-deterministically return anywhere from one message to all three concatenated,
+        // depending on how System.IO.Pipelines happens to have segmented the buffer. Reading exactly the
+        // combined expected length up front (looping if a single read doesn't yet cover it) and slicing
+        // locally avoids relying on a 1:1 read-call-to-message correspondence that isn't actually guaranteed.
+        var allSent = await ReadExactlyAsync(pipe,
+            expectedEnterWorldBytes.Length + expectedWorldSnapshotBytes.Length + selfSpawnFrameSize);
+
+        var enterWorldActual = allSent.AsSpan(0, expectedEnterWorldBytes.Length).ToArray();
+        Assert.Equal(expectedEnterWorldBytes, enterWorldActual);
+
+        var worldSnapshotActual = allSent
+            .AsSpan(expectedEnterWorldBytes.Length, expectedWorldSnapshotBytes.Length).ToArray();
+        Assert.Equal(expectedWorldSnapshotBytes, worldSnapshotActual);
 
         // 3) Self-spawn AvatarActionResponse: PreviousTribe/EffectValueForView/top-level PetLocation must
         // reflect the persisted character -- decoded via ObjectForAvatar's own TryRead rather than
         // reproducing all ~50 sibling fields by hand (Data starts 8 bytes into the 1-byte-opcode-prefixed,
         // uncompressed payload: ServerIndex(int) + UniqueNumber(uint) precede it).
-        var selfSpawnActual = await PacketAssert.ReadSentBytesAsync(pipe);
+        var selfSpawnActual = allSent
+            .AsSpan(expectedEnterWorldBytes.Length + expectedWorldSnapshotBytes.Length, selfSpawnFrameSize)
+            .ToArray();
         var selfSpawnPayload = selfSpawnActual.AsSpan(1);
         Assert.True(ObjectForAvatar.TryRead(selfSpawnPayload.Slice(8, ObjectForAvatar.WireSize), out var selfSpawnData));
         Assert.Equal(PreviousTribe, selfSpawnData.PreviousTribe);
@@ -190,6 +210,29 @@ public class EnterWorldServiceTests
         await service.HandleAsync(ValidRequest(EncodeObfuscatedAccountId(AccountId)), session, CancellationToken.None);
 
         Assert.Null(session.DisconnectReason);
+    }
+
+    /// <summary>
+    ///     Loops <see cref="PipeReader.ReadAsync" />/<see cref="PipeReader.AdvanceTo(System.SequencePosition)" />
+    ///     until exactly <paramref name="totalLength" /> bytes have been collected -- see the call site's own
+    ///     remarks for why a single read can't be assumed to align with one message.
+    /// </summary>
+    private static async Task<byte[]> ReadExactlyAsync(FakeDuplexPipe pipe, int totalLength)
+    {
+        var collected = new byte[totalLength];
+        var offset = 0;
+
+        while (offset < totalLength)
+        {
+            var result = await pipe.SessionToPeer.ReadAsync();
+            var sliceLength = (int)Math.Min(result.Buffer.Length, totalLength - offset);
+            var slice = result.Buffer.Slice(0, sliceLength);
+            slice.ToArray().CopyTo(collected, offset);
+            offset += sliceLength;
+            pipe.SessionToPeer.AdvanceTo(slice.End);
+        }
+
+        return collected;
     }
 
     private static CharacterWorldEntryBundle HappyPathBundle(short mapId, byte tribe, byte previousTribe,

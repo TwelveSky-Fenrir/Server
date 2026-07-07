@@ -11,6 +11,8 @@ CREATE TABLE auth.Accounts
     LockoutUntilUtc  DATETIME2(3)       NULL,
     IsBanned         BIT                NOT NULL
         CONSTRAINT DF_Accounts_IsBanned DEFAULT 0,
+    AccountGrade     SMALLINT           NOT NULL
+        CONSTRAINT DF_Accounts_AccountGrade DEFAULT 0, -- legacy uUserSort (Server/ts25login/S08_MyDB.cpp:244-245); strict "< 1 is not elevated" gate at every GM-command call site (e.g. GM-BLOCK, legacy case 519)
     CreatedAtUtc     DATETIME2(3)       NOT NULL
         CONSTRAINT DF_Accounts_CreatedAtUtc DEFAULT SYSUTCDATETIME(),
     CONSTRAINT PK_Accounts PRIMARY KEY CLUSTERED (AccountId),

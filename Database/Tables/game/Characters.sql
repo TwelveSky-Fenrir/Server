@@ -38,7 +38,7 @@ CREATE TABLE game.Characters
     MaxMana                  INT                NOT NULL,
     Experience               BIGINT             NOT NULL
         CONSTRAINT DF_Characters_Experience DEFAULT 0
-        CONSTRAINT CK_Characters_Experience CHECK (Experience >= 0),                             -- aExp1+aExp2 combined
+        CONSTRAINT CK_Characters_Experience CHECK (Experience >= 0),                             -- aExp1 (NOT "aExp1+aExp2 combined" -- Server/BuildEU33/DB/nxtserver.sql:41-43 and Server/ts25zone/UpperCom/S06_MyUpperCom05.cpp:229-240 both persist aExp1/aExp2 as two fully independent values, never summed; see Exp2 below)
     StatVit                  INT                NOT NULL
         CONSTRAINT DF_Characters_StatVit DEFAULT 0,
     StatStr                  INT                NOT NULL
@@ -96,9 +96,9 @@ CREATE TABLE game.Characters
         CONSTRAINT DF_Characters_ProtectForDestroy DEFAULT 0
         CONSTRAINT CK_Characters_ProtectForDestroy CHECK (ProtectForDestroy >= 0),
     DoubleExpTime1           INT                NOT NULL
-        CONSTRAINT DF_Characters_DoubleExpTime1 DEFAULT 0,                                       -- YYYYMMDD, 0 = no boost
+        CONSTRAINT DF_Characters_DoubleExpTime1 DEFAULT 0,                                       -- aDoubleExpTime1: raw per-tick decrementing counter (NOT a YYYYMMDD date), 0 = no boost; welcome grant is the bare literal 300 (Server/ts25login/S04_MyWork02.cpp:886-887), decremented once per firing (Server/ts25zone/S07_MyGame04.cpp:955-969)
     DoubleExpTime2           INT                NOT NULL
-        CONSTRAINT DF_Characters_DoubleExpTime2 DEFAULT 0,
+        CONSTRAINT DF_Characters_DoubleExpTime2 DEFAULT 0,                                       -- aDoubleExpTime2, same decrementing-counter shape as DoubleExpTime1
     AutoBuffTime             INT                NOT NULL
         CONSTRAINT DF_Characters_AutoBuffTime DEFAULT 0,                                         -- aAutoBuffTime/aContinueSkillDay, YYYYMMDD (PlayerRuntimeState.AutoBuffTime encoding), 0 = no boost
     DropItemTime             INT                NOT NULL
@@ -150,6 +150,22 @@ CREATE TABLE game.Characters
         CONSTRAINT CK_Characters_TribeTransferPermitCount CHECK (TribeTransferPermitCount >= 0), -- banked Faction Transfer Scroll (world.Items 8153/8154) uses; no spend path exists yet, same posture as BloodCoin's absent grant path
     PremiumExpireUtc         BIGINT             NOT NULL
         CONSTRAINT DF_Characters_PremiumExpireUtc DEFAULT 0,                                     -- aPremium, Unix epoch seconds (0 = none); distinct scale from the YYYYMMDD ints above
+    PreviousTribe            TINYINT            NOT NULL
+        CONSTRAINT DF_Characters_PreviousTribe DEFAULT 0
+        CONSTRAINT CK_Characters_PreviousTribe CHECK (PreviousTribe BETWEEN 0 AND 2),             -- the Noble Dragon/Royal Serpent/Grand Tiger starter-kit template (0-2, never 3) that selected this character's equipment/skills/hotkeys -- genuinely independent from Tribe (0-3), checked for self-consistency at every zone entry (Server/ts25zone/S04_MyWork02.cpp:880-901)
+    MountItemId              INT                NOT NULL
+        CONSTRAINT DF_Characters_MountItemId DEFAULT 0,                                          -- 0 = no mount; ANIMAL_NUM_TIGER1 (1301) granted at creation
+    MountExpActivity         INT                NOT NULL
+        CONSTRAINT DF_Characters_MountExpActivity DEFAULT 0,                                     -- aAnimalExpActivity[0]
+    MountPower               INT                NOT NULL
+        CONSTRAINT DF_Characters_MountPower DEFAULT 0,                                           -- aAnimalPower[0]
+    MountSlotIndex           INT                NOT NULL
+        CONSTRAINT DF_Characters_MountSlotIndex DEFAULT -1,                                      -- aAnimalIndex; -1 = none active
+    MountTime                INT                NOT NULL
+        CONSTRAINT DF_Characters_MountTime DEFAULT 0,                                            -- aAnimalTime
+    AutoTime2                INT                NOT NULL
+        CONSTRAINT DF_Characters_AutoTime2 DEFAULT 0
+        CONSTRAINT CK_Characters_AutoTime2 CHECK (AutoTime2 >= 0),                                -- aAutoTime2: per-real-minute-decrementing free auto-hunt allowance (Server/ts25zone/S07_MyGame04.cpp:787-823); 1440 (24h) granted at creation (Server/ts25login/S04_MyWork02.cpp:888)
     FlushSequence            BIGINT             NOT NULL
         CONSTRAINT DF_Characters_FlushSequence DEFAULT 0,                                        -- idempotent write-behind
     CreatedAtUtc             DATETIME2(3)       NOT NULL

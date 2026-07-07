@@ -4,10 +4,12 @@
 -- SCHEMA_ONLY: a ticket surviving a crash is worthless anyway (15s TTL).
 CREATE TABLE runtime.SessionTickets
 (
-    AccountId    INT          NOT NULL,
-    CharacterId  INT          NOT NULL,
-    ShardId      TINYINT      NOT NULL,
-    ExpiresAtUtc DATETIME2(3) NOT NULL,
+    AccountId    INT               NOT NULL,
+    CharacterId  INT               NOT NULL,
+    ShardId      TINYINT           NOT NULL,
+    ExpiresAtUtc DATETIME2(3)      NOT NULL,
+    SessionToken UNIQUEIDENTIFIER  NOT NULL, -- minted by usp_AccountSession_ClaimOrSignalKick at Login-claim time; proves a Game-side world-entry claim is for the same login epoch as the one that minted this ticket
+    AccountGrade SMALLINT          NOT NULL, -- carries auth.Accounts.AccountGrade across the Login->Game process boundary (GameServer never re-queries auth.Accounts)
     CONSTRAINT PK_SessionTickets PRIMARY KEY NONCLUSTERED HASH (AccountId)
         WITH (BUCKET_COUNT = 1024)
 )

@@ -2,13 +2,17 @@
 -- caller-resolved spawn map (Tribe -> MapId is a fixed 4-entry mapping owned by the handler, mirroring
 -- mapcheck.h::GetReturnBornInTownLocation) -- RS4 just looks up that map's default spawn point, already
 -- seeded on world.Zones.
+--
+-- RawWeaponCode is NULL for the 5 unconditional per-race grants (Amulet/Armor/Gloves/Ring/Boots) and holds
+-- the raw client-selectable code for each of the 3 weapon alternatives per race -- CreateAvatarService
+-- validates the client's chosen code against this column, then grants THIS row's ItemId (the elite weapon),
+-- never the raw code itself.
 CREATE PROCEDURE world.usp_StarterKit_GetByPreviousTribe @PreviousTribe TINYINT, @MapId SMALLINT
 AS
 BEGIN
-    SET
-        NOCOUNT ON;
+    SET NOCOUNT ON;
 
-    SELECT EquipSlot, ItemId
+    SELECT EquipSlot, ItemId, RawWeaponCode
     FROM world.StarterKitEquipment
     WHERE PreviousTribe = @PreviousTribe
     ORDER BY EquipSlot, ItemId;

@@ -106,6 +106,7 @@ Schemas/Types/game/tvp_CharacterSkillSlot.sql
 Schemas/Types/game/tvp_CharacterHotkeySlot.sql
 Schemas/Types/game/tvp_EventLogEntry.sql
 Schemas/Types/runtime/tvp_AccountIdList.sql
+Schemas/Types/admin/tvp_CharacterIdList.sql
 
 Views/world/vw_ItemBonusSkillDetail.sql
 Views/world/vw_MonsterWithDropSummary.sql
@@ -128,7 +129,6 @@ StoredProcedures/auth/usp_AccountPin_Set.sql
 StoredProcedures/game/usp_Character_GetByAccount.sql
 StoredProcedures/game/usp_Character_Create.sql
 StoredProcedures/game/usp_Character_Delete.sql
-StoredProcedures/game/usp_Character_Delete_CleanupChildTables.sql
 StoredProcedures/game/usp_Character_Rename.sql
 StoredProcedures/game/usp_CharacterItem_GetIdAtSlot.sql
 StoredProcedures/game/usp_Character_GetIdByName.sql
@@ -141,6 +141,7 @@ StoredProcedures/game/usp_Character_AdjustMoney.sql
 StoredProcedures/game/usp_Character_AdjustMoneyAndReplaceContainer.sql
 StoredProcedures/game/usp_Character_AdjustMoneyAndReplaceTwoContainers.sql
 StoredProcedures/game/usp_CharacterSkills_UpsertSlot.sql
+StoredProcedures/game/usp_CharacterHotkeys_UpsertSlot.sql
 StoredProcedures/game/usp_CharacterQuest_ApplyTransition.sql
 StoredProcedures/game/usp_Character_ApplyDailyMissionClaim.sql
 StoredProcedures/game/usp_Character_SetAutoPotionThreshold.sql
@@ -262,6 +263,7 @@ StoredProcedures/game/usp_HeroRanking_Upsert.sql
 StoredProcedures/game/usp_HeroRanking_GetByPeriod.sql
 StoredProcedures/game/usp_HeroRanking_Rollover.sql
 StoredProcedures/game/usp_HeroRanking_AddPoints.sql
+StoredProcedures/game/usp_HeroRanking_GetPoints.sql
 StoredProcedures/game/usp_TowerState_EnsureInitialized.sql
 StoredProcedures/game/usp_TowerState_GetAll.sql
 StoredProcedures/game/usp_TowerState_SetController.sql
@@ -279,6 +281,7 @@ StoredProcedures/game/usp_OfflineShop_Upsert.sql
 StoredProcedures/game/usp_OfflineShop_Close.sql
 StoredProcedures/game/usp_OfflineShop_GetByCharacter.sql
 StoredProcedures/game/usp_OfflineShop_GetByZone.sql
+StoredProcedures/game/usp_OfflineShop_GetAllOpen.sql
 StoredProcedures/game/usp_OfflineShop_SetItems.sql
 StoredProcedures/game/usp_ProxyShopName_Set.sql
 StoredProcedures/game/usp_ProxyShopName_GetByCharacter.sql
@@ -321,6 +324,7 @@ StoredProcedures/admin/usp_Ban_GetActiveForCharacter.sql
 StoredProcedures/admin/usp_Mute_Create.sql
 StoredProcedures/admin/usp_Mute_Lift.sql
 StoredProcedures/admin/usp_Mute_GetActiveForCharacter.sql
+StoredProcedures/admin/usp_Mute_GetActiveForCharacters.sql
 StoredProcedures/admin/usp_BlockedIp_Add.sql
 StoredProcedures/admin/usp_BlockedIp_Exists.sql
 StoredProcedures/admin/usp_FirewallRule_Add.sql
@@ -337,241 +341,20 @@ StoredProcedures/admin/usp_ServerQuota_GetMaxPlayers.sql
 
 Migrations/001_roles.sql
 Migrations/002_roles_login_gifts.sql
-Migrations/010_session_tickets_add_session_token.sql
 
-# auth.Accounts.AccountGrade: prerequisite read by both the Login-side "Protect Spoofed" anti-spoofing gate
-# (this migration only) and, separately, the Game-side GM-BLOCK gate's session-ticket hand-off (see
-# 012_session_tickets_add_account_grade.sql, appended by that feature's own workflow once it's ready).
-Migrations/011_accounts_add_account_grade.sql
-
-# GM-BLOCK (legacy case 519): threads auth.Accounts.AccountGrade (011, above) through the Login->Game
-# session-ticket hand-off so the Zone session can gate the command without re-querying auth.Accounts.
-Migrations/012_session_tickets_add_account_grade.sql
-
-# op19 CL_CHANGE_AVATAR_NAME_SEND rename-scroll consumption gate: usp_Character_Rename now atomically
-# checks/consumes item 1133 at the claimed slot alongside the name change (see the migration file itself
-# for the full rationale and the legacy compensation-bug this atomic version sidesteps).
-Migrations/013_character_rename_item_consumption.sql
-
-# Guild-money-movement audit logging (create/disband/upgrade): usp_Guild_CreateAndDebitMoney/
-# usp_Guild_UpgradeAndDebitMoney/usp_Guild_Disband now each write one game.EventLog row (Category=
-# GuildMoney) in the same transaction as the mutation itself -- see the migration file itself for the
-# full rationale and legacy citations. usp_Guild_Disband also gains a trailing @CharacterId parameter.
-Migrations/014_guild_money_event_log.sql
-
-# op17 starter-kit-grant correction: USE_CUSTOME_CREATE's forced-on elite-gear/weapon-remap/starting-level
-# branch is what actually ships (see the migration file's own header comment for the full citation).
-Migrations/015_starter_kit_elite_grant.sql
-
-# Atomicity fix for 015's usp_Character_CreateWithStarterKit: its 5 write statements were never wrapped in
-# an explicit transaction, so a mid-sequence failure (e.g. a bad starter-kit item row) could leave a
-# committed Characters row with a partial/missing kit -- see the migration file's own header for the full
-# autocommit-mode/XACT_ABORT explanation.
-Migrations/016_starter_kit_create_atomicity.sql
-
-# usp_Character_Delete_CleanupChildTables missed admin.Bans/admin.Mutes (character-only rows) and
-# game.TribeBankLog -- all three carry a live FK on CharacterId that AvatarDeletionGate never precondition-
-# checks, so deleting a character that was ever banned/muted by CharacterId or ever touched a tribe bank
-# threw the same unhandled FK-violation the whole CleanupChildTables procedure exists to prevent.
-Migrations/017_character_delete_moderation_tribebank_cleanup.sql
-
-# op17/zone-entry starter-kit re-audit: adds game.Characters.PreviousTribe (a genuinely independent field
-# from Tribe per legacy's own zone-entry self-consistency check, previously not persisted at all) and
-# extends usp_Character_GetForWorldEntry's RS0 to project it plus the 5 Mount* columns 015 already granted
-# but nothing ever read back -- see the migration file's own header for the full citation.
-Migrations/018_character_previous_tribe_and_mount_readpath.sql
-
-# Fix-forward for a fail-closed regression in 018: its PreviousTribe NOT NULL DEFAULT 0 silently retrofits
-# every already-existing Tribe IN (1,2) character to a mismatched PreviousTribe, which the new zone-entry
-# self-consistency gate (EnterWorldService.HandleAsync) then permanently disconnects on every future login --
-# see the migration file's own header for the full citation.
+# Fix-forward for a fail-closed regression: game.Characters.PreviousTribe (see Tables/game/Characters.sql) is
+# NOT NULL DEFAULT 0, which applies retroactively to every row that already existed at the moment its ALTER
+# TABLE originally ran -- i.e. any character created before PreviousTribe was introduced. EnterWorldService.
+# HandleAsync aborts the session outright (Server/ts25zone/S04_MyWork02.cpp:880-901's self-consistency check:
+# a main-faction Tribe 0-2 requires PreviousTribe == Tribe) whenever the two fields disagree. Combined, every
+# already-created character with Tribe = 1 or Tribe = 2 -- the large majority of any pre-existing population --
+# would silently receive PreviousTribe = 0 from the DEFAULT and then be permanently unable to enter the world
+# afterward. This is a fail-closed denial-of-service against legitimate, already-existing accounts, not
+# anything a player did -- backfills PreviousTribe = Tribe for every main-faction row that hasn't already been
+# set to a non-default value. Kept as a standalone migration (not merged into the table's own creation script)
+# since it is a one-time DATA correction against pre-existing rows, not a schema shape change -- a fresh
+# database has no rows for it to touch.
 Migrations/019_character_previous_tribe_backfill.sql
-
-# Corrective fix for a genuine simultaneous-fresh-login race in usp_AccountSession_ClaimOrSignalKick that
-# could silently delete a legitimate winner's just-registered runtime.AccountSessions row, later causing its
-# own zone-entry to be wrongly rejected as superseded by a newer login that never actually happened -- see
-# the migration file itself for the full citation and fix rationale.
-Migrations/020_account_session_claim_race_fix.sql
-
-# gameserver-directory-heartbeat-liveness: usp_GameServer_GetDirectory's 15s staleness cutoff was a bare
-# literal, not derived from or validated against Game:HeartbeatIntervalSeconds -- replaces it with an explicit
-# @StalenessCutoffSeconds parameter (still defaulting to 15, so every existing caller is unaffected); see the
-# migration file itself for the full citation.
-Migrations/021_gameserver_directory_configurable_staleness_cutoff.sql
-
-# account-session-teardown-ownership-gate (Blocker): usp_AccountSession_MarkTearingDown had no ServerKind/
-# ShardId/SessionToken match at all, unlike its sibling usp_AccountSession_ClearIfOwner one statement later in
-# the same teardown sequence -- an ordinary Login-to-Game handoff race could either wrongly reject a legitimate
-# player as SessionSuperseded or permanently poison a live Game-owned row into ConflictTearingDown; see the
-# migration file itself for the full citation and fix rationale.
-Migrations/022_account_session_mark_tearing_down_gate.sql
-
-# accountsessions-transition-race-safety (Major, distinct from 020's Blocker-severity race): a crashed
-# GameServer/shard leaves a legitimate reconnect blocked for up to ~6-7 minutes with no fast path --
-# usp_AccountSession_ClaimOrSignalKick's Game-side branch now cross-checks runtime.GameServerDirectory's
-# 15-second heartbeat-staleness threshold (already used elsewhere in this schema) and fast-clears/reclaims a
-# row whose owning shard is provably dead instead of only flagging KickRequested for a process that will
-# never service it; hardened this session to a 60-second (not 15-second) heartbeat-staleness threshold for
-# this specific branch, since it takes a destructive/non-reversible action (reassigning session ownership)
-# unlike the read-side 15-second cutoffs used elsewhere -- see the migration file itself for the full citation
-# and fix rationale.
-Migrations/023_account_session_dead_shard_fast_reclaim.sql
-
-# tribe-role-scalar-type-fix: game.usp_TribeRole_GetForCharacter's CASE expression returned untyped INT
-# literals, which CaeriusNet's Db.ExecuteScalarAsync<byte> read in TribeRepository.GetRoleForCharacterAsync
-# then failed to unbox to byte (InvalidCastException) on every single call -- i.e. on every EnterWorldService
-# world entry, for every character. This is the confirmed root cause of the "client stuck at loading 100%,
-# then idle-timeout disconnect" symptom investigated across this whole session: EnterWorldRequest genuinely
-# was received and processed, but always threw here and aborted the session before the client ever saw a
-# successful response; see the migration file itself for the full citation and fix rationale.
-Migrations/024_tribe_role_scalar_type_fix.sql
-
-# create-avatar-tribe-handling-fresh (Major): Server/ts25login/S04_MyWork02.cpp:885-889 grants every newly
-# created character a starting death-protection allowance (aProtectForDeath = 5, unconditional, same #ifdef
-# LNW33 block as the DoubleExpTime1/2 literals 018 already granted), consumed by decrementing on avatar death
-# per Server/ts25zone/S07_MyGame02.cpp:3443-3489 -- but usp_Character_CreateWithStarterKit's INSERT column
-# list never included game.Characters.ProtectForDeath, so every new character silently took the column's
-# DEFAULT of 0 instead. Fix-forward only (identical body to 018's version plus ProtectForDeath in the INSERT
-# column list/VALUES); no new stored-procedure parameter, no read-path change needed (GetForWorldEntry already
-# projects the column) -- see the migration file itself for the full citation and fix rationale.
-Migrations/025_character_protect_for_death_grant.sql
-
-# double-exp-time-counter-fix (Major, create-avatar-tribe-handling-fresh area): usp_Character_CreateWithStarterKit
-# persisted DoubleExpTime1/DoubleExpTime2 as the same ~7-day-future YYYYMMDD date as AutoBuffTime, but the
-# legacy source (Server/ts25login/S04_MyWork02.cpp:885-892) sets DoubleExpTime1/DoubleExpTime2 to the bare
-# integer literal 300 -- a raw per-tick decrementing counter (confirmed by Server/ts25zone/S07_MyGame04.cpp:
-# 955-969's decrement-if-greater-than-zero consumer), never a calendar date. Persisting a date-shaped value
-# here would have taken ~20 million decrements to reach zero instead of 300. Layered on top of 025's
-# ProtectForDeath-grant body (not 018's) so it doesn't revert that sibling fix -- see the migration file
-# itself for the full citation and fix rationale.
-Migrations/026_double_exp_time_counter_fix.sql
-
-# autotime2-grant (this session's closeout of the prior round's open aAutoTime2 question, create-avatar-
-# tribe-handling-fresh area): Server/ts25login/S04_MyWork02.cpp:888 grants aAutoTime2 = 1440 (24h of free
-# auto-hunt minutes) in the same live #ifdef LNW33 block as ProtectForDeath/DoubleExpTime1/DoubleExpTime2
-# (025/026), but game.Characters never had an AutoTime2 column at all -- completely unrepresented, not just
-# wrong-valued. Server/ts25zone/S07_MyGame04.cpp:787-823 (itself under the always-compiled #ifndef FREE_HUNT)
-# confirms aAutoTime2 is a per-real-minute-decrementing auto-hunt time budget (GetMinuteFromTick(1) ==
-# TICK_MINUTE == 60000ms, Server/Header/datetime.h:29,33), corroborated by the "auto hunt 5hr"/"3hr" cash
-# items (Server/ts25zone/S04_MyWork03.cpp:5387-5407) adding 300/180 minutes respectively. Adds the column,
-# grants the literal 1440 in usp_Character_CreateWithStarterKit (fix-forward on 026's body), projects it in
-# usp_Character_GetForWorldEntry/CharacterWorldSnapshotDto (appended last, defaulted, so existing direct-
-# construction test call sites keep compiling), and wires the existing (not newly added)
-# Network/.../AvatarInfo.cs AutoTime2 field on both the Login create-response overlay and Game's
-# AvatarInfoFactory.CreateForCharacter -- see the migration file itself for the full citation, and this
-# session's findings for what is deliberately still left open (AutoTime itself; PlayerRuntimeState wiring).
-Migrations/027_character_autotime2_grant.sql
-
-# starter-kit-equipment-doc-correction: Tables/world/StarterKitEquipment.sql's own DDL header comment has been
-# stale/misleading since 015/086 landed (still claims the dead non-USE_CUSTOME_CREATE branch and only
-# Armor/Gloves/Boots/Weapon, omitting Amulet/Ring and the RawWeaponCode column 015 added) -- that file is
-# already applied/journaled so its comment is never edited in place; this attaches a corrected MS_Description
-# extended property to the table and to RawWeaponCode instead. See the migration file itself for the full
-# citation.
-Migrations/028_starter_kit_equipment_doc_correction.sql
-
-# hero-rank-guild-buff-field-audit (Minor): usp_HeroRanking_AddPoints refreshed Level on every grant via
-# `Level = COALESCE(@Level, Level)`, but legacy's AddOrUpdateHeroRank (Server/ts25center/S08_MyDB.cpp:
-# 213-216) omits hLevel from its ON DUPLICATE KEY UPDATE clause entirely, freezing it at whatever level the
-# character was when they first ever earned a hero point for that ranking period -- see the migration file
-# itself for the full citation and fix rationale.
-Migrations/029_hero_ranking_level_freeze_fix.sql
-
-# hero-rank-points-world-entry-hydration (Major): adds game.usp_HeroRanking_GetPoints, a brand-new
-# single-character/period point-total read used by EnterWorldService to hydrate
-# PlayerRuntimeState.HeroRankPoints at world entry from the character's already-persisted Current-period
-# total (previously always started at 0 for every session/zone transfer) -- see the migration file itself
-# for the full citation and the zone-side-read-vs-ticket-schema-extension rationale.
-Migrations/030_hero_rank_points_world_entry_hydration.sql
-
-# creation-persistence-full-reaudit (Minor): game.Characters.Experience's own DDL comment ("aExp1+aExp2
-# combined") is factually wrong per direct legacy schema/persistence-call verification -- corrected via an
-# MS_Description extended property (the table script is already applied/journaled, never edited in place) --
-# see the migration file itself for the full citation trail and the deliberately-unresolved open question it
-# flags rather than guesses at.
-Migrations/031_character_experience_column_doc_correction.sql
-
-# starter-kit-inventory-store-date-grant (Minor, creation-persistence-full-reaudit area):
-# usp_Character_CreateWithStarterKit never included InventoryDate/StoreDate in its INSERT column list, so
-# every new character silently took the columns' DEFAULT of 0 instead of the legacy 7-day-future second-page
-# rental grant (Server/ts25login/S04_MyWork02.cpp:863-872, live LNW33 branch) -- see the migration file
-# itself for the full citation and fix rationale.
-Migrations/032_character_inventory_store_date_grant.sql
-
-# proxy-shop-listing-pricing (Critical): usp_OfflineShop_ExecutePurchase's seller-earnings-credit UPDATE
-# evaluated `Money + @Price` as 32-bit INT arithmetic before choosing its BigMoney-rollover CASE WHEN branch --
-# since OfflineShops.Money can legitimately sit at exactly 2,000,000,000 and Price can be as large as
-# 999,999,999, the true sum (~2.999999999e9) can exceed Int32.MaxValue and raise a raw SQL arithmetic-overflow
-# error (8115) instead of legacy's intended graceful rollover -- see the migration file itself for the full
-# citation and fix rationale (widen-then-compare via BIGINT, matching legacy's own LONGLONG-widening pattern).
-Migrations/033_offline_shop_execute_purchase_bigint_overflow_fix.sql
-
-# inventory-capacity-stacking-rules (Critical, database-layer backstop only): game.CharacterItems.Quantity
-# had no upper-bound CHECK, so the missing 999-stack cap in ContainerMatrix.ResolveMove's merge branch
-# (Application/ fix tracked separately, out of database-engineer scope) could durably persist an over-cap
-# stack with nothing at the schema level to stop it -- see the migration file itself for the full citation.
-Migrations/034_character_items_quantity_upper_bound.sql
-
-# gm-action-audit-attribution (Critical): admin.Bans gains ActorAccountId/ActorCharacterId so a ban row can be
-# attributed to the GM who issued it, and usp_Ban_Create gains two matching trailing optional parameters --
-# see the migration file itself for the full citation and rationale (this closes the "admin.Bans has no actor
-# column" half of the uppercom-center-gamelog-relay-opcodes / EventLogCategory.GmAction finding; the
-# Application-layer LogAsync wiring itself is a separate, non-database change tracked elsewhere).
-Migrations/035_bans_actor_attribution.sql
-
-# item-usage-consumables (Critical): stat/elixir-potion consumption is now wired into
-# UseInventoryItemService.ResolveAsync (StatPotionResolver), which persists its five lifetime counters
-# (EatLifePotion/EatManaPotion/EatStrPotion/EatDexPotion/EatElePotion) through the same write-behind path as
-# every other Vitals/Progression field -- game.tvp_CharacterProgress/usp_Character_PersistProgressBatch
-# never carried them; see the migration file itself for the full citation and the drop-then-recreate
-# rationale (SQL Server has no ALTER TYPE for table types).
-Migrations/036_character_progress_stat_potion_counters.sql
-
-# trade-event-log-audit (Critical, legacy parity: GL_615_TRADE_ITEM/GL_615_TRADE_ITEM2/GL_616_TRADE_MONEY):
-# EventLogCategory.Trade had zero writers -- every completed player-to-player trade was entirely unaudited,
-# both the item and money halves, on both sides. usp_CharacterTrade_Execute now writes the audit rows for
-# the completed trade in the SAME transaction as the money/container mutation -- see the migration file
-# itself for the full citation and rationale, including why the new parameters default to
-# empty/omitted/zero so the existing sole call site keeps compiling until it is updated to pass the real
-# trade-window offer data.
-Migrations/037_trade_event_log.sql
-
-# proxy-shop-listing-pricing (Major): usp_OfflineShop_WithdrawMoney's Characters.BigMoney guard only checked
-# non-negativity, never the legacy upper bound (MAX_NUMBER_SIZE2 = 999), letting repeated proxy-shop
-# list/sell/withdraw cycles push a character's own BigMoney arbitrarily above the cap enforced everywhere
-# else -- see the migration file itself for the full citation and rationale.
-Migrations/038_offline_shop_withdraw_bigmoney_cap.sql
-
-# uppercom-playuser-extra-relay-opcodes (Major): chat-time mute enforcement was checked once at world entry
-# and cached for the rest of the session (PlayerRuntimeState.IsMuted), diverging from legacy's live
-# per-message recheck across all five chat-send opcodes. Adds admin.tvp_CharacterIdList and the batched
-# admin.usp_Mute_GetActiveForCharacters that MuteRefreshPollHost (Application/Fenrir.Application.Game.
-# Hosting) polls on a fixed interval to narrow the gap to a bounded-staleness approximation instead of a
-# per-message SQL call on the IInlinePacketHandler<T> hot path -- see the migration file itself for the
-# full citation and rationale.
-Migrations/039_mute_batch_refresh.sql
-
-# proxy-shop-listing-pricing (Major): usp_OfflineShop_ExecutePurchase never checked whether a purchase sold
-# out the seller's entire 25-slot listing, so a fully-sold-out shop stayed ShopState=1 (open) indefinitely,
-# blocking usp_OfflineShop_WithdrawMoney's `ShopState = 0` gate until the owner manually closed it or the
-# periodic rental-expiry sweep force-closed it -- legacy auto-closes the instant the last item sells
-# (Server/ts25zone/S07_MyGame09.cpp:860-880) -- see the migration file itself for the full citation and
-# rationale.
-Migrations/040_offline_shop_auto_close_on_sellout.sql
-
-# auto-hunt-item-consumption (Critical): adds game.usp_CharacterHotkeys_UpsertSlot, a brand-new single-slot
-# upsert/clear procedure for game.CharacterHotkeys -- previously the table had no writer at all beyond the
-# one-time starter-kit grant, so op22 CZ_USE_HOTKEY_ITEM_SEND's potion-consumption decrement (now wired in
-# UseHotkeyItemService/HotkeyItemConsumptionResolver) had nowhere durable to persist to. See the migration
-# file itself for the full citation and the game.CharacterHotkeys column-order caveat.
-Migrations/041_hotkey_item_consumption_persistence.sql
-
-# market-wide-proxy-shop-search (Major): PSHOP_ITEM_INFO_SEND's market search previously only ever queried
-# live personal shops on the local zone instance and never the persisted proxy/deputy-shop store at all --
-# adds game.usp_OfflineShop_GetAllOpen, a brand-new cluster-wide (not zone-scoped) "every currently open
-# shop" read backing SearchShopListingsService's now-restored proxy-shop half. See the migration file itself
-# for the full citation and rationale.
-Migrations/042_market_wide_proxy_shop_search.sql
 
 Migrations/Seed/001_dev_account.sql
 
@@ -622,6 +405,5 @@ Migrations/Seed/admin/010_error_catalog_death_protection.sql
 # procedure (Book of Noble Dragon/Royal Serpent/Grand Tiger V2 tribe-conversion mechanic).
 Migrations/Seed/admin/010_error_catalog_tribe_conversion.sql
 
-# proxy-shop-listing-pricing: registers 50333 for Migrations/038_offline_shop_withdraw_bigmoney_cap.sql's new
-# BigMoney-upper-bound guard on usp_OfflineShop_WithdrawMoney.
+# proxy-shop-listing-pricing: registers 50333 for usp_OfflineShop_WithdrawMoney's BigMoney-upper-bound guard.
 Migrations/Seed/admin/011_error_catalog_offline_shop_withdraw_bigmoney_cap.sql

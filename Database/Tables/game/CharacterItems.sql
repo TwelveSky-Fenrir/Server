@@ -32,7 +32,7 @@ CREATE TABLE game.CharacterItems
     Serial      INT     NOT NULL
         CONSTRAINT DF_CharacterItems_Serial DEFAULT 0,
     CONSTRAINT PK_CharacterItems PRIMARY KEY CLUSTERED (CharacterId, Container, Slot),
-    CONSTRAINT CK_CharacterItems_Quantity CHECK (Quantity >= 1),
+    CONSTRAINT CK_CharacterItems_Quantity CHECK (Quantity BETWEEN 1 AND 999), -- MAX_ITEM_DUPLICATION_NUM (Server/Header/Protocol/DEFINE.h:611); schema-level backstop, not a substitute for ContainerMatrix.ResolveMove's own merge-cap check
     CONSTRAINT CK_CharacterItems_ContainerSlot CHECK (
         (Container IN (0, 1) AND Slot <= 63)          -- inventory pages, 8x8
             OR (Container = 2 AND Slot <= 12)         -- equipment, MAX_EQUIP_SLOT_NUM = 13

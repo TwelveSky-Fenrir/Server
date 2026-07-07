@@ -5,10 +5,8 @@
 CREATE PROCEDURE game.usp_Character_PersistProgressBatch @Progress game.tvp_CharacterProgress READONLY
 AS
 BEGIN
-    SET
-        NOCOUNT ON;
-    SET
-        XACT_ABORT ON;
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
 
     UPDATE c
     SET c.Level              = s.Level,
@@ -27,10 +25,14 @@ BEGIN
         c.ContributionPoints = s.ContributionPoints,
         c.Exp2               = s.Exp2,
         c.RebirthCount       = s.RebirthCount,
+        c.EatLifePotion      = s.EatLifePotion,
+        c.EatManaPotion      = s.EatManaPotion,
+        c.EatStrPotion       = s.EatStrPotion,
+        c.EatDexPotion       = s.EatDexPotion,
+        c.EatElePotion       = s.EatElePotion,
         c.FlushSequence      = s.FlushSequence,
         c.UpdatedAtUtc       = SYSUTCDATETIME()
     FROM game.Characters AS c
-             JOIN @Progress AS s
-                  ON s.CharacterId = c.CharacterId
+             JOIN @Progress AS s ON s.CharacterId = c.CharacterId
     WHERE s.FlushSequence > c.FlushSequence; -- idempotence guard
 END;

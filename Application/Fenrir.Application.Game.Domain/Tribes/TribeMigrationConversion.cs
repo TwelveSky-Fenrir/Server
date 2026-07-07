@@ -28,11 +28,9 @@ public static class TribeMigrationConversion
     public static TribeMigrationResult Resolve(byte currentTribe, byte previousTribe, QuestCatalog questCatalog)
     {
         if (currentTribe != TribeMigrationGate.TribeFour)
-        {
             // Outbound: tribe becomes 3, the whole 5-slot quest state resets to idle (Fujin has no quest
             // chain of its own to resume mid-step).
             return new TribeMigrationResult(TribeMigrationGate.TribeFour, QuestProgress.None);
-        }
 
         // Return: tribe is restored to PreviousTribe; quest slot 0 is set to that tribe's OWN terminal step
         // (marking its chain already-complete, not reset to the beginning), the four remaining slots idle.
@@ -42,5 +40,8 @@ public static class TribeMigrationConversion
     }
 }
 
-/// <summary>The resolved new tribe + quest state for an accepted conversion -- see <see cref="TribeMigrationConversion" />.</summary>
+/// <summary>
+///     The resolved new tribe + quest state for an accepted conversion -- see <see cref="TribeMigrationConversion" />
+///     .
+/// </summary>
 public readonly record struct TribeMigrationResult(byte NewTribe, QuestProgress NewQuestProgress);

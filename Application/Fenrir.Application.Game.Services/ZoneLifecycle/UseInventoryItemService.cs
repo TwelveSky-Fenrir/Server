@@ -1307,7 +1307,7 @@ public sealed class UseInventoryItemService(
         var response = await ConsumeAndMirrorAsync(zone, state, characterId, page, index, item, cancellationToken);
 
         if (!await zone.PostTribeProgressCommandAndWaitAsync(new TribeProgressZoneCommand(characterId,
-                RebirthCount: newRebirthCount, Exp2: 0, UpdatedStats: updatedStats, RebirthBroadcast: true),
+                    RebirthCount: newRebirthCount, Exp2: 0, UpdatedStats: updatedStats, RebirthBroadcast: true),
                 cancellationToken))
             logger.LogError(
                 "Zone {MapId} tribe-progress inbox full: dropped Rebirth-Pill mirror for character {CharacterId}",

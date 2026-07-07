@@ -16,12 +16,14 @@ public sealed partial class PlayerRuntimeState
     public required int CharacterId { get; init; }
     public required IPacketSession Session { get; init; }
     public required string Name { get; init; }
+
     /// <summary>
     ///     aTribe. Was <c>init</c>-only until the fourth-tribe (Fujin) conversion/return behavior
     ///     (CZ_CHANGE_TO_TRIBE4_SEND, op37) needed to change it mid-session -- every other mutation site
     ///     still only ever assigns this once, at world entry/zone transfer.
     /// </summary>
     public required byte Tribe { get; set; }
+
     public required byte Gender { get; init; }
     public required byte HeadType { get; init; }
     public required byte FaceType { get; init; }

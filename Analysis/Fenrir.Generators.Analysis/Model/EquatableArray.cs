@@ -37,8 +37,10 @@ internal readonly struct EquatableArray<T> : IEquatable<EquatableArray<T>>, IRea
 
     private ImmutableArray<T> ArrayOrEmpty => _array.IsDefault ? ImmutableArray<T>.Empty : _array;
 
-    /// <summary>Named to match <see cref="ImmutableArray{T}" />'s own <c>Length</c>, not <c>Count</c>, so call
-    /// sites (including C# property patterns like <c>AllowedStates.Length: > 0</c>) don't need to change.</summary>
+    /// <summary>
+    ///     Named to match <see cref="ImmutableArray{T}" />'s own <c>Length</c>, not <c>Count</c>, so call
+    ///     sites (including C# property patterns like <c>AllowedStates.Length: > 0</c>) don't need to change.
+    /// </summary>
     public int Length => ArrayOrEmpty.Length;
 
     int IReadOnlyCollection<T>.Count => Length;

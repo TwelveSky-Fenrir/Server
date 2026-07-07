@@ -27,11 +27,6 @@ public sealed partial class Zone
     /// </summary>
     private readonly SemaphoreSlim _moneyGrantSignal = new(0, int.MaxValue);
 
-    // Same ConcurrentDictionary posture as _players -- the tick is the sole writer for spawn/AI mutation, but
-    // TryDamageMonster is a deliberate exception letting a combat packet handler thread apply damage directly
-    // via an atomic Interlocked path on MonsterEntity itself.
-    private readonly ConcurrentDictionary<int, MonsterEntity> _monsters = new();
-
     /// <summary>
     ///     Monster-side counterpart to <see cref="_grid" />, keyed by <see cref="MonsterEntity.ServerIndex" />
     ///     instead of character id -- lets <see cref="SendExistingMonstersTo" /> query nearby monsters directly
@@ -43,6 +38,11 @@ public sealed partial class Zone
     ///     <see cref="Monsters.MonsterSpawnScheduler.DrainDeaths" /> on this zone's own next tick.
     /// </summary>
     private readonly AoiGrid _monsterGrid = new(options.AoiCellSize);
+
+    // Same ConcurrentDictionary posture as _players -- the tick is the sole writer for spawn/AI mutation, but
+    // TryDamageMonster is a deliberate exception letting a combat packet handler thread apply damage directly
+    // via an atomic Interlocked path on MonsterEntity itself.
+    private readonly ConcurrentDictionary<int, MonsterEntity> _monsters = new();
 
     /// <summary>
     ///     Server-initiated monster-kill money grants, queued rather than awaited inline because

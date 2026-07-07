@@ -107,7 +107,7 @@ public sealed class QuestProgressService(
             result.ExperienceReward, result.ContributionPointsReward, result.TeacherPointReward, edits, ct);
 
         var hasNumericReward = result.MoneyReward != 0 || result.ExperienceReward != 0 ||
-                                result.ContributionPointsReward != 0 || result.TeacherPointReward != 0;
+                               result.ContributionPointsReward != 0 || result.TeacherPointReward != 0;
 
         // Logged only once the quest-transition/container write above has durably committed, and only when
         // completion actually granted something -- an item deposit and/or a nonzero money/XP/CP/teacher-point

@@ -64,6 +64,18 @@ public static class HotkeyItemConsumptionResolver
         Buff
     }
 
+    public enum Outcome
+    {
+        /// <summary>Malformed input or corrupted/stale state -- caller must disconnect, no ack sent.</summary>
+        Disconnect,
+
+        /// <summary>Legitimate business-rule rejection -- caller sends a Result=1 ack, nothing else.</summary>
+        RejectedClean,
+
+        /// <summary>Caller sends a Result=0 ack, then whichever effect notifications actually apply.</summary>
+        Success
+    }
+
     /// <summary>
     ///     BUFF_INFO slot potion types 12 (Assassin Scroll) and 13 (Departed Spirit Scroll) both write --
     ///     unconsumed by any Fenrir stat/combat formula today. The two items' own catalog text ("target can't
@@ -93,6 +105,15 @@ public static class HotkeyItemConsumptionResolver
     /// <summary>Fixed percent value potion types 14/15 both write into their own slot.</summary>
     private const int HitOrDodgeBuffPercent = 25;
 
+    /// <summary>
+    ///     MAX_POTION_SORT_NUM (Server/Header/Protocol/DEFINE.h:370) -- documented, not itself range-checked (the switch
+    ///     below already only recognizes 1-16).
+    /// </summary>
+    public const int MaxPotionSortNum = 16;
+
+    /// <summary>world.Items.Sort for the generic consumable/potion family.</summary>
+    public const byte ConsumableItemCategory = 2;
+
     /// <summary>Potion type 12 (Assassin Scroll) -- the shorter of the two dark-attack-buff durations.</summary>
     private static readonly int AssassinScrollDurationTicks =
         SimulationClock.ToWholeLegacyTicks(TimeSpan.FromSeconds(40));
@@ -103,27 +124,6 @@ public static class HotkeyItemConsumptionResolver
     /// </summary>
     private static readonly int SixtySecondBuffDurationTicks =
         SimulationClock.ToWholeLegacyTicks(TimeSpan.FromSeconds(60));
-
-    public enum Outcome
-    {
-        /// <summary>Malformed input or corrupted/stale state -- caller must disconnect, no ack sent.</summary>
-        Disconnect,
-
-        /// <summary>Legitimate business-rule rejection -- caller sends a Result=1 ack, nothing else.</summary>
-        RejectedClean,
-
-        /// <summary>Caller sends a Result=0 ack, then whichever effect notifications actually apply.</summary>
-        Success
-    }
-
-    /// <summary>
-    ///     MAX_POTION_SORT_NUM (Server/Header/Protocol/DEFINE.h:370) -- documented, not itself range-checked (the switch
-    ///     below already only recognizes 1-16).
-    /// </summary>
-    public const int MaxPotionSortNum = 16;
-
-    /// <summary>world.Items.Sort for the generic consumable/potion family.</summary>
-    public const byte ConsumableItemCategory = 2;
 
     /// <param name="page">0-2.</param>
     /// <param name="index">0-13.</param>

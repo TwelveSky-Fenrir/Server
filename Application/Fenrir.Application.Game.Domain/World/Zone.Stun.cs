@@ -1,7 +1,6 @@
 using System.Collections.Immutable;
 using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Social.Party;
-using Fenrir.Data.WriteBehind;
 using Fenrir.Network.Serialization.Packets.Shared;
 
 namespace Fenrir.Application.Game.Domain.World;
@@ -216,7 +215,7 @@ public sealed partial class Zone
                     // (1/6/11/140) still grants EXP/drop/daily-mission progress but withholds CP, while a
                     // stun-trigger kill in an unlisted zone withholds every reward channel outright
                     // (S07_MyGame03.cpp default case, :3031-3040).
-                    ApplyPvpKillRewards(member, defenderState, isStunTrigger: true);
+                    ApplyPvpKillRewards(member, defenderState, true);
                 }
         }
 

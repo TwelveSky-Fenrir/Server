@@ -80,13 +80,17 @@ public enum TribeMigrationOutcome
     NoReturnAllowance,
 
     /// <summary>
-    ///     Return only, Fenrir-only hardening (not a distinct legacy gate): <see cref="World.PlayerRuntimeState.PreviousTribe" />
+    ///     Return only, Fenrir-only hardening (not a distinct legacy gate):
+    ///     <see cref="World.PlayerRuntimeState.PreviousTribe" />
     ///     is outside the legal 0-2 range. Never trusted as pre-validated -- see the behavior contract's own
     ///     Edge Cases entry on the legacy's unvalidated tPreviousTribe write path.
     /// </summary>
     InvalidPreviousTribe,
 
-    /// <summary>Both branches: holds a tribe office (master, sub-master, or elected vote candidate). S04_MyWork02.cpp:7701-7705.</summary>
+    /// <summary>
+    ///     Both branches: holds a tribe office (master, sub-master, or elected vote candidate).
+    ///     S04_MyWork02.cpp:7701-7705.
+    /// </summary>
     HoldsTribeRole,
 
     /// <summary>Both branches: has a guild, a teacher, or a student on record. S04_MyWork02.cpp:7706-7720.</summary>

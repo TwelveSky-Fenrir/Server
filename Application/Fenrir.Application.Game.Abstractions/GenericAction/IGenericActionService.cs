@@ -74,8 +74,9 @@ public interface IGenericActionService
 
     /// <summary>
     ///     tSort 206 -- spend unspent stat points (aStatPoint) to raise Strength/Dexterity/Vitality/Intelligence.
-    ///     Not yet reachable from <c>GenericActionHandler</c>'s dispatch switch; wiring it up (including reading
-    ///     <c>tStatSort</c>/<c>tAddValue</c> off the wire payload) is a separate integration step.
+    ///     Reached from <c>GenericActionHandler</c>'s dispatch switch, which reads <c>tStatSort</c>/
+    ///     <c>tAddValue</c> directly off the raw wire payload (STAT_PLUS_RECV is a bare two-int struct, not
+    ///     DefaultPData-shaped) before calling this method.
     /// </summary>
     /// <param name="statSort">tStatSort, the wire category code -- legal range 1-12 (see StatAllocationResolver).</param>
     /// <param name="addValue">tAddValue, only meaningful for category codes 9-12.</param>
@@ -100,5 +101,36 @@ public interface IGenericActionService
     ///     gap <c>Zone.CreditPetGrowthFromMonsterKill</c>'s own remarks already carry for the same routine).
     /// </remarks>
     public ValueTask<GenericActionResult> TimeExchangeAsync(Zone zone, PlayerRuntimeState state, int accountId,
+        int characterId, CancellationToken cancellationToken);
+
+    /// <summary>
+    ///     tSort 223/250 (deposit), 224/248 (withdraw), 225 (store-to-store rearrange) -- Store/coffre item
+    ///     transfer. Every rejection is a clean failure (<c>GenericActionResult.Failed</c>), never a
+    ///     disconnect -- see the implementation's own remarks.
+    /// </summary>
+    public ValueTask<GenericActionResult> TransferStoreItemAsync(int sort, byte[] data, Zone zone,
+        PlayerRuntimeState state, int accountId, int characterId, CancellationToken cancellationToken);
+
+    /// <summary>
+    ///     tSort 226 (deposit)/227 (withdraw) -- Store/coffre money transfer between wallet Money and
+    ///     StoreMoney. Every rejection is a hard disconnect -- see the implementation's own remarks.
+    /// </summary>
+    public ValueTask<GenericActionResult> TransferStoreMoneyAsync(int sort, byte[] data, Zone zone,
+        PlayerRuntimeState state, int accountId, int characterId, CancellationToken cancellationToken);
+
+    /// <summary>
+    ///     tSort 228/251 (deposit), 229/249 (withdraw), 230 (bank-to-bank rearrange) -- Save/vault
+    ///     (account-scoped bank) item transfer. Every rejection is a hard disconnect -- see the
+    ///     implementation's own remarks.
+    /// </summary>
+    public ValueTask<GenericActionResult> TransferBankItemAsync(int sort, byte[] data, Zone zone,
+        PlayerRuntimeState state, int accountId, int characterId, CancellationToken cancellationToken);
+
+    /// <summary>
+    ///     tSort 231 (deposit)/232 (withdraw) -- Save/vault (account bank) money transfer between wallet Money
+    ///     and the account's shared vault money pool. Every rejection is a hard disconnect -- see the
+    ///     implementation's own remarks.
+    /// </summary>
+    public ValueTask<GenericActionResult> TransferBankMoneyAsync(int sort, byte[] data, int accountId,
         int characterId, CancellationToken cancellationToken);
 }

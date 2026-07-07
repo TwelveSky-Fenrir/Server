@@ -283,6 +283,19 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(sp, ct);
     }
 
+    /// <summary>Atomic wallet/Store-money transfer; throws SQL 50337 instead of clamping when either pool would go negative/over cap.</summary>
+    public async ValueTask AdjustStoreMoneyAsync(int characterId, long deltaMoney, long deltaStoreMoney,
+        CancellationToken ct)
+    {
+        var sp = new StoredProcedureParametersBuilder("game", "usp_Character_AdjustStoreMoney", 0)
+            .AddParameter("CharacterId", characterId, SqlDbType.Int)
+            .AddParameter("DeltaMoney", deltaMoney, SqlDbType.BigInt)
+            .AddParameter("DeltaStoreMoney", deltaStoreMoney, SqlDbType.BigInt)
+            .Build();
+
+        await Db.ExecuteAsync(sp, ct);
+    }
+
     /// <summary>
     ///     Atomic money adjustment + one container replace, e.g. NPC-shop buy/sell -- a mid-sequence failure must never
     ///     pay without granting the item (or vice versa). Same empty-TVP-omission rule as <see cref="ReplaceContainerAsync" />

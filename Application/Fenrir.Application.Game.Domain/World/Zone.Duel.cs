@@ -56,6 +56,12 @@ public sealed partial class Zone
     {
         if (!_players.TryGetValue(command.AttackerCharacterId, out var attackerState))
             return;
+
+        // Recorded onto the attacker's tracked location unconditionally, before any other check runs -- see
+        // ApplySenderLocation's own remarks (Zone.Combat.cs). Must happen before this same packet's own
+        // distance check, which CombatResolver.ResolveDuelAttack runs against attackerSnapshot below.
+        ApplySenderLocation(attackerState, command.AttackInfo);
+
         if (!_players.TryGetValue(command.AttackInfo.ServerIndex2, out var defenderState))
             return;
 
@@ -129,7 +135,8 @@ public sealed partial class Zone
 
         // Uses _duelEndNeighborScratch instead of AoiGrid.Neighbors(...).Where(...).ToArray().
         _duelEndNeighborScratch.Clear();
-        _grid.NeighborsExcludingSelf(_duelEndNeighborScratch, state.CurrentCell, state.CharacterId);
+        _grid.NeighborsExcludingSelf(_duelEndNeighborScratch, state.CurrentCell, state.CharacterId, state.PosX,
+            state.PosY, state.PosZ);
         BroadcastAvatarAction(_duelEndNeighborScratch, state);
     }
 }

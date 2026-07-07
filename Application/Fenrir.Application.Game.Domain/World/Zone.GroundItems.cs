@@ -27,6 +27,18 @@ public sealed partial class Zone
     private readonly ConcurrentDictionary<int, GroundItemEntity> _groundItems = new();
 
     private int _groundItemServerIndexSeed;
+
+    /// <summary>
+    ///     Reusable scratch buffer for <see cref="BroadcastGroundItemAction" />'s recipient list -- same
+    ///     non-allocating shape and reuse justification as <c>Zone.PlayerLifecycle</c>'s
+    ///     <c>_rebroadcastNeighborScratch</c> / <c>Zone.Monsters</c>' <c>_monsterBroadcastNeighborScratch</c>:
+    ///     single tick thread, cleared immediately before each call, never read after the immediately-following
+    ///     send loop returns. Replaces a per-call <c>AoiGrid.Neighbors(cell).ToArray()</c> (iterator + LINQ
+    ///     buffer) that used to run once per due ground item -- during a keep-alive burst, once per due item in
+    ///     that SAME tick, not once per zone.
+    /// </summary>
+    private readonly List<int> _groundItemBroadcastNeighborScratch = [];
+
     private int _groundItemUniqueNumberSeed;
 
     public int GroundItemCount => _groundItems.Count;
@@ -47,7 +59,14 @@ public sealed partial class Zone
             0, 0, instanceId);
 
         _groundItems[index] = entity;
-        _groundItemLastRebroadcast[index] = _clock;
+
+        // Staggered, not a plain "= _clock": a single kill can drop several items in the same ProcessDeath
+        // call (public item + boss-tier items + generic-tier items), all reaching this method within the same
+        // Zone.Tick and reading the exact same _clock value -- same thundering-herd root cause as
+        // Zone.SpawnMonster's own stagger, just at a smaller per-kill scale. See
+        // SimulationClock.RebroadcastStaggerOffset's own remarks.
+        _groundItemLastRebroadcast[index] =
+            _clock - SimulationClock.RebroadcastStaggerOffset(index, SimulationClock.GroundItemRebroadcastInterval);
         BroadcastGroundItemAction(entity, 1); // action=1 at creation
     }
 
@@ -155,10 +174,14 @@ public sealed partial class Zone
     }
 
     /// <summary>
-    ///     Serialize-once broadcast for ground-item replication -- same pattern as <see cref="BroadcastAvatarAction" />.
+    ///     Serialize-once broadcast for ground-item replication -- same pattern as <see cref="BroadcastAvatarAction" />,
+    ///     including the same <see cref="IsReviveHackBroadcastSuppressed" /> per-recipient gate (see that method's
+    ///     own remarks for the legacy citations establishing both broadcast families route through the same
+    ///     MyUtil::Broadcast11 primitive).
     ///     <see cref="AoiGrid.HasAnyNeighbor" /> pre-checks emptiness before paying for
-    ///     <see cref="AoiGrid.Neighbors" />'s iterator plus a LINQ <c>ToArray()</c> buffer -- see that method's
-    ///     own remarks.
+    ///     <see cref="_groundItemBroadcastNeighborScratch" />'s scan; see that field's own remarks for why this
+    ///     is a reused non-allocating buffer rather than the enumerable-returning, iterator-plus-LINQ-<c>ToArray()</c>
+    ///     overload of <c>AoiGrid.Neighbors</c>.
     /// </summary>
     private void BroadcastGroundItemAction(GroundItemEntity item, int checkChangeActionState)
     {
@@ -166,7 +189,8 @@ public sealed partial class Zone
         if (!_grid.HasAnyNeighbor(cell))
             return;
 
-        var recipients = _grid.Neighbors(cell).ToArray();
+        _groundItemBroadcastNeighborScratch.Clear();
+        _grid.Neighbors(_groundItemBroadcastNeighborScratch, cell, item.PosX, item.PosY, item.PosZ);
         var packet = BuildItemActionRecv(item, checkChangeActionState);
         var total = FrameWriter.FrameSizeOf<GroundItemReplicationResponse>();
         var rented = ArrayPool<byte>.Shared.Rent(total);
@@ -176,12 +200,13 @@ public sealed partial class Zone
             var span = rented.AsSpan(0, total);
             FrameWriter.WriteFrame(in packet, span);
 
-            foreach (var id in recipients)
+            foreach (var id in _groundItemBroadcastNeighborScratch)
                 try
                 {
                     if (_players.TryGetValue(id, out var recipient) &&
                         recipient.Session is ClientSession clientSession &&
-                        IsVisibleAcrossDungeonInstance(item.InstanceId, recipient.DungeonInstanceId))
+                        IsVisibleAcrossDungeonInstance(item.InstanceId, recipient.DungeonInstanceId) &&
+                        !IsReviveHackBroadcastSuppressed(recipient))
                         clientSession.SendRaw(span);
                 }
                 catch (Exception ex)

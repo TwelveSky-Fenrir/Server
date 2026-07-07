@@ -1,4 +1,8 @@
+using System.Buffers;
 using System.Buffers.Binary;
+using Fenrir.Network.Abstractions;
+using Fenrir.Network.Dispatch.Sessions;
+using Fenrir.Network.Framing;
 using Fenrir.Network.Serialization.Packets.Zone;
 using Microsoft.Extensions.Logging;
 
@@ -230,18 +234,56 @@ public sealed class ZoneCenterBroadcastIngestor(
         var empty = new byte[PayloadSize];
         var response = new ZoneEventInfoResponse { Sort = PingEventCode, Data = empty };
 
-        foreach (var zone in zones.Zones)
-        foreach (var player in zone.Players)
-            player.Session.Send(response);
+        BroadcastToEveryZone(in response);
     }
 
     private void Relay(int eventCode, ReadOnlySpan<byte> data)
     {
         var response = new ZoneEventInfoResponse { Sort = eventCode, Data = data.ToArray() };
 
-        foreach (var zone in zones.Zones)
-        foreach (var player in zone.Players)
-            player.Session.Send(response);
+        BroadcastToEveryZone(in response);
+    }
+
+    /// <summary>
+    ///     Serialize-once, cluster-wide fan-out -- same rent-once/write-once/copy-N-times idiom every other
+    ///     Zone broadcast helper already uses (e.g. <c>Zone.PlayerLifecycle.BroadcastAvatarAction</c>,
+    ///     <see cref="ZoneEventBroadcaster" />'s own twin of this method), with a per-recipient failure
+    ///     isolated (logged, skipped) instead of left to abort the rest of the fan-out. Without this, a single
+    ///     recipient whose transport pipe writer has already completed (an ordinary disconnect race: the
+    ///     player is still present in <see cref="Zone.Players" /> until that player's own zone next drains its
+    ///     Leave command) throws out of <see cref="ClientSession.Send{TPacket}" /> uncaught by a bare loop --
+    ///     silently cutting off delivery to every zone/player still left to visit in the SAME call, for both
+    ///     <see cref="BroadcastAllZonesPing" /> and <see cref="Relay" /> (every event code <see cref="Ingest" />
+    ///     accepts funnels through the latter).
+    /// </summary>
+    private void BroadcastToEveryZone<TPacket>(in TPacket response) where TPacket : struct, IOutgoingPacket
+    {
+        var total = FrameWriter.FrameSizeOf<TPacket>();
+        var rented = ArrayPool<byte>.Shared.Rent(total);
+
+        try
+        {
+            var span = rented.AsSpan(0, total);
+            FrameWriter.WriteFrame(in response, span);
+
+            foreach (var zone in zones.Zones)
+            foreach (var player in zone.Players)
+                try
+                {
+                    if (player.Session is ClientSession clientSession)
+                        clientSession.SendRaw(span);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex,
+                        "Zone-center relay broadcast to character {RecipientId} (zone {MapId}) failed",
+                        player.CharacterId, zone.MapId);
+                }
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(rented);
+        }
     }
 
     private static int ReadInt32(ReadOnlySpan<byte> data, int offset)

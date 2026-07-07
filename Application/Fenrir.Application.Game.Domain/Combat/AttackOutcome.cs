@@ -61,7 +61,37 @@ public enum AttackRejectReason
     ///     attacker's level is &gt;= 90, and the defender's level is &lt; 90 (S07_MyGame02.cpp:960-976). Only
     ///     ever produced by <see cref="CombatResolver.ResolveEnemyTribeAttack" /> -- duels never evaluate it.
     /// </summary>
-    NewbieProtectionLevelGap
+    NewbieProtectionLevelGap,
+
+    /// <summary>
+    ///     <c>tAttackInfo-&gt;mAttackActionValue1</c> was neither 1 (melee) nor 2 (skill) -- the attack-mode
+    ///     selector's own <c>default: return;</c> branch (S07_MyGame02.cpp:2171-2189). Only ever produced by
+    ///     <see cref="MonsterCombatResolver.ResolvePvmAttack" /> today.
+    /// </summary>
+    InvalidAttackModeSelector,
+
+    /// <summary>
+    ///     Only ever produced when the attack-mode selector is 2 (skill) and the attacker's own
+    ///     <c>mCheckMaxAttackPacketNum</c> flag is set: the packet's skill number/combined grade must exactly
+    ///     echo what the server currently has recorded for the attacker's own in-progress action
+    ///     (S07_MyGame02.cpp:2177-2184). Same concept as <see cref="StunRejectReason.AntiCheatEchoMismatch" />,
+    ///     but gated on a different per-session flag -- see
+    ///     <see cref="MonsterCombatResolver.ResolvePvmAttack" />'s own remarks.
+    /// </summary>
+    AntiCheatEchoMismatch,
+
+    /// <summary>
+    ///     The target monster's owner-name field (<see cref="World.Monsters.MonsterEntity.OwnerName" />) is
+    ///     non-empty and does not match the attacker's own name -- a player-summoned/owned monster locked to
+    ///     whichever avatar it is stamped with (S07_MyGame02.cpp:1885-1896). One narrow exception in the
+    ///     shipped LNW33 build: monster template 9002 is exempt from the name match itself, but still rejected
+    ///     here until its own one-minute elapsed-time gate
+    ///     (<see cref="World.Monsters.MonsterEntity.OwnerNameLockExemptionArmedAt" />) has passed. Only ever
+    ///     produced by <see cref="MonsterCombatResolver.ResolvePvmAttack" /> today -- no Fenrir spawn path sets
+    ///     <see cref="World.Monsters.MonsterEntity.OwnerName" /> yet, so this reason is currently unreachable
+    ///     in production, reserved for when a summon-monster mechanic is implemented.
+    /// </summary>
+    OwnerNameLocked
 }
 
 /// <summary>A <see cref="Rejected" /> outcome carries no wire packet; a miss still echoes a zero-damage packet.</summary>

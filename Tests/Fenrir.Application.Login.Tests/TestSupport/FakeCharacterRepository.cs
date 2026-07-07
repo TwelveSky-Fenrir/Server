@@ -143,6 +143,12 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
         throw new NotSupportedException();
     }
 
+    public ValueTask AdjustStoreMoneyAsync(int characterId, long deltaMoney, long deltaStoreMoney,
+        CancellationToken ct)
+    {
+        throw new NotSupportedException();
+    }
+
     public ValueTask AdjustMoneyAndReplaceContainerAsync(int characterId, long deltaMoney, int deltaBigMoney,
         byte container, IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct)
     {

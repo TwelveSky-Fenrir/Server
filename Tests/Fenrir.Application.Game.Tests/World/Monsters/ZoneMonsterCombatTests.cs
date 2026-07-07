@@ -56,6 +56,14 @@ public class ZoneMonsterCombatTests
             ZoneTestKit.EnterData(session, 1, "Attacker")));
         zone.Tick(SimulationClock.LegacyTick); // enters + pops the monster
 
+        // This fixture doesn't wire MonsterAiSystem in (it only needs the spawn scheduler), so a freshly
+        // popped monster would otherwise sit in MonsterAiState.Spawning forever -- Zone.ApplyCombatCommand's
+        // CheckPossibleAttackTarget gate (Zone.Combat.cs) now silently rejects an attack against a monster
+        // mid-spawn-windup, so every test in this suite would see no damage applied at all. Force straight to
+        // Decision: this suite exercises PvM attack resolution, not the spawn-windup timer.
+        Assert.True(zone.TryGetMonster(1, out var spawnedMonster));
+        spawnedMonster!.AiState = MonsterAiState.Decision;
+
         Assert.True(zone.TryGetPlayer(characterId, out var attacker));
         attacker!.Stats = StrongAttacker;
 

@@ -114,6 +114,14 @@ namespace Fenrir.Application.Game.Domain.Tribes;
 ///     <see cref="PlayerRuntimeState.TribeFourReturnAllowance" /> total (decremented by one). Session-scoped
 ///     only (see that field's own remarks), so there is nothing to persist and no dirty mark either.
 /// </param>
+/// <param name="StoreMoney">
+///     CZ_PROCESS_DATA_SEND tSort 226/227 (Store/coffre money deposit/withdraw) -- the character's new
+///     Store-money total after <see cref="Fenrir.Data.Abstractions.Characters.ICharacterRepository.AdjustStoreMoneyAsync" />
+///     has already durably persisted it, so applying it here (like <see cref="Zone241Time" />/
+///     <see cref="Tribe" />/<see cref="QuestProgress" /> above) never marks
+///     <see cref="PlayerRuntimeState.MarkProgressDirty" /> -- see
+///     <see cref="Fenrir.Application.Game.Domain.World.Zone" />'s own <c>ApplyTribeProgressCommand</c> remarks.
+/// </param>
 /// <param name="Applied">
 ///     Completed once actually mirrored -- see InventoryZoneCommand.Applied for why this matters while
 ///     EconomyActionLock is held.
@@ -166,6 +174,7 @@ public readonly record struct TribeProgressZoneCommand(
     byte? Tribe = null,
     QuestProgress? QuestProgress = null,
     int? TribeFourReturnAllowance = null,
+    long? StoreMoney = null,
     TaskCompletionSource? Applied = null);
 
 /// <summary>One ground-item drop request -- see TribeProgressZoneCommand.DropItems.</summary>

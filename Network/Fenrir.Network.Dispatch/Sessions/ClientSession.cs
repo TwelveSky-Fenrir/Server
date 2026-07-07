@@ -60,6 +60,23 @@ public abstract class ClientSession(
     public long SessionId { get; } = sessionId;
 
     /// <summary>
+    ///     UTC instant of this session's own last liveness signal: seeded to accept time (the connect-time
+    ///     baseline a session that never sends anything is measured against) and re-stamped by <see cref="Touch" />
+    ///     after every frame <see cref="SessionLoop" /> successfully dispatches. Read by a per-server idle-session
+    ///     sweep to unilaterally disconnect a connection that stops producing traffic — see
+    ///     <c>Fenrir.Application.Game.Domain.World.SessionLivenessSweep</c> (Server/ts25zone/S07_MyGame01.cpp:1963-2006)
+    ///     for the GameServer policy that consumes this; deliberately generic/server-agnostic here since both
+    ///     Login and Game sessions flow through the same <see cref="SessionLoop" />.
+    /// </summary>
+    public DateTimeOffset LastActivityUtc { get; private set; } = DateTimeOffset.UtcNow;
+
+    /// <summary>Re-stamps <see cref="LastActivityUtc" /> to now — see that property's own remarks for callers/consumers.</summary>
+    public void Touch()
+    {
+        LastActivityUtc = DateTimeOffset.UtcNow;
+    }
+
+    /// <summary>
     ///     Never blocks the calling thread -- even while this session's own previous flush is still draining
     ///     under socket backpressure. The most consequential caller is a zone's own single tick thread fanning
     ///     out a broadcast to many recipients in one synchronous pass; it must never stall on one recipient's

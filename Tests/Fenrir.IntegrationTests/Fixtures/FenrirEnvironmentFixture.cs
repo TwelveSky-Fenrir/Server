@@ -95,6 +95,25 @@ public sealed class FenrirEnvironmentFixture : IAsyncLifetime
     }
 
     /// <summary>
+    ///     Captured stdout/stderr for the launched LoginServer/GameServer processes, taken at call time --
+    ///     unlike <see cref="WaitForServerReadyAsync" />'s own captured-output exception message (only
+    ///     surfaced if the process never became reachable), this is available for a test to log on ANY later
+    ///     failure, including one that happens well after both processes were already confirmed reachable
+    ///     (e.g. a process that crashed processing its first real packet, after the TCP-connect readiness
+    ///     probe already succeeded).
+    /// </summary>
+    public string LoginServerLogSnapshot()
+    {
+        return Snapshot(_loginLog, _loginLogLock);
+    }
+
+    /// <summary>See <see cref="LoginServerLogSnapshot" />'s own remarks -- same posture, GameServer process.</summary>
+    public string GameServerLogSnapshot()
+    {
+        return Snapshot(_gameLog, _gameLogLock);
+    }
+
+    /// <summary>
     ///     A freshly-"healthy" SQL Server container can still drop the very first heavy burst of DDL
     ///     (SqlException/transport-level connection reset) before it's genuinely stable -- retries with a whole
     ///     fresh container rather than resuming mid-manifest, since CREATE TABLE isn't safe to replay.
@@ -213,6 +232,19 @@ public sealed class FenrirEnvironmentFixture : IAsyncLifetime
     ///     account. So the test account is seeded directly, hashed with the exact same
     ///     <see cref="PasswordHasher" /> LoginHandler verifies against.
     /// </summary>
+    /// <summary>
+    ///     Seeded at <c>AccountGrade = 1</c> (GM-tier, the minimum <c>DeviceSpoofingGuard.GmGradeThreshold</c>)
+    ///     rather than the column's own default of 0 -- not a privilege the scenario itself needs, but a
+    ///     structural requirement of this fixture's topology: <c>DeviceSpoofingGuard.IsSpoofedDeviceTuple</c>
+    ///     unconditionally treats a server-observed remote IP of "127.0.0.1" as one of its three spoofed-tuple
+    ///     signals for any non-GM account (Server/ts25login/S08_MyDB.cpp:497-507's exact-text placeholder
+    ///     check), and every connection this fixture's bots make IS observed as 127.0.0.1 by design (real
+    ///     child LoginServer/GameServer processes on loopback, not a real network) -- there is no MAC/adapter
+    ///     value a bot could declare that passes this specific check from a loopback connection. GM-tier
+    ///     accounts are exempt from the whole gate, which is the only way this fixture's login step can ever
+    ///     reach LoginService's success path at all; DeviceSpoofingGuardTests already covers the gate's own
+    ///     non-GM/loopback-rejection behavior directly, so this exemption does not leave that logic uncovered.
+    /// </summary>
     private async Task<int> SeedTestAccountAsync()
     {
         var (hash, salt) = PasswordHasher.Hash(TestAccountPassword);
@@ -220,8 +252,8 @@ public sealed class FenrirEnvironmentFixture : IAsyncLifetime
         await using var connection = new SqlConnection(ConnectionString);
         await connection.OpenAsync();
         await using var command = new SqlCommand(
-            "INSERT INTO auth.Accounts (LoginName, PasswordHash, PasswordSalt) OUTPUT INSERTED.AccountId " +
-            "VALUES (@LoginName, @PasswordHash, @PasswordSalt);", connection);
+            "INSERT INTO auth.Accounts (LoginName, PasswordHash, PasswordSalt, AccountGrade) " +
+            "OUTPUT INSERTED.AccountId VALUES (@LoginName, @PasswordHash, @PasswordSalt, 1);", connection);
         command.Parameters.AddWithValue("@LoginName", TestAccountLoginName);
         command.Parameters.AddWithValue("@PasswordHash", hash);
         command.Parameters.AddWithValue("@PasswordSalt", salt);

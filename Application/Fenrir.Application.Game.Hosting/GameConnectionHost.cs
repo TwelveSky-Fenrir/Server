@@ -166,10 +166,8 @@ public sealed class GameConnectionHost(
 
             Greet(zoneSession, connection);
 
-            await Task.WhenAll(
-                connection.RunIOAsync(ct),
-                SessionLoop.RunAsync(zoneSession, dispatcher, rateLimiter, ipFloodGuard, ct, logger)
-            ).ConfigureAwait(false);
+            await SessionLoop.RunConnectionAsync(connection, zoneSession, dispatcher, rateLimiter, ipFloodGuard, ct,
+                logger).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

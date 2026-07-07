@@ -82,6 +82,12 @@ public static class HostingServiceCollectionExtensions
         services.AddHostedService<HeroRankingRolloverHost>();
         services.AddHostedService<GameConnectionHost>();
 
+        // Generic idle-connection reap (Server/ts25zone/S07_MyGame01.cpp:1963-2006's user-liveness loop) --
+        // see SessionLivenessSweep's own remarks for why this is a separate, independently-running sweep from
+        // TribeQuotaRegistry/TempRegistrationIdleSweep above rather than a replacement for it.
+        services.AddSingleton<SessionLivenessSweep>();
+        services.AddHostedService<SessionLivenessSweepHost>();
+
         // Cross-process duplicate-login kick/refusal, Game-side half -- see AccountSessionKickPollHost's remarks.
         services.AddHostedService<AccountSessionKickPollHost>();
 
@@ -220,10 +226,23 @@ public static class HostingServiceCollectionExtensions
         services.AddSingleton<ISimulationSystem>(sp =>
             sp.GetRequiredService<TribeGuardCorridorStateDerivationSystem>());
 
-        // AllianceDiplomacyCeremony itself is NOT registered here yet -- it needs a per-tick post-occupant
-        // scanner and a cited negotiation-duration constant, neither of which exist yet (see that class's own
-        // GAP 1/GAP 2 remarks); only its durable-state dependency is wired up so those are ready once it is.
+        // Alliance diplomacy ceremony: both former GAP 1 (post-occupant scanner) and GAP 2 (negotiation
+        // countdown length) are now resolved -- see AllianceDiplomacyCeremony's own remarks and
+        // AlliancePostOccupantScanner. Production wiring passes the cited
+        // NegotiationConfirmationDurationRawTicks constant for both negotiation-duration arguments (they are
+        // identical in legacy, S07_MyGame01.cpp:3904/:3912). AllianceDiplomacyCeremonyHost is the per-tick
+        // driver, armed only on whichever live shard hosts GameServerOptions.AllianceTribeMapId with
+        // AllianceTribeEnabled set -- see that host's own remarks, same posture as
+        // TribeSymbolBattleSchedulerHost/HolyStoneWarCycleHost above.
         services.AddSingleton<AllianceCooldownTracker>();
+        services.AddSingleton(sp => new AllianceDiplomacyCeremony(
+            sp.GetRequiredService<WorldStateService>(),
+            sp.GetRequiredService<AllianceCooldownTracker>(),
+            sp.GetRequiredService<ZoneEventBroadcaster>(),
+            sp.GetRequiredService<ILogger<AllianceDiplomacyCeremony>>(),
+            AllianceDiplomacyCeremony.NegotiationConfirmationDurationRawTicks,
+            AllianceDiplomacyCeremony.NegotiationConfirmationDurationRawTicks));
+        services.AddHostedService<AllianceDiplomacyCeremonyHost>();
 
         // TEMP_REGISTER_SEND (op11/ZoneHandshake) tribe-population quota gate: the process-wide directory
         // (TribeQuotaRegistry, also consumed directly by GameConnectionHost's connection-teardown path) plus

@@ -156,7 +156,11 @@ public sealed partial class Zone
     /// <remarks>
     ///     <see cref="AoiGrid.HasAnyNeighbor" /> pre-checks emptiness before paying for
     ///     <see cref="AoiGrid.Neighbors" />'s iterator plus a LINQ <c>ToArray()</c> buffer -- see that method's
-    ///     own remarks.
+    ///     own remarks. Gated by the same <see cref="IsReviveHackBroadcastSuppressed" /> per-recipient check as
+    ///     every other AOI broadcast this zone sends: both the periodic proxy-shop keep-alive
+    ///     (<c>mUTIL.Broadcast11</c>, S07_MyGame01.cpp:2606) and the explicit close path
+    ///     (S07_MyGame09.cpp:208-209) route through the same legacy <c>MyUtil::Broadcast11</c> primitive that
+    ///     embeds this check -- see <see cref="IsReviveHackBroadcastSuppressed" />'s own remarks.
     /// </remarks>
     private void BroadcastProxyShopState(ProxyShopBroadcastEntry entry, int checkChangeActionState)
     {
@@ -164,7 +168,7 @@ public sealed partial class Zone
         if (!_grid.HasAnyNeighbor(cell))
             return;
 
-        var recipients = _grid.Neighbors(cell).ToArray();
+        var recipients = _grid.Neighbors(cell, entry.PosX, entry.PosY, entry.PosZ).ToArray();
         var packet = new ProxyShopStallStateResponse
         {
             ServerIndex = entry.CharacterId,
@@ -190,7 +194,8 @@ public sealed partial class Zone
                 try
                 {
                     if (_players.TryGetValue(id, out var recipient) &&
-                        recipient.Session is ClientSession clientSession)
+                        recipient.Session is ClientSession clientSession &&
+                        !IsReviveHackBroadcastSuppressed(recipient))
                         clientSession.SendRaw(span);
                 }
                 catch (Exception ex)

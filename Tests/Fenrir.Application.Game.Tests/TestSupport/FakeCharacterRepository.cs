@@ -141,6 +141,18 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
         throw new NotImplementedException();
     }
 
+    public (int CharacterId, long DeltaMoney, long DeltaStoreMoney)? LastAdjustStoreMoney { get; private set; }
+
+    public ValueTask AdjustStoreMoneyAsync(int characterId, long deltaMoney, long deltaStoreMoney,
+        CancellationToken ct)
+    {
+        if (ThrowOnAdjustMoney)
+            throw new InvalidOperationException("Simulated SQL failure");
+
+        LastAdjustStoreMoney = (characterId, deltaMoney, deltaStoreMoney);
+        return ValueTask.CompletedTask;
+    }
+
     public ValueTask AdjustMoneyAndReplaceContainerAsync(int characterId, long deltaMoney, int deltaBigMoney,
         byte container, IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct)
     {

@@ -45,7 +45,7 @@ public class ZoneMoveTests
     }
 
     [Fact]
-    public void Move_Plausible_UpdatesPositionAndBroadcastsToNeighbors_NotSelf()
+    public void Move_Plausible_UpdatesPositionAndBroadcastsToNeighborsAndSelfEcho()
     {
         var zone = ZoneTestKit.CreateZone(1);
         var (mover, moverPipe) = ZoneTestKit.CreateSession(1);
@@ -65,11 +65,46 @@ public class ZoneMoveTests
         Assert.Equal(10.5f, mover10!.PosX);
         Assert.Equal(10f, mover10.PosZ);
 
-        // self excluded: client-side prediction already applied the move
-        Assert.Empty(ZoneTestKit.DrainOutbound(moverPipe));
+        // op15 (CZ_AVATAR_ACTION_SEND, isResumeAction: false) accepted-action tail echoes the just-accepted
+        // action back to the mover itself, in addition to the neighbor broadcast -- Server/ts25zone/
+        // S04_MyWork02.cpp:1770-1777's unconditional self-send, previously missing here (see
+        // MoveResume_Plausible_BroadcastsToNeighbors_NoSelfEcho below for the op16 contrast, which has no
+        // self-send at all).
+        var moverInbox = ZoneTestKit.DrainOutbound(moverPipe);
+        Assert.Equal(OneFrame, moverInbox.Length);
 
         var neighborInbox = ZoneTestKit.DrainOutbound(neighborPipe);
         Assert.Equal(OneFrame, neighborInbox.Length);
+    }
+
+    [Fact]
+    public void MoveResume_Plausible_UpdatesPositionSilently_NoSelfEcho_NoNeighborBroadcast()
+    {
+        var zone = ZoneTestKit.CreateZone(1);
+        var (mover, moverPipe) = ZoneTestKit.CreateSession(1);
+        var (neighbor, neighborPipe) = ZoneTestKit.CreateSession(2);
+
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(mover, 1, posX: 10f, posZ: 10f)));
+        zone.Post(ZoneCommand.Enter(20, ZoneTestKit.EnterData(neighbor, 1, posX: 12f, posZ: 12f)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+        ZoneTestKit.DrainOutbound(moverPipe);
+        ZoneTestKit.DrainOutbound(neighborPipe);
+
+        // op16 (CZ_UPDATE_AVATAR_ACTION, isResumeAction: true) has no broadcast call anywhere in its legacy
+        // body (Server/ts25zone/S04_MyWork02.cpp:1789-1922 -- verified directly: the handler only calls
+        // SetSpaceIndex()/UPDATE_LOGOUT_INFO, never mTRANSFER.B_AVATAR_ACTION_RECV) -- neither the acting
+        // client nor its neighbors ever see this update over the wire; the state change is applied
+        // server-side only, matching legacy's documented server-knows/clients-don't-know staleness gap for
+        // this opcode.
+        zone.Post(ZoneCommand.Move(10, MoveTo(10.5f, 10f), isResumeAction: true));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.True(zone.TryGetPlayer(10, out var mover10));
+        Assert.Equal(10.5f, mover10!.PosX);
+        Assert.Equal(10f, mover10.PosZ);
+
+        Assert.Empty(ZoneTestKit.DrainOutbound(moverPipe));
+        Assert.Empty(ZoneTestKit.DrainOutbound(neighborPipe));
     }
 
     [Fact]

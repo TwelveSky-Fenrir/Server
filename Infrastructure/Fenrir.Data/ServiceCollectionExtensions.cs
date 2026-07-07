@@ -102,6 +102,7 @@ public static class FenrirDataServiceCollectionExtensions
         builder.Services.AddSingleton<ICashRepository, CashRepository>();
         builder.Services.AddSingleton<IOfflineShopRepository, OfflineShopRepository>();
         builder.Services.AddSingleton<IGiftRepository, GiftRepository>();
+        builder.Services.AddSingleton<IAccountVaultRepository, AccountVaultRepository>();
 
         builder.Services.AddSingleton<IEventLogRepository, EventLogRepository>();
 

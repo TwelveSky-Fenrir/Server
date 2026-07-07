@@ -1,3 +1,4 @@
+using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 
 namespace Fenrir.Application.Game.Domain;
@@ -43,38 +44,33 @@ public sealed class GameServerOptions
     public int TickRateHz { get; set; } = 20;
 
     /// <summary>
-    ///     Interest-management (area-of-interest) grid cell size, in world units.
-    ///     <see cref="World.AoiGrid.Neighbors" /> always scans a fixed 3x3 block of cells centered on an object's
-    ///     own cell, so this value doubles as the effective broadcast/visibility span for every avatar, ground
-    ///     item, and monster -- there is no separate "radius" knob today. Defaults to legacy's own base unit
-    ///     radius, 1000 (<c>MAX_RADIUS_FOR_NETWORK</c>, Server/Header/Protocol/DEFINE.h:600), which is also
-    ///     legacy's "scale 1" visibility span (<c>UNIT_SCALE_RADIUS1</c>, DEFINE.h:141-143) -- the one every
-    ///     avatar and ordinary ground item broadcast always uses (independently verified at
-    ///     Server/ts25zone/S04_MyWork04.cpp:1351, Server/ts25zone/S07_MyGame04.cpp:2754,
-    ///     Server/ts25zone/S07_MyGame06.cpp:99-107) and the one the vast majority of "ordinary" monsters fall
-    ///     through to as well (<c>ReturnSpecialSortNumber</c>'s unconditional default,
-    ///     Server/ts25zone/S10_MySummon.cpp:646).
+    ///     Interest-management (area-of-interest) grid base cell size, in world units -- also the base
+    ///     (scale-1) exact-distance radius <see cref="World.AoiGrid" />'s two-stage query overloads check
+    ///     against (see that class's own remarks). Defaults to legacy's own base unit radius, 1000
+    ///     (<c>MAX_RADIUS_FOR_NETWORK</c>, Server/Header/Protocol/DEFINE.h:600), which is also legacy's "scale 1"
+    ///     visibility span (<c>UNIT_SCALE_RADIUS1</c>, DEFINE.h:141-143) -- the one every avatar and ordinary
+    ///     ground item broadcast always uses (independently verified at Server/ts25zone/S04_MyWork04.cpp:1351,
+    ///     Server/ts25zone/S07_MyGame04.cpp:2754, Server/ts25zone/S07_MyGame06.cpp:99-107) and the one the vast
+    ///     majority of "ordinary" monsters fall through to as well (<c>ReturnSpecialSortNumber</c>'s
+    ///     unconditional default, Server/ts25zone/S10_MySummon.cpp:646).
     ///     <para>
-    ///         NOT modeled: legacy's own per-monster-category scale widening to 2x/3x this radius for a handful
-    ///         of special monster categories (<c>SendSpecialNumber</c>'s category-code dispatch,
-    ///         Server/ts25zone/S07_MyGame05.cpp:3967-4001, assigned once at spawn by
-    ///         <c>ReturnSpecialSortNumber</c>, Server/ts25zone/S10_MySummon.cpp:612-647). Both the numeric
-    ///         monster-type/special-type codes those categories key on, and which of several legacy dispatch
-    ///         functions actually fires per spawn call site (S10_MySummon.cpp:854-871), were left an explicitly
-    ///         unresolved open question by the translating behavior contract -- implementing per-category
-    ///         scaling here would mean guessing at that mapping, so every object uses this same scale-1 span
-    ///         uniformly until a follow-up contract resolves it. (The contract also found the input finding's
-    ///         claim that Tower guardians get the wide radius to be likely incorrect -- the one special-type
-    ///         explicitly commented "Tower" in the source, S10_MySummon.cpp:619, resolves to a category
-    ///         explicitly dispatched to this same scale-1 span, S07_MyGame05.cpp:3998-4000.)
+    ///         <see cref="World.AoiGrid" /> now implements both of legacy's visibility-check stages (coarse
+    ///         per-axis cell box, then an exact 3D squared-distance check against the scaled radius,
+    ///         Server/ts25zone/S07_MyGame03.cpp:796-856's <c>Broadcast11</c>) and the per-monster-category scale
+    ///         widening to 2x/3x this radius (<see cref="World.Monsters.MonsterBroadcastScale" />, resolved from
+    ///         <c>SendSpecialNumber</c>'s dispatch, Server/ts25zone/S07_MyGame05.cpp:3967-4001, and
+    ///         <c>ReturnSpecialSortNumber</c>'s mapping, Server/ts25zone/S10_MySummon.cpp:612-647) for the one
+    ///         broadcast family with an unambiguous single legacy call site (the periodic monster catch-up tick,
+    ///         S07_MyGame01.cpp:2566) -- see that class's own remarks for the full mapping and for why the
+    ///         monster-spawn announcement deliberately reuses the same mapping rather than modeling each
+    ///         legacy summon call site's own separately-choosable dispatch strategy.
     ///     </para>
     ///     <para>
-    ///         Also NOT modeled: legacy's own visibility check is two-stage -- this coarse per-axis cell
-    ///         filter, then an exact 3D (X/Y/Z) Euclidean distance check against the scaled radius
-    ///         (Server/ts25zone/S07_MyGame03.cpp:796-856's <c>Broadcast11</c>). <see cref="World.AoiGrid" />
-    ///         only performs the coarse stage, and partitions X/Z only (Y is height -- see its own remarks) --
-    ///         a separately-flagged, pre-existing divergence in the shape of the check rather than its
-    ///         magnitude, so it is not addressed by this default alone.
+    ///         The coarse box partition itself still covers X/Z only, never Y -- this is retained deliberately,
+    ///         not as an open question: see <see cref="World.AoiGrid" />'s own remarks for why the exact-distance
+    ///         pass makes this harmless (the coarse box can only ever be a superset of legacy's own 3-axis
+    ///         coarse candidate set, and the exact pass trims every survivor down to the true 3D radius either
+    ///         way, so the final recipient set matches legacy exactly).
     ///     </para>
     /// </summary>
     public float AoiCellSize { get; set; } = 1000f;
@@ -163,25 +159,52 @@ public sealed class GameServerOptions
     public bool VoteTribeTestMode { get; set; }
 
     /// <summary>
-    ///     Legacy per-instance <c>Zone.Server</c> INI key <c>AllianceTribe</c> (Server/Header/ini.h:308): will
-    ///     arm the alliance diplomacy ceremony (Server/ts25zone/S07_MyGame01.cpp:3764-4012's
+    ///     Legacy per-instance <c>Zone.Server</c> INI key <c>AllianceTribe</c> (Server/Header/ini.h:308): arms
+    ///     <c>Fenrir.Application.Game.Hosting.World.ZoneWar.AllianceDiplomacyCeremonyHost</c> (the alliance
+    ///     diplomacy ceremony driver, Server/ts25zone/S07_MyGame01.cpp:3764-4012's
     ///     <c>Process_Allience_Server</c>) on whichever live shard currently hosts
-    ///     <see cref="AllianceTribeMapId" /> -- same map-id-keyed gate as <see cref="VoteTribeEnabled" />, once
-    ///     a driver exists. Not yet consumed by any Hosting scheduler -- see
-    ///     <c>Fenrir.Application.Game.Domain.World.ZoneWar.AllianceDiplomacyCeremony</c>'s own remarks for why
-    ///     the per-tick driver is not wired up yet.
+    ///     <see cref="AllianceTribeMapId" /> -- same map-id-keyed gate as <see cref="VoteTribeEnabled" />.
     /// </summary>
     public bool AllianceTribeEnabled { get; set; }
 
     /// <summary>
-    ///     The map id this shard must host for <see cref="AllianceTribeEnabled" /> to arm the (not yet built)
-    ///     alliance diplomacy ceremony driver. Legacy's designated server number for this content is 37
+    ///     The map id this shard must host for <see cref="AllianceTribeEnabled" /> to arm
+    ///     <c>AllianceDiplomacyCeremonyHost</c>. Legacy's designated server number for this content is 37
     ///     (same physical instance as <see cref="VoteTribeMapId" />/<see cref="TribeSymbolBattleMapId" />),
     ///     but each of these three systems gets its own independently-configurable map id rather than one
     ///     shared field -- the three sharing a server number in legacy is an accident of its
     ///     one-process-per-map architecture, not a game rule Fenrir must hard-code. 0 by default.
     /// </summary>
     public short AllianceTribeMapId { get; set; }
+
+    /// <summary>
+    ///     Alliance ceremony post 0's fixed world-space X/Z location, on the map <see cref="AllianceTribeMapId" />
+    ///     is configured to. Unlike <see cref="HolyStoneX" />/<see cref="HolyStoneZ" /> (defaulted to zero
+    ///     because the translating contract never found their real values), these default to the actual
+    ///     cited legacy values -- <c>mAllienceBattlePostLocation[0]</c>, Server/ts25zone/H07_MyGame.h:138-139
+    ///     combined with Server/ts25zone/S07_MyGame01.cpp:593-595's <c>Init()</c> assignment: (-41, 8, -272).
+    ///     Y is intentionally not exposed here -- see <see cref="World.ZoneWar.AlliancePostOccupantScanner" />'s
+    ///     own remarks for why the post-occupant scan is X/Z-distance-only, the same documented divergence
+    ///     from legacy's full 3D <c>CheckInRange</c> that <see cref="AoiCellSize" /> already flags elsewhere.
+    /// </summary>
+    public float AlliancePost0X { get; set; } = -41f;
+
+    public float AlliancePost0Z { get; set; } = -272f;
+
+    /// <summary>
+    ///     Alliance ceremony post 1's fixed world-space X/Z location -- <c>mAllienceBattlePostLocation[1]</c>,
+    ///     Server/ts25zone/S07_MyGame01.cpp:596-598: (35, 8, -272). See <see cref="AlliancePost0X" />'s own
+    ///     remarks.
+    /// </summary>
+    public float AlliancePost1X { get; set; } = 35f;
+
+    public float AlliancePost1Z { get; set; } = -272f;
+
+    /// <summary>
+    ///     Shared detection radius for both alliance ceremony posts -- <c>mAllienceBattlePostRadius[0]</c>
+    ///     and <c>[1]</c>, Server/ts25zone/S07_MyGame01.cpp:599-600, both literally 10.0.
+    /// </summary>
+    public float AlliancePostRadius { get; set; } = 10f;
 
     /// <summary>
     ///     Map ids this shard's zones run the Zone-241 "LOD" personal-boss-chain dungeon content on. Legacy
@@ -277,6 +300,15 @@ public sealed class GameServerOptions
     ///     itself -- a real forced-disconnect never lags the three-minute cutoff by more than one cycle.
     /// </summary>
     public int TempRegistrationIdleSweepIntervalSeconds { get; set; } = 30;
+
+    /// <summary>
+    ///     How often <c>SessionLivenessSweepHost</c> polls every currently-registered GameServer connection for
+    ///     <see cref="SessionLivenessSweep.IdleTimeout" />'s three-minute no-successfully-dispatched-frame
+    ///     window (Server/ts25zone/S07_MyGame01.cpp:1963-2006). A poll cadence, not the timeout itself -- a real
+    ///     forced-disconnect never lags the three-minute cutoff by more than one cycle. Same default cadence as
+    ///     <see cref="TempRegistrationIdleSweepIntervalSeconds" />, a sibling idle-connection sweep.
+    /// </summary>
+    public int SessionLivenessSweepIntervalSeconds { get; set; } = 30;
 
     /// <summary>
     ///     Legacy per-instance "JonNangin" INI-configured feature toggle

@@ -458,7 +458,13 @@ public sealed class EnterWorldService(
                 // PlayerRuntimeState.PreviousTribe would silently mirror Tribe instead for a tribe-3 (Fujin)
                 // character, breaking the fourth-tribe (Fujin) conversion/return behavior's return branch.
                 // Already loaded and self-consistency-checked above (IsTribeAndPreviousTribeConsistent).
-                PreviousTribe: character.PreviousTribe)));
+                PreviousTribe: character.PreviousTribe,
+                // Store/coffre money pool + second-page expiry dates -- game.Characters already persisted
+                // these three, but nothing read them back into PlayerRuntimeState until now (npc-talk
+                // Store/Save transfer gap fix). See PlayerRuntimeState.Vault.cs's own remarks.
+                StoreMoney: character.StoreMoney,
+                InventoryDate: character.InventoryDate,
+                StoreDate: character.StoreDate)));
 
             // A dropped Enter is never replayed -- the character would stay permanently invisible despite the two
             // packets above already telling the client registration succeeded, so treat it as fatal.

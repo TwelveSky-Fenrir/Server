@@ -1,6 +1,7 @@
 using Fenrir.Network.Compression;
 using Fenrir.Network.Serialization.Packets.Login;
 using Fenrir.Network.Serialization.Packets.Shared;
+using Fenrir.Network.Serialization.Wire;
 
 namespace Fenrir.IntegrationTests.Wire;
 
@@ -99,9 +100,18 @@ public sealed class LoginBotClient : IAsyncDisposable
         return WireScalars.ReadInt32(frame.AsSpan(1, 4));
     }
 
-    /// <summary>op17 CL_CREATE_AVATAR_SEND2.</summary>
+    /// <summary>
+    ///     op17 CL_CREATE_AVATAR_SEND2. <paramref name="weapon" /> must be one of the CALLING tribe's own three
+    ///     legal <c>RawWeaponCode</c> values (tribe 0: 5/6/7, tribe 1: 11/12/13, tribe 2: 17/18/19 --
+    ///     Server/ts25login/S04_MyWork02.cpp:756-778/784-806/812-834) or
+    ///     <c>CreateAvatarService.TryResolveWeaponItemId</c> can't resolve a starter-kit weapon item and the
+    ///     whole request is rejected as <c>CreateAvatarOutcome.InvalidWeapon</c> (a hard disconnect, no reply
+    ///     frame at all -- NOT the "server ignores this field" behavior an earlier version of this method
+    ///     assumed). Defaults to 5 (tribe 0's first legal code), matching every current caller's own
+    ///     tribe-0 avatar.
+    /// </summary>
     public async Task<int> CreateAvatarAsync(int avatarPost, int tribe, int gender, int head, int face,
-        string avatarName, CancellationToken ct)
+        string avatarName, CancellationToken ct, int weapon = 5)
     {
         var payload = new byte[CreateAvatarRequest.PayloadSize];
         WireScalars.WriteInt32(payload.AsSpan(0, 4), avatarPost);
@@ -110,7 +120,7 @@ public sealed class LoginBotClient : IAsyncDisposable
         WireScalars.WriteInt32(payload.AsSpan(12, 4), gender);
         WireScalars.WriteInt32(payload.AsSpan(16, 4), head);
         WireScalars.WriteInt32(payload.AsSpan(20, 4), face);
-        WireScalars.WriteInt32(payload.AsSpan(24, 4), 0); // Weapon -- dropped server-side, no starting-weapon system
+        WireScalars.WriteInt32(payload.AsSpan(24, 4), weapon);
         WireScalars.WriteFixedString(payload.AsSpan(28, 13), avatarName);
         await SendAsync(CreateAvatarRequest.Opcode, payload, ct);
 
@@ -140,11 +150,20 @@ public sealed class LoginBotClient : IAsyncDisposable
         return new ZoneTransferResult(result, ip, port, zone);
     }
 
+    /// <summary>
+    ///     Every client-&gt;server frame is <c>CLIENT_PACKET</c>-framed on the wire (<c>WireHeaderSizes.ClientPacketSize</c>
+    ///     = 9: <c>int tPacket1 + int tPacket2 + BYTE tProtocol</c>, opcode at header offset 8), not the bare
+    ///     opcode-then-payload shape a server response uses -- <see cref="Fenrir.Network.Framing.FrameDecoder" />
+    ///     unconditionally requires and slices off those leading 9 bytes before locating the opcode/payload for
+    ///     any INCOMING frame, on both LoginServer and GameServer. tPacket1/tPacket2 carry no framing
+    ///     information the server ever validates (see FrameDecoder's own remarks), so any filler value works --
+    ///     left zero here.
+    /// </summary>
     private async Task SendAsync(byte opcode, byte[] payload, CancellationToken ct)
     {
-        var frame = new byte[1 + payload.Length];
-        frame[0] = opcode;
-        payload.CopyTo(frame.AsSpan(1));
+        var frame = new byte[WireHeaderSizes.ClientPacketSize + payload.Length];
+        frame[8] = opcode;
+        payload.CopyTo(frame.AsSpan(WireHeaderSizes.ClientPacketSize));
         await _connection.SendAsync(frame, ct);
     }
 }

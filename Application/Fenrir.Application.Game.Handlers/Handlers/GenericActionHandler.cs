@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using Fenrir.Application.Game.Abstractions.GenericAction;
 using Fenrir.Application.Game.Abstractions.Inventory;
 using Fenrir.Application.Game.Abstractions.ItemModification;
@@ -14,8 +15,10 @@ namespace Fenrir.Application.Game.Handlers.Handlers;
 /// <summary>
 ///     op19, CZ_PROCESS_DATA_SEND -- catch-all dispatch on tSort: container moves (inventory&lt;-&gt;inventory,
 ///     inventory&lt;-&gt;equipment), ground pickup, manual drop-to-world, NPC teleport toll, skill learn/upgrade,
-///     NPC shop buy/sell, rune-stone stat crafting, and TimeExchange (play-time-event-to-teacher-point/
-///     pet-experience conversion). A tSort the legacy switch recognizes but this handler doesn't implement
+///     stat-point allocation, NPC shop buy/sell, rune-stone stat crafting, TimeExchange
+///     (play-time-event-to-teacher-point/pet-experience conversion), and the Store/coffre (menu index 2) and
+///     Save/vault (menu index 8, account-scoped bank) item/money transfer families. A tSort the legacy switch
+///     recognizes but this handler doesn't implement
 ///     replies with a clean failure; a tSort absent from every legacy family gets
 ///     <see cref="ClientSession.Abort" /> (anti-fuzzing).
 /// </summary>
@@ -130,6 +133,25 @@ public sealed class GenericActionHandler(
             return;
         }
 
+        // tSort 206 -- ProcessForStatPlus (spend aStatPoint into raw Str/Dex/Vit/Int). STAT_PLUS_RECV
+        // (Server/Header/Protocol/STRUCT.h:1261-1265) is a bare two-int struct -- tStatSort then tAddValue,
+        // back-to-back, no leading fields -- that doesn't share DefaultPData's 7-field/28-byte shape, so it's
+        // read directly off packet.Data rather than force-fit through DefaultPData.TryRead. Mirrors
+        // Server/ts25zone/S04_MyWork04.cpp:420-428, which casts tData directly to STAT_PLUS_RECV* at offset 0.
+        // AllocateStatPointAsync already treats every rejection (illegal category, unaffordable amount) as
+        // GenericActionResult.Aborted, and Respond() below already disconnects on Aborted -- matching the
+        // legacy dispatcher's own "no acknowledgment on failure" behavior (S04_MyWork04.cpp:303-306,354)
+        // with no extra handling needed here.
+        if (sort == 206)
+        {
+            var statSort = BinaryPrimitives.ReadInt32LittleEndian(packet.Data.AsSpan(0, 4));
+            var addValue = BinaryPrimitives.ReadInt32LittleEndian(packet.Data.AsSpan(4, 4));
+            var result = await genericActionService.AllocateStatPointAsync(statSort, addValue, zone, state,
+                characterId, cancellationToken);
+            Respond(session, zoneSession, sort, packet.Data, result);
+            return;
+        }
+
         // tSort 212/252/215: NPC-shop sell/buy. Neither side is a ContainerMatrix container (sell's destination
         // is the NPC's own catalog; buy's Page1/Index1 repurpose the wire shape as NpcId/ItemId), so these are
         // handled as their own branch rather than folded into ContainerMatrix.TryResolveContainers.
@@ -189,6 +211,49 @@ public sealed class GenericActionHandler(
             if (timeExchangeResult.GrantedPetExperienceGrowth is { } newPetGrowth)
                 session.Send(new AvatarStatUpdateResponse
                     { Sort = PetExperienceStatSort, Value = newPetGrowth, Value2 = 0 });
+            return;
+        }
+
+        // tSort 223/250/224/248/225 -- Store/coffre item deposit/withdraw/rearrange (menu index 2). tPage1/
+        // tPage2 aren't always ContainerMatrix-only ids the way 208/210/213 are (Store's own StorePage0/1),
+        // so this is its own branch rather than folded into MoveContainerAsync's ImplementedContainerMoveSorts
+        // set -- see GenericActionService.TransferStoreItemAsync's own remarks for why. No NPC-proximity gate
+        // (the "Remote Storage Fix" patch already disabled it in the reference source).
+        if (sort is 223 or 250 or 224 or 248 or 225)
+        {
+            var result = await genericActionService.TransferStoreItemAsync(sort, packet.Data, zone, state,
+                zoneSession.AccountId!.Value, characterId, cancellationToken);
+            Respond(session, zoneSession, sort, packet.Data, result);
+            return;
+        }
+
+        // tSort 226/227 -- Store/coffre money deposit/withdraw (menu index 2).
+        if (sort is 226 or 227)
+        {
+            var result = await genericActionService.TransferStoreMoneyAsync(sort, packet.Data, zone, state,
+                zoneSession.AccountId!.Value, characterId, cancellationToken);
+            Respond(session, zoneSession, sort, packet.Data, result);
+            return;
+        }
+
+        // tSort 228/251/229/249/230 -- Save/vault (account-scoped bank) item deposit/withdraw/rearrange (menu
+        // index 8). Crosses into game.AccountVault/AccountVaultItems (account-scoped, not character-scoped),
+        // so this can never be a ContainerMatrix container move either. No NPC-proximity gate (the "Remote
+        // Save Storage Fix" patch already disabled it in the reference source).
+        if (sort is 228 or 251 or 229 or 249 or 230)
+        {
+            var result = await genericActionService.TransferBankItemAsync(sort, packet.Data, zone, state,
+                zoneSession.AccountId!.Value, characterId, cancellationToken);
+            Respond(session, zoneSession, sort, packet.Data, result);
+            return;
+        }
+
+        // tSort 231/232 -- Save/vault (account bank) money deposit/withdraw (menu index 8).
+        if (sort is 231 or 232)
+        {
+            var result = await genericActionService.TransferBankMoneyAsync(sort, packet.Data,
+                zoneSession.AccountId!.Value, characterId, cancellationToken);
+            Respond(session, zoneSession, sort, packet.Data, result);
             return;
         }
 

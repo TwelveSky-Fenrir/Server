@@ -269,7 +269,6 @@ StoredProcedures/game/usp_TowerState_EnsureInitialized.sql
 StoredProcedures/game/usp_TowerState_GetAll.sql
 StoredProcedures/game/usp_TowerState_SetController.sql
 StoredProcedures/game/usp_WorldState_EnsureInitialized.sql
-StoredProcedures/game/usp_WorldState_EnsureInitialized_FixMissingTribeSeed.sql
 StoredProcedures/game/usp_WorldState_Get.sql
 StoredProcedures/game/usp_WorldState_Update.sql
 StoredProcedures/game/usp_WorldStateTribe_Update.sql
@@ -290,6 +289,14 @@ StoredProcedures/game/usp_AccountVault_EnsureInitialized.sql
 StoredProcedures/game/usp_AccountVault_Get.sql
 StoredProcedures/game/usp_AccountVault_AdjustMoney.sql
 StoredProcedures/game/usp_AccountVault_SetItems.sql
+
+# npc-talk gap fix: wires the previously-unimplemented Store/coffre (menu index 2) and Save/vault (menu
+# index 8) CZ_PROCESS_DATA_SEND item/money transfer families into GenericActionService. Store money
+# (Money<->StoreMoney) is same-row-atomic; Save/vault item and money transfers cross game.CharacterItems and
+# game.AccountVault/AccountVaultItems, so each needs its own atomic joint procedure.
+StoredProcedures/game/usp_Character_AdjustStoreMoney.sql
+StoredProcedures/game/usp_AccountVault_TransferMoneyWithCharacter.sql
+StoredProcedures/game/usp_AccountVault_TransferItemWithCharacter.sql
 
 # V8 Player Commerce & Cash
 StoredProcedures/game/usp_Character_GetRewardClaimState.sql
@@ -326,8 +333,8 @@ StoredProcedures/game/usp_Character_ApplyTribeFourConversion.sql
 
 # Rebirth zone241-time counter (legacy-behavior-translator Rebirth-advancement contract, Path B "Max
 # Rebirth" aZone241Time += 10, Server/ts25zone/S04_MyWork02.cpp:11342-11390): read/write support for
-# game.Characters.Zone241Time (Migrations/041_character_rebirth_zone241_time.sql).
-StoredProcedures/game/usp_Character_GetForWorldEntry_AppendZone241Time.sql
+# game.Characters.Zone241Time (Tables/game/Characters.sql). usp_Character_GetForWorldEntry itself already
+# projects Zone241Time as part of its own RS0 (merged into that base script directly).
 StoredProcedures/game/usp_Character_AdjustZone241Time.sql
 
 StoredProcedures/admin/usp_Ban_Create.sql
@@ -372,14 +379,12 @@ Migrations/002_roles_login_gifts.sql
 # database has no rows for it to touch.
 Migrations/019_character_previous_tribe_backfill.sql
 
-# game.Characters.Zone241Time (aZone241Time) -- see this migration's own header for the full citation. First
-# durable consumer is the legacy-behavior-translator Rebirth-advancement contract's Path B.
-Migrations/041_character_rebirth_zone241_time.sql
-
-# game.Characters.RebirthCount -- defense-in-depth CHECK bound (0-12, MAX_REBIRTH_LIMIT) matching the cap
-# both rebirth-advancement trigger paths already enforce in C# before mutating this column; see this
-# migration's own header for the full rationale.
-Migrations/042_character_rebirth_count_bound.sql
+# Fix-forward (session-state-machine legacy-parity audit): usp_AccountSession_TransitionToGame originally
+# only accepted a prior ServerKind = 0 (Login) row, so a Game(ShardA)->Game(ShardB) cross-shard zone transfer
+# -- ZoneMoveService.HandleCrossShardAsync's ticket-remint path -- could never satisfy its precondition and
+# was disconnected on arrival every time. Widens the predicate to accept a prior ServerKind of either 0 or 1;
+# see the script's own header for the full citation trail.
+Migrations/025_account_session_transition_game_to_game.sql
 
 Migrations/Seed/001_dev_account.sql
 
@@ -443,3 +448,7 @@ Migrations/Seed/admin/013_error_catalog_tribe_four_conversion.sql
 
 # Rebirth zone241-time counter: registers 50336 for the new usp_Character_AdjustZone241Time procedure.
 Migrations/Seed/admin/014_error_catalog_character_zone241_time.sql
+
+# npc-talk gap fix: registers 50337-50339 for the new usp_Character_AdjustStoreMoney/
+# usp_AccountVault_TransferMoneyWithCharacter procedures.
+Migrations/Seed/admin/015_error_catalog_store_and_account_vault_transfers.sql

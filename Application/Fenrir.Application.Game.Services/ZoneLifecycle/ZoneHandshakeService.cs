@@ -93,7 +93,14 @@ public sealed class ZoneHandshakeService(
 
         // Cross-process duplicate-login authority: proves this world-entry claim is for the same login epoch that
         // minted the ticket, not a hijack of a newer login (runtime.AccountSessions moved on since this ticket was
-        // issued -- e.g. the account logged in again elsewhere before this ticket got consumed).
+        // issued -- e.g. the account logged in again elsewhere before this ticket got consumed). This one call
+        // covers both a fresh Login->Game world-entry AND a Game(ShardA)->Game(ShardB) cross-shard zone transfer
+        // (ZoneMoveService.HandleCrossShardAsync's minted ticket lands here identically once the client
+        // reconnects to the destination shard and re-issues this same handshake) -- see
+        // IAccountSessionRepository.TransitionToGameAsync's own remarks and
+        // Database/Migrations/025_account_session_transition_game_to_game.sql for why the underlying procedure
+        // had to be widened to accept a prior ServerKind of either Login or Game for the cross-shard case to
+        // ever succeed here.
         var transitioned = await accountSessions
             .TransitionToGameAsync(accountId, consumed.SessionToken, options.Value.ShardId, cancellationToken)
             .ConfigureAwait(false);

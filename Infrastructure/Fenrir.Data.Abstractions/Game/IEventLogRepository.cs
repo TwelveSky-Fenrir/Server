@@ -108,7 +108,40 @@ public enum EventLogCategory : byte
     ///     SellToNpcShopAsync/BuyFromNpcShopAsync (backing
     ///     Fenrir.Application.Game.Domain.World.Npcs.NpcShopPolicy's ResolveSell/ResolveBuy).
     /// </summary>
-    NpcShopTrade = 16
+    NpcShopTrade = 16,
+
+    /// <summary>
+    ///     A non-stackable item moved between a character's Inventory and its own Store/coffre
+    ///     (CZ_PROCESS_DATA_SEND tSort 223/250 deposit, 224/248 withdraw; legacy <c>GL_624_STORESLOT_ITEM</c>).
+    ///     EventCode is app-owned within this category, matching <see cref="NpcShopTrade" />'s own convention:
+    ///     1 = deposited into the store, 2 = withdrawn to inventory. Never emitted for a stackable transfer or
+    ///     a store-to-store rearrange, matching StoreItemTransferPolicy's own <c>IsNonStackableTransfer</c>
+    ///     remarks. First consumer: GenericActionService.TransferStoreItemAsync.
+    /// </summary>
+    StoreSlotItem = 17,
+
+    /// <summary>
+    ///     A non-stackable item moved between a character's Inventory and its account's shared Save/vault
+    ///     (CZ_PROCESS_DATA_SEND tSort 228/251 deposit, 229/249 withdraw; legacy <c>GL_626_SAVESLOT_ITEM</c>).
+    ///     Same EventCode convention as <see cref="StoreSlotItem" />. Never emitted for a stackable transfer
+    ///     or a bank-to-bank rearrange. First consumer: GenericActionService.TransferBankItemAsync.
+    /// </summary>
+    SaveSlotItem = 18,
+
+    /// <summary>
+    ///     Money moved between a character's wallet and its own Store/coffre money pool (CZ_PROCESS_DATA_SEND
+    ///     tSort 226 deposit, 227 withdraw; legacy <c>GL_625_STORESLOT_MONEY</c>). Same EventCode convention
+    ///     as <see cref="StoreSlotItem" />. First consumer: GenericActionService.TransferStoreMoneyAsync.
+    /// </summary>
+    StoreSlotMoney = 19,
+
+    /// <summary>
+    ///     Money moved between a character's wallet and its account's shared Save/vault money pool
+    ///     (CZ_PROCESS_DATA_SEND tSort 231 deposit, 232 withdraw; legacy <c>GL_627_SAVESLOT_MONEY</c>). Same
+    ///     EventCode convention as <see cref="StoreSlotItem" />. First consumer:
+    ///     GenericActionService.TransferBankMoneyAsync.
+    /// </summary>
+    SaveSlotMoney = 20
 }
 
 /// <summary>

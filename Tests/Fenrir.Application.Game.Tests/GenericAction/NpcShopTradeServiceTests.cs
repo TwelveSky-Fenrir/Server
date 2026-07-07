@@ -126,7 +126,7 @@ public class NpcShopTradeServiceTests
         FakeEventLogRepository eventLog)
     {
         return new GenericActionService(characters, worldData, new QuestCatalog(worldData), new PartyRegistry(),
-            eventLog, NullLogger<GenericActionService>.Instance);
+            eventLog, new FakeAccountVaultRepository(), NullLogger<GenericActionService>.Instance);
     }
 
     private static DefaultPData SellMove(int quantity = 0)

@@ -4,6 +4,7 @@ using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Network.Framing;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.World.ZoneWar;
@@ -218,6 +219,45 @@ public class ZoneCenterBroadcastIngestorTests
             NullLogger<ZoneCenterBroadcastIngestor>.Instance);
 
         Assert.Throws<ArgumentException>(() => ingestor.Ingest(70, new byte[10]));
+    }
+
+    [Fact]
+    public void Ingest_OneRecipientsTransportAlreadyCompleted_DoesNotThrow_AndStillRelaysToEveryOtherRecipient()
+    {
+        var registry = CreateRegistry(1, 2);
+        var (faultySession, faultyPipe) = ZoneTestKit.CreateSession(1);
+        var (healthySession, healthyPipe) = ZoneTestKit.CreateSession(2);
+        registry[1].Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(faultySession, 1)));
+        registry[2].Post(ZoneCommand.Enter(20, ZoneTestKit.EnterData(healthySession, 2)));
+        registry[1].Tick(TimeSpan.FromMilliseconds(50));
+        registry[2].Tick(TimeSpan.FromMilliseconds(50));
+        ZoneTestKit.DrainOutbound(faultyPipe);
+        ZoneTestKit.DrainOutbound(healthyPipe);
+
+        // Simulates an ordinary disconnect race: this recipient's own transport already completed its
+        // outbound pipe (SessionLoop's teardown already ran) while the character is still present in
+        // Zone.Players (the zone's own Leave command hasn't drained yet) -- ClientSession.SendRaw throws
+        // InvalidOperationException the instant it tries to write to an already-completed PipeWriter.
+        faultyPipe.Output.Complete();
+
+        var state = new ZoneCenterSiegeState();
+        var logger = new CapturingLogger<ZoneCenterBroadcastIngestor>();
+        var ingestor = new ZoneCenterBroadcastIngestor(state, registry, logger);
+
+        // Regression guard: a bare `foreach (zone) foreach (player) player.Session.Send(...)` relay loop
+        // with no per-recipient try/catch lets the FIRST faulted recipient's exception abort delivery to
+        // every zone/player still left to visit, regardless of which of the two zones above is enumerated
+        // first -- Ingest must never throw for this reason (its own doc comment already promises it "never
+        // throws for an unrecognized or malformed-content event code"; an ordinary disconnect race must be
+        // no worse).
+        var exception = Record.Exception(() => ingestor.Ingest(70, Payload(2, 5)));
+        Assert.Null(exception);
+
+        Assert.Contains(logger.Entries, e => e.Level == LogLevel.Error && e.Message.Contains("10"));
+
+        var frame = ZoneTestKit.DrainOutbound(healthyPipe);
+        Assert.Equal(OneFrame, frame.Length);
+        Assert.Equal(70, ReadFrame(frame).Sort);
     }
 
     [Fact]

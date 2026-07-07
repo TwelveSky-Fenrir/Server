@@ -88,20 +88,23 @@ public sealed class CharacterShardLocationRepositoryTests : IDisposable
         const int characterId = 900212;
         await HeartbeatAsync(shardId);
 
-        await _repository.UpsertAsync(characterId, shardId, 1, "ShardLoc212Old", 0,
+        // AvatarName is NVARCHAR(13) (matches game.Characters.Name / MAX_AVATAR_NAME_LENGTH, see
+        // CharacterShardLocation.sql's own remarks) -- both literals below are exactly 13 characters so this
+        // test exercises the update path itself, not silent truncation.
+        await _repository.UpsertAsync(characterId, shardId, 1, "ShardLoc212Od", 0,
             CancellationToken.None);
-        await _repository.UpsertAsync(characterId, shardId, 2, "ShardLoc212New", 1,
+        await _repository.UpsertAsync(characterId, shardId, 2, "ShardLoc212Nw", 1,
             CancellationToken.None);
 
         var row = await _repository.FindByCharacterIdAsync(characterId, CancellationToken.None);
 
         Assert.NotNull(row);
         Assert.Equal((short)2, row.MapId);
-        Assert.Equal("ShardLoc212New", row.AvatarName);
+        Assert.Equal("ShardLoc212Nw", row.AvatarName);
         Assert.Equal((byte)1, row.Tribe);
 
         // Never a duplicate: the old name must no longer resolve to anything.
-        Assert.Null(await _repository.FindByNameAsync("ShardLoc212Old", CancellationToken.None));
+        Assert.Null(await _repository.FindByNameAsync("ShardLoc212Od", CancellationToken.None));
     }
 
     [Fact]

@@ -3,6 +3,7 @@ using Fenrir.Application.Game.Abstractions.GenericAction;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Pets;
 using Fenrir.Application.Game.Domain.Quests;
+using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.Stats;
@@ -12,6 +13,7 @@ using Fenrir.Application.Game.Domain.World.Loot;
 using Fenrir.Application.Game.Domain.World.Npcs;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Stats;
+using Fenrir.Data.Abstractions.Accounts;
 using Fenrir.Network.Serialization.Packets.Shared;
 using Microsoft.Extensions.Logging;
 
@@ -24,6 +26,7 @@ public sealed class GenericActionService(
     QuestCatalog questCatalog,
     PartyRegistry partyRegistry,
     IEventLogRepository eventLog,
+    IAccountVaultRepository accountVault,
     ILogger<GenericActionService> logger)
     : IGenericActionService
 {
@@ -43,6 +46,17 @@ public sealed class GenericActionService(
     private const short NpcShopBuyEventCode = 2;
 
     private const byte NpcShopTradeOutcome = 1;
+
+    /// <summary>
+    ///     Shared EventCode convention across every Store/Save (account vault) transfer category this type
+    ///     writes (StoreSlotItem/SaveSlotItem/StoreSlotMoney/SaveSlotMoney): 1 = deposit, 2 = withdraw --
+    ///     matching each category's own legacy GAMELOG citation (GL_624/625/626/627's own direction/action
+    ///     parameter).
+    /// </summary>
+    private const short VaultTransferDepositEventCode = 1;
+
+    private const short VaultTransferWithdrawEventCode = 2;
+    private const byte VaultTransferOutcome = 1;
 
     /// <summary>Server/ts25zone/S04_MyWork05.cpp:4808-4826 -- 694 teacher points per accrued play-time-event minute.</summary>
     private const int TeacherPointsPerPlayTimeMinute = 694;
@@ -516,10 +530,437 @@ public sealed class GenericActionService(
     }
 
     /// <summary>
+    ///     tSort 223/250 (deposit), 224/248 (withdraw), 225 (store-to-store rearrange) -- the Store/coffre
+    ///     item-move family. Every rejection is a clean failure (<see cref="GenericActionResult.Failed" />),
+    ///     never a disconnect -- <see cref="StoreItemTransferPolicy" />'s own citation confirms every one of
+    ///     its three backing legacy functions unconditionally returns TRUE (with tResult left at its initial
+    ///     failure value) on every rejection branch, the same "clean echo, no Quit()" posture as the
+    ///     already-implemented 208/210/213 container-move family. No NPC-proximity gate applies (the "Remote
+    ///     Storage Fix" patch already disabled it in the reference source -- see the umbrella NPC-interaction
+    ///     behavior contract's Preconditions section).
+    /// </summary>
+    public async ValueTask<GenericActionResult> TransferStoreItemAsync(int sort, byte[] data, Zone zone,
+        PlayerRuntimeState state, int accountId, int characterId, CancellationToken cancellationToken)
+    {
+        if (!DefaultPData.TryRead(data, out var move))
+            return GenericActionResult.Aborted;
+
+        var secondInventoryPageAccessible = state.InventoryDate >= GameDate.Today();
+        var secondStorePageAccessible = state.StoreDate >= GameDate.Today();
+
+        byte fromContainer;
+        byte toContainer;
+        StoreItemTransferPolicy.TransferResult resolved;
+        short auditEventCode = 0;
+
+        switch (sort)
+        {
+            case 223 or 250:
+            {
+                if (!StoreItemTransferPolicy.TryResolveInventoryContainer(move.Page1, out fromContainer) ||
+                    !StoreItemTransferPolicy.TryResolveStoreContainer(move.Page2, out toContainer))
+                    return GenericActionResult.Failed;
+
+                var (source, sourceIsStackable, sourceSupportsSocket) =
+                    ResolveTransferSource(GetSlotOrNull(state, fromContainer, move.Index1));
+                var destination = GetSlotOrNull(state, toContainer, move.Index2);
+
+                resolved = StoreItemTransferPolicy.ResolveDepositFromInventory(fromContainer, move.Index1,
+                    move.Quantity1, toContainer, move.Index2, source, destination, sourceIsStackable,
+                    sourceSupportsSocket, secondInventoryPageAccessible, secondStorePageAccessible);
+                auditEventCode = VaultTransferDepositEventCode;
+                break;
+            }
+            case 224 or 248:
+            {
+                if (!StoreItemTransferPolicy.TryResolveStoreContainer(move.Page1, out fromContainer) ||
+                    !StoreItemTransferPolicy.TryResolveInventoryContainer(move.Page2, out toContainer))
+                    return GenericActionResult.Failed;
+
+                var (source, sourceIsStackable, sourceSupportsSocket) =
+                    ResolveTransferSource(GetSlotOrNull(state, fromContainer, move.Index1));
+                var destination = GetSlotOrNull(state, toContainer, move.Index2);
+
+                resolved = StoreItemTransferPolicy.ResolveWithdrawToInventory(fromContainer, move.Index1,
+                    move.Quantity1, toContainer, move.Index2, move.XPost2, move.YPost2, source, destination,
+                    sourceIsStackable, sourceSupportsSocket, secondStorePageAccessible,
+                    secondInventoryPageAccessible);
+                auditEventCode = VaultTransferWithdrawEventCode;
+                break;
+            }
+            case 225:
+            {
+                if (!StoreItemTransferPolicy.TryResolveStoreContainer(move.Page1, out fromContainer) ||
+                    !StoreItemTransferPolicy.TryResolveStoreContainer(move.Page2, out toContainer))
+                    return GenericActionResult.Failed;
+
+                var (source, sourceIsStackable, _) =
+                    ResolveTransferSource(GetSlotOrNull(state, fromContainer, move.Index1));
+                var destination = GetSlotOrNull(state, toContainer, move.Index2);
+
+                resolved = StoreItemTransferPolicy.ResolveRearrangeWithinStore(fromContainer, move.Index1,
+                    move.Quantity1, toContainer, move.Index2, source, destination, sourceIsStackable,
+                    secondStorePageAccessible);
+                break;
+            }
+            default:
+                return GenericActionResult.Failed;
+        }
+
+        if (!resolved.Succeeded)
+            return GenericActionResult.Failed;
+
+        if (resolved.Outcome == StoreItemTransferPolicy.TransferOutcome.NoOp)
+            return GenericActionResult.Succeeded;
+
+        var fromCurrent = state.Inventory.GetContainer(fromContainer);
+        var toCurrent = fromContainer == toContainer ? fromCurrent : state.Inventory.GetContainer(toContainer);
+
+        ImmutableDictionary<byte, ItemStack> newFrom;
+        ImmutableDictionary<byte, ItemStack> newTo;
+        if (fromContainer == toContainer)
+        {
+            var updated = ApplySlotChange(fromCurrent, (byte)move.Index1, resolved.NewSource);
+            updated = ApplySlotChange(updated, (byte)move.Index2, resolved.NewDestination);
+            newFrom = updated;
+            newTo = updated;
+        }
+        else
+        {
+            newFrom = ApplySlotChange(fromCurrent, (byte)move.Index1, resolved.NewSource);
+            newTo = ApplySlotChange(toCurrent, (byte)move.Index2, resolved.NewDestination);
+        }
+
+        if (fromContainer == toContainer)
+            await characters.ReplaceContainerAsync(characterId, fromContainer, ToTvps(newTo), cancellationToken);
+        else
+            await characters.ReplaceTwoContainersAsync(characterId, fromContainer, ToTvps(newFrom), toContainer,
+                ToTvps(newTo), cancellationToken);
+
+        // Logged only once the SQL write above has durably committed, and only for the non-stackable
+        // whole-slot path -- matching StoreItemTransferPolicy's own IsNonStackableTransfer remarks (rearrange,
+        // sort 225, never sets this flag, so this never fires for that direction).
+        if (resolved.IsNonStackableTransfer)
+            await eventLog.LogAsync(auditEventCode, EventLogCategory.StoreSlotItem, accountId, characterId,
+                null, null, null, null, null, resolved.NewDestination?.ItemId ?? resolved.NewSource?.ItemId,
+                1, VaultTransferOutcome, null, cancellationToken);
+
+        var containers = fromContainer == toContainer
+            ? ImmutableArray.Create(new InventoryContainerSnapshot(fromContainer, newTo))
+            : ImmutableArray.Create(
+                new InventoryContainerSnapshot(fromContainer, newFrom),
+                new InventoryContainerSnapshot(toContainer, newTo));
+
+        if (!await zone.PostInventoryCommandAndWaitAsync(new InventoryZoneCommand(characterId, containers, null),
+                cancellationToken))
+            logger.LogError(
+                "Zone {MapId} inventory inbox full: dropped Store-transfer mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
+                zone.MapId, characterId);
+
+        return GenericActionResult.Succeeded;
+    }
+
+    /// <summary>
+    ///     tSort 226 (deposit)/227 (withdraw) -- Store/coffre money transfer between wallet Money and
+    ///     StoreMoney. Every failure here is a hard disconnect, matching the legacy's own uniform Quit() --
+    ///     see <see cref="StoreMoneyPolicy" />'s own remarks (Server/ts25zone/S04_MyWork05.cpp:2903-2969: the
+    ///     non-positive-amount, insufficient-source, and destination-cap-overflow checks each independently
+    ///     call Quit(), with no distinguishable in-band response for any of them).
+    /// </summary>
+    /// <remarks>
+    ///     Only the request-shape check (amount must be positive,
+    ///     <see cref="StoreMoneyPolicy.TransferOutcome.InvalidQuantity" />) is evaluated directly here --
+    ///     unlike <see cref="StoreMoneyPolicy" />'s own InsufficientSource/DestinationOverflow branches, which
+    ///     need the wallet's live Money balance. <see cref="PlayerRuntimeState" /> deliberately never caches
+    ///     wallet Money (same posture as every other money-spending action in this file --
+    ///     <see cref="BuyFromNpcShopAsync" />/<see cref="SellToNpcShopAsync" />/<see cref="PayTeleportTollAsync" />
+    ///     all rely on the atomic SQL call's own guard plus a catch block instead of a pre-fetched balance), so
+    ///     those two checks are enforced entirely by <c>ICharacterRepository.AdjustStoreMoneyAsync</c>'s own
+    ///     guarded UPDATE; any resulting SQL exception (either reason) is caught below and treated identically
+    ///     to the legacy's own Quit()-on-any-failure semantics.
+    /// </remarks>
+    public async ValueTask<GenericActionResult> TransferStoreMoneyAsync(int sort, byte[] data, Zone zone,
+        PlayerRuntimeState state, int accountId, int characterId, CancellationToken cancellationToken)
+    {
+        if (!DefaultPData.TryRead(data, out var move))
+            return GenericActionResult.Aborted;
+
+        if (move.Quantity1 < 1)
+            return GenericActionResult.Aborted;
+
+        var isDeposit = sort == 226;
+        var deltaMoney = isDeposit ? -(long)move.Quantity1 : move.Quantity1;
+        var deltaStoreMoney = isDeposit ? (long)move.Quantity1 : -(long)move.Quantity1;
+
+        try
+        {
+            await characters.AdjustStoreMoneyAsync(characterId, deltaMoney, deltaStoreMoney, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex,
+                "Character {CharacterId} Store-money transfer AdjustStoreMoneyAsync failed (treated as insufficient balance/cap breach)",
+                characterId);
+            return GenericActionResult.Aborted;
+        }
+
+        await eventLog.LogAsync(isDeposit ? VaultTransferDepositEventCode : VaultTransferWithdrawEventCode,
+            EventLogCategory.StoreSlotMoney, accountId, characterId, null, null, null, deltaMoney, null, null,
+            move.Quantity1, VaultTransferOutcome, null, cancellationToken);
+
+        var newStoreMoney = state.StoreMoney + deltaStoreMoney;
+        if (!await zone.PostTribeProgressCommandAndWaitAsync(
+                new TribeProgressZoneCommand(characterId, StoreMoney: newStoreMoney), cancellationToken))
+            logger.LogError(
+                "Zone {MapId} tribe-progress inbox full: dropped Store-money mirror for character {CharacterId}",
+                zone.MapId, characterId);
+
+        return GenericActionResult.Succeeded;
+    }
+
+    /// <summary>
+    ///     tSort 228/251 (deposit), 229/249 (withdraw), 230 (bank-to-bank rearrange) -- the Save/vault
+    ///     (account-scoped bank) item-move family. Every rejection is a hard disconnect
+    ///     (<see cref="GenericActionResult.Aborted" />), unlike the Store item family's clean-failure posture
+    ///     above -- see <see cref="SaveBankItemTransferPolicy" />'s own citation: every rejection branch in
+    ///     all three backing legacy functions (Server/ts25zone/S04_MyWork05.cpp:2971-3273) calls
+    ///     <c>Quit()</c> before returning FALSE (verified directly this session; this is a stronger claim than
+    ///     the umbrella NPC-interaction behavior contract's own "not fully traced" caveat for other,
+    ///     unspecified ProcessForXxx helpers -- this specific family IS fully traced, and it is uniformly
+    ///     Quit()). No NPC-proximity gate applies here either, same "Remote Save Storage Fix" disabled-patch
+    ///     posture as the Store family.
+    /// </summary>
+    public async ValueTask<GenericActionResult> TransferBankItemAsync(int sort, byte[] data, Zone zone,
+        PlayerRuntimeState state, int accountId, int characterId, CancellationToken cancellationToken)
+    {
+        if (!DefaultPData.TryRead(data, out var move))
+            return GenericActionResult.Aborted;
+
+        // Always re-fetched, never cached on PlayerRuntimeState -- see that type's own Vault.cs remarks on why
+        // an account-scoped pool can't safely be cached per-character.
+        var (_, vaultRows) = await accountVault.GetAsync(accountId, cancellationToken);
+        var vaultBySlot = new Dictionary<short, ItemStack>(vaultRows.Count);
+        foreach (var row in vaultRows)
+            if (row.ItemId is not null)
+                vaultBySlot[row.SlotIndex] = ItemStack.FromVaultRow(row);
+
+        var secondInventoryPageAccessible = state.InventoryDate >= GameDate.Today();
+
+        switch (sort)
+        {
+            case 228 or 251:
+            {
+                if (move.Page1 is not (ContainerMatrix.InventoryPage0 or ContainerMatrix.InventoryPage1))
+                    return GenericActionResult.Aborted;
+
+                var inventoryContainer = (byte)move.Page1;
+                var (source, sourceIsStackable, sourceSupportsSocket) =
+                    ResolveTransferSource(GetSlotOrNull(state, inventoryContainer, move.Index1));
+                var destination = GetVaultSlotOrNull(vaultBySlot, move.Index2);
+
+                var resolved = SaveBankItemTransferPolicy.ResolveDepositFromInventory(inventoryContainer,
+                    move.Index1, move.Quantity1, move.Index2, source, destination, sourceIsStackable,
+                    sourceSupportsSocket, secondInventoryPageAccessible);
+
+                if (!resolved.Succeeded)
+                    return GenericActionResult.Aborted;
+
+                if (resolved.Outcome == SaveBankItemTransferPolicy.TransferOutcome.NoOp)
+                    return GenericActionResult.Succeeded;
+
+                var newInventoryContainer = ApplySlotChange(state.Inventory.GetContainer(inventoryContainer),
+                    (byte)move.Index1, resolved.NewSource);
+                ApplyVaultSlotChange(vaultBySlot, (short)move.Index2, resolved.NewDestination);
+
+                await accountVault.TransferItemWithCharacterAsync(characterId, inventoryContainer,
+                    ToTvps(newInventoryContainer), accountId, ToVaultTvps(vaultBySlot), cancellationToken);
+
+                if (resolved.IsNonStackableTransfer)
+                    await eventLog.LogAsync(VaultTransferDepositEventCode, EventLogCategory.SaveSlotItem,
+                        accountId, characterId, null, null, null, null, null, resolved.NewDestination?.ItemId,
+                        1, VaultTransferOutcome, null, cancellationToken);
+
+                await MirrorInventoryContainerAsync(zone, characterId, inventoryContainer, newInventoryContainer,
+                    cancellationToken);
+                return GenericActionResult.Succeeded;
+            }
+            case 229 or 249:
+            {
+                if (move.Page2 is not (ContainerMatrix.InventoryPage0 or ContainerMatrix.InventoryPage1))
+                    return GenericActionResult.Aborted;
+
+                var inventoryContainer = (byte)move.Page2;
+                var (source, sourceIsStackable, sourceSupportsSocket) =
+                    ResolveTransferSource(GetVaultSlotOrNull(vaultBySlot, move.Index1));
+                var destination = GetSlotOrNull(state, inventoryContainer, move.Index2);
+
+                var resolved = SaveBankItemTransferPolicy.ResolveWithdrawToInventory(move.Index1, move.Quantity1,
+                    inventoryContainer, move.Index2, move.XPost2, move.YPost2, source, destination,
+                    sourceIsStackable, sourceSupportsSocket, secondInventoryPageAccessible);
+
+                if (!resolved.Succeeded)
+                    return GenericActionResult.Aborted;
+
+                if (resolved.Outcome == SaveBankItemTransferPolicy.TransferOutcome.NoOp)
+                    return GenericActionResult.Succeeded;
+
+                var newInventoryContainer = ApplySlotChange(state.Inventory.GetContainer(inventoryContainer),
+                    (byte)move.Index2, resolved.NewDestination);
+                ApplyVaultSlotChange(vaultBySlot, (short)move.Index1, resolved.NewSource);
+
+                await accountVault.TransferItemWithCharacterAsync(characterId, inventoryContainer,
+                    ToTvps(newInventoryContainer), accountId, ToVaultTvps(vaultBySlot), cancellationToken);
+
+                if (resolved.IsNonStackableTransfer)
+                    await eventLog.LogAsync(VaultTransferWithdrawEventCode, EventLogCategory.SaveSlotItem,
+                        accountId, characterId, null, null, null, null, null, resolved.NewDestination?.ItemId,
+                        1, VaultTransferOutcome, null, cancellationToken);
+
+                await MirrorInventoryContainerAsync(zone, characterId, inventoryContainer, newInventoryContainer,
+                    cancellationToken);
+                return GenericActionResult.Succeeded;
+            }
+            case 230:
+            {
+                var (source, sourceIsStackable, sourceSupportsSocket) =
+                    ResolveTransferSource(GetVaultSlotOrNull(vaultBySlot, move.Index1));
+                var destination = GetVaultSlotOrNull(vaultBySlot, move.Index2);
+
+                var resolved = SaveBankItemTransferPolicy.ResolveRearrangeWithinBank(move.Index1, move.Quantity1,
+                    move.Index2, source, destination, sourceIsStackable, sourceSupportsSocket);
+
+                if (!resolved.Succeeded)
+                    return GenericActionResult.Aborted;
+
+                if (resolved.Outcome == SaveBankItemTransferPolicy.TransferOutcome.NoOp)
+                    return GenericActionResult.Succeeded;
+
+                ApplyVaultSlotChange(vaultBySlot, (short)move.Index1, resolved.NewSource);
+                ApplyVaultSlotChange(vaultBySlot, (short)move.Index2, resolved.NewDestination);
+
+                // Vault-only mutation -- no character container touched, so this reuses the plain whole-list
+                // replace rather than the joint character+vault procedure. Never audit-logged, matching
+                // SaveBankItemTransferPolicy's own remarks (ProcessForSaveToSave has no GL_626_SAVESLOT_ITEM
+                // call anywhere in its body, unlike its deposit/withdraw siblings).
+                await accountVault.SetItemsAsync(accountId, ToVaultTvps(vaultBySlot), cancellationToken);
+                return GenericActionResult.Succeeded;
+            }
+            default:
+                return GenericActionResult.Aborted;
+        }
+    }
+
+    /// <summary>
+    ///     tSort 231 (deposit)/232 (withdraw) -- Save/vault (account bank) money transfer between wallet Money
+    ///     and the account's shared <c>game.AccountVault.Money</c>. Every failure here is a hard disconnect,
+    ///     same posture as <see cref="TransferStoreMoneyAsync" /> -- see that method's own remarks for why the
+    ///     balance-dependent <see cref="SaveBankMoneyPolicy" /> branches aren't invoked directly here (no
+    ///     cached wallet balance to validate against; <c>IAccountVaultRepository.TransferMoneyWithCharacterAsync</c>'s
+    ///     own atomic guarded UPDATE is the sole enforcement point, matching Server/ts25zone/S04_MyWork05.cpp:3275-3341's
+    ///     own uniform Quit()-on-any-failure shape).
+    /// </summary>
+    public async ValueTask<GenericActionResult> TransferBankMoneyAsync(int sort, byte[] data, int accountId,
+        int characterId, CancellationToken cancellationToken)
+    {
+        if (!DefaultPData.TryRead(data, out var move))
+            return GenericActionResult.Aborted;
+
+        if (move.Quantity1 < 1)
+            return GenericActionResult.Aborted;
+
+        var isDeposit = sort == 231;
+        var deltaCharacterMoney = isDeposit ? -(long)move.Quantity1 : move.Quantity1;
+        var deltaVaultMoney = isDeposit ? (long)move.Quantity1 : -(long)move.Quantity1;
+
+        try
+        {
+            await accountVault.TransferMoneyWithCharacterAsync(characterId, deltaCharacterMoney, accountId,
+                deltaVaultMoney, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex,
+                "Character {CharacterId} account-vault money transfer failed (treated as insufficient balance/cap breach)",
+                characterId);
+            return GenericActionResult.Aborted;
+        }
+
+        await eventLog.LogAsync(isDeposit ? VaultTransferDepositEventCode : VaultTransferWithdrawEventCode,
+            EventLogCategory.SaveSlotMoney, accountId, characterId, null, null, null, deltaCharacterMoney, null,
+            null, move.Quantity1, VaultTransferOutcome, null, cancellationToken);
+
+        return GenericActionResult.Succeeded;
+    }
+
+    /// <summary>Bounds-checked-before-cast slot read -- see <see cref="MoveContainerAsync" />'s own identical pattern.</summary>
+    private static ItemStack? GetSlotOrNull(PlayerRuntimeState state, byte container, int slot)
+    {
+        return ContainerMatrix.IsValidSlot(container, slot) ? state.Inventory.GetSlot(container, (byte)slot) : null;
+    }
+
+    private static ItemStack? GetVaultSlotOrNull(IReadOnlyDictionary<short, ItemStack> vaultBySlot, int slot)
+    {
+        return SaveBankItemTransferPolicy.IsValidSlot(slot) && vaultBySlot.TryGetValue((short)slot, out var stack)
+            ? stack
+            : null;
+    }
+
+    private static void ApplyVaultSlotChange(Dictionary<short, ItemStack> vaultBySlot, short slot,
+        ItemStack? newValue)
+    {
+        if (newValue is { } value)
+            vaultBySlot[slot] = value;
+        else
+            vaultBySlot.Remove(slot);
+    }
+
+    private static List<AccountVaultItemSlotTvp> ToVaultTvps(Dictionary<short, ItemStack> vaultBySlot)
+    {
+        var list = new List<AccountVaultItemSlotTvp>(vaultBySlot.Count);
+        foreach (var (slot, stack) in vaultBySlot)
+            list.Add(stack.ToVaultTvp(slot));
+        return list;
+    }
+
+    private static ImmutableDictionary<byte, ItemStack> ApplySlotChange(
+        ImmutableDictionary<byte, ItemStack> current, byte slot, ItemStack? newValue)
+    {
+        return newValue is { } value ? current.SetItem(slot, value) : current.Remove(slot);
+    }
+
+    /// <summary>
+    ///     Resolves <paramref name="candidate" />'s catalog definition, collapsing both "truly empty" and "item
+    ///     id no longer resolves to a known item definition" into a single null <c>Source</c> -- the exact
+    ///     collapse <see cref="StoreItemTransferPolicy" />/<see cref="SaveBankItemTransferPolicy" />'s own
+    ///     <c>SourceEmpty</c> remarks document, since neither pure policy touches the item catalog itself.
+    ///     <c>SupportsSocket</c> is always <see langword="false" /> -- Fenrir's <c>ItemDefinition</c> has no
+    ///     <c>IsValidSocket</c>-equivalent flag yet, same pre-existing gap both policies' own remarks flag,
+    ///     conservative default until that data exists rather than a guessed formula.
+    /// </summary>
+    private (ItemStack? Source, bool IsStackable, bool SupportsSocket) ResolveTransferSource(ItemStack? candidate)
+    {
+        if (candidate is not { } stack || !worldData.ItemsById.TryGetValue(stack.ItemId, out var definition))
+            return (null, false, false);
+
+        return (stack, ContainerMatrix.IsStackableSort(definition.Item.Sort), false);
+    }
+
+    private async ValueTask MirrorInventoryContainerAsync(Zone zone, int characterId, byte container,
+        ImmutableDictionary<byte, ItemStack> contents, CancellationToken cancellationToken)
+    {
+        var containers = ImmutableArray.Create(new InventoryContainerSnapshot(container, contents));
+        if (!await zone.PostInventoryCommandAndWaitAsync(new InventoryZoneCommand(characterId, containers, null),
+                cancellationToken))
+            logger.LogError(
+                "Zone {MapId} inventory inbox full: dropped account-vault transfer mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
+                zone.MapId, characterId);
+    }
+
+    /// <summary>
     ///     tSort 206 -- spends unspent stat points (aStatPoint) to raise Strength/Dexterity/Vitality/Intelligence.
     ///     Every rejection is a bare <see cref="GenericActionResult.Aborted" />: the legacy disconnects the
-    ///     session for any illegal category code or unaffordable amount here, never a soft failure reply. Not
-    ///     yet reachable from <c>GenericActionHandler</c>'s dispatch switch -- see
+    ///     session for any illegal category code or unaffordable amount here, never a soft failure reply.
+    ///     Reached from <c>GenericActionHandler</c>'s dispatch switch -- see
     ///     <see cref="IGenericActionService.AllocateStatPointAsync" />.
     /// </summary>
     /// <remarks>

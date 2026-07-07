@@ -39,10 +39,11 @@ namespace Fenrir.Application.Game.Domain.World.Monsters;
 ///             <see cref="RunChase" /> and <see cref="MonsterSpawnScheduler.ProcessDeath" /> respectively.
 ///         </item>
 ///         <item>
-///             <see cref="MonsterAiState.Flinch" />'s entry condition (a big single hit interrupting whatever
-///             the monster was doing) is not wired -- it lives in <c>Zone.ApplyPvmAttack</c>, outside this
-///             cluster's touched files this round. The state's own tick-countdown behavior is fully implemented
-///             and tested; only the trigger is a follow-up.
+///             UPDATE: <see cref="MonsterAiState.Flinch" />'s entry condition (a big single hit interrupting
+///             whatever the monster was doing) is now wired via <c>Zone.TryApplyPvmFlinch</c>, called from
+///             <c>Zone.ApplyPvmAttack</c> on a landed, non-killing hit -- previously listed here as an open
+///             trigger gap. The state's own tick-countdown behavior below was already fully implemented and
+///             tested before this.
 ///         </item>
 ///         <item>
 ///             UPDATE (2026-07, zone-transfer-in-progress-gate behavior contract): <see cref="TryAcquireTarget" />'s

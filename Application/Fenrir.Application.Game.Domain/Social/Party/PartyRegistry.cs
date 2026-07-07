@@ -39,6 +39,38 @@ public enum PartyJoinOutcome
     PartyWasFull
 }
 
+/// <summary>Discriminator for how <see cref="PartyRegistry.LeaveForDisconnect" /> resolved.</summary>
+public enum PartyDisconnectKind
+{
+    /// <summary>The disconnecting character had no live party at all -- nothing to do.</summary>
+    NotInParty,
+
+    /// <summary>
+    ///     The disconnecting character was the party's leader -- the whole party was broken, same effect as
+    ///     <see cref="PartyRegistry.Disband" />.
+    /// </summary>
+    LeaderDisbanded,
+
+    /// <summary>The disconnecting character was an ordinary member -- only they were removed; the party survives.</summary>
+    MemberLeft,
+
+    /// <summary>
+    ///     The disconnecting character was an ordinary member whose departure dropped the party below 2 --
+    ///     auto-disbanded, same "no lone-leader phantom party" rule <see cref="PartyRegistry.TryLeave" /> already
+    ///     applies to a voluntary leave.
+    /// </summary>
+    MemberLeftAndDisbanded
+}
+
+/// <summary>Result of <see cref="PartyRegistry.LeaveForDisconnect" />.</summary>
+public readonly record struct PartyDisconnectResult(
+    PartyDisconnectKind Kind,
+    IReadOnlyList<int> MembersBeforeLeave,
+    IReadOnlyList<int> RemainingMembers)
+{
+    public static readonly PartyDisconnectResult NotInParty = new(PartyDisconnectKind.NotInParty, [], []);
+}
+
 /// <summary>
 ///     One party's composition -- LeaderId is always Members[0]. Legacy keyed parties by leader name;
 ///     Fenrir keys by leader CharacterId instead, a stable identity a rename/duplicate name can't violate.
@@ -315,6 +347,57 @@ public sealed class PartyRegistry
             var members = party.Members.ToArray();
             DisbandLocked(party);
             return members;
+        }
+    }
+
+    /// <summary>
+    ///     Disconnect/logout cleanup step (behavior contract "session-state-machine", the ready and
+    ///     non-mid-transfer disconnect branch): "any active party is broken ... distinguishing member left from
+    ///     leader left". Unlike the explicit CZ_PARTY_LEAVE_SEND/CZ_PARTY_BREAK_SEND opcodes, the caller here
+    ///     does not already know whether <paramref name="characterId" /> is the leader or an ordinary member, so
+    ///     this single entry point dispatches to the same effect either <see cref="Disband" /> (leader) or
+    ///     <see cref="TryLeave" /> (member, including its own below-2-members auto-disband rule) would have had,
+    ///     and reports which one happened so the caller can send the matching wire notification. A no-op
+    ///     (<see cref="PartyDisconnectResult.NotInParty" />) if the character has no live party at all.
+    /// </summary>
+    /// <remarks>
+    ///     Réf. C++ : Server/ts25zone/S03_MyUser.cpp:338-411,404 (Exit -- party break + relay, distinguishing
+    ///     member-left/leader-left by comparing the avatar's own name against the party name). Fenrir keys
+    ///     parties by leader CharacterId rather than a per-avatar party-name field (see this class's own
+    ///     remarks), so the distinction is made structurally here instead (was <paramref name="characterId" />
+    ///     the party's LeaderId) -- the same substitution every other party-changed notification in this
+    ///     codebase already makes.
+    /// </remarks>
+    public PartyDisconnectResult LeaveForDisconnect(int characterId)
+    {
+        lock (_lock)
+        {
+            if (!_leaderByMember.TryGetValue(characterId, out var leaderId) ||
+                !_partiesByLeader.TryGetValue(leaderId, out var party))
+                return PartyDisconnectResult.NotInParty;
+
+            if (leaderId == characterId)
+            {
+                var members = party.Members.ToArray();
+                DisbandLocked(party);
+                return new PartyDisconnectResult(PartyDisconnectKind.LeaderDisbanded, members, []);
+            }
+
+            var membersBeforeLeave = party.Members.ToArray();
+
+            if (!party.TryRemoveMember(characterId))
+                return PartyDisconnectResult.NotInParty; // unreachable given the _leaderByMember check above; defensive only
+
+            _leaderByMember.Remove(characterId);
+
+            if (party.Members.Count < 2)
+            {
+                DisbandLocked(party);
+                return new PartyDisconnectResult(PartyDisconnectKind.MemberLeftAndDisbanded, membersBeforeLeave, []);
+            }
+
+            return new PartyDisconnectResult(PartyDisconnectKind.MemberLeft, membersBeforeLeave,
+                party.Members.ToArray());
         }
     }
 

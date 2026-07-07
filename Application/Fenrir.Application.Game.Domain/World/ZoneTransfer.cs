@@ -161,7 +161,12 @@ public static class ZoneTransfer
             PetExpX2Time: state.PetExpX2Time,
             // Live hotkey table -- must travel here too, or a character's bound hotkeys would silently reset
             // to empty on every in-process zone transfer. See PlayerEnterData.Hotkeys' own remarks.
-            Hotkeys: hotkeys);
+            Hotkeys: hotkeys,
+            // Store/coffre money pool + second-page expiry dates must travel here too, or they would silently
+            // reset to 0 on every in-process zone transfer -- see PlayerRuntimeState.Vault.cs's own remarks.
+            StoreMoney: state.StoreMoney,
+            InventoryDate: state.InventoryDate,
+            StoreDate: state.StoreDate);
     }
 }
 

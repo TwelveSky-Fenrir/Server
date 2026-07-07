@@ -64,7 +64,8 @@ CREATE TABLE game.Characters
         CONSTRAINT DF_Characters_BigStoreMoney DEFAULT 0
         CONSTRAINT CK_Characters_BigStoreMoney CHECK (BigStoreMoney >= 0),
     RebirthCount             INT                NOT NULL
-        CONSTRAINT DF_Characters_RebirthCount DEFAULT 0,                                         -- aRebirthNum; MAX_REBIRTH_LIMIT=12 (G1-G12) IS live in ReleaseEU33 via the Rebirth-Pill item path (WUSE_ITEM_632 unconditionally #define'd) -- see Application/Fenrir.Application.Game.Domain/Progression/RebirthProgression.cs. Path B (TribeActionService.RebirthAsync, CZ_TRIBE_WORK_SEND tSort 11) is separately app-capped at generation 6; only Path A (UseInventoryItemService's Rebirth-Pill branch) reaches 7-12.
+        CONSTRAINT DF_Characters_RebirthCount DEFAULT 0
+        CONSTRAINT CK_Characters_RebirthCount CHECK (RebirthCount BETWEEN 0 AND 12),             -- aRebirthNum; MAX_REBIRTH_LIMIT=12 (G1-G12) IS live in ReleaseEU33 via the Rebirth-Pill item path (WUSE_ITEM_632 unconditionally #define'd) -- see Application/Fenrir.Application.Game.Domain/Progression/RebirthProgression.cs. Path B (TribeActionService.RebirthAsync, CZ_TRIBE_WORK_SEND tSort 11) is separately app-capped at generation 6; only Path A (UseInventoryItemService's Rebirth-Pill branch) reaches 7-12. CHECK bound is defense-in-depth: both trigger paths already app-cap before writing (RebirthProgression.MaxRebirthGeneration), but this closes the gap for a future writer that doesn't re-validate.
     Title                    INT                NOT NULL
         CONSTRAINT DF_Characters_Title DEFAULT 0,
     Halo                     INT                NOT NULL
@@ -166,6 +167,9 @@ CREATE TABLE game.Characters
     AutoTime2                INT                NOT NULL
         CONSTRAINT DF_Characters_AutoTime2 DEFAULT 0
         CONSTRAINT CK_Characters_AutoTime2 CHECK (AutoTime2 >= 0),                                -- aAutoTime2: per-real-minute-decrementing free auto-hunt allowance (Server/ts25zone/S07_MyGame04.cpp:787-823); 1440 (24h) granted at creation (Server/ts25login/S04_MyWork02.cpp:888)
+    Zone241Time              INT                NOT NULL
+        CONSTRAINT DF_Characters_Zone241Time DEFAULT 0
+        CONSTRAINT CK_Characters_Zone241Time CHECK (Zone241Time >= 0),                            -- aZone241Time (Server/Header/Protocol/STRUCT.h:751-757's persisted avatar snapshot field, always wired as literal 0 today). First durable consumer: Rebirth-advancement Path B ("Max Rebirth", CZ_TRIBE_WORK_SEND tSort 11) unconditionally += 10 on precondition pass (Server/ts25zone/S04_MyWork02.cpp:11342-11390); see usp_Character_AdjustZone241Time for the write-path primitive.
     FlushSequence            BIGINT             NOT NULL
         CONSTRAINT DF_Characters_FlushSequence DEFAULT 0,                                        -- idempotent write-behind
     CreatedAtUtc             DATETIME2(3)       NOT NULL

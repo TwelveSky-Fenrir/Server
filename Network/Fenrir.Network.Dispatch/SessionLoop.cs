@@ -6,6 +6,7 @@ using Fenrir.Network.Dispatch.Logging;
 using Fenrir.Network.Dispatch.RateLimiting;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Framing;
+using Fenrir.Network.Transport;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Network.Dispatch;
@@ -18,6 +19,49 @@ namespace Fenrir.Network.Dispatch;
 // reason-recorded session teardown instead of an unplanned propagation all the way out of RunAsync.
 public static class SessionLoop
 {
+    /// <summary>
+    ///     Runs one connection's I/O pump (<see cref="SocketConnection.RunIOAsync" />) and its dispatch loop
+    ///     (<see cref="RunAsync" />) together, the way every connection host (<c>GameConnectionHost</c>,
+    ///     <c>LoginConnectionHost</c>) wires up an accepted socket. Prefer this over a bare
+    ///     <c>Task.WhenAll(connection.RunIOAsync(ct), RunAsync(...))</c> at the call site: this method
+    ///     additionally calls <see cref="SocketConnection.Abort" /> the moment <see cref="RunAsync" /> itself
+    ///     returns, for any reason (a decoded protocol violation, <c>ClientSession.Abort</c> from an external
+    ///     idle/liveness sweep, the peer's own graceful FIN, or the caller's own cancellation) --
+    ///     <see cref="SocketConnection.Abort" />'s own remarks explain why that call is otherwise needed: a
+    ///     session torn down while its peer stays silent (never sends another byte, never closes) would
+    ///     otherwise leave <see cref="SocketConnection.RunIOAsync" /> parked on its own blocking socket receive
+    ///     indefinitely, holding open every resource a connection host's teardown path only frees once
+    ///     <see cref="SocketConnection.RunIOAsync" /> itself completes.
+    /// </summary>
+    public static async Task RunConnectionAsync(
+        SocketConnection connection,
+        ClientSession session,
+        IFrameDispatcher dispatcher,
+        ISessionRateLimiter? rateLimiter,
+        IpFloodGuard? ipFloodGuard,
+        CancellationToken cancellationToken,
+        ILogger? logger = null)
+    {
+        var ioTask = connection.RunIOAsync(cancellationToken);
+
+        try
+        {
+            await RunAsync(session, dispatcher, rateLimiter, ipFloodGuard, cancellationToken, logger)
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            // Unblocks a receive loop still waiting on real bytes from a now-abandoned peer -- see this
+            // method's own remarks and SocketConnection.Abort's for the full reasoning. Runs even if RunAsync
+            // itself threw (it shouldn't -- see that method's own catch -- but this must not skip cleanup either way).
+            connection.Abort();
+        }
+
+        // Propagates RunIOAsync's own fault (if any -- it shouldn't produce one uncaught either, see its own
+        // remarks) now that both halves of this connection have had a chance to run to completion.
+        await ioTask.ConfigureAwait(false);
+    }
+
     public static async Task RunAsync(
         ClientSession session,
         IFrameDispatcher dispatcher,
@@ -153,6 +197,12 @@ public static class SessionLoop
             {
                 await dispatcher.DispatchAsync(frameServer, frameOpcode, framePayload, session, cancellationToken)
                     .ConfigureAwait(false);
+
+                // Liveness signal for the per-server idle-session sweep (session.LastActivityUtc's own
+                // remarks) -- stamped only once a frame clears every prior gate (decode/state/rate-limit) AND
+                // its handler ran without throwing, so a session spamming garbage that gets rejected below
+                // never counts as "active" for idle-timeout purposes.
+                session.Touch();
             }
             catch (OperationCanceledException)
             {

@@ -356,6 +356,24 @@ public sealed class ZoneBotClient : IAsyncDisposable
         await SendAsync(GenericActionRequest.Opcode, payload, ct);
     }
 
+    /// <summary>
+    ///     op19 CZ_PROCESS_DATA_SEND, tSort 206 -- ProcessForStatPlus. STAT_PLUS_RECV is a bare two-int payload
+    ///     (tStatSort then tAddValue, back-to-back at offset 0) rather than DefaultPData's 7-field/28-byte shape
+    ///     -- see GenericActionHandler's own sort-206 remarks and StatAllocationResolver for the category-code
+    ///     table (9-12 = variable-regime Str/Dex/Vit/Int, crediting exactly <paramref name="addValue" /> and
+    ///     debiting the same amount from the character's StatPoints balance).
+    /// </summary>
+    public async Task AllocateStatPointAsync(int statSort, int addValue, CancellationToken ct)
+    {
+        var payload = new byte[GenericActionRequest.PayloadSize];
+        WireScalars.WriteInt32(payload.AsSpan(0, 4), 206);
+        var data = new byte[130];
+        WireScalars.WriteInt32(data.AsSpan(0, 4), statSort);
+        WireScalars.WriteInt32(data.AsSpan(4, 4), addValue);
+        data.CopyTo(payload.AsSpan(4, 130));
+        await SendAsync(GenericActionRequest.Opcode, payload, ct);
+    }
+
     /// <summary>op20 CZ_DEMAND_ZONE_SERVER_INFO_2 -- in-process zone transfer (ZoneMoveHandler); Sort 4 = portal.</summary>
     public async Task ZoneMoveAsync(int targetZoneNumber, int presentZoneNumber, CancellationToken ct)
     {
@@ -437,11 +455,20 @@ public sealed class ZoneBotClient : IAsyncDisposable
         return decoded;
     }
 
+    /// <summary>
+    ///     Every client-&gt;server frame is <c>CLIENT_PACKET</c>-framed on the wire (<c>WireHeaderSizes.ClientPacketSize</c>
+    ///     = 9: <c>int tPacket1 + int tPacket2 + BYTE tProtocol</c>, opcode at header offset 8), not the bare
+    ///     opcode-then-payload shape a server response uses -- <see cref="Fenrir.Network.Framing.FrameDecoder" />
+    ///     unconditionally requires and slices off those leading 9 bytes before locating the opcode/payload for
+    ///     any INCOMING frame, on both LoginServer and GameServer. tPacket1/tPacket2 carry no framing
+    ///     information the server ever validates (see FrameDecoder's own remarks), so any filler value works --
+    ///     left zero here.
+    /// </summary>
     private async Task SendAsync(byte opcode, byte[] payload, CancellationToken ct)
     {
-        var frame = new byte[1 + payload.Length];
-        frame[0] = opcode;
-        payload.CopyTo(frame.AsSpan(1));
+        var frame = new byte[WireHeaderSizes.ClientPacketSize + payload.Length];
+        frame[8] = opcode;
+        payload.CopyTo(frame.AsSpan(WireHeaderSizes.ClientPacketSize));
         await _connection.SendAsync(frame, ct);
     }
 }

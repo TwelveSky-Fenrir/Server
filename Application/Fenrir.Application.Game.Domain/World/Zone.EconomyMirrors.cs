@@ -792,6 +792,13 @@ public sealed partial class Zone
         if (command.TribeFourReturnAllowance is { } tribeFourReturnAllowance)
             state.TribeFourReturnAllowance = tribeFourReturnAllowance;
 
+        // CZ_PROCESS_DATA_SEND tSort 226/227 -- already synchronously persisted by
+        // ICharacterRepository.AdjustStoreMoneyAsync before this command is posted (same posture as
+        // Tribe/QuestProgress/TribeFourReturnAllowance/Zone241Time above), so this does not set
+        // `changed`/mark progress-dirty; there is nothing left to flush.
+        if (command.StoreMoney is { } storeMoney)
+            state.StoreMoney = storeMoney;
+
         if (changed)
             state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
 
@@ -812,7 +819,8 @@ public sealed partial class Zone
         {
             var characterId = command.CharacterId;
             SendAvatarAction(state.Session, state);
-            var neighbors = _grid.Neighbors(state.CurrentCell).Where(id => id != characterId).ToArray();
+            var neighbors = _grid.Neighbors(state.CurrentCell, state.PosX, state.PosY, state.PosZ)
+                .Where(id => id != characterId).ToArray();
             BroadcastAvatarAction(neighbors, state);
         }
     }

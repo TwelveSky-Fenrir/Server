@@ -225,13 +225,6 @@ public sealed partial class Zone
             ApplyDeath(defenderState.CharacterId, DeathCause.StunLock);
     }
 
-    private static void ApplySenderLocation(PlayerRuntimeState state, AttackForProtocol attackInfo)
-    {
-        state.PosX = attackInfo.SenderLocation[0];
-        state.PosY = attackInfo.SenderLocation[1];
-        state.PosZ = attackInfo.SenderLocation[2];
-    }
-
     private bool SharesActiveDuel(int attackerId, int defenderId)
     {
         return _duelRegistry.TryGetActiveDuel(attackerId, out var duel) && duel is not null &&
@@ -271,7 +264,8 @@ public sealed partial class Zone
 
         // Uses _stunNeighborScratch instead of AoiGrid.Neighbors(...).Where(...).ToArray().
         _stunNeighborScratch.Clear();
-        _grid.NeighborsExcludingSelf(_stunNeighborScratch, state.CurrentCell, state.CharacterId);
+        _grid.NeighborsExcludingSelf(_stunNeighborScratch, state.CurrentCell, state.CharacterId, state.PosX,
+            state.PosY, state.PosZ);
         BroadcastAvatarAction(_stunNeighborScratch, state, action);
     }
 
@@ -284,7 +278,8 @@ public sealed partial class Zone
 
         // Uses _idleNeighborScratch instead of AoiGrid.Neighbors(...).Where(...).ToArray().
         _idleNeighborScratch.Clear();
-        _grid.NeighborsExcludingSelf(_idleNeighborScratch, state.CurrentCell, state.CharacterId);
+        _grid.NeighborsExcludingSelf(_idleNeighborScratch, state.CurrentCell, state.CharacterId, state.PosX,
+            state.PosY, state.PosZ);
         BroadcastAvatarAction(_idleNeighborScratch, state, action);
     }
 

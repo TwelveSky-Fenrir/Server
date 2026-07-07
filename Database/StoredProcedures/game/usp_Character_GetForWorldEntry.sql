@@ -1,11 +1,12 @@
 -- RS4 (persisted buffs) must be ignored by fresh world-entry callers (legacy wipes buff state on every
 -- login) -- it exists for crash/restart recovery only. AutoHuntConfig NULL means "never configured".
 --
--- RS0 (the first result set) is deliberately append-only at the tail: PreviousTribe/Mount*/AutoTime2 are
--- appended after Exp2, never inserted mid-list, so CharacterWorldEntryDto (the narrow, stable prefix used by
--- CreateAvatarService/ZoneTransferService, ordinally mapped onto this same result set) keeps reading the
--- exact same first 19 columns it always has and needs no change. Only CharacterWorldSnapshotDto (RS0's full
--- projection, used by GetWorldEntryBundleAsync/EnterWorldService) gains the new trailing fields.
+-- RS0 (the first result set) is deliberately append-only at the tail: PreviousTribe/Mount*/AutoTime2/
+-- Zone241Time are appended after Exp2, never inserted mid-list, so CharacterWorldEntryDto (the narrow,
+-- stable prefix used by CreateAvatarService/ZoneTransferService, ordinally mapped onto this same result set)
+-- keeps reading the exact same first 19 columns it always has and needs no change. Only
+-- CharacterWorldSnapshotDto (RS0's full projection, used by GetWorldEntryBundleAsync/EnterWorldService)
+-- gains the new trailing fields.
 CREATE PROCEDURE game.usp_Character_GetForWorldEntry @CharacterId INT
 AS
 BEGIN
@@ -83,7 +84,8 @@ BEGIN
            c.MountPower,
            c.MountSlotIndex,
            c.MountTime,
-           c.AutoTime2
+           c.AutoTime2,
+           c.Zone241Time
     FROM game.Characters AS c
              LEFT JOIN game.CharacterQuests AS q
                        ON q.CharacterId = c.CharacterId

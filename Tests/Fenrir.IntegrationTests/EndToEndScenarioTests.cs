@@ -15,19 +15,9 @@ namespace Fenrir.IntegrationTests;
 ///     buy from an NPC -&gt; chat -&gt; in-process zone transfer -&gt; disconnect -&gt; DB verification.
 /// </summary>
 /// <remarks>
-///     Two genuine, verified gaps in the current implementation are worked around here, both via direct SQL
-///     "Arrange" steps rather than skipping the affected leg of the scenario:
+///     One genuine, verified gap in the current implementation is worked around here, via a direct SQL
+///     "Arrange" step rather than skipping the affected leg of the scenario:
 ///     <list type="bullet">
-///         <item>
-///             No wire opcode exists yet to spend a fresh character's StatPoints into raw Str/Vit/Int/Dex
-///             (<c>game.Characters</c>'s stat columns all default to 0, and
-///             <c>GenericActionHandler</c>'s tSort dispatch has no such branch). A level-1 character's
-///             <c>StatCalculator.ComputeAttackSuccess</c> is therefore always 0, and
-///             <c>MonsterCombatResolver.ResolvePvmAttack</c> unconditionally rejects any attack with
-///             AttackSuccess &lt; 1 -- a fresh character can never land a hit.
-///             <see cref="ApplyCombatUnblockWorkaroundAsync" />
-///             seeds StatStr directly so the combat/kill/loot/XP leg can be driven for real over the wire.
-///         </item>
 ///         <item>
 ///             <c>Infrastructure/Fenrir.Data/WriteBehind/DirtyFlags.cs</c> says outright: "Vitals and Progression
 ///             are raised ... but have no flush reader yet." Only <c>DirtyFlags.Position</c> is ever flushed
@@ -46,6 +36,14 @@ namespace Fenrir.IntegrationTests;
 ///             itself).
 ///         </item>
 ///     </list>
+///     The prior second gap here -- no wire opcode existed to spend a fresh character's StatPoints into raw
+///     Str/Vit/Int/Dex -- is now closed: <c>GenericActionHandler</c> wires up tSort 206
+///     (<c>ProcessForStatPlus</c>), so the combat leg now drives a real
+///     <see cref="Wire.ZoneBotClient.AllocateStatPointAsync" /> call (category 9, the variable-regime Strength
+///     credit -- <c>StatAllocationResolver.BaseStat.Strength</c>) instead of seeding StatStr directly.
+///     <see cref="SeedCombatStagingAsync" /> still seeds Money and a spawn position near the planned encounter
+///     via direct SQL, but that remains pure harness convenience (skipping a town-to-encounter walk and
+///     guaranteeing purchase currency for the NPC-shop leg), not a workaround for any real gap.
 /// </remarks>
 [Collection("FenrirEnvironment")]
 public sealed class EndToEndScenarioTests
@@ -53,6 +51,12 @@ public sealed class EndToEndScenarioTests
     private const string AvatarName = "E2EBot01";
     private const string MousePin = "4242";
     private const int LoginClientVersion = 90354; // LoginServerOptions.ExpectedClientVersion default
+
+    // StatAllocationResolver.BaseStat.Strength, variable regime (tStatSort 9-12 = Str/Dex/Vit/Int, cost ==
+    // credited amount 1:1). CreateAvatarService.StartingStatPoint seeds every fresh character with 3175
+    // unspent StatPoints, so 500 is well within budget with margin to spare.
+    private const int StrengthVariableStatSort = 9;
+    private const int StrengthPointsToAllocate = 500;
 
     private readonly FenrirEnvironmentFixture _environment;
 
@@ -72,8 +76,25 @@ public sealed class EndToEndScenarioTests
         // ---- Login -> mouse PIN -> character creation ----
         var login = await LoginBotClient.ConnectAsync(_environment.LoginPort, ct);
 
-        var loginResult = await login.LoginAsync(FenrirEnvironmentFixture.TestAccountLoginName,
-            FenrirEnvironmentFixture.TestAccountPassword, LoginClientVersion, ct);
+        LoginResult loginResult;
+        try
+        {
+            loginResult = await login.LoginAsync(FenrirEnvironmentFixture.TestAccountLoginName,
+                FenrirEnvironmentFixture.TestAccountPassword, LoginClientVersion, ct);
+        }
+        catch (Exception ex)
+        {
+            // Wraps (never swallows) the original failure with the LoginServer's own captured stdout/stderr --
+            // a bare "peer closed the connection" IOException on its own gives zero insight into WHY the
+            // server ended the session (decode fault, session-state-gate rejection, rate limit, unhandled
+            // handler exception, ...); LoginConnectionHost/SessionLoop already log that reason at Warning/Error
+            // as it happens, so surfacing it here turns "the socket died" into an actionable root cause on the
+            // very first assertion failure instead of requiring a manual re-run with a debugger attached.
+            throw new InvalidOperationException(
+                $"LoginAsync failed -- see inner exception. Captured LoginServer output:\n{_environment.LoginServerLogSnapshot()}",
+                ex);
+        }
+
         Assert.Equal(0, loginResult.Result);
         Assert.Equal(1, loginResult.SecondLoginSort); // RequireSecondPassword=true by default -> PIN mandatory
 
@@ -85,7 +106,7 @@ public sealed class EndToEndScenarioTests
 
         var characterId = await ReadCharacterIdAsync(AvatarName, ct);
         var seededMoney = Math.Max(200_000, plan.ItemBuyCost * 20);
-        await ApplyCombatUnblockWorkaroundAsync(characterId, plan, seededMoney, ct);
+        await SeedCombatStagingAsync(characterId, plan, seededMoney, ct);
 
         var zoneTransfer = await login.ZoneTransferAsync(0, ct);
         Assert.Equal(0, zoneTransfer.Result);
@@ -105,6 +126,18 @@ public sealed class EndToEndScenarioTests
 
         await zone.ReadyAsync(0, ct);
         zone.StartBackgroundPump();
+
+        // ---- Real-wire stat-point allocation (tSort 206, ProcessForStatPlus -- now wired by GenericActionHandler) ----
+        // Replaces the former SQL-seeded StatStr workaround (see class remarks): category 9 is the
+        // variable-regime Strength credit (StatAllocationResolver.BaseStat.Strength), crediting
+        // StrengthPointsToAllocate 1:1 from the character's starting StatPoints balance
+        // (CreateAvatarService.StartingStatPoint = 3175 -- ample headroom) so StatCalculator.ComputeAttackSuccess
+        // clears MonsterCombatResolver.ResolvePvmAttack's AttackSuccess floor for real, not via direct SQL.
+        await zone.AllocateStatPointAsync(StrengthVariableStatSort, StrengthPointsToAllocate, ct);
+        var statAllocationResult = await WaitForGenericActionResultAsync(zone, 206, TimeSpan.FromSeconds(10));
+        Assert.True(statAllocationResult is not null,
+            "GenericActionResponse for the real-wire stat-point allocation (tSort 206) never arrived.");
+        Assert.Equal(0, statAllocationResult!.Value.Result);
 
         var currentX = plan.MonsterX;
         var currentY = plan.MonsterY;
@@ -180,20 +213,22 @@ public sealed class EndToEndScenarioTests
     }
 
     /// <summary>
-    ///     See the class remarks for why this precondition exists; both values are hand-picked to make combat/purchase
-    ///     reliable, not realistic game balance.
+    ///     Pure harness convenience, NOT a workaround for a real gap (see class remarks): seeds starting Money
+    ///     (so the NPC-purchase leg can always afford <see cref="EncounterPlan.ItemBuyCost" />) and a spawn
+    ///     position right next to the planned encounter region (so the scenario doesn't need to walk the
+    ///     character across the whole map from its tribe's town first). Both values are hand-picked to make
+    ///     that leg reliable, not realistic game balance.
     /// </summary>
-    private async Task ApplyCombatUnblockWorkaroundAsync(int characterId, EncounterPlan plan, long money,
+    private async Task SeedCombatStagingAsync(int characterId, EncounterPlan plan, long money,
         CancellationToken ct)
     {
         await using var connection = await _environment.OpenConnectionAsync();
         await using var command = new SqlCommand(
             """
             UPDATE game.Characters
-            SET StatStr = @StatStr, Money = @Money, PosX = @PosX, PosY = @PosY, PosZ = @PosZ
+            SET Money = @Money, PosX = @PosX, PosY = @PosY, PosZ = @PosZ
             WHERE CharacterId = @CharacterId;
             """, connection);
-        command.Parameters.AddWithValue("@StatStr", 2000);
         command.Parameters.AddWithValue("@Money", money);
         command.Parameters.AddWithValue("@PosX", plan.MonsterX);
         command.Parameters.AddWithValue("@PosY", plan.MonsterY);

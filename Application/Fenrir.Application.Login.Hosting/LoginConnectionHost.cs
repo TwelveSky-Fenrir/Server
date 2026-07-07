@@ -93,10 +93,8 @@ public sealed class LoginConnectionHost(
 
             await GreetAsync(loginSession, connection, ct).ConfigureAwait(false);
 
-            await Task.WhenAll(
-                connection.RunIOAsync(ct),
-                SessionLoop.RunAsync(loginSession, dispatcher, rateLimiter, ipFloodGuard, ct, logger)
-            ).ConfigureAwait(false);
+            await SessionLoop.RunConnectionAsync(connection, loginSession, dispatcher, rateLimiter, ipFloodGuard, ct,
+                logger).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

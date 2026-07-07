@@ -79,24 +79,29 @@ public readonly record struct AllianceCeremonyTickResult(
 ///         <see cref="WorldStateService" />/<see cref="ZoneEventBroadcaster" /> mutation.
 ///     </para>
 ///     <para>
-///         GAP 1 (idle-state detection, not implemented here): this class expects the two posts' current
-///         qualifying leader, if any, as plain <see cref="AllianceCeremonyCandidate" /> inputs to
-///         <see cref="Tick" /> -- it does not itself scan connected players against the two posts' hardcoded
-///         map coordinates/radii, because the translated contract driving this class cites where those
-///         constants live (S07_MyGame01.cpp:586-611) without quoting their literal values, and Fenrir's
-///         <see cref="PlayerRuntimeState" /> has no "ready"/"changing map"/"hidden" flags yet for a scanner to
-///         even test against (those belong to Combat/social-state work outside this change's scope). A future
-///         Hosting-level scanner that has both the real coordinates and those flags can supply
-///         <see cref="Tick" />'s two candidate parameters once it exists.
+///         GAP 1 (idle-state detection) -- RESOLVED: the two posts' current qualifying leader, if any, is now
+///         produced by <see cref="AlliancePostOccupantScanner.Scan" /> (S07_MyGame01.cpp:3781-3869's per-post
+///         idle-scan loops; both fixed posts' literal world-space location/radius are cited at
+///         S07_MyGame01.cpp:593-600 combined with Server/ts25zone/H07_MyGame.h:138-139) and fed into
+///         <see cref="Tick" />'s two candidate parameters every legacy tick by
+///         <c>Fenrir.Application.Game.Hosting.World.ZoneWar.AllianceDiplomacyCeremonyHost</c> -- see that
+///         scanner's own remarks for the exact per-qualifier translation, including the one still-open
+///         sub-gap ("hiding," which has no <see cref="PlayerRuntimeState" /> equivalent anywhere in Fenrir
+///         yet and is therefore skipped, not invented). <see cref="Tick" /> itself deliberately still takes
+///         plain candidate inputs rather than performing the scan inline, so this class's own state-machine
+///         tests keep driving it directly with hand-built candidates instead of a live zone/registry.
 ///     </para>
 ///     <para>
-///         GAP 2 (negotiation countdown length, not guessed): the legacy's "fresh countdown" starting value
-///         for <see cref="AllianceCeremonyPhase.NewAllianceNegotiation" />/
-///         <see cref="AllianceCeremonyPhase.AlreadyAlliedNegotiation" />
-///         has no cited numeric value, unlike <see cref="RejectionMessageDurationRawTicks" />/
-///         <see cref="PostNegotiationCooldownDurationRawTicks" /> (both explicitly tied to the cited
-///         <c>GetGameTickMinute</c>/<c>GetGameTickHour</c> convention). Rather than fabricate a number, this
-///         class requires its caller to supply both durations explicitly -- see
+///         GAP 2 (negotiation countdown length) -- RESOLVED: both negotiation phases' fresh-countdown
+///         starting value is <see cref="NegotiationConfirmationDurationRawTicks" /> (S07_MyGame01.cpp:3904 --
+///         the new-alliance path's <c>mAllienceRemainTime = 60</c> -- and :3912, the already-allied path's
+///         identical assignment; both decrement once per "every OTHER raw tick" check, :3925/:3963, matching
+///         this class's own <see cref="AdvanceNegotiation" /> parity gate exactly). Production wiring
+///         (<c>HostingServiceCollectionExtensions.AddZoneWar</c>) now passes this constant for both
+///         constructor arguments; the constructor itself still requires them explicitly rather than
+///         hardcoding the constant internally, so this class's own unit tests can keep exercising the
+///         countdown mechanics with small values instead of waiting out 60 real negotiation ticks per test --
+///         see
 ///         <see
 ///             cref="AllianceDiplomacyCeremony(WorldStateService,AllianceCooldownTracker,ZoneEventBroadcaster,ILogger{AllianceDiplomacyCeremony},int,int)" />
 ///         .
@@ -106,7 +111,8 @@ public readonly record struct AllianceCeremonyTickResult(
 ///         exposes the outcome as a plain result the caller translates into whatever packet
 ///         <c>fenrir-wire-protocol-implementer</c> eventually defines for these 5 status codes -- no such
 ///         packet exists in <c>Network.Serialization.Packets.Zone</c> yet, so this class deliberately does not
-///         attempt to send anything itself.
+///         attempt to send anything itself. <c>AllianceDiplomacyCeremonyHost</c> logs the outcome instead, in
+///         the meantime -- still open, not resolved by this change.
 ///     </para>
 /// </remarks>
 public sealed class AllianceDiplomacyCeremony
@@ -119,6 +125,14 @@ public sealed class AllianceDiplomacyCeremony
 
     /// <summary>GetGameTickHour(1) -- S07_MyGame01.cpp:4003-4011.</summary>
     public const int PostNegotiationCooldownDurationRawTicks = 7200;
+
+    /// <summary>
+    ///     <c>mAllienceRemainTime = 60</c>, identical for both negotiation phases (S07_MyGame01.cpp:3904
+    ///     new-alliance path, :3912 already-allied path). Resolves this class's own former GAP 2 -- see the
+    ///     class remarks. Not applied automatically by the constructor (see its own remarks for why); use
+    ///     this constant explicitly when constructing for production use.
+    /// </summary>
+    public const int NegotiationConfirmationDurationRawTicks = 60;
 
     /// <summary>S04_MyWork02.cpp:427-448 case 47's mutual re-alliance cooldown length.</summary>
     public const int ReAllianceCooldownDays = 14;

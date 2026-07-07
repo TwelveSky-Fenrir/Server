@@ -61,7 +61,8 @@ public sealed partial class Zone(
     HeroRankPointAccumulator? heroRankPointAccumulator = null,
     ICharacterShardLocationRepository? characterShardLocations = null,
     TribeBankTaxAccumulator? tribeBankTax = null,
-    RegularWarActiveMapTracker? regularWarActiveMapTracker = null) : IZoneActor
+    RegularWarActiveMapTracker? regularWarActiveMapTracker = null,
+    ZoneRegistry? zoneRegistry = null) : IZoneActor
 {
     /// <summary>Bounded capacity for <see cref="_inbox" /> -- also the basis for <see cref="InboxDrainCapPerTick" />.</summary>
     private const int InboxCapacity = 8192;
@@ -137,6 +138,20 @@ public sealed partial class Zone(
     /// </summary>
     private TimeSpan _clock;
 
+    /// <summary>
+    ///     This zone's own owning registry -- used only to resolve OTHER zones' tracked players when this zone's
+    ///     tick needs to reach someone outside its own <see cref="_players" /> (currently:
+    ///     <see cref="BreakPartyOnDisconnect" />'s cross-zone party-changed broadcast). Passed as <c>this</c> by
+    ///     <see cref="ZoneRegistry.Initialize" /> when it builds every <see cref="Zone" /> instance -- safe with
+    ///     no <see cref="Monsters.MonsterSpawnScheduler" />-style DI-container constructor cycle to defer around,
+    ///     since <see cref="Zone" /> is never itself DI-resolved: it is only ever built imperatively by
+    ///     <see cref="ZoneRegistry.Initialize" />, which cannot run until the <see cref="ZoneRegistry" /> singleton
+    ///     it is a method on already fully exists. Null only in test call sites that construct a single
+    ///     <see cref="Zone" /> directly -- those degrade to same-zone-only notification, same posture as every
+    ///     other optional cross-cutting dependency here.
+    /// </summary>
+    private readonly ZoneRegistry? _zoneRegistry = zoneRegistry;
+
     /// <summary>The legacy map this actor simulates -- its key in <see cref="ZoneRegistry" />.</summary>
     public short MapId { get; } = mapId;
 
@@ -171,7 +186,17 @@ public sealed partial class Zone(
         return _players.TryGetValue(characterId, out state);
     }
 
-    /// <summary>Tick-thread-only: <see cref="_grid" /> itself is not thread-safe.</summary>
+    /// <summary>
+    ///     Tick-thread-only: <see cref="_grid" /> itself is not thread-safe. Deliberately coarse-only (no
+    ///     exact-distance filtering) -- <see cref="Monsters.MonsterAiSystem.TryAcquireTarget" /> is this
+    ///     method's other caller, and its own detection radius (<c>MonsterRowDto.RadiusInfo2</c>) is an
+    ///     independent, data-driven value that can exceed <see cref="GameServerOptions.AoiCellSize" />; that
+    ///     call site applies its own exact-distance check afterward, so baking a fixed AOI-scale exact filter
+    ///     in here would silently truncate detection range for any monster configured with a wider radius. A
+    ///     broadcast call site that DOES want the AOI exact-distance pass (legacy's own <c>Broadcast11</c>
+    ///     semantics, see <see cref="AoiGrid" />'s remarks) should query <see cref="_grid" /> directly instead
+    ///     of going through this helper.
+    /// </summary>
     public IEnumerable<int> NeighborsOfPosition(float x, float z)
     {
         return _grid.Neighbors(_grid.CellOf(x, z));

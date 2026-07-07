@@ -106,9 +106,9 @@ var unclaimedDesignatedMaps = await SingletonRvrSchedulerGuard.FindUnclaimedDesi
         new SingletonRvrSchedulerValidator.DesignatedMapClaim(nameof(TribeSymbolBattleSchedulerHost),
             gameOptions.TribeSymbolBattleMapId),
         new SingletonRvrSchedulerValidator.DesignatedMapClaim(nameof(HolyStoneWarCycleHost),
-            gameOptions.HolyStoneMapId)
-        // AllianceTribeMapId intentionally excluded -- AllianceDiplomacyCeremony has no Hosting driver yet
-        // (see its own remarks). Add it here the same day that driver ships.
+            gameOptions.HolyStoneMapId),
+        new SingletonRvrSchedulerValidator.DesignatedMapClaim(nameof(AllianceDiplomacyCeremonyHost),
+            gameOptions.AllianceTribeMapId)
     ],
     host.Services.GetRequiredService<IGameServerDirectoryRepository>(),
     host.Services.GetRequiredService<IShardMapAssignmentRepository>(),

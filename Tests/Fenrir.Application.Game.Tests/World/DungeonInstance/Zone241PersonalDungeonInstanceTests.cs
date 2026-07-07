@@ -274,7 +274,15 @@ public class Zone241PersonalDungeonInstanceTests
         zone.PersonalDungeonBossCatalog = new FakeBossCatalog(BossMonsterId);
 
         var (session, pipe) = ZoneTestKit.CreateSession(1);
-        const int characterId = 3;
+        // A multiple of 10 (SimulationClock.RebroadcastStaggerOffset's own 10-bucket size for the 5 s monster
+        // interval, see its remarks) deliberately: SummonPersonalBoss uses ServerIndex = CharacterId, and
+        // bucket 0 is the one un-shifted bucket (zero stagger offset), which keeps this test's own hand-derived
+        // tick-number schedule below exact and readable. Any other characterId still fires correctly (the
+        // "rebroadcast at least once every 5 s" contract never breaks -- see MonsterRebroadcastStaggerTests),
+        // just on a different, still-valid phase that would land two keep-alives inside this test's specific
+        // 18-tick observation window instead of one, which is a property of THIS test's tick bookkeeping, not a
+        // bug in the staggering itself.
+        const int characterId = 10;
         zone.Post(ZoneCommand.Enter(characterId, EnterData(session, Zone241MapId, 100, 100, 1)));
         zone.Tick(SimulationClock
             .LegacyTick); // tick call #1: enter + arm + summon (creation broadcast) -> BattleInProgress, dungeon tick counter at 1

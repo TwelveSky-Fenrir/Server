@@ -33,7 +33,15 @@ public class ZoneTowerGuardianCombatTests
     {
         var template = WorldDataTestRows.Monster(9000) with { Life = life, DefensePower = monsterDefensePower };
         var guardianIndex = TowerWarState.GuardianServerIndex(towerIndex);
-        return MonsterEntity.Create(guardianIndex, 777u, template, guardianIndex, 100, 0, 100, 300f);
+        var guardian = MonsterEntity.Create(guardianIndex, 777u, template, guardianIndex, 100, 0, 100, 300f);
+
+        // This suite never wires MonsterAiSystem into the zone (it only needs the friendly-fire gate), so a
+        // freshly created guardian would otherwise sit in MonsterAiState.Spawning forever -- Zone.ApplyCombatCommand's
+        // CheckPossibleAttackTarget gate (Zone.Combat.cs) now silently rejects an attack against a monster
+        // mid-spawn-windup. Force straight to Decision: a tower guardian is conceptually always "up," not
+        // mid-spawn-animation, for this suite's purposes.
+        guardian.AiState = MonsterAiState.Decision;
+        return guardian;
     }
 
     private static (Zone Zone, TowerWarState TowerWar) CreateZoneWithActiveGuardian(byte attackerTribe,
@@ -176,6 +184,7 @@ public class ZoneTowerGuardianCombatTests
         var guardianIndex = TowerWarState.GuardianServerIndex(TowerIndex);
         var monster = MonsterEntity.Create(guardianIndex, 1u, WorldDataTestRows.Monster(9001) with { Life = 1000 },
             guardianIndex, 100, 0, 100, 300f);
+        monster.AiState = MonsterAiState.Decision; // see CreateGuardian's own remarks on the spawn-windup gate
         zone.SpawnMonster(monster);
 
         var (session, _) = ZoneTestKit.CreateSession(1);

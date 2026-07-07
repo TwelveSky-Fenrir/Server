@@ -15,6 +15,12 @@ namespace Fenrir.Application.Game.Domain.World;
 public sealed partial class Zone
 {
     /// <summary>
+    ///     A009 flinch damage threshold -- <c>(float)shmMONSTER_INFO-&gt;mLife * 0.10f</c>
+    ///     (<c>Server/ts25zone/S07_MyGame02.cpp:2475</c>), see <see cref="TryApplyPvmFlinch" />.
+    /// </summary>
+    private const float FlinchDamageThresholdRatio = 0.10f;
+
+    /// <summary>
     ///     Enqueued by <see cref="TryDamageMonster" /> (any thread) on a killing blow, drained by
     ///     <see cref="Monsters.MonsterSpawnScheduler" /> on this zone's own next tick (single-writer preserved).
     /// </summary>
@@ -53,6 +59,16 @@ public sealed partial class Zone
 
     private int _monsterUniqueNumberSeed;
 
+    /// <summary>
+    ///     Reusable scratch buffer for <see cref="BroadcastMonsterAction" />'s recipient list -- same
+    ///     non-allocating shape and reuse justification as <see cref="Zone.PlayerLifecycle" />'s
+    ///     <c>_rebroadcastNeighborScratch</c>: single tick thread, cleared immediately before each call, never
+    ///     read after the immediately-following send loop returns. Replaces a per-call
+    ///     <c>AoiGrid.Neighbors(cell).ToArray()</c> (iterator + LINQ buffer) that used to run once per due
+    ///     monster -- during a keep-alive burst, once per due monster in that SAME tick, not once per zone.
+    /// </summary>
+    private readonly List<int> _monsterBroadcastNeighborScratch = [];
+
     public int MonsterCount => _monsters.Count;
 
     public IEnumerable<MonsterEntity> MonstersSnapshot => _monsters.Values;
@@ -74,12 +90,20 @@ public sealed partial class Zone
     /// </summary>
     public void SpawnMonster(MonsterEntity monster)
     {
-        monster.LastRebroadcastAt = _clock;
+        // Staggered, not a plain "= _clock": MonsterSpawnScheduler.Simulate's InitialPopDone branch spawns
+        // EVERY configured spawn-region slot unconditionally on a zone's first Simulate call, all in the same
+        // Zone.Tick, all reading the exact same _clock value -- without this offset every one of those monsters
+        // would become due for RebroadcastMonsters' 5 s keep-alive on the exact same later tick, re-synchronize
+        // (that tick re-stamps all of them to that same new _clock value), and repeat forever: a thundering herd
+        // of individual MonsterReplicationResponse sends recurring every 5 s for the zone's whole lifetime. See
+        // SimulationClock.RebroadcastStaggerOffset's own remarks.
+        monster.LastRebroadcastAt = _clock - SimulationClock.RebroadcastStaggerOffset(monster.ServerIndex,
+            SimulationClock.MonsterRebroadcastInterval);
         _monsters[monster.ServerIndex] = monster;
 
         var cell = _grid.CellOf(monster.PosX, monster.PosZ);
         monster.CurrentCell = cell;
-        _monsterGrid.Add(monster.ServerIndex, cell);
+        _monsterGrid.Add(monster.ServerIndex, cell, monster.PosX, monster.PosY, monster.PosZ);
 
         BroadcastMonsterAction(monster, 1); // action=1 on B_MONSTER_ACTION_RECV at creation
     }
@@ -114,17 +138,20 @@ public sealed partial class Zone
     ///     Tick-owned caller only (<see cref="Monsters.MonsterAiSystem" />, once per monster per AI pass, after
     ///     whatever position mutation that pass applied) -- the monster-side counterpart to
     ///     <see cref="HandleMove" />'s own <c>_grid.Move</c> call for players. Keeps <see cref="_monsterGrid" />
-    ///     in sync with <paramref name="monster" />'s live position; a no-op (no dictionary churn) on any pass
-    ///     that left the monster in the same cell it already occupied, which is the overwhelming majority --
-    ///     most AI states (windup, flinch, idle wait, chase before the next step) don't move the monster at all.
+    ///     in sync with <paramref name="monster" />'s live position -- cell MEMBERSHIP churn (the
+    ///     dictionary/hash-set mutation <see cref="AoiGrid.Move(int,ValueTuple{int,int},ValueTuple{int,int},float,float,float)" />
+    ///     itself skips when <c>from == to</c>) still only happens on the minority of passes that actually
+    ///     crossed a cell boundary, same as before. Always still refreshes the monster's own tracked exact
+    ///     position, though, even within the same cell -- <see cref="AoiGrid" />'s exact-distance pass
+    ///     (<see cref="SendExistingMonstersTo" />'s own query) would otherwise compare against a stale position
+    ///     for a monster that keeps moving inside one cell without ever crossing into a new one (windup/chase
+    ///     micro-movement is exactly that case).
     /// </summary>
     public void SyncMonsterCell(MonsterEntity monster)
     {
         var newCell = _grid.CellOf(monster.PosX, monster.PosZ);
-        if (newCell == monster.CurrentCell)
-            return;
-
-        _monsterGrid.Move(monster.ServerIndex, monster.CurrentCell, newCell);
+        _monsterGrid.Move(monster.ServerIndex, monster.CurrentCell, newCell, monster.PosX, monster.PosY,
+            monster.PosZ);
         monster.CurrentCell = newCell;
     }
 
@@ -275,6 +302,52 @@ public sealed partial class Zone
     }
 
     /// <summary>
+    ///     A009 hit-stagger ("vacillement") trigger -- the piece <see cref="MonsterAiState.Flinch" />'s own
+    ///     remarks flagged as living in <see cref="ApplyPvmAttack" /> but "not wired yet." The state's own
+    ///     tick-countdown-then-return-to-<see cref="MonsterAiState.Decision" /> behavior
+    ///     (<see cref="Monsters.MonsterAiSystem" />) was already fully implemented and only needed this caller.
+    /// </summary>
+    /// <remarks>
+    ///     Réf. C++ : <c>Server/ts25zone/S07_MyGame02.cpp:2471-2487</c> (<c>ProcessAttack03</c>, immediately
+    ///     after the per-attacker damage-history accumulation). Gated, in this exact short-circuit order --
+    ///     preserved so a PRNG draw only ever happens on the same calls legacy itself draws on --
+    ///     on: <paramref name="monster" />'s <c>shmMONSTER_INFO-&gt;mDamageType != 1</c> (stationary/structure
+    ///     monsters, e.g. the tribe-symbol stones, never flinch, and this check is cheap/first so those
+    ///     monsters never consume a roll here), a 50% <c>rand_mir()</c> roll, this single hit's own
+    ///     <paramref name="damageDealt" /> exceeding 10% of <see cref="MonsterEntity.MaxLife" />, and the
+    ///     monster not already mid-flinch (<c>aSort != 8</c>). Only reachable for a hit the monster survived --
+    ///     see the caller in <see cref="ApplyPvmAttack" />, matching legacy's own <c>mDATA.mLifeValue &gt; 0</c>
+    ///     outer gate at the same source lines. On success, <c>aSort</c> is set to 8 (A009) and
+    ///     <c>mTRANSFER.B_MONSTER_ACTION_RECV(..., 1)</c> is sent -- <c>checkChangeActionState=1</c>, the same
+    ///     "this is a new action the client must render" convention <see cref="SpawnMonster" /> uses at
+    ///     creation, not the keep-alive/no-change 0 <see cref="RebroadcastMonsters" /> uses.
+    ///     <para>
+    ///         NOT reproduced: the facing-angle update (<c>aFront = GetYAngle(...)</c>, turning the monster to
+    ///         face its attacker) and the RvR-only <c>SendSpecialNumber()</c> call in the same legacy block --
+    ///         both are outside this fix's own source contract (attack-target-resolution); flag separately if
+    ///         byte-exact facing/heading parity on a flinch is ever needed.
+    ///     </para>
+    /// </remarks>
+    private void TryApplyPvmFlinch(MonsterEntity monster, int damageDealt)
+    {
+        if (monster.Template.DamageType == 1)
+            return;
+
+        if (_random.NextInt32(2) != 0)
+            return;
+
+        if (damageDealt <= (int)(monster.MaxLife * FlinchDamageThresholdRatio))
+            return;
+
+        if (monster.AiState == MonsterAiState.Flinch)
+            return;
+
+        monster.AiState = MonsterAiState.Flinch;
+        monster.StateTicks = 0;
+        BroadcastMonsterAction(monster, 1);
+    }
+
+    /// <summary>
     ///     Identifier-1407 "Elite Boss" kill announcement (<c>World.Loot.BossEventDropResolver</c>) --
     ///     <c>U_ZONE_BROADCAST_FOR_CENTER_SEND(2003, ...)</c> has no receiving Center process in Fenrir's
     ///     two-executable topology, the same collapse <see cref="ApplyTowerGuardianHitSideEffects" />'s own Center
@@ -333,7 +406,8 @@ public sealed partial class Zone
         };
 
         var recipients = new HashSet<int> { target.CharacterId };
-        foreach (var id in _grid.Neighbors(target.CurrentCell)) recipients.Add(id);
+        foreach (var id in _grid.Neighbors(target.CurrentCell, target.PosX, target.PosY, target.PosZ))
+            recipients.Add(id);
         BroadcastAttackResult(recipients, response);
 
         if (!outcome.Hit)
@@ -402,6 +476,13 @@ public sealed partial class Zone
     ///         longer holds (this same tick already despawned/killed it before this call ran) -- the lookup
     ///         below simply skips it, exactly as harmless as the old scan not finding it would have been.
     ///     </para>
+    ///     <para>
+    ///         Uses the legacy-parity exact-distance overload at the base (scale-1) radius, not each candidate
+    ///         monster's own <see cref="Monsters.MonsterBroadcastScale" />-derived scale -- unlike
+    ///         <see cref="BroadcastMonsterAction" />, this whole mechanism has no legacy citation to begin with
+    ///         (see the caveat above), so there is no cited per-candidate scale to widen by here either; this is
+    ///         a deliberate, uniform simplification rather than a re-guess.
+    ///     </para>
     /// </remarks>
     private void SendExistingMonstersTo(PlayerRuntimeState state)
     {
@@ -409,7 +490,7 @@ public sealed partial class Zone
         if (!_monsterGrid.HasAnyNeighbor(cell))
             return;
 
-        foreach (var serverIndex in _monsterGrid.Neighbors(cell))
+        foreach (var serverIndex in _monsterGrid.Neighbors(cell, state.PosX, state.PosY, state.PosZ))
         {
             if (!_monsters.TryGetValue(serverIndex, out var monster))
                 continue; // stale grid entry (despawned/killed earlier this same tick) -- harmless, skip
@@ -435,18 +516,27 @@ public sealed partial class Zone
     }
 
     /// <summary>
-    ///     Serialize-once broadcast for monster replication -- same pattern as <see cref="BroadcastAvatarAction" />.
+    ///     Serialize-once broadcast for monster replication -- same pattern as <see cref="BroadcastAvatarAction" />,
+    ///     including the same <see cref="IsReviveHackBroadcastSuppressed" /> per-recipient gate (see that method's
+    ///     own remarks for the legacy citations establishing both broadcast families route through the same
+    ///     MyUtil::Broadcast11 primitive).
     ///     <see cref="AoiGrid.HasAnyNeighbor" /> pre-checks emptiness before paying for
-    ///     <see cref="AoiGrid.Neighbors" />'s iterator plus a LINQ <c>ToArray()</c> buffer -- see that method's
-    ///     own remarks.
+    ///     <see cref="_monsterBroadcastNeighborScratch" />'s scan; see that field's own remarks for why this is a
+    ///     reused non-allocating buffer rather than the enumerable-returning, iterator-plus-LINQ-<c>ToArray()</c>
+    ///     overload of <c>AoiGrid.Neighbors</c>. Scale resolved per-monster via
+    ///     <see cref="Monsters.MonsterBroadcastScale" /> -- see that class's own remarks for the full legacy
+    ///     citation chain (periodic catch-up always dispatches through <c>SendSpecialNumber</c>, so this is not
+    ///     a guess).
     /// </summary>
     private void BroadcastMonsterAction(MonsterEntity monster, int checkChangeActionState)
     {
+        var scale = MonsterBroadcastScale.ForMonster(monster.Template.Type, monster.Template.SpecialType);
         var cell = _grid.CellOf(monster.PosX, monster.PosZ);
-        if (!_grid.HasAnyNeighbor(cell))
+        if (!_grid.HasAnyNeighbor(cell, scale))
             return;
 
-        var recipients = _grid.Neighbors(cell).ToArray();
+        _monsterBroadcastNeighborScratch.Clear();
+        _grid.Neighbors(_monsterBroadcastNeighborScratch, cell, monster.PosX, monster.PosY, monster.PosZ, scale);
         var packet = BuildMonsterActionRecv(monster, checkChangeActionState);
         var total = FrameWriter.FrameSizeOf<MonsterReplicationResponse>();
         var rented = ArrayPool<byte>.Shared.Rent(total);
@@ -456,12 +546,13 @@ public sealed partial class Zone
             var span = rented.AsSpan(0, total);
             FrameWriter.WriteFrame(in packet, span);
 
-            foreach (var id in recipients)
+            foreach (var id in _monsterBroadcastNeighborScratch)
                 try
                 {
                     if (_players.TryGetValue(id, out var recipient) &&
                         recipient.Session is ClientSession clientSession &&
-                        IsVisibleAcrossDungeonInstance(monster.InstanceId, recipient.DungeonInstanceId))
+                        IsVisibleAcrossDungeonInstance(monster.InstanceId, recipient.DungeonInstanceId) &&
+                        !IsReviveHackBroadcastSuppressed(recipient))
                         clientSession.SendRaw(span);
                 }
                 catch (Exception ex)

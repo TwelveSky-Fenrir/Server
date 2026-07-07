@@ -128,7 +128,11 @@ public sealed class ZoneRegistry
                 worldState: _worldState, partyRegistry: _partyRegistry, duelRegistry: _duelRegistry,
                 heroRankPointAccumulator: _heroRankPointAccumulator,
                 characterShardLocations: _characterShardLocations,
-                regularWarActiveMapTracker: _regularWarActiveMapTracker));
+                regularWarActiveMapTracker: _regularWarActiveMapTracker,
+                // Safe: this ZoneRegistry instance is already fully constructed by the time Initialize runs
+                // (see Zone's own _zoneRegistry remarks) -- no DI-container cycle, since Zone is never itself
+                // DI-resolved.
+                zoneRegistry: this));
     }
 
     public bool TryGet(short mapId, [NotNullWhen(true)] out Zone? zone)

@@ -42,6 +42,35 @@ public sealed class MonsterEntity
     /// </summary>
     public int? InstanceId { get; init; }
 
+    /// <summary>
+    ///     Legacy <c>mAvatarName</c> (<c>Server/ts25zone/H07_MyGame.h</c>) -- the name of the avatar this monster
+    ///     is summon-locked to, stamped on at summon time. Null/empty for every ordinary monster (the
+    ///     overwhelming majority); no Fenrir spawn path sets this today because no player-summon-monster
+    ///     mechanic exists yet -- see <see cref="Combat.MonsterCombatResolver.ResolvePvmAttack" />'s
+    ///     owner-name-lock check, the sole consumer, for the rejection rule this field feeds.
+    /// </summary>
+    /// <remarks>
+    ///     Réf. C++ : Server/ts25zone/S07_MyGame02.cpp:1885-1896 (owner-name-lock check, re-verified directly
+    ///     from source; unless this field is empty, the attacking avatar's own name must match it, or the
+    ///     attack is rejected -- one narrow exception, see <see cref="OwnerNameLockExemptionArmedAt" />).
+    /// </remarks>
+    public string? OwnerName { get; init; }
+
+    /// <summary>
+    ///     Legacy <c>mInvalidTimeForSummon</c> (<c>Server/ts25zone/H07_MyGame.h:1096</c>), reproduced ONLY for
+    ///     its single narrow reuse as the elapsed-time gate on the one <see cref="OwnerName" />-lock exemption
+    ///     (monster template 9002 in the shipped LNW33 build -- see
+    ///     <see cref="Combat.MonsterCombatResolver.ResolvePvmAttack" />). Legacy's <c>mInvalidTimeForSummon</c>
+    ///     is also reused, unrelated to the owner-name-lock check, by several other summon/respawn-readiness
+    ///     mechanics (<c>Server/ts25zone/S10_MySummon.cpp</c>, <c>Server/ts25zone/ZoneWorker.cpp</c>,
+    ///     <c>Server/ts25zone/S07_MyGame02.cpp:3129</c> on death) -- none of those are modeled by this field;
+    ///     they belong to a future summon-monster mechanic's own behavior contract. Null until a summon
+    ///     mechanic arms it; the owner-name-lock check treats null the same as "not enough time has elapsed
+    ///     yet," matching legacy's own zero-elapsed state immediately after spawn
+    ///     (<c>Server/ts25zone/S07_MyGame05.cpp:14</c>, <c>MONSTER_OBJECT::Init</c> sets it to the current tick).
+    /// </remarks>
+    public TimeSpan? OwnerNameLockExemptionArmedAt { get; init; }
+
     public float PosX { get; set; }
     public float PosY { get; set; }
     public float PosZ { get; set; }

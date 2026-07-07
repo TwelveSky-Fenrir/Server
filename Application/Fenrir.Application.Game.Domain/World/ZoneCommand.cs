@@ -262,4 +262,12 @@ public sealed record PlayerEnterData(
     // every in-process zone transfer, same "must travel or it resets" posture as every block above.
     // game.Characters already persists it (Migrations/041_character_rebirth_zone241_time.sql); this is the
     // missing runtime-hydration link. See PlayerRuntimeState.Zone241Time's own remarks.
-    int Zone241Time = 0);
+    int Zone241Time = 0,
+    // Store/coffre money pool + the two second-page purchased-extension expiry dates -- must travel here too,
+    // or PlayerRuntimeState.StoreMoney/InventoryDate/StoreDate would silently reset to 0 on every world entry
+    // and in-process zone transfer. game.Characters already persists all three; this is the missing
+    // runtime-hydration link (npc-talk Store/Save transfer gap fix). See PlayerRuntimeState.Vault.cs's own
+    // remarks.
+    long StoreMoney = 0,
+    int InventoryDate = 0,
+    int StoreDate = 0);

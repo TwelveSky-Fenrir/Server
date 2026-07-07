@@ -164,6 +164,55 @@ public static class SimulationClock
         return legacyTicks * LegacyTick;
     }
 
+    /// <summary>
+    ///     Deterministic per-entity phase offset for a periodic keep-alive cadence (<see cref="AvatarRebroadcastInterval" />,
+    ///     <see cref="MonsterRebroadcastInterval" />, <see cref="GroundItemRebroadcastInterval" />), so that many
+    ///     entities seeded from the exact same <c>Zone</c> clock value within one tick -- every configured monster
+    ///     spawn-region slot popping unconditionally on a zone's first <c>MonsterSpawnScheduler.Simulate</c> call, a
+    ///     multi-item kill drop spawning several ground items in one <c>ProcessDeath</c> call, or a burst of queued
+    ///     <c>Enter</c> commands (e.g. a post-restart reconnect storm) draining within a single <c>Zone.DrainInbox</c>
+    ///     call -- don't all become "due" for their first keep-alive rebroadcast on the exact same subsequent tick
+    ///     (a thundering herd: every one of them re-broadcasts in the same frame, then re-synchronizes and repeats
+    ///     every <paramref name="interval" /> thereafter, since the tick that services them all also re-stamps them
+    ///     all to that same later clock value).
+    ///     <para>
+    ///         Deterministic and stable per <paramref name="entityId" /> -- built from the entity's own natural
+    ///         monotonic id (<c>MonsterEntity.ServerIndex</c>, a ground item's own spawn index, a player's
+    ///         <c>CharacterId</c>), never <see cref="Random" />/<see cref="DateTime.Now" />, so tests stay
+    ///         reproducible and two runs with the same spawn order stagger identically.
+    ///     </para>
+    ///     <para>
+    ///         Bucketed in whole <see cref="LegacyTick" /> units (10 buckets for a 5 s interval, 7 for 3.5 s) rather
+    ///         than at finer (e.g. millisecond) granularity: <c>Zone.RebroadcastMonsters</c>/<c>RebroadcastAvatars</c>/
+    ///         <c>RebroadcastGroundItems</c> only ever evaluate "is this entity due yet" once per <c>Zone.Tick</c>
+    ///         call that has at least one whole legacy tick elapsed (<c>legacyTicksElapsed &gt; 0</c>), so two
+    ///         entities whose offsets fall inside the same legacy tick are indistinguishable in practice -- a finer
+    ///         bucket count would waste precision without spreading anything across an ADDITIONAL real evaluation
+    ///         pass. Sizing buckets to whole legacy ticks instead spreads consecutive entity ids (the common case:
+    ///         a zone's spawn-region slots, or ground items from one kill, are assigned small sequential ids) across
+    ///         the FULL window -- entity <c>id</c> and <c>id + bucketCount</c> land in the same bucket, but id and
+    ///         <c>id + 1</c> land in DIFFERENT, evenly-spread buckets -- rather than clustering every low id into
+    ///         the window's opening moment the way a much-larger bucket count would for any population smaller than
+    ///         that count.
+    ///     </para>
+    ///     <para>
+    ///         Callers subtract the returned offset from the clock value they would otherwise stamp verbatim (e.g.
+    ///         <c>monster.LastRebroadcastAt = _clock - RebroadcastStaggerOffset(...)</c>), which only ever pulls an
+    ///         entity's first due time EARLIER within the current interval, never later -- so the existing
+    ///         "rebroadcast at least once every <paramref name="interval" />" contract is preserved verbatim; only
+    ///         the exact tick within that window shifts.
+    ///     </para>
+    /// </summary>
+    public static TimeSpan RebroadcastStaggerOffset(int entityId, TimeSpan interval)
+    {
+        var bucketCount = (int)(interval.Ticks / LegacyTick.Ticks);
+        if (bucketCount <= 0)
+            return TimeSpan.Zero;
+
+        var bucket = ((entityId % bucketCount) + bucketCount) % bucketCount;
+        return TimeSpan.FromTicks(interval.Ticks * bucket / bucketCount);
+    }
+
     /// <summary>Fractional remainder is discarded (callers that must not lose it use SimulationTickAccumulator).</summary>
     public static int ToWholeLegacyTicks(TimeSpan duration)
     {

@@ -84,7 +84,7 @@ public sealed partial class Zone
                 var response = new LocalChatResponse
                     { AvatarName = sender.Name, Content = command.Content, Link = command.Link };
                 var recipientIds = new List<int>();
-                foreach (var id in _grid.Neighbors(sender.CurrentCell))
+                foreach (var id in _grid.Neighbors(sender.CurrentCell, sender.PosX, sender.PosY, sender.PosZ))
                     if (_players.TryGetValue(id, out var recipient) &&
                         IsAlliedOrSameTribe(sender.Tribe, recipient.Tribe))
                         recipientIds.Add(id);

@@ -218,7 +218,7 @@ public sealed class ZoneMoveService(
             SkillGradeNum2 = 0,
             SkillValue = 0
         };
-        zoneSession.Send(Zone.BuildAvatarActionRecv(state, selfSpawnAction));
+        zoneSession.Send(sourceZone.BuildAvatarActionRecv(state, selfSpawnAction));
 
         // Live state travels inside the Leave/Enter pair, position overridden to the resolved arrival point --
         // posted to the source zone, never mutated directly here (single-writer invariant).

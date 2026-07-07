@@ -15,6 +15,11 @@ public sealed class SocketConnection : IDuplexPipe, IAsyncDisposable
     private readonly Socket _socket;
     private readonly Pipe _txPipe;
 
+    // Governs ONLY the two loops' own blocking socket calls (_socket.ReceiveAsync/SendAsync) -- see Abort's
+    // own remarks for why this exists separately from the pipe-level cancellation ClientSession.Abort already
+    // performs on Transport.Input/Output.
+    private readonly CancellationTokenSource _abortCts = new();
+
     public SocketConnection(Socket socket)
     {
         _socket = socket;
@@ -38,6 +43,7 @@ public sealed class SocketConnection : IDuplexPipe, IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         _socket.Dispose();
+        _abortCts.Dispose();
 
         await _rxPipe.Reader.CompleteAsync().ConfigureAwait(false);
         await _rxPipe.Writer.CompleteAsync().ConfigureAwait(false);
@@ -49,9 +55,38 @@ public sealed class SocketConnection : IDuplexPipe, IAsyncDisposable
     public PipeWriter Output => _txPipe.Writer;
 
     // Never throws: both loops swallow their own faults and complete their pipe ends instead.
-    public Task RunIOAsync(CancellationToken cancellationToken)
+    public async Task RunIOAsync(CancellationToken cancellationToken)
     {
-        return Task.WhenAll(ReceiveLoopAsync(cancellationToken), SendLoopAsync(cancellationToken));
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _abortCts.Token);
+        await Task.WhenAll(ReceiveLoopAsync(linked.Token), SendLoopAsync(linked.Token)).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    ///     Unblocks this connection's own in-flight/next <c>Socket.ReceiveAsync</c>/<c>SendAsync</c> call inside
+    ///     <see cref="RunIOAsync" /> -- <em>not</em> the same thing as <c>ClientSession.Abort</c>, which only
+    ///     cancels the RX/TX <see cref="Pipe" /> ends (<see cref="Input" />/<see cref="Output" />) and has no
+    ///     effect on a socket-level read/write already blocked waiting on the wire. A session whose peer simply
+    ///     stops sending bytes (the exact case an idle/liveness sweep exists to catch) would otherwise leave
+    ///     <see cref="ReceiveLoopAsync" /> parked on <c>Socket.ReceiveAsync</c> indefinitely even after
+    ///     <c>ClientSession.Abort</c> ran, since nothing else ever arrives to make that call return -- and every
+    ///     resource a connection-host's teardown path frees only after <see cref="RunIOAsync" /> itself completes
+    ///     (session-registry/flood-guard slots, the eventual <see cref="DisposeAsync" /> call) would stay held.
+    ///     Safe to call multiple times or after <see cref="DisposeAsync" /> already ran (idempotent no-op via
+    ///     <see cref="ObjectDisposedException" />, swallowed here -- disposal already tore down every loop this
+    ///     would otherwise unblock). Does NOT itself dispose the socket -- same "cancel only, never own teardown"
+    ///     posture as <c>ClientSession.Abort</c>; the connection host's own call site is still the one place that
+    ///     calls <see cref="DisposeAsync" />.
+    /// </summary>
+    public void Abort()
+    {
+        try
+        {
+            _abortCts.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // DisposeAsync already ran (and already disposed _abortCts) -- both loops are long gone, nothing to unblock.
+        }
     }
 
     private async Task ReceiveLoopAsync(CancellationToken cancellationToken)

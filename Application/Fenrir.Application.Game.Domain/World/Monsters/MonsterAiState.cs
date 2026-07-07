@@ -43,9 +43,9 @@ public enum MonsterAiState : byte
     ///     A009: hit-stagger, counts to <c>mFrameInfo[1]</c> ticks then returns to <see cref="Decision" />.
     ///     Legacy enters this (<c>S07_MyGame02.cpp</c>'s <c>ProcessAttack03</c>) when a single hit deals &gt;=10%
     ///     of the monster's max life, <c>DamageType != 1</c> (stationary/structure monsters like the tribe-symbol
-    ///     stones never flinch), 50% roll, and it isn't already staggered. That trigger lives in
-    ///     <c>Zone.ApplyPvmAttack</c>, outside this cluster's touched files -- not wired yet; this state machine
-    ///     is ready for whichever caller sets <see cref="MonsterEntity.AiState" /> to this value.
+    ///     stones never flinch), 50% roll, and it isn't already staggered. Wired via
+    ///     <c>Zone.TryApplyPvmFlinch</c> (called from <c>Zone.ApplyPvmAttack</c> on a landed, non-killing hit) --
+    ///     see that method's own remarks for the exact gate order and citation.
     /// </summary>
     Flinch = 8,
 

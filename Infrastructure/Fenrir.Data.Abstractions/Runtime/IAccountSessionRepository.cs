@@ -60,9 +60,19 @@ public interface IAccountSessionRepository
         CancellationToken ct);
 
     /// <summary>
-    ///     usp_AccountSession_TransitionToGame: called at world-entry. Accepted only when the account still holds the
-    ///     Login-side session matching expectedSessionToken -- proves this claim is for the same login epoch as the
-    ///     one that minted the SessionTicket carrying that token, not a hijack of a newer login.
+    ///     usp_AccountSession_TransitionToGame: called both at fresh Login-&gt;Game world-entry AND at a
+    ///     Game(ShardA)-&gt;Game(ShardB) cross-shard zone transfer (ZoneMoveService.HandleCrossShardAsync mints a
+    ///     fresh SessionTicket for the destination shard, and the destination shard's own ZoneHandshakeService.
+    ///     ConsumeTicketAsync calls this exact same method once the client reconnects there) -- one call site,
+    ///     one procedure, for both cases. Accepted only when the account still holds a session matching
+    ///     expectedSessionToken whose prior ServerKind is either Login (fresh world-entry) or Game (cross-shard
+    ///     hop) and which is not mid-teardown/kick-flagged: proves this claim is for the same login epoch as the
+    ///     one that minted the SessionTicket carrying that token, not a hijack of a newer login. Mirrors the
+    ///     legacy session broker's own unification of these two cases into one acceptance path (PlayUser slot in
+    ///     either LP_MOVING_ZONE or ZP_MOVING_ZONE, Server/ts25playuser/S07_MyGame01.cpp:1032-1076) -- see
+    ///     Database/Migrations/025_account_session_transition_game_to_game.sql for the full citation trail and
+    ///     the fix-forward history (the procedure originally only accepted a prior ServerKind = 0/Login row,
+    ///     which made every cross-shard hop fail this precondition and get disconnected on arrival).
     /// </summary>
     public ValueTask<bool> TransitionToGameAsync(int accountId, Guid expectedSessionToken, byte shardId,
         CancellationToken ct);

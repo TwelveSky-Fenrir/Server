@@ -83,6 +83,12 @@ public static class DomainServiceCollectionExtensions
         // doesn't matter" posture as PlayTimeAccrualSystem/SupportSkillTimeUpRatioMaintenanceSystem above.
         services.AddSingleton<ISimulationSystem, PetExpBoostCountdownSystem>();
 
+        // "Hoisundo" forced-departure countdown for zones 234-240 (once-per-real-minute decrement/broadcast,
+        // disconnect below 1) -- self-contained (only reads/writes its own PlayerRuntimeState fields and the
+        // zone-wide MapId gate, defers Abort() to after its own player scan same as DeathGateTickSystem
+        // below), so its position relative to every other system here doesn't matter.
+        services.AddSingleton<ISimulationSystem, HoisundoCountdownSystem>();
+
         // Active-duel death/departure/180-tick-timeout resolution (DuelMaintenanceSystem) -- reads
         // IsDead/player-presence state that every combat/movement command already settled during this same
         // tick's DrainInbox stage, so ordering relative to the systems above doesn't matter; kept ahead of

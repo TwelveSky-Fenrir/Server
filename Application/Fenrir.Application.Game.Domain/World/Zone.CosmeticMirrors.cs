@@ -684,7 +684,8 @@ public sealed partial class Zone
         // this call site's existing "self included, last" recipient ordering exactly.
         var fisherId = command.CharacterId;
         _fishingNeighborScratch.Clear();
-        _grid.NeighborsExcludingSelf(_fishingNeighborScratch, state.CurrentCell, fisherId);
+        _grid.NeighborsExcludingSelf(_fishingNeighborScratch, state.CurrentCell, fisherId, state.PosX, state.PosY,
+            state.PosZ);
         _fishingNeighborScratch.Add(fisherId);
         BroadcastAvatarAction(_fishingNeighborScratch, state, action);
     }
@@ -805,7 +806,7 @@ public sealed partial class Zone
             FrameWriter.WriteFrame(in response, span);
 
             SendAvatarStateFlagFrame(state.CharacterId, span);
-            foreach (var neighborId in _grid.Neighbors(state.CurrentCell))
+            foreach (var neighborId in _grid.Neighbors(state.CurrentCell, state.PosX, state.PosY, state.PosZ))
             {
                 if (neighborId == state.CharacterId) continue;
                 SendAvatarStateFlagFrame(neighborId, span);
@@ -914,7 +915,8 @@ public sealed partial class Zone
         if (!command.FullActionRebroadcast) return;
         var characterId = command.CharacterId;
         SendAvatarAction(state.Session, state);
-        var neighbors = _grid.Neighbors(state.CurrentCell).Where(id => id != characterId).ToArray();
+        var neighbors = _grid.Neighbors(state.CurrentCell, state.PosX, state.PosY, state.PosZ)
+            .Where(id => id != characterId).ToArray();
         BroadcastAvatarAction(neighbors, state);
     }
 
@@ -1193,7 +1195,8 @@ public sealed partial class Zone
         // see _fishingNeighborScratch's own remarks; same self-appended-at-tail ordering preserved.
         var casterId = command.CharacterId;
         _autoBuffNeighborScratch.Clear();
-        _grid.NeighborsExcludingSelf(_autoBuffNeighborScratch, state.CurrentCell, casterId);
+        _grid.NeighborsExcludingSelf(_autoBuffNeighborScratch, state.CurrentCell, casterId, state.PosX, state.PosY,
+            state.PosZ);
         _autoBuffNeighborScratch.Add(casterId);
         BroadcastAvatarAction(_autoBuffNeighborScratch, state, action);
     }
@@ -1261,7 +1264,8 @@ public sealed partial class Zone
 
         var characterId = command.CharacterId;
         SendAvatarAction(state.Session, state);
-        var neighbors = _grid.Neighbors(state.CurrentCell).Where(id => id != characterId).ToArray();
+        var neighbors = _grid.Neighbors(state.CurrentCell, state.PosX, state.PosY, state.PosZ)
+            .Where(id => id != characterId).ToArray();
         BroadcastAvatarAction(neighbors, state);
     }
 }

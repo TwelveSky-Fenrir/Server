@@ -92,6 +92,14 @@ public interface ICharacterRepository
 
     public ValueTask AdjustMoneyAsync(int characterId, long deltaMoney, int deltaBigMoney, CancellationToken ct);
 
+    /// <summary>
+    ///     Atomic wallet/Store-money transfer (CZ_PROCESS_DATA_SEND tSort 226 deposit/227 withdraw) -- same-row
+    ///     UPDATE, both columns guarded against going negative or past MAX_NUMBER_SIZE (2,000,000,000). Throws
+    ///     SQL 50337 on an unknown character or an adjustment either column can't afford.
+    /// </summary>
+    public ValueTask AdjustStoreMoneyAsync(int characterId, long deltaMoney, long deltaStoreMoney,
+        CancellationToken ct);
+
     public ValueTask AdjustMoneyAndReplaceContainerAsync(int characterId, long deltaMoney, int deltaBigMoney,
         byte container, IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct);
 

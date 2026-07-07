@@ -12,6 +12,7 @@ using Fenrir.Application.Game.Stats;
 using Fenrir.Data.WriteBehind;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Framing;
+using Fenrir.Network.Serialization.Packets.Shared;
 using Fenrir.Network.Serialization.Packets.Zone;
 using Microsoft.Extensions.Logging;
 
@@ -130,6 +131,35 @@ public sealed partial class Zone
     }
 
     /// <summary>
+    ///     Attacker-position write-before-validation, shared by every <c>mCase</c> (1/2/3/5/6): the attack
+    ///     packet's own self-reported position is recorded onto the attacker's tracked location -- and the
+    ///     attacker's AOI cell recomputed from it -- unconditionally, as the very first step, before any other
+    ///     check (including this same packet's own distance-to-target check) runs. Not otherwise validated
+    ///     against the server-known position for this request (matches <c>ATK_VAR2::create()</c>).
+    /// </summary>
+    /// <remarks>
+    ///     Réf. C++ : Server/ts25zone/S07_MyGame02.cpp:779-787 (<c>createPlayerAttackMonster</c> -- direct
+    ///     indexing into the monster table, and the attacker-position write, cited for <c>mCase</c> 3/
+    ///     <see cref="ApplyPvmAttack" />); the identical write ordering (position recorded before any
+    ///     target/validation gate) is shared by every <c>ProcessAttackNN</c> handler for <c>mCase</c> 1
+    ///     (<see cref="ApplyDuelAttack" />), 2 (this file's own <see cref="ApplyCombatCommand" /> branch), 5 and 6
+    ///     (<see cref="ApplyStunAttack" />/<see cref="ApplyUnstunAttack" />, Zone.Stun.cs). Hoisted out of
+    ///     Zone.Stun.cs -- where it previously only ran for <c>mCase</c> 5/6 -- so <c>mCase</c> 1/2/3 stop
+    ///     evaluating their own distance/target checks against a potentially-stale, last-accepted-move-packet
+    ///     position instead of the fresher one this same attack packet just supplied.
+    /// </remarks>
+    private void ApplySenderLocation(PlayerRuntimeState state, AttackForProtocol attackInfo)
+    {
+        state.PosX = attackInfo.SenderLocation[0];
+        state.PosY = attackInfo.SenderLocation[1];
+        state.PosZ = attackInfo.SenderLocation[2];
+
+        var newCell = _grid.CellOf(state.PosX, state.PosZ);
+        _grid.Move(state.CharacterId, state.CurrentCell, newCell);
+        state.CurrentCell = newCell;
+    }
+
+    /// <summary>
     ///     Resolves one CZ_PROCESS_ATTACK_SEND request (<c>mCase</c> 1-6 dispatch) entirely on this zone's own
     ///     tick thread. <c>mCase</c> 1 (Avatar -&gt; Avatar, duel, <see cref="ApplyDuelAttack" />), 2 (Avatar -&gt;
     ///     Avatar, enemy tribe), 3 (Avatar -&gt; Monster), 5 (Stun, <see cref="ApplyStunAttack" />) and 6 (UnStun,
@@ -171,6 +201,12 @@ public sealed partial class Zone
 
         if (!_players.TryGetValue(command.AttackerCharacterId, out var attackerState))
             return;
+
+        // Recorded onto the attacker's tracked location unconditionally, before any other check runs -- see
+        // ApplySenderLocation's own remarks. Must happen before this same packet's own distance check, which
+        // CombatResolver.ResolveEnemyTribeAttack runs against attackerSnapshot below.
+        ApplySenderLocation(attackerState, command.AttackInfo);
+
         if (!_players.TryGetValue(command.AttackInfo.ServerIndex2, out var defenderState))
             return;
 
@@ -612,9 +648,26 @@ public sealed partial class Zone
     {
         if (!_players.TryGetValue(command.AttackerCharacterId, out var attackerState))
             return;
+
+        // Recorded onto the attacker's tracked location unconditionally, before any other check runs -- see
+        // ApplySenderLocation's own remarks. Must happen before this same packet's own distance check, which
+        // MonsterCombatResolver.ResolvePvmAttack runs against attackerSnapshot below.
+        ApplySenderLocation(attackerState, command.AttackInfo);
+
         if (!_monsters.TryGetValue(command.AttackInfo.ServerIndex2, out var monster))
             return;
         if (monster.UniqueNumber != command.AttackInfo.UniqueNumber2)
+            return;
+
+        // CheckPossibleAttackTarget(2, defenser->mDATA.mAction.aSort) (S07_MyGame02.cpp:1692-1716,
+        // tTargetSort==2 branch; gated in at :1881-1884): a monster mid-spawn windup, already playing its
+        // death animation, or mid forced-return-to-spawn is not a valid attack target. Silent reject, same
+        // as every other ProcessAttack03 rejection path. The Dead half of this gate is structurally
+        // redundant in Fenrir today -- TryDamageMonster removes a monster from _monsters the instant its
+        // life hits zero (Zone.Monsters.cs), so a live lookup here can never actually observe
+        // MonsterAiState.Dead -- but is still checked for full source parity in case that removal timing
+        // ever changes.
+        if (monster.AiState is MonsterAiState.Spawning or MonsterAiState.Dead or MonsterAiState.ReturnToSpawn)
             return;
 
         // CheckAttackPacket (S07_MyGame02.cpp:1718-1761), counting enabled -- see AttackPacketBudget's own
@@ -630,7 +683,8 @@ public sealed partial class Zone
 
         var attackerSnapshot = ToCombatantSnapshot(attackerState);
         var outcome = MonsterCombatResolver.ResolvePvmAttack(attackerSnapshot, monster, command.AttackInfo, _clock,
-            _random);
+            _random, attackerState.AttackBudgetEnforced, attackerState.ActionSkillNumber,
+            attackerState.ActionSkillGradeNum1 + attackerState.ActionSkillGradeNum2);
 
         if (outcome.Rejected)
             return;
@@ -653,14 +707,24 @@ public sealed partial class Zone
         };
 
         var recipients = new HashSet<int> { attackerState.CharacterId };
-        foreach (var id in _grid.Neighbors(attackerState.CurrentCell)) recipients.Add(id);
-        foreach (var id in NeighborsOfPosition(monster.PosX, monster.PosZ)) recipients.Add(id);
+        foreach (var id in _grid.Neighbors(attackerState.CurrentCell, attackerState.PosX, attackerState.PosY,
+                     attackerState.PosZ))
+            recipients.Add(id);
+        foreach (var id in _grid.Neighbors(_grid.CellOf(monster.PosX, monster.PosZ), monster.PosX, monster.PosY,
+                     monster.PosZ))
+            recipients.Add(id);
         BroadcastAttackResult(recipients, response);
 
         if (!outcome.Hit)
             return;
 
-        TryDamageMonster(monster.ServerIndex, outcome.DamageApplied, attackerState.CharacterId, out _, out _);
+        TryDamageMonster(monster.ServerIndex, outcome.DamageApplied, attackerState.CharacterId, out var monsterDied,
+            out _);
+
+        // A009 hit-stagger trigger -- only meaningful for a hit the monster actually survived; a killing
+        // blow goes straight to BroadcastMonsterDeath instead (Monsters.MonsterSpawnScheduler.ProcessDeath).
+        if (!monsterDied)
+            TryApplyPvmFlinch(monster, outcome.DamageApplied);
 
         if (isTowerGuardian)
             ApplyTowerGuardianHitSideEffects(towerIndex, attackerState);
@@ -767,7 +831,8 @@ public sealed partial class Zone
             FfaEqualStatsOverride.Apply(MapId, state.Stats ?? default),
             state.Buffs.Buff[8 * 2],
             state.Level,
-            state.IsMovingZone);
+            state.IsMovingZone,
+            state.Name);
     }
 
     /// <summary>
@@ -777,8 +842,10 @@ public sealed partial class Zone
     private HashSet<int> CombatRecipients(PlayerRuntimeState attacker, PlayerRuntimeState defender)
     {
         var recipients = new HashSet<int> { attacker.CharacterId, defender.CharacterId };
-        foreach (var id in _grid.Neighbors(attacker.CurrentCell)) recipients.Add(id);
-        foreach (var id in _grid.Neighbors(defender.CurrentCell)) recipients.Add(id);
+        foreach (var id in _grid.Neighbors(attacker.CurrentCell, attacker.PosX, attacker.PosY, attacker.PosZ))
+            recipients.Add(id);
+        foreach (var id in _grid.Neighbors(defender.CurrentCell, defender.PosX, defender.PosY, defender.PosZ))
+            recipients.Add(id);
         return recipients;
     }
 

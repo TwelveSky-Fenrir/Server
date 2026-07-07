@@ -54,6 +54,12 @@ public sealed record AccountSessionRepository(ICaeriusNetDbContext Db) : IAccoun
         }
     }
 
+    /// <summary>
+    ///     Covers both a fresh Login-&gt;Game world-entry AND a Game(ShardA)-&gt;Game(ShardB) cross-shard zone
+    ///     transfer -- same procedure, same predicate shape, widened since
+    ///     Database/Migrations/025_account_session_transition_game_to_game.sql to accept a prior ServerKind of
+    ///     either Login or Game. See IAccountSessionRepository.TransitionToGameAsync's own remarks.
+    /// </summary>
     public async ValueTask<bool> TransitionToGameAsync(int accountId, Guid expectedSessionToken, byte shardId,
         CancellationToken ct)
     {

@@ -66,6 +66,24 @@ public sealed class SessionRegistry
         return builder.ToImmutable();
     }
 
+    /// <summary>
+    ///     Every currently-registered session whose <see cref="ClientSession.LastActivityUtc" /> is at least
+    ///     <paramref name="idleTimeout" /> old as of <paramref name="nowUtc" /> -- the abandoned-connection set a
+    ///     per-server idle sweep (e.g. GameServer's <c>SessionLivenessSweep</c>) forcibly disconnects. A plain
+    ///     scan, same "rare, defensive, not a hot path" posture as <see cref="SnapshotByRemoteAddress" /> --
+    ///     called at most once per sweep interval (seconds, not per-tick), never per-frame.
+    /// </summary>
+    public ImmutableArray<ClientSession> SnapshotIdle(TimeSpan idleTimeout, DateTimeOffset nowUtc)
+    {
+        var builder = ImmutableArray.CreateBuilder<ClientSession>();
+
+        foreach (var session in _sessions.Values)
+            if (nowUtc - session.LastActivityUtc >= idleTimeout)
+                builder.Add(session);
+
+        return builder.ToImmutable();
+    }
+
     public void Unregister(long sessionId)
     {
         _sessions.TryRemove(sessionId, out _);

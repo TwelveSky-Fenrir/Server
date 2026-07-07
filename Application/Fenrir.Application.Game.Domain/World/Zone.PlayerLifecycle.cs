@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Hotkeys;
 using Fenrir.Application.Game.Domain.Inventory;
@@ -8,6 +9,7 @@ using Fenrir.Application.Game.Domain.Movement;
 using Fenrir.Application.Game.Domain.Pets;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.Skills;
+using Fenrir.Application.Game.Domain.Social.Duel;
 using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Stats;
 using Fenrir.Data.Abstractions.Game;
@@ -198,7 +200,12 @@ public sealed partial class Zone
 
     /// <summary>
     ///     Keep-alive rebroadcast: re-emits every avatar's current state to its surroundings every 3.5 s even
-    ///     when idle, so late-arriving or packet-lossy neighbors converge.
+    ///     when idle, so late-arriving or packet-lossy neighbors converge. A dead avatar still has its
+    ///     throttle timestamp stamped (so it never queues up a burst of catch-up broadcasts once revived) but
+    ///     is never actually sent -- matching legacy's hidden-or-dead short-circuit inside the same avatar
+    ///     loop (<c>S07_MyGame01.cpp:2432-2454</c>: the broadcast-throttle check stamps the timer unconditionally,
+    ///     then skips the send itself for a hiding or dead avatar). Fenrir has no player-hidden/invisible state
+    ///     yet, so only the death half of that legacy branch has an analog here.
     /// </summary>
     private void RebroadcastAvatars()
     {
@@ -211,12 +218,20 @@ public sealed partial class Zone
 
             state.LastAvatarRebroadcastAt = _clock;
 
+            // Stamp-but-don't-send for a dead avatar (S07_MyGame01.cpp:2432-2454) -- a corpse still stuck in
+            // ReviveEligibility limbo would otherwise re-walk the AOI grid and emit a keep-alive frame every
+            // 3.5s for no client-visible reason. Distinct from IsReviveHackBroadcastSuppressed below, which
+            // filters RECIPIENTS by their own unresolved-death state, not whether this SOURCE avatar is dead.
+            if (state.IsDead)
+                continue;
+
             // Uses _rebroadcastNeighborScratch instead of AoiGrid.Neighbors(...).Where(...).ToArray() -- this
             // loop runs once per connected player every tick (gated by the 3.5s per-player interval), so the
             // per-player LINQ iterator/closure/array allocation was repeated for the whole zone population
             // every tick a rebroadcast came due.
             _rebroadcastNeighborScratch.Clear();
-            _grid.NeighborsExcludingSelf(_rebroadcastNeighborScratch, state.CurrentCell, characterId);
+            _grid.NeighborsExcludingSelf(_rebroadcastNeighborScratch, state.CurrentCell, characterId, state.PosX,
+                state.PosY, state.PosZ);
             BroadcastAvatarAction(_rebroadcastNeighborScratch, state);
         }
     }
@@ -249,6 +264,17 @@ public sealed partial class Zone
             MaxMana = data.MaxMana,
             FlushSequence = data.FlushSequence,
             LastMoveUtc = DateTime.UtcNow,
+            // NOT staggered, unlike Zone.SpawnMonster/Zone.SpawnGroundItem -- see this field's own remarks for
+            // why: a mass-reconnect burst COULD in principle land several HandleEnter calls in one Zone.Tick
+            // (DrainInbox drains up to InboxDrainCapPerTick queued commands per call), but unlike
+            // MonsterSpawnScheduler's InitialPopDone -- a tight in-process loop that pops an entire zone's whole
+            // spawn-region pool with zero real time passing between iterations, EVERY zone, EVERY boot,
+            // guaranteed -- reaching this line at all requires a full TCP handshake + auth/world-entry round
+            // trip per player first, which already spreads real arrivals across many real ticks in every
+            // observed/plausible case. Verified against ZoneRebroadcastTests' own exact-cadence-boundary
+            // assertions (LastAvatarRebroadcastAt must equal _clock precisely at entry) before deciding not to
+            // apply the same stagger here -- doing so would have silently broken those tests' "not yet due"
+            // assertions for no evidenced benefit.
             LastAvatarRebroadcastAt = _clock,
             // Death-gate state carried through an in-process handoff so a player mid-death who transfers
             // zones doesn't silently come back "alive" with 0 HP on arrival, nor lose/prematurely-clear their
@@ -312,7 +338,13 @@ public sealed partial class Zone
             // not copied from any prior in-memory value (zone-enter/character-load is itself one of the
             // behavior contract's own recompute triggers).
             PremiumExpireUtc = data.PremiumExpireUtc,
-            BuffX2Time = data.BuffX2Time
+            BuffX2Time = data.BuffX2Time,
+            // Store/coffre money pool + second-page expiry dates -- see PlayerRuntimeState.Vault.cs's own
+            // remarks and PlayerEnterData.StoreMoney's own remarks for why this must travel through both
+            // world entry and an in-process zone transfer.
+            StoreMoney = data.StoreMoney,
+            InventoryDate = data.InventoryDate,
+            StoreDate = data.StoreDate
         };
 
         // Trigger 1 of the mSupportSkillTimeUpRatio behavior contract ("buff-application-stacking-decay"):
@@ -451,7 +483,7 @@ public sealed partial class Zone
             }
         }
 
-        _grid.Add(characterId, cell);
+        _grid.Add(characterId, cell, state.PosX, state.PosY, state.PosZ);
 
         // Marked dirty on entry so a handoff's map change reaches SQL even if the player never moves again;
         // on a fresh world entry the sequence already equals the DB baseline, so this flush is a deliberate no-op.
@@ -465,7 +497,7 @@ public sealed partial class Zone
         // _enterNeighborScratch instead of AoiGrid.Neighbors(...).Where(...).ToArray() -- see that field's own
         // remarks.
         _enterNeighborScratch.Clear();
-        _grid.NeighborsExcludingSelf(_enterNeighborScratch, cell, characterId);
+        _grid.NeighborsExcludingSelf(_enterNeighborScratch, cell, characterId, state.PosX, state.PosY, state.PosZ);
 
         // Direct send to each neighbor's own session for the new arrival's view of them; the new arrival
         // itself is announced to neighbors via the broadcast below. Swapping these would send the new
@@ -498,6 +530,18 @@ public sealed partial class Zone
         {
             // Once per player per zone visit, never on the per-tick rebroadcast paths -- cheap.
             logger.LogInformation("Character {CharacterId} left zone {MapId}", characterId, MapId);
+
+            // Behavior contract "session-state-machine", disconnect/logout cleanup: "any active party is
+            // broken ... distinguishing member left from leader left" -- but ONLY on a ready,
+            // non-mid-transfer disconnect (Server/ts25zone/S03_MyUser.cpp:338-411,360's own guard). This same
+            // handoffTarget-is-null branch also fires for the OLD shard's own connection teardown once a
+            // cross-shard zone-transfer client reconnects elsewhere (ZoneMoveService.HandleCrossShardAsync's
+            // own remarks: "the ordinary connection-close path already flushes/tidies this player's in-memory
+            // state the same way any other disconnect does") -- IsMovingZone is true for exactly that window,
+            // so gating on it here reproduces legacy's deliberate skip (breaking the party mid-transfer would
+            // race the new zone's own claim on the same character).
+            if (!state.IsMovingZone)
+                BreakPartyOnDisconnect(characterId, state.Name);
 
             // Plain leave (disconnect). No despawn/logout opcode exists in the M1 client protocol -- nearby
             // clients simply stop receiving updates for this entity. A documented gap, not an oversight.
@@ -535,6 +579,107 @@ public sealed partial class Zone
 
         logger.LogInformation("Character {CharacterId} handed off from zone {MapId} to zone {TargetMapId}",
             characterId, MapId, handoffTarget.MapId);
+    }
+
+    /// <summary>
+    ///     <see cref="HandleLeave" />'s disconnect-time party cleanup: breaks any active party
+    ///     <paramref name="characterId" /> belongs to (via <see cref="PartyRegistry.LeaveForDisconnect" />) and
+    ///     sends the same wire notifications the explicit CZ_PARTY_LEAVE_SEND/CZ_PARTY_BREAK_SEND handlers
+    ///     already send (<c>Fenrir.Application.Game.Handlers.Handlers.Social.PartyLeaveHandler</c>/
+    ///     <c>PartyDisbandHandler</c>), so a party-changed notification looks identical on the wire whether the
+    ///     departure was voluntary or a disconnect. A remaining member can be tracked by any zone this shard
+    ///     hosts, not just this one -- resolved via <see cref="_zoneRegistry" />, the same cross-zone lookup
+    ///     those handlers use from their own request thread. A no-op if the character had no live party (the
+    ///     overwhelmingly common case, so this stays cheap on the hot disconnect path).
+    /// </summary>
+    private void BreakPartyOnDisconnect(int characterId, string disconnectingName)
+    {
+        var result = _partyRegistry.LeaveForDisconnect(characterId);
+
+        switch (result.Kind)
+        {
+            case PartyDisconnectKind.NotInParty:
+                return;
+
+            case PartyDisconnectKind.LeaderDisbanded:
+            {
+                // USE_PARTY_V3 is off in this build, matching PartyDisbandHandler's own remarks -- Sort is
+                // always 1 and AvatarName always blank.
+                var disbandNotice = new PartyDisbandResponse { Sort = 1, AvatarName = "" };
+                foreach (var memberId in result.MembersBeforeLeave)
+                    if (memberId != characterId)
+                        SendToCharacter(memberId, disbandNotice);
+                return;
+            }
+
+            case PartyDisconnectKind.MemberLeft:
+            {
+                var leaveNotice = new PartyLeaveResponse { AvatarName = disconnectingName };
+                foreach (var memberId in result.MembersBeforeLeave)
+                    if (memberId != characterId)
+                        SendToCharacter(memberId, leaveNotice);
+
+                var roster = BuildPartyRoster(3, result.RemainingMembers);
+                foreach (var memberId in result.RemainingMembers)
+                    SendToCharacter(memberId, roster);
+                return;
+            }
+
+            case PartyDisconnectKind.MemberLeftAndDisbanded:
+            {
+                var leaveNotice = new PartyLeaveResponse { AvatarName = disconnectingName };
+                var disbandNotice = new PartyDisbandResponse { Sort = 1, AvatarName = "" };
+                foreach (var memberId in result.MembersBeforeLeave)
+                {
+                    if (memberId == characterId)
+                        continue;
+
+                    SendToCharacter(memberId, leaveNotice);
+                    SendToCharacter(memberId, disbandNotice);
+                }
+
+                return;
+            }
+        }
+    }
+
+    /// <summary>5 name slots, leader first -- same shape as PartyBroadcast.BuildRoster's ZC_PARTY_MAKE_INFO builder.</summary>
+    private PartyRosterResponse BuildPartyRoster(int sort, IReadOnlyList<int> memberIds)
+    {
+        Span<string> names = ["", "", "", "", ""];
+        for (var i = 0; i < memberIds.Count && i < 5; i++)
+            if (TryFindPlayer(memberIds[i], out var member))
+                names[i] = member.Name;
+
+        return new PartyRosterResponse
+        {
+            Sort = sort,
+            AvatarName01 = names[0],
+            AvatarName02 = names[1],
+            AvatarName03 = names[2],
+            AvatarName04 = names[3],
+            AvatarName05 = names[4]
+        };
+    }
+
+    /// <summary>
+    ///     Sends to a character tracked either by this zone or, failing that, any other zone on this shard (via
+    ///     <see cref="_zoneRegistry" />). Silently drops the send if the character isn't tracked anywhere right
+    ///     now (already disconnected too, or mid-handoff) -- same best-effort posture as every other
+    ///     party-changed notification loop in this codebase.
+    /// </summary>
+    private void SendToCharacter<TPacket>(int characterId, in TPacket packet) where TPacket : struct, IOutgoingPacket
+    {
+        if (TryFindPlayer(characterId, out var member))
+            member.Session.Send(packet);
+    }
+
+    private bool TryFindPlayer(int characterId, [NotNullWhen(true)] out PlayerRuntimeState? state)
+    {
+        if (_players.TryGetValue(characterId, out state))
+            return true;
+
+        return _zoneRegistry is not null && _zoneRegistry.TryGetPlayer(characterId, out state);
     }
 
     /// <summary>
@@ -668,7 +813,8 @@ public sealed partial class Zone
         // Uses _deathNeighborScratch instead of AoiGrid.Neighbors(...).Where(...).ToArray() -- see that field's
         // own remarks.
         _deathNeighborScratch.Clear();
-        _grid.NeighborsExcludingSelf(_deathNeighborScratch, state.CurrentCell, characterId);
+        _grid.NeighborsExcludingSelf(_deathNeighborScratch, state.CurrentCell, characterId, state.PosX, state.PosY,
+            state.PosZ);
         BroadcastAvatarAction(_deathNeighborScratch, state, deathAction);
     }
 
@@ -759,7 +905,8 @@ public sealed partial class Zone
         // Uses _reviveNeighborScratch instead of AoiGrid.Neighbors(...).Where(...).ToArray() -- see that
         // field's own remarks.
         _reviveNeighborScratch.Clear();
-        _grid.NeighborsExcludingSelf(_reviveNeighborScratch, state.CurrentCell, state.CharacterId);
+        _grid.NeighborsExcludingSelf(_reviveNeighborScratch, state.CurrentCell, state.CharacterId, state.PosX,
+            state.PosY, state.PosZ);
         BroadcastAvatarAction(_reviveNeighborScratch, state);
     }
 
@@ -864,18 +1011,42 @@ public sealed partial class Zone
         }
 
         var newCell = _grid.CellOf(state.PosX, state.PosZ);
-        _grid.Move(characterId, state.CurrentCell, newCell);
+        _grid.Move(characterId, state.CurrentCell, newCell, state.PosX, state.PosY, state.PosZ);
         state.CurrentCell = newCell;
 
         dirtyTracker.MarkDirty(characterId, DirtyFlags.Position);
 
-        // Self is excluded: the legacy client applies its own movement locally (client-side prediction) and
-        // does not need its own action echoed back to it. Uses the reusable _moveNeighborScratch buffer (see
-        // its own remarks) instead of AoiGrid.Neighbors(...).Where(...).ToArray() -- this runs on every
-        // accepted movement packet, the highest-frequency player-driven event in the server.
-        _moveNeighborScratch.Clear();
-        _grid.NeighborsExcludingSelf(_moveNeighborScratch, newCell, characterId);
-        BroadcastAvatarAction(_moveNeighborScratch, state, action);
+        // Op15 (CZ_AVATAR_ACTION_SEND) accepted-action tail: the confirmation is delivered to two independent
+        // recipient sets from this same handler invocation, not one shared send reused for both -- the acting
+        // client itself, sent directly and unconditionally (ahead of, and independent from, the neighbor
+        // broadcast's own per-recipient hiding-state suppression, IsReviveHackBroadcastSuppressed below), plus
+        // every neighbor via the broadcast just underneath. Legacy fires both from the same tail
+        // (B_AVATAR_ACTION_RECV self-send then SendBroadcast, S04_MyWork02.cpp:1770-1777) -- the self-send is
+        // NOT itself gated on hiding state, only the broadcast leg is. Op16 (CZ_UPDATE_AVATAR_ACTION,
+        // isResumeAction) has no self-send for an ordinary accepted action in legacy at all
+        // (S04_MyWork02.cpp:1789-1922), so this is gated to the op15 path only.
+        if (!isResumeAction)
+            SendAvatarAction(state.Session, state, action);
+
+        // Op16 (CZ_UPDATE_AVATAR_ACTION, isResumeAction) has no broadcast call anywhere in its legacy body
+        // outside the inert, self-only war-answer early-return (S04_MyWork02.cpp:1789-1922) -- so, matching
+        // the self-send gate immediately above (and per the broadcast-spread behavior contract's
+        // "whitelisted secondary movement-state opcode" edge case), the neighbor broadcast below is gated
+        // to the op15 path only. An op16-only state change (fishing-state Sorts 92-95, skill-effect-confirm
+        // Sort 1, party-buff Sorts, etc. -- see AvatarActionResumeWhitelist) is still applied to this
+        // character's server-side state above; it stays invisible to neighbors until the next periodic
+        // 3.5s avatar catch-up broadcast (or never, if no further state change occurs), exactly like
+        // legacy's documented server-knows/clients-don't-know staleness gap for this opcode. Uses the
+        // reusable _moveNeighborScratch buffer (see its own remarks) instead of
+        // AoiGrid.Neighbors(...).Where(...).ToArray() -- this runs on every accepted movement packet, the
+        // highest-frequency player-driven event in the server.
+        if (!isResumeAction)
+        {
+            _moveNeighborScratch.Clear();
+            _grid.NeighborsExcludingSelf(_moveNeighborScratch, newCell, characterId, state.PosX, state.PosY,
+                state.PosZ);
+            BroadcastAvatarAction(_moveNeighborScratch, state, action);
+        }
 
         // Phase A (cast-start mana charge, op15 category-2 Sorts only) vs. Phase B (effect confirm, op16
         // Sort==1 only) -- see the skill-casting-cooldown-mechanics behavior contract. Neither phase is
@@ -1218,7 +1389,7 @@ public sealed partial class Zone
             FrameWriter.WriteFrame(in response, span);
 
             SendBuffStateFrame(state.CharacterId, span);
-            foreach (var neighborId in _grid.Neighbors(state.CurrentCell))
+            foreach (var neighborId in _grid.Neighbors(state.CurrentCell, state.PosX, state.PosY, state.PosZ))
             {
                 if (neighborId == state.CharacterId) continue;
                 SendBuffStateFrame(neighborId, span);
@@ -1245,9 +1416,22 @@ public sealed partial class Zone
         }
     }
 
-    private static void SendAvatarAction(IPacketSession session, PlayerRuntimeState state)
+    private void SendAvatarAction(IPacketSession session, PlayerRuntimeState state)
     {
         session.Send(BuildAvatarActionRecv(state));
+    }
+
+    /// <summary>
+    ///     Overload that echoes a SPECIFIC just-accepted <see cref="ActionInfo" /> back to <paramref name="session" />
+    ///     verbatim -- e.g. <see cref="HandleMove" />'s op15 accepted-action self-send, which must reflect the
+    ///     actual action just written into <paramref name="state" /> (matching legacy's
+    ///     <c>B_AVATAR_ACTION_RECV(...,&amp;tUserInfo-&gt;mDATA,1)</c>, which reflects the just-written
+    ///     <c>mDATA.aAction = r-&gt;tAction</c>) rather than the parameterless overload above's synthesized
+    ///     resting Sort-0 pose.
+    /// </summary>
+    private void SendAvatarAction(IPacketSession session, PlayerRuntimeState state, ActionInfo action)
+    {
+        session.Send(BuildAvatarActionRecv(state, action));
     }
 
     /// <summary>
@@ -1274,7 +1458,7 @@ public sealed partial class Zone
                 {
                     if (_players.TryGetValue(id, out var recipient) &&
                         recipient.Session is ClientSession clientSession &&
-                        !IsAvatarBroadcastSuppressed(recipient))
+                        !IsReviveHackBroadcastSuppressed(recipient))
                         clientSession.SendRaw(span);
                 }
                 catch (Exception ex)
@@ -1290,15 +1474,31 @@ public sealed partial class Zone
     }
 
     /// <summary>
-    ///     Companion filter (side effect 3, S07_MyGame03.cpp:809-833/857-880 Broadcast11, :893-935/954-978
+    ///     Shared recipient filter (side effect 3, S07_MyGame03.cpp:809-833/857-880 Broadcast11, :893-935/954-978
     ///     Broadcast22): a recipient still flagged from an unresolved death, 30+ ticks in, silently receives
-    ///     nothing from this broadcast -- except on <see cref="ReviveEligibilityZones.BroadcastSuppressionExemptZoneId" />,
-    ///     where the suppression itself is disabled (S07_MyGame01.cpp:508-522, ZONE124 macro unconditionally
-    ///     defined at H07_MyGame.h:19). Scoped to <see cref="BroadcastAvatarAction" /> only -- the general
-    ///     avatar-state proximity fan-out the legacy's Broadcast11/22 map to -- not every other packet kind a
-    ///     zone sends (e.g. <see cref="BroadcastAttackResult" />, buff-state sends).
+    ///     nothing from any of this zone's AOI-radius broadcasts -- except on
+    ///     <see cref="ReviveEligibilityZones.BroadcastSuppressionExemptZoneId" />, where the suppression itself is
+    ///     disabled (S07_MyGame01.cpp:508-522, ZONE124 macro unconditionally defined at H07_MyGame.h:19).
+    ///     Applied identically by <see cref="BroadcastAvatarAction" />, <see cref="BroadcastMonsterAction" />,
+    ///     <see cref="BroadcastGroundItemAction" />, and <see cref="BroadcastProxyShopState" /> -- previously this
+    ///     method (as <c>IsAvatarBroadcastSuppressed</c>) was called only from the first of those, on the mistaken
+    ///     premise that Broadcast11/Broadcast22 backed avatar broadcasts alone. Re-verified this session: every
+    ///     legacy call site for all four families routes through the same two functions, which is where this
+    ///     exact check lives, not a per-family opt-in --
+    ///     <c>AVATAR_OBJECT::SendBroadcastForLogic</c> (S07_MyGame04.cpp:2762-2765, Broadcast22),
+    ///     <c>ITEM_OBJECT::SendBroadcast</c>/<c>SendBroadcastForLogic</c> (S07_MyGame06.cpp:99-107, periodic
+    ///     expiry call site :32-54, both Broadcast11),
+    ///     <c>MONSTER_OBJECT::Send1</c>/<c>Send2</c>/<c>Send3</c>/<c>SendSpecialNumber</c>
+    ///     (S07_MyGame05.cpp:3967-4002, Broadcast11, scale 1/2/3), and the proxy-shop periodic keep-alive plus its
+    ///     own explicit close path (S07_MyGame01.cpp:2606; S07_MyGame09.cpp:208-209, both Broadcast11). Note:
+    ///     <see cref="BroadcastAttackResult" /> and the avatar buff-state send (<c>AVATAR_OBJECT::SendBroadcast</c>,
+    ///     itself also observed this session to route through Broadcast11 at S07_MyGame04.cpp:2752-2755, backing
+    ///     both the buff-value broadcast at S07_MyGame04.cpp:591-592 and the avatar-vs-avatar damage broadcast at
+    ///     S07_MyGame02.cpp:1370-1371) were NOT brought under this filter here -- that is a separate, not yet
+    ///     audit-confirmed gap outside this fix's scope; it needs its own legacy-behavior-translator contract
+    ///     before either broadcast path is changed.
     /// </summary>
-    private bool IsAvatarBroadcastSuppressed(PlayerRuntimeState recipient)
+    private bool IsReviveHackBroadcastSuppressed(PlayerRuntimeState recipient)
     {
         if (MapId == ReviveEligibilityZones.BroadcastSuppressionExemptZoneId)
             return false;
@@ -1307,7 +1507,7 @@ public sealed partial class Zone
                recipient.TicksSinceDeath >= SimulationClock.DeathBroadcastSuppressionLegacyTicks;
     }
 
-    private static AvatarActionResponse BuildAvatarActionRecv(PlayerRuntimeState state)
+    private AvatarActionResponse BuildAvatarActionRecv(PlayerRuntimeState state)
     {
         var pet = PetActionFieldsOf(state);
 
@@ -1357,7 +1557,20 @@ public sealed partial class Zone
     ///     zone-transfer, with an explicit <paramref name="action" /> carrying the just-resolved arrival
     ///     position rather than <paramref name="state" />'s own (still the source zone's).
     /// </summary>
-    public static AvatarActionResponse BuildAvatarActionRecv(PlayerRuntimeState state, ActionInfo action)
+    /// <remarks>
+    ///     Broadcast-spread-gap fix: this is the single builder shared by every avatar-action broadcast in the
+    ///     zone (per-move neighbor fan-out, the 3.5s periodic catch-up, zone-enter mutual visibility,
+    ///     death/revive, duel end, and the op139 costume full-record rebroadcast), so
+    ///     <see cref="ObjectForAvatar.EffectValueForView" />/<see cref="ObjectForAvatar.DuelState" />/
+    ///     <see cref="ObjectForAvatar.CostumeNumber" />/<see cref="ObjectForAvatar.CostumeState" /> must reflect
+    ///     <paramref name="state" />'s live values here, not a permanent zero placeholder -- otherwise an
+    ///     observer who enters AOI range AFTER that state was set (rather than at the exact tick it changed)
+    ///     never learns it through any broadcast path, contradicting the periodic mechanism's documented
+    ///     "guaranteed convergence within one throttle window" property (see the broadcast-spread behavior
+    ///     contract's Edge cases). Instance (not static) specifically so it can resolve <paramref name="state" />'s
+    ///     own active duel via <see cref="_duelRegistry" />.
+    /// </remarks>
+    public AvatarActionResponse BuildAvatarActionRecv(PlayerRuntimeState state, ActionInfo action)
     {
         return new AvatarActionResponse
         {
@@ -1394,12 +1607,12 @@ public sealed partial class Zone
                 LifeValue = state.Life,
                 MaxManaValue = state.MaxMana,
                 ManaValue = state.Mana,
-                EffectValueForView = new int[35],
+                EffectValueForView = BuildEffectValueForView(state),
                 PartyName = "",
-                DuelState = new int[3],
+                DuelState = ResolveDuelStateForView(state.CharacterId),
                 PShopState = 0,
                 PShopName = "",
-                CostumeNumber = 0,
+                CostumeNumber = state.CostumeNumber,
                 BufEffectTimeState = 0,
                 BufSort = 0,
                 AutoState = 0,
@@ -1417,11 +1630,50 @@ public sealed partial class Zone
                 Unk625 = 0,
                 UniqueSkillNumber = 0,
                 UniqueSkillBuffTime = 0,
-                CostumeState = 0,
+                CostumeState = state.CostumeState,
                 StellarCoreNumber = 0
             },
             CheckChangeActionState = 0
         };
+    }
+
+    /// <summary>
+    ///     The value half of each of <paramref name="state" />'s 35 buff slots (<see cref="BuffInfo.Buff" />'s
+    ///     own flattened [value, duration] pairing per slot -- see <see cref="RecomputeStatsAndBroadcastBuffs" />
+    ///     and <see cref="ClearAllBuffs" />, which index it identically), reshaped into the 35-element view array
+    ///     <see cref="ObjectForAvatar.EffectValueForView" /> expects. This is the full-record avatar broadcast's
+    ///     own copy of the buff icons every observer's client renders -- independent of whether that observer
+    ///     also happens to receive the narrower event-driven <see cref="AvatarEffectStateResponse" /> at the
+    ///     moment a buff actually changes.
+    /// </summary>
+    private static int[] BuildEffectValueForView(PlayerRuntimeState state)
+    {
+        var view = new int[35];
+        for (var slot = 0; slot < 35; slot++)
+            view[slot] = state.Buffs.Buff[slot * 2];
+
+        return view;
+    }
+
+    /// <summary>
+    ///     <c>aDuelState[3]</c> for <paramref name="characterId" />: [0] is 1 when actively dueling else 0,
+    ///     [1] is the shared <see cref="ActiveDuel.UniqueNumber" /> of the active duel, and [2] is this
+    ///     character's side -- 1 for <see cref="ActiveDuel.PlayerA" /> (the CZ_DUEL_START_SEND caller) or 2 for
+    ///     <see cref="ActiveDuel.PlayerB" /> (the opponent). All-zero when <paramref name="characterId" /> has
+    ///     no active duel.
+    /// </summary>
+    /// <remarks>
+    ///     Réf. C++ : Server/ts25zone/S04_MyWork02.cpp:8400-8451 (BEGIN_CZ(DUEL_START_SEND): sets
+    ///     <c>aDuelState[0]=1</c>, <c>aDuelState[1]=</c>the newly-minted shared duel id, and
+    ///     <c>aDuelState[2]=1</c> for the calling <c>tUserInfo</c> vs. <c>=2</c> for <c>tOtherUserInfo</c>) ;
+    ///     Server/Header/Protocol/STRUCT.h:766 (<c>aDuelState[3]</c> field itself, part of the avatar full
+    ///     record embedded in every avatar-action broadcast, STRUCT.h:745-793).
+    /// </remarks>
+    private int[] ResolveDuelStateForView(int characterId)
+    {
+        return _duelRegistry.TryGetActiveDuel(characterId, out var duel) && duel is not null
+            ? [1, duel.UniqueNumber, characterId == duel.PlayerA ? 1 : 2]
+            : new int[3];
     }
 
     /// <summary>

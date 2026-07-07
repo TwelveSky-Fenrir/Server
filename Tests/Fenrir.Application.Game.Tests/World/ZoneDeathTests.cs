@@ -218,7 +218,7 @@ public class ZoneDeathTests
         Assert.True(zone.TryGetPlayer(10, out var deadState));
         deadState!.TicksSinceDeath = SimulationClock.DeathBroadcastSuppressionLegacyTicks; // >= 30 ticks
 
-        // IsAvatarBroadcastSuppressed gates on the RECIPIENT's own flag (Server/ts25zone/S07_MyGame03.cpp:
+        // IsReviveHackBroadcastSuppressed gates on the RECIPIENT's own flag (Server/ts25zone/S07_MyGame03.cpp:
         // 809-831 -- the mProtect_ReviveHack check inside Broadcast11's candidate loop is grouped with that
         // same loop's not-ready/mid-zone-transfer recipient skips, not with anything about the broadcaster),
         // so it's neighbor 11 that must move here, and it's the still-flagged character 10's OWN pipe that

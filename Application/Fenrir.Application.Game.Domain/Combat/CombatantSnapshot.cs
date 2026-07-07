@@ -41,4 +41,14 @@ public readonly record struct CombatantSnapshot(
     ///     an open follow-up rather than guessed at here. Defaults to <c>false</c> so existing/test callers
     ///     that don't source this per-combatant fact keep prior behavior.
     /// </summary>
-    bool IsMovingZone = false);
+    bool IsMovingZone = false,
+    /// <summary>
+    ///     This combatant's own avatar name (legacy <c>aName</c>) -- consumed only by
+    ///     <see cref="MonsterCombatResolver.ResolvePvmAttack" />'s owner-name-lock check
+    ///     (<see cref="World.Monsters.MonsterEntity.OwnerName" />). Defaults to <c>""</c> so every existing
+    ///     positional caller (tests, <see cref="StunResolver" />/<see cref="UnstunResolver" /> call sites) keeps
+    ///     compiling unchanged; an empty name can never match a non-empty <see cref="World.Monsters.MonsterEntity.OwnerName" />,
+    ///     so a caller that doesn't source this fact simply can never pass an owner-locked monster's check --
+    ///     the same fail-closed posture as this record's other defaulted fields.
+    /// </summary>
+    string Name = "");

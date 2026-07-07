@@ -2,6 +2,7 @@ using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Data.WriteBehind;
+using Fenrir.Network.Serialization.Packets.Zone;
 
 namespace Fenrir.Application.Game.Domain.Simulation;
 
@@ -23,11 +24,32 @@ namespace Fenrir.Application.Game.Domain.Simulation;
 ///     the same call, the same translation of "a burst must catch up by the full amount"
 ///     (<see cref="ISimulationSystem" />'s own contract) already chosen by <see cref="StunCountdownSystem" /> for
 ///     this identical gate.
+///     Each gate firing that computes a nonzero HP and/or MP amount pushes an
+///     <see cref="AvatarStatUpdateResponse" /> to the sitting player's own connection only, one packet per
+///     nonzero stat -- S07_MyGame04.cpp:481-489 (HP push) and :509-519 (MP push), both via the
+///     single-connection overload confirmed by Server/ts25zone/S05_MyTransfer.cpp:519-542 and
+///     Server/ts25zone/H05_MyTransfer.h:33-34. A stat whose recovery amount computes to zero (already at max,
+///     or an unresolved skill/grade &lt; 1) sends nothing for that stat -- this is independent per stat, unlike
+///     the dirty-tracker mark below which fires once for both stats together purely for write-behind batching.
 /// </remarks>
 public sealed class MeditationRegenSystem(WorldDataCache worldData, DirtyTracker<int> dirtyTracker)
     : ISimulationSystem
 {
     private const int MeditationActionSort = 31;
+
+    /// <summary>
+    ///     S010CHARACTER_HP (Server/Header/Protocol/STRUCT.h:1525) -- same literal already used by
+    ///     <c>Zone.CharacterHpStatSort</c> (Zone.PlayerLifecycle.cs), duplicated locally because this system
+    ///     sits in a different class from the <c>Zone</c> partial-class family that owns that constant.
+    /// </summary>
+    private const int CharacterHpStatSort = 10;
+
+    /// <summary>
+    ///     S011CHARACTER_MP (Server/Header/Protocol/STRUCT.h:1526) -- same literal already used by
+    ///     <c>Zone.CharacterMpStatSort</c> (Zone.CosmeticMirrors.cs), duplicated locally for the same reason
+    ///     as <see cref="CharacterHpStatSort" />.
+    /// </summary>
+    private const int CharacterMpStatSort = 11;
 
     public void Simulate(Zone zone, int legacyTicksElapsed)
     {
@@ -57,6 +79,17 @@ public sealed class MeditationRegenSystem(WorldDataCache worldData, DirtyTracker
 
             if (life == state.Life && mana == state.Mana)
                 continue;
+
+            // Each stat's push is independent -- a stat whose amount computed to zero (already at max, or an
+            // unresolved skill/grade < 1) neither changes nor sends a packet, matching the contract's "no
+            // packet for a stat whose recovery computes to zero" rule.
+            if (life != state.Life)
+                state.Session.Send(new AvatarStatUpdateResponse
+                    { Sort = CharacterHpStatSort, Value = life, Value2 = 0 });
+
+            if (mana != state.Mana)
+                state.Session.Send(new AvatarStatUpdateResponse
+                    { Sort = CharacterMpStatSort, Value = mana, Value2 = 0 });
 
             state.Life = life;
             state.Mana = mana;

@@ -1,6 +1,10 @@
+using System.Buffers;
 using System.Buffers.Binary;
 using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.World.WorldState;
+using Fenrir.Network.Abstractions;
+using Fenrir.Network.Dispatch.Sessions;
+using Fenrir.Network.Framing;
 using Fenrir.Network.Serialization.Packets.Zone;
 using Microsoft.Extensions.Logging;
 
@@ -202,9 +206,7 @@ public sealed class ZoneEventBroadcaster(
         // same broadcast frame. Same call Zone.Combat.cs's own BroadcastTowerStatus already uses.
         var response = towerWar.BuildStatusSnapshot();
 
-        foreach (var zone in zones.Zones)
-        foreach (var player in zone.Players)
-            player.Session.Send(response);
+        BroadcastToEveryZone(in response);
     }
 
     private void Broadcast(int sort, params ReadOnlySpan<int> fields)
@@ -215,8 +217,48 @@ public sealed class ZoneEventBroadcaster(
 
         var response = new ZoneEventInfoResponse { Sort = sort, Data = data };
 
-        foreach (var zone in zones.Zones)
-        foreach (var player in zone.Players)
-            player.Session.Send(response);
+        BroadcastToEveryZone(in response);
+    }
+
+    /// <summary>
+    ///     Serialize-once, cluster-wide fan-out: the frame is encoded exactly once and copied into every
+    ///     connected player's own transport across every zone this shard hosts -- same rent-once/write-once/
+    ///     copy-N-times idiom every other Zone broadcast helper already uses (e.g.
+    ///     <c>Zone.PlayerLifecycle.BroadcastAvatarAction</c>), with a per-recipient failure isolated (logged,
+    ///     skipped) instead of left to abort the rest of the fan-out. Without this, a single recipient whose
+    ///     transport pipe writer has already completed (an ordinary disconnect race: the player is still
+    ///     present in <see cref="Zone.Players" /> until that player's own zone next drains its Leave command)
+    ///     throws out of <see cref="ClientSession.Send{TPacket}" /> uncaught by a bare loop -- silently cutting
+    ///     off delivery to every zone/player still left to visit in the SAME call, for every <c>Announce*</c>
+    ///     method on this class (all of which funnel through here).
+    /// </summary>
+    private void BroadcastToEveryZone<TPacket>(in TPacket response) where TPacket : struct, IOutgoingPacket
+    {
+        var total = FrameWriter.FrameSizeOf<TPacket>();
+        var rented = ArrayPool<byte>.Shared.Rent(total);
+
+        try
+        {
+            var span = rented.AsSpan(0, total);
+            FrameWriter.WriteFrame(in response, span);
+
+            foreach (var zone in zones.Zones)
+            foreach (var player in zone.Players)
+                try
+                {
+                    if (player.Session is ClientSession clientSession)
+                        clientSession.SendRaw(span);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex,
+                        "Cluster-wide RvR broadcast to character {RecipientId} (zone {MapId}) failed",
+                        player.CharacterId, zone.MapId);
+                }
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(rented);
+        }
     }
 }

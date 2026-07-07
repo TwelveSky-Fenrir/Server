@@ -57,6 +57,13 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
 
     public (int CharacterId, int Delta)? LastGrantTribeTransferPermit { get; private set; }
 
+    /// <summary>Last call ever made to <see cref="UpsertHotkeySlotAsync" /> -- (Sort, Value1, Value2) is the raw legacy triple.</summary>
+    public (int CharacterId, byte Page, byte KeyIndex, int Sort, int Value1, int Value2)? LastUpsertHotkeySlot
+    {
+        get;
+        private set;
+    }
+
     public ValueTask ReplaceContainerAsync(int characterId, byte container,
         IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct)
     {
@@ -164,7 +171,8 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
     public ValueTask UpsertHotkeySlotAsync(int characterId, byte page, byte keyIndex, int sort, int value1,
         int value2, CancellationToken ct)
     {
-        throw new NotImplementedException();
+        LastUpsertHotkeySlot = (characterId, page, keyIndex, sort, value1, value2);
+        return ValueTask.CompletedTask;
     }
 
     public ValueTask ExecuteTradeAsync(int characterA, IReadOnlyList<CharacterItemSlotTvp> itemsA0,
@@ -184,11 +192,39 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
         throw new NotImplementedException();
     }
 
+    public bool ThrowOnAdjustZone241Time { get; set; }
+
+    public (int CharacterId, int Delta)? LastAdjustZone241Time { get; private set; }
+
+    public int Zone241Time { get; private set; }
+
+    public ValueTask<int> AdjustZone241TimeAsync(int characterId, int delta, CancellationToken ct)
+    {
+        if (ThrowOnAdjustZone241Time)
+            throw new InvalidOperationException("Simulated SQL failure");
+
+        LastAdjustZone241Time = (characterId, delta);
+        Zone241Time += delta;
+        return ValueTask.FromResult(Zone241Time);
+    }
+
     public ValueTask ApplyTribeConversionAsync(int characterId, int itemId, byte container,
         IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct)
     {
         throw new NotImplementedException();
     }
+
+    public ValueTask ApplyTribeFourConversionAsync(int characterId, byte newTribe, int stepPermanent,
+        int activeQuestId, int qSort, int targetPhase, int killCounter, CancellationToken ct)
+    {
+        TribeFourConversions.Add((characterId, newTribe, stepPermanent, activeQuestId, qSort, targetPhase,
+            killCounter));
+        return ValueTask.CompletedTask;
+    }
+
+    /// <summary>Every call ever made to <see cref="ApplyTribeFourConversionAsync" />, most-recent last -- append-only.</summary>
+    public List<(int CharacterId, byte NewTribe, int StepPermanent, int ActiveQuestId, int QSort, int TargetPhase,
+        int KillCounter)> TribeFourConversions { get; } = [];
 
     public ValueTask ApplyQuestTransitionAsync(int characterId, int stepPermanent, int activeQuestId, int qSort,
         int targetPhase, int killCounter, long deltaMoney, byte? container1,

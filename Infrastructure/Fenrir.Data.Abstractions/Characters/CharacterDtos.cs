@@ -150,7 +150,14 @@ public sealed partial record CharacterWorldSnapshotDto(
     // enabled). Appended last, defaulted to 0 (same "pre-existing N-arg test construction keeps compiling"
     // posture as AccountDtos.AuthenticateAccountDto.AccountGrade), not inserted next to MountTime, so this
     // record's field order for every prior column is unchanged.
-    int AutoTime2 = 0);
+    int AutoTime2 = 0,
+    // Migrations/041_character_rebirth_zone241_time.sql: aZone241Time, wire-exposed via
+    // AvatarInfo.Zone241Time (still always sent as the bare literal 0 from AvatarInfoFactory until a caller
+    // wires this persisted value through -- see that migration's own header). First durable consumer is the
+    // legacy-behavior-translator Rebirth-advancement contract's Path B ("Max Rebirth" aZone241Time += 10).
+    // Appended last, defaulted to 0, same "pre-existing N-arg test construction keeps compiling" posture as
+    // AutoTime2 immediately above.
+    int Zone241Time = 0);
 
 /// <summary>
 ///     RS1 of usp_Character_GetForWorldEntry. ExpireDate: legacy YYYYMMDD int, 0 = not a rental. Container: 0/1

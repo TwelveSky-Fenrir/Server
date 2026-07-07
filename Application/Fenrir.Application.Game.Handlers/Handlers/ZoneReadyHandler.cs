@@ -3,6 +3,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Fenrir.Network.Serialization.Wire;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers;
@@ -14,13 +15,17 @@ namespace Fenrir.Application.Game.Handlers.Handlers;
 ///     heartbeat watchdog, tribe anti-tamper, auto-hunt anti-hack.
 /// </summary>
 /// <remarks>
-///     Fenrir's op13 only ever fires once per session (ZoneReadyRequest.AllowedStates is Registering-only --
-///     any later replay is already rejected upstream by SessionStateGate with StateViolation, unlike legacy
-///     where nothing stops a repeat CLIENT_OK_FOR_ZONE_SEND). The heartbeat watchdog below is consequently
-///     unreachable today (no heartbeat can exist yet before this handshake completes) but is wired for real:
-///     it activates the moment anything re-admits op13 later in a session's life, exactly like legacy's own
-///     zone-transfer resend. Same "real but not yet reachable" posture as several other guards in
-///     <see cref="PlayerRuntimeState" /> (e.g. MissionJoinWar).
+///     ZoneReadyRequest.AllowedStates spans Registering and InWorld -- the same blanket rule every other
+///     incoming Zone opcode uses -- rather than Registering-only, so a repeat CLIENT_OK_FOR_ZONE_SEND no
+///     longer gets rejected upstream by SessionStateGate with StateViolation the way it used to. Because of
+///     that, this handler itself now owns the idempotency guard below: once a session is already InWorld, a
+///     duplicate op13 is a safe no-op rather than re-running the 3 guardrails. That matters because Guard 3
+///     (auto-hunt anti-hack) has a real side effect -- it increments <c>PlayerRuntimeState.AutoTimeHack</c>
+///     -- and letting a harmless resend accumulate strikes could eventually Abort an already-legitimately-
+///     playing session for no reason. The heartbeat watchdog is consequently reachable only via this repeat
+///     path (no heartbeat can exist yet on the very first, Registering-state op13) but is wired for real,
+///     exactly like legacy's own zone-transfer resend. Same "real but not yet reachable on the first call"
+///     posture as several other guards in <see cref="PlayerRuntimeState" /> (e.g. MissionJoinWar).
 ///     This handler never sends any response packet, on any branch -- matching Server/ts25zone/
 ///     S04_MyWork02.cpp:1213-1291, where CLIENT_OK_FOR_ZONE_SEND has no outbound send anywhere in its body.
 ///     In particular, the avatar snapshot (EnterWorldResponse) and world/tribe broadcast
@@ -35,6 +40,12 @@ public sealed class ZoneReadyHandler(IZoneReadyService service, ILogger<ZoneRead
     public void Handle(in ZoneReadyRequest packet, IPacketSession session)
     {
         var zoneSession = (ZoneClientSession)session;
+
+        // Idempotency guard: the handshake already completed once for this session. Re-running the guards
+        // below on a duplicate send would risk accumulating anti-hack strikes (Guard 3) against an already
+        // in-world, legitimately playing session -- treat a repeat as a safe no-op instead.
+        if (zoneSession.State == ZoneSessionState.InWorld)
+            return;
 
         // Benign staleness window around world entry: the posted ZoneCommand.Enter may not have been ticked
         // yet. Nothing to validate against in that case -- fall through and still admit the session, same as

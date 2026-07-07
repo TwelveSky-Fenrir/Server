@@ -129,7 +129,7 @@ public sealed class EventLogQueueTests
                 return ValueTask.CompletedTask;
             },
             interval: TimeSpan.FromMilliseconds(50),
-            onFlushError: ex => firstAttemptFailed.TrySetResult(ex));
+            onFlushError: (ex, _) => firstAttemptFailed.TrySetResult(ex));
 
         using var cts = new CancellationTokenSource();
         var runTask = queue.RunAsync(cts.Token);

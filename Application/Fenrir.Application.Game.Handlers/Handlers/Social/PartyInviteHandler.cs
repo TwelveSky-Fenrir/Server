@@ -7,8 +7,8 @@ using Fenrir.Network.Serialization.Packets.Zone;
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
 /// <summary>
-///     CZ_PARTY_ASK_SEND (opcode 65) -- level check uses <see cref="PlayerRuntimeState.Level" /> alone;
-///     aLevel2 (legacy's rebirth sub-level) isn't modeled.
+///     CZ_PARTY_ASK_SEND (opcode 65) -- level-gap check delegates to <c>PartyInviteService.Invite</c>, which
+///     uses <see cref="PlayerRuntimeState.CombinedLevel" /> (aLevel1+aLevel2) on both sides.
 /// </summary>
 public sealed class PartyInviteHandler(IPartyInviteService partyInviteService)
     : IInlinePacketHandler<PartyInviteRequest>

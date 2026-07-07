@@ -17,7 +17,8 @@ namespace Fenrir.Network.Serialization.Packets.Zone;
 ///     in the cited legacy range, flagged as an open finding rather than assumed dead.
 /// </remarks>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.ZoneReady,
-    ExpectedSize = 25, AllowedStates = [(byte)ZoneSessionState.Registering])]
+    ExpectedSize = 25,
+    AllowedStates = [(byte)ZoneSessionState.Registering, (byte)ZoneSessionState.InWorld])]
 public readonly partial record struct ZoneReadyRequest : IIncomingPacket<ZoneReadyRequest>
 {
     public required int Tribe { get; init; }

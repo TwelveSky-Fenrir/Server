@@ -1,5 +1,6 @@
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.GameData;
+using Fenrir.Data.Abstractions.Game;
 
 namespace Fenrir.Application.Game.Domain.World.Npcs;
 
@@ -279,6 +280,12 @@ public static class NpcShopPolicy
         return ContainerMatrix.IsStackableSort(item.Sort) ? unitCost * quantity : unitCost;
     }
 
+    /// <summary>
+    ///     On <see cref="Succeeded" />, the caller (<c>GenericActionService.SellToNpcShopAsync</c>) logs a
+    ///     game.EventLog audit row (Category=NpcShopTrade) once the money credit + container replace have
+    ///     durably persisted -- legacy <c>GL_621_NSHOP_ITEM</c>, see <see cref="EventLogCategory.NpcShopTrade" />'s
+    ///     own remarks. This pure policy performs no logging itself (no I/O in <c>Fenrir.Application.Game.Domain</c>).
+    /// </summary>
     public readonly record struct SellResult(
         SellOutcome Outcome,
         long MoneyGained,
@@ -287,6 +294,12 @@ public static class NpcShopPolicy
         public bool Succeeded => Outcome == SellOutcome.Success;
     }
 
+    /// <summary>
+    ///     On <see cref="Succeeded" />, the caller (<c>GenericActionService.BuyFromNpcShopAsync</c>) logs a
+    ///     game.EventLog audit row (Category=NpcShopTrade) once the money debit + container replace have
+    ///     durably persisted -- legacy <c>GL_621_NSHOP_ITEM</c>, see <see cref="EventLogCategory.NpcShopTrade" />'s
+    ///     own remarks. This pure policy performs no logging itself (no I/O in <c>Fenrir.Application.Game.Domain</c>).
+    /// </summary>
     public readonly record struct BuyResult(
         BuyOutcome Outcome,
         int MoneyCost,

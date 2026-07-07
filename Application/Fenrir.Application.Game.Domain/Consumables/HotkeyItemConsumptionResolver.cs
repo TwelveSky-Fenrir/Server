@@ -1,21 +1,25 @@
+using System.Collections.Immutable;
 using Fenrir.Application.Game.Domain.Hotkeys;
+using Fenrir.Application.Game.Domain.Simulation;
+using Fenrir.Application.Game.Domain.Skills;
 
 namespace Fenrir.Application.Game.Domain.Consumables;
 
 /// <summary>
 ///     Pure policy for CZ_USE_HOTKEY_ITEM_SEND (op22)'s item-kind hotkey-slot activation: bounds/kind/action-
-///     state gating, item-category/quantity validation, the per-potion-type dispatch (life/mana/no-op gain),
-///     and the hotkey-quantity decrement/clear-on-empty. No I/O, no Zone/PlayerRuntimeState/WorldDataCache
-///     dependency -- same posture as <see cref="Hotkeys.HotkeyActionResolver" />/<c>BottleResolver</c>; the
-///     caller (<c>UseHotkeyItemService</c>) resolves the hotkey slot, the item catalog lookup, and the
-///     character's live vitals before calling in.
+///     state gating, item-category/quantity validation, the per-potion-type dispatch (life/mana/no-op gain,
+///     fixed-value self-buff writes), and the hotkey-quantity decrement/clear-on-empty. No I/O, no
+///     Zone/PlayerRuntimeState/WorldDataCache dependency -- same posture as
+///     <see cref="Hotkeys.HotkeyActionResolver" />/<c>BottleResolver</c>; the caller (<c>UseHotkeyItemService</c>)
+///     resolves the hotkey slot, the item catalog lookup, and the character's live vitals before calling in.
 /// </summary>
 /// <remarks>
 ///     Réf. C++ : Server/ts25zone/S04_MyWork02.cpp:2203-2492 (full <c>BEGIN_CZ(USE_HOTKEY_ITEM_SEND)</c>
 ///     handler) ; Server/Header/Protocol/DEFINE.h:300-301 (MAX_HOT_KEY_PAGE=3, MAX_HOT_KEY_NUM=14) ;
 ///     Server/Header/Protocol/DEFINE.h:370 (MAX_POTION_SORT_NUM=16) ; Server/ts25zone/S07_MyGame04.cpp:
 ///     2578-2612 (Stun/UnStun drive the "may eat potion" flag) ; Server/ts25zone/S07_MyGame04.cpp:1617-1654
-///     (ProcessForDeath drives the same flag on death).
+///     (ProcessForDeath drives the same flag on death) ; Server/ts25zone/S04_MyWork02.cpp:2387-2451 (potion
+///     types 12-15's own fixed-value/duration buff writes, see this class's own remarks below).
 ///     <para>
 ///         Action-state block list: the legacy source also names a third value (38) alongside stunned (11) and
 ///         dead (12), but no citation available to this resolver's originating behavior contract confirmed its
@@ -23,14 +27,22 @@ namespace Fenrir.Application.Game.Domain.Consumables;
 ///         <c>cpp-ts25-explorer</c> re-check.
 ///     </para>
 ///     <para>
-///         Potion types 6 (pet-activity), 12/13 (mutually-exclusive combat-debuff scrolls), 14/15
-///         (unconditional self-buff scrolls), and 16 (mount-activity) are recognized here -- never treated as
+///         Potion types 6 (pet-activity) and 16 (mount-activity) are recognized here -- never treated as
 ///         malformed -- but deliberately NOT wired to their real effects yet: their wire-notification Sort
-///         codes (pet/mount) and buff-display-slot indices (12-15) were not confirmed by the behavior contract
-///         this resolver implements, and inventing them risks a wrong byte-exact wire shape for a future
-///         consumer. Same "known but not yet implemented -&gt; clean reject, never disconnect" posture as
+///         codes (pet/mount) were not confirmed by the behavior contract this resolver implements, and
+///         inventing them risks a wrong byte-exact wire shape for a future consumer. Same "known but not yet
+///         implemented -&gt; clean reject, never disconnect" posture as
 ///         <c>Inventory.ContainerMatrix.IsImplementedContainerMoveSort</c>. Flagged for a follow-up
 ///         legacy-behavior-translator contract.
+///     </para>
+///     <para>
+///         Potion types 12-15 (Assassin Scroll/Departed Spirit Scroll/Attack Increase Book/Dodge Increase
+///         Book -- world.Items 1364/1156/1471/1472 respectively, ids and PotionType1 values cross-checked
+///         against <c>Database/Migrations/Seed/world/080_items.sql</c>) each write a single fixed self-buff
+///         on use, per <see cref="DarkAttackBuffSlot" />/<see cref="HitRateBuffSlot" />/
+///         <see cref="DodgeRateBuffSlot" />'s own remarks. None of the four values/durations is read from the
+///         item's own catalog row (PotionType2 is 0 for all four, unlike types 1-5's own PotionType2-as-
+///         amount convention) -- they are fixed literals in the cited switch.
 ///     </para>
 /// </remarks>
 public static class HotkeyItemConsumptionResolver
@@ -39,15 +51,58 @@ public static class HotkeyItemConsumptionResolver
     public enum EffectKind
     {
         /// <summary>
-        ///     Types 9 (no-op) and every recognized-but-unwired type (6/12-16, all resolved as
+        ///     Type 9 (no-op) and every still-unwired type (6/16, both resolved as
         ///     <see cref="Outcome.RejectedClean" /> today).
         /// </summary>
         None,
 
         Life,
         Mana,
-        LifeAndMana
+        LifeAndMana,
+
+        /// <summary>Potion types 12-15 -- a single fixed-value/duration BUFF_INFO slot write, see this class's own remarks.</summary>
+        Buff
     }
+
+    /// <summary>
+    ///     BUFF_INFO slot potion types 12 (Assassin Scroll) and 13 (Departed Spirit Scroll) both write --
+    ///     unconsumed by any Fenrir stat/combat formula today. The two items' own catalog text ("target can't
+    ///     use Healing potion for 2 secs") describes an on-hit proc this stored percentage is presumably meant
+    ///     to drive, which is a separate, not-yet-implemented combat mechanic outside this resolver's scope
+    ///     (see <see cref="Combat.CombatResolver" />, which does not read this slot).
+    /// </summary>
+    private const int DarkAttackBuffSlot = 15;
+
+    /// <summary>
+    ///     BUFF_INFO slot potion type 14 (Attack Increase Book) writes -- consumed by
+    ///     <see cref="Stats.StatCalculator.ComputeEffectiveStats" /> as an AttackSuccess (hit-rate) percent
+    ///     bonus.
+    /// </summary>
+    private const int HitRateBuffSlot = 17;
+
+    /// <summary>
+    ///     BUFF_INFO slot potion type 15 (Dodge Increase Book) writes -- consumed by
+    ///     <see cref="Stats.StatCalculator.ComputeEffectiveStats" /> as an AttackBlock (dodge-rate) percent
+    ///     bonus.
+    /// </summary>
+    private const int DodgeRateBuffSlot = 18;
+
+    /// <summary>Fixed percent value potion types 12/13 both write into <see cref="DarkAttackBuffSlot" />.</summary>
+    private const int DarkAttackBuffPercent = 3;
+
+    /// <summary>Fixed percent value potion types 14/15 both write into their own slot.</summary>
+    private const int HitOrDodgeBuffPercent = 25;
+
+    /// <summary>Potion type 12 (Assassin Scroll) -- the shorter of the two dark-attack-buff durations.</summary>
+    private static readonly int AssassinScrollDurationTicks =
+        SimulationClock.ToWholeLegacyTicks(TimeSpan.FromSeconds(40));
+
+    /// <summary>
+    ///     Potion type 13 (Departed Spirit Scroll) and both potion types 14/15 (Attack/Dodge Increase Book)
+    ///     share this same 60-second duration.
+    /// </summary>
+    private static readonly int SixtySecondBuffDurationTicks =
+        SimulationClock.ToWholeLegacyTicks(TimeSpan.FromSeconds(60));
 
     public enum Outcome
     {
@@ -155,11 +210,16 @@ public static class HotkeyItemConsumptionResolver
                 // Genuine legacy no-op consumable -- always proceeds to decrement/acknowledge, zero effect.
                 return Succeed(slot, EffectKind.None, 0, 0);
 
+            case 12: // Assassin Scroll (world.Items 1364) -- self buff, slot 15, +3%, 40s
+                return SucceedWithBuff(slot, DarkAttackBuffSlot, DarkAttackBuffPercent, AssassinScrollDurationTicks);
+            case 13: // Departed Spirit Scroll (world.Items 1156) -- self buff, slot 15, +3%, 60s
+                return SucceedWithBuff(slot, DarkAttackBuffSlot, DarkAttackBuffPercent, SixtySecondBuffDurationTicks);
+            case 14: // Attack Increase Book (world.Items 1471) -- self buff, slot 17 (hit rate), +25%, 60s
+                return SucceedWithBuff(slot, HitRateBuffSlot, HitOrDodgeBuffPercent, SixtySecondBuffDurationTicks);
+            case 15: // Dodge Increase Book (world.Items 1472) -- self buff, slot 18 (dodge rate), +25%, 60s
+                return SucceedWithBuff(slot, DodgeRateBuffSlot, HitOrDodgeBuffPercent, SixtySecondBuffDurationTicks);
+
             case 6: // pet-activity
-            case 12: // combat-debuff scroll (Assassin Scroll family)
-            case 13: // combat-debuff scroll (Departed Spirit Scroll family)
-            case 14: // self-buff scroll, increase hit rate
-            case 15: // self-buff scroll, increase dodge rate
             case 16: // mount-activity
                 // Recognized, not yet wired to a real effect -- see this type's own remarks.
                 return Result.RejectedCleanResult;
@@ -174,7 +234,24 @@ public static class HotkeyItemConsumptionResolver
     {
         var remaining = slot.Value2 - 1;
         var newSlot = remaining > 0 ? slot with { Value2 = remaining } : HotkeySlot.Empty;
-        return new Result(Outcome.Success, newSlot, effect, lifeGain, manaGain);
+        return new Result(Outcome.Success, newSlot, effect, lifeGain, manaGain,
+            ImmutableArray<SkillCastResolver.BuffWrite>.Empty);
+    }
+
+    /// <summary>
+    ///     Same decrement/clear-on-empty tail as <see cref="Succeed" />, plus the single resolved BUFF_INFO
+    ///     write potion types 12-15 each carry. Reuses <see cref="SkillCastResolver.BuffWrite" /> (Slot, Value,
+    ///     DurationTicks) rather than inventing a duplicate tuple type -- it is already the exact payload
+    ///     <c>Zone.ApplyBuffWrites</c> expects, and this is now a third, otherwise-unrelated reuse of that same
+    ///     shared type alongside the manual self-buff skill-cast confirm and <c>AutoHuntTickSystem</c>'s
+    ///     bot-buff loop.
+    /// </summary>
+    private static Result SucceedWithBuff(HotkeySlot slot, int buffSlot, int value, int durationTicks)
+    {
+        var remaining = slot.Value2 - 1;
+        var newSlot = remaining > 0 ? slot with { Value2 = remaining } : HotkeySlot.Empty;
+        var write = ImmutableArray.Create(new SkillCastResolver.BuffWrite(buffSlot, value, durationTicks));
+        return new Result(Outcome.Success, newSlot, EffectKind.Buff, 0, 0, write);
     }
 
     /// <summary>
@@ -189,14 +266,22 @@ public static class HotkeyItemConsumptionResolver
         return Math.Clamp(raw, 0, headroom);
     }
 
+    /// <param name="BuffWrites">
+    ///     Populated only for <see cref="EffectKind.Buff" /> (potion types 12-15) -- always exactly one write.
+    ///     Empty for every other <see cref="EffectKind" />.
+    /// </param>
     public readonly record struct Result(
         Outcome Outcome,
         HotkeySlot NewSlot,
         EffectKind Effect,
         int LifeGain,
-        int ManaGain)
+        int ManaGain,
+        ImmutableArray<SkillCastResolver.BuffWrite> BuffWrites)
     {
-        public static readonly Result DisconnectResult = new(Outcome.Disconnect, default, EffectKind.None, 0, 0);
-        public static readonly Result RejectedCleanResult = new(Outcome.RejectedClean, default, EffectKind.None, 0, 0);
+        public static readonly Result DisconnectResult = new(Outcome.Disconnect, default, EffectKind.None, 0, 0,
+            ImmutableArray<SkillCastResolver.BuffWrite>.Empty);
+
+        public static readonly Result RejectedCleanResult = new(Outcome.RejectedClean, default, EffectKind.None, 0,
+            0, ImmutableArray<SkillCastResolver.BuffWrite>.Empty);
     }
 }

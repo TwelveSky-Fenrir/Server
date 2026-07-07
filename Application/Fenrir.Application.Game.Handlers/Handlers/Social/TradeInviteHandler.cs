@@ -7,8 +7,8 @@ using Fenrir.Network.Serialization.Packets.Zone;
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
 /// <summary>
-///     CZ_TRADE_ASK_SEND (opcode 47) -- level uses <see cref="PlayerRuntimeState.Level" /> alone; aLevel2
-///     isn't modeled, same gap as party's invite check.
+///     CZ_TRADE_ASK_SEND (opcode 47) -- the displayed level delegates to <c>TradeInviteService.Invite</c>,
+///     which uses <see cref="PlayerRuntimeState.CombinedLevel" /> (aLevel1+aLevel2).
 /// </summary>
 public sealed class TradeInviteHandler(ITradeInviteService tradeInviteService)
     : IInlinePacketHandler<TradeInviteRequest>

@@ -22,6 +22,7 @@ public sealed class CraftPetHandler(ICraftPetService craftPetService)
     {
         var zoneSession = (ZoneClientSession)session;
         var characterId = zoneSession.CharacterId!.Value;
+        var accountId = zoneSession.AccountId!.Value;
 
         if (zoneSession.CurrentZone is not Zone zone || !zone.TryGetPlayer(characterId, out var state) ||
             state is null)
@@ -31,7 +32,8 @@ public sealed class CraftPetHandler(ICraftPetService craftPetService)
         await state.EconomyActionLock.WaitAsync(cancellationToken);
         try
         {
-            await ResolveAndApplyAsync(packet, session, zoneSession, zone, state, characterId, cancellationToken);
+            await ResolveAndApplyAsync(packet, session, zoneSession, zone, state, characterId, accountId,
+                cancellationToken);
         }
         finally
         {
@@ -40,7 +42,7 @@ public sealed class CraftPetHandler(ICraftPetService craftPetService)
     }
 
     private async ValueTask ResolveAndApplyAsync(CraftPetRequest packet, IPacketSession session,
-        ZoneClientSession zoneSession, Zone zone, PlayerRuntimeState state, int characterId,
+        ZoneClientSession zoneSession, Zone zone, PlayerRuntimeState state, int characterId, int accountId,
         CancellationToken cancellationToken)
     {
         CraftPetResult result;
@@ -51,13 +53,13 @@ public sealed class CraftPetHandler(ICraftPetService craftPetService)
             case PetCraftRecipeCatalog.Recipe2Sort:
             case PetCraftRecipeCatalog.Recipe3Sort:
                 result = await craftPetService.ResolveFourSlotRecipeAsync(packet, zone, state, characterId,
-                    cancellationToken);
+                    accountId, cancellationToken);
                 break;
             case PetCraftRecipeCatalog.Recipe4Sort:
             case PetCraftRecipeCatalog.Recipe5Sort:
             case PetCraftRecipeCatalog.Recipe6Sort:
                 result = await craftPetService.ResolveTwoSlotRecipeAsync(packet, zone, state, characterId,
-                    cancellationToken);
+                    accountId, cancellationToken);
                 break;
             default:
                 zoneSession.Abort(DisconnectReason.Faulted);

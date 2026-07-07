@@ -56,11 +56,21 @@ public interface IGenericActionService
     public ValueTask<GenericActionResult> UpgradeSkillAsync(byte[] data, Zone zone, PlayerRuntimeState state,
         int characterId, CancellationToken cancellationToken);
 
-    public ValueTask<GenericActionResult> SellToNpcShopAsync(Zone zone, PlayerRuntimeState state, int characterId,
-        DefaultPData move, CancellationToken cancellationToken);
+    /// <param name="accountId">
+    ///     The acting player's account id -- carried only for the game.EventLog audit row written once the
+    ///     sale has durably persisted (Category=NpcShopTrade); not used for any validation or persistence
+    ///     decision.
+    /// </param>
+    public ValueTask<GenericActionResult> SellToNpcShopAsync(Zone zone, PlayerRuntimeState state, int accountId,
+        int characterId, DefaultPData move, CancellationToken cancellationToken);
 
-    public ValueTask<GenericActionResult> BuyFromNpcShopAsync(Zone zone, PlayerRuntimeState state, int characterId,
-        DefaultPData move, CancellationToken cancellationToken);
+    /// <param name="accountId">
+    ///     The acting player's account id -- carried only for the game.EventLog audit row written once the
+    ///     purchase has durably persisted (Category=NpcShopTrade); not used for any validation or persistence
+    ///     decision.
+    /// </param>
+    public ValueTask<GenericActionResult> BuyFromNpcShopAsync(Zone zone, PlayerRuntimeState state, int accountId,
+        int characterId, DefaultPData move, CancellationToken cancellationToken);
 
     /// <summary>
     ///     tSort 206 -- spend unspent stat points (aStatPoint) to raise Strength/Dexterity/Vitality/Intelligence.

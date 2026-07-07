@@ -15,10 +15,22 @@ public sealed class FriendService(
 {
     private const int MaxFriends = 10;
 
+    /// <remarks>
+    ///     Réf. C++ : Server/ts25zone/S04_MyWork02.cpp:8259-8277,8459-8471,9088-9101,9311-9324 (the shared
+    ///     CZ_DUEL_ASK_SEND/CZ_FRIEND_ASK_SEND/CZ_PARTY_ASK_SEND/CZ_TEACHER_ASK_SEND/CZ_TRADE_ASK_SEND
+    ///     pre-check family) -- legacy checks the requester's OWN busy/pose state before it ever resolves
+    ///     the target avatar by name, so a busy asker naming a nonexistent/offline target gets the busy
+    ///     reply, not "target not found". <see cref="FriendRegistry.IsNegotiating" /> is therefore checked
+    ///     ahead of <see cref="FindPlayerByName" />; the same check inside <see cref="FriendRegistry.TryAsk" />
+    ///     stays in place for the actual registration.
+    /// </remarks>
     public FriendAskResultKind Ask(Zone zone, PlayerRuntimeState asker, string targetAvatarName)
     {
         if (zone.MapId == 124)
             return FriendAskResultKind.MapForbidden;
+
+        if (friends.IsNegotiating(asker.CharacterId))
+            return FriendAskResultKind.AskerBusy;
 
         var target = FindPlayerByName(zone, targetAvatarName);
         if (target is null)

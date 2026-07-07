@@ -78,7 +78,37 @@ public enum EventLogCategory : byte
     ///     4 = earnings withdrawn. First consumers: Fenrir.Application.Game.Services.Commerce.
     ///     OpenShopStallService/UpdateProxyShopService/WithdrawProxyShopEarningsService.
     /// </summary>
-    ProxyShop = 14
+    ProxyShop = 14,
+
+    /// <summary>
+    ///     A cosmetic entitlement is permanently removed from the character's active collection -- legacy
+    ///     <c>CZ_COSTUME_STATE_SEND</c>/<c>CZ_ANIMAL_STATE_SEND</c> Sort 5 ("Delete"). Today this only ever
+    ///     fires for the costume side: the wardrobe slot is cleared and, as a make-good, a plain inventory
+    ///     item is granted back (<c>CostumeStateResolver.ResultKind.ReturnToInventorySuccess</c>) -- distinct
+    ///     from <see cref="ItemCreate" /> since nothing new is minted, an existing entitlement is merely
+    ///     converted back to its inventory form. The mount equivalent (op87 Sort 5) is deliberately NOT wired
+    ///     to this category: <c>MountStateResolver</c> treats it as an out-of-scope disconnect -- a documented
+    ///     exploit-surface closure (a "delete mount id 0" quirk would grant free Contribution Points with no
+    ///     real mount required), not a missing-instrumentation gap -- see that type's own remarks. First
+    ///     consumer: Fenrir.Application.Game.Services.BuffsMountsCosmetics.CostumeStateService's
+    ///     return-to-inventory branch.
+    /// </summary>
+    CosmeticDelete = 15,
+
+    /// <summary>
+    ///     A player sold an item to, or bought an item from, an NPC shop -- legacy <c>GL_621_NSHOP_ITEM</c>
+    ///     (ServerDocs/12_ts25zone/07_MyWork05_Helpers.md:163-171 names it as the dedicated audit call the
+    ///     NPC-shop family (<c>ProcessForInventoryToNPCShop</c>/<c>ProcessForNPCShopToInventory</c>,
+    ///     Server/ts25zone/S04_MyWork05.cpp:1398-1542/1716-2029) issues before returning; that documentation
+    ///     does not pin the call to an exact line number, so none is cited here). EventCode is app-owned
+    ///     within this category: 1 = sold to the shop, 2 = bought from the shop. A dedicated category rather
+    ///     than folding into <see cref="Currency" />, matching how <see cref="ProxyShop" />/
+    ///     <see cref="GuildMoney" /> each got their own category instead of being shoehorned into a broader
+    ///     existing one. First consumer: Fenrir.Application.Game.Services.GenericAction.GenericActionService's
+    ///     SellToNpcShopAsync/BuyFromNpcShopAsync (backing
+    ///     Fenrir.Application.Game.Domain.World.Npcs.NpcShopPolicy's ResolveSell/ResolveBuy).
+    /// </summary>
+    NpcShopTrade = 16
 }
 
 /// <summary>

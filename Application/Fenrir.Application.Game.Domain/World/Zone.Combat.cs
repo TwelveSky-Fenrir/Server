@@ -296,10 +296,12 @@ public sealed partial class Zone
     ///     </para>
     ///     <para>
     ///         <paramref name="isStunTrigger" /> is the "stun vs. not" collapse of the legacy's three-value
-    ///         kill-type marker -- always false from this method's only current caller (the ordinary HP-death
-    ///         path in <see cref="ApplyCombatCommand" />). A future stun-chain integration point (the
-    ///         non-death, party-wide trigger the source contract also describes) should call this method with
-    ///         <c>isStunTrigger: true</c> once per present party member instead of duplicating this pipeline.
+    ///         kill-type marker. False from the ordinary HP-death path in <see cref="ApplyCombatCommand" />;
+    ///         true from the non-death, party-wide team-stun sub-mechanic
+    ///         (<see cref="ApplyTeamStunSubMechanic" />, S07_MyGame02.cpp:3708-3725), which calls this
+    ///         method once per present party member holding the Critical buff instead of duplicating this
+    ///         pipeline -- matching legacy calling <c>MyUtil::ProcessForKillOtherTribe(..., KILL_CP_TYPE::STUN)</c>
+    ///         verbatim from that same site.
     ///     </para>
     /// </remarks>
     private void ApplyPvpKillRewards(PlayerRuntimeState attackerState, PlayerRuntimeState defenderState,

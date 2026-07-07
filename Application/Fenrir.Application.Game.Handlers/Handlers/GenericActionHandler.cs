@@ -141,11 +141,13 @@ public sealed class GenericActionHandler(
                 return;
             }
 
+            // AccountId is guaranteed set alongside CharacterId (both written together by MarkTicketConsumed
+            // before InWorld is reachable) -- same non-null posture as the 209 branch above.
             var result = sort == 215
-                ? await genericActionService.BuyFromNpcShopAsync(zone, state, characterId, shopMove,
-                    cancellationToken)
-                : await genericActionService.SellToNpcShopAsync(zone, state, characterId, shopMove,
-                    cancellationToken);
+                ? await genericActionService.BuyFromNpcShopAsync(zone, state, zoneSession.AccountId!.Value,
+                    characterId, shopMove, cancellationToken)
+                : await genericActionService.SellToNpcShopAsync(zone, state, zoneSession.AccountId!.Value,
+                    characterId, shopMove, cancellationToken);
             Respond(session, zoneSession, sort, packet.Data, result);
             return;
         }

@@ -75,6 +75,42 @@ public class DuelServiceTests
         Assert.Equal(DuelAskResultKind.ChallengerBusy, result);
     }
 
+    /// <summary>
+    ///     Response-code-order regression: the challenger's own busy/pose state must be checked before the
+    ///     target avatar is resolved by name, so a busy challenger naming a nonexistent avatar still gets
+    ///     the busy reply, not "target not found" (Server/ts25zone/S04_MyWork02.cpp:8259-8277).
+    /// </summary>
+    [Fact]
+    public void Ask_ChallengerBusy_AndTargetNameDoesNotExist_ReturnsChallengerBusy_NotTargetNotFound()
+    {
+        var (service, zones, duels) = CreateService(1);
+        var challenger = Enter(zones, 1, 10, "Challenger", 1);
+        Enter(zones, 1, 20, "PendingTarget", 1);
+
+        Assert.Equal(DuelAskOutcome.Sent, duels.TryAsk(10, 20, false)); // still pending, never answered
+
+        var result = service.Ask(zones[1], challenger, "NoSuchAvatar", 0);
+
+        Assert.Equal(DuelAskResultKind.ChallengerBusy, result);
+    }
+
+    /// <summary>Same response-code-order regression as above, for the desynced-Active-duel outcome.</summary>
+    [Fact]
+    public void Ask_ChallengerAlreadyActivelyDueling_AndTargetNameDoesNotExist_ReturnsChallengerAlreadyDueling()
+    {
+        var (service, zones, duels) = CreateService(1);
+        var challenger = Enter(zones, 1, 10, "Challenger", 1);
+        Enter(zones, 1, 20, "PriorOpponent", 1);
+
+        Assert.Equal(DuelAskOutcome.Sent, duels.TryAsk(10, 20, false));
+        Assert.True(duels.TryAnswer(20, true, out _));
+        Assert.True(duels.TryStart(10, out _));
+
+        var result = service.Ask(zones[1], challenger, "NoSuchAvatar", 0);
+
+        Assert.Equal(DuelAskResultKind.ChallengerAlreadyDueling, result);
+    }
+
     [Fact]
     public void Start_SendsRemainTimeEqualToDurationTicks_NotASeparateLiteral()
     {

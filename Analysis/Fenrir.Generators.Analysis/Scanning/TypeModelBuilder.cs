@@ -32,6 +32,12 @@ internal static class TypeModelBuilder
         var expectedSize = attribute.GetNamedInt32("ExpectedSize", -1);
         var allowedStates = attribute.GetNamedByteArray("AllowedStates");
 
+        if (direction == FenrirDirection.Outgoing && allowedStates.Length > 0)
+            diagnostics.Add(Diagnostic.Create(
+                FenrirDiagnostics.AllowedStatesOnOutgoingPacket,
+                typeSymbol.Locations.FirstOrDefault(),
+                typeSymbol.Name));
+
         var fieldDiagnostics = new List<Diagnostic>();
         var fields = FieldScanner.Scan(typeSymbol, context.SemanticModel.Compilation, fieldDiagnostics,
             out var fieldsSize);
@@ -60,7 +66,6 @@ internal static class TypeModelBuilder
 
         var model = new TypeModel
         {
-            Symbol = typeSymbol,
             Namespace = SymbolNameHelpers.GetFullNamespace(typeSymbol.ContainingNamespace),
             TypeName = typeSymbol.Name,
             FullTypeName = typeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
@@ -110,7 +115,6 @@ internal static class TypeModelBuilder
 
         var model = new TypeModel
         {
-            Symbol = typeSymbol,
             Namespace = SymbolNameHelpers.GetFullNamespace(typeSymbol.ContainingNamespace),
             TypeName = typeSymbol.Name,
             FullTypeName = typeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),

@@ -71,6 +71,7 @@ public static class FenrirDataServiceCollectionExtensions
         builder.Services.AddSingleton<IShardMapAssignmentRepository, ShardMapAssignmentRepository>();
         builder.Services.AddSingleton<IGameSettingsRepository, GameSettingsRepository>();
         builder.Services.AddSingleton<IServerQuotaRepository, ServerQuotaRepository>();
+        builder.Services.AddSingleton<ITribeFourQuotaRepository, TribeFourQuotaRepository>();
 
         builder.Services.AddSingleton<IMuteRepository, MuteRepository>();
         builder.Services.AddSingleton<IBanRepository, BanRepository>();

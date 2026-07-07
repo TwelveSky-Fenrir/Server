@@ -8,8 +8,20 @@ namespace Fenrir.Application.Game.Domain.World.WorldState;
 ///     <see cref="WorldStateService" />'s own remarks document as backed by a real table today (Zone038 ownership,
 ///     the tribe-symbol-battle window, per-tribe symbol ownership, the neutral monster symbol, and per-tribe
 ///     points). Every other WorldInfo field is passed through unchanged: no backing state exists yet for the
-///     numbered zone-siege machines, guild battle, four-guild, alliance-offer flattening, or tribe gate/vote-close
-///     fields -- see <see cref="WorldStateService" />'s own class remarks for that boundary.
+///     numbered zone-siege machines, guild battle, four-guild, or alliance-offer flattening fields.
+///     <para>
+///         <c>TribeCloseInfo</c> is a documented exception to "no backing state exists yet", not an oversight:
+///         <c>game.WorldStateTribes.IsClosed</c> is a real, migrated column, and
+///         <see cref="WorldStateService.SetTribeClosed" /> already writes it. It is still left as a template
+///         pass-through here because that column has no confirmed relationship to this wire field -- the legacy
+///         <c>mTribeCloseInfo[2]</c> it would project onto is itself dead in the C++ source (written once, to a
+///         boot-time constant, never read or reassigned by any gameplay logic), and no tribe-vote/zone-war
+///         mechanic in this codebase calls <see cref="WorldStateService.SetTribeClosed" /> to give the column
+///         real semantics -- see that method's own remarks for the citations and the callers considered and
+///         rejected. <c>CloseVoteState</c> (legacy <c>mCloseVoteState[4]</c>) is, unlike <c>TribeCloseInfo</c>,
+///         genuinely still unbacked by any column -- it remains grouped with the numbered zone-siege/guild-battle
+///         fields above, not with <c>TribeCloseInfo</c>.
+///     </para>
 /// </summary>
 public static class WorldStateProjection
 {

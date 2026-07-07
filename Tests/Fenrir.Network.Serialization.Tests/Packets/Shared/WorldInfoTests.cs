@@ -34,7 +34,7 @@ public class WorldInfoTests
             CloseVoteState = v.NextIntArray(4),
             Tribe4QuestDate = v.NextInt(),
             Tribe4QuestState = v.NextInt(),
-            Tribe4QuestName = v.NextString(16),
+            Tribe4QuestName = v.NextString(13),
             Zone049TypeState = v.NextIntArray(13),
             Zone049TypeStateTime = v.NextIntArray(13),
             Zone051TypeState = v.NextIntArray(6),

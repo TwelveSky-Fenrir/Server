@@ -22,6 +22,7 @@ public sealed class CraftLegendaryPetHandler(ICraftLegendaryPetService craftLege
     {
         var zoneSession = (ZoneClientSession)session;
         var characterId = zoneSession.CharacterId!.Value;
+        var accountId = zoneSession.AccountId!.Value;
 
         if (zoneSession.CurrentZone is not Zone zone || !zone.TryGetPlayer(characterId, out var state) ||
             state is null)
@@ -31,7 +32,7 @@ public sealed class CraftLegendaryPetHandler(ICraftLegendaryPetService craftLege
         await state.EconomyActionLock.WaitAsync(cancellationToken);
         try
         {
-            var result = await craftLegendaryPetService.ResolveAsync(packet, zone, state, characterId,
+            var result = await craftLegendaryPetService.ResolveAsync(packet, zone, state, characterId, accountId,
                 cancellationToken);
 
             if (result.Outcome != CraftLegendaryPetOutcome.Applied)

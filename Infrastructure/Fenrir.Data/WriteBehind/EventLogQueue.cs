@@ -43,7 +43,7 @@ public sealed class EventLogQueue : IEventLogQueue, IAsyncDisposable
     private readonly TimeSpan _interval;
     private readonly TaskCompletionSource _loopExited = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly Action<int>? _onDropped;
-    private readonly Action<Exception>? _onFlushError;
+    private readonly Action<Exception, int>? _onFlushError;
 
     // Cancelled by DisposeAsync so a running loop exits before the timer/channel it awaits are torn down.
     private readonly CancellationTokenSource _shutdownCts = new();
@@ -55,7 +55,7 @@ public sealed class EventLogQueue : IEventLogQueue, IAsyncDisposable
         int capacity = DefaultCapacity,
         int batchSize = DefaultBatchSize,
         TimeSpan? interval = null,
-        Action<Exception>? onFlushError = null,
+        Action<Exception, int>? onFlushError = null,
         Action<int>? onDropped = null)
     {
         _flushCallback = flushCallback;
@@ -172,7 +172,10 @@ public sealed class EventLogQueue : IEventLogQueue, IAsyncDisposable
         {
             try
             {
-                _onFlushError?.Invoke(ex);
+                // batch.Count is passed through so the caller's log can state exactly how many rows were
+                // lost -- this batch is dropped, never requeued (see class remarks), so this count is the
+                // only record that these rows ever existed.
+                _onFlushError?.Invoke(ex, batch.Count);
             }
             catch
             {

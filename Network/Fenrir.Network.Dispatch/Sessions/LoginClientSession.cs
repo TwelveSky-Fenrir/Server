@@ -2,14 +2,19 @@ using System.IO.Pipelines;
 using System.Net;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Serialization.Wire;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Network.Dispatch.Sessions;
 
 /// <summary>
 ///     Login-flow session: <c>Connected → VersionOk → Authenticated → CharSelect → HandoverIssued</c>.
 /// </summary>
-public sealed class LoginClientSession(long sessionId, IDuplexPipe transport, IPEndPoint? remoteEndPoint = null)
-    : ClientSession(sessionId, transport, FenrirServer.Login, remoteEndPoint)
+public sealed class LoginClientSession(
+    long sessionId,
+    IDuplexPipe transport,
+    IPEndPoint? remoteEndPoint = null,
+    ILogger? logger = null)
+    : ClientSession(sessionId, transport, FenrirServer.Login, remoteEndPoint, logger)
 {
     public LoginSessionState State { get; private set; } = LoginSessionState.Connected;
 

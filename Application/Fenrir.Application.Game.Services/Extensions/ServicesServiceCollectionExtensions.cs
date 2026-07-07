@@ -27,6 +27,7 @@ using Fenrir.Application.Game.Services.Social;
 using Fenrir.Application.Game.Services.Tribes;
 using Fenrir.Application.Game.Services.ZoneLifecycle;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Fenrir.Application.Game.Services.Extensions;
 
@@ -35,6 +36,11 @@ public static class ServicesServiceCollectionExtensions
 {
     public static IServiceCollection AddGameServices(this IServiceCollection services)
     {
+        // TryAdd: harmless if some other registration (e.g. a test host) already supplied one -- this is the
+        // only consumer today (TribeMigrationService's own wall-clock read), not a general-purpose clock
+        // abstraction rollout.
+        services.TryAddSingleton(TimeProvider.System);
+
         AddGuildsServices(services);
         AddTribeServices(services);
         AddQuestsServices(services);
@@ -65,6 +71,7 @@ public static class ServicesServiceCollectionExtensions
         services.AddSingleton<ITribeBankService, TribeBankService>();
         services.AddSingleton<ITribePopulationService, TribePopulationService>();
         services.AddSingleton<ITribeVoteService, TribeVoteService>();
+        services.AddSingleton<ITribeMigrationService, TribeMigrationService>();
     }
 
     private static void AddQuestsServices(IServiceCollection services)

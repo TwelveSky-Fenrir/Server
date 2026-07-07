@@ -154,13 +154,19 @@ public sealed partial class Zone
         }
     }
 
-    /// <summary>Serialize-once broadcast for ground-item replication -- same pattern as <see cref="BroadcastAvatarAction" />.</summary>
+    /// <summary>
+    ///     Serialize-once broadcast for ground-item replication -- same pattern as <see cref="BroadcastAvatarAction" />.
+    ///     <see cref="AoiGrid.HasAnyNeighbor" /> pre-checks emptiness before paying for
+    ///     <see cref="AoiGrid.Neighbors" />'s iterator plus a LINQ <c>ToArray()</c> buffer -- see that method's
+    ///     own remarks.
+    /// </summary>
     private void BroadcastGroundItemAction(GroundItemEntity item, int checkChangeActionState)
     {
-        var recipients = NeighborsOfPosition(item.PosX, item.PosZ).ToArray();
-        if (recipients.Length == 0)
+        var cell = _grid.CellOf(item.PosX, item.PosZ);
+        if (!_grid.HasAnyNeighbor(cell))
             return;
 
+        var recipients = _grid.Neighbors(cell).ToArray();
         var packet = BuildItemActionRecv(item, checkChangeActionState);
         var total = FrameWriter.FrameSizeOf<GroundItemReplicationResponse>();
         var rented = ArrayPool<byte>.Shared.Rent(total);

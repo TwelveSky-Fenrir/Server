@@ -69,6 +69,7 @@ public static class Opcodes
             public const byte SearchShopListings = 34;
             public const byte BuyShopItem = 35;
             public const byte QuestProgress = 36;
+            public const byte TribeMigration = 37;
             public const byte LocalChat = 38;
             public const byte Whisper = 39;
             public const byte Shout = 40;

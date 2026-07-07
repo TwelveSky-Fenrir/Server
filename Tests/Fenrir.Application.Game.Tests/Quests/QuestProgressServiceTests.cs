@@ -18,8 +18,9 @@ namespace Fenrir.Application.Game.Tests.Quests;
 ///     "mission completed") over a real <see cref="Zone" />; ticks the zone while the service's own
 ///     <c>PostQuestCommandAndWaitAsync</c> await is pending, same pattern as
 ///     <c>UseInventoryItemServiceTests</c>. Covers only the game.EventLog (Category=ItemCreate) wiring added
-///     for the reward-item grant -- every other CompleteAsync/QuestStateMachine rule is covered by
-///     <c>QuestStateMachineTests</c> and is not duplicated here.
+///     for the quest-completion reward grant -- item deposit and/or nonzero money/experience/
+///     contribution-point/teacher-point reward -- every other CompleteAsync/QuestStateMachine rule is
+///     covered by <c>QuestStateMachineTests</c> and is not duplicated here.
 /// </summary>
 public class QuestProgressServiceTests
 {
@@ -114,10 +115,12 @@ public class QuestProgressServiceTests
         Assert.Equal(RewardItemId, logged.ItemId);
         Assert.Equal(1, logged.Quantity); // Sort=1 (non-equipment) -> quantity 1, see QuestStateMachine.Complete
         Assert.Equal((byte)1, logged.Outcome);
+        Assert.Null(logged.DeltaMoney);
+        Assert.Null(logged.Payload); // no nonzero money/XP/CP/teacher-point reward configured alongside the item
     }
 
     [Fact]
-    public async Task Complete_MoneyOnlyReward_NoItemGranted_LogsNothing()
+    public async Task Complete_MoneyOnlyReward_NoItemGranted_LogsAnAuditRow_WithDeltaMoney_ButNoItemId()
     {
         var moneyReward = new QuestRewardRowDto(QuestId, 0, 2, null, 1000);
         var (_, zone, state, _, eventLog, service) = SetUp(KillQuestAtStep3(), [moneyReward], 1);
@@ -127,7 +130,65 @@ public class QuestProgressServiceTests
             service.CompleteAsync(packet, state, zone, CharacterId, AccountId, CancellationToken.None), zone);
 
         Assert.True(result.Success);
-        Assert.Empty(eventLog.LoggedEvents);
+
+        var logged = Assert.Single(eventLog.LoggedEvents);
+        Assert.Equal(EventLogCategory.ItemCreate, logged.Category);
+        Assert.Equal(AccountId, logged.ActorAccountId);
+        Assert.Equal(CharacterId, logged.ActorCharacterId);
+        Assert.Equal(1000, logged.DeltaMoney);
+        Assert.Null(logged.ItemId);
+        Assert.Null(logged.Quantity);
+        Assert.Equal((byte)1, logged.Outcome);
+        Assert.Equal("ExperienceReward=0;ContributionPointsReward=0;TeacherPointReward=0", logged.Payload);
+    }
+
+    [Fact]
+    public async Task Complete_ExperienceContributionAndTeacherPointReward_NoItemOrMoney_LogsAuditRow_WithPayload()
+    {
+        var rewards = new[]
+        {
+            new QuestRewardRowDto(QuestId, 0, 4, null, 200), // RewardType 4 = experience
+            new QuestRewardRowDto(QuestId, 1, 3, null, 50), // RewardType 3 = contribution points
+            new QuestRewardRowDto(QuestId, 2, 5, null, 5) // RewardType 5 = teacher points
+        };
+        var (_, zone, state, _, eventLog, service) = SetUp(KillQuestAtStep3(), rewards, 1);
+        var packet = new QuestProgressRequest { Sort = 2, Page1 = 0, Index1 = 0, XPost = 0, YPost = 0 };
+
+        var result = await RunToCompletionAsync(
+            service.CompleteAsync(packet, state, zone, CharacterId, AccountId, CancellationToken.None), zone);
+
+        Assert.True(result.Success);
+
+        var logged = Assert.Single(eventLog.LoggedEvents);
+        Assert.Equal(EventLogCategory.ItemCreate, logged.Category);
+        Assert.Null(logged.DeltaMoney);
+        Assert.Null(logged.ItemId);
+        Assert.Null(logged.Quantity);
+        Assert.Equal((byte)1, logged.Outcome);
+        Assert.Equal("ExperienceReward=200;ContributionPointsReward=50;TeacherPointReward=5", logged.Payload);
+    }
+
+    [Fact]
+    public async Task Complete_ItemAndMoneyReward_LogsOneAuditRow_WithBothItemAndDeltaMoney()
+    {
+        var rewards = new[]
+        {
+            new QuestRewardRowDto(QuestId, 0, 6, RewardItemId, null),
+            new QuestRewardRowDto(QuestId, 1, 2, null, 500)
+        };
+        var (_, zone, state, _, eventLog, service) = SetUp(KillQuestAtStep3(), rewards, 1);
+        var packet = new QuestProgressRequest { Sort = 2, Page1 = 0, Index1 = 0, XPost = 0, YPost = 0 };
+
+        var result = await RunToCompletionAsync(
+            service.CompleteAsync(packet, state, zone, CharacterId, AccountId, CancellationToken.None), zone);
+
+        Assert.True(result.Success);
+
+        var logged = Assert.Single(eventLog.LoggedEvents);
+        Assert.Equal(RewardItemId, logged.ItemId);
+        Assert.Equal(1, logged.Quantity);
+        Assert.Equal(500, logged.DeltaMoney);
+        Assert.Equal("ExperienceReward=0;ContributionPointsReward=0;TeacherPointReward=0", logged.Payload);
     }
 
     [Fact]

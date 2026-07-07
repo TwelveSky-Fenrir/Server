@@ -647,6 +647,12 @@ public sealed partial class Zone
             changed = true;
         }
 
+        // aZone241Time -- already synchronously persisted by ICharacterRepository.AdjustZone241TimeAsync
+        // before this command is posted (same posture as Tribe/QuestProgress/TribeFourReturnAllowance
+        // further below), so this does not set `changed`/mark progress-dirty; there is nothing left to flush.
+        if (command.Zone241Time is { } zone241Time)
+            state.Zone241Time = zone241Time;
+
         if (command.LodRounds is { } lodRounds)
         {
             state.LodRounds = lodRounds;
@@ -767,6 +773,25 @@ public sealed partial class Zone
             changed = true;
         }
 
+        // Op37 (CZ_CHANGE_TO_TRIBE4_SEND) success -- already synchronously persisted by
+        // game.usp_Character_ApplyTribeFourConversion before this command is posted, so -- same posture as
+        // ApplyQuestCommand's own StepPermanent/ActiveFlag/QSort/TargetPhase/KillCounter mirror -- none of
+        // these three set `changed`/mark progress-dirty; there is nothing left to flush.
+        if (command.Tribe is { } newTribe)
+            state.Tribe = newTribe;
+
+        if (command.QuestProgress is { } questProgress)
+        {
+            state.QuestStepPermanent = questProgress.StepPermanent;
+            state.QuestActiveFlag = questProgress.ActiveFlag;
+            state.QuestSort = questProgress.QSort;
+            state.QuestTargetPhase = questProgress.TargetPhase;
+            state.QuestKillCounter = questProgress.KillCounter;
+        }
+
+        if (command.TribeFourReturnAllowance is { } tribeFourReturnAllowance)
+            state.TribeFourReturnAllowance = tribeFourReturnAllowance;
+
         if (changed)
             state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
 
@@ -774,11 +799,11 @@ public sealed partial class Zone
             foreach (var drop in command.DropItems)
                 SpawnGroundItem(drop.ItemId, drop.Quantity, state.PosX, state.PosY, state.PosZ, state.Name, "", 0);
 
-        // tSort 11 Max Rebirth's own B_AVATAR_CHANGE_INFO_1(sort 14)+Broadcast11 pairing (S04_MyWork02.cpp:11367);
-        // Value03 (aZone241Time) has no Fenrir-side field yet, same "not modeled" posture as this file's other
-        // untracked wire-only counters -- sent as 0.
+        // tSort 11 Max Rebirth's own B_AVATAR_CHANGE_INFO_1(sort 14)+Broadcast11 pairing (S04_MyWork02.cpp:11367),
+        // also posted by the Rebirth-Pill item-consumption path (Path A). Value03 (aZone241Time) is read from
+        // the just-mirrored state.Zone241Time above (0 for Path A, which never touches this counter).
         if (command.RebirthBroadcast)
-            BroadcastAvatarStateFlag(state, 14, state.ContributionPoints, state.RebirthCount, 0);
+            BroadcastAvatarStateFlag(state, 14, state.ContributionPoints, state.RebirthCount, state.Zone241Time);
 
         // Op 23 (CZ_USE_INVENTORY_ITEM_SEND) stat-potion family's own post-consumption avatar-action refresh
         // -- see TribeProgressZoneCommand.FullActionRebroadcast's own remarks for why this sends the

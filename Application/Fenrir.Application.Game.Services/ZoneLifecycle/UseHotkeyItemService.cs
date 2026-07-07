@@ -10,8 +10,9 @@ namespace Fenrir.Application.Game.Services.ZoneLifecycle;
 /// <summary>
 ///     op22, CZ_USE_HOTKEY_ITEM_SEND -- resolves whatever is bound at the requested hotkey slot via
 ///     <see cref="HotkeyItemConsumptionResolver" />, then, on success, durably persists the decremented/
-///     cleared slot to <c>game.CharacterHotkeys</c> and mirrors both the slot and any life/mana gain into the
-///     tick-owned <see cref="Zone" />/<see cref="PlayerRuntimeState" /> via <see cref="HotkeySlotMirrorZoneCommand" />.
+///     cleared slot to <c>game.CharacterHotkeys</c> and mirrors the slot, any life/mana gain, and any resolved
+///     BUFF_INFO write (potion types 12-15) into the tick-owned <see cref="Zone" />/<see cref="PlayerRuntimeState" />
+///     via <see cref="HotkeySlotMirrorZoneCommand" />.
 /// </summary>
 /// <remarks>
 ///     Réf. C++ : Server/ts25zone/S04_MyWork02.cpp:2203-2492 (full <c>BEGIN_CZ(USE_HOTKEY_ITEM_SEND)</c>
@@ -91,7 +92,7 @@ public sealed class UseHotkeyItemService(
             : null;
 
         if (!zone.PostHotkeySlotMirrorCommand(new HotkeySlotMirrorZoneCommand(characterId, pageByte, indexByte,
-                newSlot, lifeGain, manaGain)))
+                newSlot, lifeGain, manaGain, resolved.BuffWrites)))
             logger.LogError(
                 "Zone {MapId} hotkey-slot inbox full: dropped hotkey-item-use mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
                 zone.MapId, characterId);

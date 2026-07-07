@@ -154,15 +154,17 @@ public static class ContainerMatrix
 
     /// <summary>
     ///     Move into an empty destination (splitting the source stack if requestedQuantity is less than the
-    ///     full stack), merge into a destination holding the same stackable item, or reject outright when the
-    ///     destination is occupied by anything else (a different item id, or the same id but not stackable).
-    ///     There is no swap-with-occupant fallback: legacy's ProcessForInventoryToEquip/ProcessForEquipToInventory/
-    ///     ProcessForInventoryToInventory family (tSort 210/213/208) rejects an occupied, non-mergeable destination
-    ///     unconditionally for all 3 directions -- confirmed identically at
-    ///     Server/ts25zone/S04_MyWork05.cpp:1589-1594 (unequip), :875-880 (inventory-to-inventory default case),
-    ///     :1282-1287 (equip). A prior revision of this method swapped the two stacks instead; that was a
-    ///     source-verified-wrong divergence (it let an unvalidated item land directly in Equipment via the
-    ///     unequip/213 direction, bypassing EquipItemValidationGate entirely) and has been corrected to match.
+    ///     full stack, and <paramref name="sourceIsStackable" /> is true -- a non-stackable source always moves
+    ///     its whole quantity into an empty destination regardless of requestedQuantity), merge into a
+    ///     destination holding the same stackable item, or reject outright when the destination is occupied by
+    ///     anything else (a different item id, or the same id but not stackable). There is no swap-with-occupant
+    ///     fallback: legacy's ProcessForInventoryToEquip/ProcessForEquipToInventory/ProcessForInventoryToInventory
+    ///     family (tSort 210/213/208) rejects an occupied, non-mergeable destination unconditionally for all 3
+    ///     directions -- confirmed identically at Server/ts25zone/S04_MyWork05.cpp:1589-1594 (unequip), :875-880
+    ///     (inventory-to-inventory default case), :1282-1287 (equip). A prior revision of this method swapped
+    ///     the two stacks instead; that was a source-verified-wrong divergence (it let an unvalidated item land
+    ///     directly in Equipment via the unequip/213 direction, bypassing EquipItemValidationGate entirely) and
+    ///     has been corrected to match.
     /// </summary>
     /// <param name="requestedQuantity">&lt;= 0 means "move the whole source stack".</param>
     public static MoveOutcomeResult ResolveMove(
@@ -189,8 +191,17 @@ public static class ContainerMatrix
 
         if (destination is not { } dst)
         {
-            var moved = src with { Quantity = quantity };
-            var remaining = src.Quantity - quantity;
+            // A non-stackable source always moves whole into an empty destination, ignoring any partial
+            // quantity the client requested -- the same posture already enforced for the occupied-destination
+            // branch just below (dst.ItemId != src.ItemId when !sourceIsStackable never merges a partial
+            // amount either), and the same shape as this family's sibling policies:
+            // TradeItemPlacementResolver.ResolveNonStackableTransfer takes no quantity parameter at all, and
+            // StoreItemTransferPolicy.ResolveOneWayTransfer's own !sourceIsStackable branch moves the whole
+            // slot before ever consulting requestedQuantity. Without this guard a non-stackable item that
+            // somehow carried Quantity > 1 could be split into two live slots from one unit of durable state.
+            var effectiveQuantity = sourceIsStackable ? quantity : src.Quantity;
+            var moved = src with { Quantity = effectiveQuantity };
+            var remaining = src.Quantity - effectiveQuantity;
             ItemStack? newSource = remaining > 0 ? src with { Quantity = remaining } : null;
             return new MoveOutcomeResult(MoveOutcome.Success, newSource, moved);
         }

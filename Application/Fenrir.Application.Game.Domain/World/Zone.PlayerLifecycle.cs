@@ -271,21 +271,20 @@ public sealed partial class Zone
             TeacherPoint = data.TeacherPoint,
             Level2 = data.Level2,
             Exp2 = data.Exp2,
+            Zone241Time = data.Zone241Time,
             IsMuted = data.IsMuted,
             GuildId = data.GuildId,
             GuildName = data.GuildName,
             GuildRoleDb = data.GuildRoleDb,
             GuildCallName = data.GuildCallName,
             TribeRole = data.TribeRole,
-            // game.Characters.PreviousTribe is now a real, independently-persisted column (Migrations/018)
-            // and EnterWorldService.HandleAsync already gates entry on Tribe/PreviousTribe self-consistency
-            // (Server/ts25zone/S04_MyWork02.cpp:880-901), so for a main-faction Tribe (0-2) that gate
-            // guarantees PreviousTribe == Tribe and this stand-in is legacy-accurate. It is NOT accurate for a
-            // fourth-faction (Tribe 3) character, whose real PreviousTribe is one of 0/1/2 and therefore
-            // differs from Tribe by design -- PlayerEnterData (ZoneCommand.cs) does not carry the persisted
-            // value through yet, so this in-process ABI still needs that field added before a tribe-3
-            // character's runtime state can be correct. Tracked, not silently assumed equivalent.
-            PreviousTribe = data.Tribe,
+            // game.Characters.PreviousTribe is a real, independently-persisted column (Migrations/018),
+            // EnterWorldService.HandleAsync gates entry on Tribe/PreviousTribe self-consistency
+            // (Server/ts25zone/S04_MyWork02.cpp:880-901), and PlayerEnterData.PreviousTribe now carries the
+            // real persisted value through both world entry and in-process zone transfer (see that field's
+            // own remarks) -- so this is correct for a tribe-3 (Fujin) character too, not just the
+            // main-faction (0-2) case where it happens to equal Tribe.
+            PreviousTribe = data.PreviousTribe,
             // One of exactly two legitimate write sites for this field -- the other is every accepted Sort-0
             // ("rest"/stand-up) CZ_AVATAR_ACTION_SEND action, see ApplyRestActionProtectionAndHeal. A one-shot
             // ~10s combat grace period starting now, for every arrival. Combat code must never write this
@@ -1376,7 +1375,7 @@ public sealed partial class Zone
                 GuildMarkEffect = 0,
                 Name = state.Name,
                 Tribe = state.Tribe,
-                PreviousTribe = 0,
+                PreviousTribe = state.PreviousTribe,
                 Gender = state.Gender,
                 HeadType = state.HeadType,
                 FaceType = state.FaceType,

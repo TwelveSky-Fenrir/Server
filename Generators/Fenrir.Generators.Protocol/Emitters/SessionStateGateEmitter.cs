@@ -6,6 +6,25 @@ using Fenrir.Generators.Analysis.Support;
 namespace Fenrir.Generators.Protocol.Emitters;
 
 /// <summary>Restricted to incoming packets: an outgoing packet never needs gating, the server decides whether to send it.</summary>
+/// <remarks>
+///     Known architectural limitation, not a bug: the emitted <c>Allows(state, opcode)</c> switch (see
+///     <see cref="EmitAllows" />) can only gate on the static <c>LoginSessionState</c>/<c>ZoneSessionState</c>
+///     enum value each <c>[FenrirPacket(AllowedStates = [...])]</c> declares -- it has no way to additionally
+///     require a runtime flag on top of a state (e.g. "only in <c>ZoneSessionState.InGame</c> AND only while
+///     the character's active duel/pshop/trade flag is set"). Any such combined state+flag precondition has
+///     to be checked by the packet's own handler after dispatch, not by this pre-dispatch gate -- see e.g.
+///     <c>CombatResolver.ResolveDuelAttack</c>'s <c>attackerAndDefenderShareActiveDuel</c> parameter, resolved
+///     by its caller from live <c>PlayerRuntimeState</c>, not from anything <see cref="SessionStateGateEmitter" />
+///     could express. This is a documented forward-looking limitation only -- as of this writing no live
+///     Fenrir feature needs a combined state+flag gate at the dispatch layer, so extending the generator (e.g.
+///     a per-packet predicate delegate alongside <c>AllowedStates</c>) is deliberately deferred until one
+///     actually does. The dispatch-side call site is <c>ClientSession.IsOpcodeAllowed</c>
+///     (<c>Network/Fenrir.Network.Dispatch/Sessions/ClientSession.cs:100</c>, overridden per-server in
+///     <c>ZoneClientSession.cs:85-88</c>/<c>LoginClientSession.cs</c>), invoked from
+///     <c>SessionLoop.ProcessBufferAsync</c> before every dispatch
+///     (<c>Network/Fenrir.Network.Dispatch/SessionLoop.cs:112</c>) -- see that call site's own remarks for
+///     the same limitation from the dispatch side.
+/// </remarks>
 internal static class SessionStateGateEmitter
 {
     public const string HintName = "SessionStateGate.g.cs";

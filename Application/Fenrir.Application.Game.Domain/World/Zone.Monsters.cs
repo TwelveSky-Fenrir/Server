@@ -33,6 +33,18 @@ public sealed partial class Zone
     private readonly ConcurrentDictionary<int, MonsterEntity> _monsters = new();
 
     /// <summary>
+    ///     Monster-side counterpart to <see cref="_grid" />, keyed by <see cref="MonsterEntity.ServerIndex" />
+    ///     instead of character id -- lets <see cref="SendExistingMonstersTo" /> query nearby monsters directly
+    ///     instead of scanning every monster this zone holds. Tick-owned only, same posture as <see cref="_grid" />
+    ///     itself: every mutation (<see cref="SpawnMonster" />, <see cref="SyncMonsterCell" />,
+    ///     <see cref="RemoveMonsterFromGrid" />) runs only from this zone's own tick thread, including the
+    ///     death path -- <see cref="TryDamageMonster" /> removes the dying monster from <see cref="_monsters" />
+    ///     (safe from any thread) but deliberately leaves THIS grid alone, deferring the matching removal to
+    ///     <see cref="Monsters.MonsterSpawnScheduler.DrainDeaths" /> on this zone's own next tick.
+    /// </summary>
+    private readonly AoiGrid _monsterGrid = new(options.AoiCellSize);
+
+    /// <summary>
     ///     Server-initiated monster-kill money grants, queued rather than awaited inline because
     ///     <see cref="Tick" /> is fully synchronous and must never block on SQL I/O; drained by
     ///     <see cref="MonsterLootFlushHost" /> from any thread.
@@ -55,11 +67,20 @@ public sealed partial class Zone
         return unchecked((uint)Interlocked.Increment(ref _monsterUniqueNumberSeed));
     }
 
-    /// <summary>Tick-owned caller only (<see cref="Monsters.MonsterSpawnScheduler" />).</summary>
+    /// <summary>
+    ///     Tick-owned caller only (<see cref="Monsters.MonsterSpawnScheduler" />). Registers <paramref name="monster" />
+    ///     in both <see cref="_monsters" /> and <see cref="_monsterGrid" /> (at its already-resolved spawn
+    ///     position) before announcing it.
+    /// </summary>
     public void SpawnMonster(MonsterEntity monster)
     {
         monster.LastRebroadcastAt = _clock;
         _monsters[monster.ServerIndex] = monster;
+
+        var cell = _grid.CellOf(monster.PosX, monster.PosZ);
+        monster.CurrentCell = cell;
+        _monsterGrid.Add(monster.ServerIndex, cell);
+
         BroadcastMonsterAction(monster, 1); // action=1 on B_MONSTER_ACTION_RECV at creation
     }
 
@@ -71,7 +92,40 @@ public sealed partial class Zone
     /// </summary>
     public void DespawnMonsterSilently(int serverIndex)
     {
-        _monsters.TryRemove(serverIndex, out _);
+        if (_monsters.TryRemove(serverIndex, out var monster))
+            RemoveMonsterFromGrid(monster);
+    }
+
+    /// <summary>
+    ///     Tick-owned caller only -- unregisters <paramref name="monster" /> from <see cref="_monsterGrid" /> at
+    ///     its own last-synced <see cref="MonsterEntity.CurrentCell" />. Every direct <see cref="_monsters" />
+    ///     removal elsewhere in this partial class family (<see cref="DespawnMonsterSilently" />,
+    ///     <see cref="Monsters.MonsterSpawnScheduler.DrainDeaths" />, <see cref="SummonPersonalBoss" />'s slot
+    ///     reuse, <see cref="ClearZone241PersonalDungeonInstance" />'s instance sweep) must pair with a call
+    ///     here so <see cref="_monsterGrid" /> never accumulates a stale entry for a monster that no longer
+    ///     exists in <see cref="_monsters" />.
+    /// </summary>
+    public void RemoveMonsterFromGrid(MonsterEntity monster)
+    {
+        _monsterGrid.Remove(monster.ServerIndex, monster.CurrentCell);
+    }
+
+    /// <summary>
+    ///     Tick-owned caller only (<see cref="Monsters.MonsterAiSystem" />, once per monster per AI pass, after
+    ///     whatever position mutation that pass applied) -- the monster-side counterpart to
+    ///     <see cref="HandleMove" />'s own <c>_grid.Move</c> call for players. Keeps <see cref="_monsterGrid" />
+    ///     in sync with <paramref name="monster" />'s live position; a no-op (no dictionary churn) on any pass
+    ///     that left the monster in the same cell it already occupied, which is the overwhelming majority --
+    ///     most AI states (windup, flinch, idle wait, chase before the next step) don't move the monster at all.
+    /// </summary>
+    public void SyncMonsterCell(MonsterEntity monster)
+    {
+        var newCell = _grid.CellOf(monster.PosX, monster.PosZ);
+        if (newCell == monster.CurrentCell)
+            return;
+
+        _monsterGrid.Move(monster.ServerIndex, monster.CurrentCell, newCell);
+        monster.CurrentCell = newCell;
     }
 
     /// <summary>
@@ -340,18 +394,25 @@ public sealed partial class Zone
     ///     view of any monster changes because of this arrival, and no timer/state is touched --
     ///     <see cref="MonsterEntity.LastRebroadcastAt" /> keeps running on its own independent cadence
     ///     regardless of whether this method ever runs.
+    ///     <para>
+    ///         Queries <see cref="_monsterGrid" /> instead of scanning every <see cref="_monsters" /> entry --
+    ///         this runs once per player <see cref="HandleEnter" />, so on a busy zone the old brute-force scan
+    ///         cost every monster in the zone once per arriving player, not once per tick. A grid entry can
+    ///         very rarely point at a <see cref="MonsterEntity.ServerIndex" /> that <see cref="_monsters" /> no
+    ///         longer holds (this same tick already despawned/killed it before this call ran) -- the lookup
+    ///         below simply skips it, exactly as harmless as the old scan not finding it would have been.
+    ///     </para>
     /// </remarks>
     private void SendExistingMonstersTo(PlayerRuntimeState state)
     {
-        if (_monsters.IsEmpty)
+        var cell = state.CurrentCell;
+        if (!_monsterGrid.HasAnyNeighbor(cell))
             return;
 
-        foreach (var monster in _monsters.Values)
+        foreach (var serverIndex in _monsterGrid.Neighbors(cell))
         {
-            var monsterCell = _grid.CellOf(monster.PosX, monster.PosZ);
-            if (Math.Abs(monsterCell.X - state.CurrentCell.X) > 1 ||
-                Math.Abs(monsterCell.Z - state.CurrentCell.Z) > 1)
-                continue;
+            if (!_monsters.TryGetValue(serverIndex, out var monster))
+                continue; // stale grid entry (despawned/killed earlier this same tick) -- harmless, skip
 
             if (!IsVisibleAcrossDungeonInstance(monster.InstanceId, state.DungeonInstanceId))
                 continue;
@@ -373,13 +434,19 @@ public sealed partial class Zone
         }
     }
 
-    /// <summary>Serialize-once broadcast for monster replication -- same pattern as <see cref="BroadcastAvatarAction" />.</summary>
+    /// <summary>
+    ///     Serialize-once broadcast for monster replication -- same pattern as <see cref="BroadcastAvatarAction" />.
+    ///     <see cref="AoiGrid.HasAnyNeighbor" /> pre-checks emptiness before paying for
+    ///     <see cref="AoiGrid.Neighbors" />'s iterator plus a LINQ <c>ToArray()</c> buffer -- see that method's
+    ///     own remarks.
+    /// </summary>
     private void BroadcastMonsterAction(MonsterEntity monster, int checkChangeActionState)
     {
-        var recipients = NeighborsOfPosition(monster.PosX, monster.PosZ).ToArray();
-        if (recipients.Length == 0)
+        var cell = _grid.CellOf(monster.PosX, monster.PosZ);
+        if (!_grid.HasAnyNeighbor(cell))
             return;
 
+        var recipients = _grid.Neighbors(cell).ToArray();
         var packet = BuildMonsterActionRecv(monster, checkChangeActionState);
         var total = FrameWriter.FrameSizeOf<MonsterReplicationResponse>();
         var rented = ArrayPool<byte>.Shared.Rent(total);

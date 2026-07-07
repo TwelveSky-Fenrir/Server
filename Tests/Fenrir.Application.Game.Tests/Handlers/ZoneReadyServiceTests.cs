@@ -141,6 +141,34 @@ public class ZoneReadyServiceTests
     }
 
     [Fact]
+    public void DuplicateSend_WhileAlreadyInWorld_IsSafeNoOp()
+    {
+        // AllowedStates spans Registering+InWorld (the blanket rule other Zone opcodes use), so a resend is
+        // no longer rejected upstream by SessionStateGate -- the handler itself must treat it as a no-op.
+        var zone = ZoneTestKit.CreateZone(1);
+        var (session, _, state) = Setup(zone, 10, 2);
+        var handler = new ZoneReadyHandler(new ZoneReadyService());
+
+        // First (legitimate) op13 completes the handshake.
+        handler.Handle(new ZoneReadyRequest { Tribe = 2, AutoTime = 0, AutoTime2 = 0, AutoState = 0 }, session);
+        Assert.Equal(ZoneSessionState.InWorld, session.State);
+        Assert.Null(session.DisconnectReason);
+        var connectTimeAfterHandshake = state.ConnectTime;
+
+        state.AutoHuntEnabled = false;
+
+        // A duplicate send while already InWorld -- one that would fail every guard if re-run (wrong tribe,
+        // auto-hunt claimed without server-side auto-hunt enabled) -- must be a safe no-op: no Abort, no
+        // re-stamped ConnectTime, no accumulated anti-hack strike.
+        handler.Handle(new ZoneReadyRequest { Tribe = 999, AutoTime = 0, AutoTime2 = 0, AutoState = 1 }, session);
+
+        Assert.Equal(ZoneSessionState.InWorld, session.State);
+        Assert.Null(session.DisconnectReason);
+        Assert.Equal(0, state.AutoTimeHack);
+        Assert.Equal(connectTimeAfterHandshake, state.ConnectTime);
+    }
+
+    [Fact]
     public void PlayerNotYetTickedIntoZone_SkipsGuardsButStillMarksInWorld()
     {
         // No PlayerRuntimeState exists yet to hand the service -- the skip-guards-but-still-admit fallback is

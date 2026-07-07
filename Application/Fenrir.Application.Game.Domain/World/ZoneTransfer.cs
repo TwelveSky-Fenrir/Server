@@ -93,6 +93,10 @@ public static class ZoneTransfer
             state.TeacherCharacterId,
             state.StudentCharacterId,
             GuildCallName: state.GuildCallName,
+            // The real persisted origin tribe (0-2) must travel here too, or a tribe-3 (Fujin) character's
+            // PlayerRuntimeState.PreviousTribe would silently revert to mirroring Tribe (wrong by design for
+            // that one case) on every in-process zone transfer -- see that field's own remarks.
+            PreviousTribe: state.PreviousTribe,
             StatVit: state.StatVit,
             StatStr: state.StatStr,
             StatInt: state.StatInt,
@@ -106,6 +110,9 @@ public static class ZoneTransfer
             TeacherPoint: state.TeacherPoint,
             Level2: state.Level2,
             Exp2: state.Exp2,
+            // aZone241Time must travel here too, or it would silently reset to 0 on every in-process zone
+            // transfer -- see PlayerRuntimeState.Zone241Time's own remarks.
+            Zone241Time: state.Zone241Time,
             KnownCashCatalogVersion: state.KnownCashCatalogVersion,
             TicksSinceDeath: state.TicksSinceDeath,
             ReviveHackFlag: state.ReviveHackFlag,

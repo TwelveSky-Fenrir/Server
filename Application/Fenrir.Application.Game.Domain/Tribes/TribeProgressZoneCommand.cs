@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using Fenrir.Application.Game.Domain.Quests;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Stats;
 
@@ -30,8 +31,18 @@ namespace Fenrir.Application.Game.Domain.Tribes;
 /// <param name="Exp2">tSort 11 (Max Rebirth) resets this to 0 on success -- see <see cref="RebirthCount" />.</param>
 /// <param name="RebirthCount">tSort 11 (Max Rebirth) increments this by 1 on success.</param>
 /// <param name="RebirthBroadcast">
-///     tSort 11's own AOI-wide AVATAR_CHANGE_INFO_1 sort-14 notice (ContributionPoints/RebirthCount), sent once
-///     both fields above are already applied to <see cref="PlayerRuntimeState" />.
+///     tSort 11's own AOI-wide AVATAR_CHANGE_INFO_1 sort-14 notice (ContributionPoints/RebirthCount/
+///     Zone241Time), sent once every field above is already applied to <see cref="PlayerRuntimeState" />. Also
+///     posted by the Rebirth-Pill item-consumption path (UseInventoryItemService), which never sets
+///     <see cref="Zone241Time" />.
+/// </param>
+/// <param name="Zone241Time">
+///     tSort 11 (Max Rebirth)'s own <c>aZone241Time += 10</c> side effect -- the character's new total after
+///     <see cref="Fenrir.Data.Abstractions.Characters.ICharacterRepository.AdjustZone241TimeAsync" /> has
+///     already durably persisted it, so applying it here (like <see cref="Tribe" />/<see cref="QuestProgress" />
+///     /<see cref="TribeFourReturnAllowance" /> below) never marks <see cref="PlayerRuntimeState.MarkProgressDirty" />
+///     -- see <see cref="Fenrir.Application.Game.Domain.World.Zone" />'s own <c>ApplyTribeProgressCommand</c>
+///     remarks. Never set by the Rebirth-Pill item-consumption path (Path A), which does not touch this counter.
 /// </param>
 /// <param name="LodRounds">
 ///     Item 1434's banked "Life or Death" round counter -- see
@@ -86,6 +97,23 @@ namespace Fenrir.Application.Game.Domain.Tribes;
 ///     Pet EXP boost pill (world.Items 1190/17035/8413) -- the character's new running duration-counter
 ///     total after this use. See <see cref="PlayerRuntimeState.PetExpX2Time" />.
 /// </param>
+/// <param name="Tribe">
+///     CZ_CHANGE_TO_TRIBE4_SEND (op37) success -- the character's new tribe membership. Already synchronously
+///     persisted (game.usp_Character_ApplyTribeFourConversion) by the time this is posted, so applying it here
+///     never marks <see cref="PlayerRuntimeState.MarkProgressDirty" /> the way most other fields on this
+///     record do -- see <see cref="Fenrir.Application.Game.Domain.World.Zone" />'s own
+///     <c>ApplyTribeProgressCommand</c> remarks.
+/// </param>
+/// <param name="QuestProgress">
+///     CZ_CHANGE_TO_TRIBE4_SEND (op37) success -- the character's 5-slot quest state after conversion (reset
+///     to idle on the outbound branch, or the restored tribe's terminal/complete step on the return branch).
+///     Same "already synchronously persisted, no dirty mark" posture as <see cref="Tribe" />.
+/// </param>
+/// <param name="TribeFourReturnAllowance">
+///     CZ_CHANGE_TO_TRIBE4_SEND (op37) return-branch success -- the character's new
+///     <see cref="PlayerRuntimeState.TribeFourReturnAllowance" /> total (decremented by one). Session-scoped
+///     only (see that field's own remarks), so there is nothing to persist and no dirty mark either.
+/// </param>
 /// <param name="Applied">
 ///     Completed once actually mirrored -- see InventoryZoneCommand.Applied for why this matters while
 ///     EconomyActionLock is held.
@@ -113,6 +141,7 @@ public readonly record struct TribeProgressZoneCommand(
     int? Exp2 = null,
     int? RebirthCount = null,
     bool RebirthBroadcast = false,
+    int? Zone241Time = null,
     int? LodRounds = null,
     int? ProtectForRefine = null,
     int? ProtectForDestroy = null,
@@ -134,6 +163,9 @@ public readonly record struct TribeProgressZoneCommand(
     int? EatElePotion = null,
     bool FullActionRebroadcast = false,
     int? PetExpX2Time = null,
+    byte? Tribe = null,
+    QuestProgress? QuestProgress = null,
+    int? TribeFourReturnAllowance = null,
     TaskCompletionSource? Applied = null);
 
 /// <summary>One ground-item drop request -- see TribeProgressZoneCommand.DropItems.</summary>

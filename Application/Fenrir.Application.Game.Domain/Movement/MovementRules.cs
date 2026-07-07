@@ -48,10 +48,9 @@ public sealed class MovementRules(IOptions<GameServerOptions> options)
         var targetY = intent.Location[1];
         var targetZ = intent.Location[2];
 
-        if (!geometry.IsWalkable(targetX, targetZ))
-            return false;
+        geometry.Resolve(targetX, targetZ, out var walkable, out var groundY);
 
-        if (!geometry.TryGetGroundHeight(targetX, targetZ, out var groundY))
+        if (!walkable)
             return false;
 
         // No upper-bound check -- would risk breaking legitimate multi-level platforms/bridges/jumps.

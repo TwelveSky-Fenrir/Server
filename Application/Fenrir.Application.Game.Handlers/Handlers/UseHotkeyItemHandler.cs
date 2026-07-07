@@ -9,10 +9,10 @@ namespace Fenrir.Application.Game.Handlers.Handlers;
 /// <summary>
 ///     op22, CZ_USE_HOTKEY_ITEM_SEND -- NOT a hotkey assignment; activates whatever is already bound at the
 ///     given hotkey (page, index). Only item-kind bindings are resolved to a real effect today (world.Items
-///     iSort==2, the generic consumable/potion family, potion-type codes 1-5 for life/mana gain and 9 as a
-///     genuine no-op) -- see <c>HotkeyItemConsumptionResolver</c>'s own remarks for which potion-type codes
-///     (6, 12-16) are recognized but still a deliberate clean-reject pending their own wire-notification
-///     citation.
+///     iSort==2, the generic consumable/potion family, potion-type codes 1-5 for life/mana gain, 9 as a
+///     genuine no-op, and 12-15 for the four fixed-value self-buff scrolls/books) -- see
+///     <c>HotkeyItemConsumptionResolver</c>'s own remarks for which potion-type codes (6, 16) are still
+///     recognized but a deliberate clean-reject pending their own wire-notification citation.
 /// </summary>
 /// <remarks>
 ///     Réf. C++ : Server/ts25zone/S04_MyWork02.cpp:2203-2492 (full <c>BEGIN_CZ(USE_HOTKEY_ITEM_SEND)</c>

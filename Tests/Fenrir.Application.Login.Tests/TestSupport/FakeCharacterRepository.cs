@@ -185,8 +185,19 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
         throw new NotSupportedException();
     }
 
+    public ValueTask<int> AdjustZone241TimeAsync(int characterId, int delta, CancellationToken ct)
+    {
+        throw new NotSupportedException();
+    }
+
     public ValueTask ApplyTribeConversionAsync(int characterId, int itemId, byte container,
         IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct)
+    {
+        throw new NotSupportedException();
+    }
+
+    public ValueTask ApplyTribeFourConversionAsync(int characterId, byte newTribe, int stepPermanent,
+        int activeQuestId, int qSort, int targetPhase, int killCounter, CancellationToken ct)
     {
         throw new NotSupportedException();
     }

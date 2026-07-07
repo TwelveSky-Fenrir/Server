@@ -148,7 +148,8 @@ public sealed partial class Zone
     {
         var serverIndex = state.CharacterId;
 
-        _monsters.TryRemove(serverIndex, out _);
+        if (_monsters.TryRemove(serverIndex, out var displaced))
+            RemoveMonsterFromGrid(displaced);
 
         var boss = MonsterEntity.Create(serverIndex, NextMonsterUniqueNumber(), template, serverIndex,
             state.PosX, state.PosY, state.PosZ, PersonalDungeonBossLeashRadius, serverIndex);
@@ -187,8 +188,8 @@ public sealed partial class Zone
             return;
 
         foreach (var (index, monster) in _monsters)
-            if (monster.InstanceId == instanceId)
-                _monsters.TryRemove(index, out _);
+            if (monster.InstanceId == instanceId && _monsters.TryRemove(index, out _))
+                RemoveMonsterFromGrid(monster);
 
         foreach (var (index, item) in _groundItems)
             if (item.InstanceId == instanceId)

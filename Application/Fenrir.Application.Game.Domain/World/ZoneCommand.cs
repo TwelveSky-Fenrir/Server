@@ -234,6 +234,12 @@ public sealed record PlayerEnterData(
     // consumption pass adds one.
     long PremiumExpireUtc = 0,
     int BuffX2Time = 0,
+    // The character's real, persisted game.Characters.PreviousTribe (0-2) -- must travel here too, or
+    // PlayerRuntimeState.PreviousTribe silently reverts to mirroring Tribe on every world entry/zone
+    // transfer, which is wrong for a tribe-3 (Fujin) character by design (see
+    // PlayerRuntimeState.PreviousTribe's own remarks). Defaults to 0 for callers not yet updated; both live
+    // call sites (EnterWorldService, ZoneTransfer.CreateEnterData) pass the real value explicitly.
+    byte PreviousTribe = 0,
     // The transferring character's full live BUFF_INFO (Server/ts25zone/S04_MyWork02.cpp:2017-2186's
     // DEMAND_ZONE_SERVER_INFO_2 -> REGISTER_AVATAR_SEND broker round trip, Server/Header/Protocol/STRUCT.h:1462).
     // Null on a fresh login: EnterWorldService does not (yet) hydrate PlayerRuntimeState.Buffs from persisted
@@ -251,4 +257,9 @@ public sealed record PlayerEnterData(
     // silently resets to 0 on every in-process zone transfer, same "must travel or it resets" posture as
     // PetGrowth/PetActivity above. No persisted source exists (PlayerRuntimeState.PetExpX2Time's own remarks),
     // so it stays 0 on a fresh world entry, same posture as BuffX2Time.
-    int PetExpX2Time = 0);
+    int PetExpX2Time = 0,
+    // aZone241Time -- must travel here too, or PlayerRuntimeState.Zone241Time would silently reset to 0 on
+    // every in-process zone transfer, same "must travel or it resets" posture as every block above.
+    // game.Characters already persists it (Migrations/041_character_rebirth_zone241_time.sql); this is the
+    // missing runtime-hydration link. See PlayerRuntimeState.Zone241Time's own remarks.
+    int Zone241Time = 0);

@@ -2,7 +2,9 @@ using System.IO.Pipelines;
 using System.Net;
 using System.Threading.Channels;
 using Fenrir.Network.Abstractions;
+using Fenrir.Network.Dispatch.Logging;
 using Fenrir.Network.Framing;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Network.Dispatch.Sessions;
 
@@ -11,7 +13,8 @@ public abstract class ClientSession(
     long sessionId,
     IDuplexPipe transport,
     FenrirServer server,
-    IPEndPoint? remoteEndPoint = null)
+    IPEndPoint? remoteEndPoint = null,
+    ILogger? logger = null)
     : IPacketSession
 {
     private const int SlowConsumerBackpressureStreakLimit = 5;
@@ -75,6 +78,7 @@ public abstract class ClientSession(
             FrameWriter.WriteFrame(in packet, queued);
             _pendingSends.Writer.TryWrite(queued);
             ClaimOwnershipIfNowFreeToAvoidStrandedFrame();
+            LogPacketSent(TPacket.Opcode, total);
             return;
         }
 
@@ -90,6 +94,7 @@ public abstract class ClientSession(
             throw;
         }
 
+        LogPacketSent(TPacket.Opcode, total);
         FlushLocked();
     }
 
@@ -107,6 +112,7 @@ public abstract class ClientSession(
         {
             _pendingSends.Writer.TryWrite(rawFrame.ToArray());
             ClaimOwnershipIfNowFreeToAvoidStrandedFrame();
+            LogPacketSent(OpcodeOf(rawFrame), rawFrame.Length);
             return;
         }
 
@@ -122,7 +128,30 @@ public abstract class ClientSession(
             throw;
         }
 
+        LogPacketSent(OpcodeOf(rawFrame), rawFrame.Length);
         FlushLocked();
+    }
+
+    /// <summary>
+    ///     Every producer of a pre-built raw frame (<see cref="FrameWriter.WriteFrame{TPacket}" />, the
+    ///     generated <c>LoginMessageFactory</c>/<c>ZoneMessageFactory.Encode</c> ZPACKET envelope) writes the
+    ///     opcode as the frame's first byte -- safe to read back here purely for <see cref="LogPacketSent" />,
+    ///     without requiring every <see cref="SendRaw" /> call site to separately supply its own opcode.
+    /// </summary>
+    private static byte OpcodeOf(ReadOnlySpan<byte> rawFrame)
+    {
+        return rawFrame.IsEmpty ? (byte)0 : rawFrame[0];
+    }
+
+    /// <summary>
+    ///     Debug-level operational log of an outgoing frame -- see <see cref="PacketLog.PacketSent" />'s own
+    ///     remarks for why this relies on that method's generated <c>IsEnabled</c> check rather than an
+    ///     explicit one here: <paramref name="opcode" />/<paramref name="byteSize" /> are already-known values
+    ///     from the caller, so there is no extra work worth pre-gating.
+    /// </summary>
+    private void LogPacketSent(byte opcode, int byteSize)
+    {
+        logger?.PacketSent(SessionId, opcode, byteSize);
     }
 
     // Caller must already hold _sendLock. Flushes what was just written, then keeps draining/flushing

@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using Fenrir.Generators.Analysis.Model;
+using Fenrir.Generators.Analysis.Scanning;
 using Fenrir.Generators.Analysis.Support;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -65,7 +66,8 @@ public sealed class HandlerDispatchIncrementalGenerator : IIncrementalGenerator
                 PacketTypeFullName = packetType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
                 Server = server,
                 Opcode = opcode,
-                IsAsync = isAsync
+                IsAsync = isAsync,
+                Location = typeSymbol.Locations.FirstOrDefault() ?? Location.None
             });
         }
 
@@ -74,6 +76,9 @@ public sealed class HandlerDispatchIncrementalGenerator : IIncrementalGenerator
 
     private static void Emit(SourceProductionContext context, ImmutableArray<HandlerModel> handlers)
     {
+        ReportCollisions(context, handlers.Where(h => !h.IsAsync));
+        ReportCollisions(context, handlers.Where(h => h.IsAsync));
+
         var inline = Deduplicate(handlers.Where(h => !h.IsAsync));
         var async = Deduplicate(handlers.Where(h => h.IsAsync));
 
@@ -146,6 +151,15 @@ public sealed class HandlerDispatchIncrementalGenerator : IIncrementalGenerator
         writer.Line("return services;");
         writer.CloseBrace();
         writer.CloseBrace();
+    }
+
+    /// <summary>FEN015: reports a diagnostic per (Server, Opcode) claimed by more than one handler in this bucket.</summary>
+    private static void ReportCollisions(SourceProductionContext context, IEnumerable<HandlerModel> handlers)
+    {
+        var (_, diagnostics) = HandlerCollisionChecker.Check(handlers.ToImmutableArray());
+
+        foreach (var diagnostic in diagnostics)
+            context.ReportDiagnostic(diagnostic);
     }
 
     private static ImmutableArray<HandlerModel> Deduplicate(IEnumerable<HandlerModel> handlers)

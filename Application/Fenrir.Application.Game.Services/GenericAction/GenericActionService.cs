@@ -32,6 +32,18 @@ public sealed class GenericActionService(
 
     private const byte TimeExchangeOutcome = 1;
 
+    /// <summary>
+    ///     game.EventLog.EventCode for a sale to an NPC shop, scoped independently within
+    ///     <see cref="EventLogCategory.NpcShopTrade" /> -- see that category's own remarks for the numbering
+    ///     scheme and legacy <c>GL_621_NSHOP_ITEM</c> citation.
+    /// </summary>
+    private const short NpcShopSellEventCode = 1;
+
+    /// <summary>game.EventLog.EventCode for a purchase from an NPC shop -- see <see cref="NpcShopSellEventCode" />.</summary>
+    private const short NpcShopBuyEventCode = 2;
+
+    private const byte NpcShopTradeOutcome = 1;
+
     /// <summary>Server/ts25zone/S04_MyWork05.cpp:4808-4826 -- 694 teacher points per accrued play-time-event minute.</summary>
     private const int TeacherPointsPerPlayTimeMinute = 694;
 
@@ -366,7 +378,7 @@ public sealed class GenericActionService(
 
     /// <summary>tSort 212/252 -- sell to an NPC shop.</summary>
     public async ValueTask<GenericActionResult> SellToNpcShopAsync(Zone zone, PlayerRuntimeState state,
-        int characterId, DefaultPData move, CancellationToken cancellationToken)
+        int accountId, int characterId, DefaultPData move, CancellationToken cancellationToken)
     {
         if (!NpcShopPolicy.TownZoneNumbers.Contains(zone.MapId) ||
             !worldData.ZonesByNumber.TryGetValue(zone.MapId, out var zoneDefinition) ||
@@ -407,6 +419,15 @@ public sealed class GenericActionService(
             return GenericActionResult.Aborted;
         }
 
+        // Logged only once AdjustMoneyAndReplaceContainerAsync above has durably committed -- an audit row must
+        // never assert a sale the DB write didn't actually persist. Sold quantity is derived from the
+        // before/after stack rather than echoing move.Quantity1 verbatim, since NpcShopPolicy.ResolveSell
+        // ignores the requested quantity entirely for a non-stackable item (S04_MyWork05.cpp:1398-1542).
+        var soldQuantity = source.Quantity - (resolved.RemainingSourceStack?.Quantity ?? 0);
+        await eventLog.LogAsync(NpcShopSellEventCode, EventLogCategory.NpcShopTrade, accountId, characterId,
+            null, null, null, resolved.MoneyGained, null, source.ItemId, soldQuantity, NpcShopTradeOutcome, null,
+            cancellationToken);
+
         var containers = ImmutableArray.Create(new InventoryContainerSnapshot((byte)page1, projectedContainer));
         if (!await zone.PostInventoryCommandAndWaitAsync(new InventoryZoneCommand(characterId, containers, null),
                 cancellationToken))
@@ -422,7 +443,7 @@ public sealed class GenericActionService(
     ///     (NpcId, ItemId), not an inventory slot.
     /// </summary>
     public async ValueTask<GenericActionResult> BuyFromNpcShopAsync(Zone zone, PlayerRuntimeState state,
-        int characterId, DefaultPData move, CancellationToken cancellationToken)
+        int accountId, int characterId, DefaultPData move, CancellationToken cancellationToken)
     {
         if (!NpcShopPolicy.TownZoneNumbers.Contains(zone.MapId) ||
             !worldData.ZonesByNumber.TryGetValue(zone.MapId, out var zoneDefinition) ||
@@ -463,6 +484,15 @@ public sealed class GenericActionService(
                 characterId);
             return GenericActionResult.Aborted;
         }
+
+        // Logged only once AdjustMoneyAndReplaceContainerAsync above has durably committed -- an audit row must
+        // never assert a purchase the DB write didn't actually persist. Purchased quantity is derived from the
+        // before/after destination stack (rather than echoing move.Quantity1 verbatim) so a merge into an
+        // already-occupied slot logs only the newly-added units, not the destination's post-merge total.
+        var purchasedQuantity = resolved.NewDestinationStack!.Value.Quantity - (destinationSlot?.Quantity ?? 0);
+        await eventLog.LogAsync(NpcShopBuyEventCode, EventLogCategory.NpcShopTrade, accountId, characterId,
+            null, null, null, -(long)resolved.MoneyCost, null, itemDefinition.Item.ItemId, purchasedQuantity,
+            NpcShopTradeOutcome, null, cancellationToken);
 
         var containers = ImmutableArray.Create(new InventoryContainerSnapshot((byte)page2, projectedContainer));
         if (!await zone.PostInventoryCommandAndWaitAsync(new InventoryZoneCommand(characterId, containers, null),

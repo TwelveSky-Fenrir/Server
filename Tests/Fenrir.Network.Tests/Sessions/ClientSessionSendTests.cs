@@ -2,6 +2,8 @@ using System.Buffers;
 using System.IO.Pipelines;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Fenrir.Network.Tests.TestSupport;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Network.Tests.Sessions;
 
@@ -141,5 +143,83 @@ public class ClientSessionSendTests
         catch (OperationCanceledException)
         {
         }
+    }
+
+    // Packet-level observability (Fenrir.Network.Dispatch.Logging.PacketLog): Send<T> must emit exactly one
+    // Debug-level "packet sent" entry, carrying the session id/opcode/byte size, when Debug is enabled.
+    [Fact]
+    public async Task Send_LogsPacketSentAtDebug_WhenDebugEnabled()
+    {
+        var pipe = new FakeDuplexPipe();
+        var logger = new CapturingLogger(LogLevel.Debug);
+        var session = new ZoneClientSession(42, pipe, logger: logger);
+        var packet = new ZoneGreetingResponse { RandomNumber = 0x12345678 };
+
+        session.Send(packet);
+
+        await DrainAsync(pipe);
+
+        var entry = Assert.Single(logger.Entries);
+        Assert.Equal(LogLevel.Debug, entry.Level);
+        Assert.Contains("42", entry.Message);
+        Assert.Contains(ZoneGreetingResponse.Opcode.ToString(), entry.Message);
+    }
+
+    // Mirrors the generated method's own IsEnabled(LogLevel.Debug) short-circuit -- at Information (both
+    // servers' appsettings.json default floor) not a single log entry should be produced per packet.
+    [Fact]
+    public async Task Send_LogsNothing_WhenDebugDisabled()
+    {
+        var pipe = new FakeDuplexPipe();
+        var logger = new CapturingLogger(LogLevel.Information);
+        var session = new ZoneClientSession(1, pipe, logger: logger);
+        var packet = new ZoneGreetingResponse { RandomNumber = 1 };
+
+        session.Send(packet);
+
+        await DrainAsync(pipe);
+
+        Assert.Empty(logger.Entries);
+    }
+
+    // SendRaw has no TPacket to read Opcode from -- it must recover the opcode from the pre-built frame's own
+    // first byte instead (every producer, FrameWriter.WriteFrame and the generated MessageFactory.Encode,
+    // writes it there).
+    [Fact]
+    public async Task SendRaw_LogsPacketSentWithOpcodeFromFirstByte_WhenDebugEnabled()
+    {
+        var pipe = new FakeDuplexPipe();
+        var logger = new CapturingLogger(LogLevel.Debug);
+        var session = new ZoneClientSession(7, pipe, logger: logger);
+        byte[] raw = [0xAB, 0xBE, 0xEF];
+
+        session.SendRaw(raw);
+
+        await DrainAsync(pipe);
+
+        var entry = Assert.Single(logger.Entries);
+        Assert.Equal(LogLevel.Debug, entry.Level);
+        Assert.Contains("7", entry.Message);
+        Assert.Contains("171", entry.Message); // 0xAB == 171, the opcode byte
+    }
+
+    // A session with no logger wired up (the common case in every other test in this file) must behave
+    // exactly as before this feature existed -- Send/SendRaw never touch a null logger.
+    [Fact]
+    public async Task Send_NeverThrows_WhenNoLoggerWired()
+    {
+        var pipe = new FakeDuplexPipe();
+        var session = new ZoneClientSession(1, pipe);
+        var packet = new ZoneGreetingResponse { RandomNumber = 1 };
+
+        session.Send(packet);
+
+        await DrainAsync(pipe);
+    }
+
+    private static async Task DrainAsync(FakeDuplexPipe pipe)
+    {
+        var result = await pipe.SessionToPeer.ReadAsync();
+        pipe.SessionToPeer.AdvanceTo(result.Buffer.End);
     }
 }

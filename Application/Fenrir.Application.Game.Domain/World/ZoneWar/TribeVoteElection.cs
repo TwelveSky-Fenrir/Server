@@ -91,8 +91,16 @@ public sealed class TribeVoteElection(
     ZoneRegistry zones,
     ILogger<TribeVoteElection> logger)
 {
-    /// <summary>LV_M33 (DEFINE.h:483) -- both the candidacy and vote level gates in the active (non-__GOD__) build.</summary>
-    public const short MinimumLevel = 145;
+    /// <summary>
+    ///     LV_M33 (145, DEFINE.h:483) + MAX_LIMIT_HIGH_LEVEL_NUM (12) + 6 = 163 -- both the candidacy and vote
+    ///     eligibility gates in the always-live <c>__GOD__</c> build branch (DEFINE.h:21-30 confirms
+    ///     <c>__GOD__</c>/<c>__REBIRTH__</c> are unconditionally defined in every buildable configuration; the
+    ///     alternate, ordinary-level-only <c>&lt; LV_M33</c> comparison basis is dead code in every one of
+    ///     them). This gate is not a simple ordinary-level threshold: because ordinary level alone caps at 145,
+    ///     a character with zero high-level and zero rebirth progress can never satisfy it -- see
+    ///     <see cref="CombinedEligibilityLevel" />'s own remarks.
+    /// </summary>
+    public const int MinimumEligibilityLevel = 163;
 
     /// <summary>The candidacy CP floor (S04_MyWork02.cpp:11643-11647's <c>aKillOtherTribe &lt; 1000</c> check).</summary>
     public const int MinimumContributionPoints = 1000;
@@ -180,7 +188,7 @@ public sealed class TribeVoteElection(
         if (Phase != TribeVotePhase.Candidacy)
             return TribeVoteCandidacyOutcome.WindowClosed;
 
-        if (player.Level < MinimumLevel)
+        if (CombinedEligibilityLevel(player) < MinimumEligibilityLevel)
             return TribeVoteCandidacyOutcome.LevelTooLow;
 
         if (player.ContributionPoints < MinimumContributionPoints)
@@ -209,7 +217,7 @@ public sealed class TribeVoteElection(
         if (Phase != TribeVotePhase.Voting)
             return TribeVoteCastOutcome.WindowClosed;
 
-        if (player.Level < MinimumLevel)
+        if (CombinedEligibilityLevel(player) < MinimumEligibilityLevel)
             return TribeVoteCastOutcome.LevelTooLow;
 
         var candidates = await worldState.GetTribeVotesAsync(player.Tribe, ct).ConfigureAwait(false);
@@ -234,9 +242,8 @@ public sealed class TribeVoteElection(
         if (alreadyVoted)
             return TribeVoteCastOutcome.AlreadyVotedThisWindow;
 
-        // aLevel1 + (aLevel2 + aRebirthNum) * 3 - 112 (S04_MyWork02.cpp:11782); Fenrir has no separate
-        // aLevel2 track, so Level stands in for aLevel1 alone here -- documented simplification.
-        var votePoints = player.Level + player.RebirthCount * 3 - 112;
+        // aLevel1 + (aLevel2 + aRebirthNum) * 3 - 112 (S04_MyWork02.cpp:11782).
+        var votePoints = player.Level + (player.Level2 + player.RebirthCount) * 3 - 112;
 
         await worldState.CastTribeVoteAsync(player.Tribe, slotIndex, votePoints, ct).ConfigureAwait(false);
 
@@ -349,5 +356,19 @@ public sealed class TribeVoteElection(
             if (zones.TryGetPlayerAndZone(subMaster.CharacterId, out _, out var zone))
                 zone.PostTribeProgressCommand(new TribeProgressZoneCommand(subMaster.CharacterId, TribeRole: 0));
         }
+    }
+
+    /// <summary>
+    ///     aLevel1+aLevel2+aRebirthNum -- the three-term sum both <see cref="TryRegisterCandidacyAsync" /> and
+    ///     <see cref="TryCastVoteAsync" /> compare against <see cref="MinimumEligibilityLevel" />. Deliberately
+    ///     not <see cref="PlayerRuntimeState.CombinedLevel" /> (which omits RebirthCount) -- this gate folds in
+    ///     all three terms, unlike the party-invite/trade-ask sites that only need the two-term combined level.
+    ///     Because ordinary level alone caps at 145, this gate is unreachable by a character with zero
+    ///     high-level and zero rebirth progress no matter how capped their ordinary level is -- a materially
+    ///     stricter gate than a simple level threshold, not an incremental addition to one.
+    /// </summary>
+    private static int CombinedEligibilityLevel(PlayerRuntimeState player)
+    {
+        return player.Level + player.Level2 + player.RebirthCount;
     }
 }

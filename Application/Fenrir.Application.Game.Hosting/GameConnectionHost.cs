@@ -53,8 +53,13 @@ public sealed class GameConnectionHost(
         var opts = options.Value;
         _listener = new FenrirTcpListener<ZoneClientSession>(
             new IPEndPoint(IPAddress.Any, opts.Port),
-            static (sessionId, transport, remoteEndPoint) =>
-                new ZoneClientSession(sessionId, transport, remoteEndPoint));
+            // Not `static` anymore: captures `logger` so every accepted session can emit its own Debug-level
+            // packet-sent log through the same ILogger<GameConnectionHost> instance SessionLoop already logs
+            // packet-received/violation events through -- one closure allocated here, once, at ExecuteAsync
+            // startup (not per connection: the delegate itself is reused for every accepted socket), well
+            // within the "closure allocated once and reused is fine" budget.
+            (sessionId, transport, remoteEndPoint) =>
+                new ZoneClientSession(sessionId, transport, remoteEndPoint, logger));
 
         logger.LogInformation("GameServer listening on port {Port} (shard {ShardId}, maps [{Maps}])", opts.Port,
             opts.ShardId, string.Join(", ", zones.Zones.Select(z => z.MapId).Order()));

@@ -14,5 +14,5 @@ public readonly record struct CraftLegendaryPetResult(CraftLegendaryPetOutcome O
 public interface ICraftLegendaryPetService
 {
     public ValueTask<CraftLegendaryPetResult> ResolveAsync(CraftLegendaryPetRequest packet, Zone zone,
-        PlayerRuntimeState state, int characterId, CancellationToken cancellationToken);
+        PlayerRuntimeState state, int characterId, int accountId, CancellationToken cancellationToken);
 }

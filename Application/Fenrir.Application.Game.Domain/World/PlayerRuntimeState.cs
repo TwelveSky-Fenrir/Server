@@ -16,7 +16,12 @@ public sealed partial class PlayerRuntimeState
     public required int CharacterId { get; init; }
     public required IPacketSession Session { get; init; }
     public required string Name { get; init; }
-    public required byte Tribe { get; init; }
+    /// <summary>
+    ///     aTribe. Was <c>init</c>-only until the fourth-tribe (Fujin) conversion/return behavior
+    ///     (CZ_CHANGE_TO_TRIBE4_SEND, op37) needed to change it mid-session -- every other mutation site
+    ///     still only ever assigns this once, at world entry/zone transfer.
+    /// </summary>
+    public required byte Tribe { get; set; }
     public required byte Gender { get; init; }
     public required byte HeadType { get; init; }
     public required byte FaceType { get; init; }
@@ -66,18 +71,38 @@ public sealed partial class PlayerRuntimeState
     ///     aLevel2, the post-cap "high level" rebirth ladder (1-12, MAX_LIMIT_HIGH_LEVEL_NUM) -- only reachable
     ///     once <see cref="Level" /> reaches <see cref="Stats.LevelProgressionCalculator.MaxLevel" />. No
     ///     Fenrir-side kill-experience path grants this yet (see <see cref="Stats.LevelProgressionCalculator" />'s
-    ///     own remarks); <c>TribeActionHandler.HandleRebirthAsync</c>'s Max Rebirth gate is its only consumer today.
+    ///     own remarks, and <see cref="Progression.RebirthProgression" />'s own remarks on
+    ///     <c>ProcessForExperience2</c> being a distinct, unimplemented prerequisite subsystem) -- both rebirth
+    ///     paths (<c>TribeActionService.RebirthAsync</c>, the CP-funded path capped at generation 6; and
+    ///     <c>UseInventoryItemService</c>'s Rebirth-Pill branch, the only path reaching generations 7-12) and
+    ///     the three combined-level sites (<see cref="CombinedLevel" />'s own consumers) read this field.
     /// </summary>
     public short Level2 { get; set; }
 
-    /// <summary>aExp2 -- Level2's own XP counter, reset to 0 on every successful Max Rebirth.</summary>
+    /// <summary>aExp2 -- Level2's own XP counter, reset to 0 on every successful rebirth transition.</summary>
     public int Exp2 { get; set; }
 
     /// <summary>
-    ///     aRebirthNum -- real cap is 6 (app-enforced by TribeActionHandler, not this field). Read by StatCalculator's
-    ///     CriticalDefence and Critical wrapper bonuses.
+    ///     aRebirthNum (0-12, MAX_REBIRTH_LIMIT) -- the CP-funded path (<c>TribeActionService.RebirthAsync</c>)
+    ///     is app-enforced-capped at generation 6; the Rebirth-Pill item-consumption path
+    ///     (<c>UseInventoryItemService</c>) is the only one reaching generations 7-12. Read by StatCalculator's
+    ///     CriticalDefence and Critical wrapper bonuses, and by the tribe-vote eligibility/vote-weight formulas
+    ///     (<see cref="ZoneWar.TribeVoteElection" />).
     /// </summary>
     public int RebirthCount { get; set; }
+
+    /// <summary>
+    ///     aLevel1+aLevel2 -- the "combined level" value <c>MyFactor.cpp</c>'s <c>GetLevel()</c> accessor
+    ///     returns and a broad set of level-scaled stat formulas consume (see
+    ///     <see cref="Progression.RebirthProgression" />'s own remarks). The three sites that previously
+    ///     compared <see cref="Level" /> alone -- <c>PartyInviteService</c>'s party-invite level-gap gate,
+    ///     <c>TradeInviteService</c>'s trade-ask displayed level, and this type's own consumer
+    ///     <see cref="ZoneWar.TribeVoteElection" /> (which additionally folds in <see cref="RebirthCount" />
+    ///     for its own eligibility/vote-weight formulas, so does not use this property directly) -- all read
+    ///     this instead now.
+    /// </summary>
+    /// <remarks>Réf. C++ : Server/Header/Protocol/MyFactor.cpp:508-511 (GetLevel()).</remarks>
+    public int CombinedLevel => Level + Level2;
 
     /// <summary>aTitle (category*100 + rank 1-14) -- read by StatCalculator's title-rank bonus tables.</summary>
     public int Title { get; set; }
@@ -96,6 +121,18 @@ public sealed partial class PlayerRuntimeState
     ///     TeacherCharacterId/StudentCharacterId bond.
     /// </summary>
     public int TeacherPoint { get; set; }
+
+    /// <summary>
+    ///     aZone241Time -- an unrelated "zone241 time" counter incremented by 10 on every successful CP-funded
+    ///     rebirth transition (<c>TribeActionService.RebirthAsync</c>'s Path B only; the Rebirth-Pill Path A
+    ///     never touches it). Wire-exposed via <c>AvatarInfo.Zone241Time</c> and as Value03 of the
+    ///     rebirth-transition's own AVATAR_CHANGE_INFO_1 sort-14 broadcast. Durably persisted via
+    ///     <c>ICharacterRepository.AdjustZone241TimeAsync</c> (game.Characters.Zone241Time,
+    ///     Migrations/041_character_rebirth_zone241_time.sql) -- already synchronously persisted by the time a
+    ///     <c>TribeProgressZoneCommand</c> mirrors the new value here, same "no dirty mark, nothing left to
+    ///     flush" posture as <see cref="Tribe" />/<c>QuestProgress</c>/<c>TribeFourReturnAllowance</c>.
+    /// </summary>
+    public int Zone241Time { get; set; }
 
     /// <summary>
     ///     War Point stat -- wire-exposed via <c>AvatarInfo.WarPoint</c> (still always sent as 0 from

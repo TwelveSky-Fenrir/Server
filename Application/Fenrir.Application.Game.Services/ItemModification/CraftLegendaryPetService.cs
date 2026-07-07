@@ -18,11 +18,19 @@ namespace Fenrir.Application.Game.Services.ItemModification;
 public sealed class CraftLegendaryPetService(
     ICharacterRepository characters,
     WorldDataCache worldData,
+    IEventLogRepository eventLog,
     ILogger<CraftLegendaryPetService> logger)
     : ICraftLegendaryPetService
 {
+    /// <summary>
+    ///     game.EventLog.EventCode for op131's single reachable recipe (tSort==2) -- scoped independently
+    ///     within <see cref="EventLogCategory.ItemCreate" />, same "app-owned, per-class numbering" posture as
+    ///     <see cref="CraftItemService" />'s own EventCode constants.
+    /// </summary>
+    private const short LegendaryPetCraftEventCode = 1;
+
     public async ValueTask<CraftLegendaryPetResult> ResolveAsync(CraftLegendaryPetRequest packet, Zone zone,
-        PlayerRuntimeState state, int characterId, CancellationToken cancellationToken)
+        PlayerRuntimeState state, int characterId, int accountId, CancellationToken cancellationToken)
     {
         if (packet.Sort != LegendaryPetCraftCatalog.Sort ||
             !IsValidSlot(packet.Page1, packet.Index1) || !IsValidSlot(packet.Page2, packet.Index2) ||
@@ -74,6 +82,13 @@ public sealed class CraftLegendaryPetService(
         else
             await characters.ReplaceTwoContainersAsync(characterId, pages[0], ToTvps(working[pages[0]]), pages[1],
                 ToTvps(working[pages[1]]), cancellationToken);
+
+        // Logged only once the container replace(s) above have durably committed -- an ItemCreate row must
+        // never assert a mint that the DB write didn't actually persist (same posture as CraftItemService's
+        // own craft-family logging). newPet.Quantity is always 0 (a single fresh unit), so the logged
+        // Quantity is hardcoded 1 rather than echoing the raw 0-unit convention.
+        await eventLog.LogAsync(LegendaryPetCraftEventCode, EventLogCategory.ItemCreate, accountId, characterId,
+            null, null, null, null, null, resolved.ResultItemId, 1, 1, null, cancellationToken);
 
         var containers = pages.Select(page => new InventoryContainerSnapshot(page, working[page]))
             .ToImmutableArray();

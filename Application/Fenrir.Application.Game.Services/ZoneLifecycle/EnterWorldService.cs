@@ -436,6 +436,9 @@ public sealed class EnterWorldService(
                 TeacherPoint: character.TeacherPoint,
                 Level2: character.Level2,
                 Exp2: character.Exp2,
+                // aZone241Time -- game.Characters already persisted this, but nothing read it back into
+                // PlayerRuntimeState until now. See PlayerRuntimeState.Zone241Time's own remarks.
+                Zone241Time: character.Zone241Time,
                 HeroRankPoints: heroRankPoints,
                 // Stat/elixir-potion lifetime counters (item-usage-consumables finding, Critical) --
                 // game.Characters already persisted these five, but nothing read them back into
@@ -450,7 +453,12 @@ public sealed class EnterWorldService(
                 // game.Characters.PremiumExpireUtc, not the PlayerEnterData default of 0. BuffX2Time stays at
                 // its default (no persisted source exists yet -- see PlayerRuntimeState.BuffX2Time's own
                 // remarks), so a fresh world entry always starts with that factor inactive.
-                PremiumExpireUtc: character.PremiumExpireUtc)));
+                PremiumExpireUtc: character.PremiumExpireUtc,
+                // The character's real persisted origin tribe (0-2) -- must travel here too, or
+                // PlayerRuntimeState.PreviousTribe would silently mirror Tribe instead for a tribe-3 (Fujin)
+                // character, breaking the fourth-tribe (Fujin) conversion/return behavior's return branch.
+                // Already loaded and self-consistency-checked above (IsTribeAndPreviousTribeConsistent).
+                PreviousTribe: character.PreviousTribe)));
 
             // A dropped Enter is never replayed -- the character would stay permanently invisible despite the two
             // packets above already telling the client registration succeeded, so treat it as fatal.

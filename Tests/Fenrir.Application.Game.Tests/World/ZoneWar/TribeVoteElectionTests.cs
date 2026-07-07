@@ -33,8 +33,14 @@ public class TribeVoteElectionTests
         return service;
     }
 
+    /// <summary>
+    ///     Default shape (145+12+6=163) sits exactly at <see cref="TribeVoteElection.MinimumEligibilityLevel" />
+    ///     -- most tests below don't care about the eligibility gate itself and just need a player who clears
+    ///     it, so defaulting to "exactly eligible" keeps every pre-existing call site (added before Level2/
+    ///     RebirthCount were folded into this gate) passing without having to touch each one individually.
+    /// </summary>
     private static PlayerRuntimeState CreatePlayer(int characterId, byte tribe, short level = 145,
-        int contributionPoints = 1000, int rebirthCount = 0)
+        int contributionPoints = 1000, int rebirthCount = 6, short level2 = 12)
     {
         var (session, _) = ZoneTestKit.CreateSession(characterId);
         return new PlayerRuntimeState
@@ -47,6 +53,7 @@ public class TribeVoteElectionTests
             HeadType = 0,
             FaceType = 0,
             Level = level,
+            Level2 = level2,
             ContributionPoints = contributionPoints,
             RebirthCount = rebirthCount
         };
@@ -91,13 +98,48 @@ public class TribeVoteElectionTests
     }
 
     [Fact]
-    public async Task TryRegisterCandidacyAsync_LevelBelowMinimum_Rejects()
+    public async Task TryRegisterCandidacyAsync_CombinedEligibilityLevelOneBelowThreshold_Rejects()
     {
         var worldState = CreateWorldState(out _);
         var election = new TribeVoteElection(worldState, new FakeTribeRepository(), CreateRegistry(),
             NullLogger<TribeVoteElection>.Instance);
         await election.OpenCandidacyWindowAsync(CancellationToken.None);
-        var player = CreatePlayer(500, 1, 144);
+        // 145 + 11 + 6 = 162, one short of the 163 threshold -- proves Level2 (not just Level) is part of
+        // the comparison, since ordinary Level here is still at its own cap.
+        var player = CreatePlayer(500, 1, level2: 11);
+
+        var outcome = await election.TryRegisterCandidacyAsync(player, 0, CancellationToken.None);
+
+        Assert.Equal(TribeVoteCandidacyOutcome.LevelTooLow, outcome);
+    }
+
+    [Fact]
+    public async Task TryRegisterCandidacyAsync_CombinedEligibilityLevelExactlyAtThreshold_PassesTheGate()
+    {
+        var worldState = CreateWorldState(out _);
+        var election = new TribeVoteElection(worldState, new FakeTribeRepository(), CreateRegistry(),
+            NullLogger<TribeVoteElection>.Instance);
+        await election.OpenCandidacyWindowAsync(CancellationToken.None);
+        // 145 + 12 + 6 = 163 exactly -- CreatePlayer's own default shape.
+        var player = CreatePlayer(500, 1);
+
+        var outcome = await election.TryRegisterCandidacyAsync(player, 0, CancellationToken.None);
+
+        Assert.Equal(TribeVoteCandidacyOutcome.Registered, outcome);
+    }
+
+    [Fact]
+    public async Task
+        TryRegisterCandidacyAsync_OrdinaryLevelCappedWithNoHighLevelOrRebirthProgress_NeverSatisfiesTheGate()
+    {
+        // Ordinary level alone caps at 145 (9 short of the 163 threshold), so a character who never advanced
+        // past that cap with zero high-level and zero rebirth progress can never pass this gate under any
+        // circumstance -- per the originating contract's own Edge cases.
+        var worldState = CreateWorldState(out _);
+        var election = new TribeVoteElection(worldState, new FakeTribeRepository(), CreateRegistry(),
+            NullLogger<TribeVoteElection>.Instance);
+        await election.OpenCandidacyWindowAsync(CancellationToken.None);
+        var player = CreatePlayer(500, 1, level2: 0, rebirthCount: 0);
 
         var outcome = await election.TryRegisterCandidacyAsync(player, 0, CancellationToken.None);
 
@@ -196,6 +238,22 @@ public class TribeVoteElectionTests
     }
 
     [Fact]
+    public async Task TryCastVoteAsync_CombinedEligibilityLevelOneBelowThreshold_Rejects()
+    {
+        var worldState = CreateWorldState(out _);
+        var election = new TribeVoteElection(worldState, new FakeTribeRepository(), CreateRegistry(),
+            NullLogger<TribeVoteElection>.Instance);
+        await election.OpenCandidacyWindowAsync(CancellationToken.None);
+        election.OpenVotingWindow();
+        // 145 + 11 + 6 = 162, one short of the 163 threshold -- the same gate candidacy registration uses.
+        var voter = CreatePlayer(500, 1, level2: 11);
+
+        var outcome = await election.TryCastVoteAsync(voter, 0, CancellationToken.None);
+
+        Assert.Equal(TribeVoteCastOutcome.LevelTooLow, outcome);
+    }
+
+    [Fact]
     public async Task TryCastVoteAsync_Success_AddsComputedPoints()
     {
         var worldState = CreateWorldState(out var repository);
@@ -204,14 +262,17 @@ public class TribeVoteElectionTests
         await election.OpenCandidacyWindowAsync(CancellationToken.None);
         repository.VotesByTribe[1] = [new TribeVoteDto(1, 0, 999, 150, 1200, 0, DateTime.UtcNow)];
         election.OpenVotingWindow();
-        var voter = CreatePlayer(500, 1, 150, rebirthCount: 2);
+        // Level+Level2+RebirthCount = 150+10+3 = 163, exactly at the eligibility threshold -- deliberately
+        // three distinct numbers so the assertion below cannot pass by accident if any one term were dropped
+        // or the wrong two were multiplied together.
+        var voter = CreatePlayer(500, 1, 150, rebirthCount: 3, level2: 10);
 
         var outcome = await election.TryCastVoteAsync(voter, 0, CancellationToken.None);
 
         Assert.Equal(TribeVoteCastOutcome.Cast, outcome);
         var votes = await worldState.GetTribeVotesAsync(1, CancellationToken.None);
-        // aLevel1 + (aLevel2 + aRebirthNum) * 3 - 112 => 150 + 2*3 - 112 = 44
-        Assert.Equal(44, votes[0].VotePoint);
+        // aLevel1 + (aLevel2 + aRebirthNum) * 3 - 112 => 150 + (10 + 3) * 3 - 112 = 77
+        Assert.Equal(77, votes[0].VotePoint);
     }
 
     [Fact]

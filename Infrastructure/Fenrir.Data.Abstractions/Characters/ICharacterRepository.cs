@@ -217,6 +217,20 @@ public interface ICharacterRepository
     public ValueTask<int> AdjustDeathProtectionAsync(int characterId, int delta, CancellationToken ct);
 
     /// <summary>
+    ///     game.Characters.Zone241Time -- the "aZone241Time" counter (Migrations/041_character_rebirth_zone241_time.sql
+    ///     for the column's own citation). First durable consumer is the legacy-behavior-translator
+    ///     Rebirth-advancement contract's Path B ("Max Rebirth", CZ_TRIBE_WORK_SEND tSort 11), whose legacy
+    ///     success branch does <c>aZone241Time += 10</c> (Server/ts25zone/S04_MyWork02.cpp:11342-11390). Same
+    ///     forward-compat <paramref name="delta" />-sign posture as <see cref="AdjustDeathProtectionAsync" />/
+    ///     <see cref="GrantTribeTransferPermitAsync" /> -- this is a dumb delta-adjust primitive; whether an
+    ///     increment should be applied unconditionally on passing preconditions (the legacy's own quirk) or
+    ///     only on an actual successful rebirth transition (the contract's own hardening recommendation) is
+    ///     the calling domain code's decision, not enforced here. Returns the balance after the adjustment.
+    ///     Throws SQL 50336 on an unknown character or an adjustment that would take Zone241Time negative.
+    /// </summary>
+    public ValueTask<int> AdjustZone241TimeAsync(int characterId, int delta, CancellationToken ct);
+
+    /// <summary>
     ///     Book of Noble Dragon/Royal Serpent/Grand Tiger V2 tribe-conversion mechanic (world.Items
     ///     99014/99015/99016) -- see usp_Character_ApplyTribeConversion.sql's own header for the full
     ///     precondition list, THROW codes (50313-50320), and -- importantly -- which 3 preconditions the
@@ -238,4 +252,16 @@ public interface ICharacterRepository
     /// </remarks>
     public ValueTask ApplyTribeConversionAsync(int characterId, int itemId, byte container,
         IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct);
+
+    /// <summary>
+    ///     CZ_CHANGE_TO_TRIBE4_SEND (op37) success -- the fourth-tribe (Fujin) conversion/return behavior.
+    ///     Atomically writes game.Characters.Tribe plus the 5-slot inline quest state (mirroring
+    ///     <see cref="ApplyQuestTransitionAsync" />'s own column shape, minus that method's money/container
+    ///     parameters -- this behavior never touches money, items, or containers). Distinct from, and must
+    ///     never be conflated with, <see cref="ApplyTribeConversionAsync" /> -- that is the unrelated
+    ///     skill-book-item-driven swap between tribes 0/1/2, which DOES remap equipment/skills; this one is a
+    ///     routing move into/out of the neutral tribe-3 pool and touches neither.
+    /// </summary>
+    public ValueTask ApplyTribeFourConversionAsync(int characterId, byte newTribe, int stepPermanent,
+        int activeQuestId, int qSort, int targetPhase, int killCounter, CancellationToken ct);
 }

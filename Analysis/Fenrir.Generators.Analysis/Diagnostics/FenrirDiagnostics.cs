@@ -57,4 +57,21 @@ internal static class FenrirDiagnostics
         Category,
         DiagnosticSeverity.Error,
         true);
+
+    public static readonly DiagnosticDescriptor HandlerCollision = new(
+        "FEN015",
+        "Handler collision",
+        "Handlers '{0}' and '{1}' both handle (Server={2}, Opcode={3})",
+        Category,
+        DiagnosticSeverity.Error,
+        true);
+
+    public static readonly DiagnosticDescriptor AllowedStatesOnOutgoingPacket = new(
+        "FEN016",
+        "AllowedStates on outgoing packet",
+        "Type '{0}' declares AllowedStates on an Outgoing [FenrirPacket]; SessionStateGate only gates Incoming " +
+        "packets, so this value is silently ignored",
+        Category,
+        DiagnosticSeverity.Error,
+        true);
 }

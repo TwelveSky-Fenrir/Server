@@ -2,6 +2,7 @@ using System.IO.Pipelines;
 using System.Net;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Serialization.Wire;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Network.Dispatch.Sessions;
 
@@ -26,8 +27,12 @@ public enum GmCommandTier : short
 /// <summary>
 ///     Zone-flow session: <c>Connected → TicketConsumed → Registering → InWorld</c>.
 /// </summary>
-public sealed class ZoneClientSession(long sessionId, IDuplexPipe transport, IPEndPoint? remoteEndPoint = null)
-    : ClientSession(sessionId, transport, FenrirServer.Zone, remoteEndPoint)
+public sealed class ZoneClientSession(
+    long sessionId,
+    IDuplexPipe transport,
+    IPEndPoint? remoteEndPoint = null,
+    ILogger? logger = null)
+    : ClientSession(sessionId, transport, FenrirServer.Zone, remoteEndPoint, logger)
 {
     public ZoneSessionState State { get; private set; } = ZoneSessionState.Connected;
 

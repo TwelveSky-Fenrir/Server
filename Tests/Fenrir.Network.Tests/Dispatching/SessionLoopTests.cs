@@ -7,6 +7,7 @@ using Fenrir.Network.Serialization.Packets.Zone;
 using Fenrir.Network.Serialization.Wire;
 using Fenrir.Network.Tests.Sessions;
 using Fenrir.Network.Tests.TestSupport;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Network.Tests.Dispatching;
 
@@ -245,6 +246,50 @@ public sealed class SessionLoopTests
 
         Assert.Empty(dispatcher.Records);
         Assert.Equal(DisconnectReason.ClientClosed, session.DisconnectReason);
+    }
+
+    // Packet-level observability (Fenrir.Network.Dispatch.Logging.PacketLog): every successfully decoded
+    // frame must emit exactly one Debug-level "packet received" entry, carrying session id/opcode/byte size,
+    // when Debug is enabled -- before this feature existed there was only an ad-hoc LogDebug call here.
+    [Fact]
+    public async Task RunAsync_DebugLoggingEnabled_LogsPacketReceivedWithOpcodeAndSize()
+    {
+        var pipe = new FakeDuplexPipe();
+        var session = InWorldZoneSession(20, pipe);
+        var dispatcher = new RecordingFrameDispatcher();
+        var logger = new CapturingLogger(LogLevel.Debug);
+        var loopTask = SessionLoop.RunAsync(session, dispatcher, null, null, CancellationToken.None, logger);
+
+        var frame = BuildClientFrame(HeartbeatRequest.Opcode, HeartbeatRequest.PayloadSize);
+        await pipe.PeerToSession.WriteAsync(frame);
+        await pipe.PeerToSession.CompleteAsync();
+
+        await AwaitLoopAsync(loopTask);
+
+        var received = Assert.Single(logger.Entries, e => e.Level == LogLevel.Debug);
+        Assert.Contains("20", received.Message);
+        Assert.Contains(HeartbeatRequest.Opcode.ToString(), received.Message);
+        Assert.Contains(HeartbeatRequest.PayloadSize.ToString(), received.Message);
+    }
+
+    // Mirrors the generated method's own IsEnabled(LogLevel.Debug) short-circuit -- SessionLoop itself must
+    // never even capture a Stopwatch timestamp when Debug is disabled, let alone log anything.
+    [Fact]
+    public async Task RunAsync_DebugLoggingDisabled_NeverLogsPacketReceived()
+    {
+        var pipe = new FakeDuplexPipe();
+        var session = InWorldZoneSession(21, pipe);
+        var dispatcher = new RecordingFrameDispatcher();
+        var logger = new CapturingLogger(LogLevel.Information);
+        var loopTask = SessionLoop.RunAsync(session, dispatcher, null, null, CancellationToken.None, logger);
+
+        var frame = BuildClientFrame(HeartbeatRequest.Opcode, HeartbeatRequest.PayloadSize);
+        await pipe.PeerToSession.WriteAsync(frame);
+        await pipe.PeerToSession.CompleteAsync();
+
+        await AwaitLoopAsync(loopTask);
+
+        Assert.Empty(logger.Entries);
     }
 
     private static ZoneClientSession InWorldZoneSession(long sessionId, FakeDuplexPipe pipe)

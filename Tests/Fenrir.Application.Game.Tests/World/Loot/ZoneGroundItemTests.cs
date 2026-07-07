@@ -6,6 +6,8 @@ using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Tests.GameData;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Data.Abstractions.World;
+using Fenrir.Network.Framing;
+using Fenrir.Network.Serialization.Packets.Zone;
 
 namespace Fenrir.Application.Game.Tests.World.Loot;
 
@@ -187,6 +189,40 @@ public class ZoneGroundItemTests
 
         Assert.Equal(1, outcomes.Count(o => o == GroundItemClaimOutcome.Success));
         Assert.Equal(0, zone.GroundItemCount);
+    }
+
+    /// <summary>
+    ///     Covers <c>Zone.BroadcastGroundItemAction</c>'s <see cref="AoiGrid.HasAnyNeighbor" /> emptiness
+    ///     pre-check, the ground-item counterpart of the same refactor already covered for monsters
+    ///     (<c>ZoneMonsterAoiGridTests</c>) and proxy shops (<c>ZoneProxyShopTests.ShopWithNoNeighbors_IsNeverBroadcastTo</c>):
+    ///     a drop with nobody nearby must neither throw nor send anything, while a drop next to a player must
+    ///     still reach them exactly as before.
+    /// </summary>
+    [Fact]
+    public void SpawnGroundItem_WithNoNeighborsAnywhere_SendsNothing_AndDoesNotThrow()
+    {
+        var zone = ZoneTestKit.CreateZone(1);
+
+        zone.SpawnGroundItem(PotionItemId, 1, 5000f, 0f, 5000f, "Nobody", "", 0);
+
+        Assert.Equal(1, zone.GroundItemCount);
+    }
+
+    [Fact]
+    public void SpawnGroundItem_BroadcastsTheCreationFrame_ToANearbyPlayer()
+    {
+        var zone = ZoneTestKit.CreateZone(1);
+        var (session, pipe) = ZoneTestKit.CreateSession(1);
+
+        // Same AOI cell as the drop below (default cell size, both floor to the same coarse cell).
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1, posX: 50f, posZ: 50f)));
+        zone.Tick(SimulationClock.LegacyTick);
+        ZoneTestKit.DrainOutbound(pipe);
+
+        zone.SpawnGroundItem(PotionItemId, 1, 60f, 0f, 60f, "Someone", "", 0);
+
+        Assert.Equal(FrameWriter.FrameSizeOf<GroundItemReplicationResponse>(),
+            ZoneTestKit.DrainOutbound(pipe).Length);
     }
 
     /// <summary>

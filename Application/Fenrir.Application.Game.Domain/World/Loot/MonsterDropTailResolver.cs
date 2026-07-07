@@ -83,8 +83,9 @@ public static class MonsterDropTailResolver
     ///     (<c>S07_MyGame05.cpp:3403-3404</c>). Kept as a local copy rather than referencing
     ///     <see cref="Fenrir.Application.Game.Domain.Consumables.StatPotionResolver.RequiredLevel2" /> -- this codebase's own
     ///     established
-    ///     convention for this constant (see e.g. <c>TribeActionService.MaxHighLevel</c>) is one private copy
-    ///     per consuming file, not a shared cross-namespace reference.
+    ///     convention for this constant (see e.g. <see cref="Progression.RebirthProgression.MaxHighLevel" />,
+    ///     shared only between the two rebirth-advancement trigger paths that consume it) is one private copy
+    ///     per unrelated consuming file, not a single cross-namespace constant reused everywhere.
     /// </summary>
     private const int MaxHighLevel = 12;
 

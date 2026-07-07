@@ -19,6 +19,7 @@ public sealed class CostumeStateHandler(ICostumeStateService service) : IAsyncPa
     {
         var zoneSession = (ZoneClientSession)session;
         var characterId = zoneSession.CharacterId!.Value;
+        var accountId = zoneSession.AccountId!.Value;
 
         if (zoneSession.CurrentZone is not Zone zone || !zone.TryGetPlayer(characterId, out var state) ||
             state is null)
@@ -27,7 +28,7 @@ public sealed class CostumeStateHandler(ICostumeStateService service) : IAsyncPa
         await state.EconomyActionLock.WaitAsync(cancellationToken);
         try
         {
-            var result = await service.ApplyAsync(zone, state, characterId, packet.Sort, packet.Value,
+            var result = await service.ApplyAsync(zone, state, characterId, accountId, packet.Sort, packet.Value,
                 cancellationToken);
 
             switch (result.Outcome)

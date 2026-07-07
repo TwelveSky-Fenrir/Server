@@ -317,6 +317,10 @@ public class ZoneStunCombatTests
     public void TeamStun_ExactlyFiveMembersPresent_IncrementsCounter_AndGrantsCreditOnlyWithCriticalBuffOnBothSides()
     {
         var partyRegistry = new PartyRegistry();
+        // Map 1 is one of the four "city" zones (S07_MyGame03.cpp:2841-2852): a stun-trigger kill credit
+        // there still grants daily-mission progress (asserted below) but withholds CP -- see the
+        // PvpKillRewardZoneCatalog CityZone_StunKill_WithholdsOnlyContributionPoints coverage for the
+        // zone-profile assertion this end-to-end test builds on top of.
         var zone = ZoneTestKit.CreateZone(1, worldData: StunCatalog(), randomSource: new ScriptedRandomSource(0),
             partyRegistry: partyRegistry);
 
@@ -363,6 +367,79 @@ public class ZoneStunCombatTests
         Assert.Equal(1, attacker.MissionKillOtherTribe);
         foreach (var member in members)
             Assert.Equal(1, member.MissionKillOtherTribe);
+
+        // Zone-gating: a city zone withholds CP on a stun-trigger kill (S07_MyGame03.cpp:2845-2848) even
+        // though daily-mission progress (asserted above) is unconditional there. Routing the team-stun credit
+        // through ApplyPvpKillRewards(..., isStunTrigger: true) must reproduce that split, not grant both or
+        // neither.
+        Assert.Equal(0, attacker.ContributionPoints);
+        foreach (var member in members)
+            Assert.Equal(0, member.ContributionPoints);
+    }
+
+    [Fact]
+    public void TeamStun_ZoneOutsideRewardCatalog_GrantsNoCreditDespiteFullPartyAndCriticalBuffs()
+    {
+        // Map 54 authorizes enemy-tribe PvP (ZonePvpZoneCatalog.AllowsEnemyTribeAttack) but is NOT one of
+        // PvpKillRewardZoneCatalog's modeled groups (not a city zone, not FFA, not an unconditional-full
+        // zone) -- it falls through to the default branch, which withholds every reward channel on a
+        // stun-trigger kill (S07_MyGame03.cpp default case, :3031-3040). Before ApplyTeamStunSubMechanic was
+        // routed through ApplyPvpKillRewards, this credit ignored the killing zone entirely and always
+        // granted MissionKillOtherTribe regardless of where the stun happened -- this test pins the fix.
+        const short unmodeledZoneId = 54;
+        var partyRegistry = new PartyRegistry();
+        var zone = ZoneTestKit.CreateZone(unmodeledZoneId, worldData: StunCatalog(),
+            randomSource: new ScriptedRandomSource(0), partyRegistry: partyRegistry);
+
+        var (_, attacker, defender) = EnterTwoPlayers(zone, 10, 0, 20, 1);
+
+        var memberIds = new[] { 30, 40, 50, 60 };
+        var members = new List<PlayerRuntimeState>();
+        foreach (var memberId in memberIds)
+        {
+            var (session, _) = ZoneTestKit.CreateSession(memberId);
+            zone.Post(ZoneCommand.Enter(memberId,
+                ZoneTestKit.EnterData(session, zone.MapId, $"Ally{memberId}", tribe: 0)));
+        }
+
+        zone.Tick(SimulationClock.LegacyTick);
+
+        foreach (var memberId in memberIds)
+        {
+            Assert.True(zone.TryGetPlayer(memberId, out var member));
+            members.Add(member!);
+            Assert.Equal(PartyInviteOutcome.Sent, partyRegistry.TryInvite(attacker.CharacterId, 1, 0, memberId, 1, 0));
+            Assert.True(partyRegistry.TryAnswer(memberId, true, out _, out _));
+        }
+
+        Assert.Equal(5, partyRegistry.GetMembers(attacker.CharacterId).Count);
+
+        defender.Buffs.Buff[CriticalBuffSlot * 2 + 1] = 10;
+        foreach (var member in members)
+            member.Buffs.Buff[CriticalBuffSlot * 2 + 1] = 10;
+        attacker.Buffs.Buff[CriticalBuffSlot * 2 + 1] = 10;
+
+        zone.PostCombatCommand(new CombatCommand
+        {
+            AttackerCharacterId = attacker.CharacterId,
+            AttackInfo = StunRequest(attacker.CharacterId, defender.CharacterId, defender.UniqueNumber,
+                TeamStunSkillId)
+        });
+        zone.Tick(SimulationClock.LegacyTick);
+
+        // The stun and its repeated-stun counter are zone-blind (unconditional in legacy) and still apply...
+        Assert.True(defender.IsStunned);
+        Assert.Equal(1, defender.RepeatedStunCount);
+
+        // ...but every reward channel this default-branch zone withholds on a stun-trigger kill is actually
+        // withheld, including the daily-mission counter the pre-fix code granted unconditionally.
+        Assert.Equal(0, attacker.MissionKillOtherTribe);
+        Assert.Equal(0, attacker.ContributionPoints);
+        foreach (var member in members)
+        {
+            Assert.Equal(0, member.MissionKillOtherTribe);
+            Assert.Equal(0, member.ContributionPoints);
+        }
     }
 
     [Fact]

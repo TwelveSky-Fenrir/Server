@@ -277,4 +277,17 @@ public sealed class GameServerOptions
     ///     itself -- a real forced-disconnect never lags the three-minute cutoff by more than one cycle.
     /// </summary>
     public int TempRegistrationIdleSweepIntervalSeconds { get; set; } = 30;
+
+    /// <summary>
+    ///     Legacy per-instance "JonNangin" INI-configured feature toggle
+    ///     (Server/ts25zone/S04_MyWork02.cpp:7570-7575, wired from Server/Header/ini.h:328/api.h:157 per the
+    ///     translating behavior contract) gating the fourth-tribe (Fujin) conversion/return behavior
+    ///     (CZ_CHANGE_TO_TRIBE4_SEND, op37) -- a deployment-wide switch, not per-player/per-character. Defaults
+    ///     false: this behavior was never live in the shipped legacy binary (its handler unconditionally
+    ///     disconnected the client before any of this logic ran), so it fails safe/inert until an operator
+    ///     deliberately opts in, matching this codebase's own convention for other newly-completed, previously
+    ///     dead/unreachable content flags (<see cref="VoteTribeEnabled" />/<see cref="AllianceTribeEnabled" />/
+    ///     <see cref="HolyStoneBattleEnabled" />).
+    /// </summary>
+    public bool TribeFourConversionEnabled { get; set; }
 }

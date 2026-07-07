@@ -18,10 +18,14 @@ public sealed class QuestProgressService(
     : IQuestProgressService
 {
     /// <summary>
-    ///     game.EventLog.EventCode for a quest-completion item reward (tSort 2, "mission completed" -- see
+    ///     game.EventLog.EventCode for a quest-completion reward grant (tSort 2, "mission completed" -- see
     ///     <see cref="CompleteAsync" />), scoped independently within <see cref="EventLogCategory.ItemCreate" />;
     ///     EventCode is only ever caller-interpreted alongside its Category (see game.EventLog.sql's own
-    ///     "app-owned numbering scheme" comment).
+    ///     "app-owned numbering scheme" comment). Fires whenever completion actually grants something -- an
+    ///     item deposit, and/or any nonzero money/experience/contribution-point/teacher-point reward -- not
+    ///     only when an item was granted. Money has its own DeltaMoney column; experience, contribution
+    ///     points, and teacher points have no dedicated EventLog column, so those three are packed into
+    ///     Payload when any of them is nonzero.
     /// </summary>
     private const short QuestRewardEventCode = 1;
 
@@ -102,11 +106,24 @@ public sealed class QuestProgressService(
         await PersistAndMirrorAsync(zone, characterId, result.NewProgress, result.MoneyReward,
             result.ExperienceReward, result.ContributionPointsReward, result.TeacherPointReward, edits, ct);
 
-        // Logged only once the quest-transition/container write above has durably committed, and only when a
-        // reward item was actually deposited -- a money/CP/XP-only completion mints nothing to audit here.
-        if (itemRewardGranted)
+        var hasNumericReward = result.MoneyReward != 0 || result.ExperienceReward != 0 ||
+                                result.ContributionPointsReward != 0 || result.TeacherPointReward != 0;
+
+        // Logged only once the quest-transition/container write above has durably committed, and only when
+        // completion actually granted something -- an item deposit and/or a nonzero money/XP/CP/teacher-point
+        // reward. A completion that grants literally nothing (all reward fields zero/absent) mints nothing to
+        // audit here.
+        if (itemRewardGranted || hasNumericReward)
             await eventLog.LogAsync(QuestRewardEventCode, EventLogCategory.ItemCreate, accountId, characterId,
-                null, null, null, null, null, result.RewardItemId, result.RewardItemQuantity, 1, null, ct);
+                null, null, null,
+                result.MoneyReward != 0 ? result.MoneyReward : null, null,
+                itemRewardGranted ? result.RewardItemId : null,
+                itemRewardGranted ? result.RewardItemQuantity : null,
+                1,
+                hasNumericReward
+                    ? $"ExperienceReward={result.ExperienceReward};ContributionPointsReward={result.ContributionPointsReward};TeacherPointReward={result.TeacherPointReward}"
+                    : null,
+                ct);
 
         return new QuestActionResult(true);
     }

@@ -217,6 +217,11 @@ public sealed class MonsterAiSystem(IRandomSource? random = null) : ISimulationS
             case MonsterAiState.Dead:
                 break; // transient -- removed from the pool before the next tick drains it
         }
+
+        // Keeps Zone's monster-side AOI grid in sync with wherever this pass just left the monster (Patrol/
+        // Chase's MoveToward step, or ReturnToSpawn's teleport-home branch above) -- a cheap no-op on every
+        // other state, since none of them mutate PosX/PosZ. See Zone.SyncMonsterCell's own remarks.
+        zone.SyncMonsterCell(monster);
     }
 
     /// <summary>

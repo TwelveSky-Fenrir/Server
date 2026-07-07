@@ -24,8 +24,8 @@ public readonly partial record struct WorldInfo : IFenrirWireType<WorldInfo>
     [FixedArray(4)] public required int[] CloseVoteState { get; init; }
     public required int Tribe4QuestDate { get; init; }
     public required int Tribe4QuestState { get; init; }
-    [FixedString(16)] public required string Tribe4QuestName { get; init; }
-    [FixedArray(13)] public required int[] Zone049TypeState { get; init; }
+    [FixedString(13)] public required string Tribe4QuestName { get; init; }
+    [Reserved(3)] [FixedArray(13)] public required int[] Zone049TypeState { get; init; }
     [FixedArray(13)] public required int[] Zone049TypeStateTime { get; init; }
     [FixedArray(6)] public required int[] Zone051TypeState { get; init; }
     [FixedArray(6)] public required int[] Zone051TypeStateTime { get; init; }

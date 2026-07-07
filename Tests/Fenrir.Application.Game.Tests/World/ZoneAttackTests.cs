@@ -285,4 +285,82 @@ public class ZoneAttackTests
         zone.PostCombatCommand(new CombatCommand { AttackerCharacterId = 999, AttackInfo = MeleeRequest(999, 2) });
         zone.Tick(TimeSpan.FromMilliseconds(50)); // must not throw
     }
+
+    /// <summary>
+    ///     Legacy-parity regression (S04_MyWork02.cpp:1770-1785): the mutual PvP-attack-immunity window
+    ///     (<c>mTickCountFor01SecondForProtect</c> / <see cref="PlayerRuntimeState.ZoneEntryAtZoneClock" />)
+    ///     has a SECOND write site distinct from the one-shot stamp at zone (re)entry (:838) -- every
+    ///     accepted Sort-0 ("rest"/stand-up) CZ_AVATAR_ACTION_SEND action re-arms it too, unconditionally
+    ///     (not gated on <see cref="PlayerRuntimeState.IsDead" />). A real client always settles into
+    ///     exactly this idle pose the instant it stops moving after standing back up post-respawn, so a
+    ///     character who has been in the zone for a long session -- long past their original zone-entry
+    ///     grace window -- is not left with a stale/expired immunity window immediately after dying and
+    ///     respawning. <c>Zone.PlayerLifecycle</c>'s <c>ApplyRestActionProtectionAndHeal</c> (wired from
+    ///     <c>Zone.HandleMove</c>) already reproduces this; this test proves it end-to-end through
+    ///     <c>Zone.ApplyCombatCommand</c> rather than only at the <see cref="CombatResolver" /> unit level.
+    /// </summary>
+    [Fact]
+    public void RestActionAfterLongSession_RearmsZoneEntryProtectWindow_BlockingTheNextAttack()
+    {
+        var zone = TwoPlayerZone(out _, out _);
+        Assert.True(zone.TryGetPlayer(2, out var defender));
+
+        // Simulate a long session: push the clock far past both sides' original zone-entry grace window
+        // (already exhausted once by TwoPlayerZone itself) by another half hour of play.
+        zone.Tick(TimeSpan.FromMinutes(30));
+
+        // The client's own idle packet the instant it settles after standing up post-respawn -- Type 0,
+        // Sort 0 (RestActionSort in Zone.PlayerLifecycle.cs).
+        zone.Post(ZoneCommand.Move(2, RestOrMoveAction(0, 100, 100)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        // Immediately follow with a legal, already-acting pose (Sort 2, "plain movement") so the UNRELATED
+        // defender-action-state gate (ActionSort == 0 == CombatResolver's own "no action yet" placeholder,
+        // S07_MyGame02.cpp:921-924) doesn't also reject the next attack for a different reason and confound
+        // this assertion. ZoneEntryAtZoneClock, once armed by the Sort-0 action above, is untouched by this
+        // follow-up move -- only a Sort-0 action re-arms it (Zone.PlayerLifecycle.cs's own RestActionSort
+        // gate).
+        zone.Post(ZoneCommand.Move(2, RestOrMoveAction(2, 100, 100)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        var lifeAfterRest = defender!.Life;
+
+        // Attacking immediately after the fresh Sort-0 action must be rejected: the window was just re-armed.
+        zone.PostCombatCommand(new CombatCommand { AttackerCharacterId = 1, AttackInfo = MeleeRequest(1, 2) });
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+        Assert.Equal(lifeAfterRest, defender.Life);
+
+        // Once the FRESH window itself elapses, the identical attack lands normally -- proving this is a
+        // genuine, re-armable ~10s grace period tied to the Sort-0 action's own timestamp, not a permanent
+        // block or an artifact of some other gate.
+        zone.Tick(CombatResolver.ProtectDuration + TimeSpan.FromSeconds(1));
+        zone.PostCombatCommand(new CombatCommand { AttackerCharacterId = 1, AttackInfo = MeleeRequest(1, 2) });
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+        Assert.True(defender.Life < lifeAfterRest);
+    }
+
+    private static ActionInfo RestOrMoveAction(int sort, float x, float z)
+    {
+        return new ActionInfo
+        {
+            Type = 0,
+            Sort = sort,
+            Frame = 0,
+            Location = [x, 0f, z],
+            TargetLocation = [x, 0f, z],
+            Front = 0f,
+            TargetFront = 0f,
+            PetLocation = new float[3],
+            PetTargetLocation = new float[3],
+            PetFront = 0,
+            PetSort = 0,
+            TargetObjectSort = 0,
+            TargetObjectIndex = 0,
+            TargetObjectUniqueNumber = 0,
+            SkillNumber = 0,
+            SkillGradeNum1 = 0,
+            SkillGradeNum2 = 0,
+            SkillValue = 0
+        };
+    }
 }

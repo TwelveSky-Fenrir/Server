@@ -153,12 +153,18 @@ public sealed partial class Zone
     ///     (Server/ts25zone/S07_MyGame09.cpp:570, in
     ///     context 559-577; ServerDocs/12_ts25zone/15_MyGame08_09_EventsCenter_ProxyShops.md:570,580).
     /// </param>
+    /// <remarks>
+    ///     <see cref="AoiGrid.HasAnyNeighbor" /> pre-checks emptiness before paying for
+    ///     <see cref="AoiGrid.Neighbors" />'s iterator plus a LINQ <c>ToArray()</c> buffer -- see that method's
+    ///     own remarks.
+    /// </remarks>
     private void BroadcastProxyShopState(ProxyShopBroadcastEntry entry, int checkChangeActionState)
     {
-        var recipients = NeighborsOfPosition(entry.PosX, entry.PosZ).ToArray();
-        if (recipients.Length == 0)
+        var cell = _grid.CellOf(entry.PosX, entry.PosZ);
+        if (!_grid.HasAnyNeighbor(cell))
             return;
 
+        var recipients = _grid.Neighbors(cell).ToArray();
         var packet = new ProxyShopStallStateResponse
         {
             ServerIndex = entry.CharacterId,

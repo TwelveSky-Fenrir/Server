@@ -4,6 +4,7 @@ using Fenrir.Application.Game.Domain.Commerce;
 using Fenrir.Application.Game.Domain.Consumables;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Pets;
+using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.Domain.Tribes;
@@ -198,6 +199,9 @@ public sealed class UseInventoryItemService(
         if (IsPetExpBoostPill(item.ItemId))
             return await ResolvePetExpBoostPillAsync(zone, state, characterId, accountId, page, index, item, value,
                 cancellationToken);
+
+        if (IsRebirthPill(item.ItemId))
+            return await ResolveRebirthPillAsync(zone, state, characterId, page, index, item, cancellationToken);
 
         return Fail(page, index);
     }
@@ -1239,6 +1243,80 @@ public sealed class UseInventoryItemService(
     }
 
     /// <summary>
+    ///     Rebirth Pill (world.Items 632/1241/2462) -- Path A of the G1-G12 rebirth-advancement mechanism, the
+    ///     only path that reaches generations 7-12 (Path B,
+    ///     <see cref="Fenrir.Application.Game.Services.Tribes.TribeActionService.RebirthAsync" />, is
+    ///     hard-capped at generation 6). Requires Level2 already at its own cap with Exp2 at its 100%
+    ///     threshold, and RebirthCount below the absolute cap; on success consumes exactly one unit from the
+    ///     referenced slot (the generic <see cref="ConsumeAndMirrorAsync" /> tail below -- same "decrement one,
+    ///     clear the slot at zero" semantics every other family in this file uses), resets Exp2 to 0,
+    ///     increments RebirthCount, and recomputes stats (RebirthCount feeds StatCalculator's critical/
+    ///     critical-defence bonus tables). Unlike Path B, never touches ContributionPoints, Zone241Time, or
+    ///     HP/MP -- see the originating contract's own Outputs section. Every failure below is a clean
+    ///     Result=1 (no distinguishing reason on the wire), matching every other item-use failure in this file
+    ///     and the contract's own Error/failure semantics for this path (never a disconnect).
+    ///     <para>
+    ///         Ordering is deliberate and security-relevant: the pill is consumed FIRST (an immediate, durable
+    ///         write via <see cref="ConsumeAndMirrorAsync" />/<c>ICharacterRepository.ReplaceContainerAsync</c>),
+    ///         and the permanent RebirthCount/Exp2 grant is only posted onto the zone's tribe-progress inbox
+    ///         AFTER that write has actually completed. RebirthCount/Exp2 are write-behind-tracked fields (see
+    ///         <c>Zone.ApplyTribeProgressCommand</c>'s own remarks: they mark <c>DirtyFlags.Progression</c>,
+    ///         they are not synchronously persisted the way <see cref="TribeProgressZoneCommand.Zone241Time" />
+    ///         is) -- had the grant been mirrored into <see cref="PlayerRuntimeState" /> first and the
+    ///         item-consumption write failed/thrown afterward (a transient SQL failure, a cancelled request,
+    ///         etc.), the in-memory RebirthCount increment would still eventually flush to durable storage even
+    ///         though the pill was never actually removed: a permanent, unearned tier grant. Consuming first
+    ///         means the only failure this ordering can produce is the opposite (pill consumed, no tier
+    ///         granted, logged below), which never advantages the caller. Matches the already-safe ordering
+    ///         <c>TribeActionService.RebirthAsync</c> (Path B) uses for its own Zone241Time write.
+    ///     </para>
+    /// </summary>
+    /// <remarks>
+    ///     Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:5471-5536 (full handler: preconditions, item consumption
+    ///     via DecreaseQunatity, aExp2/aRebirthNum mutation, broadcast, milestone-reward call) ;
+    ///     Server/Header/Protocol/DEFINE.h:604-606 (MAX_LIMIT_HIGH_LEVEL_NUM=12, MAX_REBIRTH_LIMIT=12). The
+    ///     milestone-reward pass this handler also runs on every successful transition (generation 6/12
+    ///     tribe-specific ground-item drop, generation-12 server-wide notice naming the character) is
+    ///     deliberately NOT wired here -- see <c>TribeActionService.RebirthAsync</c>'s own remarks for why: no
+    ///     citation available to this pass establishes the actual item ids or notice wording, and this
+    ///     project's policy against guessing legacy-parity content from memory means fabricating either is
+    ///     worse than leaving this an explicit, documented gap pending its own legacy-behavior-translator
+    ///     follow-up.
+    /// </remarks>
+    private async ValueTask<UseInventoryItemResponse> ResolveRebirthPillAsync(Zone zone, PlayerRuntimeState state,
+        int characterId, byte page, byte index, ItemStack item, CancellationToken cancellationToken)
+    {
+        if (!RebirthProgression.IsHighLevelExperienceFull(state.Level2, state.Exp2) ||
+            state.RebirthCount >= RebirthProgression.MaxRebirthGeneration)
+            return Fail(page, index);
+
+        var newRebirthCount = state.RebirthCount + 1;
+        var attributes = new CharacterBaseAttributes(state.StatVit, state.StatStr, state.StatInt, state.StatDex,
+            state.Level, state.Tribe, state.PreviousTribe, state.Title, state.Halo, newRebirthCount);
+        var equipmentContainer = state.Inventory.GetContainer(ContainerMatrix.Equipment);
+        var petItemId = equipmentContainer.TryGetValue(PetSlots.EquipmentSlot, out var petStack)
+            ? petStack.ItemId
+            : 0;
+        var petContribution = PetGrowthCalculator.Compute(petItemId, state.PetGrowth, state.PetActivity,
+            worldData.ItemsById);
+        var updatedStats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData, state.Buffs,
+            petContribution);
+
+        // Consume the pill first -- see this method's own <summary> for why this ordering (not the reverse)
+        // is the security-relevant choice.
+        var response = await ConsumeAndMirrorAsync(zone, state, characterId, page, index, item, cancellationToken);
+
+        if (!await zone.PostTribeProgressCommandAndWaitAsync(new TribeProgressZoneCommand(characterId,
+                RebirthCount: newRebirthCount, Exp2: 0, UpdatedStats: updatedStats, RebirthBroadcast: true),
+                cancellationToken))
+            logger.LogError(
+                "Zone {MapId} tribe-progress inbox full: dropped Rebirth-Pill mirror for character {CharacterId}",
+                zone.MapId, characterId);
+
+        return response;
+    }
+
+    /// <summary>
     ///     Faction Notice Scroll (world.Item 566) -- recharges <see cref="PlayerRuntimeState.TribeNotifyScrollCount" />
     ///     by 5.
     /// </summary>
@@ -1337,6 +1415,16 @@ public sealed class UseInventoryItemService(
     private static bool IsPetExpBoostPill(int itemId)
     {
         return itemId is 1190 or 17035 or 8413;
+    }
+
+    /// <summary>
+    ///     world.Items 632/1241/2462 ("Rebirth Pill") -- see <see cref="ResolveRebirthPillAsync" />. Fully
+    ///     interchangeable: no per-tier item differentiation exists, any of the three can drive any
+    ///     transition from generation 0 through generation 11.
+    /// </summary>
+    private static bool IsRebirthPill(int itemId)
+    {
+        return itemId is 632 or 1241 or 2462;
     }
 
     private static UseInventoryItemResponse Fail(byte page, byte index)

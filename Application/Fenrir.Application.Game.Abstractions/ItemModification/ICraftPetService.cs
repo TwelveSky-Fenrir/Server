@@ -20,9 +20,9 @@ public interface ICraftPetService
 {
     public ValueTask<CraftPetResult> ResolveFourSlotRecipeAsync(CraftPetRequest packet, Zone zone,
         PlayerRuntimeState state,
-        int characterId, CancellationToken cancellationToken);
+        int characterId, int accountId, CancellationToken cancellationToken);
 
     public ValueTask<CraftPetResult> ResolveTwoSlotRecipeAsync(CraftPetRequest packet, Zone zone,
         PlayerRuntimeState state,
-        int characterId, CancellationToken cancellationToken);
+        int characterId, int accountId, CancellationToken cancellationToken);
 }

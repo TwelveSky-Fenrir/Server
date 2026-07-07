@@ -24,7 +24,10 @@ public sealed class EventLogFlushHost : BackgroundService, IEventLogQueue
     {
         _queue = new EventLogQueue(
             eventLog.BatchLogAsync,
-            onFlushError: ex => logger.LogError(ex, "game.EventLog write-behind flush failed; batch dropped"),
+            onFlushError: (ex, count) => logger.LogError(ex,
+                "game.EventLog write-behind flush failed; batch of {Count} entr{Suffix} dropped by design " +
+                "(see EventLogQueue remarks -- no retry, no requeue)",
+                count, count == 1 ? "y" : "ies"),
             onDropped: count => logger.LogWarning(
                 "game.EventLog write-behind queue full; dropped {Count} entr{Suffix} (sustained DB unavailability?)",
                 count, count == 1 ? "y" : "ies"));

@@ -1,3 +1,4 @@
+using System;
 using System.Globalization;
 using Fenrir.Generators.Analysis.Model;
 using Fenrir.Generators.Analysis.Support;
@@ -74,55 +75,39 @@ internal static class PacketEmitter
             var localName = "v_" + field.PropertyName;
             var slice = $"source.Slice({field.Offset}, {field.OwnSize})";
 
-            switch (field.Shape)
+            // Switch EXPRESSION (not statement): an unhandled FieldShape trips CS8509, a solution-wide
+            // build ERROR via TreatWarningsAsErrors, instead of silently emitting zero bytes for that field.
+            Action emitField = field.Shape switch
             {
-                case FieldShape.Int32:
-                    writer.Line(
-                        $"var {localName} = global::System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian({slice});");
-                    break;
-                case FieldShape.UInt32:
-                    writer.Line(
-                        $"var {localName} = global::System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian({slice});");
-                    break;
-                case FieldShape.Byte:
-                    writer.Line($"var {localName} = source[{field.Offset}];");
-                    break;
-                case FieldShape.Single:
-                    writer.Line(
-                        $"var {localName} = global::System.Buffers.Binary.BinaryPrimitives.ReadSingleLittleEndian({slice});");
-                    break;
-                case FieldShape.Int64:
-                    writer.Line(
-                        $"var {localName} = global::System.Buffers.Binary.BinaryPrimitives.ReadInt64LittleEndian({slice});");
-                    break;
-                case FieldShape.FixedString:
-                    writer.Line(
-                        $"var {localName} = global::Fenrir.Network.Serialization.Wire.LegacyWireCodec.ReadFixedString({slice});");
-                    break;
-                case FieldShape.Int32Array:
-                    writer.Line(
-                        $"var {localName} = global::Fenrir.Network.Serialization.Wire.LegacyWireCodec.ReadInt32Array({slice});");
-                    break;
-                case FieldShape.SingleArray:
-                    writer.Line(
-                        $"var {localName} = global::Fenrir.Network.Serialization.Wire.LegacyWireCodec.ReadSingleArray({slice});");
-                    break;
-                case FieldShape.ByteArray:
-                    writer.Line(
-                        $"var {localName} = global::Fenrir.Network.Serialization.Wire.LegacyWireCodec.ReadByteArray({slice});");
-                    break;
-                case FieldShape.FixedStringArray:
-                    writer.Line(
-                        $"var {localName} = global::Fenrir.Network.Serialization.Wire.LegacyWireCodec.ReadFixedStringRows({slice}, {field.StringLength});");
-                    break;
-                case FieldShape.Nested:
+                FieldShape.Int32 => () => writer.Line(
+                    $"var {localName} = global::System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian({slice});"),
+                FieldShape.UInt32 => () => writer.Line(
+                    $"var {localName} = global::System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian({slice});"),
+                FieldShape.Byte => () => writer.Line($"var {localName} = source[{field.Offset}];"),
+                FieldShape.Single => () => writer.Line(
+                    $"var {localName} = global::System.Buffers.Binary.BinaryPrimitives.ReadSingleLittleEndian({slice});"),
+                FieldShape.Int64 => () => writer.Line(
+                    $"var {localName} = global::System.Buffers.Binary.BinaryPrimitives.ReadInt64LittleEndian({slice});"),
+                FieldShape.FixedString => () => writer.Line(
+                    $"var {localName} = global::Fenrir.Network.Serialization.Wire.LegacyWireCodec.ReadFixedString({slice});"),
+                FieldShape.Int32Array => () => writer.Line(
+                    $"var {localName} = global::Fenrir.Network.Serialization.Wire.LegacyWireCodec.ReadInt32Array({slice});"),
+                FieldShape.SingleArray => () => writer.Line(
+                    $"var {localName} = global::Fenrir.Network.Serialization.Wire.LegacyWireCodec.ReadSingleArray({slice});"),
+                FieldShape.ByteArray => () => writer.Line(
+                    $"var {localName} = global::Fenrir.Network.Serialization.Wire.LegacyWireCodec.ReadByteArray({slice});"),
+                FieldShape.FixedStringArray => () => writer.Line(
+                    $"var {localName} = global::Fenrir.Network.Serialization.Wire.LegacyWireCodec.ReadFixedStringRows({slice}, {field.StringLength});"),
+                FieldShape.Nested => () =>
+                {
                     writer.Line($"if (!{field.NestedTypeFullName}.TryRead({slice}, out var {localName}))");
                     writer.OpenBrace();
                     writer.Line("packet = default;");
                     writer.Line("return false;");
                     writer.CloseBrace();
-                    break;
-                case FieldShape.NestedArray:
+                },
+                FieldShape.NestedArray => () =>
+                {
                     writer.Line($"var {localName} = new {field.NestedTypeFullName}[{field.ElementCount}];");
                     writer.Line($"for (var i = 0; i < {field.ElementCount}; i++)");
                     writer.OpenBrace();
@@ -133,8 +118,19 @@ internal static class PacketEmitter
                     writer.Line("return false;");
                     writer.CloseBrace();
                     writer.CloseBrace();
-                    break;
-            }
+                },
+                // Roslyn never treats a switch expression over an enum as exhaustive from named members
+                // alone (the underlying integral type can hold unnamed values), so a discard-free version
+                // of this switch fails to build unconditionally rather than only on a genuinely missed
+                // case. This throwing discard is therefore load-bearing, not decorative: every FieldShape
+                // above is named explicitly, so this arm is only reachable if FieldShape gains a new
+                // member that isn't added here too - turning that into a loud generator-time failure
+                // instead of the silent zero-byte emission this switch used to produce.
+                _ => () => throw new NotSupportedException(
+                    $"PacketEmitter.EmitTryRead has no case for FieldShape.{field.Shape} (field '{field.PropertyName}').")
+            };
+
+            emitField();
         }
 
         writer.Line();
@@ -172,58 +168,47 @@ internal static class PacketEmitter
             var slice = $"destination.Slice({field.Offset}, {field.OwnSize})";
             var access = field.PropertyName;
 
-            switch (field.Shape)
+            // Switch EXPRESSION (not statement): an unhandled FieldShape trips CS8509, a solution-wide
+            // build ERROR via TreatWarningsAsErrors, instead of silently emitting zero bytes for that field.
+            Action emitField = field.Shape switch
             {
-                case FieldShape.Int32:
-                    writer.Line(
-                        $"global::System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian({slice}, {access});");
-                    break;
-                case FieldShape.UInt32:
-                    writer.Line(
-                        $"global::System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian({slice}, {access});");
-                    break;
-                case FieldShape.Byte:
-                    writer.Line($"destination[{field.Offset}] = {access};");
-                    break;
-                case FieldShape.Single:
-                    writer.Line(
-                        $"global::System.Buffers.Binary.BinaryPrimitives.WriteSingleLittleEndian({slice}, {access});");
-                    break;
-                case FieldShape.Int64:
-                    writer.Line(
-                        $"global::System.Buffers.Binary.BinaryPrimitives.WriteInt64LittleEndian({slice}, {access});");
-                    break;
-                case FieldShape.FixedString:
-                    writer.Line(
-                        $"global::Fenrir.Network.Serialization.Wire.LegacyWireCodec.WriteFixedString({slice}, {access});");
-                    break;
-                case FieldShape.Int32Array:
-                    writer.Line(
-                        $"global::Fenrir.Network.Serialization.Wire.LegacyWireCodec.WriteInt32Array({slice}, {access});");
-                    break;
-                case FieldShape.SingleArray:
-                    writer.Line(
-                        $"global::Fenrir.Network.Serialization.Wire.LegacyWireCodec.WriteSingleArray({slice}, {access});");
-                    break;
-                case FieldShape.ByteArray:
-                    writer.Line(
-                        $"global::Fenrir.Network.Serialization.Wire.LegacyWireCodec.WriteByteArray({slice}, {access});");
-                    break;
-                case FieldShape.FixedStringArray:
-                    writer.Line(
-                        $"global::Fenrir.Network.Serialization.Wire.LegacyWireCodec.WriteFixedStringRows({slice}, {access}, {field.StringLength});");
-                    break;
-                case FieldShape.Nested:
-                    writer.Line($"{access}.Write({slice});");
-                    break;
-                case FieldShape.NestedArray:
+                FieldShape.Int32 => () => writer.Line(
+                    $"global::System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian({slice}, {access});"),
+                FieldShape.UInt32 => () => writer.Line(
+                    $"global::System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian({slice}, {access});"),
+                FieldShape.Byte => () => writer.Line($"destination[{field.Offset}] = {access};"),
+                FieldShape.Single => () => writer.Line(
+                    $"global::System.Buffers.Binary.BinaryPrimitives.WriteSingleLittleEndian({slice}, {access});"),
+                FieldShape.Int64 => () => writer.Line(
+                    $"global::System.Buffers.Binary.BinaryPrimitives.WriteInt64LittleEndian({slice}, {access});"),
+                FieldShape.FixedString => () => writer.Line(
+                    $"global::Fenrir.Network.Serialization.Wire.LegacyWireCodec.WriteFixedString({slice}, {access});"),
+                FieldShape.Int32Array => () => writer.Line(
+                    $"global::Fenrir.Network.Serialization.Wire.LegacyWireCodec.WriteInt32Array({slice}, {access});"),
+                FieldShape.SingleArray => () => writer.Line(
+                    $"global::Fenrir.Network.Serialization.Wire.LegacyWireCodec.WriteSingleArray({slice}, {access});"),
+                FieldShape.ByteArray => () => writer.Line(
+                    $"global::Fenrir.Network.Serialization.Wire.LegacyWireCodec.WriteByteArray({slice}, {access});"),
+                FieldShape.FixedStringArray => () => writer.Line(
+                    $"global::Fenrir.Network.Serialization.Wire.LegacyWireCodec.WriteFixedStringRows({slice}, {access}, {field.StringLength});"),
+                FieldShape.Nested => () => writer.Line($"{access}.Write({slice});"),
+                FieldShape.NestedArray => () =>
+                {
                     writer.Line($"for (var i = 0; i < {field.ElementCount}; i++)");
                     writer.OpenBrace();
                     writer.Line(
                         $"{access}[i].Write(destination.Slice({field.Offset} + i * {field.NestedSize}, {field.NestedSize}));");
                     writer.CloseBrace();
-                    break;
-            }
+                },
+                // See the matching discard arm in EmitTryRead: Roslyn can't prove enum-switch exhaustiveness
+                // from named members alone, so this throwing discard is what stands in for a compile-time
+                // CS8509 here - every named FieldShape is handled above, so this only fires if the enum
+                // gains a member this switch wasn't updated for.
+                _ => () => throw new NotSupportedException(
+                    $"PacketEmitter.EmitWrite has no case for FieldShape.{field.Shape} (field '{field.PropertyName}').")
+            };
+
+            emitField();
 
             if (field.AvatarXor != AvatarXorKind.None)
                 switch (field.AvatarXor)

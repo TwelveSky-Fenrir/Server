@@ -8,10 +8,26 @@ namespace Fenrir.Application.Game.Services.Social;
 /// <inheritdoc cref="IDuelService" />
 public sealed class DuelService(ZoneRegistry zones, DuelRegistry duels) : IDuelService
 {
+    /// <remarks>
+    ///     Réf. C++ : Server/ts25zone/S04_MyWork02.cpp:8259-8277,8459-8471,9088-9101,9311-9324 (the shared
+    ///     CZ_DUEL_ASK_SEND/CZ_FRIEND_ASK_SEND/CZ_PARTY_ASK_SEND/CZ_TEACHER_ASK_SEND/CZ_TRADE_ASK_SEND
+    ///     pre-check family) -- legacy checks the requester's OWN busy/pose state (still dueling, still
+    ///     negotiating another ask) before it ever resolves the target avatar by name, so a busy challenger
+    ///     asking a nonexistent/offline name gets the busy reply, not "target not found". The two
+    ///     challenger-side checks below are therefore ordered ahead of <see cref="FindPlayerByName" />; the
+    ///     equivalent checks inside <see cref="DuelRegistry.TryAsk" /> stay in place for the actual
+    ///     registration (still race-safe under its own lock) and only matter now for a busy state that
+    ///     changed in the narrow window between the two checks.
+    /// </remarks>
     public DuelAskResultKind Ask(Zone zone, PlayerRuntimeState challenger, string targetAvatarName, int sort)
     {
         if (zone.MapId == 124)
             return DuelAskResultKind.MapForbidden;
+
+        if (duels.TryGetActiveDuel(challenger.CharacterId, out _))
+            return DuelAskResultKind.ChallengerAlreadyDueling;
+        if (duels.IsNegotiating(challenger.CharacterId))
+            return DuelAskResultKind.ChallengerBusy;
 
         var target = FindPlayerByName(zone, targetAvatarName);
         if (target is null)

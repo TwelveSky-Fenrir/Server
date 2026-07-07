@@ -39,6 +39,12 @@ public class TribeVoteServiceTests
 
         zone.TryGetPlayer(CharacterId, out var state);
         state!.ContributionPoints = contributionPoints;
+        // 145 (default level) + 12 (Level2) + 6 (RebirthCount) = 163, exactly
+        // TribeVoteElection.MinimumEligibilityLevel -- keeps every pre-existing call site that doesn't care
+        // about the eligibility gate itself passing without having to touch each one individually (mirrors
+        // TribeVoteElectionTests.CreatePlayer's own default shape).
+        state.Level2 = 12;
+        state.RebirthCount = 6;
 
         var repository = new FakeWorldStateRepository();
         var worldState = new WorldStateService(repository, NullLogger<WorldStateService>.Instance);

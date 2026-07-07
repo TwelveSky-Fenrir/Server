@@ -1,6 +1,8 @@
 using System.Buffers;
+using System.Diagnostics;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.FloodProtection;
+using Fenrir.Network.Dispatch.Logging;
 using Fenrir.Network.Dispatch.RateLimiting;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Framing;
@@ -72,12 +74,20 @@ public static class SessionLoop
         // Copied to a local: ref-safety for a ref struct out-param is stricter on an async method's parameter than a local.
         var remaining = buffer;
 
+        // Hoisted out of the frame loop below (one buffer read can contain several frames): a virtual
+        // IsEnabled call is cheap, but there's no reason to repeat it per frame when the logger itself never
+        // changes for the lifetime of this call. Checked explicitly (rather than relying on PacketReceived's
+        // own generated IsEnabled check) because it also gates the Stopwatch capture just below -- see
+        // PacketLog.PacketReceived's own remarks for why that capture must not happen unconditionally.
+        var debugEnabled = logger is not null && logger.IsEnabled(LogLevel.Debug);
+
         while (true)
         {
             FenrirServer frameServer;
             byte frameOpcode;
             ReadOnlySequence<byte> framePayload;
             bool decoded;
+            var decodeStartTimestamp = debugEnabled ? Stopwatch.GetTimestamp() : 0L;
 
             try
             {
@@ -106,9 +116,21 @@ public static class SessionLoop
             if (!decoded)
                 return new BufferOutcome(remaining.Start, remaining.End, false); // partial frame — wait for more bytes
 
-            logger?.LogDebug("Session {SessionId}: frame received, server {Server} opcode {Opcode} ({Length} bytes)",
-                session.SessionId, frameServer, frameOpcode, framePayload.Length);
+            if (debugEnabled)
+                // framePayload.Length is a long (ReadOnlySequence<byte>'s own contract) but every real wire
+                // frame is header + a handful to a few thousand payload bytes -- OpcodeRegistry.FrameSizeOf's
+                // own int-typed size table already bounds it well under int range, so this narrowing is safe.
+                logger!.PacketReceived(session.SessionId, frameServer, frameOpcode, (int)framePayload.Length,
+                    Stopwatch.GetElapsedTime(decodeStartTimestamp).TotalMicroseconds);
 
+            // Known architectural limitation, not a bug: IsOpcodeAllowed / the generated SessionStateGate it
+            // delegates to can only gate on the static session-state enum value (LoginSessionState /
+            // ZoneSessionState), never on a state+runtime-flag combination (e.g. "InGame AND actively
+            // dueling"). Any precondition that needs a live runtime flag on top of session state has to be
+            // checked inside the packet's own handler after dispatch, not here. See
+            // SessionStateGateEmitter's own remarks (Generators/Fenrir.Generators.Protocol/Emitters/
+            // SessionStateGateEmitter.cs) for the full rationale -- this is a documented forward-looking
+            // limitation only; no live Fenrir feature currently needs a combined gate at this layer.
             if (!session.IsOpcodeAllowed(frameOpcode))
             {
                 logger?.LogWarning(

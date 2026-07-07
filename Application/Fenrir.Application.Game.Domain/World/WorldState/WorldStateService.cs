@@ -313,6 +313,33 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
         }
     }
 
+    /// <summary>
+    ///     Writes real, durable per-tribe backing state (<c>game.WorldStateTribes.IsClosed</c>) -- but has no
+    ///     production caller today, and this method does not by itself give that state any wire-visible or
+    ///     gameplay meaning.
+    ///     <para>
+    ///         Investigated and deliberately left unwired rather than guessed at: the column's name suggests it
+    ///         backs <c>WorldInfo.TribeCloseInfo</c> (legacy <c>mTribeCloseInfo[2]</c>), but that legacy field is
+    ///         itself dead state in the C++ source -- it is written exactly once, to the constant pair
+    ///         <c>{0, -1}</c>, at ts25center boot, and round-tripped through the DB SELECT/UPDATE/INSERT column
+    ///         mapping, but is never read or reassigned by any gameplay logic in ts25center, ts25zone, or any
+    ///         other executable. No tribe-vote/zone-war mechanic in this codebase naturally owns calling this
+    ///         method either: <see cref="ZoneWar.TribeVoteElection" />'s own <c>Phase</c> already models the
+    ///         unrelated legacy <c>mTribeVoteState</c>/<c>mCloseVoteState</c> pair (itself a separate, still
+    ///         entirely unbacked-in-DB gap, documented on that class), and
+    ///         <see cref="ZoneWar.TribeGuardCorridorState" /> models the unrelated
+    ///         <c>mTribeGuardState[4][4]</c> checkpoint table. Inventing a caller here would be assigning this
+    ///         column gameplay semantics the legacy source does not have -- see
+    ///         <see cref="WorldStateProjection" />'s own remarks for why <c>TribeCloseInfo</c> is left as a
+    ///         template pass-through rather than projected from this column.
+    ///     </para>
+    /// </summary>
+    /// <remarks>
+    ///     Réf. C++ : Server/ts25center/S07_MyGame01.cpp:34-35 (the only two writes to
+    ///     <c>mWorldInfo-&gt;mTribeCloseInfo</c> in the entire tree, both boot-time constants) ;
+    ///     Server/Header/CSQLWorldTribe.cpp:33-34 (DB column mapping only, no gameplay read/write) ;
+    ///     Server/Header/unity.h:334, Server/Header/Protocol/STRUCT.h:599 (struct definition).
+    /// </remarks>
     public void SetTribeClosed(byte tribeId, bool isClosed)
     {
         ValidateTribeId(tribeId);

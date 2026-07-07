@@ -263,6 +263,11 @@ public sealed class MonsterSpawnScheduler(
     {
         while (zone.TryDequeueDeadMonster(out var death))
         {
+            // Zone.TryDamageMonster already removed the dying monster from Zone's own _monsters dictionary
+            // (safe from any thread) but deliberately left its monster-side AOI grid entry alone -- that grid
+            // is tick-owned only, so the matching removal happens here instead, on this zone's own tick thread.
+            zone.RemoveMonsterFromGrid(death!.Monster);
+
             var slot = state.Slots.Find(s => s.ServerIndex == death!.Monster.ServerIndex);
             if (slot is not null)
             {

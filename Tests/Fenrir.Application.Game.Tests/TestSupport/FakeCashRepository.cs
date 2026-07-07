@@ -13,6 +13,7 @@ internal sealed class FakeCashRepository : ICashRepository
 
     public bool ThrowOnCredit { get; set; }
     public bool ThrowOnDebitAndGrantItem { get; set; }
+    public bool ThrowOnGetBalance { get; set; }
 
     public (int AccountId, int Amount, byte Reason, int? ProductId)? LastCredit { get; private set; }
 
@@ -21,6 +22,9 @@ internal sealed class FakeCashRepository : ICashRepository
 
     public ValueTask<int> GetBalanceAsync(int accountId, CancellationToken ct)
     {
+        if (ThrowOnGetBalance)
+            throw new InvalidOperationException("Simulated SQL failure");
+
         return ValueTask.FromResult(_balances.GetValueOrDefault(accountId));
     }
 

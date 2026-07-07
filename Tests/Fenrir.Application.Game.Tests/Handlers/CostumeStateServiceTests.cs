@@ -5,6 +5,7 @@ using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Services.BuffsMountsCosmetics;
 using Fenrir.Application.Game.Tests.GameData;
 using Fenrir.Application.Game.Tests.TestSupport;
+using Fenrir.Data.Abstractions.Game;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Framing;
 using Fenrir.Network.Serialization.Packets.Zone;
@@ -14,13 +15,15 @@ namespace Fenrir.Application.Game.Tests.Handlers;
 
 public class CostumeStateServiceTests
 {
+    private const int AccountId = 1;
+
     private static readonly int StateFlagFrame = FrameWriter.FrameSizeOf<AvatarStateFlagResponse>();
 
     private static (ZoneClientSession Session, FakeDuplexPipe Pipe, PlayerRuntimeState State) Setup(Zone zone,
         int characterId, float posX = 10f, float posZ = 10f)
     {
         var (session, pipe) = ZoneTestKit.CreateSession(characterId);
-        session.MarkTicketConsumed(1, characterId);
+        session.MarkTicketConsumed(AccountId, characterId);
         session.MarkRegistering();
         session.MarkInWorld();
 
@@ -35,7 +38,8 @@ public class CostumeStateServiceTests
         return (session, pipe, state!);
     }
 
-    private static CostumeStateService CreateService(FakeCharacterRepository characters)
+    private static CostumeStateService CreateService(FakeCharacterRepository characters,
+        FakeEventLogRepository? eventLog = null)
     {
         var itemsById = new Dictionary<int, ItemDefinition>
         {
@@ -43,7 +47,7 @@ public class CostumeStateServiceTests
         }.ToFrozenDictionary();
 
         return new CostumeStateService(characters, ZoneTestKit.EmptyWorldData(itemsById),
-            NullLogger<CostumeStateService>.Instance);
+            eventLog ?? new FakeEventLogRepository(), NullLogger<CostumeStateService>.Instance);
     }
 
     [Fact]
@@ -54,7 +58,7 @@ public class CostumeStateServiceTests
         state.CostumeWardrobe = state.CostumeWardrobe.SetItem(2, 305);
         var service = CreateService(new FakeCharacterRepository());
 
-        var result = await service.ApplyAsync(zone, state, 10, 1, 2, CancellationToken.None);
+        var result = await service.ApplyAsync(zone, state, 10, AccountId, 1, 2, CancellationToken.None);
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.Null(session.DisconnectReason);
@@ -71,7 +75,7 @@ public class CostumeStateServiceTests
         var (session, _, state) = Setup(zone, 10);
         var service = CreateService(new FakeCharacterRepository());
 
-        var result = await service.ApplyAsync(zone, state, 10, 1, 2, CancellationToken.None);
+        var result = await service.ApplyAsync(zone, state, 10, AccountId, 1, 2, CancellationToken.None);
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.Null(session.DisconnectReason);
@@ -95,7 +99,7 @@ public class CostumeStateServiceTests
         state.Mana = 1;
         var service = CreateService(new FakeCharacterRepository());
 
-        var result = await service.ApplyAsync(zone, state, 10, 3, 0, CancellationToken.None);
+        var result = await service.ApplyAsync(zone, state, 10, AccountId, 3, 0, CancellationToken.None);
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.True(zone.TryGetPlayer(10, out var mover));
@@ -124,7 +128,7 @@ public class CostumeStateServiceTests
         state.Mana = 1;
         var service = CreateService(new FakeCharacterRepository());
 
-        var result = await service.ApplyAsync(zone, state, 10, 4, 0, CancellationToken.None);
+        var result = await service.ApplyAsync(zone, state, 10, AccountId, 4, 0, CancellationToken.None);
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.True(zone.TryGetPlayer(10, out var mover));
@@ -138,30 +142,33 @@ public class CostumeStateServiceTests
     }
 
     [Fact]
-    public async Task ReturnToInventory_IndexMismatch_RepliesResult1NoDisconnect()
+    public async Task ReturnToInventory_IndexMismatch_RepliesResult1NoDisconnect_AndLogsNothing()
     {
         var zone = ZoneTestKit.CreateZone(1);
         var (session, _, state) = Setup(zone, 10);
-        var service = CreateService(new FakeCharacterRepository());
+        var eventLog = new FakeEventLogRepository();
+        var service = CreateService(new FakeCharacterRepository(), eventLog);
 
-        var result = await service.ApplyAsync(zone, state, 10, 5, 3, CancellationToken.None);
+        var result = await service.ApplyAsync(zone, state, 10, AccountId, 5, 3, CancellationToken.None);
 
         Assert.Null(session.DisconnectReason);
         Assert.Equal(CostumeStateOutcome.Reply, result.Outcome);
         Assert.Equal(1, result.ResultCode);
+        Assert.Empty(eventLog.LoggedEvents);
     }
 
     [Fact]
-    public async Task ReturnToInventory_Success_GrantsItemToInventoryAndClearsWardrobeSlot()
+    public async Task ReturnToInventory_Success_GrantsItemToInventoryAndClearsWardrobeSlot_AndLogsACosmeticDeleteAuditRow()
     {
         var zone = ZoneTestKit.CreateZone(1);
         var (session, _, state) = Setup(zone, 10);
         state.CostumeIndex = 3;
         state.CostumeWardrobe = state.CostumeWardrobe.SetItem(3, 305);
         var characters = new FakeCharacterRepository();
-        var service = CreateService(characters);
+        var eventLog = new FakeEventLogRepository();
+        var service = CreateService(characters, eventLog);
 
-        var result = await service.ApplyAsync(zone, state, 10, 5, 3, CancellationToken.None);
+        var result = await service.ApplyAsync(zone, state, 10, AccountId, 5, 3, CancellationToken.None);
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.Null(session.DisconnectReason);
@@ -174,17 +181,30 @@ public class CostumeStateServiceTests
 
         Assert.Equal(CostumeStateOutcome.Reply, result.Outcome);
         Assert.Equal(0, result.ResultCode);
+
+        var logged = Assert.Single(eventLog.LoggedEvents);
+        Assert.Equal((short)1, logged.EventCode);
+        Assert.Equal(EventLogCategory.CosmeticDelete, logged.Category);
+        Assert.Equal(AccountId, logged.ActorAccountId);
+        Assert.Equal(10, logged.ActorCharacterId);
+        Assert.Null(logged.TargetAccountId);
+        Assert.Null(logged.TargetCharacterId);
+        Assert.Equal(305, logged.ItemId);
+        Assert.Equal(1, logged.Quantity);
+        Assert.Equal((byte)1, logged.Outcome);
     }
 
     [Fact]
-    public async Task UnsupportedSort_Aborts()
+    public async Task UnsupportedSort_Aborts_AndLogsNothing()
     {
         var zone = ZoneTestKit.CreateZone(1);
         var (_, _, state) = Setup(zone, 10);
-        var service = CreateService(new FakeCharacterRepository());
+        var eventLog = new FakeEventLogRepository();
+        var service = CreateService(new FakeCharacterRepository(), eventLog);
 
-        var result = await service.ApplyAsync(zone, state, 10, 9, 0, CancellationToken.None);
+        var result = await service.ApplyAsync(zone, state, 10, AccountId, 9, 0, CancellationToken.None);
 
         Assert.Equal(CostumeStateOutcome.Disconnect, result.Outcome);
+        Assert.Empty(eventLog.LoggedEvents);
     }
 }

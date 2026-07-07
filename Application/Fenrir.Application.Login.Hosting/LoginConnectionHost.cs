@@ -46,8 +46,13 @@ public sealed class LoginConnectionHost(
         var opts = options.Value;
         _listener = new FenrirTcpListener<LoginClientSession>(
             new IPEndPoint(IPAddress.Any, opts.Port),
-            static (sessionId, transport, remoteEndPoint) =>
-                new LoginClientSession(sessionId, transport, remoteEndPoint));
+            // Not `static` anymore: captures `logger` so every accepted session can emit its own Debug-level
+            // packet-sent log through the same ILogger<LoginConnectionHost> instance SessionLoop already logs
+            // packet-received/violation events through -- one closure allocated here, once, at ExecuteAsync
+            // startup (not per connection: the delegate itself is reused for every accepted socket), well
+            // within the "closure allocated once and reused is fine" budget.
+            (sessionId, transport, remoteEndPoint) =>
+                new LoginClientSession(sessionId, transport, remoteEndPoint, logger));
 
         logger.LogInformation("LoginServer listening on port {Port}", opts.Port);
 

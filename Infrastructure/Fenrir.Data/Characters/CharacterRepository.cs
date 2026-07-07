@@ -641,6 +641,20 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
     }
 
     /// <summary>
+    ///     game.Characters.Zone241Time adjustment. Returns the post-adjustment balance. Throws SQL 50336 on
+    ///     unknown character or an adjustment that would take the balance negative.
+    /// </summary>
+    public async ValueTask<int> AdjustZone241TimeAsync(int characterId, int delta, CancellationToken ct)
+    {
+        var sp = new StoredProcedureParametersBuilder("game", "usp_Character_AdjustZone241Time", 1)
+            .AddParameter("CharacterId", characterId, SqlDbType.Int)
+            .AddParameter("Delta", delta, SqlDbType.Int)
+            .Build();
+
+        return await Db.ExecuteScalarAsync<int>(sp, ct);
+    }
+
+    /// <summary>
     ///     Book of Noble Dragon/Royal Serpent/Grand Tiger V2 tribe-conversion mechanic (world.Items
     ///     99014/99015/99016); see usp_Character_ApplyTribeConversion.sql's own header for the full
     ///     precondition list and THROW codes (50313-50320). Empty-TVP-omission rule same as
@@ -658,5 +672,26 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
             builder.AddTvpParameter("Items", items);
 
         await Db.ExecuteAsync(builder.Build(), ct);
+    }
+
+    /// <summary>
+    ///     Fourth-tribe (Fujin) conversion/return (CZ_CHANGE_TO_TRIBE4_SEND, op37) -- see
+    ///     usp_Character_ApplyTribeFourConversion.sql's own header. Distinct from, and never conflated with,
+    ///     <see cref="ApplyTribeConversionAsync" /> -- see that method's own remarks.
+    /// </summary>
+    public async ValueTask ApplyTribeFourConversionAsync(int characterId, byte newTribe, int stepPermanent,
+        int activeQuestId, int qSort, int targetPhase, int killCounter, CancellationToken ct)
+    {
+        var sp = new StoredProcedureParametersBuilder("game", "usp_Character_ApplyTribeFourConversion", 0)
+            .AddParameter("CharacterId", characterId, SqlDbType.Int)
+            .AddParameter("NewTribe", newTribe, SqlDbType.TinyInt)
+            .AddParameter("StepPermanent", stepPermanent, SqlDbType.Int)
+            .AddParameter("ActiveQuestId", activeQuestId, SqlDbType.Int)
+            .AddParameter("QSort", qSort, SqlDbType.Int)
+            .AddParameter("TargetPhase", targetPhase, SqlDbType.Int)
+            .AddParameter("KillCounter", killCounter, SqlDbType.Int)
+            .Build();
+
+        await Db.ExecuteAsync(sp, ct);
     }
 }

@@ -48,6 +48,15 @@ public sealed class MonsterEntity
     public float Heading { get; set; }
 
     /// <summary>
+    ///     This monster's own current cell in <see cref="Zone" />'s monster-side AOI grid -- the monster
+    ///     counterpart of <see cref="PlayerRuntimeState.CurrentCell" />. Tick-owned only; kept in sync by
+    ///     <see cref="Zone.SpawnMonster" /> (initial registration) and <see cref="Zone.SyncMonsterCell" />
+    ///     (every AI tick that moves this monster) -- see <see cref="Zone.SendExistingMonstersTo" />'s own
+    ///     remarks for why this grid exists.
+    /// </summary>
+    public (int X, int Z) CurrentCell { get; set; }
+
+    /// <summary>
     ///     Spawn anchor (legacy <c>mFirstLocation</c>) -- <see cref="MonsterAiState.ReturnToSpawn" />'s
     ///     destination. NOT the basis of <see cref="MonsterAiSystem.RunChase" />'s chase give-up guard, which
     ///     compares the monster's live position against its TARGET's live position instead (see

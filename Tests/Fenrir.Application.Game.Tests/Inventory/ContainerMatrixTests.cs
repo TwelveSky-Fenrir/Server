@@ -140,6 +140,29 @@ public class ContainerMatrixTests
     }
 
     [Fact]
+    public void ResolveMove_EmptyDestination_NonStackableSource_IgnoresPartialQuantityRequest_MovesWholeStack()
+    {
+        // Defensive guard: Fenrir's current write paths (GroundItemPickupPolicy, NpcShopPolicy, BuyCashItemService,
+        // BuyBloodMarkItemService, UpdateProxyShopService, PshopPurchasePolicy, StoreItemTransferPolicy,
+        // SaveBankItemTransferPolicy, TradeItemPlacementResolver) all gate Quantity > 1 behind IsStackableSort, so
+        // a non-stackable ItemStack should never legitimately carry Quantity > 1 -- but nothing in the domain type
+        // itself (or the game.CharacterItems CK_CharacterItems_Quantity CHECK, which only bounds 1-999 regardless
+        // of Sort) prevents one from existing. If a non-stackable stack ever did carry Quantity > 1, a
+        // client-requested partial quantity must still be ignored and the whole stack moved as one unit --
+        // matching TradeItemPlacementResolver.ResolveNonStackableTransfer (no quantity parameter at all) and
+        // StoreItemTransferPolicy.ResolveOneWayTransfer's own !sourceIsStackable branch. This guards against
+        // a non-stackable item's quantity being split across two live slots from one unit of durable state.
+        var source = Stack(999, 5);
+
+        var result = ContainerMatrix.ResolveMove(ContainerMatrix.InventoryPage0, 0, 2,
+            ContainerMatrix.InventoryPage0, 1, source, null, false);
+
+        Assert.Equal(ContainerMatrix.MoveOutcome.Success, result.Outcome);
+        Assert.Null(result.NewSource);
+        Assert.Equal(5, result.NewDestination!.Value.Quantity);
+    }
+
+    [Fact]
     public void ResolveMove_EmptyDestination_PartialQuantity_SplitsTheStack()
     {
         var source = Stack(2, 10);

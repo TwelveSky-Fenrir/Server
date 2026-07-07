@@ -66,6 +66,31 @@ public sealed class AoiGrid(float cellSize)
     }
 
     /// <summary>
+    ///     Cheap emptiness pre-check for hot broadcast call sites (<see cref="Zone.BroadcastMonsterAction" />,
+    ///     <see cref="Zone.BroadcastGroundItemAction" />, <see cref="Zone.BroadcastProxyShopState" />): true if
+    ///     any of the 9 candidate cells around <paramref name="cell" /> currently holds at least one occupant.
+    ///     Those call sites used to compute <c>NeighborsOfPosition(...).ToArray()</c> unconditionally just to
+    ///     test <c>Length == 0</c> before an early return -- allocating <see cref="Neighbors" />'s own
+    ///     compiler-generated iterator plus a LINQ <see cref="Enumerable.ToArray{TSource}" /> buffer on every
+    ///     single broadcast, even the overwhelmingly common case of a solitary monster/item/shop with nobody
+    ///     nearby to tell. This does the same 9-cell scan as <see cref="Neighbors" /> but only ever checks
+    ///     <see cref="Dictionary{TKey,TValue}.ContainsKey" /> -- it never walks a cell's member set, and it
+    ///     returns as soon as the first occupied cell is found rather than always visiting all 9. Correct
+    ///     without inspecting membership because <see cref="Remove" /> already deletes a cell's dictionary
+    ///     entry the moment its member set empties out (see that method), so "the cell key is present" and
+    ///     "the cell has at least one occupant" are exactly the same condition here.
+    /// </summary>
+    public bool HasAnyNeighbor((int X, int Z) cell)
+    {
+        for (var dx = -1; dx <= 1; dx++)
+        for (var dz = -1; dz <= 1; dz++)
+            if (_cells.ContainsKey((cell.X + dx, cell.Z + dz)))
+                return true;
+
+        return false;
+    }
+
+    /// <summary>
     ///     Non-allocating counterpart to <see cref="Neighbors" /> for hot per-packet call sites: appends every
     ///     character id in the 3x3 neighborhood of <paramref name="cell" /> to <paramref name="buffer" />,
     ///     excluding <paramref name="excludeCharacterId" />. <see cref="Neighbors" /> is a <c>yield return</c>

@@ -140,7 +140,6 @@ internal static class FieldScanner
             return new FieldModel
             {
                 PropertyName = property.Name,
-                Symbol = property,
                 Shape = FieldShape.FixedString,
                 ReservedBefore = reservedBefore,
                 StringLength = fixedStringLength.Value,
@@ -171,7 +170,6 @@ internal static class FieldScanner
                 return new FieldModel
                 {
                     PropertyName = property.Name,
-                    Symbol = property,
                     Shape = FieldShape.NestedArray,
                     ReservedBefore = reservedBefore,
                     ElementCount = fixedArrayCount.Value,
@@ -187,7 +185,6 @@ internal static class FieldScanner
                     return new FieldModel
                     {
                         PropertyName = property.Name,
-                        Symbol = property,
                         Shape = FieldShape.FixedStringArray,
                         ReservedBefore = reservedBefore,
                         ElementCount = fixedArrayCount.Value,
@@ -232,7 +229,6 @@ internal static class FieldScanner
             return new FieldModel
             {
                 PropertyName = property.Name,
-                Symbol = property,
                 Shape = arrayShape.Value,
                 ReservedBefore = reservedBefore,
                 ElementCount = fixedArrayCount.Value,
@@ -264,7 +260,6 @@ internal static class FieldScanner
             return new FieldModel
             {
                 PropertyName = property.Name,
-                Symbol = property,
                 Shape = scalarShape.Value,
                 ReservedBefore = reservedBefore,
                 OwnSize = size,
@@ -281,7 +276,6 @@ internal static class FieldScanner
                 return new FieldModel
                 {
                     PropertyName = property.Name,
-                    Symbol = property,
                     Shape = FieldShape.Nested,
                     ReservedBefore = reservedBefore,
                     NestedTypeFullName = namedType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),

@@ -33,7 +33,42 @@ public class FriendServiceTests
 
     private static FriendService CreateService(ZoneRegistry zones, ICharacterShardLocationRepository directory)
     {
-        return new FriendService(zones, new FriendRegistry(), new ThrowingFriendRepository(), directory);
+        return CreateService(zones, new FriendRegistry(), directory);
+    }
+
+    private static FriendService CreateService(ZoneRegistry zones, FriendRegistry friends,
+        ICharacterShardLocationRepository directory)
+    {
+        return new FriendService(zones, friends, new ThrowingFriendRepository(), directory);
+    }
+
+    /// <summary>
+    ///     Response-code-order regression: the asker's own busy/pose state must be checked before the target
+    ///     avatar is resolved by name, so a busy asker naming a nonexistent avatar still gets the busy reply,
+    ///     not "target not found" (Server/ts25zone/S04_MyWork02.cpp:8459-8471).
+    /// </summary>
+    [Fact]
+    public void Ask_AskerBusy_AndTargetNameDoesNotExist_ReturnsAskerBusy_NotTargetNotFound()
+    {
+        var friends = new FriendRegistry();
+        var zones = ZoneTestKit.CreateRegistry();
+        zones.Initialize([1]);
+        zones.TryGet(1, out var zone);
+
+        var (askerSession, _) = ZoneTestKit.CreateSession(1);
+        zone!.Post(ZoneCommand.Enter(1, ZoneTestKit.EnterData(askerSession, 1, "Asker", tribe: 1)));
+        var (pendingSession, _) = ZoneTestKit.CreateSession(2);
+        zone.Post(ZoneCommand.Enter(2, ZoneTestKit.EnterData(pendingSession, 1, "PendingTarget", tribe: 1)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.True(zone.TryGetPlayer(1, out var asker));
+        Assert.Equal(FriendAskOutcome.Sent, friends.TryAsk(1, 2)); // still pending, never answered
+
+        var service = CreateService(zones, friends, new FakeCharacterShardLocationRepository());
+
+        var result = service.Ask(zone, asker!, "NoSuchAvatar");
+
+        Assert.Equal(FriendAskResultKind.AskerBusy, result);
     }
 
     [Fact]

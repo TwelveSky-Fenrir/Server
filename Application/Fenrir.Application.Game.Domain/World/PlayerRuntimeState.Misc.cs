@@ -39,10 +39,30 @@ public partial class PlayerRuntimeState
     public int TribeNotifyScrollCount { get; set; }
 
     /// <summary>
-    ///     aPreviousTribe. No rebirth/tribe-transition system exists yet to populate this from anything other
-    ///     than the character's current <see cref="Tribe" /> -- defaults to <see cref="Tribe" /> at world entry.
+    ///     aPreviousTribe -- the character's real, persisted <c>game.Characters.PreviousTribe</c> value (0-2, DB
+    ///     CHECK-constrained), hydrated at world entry/zone transfer via <see cref="World.PlayerEnterData.PreviousTribe" />.
+    ///     Equal to <see cref="Tribe" /> for every main-faction (0-2) character; only genuinely differs for a
+    ///     tribe-3 (Fujin) character, who carries their original tribe here -- see
+    ///     <c>EnterWorldService.IsTribeAndPreviousTribeConsistent</c> for the world-entry gate that guarantees
+    ///     this invariant before a player is ever added to a zone. Never itself mutated by the fourth-tribe
+    ///     (Fujin) conversion/return behavior (CZ_CHANGE_TO_TRIBE4_SEND, op37) -- that behavior only reads this
+    ///     field to resolve which tribe a returning Fujin member came from; it permanently records "original
+    ///     faction" and does not toggle between <see cref="Tribe" />'s two possible values the way <see cref="Tribe" />
+    ///     itself does.
     /// </summary>
     public byte PreviousTribe { get; set; }
+
+    /// <summary>
+    ///     The per-character fourth-tribe (Fujin) RETURN allowance -- gates
+    ///     <c>Tribes.TribeMigrationGate</c>'s return branch (converting FROM tribe 3 back to <see cref="PreviousTribe" />).
+    ///     Session-scoped only, same "no producer wired up yet" posture as <see cref="BonusItemLevel" />/
+    ///     <see cref="TribeNotifyScrollCount" /> -- the legacy counter this mirrors
+    ///     (<c>Server/ts25zone/S04_MyWork03.cpp:5904-5908</c>) never had a working grant path in the shipped
+    ///     game either (see the "Fourth-tribe (Fujin) conversion and return" behavior contract's own Edge
+    ///     Cases). Always 0 until a separate, explicitly product-reviewed feature grants a charge -- this field
+    ///     deliberately has no producer here, only the gate/consumption (decrement-on-success) side.
+    /// </summary>
+    public int TribeFourReturnAllowance { get; set; }
 
     /// <summary>
     ///     aBottle/aBottleCount (10 slots, ItemId 0 = empty). Session-scoped only -- same open issue as

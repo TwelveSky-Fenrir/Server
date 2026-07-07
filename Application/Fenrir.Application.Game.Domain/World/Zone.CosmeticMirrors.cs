@@ -484,10 +484,11 @@ public sealed partial class Zone
     /// <summary>
     ///     No-op if the character already left -- a stale mirror for a departed character is harmless.
     ///     <see cref="HotkeySlotMirrorZoneCommand.NewLife" />/<see cref="HotkeySlotMirrorZoneCommand.NewMana" />
-    ///     (op22 potion-type-1-5 life/mana gain, see <c>HotkeyItemConsumptionResolver</c>) are applied and
-    ///     notified AFTER the slot mirror, matching the legacy handler's own "decrement/ack first, stat effect
-    ///     second" ordering -- the ack itself is already sent by <c>UseHotkeyItemHandler</c> before this command
-    ///     was ever posted.
+    ///     (op22 potion-type-1-5 life/mana gain, see <c>HotkeyItemConsumptionResolver</c>) and
+    ///     <see cref="HotkeySlotMirrorZoneCommand.BuffWrites" /> (potion-types 12-15's own BUFF_INFO write) are
+    ///     applied and notified AFTER the slot mirror, matching the legacy handler's own "decrement/ack first,
+    ///     stat effect second" ordering -- the ack itself is already sent by <c>UseHotkeyItemHandler</c> before
+    ///     this command was ever posted.
     /// </summary>
     private void ApplyHotkeySlotMirrorCommand(in HotkeySlotMirrorZoneCommand command)
     {
@@ -495,6 +496,9 @@ public sealed partial class Zone
             return;
 
         state.SetHotkeySlot(command.Page, command.Index, command.NewSlot);
+
+        if (!command.BuffWrites.IsDefaultOrEmpty)
+            ApplyBuffWrites(state, command.BuffWrites);
 
         if (command.LifeGain is null && command.ManaGain is null)
             return;
@@ -1295,6 +1299,9 @@ public readonly record struct DrinkBottleZoneCommand(
 ///     value would silently clobber/revert whatever the tick thread applied in that window. Same
 ///     recompute-at-apply-time pattern already used by <see cref="AutoBuffZoneCommand" />/
 ///     <see cref="ApplyAutoBuffCommand" /> and <see cref="AvatarBuffZoneCommand" />/<see cref="ApplyAvatarBuffCommand" />.
+///     <see cref="BuffWrites" /> is potion types 12-15's own BUFF_INFO write (<c>HotkeyItemConsumptionResolver</c>) --
+///     default/empty for every other potion type, applied via the same <c>Zone.ApplyBuffWrites</c> the manual
+///     self-buff skill-cast confirm and <c>AutoHuntTickSystem</c>'s bot-buff loop already share.
 /// </summary>
 public readonly record struct HotkeySlotMirrorZoneCommand(
     int CharacterId,
@@ -1302,7 +1309,8 @@ public readonly record struct HotkeySlotMirrorZoneCommand(
     byte Index,
     HotkeySlot NewSlot,
     int? LifeGain = null,
-    int? ManaGain = null);
+    int? ManaGain = null,
+    ImmutableArray<SkillCastResolver.BuffWrite> BuffWrites = default);
 
 /// <summary>
 ///     Op 118 <c>HeroRanking</c> throttle-timestamp mirror -- the ranking query itself is read-only and answered

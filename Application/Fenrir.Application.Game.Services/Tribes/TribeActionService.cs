@@ -3,6 +3,7 @@ using Fenrir.Application.Game.Abstractions.Tribes;
 using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Pets;
+using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.GameData;
@@ -29,31 +30,16 @@ public sealed class TribeActionService(
     private const int RebirthCpCost = 10_000;
 
     /// <summary>
-    ///     The real, EU33 rebirth cap. The legacy's own tSort 11 gate constant, <c>MAX_REBIRTH_LIMIT</c>, is
-    ///     12 -- but the legacy's own handler body never lets a character actually get that far: once
-    ///     aRebirthNum reaches 6 it takes its own separate "already maxed" branch (echoes failure, no
-    ///     further increment) every time after, so 6 is the one and only cap real play ever reaches. Folding
-    ///     both legacy checks into this single, lower cap reproduces that same real ceiling directly, instead
-    ///     of the legacy's two-tier (unreachable 12, actual 6) shape; <c>MyWork::MaxRebirth</c>'s own
-    ///     <c>==12</c> drop/broadcast branch (S04_MyWork05.cpp:4851) is this same dead code, confirming 12 is
-    ///     a non-EU33 debug artifact rather than a real milestone.
+    ///     Path B ("Max Rebirth")'s own path-specific cap -- confirmed by the Rebirth-advancement behavior
+    ///     contract as a genuine, distinct rule from <see cref="RebirthProgression.MaxRebirthGeneration" />
+    ///     (the absolute 12 cap): once <c>aRebirthNum</c> reaches 6, a further Path B request does not
+    ///     disconnect (unlike every other Path B precondition failure) -- it is answered with a graceful
+    ///     in-band failure instead, and neither the counter nor the CP cost is touched. Generations 7-12 are
+    ///     reachable only via Path A, the Rebirth-Pill item-consumption path
+    ///     (<c>UseInventoryItemService</c>'s own Rebirth-Pill branch), which checks against the true absolute
+    ///     cap instead of this one.
     /// </summary>
     private const int MaxRebirth = 6;
-
-    /// <summary>MAX_LIMIT_HIGH_LEVEL_NUM (DEFINE.h) -- Level2's own cap, the "G12" gate on Max Rebirth.</summary>
-    private const int MaxHighLevel = 12;
-
-    /// <summary>
-    ///     LEVELSYSTEM::ReturnHighExpValue's <c>mRangeForHigh</c> table (GameSystem_01_Level.cpp:319-330):
-    ///     the XP needed to be considered "100%" at Level2 N is HighLevelExpTable[N-1]. Only ever consulted
-    ///     at N=<see cref="MaxHighLevel" /> here (Max Rebirth requires Level2 already at its cap), so this
-    ///     is a plain lookup, not a data-driven catalog like <see cref="GameData.WorldDataCache.LevelsByLevel" />.
-    /// </summary>
-    private static readonly int[] HighLevelExpTable =
-    [
-        962_105_896, 1_000_590_131, 1_040_613_736, 1_082_238_285, 1_125_527_816, 1_170_548_928,
-        1_217_370_885, 1_266_065_720, 1_316_708_348, 1_369_376_681, 1_424_151_748, 1_481_117_817
-    ];
 
     // Indexed by current title rank (0-11) before purchase; the 13th entry is dead but kept for table fidelity.
     private static readonly int[] TitleCostCp =
@@ -369,27 +355,38 @@ public sealed class TribeActionService(
     }
 
     /// <summary>
-    ///     tSort 11 -- Max Rebirth (S04_MyWork02.cpp:11343-11375, <c>__REBIRTH__</c>). Requires Level1 AND
-    ///     Level2 both already at their own caps, Exp2 at 100% of Level2's threshold, a 10,000 CP toll, and
-    ///     <see cref="MaxRebirth" /> not yet reached; on success resets Exp2, increments RebirthCount, debits
-    ///     the CP, fully heals, and recomputes stats (RebirthCount feeds StatCalculator's critical-defence and
-    ///     critical-wrapper bonuses).
+    ///     tSort 11 -- Max Rebirth, Path B of the G1-G12 rebirth-advancement mechanism (S04_MyWork02.cpp:
+    ///     10800,11342-11390, <c>__REBIRTH__</c>). Requires Level1 AND Level2 both already at their own caps
+    ///     (equivalently, their combined sum at <see cref="RebirthProgression.CombinedLevelCap" />), Exp2 at
+    ///     100% of Level2's threshold, a 10,000 CP toll, and the absolute rebirth cap
+    ///     (<see cref="RebirthProgression.MaxRebirthGeneration" />) not yet reached; on success resets Exp2,
+    ///     increments RebirthCount, debits the CP, banks <c>aZone241Time += 10</c>, fully heals, and recomputes
+    ///     stats (RebirthCount feeds StatCalculator's critical-defence and critical-wrapper bonuses).
     /// </summary>
     /// <remarks>
-    ///     The legacy's own success branch also does <c>aZone241Time += 10</c> -- Fenrir has no field for that
-    ///     counter yet (same "not modeled" posture as this file's other untracked wire-only counters), so it
-    ///     is not reproduced. See <see cref="MaxRebirth" />'s own remarks for why 6, not the legacy's own
-    ///     <c>MAX_REBIRTH_LIMIT</c>=12, is the cap enforced here.
+    ///     Hardened against a legacy quirk the originating behavior contract explicitly calls out as a data-
+    ///     loss bug, not a designed rule: the legacy unconditionally resets Exp2 and bumps aZone241Time the
+    ///     instant the four preconditions above pass, BEFORE checking whether <see cref="MaxRebirth" /> (the
+    ///     path-specific cap of 6, distinct from the absolute 12 above) has already been reached -- so a
+    ///     character sitting at generation 6+ who re-grew Exp2 to 100% and retries Path B loses that bar for
+    ///     zero reward. This method checks <see cref="MaxRebirth" /> before mutating anything, so no state is
+    ///     ever touched on that path; see <see cref="MaxRebirth" />'s own remarks for why that check is
+    ///     answered as a graceful in-band failure rather than the disconnect every other precondition above
+    ///     uses.
     /// </remarks>
     public async ValueTask<TribeActionOutcome> RebirthAsync(Zone zone, PlayerRuntimeState state, int characterId,
         CancellationToken ct)
     {
-        if (state.RebirthCount >= MaxRebirth ||
-            state.Level != LevelProgressionCalculator.MaxLevel ||
-            state.Level2 != MaxHighLevel ||
-            state.Exp2 < HighLevelExpTable[state.Level2 - 1] ||
+        if (state.RebirthCount >= RebirthProgression.MaxRebirthGeneration ||
+            state.Level + state.Level2 != RebirthProgression.CombinedLevelCap ||
+            !RebirthProgression.IsHighLevelExperienceFull(state.Level2, state.Exp2) ||
             state.ContributionPoints < RebirthCpCost)
             return TribeActionOutcome.Abort;
+
+        // Path-specific cap, checked only once every other precondition already passed -- see this method's
+        // own <remarks> for why nothing above this line may ever mutate state.
+        if (state.RebirthCount >= MaxRebirth)
+            return TribeActionOutcome.Ok(1);
 
         var newRebirthCount = state.RebirthCount + 1;
         var attributes = new CharacterBaseAttributes(state.StatVit, state.StatStr, state.StatInt, state.StatDex,
@@ -398,10 +395,29 @@ public sealed class TribeActionService(
         var updatedStats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData,
             pet: ComputePetContribution(state, equipmentContainer));
 
+        int newZone241Time;
+        try
+        {
+            newZone241Time = await characters.AdjustZone241TimeAsync(characterId, 10, ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogInformation(ex, "Character {CharacterId} rebirth Zone241Time adjustment failed", characterId);
+            return TribeActionOutcome.Abort;
+        }
+
         await zone.PostTribeProgressCommandAndWaitAsync(new TribeProgressZoneCommand(characterId,
             state.ContributionPoints - RebirthCpCost, RebirthCount: newRebirthCount, Exp2: 0,
             Life: updatedStats.MaxLife, Mana: updatedStats.MaxMana, UpdatedStats: updatedStats,
-            RebirthBroadcast: true), ct);
+            RebirthBroadcast: true, Zone241Time: newZone241Time), ct);
+
+        // Milestone-reward pass (generation 6/12 tribe-specific ground-item drop, plus a generation-12
+        // server-wide notice naming the character) -- S04_MyWork05.cpp:4828-4865's MyWork::MaxRebirth, run
+        // unconditionally after every successful transition on both rebirth paths. Deliberately NOT wired
+        // here: no citation available to this pass establishes the actual tribe-keyed item ids or the notice
+        // wording, and this project's policy against reproducing/guessing legacy-parity content from memory
+        // means fabricating either is worse than leaving this an explicit, documented gap. Flagged for a
+        // dedicated legacy-behavior-translator follow-up before this pass is wired in for either path.
 
         return TribeActionOutcome.Ok();
     }

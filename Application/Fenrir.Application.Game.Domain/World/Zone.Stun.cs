@@ -206,13 +206,17 @@ public sealed partial class Zone
                     if (!memberHasCriticalBuff)
                         continue;
 
-                    if (!_killCooldownTracker.TryRegisterKill(member.CharacterId, defenderState.CharacterId,
-                            DateTime.UtcNow))
-                        continue;
-
-                    member.MissionKillOtherTribe =
-                        Math.Min(member.MissionKillOtherTribe + 1, KillCooldownTracker.MissionKillOtherTribeCap);
-                    member.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
+                    // S07_MyGame02.cpp:3714/3721 calls MyUtil::ProcessForKillOtherTribe(tPartyUser[index01],
+                    // atk.defenser, mSERVER_INFO.mServerNumber, KILL_CP_TYPE::STUN) verbatim per present party
+                    // member -- the exact same per-zone-gated CP/EXP/hero-point/daily-mission pipeline the
+                    // ordinary HP-death kill path runs (ApplyPvpKillRewards), not a narrower, zone-blind reward
+                    // channel of its own. Routing through it here (instead of unconditionally bumping
+                    // MissionKillOtherTribe) picks up the anti-farm cooldown, the combined-level-gap cap, AND
+                    // PvpKillRewardZoneCatalog's per-zone gating -- e.g. a stun-trigger kill in a "city" zone
+                    // (1/6/11/140) still grants EXP/drop/daily-mission progress but withholds CP, while a
+                    // stun-trigger kill in an unlisted zone withholds every reward channel outright
+                    // (S07_MyGame03.cpp default case, :3031-3040).
+                    ApplyPvpKillRewards(member, defenderState, isStunTrigger: true);
                 }
         }
 

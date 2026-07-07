@@ -71,6 +71,59 @@ public sealed class ZoneGeometry(WorldTriangle[] triangles, QuadtreeNode[] quadt
         return false;
     }
 
+    /// <summary>
+    ///     Combined <see cref="IsWalkable" /> + <see cref="TryGetGroundHeight" /> answer for (x, z) at
+    ///     <see cref="TryGetGroundHeight" />'s default parameters (root ceiling, one-sided, best-of-many), descending
+    ///     the quadtree once and scanning the resolved leaf's triangles once instead of the two independent descents
+    ///     a caller needing both answers would otherwise perform. <paramref name="walkable" /> is true only when (x, z)
+    ///     both sits inside some triangle's XZ footprint (matching <see cref="IsWalkable" />) and that footprint also
+    ///     yields a resolvable one-sided ground height (matching <see cref="TryGetGroundHeight" />'s found result) --
+    ///     the same conjunction a caller previously had to check across two separate calls; a footprint with no
+    ///     standable surface underneath it (e.g. the underside of a bridge, with no floor triangle in that same XZ
+    ///     spot) is not walkable under this combined answer even though <see cref="IsWalkable" /> alone would say yes.
+    ///     <paramref name="groundY" /> is only meaningful when <paramref name="walkable" /> is true.
+    /// </summary>
+    public void Resolve(float x, float z, out bool walkable, out float groundY)
+    {
+        walkable = false;
+        groundY = 0f;
+
+        if (quadtree.Length == 0 || !TryDescend(x, z, out var nodeIndex))
+            return;
+
+        var hasFootprint = false;
+        var hasGround = false;
+        var ceilingY = quadtree[0].BoxMax.Y;
+
+        foreach (var triangleIndex in quadtree[nodeIndex].TriangleIndex)
+        {
+            var triangle = triangles[triangleIndex];
+
+            if (!hasFootprint && IsPointInsideTriangleXz(triangle, x, z))
+                hasFootprint = true;
+
+            if (triangle.PlaneInfo.Y <= 0f)
+                continue;
+
+            if (!TryGetHeightFromPlane(triangle, x, z, out var candidateY))
+                continue;
+
+            if (candidateY > ceilingY)
+                continue;
+
+            if (!IsPointInsideTriangleXyz(triangle, x, candidateY, z))
+                continue;
+
+            if (!hasGround || candidateY > groundY)
+            {
+                hasGround = true;
+                groundY = candidateY;
+            }
+        }
+
+        walkable = hasFootprint && hasGround;
+    }
+
     private bool TryDescend(float x, float z, out int nodeIndex)
     {
         nodeIndex = 0;

@@ -2,6 +2,7 @@ using System.Buffers.Binary;
 using System.Collections.Frozen;
 using Fenrir.Application.Game.Abstractions.Tribes;
 using Fenrir.Application.Game.Domain.Movement;
+using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Services.Tribes;
 using Fenrir.Application.Game.Tests.GameData;
@@ -54,7 +55,7 @@ public class TribeActionServiceTests
         return (session, pipe, state);
     }
 
-    private static TribeActionService CreateService()
+    private static TribeActionService CreateService(FakeCharacterRepository? characters = null)
     {
         var options = ZoneTestKit.Options();
         var registry = new ZoneRegistry(Options.Create(options), new MovementRules(Options.Create(options)),
@@ -66,7 +67,7 @@ public class TribeActionServiceTests
         var levels = new Dictionary<short, LevelRowDto> { [145] = WorldDataTestRows.Level(145) }
             .ToFrozenDictionary();
 
-        return new TribeActionService(registry, new FakeTribeRepository(), new FakeCharacterRepository(),
+        return new TribeActionService(registry, new FakeTribeRepository(), characters ?? new FakeCharacterRepository(),
             ZoneTestKit.EmptyWorldData(levelsByLevel: levels), NullLogger<TribeActionService>.Instance);
     }
 
@@ -88,18 +89,43 @@ public class TribeActionServiceTests
     }
 
     [Fact]
-    public async Task Rebirth_AlreadyAtRealCap_Aborts_AndDoesNotMutate()
+    public async Task Rebirth_AlreadyAtPathSpecificCap_RepliesFailure_WithoutDisconnecting_AndDoesNotMutate()
     {
         var zone = ZoneTestKit.CreateZone(1);
-        var (session, _, state) = Setup(zone, CharacterId, rebirthCount: 6);
+        var (session, pipe, state) = Setup(zone, CharacterId, rebirthCount: 6);
+        var service = CreateService();
+
+        var outcome = await service.RebirthAsync(zone, state, CharacterId, CancellationToken.None);
+        Respond(session, RebirthRequest(), outcome);
+
+        // Hardened against the legacy quirk (Rebirth-advancement contract, Edge cases): this specific failure
+        // -- the path-specific cap of 6, distinct from the absolute cap of 12 -- is a graceful in-band
+        // response, never a disconnect, and unlike the legacy, nothing is mutated merely by hitting it: not
+        // Exp2 (the legacy unconditionally resets this one BEFORE the cap check, destroying an already-grown
+        // bar for zero reward), not RebirthCount, not ContributionPoints, not Zone241Time.
+        Assert.Null(session.DisconnectReason);
+        Assert.Equal(6, state.RebirthCount);
+        Assert.Equal(MaxHighLevelExp, state.Exp2);
+        Assert.Equal(10_000, state.ContributionPoints);
+        Assert.Equal(0, state.Zone241Time);
+
+        var frame = ZoneTestKit.DrainOutbound(pipe);
+        Assert.Equal(RebirthFrame, frame.Length);
+        Assert.Equal(1, BinaryPrimitives.ReadInt32LittleEndian(frame.AsSpan(1))); // Result=1, generic failure
+    }
+
+    [Fact]
+    public async Task Rebirth_AlreadyAtAbsoluteCap_Aborts()
+    {
+        var zone = ZoneTestKit.CreateZone(1);
+        var (session, _, state) = Setup(zone, CharacterId, rebirthCount: RebirthProgression.MaxRebirthGeneration);
         var service = CreateService();
 
         var outcome = await service.RebirthAsync(zone, state, CharacterId, CancellationToken.None);
         Respond(session, RebirthRequest(), outcome);
 
         Assert.Equal(DisconnectReason.Faulted, session.DisconnectReason);
-        Assert.Equal(6, state.RebirthCount);
-        Assert.Equal(MaxHighLevelExp, state.Exp2);
+        Assert.Equal(RebirthProgression.MaxRebirthGeneration, state.RebirthCount);
     }
 
     [Fact]
@@ -174,6 +200,10 @@ public class TribeActionServiceTests
         Assert.Equal(1, after!.RebirthCount);
         Assert.Equal(0, after.Exp2);
         Assert.Equal(0, after.ContributionPoints);
+        // aZone241Time += 10 (durably persisted via ICharacterRepository.AdjustZone241TimeAsync, then
+        // mirrored back onto PlayerRuntimeState) -- Path B's own side effect the Rebirth-Pill path (A) never
+        // triggers.
+        Assert.Equal(10, after.Zone241Time);
         // Full heal to the FRESHLY recomputed max (not whatever MaxLife/MaxMana happened to hold before) --
         // same "SetIntegerUp to the new max, not a clamp" posture as tSort 6/10 elsewhere in this service.
         Assert.NotNull(after.Stats);
@@ -196,7 +226,7 @@ public class TribeActionServiceTests
         Assert.Equal(14, BinaryPrimitives.ReadInt32LittleEndian(stateFlag[8..])); // Sort
         Assert.Equal(0, BinaryPrimitives.ReadInt32LittleEndian(stateFlag[12..])); // Value01 = ContributionPoints
         Assert.Equal(1, BinaryPrimitives.ReadInt32LittleEndian(stateFlag[16..])); // Value02 = RebirthCount
-        Assert.Equal(0, BinaryPrimitives.ReadInt32LittleEndian(stateFlag[20..])); // Value03 (Zone241Time, not modeled)
+        Assert.Equal(10, BinaryPrimitives.ReadInt32LittleEndian(stateFlag[20..])); // Value03 = Zone241Time
     }
 
     [Fact]
@@ -216,5 +246,46 @@ public class TribeActionServiceTests
         Assert.Equal(StateFlagFrame, neighborFrame.Length);
         var payload = neighborFrame.AsSpan(1);
         Assert.Equal(14, BinaryPrimitives.ReadInt32LittleEndian(payload[8..]));
+    }
+
+    [Fact]
+    public async Task Rebirth_Zone241TimeAdjustmentFails_Aborts_AndDoesNotMutateAnything()
+    {
+        var zone = ZoneTestKit.CreateZone(1);
+        var characters = new FakeCharacterRepository { ThrowOnAdjustZone241Time = true };
+        var (session, _, state) = Setup(zone, CharacterId);
+        var service = CreateService(characters);
+
+        var outcome = await service.RebirthAsync(zone, state, CharacterId, CancellationToken.None);
+        Respond(session, RebirthRequest(), outcome);
+
+        Assert.Equal(DisconnectReason.Faulted, session.DisconnectReason);
+        Assert.Equal(0, state.RebirthCount);
+        Assert.Equal(MaxHighLevelExp, state.Exp2);
+        Assert.Equal(10_000, state.ContributionPoints);
+    }
+
+    [Fact]
+    public async Task Rebirth_CannotBeRepeated_WithoutExp2BeingRegrownToFullBetweenAttempts()
+    {
+        // Proves a second Max Rebirth attempt immediately after a successful one is rejected -- Exp2 was
+        // reset to 0 by the first success, so the second attempt fails the "100% of Level2's threshold"
+        // precondition, exactly like any other under-threshold Exp2 value would.
+        var zone = ZoneTestKit.CreateZone(1);
+        var (session, _, state) = Setup(zone, CharacterId);
+        var service = CreateService();
+
+        var first = await service.RebirthAsync(zone, state, CharacterId, CancellationToken.None);
+        zone.Tick(TimeSpan.FromMilliseconds(50)); // drains the posted TribeProgressZoneCommand mirror
+        Assert.False(first.Aborted);
+        Assert.True(zone.TryGetPlayer(CharacterId, out state));
+        Assert.Equal(1, state!.RebirthCount);
+        Assert.Equal(0, state.Exp2);
+
+        var second = await service.RebirthAsync(zone, state, CharacterId, CancellationToken.None);
+        Respond(session, RebirthRequest(), second);
+
+        Assert.Equal(DisconnectReason.Faulted, session.DisconnectReason); // combined-precondition failure, not the 6-cap
+        Assert.Equal(1, state.RebirthCount); // unchanged by the rejected second attempt
     }
 }

@@ -64,7 +64,7 @@ CREATE TABLE game.Characters
         CONSTRAINT DF_Characters_BigStoreMoney DEFAULT 0
         CONSTRAINT CK_Characters_BigStoreMoney CHECK (BigStoreMoney >= 0),
     RebirthCount             INT                NOT NULL
-        CONSTRAINT DF_Characters_RebirthCount DEFAULT 0,                                         -- aRebirthNum; real cap is 6 (app-enforced) -- legacy's own MAX_REBIRTH_LIMIT=12 is a non-EU33 debug artifact, see TribeActionHandler.HandleRebirthAsync
+        CONSTRAINT DF_Characters_RebirthCount DEFAULT 0,                                         -- aRebirthNum; MAX_REBIRTH_LIMIT=12 (G1-G12) IS live in ReleaseEU33 via the Rebirth-Pill item path (WUSE_ITEM_632 unconditionally #define'd) -- see Application/Fenrir.Application.Game.Domain/Progression/RebirthProgression.cs. Path B (TribeActionService.RebirthAsync, CZ_TRIBE_WORK_SEND tSort 11) is separately app-capped at generation 6; only Path A (UseInventoryItemService's Rebirth-Pill branch) reaches 7-12.
     Title                    INT                NOT NULL
         CONSTRAINT DF_Characters_Title DEFAULT 0,
     Halo                     INT                NOT NULL

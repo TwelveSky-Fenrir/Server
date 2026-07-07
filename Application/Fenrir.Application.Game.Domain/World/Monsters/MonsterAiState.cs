@@ -18,7 +18,11 @@ public enum MonsterAiState : byte
     /// <summary>A004: walking back to spawn at <c>mWalkSpeed</c>.</summary>
     Patrol = 3,
 
-    /// <summary>A005: chasing locked target at <c>mRunSpeed</c>, leashed to the spawn region.</summary>
+    /// <summary>
+    ///     A005: chasing locked target at <c>mRunSpeed</c>; gives up once the target's live position drifts
+    ///     beyond the monster's own detection radius (<c>RadiusInfo2</c>) from the monster's own live
+    ///     position -- not a distance-from-home leash (<see cref="MonsterAiSystem.RunChase" />'s remarks).
+    /// </summary>
     Chase = 4,
 
     /// <summary>A006: attack windup, counts to <c>mFrameInfo[2]</c> ticks.</summary>
@@ -45,7 +49,14 @@ public enum MonsterAiState : byte
     /// </summary>
     Flinch = 8,
 
-    /// <summary>A020: forced return to <see cref="MonsterEntity.HomeX" /> after losing/leashing off a target.</summary>
+    /// <summary>
+    ///     A020: forced return to <see cref="MonsterEntity.HomeX" />/<see cref="MonsterEntity.HomeY" />/
+    ///     <see cref="MonsterEntity.HomeZ" /> after losing/giving-up a chase. A fixed, distance-independent
+    ///     animation-frame delay counting to <c>mFrameInfo[5]</c> (<see cref="MonsterRowDto.FrameInfo6" />)
+    ///     ticks, then an instantaneous teleport to the spawn point -- never a walk
+    ///     (<c>Server/ts25zone/S07_MyGame05.cpp:1658-1673</c>, no movement/pathing call anywhere in that
+    ///     handler).
+    /// </summary>
     ReturnToSpawn = 19,
 
     /// <summary>

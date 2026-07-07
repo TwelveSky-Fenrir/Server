@@ -72,6 +72,17 @@ public static class DomainServiceCollectionExtensions
         // so its position relative to every other system here doesn't matter.
         services.AddSingleton<ISimulationSystem, PlayTimeAccrualSystem>();
 
+        // Once-per-real-minute mSupportSkillTimeUpRatio source-field aging/expiry (BuffX2Time countdown,
+        // Premium expiry) -- same "self-contained, order doesn't matter" posture as PlayTimeAccrualSystem
+        // above: a self-buff cast (AutoHuntTickSystem or Zone.ApplySkillEffectConfirm) that lands in the same
+        // tick this recomputes in may read a one-tick-stale ratio, which the behavior contract's own
+        // "Staleness" edge case explicitly accepts.
+        services.AddSingleton<ISimulationSystem, SupportSkillTimeUpRatioMaintenanceSystem>();
+
+        // Once-per-real-minute Pet EXP boost pill countdown (PetExpX2Time) -- same "self-contained, order
+        // doesn't matter" posture as PlayTimeAccrualSystem/SupportSkillTimeUpRatioMaintenanceSystem above.
+        services.AddSingleton<ISimulationSystem, PetExpBoostCountdownSystem>();
+
         // Active-duel death/departure/180-tick-timeout resolution (DuelMaintenanceSystem) -- reads
         // IsDead/player-presence state that every combat/movement command already settled during this same
         // tick's DrainInbox stage, so ordering relative to the systems above doesn't matter; kept ahead of
@@ -92,7 +103,9 @@ public static class DomainServiceCollectionExtensions
         // for why this small Domain class -- not RegularWarSchedulerHost itself -- is the bridge.
         services.AddSingleton<RegularWarActiveMapTracker>();
 
-        // Process-wide singletons: a party/duel/trade/friend-ask/mentor-ask negotiation can span multiple Zone actors.
+        // Process-wide singletons: a party/duel/trade/friend-ask/mentor-ask negotiation can span multiple Zone actors
+        // within THIS process. PartyRegistry specifically has a documented, still-unresolved cross-shard scope gap
+        // when party members are split across two different GameServer shard processes -- see its own class remarks.
         services.AddSingleton<PartyRegistry>();
         services.AddSingleton<FriendRegistry>();
         services.AddSingleton<MentorRegistry>();

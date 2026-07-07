@@ -38,15 +38,15 @@
 -- LoginConnectionHost.TearDownAccountSessionAsync and GameConnectionHost's copy now pass the same
 -- (ServerKind, ShardId, SessionToken) triple to this call that they already pass to the ClearIfOwnerAsync call
 -- immediately after it.
-CREATE OR ALTER PROCEDURE runtime.usp_AccountSession_MarkTearingDown
-    @AccountId    INT,
-    @ServerKind   TINYINT,
-    @ShardId      TINYINT NULL,
-    @SessionToken UNIQUEIDENTIFIER
-WITH NATIVE_COMPILATION, SCHEMABINDING
+CREATE OR ALTER PROCEDURE runtime.usp_AccountSession_MarkTearingDown @AccountId INT,
+                                                                     @ServerKind TINYINT,
+                                                                     @ShardId TINYINT NULL,
+                                                                     @SessionToken UNIQUEIDENTIFIER
+    WITH NATIVE_COMPILATION , SCHEMABINDING
 AS
-BEGIN ATOMIC
-WITH (TRANSACTION ISOLATION LEVEL = SNAPSHOT, LANGUAGE = N'us_english')
+BEGIN
+    ATOMIC
+    WITH (TRANSACTION ISOLATION LEVEL = SNAPSHOT, LANGUAGE = N'us_english')
     UPDATE runtime.AccountSessions
     SET SessionState = 1
     WHERE AccountId = @AccountId

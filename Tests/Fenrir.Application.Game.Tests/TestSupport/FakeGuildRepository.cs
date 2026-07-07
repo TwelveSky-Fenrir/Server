@@ -44,6 +44,9 @@ internal sealed class FakeGuildRepository : IGuildRepository
         private set;
     }
 
+    /// <summary>Scripted return for <see cref="GetByCharacterAsync" /> -- null (the default) means "no guild".</summary>
+    public CharacterGuildMembershipDto? MembershipToReturn { get; set; }
+
     public ValueTask<GuildSummaryDto?> GetByIdAsync(int guildId, CancellationToken ct)
     {
         return ValueTask.FromResult(_guilds.GetValueOrDefault(guildId));
@@ -82,9 +85,6 @@ internal sealed class FakeGuildRepository : IGuildRepository
 
         return ValueTask.CompletedTask;
     }
-
-    /// <summary>Scripted return for <see cref="GetByCharacterAsync" /> -- null (the default) means "no guild".</summary>
-    public CharacterGuildMembershipDto? MembershipToReturn { get; set; }
 
     public ValueTask<CharacterGuildMembershipDto?> GetByCharacterAsync(int characterId, CancellationToken ct)
     {
@@ -205,6 +205,14 @@ internal sealed class FakeGuildRepository : IGuildRepository
             list[index] = row;
         else
             list.Add(row);
+
+        return ValueTask.CompletedTask;
+    }
+
+    public ValueTask AdjustPointsAsync(int guildId, int delta, CancellationToken ct)
+    {
+        if (_guilds.TryGetValue(guildId, out var guild))
+            _guilds[guildId] = guild with { Points = guild.Points + delta };
 
         return ValueTask.CompletedTask;
     }

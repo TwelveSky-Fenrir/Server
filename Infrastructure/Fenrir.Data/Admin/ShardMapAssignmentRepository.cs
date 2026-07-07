@@ -23,7 +23,7 @@ public sealed record ShardMapAssignmentRepository(ICaeriusNetDbContext Db) : ISh
     // for why a boot-time overlap check needs this in addition to the per-shard lookup above.
     public async ValueTask<IReadOnlyList<ShardMapAssignmentDto>> GetAllAssignmentsAsync(CancellationToken ct)
     {
-        var sp = new StoredProcedureParametersBuilder("admin", "usp_ShardMapAssignment_GetAll", 16).Build();
+        var sp = new StoredProcedureParametersBuilder("admin", "usp_ShardMapAssignment_GetAll").Build();
 
         var rows = await Db.QueryAsReadOnlyCollectionAsync<ShardMapAssignmentDto>(sp, ct);
         return rows.ToArray();

@@ -139,7 +139,7 @@ public class RuneStoneCraftResolverTests
     {
         var packed = RuneStoneStatCodec.Encode(1, 1, 1, 1);
         var result = RuneStoneCraftResolver.Resolve(
-            Request(RuneStoneCraftCatalog.AddStatItemId, destinationPackedStat: packed),
+            Request(destinationPackedStat: packed),
             new ScriptedRandomSource(0));
 
         Assert.Equal(RuneStoneCraftOutcome.Refused, result.Outcome);
@@ -152,7 +152,7 @@ public class RuneStoneCraftResolverTests
     public void AddStat_AllEmpty_FillsStrFirst()
     {
         var result = RuneStoneCraftResolver.Resolve(
-            Request(RuneStoneCraftCatalog.AddStatItemId, destinationPackedStat: 0),
+            Request(),
             new ScriptedRandomSource(199)); // top tier => 30
 
         Assert.True(result.Succeeded);
@@ -170,7 +170,7 @@ public class RuneStoneCraftResolverTests
     {
         var packed = RuneStoneStatCodec.Encode(5, 0, 0, 0);
         var result = RuneStoneCraftResolver.Resolve(
-            Request(RuneStoneCraftCatalog.AddStatItemId, destinationPackedStat: packed),
+            Request(destinationPackedStat: packed),
             new ScriptedRandomSource(199));
 
         Assert.True(result.Succeeded);
@@ -186,7 +186,7 @@ public class RuneStoneCraftResolverTests
     {
         var packed = RuneStoneStatCodec.Encode(5, 6, 0, 0);
         var result = RuneStoneCraftResolver.Resolve(
-            Request(RuneStoneCraftCatalog.AddStatItemId, destinationPackedStat: packed),
+            Request(destinationPackedStat: packed),
             new ScriptedRandomSource(199));
 
         Assert.True(result.Succeeded);
@@ -202,7 +202,7 @@ public class RuneStoneCraftResolverTests
     {
         var packed = RuneStoneStatCodec.Encode(5, 6, 7, 0);
         var result = RuneStoneCraftResolver.Resolve(
-            Request(RuneStoneCraftCatalog.AddStatItemId, destinationPackedStat: packed),
+            Request(destinationPackedStat: packed),
             new ScriptedRandomSource(199));
 
         Assert.True(result.Succeeded);

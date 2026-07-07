@@ -5,9 +5,9 @@ CREATE PROCEDURE game.usp_TribeVote_ClearTribe @TribeId TINYINT
 AS
 BEGIN
     SET
-NOCOUNT ON;
+        NOCOUNT ON;
 
-DELETE
-FROM game.TribeVotes
-WHERE TribeId = @TribeId;
+    DELETE
+    FROM game.TribeVotes
+    WHERE TribeId = @TribeId;
 END;

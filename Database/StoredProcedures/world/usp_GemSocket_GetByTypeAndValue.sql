@@ -3,10 +3,10 @@ CREATE PROCEDURE world.usp_GemSocket_GetByTypeAndValue @Type INT, @Value02 INT
 AS
 BEGIN
     SET
-NOCOUNT ON;
+        NOCOUNT ON;
 
-SELECT GemSocketId, Type, Value01, Value02, Value03, Value04
-FROM world.GemSockets
-WHERE Type = @Type
-  AND Value02 = @Value02;
+    SELECT GemSocketId, Type, Value01, Value02, Value03, Value04
+    FROM world.GemSockets
+    WHERE Type = @Type
+      AND Value02 = @Value02;
 END;

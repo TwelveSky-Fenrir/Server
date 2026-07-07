@@ -6,10 +6,12 @@
 -- losing it back to Application.Fenrir.Game.Progression.TowerWarState's in-memory-only defaults.
 CREATE TABLE game.TowerState
 (
-    TowerIndex         TINYINT NOT NULL,
-    Level              TINYINT NOT NULL CONSTRAINT DF_TowerState_Level DEFAULT (0),
-    TowerType          TINYINT NOT NULL CONSTRAINT DF_TowerState_TowerType DEFAULT (0),
-    ControllingTribeId TINYINT NULL,
+    TowerIndex         TINYINT      NOT NULL,
+    Level              TINYINT      NOT NULL
+        CONSTRAINT DF_TowerState_Level DEFAULT (0),
+    TowerType          TINYINT      NOT NULL
+        CONSTRAINT DF_TowerState_TowerType DEFAULT (0),
+    ControllingTribeId TINYINT      NULL,
     CapturedAtUtc      DATETIME2(3) NULL,
     CONSTRAINT PK_TowerState PRIMARY KEY CLUSTERED (TowerIndex),
     CONSTRAINT CK_TowerState_TowerIndex CHECK (TowerIndex BETWEEN 0 AND 11),

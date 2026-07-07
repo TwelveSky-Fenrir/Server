@@ -30,6 +30,40 @@ public partial class PlayerRuntimeState
     public int PetActivityDecayTicks { get; set; }
 
     /// <summary>
+    ///     Legacy <c>aPetExpX2Time</c> -- the "Pet EXP boost pill" consumable's (world.Items 1190/17035/8413)
+    ///     running duration counter. While positive: doubles pet-kill EXP credited (see
+    ///     <see cref="World.Zone.CreditPetGrowthFromMonsterKill" />) and pauses <see cref="Simulation.PetActivitySystem" />'s
+    ///     30s activity decay entirely. Ticks down by (up to) 1 per elapsed real minute via
+    ///     <see cref="Simulation.PetExpBoostCountdownSystem" /> -- but only while an equipped pet item is
+    ///     present, and only while that pet's growth is still below the designer-facing 200% cap (see that
+    ///     system's own remarks for both gates).
+    /// </summary>
+    /// <remarks>
+    ///     In-memory only, same posture as <see cref="TowerCpMilestoneCounter" />'s own remarks: no
+    ///     Characters/CharacterProgressTvp column backs this counter yet, so adding one is a product decision
+    ///     outside this contract's scope, not something to invent here -- resets to 0 on a fresh world entry
+    ///     (an in-process zone transfer still carries the live value through, same as <see cref="PetGrowth" />/
+    ///     <see cref="PetActivity" />, via <see cref="World.ZoneTransfer.CreateEnterData" />). The one-shot grant
+    ///     from consuming the pill marks Progression dirty (see <c>UseInventoryItemService</c>'s pet-exp-boost
+    ///     branch) -- the same "rare, event-driven grant" posture <see cref="World.Zone.GrantWarPoints" />/
+    ///     <see cref="World.Zone.GrantBloodPoints" /> already use despite an identical "not yet persisted"
+    ///     status. The per-minute countdown and the 30s decay-pause do NOT mark dirty, matching
+    ///     <see cref="Simulation.PlayTimeAccrualSystem" />'s own remarks for a guaranteed per-tick-per-player
+    ///     counter with no persisted column to flush.
+    /// </remarks>
+    public int PetExpX2Time { get; set; }
+
+    /// <summary>
+    ///     Legacy-tick accumulator for <see cref="Simulation.PetExpBoostCountdownSystem" />'s own
+    ///     once-per-real-minute cadence -- deliberately a separate counter from <see cref="PlayTimeAccrualTicks" />/
+    ///     <see cref="SupportSkillTimeUpRatioAccrualTicks" /> even though all three share the same
+    ///     120-legacy-tick (60s) period, matching <see cref="SupportSkillTimeUpRatioAccrualTicks" />'s own
+    ///     remarks on why sharing one accumulator across independently-owned per-minute systems would
+    ///     double-consume/desync them.
+    /// </summary>
+    public int PetExpX2TimeAccrualTicks { get; set; }
+
+    /// <summary>
     ///     aAnimal[10] mount garage -- no acquisition path exists yet (only the unimplemented UseInventoryItem
     ///     mount-item family populates it per S04_MyWork03.cpp), so every slot stays 0 until that lands. A real
     ///     array, permanently empty for now, same posture as <see cref="MissionJoinWar" />.
@@ -82,9 +116,11 @@ public partial class PlayerRuntimeState
 
     /// <summary>
     ///     aAction.aPetSort -- last accepted CZ_UPDATE_PET_ACTION_SEND's pet sub-fields. The legacy handler has
-    ///     no reply/broadcast of its own; the update rides along on the next full avatar rebroadcast instead
-    ///     (<see cref="Zone" />'s shared rebroadcast-snapshot builder still needs wiring to surface these --
-    ///     tracked here, not yet plumbed into that shared path).
+    ///     no reply/broadcast of its own; the update rides along on the next independently-triggered full
+    ///     avatar-action rebroadcast instead. Every <see cref="Zone" /> call site that builds a fresh
+    ///     <c>ActionInfo</c> for a broadcast reads this and its five siblings back via
+    ///     <c>Zone.PetActionFieldsOf</c> rather than the empty/zero placeholder used before that wiring
+    ///     landed (companion-pet-follow-rebroadcast finding).
     /// </summary>
     public int PetActionSort { get; set; }
 

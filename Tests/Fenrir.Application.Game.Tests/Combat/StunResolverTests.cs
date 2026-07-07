@@ -276,15 +276,50 @@ public class StunResolverTests
     }
 
     [Fact]
-    public void DefenderStunImmunityBuff_ForcesFailure_ForOrdinarySkill()
+    public void DefenderStunDefenseBuff_AppliesFlatBlockOfOneHundred_LowSuccessValueStillFails()
     {
         var attacker = Combatant(1, 0);
         var defender = Combatant(2, 1);
-        // A huge success value would ordinarily guarantee a hit; the buff must still force a loss.
+        // Buff slot 13 ("Stun Defense") replaces the block value with the literal 100 (S07_MyGame02.cpp:3645-
+        // 3653), not int.MaxValue -- margin = 50 - 100 = negative, still fails, but as a beatable mitigation,
+        // not unconditional immunity (see the next test).
+        var outcome = StunResolver.Resolve(
+            Request(attacker, defender, FlatSkill(7, 50, runTime: 5), defenderHasImmunityBuff: true),
+            TimeSpan.Zero, new ScriptedRandomSource(0));
+        Assert.False(outcome.Rejected);
+        Assert.False(outcome.Success);
+    }
+
+    [Fact]
+    public void DefenderStunDefenseBuff_IsFiniteMitigation_NotAbsoluteImmunity_HighSuccessValueStillLands()
+    {
+        var attacker = Combatant(1, 0);
+        var defender = Combatant(2, 1);
+        // A sufficiently high stun-attack success value (scales with the attacker's used-skill grade) can
+        // still exceed the flat 100 block and land the stun despite the buff being active: margin = 500 - 100
+        // = 400. This is the exact real-PvP divergence the flat-100 fix closes -- the buff mitigates, it does
+        // not guarantee immunity, unlike the previous int.MaxValue substitution.
         var outcome = StunResolver.Resolve(
             Request(attacker, defender, FlatSkill(7, 500, runTime: 5), defenderHasImmunityBuff: true),
             TimeSpan.Zero, new ScriptedRandomSource(0));
         Assert.False(outcome.Rejected);
-        Assert.False(outcome.Success);
+        Assert.True(outcome.Success);
+    }
+
+    [Fact]
+    public void DefenderStunDefenseBuff_ReplacesNotAddsTo_ResistSkillDerivedBlock()
+    {
+        var attacker = Combatant(1, 0);
+        var defender = Combatant(2, 1);
+        var resist = FlatSkill(5, stunDefense: 999); // would normally guarantee a miss on its own
+        // The buff-13 override is a replacement, not an addition/combination: block becomes 100, not 999 and
+        // not 999+100. margin = 150 - 100 = 50 -> succeeds; had the resist-skill value been used instead, or
+        // added to 100, this would fail.
+        var outcome = StunResolver.Resolve(
+            Request(attacker, defender, FlatSkill(7, 150, runTime: 5), resistSkill: resist, resistGradePoints: 10,
+                defenderHasImmunityBuff: true),
+            TimeSpan.Zero, new ScriptedRandomSource(0));
+        Assert.False(outcome.Rejected);
+        Assert.True(outcome.Success);
     }
 }

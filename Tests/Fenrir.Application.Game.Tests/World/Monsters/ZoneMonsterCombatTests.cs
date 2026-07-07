@@ -59,6 +59,13 @@ public class ZoneMonsterCombatTests
         Assert.True(zone.TryGetPlayer(characterId, out var attacker));
         attacker!.Stats = StrongAttacker;
 
+        // This suite exercises PvM combat resolution, not the attack sub-packet budget/replay guard (that's
+        // AttackPacketBudgetTests' own job) -- a real client always sends a legal avatar-action packet first
+        // to establish a non-zero ceiling, which this fixture skips. Uncapped here (some tests below loop up
+        // to 50 attack commands to grind a monster down) so a raw CombatCommand posted straight after Enter
+        // isn't silently rejected by AttackPacketBudget.TryConsume.
+        attacker.AttackSubPacketCeiling = int.MaxValue;
+
         // ResolvePvmAttack checks the attacker's own zone-entry protect window, even against a monster
         zone.Tick(CombatResolver.ProtectDuration + TimeSpan.FromSeconds(1));
 

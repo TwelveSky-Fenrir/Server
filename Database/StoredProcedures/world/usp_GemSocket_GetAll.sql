@@ -1,10 +1,10 @@
 CREATE PROCEDURE world.usp_GemSocket_GetAll
-    AS
+AS
 BEGIN
     SET
-NOCOUNT ON;
+        NOCOUNT ON;
 
-SELECT GemSocketId, Type, Value01, Value02, Value03, Value04
-FROM world.GemSockets
-ORDER BY GemSocketId;
+    SELECT GemSocketId, Type, Value01, Value02, Value03, Value04
+    FROM world.GemSockets
+    ORDER BY GemSocketId;
 END;

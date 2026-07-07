@@ -1,6 +1,7 @@
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.Monsters;
+using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.GameData;
 
 namespace Fenrir.Application.Game.Domain.Progression;
@@ -21,7 +22,22 @@ namespace Fenrir.Application.Game.Domain.Progression;
 ///     detected by simple absence from the zone's live pool rather than draining <c>Zone</c>'s shared dead-monster
 ///     queue (already single-consumer, drained by <see cref="Monsters.MonsterSpawnScheduler" /> in the same tick).
 /// </remarks>
-public sealed class TowerGuardianSystem(TowerWarState towerWar, WorldDataCache worldData) : ISimulationSystem
+/// <remarks>
+///     <paramref name="zoneEventBroadcaster" /> is <see cref="Lazy{T}" />, not a direct reference, for the exact
+///     same reason <see cref="Monsters.MonsterSpawnScheduler" />'s own <c>zoneEventBroadcaster</c> parameter is:
+///     <see cref="ZoneEventBroadcaster" /> itself depends on <see cref="World.ZoneRegistry" />, and this system is
+///     one of the <see cref="ISimulationSystem" /> instances <see cref="World.ZoneRegistry" /> resolves at its own
+///     construction time -- a direct reference here would be a same-container constructor cycle. Deferring the
+///     lookup until first use (this tower's first completed upgrade or destruction) resolves it after every
+///     singleton, including <see cref="World.ZoneRegistry" /> itself, is already constructed and cached. Drives
+///     <see cref="ZoneEventBroadcaster.AnnounceTowerStatus" /> (legacy tSort=752) on upgrade-completion
+///     (<see cref="TrySpawnGuardian" />) and, separately, on destroy-completion (<see cref="Simulate" />'s
+///     <see cref="TowerSiegePhase.Sieged" /> branch) -- see that method's own remarks for the exact citations.
+/// </remarks>
+public sealed class TowerGuardianSystem(
+    TowerWarState towerWar,
+    WorldDataCache worldData,
+    Lazy<ZoneEventBroadcaster>? zoneEventBroadcaster = null) : ISimulationSystem
 {
     /// <summary>
     ///     No legacy leash constant exists for tower guardians (S10_MySummon.cpp never sets one) -- generous
@@ -51,7 +67,15 @@ public sealed class TowerGuardianSystem(TowerWarState towerWar, WorldDataCache w
 
             case TowerSiegePhase.Sieged:
                 if (towerWar.IsDueForDestruction(towerIndex, DateTime.UtcNow))
+                {
                     towerWar.CompleteDestruction(towerIndex);
+
+                    // Legacy U_ZONE_BROADCAST_FOR_CENTER_SEND(752, ...) on destroy-completion
+                    // (S07_MyGame01.cpp:13759) -- cluster-wide, not just this zone; see
+                    // ZoneEventBroadcaster.AnnounceTowerStatus's own remarks for the full citation.
+                    zoneEventBroadcaster?.Value.AnnounceTowerStatus(towerWar);
+                }
+
                 break;
 
             case TowerSiegePhase.Dormant:
@@ -86,5 +110,11 @@ public sealed class TowerGuardianSystem(TowerWarState towerWar, WorldDataCache w
         zone.SpawnMonster(guardian);
 
         towerWar.CompleteUpgrade(towerIndex);
+
+        // Legacy U_ZONE_BROADCAST_FOR_CENTER_SEND(752, ...) on upgrade-completion (S07_MyGame01.cpp:13733) --
+        // cluster-wide, not just this zone; see ZoneEventBroadcaster.AnnounceTowerStatus's own remarks for the
+        // full citation. Only reached once per upgrade: the next tick's GetPhase no longer reports Building
+        // once CompleteUpgrade above has cleared the pending state, so Simulate stops calling this method.
+        zoneEventBroadcaster?.Value.AnnounceTowerStatus(towerWar);
     }
 }

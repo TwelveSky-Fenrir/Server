@@ -113,11 +113,18 @@ public class ClientSessionSendTests
             }
         });
 
-        // Every send hits the 1-byte pause threshold and must wait for the reader to drain back to 0; the
-        // (limit+1)-th call can only return once the limit-th call's flush (and any resulting Abort) already
-        // ran, because both serialize on the same send lock -- no sleep/poll needed for this to be deterministic.
-        for (var i = 0; i < 12 && session.DisconnectReason is null; i++)
+        // Send never blocks the caller anymore, even while a previous send on this same session is still
+        // draining under backpressure (see ClientSession's own _pendingSends remarks) -- every one of these 12
+        // calls returns immediately regardless of how far behind the pipe is, queuing instead of waiting. The
+        // five-streak eviction itself only completes once each queued frame's own flush has actually resolved
+        // against the reader above, which happens on a background continuation rather than inline here, so
+        // this polls for it instead of assuming the send loop itself drives the eviction to completion.
+        for (var i = 0; i < 12; i++)
             session.Send(packet);
+
+        using var deadlineCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        while (session.DisconnectReason is null && !deadlineCts.IsCancellationRequested)
+            await Task.Delay(10, CancellationToken.None);
 
         readerCts.Cancel();
         await Swallow(readerTask);

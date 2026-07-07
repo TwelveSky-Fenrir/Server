@@ -53,7 +53,32 @@ public enum EventLogCategory : byte
     ///     tSort 237): accrued play-time-event minutes converted into teacher points + pet experience. First
     ///     consumer: Fenrir.Application.Game.Services.GenericAction.GenericActionService.TimeExchangeAsync.
     /// </summary>
-    PlayTimeExchange = 12
+    PlayTimeExchange = 12,
+
+    /// <summary>
+    ///     A generic inventory item was used via CZ_USE_INVENTORY_ITEM_SEND with no modeled domain-specific
+    ///     effect of its own (legacy <c>GL_606_USE_INVENTORY_ITEM</c>, the same logging call shared by nearly
+    ///     every item-use branch in the legacy dispatch) -- distinct from the narrower categories above
+    ///     (<see cref="Currency" />, <see cref="CashItemUse" />, etc.) used by item-use branches that do have a
+    ///     modeled monetary/gameplay effect worth its own category. First consumer:
+    ///     Fenrir.Application.Game.Services.ZoneLifecycle.UseInventoryItemService's Teleport/Dungeon/Return
+    ///     Scroll branch (item ids 1109/1224/1026), which per its legacy source has no effect beyond this
+    ///     "before" usage log entry and an unconditional success reply.
+    /// </summary>
+    ItemUse = 13,
+
+    /// <summary>
+    ///     The offline/deputy-shop ("proxy shop") vertical: listing an item for sale (legacy
+    ///     <c>GL_1000_PXSHOP_REG</c>), retrieving an unsold item or purchasing a listed one (legacy
+    ///     <c>GL_1001_PXSHOP_ITEM</c>), and withdrawing a closed shop's accumulated earnings (legacy
+    ///     <c>GL_1002_PXSHOP_MONEY</c>) -- a dedicated category rather than folding into <see cref="Trade" />
+    ///     or <see cref="Currency" />, matching how <see cref="GuildMoney" />/<see cref="PlayTimeExchange" />
+    ///     each got their own category instead of being shoehorned into a broader existing one. EventCode is
+    ///     app-owned within this category: 1 = listed (per accepted slot), 2 = retrieved, 3 = purchased,
+    ///     4 = earnings withdrawn. First consumers: Fenrir.Application.Game.Services.Commerce.
+    ///     OpenShopStallService/UpdateProxyShopService/WithdrawProxyShopEarningsService.
+    /// </summary>
+    ProxyShop = 14
 }
 
 /// <summary>

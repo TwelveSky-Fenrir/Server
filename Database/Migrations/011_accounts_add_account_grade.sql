@@ -10,23 +10,22 @@
 -- SCHEMABINDING/natively compiled, so CREATE OR ALTER is enough here -- no DROP needed first.
 
 ALTER TABLE auth.Accounts
-    ADD AccountGrade SMALLINT NOT NULL CONSTRAINT DF_Accounts_AccountGrade DEFAULT 0;
+    ADD AccountGrade SMALLINT NOT NULL
+        CONSTRAINT DF_Accounts_AccountGrade DEFAULT 0;
 GO
 
 -- Elevation is a strict "< 1 is not elevated" binary gate at every legacy call site that reads uUserSort
 -- this way (case 519 and siblings 518/520/521, Server/ts25zone/S04_MyWork04.cpp). SMALLINT (not BIT) is
 -- kept to match legacy's own field width and leave room for a future graduated grade, even though nothing
 -- today distinguishes grade 1 from grade 2+.
-CREATE
-OR
-ALTER PROCEDURE auth.usp_Account_Authenticate @LoginName NVARCHAR(64)
-    AS
+CREATE OR ALTER PROCEDURE auth.usp_Account_Authenticate @LoginName NVARCHAR(64)
+AS
 BEGIN
     SET
-NOCOUNT ON;
+        NOCOUNT ON;
 
-SELECT AccountId, PasswordHash, PasswordSalt, FailedLoginCount, LockoutUntilUtc, IsBanned, AccountGrade
-FROM auth.Accounts
-WHERE LoginName = @LoginName;
+    SELECT AccountId, PasswordHash, PasswordSalt, FailedLoginCount, LockoutUntilUtc, IsBanned, AccountGrade
+    FROM auth.Accounts
+    WHERE LoginName = @LoginName;
 END;
 GO

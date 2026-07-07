@@ -213,7 +213,7 @@ public class AllianceDiplomacyCeremonyTests
     [Fact]
     public void NewAllianceNegotiation_ProgressesEveryOtherRawTick_AndSkipsOddTicks()
     {
-        var (ceremony, worldState, _) = CreateCeremony(4, AlreadyAlliedDuration);
+        var (ceremony, worldState, _) = CreateCeremony();
         worldState.SetTribePoints(0, 500);
         worldState.SetTribePoints(1, 500);
         var one = new AllianceCeremonyCandidate(1, 0);
@@ -251,7 +251,7 @@ public class AllianceDiplomacyCeremonyTests
     [Fact]
     public void NewAllianceNegotiation_OddTick_DoesNotYetDetectALeaderHavingLeft()
     {
-        var (ceremony, worldState, _) = CreateCeremony(10, AlreadyAlliedDuration);
+        var (ceremony, worldState, _) = CreateCeremony(10);
         worldState.SetTribePoints(0, 500);
         worldState.SetTribePoints(1, 500);
         var one = new AllianceCeremonyCandidate(1, 0);
@@ -269,7 +269,7 @@ public class AllianceDiplomacyCeremonyTests
     [Fact]
     public void NewAllianceNegotiation_CompletingTheCountdown_IsADeadEnd_NoAllianceIsEverFormed()
     {
-        var (ceremony, worldState, _) = CreateCeremony(2, AlreadyAlliedDuration);
+        var (ceremony, worldState, _) = CreateCeremony(2);
         worldState.SetTribePoints(0, 500);
         worldState.SetTribePoints(1, 500);
         var one = new AllianceCeremonyCandidate(1, 0);
@@ -309,7 +309,7 @@ public class AllianceDiplomacyCeremonyTests
     public void
         PostNegotiationCooldown_HoldsForExactlyTheGameTickHourConvention_ThenReturnsToIdle_RegardlessOfWhichPathLedIntoIt()
     {
-        var (ceremony, worldState, _) = CreateCeremony(2, AlreadyAlliedDuration);
+        var (ceremony, worldState, _) = CreateCeremony(2);
         worldState.SetTribePoints(0, 500);
         worldState.SetTribePoints(1, 500);
         var one = new AllianceCeremonyCandidate(1, 0);

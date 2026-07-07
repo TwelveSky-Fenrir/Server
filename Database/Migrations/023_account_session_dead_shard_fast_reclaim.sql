@@ -40,14 +40,14 @@
 -- Whether a row correctly mid-teardown on a still-alive shard should ever be treated as fast-clearable, or
 -- whether it should share this same liveness check, is a separate, unresolved design question -- not an
 -- oversight.
-CREATE OR ALTER PROCEDURE runtime.usp_AccountSession_ClaimOrSignalKick
-    @AccountId       INT,
-    @NewSessionToken UNIQUEIDENTIFIER,
-    @AttemptNumber   TINYINT NOT NULL
-WITH NATIVE_COMPILATION, SCHEMABINDING
-AS
-BEGIN ATOMIC
-WITH (TRANSACTION ISOLATION LEVEL = SNAPSHOT, LANGUAGE = N'us_english')
+CREATE OR ALTER PROCEDURE runtime.usp_AccountSession_ClaimOrSignalKick @AccountId INT,
+                                                                       @NewSessionToken UNIQUEIDENTIFIER,
+                                                                       @AttemptNumber TINYINT NOT NULL
+                                                                                              WITH NATIVE_COMPILATION, SCHEMABINDING
+    AS
+BEGIN
+    ATOMIC
+    WITH (TRANSACTION ISOLATION LEVEL = SNAPSHOT, LANGUAGE = N'us_english')
     DECLARE @ServerKind TINYINT, @ShardId TINYINT, @SessionState TINYINT, @ShardHeartbeatUtc DATETIME2(3) = NULL;
 
     SELECT @ServerKind = ServerKind, @ShardId = ShardId, @SessionState = SessionState
@@ -63,63 +63,69 @@ WITH (TRANSACTION ISOLATION LEVEL = SNAPSHOT, LANGUAGE = N'us_english')
     WHERE ShardId = @ShardId;
 
     IF @ServerKind IS NULL
-    BEGIN
-        INSERT INTO runtime.AccountSessions
+        BEGIN
+            INSERT INTO runtime.AccountSessions
             (AccountId, ServerKind, ShardId, SessionToken, SessionState, KickRequested, ConnectedAtUtc,
              LastRefreshedUtc)
-        VALUES (@AccountId, 0, NULL, @NewSessionToken, 0, 0, SYSUTCDATETIME(), SYSUTCDATETIME());
+            VALUES (@AccountId, 0, NULL, @NewSessionToken, 0, 0, SYSUTCDATETIME(), SYSUTCDATETIME());
 
-        SELECT CAST(0 AS TINYINT) AS Outcome, CAST(NULL AS TINYINT) AS PreviousShardId;
-    END
-    ELSE IF @SessionState = 1
-    BEGIN
-        SELECT CAST(3 AS TINYINT) AS Outcome, CAST(NULL AS TINYINT) AS PreviousShardId;
-    END
-    ELSE IF @ServerKind = 0 AND @AttemptNumber = 1
-    BEGIN
-        -- First attempt seeing an existing Login-side row for this account: a genuinely stale/abandoned
-        -- session (no write conflict preceded this read), safe to clear so the caller can proceed once
-        -- retried -- self-heals a crashed login process exactly as before this fix.
-        DELETE FROM runtime.AccountSessions
-        WHERE AccountId = @AccountId;
-
-        SELECT CAST(1 AS TINYINT) AS Outcome, CAST(NULL AS TINYINT) AS PreviousShardId;
-    END
-    ELSE IF @ServerKind = 0
-    BEGIN
-        -- @AttemptNumber > 1: this call only exists because our own first attempt's INSERT for this exact
-        -- @AccountId already lost a write-write conflict against a concurrent transaction, so the row found
-        -- here is provably that concurrent winner's just-committed row, not a stale one -- leave it
-        -- untouched. Still report ConflictLogin so the losing caller is refused exactly as before.
-        SELECT CAST(1 AS TINYINT) AS Outcome, CAST(NULL AS TINYINT) AS PreviousShardId;
-    END
-    ELSE IF @ShardHeartbeatUtc IS NULL OR @ShardHeartbeatUtc <= DATEADD(SECOND, -60, SYSUTCDATETIME())
-    BEGIN
-        -- Game-side row (ServerKind = 1, SessionState = 0) whose owning shard has no directory row at all, or
-        -- one whose heartbeat is older than this branch's own wider 60-second threshold (see this procedure's
-        -- header comment for why it deliberately differs from usp_GameServer_GetDirectory/
-        -- usp_CharacterShardLocation_FindByCharacterId's 15-second one): the shard is provably dead, so
-        -- fast-clear and reclaim immediately instead of leaving the row for AccountSessionReapHost's 6-minute
-        -- staleness sweep to eventually notice.
-        DELETE FROM runtime.AccountSessions
-        WHERE AccountId = @AccountId;
-
-        INSERT INTO runtime.AccountSessions
-            (AccountId, ServerKind, ShardId, SessionToken, SessionState, KickRequested, ConnectedAtUtc,
-             LastRefreshedUtc)
-        VALUES (@AccountId, 0, NULL, @NewSessionToken, 0, 0, SYSUTCDATETIME(), SYSUTCDATETIME());
-
-        SELECT CAST(4 AS TINYINT) AS Outcome, @ShardId AS PreviousShardId;
-    END
+            SELECT CAST(0 AS TINYINT) AS Outcome, CAST(NULL AS TINYINT) AS PreviousShardId;
+        END
     ELSE
-    BEGIN
-        -- Shard is still heartbeating within the 15s window: unchanged behavior, flag for the (presumably
-        -- live) owning process's own kick-poll to service.
-        UPDATE runtime.AccountSessions
-        SET KickRequested = 1
-        WHERE AccountId = @AccountId;
+        IF @SessionState = 1
+            BEGIN
+                SELECT CAST(3 AS TINYINT) AS Outcome, CAST(NULL AS TINYINT) AS PreviousShardId;
+            END
+        ELSE
+            IF @ServerKind = 0 AND @AttemptNumber = 1
+                BEGIN
+                    -- First attempt seeing an existing Login-side row for this account: a genuinely stale/abandoned
+                    -- session (no write conflict preceded this read), safe to clear so the caller can proceed once
+                    -- retried -- self-heals a crashed login process exactly as before this fix.
+                    DELETE
+                    FROM runtime.AccountSessions
+                    WHERE AccountId = @AccountId;
 
-        SELECT CAST(2 AS TINYINT) AS Outcome, @ShardId AS PreviousShardId;
-    END
+                    SELECT CAST(1 AS TINYINT) AS Outcome, CAST(NULL AS TINYINT) AS PreviousShardId;
+                END
+            ELSE
+                IF @ServerKind = 0
+                    BEGIN
+                        -- @AttemptNumber > 1: this call only exists because our own first attempt's INSERT for this exact
+                        -- @AccountId already lost a write-write conflict against a concurrent transaction, so the row found
+                        -- here is provably that concurrent winner's just-committed row, not a stale one -- leave it
+                        -- untouched. Still report ConflictLogin so the losing caller is refused exactly as before.
+                        SELECT CAST(1 AS TINYINT) AS Outcome, CAST(NULL AS TINYINT) AS PreviousShardId;
+                    END
+                ELSE
+                    IF @ShardHeartbeatUtc IS NULL OR @ShardHeartbeatUtc <= DATEADD(SECOND, -60, SYSUTCDATETIME())
+                        BEGIN
+                            -- Game-side row (ServerKind = 1, SessionState = 0) whose owning shard has no directory row at all, or
+                            -- one whose heartbeat is older than this branch's own wider 60-second threshold (see this procedure's
+                            -- header comment for why it deliberately differs from usp_GameServer_GetDirectory/
+                            -- usp_CharacterShardLocation_FindByCharacterId's 15-second one): the shard is provably dead, so
+                            -- fast-clear and reclaim immediately instead of leaving the row for AccountSessionReapHost's 6-minute
+                            -- staleness sweep to eventually notice.
+                            DELETE
+                            FROM runtime.AccountSessions
+                            WHERE AccountId = @AccountId;
+
+                            INSERT INTO runtime.AccountSessions
+                            (AccountId, ServerKind, ShardId, SessionToken, SessionState, KickRequested, ConnectedAtUtc,
+                             LastRefreshedUtc)
+                            VALUES (@AccountId, 0, NULL, @NewSessionToken, 0, 0, SYSUTCDATETIME(), SYSUTCDATETIME());
+
+                            SELECT CAST(4 AS TINYINT) AS Outcome, @ShardId AS PreviousShardId;
+                        END
+                    ELSE
+                        BEGIN
+                            -- Shard is still heartbeating within the 15s window: unchanged behavior, flag for the (presumably
+                            -- live) owning process's own kick-poll to service.
+                            UPDATE runtime.AccountSessions
+                            SET KickRequested = 1
+                            WHERE AccountId = @AccountId;
+
+                            SELECT CAST(2 AS TINYINT) AS Outcome, @ShardId AS PreviousShardId;
+                        END
 END;
 GO

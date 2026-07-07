@@ -16,7 +16,6 @@ namespace Fenrir.Application.Game.Handlers.Handlers;
 ///     contract, but never reaches <see cref="IZoneHandshakeService" /> at all: <c>ZoneHandshakeRequest.AllowedStates</c>
 ///     is Connected-only, so <c>SessionStateGate</c> already drops any replay before dispatch (silent, same as
 ///     every other state violation) -- unlike legacy, which has no such wire-level guard for this packet.
-///
 ///     This handler's own "Zone handshake accepted..." Info line below is, by construction, logged right after
 ///     <c>ZoneHandshakeService.ConsumeTicketAsync</c>'s final action stamps this connection's registration
 ///     timestamp into <c>TribeQuotaRegistry</c> -- which starts the clock for

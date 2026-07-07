@@ -11,3 +11,8 @@ public sealed partial record MuteRowDto(
     byte Reason,
     DateTime? ExpiresAtUtc,
     DateTime CreatedAtUtc);
+
+// admin.usp_Mute_GetActiveForCharacters (batched); GetActiveCharacterIdsAsync only needs the id back, one
+// row per currently-muted character in the supplied set.
+[GenerateDto]
+public sealed partial record MutedCharacterIdDto(int CharacterId);

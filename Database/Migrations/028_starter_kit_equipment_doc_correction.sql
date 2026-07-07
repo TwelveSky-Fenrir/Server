@@ -48,37 +48,37 @@
 -- nvarchar(4000)/8,000-byte cap and sp_addextendedproperty's own 7,500-byte @value cap.
 DECLARE @TableDescription NVARCHAR(4000) =
     N'Server/ts25login/S04_MyWork02.cpp CREATE_AVATAR_SEND2, USE_CUSTOME_CREATE branch (force-defined '
-    + N'unconditionally at S04_MyWork02.cpp:1, no #undef anywhere under Server/ -- this is the branch that '
-    + N'ships in every build configuration; see Migrations/015_starter_kit_elite_grant.sql''s header '
-    + N'comment for the full citation). Keyed by PreviousTribe (0=Noble Dragon,1=Royal Serpent,2=Grand '
-    + N'Tiger), the client-chosen starting-kit template -- distinct from the playable Tribe (0-3) used for '
-    + N'spawn/faction. EquipSlot follows FEQUIP_TYPE (Server/Header/Protocol/STRUCT.h:1662-1676): '
-    + N'0=Amulet,2=Armor,3=Gloves,4=Ring,5=Boots,7=Weapon. Amulet/Armor/Gloves/Ring/Boots each own exactly '
-    + N'one row per PreviousTribe; Weapon owns the 3 client-selectable alternatives (CreateAvatarRequest.'
-    + N'Weapon, matched via RawWeaponCode, must match one of them) -- 8 rows per PreviousTribe, 24 total. '
-    + N'Current seed data is Migrations/Seed/world/086_starter_kit_equipment_elite_correction.sql''s rows '
-    + N'(which DELETEs and replaces 082_starter_kit_equipment.sql''s original, now-superseded '
-    + N'dead-branch/no-Ring-or-Amulet/no-weapon-remap rows).';
+        + N'unconditionally at S04_MyWork02.cpp:1, no #undef anywhere under Server/ -- this is the branch that '
+        + N'ships in every build configuration; see Migrations/015_starter_kit_elite_grant.sql''s header '
+        + N'comment for the full citation). Keyed by PreviousTribe (0=Noble Dragon,1=Royal Serpent,2=Grand '
+        + N'Tiger), the client-chosen starting-kit template -- distinct from the playable Tribe (0-3) used for '
+        + N'spawn/faction. EquipSlot follows FEQUIP_TYPE (Server/Header/Protocol/STRUCT.h:1662-1676): '
+        + N'0=Amulet,2=Armor,3=Gloves,4=Ring,5=Boots,7=Weapon. Amulet/Armor/Gloves/Ring/Boots each own exactly '
+        + N'one row per PreviousTribe; Weapon owns the 3 client-selectable alternatives (CreateAvatarRequest.'
+        + N'Weapon, matched via RawWeaponCode, must match one of them) -- 8 rows per PreviousTribe, 24 total. '
+        + N'Current seed data is Migrations/Seed/world/086_starter_kit_equipment_elite_correction.sql''s rows '
+        + N'(which DELETEs and replaces 082_starter_kit_equipment.sql''s original, now-superseded '
+        + N'dead-branch/no-Ring-or-Amulet/no-weapon-remap rows).';
 
 EXECUTE sys.sp_addextendedproperty
-    @name = N'MS_Description',
-    @value = @TableDescription,
-    @level0type = N'SCHEMA', @level0name = N'world',
-    @level1type = N'TABLE', @level1name = N'StarterKitEquipment';
+        @name = N'MS_Description',
+        @value = @TableDescription,
+        @level0type = N'SCHEMA', @level0name = N'world',
+        @level1type = N'TABLE', @level1name = N'StarterKitEquipment';
 GO
 
 DECLARE @RawWeaponCodeDescription NVARCHAR(4000) =
     N'Added by Migrations/015_starter_kit_elite_grant.sql (not present in the original CREATE TABLE '
-    + N'script). NULL for the 5 unconditional per-race grants (Amulet/Armor/Gloves/Ring/Boots); holds the '
-    + N'raw client-selectable weapon code (5/6/7, 11/12/13, or 17/18/19 depending on PreviousTribe) for '
-    + N'each of the 3 Weapon (EquipSlot=7) rows per race. CreateAvatarService.TryResolveWeaponItemId '
-    + N'matches CreateAvatarRequest.Weapon against this column, then grants that row''s ItemId (the elite '
-    + N'weapon) -- never the raw code itself.';
+        + N'script). NULL for the 5 unconditional per-race grants (Amulet/Armor/Gloves/Ring/Boots); holds the '
+        + N'raw client-selectable weapon code (5/6/7, 11/12/13, or 17/18/19 depending on PreviousTribe) for '
+        + N'each of the 3 Weapon (EquipSlot=7) rows per race. CreateAvatarService.TryResolveWeaponItemId '
+        + N'matches CreateAvatarRequest.Weapon against this column, then grants that row''s ItemId (the elite '
+        + N'weapon) -- never the raw code itself.';
 
 EXECUTE sys.sp_addextendedproperty
-    @name = N'MS_Description',
-    @value = @RawWeaponCodeDescription,
-    @level0type = N'SCHEMA', @level0name = N'world',
-    @level1type = N'TABLE', @level1name = N'StarterKitEquipment',
-    @level2type = N'COLUMN', @level2name = N'RawWeaponCode';
+        @name = N'MS_Description',
+        @value = @RawWeaponCodeDescription,
+        @level0type = N'SCHEMA', @level0name = N'world',
+        @level1type = N'TABLE', @level1name = N'StarterKitEquipment',
+        @level2type = N'COLUMN', @level2name = N'RawWeaponCode';
 GO

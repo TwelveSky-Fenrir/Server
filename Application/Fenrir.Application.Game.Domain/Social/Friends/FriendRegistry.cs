@@ -25,9 +25,17 @@ public sealed class FriendRegistry
     private readonly Dictionary<int, int> _pendingByAsker = new();
     private readonly Dictionary<int, int> _pendingByTarget = new();
 
-    private bool IsNegotiating(int characterId)
+    /// <summary>
+    ///     Friend-family half of the legacy <c>CheckCommunityWork</c> exclusivity check. Public so sibling
+    ///     negotiation families (e.g. Guild ask, see <c>GuildInviteService</c>) can compose a cross-family busy
+    ///     check without duplicating this registry's own state.
+    /// </summary>
+    public bool IsNegotiating(int characterId)
     {
-        return _pendingByAsker.ContainsKey(characterId) || _pendingByTarget.ContainsKey(characterId);
+        lock (_lock)
+        {
+            return _pendingByAsker.ContainsKey(characterId) || _pendingByTarget.ContainsKey(characterId);
+        }
     }
 
     public FriendAskOutcome TryAsk(int askerId, int targetId)

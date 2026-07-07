@@ -7,21 +7,21 @@
 -- only ever holds CharacterWorldEntryDto's narrow prefix, not the full stat/progression row, and this floor
 -- clamp must never overwrite Stat*/SkillPoints/Experience with stale zeros.
 CREATE PROCEDURE game.usp_Character_ClampVitalsFloor @CharacterId INT,
-    @FlushSequence BIGINT,
-    @Life          INT,
-    @Mana          INT
+                                                     @FlushSequence BIGINT,
+                                                     @Life INT,
+                                                     @Mana INT
 AS
 BEGIN
     SET
-NOCOUNT ON;
+        NOCOUNT ON;
     SET
-XACT_ABORT ON;
+        XACT_ABORT ON;
 
-UPDATE game.Characters
-SET Life          = @Life,
-    Mana          = @Mana,
-    FlushSequence = @FlushSequence,
-    UpdatedAtUtc  = SYSUTCDATETIME()
-WHERE CharacterId = @CharacterId
-  AND @FlushSequence > FlushSequence;
+    UPDATE game.Characters
+    SET Life          = @Life,
+        Mana          = @Mana,
+        FlushSequence = @FlushSequence,
+        UpdatedAtUtc  = SYSUTCDATETIME()
+    WHERE CharacterId = @CharacterId
+      AND @FlushSequence > FlushSequence;
 END;

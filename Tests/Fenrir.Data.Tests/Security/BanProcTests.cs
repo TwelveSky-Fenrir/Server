@@ -24,6 +24,7 @@ public class BanProcTests
     private readonly IAccountRepository _accounts;
     private readonly IBanRepository _bans;
     private readonly ICharacterRepository _characters;
+    private readonly string _connectionString;
 
     public BanProcTests(SqlServerFixture fixture)
     {
@@ -36,6 +37,7 @@ public class BanProcTests
         _accounts = new AccountRepository(db);
         _characters = new CharacterRepository(db);
         _bans = new BanRepository(db);
+        _connectionString = fixture.ConnectionString;
     }
 
     [Fact]
@@ -116,6 +118,47 @@ public class BanProcTests
             _bans.CreateAsync(null, null, BanReason.GmManualBlock, null, CancellationToken.None).AsTask());
 
         Assert.Equal(50301, ex.Number);
+    }
+
+    // gm-action-audit-attribution (Migrations/035_bans_actor_attribution.sql): admin.Bans now records which GM
+    // issued the ban, independently of the existing target AccountId/CharacterId pair. Verified via a raw SELECT
+    // since neither usp_Ban_GetActiveForAccount/Character nor BanRowDto project the new columns today (both only
+    // ever consumed for their row COUNT).
+    [Fact]
+    public async Task CreateAsync_WithActorIds_PersistsThemIndependentlyOfTheTargetPair()
+    {
+        var (targetAccountId, targetCharacterId) = await CreateCharacterAsync();
+        var (gmAccountId, gmCharacterId) = await CreateCharacterAsync();
+
+        var banId = await _bans.CreateAsync(targetAccountId, targetCharacterId, BanReason.GmManualBlock,
+            null, CancellationToken.None, gmAccountId, gmCharacterId);
+
+        Assert.Equal(gmAccountId,
+            await ScalarAsync<int>($"SELECT ActorAccountId FROM admin.Bans WHERE BanId = {banId};"));
+        Assert.Equal(gmCharacterId,
+            await ScalarAsync<int>($"SELECT ActorCharacterId FROM admin.Bans WHERE BanId = {banId};"));
+    }
+
+    // Actor ids are optional -- omitting them (every pre-existing call site) must persist NULL, not fail, and
+    // must not disturb the existing target-pair behavior.
+    [Fact]
+    public async Task CreateAsync_WithoutActorIds_PersistsNullActorColumns()
+    {
+        var (accountId, characterId) = await CreateCharacterAsync();
+
+        var banId = await _bans.CreateAsync(accountId, characterId, BanReason.GmManualBlock, null,
+            CancellationToken.None);
+
+        Assert.Equal(1, await ScalarAsync<int>(
+            $"SELECT COUNT(*) FROM admin.Bans WHERE BanId = {banId} AND ActorAccountId IS NULL AND ActorCharacterId IS NULL;"));
+    }
+
+    private async Task<T> ScalarAsync<T>(string sql)
+    {
+        await using var connection = new SqlConnection(_connectionString);
+        await connection.OpenAsync();
+        await using var command = new SqlCommand(sql, connection);
+        return (T)(await command.ExecuteScalarAsync())!;
     }
 
     private async Task<(int AccountId, int CharacterId)> CreateCharacterAsync()

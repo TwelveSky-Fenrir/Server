@@ -149,7 +149,7 @@ public class CreateAvatarHandlerTests
             // zone-avatarinfo-factory-parity finding: the pet slot's 2nd/3rd wire ints are activity/growth
             // (Server/ts25login/S04_MyWork02.cpp:1131-1135 -- MAX_PAT_ACTIVITY_SIZE/640,000,000), mirroring
             // CreateAvatarService's own StarterPetActivity/StarterPetGrowth constants.
-            Equip = AvatarInfoFactory.BuildEquipArray(call.Equipment, petGrowth: 640_000_000, petActivity: 100),
+            Equip = AvatarInfoFactory.BuildEquipArray(call.Equipment, 640_000_000, 100),
             // zone-avatarinfo-factory-parity finding: see CreateAvatarService's own remarks (Inventory/Skill/
             // HotKey overlay, right after Equip) for the full citation. StoreItem stays at Zeroed's 0 default
             // -- no starter kit grants a warehouse row.
@@ -227,7 +227,8 @@ public class CreateAvatarHandlerTests
         await handler.HandleAsync(request, session, CancellationToken.None);
 
         Assert.Null(session.DisconnectReason);
-        Assert.Equal(((byte)1, (short)6), starterKits.LastCall); // Tribe 1 -> mapcheck.h map 6; PreviousTribe threaded unchanged
+        Assert.Equal(((byte)1, (short)6),
+            starterKits.LastCall); // Tribe 1 -> mapcheck.h map 6; PreviousTribe threaded unchanged
 
         var call = characters.LastCreateWithStarterKit;
         Assert.NotNull(call);
@@ -263,7 +264,7 @@ public class CreateAvatarHandlerTests
 
         // 6 is a valid Noble Dragon weapon id, not one of Royal Serpent's (11/12/13) -- guards the
         // "previousTribe is 0 or 1 or 2" weapon-validation gate at value 1 specifically, not just 0.
-        var request = ValidRequest(6) with { Tribe = 1, PreviousTribe = 1 };
+        var request = ValidRequest() with { Tribe = 1, PreviousTribe = 1 };
 
         await handler.HandleAsync(request, session, CancellationToken.None);
 
@@ -340,7 +341,8 @@ public class CreateAvatarHandlerTests
     // This proves the two fields are honored independently: spawn map follows Tribe, starter kit follows
     // PreviousTribe, and the mismatch itself is not a creation-time failure.
     [Fact]
-    public async Task HandleAsync_TribeAndPreviousTribeMismatchedWithinMainFactionRange_CreatesNormallyWithNoCrossValidation()
+    public async Task
+        HandleAsync_TribeAndPreviousTribeMismatchedWithinMainFactionRange_CreatesNormallyWithNoCrossValidation()
     {
         var characters = FakeCharacterRepository.WithNone();
         var starterKits = FakeStarterKitRepository.RoyalSerpentKit();
@@ -642,9 +644,9 @@ public class CreateAvatarHandlerTests
         var tribes = FakeTribeRepository.WithPoints((0, 100), (1, 0), (2, 0), (3, 0));
         var handler =
             new CreateAvatarHandler(
-            new CreateAvatarService(characters, starterKits, tribes, DefaultOptions(),
-                NullLogger<CreateAvatarService>.Instance),
-            NullLogger<CreateAvatarHandler>.Instance);
+                new CreateAvatarService(characters, starterKits, tribes, DefaultOptions(),
+                    NullLogger<CreateAvatarService>.Instance),
+                NullLogger<CreateAvatarHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
 
         await handler.HandleAsync(ValidRequest(), session, CancellationToken.None);
@@ -666,9 +668,9 @@ public class CreateAvatarHandlerTests
         var tribes = FakeTribeRepository.WithPoints((0, 10), (1, 150), (2, 0), (3, 0));
         var handler =
             new CreateAvatarHandler(
-            new CreateAvatarService(characters, starterKits, tribes, DefaultOptions(),
-                NullLogger<CreateAvatarService>.Instance),
-            NullLogger<CreateAvatarHandler>.Instance);
+                new CreateAvatarService(characters, starterKits, tribes, DefaultOptions(),
+                    NullLogger<CreateAvatarService>.Instance),
+                NullLogger<CreateAvatarHandler>.Instance);
         var (session, _) = CreateSessionInCharSelect();
 
         await handler.HandleAsync(ValidRequest(), session, CancellationToken.None);
@@ -685,9 +687,9 @@ public class CreateAvatarHandlerTests
         var tribes = FakeTribeRepository.WithPoints((0, 99), (1, 0), (2, 0), (3, 0));
         var handler =
             new CreateAvatarHandler(
-            new CreateAvatarService(characters, starterKits, tribes, DefaultOptions(),
-                NullLogger<CreateAvatarService>.Instance),
-            NullLogger<CreateAvatarHandler>.Instance);
+                new CreateAvatarService(characters, starterKits, tribes, DefaultOptions(),
+                    NullLogger<CreateAvatarService>.Instance),
+                NullLogger<CreateAvatarHandler>.Instance);
         var (session, _) = CreateSessionInCharSelect();
 
         await handler.HandleAsync(ValidRequest(), session, CancellationToken.None);
@@ -768,7 +770,7 @@ public class CreateAvatarHandlerTests
             ProtectForDeath = 5,
             // zone-avatarinfo-factory-parity finding: see the equivalent block in
             // HandleAsync_ValidRequest_RepliesResultZeroWithFullAvatarInfo above for the full citation.
-            Equip = AvatarInfoFactory.BuildEquipArray(call.Equipment, petGrowth: 640_000_000, petActivity: 100),
+            Equip = AvatarInfoFactory.BuildEquipArray(call.Equipment, 640_000_000, 100),
             Inventory = AvatarInfoFactory.BuildInventoryArray(call.Inventory),
             Skill = AvatarInfoFactory.BuildSkillArray(call.Skills),
             HotKey = AvatarInfoFactory.BuildHotKeyArray(call.Hotkeys),

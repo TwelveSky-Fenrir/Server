@@ -9,11 +9,16 @@ namespace Fenrir.Application.Game.Services.Tribes;
 ///     GM-rank concept (see <see cref="Chat.GlobalAnnouncementHandler" />), so the legacy's
 ///     <c>uUserSort &lt; 1</c> GM bypass is always taken and every caller falls through to the
 ///     <c>ReturnTribeRole != 0</c> check. Sort 2 (withdraw) is Force Leader-only and additionally requires at
-///     least 3 appointed sub-masters. Sort 3 (deposit) is a Fenrir-only addition, not a legacy client sort:
+///     least 3 appointed sub-masters. Sort 3 (deposit) is a Fenrir-only addition, not a legacy client sort --
 ///     the legacy deposit path (ZONE_TRIBE_BANK_SAVE_FOR_PLAYUSER_SEND) was a periodic system-side tax sweep
-///     gated on a WorldState/territory-ownership model Fenrir has not ported yet, so it has no client trigger
-///     at all -- "the bank can be emptied but never filled" is fixed here instead by letting any tribe member
-///     donate their own money (never someone else's, so no privileged-role gate is needed).
+///     gated on a WorldState/territory-ownership model Fenrir has not ported yet, so an unmodified legacy
+///     client can never legitimately produce this Sort value at all. Legacy's own rule is that the *one*
+///     mutating tribe-bank operation it has (Sort 2/withdraw) requires Force Leader role plus a 3-sub-master
+///     quorum regardless of the money's direction of travel, so this Fenrir-only deposit path is gated
+///     identically to withdraw rather than left open to any tribe member: moving the depositor's own money
+///     into the bank is still a tribe-wide mutation of shared funds, not a personal action, and closes what
+///     was previously an authorization gap (a plain member could deposit -- never someone else's money, but
+///     still with none of the Force-Leader-plus-quorum approval every other bank mutation requires).
 /// </summary>
 public sealed class TribeBankService(ITribeRepository tribes, ILogger<TribeBankService> logger) : ITribeBankService
 {
@@ -59,7 +64,11 @@ public sealed class TribeBankService(ITribeRepository tribes, ILogger<TribeBankS
     public async ValueTask<TribeBankResult> DepositAsync(int slotValue, PlayerRuntimeState state, int characterId,
         CancellationToken ct)
     {
-        if (slotValue < 0 || slotValue >= SlotCount)
+        if (slotValue < 0 || slotValue >= SlotCount || state.TribeRole != 1)
+            return TribeBankResult.Aborted;
+
+        var subMasters = await tribes.GetSubMastersAsync(state.Tribe, ct);
+        if (subMasters.Count < RequiredSubMasterCount)
             return TribeBankResult.Aborted;
 
         long newMoney;

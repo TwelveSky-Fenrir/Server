@@ -347,16 +347,44 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
     }
 
     /// <summary>
+    ///     Durable single-slot write to game.CharacterHotkeys (op22 CZ_USE_HOTKEY_ITEM_SEND's post-consumption
+    ///     decrement/clear) -- see <see cref="ICharacterRepository.UpsertHotkeySlotAsync" />'s own remarks for
+    ///     the column-order caveat.
+    /// </summary>
+    public async ValueTask UpsertHotkeySlotAsync(int characterId, byte page, byte keyIndex, int sort, int value1,
+        int value2, CancellationToken ct)
+    {
+        var sp = new StoredProcedureParametersBuilder("game", "usp_CharacterHotkeys_UpsertSlot", 0)
+            .AddParameter("CharacterId", characterId, SqlDbType.Int)
+            .AddParameter("Page", page, SqlDbType.TinyInt)
+            .AddParameter("KeyIndex", keyIndex, SqlDbType.TinyInt)
+            .AddParameter("Sort", sort, SqlDbType.Int)
+            .AddParameter("Value1", value1, SqlDbType.Int)
+            .AddParameter("Value2", value2, SqlDbType.Int)
+            .Build();
+
+        await Db.ExecuteAsync(sp, ct);
+    }
+
+    /// <summary>
     ///     Atomic two-character trade commit -- both sides' final inventory contents and money deltas commit in one
     ///     transaction or none do. TradeSession has already computed every value; this is the durable commit, not the
-    ///     negotiation.
+    ///     negotiation. Since Migrations/037_trade_event_log.sql, the same transaction also writes the
+    ///     game.EventLog audit rows for the trade (legacy GL_615_TRADE_ITEM/GL_615_TRADE_ITEM2/GL_616_TRADE_MONEY)
+    ///     when <paramref name="tradedItemsA" />/<paramref name="tradedItemsB" />/<paramref name="offeredMoneyA" />/
+    ///     <paramref name="offeredMoneyB" /> are supplied -- see ICharacterRepository's own doc comment for why
+    ///     these are distinct from the whole-container/net-delta parameters already here.
     /// </summary>
     public async ValueTask ExecuteTradeAsync(
         int characterA, IReadOnlyList<CharacterItemSlotTvp> itemsA0, IReadOnlyList<CharacterItemSlotTvp> itemsA1,
         long deltaMoneyA, int deltaBigMoneyA,
         int characterB, IReadOnlyList<CharacterItemSlotTvp> itemsB0, IReadOnlyList<CharacterItemSlotTvp> itemsB1,
         long deltaMoneyB, int deltaBigMoneyB,
-        CancellationToken ct)
+        CancellationToken ct,
+        IReadOnlyList<CharacterItemSlotTvp>? tradedItemsA = null,
+        IReadOnlyList<CharacterItemSlotTvp>? tradedItemsB = null,
+        long offeredMoneyA = 0, int offeredBigMoneyA = 0,
+        long offeredMoneyB = 0, int offeredBigMoneyB = 0)
     {
         var builder = new StoredProcedureParametersBuilder("game", "usp_CharacterTrade_Execute", 0)
             .AddParameter("CharacterA", characterA, SqlDbType.Int);
@@ -373,6 +401,16 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
 
         builder.AddParameter("DeltaMoneyB", deltaMoneyB, SqlDbType.BigInt)
             .AddParameter("DeltaBigMoneyB", deltaBigMoneyB, SqlDbType.Int);
+
+        // Audit-only additions (Migrations/037_trade_event_log.sql) -- appended last, never inserted among the
+        // existing scalars/TVPs above, matching the append-only parameter rule.
+        if (tradedItemsA is { Count: > 0 }) builder.AddTvpParameter("TradedItemsA", tradedItemsA);
+        if (tradedItemsB is { Count: > 0 }) builder.AddTvpParameter("TradedItemsB", tradedItemsB);
+
+        builder.AddParameter("OfferedMoneyA", offeredMoneyA, SqlDbType.BigInt)
+            .AddParameter("OfferedBigMoneyA", offeredBigMoneyA, SqlDbType.Int)
+            .AddParameter("OfferedMoneyB", offeredMoneyB, SqlDbType.BigInt)
+            .AddParameter("OfferedBigMoneyB", offeredBigMoneyB, SqlDbType.Int);
 
         await Db.ExecuteAsync(builder.Build(), ct);
     }
@@ -586,5 +624,39 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
             .Build();
 
         return await Db.ExecuteScalarAsync<int>(sp, ct);
+    }
+
+    /// <summary>
+    ///     game.Characters.ProtectForDeath adjustment/consumption. Returns the post-adjustment balance.
+    ///     Throws SQL 50332 on unknown character or an adjustment that would take the balance negative.
+    /// </summary>
+    public async ValueTask<int> AdjustDeathProtectionAsync(int characterId, int delta, CancellationToken ct)
+    {
+        var sp = new StoredProcedureParametersBuilder("game", "usp_Character_AdjustDeathProtection", 1)
+            .AddParameter("CharacterId", characterId, SqlDbType.Int)
+            .AddParameter("Delta", delta, SqlDbType.Int)
+            .Build();
+
+        return await Db.ExecuteScalarAsync<int>(sp, ct);
+    }
+
+    /// <summary>
+    ///     Book of Noble Dragon/Royal Serpent/Grand Tiger V2 tribe-conversion mechanic (world.Items
+    ///     99014/99015/99016); see usp_Character_ApplyTribeConversion.sql's own header for the full
+    ///     precondition list and THROW codes (50313-50320). Empty-TVP-omission rule same as
+    ///     <see cref="ReplaceContainerAsync" />.
+    /// </summary>
+    public async ValueTask ApplyTribeConversionAsync(int characterId, int itemId, byte container,
+        IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct)
+    {
+        var builder = new StoredProcedureParametersBuilder("game", "usp_Character_ApplyTribeConversion", 0)
+            .AddParameter("CharacterId", characterId, SqlDbType.Int)
+            .AddParameter("ItemId", itemId, SqlDbType.Int)
+            .AddParameter("Container", container, SqlDbType.TinyInt);
+
+        if (items.Count > 0)
+            builder.AddTvpParameter("Items", items);
+
+        await Db.ExecuteAsync(builder.Build(), ct);
     }
 }

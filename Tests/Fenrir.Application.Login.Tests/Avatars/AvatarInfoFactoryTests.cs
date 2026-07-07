@@ -113,12 +113,12 @@ public class AvatarInfoFactoryTests
     {
         var equipment = new List<CharacterItemSlotTvp>
         {
-            new(Slot: 0, ItemId: 84671, Quantity: 1, Enchant: 45, Combine: 6, Refine: 1, Socket: 2,
-                SocketGem1: 0, SocketGem2: 0, SocketGem3: 0, ExpireDate: 12345, Serial: 0), // Amulet
-            new(Slot: 7, ItemId: 84527, Quantity: 1, Enchant: 45, Combine: 6, Refine: 0, Socket: 0,
-                SocketGem1: 0, SocketGem2: 0, SocketGem3: 0, ExpireDate: 0, Serial: 0), // Weapon
-            new(Slot: 13, ItemId: 999999, Quantity: 1, Enchant: 0, Combine: 0, Refine: 0, Socket: 0,
-                SocketGem1: 0, SocketGem2: 0, SocketGem3: 0, ExpireDate: 0, Serial: 0) // out of FEQUIP_TYPE's range
+            new(0, 84671, 1, 45, 6, 1, 2,
+                0, 0, 0, 12345, 0), // Amulet
+            new(7, 84527, 1, 45, 6, 0, 0,
+                0, 0, 0, 0, 0), // Weapon
+            new(13, 999999, 1, 0, 0, 0, 0,
+                0, 0, 0, 0, 0) // out of FEQUIP_TYPE's range
         };
 
         var equip = AvatarInfoFactory.BuildEquipArray(equipment);

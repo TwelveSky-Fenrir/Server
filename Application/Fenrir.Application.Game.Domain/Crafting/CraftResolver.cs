@@ -13,6 +13,12 @@ namespace Fenrir.Application.Game.Domain.Crafting;
 /// </remarks>
 public static class CraftResolver
 {
+    public enum DustRecycleOutcome
+    {
+        Rejected,
+        Success
+    }
+
     public enum ElixirOutcome
     {
         Success,
@@ -23,12 +29,52 @@ public static class CraftResolver
         Rejected
     }
 
+    public enum FeatherTierUpOutcome
+    {
+        Rejected,
+        Success
+    }
+
     public enum JadeOutcome
     {
         /// <summary>Always succeeds, no roll.</summary>
         Success,
 
         Rejected
+    }
+
+    public enum MountFusionOutcome
+    {
+        Rejected,
+        Upgraded,
+        DustConsolation
+    }
+
+    public enum StoneMatOutcome
+    {
+        Rejected,
+        Success
+    }
+
+    public enum WingAssemblyOutcome
+    {
+        Rejected,
+        Assembled,
+        Destroyed
+    }
+
+    public enum WingFifthTierOutcome
+    {
+        Rejected,
+        Success,
+        DustConsolation
+    }
+
+    public enum WingTierRerollOutcome
+    {
+        Rejected,
+        Rerolled,
+        DustConsolation
     }
 
     /// <summary>
@@ -86,6 +132,274 @@ public static class CraftResolver
         return new ElixirResult(ElixirOutcome.Failed, remaining, null);
     }
 
+    /// <summary>
+    ///     MK_MATS_01019 -- 4 separate stone-mat items (not one stack of 4) become one random result item.
+    ///     changeResultSort's own item-catalog lookup (:4383) can never actually fail here since
+    ///     randomStoneMat()'s output is this fixed, all-valid 4-item pool -- so unlike the legacy source this
+    ///     resolver has no corresponding rejection path for that step.
+    /// </summary>
+    /// <remarks>Every slot must hold exactly 1 unit -- same duplication guard as <see cref="ResolveJadeUpgrade" />.</remarks>
+    public static StoneMatResult ResolveStoneMatCombine(ItemStack material1, ItemStack material2,
+        ItemStack material3, ItemStack material4, IRandomSource random)
+    {
+        if (material1.ItemId != CraftRecipeCatalog.StoneMatMaterialItemId ||
+            material2.ItemId != CraftRecipeCatalog.StoneMatMaterialItemId ||
+            material3.ItemId != CraftRecipeCatalog.StoneMatMaterialItemId ||
+            material4.ItemId != CraftRecipeCatalog.StoneMatMaterialItemId)
+            return new StoneMatResult(StoneMatOutcome.Rejected, 0);
+
+        if (material1.Quantity > 1 || material2.Quantity > 1 || material3.Quantity > 1 || material4.Quantity > 1)
+            return new StoneMatResult(StoneMatOutcome.Rejected, 0);
+
+        var pool = CraftRecipeCatalog.StoneMatResultPool;
+        return new StoneMatResult(StoneMatOutcome.Success, pool[random.NextInt32(pool.Count)]);
+    }
+
+    /// <summary>
+    ///     MK_ANIMAL_NUM_1/2 -- 3 same-tier mounts + 1 exact catalyst -&gt; a chance at a next-tier mount, else a
+    ///     dust consolation grant (still a wire-level success either way -- :4541-4639).
+    /// </summary>
+    /// <param name="sort">
+    ///     <see cref="CraftRecipeCatalog.MountFusionTier1Sort" /> or
+    ///     <see cref="CraftRecipeCatalog.MountFusionTier2Sort" />.
+    /// </param>
+    public static MountFusionResult ResolveMountFusion(int sort, int material1ItemId, int material2ItemId,
+        int material3ItemId, int catalystItemId, IRandomSource random)
+    {
+        var isTier2 = sort == CraftRecipeCatalog.MountFusionTier2Sort;
+        var materialPool = isTier2
+            ? CraftRecipeCatalog.MountFusionTier2MaterialItemIds
+            : CraftRecipeCatalog.MountFusionTier1MaterialItemIds;
+        var catalystItemIdRequired = isTier2
+            ? CraftRecipeCatalog.MountFusionTier2CatalystItemId
+            : CraftRecipeCatalog.MountFusionTier1CatalystItemId;
+
+        if (!materialPool.Contains(material1ItemId) || !materialPool.Contains(material2ItemId) ||
+            !materialPool.Contains(material3ItemId) || catalystItemId != catalystItemIdRequired)
+            return new MountFusionResult(MountFusionOutcome.Rejected, 0, 0);
+
+        var numerator = isTier2
+            ? CraftRecipeCatalog.MountFusionTier2SuccessNumerator
+            : CraftRecipeCatalog.MountFusionTier1SuccessNumerator;
+        var denominator = isTier2
+            ? CraftRecipeCatalog.MountFusionTier2SuccessDenominator
+            : CraftRecipeCatalog.MountFusionTier1SuccessDenominator;
+
+        if (random.NextInt32(denominator) < numerator)
+        {
+            var pool = isTier2
+                ? CraftRecipeCatalog.MountFusionTier2ResultPool
+                : CraftRecipeCatalog.MountFusionTier1ResultPool;
+            return new MountFusionResult(MountFusionOutcome.Upgraded, pool[random.NextInt32(pool.Count)], 0);
+        }
+
+        var dustQuantity = isTier2
+            ? CraftRecipeCatalog.MountFusionTier2FailureDustQuantity
+            : CraftRecipeCatalog.MountFusionTier1FailureDustQuantity;
+        return new MountFusionResult(MountFusionOutcome.DustConsolation, CraftRecipeCatalog.DustItemId, dustQuantity);
+    }
+
+    /// <summary>
+    ///     MK_WING_0 -- 3x White Feather + 1 of 9 catalyst gems -&gt; a chance at one of 5 wing tiers, else the
+    ///     material is destroyed outright (no dust consolation -- this is the one recipe in the whole family
+    ///     with a genuine hard-failure roll outcome). Town-zone and Contribution-Point preconditions are
+    ///     checked by the caller (need Zone/PlayerRuntimeState access) and passed in already resolved so this
+    ///     stays a pure, Zone-independent resolver -- :5096-5202.
+    /// </summary>
+    public static WingAssemblyResult ResolveWingAssembly(bool isTownZone, bool hasSufficientContributionPoints,
+        int material1ItemId, int material2ItemId, int material3ItemId, int catalystItemId, byte previousTribe,
+        IRandomSource random)
+    {
+        if (!isTownZone || !hasSufficientContributionPoints)
+            return new WingAssemblyResult(WingAssemblyOutcome.Rejected, 0);
+
+        if (material1ItemId != CraftRecipeCatalog.WingFeatherWhiteItemId ||
+            material2ItemId != CraftRecipeCatalog.WingFeatherWhiteItemId ||
+            material3ItemId != CraftRecipeCatalog.WingFeatherWhiteItemId ||
+            !CraftRecipeCatalog.WingAssemblyCatalystItemIds.Contains(catalystItemId))
+            return new WingAssemblyResult(WingAssemblyOutcome.Rejected, 0);
+
+        var roll = random.NextInt32(100);
+        var tier = roll switch
+        {
+            1 => 5,
+            2 => 2,
+            3 => 3,
+            4 => 4,
+            >= 5 and <= 15 => 1,
+            _ => 0
+        };
+
+        if (tier == 0)
+            return new WingAssemblyResult(WingAssemblyOutcome.Destroyed, 0);
+
+        return new WingAssemblyResult(WingAssemblyOutcome.Assembled,
+            CraftRecipeCatalog.WingTierItemId(tier, previousTribe));
+    }
+
+    /// <summary>
+    ///     MK_WING_1/MK_WING_3 -- deterministic, no RNG: 10 White Feather -&gt; 1 Black Feather, or 10 Black
+    ///     Feather -&gt; 1 Gold Feather -- :5270-5340.
+    /// </summary>
+    /// <param name="sort">
+    ///     <see cref="CraftRecipeCatalog.FeatherTierUpWhiteToBlackSort" /> or
+    ///     <see cref="CraftRecipeCatalog.FeatherTierUpBlackToGoldSort" />.
+    /// </param>
+    public static FeatherTierUpResult ResolveFeatherTierUp(int sort, int materialItemId, int materialQuantity)
+    {
+        var (checkItemId, gainItemId) = sort == CraftRecipeCatalog.FeatherTierUpBlackToGoldSort
+            ? (CraftRecipeCatalog.WingFeatherBlackItemId, CraftRecipeCatalog.WingFeatherGoldItemId)
+            : (CraftRecipeCatalog.WingFeatherWhiteItemId, CraftRecipeCatalog.WingFeatherBlackItemId);
+
+        if (materialItemId != checkItemId || materialQuantity < CraftRecipeCatalog.FeatherTierUpRequiredQuantity)
+            return new FeatherTierUpResult(FeatherTierUpOutcome.Rejected, 0);
+
+        return new FeatherTierUpResult(FeatherTierUpOutcome.Success, gainItemId);
+    }
+
+    /// <summary>
+    ///     MK_WING_2 -- 3x tier-1 wing + 1 catalyst (partially consumed, 1 unit) -&gt; a chance at a higher wing
+    ///     tier, else a dust consolation grant (still wire-success) -- :5342-5403.
+    /// </summary>
+    public static WingTierRerollResult ResolveWingTierReroll(int material1ItemId, int material2ItemId,
+        int material3ItemId, int catalystItemId, int catalystQuantity, byte previousTribe, IRandomSource random)
+    {
+        var tier1ItemId = CraftRecipeCatalog.WingTierItemId(1, previousTribe);
+        if (material1ItemId != tier1ItemId || material2ItemId != tier1ItemId || material3ItemId != tier1ItemId ||
+            catalystItemId != CraftRecipeCatalog.WingTierRerollCatalystItemId || catalystQuantity < 1)
+            return new WingTierRerollResult(WingTierRerollOutcome.Rejected, 0);
+
+        var roll = random.NextInt32(100);
+        var tier = roll switch
+        {
+            < 5 => 5,
+            < 10 => 2,
+            < 15 => 3,
+            < 20 => 4,
+            _ => 0
+        };
+
+        return tier == 0
+            ? new WingTierRerollResult(WingTierRerollOutcome.DustConsolation, CraftRecipeCatalog.DustItemId)
+            : new WingTierRerollResult(WingTierRerollOutcome.Rerolled,
+                CraftRecipeCatalog.WingTierItemId(tier, previousTribe));
+    }
+
+    /// <summary>
+    ///     MK_WING_5 -- 3x item 1401 + 1 catalyst -&gt; a 10% chance at item 1403, else a dust consolation grant
+    ///     (still wire-success) -- :5491-5541. MK_WING_6 shares the outer case but has no compiled inner-switch
+    ///     branch (see <see cref="CraftRecipeCatalog.WingSixthTierUnvalidatedSort" />'s remarks) -- it skips
+    ///     every material check and always lands on the dust branch, which this resolver reproduces exactly.
+    /// </summary>
+    /// <param name="sort">
+    ///     <see cref="CraftRecipeCatalog.WingFifthTierSort" /> or
+    ///     <see cref="CraftRecipeCatalog.WingSixthTierUnvalidatedSort" />.
+    /// </param>
+    public static WingFifthTierResult ResolveWingFifthTier(int sort, int material1ItemId, int material2ItemId,
+        int material3ItemId, int catalystItemId, IRandomSource random)
+    {
+        if (sort == CraftRecipeCatalog.WingSixthTierUnvalidatedSort)
+            return new WingFifthTierResult(WingFifthTierOutcome.DustConsolation, CraftRecipeCatalog.DustItemId);
+
+        if (material1ItemId != CraftRecipeCatalog.WingFifthMaterialItemId ||
+            material2ItemId != CraftRecipeCatalog.WingFifthMaterialItemId ||
+            material3ItemId != CraftRecipeCatalog.WingFifthMaterialItemId ||
+            catalystItemId != CraftRecipeCatalog.WingFifthCatalystItemId)
+            return new WingFifthTierResult(WingFifthTierOutcome.Rejected, 0);
+
+        return random.NextInt32(500) < 50
+            ? new WingFifthTierResult(WingFifthTierOutcome.Success, CraftRecipeCatalog.WingFifthResultItemId)
+            : new WingFifthTierResult(WingFifthTierOutcome.DustConsolation, CraftRecipeCatalog.DustItemId);
+    }
+
+    /// <summary>
+    ///     MK_DUST_WING/CLOAK/ANIMAL/PET1/PET2 -- exchange N units of wing dust for a weighted-random reward
+    ///     item; no true failure branch once the threshold/identity gate passes -- :5553-5858.
+    /// </summary>
+    public static DustRecycleResult ResolveDustRecycle(int sort, int materialItemId, int materialQuantity,
+        byte previousTribe, IRandomSource random)
+    {
+        var threshold = DustRecycleThreshold(sort);
+        if (threshold == 0 || materialItemId != CraftRecipeCatalog.DustItemId || materialQuantity < threshold)
+            return new DustRecycleResult(DustRecycleOutcome.Rejected, 0);
+
+        var resultItemId = sort switch
+        {
+            CraftRecipeCatalog.DustRecycleWingSort => PickWingDustTier(random, previousTribe),
+            CraftRecipeCatalog.DustRecycleCloakSort => CraftRecipeCatalog.DustRecycleCloakResultItemId,
+            CraftRecipeCatalog.DustRecycleAnimalSort => PickFromPool(CraftRecipeCatalog.MountFusionTier1ResultPool,
+                random),
+            CraftRecipeCatalog.DustRecyclePet1Sort => PickDustPet1(random),
+            CraftRecipeCatalog.DustRecyclePet2Sort => PickDustPet2(random),
+            _ => 0
+        };
+
+        return new DustRecycleResult(DustRecycleOutcome.Success, resultItemId);
+    }
+
+    /// <summary>
+    ///     The exact-vs-over-threshold container-mutation branch (in-place convert vs. reduce + grant a new
+    ///     slot) lives in the caller (needs inventory/free-slot access), so this is exposed for the caller to
+    ///     re-derive the same threshold rather than duplicating the sort-&gt;threshold mapping a second time.
+    /// </summary>
+    public static int DustRecycleThreshold(int sort)
+    {
+        return sort switch
+        {
+            CraftRecipeCatalog.DustRecycleWingSort => CraftRecipeCatalog.DustRecycleWingThreshold,
+            CraftRecipeCatalog.DustRecycleCloakSort => CraftRecipeCatalog.DustRecycleCloakThreshold,
+            CraftRecipeCatalog.DustRecycleAnimalSort => CraftRecipeCatalog.DustRecycleAnimalThreshold,
+            CraftRecipeCatalog.DustRecyclePet1Sort => CraftRecipeCatalog.DustRecyclePet1Threshold,
+            CraftRecipeCatalog.DustRecyclePet2Sort => CraftRecipeCatalog.DustRecyclePet2Threshold,
+            _ => 0
+        };
+    }
+
+    private static int PickWingDustTier(IRandomSource random, byte previousTribe)
+    {
+        var roll = random.NextInt32(20);
+        var tier = roll switch
+        {
+            < 5 => 5,
+            < 10 => 2,
+            < 15 => 3,
+            _ => 4
+        };
+        return CraftRecipeCatalog.WingTierItemId(tier, previousTribe);
+    }
+
+    private static int PickFromPool(IReadOnlyList<int> pool, IRandomSource random)
+    {
+        return pool[random.NextInt32(pool.Count)];
+    }
+
+    private static int PickDustPet1(IRandomSource random)
+    {
+        var roll = random.NextInt32(25);
+        return roll switch
+        {
+            < 4 => 1006,
+            < 8 => 1007,
+            < 12 => 1008,
+            < 16 => 1009,
+            < 20 => 1010,
+            _ => 1011
+        };
+    }
+
+    private static int PickDustPet2(IRandomSource random)
+    {
+        var roll = random.NextInt32(15);
+        return roll switch
+        {
+            < 1 => 1016,
+            < 3 => 1012,
+            < 6 => 1013,
+            < 9 => 1014,
+            _ => 1015
+        };
+    }
+
     public readonly record struct JadeResult(JadeOutcome Outcome, ItemStack? ResultStack)
     {
         public bool Succeeded => Outcome == JadeOutcome.Success;
@@ -94,5 +408,40 @@ public static class CraftResolver
     public readonly record struct ElixirResult(ElixirOutcome Outcome, ItemStack? RemainingMaterial, int? ResultItemId)
     {
         public bool Succeeded => Outcome is ElixirOutcome.Success or ElixirOutcome.Failed;
+    }
+
+    public readonly record struct StoneMatResult(StoneMatOutcome Outcome, int ResultItemId)
+    {
+        public bool Succeeded => Outcome == StoneMatOutcome.Success;
+    }
+
+    public readonly record struct MountFusionResult(MountFusionOutcome Outcome, int ResultItemId, int ResultQuantity)
+    {
+        public bool Succeeded => Outcome != MountFusionOutcome.Rejected;
+    }
+
+    public readonly record struct WingAssemblyResult(WingAssemblyOutcome Outcome, int ResultItemId)
+    {
+        public bool Succeeded => Outcome != WingAssemblyOutcome.Rejected;
+    }
+
+    public readonly record struct FeatherTierUpResult(FeatherTierUpOutcome Outcome, int ResultItemId)
+    {
+        public bool Succeeded => Outcome == FeatherTierUpOutcome.Success;
+    }
+
+    public readonly record struct WingTierRerollResult(WingTierRerollOutcome Outcome, int ResultItemId)
+    {
+        public bool Succeeded => Outcome != WingTierRerollOutcome.Rejected;
+    }
+
+    public readonly record struct WingFifthTierResult(WingFifthTierOutcome Outcome, int ResultItemId)
+    {
+        public bool Succeeded => Outcome != WingFifthTierOutcome.Rejected;
+    }
+
+    public readonly record struct DustRecycleResult(DustRecycleOutcome Outcome, int ResultItemId)
+    {
+        public bool Succeeded => Outcome == DustRecycleOutcome.Success;
     }
 }

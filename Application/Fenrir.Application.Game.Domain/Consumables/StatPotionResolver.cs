@@ -5,21 +5,27 @@ namespace Fenrir.Application.Game.Domain.Consumables;
 ///     Elemental sub-stats; base and "g12" high-tier variants). No I/O, no Zone dependency.
 /// </summary>
 /// <remarks>
-///     Not wired to any production catalog item id yet: the behavior contract this was built from gave the
-///     rates/caps/tiers precisely but did not reproduce the exact id-to-(stat,tier,fixed-amount) table --
-///     only grouped id ranges whose internal per-id tier assignment could not be reconstructed with
-///     confidence (one candidate reading implies a doubled "Potion"+"Elixir" set per stat, which further
-///     breaks a simple 1:1 id-to-tier mapping attempt). Wiring this to real item ids, and to the elemental
-///     sub-stat "packed into a single stored value" detail (modeled here as a single shared counter, not a
-///     bit-packed one, since no bit layout was specified), is a follow-up once the precise per-id table is
-///     extracted from the cited source range. This type's cap/bulk/tier math is fully correct and tested
-///     against fabricated ids in the meantime.
+///     Wired to the 28 production catalog ids (item-usage-consumables finding, Critical) by
+///     <c>Fenrir.Application.Game.Services.ZoneLifecycle.UseInventoryItemService.ResolveStatPotionSpec</c> --
+///     see that method's own remarks for the full id-to-(stat,tier) table and its provenance (the
+///     behavior contract's cited tAddTime/tAddTime2 pairs for the Elemental ids, the finding's own
+///     statement that 801-806 are the g12 tier, cross-referenced against Fenrir's own already-imported
+///     world.Items catalog text for the remaining ordinary-tier ids). The Elemental counter's
+///     divide/modulo-1000 packed-dual-value convention is modeled by the sibling
+///     <see cref="ElementalPotionPacking" /> type, one layer above this one -- this type only ever operates
+///     on an already-unpacked sub-value, kind-agnostic by design.
 /// </remarks>
 /// <remarks>
 ///     Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:2879-2947 (id-to-stat/tier mapping, per-id fixed add
-///     amounts) ; :2948-3156 (per-stat cap check, headroom-based bulk-count coercion, g12-tier preconditions
-///     and single-unit-only add) ; :3157-3211 (stat/HP-MP recompute, stack consumption, double self+nearby
-///     broadcast) ; Server/Header/Protocol/DEFINE.h:361-362 (200 ordinary-tier cap, 400 g12-tier cap).
+///     amounts) ; :2948-3156 (per-stat cap check, headroom-based bulk-count coercion, g12-tier
+///     preconditions and bulk-aware add) ; :3157-3211 (stat/HP-MP recompute, stack consumption, double
+///     self+nearby broadcast) ; Server/Header/Protocol/DEFINE.h:361-362 (200 ordinary-tier cap, 400
+///     g12-tier cap) ; Server/Header/Protocol/DEFINE.h:605 (12, MAX_LIMIT_HIGH_LEVEL_NUM -- the g12 gate is
+///     wAvatar.aLevel2, NOT wAvatar.aRebirthNum: the two are declared as distinct fields
+///     (Server/Header/Protocol/STRUCT.h:471,841) and used as independent, alternative conditions elsewhere
+///     (Server/Header/S18_MyZoneInfo.cpp:2211) -- an earlier revision of this type mistakenly named its
+///     g12 threshold parameter after "rebirth count"; fixed here to <see cref="RequiredLevel2" />/
+///     <c>level2</c> throughout).
 /// </remarks>
 public static class StatPotionResolver
 {
@@ -33,12 +39,18 @@ public static class StatPotionResolver
         /// </summary>
         AlreadyMaxed,
 
-        /// <summary>g12 tier only: banked count not yet at the ordinary cap, or rebirth/high-level threshold not met.</summary>
+        /// <summary>
+        ///     g12 tier only: banked count not yet at the ordinary cap, still at/above the g12 cap, or the Level2 threshold
+        ///     not met.
+        /// </summary>
         PreconditionFailed
     }
 
     public const int OrdinaryTierCap = 200;
     public const int G12TierCap = 400;
+
+    /// <summary>MAX_LIMIT_HIGH_LEVEL_NUM (DEFINE.h:605) -- the g12 tier's own level-progression gate, wAvatar.aLevel2.</summary>
+    public const int RequiredLevel2 = 12;
 
     /// <summary>
     ///     Ordinary tier ("1x"/"10x" ids): bulk-aware. If the requested bulk count would overshoot
@@ -58,18 +70,26 @@ public static class StatPotionResolver
     }
 
     /// <summary>
-    ///     g12 high-tier ids: single-unit only (bulk consumption does not apply to them at all), gated on the
-    ///     banked count already being at-or-above <see cref="OrdinaryTierCap" /> and still below
-    ///     <see cref="G12TierCap" />, plus a rebirth/high-level threshold whose numeric value was not specified
-    ///     in the originating contract -- the caller must supply it (<paramref name="requiredRebirthLevel" />)
-    ///     rather than this type guessing one.
+    ///     g12 high-tier ids: gated on the banked count already being at-or-above <see cref="OrdinaryTierCap" />,
+    ///     still below <see cref="G12TierCap" />, and <paramref name="level2" /> (wAvatar.aLevel2) being
+    ///     at-or-above <see cref="RequiredLevel2" />. Bulk-aware like <see cref="ResolveOrdinary" /> --
+    ///     <paramref name="requestedBulkCount" /> is clamped down to whatever headroom remains under
+    ///     <see cref="G12TierCap" /> (never rejected for being merely too large, only for failing the three
+    ///     preconditions above), and each consumed unit adds exactly 1 to the counter (no separate
+    ///     per-unit-amount multiplier the way the ordinary tier's 10x ids have -- no ten-unit-stack g12 id
+    ///     exists in the 28-id set this resolver serves).
     /// </summary>
-    public static G12Result ResolveG12(int currentCount, int rebirthCount, int requiredRebirthLevel)
+    public static G12Result ResolveG12(int currentCount, int level2, int requestedBulkCount)
     {
-        if (currentCount < OrdinaryTierCap || currentCount >= G12TierCap || rebirthCount < requiredRebirthLevel)
-            return new G12Result(Outcome.PreconditionFailed, currentCount);
+        if (currentCount < OrdinaryTierCap || currentCount >= G12TierCap || level2 < RequiredLevel2)
+            return new G12Result(Outcome.PreconditionFailed, currentCount, 0);
 
-        return new G12Result(Outcome.Success, currentCount + 1);
+        // Guaranteed >= 1 by the "< G12TierCap" precondition above -- no separate zero-headroom rejection
+        // branch is needed (or legacy-accurate) here, unlike the ordinary tier's AlreadyMaxed case.
+        var headroom = G12TierCap - currentCount;
+        var coercedCount = Math.Min(Math.Max(requestedBulkCount, 1), headroom);
+
+        return new G12Result(Outcome.Success, currentCount + coercedCount, coercedCount);
     }
 
     public readonly record struct OrdinaryResult(Outcome Outcome, int NewCount, int UnitsConsumed)
@@ -77,7 +97,7 @@ public static class StatPotionResolver
         public bool Succeeded => Outcome == Outcome.Success;
     }
 
-    public readonly record struct G12Result(Outcome Outcome, int NewCount)
+    public readonly record struct G12Result(Outcome Outcome, int NewCount, int UnitsConsumed)
     {
         public bool Succeeded => Outcome == Outcome.Success;
     }

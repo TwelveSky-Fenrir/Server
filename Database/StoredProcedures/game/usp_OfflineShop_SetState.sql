@@ -2,15 +2,15 @@
 -- Player-facing close only sets ShopState=0; it does NOT clear items/money (those stay retrievable/
 -- withdrawable while closed). usp_OfflineShop_Close (full DELETE) is admin/account-cleanup only.
 CREATE PROCEDURE game.usp_OfflineShop_SetState @CharacterId INT,
-    @ShopState   TINYINT
+                                               @ShopState TINYINT
 AS
 BEGIN
     SET
-NOCOUNT ON;
+        NOCOUNT ON;
     SET
-XACT_ABORT ON;
+        XACT_ABORT ON;
 
-UPDATE game.OfflineShops
-SET ShopState = @ShopState
-WHERE CharacterId = @CharacterId;
+    UPDATE game.OfflineShops
+    SET ShopState = @ShopState
+    WHERE CharacterId = @CharacterId;
 END;

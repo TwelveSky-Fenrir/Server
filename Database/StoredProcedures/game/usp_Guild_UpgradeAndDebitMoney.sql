@@ -12,52 +12,52 @@
 --     none is added here -- the C# service layer already derives @Grade from the guild's own current grade).
 --   - the same TOCTOU-safe money cap/floor guard as usp_Character_AdjustMoney (50261 cap breach), plus a new
 --     50278 for "unknown character or insufficient balance" (its own number, same precedent as 50277 above).
-CREATE PROCEDURE game.usp_Guild_UpgradeAndDebitMoney @GuildId       INT,
-    @Grade         INT,
-    @CharacterId   INT,
-    @DeltaMoney    BIGINT,
-    @DeltaBigMoney INT
+CREATE PROCEDURE game.usp_Guild_UpgradeAndDebitMoney @GuildId INT,
+                                                     @Grade INT,
+                                                     @CharacterId INT,
+                                                     @DeltaMoney BIGINT,
+                                                     @DeltaBigMoney INT
 AS
 BEGIN
     SET
-NOCOUNT ON;
+        NOCOUNT ON;
     SET
-XACT_ABORT ON;
+        XACT_ABORT ON;
 
-BEGIN
-TRANSACTION;
+    BEGIN
+        TRANSACTION;
 
-UPDATE game.Guilds
-SET Grade = @Grade
-WHERE GuildId = @GuildId;
+    UPDATE game.Guilds
+    SET Grade = @Grade
+    WHERE GuildId = @GuildId;
 
-IF
-@@ROWCOUNT = 0
+    IF
+        @@ROWCOUNT = 0
         THROW 50235, N'Guild not found.', 1;
 
     -- Guarded UPDATE closes a TOCTOU: two concurrent debits must never jointly breach the floor/cap.
-UPDATE game.Characters
-SET Money        = Money + @DeltaMoney,
-    BigMoney     = BigMoney + @DeltaBigMoney,
-    UpdatedAtUtc = SYSUTCDATETIME()
-WHERE CharacterId = @CharacterId
-  AND Money + @DeltaMoney BETWEEN 0 AND 2000000000
-  AND BigMoney + @DeltaBigMoney >= 0;
+    UPDATE game.Characters
+    SET Money        = Money + @DeltaMoney,
+        BigMoney     = BigMoney + @DeltaBigMoney,
+        UpdatedAtUtc = SYSUTCDATETIME()
+    WHERE CharacterId = @CharacterId
+      AND Money + @DeltaMoney BETWEEN 0 AND 2000000000
+      AND BigMoney + @DeltaBigMoney >= 0;
 
-IF
-@@ROWCOUNT = 0
-BEGIN
-        -- Diagnostic re-read only; picks which error code to throw.
-        IF
-EXISTS (SELECT 1
-                   FROM game.Characters
-                   WHERE CharacterId = @CharacterId
-                     AND Money + @DeltaMoney > 2000000000)
-            THROW 50261, N'Adjustment would exceed the legacy money cap (MAX_NUMBER_SIZE = 2,000,000,000).', 1;
+    IF
+        @@ROWCOUNT = 0
+        BEGIN
+            -- Diagnostic re-read only; picks which error code to throw.
+            IF
+                EXISTS (SELECT 1
+                        FROM game.Characters
+                        WHERE CharacterId = @CharacterId
+                          AND Money + @DeltaMoney > 2000000000)
+                THROW 50261, N'Adjustment would exceed the legacy money cap (MAX_NUMBER_SIZE = 2,000,000,000).', 1;
 
-        THROW
-50278, N'Unknown character or insufficient money balance for the guild upgrade cost.', 1;
-END;
+            THROW
+                50278, N'Unknown character or insufficient money balance for the guild upgrade cost.', 1;
+        END;
 
-COMMIT TRANSACTION;
+    COMMIT TRANSACTION;
 END;

@@ -1,3 +1,4 @@
+using Fenrir.Network.Serialization.Packets.Zone;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Domain.Progression;
@@ -126,6 +127,34 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
         {
             return _controllingTribe[towerIndex];
         }
+    }
+
+    /// <summary>
+    ///     The full 12-tower ownership/status snapshot (legacy <c>B_BROADCAST_CHUGSOUNG_INFO</c>) as one flat,
+    ///     read-only batch -- every caller that needs this exact payload shares this one projection instead of
+    ///     re-deriving it: <see cref="World.Zone" />'s post-siege-start rebroadcast
+    ///     (<c>ApplyTowerGuardianHitSideEffects</c>) and the unconditional per-zone-entry snapshot the Services
+    ///     layer sends alongside the RvR world-info broadcast both read the identical 12-tower state, taken
+    ///     under one lock so no in-flight <see cref="BeginUpgrade" />/<see cref="CompleteUpgrade" /> can be
+    ///     observed half-applied across the batch.
+    /// </summary>
+    public TowerStatusResponse BuildStatusSnapshot()
+    {
+        var state1 = new int[TowerCount];
+        var state2 = new int[TowerCount];
+
+        lock (_lock)
+        {
+            for (var i = 0; i < TowerCount; i++)
+            {
+                state1[i] = _packedState[i];
+                // Legacy mState2Tower is filled -1 on every DB read and never appears in any SQL query of its
+                // own (ServerDocs/10_ts25center/02_HeroRank_Guilde_Discord_Votes.md:296-298) -- dead, always -1.
+                state2[i] = -1;
+            }
+        }
+
+        return new TowerStatusResponse { State1Tower = state1, State2Tower = state2 };
     }
 
     /// <summary>The queued level/type for a tower currently in <see cref="TowerSiegePhase.Building" />; 0 otherwise.</summary>

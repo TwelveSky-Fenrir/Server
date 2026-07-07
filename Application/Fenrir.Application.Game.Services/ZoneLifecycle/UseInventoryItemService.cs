@@ -5,8 +5,10 @@ using Fenrir.Application.Game.Domain.Consumables;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Pets;
 using Fenrir.Application.Game.Domain.Simulation;
+using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Application.Game.Domain.World.Loot;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Stats;
 using Fenrir.Network.Serialization.Packets.Zone;
@@ -24,6 +26,30 @@ public sealed class UseInventoryItemService(
     ILogger<UseInventoryItemService> logger) : IUseInventoryItemService
 {
     private const byte BottleSort = 26;
+
+    /// <summary>world.Items.Sort for the "skill grimoire" category -- see <see cref="ResolveSkillGrimoireAsync" />.</summary>
+    private const byte SkillGrimoireSort = 5;
+
+    /// <summary>
+    ///     game.EventLog.EventCode for the skill-grimoire "item consumed" audit entry -- scoped independently
+    ///     within <see cref="EventLogCategory.ItemUse" /> (see <see cref="GpTicketRedeemedEventCode" />'s own
+    ///     remarks on per-category scoping); distinct from <see cref="TeleportRecallScrollUsedEventCode" />'s
+    ///     own 1 in the same category.
+    /// </summary>
+    private const short SkillGrimoireItemConsumedEventCode = 2;
+
+    /// <summary>
+    ///     game.EventLog.EventCode for the skill-grimoire "skill learned" audit entry, same category/scoping posture as
+    ///     <see cref="SkillGrimoireItemConsumedEventCode" />.
+    /// </summary>
+    private const short SkillGrimoireSkillLearnedEventCode = 3;
+
+    /// <summary>
+    ///     game.EventLog.Outcome for both skill-grimoire audit entries -- 1 marks success, matching
+    ///     <see cref="TeleportRecallScrollSuccessOutcome" />'s own precedent; this path has no failure branch left to log once
+    ///     <see cref="SkillGrimoireLearnResolver" /> has already returned Success.
+    /// </summary>
+    private const byte SkillGrimoireLearnSuccessOutcome = 1;
 
     /// <summary>
     ///     game.CashLog.Reason for a GP ticket redemption credit -- distinct from Reason=1 (cash-shop
@@ -50,9 +76,61 @@ public sealed class UseInventoryItemService(
     /// </summary>
     private const short ProxyShopRentalExtensionEventCode = 2;
 
+    /// <summary>
+    ///     game.EventLog.EventCode for a Pet EXP boost pill consumption (legacy <c>GL_605_USE_CASH_ITEM</c>),
+    ///     scoped independently within <see cref="EventLogCategory.CashItemUse" /> -- distinct from
+    ///     <see cref="ProxyShopRentalExtensionEventCode" />'s own 2 in the same category, same per-category
+    ///     scoping posture as that constant's own remarks.
+    /// </summary>
+    private const short PetExpBoostPillUsedEventCode = 3;
+
     private const int LodTicketItemId = 1434;
     private const int FactionNoticeItemId = 566;
     private const int TaiyanKeyItemId = 1049;
+
+    /// <summary>
+    ///     game.EventLog.EventCode for the Teleport/Dungeon/Return Scroll "before" usage log -- an app-owned
+    ///     numbering scheme scoped independently within <see cref="EventLogCategory.ItemUse" /> (see
+    ///     <see cref="GpTicketRedeemedEventCode" />'s own remarks on per-category scoping).
+    /// </summary>
+    private const short TeleportRecallScrollUsedEventCode = 1;
+
+    /// <summary>
+    ///     game.EventLog.Outcome for <see cref="TeleportRecallScrollUsedEventCode" /> -- caller/EventCode-
+    ///     defined (see game.EventLog.sql's own "Outcome is likewise a caller/EventCode-defined code"
+    ///     comment). 1 marks success, matching
+    ///     <see cref="Fenrir.Application.Game.Services.ItemModification.DestroyItemService" />'s own
+    ///     precedent; this branch has no failure path to log once the (unmodeled here, see
+    ///     <see cref="ResolveTeleportRecallScrollAsync" />'s own remarks) quantity-below-one precondition is
+    ///     past.
+    /// </summary>
+    private const byte TeleportRecallScrollSuccessOutcome = 1;
+
+    /// <summary>
+    ///     game.EventLog.EventCode for the generic "item used" entry every successful stat/elixir-potion
+    ///     consumption writes first (Server/ts25zone/S04_MyWork03.cpp:3157-3184's first, generic
+    ///     GL_606_USE_INVENTORY_ITEM-style log call) -- distinct from <see cref="TeleportRecallScrollUsedEventCode" />'s
+    ///     own 1 within the same <see cref="EventLogCategory.ItemUse" /> category (EventCode is only ever
+    ///     caller-interpreted alongside its Category, so a second app-owned value here does not collide).
+    /// </summary>
+    private const short StatPotionUsedEventCode = 4;
+
+    /// <summary>
+    ///     game.EventLog.Outcome for both stat-potion audit entries below -- 1 marks success, same precedent as
+    ///     <see cref="TeleportRecallScrollSuccessOutcome" />; this path has no failure branch left to log once
+    ///     <see cref="StatPotionResolver" /> has already reported success.
+    /// </summary>
+    private const byte StatPotionSuccessOutcome = 1;
+
+    /// <summary>
+    ///     The three tribe-conversion book ids, excluded from <see cref="ResolveSkillGrimoireAsync" />'s
+    ///     dispatch -- a distinct, separately-gated special case not modeled here (see
+    ///     <see cref="SkillGrimoireLearnResolver" />'s own remarks). Left unhandled, they still fall through
+    ///     to the generic <see cref="Fail" /> at the bottom of <see cref="ResolveAsync" />, same as before this
+    ///     feature existed.
+    /// </summary>
+    private static readonly ImmutableHashSet<int> TribeConversionBookItemIds =
+        ImmutableHashSet.Create(99014, 99015, 99016);
 
     public async ValueTask<UseInventoryItemResponse> ResolveAsync(Zone zone, PlayerRuntimeState state,
         int characterId, int accountId, byte page, byte index, int value, CancellationToken cancellationToken)
@@ -63,6 +141,10 @@ public sealed class UseInventoryItemService(
 
         if (itemDefinition.Item.Sort == BottleSort)
             return await ResolveBottleAsync(zone, state, characterId, page, index, item, cancellationToken);
+
+        if (itemDefinition.Item.Sort == SkillGrimoireSort && !TribeConversionBookItemIds.Contains(item.ItemId))
+            return await ResolveSkillGrimoireAsync(zone, state, characterId, accountId, page, index, item,
+                itemDefinition, cancellationToken);
 
         if (GpTicketCatalog.ResolveCreditAmount(item.ItemId) is { } creditAmount)
             return await ResolveGpTicketAsync(zone, state, characterId, accountId, page, index, item, creditAmount,
@@ -105,7 +187,41 @@ public sealed class UseInventoryItemService(
             return await ResolveProxyShopRentalExtensionAsync(zone, state, characterId, page, index, item,
                 cancellationToken);
 
+        if (IsTeleportRecallScroll(item.ItemId))
+            return await ResolveTeleportRecallScrollAsync(characterId, accountId, page, index, item, value,
+                cancellationToken);
+
+        if (ResolveStatPotionSpec(item.ItemId) is { } statPotionSpec)
+            return await ResolveStatPotionAsync(zone, state, characterId, accountId, page, index, item,
+                statPotionSpec.Kind, statPotionSpec.Tier, value, cancellationToken);
+
+        if (IsPetExpBoostPill(item.ItemId))
+            return await ResolvePetExpBoostPillAsync(zone, state, characterId, accountId, page, index, item, value,
+                cancellationToken);
+
         return Fail(page, index);
+    }
+
+    /// <summary>
+    ///     game.EventLog.EventCode for the stat-specific "which counter, which tier" entry every successful
+    ///     stat/elixir-potion consumption writes second (Server/ts25zone/S04_MyWork03.cpp:3157-3184's second
+    ///     log call, "twelve distinct sub-type codes... together with that stat's new counter value" per the
+    ///     originating behavior contract) -- one code per (<see cref="StatPotionKind" />, ordinary-vs-g12)
+    ///     pair, all independently scoped within <see cref="EventLogCategory.ItemUse" />.
+    /// </summary>
+    private static short StatPotionSubTypeEventCode(StatPotionKind kind, StatPotionTier tier)
+    {
+        var isG12 = tier == StatPotionTier.G12;
+        return kind switch
+        {
+            StatPotionKind.Life => isG12 ? (short)11 : (short)10,
+            StatPotionKind.Mana => isG12 ? (short)13 : (short)12,
+            StatPotionKind.Str => isG12 ? (short)15 : (short)14,
+            StatPotionKind.Dex => isG12 ? (short)17 : (short)16,
+            StatPotionKind.ElementalDamage => isG12 ? (short)19 : (short)18,
+            StatPotionKind.ElementalDefense => isG12 ? (short)21 : (short)20,
+            _ => 0
+        };
     }
 
     private async ValueTask<UseInventoryItemResponse> ResolveBottleAsync(Zone zone, PlayerRuntimeState state,
@@ -139,6 +255,76 @@ public sealed class UseInventoryItemService(
                 zone.MapId, characterId);
 
         return response;
+    }
+
+    /// <summary>
+    ///     Skill-grimoire consumption (world.Items iSort==5's general case, e.g. items 99011-99013 "Book of
+    ///     Nobel Dragon/Royal Serpent/Grand Tiger" and the per-tribe 90101-90118 endgame grimoire family) --
+    ///     learns the item's GainSkillNumber into the first empty slot of its category's sub-range. Gated on
+    ///     the item's own tribe restriction (checked against the character's <b>previous</b> tribe, not its
+    ///     current one -- same field <see cref="EquipItemValidationGate" /> reads for its own equip-time tribe
+    ///     check), combined level, a duplicate-skill scan, the skill resolving in the catalog at all, and a
+    ///     skill-point balance check -- see <see cref="SkillGrimoireLearnResolver" /> for the full rule and its
+    ///     citations. The three tribe-conversion book ids (99014/99015/99016) never reach here; excluded at
+    ///     the call site in <see cref="ResolveAsync" />.
+    ///     <para>
+    ///         Every failure branch in the legacy is a Quit() (disconnect); this port answers with a clean
+    ///         Result=1 failure instead, the same documented simplification already used by this file's own
+    ///         <see cref="ResolveStatCleanseAsync" />/<see cref="ResolveTaiyanKeyAsync" /> branches --
+    ///         <see cref="IUseInventoryItemService" />'s return shape has no way to signal "please disconnect"
+    ///         this deep without a broader refactor.
+    ///     </para>
+    /// </summary>
+    /// <remarks>
+    ///     Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:2347-2353 (success-path mutations: skill-point debit,
+    ///     slot write, two audit-log calls, item-removal call) ; Server/ts25zone/S04_MyWork03.cpp:756-761
+    ///     (the shared item-removal routine: clears the six inventory-slot fields and the three socket
+    ///     fields, sends the success response, resets the slot's expiration-date field) ;
+    ///     Server/ts25zone/S04_MyWork03.cpp:91-104 (response-macro definitions, Result=0/1 semantics).
+    /// </remarks>
+    private async ValueTask<UseInventoryItemResponse> ResolveSkillGrimoireAsync(Zone zone, PlayerRuntimeState state,
+        int characterId, int accountId, byte page, byte index, ItemStack item, ItemDefinition itemDefinition,
+        CancellationToken cancellationToken)
+    {
+        var skillDefinition = itemDefinition.Item.GainSkillNumber is { } grantedSkillId
+            ? worldData.SkillsById.GetValueOrDefault(grantedSkillId)
+            : null;
+
+        var resolved = SkillGrimoireLearnResolver.Resolve(itemDefinition.Item.EquipInfo1,
+            itemDefinition.Item.LevelLimit, itemDefinition.Item.MartialLevelLimit,
+            itemDefinition.Item.GainSkillNumber, state.PreviousTribe, state.Level + state.Level2, skillDefinition,
+            state.LearnedSkills, state.SkillPoints);
+
+        if (resolved.Outcome != SkillGrimoireLearnResolver.Outcome.Success)
+            return Fail(page, index);
+
+        var newSkillPoints = state.SkillPoints - resolved.Cost;
+        var learned = new LearnedSkill(resolved.SkillId, resolved.Cost);
+
+        await characters.UpsertSkillSlotAsync(characterId, resolved.Slot, resolved.SkillId, resolved.Cost,
+            cancellationToken);
+
+        if (!zone.PostSkillCommand(new SkillZoneCommand(characterId, resolved.Slot, learned, newSkillPoints)))
+            logger.LogError(
+                "Zone {MapId} skill inbox full: dropped skill-grimoire learn mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
+                zone.MapId, characterId);
+
+        // Item-slot-state-before-removal audit entry (S04_MyWork03.cpp:2347-2353's first log call) -- same
+        // Serial/ExpireDate payload convention as this file's other item-use log calls.
+        await eventLog.LogAsync(SkillGrimoireItemConsumedEventCode, EventLogCategory.ItemUse, accountId, characterId,
+            null, null, null, null, null, item.ItemId, item.Quantity, SkillGrimoireLearnSuccessOutcome,
+            $"Serial={item.Serial};ExpireDate={item.ExpireDate}", cancellationToken);
+
+        // Learn-outcome audit entry (S04_MyWork03.cpp:2347-2353's second log call) -- ItemId still identifies
+        // the consumed grimoire; none of the other named scalar columns (Quantity/DeltaMoney/DeltaBigMoney)
+        // has an honest fit for "slot"/"learned skill id"/"point cost", so those three plus the post-debit
+        // skill-point balance all go into Payload instead of stretching an unrelated column's semantics.
+        await eventLog.LogAsync(SkillGrimoireSkillLearnedEventCode, EventLogCategory.ItemUse, accountId, characterId,
+            null, null, null, null, null, item.ItemId, null, SkillGrimoireLearnSuccessOutcome,
+            $"Slot={resolved.Slot};SkillId={resolved.SkillId};Cost={resolved.Cost};SkillPoints={newSkillPoints}",
+            cancellationToken);
+
+        return await ConsumeAndMirrorAsync(zone, state, characterId, page, index, item, cancellationToken);
     }
 
     /// <summary>
@@ -244,13 +430,36 @@ public sealed class UseInventoryItemService(
 
     /// <summary>
     ///     Faction Transfer Scroll items (world.Items 8153/8154, "Transfer to any Faction. Right click to
-    ///     use.") -- only the permission gate is modeled here: consuming the scroll credits one banked
+    ///     use.") -- still only the permission gate is modeled here: consuming the scroll credits one banked
     ///     transfer permit (game.Characters.TribeTransferPermitCount) via
-    ///     <see cref="ICharacterRepository.GrantTribeTransferPermitAsync" />. This is the mirror image of
-    ///     game.Characters.BloodCoin (which has a spend path but no known grant path) -- a grant path with no
-    ///     spend path yet, because no legacy source available here documents the actual tribe-change
-    ///     mechanic that would consume it. No tribe mutation is invented.
+    ///     <see cref="ICharacterRepository.GrantTribeTransferPermitAsync" />. This remains a grant path with
+    ///     no spend path, but the earlier premise for that gap ("no legacy source available here documents
+    ///     the actual tribe-change mechanic") is now known to be false and must not be relied on going
+    ///     forward: the full legacy mechanic (precondition chain, error messages, and the
+    ///     costume/equipment/skill remap mutation) has since been located and is cited below. It is not yet
+    ///     ported here because the legacy source itself has open gaps a wire-protocol-scoped change cannot
+    ///     close: the equipment/costume equivalence tables' exact contents were not traced line-by-line (only
+    ///     their shape was confirmed), the legacy "zone 37 reachability" and cross-process admin-toggle
+    ///     checks (ts25extra's <c>skyinfo.s_tchange0/1/2</c>) have no Fenrir-side equivalent table/service
+    ///     yet, and legacy's zone-relocation dispatch (<c>B_RETURN_TO_AUTO_ZONE</c>) has no settled mapping
+    ///     onto Fenrir's map-sharded topology. Porting the actual spend/mutation is Domain+Services+Data work
+    ///     (tribe-role/party/guild/mentor/cape/friend-list gates, the remap tables themselves, a new
+    ///     admin-toggle equivalent, and a zone-relocation decision) that belongs with
+    ///     <c>fenrir-gameplay-domain-engineer</c>/<c>fenrir-database-engineer</c>/
+    ///     <c>fenrir-realtime-simulation-architect</c>, not invented here. No tribe mutation is invented.
     /// </summary>
+    /// <remarks>
+    ///     Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:4740-4856 (full precondition chain, error messages,
+    ///     mutation call, item removal, proxy-shop closure, zone-routing dispatch) ;
+    ///     Server/ts25zone/UpperCom/S06_MyUpperCom04.cpp:446-456 (the cross-process
+    ///     U_ZONE_CHECK_CHANGE_TRIBE_FOR_EXTRA_SEND call shape) ; Server/ts25extra/S04_MyWork02.cpp:1322-1341
+    ///     and Server/ts25extra/S08_MyDB.cpp:1217-1238 (the admin per-tribe transfer toggle,
+    ///     <c>skyinfo.s_tchange&lt;N&gt;</c>) ; Server/ts25zone/S07_MyGame03.cpp:11525-11744
+    ///     (<c>TChangeTribe</c>, the costume/equipment/skill/hotkey/auto-buff remap -- table contents
+    ///     unverified, see this method's own summary) ; Server/Header/mapcheck.h:83-114 (<c>IsValidTown</c>) ;
+    ///     Server/Header/function.h:92-114 (<c>ReturnTribeRole</c>) ; Server/Header/Protocol/DEFINE.h:483
+    ///     (<c>LV_M33</c> = 145, the exact-equality level gate).
+    /// </remarks>
     private async ValueTask<UseInventoryItemResponse> ResolveTribeTransferScrollAsync(Zone zone,
         PlayerRuntimeState state, int characterId, byte page, byte index, ItemStack item,
         CancellationToken cancellationToken)
@@ -345,6 +554,284 @@ public sealed class UseInventoryItemService(
         zone.TryUpdateProxyShopExpiration(characterId, resolved.NewExpirationDate);
 
         return response;
+    }
+
+    /// <summary>
+    ///     Teleport Scroll / Dungeon Scroll / "return scroll" (world.Items 1109/1224/1026) -- per the
+    ///     behavior contract for this family, using any of the three has no modeled effect beyond a durable
+    ///     "before" usage log entry and an unconditional success reply: the legacy decrement/clear block is
+    ///     compiled out in every build (gated on a flag defined unconditionally, never on a build variant),
+    ///     so no quantity is consumed and the slot is left untouched here to match. There is no per-id
+    ///     distinction between the three items in the cited legacy branch. The actual zone-change/teleport
+    ///     mechanism this item is presumably meant to trigger is a separate, client-driven mechanism outside
+    ///     this opcode's scope -- not modeled here, and not independently verified anywhere in this codebase
+    ///     yet. The legacy quantity-below-one precondition (a disconnect there) is deliberately answered here
+    ///     with a clean failure instead, the same documented simplification already used by
+    ///     <see cref="ResolveStatCleanseAsync" />/<see cref="ResolveTaiyanKeyAsync" /> for their own
+    ///     disconnect-worthy preconditions -- <see cref="IUseInventoryItemService" />'s return shape has no way
+    ///     to signal "please disconnect" this deep without a broader refactor. <c>Value</c> passes the
+    ///     request's own value field straight through unmodified, matching the legacy response helper;
+    ///     <c>Value2</c> is documented in the legacy source as leftover shared dispatch state with no
+    ///     meaningful per-request content (several unrelated branches assign it, this one never does) --
+    ///     reproduced here as a fixed 0 rather than as a byte-for-byte artifact of legacy's single-threaded,
+    ///     un-reset shared variable; flagged in the originating contract as a legacy state-sharing artifact,
+    ///     not a deliberate protocol contract to reproduce.
+    /// </summary>
+    /// <remarks>
+    ///     Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:2563 (switch(ttitem->iIndex) start) and :2599-2620
+    ///     (case 1109/1224/1026 body, #ifdef WUSE_ITEM_1109) ; Server/Header/use_inventory.h:16 (#define
+    ///     WUSE_ITEM_1109, unconditional -- confirms this case body is live, not dead code) ;
+    ///     Server/ts25zone/S04_MyWork03.cpp:2609-2615 (the decrement/clear block, gated on a flag defined
+    ///     unconditionally at Server/Header/Protocol/DEFINE.h:18, and therefore dead in every build) ;
+    ///     Server/ts25zone/S04_MyWork03.cpp:100-103 (the response helpers sourcing Value from the request's
+    ///     own value field and Value2 from shared, non-per-request state).
+    /// </remarks>
+    private async ValueTask<UseInventoryItemResponse> ResolveTeleportRecallScrollAsync(int characterId,
+        int accountId, byte page, byte index, ItemStack item, int value, CancellationToken cancellationToken)
+    {
+        if (item.Quantity < 1)
+            return Fail(page, index);
+
+        await eventLog.LogAsync(TeleportRecallScrollUsedEventCode, EventLogCategory.ItemUse, accountId, characterId,
+            null, null, null, null, null, item.ItemId, item.Quantity, TeleportRecallScrollSuccessOutcome,
+            $"Serial={item.Serial};ExpireDate={item.ExpireDate}", cancellationToken);
+
+        // No inventory mutation and no zone command: the legacy decrement/clear block never runs in any
+        // build (see this method's own remarks), and there is no other durable side effect to mirror.
+        return new UseInventoryItemResponse { Result = 0, Page = page, Index = index, Value = value, Value2 = 0 };
+    }
+
+    private static bool IsTeleportRecallScroll(int itemId)
+    {
+        return itemId is 1109 or 1224 or 1026;
+    }
+
+    /// <summary>
+    ///     The 28-id table for the STR/DEX/VIT/MP/Elemental potion-and-elixir family (item-usage-consumables
+    ///     finding, Critical). Every ordinary stat (Life/Mana/Str/Dex) has a 2-or-3-way "Potion"+"Elixir"(+
+    ///     "bound" reskin) single-unit id set and a separate ten-unit-stack id set, plus one shared g12
+    ///     high-tier id; the combined Elemental stat splits into an independent damage sub-family and defense
+    ///     sub-family, each with its own single/ten/g12 triplet.
+    /// </summary>
+    /// <remarks>
+    ///     Provenance, since the originating behavior contract deliberately gave the per-group tier <i>shape</i>
+    ///     (single adds 1, ten-stack adds 10, g12 adds 1, in subvalue space) rather than a ready-made id table:
+    ///     <list type="bullet">
+    ///         <item>
+    ///             The four Elemental ids (578/579/640/641) are exactly as cited by the contract's own
+    ///             tAddTime/tAddTime2 pairs (578 1/1000 damage-only, 579 1/1 defense-only, 640 10/10000
+    ///             damage-only, 641 10/10 defense-only -- 1000 being an exact multiple of
+    ///             <see cref="ElementalPotionPacking.Modulus" /> is what makes a "damage-only" id possible at
+    ///             all: adding a multiple of 1000 to the packed raw counter never perturbs the modulo-1000
+    ///             defense remainder).
+    ///         </item>
+    ///         <item>
+    ///             801-806 are the g12 tier verbatim per the finding's own text ("items 801-806, gated on
+    ///             wAvatar.aLevel2 &gt;= MAX_LIMIT_HIGH_LEVEL_NUM=12"), and Fenrir's own already-imported
+    ///             world.Items catalog text (Database/Migrations/Seed/world/080_items.sql) confirms their
+    ///             per-id stat via flavor text ("Expanded VIT/INT/STR/Agility Elixir... Increase [20] HP/
+    ///             [25] MP/[3] damage/[2] AR,Dodge permanently", "Expand A Damage/Defense Elixir... Increase
+    ///             E. damage/defense by 10 permanently").
+    ///         </item>
+    ///         <item>
+    ///             The remaining 18 ordinary-tier ids (506-509, 636-639, 1017/1018, 1092/1093, 17026-17029,
+    ///             17038/17039) are cross-referenced the same way against that same catalog text -- e.g. 506
+    ///             "VIT Elixir... Increase [20] HP", 1017 "Vitality Elixir... Increase [20] HP", and 17038
+    ///             "(bound variant, same [20] HP text)" all independently resolve to Life/single, while 636
+    ///             "VIT Elixir(M)... 10ea. at once" and 17026 "(bound ten-unit reskin)" resolve to Life/
+    ///             ten-stack; the doubled/tripled "Potion"+"Elixir"+"bound" id sets per stat this uncovers are
+    ///             exactly what this type's own predecessor remarks (before this finding was wired) flagged as
+    ///             not yet reconstructed with confidence. This id-to-catalog-text cross-reference was NOT
+    ///             independently re-verified against the raw <c>switch(ttitem-&gt;iIndex)</c> statement itself
+    ///             (Server/ts25zone/S04_MyWork03.cpp:2879-2947) the way the Elemental/g12 groups above were --
+    ///             flagged for a cpp-protocol-header-analyst re-check if a byte-exact per-id guarantee is
+    ///             ever required beyond what the catalog text already corroborates.
+    ///         </item>
+    ///     </list>
+    /// </remarks>
+    private static StatPotionSpec? ResolveStatPotionSpec(int itemId)
+    {
+        return itemId switch
+        {
+            506 or 1017 or 17038 => new StatPotionSpec(StatPotionKind.Life, StatPotionTier.Single),
+            636 or 17026 => new StatPotionSpec(StatPotionKind.Life, StatPotionTier.TenStack),
+            801 => new StatPotionSpec(StatPotionKind.Life, StatPotionTier.G12),
+
+            507 or 1018 or 17039 => new StatPotionSpec(StatPotionKind.Mana, StatPotionTier.Single),
+            637 or 17027 => new StatPotionSpec(StatPotionKind.Mana, StatPotionTier.TenStack),
+            802 => new StatPotionSpec(StatPotionKind.Mana, StatPotionTier.G12),
+
+            509 or 1092 => new StatPotionSpec(StatPotionKind.Str, StatPotionTier.Single),
+            638 or 17028 => new StatPotionSpec(StatPotionKind.Str, StatPotionTier.TenStack),
+            803 => new StatPotionSpec(StatPotionKind.Str, StatPotionTier.G12),
+
+            508 or 1093 => new StatPotionSpec(StatPotionKind.Dex, StatPotionTier.Single),
+            639 or 17029 => new StatPotionSpec(StatPotionKind.Dex, StatPotionTier.TenStack),
+            804 => new StatPotionSpec(StatPotionKind.Dex, StatPotionTier.G12),
+
+            578 => new StatPotionSpec(StatPotionKind.ElementalDamage, StatPotionTier.Single),
+            640 => new StatPotionSpec(StatPotionKind.ElementalDamage, StatPotionTier.TenStack),
+            805 => new StatPotionSpec(StatPotionKind.ElementalDamage, StatPotionTier.G12),
+
+            579 => new StatPotionSpec(StatPotionKind.ElementalDefense, StatPotionTier.Single),
+            641 => new StatPotionSpec(StatPotionKind.ElementalDefense, StatPotionTier.TenStack),
+            806 => new StatPotionSpec(StatPotionKind.ElementalDefense, StatPotionTier.G12),
+
+            _ => null
+        };
+    }
+
+    /// <summary>
+    ///     Reads the sub-value <paramref name="kind" /> currently occupies -- unpacking
+    ///     <see cref="PlayerRuntimeState.EatElePotion" /> for the two Elemental kinds.
+    /// </summary>
+    private static int CurrentStatPotionSubValue(PlayerRuntimeState state, StatPotionKind kind)
+    {
+        return kind switch
+        {
+            StatPotionKind.Life => state.EatLifePotion,
+            StatPotionKind.Mana => state.EatManaPotion,
+            StatPotionKind.Str => state.EatStrPotion,
+            StatPotionKind.Dex => state.EatDexPotion,
+            StatPotionKind.ElementalDamage => ElementalPotionPacking.DamageSubValue(state.EatElePotion),
+            StatPotionKind.ElementalDefense => ElementalPotionPacking.DefenseSubValue(state.EatElePotion),
+            _ => 0
+        };
+    }
+
+    /// <summary>
+    ///     Computes the new RAW counter value to persist for <paramref name="kind" /> given a freshly-resolved
+    ///     sub-value -- for the four non-Elemental kinds this is the sub-value itself; for the two Elemental
+    ///     kinds this repacks it against <paramref name="state" />'s CURRENT <see cref="PlayerRuntimeState.EatElePotion" />
+    ///     so the other, untouched sub-value survives.
+    /// </summary>
+    private static int ResolvedStatPotionRawCounter(PlayerRuntimeState state, StatPotionKind kind, int newSubValue)
+    {
+        return kind switch
+        {
+            StatPotionKind.ElementalDamage =>
+                ElementalPotionPacking.WithDamageSubValue(state.EatElePotion, newSubValue),
+            StatPotionKind.ElementalDefense => ElementalPotionPacking.WithDefenseSubValue(state.EatElePotion,
+                newSubValue),
+            _ => newSubValue
+        };
+    }
+
+    /// <summary>
+    ///     Stat/elixir-potion consumption (item-usage-consumables finding, Critical): the highest-impact gap
+    ///     this finding closed -- every one of the 28 recognized ids previously fell through to the generic
+    ///     <see cref="Fail" /> with no stack decrement and no stat/HP/MP change whatsoever, despite
+    ///     <see cref="StatPotionResolver" /> already correctly modeling the 200/400 cap math. Bulk-aware for
+    ///     every tier (including g12, which the resolver's own predecessor incorrectly modeled as
+    ///     single-unit-only -- see <see cref="StatPotionResolver.ResolveG12" />'s own remarks for the fix).
+    ///     <c>Value</c> deliberately echoes the client's own raw requested count unmodified on both success and
+    ///     failure -- the true new counter value is only ever observable via the post-consumption avatar-action
+    ///     refresh, matching the legacy response helper's own behavior for this specific branch (unlike several
+    ///     sibling branches elsewhere in this file that DO overwrite <c>Value</c> with an authoritative result).
+    /// </summary>
+    /// <remarks>
+    ///     Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:2900-3211 (the whole switch) ; :2879-2914 (outer entry
+    ///     dispatch, tAddTime initialized to 1) ; :2915-2947 (inner tier-amount switch) ; :2948 (GetBulkStackUseCount
+    ///     call -- <see cref="BulkUseCoercion.Coerce" /> is this codebase's own transcription of that helper,
+    ///     already flagged in its own remarks as reused by this exact family) ; :2951-3156 (per-id assignment
+    ///     switch: counter selection, headroom formula, clamp-to-headroom, g12 preconditions/math) ;
+    ///     Server/Header/Protocol/DEFINE.h:361-362 (200/400 caps) ; :605 (12, g12 level gate) ;
+    ///     Server/ts25zone/S07_MyGame03.cpp:9132-9139 (Elemental packed-dual-value read) ;
+    ///     Server/ts25zone/S04_MyWork03.cpp:3157-3184 (post-switch stat/HP-MP recompute, the generic-plus-
+    ///     stat-specific audit-log pair) ; :3186 (DecreaseQunatityEx, the clamped bulk count) ; :3188-3211
+    ///     (post-consumption double avatar-state refresh to self plus AOI-neighbor broadcast -- see
+    ///     <see cref="TribeProgressZoneCommand.FullActionRebroadcast" />'s own remarks for why Fenrir sends the
+    ///     self-refresh once, not literally twice).
+    /// </remarks>
+    private async ValueTask<UseInventoryItemResponse> ResolveStatPotionAsync(Zone zone, PlayerRuntimeState state,
+        int characterId, int accountId, byte page, byte index, ItemStack item, StatPotionKind kind,
+        StatPotionTier tier, int requestedValue, CancellationToken cancellationToken)
+    {
+        var bulkRequested = BulkUseCoercion.Coerce(requestedValue, item.Quantity);
+        var currentSubValue = CurrentStatPotionSubValue(state, kind);
+
+        int newSubValue;
+        int unitsConsumed;
+
+        if (tier == StatPotionTier.G12)
+        {
+            var g12 = StatPotionResolver.ResolveG12(currentSubValue, state.Level2, bulkRequested);
+            if (!g12.Succeeded)
+                return Fail(page, index);
+
+            newSubValue = g12.NewCount;
+            unitsConsumed = g12.UnitsConsumed;
+        }
+        else
+        {
+            var perUnitAmount = tier == StatPotionTier.TenStack ? 10 : 1;
+            var ordinary = StatPotionResolver.ResolveOrdinary(currentSubValue, perUnitAmount, bulkRequested);
+            if (!ordinary.Succeeded)
+                return Fail(page, index);
+
+            newSubValue = ordinary.NewCount;
+            unitsConsumed = ordinary.UnitsConsumed;
+        }
+
+        var newRawCounter = ResolvedStatPotionRawCounter(state, kind, newSubValue);
+
+        // General equipment/buff-driven recompute -- not potion-specific logic, the same routine
+        // ResolveStatsClearAsync/ResolveStatCleanseAsync above already trigger for their own, unrelated,
+        // stat-affecting branches. None of the five Eat*Potion counters feed this computation today (no
+        // StatCalculator formula consumes them yet -- a separate, not-yet-scheduled gap), so this call is a
+        // no-op in practice until that formula exists; kept here anyway to match the legacy side-effect list
+        // and stay correct automatically the day that formula lands.
+        var updatedStats = RecomputeStatsAfterReset(state, state.StatVit, state.StatStr, state.StatInt,
+            state.StatDex);
+
+        var command = kind switch
+        {
+            StatPotionKind.Life => new TribeProgressZoneCommand(characterId, EatLifePotion: newRawCounter,
+                UpdatedStats: updatedStats, FullActionRebroadcast: true),
+            StatPotionKind.Mana => new TribeProgressZoneCommand(characterId, EatManaPotion: newRawCounter,
+                UpdatedStats: updatedStats, FullActionRebroadcast: true),
+            StatPotionKind.Str => new TribeProgressZoneCommand(characterId, EatStrPotion: newRawCounter,
+                UpdatedStats: updatedStats, FullActionRebroadcast: true),
+            StatPotionKind.Dex => new TribeProgressZoneCommand(characterId, EatDexPotion: newRawCounter,
+                UpdatedStats: updatedStats, FullActionRebroadcast: true),
+            _ => new TribeProgressZoneCommand(characterId, EatElePotion: newRawCounter,
+                UpdatedStats: updatedStats, FullActionRebroadcast: true)
+        };
+
+        if (!await zone.PostTribeProgressCommandAndWaitAsync(command, cancellationToken))
+            logger.LogError(
+                "Zone {MapId} tribe-progress inbox full: dropped stat-potion mirror for character {CharacterId}",
+                zone.MapId, characterId);
+
+        // Generic "item used" entry, then the stat-specific entry carrying the new counter value in Payload
+        // (no named scalar column has an honest fit for "the resulting sub-value of a packed counter") --
+        // same two-entries-per-success shape as ResolveSkillGrimoireAsync above.
+        await eventLog.LogAsync(StatPotionUsedEventCode, EventLogCategory.ItemUse, accountId, characterId,
+            null, null, null, null, null, item.ItemId, unitsConsumed, StatPotionSuccessOutcome, null,
+            cancellationToken);
+
+        await eventLog.LogAsync(StatPotionSubTypeEventCode(kind, tier), EventLogCategory.ItemUse, accountId,
+            characterId, null, null, null, null, null, item.ItemId, unitsConsumed, StatPotionSuccessOutcome,
+            $"NewCount={newSubValue}", cancellationToken);
+
+        var remaining = item.Quantity - unitsConsumed;
+        var container = state.Inventory.GetContainer(page);
+        var projected = remaining > 0
+            ? container.SetItem(index, item with { Quantity = remaining })
+            : container.Remove(index);
+
+        await characters.ReplaceContainerAsync(characterId, page, ToTvps(projected), cancellationToken);
+
+        var containers = ImmutableArray.Create(new InventoryContainerSnapshot(page, projected));
+        if (!await zone.PostInventoryCommandAndWaitAsync(new InventoryZoneCommand(characterId, containers, null),
+                cancellationToken))
+            logger.LogError(
+                "Zone {MapId} inventory inbox full: dropped stat-potion mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
+                zone.MapId, characterId);
+
+        // Value echoes the client's own raw requested count unmodified -- see this method's own <summary>.
+        return new UseInventoryItemResponse
+            { Result = 0, Page = page, Index = index, Value = requestedValue, Value2 = 0 };
     }
 
     /// <summary>
@@ -501,7 +988,7 @@ public sealed class UseInventoryItemService(
         int statInt, int statDex)
     {
         var attributes = new CharacterBaseAttributes(statVit, statStr, statInt, statDex, state.Level, state.Tribe,
-            state.Title, state.Halo, state.RebirthCount);
+            state.PreviousTribe, state.Title, state.Halo, state.RebirthCount);
         var equipmentContainer = state.Inventory.GetContainer(ContainerMatrix.Equipment);
         var petItemId = equipmentContainer.TryGetValue(PetSlots.EquipmentSlot, out var petStack)
             ? petStack.ItemId
@@ -672,6 +1159,86 @@ public sealed class UseInventoryItemService(
     }
 
     /// <summary>
+    ///     Pet EXP boost pill (world.Items 1190/17035/8413, legacy <c>aPetExpX2Time</c>) -- bulk-aware charge
+    ///     onto <see cref="PlayerRuntimeState.PetExpX2Time" />, 180 units per unit consumed (charge math and
+    ///     the overflow-reject path both live in <see cref="PetExpBoostPillResolver" />). Once positive, this
+    ///     counter doubles pet-kill EXP (<see cref="Zone.CreditPetGrowthFromMonsterKill" />) and pauses
+    ///     pet-activity decay (<see cref="Fenrir.Application.Game.Domain.Simulation.PetActivitySystem" />)
+    ///     until <see cref="Fenrir.Application.Game.Domain.Simulation.PetExpBoostCountdownSystem" /> counts it
+    ///     back down -- neither of those two periodic effects is triggered from here; this method only grants
+    ///     the one-shot charge and writes its audit trail. Item id 99402 (a fourth trigger id in the same
+    ///     legacy case block, gated behind the non-production <c>ONLINE_FOR_DS</c> branch) is deliberately not
+    ///     wired into <see cref="IsPetExpBoostPill" /> -- see <see cref="PetExpBoostPillResolver" />'s own
+    ///     remarks.
+    /// </summary>
+    /// <remarks>
+    ///     Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:5440-5468 (case 1190/17035/8413 -- the 180-unit charge,
+    ///     bulk multiplication, and the overflow-reject path, already covered in full by
+    ///     <see cref="PetExpBoostPillResolver" />'s own remarks) ; Server/ts25zone/S04_MyWork03.cpp:629-669
+    ///     (<c>GetBulkStackUseCount</c>, modeled here -- as in every sibling bulk-aware branch in this file --
+    ///     by <see cref="BulkUseCoercion.Coerce" />) ; Server/ts25zone/UpperCom/S06_MyUpperCom05.cpp:320-325
+    ///     and Server/ts25zone/H06_MyUpperCom.h:271 (<c>GL_605_USE_CASH_ITEM</c> -- user index, item id, the
+    ///     RESULTING (post-decrement) quantity, an item "value" field, and a "recognition number" field ;
+    ///     modeled here as <see cref="ItemValueCodec.Encode" /> for "value" and <see cref="ItemStack.Serial" />
+    ///     for "recognition number" -- the same two-field mapping this codebase already uses everywhere else a
+    ///     legacy item's packed-upgrade/serial pair needs a C# representation, e.g.
+    ///     <see cref="Fenrir.Application.Game.Domain.Inventory.InventoryToWorldDropPolicy" />) ;
+    ///     Server/ts25zone/S04_MyWork03.cpp:613-628 (<c>DecreaseQunatity</c>) and :671-711
+    ///     (<c>DecreaseQunatityEx</c>) -- stack decrement and slot-clear-on-empty (including the
+    ///     expiration-date reset that removing the slot's <see cref="ItemStack" /> entry outright already
+    ///     performs here, same as every sibling branch's own slot-clear path in this file).
+    /// </remarks>
+    private async ValueTask<UseInventoryItemResponse> ResolvePetExpBoostPillAsync(Zone zone,
+        PlayerRuntimeState state, int characterId, int accountId, byte page, byte index, ItemStack item,
+        int requestedValue, CancellationToken cancellationToken)
+    {
+        var bulkCount = BulkUseCoercion.Coerce(requestedValue, item.Quantity);
+
+        var charged = PetExpBoostPillResolver.ResolveCharge(state.PetExpX2Time, bulkCount);
+        if (!charged.Succeeded)
+            return Fail(page, index);
+
+        if (!await zone.PostTribeProgressCommandAndWaitAsync(
+                new TribeProgressZoneCommand(characterId, PetExpX2Time: charged.NewCounterValue),
+                cancellationToken))
+            logger.LogError(
+                "Zone {MapId} tribe-progress inbox full: dropped Pet-EXP-boost-pill mirror for character {CharacterId}",
+                zone.MapId, characterId);
+
+        // "The resulting stack quantity" per this method's own citation -- the post-decrement remainder, not
+        // the pre-use stack size (unlike ResolveGpTicketAsync/ResolveProxyShopRentalExtensionAsync's own log
+        // calls above, which log the pre-decrement quantity for their own, differently-cited, item families).
+        var remaining = item.Quantity - bulkCount;
+        var packedValue = ItemValueCodec.Encode(item.Enchant, item.Combine, item.Refine, item.Socket);
+
+        await eventLog.LogAsync(PetExpBoostPillUsedEventCode, EventLogCategory.CashItemUse, accountId, characterId,
+            null, null, null, null, null, item.ItemId, remaining, 0, $"Value={packedValue};Serial={item.Serial}",
+            cancellationToken);
+
+        var container = state.Inventory.GetContainer(page);
+        var projected = remaining > 0
+            ? container.SetItem(index, item with { Quantity = remaining })
+            : container.Remove(index);
+
+        await characters.ReplaceContainerAsync(characterId, page, ToTvps(projected), cancellationToken);
+
+        var containers = ImmutableArray.Create(new InventoryContainerSnapshot(page, projected));
+        if (!await zone.PostInventoryCommandAndWaitAsync(new InventoryZoneCommand(characterId, containers, null),
+                cancellationToken))
+            logger.LogError(
+                "Zone {MapId} inventory inbox full: dropped Pet-EXP-boost-pill mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
+                zone.MapId, characterId);
+
+        // Value carries the resulting counter total, Value2 the bulk count actually consumed -- per this
+        // family's own Outputs contract, distinct from ResolveProtectionCharmAsync's identically-shaped
+        // response (same two-field convention, different source counter).
+        return new UseInventoryItemResponse
+        {
+            Result = 0, Page = page, Index = index, Value = charged.NewCounterValue, Value2 = bulkCount
+        };
+    }
+
+    /// <summary>
     ///     Faction Notice Scroll (world.Item 566) -- recharges <see cref="PlayerRuntimeState.TribeNotifyScrollCount" />
     ///     by 5.
     /// </summary>
@@ -766,6 +1333,12 @@ public sealed class UseInventoryItemService(
         return itemId is 8153 or 8154;
     }
 
+    /// <summary>world.Items 1190/17035/8413 -- see <see cref="ResolvePetExpBoostPillAsync" />.</summary>
+    private static bool IsPetExpBoostPill(int itemId)
+    {
+        return itemId is 1190 or 17035 or 8413;
+    }
+
     private static UseInventoryItemResponse Fail(byte page, byte index)
     {
         return new UseInventoryItemResponse { Result = 1, Page = page, Index = index, Value = 0, Value2 = 0 };
@@ -778,6 +1351,33 @@ public sealed class UseInventoryItemService(
             list.Add(stack.ToTvp(slot));
         return list;
     }
+
+    /// <summary>
+    ///     Which of the five banked counters a recognized stat/elixir-potion id feeds -- see
+    ///     <see cref="ResolveStatPotionSpec" />.
+    /// </summary>
+    private enum StatPotionKind
+    {
+        Life,
+        Mana,
+        Str,
+        Dex,
+        ElementalDamage,
+        ElementalDefense
+    }
+
+    /// <summary>
+    ///     Which of the three consumption tiers a recognized stat/elixir-potion id belongs to -- see
+    ///     <see cref="ResolveStatPotionSpec" />.
+    /// </summary>
+    private enum StatPotionTier
+    {
+        Single,
+        TenStack,
+        G12
+    }
+
+    private readonly record struct StatPotionSpec(StatPotionKind Kind, StatPotionTier Tier);
 
     private readonly record struct CharmChargeSpec(ProtectionCharmCounterKind Kind, int PerUnitAmount);
 

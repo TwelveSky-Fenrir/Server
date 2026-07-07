@@ -17,12 +17,15 @@ namespace Fenrir.Application.Game.Domain.Combat;
 ///     (ProcessAttack05 calls with counting explicitly disabled) ; Server/ts25zone/H07_MyGame.h:497
 ///     (declaration, confirming the counting parameter's default) ; Server/Header/Protocol/STRUCT.h:958-978
 ///     (<c>ATTACK_FOR_PROTOCOL.mAttackActionValue4</c>, the replay-guard field).
-///     NOT WIRED into <c>Zone.PlayerLifecycle</c>'s combat resolution yet (<c>ApplyCombatCommand</c>
-///     mCase 2/3): every existing combat test fixture posts a raw <see cref="CombatCommand" /> straight after
-///     Enter, without first posting a legal avatar action to establish a non-zero
-///     <see cref="PlayerRuntimeState.AttackSubPacketCeiling" /> the way a real client always does -- wiring
-///     this in requires updating those fixtures too, a separate, coordinated follow-up left for
-///     whoever owns the tick-loop combat integration next.
+///     Wired into the four live mCase 1/2/3/6 combat-resolution call sites (<c>Zone.Duel.cs</c>'s
+///     <c>ApplyDuelAttack</c>, <c>Zone.Combat.cs</c>'s <c>ApplyCombatCommand</c>/<c>ApplyPvmAttack</c>, and
+///     <c>Zone.Stun.cs</c>'s <c>ApplyUnstunAttack</c>), each with counting enabled (the default parameter),
+///     matching every cited call site above except <c>ProcessAttack05</c>. mCase 5
+///     (<see cref="Zone.ApplyStunAttack" />) deliberately never calls this -- see <c>ProcessAttack05</c>'s own
+///     citation. Combat test fixtures across
+///     <c>Fenrir.Application.Game.Tests</c> and the <c>Fenrir.IntegrationTests</c> bot client now establish a
+///     non-zero <see cref="PlayerRuntimeState.AttackSubPacketCeiling" /> before posting a raw
+///     <see cref="CombatCommand" />/wire attack packet, the way a real client always does.
 /// </remarks>
 public static class AttackPacketBudget
 {
@@ -42,8 +45,9 @@ public static class AttackPacketBudget
     /// <param name="countAttempt">
     ///     False skips the counter/ceiling comparison -- mirrors <c>ProcessAttack05</c>'s explicit opt-out.
     ///     Defaults to true, matching every other attack-resolution flow's default parameter. No current
-    ///     Fenrir call site passes false: stun (mCase 5) combat resolution is itself unmodeled (see
-    ///     <see cref="CombatResolver" />'s remarks).
+    ///     Fenrir call site passes false: mCase 5 (stun, <see cref="Zone.ApplyStunAttack" />) is modeled but
+    ///     deliberately never calls this method at all, reproducing <c>ProcessAttack05</c>'s fully-disabled
+    ///     check without needing a <c>countAttempt: false</c> call site.
     /// </param>
     public static bool TryConsume(PlayerRuntimeState state, int attackActionValue4, bool countAttempt = true)
     {

@@ -27,8 +27,44 @@ public static class ProxyShopZonePolicy
 {
     public const short ZoneNumber = 37;
 
+    /// <summary>Zone 37's fixed market-district reference point, X axis.</summary>
+    private const float MarketCenterX = 1.0f;
+
+    /// <summary>Zone 37's fixed market-district reference point, Y axis.</summary>
+    private const float MarketCenterY = 0.0f;
+
+    /// <summary>Zone 37's fixed market-district reference point, Z axis.</summary>
+    private const float MarketCenterZ = -1478.0f;
+
+    private const float MarketRadius = 1000.0f;
+
     public static bool IsProxyShopZone(short mapId)
     {
         return mapId == ZoneNumber;
+    }
+
+    /// <summary>
+    ///     True only if the given position is strictly inside the zone-37 "market district" -- a 1000-unit-radius
+    ///     sphere centered at (1, 0, -1478) -- the in-map geofence legacy applies immediately after the
+    ///     zone-number gate, before either a live personal shop or a proxy/deputy shop may open. A position
+    ///     exactly on the boundary sphere is rejected, matching legacy's strict less-than comparison. Distance is
+    ///     full 3-axis Euclidean, not an XZ-only/flattened shortcut, so a position that is horizontally close to
+    ///     the center but far apart on the vertical axis still fails.
+    /// </summary>
+    /// <remarks>
+    ///     Réf. C++ : Server/ts25zone/S04_MyWork02.cpp:6056-6060 (the single call site, applied identically to
+    ///     both the live-shop (<c>tSort==1</c>) and proxy-shop (<c>tSort==2</c>) requests, before their handling
+    ///     paths diverge) ; Server/Header/mapcheck.h:189-244 (<c>CheckPossiblePShopRegion</c> -- zone 37's case
+    ///     applies no tribe restriction, unlike the four other recognized zone numbers, which are unreachable
+    ///     dead code here since Fenrir already restricts this whole feature to zone 37 -- see this type's own
+    ///     remarks) ; Server/Header/mapcheck.h:12-15 (<c>GetLengthXYZ</c> -- confirms the distance formula is
+    ///     full 3-axis Euclidean, not a flattened variant).
+    /// </remarks>
+    public static bool IsWithinMarketDistrict(float x, float y, float z)
+    {
+        var dx = x - MarketCenterX;
+        var dy = y - MarketCenterY;
+        var dz = z - MarketCenterZ;
+        return dx * dx + dy * dy + dz * dz < MarketRadius * MarketRadius;
     }
 }

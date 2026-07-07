@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Network.Serialization.Packets.Zone;
 using Microsoft.Extensions.Logging;
@@ -167,6 +168,43 @@ public sealed class ZoneEventBroadcaster(
             throw new ArgumentException($"Expected exactly {WorldStateService.TribeCount} totals.", nameof(totals));
 
         Broadcast(1234, totals[0], totals[1], totals[2], totals[3]);
+    }
+
+    /// <summary>
+    ///     Tower status broadcast (legacy tSort=752, <c>U_ZONE_BROADCAST_FOR_CENTER_SEND</c>) on upgrade-completion
+    ///     and, separately, on destroy-completion -- see <see cref="Progression.TowerGuardianSystem" />'s own two
+    ///     call sites. Neither the receiving zone's own notification-dispatch switch nor Center's own world-state
+    ///     mutation switch has a dedicated branch for 752, so both fall through to their unconditional default
+    ///     trailer: every connected client in the whole cluster learns the new tower state, not merely players in
+    ///     the affected tower's own zone. Unlike every other <c>Announce*</c> method on this class, the
+    ///     client-facing packet here is the already-implemented, dedicated <see cref="TowerStatusResponse" /> (its
+    ///     own wire opcode) rather than the generic op94 <see cref="ZoneEventInfoResponse" /> sort family this
+    ///     class's other methods use -- only the shard-wide fan-out PATTERN below is reused, not
+    ///     <see cref="Broadcast" /> itself.
+    /// </summary>
+    /// <remarks>
+    ///     Réf. C++ : Server/ts25zone/S07_MyGame01.cpp:13733 (upgrade-completion send,
+    ///     <c>U_ZONE_BROADCAST_FOR_CENTER_SEND(752, mTowerIndex, mTowerInfo-&gt;mState1Tower[mTowerIndex])</c>) ;
+    ///     :13759 (destroy-completion send, the identical call) ; Server/ts25zone/S07_MyGame08.cpp:1085-1093
+    ///     (zone-side dispatch switch's neighboring cases 751/753/754/755, no case 752 anywhere in this switch) ;
+    ///     :1349-1352 (the switch's unconditional default trailer -- relay onward + local-client broadcast).
+    ///     The Center-side relay/persistence citation previously here (S04_MyWork02.cpp:1085-1093/:1213-1221)
+    ///     did not hold up under re-verification -- those line ranges are ts25zone's own REGISTER_AVATAR_SEND/
+    ///     CLIENT_OK_FOR_ZONE_SEND handlers, not a ts25center switch -- and has been removed rather than left
+    ///     misattributed pending a fresh citation.
+    /// </remarks>
+    public void AnnounceTowerStatus(TowerWarState towerWar)
+    {
+        // BuildStatusSnapshot() takes ONE lock over the whole 12-tower batch, so no in-flight
+        // BeginUpgrade/CompleteUpgrade from another zone's own tick thread can be observed half-applied
+        // across the batch -- unlike looping GetPackedState(i) per-tower (each independently locked), which
+        // can produce a torn snapshot mixing pre- and post-completion state across different towers in the
+        // same broadcast frame. Same call Zone.Combat.cs's own BroadcastTowerStatus already uses.
+        var response = towerWar.BuildStatusSnapshot();
+
+        foreach (var zone in zones.Zones)
+        foreach (var player in zone.Players)
+            player.Session.Send(response);
     }
 
     private void Broadcast(int sort, params ReadOnlySpan<int> fields)

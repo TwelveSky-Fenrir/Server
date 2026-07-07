@@ -20,6 +20,7 @@ public sealed class UpdateProxyShopHandler(IUpdateProxyShopService service)
     {
         var zoneSession = (ZoneClientSession)session;
         var characterId = zoneSession.CharacterId!.Value;
+        var accountId = zoneSession.AccountId!.Value;
 
         if (zoneSession.CurrentZone is not Zone zone || !zone.TryGetPlayer(characterId, out var state) ||
             state is null)
@@ -42,9 +43,9 @@ public sealed class UpdateProxyShopHandler(IUpdateProxyShopService service)
         try
         {
             var result = packet.BuySort == 1
-                ? await service.RetrieveAsync(packet, zone, state, characterId, validation.SlotIndex,
+                ? await service.RetrieveAsync(packet, zone, state, characterId, accountId, validation.SlotIndex,
                     validation.ItemDefinition!, cancellationToken)
-                : await service.PurchaseAsync(packet, zone, state, characterId, validation.SlotIndex,
+                : await service.PurchaseAsync(packet, zone, state, characterId, accountId, validation.SlotIndex,
                     validation.ItemDefinition!, cancellationToken);
 
             if (result is null)

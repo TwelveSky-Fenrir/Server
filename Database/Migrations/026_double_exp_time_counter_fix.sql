@@ -42,29 +42,28 @@
 --     _manifest.txt since before this migration) -- DbMigrator refuses a changed re-apply of an
 --     already-journaled script, so the comment is left as-is here rather than edited in place. The column
 --     type itself (INT) is unaffected either way -- 300 fits it exactly as well as a YYYYMMDD value did.
-CREATE OR ALTER PROCEDURE game.usp_Character_CreateWithStarterKit
-    @AccountId INT,
-    @Slot TINYINT,
-    @Name NVARCHAR(13),
-    @Tribe TINYINT,
-    @Gender TINYINT,
-    @HeadType TINYINT,
-    @FaceType TINYINT,
-    @MapId SMALLINT,
-    @PosX REAL,
-    @PosY REAL,
-    @PosZ REAL,
-    @Life INT,
-    @MaxLife INT,
-    @Mana INT,
-    @MaxMana INT,
-    @WelcomeBuffUntilDate INT,
-    @PremiumUntilUnixSeconds BIGINT,
-    @Equipment game.tvp_CharacterItemSlot READONLY,
-    @Inventory game.tvp_CharacterItemSlot READONLY,
-    @Skills game.tvp_CharacterSkillSlot READONLY,
-    @Hotkeys game.tvp_CharacterHotkeySlot READONLY,
-    @PreviousTribe TINYINT = 0
+CREATE OR ALTER PROCEDURE game.usp_Character_CreateWithStarterKit @AccountId INT,
+                                                                  @Slot TINYINT,
+                                                                  @Name NVARCHAR(13),
+                                                                  @Tribe TINYINT,
+                                                                  @Gender TINYINT,
+                                                                  @HeadType TINYINT,
+                                                                  @FaceType TINYINT,
+                                                                  @MapId SMALLINT,
+                                                                  @PosX REAL,
+                                                                  @PosY REAL,
+                                                                  @PosZ REAL,
+                                                                  @Life INT,
+                                                                  @MaxLife INT,
+                                                                  @Mana INT,
+                                                                  @MaxMana INT,
+                                                                  @WelcomeBuffUntilDate INT,
+                                                                  @PremiumUntilUnixSeconds BIGINT,
+                                                                  @Equipment game.tvp_CharacterItemSlot READONLY,
+                                                                  @Inventory game.tvp_CharacterItemSlot READONLY,
+                                                                  @Skills game.tvp_CharacterSkillSlot READONLY,
+                                                                  @Hotkeys game.tvp_CharacterHotkeySlot READONLY,
+                                                                  @PreviousTribe TINYINT = 0
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -76,7 +75,10 @@ BEGIN
     IF EXISTS (SELECT 1 FROM game.Characters WHERE Name = @Name)
         THROW 50202, 'Character name already taken.', 1;
 
-    DECLARE @CharacterId TABLE (CharacterId INT);
+    DECLARE @CharacterId TABLE
+                         (
+                             CharacterId INT
+                         );
 
     BEGIN TRANSACTION;
 
@@ -104,9 +106,10 @@ BEGIN
      MountItemId, MountExpActivity, MountPower, MountSlotIndex, MountTime,
      ProtectForDeath,
      DoubleExpTime1, DoubleExpTime2, AutoBuffTime, PremiumExpireUtc)
-        OUTPUT INSERTED.CharacterId INTO @CharacterId
-    VALUES
-        (@AccountId, @Slot, @Name, @Tribe, @PreviousTribe, @Gender, @HeadType, @FaceType, @MapId, @PosX, @PosY, @PosZ, @Life, @MaxLife, @Mana, @MaxMana, 1, 1, 1, 1, 640000000, 100, 145, 12, 0, 2000000000, 0, 3175, 10000, 1301, 0, 5, 0, 99999999, 5, 300, 300, @WelcomeBuffUntilDate, @PremiumUntilUnixSeconds);
+    OUTPUT INSERTED.CharacterId INTO @CharacterId
+    VALUES (@AccountId, @Slot, @Name, @Tribe, @PreviousTribe, @Gender, @HeadType, @FaceType, @MapId, @PosX, @PosY,
+            @PosZ, @Life, @MaxLife, @Mana, @MaxMana, 1, 1, 1, 1, 640000000, 100, 145, 12, 0, 2000000000, 0, 3175, 10000,
+            1301, 0, 5, 0, 99999999, 5, 300, 300, @WelcomeBuffUntilDate, @PremiumUntilUnixSeconds);
 
     DECLARE @NewCharacterId INT = (SELECT CharacterId FROM @CharacterId);
 

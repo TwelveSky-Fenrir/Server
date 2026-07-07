@@ -1,10 +1,10 @@
 CREATE PROCEDURE world.usp_ZoneNpcSpawn_GetAll
-    AS
+AS
 BEGIN
     SET
-NOCOUNT ON;
+        NOCOUNT ON;
 
-SELECT ZoneNumber, SlotIndex, NpcId, PosX, PosY, PosZ, Angle
-FROM world.ZoneNpcSpawns
-ORDER BY ZoneNumber, SlotIndex;
+    SELECT ZoneNumber, SlotIndex, NpcId, PosX, PosY, PosZ, Angle
+    FROM world.ZoneNpcSpawns
+    ORDER BY ZoneNumber, SlotIndex;
 END;

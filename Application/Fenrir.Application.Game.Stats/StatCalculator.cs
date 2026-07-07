@@ -52,7 +52,7 @@ public static partial class StatCalculator
         PetStatContribution pet = default)
     {
         var bySlot = BuildSlotLookup(equipment);
-        var setNumber = SetBonusTables.ResolveEffectiveSetNumber(attributes.Tribe, equipment, legacySetNumber);
+        var setNumber = SetBonusTables.ResolveEffectiveSetNumber(attributes.PreviousTribe, equipment, legacySetNumber);
         var isLegendarySet = AnyLegendary(bySlot);
         var levelRow = GetLevelRow(levels, attributes.Level);
 
@@ -62,7 +62,7 @@ public static partial class StatCalculator
         var wisdom = ComputeWisdom(attributes, bySlot);
 
         return new EffectiveStats(
-            ComputeMaxLife(vitality, levelRow, setNumber, isLegendarySet, attributes.Tribe, bySlot, pet.Life),
+            ComputeMaxLife(vitality, levelRow, setNumber, isLegendarySet, attributes.PreviousTribe, bySlot, pet.Life),
             ComputeMaxMana(ki, levelRow, setNumber, bySlot, pet.Mana),
             ComputeAttackPower(strength, ki, levelRow, setNumber, bySlot),
             ComputeDefensePower(wisdom, levelRow, setNumber, bySlot),
@@ -91,7 +91,7 @@ public static partial class StatCalculator
     {
         var baseStats = ComputeBaseStats(attributes, equipment, levels, legacySetNumber, pet);
         var bySlot = BuildSlotLookup(equipment);
-        var setNumber = SetBonusTables.ResolveEffectiveSetNumber(attributes.Tribe, equipment, legacySetNumber);
+        var setNumber = SetBonusTables.ResolveEffectiveSetNumber(attributes.PreviousTribe, equipment, legacySetNumber);
         var titleRank = attributes.Title % 100;
 
         var attackPower = ApplyBuffPercent(baseStats.AttackPower, GetBuffPercent(buffs, 0));

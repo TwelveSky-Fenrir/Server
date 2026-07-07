@@ -11,6 +11,7 @@ using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Data.Abstractions.World;
 using Fenrir.Data.WriteBehind;
 using Fenrir.Network.Serialization.Packets.Shared;
+using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.Simulation;
 
@@ -29,10 +30,10 @@ public class AutoHuntTickSystemTests
         var worldData = ZoneTestKit.EmptyWorldData(skillsById: skillsById, itemsById: itemsById);
         var dirtyTracker = new DirtyTracker<int>();
         var opts = options ?? ZoneTestKit.Options();
-        var optionsWrapper = Microsoft.Extensions.Options.Options.Create(opts);
-        var zone = ZoneTestKit.CreateZone(mapId, opts, dirtyTracker: dirtyTracker,
-            simulationSystems: [new AutoHuntTickSystem(worldData, dirtyTracker, optionsWrapper)],
-            worldData: worldData);
+        var optionsWrapper = Options.Create(opts);
+        var zone = ZoneTestKit.CreateZone(mapId, opts, dirtyTracker,
+            [new AutoHuntTickSystem(worldData, dirtyTracker, optionsWrapper)],
+            worldData);
 
         var (session, _) = ZoneTestKit.CreateSession(1);
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, mapId)));

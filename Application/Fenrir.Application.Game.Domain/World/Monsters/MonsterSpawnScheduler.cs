@@ -49,7 +49,8 @@ internal sealed class MonsterZoneSpawnState
 ///         (<see cref="RollRespawnTicks" />'s monster-746 fixed cooldown, and <see cref="MonsterBossRespawnTracker" />'s
 ///         disk-persisted deadline for the 5 monsters 564-568) and the tribe/monster-symbol "Holy Stone" report
 ///         on kill (<see cref="ProcessDeath" />). Not ported: <c>SummonBossMonster</c> (a separate boss-table
-///         state machine, <c>Server/ts25zone/S10_MySummon.cpp:1066-1216</c>) and <c>SummonGuard</c>/<c>SummonTribeSymbol</c>
+///         state machine, <c>Server/ts25zone/S10_MySummon.cpp:1066-1216</c>) and <c>SummonGuard</c>/
+///         <c>SummonTribeSymbol</c>
 ///         (hardcoded per-tribe-territory coordinates that depend on an unmodeled territory-ownership system) --
 ///         both summon their monsters outside <c>world.MonsterSpawnRegions</c> entirely, so neither is reachable
 ///         from this scheduler's own per-region pool. The dungeon <c>mNumber</c>-forced-to-20 instance-population
@@ -85,6 +86,25 @@ public sealed class MonsterSpawnScheduler(
     : ISimulationSystem
 {
     /// <summary>
+    ///     Legacy's <c>END_NORMAL_MONSTER_OBJECT_NUM</c> (<c>Server/ts25zone/S01_MainApplication.cpp:38-57</c>,
+    ///     per <c>ServerDocs/12_ts25zone/21_MyWorld_MySummon_Navmesh_Spawn.md</c> &#167;3.3): the running total of
+    ///     every <c>world.MonsterSpawnRegions</c> row's slot count that <c>LoadRegionInfo_1</c> checks against
+    ///     before committing a zone's spawn table, discarding the WHOLE table back to empty rather than
+    ///     truncating it the moment the total crosses this ceiling (<c>Server/ts25zone/S10_MySummon.cpp:575-580</c>).
+    ///     Legacy additionally resizes this ceiling per physical server number at boot -- doubled for the five
+    ///     "_FIX" dungeon variants (39/144/145/313/74), collapsed to 1000 for instance-zone shards (241-330), to
+    ///     1 for FFA maps (<c>Server/ts25zone/S02_MyServer.cpp:140-227</c>) -- which Fenrir does not model (no
+    ///     equivalent per-shard object-pool resizing concept exists here), so this is always the un-resized base
+    ///     default. Applied to a zone's whole combined spawn-region pool rather than a "regular-monster-only"
+    ///     subset, because <see cref="BuildState" /> -- like the rest of this scheduler, see its own class
+    ///     remarks -- does not separate boss-sourced rows (<c>Z0NN_SUMMONBOSSMONSTER.WREGION</c>) into a
+    ///     distinct table the way legacy's <c>LoadRegionInfo_2</c> does; every live zone's seeded row total sits
+    ///     nowhere near this ceiling, so the discard branch below is expected to be dead in steady state, same
+    ///     as legacy's own experience of the check.
+    /// </summary>
+    private const int RegularMonsterTableCapacity = 3400;
+
+    /// <summary>
     ///     A fresh <see cref="System.Random" /> per zone -- never shared across zones, since different zones
     ///     tick concurrently and <see cref="System.Random" /> is not thread-safe. Tests may inject a factory
     ///     returning a seeded <see cref="Random" /> for deterministic rolls.
@@ -103,25 +123,6 @@ public sealed class MonsterSpawnScheduler(
     ///     kills of this monster can race each other on separate tick threads.
     /// </summary>
     private int _demonLordKillTally;
-
-    /// <summary>
-    ///     Legacy's <c>END_NORMAL_MONSTER_OBJECT_NUM</c> (<c>Server/ts25zone/S01_MainApplication.cpp:38-57</c>,
-    ///     per <c>ServerDocs/12_ts25zone/21_MyWorld_MySummon_Navmesh_Spawn.md</c> &#167;3.3): the running total of
-    ///     every <c>world.MonsterSpawnRegions</c> row's slot count that <c>LoadRegionInfo_1</c> checks against
-    ///     before committing a zone's spawn table, discarding the WHOLE table back to empty rather than
-    ///     truncating it the moment the total crosses this ceiling (<c>Server/ts25zone/S10_MySummon.cpp:575-580</c>).
-    ///     Legacy additionally resizes this ceiling per physical server number at boot -- doubled for the five
-    ///     "_FIX" dungeon variants (39/144/145/313/74), collapsed to 1000 for instance-zone shards (241-330), to
-    ///     1 for FFA maps (<c>Server/ts25zone/S02_MyServer.cpp:140-227</c>) -- which Fenrir does not model (no
-    ///     equivalent per-shard object-pool resizing concept exists here), so this is always the un-resized base
-    ///     default. Applied to a zone's whole combined spawn-region pool rather than a "regular-monster-only"
-    ///     subset, because <see cref="BuildState" /> -- like the rest of this scheduler, see its own class
-    ///     remarks -- does not separate boss-sourced rows (<c>Z0NN_SUMMONBOSSMONSTER.WREGION</c>) into a
-    ///     distinct table the way legacy's <c>LoadRegionInfo_2</c> does; every live zone's seeded row total sits
-    ///     nowhere near this ceiling, so the discard branch below is expected to be dead in steady state, same
-    ///     as legacy's own experience of the check.
-    /// </summary>
-    private const int RegularMonsterTableCapacity = 3400;
 
     public void Simulate(Zone zone, int legacyTicksElapsed)
     {
@@ -216,8 +217,22 @@ public sealed class MonsterSpawnScheduler(
     }
 
     /// <summary>
-    ///     Random point inside the region's disk, Y resolved via <see cref="Zone.Geometry" /> when available, else the
-    ///     region's own recorded Y.
+    ///     Random point inside the region's disk. When <see cref="Zone.Geometry" /> is loaded, the point must
+    ///     resolve to a ground height or the whole attempt fails closed -- legacy's own <c>CreateSummon</c>
+    ///     aborts identically on an off-mesh scatter point (<c>if ( !mWORLD.GetYCoord(...) ) { return FALSE; }</c>,
+    ///     <c>Server/ts25zone/S10_MySummon.cpp:745-748</c>) and leaves the slot's cooldown state untouched so the
+    ///     next periodic respawn scan re-rolls a fresh random point and retries -- see <see cref="Simulate" />'s
+    ///     own callers, which never advance a slot's timer past zero on a failed attempt. A region whose exact
+    ///     center is off-mesh (zero/absent radius) fails the same check, matching
+    ///     <c>Server/ts25zone/S10_MySummon.cpp:724-763</c>'s <c>mRADIUS &gt; 0</c> gate only ever controlling
+    ///     whether a nonzero scatter distance is drawn, never whether the ground-height check itself runs.
+    ///     <para>
+    ///         When <see cref="Zone.Geometry" /> is null (no <c>.WM</c> loaded for this zone at all), there is no
+    ///         legacy equivalent to compare against -- production ts25zone always has terrain data for every
+    ///         live map -- so this falls back to the region's raw recorded Y unconditionally rather than failing
+    ///         closed, to avoid permanently starving spawns in a zone whose terrain file hasn't been supplied
+    ///         (e.g. in tests). This is a Fenrir-only divergence, not a ported legacy behavior.
+    ///     </para>
     /// </summary>
     private void Spawn(Zone zone, MonsterSpawnSlot slot)
     {
@@ -229,8 +244,12 @@ public sealed class MonsterSpawnScheduler(
         var z = region.LocationZ + (float)(Math.Sin(angle) * scatter);
         var y = (float)region.LocationY;
 
-        if (zone.Geometry is { } geometry && geometry.TryGetGroundHeight(x, z, out var groundY))
+        if (zone.Geometry is { } geometry)
+        {
+            if (!geometry.TryGetGroundHeight(x, z, out var groundY))
+                return; // off-mesh scatter point: fail closed, retry next scan with a freshly drawn point
             y = groundY;
+        }
 
         var leash = MathF.Max(region.Radius, 1f);
         var entity = MonsterEntity.Create(slot.ServerIndex, zone.NextMonsterUniqueNumber(), slot.Monster,
@@ -358,20 +377,42 @@ public sealed class MonsterSpawnScheduler(
         }
         else
         {
+            // Premium-account drop-rate bonus (Server/ts25zone/S07_MyGame05.cpp:2171-2176, MonsterDropRoller's
+            // own class remarks for the full citation chain): a plain greater-than-zero check on the killer's
+            // stored premium-expiry timestamp, never re-compared against the current time here -- expiry itself
+            // is caught elsewhere by SupportSkillTimeUpRatioMaintenanceSystem's own per-minute pass, which zeroes
+            // PremiumExpireUtc once it lapses.
             var result = state.DropRoller.Roll(monsterDefinition, killer.Level, killer.Tribe, luck, killerQuest,
-                KillerHasItem);
+                KillerHasItem, killer.PremiumExpireUtc > 0);
             money = result.Money;
-            genericItems = result.Items;
+
+            // Tail-span tiers (MonsterDropTailResolver, Server/ts25zone/S07_MyGame05.cpp:3391-3427 "CP Gift
+            // Card", :3515-3582 "LOD Rebirth Item"): sit after MonsterDropRoller's own documented :2999
+            // boundary, still gated by the same early-return (SkipGenericTiers, this branch) that guards
+            // every other generic tier above.
+            var generalDropEligible = MonsterDropRoller.IsEligible(monsterDefinition.Monster, killer.Level);
+            var cpGiftItems = MonsterDropTailResolver.ResolveCpGiftCard(generalDropEligible,
+                monster.Template.MonsterId, zone.IsZone241TypeZone, killer.Level2,
+                // mCheckZone126TypeServer's legacy-server-number-to-Fenrir-shard mapping is still an open
+                // question (see MonsterDropTailResolver's own remarks) -- hardcoded false pending that work,
+                // not a claim that no live shard is ever "Zone126-type".
+                false, state.Random);
+            var rebirthItems = MonsterDropTailResolver.ResolveRebirthItem(monster.Template.MonsterId, state.Random);
+
+            genericItems = cpGiftItems.Count == 0 && rebirthItems.Count == 0
+                ? result.Items
+                : [.. result.Items, .. cpGiftItems, .. rebirthItems];
         }
 
         if (money is { } amount)
-        {
+            // Deliberately NOT routed through Zone.CreditMonsterKillTribeTax: in production ts25zone, a
+            // monster-kill money grant never reaches AddTribeBankInfo3 (the 9% tribe-bank tax). The only
+            // call site of that function is ProcessForDropItem's DP_MN_TO_WD/currency-item branch
+            // (S07_MyGame03.cpp:486-494), and the live DROP_MONEY block never calls ProcessForDropItem for
+            // its own currency grant -- the one line that would have (S07_MyGame05.cpp:2689) is commented
+            // out. See Zone.TribeBankTax.cs's own remarks for the full citation set and the still-live 1%
+            // NPC-service tax this does not affect.
             zone.QueueMoneyGrant(killer.CharacterId, amount);
-
-            // Tribe bank 9% tax: additional to, never subtracted from, the killer's own award above -- see
-            // Zone.TribeBankTax.cs / TribeBankTaxAccumulator.CreditMonsterKillCurrencyTax's own remarks.
-            zone.CreditMonsterKillTribeTax(killer.Tribe, amount);
-        }
 
         foreach (var publicItem in bossOutcome.PublicItems)
             // Ownerless/public loot (identifier 576's Labyrinth Key): empty master/party name makes it

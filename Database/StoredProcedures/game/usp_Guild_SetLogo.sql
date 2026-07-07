@@ -1,17 +1,17 @@
 CREATE PROCEDURE game.usp_Guild_SetLogo @GuildId INT,
-    @Logo    INT
+                                        @Logo INT
 AS
 BEGIN
     SET
-NOCOUNT ON;
+        NOCOUNT ON;
     SET
-XACT_ABORT ON;
+        XACT_ABORT ON;
 
-UPDATE game.Guilds
-SET Logo = @Logo
-WHERE GuildId = @GuildId;
+    UPDATE game.Guilds
+    SET Logo = @Logo
+    WHERE GuildId = @GuildId;
 
-IF
-@@ROWCOUNT = 0
+    IF
+        @@ROWCOUNT = 0
         THROW 50235, N'Guild not found.', 1;
 END;

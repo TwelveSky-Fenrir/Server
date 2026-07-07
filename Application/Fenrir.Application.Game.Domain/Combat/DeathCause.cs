@@ -24,11 +24,12 @@ public enum DeathCause
 
     /// <summary>
     ///     A private 1-on-1 duel death (<c>PVP_ATTACK_TYPE::DUEL</c>, <c>S07_MyGame02.cpp:881-884</c>) -- the
-    ///     one cause that does NOT arm <see cref="World.PlayerRuntimeState.ReviveHackFlag" />. Not reachable
-    ///     yet: Fenrir has no same-tribe duel-combat path (same-tribe attacks are still rejected outright by
-    ///     <see cref="CombatResolver" />, see <see cref="Social.Duel.DuelRegistry" />'s own remarks) -- kept
-    ///     here so the mapping is already correct for when duel combat is unlocked, rather than guessed at
-    ///     retroactively.
+    ///     one cause that does NOT arm <see cref="World.PlayerRuntimeState.ReviveHackFlag" />. Reached via
+    ///     <c>Zone.ApplyDuelAttack</c> (<c>mCase</c> 1, <see cref="CombatResolver.ResolveDuelAttack" />), gated
+    ///     by <see cref="Social.Duel.DuelRegistry" />'s own duel-authorization check rather than the ordinary
+    ///     same-tribe guard <see cref="CombatResolver.ResolveEnemyTribeAttack" /> uses -- unlike that path, a
+    ///     duel kill deliberately does NOT reach <c>Zone.ApplyPvpKillRewards</c> (see
+    ///     <c>Zone.ApplyDuelAttack</c>'s own remarks for why).
     /// </summary>
     Duel
 }

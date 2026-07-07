@@ -1,71 +1,71 @@
 -- Exists to close a real item-loss window: callers used to invoke usp_CharacterItems_ReplaceContainer
 -- twice as independent transactions, so a fault between them could empty the source and never fill the destination.
 CREATE PROCEDURE game.usp_CharacterItems_ReplaceTwoContainers @CharacterId INT,
-    @ContainerA  TINYINT,
-    @ItemsA      game.tvp_CharacterItemSlot READONLY,
-    @ContainerB  TINYINT,
-    @ItemsB      game.tvp_CharacterItemSlot READONLY
+                                                              @ContainerA TINYINT,
+                                                              @ItemsA game.tvp_CharacterItemSlot READONLY,
+                                                              @ContainerB TINYINT,
+                                                              @ItemsB game.tvp_CharacterItemSlot READONLY
 AS
 BEGIN
     SET
-NOCOUNT ON;
+        NOCOUNT ON;
     SET
-XACT_ABORT ON;
+        XACT_ABORT ON;
 
     IF
-@ContainerA = @ContainerB
+        @ContainerA = @ContainerB
         THROW 50260, N'ContainerA and ContainerB must differ -- use usp_CharacterItems_ReplaceContainer for a same-container move.', 1;
 
-BEGIN
-TRANSACTION;
+    BEGIN
+        TRANSACTION;
 
-DELETE
-FROM game.CharacterItems
-WHERE CharacterId = @CharacterId
-  AND Container = @ContainerA;
+    DELETE
+    FROM game.CharacterItems
+    WHERE CharacterId = @CharacterId
+      AND Container = @ContainerA;
 
-INSERT INTO game.CharacterItems (CharacterId, Container, Slot, ItemId, Quantity,
-                                 Enchant, Combine, Refine, Socket,
-                                 SocketGem1, SocketGem2, SocketGem3, ExpireDate, Serial)
-SELECT @CharacterId,
-       @ContainerA,
-       Slot,
-       ItemId,
-       Quantity,
-       Enchant,
-       Combine,
-       Refine,
-       Socket,
-       SocketGem1,
-       SocketGem2,
-       SocketGem3,
-       ExpireDate,
-       Serial
-FROM @ItemsA;
+    INSERT INTO game.CharacterItems (CharacterId, Container, Slot, ItemId, Quantity,
+                                     Enchant, Combine, Refine, Socket,
+                                     SocketGem1, SocketGem2, SocketGem3, ExpireDate, Serial)
+    SELECT @CharacterId,
+           @ContainerA,
+           Slot,
+           ItemId,
+           Quantity,
+           Enchant,
+           Combine,
+           Refine,
+           Socket,
+           SocketGem1,
+           SocketGem2,
+           SocketGem3,
+           ExpireDate,
+           Serial
+    FROM @ItemsA;
 
-DELETE
-FROM game.CharacterItems
-WHERE CharacterId = @CharacterId
-  AND Container = @ContainerB;
+    DELETE
+    FROM game.CharacterItems
+    WHERE CharacterId = @CharacterId
+      AND Container = @ContainerB;
 
-INSERT INTO game.CharacterItems (CharacterId, Container, Slot, ItemId, Quantity,
-                                 Enchant, Combine, Refine, Socket,
-                                 SocketGem1, SocketGem2, SocketGem3, ExpireDate, Serial)
-SELECT @CharacterId,
-       @ContainerB,
-       Slot,
-       ItemId,
-       Quantity,
-       Enchant,
-       Combine,
-       Refine,
-       Socket,
-       SocketGem1,
-       SocketGem2,
-       SocketGem3,
-       ExpireDate,
-       Serial
-FROM @ItemsB;
+    INSERT INTO game.CharacterItems (CharacterId, Container, Slot, ItemId, Quantity,
+                                     Enchant, Combine, Refine, Socket,
+                                     SocketGem1, SocketGem2, SocketGem3, ExpireDate, Serial)
+    SELECT @CharacterId,
+           @ContainerB,
+           Slot,
+           ItemId,
+           Quantity,
+           Enchant,
+           Combine,
+           Refine,
+           Socket,
+           SocketGem1,
+           SocketGem2,
+           SocketGem3,
+           ExpireDate,
+           Serial
+    FROM @ItemsB;
 
-COMMIT TRANSACTION;
+    COMMIT TRANSACTION;
 END;

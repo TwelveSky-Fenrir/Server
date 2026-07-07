@@ -168,32 +168,42 @@ public class ContainerMatrixTests
     }
 
     [Fact]
-    public void ResolveMove_DifferentItem_SwapsBothStacksWhole()
+    public void ResolveMove_DifferentItem_OccupiedDestinationIsRejected_NoSwap()
     {
+        // Legacy's ProcessForInventoryToInventory/ProcessForInventoryToEquip/ProcessForEquipToInventory family
+        // rejects an occupied, non-mergeable destination outright for all 3 directions -- there is no
+        // swap-with-occupant concept anywhere in that family (Server/ts25zone/S04_MyWork05.cpp:875-880).
         var source = Stack(10);
         var destination = Stack(20);
 
         var result = ContainerMatrix.ResolveMove(ContainerMatrix.InventoryPage0, 0, 0,
             ContainerMatrix.InventoryPage0, 1, source, destination, false);
 
-        Assert.Equal(ContainerMatrix.MoveOutcome.Success, result.Outcome);
-        Assert.Equal(destination, result.NewSource);
-        Assert.Equal(source, result.NewDestination);
+        Assert.Equal(ContainerMatrix.MoveOutcome.DestinationOccupied, result.Outcome);
+        Assert.False(result.Succeeded);
+        Assert.Equal(source, result.NewSource);
+        Assert.Equal(destination, result.NewDestination);
     }
 
     [Fact]
-    public void ResolveMove_SameItemIdButNotStackable_SwapsInsteadOfMerging()
+    public void ResolveMove_SameItemIdButNotStackable_OccupiedDestinationIsRejected_NoSwap()
     {
-        // sourceIsStackable=false forces swap even with matching ItemId -- two enchanted items aren't one pile
+        // sourceIsStackable=false: two enchanted items sharing an ItemId aren't one mergeable pile, so this
+        // must reject exactly like any other occupied-destination case -- not merge, and (the historical bug
+        // this test now guards against) not swap either. Server/ts25zone/S04_MyWork05.cpp:1589-1594 confirms
+        // the equip->inventory (unequip) direction rejects identically; using Equipment as the source
+        // container here is deliberately the same shape as the unequip (tSort 213) direction, where a swap
+        // would otherwise write an arbitrary, unvalidated item straight into the vacated Equipment slot.
         var source = Stack(999, 1, 5);
         var destination = Stack(999, 1, 12);
 
         var result = ContainerMatrix.ResolveMove(ContainerMatrix.Equipment, 7, 0,
             ContainerMatrix.InventoryPage0, 1, source, destination, false);
 
-        Assert.Equal(ContainerMatrix.MoveOutcome.Success, result.Outcome);
-        Assert.Equal(destination, result.NewSource);
-        Assert.Equal(source, result.NewDestination);
+        Assert.Equal(ContainerMatrix.MoveOutcome.DestinationOccupied, result.Outcome);
+        Assert.False(result.Succeeded);
+        Assert.Equal(source, result.NewSource);
+        Assert.Equal(destination, result.NewDestination);
     }
 
     [Fact]

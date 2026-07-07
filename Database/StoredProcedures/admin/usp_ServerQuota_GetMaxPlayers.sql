@@ -2,12 +2,12 @@
 -- at LoginServer startup -- deliberately not cached here (unlike admin.usp_GameSettings_Get's 5-minute
 -- AddInMemoryCache): the caller alone owns the refresh cadence.
 CREATE PROCEDURE admin.usp_ServerQuota_GetMaxPlayers
-    AS
+AS
 BEGIN
     SET
-NOCOUNT ON;
+        NOCOUNT ON;
 
-SELECT MaxPlayers
-FROM admin.ServerQuota
-WHERE Id = 1;
+    SELECT MaxPlayers
+    FROM admin.ServerQuota
+    WHERE Id = 1;
 END;

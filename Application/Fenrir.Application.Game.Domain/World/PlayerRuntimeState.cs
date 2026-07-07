@@ -138,6 +138,20 @@ public sealed partial class PlayerRuntimeState
     public SemaphoreSlim EconomyActionLock { get; } = new(1, 1);
 
     /// <summary>
+    ///     Wall-clock instant of this character's last accepted op23 (CZ_USE_INVENTORY_ITEM_SEND) request --
+    ///     the per-avatar, item-agnostic anti-flood gate mirroring legacy's single <c>mTickForUseInventoryItem</c>
+    ///     field (Server/Header/H07_MyGame.h:901): one shared stamp across every item id, never a per-item-type
+    ///     cooldown table. Defaulted to <see cref="DateTime.UtcNow" /> at construction time so a freshly
+    ///     (re)registered avatar (every zone entry/transfer constructs a fresh <see cref="PlayerRuntimeState" />)
+    ///     starts the gate the same way legacy (re)initializes it to the current tick at avatar registration
+    ///     (Server/ts25zone/S04_MyWork02.cpp:877) -- the very first item-use attempt after entering a zone is
+    ///     subject to the exact same gate as any later one. Checked and stamped by
+    ///     <c>UseInventoryItemHandler</c>, before any item-specific dispatch, mirroring legacy's own ordering
+    ///     (Server/ts25zone/S04_MyWork03.cpp:1861-1866).
+    /// </summary>
+    public DateTime LastItemUseUtc { get; set; } = DateTime.UtcNow;
+
+    /// <summary>
     ///     Server-side monotonic counter, independent of the DB's own FlushSequence baseline -- incremented
     ///     once per accepted move (<c>Zone.PlayerLifecycle.HandleMove</c>) or once per call to
     ///     <see cref="MarkProgressDirty" />, never reset, so <c>usp_Character_PersistBatch</c> AND

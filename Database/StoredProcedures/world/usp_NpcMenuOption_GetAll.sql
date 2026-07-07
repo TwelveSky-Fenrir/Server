@@ -1,10 +1,10 @@
 CREATE PROCEDURE world.usp_NpcMenuOption_GetAll
-    AS
+AS
 BEGIN
     SET
-NOCOUNT ON;
+        NOCOUNT ON;
 
-SELECT NpcId, SlotIndex, OptionId
-FROM world.NpcMenuOptions
-ORDER BY NpcId, SlotIndex;
+    SELECT NpcId, SlotIndex, OptionId
+    FROM world.NpcMenuOptions
+    ORDER BY NpcId, SlotIndex;
 END;

@@ -38,6 +38,15 @@ public sealed class GenericActionService(
     /// <summary>Server/ts25zone/S04_MyWork05.cpp:4808-4826 -- 400 pet experience per accrued play-time-event minute.</summary>
     private const int PetExperiencePerPlayTimeMinute = 400;
 
+    /// <summary>
+    ///     mDATA.aAction.aSort's idle/ready pose sentinel -- the same value already independently established by
+    ///     the post-cure/expiry reset (Server/ts25zone/S07_MyGame04.cpp:449, mirrored by <c>Zone</c>'s own private
+    ///     <c>IdleActionSort</c> in Zone.Stun.cs) and by the identical <c>ActionSort != 1</c> gate
+    ///     <see cref="AutoBuffActivationResolver" /> and <c>MountStateResolver</c> already apply for their own,
+    ///     unrelated actions.
+    /// </summary>
+    private const int IdleActionSort = 1;
+
     public async ValueTask<GenericActionResult> MoveContainerAsync(int sort, byte[] data, Zone zone,
         PlayerRuntimeState state, int characterId, CancellationToken cancellationToken)
     {
@@ -73,10 +82,27 @@ public sealed class GenericActionService(
         if (resolved.Outcome == ContainerMatrix.MoveOutcome.NoOp)
             return GenericActionResult.Succeeded;
 
+        // Idle-pose precondition, both equip (210) and unequip (213) directions: ProcessForInventoryToEquip/
+        // ProcessForEquipToInventory each soft-refuse (no disconnect) when the avatar's own currently-tracked
+        // action isn't the idle/ready pose (Server/ts25zone/S04_MyWork05.cpp:1261-1265 for 210, :1575-1579 for
+        // 213) -- what the non-idle codes represent (attack windup, stun, cast, etc.) wasn't itself observed in
+        // those cited ranges, only that any value other than the idle sentinel fails this check. A well-formed
+        // request the domain cleanly rejects (GenericActionResult.Failed --> wire Result=1), never a disconnect;
+        // this runs ahead of the equip-legality gate and the transfer itself, matching both cited call sites'
+        // own ordering. Never reached for 208 (plain inventory rearrange): neither side of a 208 move is ever
+        // Equipment (see ContainerMatrix.TryResolveContainers).
+        if ((toContainer == ContainerMatrix.Equipment || fromContainer == ContainerMatrix.Equipment) &&
+            state.ActionSort != IdleActionSort)
+            return GenericActionResult.Failed;
+
         // tSort 210 (Inventory->Equip) only: CheckPossibleEquipItem's tribe/slot-tag/level/rebirth/final-category
         // gate. Not applied to 208/213 -- neither ordinary inventory rearrange nor unequip re-checks equip
         // legality in the legacy (Server/ts25zone/S04_MyWork05.cpp:1234-1306 is the InventoryToEquip-only call
-        // site). resolved.Succeeded already guarantees sourceStack is non-null here.
+        // site). This is safe for the 213 (unequip, Equipment->Inventory) direction specifically because
+        // ContainerMatrix.ResolveMove no longer swaps an occupied destination's contents into the vacated
+        // Equipment slot -- an occupied, non-mergeable destination is now a hard reject for all 3 directions
+        // (see ResolveMove's own remarks), so no path exists for an arbitrary/unvalidated item to reach
+        // Equipment through this branch. resolved.Succeeded already guarantees sourceStack is non-null here.
         if (toContainer == ContainerMatrix.Equipment)
         {
             EquipItemValidationGate.EquipCandidate? candidate = null;
@@ -111,7 +137,8 @@ public sealed class GenericActionService(
         {
             var equipmentContainer = fromContainer == ContainerMatrix.Equipment ? projected.From : projected.To;
             var attributes = new CharacterBaseAttributes(state.StatVit, state.StatStr, state.StatInt,
-                state.StatDex, state.Level, state.Tribe, state.Title, state.Halo, state.RebirthCount);
+                state.StatDex, state.Level, state.Tribe, state.PreviousTribe, state.Title, state.Halo,
+                state.RebirthCount);
 
             // Pet stat contribution uses the PROJECTED equipment but the still-current growth/activity -- a pet
             // swap within one request can transiently keep the old pet's growth for the new one until the next
@@ -493,7 +520,7 @@ public sealed class GenericActionService(
         var newDex = state.StatDex + (resolved.Stat == StatAllocationResolver.BaseStat.Dexterity ? resolved.Amount : 0);
 
         var attributes = new CharacterBaseAttributes(newVit, newStr, newInt, newDex, state.Level, state.Tribe,
-            state.Title, state.Halo, state.RebirthCount);
+            state.PreviousTribe, state.Title, state.Halo, state.RebirthCount);
         var equipmentContainer = state.Inventory.GetContainer(ContainerMatrix.Equipment);
 
         var petItemId = equipmentContainer.TryGetValue(PetSlots.EquipmentSlot, out var petStack)

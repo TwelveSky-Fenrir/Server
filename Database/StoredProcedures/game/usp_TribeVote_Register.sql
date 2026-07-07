@@ -4,29 +4,30 @@
 -- already verified the displacement is legal (challenger's KillOtherTribeCount strictly exceeds the
 -- incumbent's, or the slot is empty) and that this character is not already registered in a different
 -- slot for this tribe -- this proc only performs the upsert itself.
-CREATE PROCEDURE game.usp_TribeVote_Register @TribeId              TINYINT,
-    @SlotIndex            TINYINT,
-    @CandidateCharacterId INT,
-    @CandidateLevel       SMALLINT,
-    @KillOtherTribeCount  INT
+CREATE PROCEDURE game.usp_TribeVote_Register @TribeId TINYINT,
+                                             @SlotIndex TINYINT,
+                                             @CandidateCharacterId INT,
+                                             @CandidateLevel SMALLINT,
+                                             @KillOtherTribeCount INT
 AS
 BEGIN
     SET
-NOCOUNT ON;
+        NOCOUNT ON;
     SET
-XACT_ABORT ON;
+        XACT_ABORT ON;
 
     IF
-EXISTS (SELECT 1 FROM game.TribeVotes WHERE TribeId = @TribeId AND SlotIndex = @SlotIndex)
-UPDATE game.TribeVotes
-SET CandidateCharacterId = @CandidateCharacterId,
-    CandidateLevel       = @CandidateLevel,
-    KillOtherTribeCount  = @KillOtherTribeCount,
-    VotePoint            = 0,
-    RegisteredAtUtc      = SYSUTCDATETIME()
-WHERE TribeId = @TribeId
-  AND SlotIndex = @SlotIndex;
-ELSE
-        INSERT INTO game.TribeVotes (TribeId, SlotIndex, CandidateCharacterId, CandidateLevel, KillOtherTribeCount, VotePoint)
+        EXISTS (SELECT 1 FROM game.TribeVotes WHERE TribeId = @TribeId AND SlotIndex = @SlotIndex)
+        UPDATE game.TribeVotes
+        SET CandidateCharacterId = @CandidateCharacterId,
+            CandidateLevel       = @CandidateLevel,
+            KillOtherTribeCount  = @KillOtherTribeCount,
+            VotePoint            = 0,
+            RegisteredAtUtc      = SYSUTCDATETIME()
+        WHERE TribeId = @TribeId
+          AND SlotIndex = @SlotIndex;
+    ELSE
+        INSERT INTO game.TribeVotes (TribeId, SlotIndex, CandidateCharacterId, CandidateLevel, KillOtherTribeCount,
+                                     VotePoint)
         VALUES (@TribeId, @SlotIndex, @CandidateCharacterId, @CandidateLevel, @KillOtherTribeCount, 0);
 END;

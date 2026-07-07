@@ -4,9 +4,9 @@
 -- SCHEMA_ONLY: a ticket surviving a crash is worthless anyway (15s TTL).
 CREATE TABLE runtime.SessionTickets
 (
-    AccountId    INT     NOT NULL,
-    CharacterId  INT     NOT NULL,
-    ShardId      TINYINT NOT NULL,
+    AccountId    INT          NOT NULL,
+    CharacterId  INT          NOT NULL,
+    ShardId      TINYINT      NOT NULL,
     ExpiresAtUtc DATETIME2(3) NOT NULL,
     CONSTRAINT PK_SessionTickets PRIMARY KEY NONCLUSTERED HASH (AccountId)
         WITH (BUCKET_COUNT = 1024)

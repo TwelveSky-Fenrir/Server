@@ -40,13 +40,13 @@ public sealed class GameConnectionHost(
     /// </summary>
     private const short LogoutEventCode = 4;
 
-    private FenrirTcpListener<ZoneClientSession>? _listener;
-
     // Tracks every still-running OnAcceptedAsync invocation so StopAsync can await full connection teardown
     // (including FlushFinalCharacterStateAsync/RequestImmediateFlush/disconnect logging in its own finally
     // block) before this host's own StopAsync returns -- see StopAsync's own remarks for the parity gap this
     // closes.
     private readonly ConcurrentDictionary<Task, byte> _inFlightConnections = new();
+
+    private FenrirTcpListener<ZoneClientSession>? _listener;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {

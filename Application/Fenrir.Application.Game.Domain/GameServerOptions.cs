@@ -18,7 +18,9 @@ public sealed class GameServerOptions
 
     /// <summary>
     ///     Dev-only NTFS junction onto the legacy DATA tree (not committed -- multi-hundred-MB external asset). Resolved
-    ///     against cwd, not <c>AppContext.BaseDirectory</c>.
+    ///     against cwd, not <c>AppContext.BaseDirectory</c>. In particular, <c>{GameDataDirectory}/WORLD/Z{mapId:D3}.WM</c>
+    ///     backs each zone's collision/navmesh geometry (<see cref="World.Zone.Geometry" />) -- see
+    ///     <see cref="GameServerOptionsValidator" />'s remarks for why its presence is not validated at startup.
     /// </summary>
     public string GameDataDirectory { get; set; } = "GameData";
 
@@ -40,8 +42,42 @@ public sealed class GameServerOptions
 
     public int TickRateHz { get; set; } = 20;
 
-    /// <summary>Interest-management cell size (view radius).</summary>
-    public float AoiCellSize { get; set; } = 75f;
+    /// <summary>
+    ///     Interest-management (area-of-interest) grid cell size, in world units.
+    ///     <see cref="World.AoiGrid.Neighbors" /> always scans a fixed 3x3 block of cells centered on an object's
+    ///     own cell, so this value doubles as the effective broadcast/visibility span for every avatar, ground
+    ///     item, and monster -- there is no separate "radius" knob today. Defaults to legacy's own base unit
+    ///     radius, 1000 (<c>MAX_RADIUS_FOR_NETWORK</c>, Server/Header/Protocol/DEFINE.h:600), which is also
+    ///     legacy's "scale 1" visibility span (<c>UNIT_SCALE_RADIUS1</c>, DEFINE.h:141-143) -- the one every
+    ///     avatar and ordinary ground item broadcast always uses (independently verified at
+    ///     Server/ts25zone/S04_MyWork04.cpp:1351, Server/ts25zone/S07_MyGame04.cpp:2754,
+    ///     Server/ts25zone/S07_MyGame06.cpp:99-107) and the one the vast majority of "ordinary" monsters fall
+    ///     through to as well (<c>ReturnSpecialSortNumber</c>'s unconditional default,
+    ///     Server/ts25zone/S10_MySummon.cpp:646).
+    ///     <para>
+    ///         NOT modeled: legacy's own per-monster-category scale widening to 2x/3x this radius for a handful
+    ///         of special monster categories (<c>SendSpecialNumber</c>'s category-code dispatch,
+    ///         Server/ts25zone/S07_MyGame05.cpp:3967-4001, assigned once at spawn by
+    ///         <c>ReturnSpecialSortNumber</c>, Server/ts25zone/S10_MySummon.cpp:612-647). Both the numeric
+    ///         monster-type/special-type codes those categories key on, and which of several legacy dispatch
+    ///         functions actually fires per spawn call site (S10_MySummon.cpp:854-871), were left an explicitly
+    ///         unresolved open question by the translating behavior contract -- implementing per-category
+    ///         scaling here would mean guessing at that mapping, so every object uses this same scale-1 span
+    ///         uniformly until a follow-up contract resolves it. (The contract also found the input finding's
+    ///         claim that Tower guardians get the wide radius to be likely incorrect -- the one special-type
+    ///         explicitly commented "Tower" in the source, S10_MySummon.cpp:619, resolves to a category
+    ///         explicitly dispatched to this same scale-1 span, S07_MyGame05.cpp:3998-4000.)
+    ///     </para>
+    ///     <para>
+    ///         Also NOT modeled: legacy's own visibility check is two-stage -- this coarse per-axis cell
+    ///         filter, then an exact 3D (X/Y/Z) Euclidean distance check against the scaled radius
+    ///         (Server/ts25zone/S07_MyGame03.cpp:796-856's <c>Broadcast11</c>). <see cref="World.AoiGrid" />
+    ///         only performs the coarse stage, and partitions X/Z only (Y is height -- see its own remarks) --
+    ///         a separately-flagged, pre-existing divergence in the shape of the check rather than its
+    ///         magnitude, so it is not addressed by this default alone.
+    ///     </para>
+    /// </summary>
+    public float AoiCellSize { get; set; } = 1000f;
 
     /// <summary>
     ///     Anti-speed-hack budget. No legacy source documents an exact speed for M1's map, so this is a generous
@@ -68,6 +104,15 @@ public sealed class GameServerOptions
     ///     session for has been flagged for kick in <c>runtime.AccountSessions</c> (a newer login elsewhere).
     /// </summary>
     public int AccountSessionPollIntervalSeconds { get; set; } = 20;
+
+    /// <summary>
+    ///     How often <c>MuteRefreshPollHost</c> re-batches <c>admin.Mutes</c> for every online character on this
+    ///     shard and applies the result to <c>PlayerRuntimeState.IsMuted</c> -- the bounded-staleness
+    ///     approximation of legacy's per-message live mute recheck (see that host's own remarks). A GM
+    ///     mute/unmute applied mid-session takes effect within this many seconds instead of only at the
+    ///     character's next world entry.
+    /// </summary>
+    public int MutePollIntervalSeconds { get; set; } = 15;
 
     /// <summary>
     ///     Trigger A of <c>Fenrir.Network.Dispatch.FloodProtection.IpFloodGuard</c>: max concurrent connections

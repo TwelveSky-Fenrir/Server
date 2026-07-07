@@ -14,8 +14,7 @@ namespace Fenrir.Application.Game.Domain.Crafting;
 ///         contract's own wording is just informal phrasing, not genuine imprecision) -- and each tier's
 ///         output *value range* (26-30 / 20-24 / 15-19 / 1-14), but not the legacy's own exact intra-tier
 ///         draw-to-value formula. The mapping below is therefore a documented, not independently
-///         source-verified, modeling choice (same posture as <c>ContainerMatrix.ResolveMove</c>'s own
-///         same-kind disclaimer for its merge-vs-swap fallback). The top tier (5 draws/5 values) and the
+///         source-verified, modeling choice. The top tier (5 draws/5 values) and the
 ///         lower-mid tier (50 draws/5 values) divide into perfectly even 1-per-value and 10-per-value
 ///         strides respectively. The upper-mid tier (20 draws/5 values) is the one exception: its lowest
 ///         value (20) absorbs one extra draw at the tier's own boundary (draws 175-179, 5 draws) while the

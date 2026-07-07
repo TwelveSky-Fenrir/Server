@@ -159,7 +159,7 @@ public class StarterKitProcTests
             100, 100, 50, 50,
             welcomeBuffUntilDate, premiumUntilUnixSeconds,
             equipment, inventory, skills, hotkeys,
-            CancellationToken.None, previousTribe: 2);
+            CancellationToken.None, 2);
 
         Assert.True(characterId > 0);
 
@@ -279,7 +279,7 @@ public class StarterKitProcTests
 
         var ex = await Record.ExceptionAsync(() => _characters.CreateWithStarterKitAsync(
             accountId, 0, name, 0, 0, 0, 0, 1, 0f, 0f, 0f, 100, 100, 50, 50, 0, 0,
-            [], [], [], [], CancellationToken.None, previousTribe: 3).AsTask());
+            [], [], [], [], CancellationToken.None, 3).AsTask());
 
         Assert.NotNull(ex);
         var sqlException = ex as SqlException ?? ex!.InnerException as SqlException;

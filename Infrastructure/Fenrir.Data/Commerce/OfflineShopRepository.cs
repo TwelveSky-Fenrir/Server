@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Data;
 using CaeriusNet.Abstractions;
 using CaeriusNet.Builders;
@@ -22,6 +23,13 @@ public sealed record OfflineShopRepository(ICaeriusNetDbContext Db) : IOfflineSh
         var (shops, items) =
             await Db.QueryMultipleReadOnlyCollectionAsync<OfflineShopRowDto, OfflineShopItemRowDto>(sp, ct);
         return (shops.Count > 0 ? shops[0] : null, items);
+    }
+
+    /// <summary>CZ_PSHOP_ITEM_INFO_SEND's proxy-shop half; every ShopState=1 shop's for-sale slots, cluster-wide.</summary>
+    public async ValueTask<ReadOnlyCollection<OfflineShopOpenListingRowDto>> GetAllOpenAsync(CancellationToken ct)
+    {
+        var sp = new StoredProcedureParametersBuilder("game", "usp_OfflineShop_GetAllOpen", 64).Build();
+        return await Db.QueryAsReadOnlyCollectionAsync<OfflineShopOpenListingRowDto>(sp, ct);
     }
 
     /// <summary>

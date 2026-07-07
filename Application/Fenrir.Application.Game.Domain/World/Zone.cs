@@ -63,6 +63,37 @@ public sealed partial class Zone(
     TribeBankTaxAccumulator? tribeBankTax = null,
     RegularWarActiveMapTracker? regularWarActiveMapTracker = null) : IZoneActor
 {
+    /// <summary>Bounded capacity for <see cref="_inbox" /> -- also the basis for <see cref="InboxDrainCapPerTick" />.</summary>
+    private const int InboxCapacity = 8192;
+
+    /// <summary>
+    ///     Per-tick cap on how many items <see cref="DrainInbox" /> will read from <see cref="_inbox" /> before
+    ///     returning control to the rest of <see cref="Tick" /> (Simulate/Rebroadcast): half of
+    ///     <see cref="InboxCapacity" />. Every other <c>Drain*Commands</c> method across this partial class
+    ///     family (<c>Zone.Combat.cs</c>, <c>Zone.Chat.cs</c>, <c>Zone.EconomyMirrors.cs</c>,
+    ///     <c>Zone.CosmeticMirrors.cs</c>) applies this same "half of that channel's own bounded capacity"
+    ///     convention to its own channel.
+    ///     <para>
+    ///         Without a cap, a channel-saturating burst (a client bug, a lag spike driving a flood of retries,
+    ///         or simply a very active zone filling a channel up to its bound) is fully drained inline in a
+    ///         single <see cref="Tick" /> call, however large, before Simulate/Rebroadcast run for that frame at
+    ///         all. Capping at half of the channel's own bound instead spreads a full-to-capacity backlog across
+    ///         at least two ticks, while any realistic normal load -- nowhere near a channel's own bound -- is
+    ///         completely unaffected (the cap can only ever bind once the backlog already exceeds half of what
+    ///         the channel is willing to hold in the first place). Any remainder simply stays queued in the
+    ///         channel; the next <see cref="Tick" /> drains it from where this one left off -- nothing is
+    ///         dropped or reordered by this cap itself.
+    ///     </para>
+    ///     <para>
+    ///         This is a Fenrir-side robustness safeguard, not a legacy-parity reproduction: no
+    ///         <c>Server/path:line</c> citation was supplied or independently located for an equivalent
+    ///         per-frame processing cap in the legacy <c>ts25zone</c> message pump this tick loop is modeled
+    ///         after -- see the <c>fenrir-tick-loop-self-critique</c> finding/behavior contract this constant
+    ///         was added for.
+    ///     </para>
+    /// </summary>
+    private const int InboxDrainCapPerTick = InboxCapacity / 2;
+
     private readonly SimulationTickAccumulator _accumulator = new();
 
     /// <summary>
@@ -82,7 +113,7 @@ public sealed partial class Zone(
         heroRankPointAccumulator ?? new HeroRankPointAccumulator();
 
     private readonly Channel<ZoneCommand> _inbox = Channel.CreateBounded<ZoneCommand>(
-        new BoundedChannelOptions(8192) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+        new BoundedChannelOptions(InboxCapacity) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
     private readonly KeyValuePair<string, object?> _mapTag = ZoneTickMetrics.MapTag(mapId);
 
@@ -162,7 +193,23 @@ public sealed partial class Zone(
             var elapsed = Stopwatch.GetElapsedTime(lastFrame, now);
             lastFrame = now;
 
-            Tick(elapsed);
+            try
+            {
+                Tick(elapsed);
+            }
+            catch (Exception ex)
+            {
+                // Mirrors legacy's __try/__except around the ENTIRE per-tick Logic() call
+                // (Server/ts25zone/S02_MyServer.cpp:412-431): any fault anywhere in this tick's processing is
+                // contained here, logged, and only this one tick's remaining work is lost -- this zone's loop
+                // resumes normally on the very next iteration, and every OTHER zone's loop (a separate task,
+                // see ZoneTickHost) is completely unaffected either way. Every stage inside Tick already
+                // carries its own finer-grained log-and-continue containment (DrainInbox, Simulate, and the
+                // tail-stage guards below); this is the last-resort backstop for anything that still escapes
+                // one of those (e.g. the clock/metrics bookkeeping in Tick itself), per the
+                // zone-tick-loop-fault-isolation behavior contract.
+                logger.LogError(ex, "Zone {MapId} tick failed; skipping the remainder of this tick", MapId);
+            }
 
             var tickMs = Stopwatch.GetElapsedTime(now).TotalMilliseconds;
             if (tickMs > tickInterval.TotalMilliseconds)
@@ -194,6 +241,7 @@ public sealed partial class Zone(
         DrainPshopCommands();
         DrainMissionCommands();
         DrainDrinkBottleCommands();
+        DrainHotkeySlotMirrorCommands();
         DrainHeroRankingQueryCommands();
         DrainHeroRankingRolloverCommands();
         DrainFishingCommands();
@@ -209,8 +257,21 @@ public sealed partial class Zone(
         var t2 = Stopwatch.GetTimestamp();
 
         // Claimed-item despawns first (so other players stop seeing it ASAP), then the 5 s keep-alives, then
-        // the 60 s expiry sweep -- runs every frame regardless of the gates below, exactly as before.
-        DrainClaimedGroundItemDespawns();
+        // the 60 s expiry sweep -- runs every frame regardless of the gates below, exactly as before. Each
+        // stage below is individually try/caught, log-and-continue -- same posture as DrainInbox's per-command
+        // guard and Simulate's per-system guard just above: a fault in any ONE tail stage must never skip the
+        // REMAINING tail stages, and must never escape Tick itself (zone-tick-loop-fault-isolation behavior
+        // contract; legacy's own coarser __try/__except around the whole per-tick Logic() call is the ancestor
+        // of this same guarantee, Server/ts25zone/S02_MyServer.cpp:412-431).
+        try
+        {
+            DrainClaimedGroundItemDespawns();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Zone {MapId} tick stage {Stage} failed", MapId,
+                nameof(DrainClaimedGroundItemDespawns));
+        }
 
         var hasPlayers = !_players.IsEmpty;
 
@@ -225,7 +286,14 @@ public sealed partial class Zone(
         // frame, same as before.
         if (legacyTicksElapsed > 0)
         {
-            RebroadcastAvatars();
+            try
+            {
+                RebroadcastAvatars();
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Zone {MapId} tick stage {Stage} failed", MapId, nameof(RebroadcastAvatars));
+            }
 
             // A zone with nobody connected has an empty AOI grid -- no possible recipient anywhere in this
             // zone for a monster/ground-item keep-alive, so these two calls (pure broadcast, no other side
@@ -233,16 +301,79 @@ public sealed partial class Zone(
             // a real state mutation (removing expired items from this zone), not just a broadcast.
             if (hasPlayers)
             {
-                RebroadcastMonsters();
-                RebroadcastGroundItems();
+                try
+                {
+                    RebroadcastMonsters();
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Zone {MapId} tick stage {Stage} failed", MapId,
+                        nameof(RebroadcastMonsters));
+                }
+
+                try
+                {
+                    RebroadcastGroundItems();
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Zone {MapId} tick stage {Stage} failed", MapId,
+                        nameof(RebroadcastGroundItems));
+                }
             }
 
-            ExpireGroundItems();
+            try
+            {
+                ExpireGroundItems();
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Zone {MapId} tick stage {Stage} failed", MapId, nameof(ExpireGroundItems));
+            }
         }
 
-        RebroadcastProxyShops();
-        AdvanceZone241PersonalDungeonInstances();
-        TryFlushTribeBankTax();
+        try
+        {
+            RebroadcastProxyShops();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Zone {MapId} tick stage {Stage} failed", MapId, nameof(RebroadcastProxyShops));
+        }
+
+        // Unlike RebroadcastProxyShops just above (deliberately unconditional -- see that block's own
+        // comment), this subsystem has its own documented 20-LEGACY-TICK status-broadcast cadence
+        // (PersonalDungeonBattleBroadcastCadenceTicks, Zone.DungeonInstance.cs) that must be paid in legacy
+        // ticks, not physical 20 Hz frames -- gating it here the same way as the RebroadcastAvatars/etc.
+        // block above (and feeding it legacyTicksElapsed, so a stalled host's multi-tick catch-up still
+        // advances the per-player counter correctly instead of just +1) keeps its cadence at the documented
+        // ~10 s rather than firing ~10x too often.
+        if (legacyTicksElapsed > 0)
+            try
+            {
+                AdvanceZone241PersonalDungeonInstances(legacyTicksElapsed);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Zone {MapId} tick stage {Stage} failed", MapId,
+                    nameof(AdvanceZone241PersonalDungeonInstances));
+            }
+
+        // TryFlushTribeBankTax's own correct cadence relative to legacy is an open question (not resolved
+        // by the fenrir-tick-loop-self-critique finding this file's dungeon-instance gate above was fixed
+        // from) -- left unconditional here rather than guessing a gate for it. TrySweep itself is
+        // wall-clock-driven (_clock vs. a 10-minute threshold, not a tick counter), so calling it up to 10x
+        // more often than legacy's own tick only means checking that clock comparison more often, not a
+        // correctness issue the way the ungated dungeon-instance counter above was.
+        try
+        {
+            TryFlushTribeBankTax();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Zone {MapId} tick stage {Stage} failed", MapId, nameof(TryFlushTribeBankTax));
+        }
+
         var t3 = Stopwatch.GetTimestamp();
 
         ZoneTickMetrics.StageDurationMs.Record(Stopwatch.GetElapsedTime(t0, t1).TotalMilliseconds, _mapTag,
@@ -256,7 +387,10 @@ public sealed partial class Zone(
 
     private void DrainInbox()
     {
-        while (_inbox.Reader.TryRead(out var command))
+        var processed = 0;
+        while (processed < InboxDrainCapPerTick && _inbox.Reader.TryRead(out var command))
+        {
+            processed++;
             try
             {
                 switch (command.Kind)
@@ -275,6 +409,12 @@ public sealed partial class Zone(
                         var petAction = command.Action;
                         HandlePetAction(command.CharacterId, in petAction);
                         break;
+                    case ZoneCommandKind.MarkZoneTransferPending:
+                        HandleMarkZoneTransferPending(command.CharacterId);
+                        break;
+                    case ZoneCommandKind.SetMuted:
+                        HandleSetMuted(command.CharacterId, command.Muted);
+                        break;
                 }
             }
             catch (Exception ex)
@@ -284,6 +424,27 @@ public sealed partial class Zone(
                 logger.LogError(ex, "Zone {MapId} command {Kind} for character {CharacterId} failed", MapId,
                     command.Kind, command.CharacterId);
             }
+        }
+
+        if (processed >= InboxDrainCapPerTick)
+            LogDrainCapEngaged(_inbox.Reader, "inbox", InboxDrainCapPerTick);
+    }
+
+    /// <summary>
+    ///     Shared per-tick-drain-cap observability hook for every <c>Drain*Commands</c> method in this partial
+    ///     class family (see <see cref="InboxDrainCapPerTick" />'s own remarks): logs that <paramref name="channelName" />
+    ///     stopped draining at its per-tick cap with more of its own backlog still queued -- channel-specific
+    ///     detail the blanket post-hoc tick-duration warning in <see cref="RunAsync" /> cannot provide on its
+    ///     own (that warning fires after the fact for the WHOLE tick and never identifies which of the many
+    ///     channels contributed). Nothing is dropped or lost: the remainder stays queued in the channel and is
+    ///     picked up by this exact same drain call on a following tick.
+    /// </summary>
+    private void LogDrainCapEngaged<T>(ChannelReader<T> reader, string channelName, int cap)
+    {
+        var remaining = reader.CanCount ? reader.Count : -1;
+        logger.LogWarning(
+            "Zone {MapId} {Channel} drain hit its per-tick cap of {Cap} item(s); {Remaining} still queued and will be processed on a following tick",
+            MapId, channelName, cap, remaining);
     }
 
     /// <summary>
@@ -320,7 +481,11 @@ public sealed partial class Zone(
         if (!File.Exists(wmPath))
         {
             zoneLogger.LogWarning(
-                "No world geometry found at {Path} for MapId {MapId} -- movement validation continues without terrain awareness",
+                "No world geometry found at {Path} for MapId {MapId} -- monster pathing (MonsterAiSystem.MoveToward) " +
+                "will not be constrained by terrain/obstacles and will not snap to ground height, and player-movement " +
+                "validation (MovementRules.IsPlausible) will skip its walkability/ground-height sub-checks (the " +
+                "independent speed-budget check still applies). Expected until real .WM navmesh assets are deployed " +
+                "for this map -- see GameServerOptionsValidator's remarks for why this is not a startup-blocking check",
                 wmPath, mapId);
             return null;
         }
@@ -331,7 +496,11 @@ public sealed partial class Zone(
         }
         catch (Exception ex)
         {
-            zoneLogger.LogError(ex, "Failed to load world geometry from {Path}", wmPath);
+            zoneLogger.LogError(ex,
+                "Failed to load world geometry from {Path} for MapId {MapId} -- same degraded movement consequences " +
+                "as a missing file (unconstrained monster pathing, speed-only player-movement validation), but this " +
+                "file exists and failed to parse/read, so unlike the missing-file case this warrants investigation",
+                wmPath, mapId);
             return null;
         }
     }

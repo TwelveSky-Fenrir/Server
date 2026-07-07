@@ -22,6 +22,16 @@ public readonly record struct EquippedItemSlot(
 ///     internal names -- "Ki" in the legacy IS Intelligence and "Wisdom" IS Dexterity (GetBaseKi() reads
 ///     iIntelligent, GetBaseWisdom() reads iDexterity).
 /// </summary>
+/// <param name="Tribe">The character's current playable faction (0-3). Not itself read by any formula below.</param>
+/// <param name="PreviousTribe">
+///     aPreviousTribe -- the character's origin-race marker (0=Noble Dragon, 1=Royal Serpent, 2=Grand
+///     Tiger). For the overwhelming majority of characters this equals <see cref="Tribe" />; it only
+///     genuinely diverges for a fourth-faction (<see cref="Tribe" />==3) character, whose origin race is
+///     preserved here. The G12 custom-set HP bonus (<see cref="StatCalculator.ComputeBaseStats" /> via
+///     <c>ComputeG12CustomSetBonus</c>) and the NXT set-tier detector
+///     (<see cref="SetBonusTables.DetectNxtSetNumber" />) both key off this field, never <see cref="Tribe" />
+///     -- Server/Header/Protocol/MyFactor.cpp:2032-2094, Server/ts25zone/S07_MyGame03.cpp:7516-7626.
+/// </param>
 public readonly record struct CharacterBaseAttributes(
     int Vitality,
     int Strength,
@@ -29,6 +39,7 @@ public readonly record struct CharacterBaseAttributes(
     int Dexterity,
     short Level,
     byte Tribe,
+    byte PreviousTribe,
     int Title,
     int Halo,
     int RebirthCount);

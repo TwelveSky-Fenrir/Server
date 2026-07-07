@@ -58,6 +58,39 @@ public partial class PlayerRuntimeState
     public bool ReviveHackFlag { get; set; }
 
     /// <summary>
+    ///     Legacy <c>mMoveZoneResult</c> / <c>MyUser::IsMovingZone()</c> (<c>Server/ts25zone/H07_MyGame.h:846</c>,
+    ///     <c>Server/ts25zone/H03_MyUser.h:15</c>, <c>return mMoveZoneResult == 1;</c>) -- true from the instant
+    ///     this shard tells the client the destination zone's IP/port for a CROSS-SHARD zone transfer (set by
+    ///     <c>Zone.HandleMarkZoneTransferPending</c>, posted via
+    ///     <c>Fenrir.Application.Game.Services.ZoneLifecycle.ZoneMoveService.HandleCrossShardAsync</c>'s
+    ///     successful-handoff branch, <c>Server/ts25zone/S04_MyWork02.cpp:2182</c>'s Fenrir analog) until this
+    ///     character's actual disconnect from THIS shard finally removes it from <see cref="Zone" />'s own
+    ///     player map.
+    ///     <para>
+    ///         Deliberately never set for a SAME-shard handoff (<c>Zone.HandleLeave</c>'s non-null
+    ///         <c>handoffTarget</c> branch): that path removes the character from the zone's player map and
+    ///         posts the destination zone's Enter atomically in the same tick, so there is no observable
+    ///         "moving" window to gate against there. Only the cross-shard path
+    ///         (<c>ZoneMoveService.HandleCrossShardAsync</c>) leaves the transferring character live and
+    ///         trackable in the ORIGIN shard's own zone for the whole real-world interval until the client's
+    ///         own TCP disconnect actually happens -- exactly the window legacy's <c>mMoveZoneResult</c> was
+    ///         built to guard. See the zone-transfer-in-progress-gate behavior contract (2026-07 round) for
+    ///         the full citation trail.
+    ///     </para>
+    ///     <para>
+    ///         Wired-up consumers so far: <c>Monsters.MonsterAiSystem.TryAcquireTarget</c> (excludes a
+    ///         flagged avatar from monster target acquisition, mirroring <see cref="IsDead" />'s own
+    ///         exclusion) and <c>Combat.UnstunResolver.Resolve</c> (via
+    ///         <see cref="Combat.CombatantSnapshot.IsMovingZone" /> on the cure attempt's target only, never
+    ///         the curer -- matching legacy exactly). The remaining ~28 combat/social sites the contract's own
+    ///         citation range covers (<c>S04_MyWork02.cpp:8292-9950</c>, minus the two duel sites already
+    ///         re-verified there) are deliberately left unwired here -- an open, tracked follow-up, not
+    ///         guessed at.
+    ///     </para>
+    /// </summary>
+    public bool IsMovingZone { get; set; }
+
+    /// <summary>
     ///     Legacy internal death sub-counter -- set to <see cref="ReviveEligibilityRules.DeathSubCounterBaseline" />
     ///     at death and again on eligibility grant. No consumer of it was located in the cited files (see the
     ///     behavior contract this satisfies), so its downstream purpose is not modeled here.
@@ -70,17 +103,41 @@ public partial class PlayerRuntimeState
     ///     movement. Read by <see cref="Simulation.MeditationRegenSystem" /> (31 = sitting/meditating). 0 = idle.
     /// </summary>
     /// <remarks>
-    ///     KNOWN CONFLICT (discovered wiring <see cref="CharacterMotionWhitelist" />, not yet
-    ///     reconciled): <see cref="CharacterMotionWhitelist" />'s own citation
-    ///     (Server/ts25zone/S04_MyWork05.cpp:4249-4252) confirms Sort 31 is reachable only under
-    ///     <c>#ifdef __MOBILE__</c>, never defined in any shipped build -- i.e. dead code, so no legally
-    ///     accepted avatar action can ever set this field to 31 once <see cref="Zone.HandleMove" /> enforces
-    ///     that whitelist. <see cref="Simulation.MeditationRegenSystem" />'s own citation
-    ///     (S07_MyGame04.cpp:461-518) independently asserts aSort==31 is a real, reachable meditation state.
-    ///     These two legacy-grounded citations contradict each other; resolving which one is right (and what
-    ///     Sort/Type the real client actually sends to sit/meditate) needs a fresh
-    ///     legacy-behavior-translator contract, not a guess here. Left unresolved: three
-    ///     <c>MeditationRegenSystemTests</c> are marked <c>Skip</c> pending that contract.
+    ///     RESOLVED (previously logged here as an unreconciled "KNOWN CONFLICT" between
+    ///     <see cref="CharacterMotionWhitelist" />'s and <see cref="Simulation.MeditationRegenSystem" />'s own
+    ///     citations): both citations are correct, because they describe two textually distinct, separately
+    ///     gated legacy switch statements, not one contradictory one. <see cref="CharacterMotionWhitelist" />
+    ///     reimplements CZ_AVATAR_ACTION_SEND (op15)'s own motion-legality table
+    ///     (<c>CheckValidCharacterMotionForSend</c>, Server/ts25zone/S04_MyWork05.cpp:4249-4252), where Sort
+    ///     31 is reachable only under <c>#ifdef __MOBILE__</c> -- never <c>#define</c>d anywhere in the whole
+    ///     <c>Server/</c> tree, so dead code via op15 in every shipped build.
+    ///     <see cref="Movement.AvatarActionResumeWhitelist" />
+    ///     reimplements CZ_UPDATE_AVATAR_ACTION (op16)'s own, entirely separate inline switch
+    ///     (Server/ts25zone/S04_MyWork02.cpp:1789-1878), which legalizes Sort 31 with Type 0 unconditionally
+    ///     and with no preprocessor guard at all (:1834-1840, disconnecting instead on any other Type) -- live
+    ///     in every build. <see cref="Zone.HandleMove" /> (Zone.PlayerLifecycle.cs:613-639) dispatches to
+    ///     whichever of the two whitelists matches the opcode that delivered the action, so a real client CAN
+    ///     and does reach Sort 31 here, via a live op16 packet -- only the op15 path is dead.
+    ///     <see cref="Simulation.MeditationRegenSystem" /> already reads this field correctly as-is; no code
+    ///     change was needed here, only this comment (and <c>MeditationRegenSystemTests</c>' three previously
+    ///     skipped tests, now enabled) were stale.
+    ///     <para>
+    ///         Deliberately left at the implicit C# default of 0, NOT defaulted to 1 -- this field does double
+    ///         duty as (a) the ATTACKER's own replay-guard consistency value (
+    ///         <see cref="Combat.AttackPacketBudget.TryConsume" />
+    ///         compares the incoming sub-packet's <c>AttackActionValue4</c> against this field, and a real
+    ///         client's own attack packet is always preceded by the op15/op16 action that just set this to the
+    ///         SAME value moments earlier) and (b) the DEFENDER's action-state precondition
+    ///         (<see cref="Combat.CombatResolver.ResolveEnemyTribeAttack" />'s <c>NoActionYetSort</c>/
+    ///         <c>DeathPoseSort</c> gate). Changing this property's default to close (b) silently broke (a) for
+    ///         every existing test/scenario whose recorded <c>AttackActionValue4</c> assumed the plain-0
+    ///         default -- confirmed by a 39-test regression when tried. The (b) gap is real (a freshly-entered
+    ///         defender who hasn't sent their own first action yet defaults here to 0 = <c>NoActionYetSort</c>,
+    ///         making them briefly untargetable) but is closed at the TEST-FIXTURE level instead (each combat
+    ///         test's defender explicitly sets a legal ActionSort before being attacked, matching
+    ///         <c>ZoneDuelCombatTests</c>' own established pattern) rather than by changing this shared
+    ///         default's blast radius onto the unrelated attacker-side invariant.
+    ///     </para>
     /// </remarks>
     public int ActionSort { get; set; }
 
@@ -145,18 +202,42 @@ public partial class PlayerRuntimeState
     public BuffInfo Buffs { get; } = new() { Buff = new int[70] };
 
     /// <summary>
-    ///     Zone-clock instant this character last entered/re-entered a zone -- the legacy's anti-chain-attack
-    ///     grace window (~10s, checked on both sides of an attack). Never refreshed by taking/dealing damage:
-    ///     it is a one-shot spawn/arrival grace period, not a rolling cooldown (an earlier version here
-    ///     refreshed it on every hit, which made two players who traded blows mutually unable to fight anyone
-    ///     for the next 10s). Null, not <see cref="TimeSpan.Zero" />, means "never entered" -- zero is itself
-    ///     a reachable zone-clock instant.
+    ///     Reusable 35-slot "changed slot" mask scratch buffer, shared by every buff-write-and-notify call
+    ///     site for THIS player (<see cref="Zone.ApplyBuffWrites" /> for a manual op30 self-buff cast and the
+    ///     auto-hunt bot-buff loop, <see cref="Simulation.BuffExpirySystem" />'s natural per-tick expiry, and
+    ///     <see cref="Zone.ClearAllBuffs" /> on death) instead of each one allocating its own fresh
+    ///     <c>int[35]</c> on the managed heap per call -- see the buff-slot-write-and-notify-pattern behavior
+    ///     contract. Safe to reuse across calls: every writer is this player's own zone tick thread (this
+    ///     class's own single-writer contract), and <see cref="Zone.RecomputeStatsAndBroadcastBuffs" />
+    ///     synchronously serializes the array's contents into the outgoing wire frame before returning, so no
+    ///     caller retains a reference to it past that call. Every writer clears (or lazily clears on first
+    ///     actual change) this buffer itself before flagging slots, since a stale flag from a PRIOR unrelated
+    ///     call on this same player must never leak into the next notification.
+    /// </summary>
+    public int[] BuffChangeScratch { get; } = new int[35];
+
+    /// <summary>
+    ///     Zone-clock instant of this character's mutual PvP-attack-immunity window start -- the legacy's
+    ///     anti-chain-attack grace window (~10s, <c>PROTECT_TICK</c>, checked on both sides of an attack:
+    ///     <see cref="Combat.CombatResolver" />/<see cref="Combat.MonsterCombatResolver" />/
+    ///     <see cref="Combat.StunResolver" />). Exactly two legitimate write sites, matching legacy's own two
+    ///     (<c>S04_MyWork02.cpp:838</c> and <c>:1783</c>): zone (re)entry (<see cref="Zone.HandleEnter" />) and
+    ///     every accepted Sort-0 ("rest"/stand-up) CZ_AVATAR_ACTION_SEND action
+    ///     (<see cref="Zone.ApplyRestActionProtectionAndHeal" />). Never refreshed by taking/dealing damage: it
+    ///     is a one-shot grace period re-armed only by those two events, not a rolling cooldown (an earlier
+    ///     version here refreshed it on every hit, which made two players who traded blows mutually unable to
+    ///     fight anyone for the next 10s). Null, not <see cref="TimeSpan.Zero" />, means "never entered" --
+    ///     zero is itself a reachable zone-clock instant.
     /// </summary>
     public TimeSpan? ZoneEntryAtZoneClock { get; set; }
 
     /// <summary>
-    ///     Zone-clock instant of this character's last accepted skill cast (Sort=30) -- a global,
-    ///     one-cast-per-legacy-tick anti-flood gate. Null means "never cast."
+    ///     Zone-clock instant of this character's last accepted skill-cast mana charge (op15
+    ///     CZ_AVATAR_ACTION_SEND, action-category Sort resolving to the real skill-cast category -- Sorts
+    ///     32, 33, 38-90 -- NOT action-Sort 30, which is the unrelated stand-up-from-death request) -- a
+    ///     global, one-cast-attempt-per-legacy-tick anti-flood gate. Null means "never cast." See
+    ///     <see cref="Zone.ApplySkillCastManaCharge" /> and the skill-casting-cooldown-mechanics behavior
+    ///     contract.
     /// </summary>
     public TimeSpan? LastSkillCastAtZoneClock { get; set; }
 
@@ -184,6 +265,16 @@ public partial class PlayerRuntimeState
     ///     <see cref="Simulation.StunCountdownSystem" />.
     /// </summary>
     public int StunCountdownAccumulatorTicks { get; set; }
+
+    /// <summary>
+    ///     Legacy-tick accumulator toward the next ~1s sit/meditate HP+MP regen firing -- same
+    ///     per-character-accumulator pattern as <see cref="StunCountdownAccumulatorTicks" /> for the identical
+    ///     shared gate (<c>S07_MyGame04.cpp:378-380</c>), consumed only by
+    ///     <see cref="Simulation.MeditationRegenSystem" />. Only accumulates while
+    ///     <see cref="ActionSort" /> == 31 (sitting); a critical-severity fix -- without this gate the regen
+    ///     system applied a full ~1-second regen amount on every 500 ms legacy tick, twice the legacy rate.
+    /// </summary>
+    public int MeditationRegenAccumulatorTicks { get; set; }
 
     /// <summary>
     ///     mStunAtkCount -- the team-stun (skill 80) sub-mechanic's repeated-stun counter on the victim side.

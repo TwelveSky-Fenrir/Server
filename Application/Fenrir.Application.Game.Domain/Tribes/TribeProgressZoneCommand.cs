@@ -56,10 +56,35 @@ namespace Fenrir.Application.Game.Domain.Tribes;
 ///     (credited amount &gt; 0 or a reactivation), same guard <c>Zone.CreditPetGrowthFromMonsterKill</c>
 ///     already applies for its own (unrelated) call site. See <see cref="PlayerRuntimeState.PetGrowth" />.
 /// </param>
-/// <param name="PetActivity">Paired 1:1 with <see cref="PetGrowth" /> -- see <see cref="PlayerRuntimeState.PetActivity" />.</param>
+/// <param name="PetActivity">
+///     Paired 1:1 with <see cref="PetGrowth" /> -- see <see cref="PlayerRuntimeState.PetActivity" />
+///     .
+/// </param>
 /// <param name="PlayTimeEvent">
 ///     tSort 237 (TimeExchange) -- always 0 when set (every accrued minute is consumed in full on each
 ///     conversion). See <see cref="PlayerRuntimeState.PlayTimeEvent" />.
+/// </param>
+/// <param name="EatLifePotion">Stat-potion Life/HP counter -- see <see cref="PlayerRuntimeState.EatLifePotion" />.</param>
+/// <param name="EatManaPotion">Stat-potion Mana/MP counter -- see <see cref="PlayerRuntimeState.EatManaPotion" />.</param>
+/// <param name="EatStrPotion">Stat-potion Strength counter -- see <see cref="PlayerRuntimeState.EatStrPotion" />.</param>
+/// <param name="EatDexPotion">Stat-potion Dexterity counter -- see <see cref="PlayerRuntimeState.EatDexPotion" />.</param>
+/// <param name="EatElePotion">
+///     Stat-potion combined Elemental counter (already packed by the caller via
+///     <see cref="Fenrir.Application.Game.Domain.Consumables.ElementalPotionPacking" /> before being set
+///     here) -- see <see cref="PlayerRuntimeState.EatElePotion" />.
+/// </param>
+/// <param name="FullActionRebroadcast">
+///     Op 23 (CZ_USE_INVENTORY_ITEM_SEND) stat-potion family's own post-consumption self + AOI-neighbor
+///     avatar-action refresh (Server/ts25zone/S04_MyWork03.cpp:3188-3211) -- same <c>SendAvatarAction</c>/
+///     <c>BroadcastAvatarAction</c> pairing <see cref="CostumeZoneCommand.FullActionRebroadcast" /> already
+///     uses for its own op 139 branch, reused here rather than duplicated. Legacy sends the self-refresh
+///     twice in a row ("to fix live client display without requiring a relog"); Fenrir sends it once -- a
+///     second identical, immutable snapshot cannot convey information a first send didn't already, so the
+///     double-send is treated as a legacy redundancy artifact, not reproduced verbatim.
+/// </param>
+/// <param name="PetExpX2Time">
+///     Pet EXP boost pill (world.Items 1190/17035/8413) -- the character's new running duration-counter
+///     total after this use. See <see cref="PlayerRuntimeState.PetExpX2Time" />.
 /// </param>
 /// <param name="Applied">
 ///     Completed once actually mirrored -- see InventoryZoneCommand.Applied for why this matters while
@@ -102,6 +127,13 @@ public readonly record struct TribeProgressZoneCommand(
     int? PetGrowth = null,
     byte? PetActivity = null,
     int? PlayTimeEvent = null,
+    int? EatLifePotion = null,
+    int? EatManaPotion = null,
+    int? EatStrPotion = null,
+    int? EatDexPotion = null,
+    int? EatElePotion = null,
+    bool FullActionRebroadcast = false,
+    int? PetExpX2Time = null,
     TaskCompletionSource? Applied = null);
 
 /// <summary>One ground-item drop request -- see TribeProgressZoneCommand.DropItems.</summary>

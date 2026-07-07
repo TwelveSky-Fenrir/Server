@@ -23,8 +23,10 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
     /// <summary>Set by a test to make the next <see cref="CreateWithStarterKitAsync" /> call throw instead.</summary>
     public Exception? CreateWithStarterKitException { get; set; }
 
-    /// <summary>Set by a test to make the next <see cref="DeleteAsync" /> call throw instead -- for exercising
-    /// DeleteAvatarService's current (unmapped) database-delete-failure path.</summary>
+    /// <summary>
+    ///     Set by a test to make the next <see cref="DeleteAsync" /> call throw instead -- for exercising
+    ///     DeleteAvatarService's current (unmapped) database-delete-failure path.
+    /// </summary>
     public Exception? DeleteException { get; set; }
 
     /// <summary>Every argument CreateAvatarHandler passed to the most recent CreateWithStarterKitAsync call.</summary>
@@ -160,10 +162,31 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
         throw new NotSupportedException();
     }
 
+    public ValueTask UpsertHotkeySlotAsync(int characterId, byte page, byte keyIndex, int sort, int value1,
+        int value2, CancellationToken ct)
+    {
+        throw new NotSupportedException();
+    }
+
     public ValueTask ExecuteTradeAsync(int characterA, IReadOnlyList<CharacterItemSlotTvp> itemsA0,
         IReadOnlyList<CharacterItemSlotTvp> itemsA1, long deltaMoneyA, int deltaBigMoneyA, int characterB,
         IReadOnlyList<CharacterItemSlotTvp> itemsB0, IReadOnlyList<CharacterItemSlotTvp> itemsB1,
-        long deltaMoneyB, int deltaBigMoneyB, CancellationToken ct)
+        long deltaMoneyB, int deltaBigMoneyB, CancellationToken ct,
+        IReadOnlyList<CharacterItemSlotTvp>? tradedItemsA = null,
+        IReadOnlyList<CharacterItemSlotTvp>? tradedItemsB = null,
+        long offeredMoneyA = 0, int offeredBigMoneyA = 0,
+        long offeredMoneyB = 0, int offeredBigMoneyB = 0)
+    {
+        throw new NotSupportedException();
+    }
+
+    public ValueTask<int> AdjustDeathProtectionAsync(int characterId, int delta, CancellationToken ct)
+    {
+        throw new NotSupportedException();
+    }
+
+    public ValueTask ApplyTribeConversionAsync(int characterId, int itemId, byte container,
+        IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct)
     {
         throw new NotSupportedException();
     }

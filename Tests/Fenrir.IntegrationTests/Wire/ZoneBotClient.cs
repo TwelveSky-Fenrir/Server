@@ -246,9 +246,46 @@ public sealed class ZoneBotClient : IAsyncDisposable
     }
 
     /// <summary>op18 CZ_PROCESS_ATTACK_SEND. mCase 3 = Avatar -&gt; Monster (see MonsterCombatResolver.ResolvePvmAttack).</summary>
+    /// <remarks>
+    ///     Declares a legal single-hit swing (op15 CZ_AVATAR_ACTION_SEND, Sort 5) immediately before the
+    ///     attack sub-packet itself -- <c>Zone.ApplyPvmAttack</c> now enforces
+    ///     <c>AttackPacketBudget.TryConsume</c> (mirrors <c>CheckAttackPacket</c>,
+    ///     Server/ts25zone/S07_MyGame02.cpp:1718-1761), which silently drops any mCase 3 sub-packet unless a
+    ///     prior avatar action already established a non-zero ceiling and a matching replay-guard value. One
+    ///     declare per call keeps this bot's retry loop (<c>KillMonsterUntilDeadAsync</c>) always within
+    ///     budget without needing to track cross-call state; the declared position mirrors the caller's own
+    ///     current position, so it is never rejected as an implausible move.
+    /// </remarks>
     public async Task AttackMonsterAsync(int attackerServerIndex, uint attackerUniqueNumber, int monsterServerIndex,
         uint monsterUniqueNumber, float x, float y, float z, CancellationToken ct)
     {
+        const int singleHitSwingSort = 5;
+
+        var declarePayload = new byte[AvatarActionRequest.PayloadSize];
+        var declareAction = new ActionInfo
+        {
+            Type = 1,
+            Sort = singleHitSwingSort,
+            Frame = 0,
+            Location = [x, y, z],
+            TargetLocation = [x, y, z],
+            Front = 0,
+            TargetFront = 0,
+            PetLocation = new float[3],
+            PetTargetLocation = new float[3],
+            PetFront = 0,
+            PetSort = 0,
+            TargetObjectSort = 0,
+            TargetObjectIndex = 0,
+            TargetObjectUniqueNumber = 0,
+            SkillNumber = 0,
+            SkillGradeNum1 = 0,
+            SkillGradeNum2 = 0,
+            SkillValue = 0
+        };
+        declareAction.Write(declarePayload);
+        await SendAsync(AvatarActionRequest.Opcode, declarePayload, ct);
+
         var payload = new byte[AttackRequest.PayloadSize];
         var info = new AttackForProtocol
         {
@@ -261,7 +298,7 @@ public sealed class ZoneBotClient : IAsyncDisposable
             AttackActionValue1 = 1,
             AttackActionValue2 = 0,
             AttackActionValue3 = 0,
-            AttackActionValue4 = 0,
+            AttackActionValue4 = singleHitSwingSort,
             AttackResultValue = 0,
             AttackCriticalExist = 0,
             AttackElementDamage = 0,

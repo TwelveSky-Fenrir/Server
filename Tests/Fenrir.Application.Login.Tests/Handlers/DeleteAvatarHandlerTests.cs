@@ -180,8 +180,8 @@ public class DeleteAvatarHandlerTests
             NullLogger<DeleteAvatarHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
 
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => handler.HandleAsync(Request(), session, CancellationToken.None).AsTask());
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            handler.HandleAsync(Request(), session, CancellationToken.None).AsTask());
 
         PacketAssert.AssertNothingSent(pipe);
     }

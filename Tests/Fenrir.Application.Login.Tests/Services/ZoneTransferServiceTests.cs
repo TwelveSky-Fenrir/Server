@@ -104,7 +104,7 @@ public class ZoneTransferServiceTests
         var characters = FakeCharacterRepository.With(Summary, WorldEntryWith(850, 320));
         var otherShard = new ShardDirectoryEntryDto(2, "10.0.0.2", 30001, 0, 100, 0f);
         var (service, tickets, _, _) = CreateServiceWithDirectory(characters, [otherShard],
-            new Dictionary<byte, short[]> { [2] = [(short)(HostedMapId + 1)] });
+            new Dictionary<byte, short[]> { [2] = [HostedMapId + 1] });
 
         var result = await service.RequestZoneTransferAsync(AccountId, Summary.Slot, Guid.NewGuid(), 0,
             CancellationToken.None);
@@ -139,8 +139,8 @@ public class ZoneTransferServiceTests
         var (service, tickets, _, _) = CreateServiceWithDirectory(characters, [shard1, shard2],
             new Dictionary<byte, short[]>
             {
-                [1] = [(short)(HostedMapId + 1)],
-                [2] = [(short)(HostedMapId + 2)]
+                [1] = [HostedMapId + 1],
+                [2] = [HostedMapId + 2]
             });
 
         var result = await service.RequestZoneTransferAsync(AccountId, Summary.Slot, Guid.NewGuid(), 0,
@@ -156,7 +156,8 @@ public class ZoneTransferServiceTests
     // resolved shard must reject exactly like "no shard claims this map" (no ticket) and proactively evict
     // the dead shard's directory row instead of waiting for it to age out on its own.
     [Fact]
-    public async Task RequestZoneTransferAsync_ResolvedShardFailsReachabilityProbe_ReturnsShardUnavailableMintsNoTicketAndEvictsTheShard()
+    public async Task
+        RequestZoneTransferAsync_ResolvedShardFailsReachabilityProbe_ReturnsShardUnavailableMintsNoTicketAndEvictsTheShard()
     {
         var characters = FakeCharacterRepository.With(Summary, WorldEntryWith(850, 320));
         var (service, tickets, directory, reachability) = CreateServiceWithDirectory(characters, [Shard],
@@ -175,7 +176,8 @@ public class ZoneTransferServiceTests
     }
 
     [Fact]
-    public async Task RequestZoneTransferAsync_ResolvedShardPassesReachabilityProbe_MintsTicketAndNeverMarksItUnreachable()
+    public async Task
+        RequestZoneTransferAsync_ResolvedShardPassesReachabilityProbe_MintsTicketAndNeverMarksItUnreachable()
     {
         var characters = FakeCharacterRepository.With(Summary, WorldEntryWith(850, 320));
         var (service, tickets, directory, _) = CreateServiceWithDirectory(characters, [Shard],

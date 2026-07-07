@@ -184,7 +184,7 @@ public class TribeSymbolSpawnerTests
     [Fact]
     public void SmallestTribe_SpawningItsOwnSymbol_GetsDoubleHealth()
     {
-        var cache = CacheWithAllFiveSymbols(100);
+        var cache = CacheWithAllFiveSymbols();
         var catalog = CatalogWith(0, 0, 5);
         var worldState = CreateWorldState();
         var spawner = new TribeSymbolSpawner(cache, catalog, worldState);
@@ -203,7 +203,7 @@ public class TribeSymbolSpawnerTests
     [Fact]
     public void NotTheSmallestTribe_SpawningItsOwnSymbol_GetsNormalHealth()
     {
-        var cache = CacheWithAllFiveSymbols(100);
+        var cache = CacheWithAllFiveSymbols();
         var catalog = CatalogWith(0, 0, 5);
         var worldState = CreateWorldState();
         var spawner = new TribeSymbolSpawner(cache, catalog, worldState);

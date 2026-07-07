@@ -8,8 +8,10 @@ namespace Fenrir.Application.Login.Tests.TestSupport;
 internal sealed class FakeGameServerDirectoryRepository(params ShardDirectoryEntryDto[] shards)
     : IGameServerDirectoryRepository
 {
-    /// <summary>Every ShardId MarkUnreachableAsync was called with, in call order -- for ZoneTransferService's
-    /// dead-shard-eviction path (a failed reachability probe).</summary>
+    /// <summary>
+    ///     Every ShardId MarkUnreachableAsync was called with, in call order -- for ZoneTransferService's
+    ///     dead-shard-eviction path (a failed reachability probe).
+    /// </summary>
     public List<byte> MarkedUnreachableShardIds { get; } = [];
 
     public ValueTask<ImmutableArray<ShardDirectoryEntryDto>> GetDirectoryAsync(CancellationToken ct)

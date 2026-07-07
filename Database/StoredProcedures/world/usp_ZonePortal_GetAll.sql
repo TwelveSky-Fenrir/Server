@@ -1,10 +1,10 @@
 CREATE PROCEDURE world.usp_ZonePortal_GetAll
-    AS
+AS
 BEGIN
     SET
-NOCOUNT ON;
+        NOCOUNT ON;
 
-SELECT ZoneNumber, SlotIndex, TriggerX, TriggerY, TriggerZ, TargetZoneNumber
-FROM world.ZonePortals
-ORDER BY ZoneNumber, SlotIndex;
+    SELECT ZoneNumber, SlotIndex, TriggerX, TriggerY, TriggerZ, TargetZoneNumber
+    FROM world.ZonePortals
+    ORDER BY ZoneNumber, SlotIndex;
 END;

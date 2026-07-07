@@ -84,7 +84,7 @@ public class InventoryToWorldDropPolicyTests
     [Fact]
     public void FirstPage_IgnoresPremiumGate_EvenWhenExpired()
     {
-        var result = Resolve(ContainerMatrix.InventoryPage0, premiumPageAccessAllowed: false,
+        var result = Resolve(premiumPageAccessAllowed: false,
             source: Stack(50, 1), itemDefinition: StackableItem(50));
 
         Assert.True(result.Succeeded);

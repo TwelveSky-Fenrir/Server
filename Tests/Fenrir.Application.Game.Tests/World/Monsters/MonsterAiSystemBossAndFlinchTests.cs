@@ -41,7 +41,7 @@ public class MonsterAiSystemBossAndFlinchTests
             LocationX = 0,
             LocationY = 0,
             LocationZ = 0,
-            Radius = 50 // also the leash bound (MonsterEntity.LeashRadius) -- must clear the chase distance below
+            Radius = 50 // spawn scatter radius only -- chase give-up is gated on RadiusInfo2, not this value
         };
 
         var rows = WorldDataTestRows.MinimalRows() with { Monsters = [monster], MonsterSpawnRegions = [region] };
@@ -103,7 +103,7 @@ public class MonsterAiSystemBossAndFlinchTests
     [Fact]
     public void RangedAttackWindup_ReturnsToDecision_AfterFrameInfo4Ticks()
     {
-        var zone = CreateZone(CacheWithOneRegion(40, 2, 1000, 2));
+        var zone = CreateZone(CacheWithOneRegion(40, 2, 1000));
         var (session, _) = ZoneTestKit.CreateSession(1);
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1, "Target", 10, posZ: 0)));
 

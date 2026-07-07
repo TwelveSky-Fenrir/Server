@@ -6,15 +6,15 @@
 -- cluster-wide at a time, since a map is hosted by exactly one shard). Idempotent-on-missing-row like
 -- usp_WorldStateTribe_Update: a missing row (tribe never initialized) affects 0 rows and does not error.
 CREATE PROCEDURE game.usp_WorldStateTribe_AddPoints @TribeId TINYINT,
-    @Delta   INT
+                                                    @Delta INT
 AS
 BEGIN
     SET
-NOCOUNT ON;
+        NOCOUNT ON;
     SET
-XACT_ABORT ON;
+        XACT_ABORT ON;
 
-UPDATE game.WorldStateTribes
-SET Points = Points + @Delta
-WHERE TribeId = @TribeId;
+    UPDATE game.WorldStateTribes
+    SET Points = Points + @Delta
+    WHERE TribeId = @TribeId;
 END;

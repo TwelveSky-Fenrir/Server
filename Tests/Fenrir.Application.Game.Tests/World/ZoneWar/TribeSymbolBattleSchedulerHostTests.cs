@@ -53,7 +53,7 @@ public class TribeSymbolBattleSchedulerHostTests
     [Fact]
     public void MapHostedByThisShard_WithoutEnabled_IsNotArmed()
     {
-        var host = CreateHost([37], holyStoneBattleEnabled: false);
+        var host = CreateHost([37], false);
 
         Assert.False(host.IsArmed);
     }

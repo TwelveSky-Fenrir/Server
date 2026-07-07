@@ -6,30 +6,30 @@
 -- write has no domain failure condition to reject; a bad EventCode/Category from the caller is an app bug,
 -- not a registered admin.ErrorCatalog case.
 CREATE PROCEDURE game.usp_EventLog_Insert @EventCode SMALLINT,
-    @Category TINYINT,
-    @ActorAccountId INT = NULL,
-    @ActorCharacterId INT = NULL,
-    @TargetAccountId INT = NULL,
-    @TargetCharacterId INT = NULL,
-    @ShardId SMALLINT = NULL,
-    @DeltaMoney BIGINT = NULL,
-    @DeltaBigMoney BIGINT = NULL,
-    @ItemId INT = NULL,
-    @Quantity INT = NULL,
-    @Outcome TINYINT = NULL,
-    @Payload NVARCHAR(MAX) = NULL
+                                          @Category TINYINT,
+                                          @ActorAccountId INT = NULL,
+                                          @ActorCharacterId INT = NULL,
+                                          @TargetAccountId INT = NULL,
+                                          @TargetCharacterId INT = NULL,
+                                          @ShardId SMALLINT = NULL,
+                                          @DeltaMoney BIGINT = NULL,
+                                          @DeltaBigMoney BIGINT = NULL,
+                                          @ItemId INT = NULL,
+                                          @Quantity INT = NULL,
+                                          @Outcome TINYINT = NULL,
+                                          @Payload NVARCHAR(MAX) = NULL
 AS
 BEGIN
     SET
-NOCOUNT ON;
+        NOCOUNT ON;
     SET
-XACT_ABORT ON;
+        XACT_ABORT ON;
 
     -- Single INSERT is already atomic; it naturally joins whatever ambient transaction the caller (if any)
     -- already opened -- no explicit BEGIN TRANSACTION needed, same carve-out as a single guarded UPDATE.
-INSERT INTO game.EventLog
-(EventCode, Category, ActorAccountId, ActorCharacterId, TargetAccountId, TargetCharacterId,
- ShardId, DeltaMoney, DeltaBigMoney, ItemId, Quantity, Outcome, Payload)
-VALUES (@EventCode, @Category, @ActorAccountId, @ActorCharacterId, @TargetAccountId, @TargetCharacterId,
-        @ShardId, @DeltaMoney, @DeltaBigMoney, @ItemId, @Quantity, @Outcome, @Payload);
+    INSERT INTO game.EventLog
+    (EventCode, Category, ActorAccountId, ActorCharacterId, TargetAccountId, TargetCharacterId,
+     ShardId, DeltaMoney, DeltaBigMoney, ItemId, Quantity, Outcome, Payload)
+    VALUES (@EventCode, @Category, @ActorAccountId, @ActorCharacterId, @TargetAccountId, @TargetCharacterId,
+            @ShardId, @DeltaMoney, @DeltaBigMoney, @ItemId, @Quantity, @Outcome, @Payload);
 END;

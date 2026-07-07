@@ -16,6 +16,17 @@ public sealed class GameServerOptionsValidator : IValidateOptions<GameServerOpti
             errors.Add($"Game:TicketTtlSeconds must be positive (was {options.TicketTtlSeconds}).");
         if (string.IsNullOrWhiteSpace(options.GameDataDirectory))
             errors.Add("Game:GameDataDirectory must not be empty.");
+
+        // Deliberately does NOT check that {GameDataDirectory}/WORLD/*.WM navmesh data actually exists on disk.
+        // Legacy fails a zone process's entire startup fatally when its own .WM load fails (ServerDocs/12_ts25zone/
+        // 21_MyWorld_MySummon_Navmesh_Spawn.md §8.1), but Fenrir's Zone.TryLoadGeometry degrades gracefully instead
+        // (Zone.cs remarks on the Geometry property) because .WM is a multi-hundred-MB external asset that is not
+        // committed to this repo -- as of this writing, no Fenrir-side deployment (dev, CI, or otherwise) ships
+        // committed navmesh data, so failing ValidateOnStart on its absence here would currently prevent every
+        // GameServer instance from starting at all, not just catch a real misconfiguration. Whether to eventually
+        // adopt legacy's fatal-on-missing-mesh posture (once real navmesh assets are provisioned for a deployment)
+        // is an open product decision this validator does not make unilaterally -- see the monster-ai-aggro-pathing
+        // finding this comment was added for.
         if (options.TickRateHz <= 0) errors.Add($"Game:TickRateHz must be positive (was {options.TickRateHz}).");
         if (options.AoiCellSize <= 0) errors.Add($"Game:AoiCellSize must be positive (was {options.AoiCellSize}).");
         if (options.MaxPlausibleSpeedPerSecond <= 0)
@@ -29,6 +40,8 @@ public sealed class GameServerOptionsValidator : IValidateOptions<GameServerOpti
         if (options.AccountSessionPollIntervalSeconds <= 0)
             errors.Add(
                 $"Game:AccountSessionPollIntervalSeconds must be positive (was {options.AccountSessionPollIntervalSeconds}).");
+        if (options.MutePollIntervalSeconds <= 0)
+            errors.Add($"Game:MutePollIntervalSeconds must be positive (was {options.MutePollIntervalSeconds}).");
         if (options.TempRegistrationIdleSweepIntervalSeconds <= 0)
             errors.Add(
                 $"Game:TempRegistrationIdleSweepIntervalSeconds must be positive (was {options.TempRegistrationIdleSweepIntervalSeconds}).");

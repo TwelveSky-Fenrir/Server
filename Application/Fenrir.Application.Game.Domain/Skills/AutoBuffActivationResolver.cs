@@ -26,6 +26,21 @@ public static class AutoBuffActivationResolver
     /// <summary>aAction.aSort after a successful Sort=1 activation.</summary>
     public const int ChannelingActionSort = 41;
 
+    /// <summary>
+    ///     The 90%-of-current-mana debit applied on a successful Sort=1 activation. Exposed as a pure function
+    ///     of the mana value it is given (not of any live state) so callers on either side of the zone tick
+    ///     boundary can derive the same number from whatever mana value is current *to them* -- see
+    ///     <see cref="Fenrir.Application.Game.Domain.World.Zone" />'s <c>ApplyAutoBuffCommand</c> remarks for why
+    ///     the tick thread, not the request thread, is the one that must call this against the live value.
+    /// </summary>
+    public static int ManaAfterActivation(int mana)
+    {
+        // (int)(mana * 0.9f) is never greater than mana for mana >= 0, so the caller-side Disconnect check
+        // below can never actually trigger -- reproduced verbatim from the C++ source rather than dropped
+        // as dead code (D8).
+        return mana - (int)(mana * 0.9f);
+    }
+
     public static Result Resolve(int sort, in Context ctx, int today)
     {
         switch (sort)
@@ -34,12 +49,10 @@ public static class AutoBuffActivationResolver
                 if (ctx.AutoBuffTime < today || ctx.ActionSort != 1)
                     return new Result(ResultKind.NoReply);
 
-                // (int)(mana * 0.9f) is never greater than mana for mana >= 0, so this can never actually
-                // trigger -- reproduced verbatim from the C++ source rather than dropped as dead code (D8).
                 var reducedMana = (int)(ctx.Mana * 0.9f);
                 return ctx.Mana < reducedMana
                     ? new Result(ResultKind.Disconnect)
-                    : new Result(ResultKind.Activate, ctx.Mana - reducedMana);
+                    : new Result(ResultKind.Activate, ManaAfterActivation(ctx.Mana));
 
             case 2:
                 return new Result(ResultKind.Tick);

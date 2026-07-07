@@ -5,20 +5,20 @@
 -- must behave like legacy's own silent SetSqlBlockIP upsert (Server/Header/enter_count.cpp:59-63), not fail
 -- loudly. Mirrors the same UPDATE-then-conditional-INSERT shape as auth.usp_AccountPin_Set.
 CREATE PROCEDURE admin.usp_FirewallRule_Upsert @IpAddress VARCHAR(45),
-    @RuleType  TINYINT
+                                               @RuleType TINYINT
 AS
 BEGIN
     SET
-NOCOUNT ON;
+        NOCOUNT ON;
     SET
-XACT_ABORT ON;
+        XACT_ABORT ON;
 
-UPDATE admin.FirewallRules
-SET RuleType = @RuleType
-WHERE IpAddress = @IpAddress;
+    UPDATE admin.FirewallRules
+    SET RuleType = @RuleType
+    WHERE IpAddress = @IpAddress;
 
-IF
-@@ROWCOUNT = 0
+    IF
+        @@ROWCOUNT = 0
         INSERT INTO admin.FirewallRules (IpAddress, RuleType)
         VALUES (@IpAddress, @RuleType);
 END;

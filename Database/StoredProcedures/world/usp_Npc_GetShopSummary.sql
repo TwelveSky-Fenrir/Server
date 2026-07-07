@@ -1,18 +1,18 @@
 CREATE PROCEDURE world.usp_Npc_GetShopSummary
-    AS
+AS
 BEGIN
     SET
-NOCOUNT ON;
+        NOCOUNT ON;
 
-SELECT NpcId,
-       Name,
-       Tribe,
-       Type,
-       SpeechLineCount,
-       MenuOptionCount,
-       ShopItemCount,
-       SkillOfferCount,
-       GambleCostRowCount
-FROM world.vw_NpcWithShopSummary
-ORDER BY NpcId;
+    SELECT NpcId,
+           Name,
+           Tribe,
+           Type,
+           SpeechLineCount,
+           MenuOptionCount,
+           ShopItemCount,
+           SkillOfferCount,
+           GambleCostRowCount
+    FROM world.vw_NpcWithShopSummary
+    ORDER BY NpcId;
 END;

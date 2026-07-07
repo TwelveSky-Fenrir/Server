@@ -24,79 +24,77 @@
 --   2    the new name is already taken by another character, or unchanged from this character's own current
 --        name -- the uniqueness check does not exclude self, the same two-birds-one-check behavior the
 --        original version of this proc already had.
-CREATE
-OR
-ALTER PROCEDURE game.usp_Character_Rename @AccountId INT,
-    @Slot TINYINT,
-    @NewName NVARCHAR(13),
-    @ItemContainer TINYINT,
-    @ItemSlot TINYINT,
-    @RequiredItemId INT
-    AS
+CREATE OR ALTER PROCEDURE game.usp_Character_Rename @AccountId INT,
+                                                    @Slot TINYINT,
+                                                    @NewName NVARCHAR(13),
+                                                    @ItemContainer TINYINT,
+                                                    @ItemSlot TINYINT,
+                                                    @RequiredItemId INT
+AS
 BEGIN
     SET
-NOCOUNT ON;
+        NOCOUNT ON;
     SET
-XACT_ABORT ON;
+        XACT_ABORT ON;
 
     DECLARE
-@CharacterId INT;
+        @CharacterId INT;
 
-SELECT @CharacterId = CharacterId
-FROM game.Characters
-WHERE AccountId = @AccountId
-  AND Slot = @Slot;
-
-IF
-@CharacterId IS NULL
-BEGIN
-SELECT 102;
-RETURN;
-END;
+    SELECT @CharacterId = CharacterId
+    FROM game.Characters
+    WHERE AccountId = @AccountId
+      AND Slot = @Slot;
 
     IF
-NOT EXISTS (SELECT 1
-                   FROM game.CharacterItems
-                   WHERE CharacterId = @CharacterId
-                     AND Container = @ItemContainer
-                     AND Slot = @ItemSlot
-                     AND ItemId = @RequiredItemId)
-BEGIN
-SELECT -1;
-RETURN;
-END;
+        @CharacterId IS NULL
+        BEGIN
+            SELECT 102;
+            RETURN;
+        END;
 
     IF
-EXISTS (SELECT 1 FROM game.Characters WHERE Name = @NewName)
-BEGIN
-SELECT 2;
-RETURN;
-END;
+        NOT EXISTS (SELECT 1
+                    FROM game.CharacterItems
+                    WHERE CharacterId = @CharacterId
+                      AND Container = @ItemContainer
+                      AND Slot = @ItemSlot
+                      AND ItemId = @RequiredItemId)
+        BEGIN
+            SELECT -1;
+            RETURN;
+        END;
 
-BEGIN
-TRANSACTION;
+    IF
+        EXISTS (SELECT 1 FROM game.Characters WHERE Name = @NewName)
+        BEGIN
+            SELECT 2;
+            RETURN;
+        END;
 
-UPDATE game.Characters
-SET Name         = @NewName,
-    UpdatedAtUtc = SYSUTCDATETIME()
-WHERE CharacterId = @CharacterId;
+    BEGIN
+        TRANSACTION;
 
-IF
-@@ROWCOUNT = 0
-BEGIN
-ROLLBACK TRANSACTION;
-SELECT 102;
-RETURN;
-END;
+    UPDATE game.Characters
+    SET Name         = @NewName,
+        UpdatedAtUtc = SYSUTCDATETIME()
+    WHERE CharacterId = @CharacterId;
 
-DELETE
-FROM game.CharacterItems
-WHERE CharacterId = @CharacterId
-  AND Container = @ItemContainer
-  AND Slot = @ItemSlot;
+    IF
+        @@ROWCOUNT = 0
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 102;
+            RETURN;
+        END;
 
-COMMIT TRANSACTION;
+    DELETE
+    FROM game.CharacterItems
+    WHERE CharacterId = @CharacterId
+      AND Container = @ItemContainer
+      AND Slot = @ItemSlot;
 
-SELECT 0;
+    COMMIT TRANSACTION;
+
+    SELECT 0;
 END;
 GO

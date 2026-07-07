@@ -34,16 +34,14 @@ public enum TribeGuardCorridorMoveOutcome
 ///     (<c>B_RETURN_TO_AUTO_ZONE</c> -- the soft-failure fallback-redirect instruction is the CALLER's concern,
 ///     not this gate's; it carries no destination payload of its own).
 ///     <para>
-///         AMBIGUITY NOTE: the translated contract's "Directional asymmetry" edge case reads as if segment 0
-///         (outermost) and segment 3 (innermost) might not need BOTH the guard-state AND adjacency check that
-///         the same contract's "Strict single-step adjacency for advances" edge case then states unconditionally
-///         ("an advance into a corridor zone is only permitted from the one specific zone immediately outside
-///         it" -- no segment exception mentioned there, and the worked example "jump directly from the hub...
-///         past an intermediate corridor zone" is itself a segment-0-adjacent scenario). This implementation
-///         follows the unconditional, more specific rule -- every segment 0-3 requires both an exact single-step
-///         adjacency match AND an open guard state to advance -- for every requester that isn't the owning
-///         tribe or its ally. Revisit if a follow-up legacy-behavior-translator pass resolves the two bullets
-///         differently.
+///         RESOLVED (previously flagged as an ambiguity here): a re-verified legacy-behavior-translator
+///         contract confirms every segment 0-3, including both chain ends, follows the identical rule with no
+///         special-case divergence -- retreat toward the hub is always unconditionally allowed, and an advance
+///         requires both exact single-step adjacency (the hub for segment 0, the previous segment's own zone
+///         otherwise) AND an open guard state, with no exception for the outermost or innermost position. The
+///         implementation below already matches this (no segment-specific branching), so this remark now only
+///         records that the ambiguity previously noted here was checked and is not real, rather than describing
+///         an unresolved open question.
 ///     </para>
 /// </remarks>
 public static class TribeGuardCorridorGate

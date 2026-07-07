@@ -4,23 +4,23 @@ CREATE PROCEDURE game.usp_OfflineShop_GetByZone @ZoneNumber SMALLINT
 AS
 BEGIN
     SET
-NOCOUNT ON;
+        NOCOUNT ON;
 
-SELECT CharacterId,
-       ZoneNumber,
-       ShopState,
-       LocationX,
-       LocationY,
-       LocationZ,
-       SlotIndex,
-       ItemId,
-       ItemName,
-       Quantity,
-       Value,
-       SerialNumber,
-       Price,
-       SocketData
-FROM game.vw_OfflineShopListing
-WHERE ZoneNumber = @ZoneNumber
-ORDER BY CharacterId, SlotIndex;
+    SELECT CharacterId,
+           ZoneNumber,
+           ShopState,
+           LocationX,
+           LocationY,
+           LocationZ,
+           SlotIndex,
+           ItemId,
+           ItemName,
+           Quantity,
+           Value,
+           SerialNumber,
+           Price,
+           SocketData
+    FROM game.vw_OfflineShopListing
+    WHERE ZoneNumber = @ZoneNumber
+    ORDER BY CharacterId, SlotIndex;
 END;

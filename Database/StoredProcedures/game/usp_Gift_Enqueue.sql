@@ -1,27 +1,30 @@
 -- Also appends a GiftLog row for this Pending state, so the log covers every state a gift passes through.
 CREATE PROCEDURE game.usp_Gift_Enqueue @AccountId INT,
-    @ProductId INT = NULL,
-    @Quantity  INT,
-    @Value     INT
+                                       @ProductId INT = NULL,
+                                       @Quantity INT,
+                                       @Value INT
 AS
 BEGIN
     SET
-NOCOUNT ON;
+        NOCOUNT ON;
     SET
-XACT_ABORT ON;
+        XACT_ABORT ON;
 
     DECLARE
-@Now DATETIME2(3) = SYSUTCDATETIME();
+        @Now DATETIME2(3) = SYSUTCDATETIME();
     DECLARE
-@Inserted TABLE (GiftId INT);
+        @Inserted TABLE
+                  (
+                      GiftId INT
+                  );
 
-INSERT INTO game.Gifts (AccountId, ProductId, Quantity, Value, Status, CreatedAtUtc)
+    INSERT INTO game.Gifts (AccountId, ProductId, Quantity, Value, Status, CreatedAtUtc)
     OUTPUT INSERTED.GiftId INTO @Inserted (GiftId)
-VALUES (@AccountId, @ProductId, @Quantity, @Value, 0, @Now);
+    VALUES (@AccountId, @ProductId, @Quantity, @Value, 0, @Now);
 
-INSERT INTO game.GiftLog (AccountId, ProductId, Quantity, Value, Status, CreatedAtUtc)
-VALUES (@AccountId, @ProductId, @Quantity, @Value, 0, @Now);
+    INSERT INTO game.GiftLog (AccountId, ProductId, Quantity, Value, Status, CreatedAtUtc)
+    VALUES (@AccountId, @ProductId, @Quantity, @Value, 0, @Now);
 
-SELECT GiftId
-FROM @Inserted;
+    SELECT GiftId
+    FROM @Inserted;
 END;

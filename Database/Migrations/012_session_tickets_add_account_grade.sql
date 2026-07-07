@@ -24,23 +24,24 @@ GO
 
 -- Idempotent: only one active ticket exists per AccountId at any time -- a second login for the same
 -- account before the previous ticket is consumed simply supersedes it (DELETE-then-INSERT).
-CREATE PROCEDURE runtime.usp_SessionTicket_Create @AccountId    INT,
-    @CharacterId  INT,
-    @ShardId      TINYINT,
-    @TtlSeconds   INT,
-    @SessionToken UNIQUEIDENTIFIER,
-    @AccountGrade SMALLINT
-WITH NATIVE_COMPILATION, SCHEMABINDING
+CREATE PROCEDURE runtime.usp_SessionTicket_Create @AccountId INT,
+                                                  @CharacterId INT,
+                                                  @ShardId TINYINT,
+                                                  @TtlSeconds INT,
+                                                  @SessionToken UNIQUEIDENTIFIER,
+                                                  @AccountGrade SMALLINT
+    WITH NATIVE_COMPILATION , SCHEMABINDING
 AS
-BEGIN ATOMIC
-WITH (TRANSACTION ISOLATION LEVEL = SNAPSHOT, LANGUAGE = N'us_english')
-DELETE
-FROM runtime.SessionTickets
-WHERE AccountId = @AccountId;
+BEGIN
+    ATOMIC
+    WITH (TRANSACTION ISOLATION LEVEL = SNAPSHOT, LANGUAGE = N'us_english')
+    DELETE
+    FROM runtime.SessionTickets
+    WHERE AccountId = @AccountId;
 
-INSERT INTO runtime.SessionTickets (AccountId, CharacterId, ShardId, ExpiresAtUtc, SessionToken, AccountGrade)
-VALUES (@AccountId, @CharacterId, @ShardId, DATEADD(SECOND, @TtlSeconds, SYSUTCDATETIME()), @SessionToken,
-        @AccountGrade);
+    INSERT INTO runtime.SessionTickets (AccountId, CharacterId, ShardId, ExpiresAtUtc, SessionToken, AccountGrade)
+    VALUES (@AccountId, @CharacterId, @ShardId, DATEADD(SECOND, @TtlSeconds, SYSUTCDATETIME()), @SessionToken,
+            @AccountGrade);
 END;
 GO
 
@@ -49,44 +50,46 @@ GO
 -- a blind retry here is the classic MMO ticket-dupe bug). AccountGrade is appended as the SELECT's last
 -- column (ordinal-mapped) -- ConsumedTicketDto's ctor appends it last too.
 CREATE PROCEDURE runtime.usp_SessionTicket_Consume @AccountId INT
-WITH NATIVE_COMPILATION, SCHEMABINDING
+    WITH NATIVE_COMPILATION , SCHEMABINDING
 AS
-BEGIN ATOMIC
-WITH (TRANSACTION ISOLATION LEVEL = SNAPSHOT, LANGUAGE = N'us_english')
+BEGIN
+    ATOMIC
+    WITH (TRANSACTION ISOLATION LEVEL = SNAPSHOT, LANGUAGE = N'us_english')
     DECLARE
-@CharacterId INT, @ShardId TINYINT, @Exp DATETIME2(3), @SessionToken UNIQUEIDENTIFIER, @AccountGrade SMALLINT;
+        @CharacterId INT, @ShardId TINYINT, @Exp DATETIME2(3), @SessionToken UNIQUEIDENTIFIER, @AccountGrade SMALLINT;
 
-SELECT @CharacterId = CharacterId,
-       @ShardId = ShardId,
-       @Exp = ExpiresAtUtc,
-       @SessionToken = SessionToken,
-       @AccountGrade = AccountGrade
-FROM runtime.SessionTickets
-WHERE AccountId = @AccountId;
+    SELECT @CharacterId = CharacterId,
+           @ShardId = ShardId,
+           @Exp = ExpiresAtUtc,
+           @SessionToken = SessionToken,
+           @AccountGrade = AccountGrade
+    FROM runtime.SessionTickets
+    WHERE AccountId = @AccountId;
 
-DELETE
-FROM runtime.SessionTickets
-WHERE AccountId = @AccountId;
+    DELETE
+    FROM runtime.SessionTickets
+    WHERE AccountId = @AccountId;
 
-IF
-@Exp IS NOT NULL AND @Exp > SYSUTCDATETIME()
-SELECT @CharacterId  AS CharacterId,
-       @ShardId      AS ShardId,
-       @SessionToken AS SessionToken,
-       @AccountGrade AS AccountGrade;
+    IF
+        @Exp IS NOT NULL AND @Exp > SYSUTCDATETIME()
+        SELECT @CharacterId  AS CharacterId,
+               @ShardId      AS ShardId,
+               @SessionToken AS SessionToken,
+               @AccountGrade AS AccountGrade;
 END;
 GO
 
 -- Called on a server-side timer, not from the client path: runtime.SessionTickets is SCHEMA_ONLY
 -- memory-optimized and has no background cleanup of its own -- expired rows sit there until deleted.
 CREATE PROCEDURE runtime.usp_SessionTicket_Purge
-WITH NATIVE_COMPILATION,
-     SCHEMABINDING
-         AS
-BEGIN ATOMIC
-WITH (TRANSACTION ISOLATION LEVEL = SNAPSHOT, LANGUAGE = N'us_english')
-DELETE
-FROM runtime.SessionTickets
-WHERE ExpiresAtUtc <= SYSUTCDATETIME();
+    WITH NATIVE_COMPILATION ,
+        SCHEMABINDING
+AS
+BEGIN
+    ATOMIC
+    WITH (TRANSACTION ISOLATION LEVEL = SNAPSHOT, LANGUAGE = N'us_english')
+    DELETE
+    FROM runtime.SessionTickets
+    WHERE ExpiresAtUtc <= SYSUTCDATETIME();
 END;
 GO

@@ -8,6 +8,42 @@ namespace Fenrir.Application.Login.Domain.Avatars;
 /// </summary>
 public static class AvatarInfoFactory
 {
+    // FEQUIP_TYPE (Server/Header/Protocol/STRUCT.h:1662-1676): amulet/cape/armor/gloves/ring/boots/an unused
+    // slot/weapon/pet/4 decoration slots -- 13 slots total, each packed as 4 wire ints. Universal wire-shape
+    // constants, not per-race data (bridge-stats-equipment contract, gap-table row 7); this is an independent
+    // duplication of the same constants on GameServer's own AvatarInfoFactory, not a shared one, since Login
+    // has no reference to the Game project.
+    private const int EquipSlotCount = 13;
+    private const int EquipWireIntsPerSlot = 4;
+
+    // FEQUIP_TYPE::EPET, index 8 -- same independent-duplication posture as EquipSlotCount/EquipWireIntsPerSlot
+    // above (Game's own copy lives at Fenrir.Application.Game.Domain.Pets.PetSlots.EquipmentSlot).
+    private const int PetEquipSlot = 8;
+
+    // wAvatar.aInventory[2][64][6] -- ServerDocs/12_ts25zone/06_MyWork03_Items_Equipement_Craft_Quetes.md:
+    // 115-117 ("Format d'inventaire, 6 entiers par slot... [0] ID objet, [3] quantité/durabilité, [4] valeur
+    // d'amélioration/option, [5] réservé"); total wire size cross-checked against ServerDocs/19_Header_Lib/
+    // 06_FunctionH_Utilitaires_XOR.md:276's MAX_INVENTORY_PAGE_NUM * MAX_INVENTORY_SLOT_NUM *
+    // MAX_INVENTORY_VALUE_NUM = 2*64*6 = 768, matching AvatarInfo.Inventory's own FixedArray(768). Same
+    // "[1]/[2] left at wire-zero, not established by any available citation" open question as GameServer's
+    // own AvatarInfoFactory.BuildInventoryArrayFromRows -- see that method's remarks for the full citation.
+    // Only page 0 is modeled: usp_Character_CreateWithStarterKit always inserts starter-kit inventory rows at
+    // Container=0 (Database/StoredProcedures/game/usp_Character_CreateWithStarterKit.sql), so no starter kit
+    // ever populates page 1 -- there is nothing to project there at creation time, not a gap.
+    private const int InventorySlotsPerPage = 64;
+    private const int InventoryWireIntsPerSlot = 6;
+
+    // wAvatar.aSkill[40][2] -- Database/Tables/game/CharacterSkills.sql:1's own citation
+    // ("[slot][0]=SkillId, [slot][1]=Grade"); 40*2 = 80 matches AvatarInfo.Skill's own FixedArray(80).
+    private const int SkillSlotCount = 40;
+    private const int SkillWireIntsPerSlot = 2;
+
+    // wAvatar.aHotKey[3][14][3] -- Database/Tables/game/CharacterHotkeys.sql:1's own citation
+    // ("3 pages x 14 keys x 3 ints... Sort/Value1/Value2 stored verbatim as the legacy triple");
+    // 3*14*3 = 126 matches AvatarInfo.HotKey's own FixedArray(126).
+    private const int HotkeyPageCount = 3;
+    private const int HotkeyKeysPerPage = 14;
+    private const int HotkeyWireIntsPerSlot = 3;
     public static AvatarInfo Zeroed => AvatarInfoTemplates.Zeroed;
 
     public static AvatarInfo CreateForCharacter(CharacterWorldEntryDto character)
@@ -31,18 +67,6 @@ public static class AvatarInfoFactory
             ]
         };
     }
-
-    // FEQUIP_TYPE (Server/Header/Protocol/STRUCT.h:1662-1676): amulet/cape/armor/gloves/ring/boots/an unused
-    // slot/weapon/pet/4 decoration slots -- 13 slots total, each packed as 4 wire ints. Universal wire-shape
-    // constants, not per-race data (bridge-stats-equipment contract, gap-table row 7); this is an independent
-    // duplication of the same constants on GameServer's own AvatarInfoFactory, not a shared one, since Login
-    // has no reference to the Game project.
-    private const int EquipSlotCount = 13;
-    private const int EquipWireIntsPerSlot = 4;
-
-    // FEQUIP_TYPE::EPET, index 8 -- same independent-duplication posture as EquipSlotCount/EquipWireIntsPerSlot
-    // above (Game's own copy lives at Fenrir.Application.Game.Domain.Pets.PetSlots.EquipmentSlot).
-    private const int PetEquipSlot = 8;
 
     /// <summary>
     ///     Projects the equipment rows CreateAvatarHandler is about to persist onto AVATAR_INFO's aEquip[13][4]
@@ -87,31 +111,6 @@ public static class AvatarInfoFactory
 
         return equip;
     }
-
-    // wAvatar.aInventory[2][64][6] -- ServerDocs/12_ts25zone/06_MyWork03_Items_Equipement_Craft_Quetes.md:
-    // 115-117 ("Format d'inventaire, 6 entiers par slot... [0] ID objet, [3] quantité/durabilité, [4] valeur
-    // d'amélioration/option, [5] réservé"); total wire size cross-checked against ServerDocs/19_Header_Lib/
-    // 06_FunctionH_Utilitaires_XOR.md:276's MAX_INVENTORY_PAGE_NUM * MAX_INVENTORY_SLOT_NUM *
-    // MAX_INVENTORY_VALUE_NUM = 2*64*6 = 768, matching AvatarInfo.Inventory's own FixedArray(768). Same
-    // "[1]/[2] left at wire-zero, not established by any available citation" open question as GameServer's
-    // own AvatarInfoFactory.BuildInventoryArrayFromRows -- see that method's remarks for the full citation.
-    // Only page 0 is modeled: usp_Character_CreateWithStarterKit always inserts starter-kit inventory rows at
-    // Container=0 (Database/StoredProcedures/game/usp_Character_CreateWithStarterKit.sql), so no starter kit
-    // ever populates page 1 -- there is nothing to project there at creation time, not a gap.
-    private const int InventorySlotsPerPage = 64;
-    private const int InventoryWireIntsPerSlot = 6;
-
-    // wAvatar.aSkill[40][2] -- Database/Tables/game/CharacterSkills.sql:1's own citation
-    // ("[slot][0]=SkillId, [slot][1]=Grade"); 40*2 = 80 matches AvatarInfo.Skill's own FixedArray(80).
-    private const int SkillSlotCount = 40;
-    private const int SkillWireIntsPerSlot = 2;
-
-    // wAvatar.aHotKey[3][14][3] -- Database/Tables/game/CharacterHotkeys.sql:1's own citation
-    // ("3 pages x 14 keys x 3 ints... Sort/Value1/Value2 stored verbatim as the legacy triple");
-    // 3*14*3 = 126 matches AvatarInfo.HotKey's own FixedArray(126).
-    private const int HotkeyPageCount = 3;
-    private const int HotkeyKeysPerPage = 14;
-    private const int HotkeyWireIntsPerSlot = 3;
 
     /// <summary>
     ///     Projects the starter-kit inventory rows CreateAvatarService is about to persist (always Container=0,

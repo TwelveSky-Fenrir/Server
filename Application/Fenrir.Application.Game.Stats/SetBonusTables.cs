@@ -155,17 +155,21 @@ public static class SetBonusTables
 
     /// <summary>
     ///     Detects the NXT set tier for the 6 canonical slots (0=ring, 2=armor, 3=gloves, 4=amulet, 5=boots,
-    ///     7=weapon, literal-index convention) against <paramref name="tribe" />'s catalog. Counts how many
+    ///     7=weapon, literal-index convention) against <paramref name="previousTribe" />'s catalog. Keyed on
+    ///     aPreviousTribe, not the character's current playable tribe (Server/ts25zone/S07_MyGame03.cpp:
+    ///     7571-7626, <c>MyUtil::CheckSetItemNumberNXT</c>) -- legacy indexes its two fixed 3-row tables with
+    ///     no bounds check at all for this input; this port returns 0 instead of indexing out of bounds, a
+    ///     deliberately safer (not legacy-identical) guard for the unrecognized-tribe case. Counts how many
     ///     of those 6 slots hold a matching tribe piece (any of the 3 weapons in the weapon slot, any of the
     ///     5 non-weapon pieces in the other 5, order-independent). Returns 0, 101 (&gt;=2), 102 (&gt;=4), or
-    ///     103 (&gt;=6). Tribe values outside 0..2 return 0 rather than indexing out of bounds.
+    ///     103 (&gt;=6).
     /// </summary>
-    public static int DetectNxtSetNumber(byte tribe, IReadOnlyList<EquippedItemSlot> equipment)
+    public static int DetectNxtSetNumber(byte previousTribe, IReadOnlyList<EquippedItemSlot> equipment)
     {
-        if (tribe > 2) return 0;
+        if (previousTribe > 2) return 0;
 
-        var weaponIds = NxtWeaponIdsByTribe[tribe];
-        var pieceIds = NxtPieceIdsByTribe[tribe];
+        var weaponIds = NxtWeaponIdsByTribe[previousTribe];
+        var pieceIds = NxtPieceIdsByTribe[previousTribe];
         var matched = 0;
 
         foreach (var slot in equipment)
@@ -192,12 +196,13 @@ public static class SetBonusTables
 
     /// <summary>
     ///     NXT (101-103) if detected (checked first, matching legacy priority), otherwise the caller-supplied legacy set
-    ///     number.
+    ///     number. <paramref name="previousTribe" /> is aPreviousTribe, not the character's current playable tribe --
+    ///     see <see cref="DetectNxtSetNumber" />.
     /// </summary>
-    public static int ResolveEffectiveSetNumber(byte tribe, IReadOnlyList<EquippedItemSlot> equipment,
+    public static int ResolveEffectiveSetNumber(byte previousTribe, IReadOnlyList<EquippedItemSlot> equipment,
         int legacySetNumber)
     {
-        var nxt = DetectNxtSetNumber(tribe, equipment);
+        var nxt = DetectNxtSetNumber(previousTribe, equipment);
         return nxt != 0 ? nxt : legacySetNumber;
     }
 

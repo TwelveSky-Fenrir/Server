@@ -1,8 +1,13 @@
+using System.Buffers;
 using System.Collections.Immutable;
 using System.Threading.Channels;
+using Fenrir.Application.Game.Domain.Hotkeys;
+using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.Domain.Social.Pshop;
 using Fenrir.Application.Game.Stats;
 using Fenrir.Data.WriteBehind;
+using Fenrir.Network.Dispatch.Sessions;
+using Fenrir.Network.Framing;
 using Fenrir.Network.Serialization.Packets.Shared;
 using Fenrir.Network.Serialization.Packets.Zone;
 using Microsoft.Extensions.Logging;
@@ -29,12 +34,152 @@ public sealed partial class Zone
     private const int HeroRankPointStatSort = 904;
 
     /// <summary>
+    ///     Bounded capacity for <see cref="_autoBuffInbox" /> -- also the basis for
+    ///     <see cref="AutoBuffInboxDrainCapPerTick" />.
+    /// </summary>
+    private const int AutoBuffInboxCapacity = 256;
+
+    /// <summary>
+    ///     Per-tick drain cap for <see cref="_autoBuffInbox" /> -- same "half of this channel's own bounded
+    ///     capacity" convention as <see cref="InboxDrainCapPerTick" /> (see that constant's own remarks for the
+    ///     full rationale and the Fenrir-side-safeguard-not-legacy-parity caveat). Every channel declared in
+    ///     this file follows the same pairing.
+    /// </summary>
+    private const int AutoBuffInboxDrainCapPerTick = AutoBuffInboxCapacity / 2;
+
+    /// <summary>
+    ///     Bounded capacity for <see cref="_avatarBuffInbox" /> -- also the basis for
+    ///     <see cref="AvatarBuffInboxDrainCapPerTick" />.
+    /// </summary>
+    private const int AvatarBuffInboxCapacity = 256;
+
+    /// <summary>
+    ///     Per-tick drain cap for <see cref="_avatarBuffInbox" /> -- see <see cref="InboxDrainCapPerTick" />'s own
+    ///     remarks.
+    /// </summary>
+    private const int AvatarBuffInboxDrainCapPerTick = AvatarBuffInboxCapacity / 2;
+
+    /// <summary>
+    ///     Bounded capacity for <see cref="_bottleInbox" /> -- also the basis for
+    ///     <see cref="BottleInboxDrainCapPerTick" />.
+    /// </summary>
+    private const int BottleInboxCapacity = 256;
+
+    /// <summary>Per-tick drain cap for <see cref="_bottleInbox" /> -- see <see cref="InboxDrainCapPerTick" />'s own remarks.</summary>
+    private const int BottleInboxDrainCapPerTick = BottleInboxCapacity / 2;
+
+    /// <summary>
+    ///     Bounded capacity for <see cref="_hotkeySlotInbox" /> -- also the basis for
+    ///     <see cref="HotkeySlotInboxDrainCapPerTick" />.
+    /// </summary>
+    private const int HotkeySlotInboxCapacity = 256;
+
+    /// <summary>
+    ///     Per-tick drain cap for <see cref="_hotkeySlotInbox" /> -- see <see cref="InboxDrainCapPerTick" />'s own
+    ///     remarks.
+    /// </summary>
+    private const int HotkeySlotInboxDrainCapPerTick = HotkeySlotInboxCapacity / 2;
+
+    /// <summary>
+    ///     Bounded capacity for <see cref="_costumeInbox" /> -- also the basis for
+    ///     <see cref="CostumeInboxDrainCapPerTick" />.
+    /// </summary>
+    private const int CostumeInboxCapacity = 256;
+
+    /// <summary>Per-tick drain cap for <see cref="_costumeInbox" /> -- see <see cref="InboxDrainCapPerTick" />'s own remarks.</summary>
+    private const int CostumeInboxDrainCapPerTick = CostumeInboxCapacity / 2;
+
+    /// <summary>
+    ///     Bounded capacity for <see cref="_fishingInbox" /> -- also the basis for
+    ///     <see cref="FishingInboxDrainCapPerTick" />.
+    /// </summary>
+    private const int FishingInboxCapacity = 512;
+
+    /// <summary>Per-tick drain cap for <see cref="_fishingInbox" /> -- see <see cref="InboxDrainCapPerTick" />'s own remarks.</summary>
+    private const int FishingInboxDrainCapPerTick = FishingInboxCapacity / 2;
+
+    /// <summary>
+    ///     Bounded capacity for <see cref="_heroRankingInbox" /> -- also the basis for
+    ///     <see cref="HeroRankingInboxDrainCapPerTick" />.
+    /// </summary>
+    private const int HeroRankingInboxCapacity = 256;
+
+    /// <summary>
+    ///     Per-tick drain cap for <see cref="_heroRankingInbox" /> -- see <see cref="InboxDrainCapPerTick" />'s own
+    ///     remarks.
+    /// </summary>
+    private const int HeroRankingInboxDrainCapPerTick = HeroRankingInboxCapacity / 2;
+
+    /// <summary>
+    ///     Bounded capacity for <see cref="_heroRankingRolloverInbox" /> -- also the basis for
+    ///     <see cref="HeroRankingRolloverInboxDrainCapPerTick" />. In practice this cap can never bind: this
+    ///     channel carries at most one real item per rollover event per zone (see the field's own remarks).
+    /// </summary>
+    private const int HeroRankingRolloverInboxCapacity = 4;
+
+    /// <summary>
+    ///     Per-tick drain cap for <see cref="_heroRankingRolloverInbox" /> -- see <see cref="InboxDrainCapPerTick" />'s
+    ///     own remarks.
+    /// </summary>
+    private const int HeroRankingRolloverInboxDrainCapPerTick = HeroRankingRolloverInboxCapacity / 2;
+
+    /// <summary>
+    ///     Bounded capacity for <see cref="_mountInbox" /> -- also the basis for <see cref="MountInboxDrainCapPerTick" />
+    ///     .
+    /// </summary>
+    private const int MountInboxCapacity = 256;
+
+    /// <summary>Per-tick drain cap for <see cref="_mountInbox" /> -- see <see cref="InboxDrainCapPerTick" />'s own remarks.</summary>
+    private const int MountInboxDrainCapPerTick = MountInboxCapacity / 2;
+
+    /// <summary>
+    ///     Bounded capacity for <see cref="_pshopInbox" /> -- also the basis for <see cref="PshopInboxDrainCapPerTick" />
+    ///     .
+    /// </summary>
+    private const int PshopInboxCapacity = 256;
+
+    /// <summary>Per-tick drain cap for <see cref="_pshopInbox" /> -- see <see cref="InboxDrainCapPerTick" />'s own remarks.</summary>
+    private const int PshopInboxDrainCapPerTick = PshopInboxCapacity / 2;
+
+    /// <summary>Bounded capacity for <see cref="_runeInbox" /> -- also the basis for <see cref="RuneInboxDrainCapPerTick" />.</summary>
+    private const int RuneInboxCapacity = 256;
+
+    /// <summary>Per-tick drain cap for <see cref="_runeInbox" /> -- see <see cref="InboxDrainCapPerTick" />'s own remarks.</summary>
+    private const int RuneInboxDrainCapPerTick = RuneInboxCapacity / 2;
+
+    /// <summary>
+    ///     Bounded capacity for <see cref="_stellarCoreInbox" /> -- also the basis for
+    ///     <see cref="StellarCoreInboxDrainCapPerTick" />.
+    /// </summary>
+    private const int StellarCoreInboxCapacity = 256;
+
+    /// <summary>
+    ///     Per-tick drain cap for <see cref="_stellarCoreInbox" /> -- see <see cref="InboxDrainCapPerTick" />'s own
+    ///     remarks.
+    /// </summary>
+    private const int StellarCoreInboxDrainCapPerTick = StellarCoreInboxCapacity / 2;
+
+    /// <summary>
+    ///     S011CHARACTER_MP -- the mana counterpart of <see cref="CharacterHpStatSort" />
+    ///     (Server/Header/Protocol/STRUCT.h:1526).
+    /// </summary>
+    private const int CharacterMpStatSort = 11;
+
+    /// <summary>
     ///     Op 94/95 (<c>ContinueSkillStat</c>/<c>ContinueSkillUse</c>) auto-buff registration + activation
     ///     mirror. See <see cref="ApplyAutoBuffCommand" />'s remarks for what this stub does/doesn't mirror yet.
     /// </summary>
     private readonly Channel<AutoBuffZoneCommand> _autoBuffInbox =
         Channel.CreateBounded<AutoBuffZoneCommand>(
-            new BoundedChannelOptions(256) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+            new BoundedChannelOptions(AutoBuffInboxCapacity)
+                { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+
+    /// <summary>
+    ///     Reusable scratch buffer for <see cref="ApplyAutoBuffCommand" />'s self-plus-neighbors broadcast
+    ///     recipient list -- see <see cref="_fishingNeighborScratch" />'s own remarks for the reuse
+    ///     justification.
+    /// </summary>
+    private readonly List<int> _autoBuffNeighborScratch = [];
 
     /// <summary>
     ///     Op 97/111 (<c>PlaytimeBuff</c>/<c>RankBuff</c>) self-mutation mirror. See
@@ -42,12 +187,14 @@ public sealed partial class Zone
     /// </summary>
     private readonly Channel<AvatarBuffZoneCommand> _avatarBuffInbox =
         Channel.CreateBounded<AvatarBuffZoneCommand>(
-            new BoundedChannelOptions(256) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+            new BoundedChannelOptions(AvatarBuffInboxCapacity)
+                { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
     /// <summary>Op 129 <c>DrinkBottle</c> self-mutation mirror. See <see cref="ApplyDrinkBottleCommand" />'s remarks.</summary>
     private readonly Channel<DrinkBottleZoneCommand> _bottleInbox =
         Channel.CreateBounded<DrinkBottleZoneCommand>(
-            new BoundedChannelOptions(256) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+            new BoundedChannelOptions(BottleInboxCapacity)
+                { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
     /// <summary>
     ///     Op 90/139 (<c>CostumeState</c>/<c>CostumeVisibility</c>) self-mutation mirror. See
@@ -55,7 +202,8 @@ public sealed partial class Zone
     /// </summary>
     private readonly Channel<CostumeZoneCommand> _costumeInbox =
         Channel.CreateBounded<CostumeZoneCommand>(
-            new BoundedChannelOptions(256) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+            new BoundedChannelOptions(CostumeInboxCapacity)
+                { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
     /// <summary>
     ///     Op 103/104/105 (<c>FishingLine</c>/<c>FishingProgress</c>/<c>FishingCatch</c>) shared state-machine
@@ -63,7 +211,17 @@ public sealed partial class Zone
     /// </summary>
     private readonly Channel<FishingZoneCommand> _fishingInbox =
         Channel.CreateBounded<FishingZoneCommand>(
-            new BoundedChannelOptions(512) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+            new BoundedChannelOptions(FishingInboxCapacity)
+                { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+
+    /// <summary>
+    ///     Reusable scratch buffer for <see cref="ApplyFishingCommand" />'s self-plus-neighbors broadcast
+    ///     recipient list -- same non-allocating shape and reuse justification as
+    ///     <c>Zone.PlayerLifecycle.cs</c>'s own <c>_moveNeighborScratch</c>: single tick thread, cleared before
+    ///     use, consumed entirely by the immediately-following broadcast call before this command's handling
+    ///     returns.
+    /// </summary>
+    private readonly List<int> _fishingNeighborScratch = [];
 
     /// <summary>
     ///     Op 118 <c>HeroRanking</c> throttle-timestamp mirror -- the ranking query itself is read-only and answered
@@ -71,7 +229,8 @@ public sealed partial class Zone
     /// </summary>
     private readonly Channel<HeroRankingQueryZoneCommand> _heroRankingInbox =
         Channel.CreateBounded<HeroRankingQueryZoneCommand>(
-            new BoundedChannelOptions(256) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+            new BoundedChannelOptions(HeroRankingInboxCapacity)
+                { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
     /// <summary>
     ///     Weekly hero-ranking Current-&gt;Previous rollover reset trigger -- posted once per successful flip by
@@ -82,7 +241,19 @@ public sealed partial class Zone
     /// </summary>
     private readonly Channel<HeroRankingRolloverZoneCommand> _heroRankingRolloverInbox =
         Channel.CreateBounded<HeroRankingRolloverZoneCommand>(
-            new BoundedChannelOptions(4) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+            new BoundedChannelOptions(HeroRankingRolloverInboxCapacity)
+                { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+
+    /// <summary>
+    ///     Op22 <c>CZ_USE_HOTKEY_ITEM_SEND</c> self-mutation mirror for <see cref="PlayerRuntimeState.Hotkeys" />
+    ///     -- the posting handler (<c>UseHotkeyItemService</c>) already validated/decremented and persisted the
+    ///     slot to SQL; this only mirrors that decision into the tick-owned <see cref="PlayerRuntimeState" />.
+    ///     See <see cref="ApplyHotkeySlotMirrorCommand" />.
+    /// </summary>
+    private readonly Channel<HotkeySlotMirrorZoneCommand> _hotkeySlotInbox =
+        Channel.CreateBounded<HotkeySlotMirrorZoneCommand>(
+            new BoundedChannelOptions(HotkeySlotInboxCapacity)
+                { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
     /// <summary>
     ///     Op 87/113 (<c>MountState</c>/<c>MountAbsorb</c>) self-mutation mirror. See
@@ -90,7 +261,8 @@ public sealed partial class Zone
     /// </summary>
     private readonly Channel<MountZoneCommand> _mountInbox =
         Channel.CreateBounded<MountZoneCommand>(
-            new BoundedChannelOptions(256) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+            new BoundedChannelOptions(MountInboxCapacity)
+                { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
     /// <summary>
     ///     Fire-and-forget, purely cosmetic PShop-stall mirrors posted by <c>BuyShopItemHandler</c> onto the
@@ -98,7 +270,8 @@ public sealed partial class Zone
     /// </summary>
     private readonly Channel<PshopZoneCommand> _pshopInbox =
         Channel.CreateBounded<PshopZoneCommand>(
-            new BoundedChannelOptions(256) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+            new BoundedChannelOptions(PshopInboxCapacity)
+                { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
     /// <summary>
     ///     Op 157 <c>RuneSocket</c> self-mutation mirror. See <see cref="ApplyRuneSocketCommand" />'s remarks
@@ -106,7 +279,8 @@ public sealed partial class Zone
     /// </summary>
     private readonly Channel<RuneSocketZoneCommand> _runeInbox =
         Channel.CreateBounded<RuneSocketZoneCommand>(
-            new BoundedChannelOptions(256) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+            new BoundedChannelOptions(RuneInboxCapacity)
+                { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
     /// <summary>
     ///     Op 153 <c>StellarCoreState</c> self-mutation mirror, same shape as <see cref="_costumeInbox" />. See
@@ -114,16 +288,43 @@ public sealed partial class Zone
     /// </summary>
     private readonly Channel<StellarCoreZoneCommand> _stellarCoreInbox =
         Channel.CreateBounded<StellarCoreZoneCommand>(
-            new BoundedChannelOptions(256) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+            new BoundedChannelOptions(StellarCoreInboxCapacity)
+                { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
     public bool PostPshopCommand(in PshopZoneCommand command)
     {
         return _pshopInbox.Writer.TryWrite(command);
     }
 
+    /// <summary>Same contract as <see cref="PostInventoryCommandAndWaitAsync" />.</summary>
+    public async Task<bool> PostPshopCommandAndWaitAsync(PshopZoneCommand command, CancellationToken ct,
+        TimeSpan? timeout = null)
+    {
+        var applied = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var withSignal = command with { Applied = applied };
+
+        if (!PostPshopCommand(in withSignal))
+            return false;
+
+        try
+        {
+            await applied.Task.WaitAsync(timeout ?? TimeSpan.FromSeconds(2), ct).ConfigureAwait(false);
+        }
+        catch (TimeoutException)
+        {
+        }
+
+        return true;
+    }
+
     public bool PostDrinkBottleCommand(in DrinkBottleZoneCommand command)
     {
         return _bottleInbox.Writer.TryWrite(command);
+    }
+
+    public bool PostHotkeySlotMirrorCommand(in HotkeySlotMirrorZoneCommand command)
+    {
+        return _hotkeySlotInbox.Writer.TryWrite(command);
     }
 
     public bool PostHeroRankingQueryCommand(in HeroRankingQueryZoneCommand command)
@@ -222,7 +423,10 @@ public sealed partial class Zone
 
     private void DrainDrinkBottleCommands()
     {
-        while (_bottleInbox.Reader.TryRead(out var command))
+        var processed = 0;
+        while (processed < BottleInboxDrainCapPerTick && _bottleInbox.Reader.TryRead(out var command))
+        {
+            processed++;
             try
             {
                 ApplyDrinkBottleCommand(in command);
@@ -234,6 +438,10 @@ public sealed partial class Zone
                     command.CharacterId);
                 command.Applied?.TrySetException(ex);
             }
+        }
+
+        if (processed >= BottleInboxDrainCapPerTick)
+            LogDrainCapEngaged(_bottleInbox.Reader, "drink-bottle", BottleInboxDrainCapPerTick);
     }
 
     private void ApplyDrinkBottleCommand(in DrinkBottleZoneCommand command)
@@ -252,9 +460,70 @@ public sealed partial class Zone
         state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
     }
 
+    private void DrainHotkeySlotMirrorCommands()
+    {
+        var processed = 0;
+        while (processed < HotkeySlotInboxDrainCapPerTick && _hotkeySlotInbox.Reader.TryRead(out var command))
+        {
+            processed++;
+            try
+            {
+                ApplyHotkeySlotMirrorCommand(in command);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Zone {MapId} hotkey-slot mirror command for character {CharacterId} failed",
+                    MapId, command.CharacterId);
+            }
+        }
+
+        if (processed >= HotkeySlotInboxDrainCapPerTick)
+            LogDrainCapEngaged(_hotkeySlotInbox.Reader, "hotkey-slot", HotkeySlotInboxDrainCapPerTick);
+    }
+
+    /// <summary>
+    ///     No-op if the character already left -- a stale mirror for a departed character is harmless.
+    ///     <see cref="HotkeySlotMirrorZoneCommand.NewLife" />/<see cref="HotkeySlotMirrorZoneCommand.NewMana" />
+    ///     (op22 potion-type-1-5 life/mana gain, see <c>HotkeyItemConsumptionResolver</c>) are applied and
+    ///     notified AFTER the slot mirror, matching the legacy handler's own "decrement/ack first, stat effect
+    ///     second" ordering -- the ack itself is already sent by <c>UseHotkeyItemHandler</c> before this command
+    ///     was ever posted.
+    /// </summary>
+    private void ApplyHotkeySlotMirrorCommand(in HotkeySlotMirrorZoneCommand command)
+    {
+        if (!_players.TryGetValue(command.CharacterId, out var state))
+            return;
+
+        state.SetHotkeySlot(command.Page, command.Index, command.NewSlot);
+
+        if (command.LifeGain is null && command.ManaGain is null)
+            return;
+
+        if (command.LifeGain is { } lifeGain)
+        {
+            var maxLife = state.Stats?.MaxLife ?? state.MaxLife;
+            state.Life = Math.Clamp(state.Life + lifeGain, 0, maxLife);
+            state.Session.Send(new AvatarStatUpdateResponse
+                { Sort = CharacterHpStatSort, Value = state.Life, Value2 = 0 });
+        }
+
+        if (command.ManaGain is { } manaGain)
+        {
+            var maxMana = state.Stats?.MaxMana ?? state.MaxMana;
+            state.Mana = Math.Clamp(state.Mana + manaGain, 0, maxMana);
+            state.Session.Send(new AvatarStatUpdateResponse
+                { Sort = CharacterMpStatSort, Value = state.Mana, Value2 = 0 });
+        }
+
+        state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
+    }
+
     private void DrainHeroRankingQueryCommands()
     {
-        while (_heroRankingInbox.Reader.TryRead(out var command))
+        var processed = 0;
+        while (processed < HeroRankingInboxDrainCapPerTick && _heroRankingInbox.Reader.TryRead(out var command))
+        {
+            processed++;
             try
             {
                 ApplyHeroRankingQueryCommand(in command);
@@ -264,6 +533,10 @@ public sealed partial class Zone
                 logger.LogError(ex, "Zone {MapId} hero-ranking query command for character {CharacterId} failed",
                     MapId, command.CharacterId);
             }
+        }
+
+        if (processed >= HeroRankingInboxDrainCapPerTick)
+            LogDrainCapEngaged(_heroRankingInbox.Reader, "hero-ranking-query", HeroRankingInboxDrainCapPerTick);
     }
 
     /// <summary>Same posture as <see cref="ApplyInventoryCommand" />.</summary>
@@ -280,7 +553,11 @@ public sealed partial class Zone
 
     private void DrainHeroRankingRolloverCommands()
     {
-        while (_heroRankingRolloverInbox.Reader.TryRead(out _))
+        var processed = 0;
+        while (processed < HeroRankingRolloverInboxDrainCapPerTick &&
+               _heroRankingRolloverInbox.Reader.TryRead(out _))
+        {
+            processed++;
             try
             {
                 ApplyHeroRankingRolloverReset();
@@ -289,6 +566,11 @@ public sealed partial class Zone
             {
                 logger.LogError(ex, "Zone {MapId} hero-ranking rollover reset failed", MapId);
             }
+        }
+
+        if (processed >= HeroRankingRolloverInboxDrainCapPerTick)
+            LogDrainCapEngaged(_heroRankingRolloverInbox.Reader, "hero-ranking-rollover",
+                HeroRankingRolloverInboxDrainCapPerTick);
     }
 
     /// <summary>
@@ -324,7 +606,10 @@ public sealed partial class Zone
 
     private void DrainFishingCommands()
     {
-        while (_fishingInbox.Reader.TryRead(out var command))
+        var processed = 0;
+        while (processed < FishingInboxDrainCapPerTick && _fishingInbox.Reader.TryRead(out var command))
+        {
+            processed++;
             try
             {
                 ApplyFishingCommand(in command);
@@ -336,6 +621,10 @@ public sealed partial class Zone
                     command.CharacterId);
                 command.Applied?.TrySetException(ex);
             }
+        }
+
+        if (processed >= FishingInboxDrainCapPerTick)
+            LogDrainCapEngaged(_fishingInbox.Reader, "fishing", FishingInboxDrainCapPerTick);
     }
 
     /// <summary>
@@ -363,6 +652,7 @@ public sealed partial class Zone
         if (command.ActionSort is { } sort)
             state.ActionSort = sort;
 
+        var fishingPet = PetActionFieldsOf(state);
         var action = new ActionInfo
         {
             Type = 0,
@@ -372,10 +662,10 @@ public sealed partial class Zone
             TargetLocation = [state.PosX, state.PosY, state.PosZ],
             Front = state.Heading,
             TargetFront = state.Heading,
-            PetLocation = new float[3],
-            PetTargetLocation = new float[3],
-            PetFront = 0,
-            PetSort = 0,
+            PetLocation = fishingPet.PetLocation,
+            PetTargetLocation = fishingPet.PetTargetLocation,
+            PetFront = fishingPet.PetFront,
+            PetSort = fishingPet.PetSort,
             TargetObjectSort = 0,
             TargetObjectIndex = 0,
             TargetObjectUniqueNumber = 0,
@@ -385,15 +675,22 @@ public sealed partial class Zone
             SkillValue = 0
         };
 
+        // Uses _fishingNeighborScratch instead of AoiGrid.Neighbors(...).Where(...).ToList() + Add(...) --
+        // see that field's own remarks. Self is appended at the tail (never excluded outright), preserving
+        // this call site's existing "self included, last" recipient ordering exactly.
         var fisherId = command.CharacterId;
-        var recipients = _grid.Neighbors(state.CurrentCell).Where(id => id != fisherId).ToList();
-        recipients.Add(fisherId);
-        BroadcastAvatarAction(recipients, state, action);
+        _fishingNeighborScratch.Clear();
+        _grid.NeighborsExcludingSelf(_fishingNeighborScratch, state.CurrentCell, fisherId);
+        _fishingNeighborScratch.Add(fisherId);
+        BroadcastAvatarAction(_fishingNeighborScratch, state, action);
     }
 
     private void DrainMountCommands()
     {
-        while (_mountInbox.Reader.TryRead(out var command))
+        var processed = 0;
+        while (processed < MountInboxDrainCapPerTick && _mountInbox.Reader.TryRead(out var command))
+        {
+            processed++;
             try
             {
                 ApplyMountCommand(in command);
@@ -405,6 +702,10 @@ public sealed partial class Zone
                     command.CharacterId);
                 command.Applied?.TrySetException(ex);
             }
+        }
+
+        if (processed >= MountInboxDrainCapPerTick)
+            LogDrainCapEngaged(_mountInbox.Reader, "mount", MountInboxDrainCapPerTick);
     }
 
     /// <summary>
@@ -488,18 +789,51 @@ public sealed partial class Zone
             Value03 = value03
         };
 
-        state.Session.Send(response);
-        foreach (var neighborId in _grid.Neighbors(state.CurrentCell))
+        // Rent-once/write-once/copy-N-times -- same idiom as BroadcastAvatarAction (Zone.PlayerLifecycle.cs):
+        // the frame is encoded exactly once and copied into each recipient's own transport, with a
+        // per-recipient failure isolated (logged, skipped) rather than aborting the rest of this broadcast.
+        var total = FrameWriter.FrameSizeOf<AvatarStateFlagResponse>();
+        var rented = ArrayPool<byte>.Shared.Rent(total);
+
+        try
         {
-            if (neighborId == state.CharacterId) continue;
-            if (_players.TryGetValue(neighborId, out var neighbor))
-                neighbor.Session.Send(response);
+            var span = rented.AsSpan(0, total);
+            FrameWriter.WriteFrame(in response, span);
+
+            SendAvatarStateFlagFrame(state.CharacterId, span);
+            foreach (var neighborId in _grid.Neighbors(state.CurrentCell))
+            {
+                if (neighborId == state.CharacterId) continue;
+                SendAvatarStateFlagFrame(neighborId, span);
+            }
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(rented);
+        }
+    }
+
+    private void SendAvatarStateFlagFrame(int recipientId, ReadOnlySpan<byte> frame)
+    {
+        try
+        {
+            if (_players.TryGetValue(recipientId, out var recipient) &&
+                recipient.Session is ClientSession clientSession)
+                clientSession.SendRaw(frame);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Zone {MapId} avatar-state-flag broadcast to character {RecipientId} failed", MapId,
+                recipientId);
         }
     }
 
     private void DrainCostumeCommands()
     {
-        while (_costumeInbox.Reader.TryRead(out var command))
+        var processed = 0;
+        while (processed < CostumeInboxDrainCapPerTick && _costumeInbox.Reader.TryRead(out var command))
+        {
+            processed++;
             try
             {
                 ApplyCostumeCommand(in command);
@@ -511,6 +845,10 @@ public sealed partial class Zone
                     command.CharacterId);
                 command.Applied?.TrySetException(ex);
             }
+        }
+
+        if (processed >= CostumeInboxDrainCapPerTick)
+            LogDrainCapEngaged(_costumeInbox.Reader, "costume", CostumeInboxDrainCapPerTick);
     }
 
     /// <summary>
@@ -578,7 +916,10 @@ public sealed partial class Zone
 
     private void DrainStellarCoreCommands()
     {
-        while (_stellarCoreInbox.Reader.TryRead(out var command))
+        var processed = 0;
+        while (processed < StellarCoreInboxDrainCapPerTick && _stellarCoreInbox.Reader.TryRead(out var command))
+        {
+            processed++;
             try
             {
                 ApplyStellarCoreCommand(in command);
@@ -590,6 +931,10 @@ public sealed partial class Zone
                     command.CharacterId);
                 command.Applied?.TrySetException(ex);
             }
+        }
+
+        if (processed >= StellarCoreInboxDrainCapPerTick)
+            LogDrainCapEngaged(_stellarCoreInbox.Reader, "stellar-core", StellarCoreInboxDrainCapPerTick);
     }
 
     /// <summary>
@@ -649,7 +994,10 @@ public sealed partial class Zone
 
     private void DrainAvatarBuffCommands()
     {
-        while (_avatarBuffInbox.Reader.TryRead(out var command))
+        var processed = 0;
+        while (processed < AvatarBuffInboxDrainCapPerTick && _avatarBuffInbox.Reader.TryRead(out var command))
+        {
+            processed++;
             try
             {
                 ApplyAvatarBuffCommand(in command);
@@ -661,13 +1009,23 @@ public sealed partial class Zone
                     command.CharacterId);
                 command.Applied?.TrySetException(ex);
             }
+        }
+
+        if (processed >= AvatarBuffInboxDrainCapPerTick)
+            LogDrainCapEngaged(_avatarBuffInbox.Reader, "avatar-buff", AvatarBuffInboxDrainCapPerTick);
     }
 
     /// <summary>
     ///     Op 97/111 (<c>PlaytimeBuff</c>/<c>RankBuff</c>) self-mutation mirror. Both opcodes' own
     ///     AvatarStatUpdateResponse self-unicast is sent directly by the handler (the value is already known
     ///     before the tick mirrors it, same posture as <c>DrinkBottleHandler</c>) -- this only mirrors the
-    ///     already-decided state.
+    ///     already-decided state. <see cref="AvatarBuffZoneCommand.HealToMax" /> is deliberately a request
+    ///     ("heal this character to their current cap"), not a literal life/mana value: the posting handler
+    ///     runs on the session thread and cannot know the character's true <see cref="PlayerRuntimeState.MaxLife" />/
+    ///     <see cref="PlayerRuntimeState.MaxMana" /> at the moment this command is actually drained here on the
+    ///     tick thread (a concurrent buff expiry, gear change, or level-up could have moved the cap in between).
+    ///     Deriving Life/Mana from <c>state.Stats</c>/<c>state.MaxLife</c>/<c>state.MaxMana</c> here, at apply
+    ///     time, closes that stale-cap race -- see the items-skills-fenrir-self-critique finding this fixes.
     /// </summary>
     private void ApplyAvatarBuffCommand(in AvatarBuffZoneCommand command)
     {
@@ -682,15 +1040,10 @@ public sealed partial class Zone
         if (command.RankBuffType is { } rankBuffType)
             state.RankBuffType = rankBuffType;
 
-        if (command.Life is { } life)
+        if (command.HealToMax)
         {
-            state.Life = life;
-            changed = true;
-        }
-
-        if (command.Mana is { } mana)
-        {
-            state.Mana = mana;
+            state.Life = state.Stats?.MaxLife ?? state.MaxLife;
+            state.Mana = state.Stats?.MaxMana ?? state.MaxMana;
             changed = true;
         }
 
@@ -703,7 +1056,10 @@ public sealed partial class Zone
 
     private void DrainRuneSocketCommands()
     {
-        while (_runeInbox.Reader.TryRead(out var command))
+        var processed = 0;
+        while (processed < RuneInboxDrainCapPerTick && _runeInbox.Reader.TryRead(out var command))
+        {
+            processed++;
             try
             {
                 ApplyRuneSocketCommand(in command);
@@ -715,6 +1071,10 @@ public sealed partial class Zone
                     command.CharacterId);
                 command.Applied?.TrySetException(ex);
             }
+        }
+
+        if (processed >= RuneInboxDrainCapPerTick)
+            LogDrainCapEngaged(_runeInbox.Reader, "rune-socket", RuneInboxDrainCapPerTick);
     }
 
     /// <summary>
@@ -739,7 +1099,10 @@ public sealed partial class Zone
 
     private void DrainAutoBuffCommands()
     {
-        while (_autoBuffInbox.Reader.TryRead(out var command))
+        var processed = 0;
+        while (processed < AutoBuffInboxDrainCapPerTick && _autoBuffInbox.Reader.TryRead(out var command))
+        {
+            processed++;
             try
             {
                 ApplyAutoBuffCommand(in command);
@@ -751,17 +1114,30 @@ public sealed partial class Zone
                     command.CharacterId);
                 command.Applied?.TrySetException(ex);
             }
+        }
+
+        if (processed >= AutoBuffInboxDrainCapPerTick)
+            LogDrainCapEngaged(_autoBuffInbox.Reader, "auto-buff", AutoBuffInboxDrainCapPerTick);
     }
 
     /// <summary>
     ///     Op 94/95 (<c>ContinueSkillStat</c>/<c>ContinueSkillUse</c>) mirror. <c>RegisteredSkills</c> (op 94)
-    ///     lands on <see cref="PlayerRuntimeState.AutoBuffSkill" />; <c>ManaAfterActivation</c>/<c>ActionSort</c>
+    ///     lands on <see cref="PlayerRuntimeState.AutoBuffSkill" />; <c>ActivateAutoBuff</c>/<c>ActionSort</c>
     ///     (op 95 <c>tSort==1</c>) mirror <see cref="PlayerRuntimeState.Mana" />/<see cref="PlayerRuntimeState.ActionSort" />
     ///     and, when <see cref="AutoBuffZoneCommand.Broadcast" /> is set, rebroadcast the resulting avatar action
     ///     to self + AOI neighbors -- same self-inclusive <c>Broadcast11</c> posture as <see cref="ApplyFishingCommand" />.
     ///     Op 95 <c>tSort==2</c>'s per-tick buff-application logic (<c>ProcessForCreateEffectValue</c>) is out of
     ///     scope -- see <see cref="Skills.AutoBuffActivationResolver" />'s remarks.
     /// </summary>
+    /// <remarks>
+    ///     <c>ActivateAutoBuff</c> is a request flag, not a literal post-activation mana value: the posting
+    ///     handler's activate/no-reply/disconnect decision (<see cref="AutoBuffActivationResolver.Resolve" />)
+    ///     still runs on the session thread against a snapshot read, but the actual 90%-mana debit is deferred
+    ///     to and recomputed here, on the tick thread, against whatever <c>state.Mana</c> is *at apply time* via
+    ///     <see cref="AutoBuffActivationResolver.ManaAfterActivation" />. This closes the stale-mana race the
+    ///     previous "compute on the session thread, apply verbatim here" shape had -- see the
+    ///     items-skills-fenrir-self-critique finding this fixes.
+    /// </remarks>
     private void ApplyAutoBuffCommand(in AutoBuffZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state))
@@ -770,9 +1146,9 @@ public sealed partial class Zone
         if (command.RegisteredSkills is { } registered)
             state.AutoBuffSkill = registered;
 
-        if (command.ManaAfterActivation is { } mana)
+        if (command.ActivateAutoBuff)
         {
-            state.Mana = mana;
+            state.Mana = AutoBuffActivationResolver.ManaAfterActivation(state.Mana);
             state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
         }
 
@@ -786,6 +1162,7 @@ public sealed partial class Zone
         state.ActionSkillGradeNum1 = 0;
         state.ActionSkillGradeNum2 = 0;
 
+        var autoBuffPet = PetActionFieldsOf(state);
         var action = new ActionInfo
         {
             Type = 0,
@@ -795,10 +1172,10 @@ public sealed partial class Zone
             TargetLocation = [state.PosX, state.PosY, state.PosZ],
             Front = state.Heading,
             TargetFront = state.Heading,
-            PetLocation = new float[3],
-            PetTargetLocation = new float[3],
-            PetFront = 0,
-            PetSort = 0,
+            PetLocation = autoBuffPet.PetLocation,
+            PetTargetLocation = autoBuffPet.PetTargetLocation,
+            PetFront = autoBuffPet.PetFront,
+            PetSort = autoBuffPet.PetSort,
             TargetObjectSort = 0,
             TargetObjectIndex = 0,
             TargetObjectUniqueNumber = 0,
@@ -808,45 +1185,80 @@ public sealed partial class Zone
             SkillValue = 0
         };
 
+        // Uses _autoBuffNeighborScratch instead of AoiGrid.Neighbors(...).Where(...).ToList() + Add(...) --
+        // see _fishingNeighborScratch's own remarks; same self-appended-at-tail ordering preserved.
         var casterId = command.CharacterId;
-        var recipients = _grid.Neighbors(state.CurrentCell).Where(id => id != casterId).ToList();
-        recipients.Add(casterId);
-        BroadcastAvatarAction(recipients, state, action);
+        _autoBuffNeighborScratch.Clear();
+        _grid.NeighborsExcludingSelf(_autoBuffNeighborScratch, state.CurrentCell, casterId);
+        _autoBuffNeighborScratch.Add(casterId);
+        BroadcastAvatarAction(_autoBuffNeighborScratch, state, action);
     }
 
     private void DrainPshopCommands()
     {
-        while (_pshopInbox.Reader.TryRead(out var command))
+        var processed = 0;
+        while (processed < PshopInboxDrainCapPerTick && _pshopInbox.Reader.TryRead(out var command))
+        {
+            processed++;
             try
             {
                 ApplyPshopCommand(in command);
+                command.Applied?.TrySetResult();
             }
             catch (Exception ex)
             {
                 logger.LogError(ex, "Zone {MapId} pshop command for character {CharacterId} failed", MapId,
                     command.CharacterId);
+                command.Applied?.TrySetException(ex);
             }
+        }
+
+        if (processed >= PshopInboxDrainCapPerTick)
+            LogDrainCapEngaged(_pshopInbox.Reader, "pshop", PshopInboxDrainCapPerTick);
     }
 
     /// <summary>
     ///     No-op if the character left, or their stall was already re-opened/re-populated since (a stale mirror is
-    ///     harmless).
+    ///     harmless). Otherwise clears the sold slot unconditionally, then delivers the seller-only
+    ///     notifications the purchase itself never reaches without this hop -- B_BUY_PSHOP_RECV(6) "your item
+    ///     sold", B_DEMAND_PSHOP_RECV(3) self-view listing refresh, and -- if that was the stall's last
+    ///     occupied slot -- B_END_PSHOP_RECV(1) "your stall closed" plus an avatar-action broadcast to nearby
+    ///     players (Server/ts25zone/S04_MyWork02.cpp:7067-7071,7096-7100,7102-7120). The buyer never receives
+    ///     any message sent from here -- see <c>BuyShopItemHandler</c>'s own remarks.
     /// </summary>
     private void ApplyPshopCommand(in PshopZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state) || state.PshopListing is not { } listing)
             return;
 
-        if (command.CloseShop)
-        {
-            state.PshopOpen = false;
-            return;
-        }
-
         var itemInfo = listing.ItemInfo;
         var baseIndex = (command.Page * 5 + command.Slot) * 9;
         for (var k = 0; k < 9; k++)
             itemInfo[baseIndex + k] = 0;
+
+        // B_BUY_PSHOP_RECV(6) "your item just sold" -- seller-only, carries the seller's own source-slot
+        // coordinates and the sold item's value/socket details, already built by BuyShopItemService
+        // (Server/ts25zone/S04_MyWork02.cpp:7070-7071).
+        state.Session.Send(command.SellerSoldNotification);
+
+        // B_DEMAND_PSHOP_RECV(3) self-view listing refresh -- seller-only. listing.ItemInfo is the same
+        // backing array just cleared above, so this already reflects the post-clear state
+        // (Server/ts25zone/S04_MyWork02.cpp:7099-7100).
+        state.Session.Send(new ViewShopStallResponse { Result = 3, PshopInfo = listing });
+
+        if (!command.CloseShop)
+            return;
+
+        // Stall fully emptied by this sale: clear the open flag, notify the seller with B_END_PSHOP_RECV(1),
+        // and broadcast the shop-closed avatar-action cue to nearby players -- seller-only, never the buyer
+        // (Server/ts25zone/S04_MyWork02.cpp:7116-7120).
+        state.PshopOpen = false;
+        state.Session.Send(new CloseShopStallResponse { Result = 1 });
+
+        var characterId = command.CharacterId;
+        SendAvatarAction(state.Session, state);
+        var neighbors = _grid.Neighbors(state.CurrentCell).Where(id => id != characterId).ToArray();
+        BroadcastAvatarAction(neighbors, state);
     }
 }
 
@@ -864,6 +1276,33 @@ public readonly record struct DrinkBottleZoneCommand(
     int? NewItemId = null,
     EffectiveStats? UpdatedStats = null,
     TaskCompletionSource? Applied = null);
+
+/// <summary>
+///     Op22 <c>CZ_USE_HOTKEY_ITEM_SEND</c> hotkey-slot mirror -- see
+///     <see cref="Zone.ApplyHotkeySlotMirrorCommand" />. <paramref name="NewSlot" /> is the full post-decrement
+///     (or post-clear) content, already computed by <c>HotkeyItemConsumptionResolver</c>/<c>UseHotkeyItemService</c>.
+///     <paramref name="NewLife" />/<paramref name="NewMana" /> are the absolute post-gain values (already
+///     clamped by <c>HotkeyItemConsumptionResolver</c>) for potion types 1-5 -- null means "this pool was not
+///     affected by this activation," matching <see cref="DrinkBottleZoneCommand.NewItemId" />'s own
+///     null-means-unchanged convention.
+/// </summary>
+/// <summary>
+///     <see cref="LifeGain" />/<see cref="ManaGain" /> are DELTAS applied against the LIVE
+///     <see cref="PlayerRuntimeState.Life" />/<see cref="PlayerRuntimeState.Mana" /> at apply time
+///     (<see cref="Zone.ApplyHotkeySlotMirrorCommand" />), not precomputed absolute values -- the posting
+///     handler runs on the session thread and cannot see concurrent tick-thread mutations (combat damage,
+///     HP/MP regen, another potion) between its snapshot read and this command's drain, so an absolute
+///     value would silently clobber/revert whatever the tick thread applied in that window. Same
+///     recompute-at-apply-time pattern already used by <see cref="AutoBuffZoneCommand" />/
+///     <see cref="ApplyAutoBuffCommand" /> and <see cref="AvatarBuffZoneCommand" />/<see cref="ApplyAvatarBuffCommand" />.
+/// </summary>
+public readonly record struct HotkeySlotMirrorZoneCommand(
+    int CharacterId,
+    byte Page,
+    byte Index,
+    HotkeySlot NewSlot,
+    int? LifeGain = null,
+    int? ManaGain = null);
 
 /// <summary>
 ///     Op 118 <c>HeroRanking</c> throttle-timestamp mirror -- the ranking query itself is read-only and answered
@@ -976,14 +1415,16 @@ public readonly record struct StellarCoreZoneCommand(
 
 /// <summary>
 ///     Op 97/111 (<c>PlaytimeBuff</c>/<c>RankBuff</c>) self-mutation mirror, same shape as
-///     <see cref="MountZoneCommand" />.
+///     <see cref="MountZoneCommand" />. <see cref="HealToMax" /> is a request ("heal to whatever the current
+///     cap is"), not a literal Life/Mana value -- see <see cref="Zone.ApplyAvatarBuffCommand" />'s remarks for
+///     why the derivation must happen on the tick thread, at apply time, rather than on the posting session
+///     thread.
 /// </summary>
 public readonly record struct AvatarBuffZoneCommand(
     int CharacterId,
     int? StateTimeEffect = null,
     int? RankBuffType = null,
-    int? Life = null,
-    int? Mana = null,
+    bool HealToMax = false,
     EffectiveStats? UpdatedStats = null,
     TaskCompletionSource? Applied = null);
 
@@ -999,11 +1440,16 @@ public readonly record struct RuneSocketZoneCommand(
     EffectiveStats? UpdatedStats,
     TaskCompletionSource? Applied = null);
 
-/// <summary>Op 94/95 (<c>ContinueSkillStat</c>/<c>ContinueSkillUse</c>) auto-buff registration + activation mirror.</summary>
+/// <summary>
+///     Op 94/95 (<c>ContinueSkillStat</c>/<c>ContinueSkillUse</c>) auto-buff registration + activation mirror.
+///     <see cref="ActivateAutoBuff" /> is a request flag, not a precomputed post-activation mana value -- see
+///     <see cref="Zone.ApplyAutoBuffCommand" />'s remarks for why the mana debit must be recomputed on the
+///     tick thread, at apply time, rather than on the posting session thread.
+/// </summary>
 public readonly record struct AutoBuffZoneCommand(
     int CharacterId,
     ImmutableArray<(int SkillId, int Grade)>? RegisteredSkills = null,
-    int? ManaAfterActivation = null,
+    bool ActivateAutoBuff = false,
     int? ActionSort = null,
     bool Broadcast = false,
     TaskCompletionSource? Applied = null);

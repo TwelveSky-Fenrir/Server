@@ -2,6 +2,7 @@ using System.Collections.Frozen;
 using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Guilds;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Services.ZoneLifecycle;
 using Fenrir.Application.Game.Tests.TestSupport;
@@ -37,7 +38,9 @@ public class ZoneMoveServiceSpawnPointTests
 
         var worldState = ZoneTestKit.CreateWorldState();
         var service = new ZoneMoveService(zones, worldData, new GuildRankingCache(), worldState,
-            new FakeGameServerDirectoryRepository(), new FakeShardMapAssignmentRepository(new Dictionary<byte, short[]>()),
+            TribeGuardCorridorCatalog.Empty, new TribeGuardCorridorState(),
+            new FakeGameServerDirectoryRepository(),
+            new FakeShardMapAssignmentRepository(new Dictionary<byte, short[]>()),
             new FakeSessionTicketRepository(),
             Options.Create(new GameServerOptions()), NullLogger<ZoneMoveService>.Instance);
 
@@ -86,7 +89,7 @@ public class ZoneMoveServiceSpawnPointTests
         var targetDefinition = new ZoneDefinition(
             new ZoneRowDto(TargetMapId, 55f, 5f, 66f),
             [],
-            [new ZoneSpawnPointRowDto(TargetMapId, 0, (short)(SourceMapId + 1), 111f, 22f, 333f)],
+            [new ZoneSpawnPointRowDto(TargetMapId, 0, SourceMapId + 1, 111f, 22f, 333f)],
             [],
             []);
         var (service, session, sourceZone, targetZone) = CreateService(targetDefinition);

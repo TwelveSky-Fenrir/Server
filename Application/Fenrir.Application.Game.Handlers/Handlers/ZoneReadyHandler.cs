@@ -21,7 +21,6 @@ namespace Fenrir.Application.Game.Handlers.Handlers;
 ///     it activates the moment anything re-admits op13 later in a session's life, exactly like legacy's own
 ///     zone-transfer resend. Same "real but not yet reachable" posture as several other guards in
 ///     <see cref="PlayerRuntimeState" /> (e.g. MissionJoinWar).
-///
 ///     This handler never sends any response packet, on any branch -- matching Server/ts25zone/
 ///     S04_MyWork02.cpp:1213-1291, where CLIENT_OK_FOR_ZONE_SEND has no outbound send anywhere in its body.
 ///     In particular, the avatar snapshot (EnterWorldResponse) and world/tribe broadcast

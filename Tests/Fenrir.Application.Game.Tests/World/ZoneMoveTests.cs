@@ -19,7 +19,12 @@ public class ZoneMoveTests
         return new ActionInfo
         {
             Type = 0,
-            Sort = 0,
+            // Sort 2 ("plain movement"), NOT 0 -- Sort 0 is RestActionSort, and an accepted Sort-0 action now
+            // legitimately triggers Zone.PlayerLifecycle.cs's ApplyRestActionProtectionAndHeal (legacy-parity
+            // "rest"/stand-up side effect: an unconditional HP heal + a self-only AvatarStatUpdateResponse),
+            // which would make this suite's "self excluded from a plain move" assertions fail for the wrong
+            // reason. Sort 2 is legal for every Type (CharacterMotionWhitelist) and carries no such side effect.
+            Sort = 2,
             Frame = 0,
             Location = [x, 0f, z],
             TargetLocation = [x, 0f, z],

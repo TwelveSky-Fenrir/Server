@@ -1,10 +1,10 @@
 CREATE PROCEDURE world.usp_NpcSpeech_GetAll
-    AS
+AS
 BEGIN
     SET
-NOCOUNT ON;
+        NOCOUNT ON;
 
-SELECT NpcId, SpeechGroup, SpeechIndex, Text
-FROM world.NpcSpeeches
-ORDER BY NpcId, SpeechGroup, SpeechIndex;
+    SELECT NpcId, SpeechGroup, SpeechIndex, Text
+    FROM world.NpcSpeeches
+    ORDER BY NpcId, SpeechGroup, SpeechIndex;
 END;

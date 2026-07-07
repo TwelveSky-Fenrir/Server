@@ -39,10 +39,17 @@ namespace Fenrir.Application.Game.Domain.Movement;
 ///     <para>
 ///         Out of scope for this table: the other side effects the legacy op16 handler performs alongside
 ///         this Sort/Type gate (AFK-tick reset for Sort 11, the fishing "catching" flag clear for Sort
-///         94/95, "create effect value" processing for Sort 1, the post-acceptance skill-grade anti-hack
-///         check, and party-buff-state transitions for a subset of skill numbers, :1801-1920 generally) are
-///         not reimplemented here and are tracked separately -- this class reproduces only the Sort/Type
-///         legality boundary itself, which is what the character-motion-whitelist-reverify finding is about.
+///         94/95, the post-acceptance skill-grade anti-hack check, and party-buff-state transitions for a
+///         subset of skill numbers, :1801-1920 generally) are not reimplemented here and are tracked
+///         separately -- this class reproduces only the Sort/Type legality boundary itself, which is what
+///         the character-motion-whitelist-reverify finding is about.
+///     </para>
+///     <para>
+///         "Create effect value" processing for Sort 1 (:1818, <c>ProcessForCreateEffectValue</c>) IS now
+///         reimplemented -- per the skill-casting-cooldown-mechanics behavior contract, it lives in
+///         <c>Zone.PlayerLifecycle</c>'s <c>ApplySkillEffectConfirm</c>, called from <c>HandleMove</c> when
+///         this table accepts an op16 action whose Sort equals 1, not here: this table's own responsibility
+///         stays limited to the Sort/Type legality boundary.
 ///     </para>
 /// </remarks>
 public static class AvatarActionResumeWhitelist

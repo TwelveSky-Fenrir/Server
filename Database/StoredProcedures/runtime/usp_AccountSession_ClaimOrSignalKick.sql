@@ -9,47 +9,50 @@
 -- Outcome: 0 = Registered (no prior row), 1 = ConflictLogin (stale Login row cleared, caller evicts any
 -- local socket), 2 = ConflictGameKicked (live Game row flagged, PreviousShardId tells the caller which shard
 -- owns it), 3 = ConflictTearingDown (row mid-teardown, no change made).
-CREATE PROCEDURE runtime.usp_AccountSession_ClaimOrSignalKick @AccountId       INT,
-    @NewSessionToken UNIQUEIDENTIFIER
-WITH NATIVE_COMPILATION, SCHEMABINDING
+CREATE PROCEDURE runtime.usp_AccountSession_ClaimOrSignalKick @AccountId INT,
+                                                              @NewSessionToken UNIQUEIDENTIFIER
+    WITH NATIVE_COMPILATION , SCHEMABINDING
 AS
-BEGIN ATOMIC
-WITH (TRANSACTION ISOLATION LEVEL = SNAPSHOT, LANGUAGE = N'us_english')
+BEGIN
+    ATOMIC
+    WITH (TRANSACTION ISOLATION LEVEL = SNAPSHOT, LANGUAGE = N'us_english')
     DECLARE
-@ServerKind TINYINT, @ShardId TINYINT, @SessionState TINYINT;
+        @ServerKind TINYINT, @ShardId TINYINT, @SessionState TINYINT;
 
-SELECT @ServerKind = ServerKind, @ShardId = ShardId, @SessionState = SessionState
-FROM runtime.AccountSessions
-WHERE AccountId = @AccountId;
+    SELECT @ServerKind = ServerKind, @ShardId = ShardId, @SessionState = SessionState
+    FROM runtime.AccountSessions
+    WHERE AccountId = @AccountId;
 
-IF
-@ServerKind IS NULL
-BEGIN
-INSERT INTO runtime.AccountSessions
-(AccountId, ServerKind, ShardId, SessionToken, SessionState, KickRequested, ConnectedAtUtc,
- LastRefreshedUtc)
-VALUES (@AccountId, 0, NULL, @NewSessionToken, 0, 0, SYSUTCDATETIME(), SYSUTCDATETIME());
+    IF
+        @ServerKind IS NULL
+        BEGIN
+            INSERT INTO runtime.AccountSessions
+            (AccountId, ServerKind, ShardId, SessionToken, SessionState, KickRequested, ConnectedAtUtc,
+             LastRefreshedUtc)
+            VALUES (@AccountId, 0, NULL, @NewSessionToken, 0, 0, SYSUTCDATETIME(), SYSUTCDATETIME());
 
-SELECT CAST(0 AS TINYINT) AS Outcome, CAST(NULL AS TINYINT) AS PreviousShardId;
-END
-ELSE IF @SessionState = 1
-BEGIN
-SELECT CAST(3 AS TINYINT) AS Outcome, CAST(NULL AS TINYINT) AS PreviousShardId;
-END
-ELSE IF @ServerKind = 0
-BEGIN
-DELETE
-FROM runtime.AccountSessions
-WHERE AccountId = @AccountId;
+            SELECT CAST(0 AS TINYINT) AS Outcome, CAST(NULL AS TINYINT) AS PreviousShardId;
+        END
+    ELSE
+        IF @SessionState = 1
+            BEGIN
+                SELECT CAST(3 AS TINYINT) AS Outcome, CAST(NULL AS TINYINT) AS PreviousShardId;
+            END
+        ELSE
+            IF @ServerKind = 0
+                BEGIN
+                    DELETE
+                    FROM runtime.AccountSessions
+                    WHERE AccountId = @AccountId;
 
-SELECT CAST(1 AS TINYINT) AS Outcome, CAST(NULL AS TINYINT) AS PreviousShardId;
-END
-ELSE
-BEGIN
-UPDATE runtime.AccountSessions
-SET KickRequested = 1
-WHERE AccountId = @AccountId;
+                    SELECT CAST(1 AS TINYINT) AS Outcome, CAST(NULL AS TINYINT) AS PreviousShardId;
+                END
+            ELSE
+                BEGIN
+                    UPDATE runtime.AccountSessions
+                    SET KickRequested = 1
+                    WHERE AccountId = @AccountId;
 
-SELECT CAST(2 AS TINYINT) AS Outcome, @ShardId AS PreviousShardId;
-END
+                    SELECT CAST(2 AS TINYINT) AS Outcome, @ShardId AS PreviousShardId;
+                END
 END;

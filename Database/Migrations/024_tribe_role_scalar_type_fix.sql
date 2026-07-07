@@ -26,12 +26,12 @@ BEGIN
     SET NOCOUNT ON;
 
     SELECT TribeRole =
-           CAST(
-               CASE
-                   WHEN master.TribeId IS NOT NULL THEN 1
-                   WHEN sub.CharacterId IS NOT NULL THEN 2
-                   ELSE 0
-                   END AS TINYINT)
+               CAST(
+                   CASE
+                       WHEN master.TribeId IS NOT NULL THEN 1
+                       WHEN sub.CharacterId IS NOT NULL THEN 2
+                       ELSE 0
+                       END AS TINYINT)
     FROM game.Characters AS c
              LEFT JOIN game.Tribes AS master
                        ON master.TribeId = c.Tribe AND master.MasterCharacterId = c.CharacterId

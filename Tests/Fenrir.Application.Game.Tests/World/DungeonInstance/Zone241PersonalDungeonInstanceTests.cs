@@ -258,8 +258,10 @@ public class Zone241PersonalDungeonInstanceTests
         boss.AiState = MonsterAiState.Decision;
         zone.SpawnMonster(boss);
 
-        zone.Tick(SimulationClock.LegacyTick); // 1st AI pass -- 1-second detection throttle blocks the very first check (S07_MyGame05.cpp:127-131)
-        zone.Tick(SimulationClock.LegacyTick); // 2nd AI pass -- throttle elapsed; only the tagged owner is an eligible target
+        zone.Tick(SimulationClock
+            .LegacyTick); // 1st AI pass -- 1-second detection throttle blocks the very first check (S07_MyGame05.cpp:127-131)
+        zone.Tick(SimulationClock
+            .LegacyTick); // 2nd AI pass -- throttle elapsed; only the tagged owner is an eligible target
 
         Assert.Equal(ownerId, boss.TargetCharacterId);
         Assert.NotEqual(bystanderId, boss.TargetCharacterId);

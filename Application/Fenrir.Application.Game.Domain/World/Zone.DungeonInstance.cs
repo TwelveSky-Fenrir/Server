@@ -211,9 +211,15 @@ public sealed partial class Zone
     /// <summary>
     ///     Trigger 3: <c>MyGame::Logic()</c>'s once-per-tick <c>Process_Zone_241_TYPE()</c> call
     ///     (S07_MyGame01.cpp:3020), restricted to the states/transitions this pass models -- see class remarks.
-    ///     Called once per <see cref="Tick" /> only while <see cref="IsZone241TypeZone" />.
+    ///     Called from <see cref="Tick" /> only while <see cref="IsZone241TypeZone" /> AND at least one legacy
+    ///     (500 ms) tick elapsed this frame -- <paramref name="legacyTicksElapsed" /> is how many, so a
+    ///     stalled host's multi-tick catch-up still advances <see cref="PlayerRuntimeState.DungeonInstanceTick" />
+    ///     by the correct amount rather than by a flat 1 per physical 20 Hz frame (see
+    ///     fenrir-tick-loop-self-critique's dungeon-instance-cadence finding: the previous ungated,
+    ///     always-+1 version fired <see cref="PersonalDungeonBattleBroadcastCadenceTicks" />'s 20-tick
+    ///     status broadcast ~10x too often, once per second instead of once per ~10 s).
     /// </summary>
-    public void AdvanceZone241PersonalDungeonInstances()
+    public void AdvanceZone241PersonalDungeonInstances(int legacyTicksElapsed)
     {
         if (!IsZone241TypeZone)
             return;
@@ -223,7 +229,7 @@ public sealed partial class Zone
             if (state.DungeonInstanceLifecycleState == DungeonInstanceLifecycle.Idle)
                 continue;
 
-            state.DungeonInstanceTick++;
+            state.DungeonInstanceTick += legacyTicksElapsed;
 
             if (state.DungeonInstanceLifecycleState != DungeonInstanceLifecycle.BattleInProgress)
                 continue;

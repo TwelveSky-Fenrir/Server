@@ -9,7 +9,12 @@ namespace Fenrir.Application.Game.Services.Gm;
 /// <summary>
 ///     See <see cref="IGmBlockAvatarService" />'s own remarks for the full behavior contract. Citations:
 ///     Server/ts25zone/S04_MyWork04.cpp:1487-1515 (gate, target lookup, ban dispatch, target disconnect, the
-///     return-vs-break control-flow divergence versus sibling case 518 KICK) ;
+///     return-vs-break control-flow divergence versus sibling case 518 KICK) ; :2121-2122 (shared
+///     PROCESS_DATA_SEND/RECV reply step reached only by sub-commands that fall through, which sends this on
+///     opcode 23 -- legacy has no command-specific reply message for GM-BLOCK) ;
+///     Server/Header/Protocol/ZONE.h:462-468, :1437-1438 (the opcode-23 ZC_PROCESS_DATA_RECV shape:
+///     Result+Sort+Data+RuneValue) ; Server/Header/Protocol/DEFINE.h:377-381 (Data is 130 bytes under the
+///     production build, giving 143 bytes total header included) ;
 ///     Server/ts25zone/S07_MyGame03.cpp:4422-4451 (SearchAvatar: process-local, ready-state-only, first-match,
 ///     excludes the caller's own index by default) ; Server/Header/datetime.h:195-218 (ReturnAddDate: "today
 ///     plus 365*30 days," a concrete far-future date, never a null/forever sentinel).
@@ -20,6 +25,18 @@ public sealed class GmBlockAvatarService(
     ILogger<GmBlockAvatarService> logger) : IGmBlockAvatarService
 {
     private const int ResultTargetNotFound = 1; // legacy tResult's own default-initialized value (S04_MyWork04.cpp:305)
+
+    // Legacy PROCESS_DATA_SEND sub-command selector for [GM]-BLOCK (S04_MyWork04.cpp:1487) -- echoed back
+    // verbatim as GenericActionResponse.Sort on the "not found" reply, exactly like every sibling sub-command
+    // that falls through to the shared epilogue.
+    private const int GmBlockSort = 519;
+
+    // Legacy echoes back the same 130-byte opaque tData buffer it received (S04_MyWork04.cpp:2121-2122).
+    // GmBlockAvatarRequest is Fenrir's own compact dedicated shape (AvatarName only), not the generic
+    // envelope, so there is no original opaque payload here to echo -- a zero-filled buffer is sent instead.
+    // The client does not derive anything from Data's content on this failure path; only the total wire size
+    // (143 bytes) has to match what an unmodified client's dispatch table expects at opcode 23.
+    private static readonly byte[] EmptyGenericActionData = new byte[130];
 
     // Legacy: ReturnAddDate(0, 365*30) -- "today plus 10,950 days," a concrete future date, not NULL/forever
     // (Database/Tables/admin/Bans.sql's own null-vs-concrete-date convention).
@@ -47,7 +64,12 @@ public sealed class GmBlockAvatarService(
         var found = zones.TryGetPlayerAndZoneByName(packet.AvatarName, out var target, out _);
         if (!found || target!.CharacterId == callerCharacterId)
         {
-            zoneSession.Send(new GmBlockAvatarResponse { Result = ResultTargetNotFound });
+            // Legacy's real reply shape for this outcome: the shared opcode-23 PROCESS_DATA_RECV envelope,
+            // never a command-specific message (S04_MyWork04.cpp:2121-2122).
+            zoneSession.Send(new GenericActionResponse
+            {
+                Result = ResultTargetNotFound, Sort = GmBlockSort, Data = EmptyGenericActionData, RuneValue = 0
+            });
             return;
         }
 

@@ -102,6 +102,28 @@ public static class CashCatalogBuilder
     }
 
     /// <summary>
+    ///     Fenrir-chosen "cash shop administratively open" sentinel slot (ItemMallProductId=100002/ProductType=5),
+    ///     mirroring <see cref="ResolveVersion" />/<see cref="ResolveCrc" />'s existing 100000/100001 convention.
+    ///     Mirrors legacy's <c>CASH_INFO.mIsSellCash</c> flag (Server/Header/Protocol/STRUCT.h:1435-1446), read
+    ///     by <c>ts25zone</c> at purchase time but only ever written by the separate <c>ts25extra</c> process in
+    ///     legacy; Fenrir has no second writer process, so this table row is the closest equivalent live,
+    ///     administratively-settable source. The behavior contract this ports gives no literal row number for
+    ///     this flag (deriving/maintaining the live value is explicitly out of that contract's scope), so this
+    ///     specific slot is a Fenrir-side design choice, not a verified legacy literal. No seed row reserves
+    ///     this slot yet in world.ItemMallProducts, so this always resolves to <c>true</c> (shop open) today --
+    ///     a deliberately backward-compatible default matching Fenrir's pre-existing always-open behavior, not
+    ///     a parity regression a client could observe.
+    /// </summary>
+    public static bool ResolveSellEnabled(IEnumerable<ItemMallProductRowDto> products)
+    {
+        foreach (var product in products)
+            if (product.ItemMallProductId == 100002 && product.ProductType == 5)
+                return product.IsActive;
+
+        return true;
+    }
+
+    /// <summary>
     ///     <see cref="ItemMallProductId" /> is a Fenrir-only addition for game.CashLog's audit trail -- never sent on the
     ///     wire.
     /// </summary>

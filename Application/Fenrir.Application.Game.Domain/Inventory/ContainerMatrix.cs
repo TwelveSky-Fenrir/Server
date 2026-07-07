@@ -20,7 +20,15 @@ public static class ContainerMatrix
         SourceOutOfRange,
         DestinationOutOfRange,
         SourceEmpty,
-        InsufficientQuantity
+        InsufficientQuantity,
+
+        /// <summary>
+        ///     Destination already holds a different (or non-stackable) item -- the legacy
+        ///     ProcessForInventoryToEquip/ProcessForEquipToInventory/ProcessForInventoryToInventory family rejects
+        ///     this outright for all 3 directions (208/210/213); there is no swap-with-occupant concept anywhere in
+        ///     that family. See <see cref="ResolveMove" />'s own remarks.
+        /// </summary>
+        DestinationOccupied
     }
 
     public const byte InventoryPage0 = 0;
@@ -146,8 +154,15 @@ public static class ContainerMatrix
 
     /// <summary>
     ///     Move into an empty destination (splitting the source stack if requestedQuantity is less than the
-    ///     full stack), merge into a destination holding the same stackable item, or swap the two whole stacks
-    ///     otherwise (a documented, not independently source-verified, modeling choice).
+    ///     full stack), merge into a destination holding the same stackable item, or reject outright when the
+    ///     destination is occupied by anything else (a different item id, or the same id but not stackable).
+    ///     There is no swap-with-occupant fallback: legacy's ProcessForInventoryToEquip/ProcessForEquipToInventory/
+    ///     ProcessForInventoryToInventory family (tSort 210/213/208) rejects an occupied, non-mergeable destination
+    ///     unconditionally for all 3 directions -- confirmed identically at
+    ///     Server/ts25zone/S04_MyWork05.cpp:1589-1594 (unequip), :875-880 (inventory-to-inventory default case),
+    ///     :1282-1287 (equip). A prior revision of this method swapped the two stacks instead; that was a
+    ///     source-verified-wrong divergence (it let an unvalidated item land directly in Equipment via the
+    ///     unequip/213 direction, bypassing EquipItemValidationGate entirely) and has been corrected to match.
     /// </summary>
     /// <param name="requestedQuantity">&lt;= 0 means "move the whole source stack".</param>
     public static MoveOutcomeResult ResolveMove(
@@ -180,14 +195,20 @@ public static class ContainerMatrix
             return new MoveOutcomeResult(MoveOutcome.Success, newSource, moved);
         }
 
-        if (!sourceIsStackable || dst.ItemId != src.ItemId)
-            return new MoveOutcomeResult(MoveOutcome.Success, destination, source);
-        {
-            var merged = dst with { Quantity = dst.Quantity + quantity };
-            var remaining = src.Quantity - quantity;
-            ItemStack? newSource = remaining > 0 ? src with { Quantity = remaining } : null;
-            return new MoveOutcomeResult(MoveOutcome.Success, newSource, merged);
-        }
+        // A merge that would exceed the 999 stack cap (Migrations/034_character_items_quantity_upper_bound.sql's
+        // CK_CharacterItems_Quantity CHECK constraint) is rejected the same clean way as an incompatible
+        // destination, rather than left to surface as an unhandled SqlException 547 out of the persistence
+        // call site -- same MaxStackQuantity ceiling every sibling transfer policy in this namespace
+        // (GroundItemPickupPolicy, StoreItemTransferPolicy, SaveBankItemTransferPolicy, PshopPurchasePolicy,
+        // NpcShopPolicy) already enforces.
+        if (!sourceIsStackable || dst.ItemId != src.ItemId ||
+            dst.Quantity + quantity > GroundItemPickupPolicy.MaxStackQuantity)
+            return new MoveOutcomeResult(MoveOutcome.DestinationOccupied, source, destination);
+
+        var merged = dst with { Quantity = dst.Quantity + quantity };
+        var remainingAfterMerge = src.Quantity - quantity;
+        ItemStack? newSourceAfterMerge = remainingAfterMerge > 0 ? src with { Quantity = remainingAfterMerge } : null;
+        return new MoveOutcomeResult(MoveOutcome.Success, newSourceAfterMerge, merged);
     }
 
     /// <summary>Projects a move onto the current container contents, producing the new full content of each side.</summary>

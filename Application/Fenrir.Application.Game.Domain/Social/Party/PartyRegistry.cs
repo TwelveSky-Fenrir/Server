@@ -84,6 +84,22 @@ public sealed class Party
 /// <remarks>
 ///     Alliance is not modeled: the legacy tribe gate also checks ReturnAllianceTribe, but with no alliance
 ///     state machine this collapses to a plain same-tribe check, strictly more restrictive than the real rule.
+///     <para>
+///         CROSS-SHARD SCOPE (Fenrir architecture note, not a legacy citation -- flagged by the
+///         center-world-authority "process-wide-singleton-not-cross-shard-synced" review, 2026-07): "process-wide"
+///         above means one instance per running <c>GameServer</c> PROCESS (<c>AddSingleton</c>), not one per
+///         cluster. The legacy's single <c>ts25center</c> hub relayed every party mutation to every connected
+///         zone process (<c>ZONE_BROADCAST_FOR_RELAY_SEND</c>, <c>Server/ts25center/S04_MyWork02.cpp:1317-1605</c>),
+///         so a party split across two zone processes was always visible identically from either side. Fenrir's
+///         map-based sharding means two party members can be handled by two different running processes with no
+///         equivalent relay: an invite/answer/leave/kick/disband mutates only the registry instance in the
+///         process that received the packet, and nothing propagates that mutation to any other process's copy --
+///         no error, no signal to the caller that a fuller view might exist elsewhere. The only place this gap is
+///         currently compensated is party-NAME resolution (<see cref="PartyIdentityResolver" />'s own documented
+///         "leader on a different zone shard" fallback, reporting the requester's own name instead of crashing or
+///         silently corrupting state); full membership/negotiation state has no such fallback and remains an
+///         open, unaddressed cross-shard gap, not a verified-safe design.
+///     </para>
 /// </remarks>
 public sealed class PartyRegistry
 {
@@ -136,9 +152,19 @@ public sealed class PartyRegistry
         }
     }
 
-    private bool IsNegotiating(int characterId)
+    /// <summary>
+    ///     Party-family half of the legacy <c>CheckCommunityWork</c> exclusivity check -- pending negotiation
+    ///     only, deliberately NOT the same as <see cref="IsInParty" /> (already belonging to a party is not one
+    ///     of the seven exclusivity flags). Public so sibling negotiation families (e.g. Guild ask, see
+    ///     <c>GuildInviteService</c>) can compose a cross-family busy check without duplicating this registry's
+    ///     own state.
+    /// </summary>
+    public bool IsNegotiating(int characterId)
     {
-        return _pendingByInviter.ContainsKey(characterId) || _pendingByInvitee.ContainsKey(characterId);
+        lock (_lock)
+        {
+            return _pendingByInviter.ContainsKey(characterId) || _pendingByInvitee.ContainsKey(characterId);
+        }
     }
 
     /// <summary>

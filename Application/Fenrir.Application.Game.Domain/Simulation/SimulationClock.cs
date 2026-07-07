@@ -9,10 +9,40 @@ namespace Fenrir.Application.Game.Domain.Simulation;
 ///     Anti-x10 warning: a legacy tick is 500 ms, not 50 ms, and is 10x the network frame period. Never
 ///     convert a legacy tick count by multiplying with the network frame period -- always go through
 ///     <see cref="ToTimeSpan" /> / <see cref="ToWholeLegacyTicks" />.
+///     <para>
+///         Legacy trivia: the shipped <c>TimeLogic=500</c> is actually armed/consumed as 499 ms at
+///         runtime, due to a bootstrap-time -1 adjustment the legacy applies once and never revisits. See
+///         <see cref="LegacyTickMilliseconds" />'s own remarks for the full citation and why Fenrir
+///         intentionally keeps a flat 500 rather than reproducing it.
+///     </para>
 /// </remarks>
 public static class SimulationClock
 {
     /// <summary>One legacy simulation tick: 500 ms (TimeLogic=500, ServerInfo.ini line 143).</summary>
+    /// <remarks>
+    ///     The legacy zone never actually runs on this literal ini value. <c>SetTimeLogic</c>
+    ///     (<c>Server/Header/socket.h:3-14</c>) decrements the loaded <c>TimeLogic</c> by 1 (floored at 1)
+    ///     and writes the decremented value back in place (<c>socket.h:8</c>) before both arming the
+    ///     Win32 <c>SetTimer</c> callback and computing the <c>dTime</c> fed into <c>mGAME.Logic()</c>
+    ///     (<c>Server/ts25zone/S02_MyServer.cpp:348-354,412-420</c>). So the shipped
+    ///     <c>TimeLogic=500</c> (<c>Server/BuildEU33/ServerInfo.ini:143</c>) is actually armed and consumed
+    ///     as 499 ms, not 500 ms, for the rest of that process's life.
+    ///     <para>
+    ///         Fenrir deliberately keeps this constant at a flat 500, not 499. The cited material never
+    ///         establishes a gameplay rationale for the -1 -- it reads as an artifact of arming a Win32
+    ///         <c>SetTimer</c> callback from the legacy's single-threaded main-window loop, not a
+    ///         deliberate tuning choice -- and <c>Zone.RunAsync</c> has no equivalent step to reproduce it
+    ///         against: Fenrir never arms a fixed-period OS timer for the logic tick at all, it measures
+    ///         real elapsed wall-clock time via <c>Stopwatch</c> on a <c>PeriodicTimer</c> and feeds that
+    ///         measured value into <see cref="SimulationTickAccumulator" />. The resulting ~0.2% cadence
+    ///         difference (499 ms vs 500 ms) is functionally negligible for every gameplay timer derived
+    ///         from this constant -- switching it to 499 would also silently rescale every other constant
+    ///         in this file whose doc comment states its real-world duration assuming a flat 500 ms (e.g.
+    ///         <see cref="PlayTimeAccrualLegacyTicks" />'s "full real minute"), for no verified behavioral
+    ///         benefit. This is a deliberate, recorded decision, not an oversight -- revisit only if a
+    ///         specific system is found to need byte-exact parity with the legacy's 499 ms constant.
+    ///     </para>
+    /// </remarks>
     public const int LegacyTickMilliseconds = 500;
 
     /// <summary>Monster respawn-scan cadence: every 20 legacy ticks (~10 s). Consumed by MonsterSpawnScheduler.</summary>
@@ -30,6 +60,21 @@ public static class SimulationClock
     public const int PetActivityDecayLegacyTicks = 60;
 
     /// <summary>
+    ///     Post-chase-loss idle in-place re-detection grace period (<c>mCheckFirstLocationTime</c>,
+    ///     <c>S07_MyGame05.cpp:1012</c>): a monster idling with no re-acquired target only starts heading home
+    ///     after this many continuous legacy ticks (60 s at TimeLogic=500ms) with zero engagement -- not the
+    ///     instant it gives up its chase target. Consumed by MonsterAiSystem.
+    /// </summary>
+    public const int MonsterIdleReturnHomeLegacyTicks = 120;
+
+    /// <summary>
+    ///     Idle random-short-wander fallback cadence (<c>mCheckLastWalkTime</c>, <c>S07_MyGame05.cpp:1033</c>),
+    ///     only reached on a given idle tick when <see cref="MonsterIdleReturnHomeLegacyTicks" /> has not itself
+    ///     just fired (40 s at TimeLogic=500ms). Consumed by MonsterAiSystem.
+    /// </summary>
+    public const int MonsterIdleWanderLegacyTicks = 80;
+
+    /// <summary>
     ///     Play-time accrual cadence (<c>S07_MyGame04.cpp:887-911</c>'s strict
     ///     <c>(mGAME.mTickCount - user-&gt;mTickCountFor01Minute) == 120</c> gate): a full real minute is 120
     ///     legacy ticks at TimeLogic=500ms (<c>ServerInfo.ini:143</c>). Consumed by PlayTimeAccrualSystem.
@@ -41,6 +86,15 @@ public static class SimulationClock
     ///     the legacy -- <c>S07_MyGame04.cpp:378-380,438-459</c>). Consumed by StunCountdownSystem.
     /// </summary>
     public const int StunCountdownLegacyTicks = 2;
+
+    /// <summary>
+    ///     Passive sit/meditate HP+MP regen cadence: fires once every 2 legacy ticks (~1 s), the exact same
+    ///     shared <c>mTickCountFor01Second == 2</c> strict-equality gate as <see cref="StunCountdownLegacyTicks" />
+    ///     (<c>S07_MyGame04.cpp:378-380</c>, regen block at <c>:461-519</c>, shared scope's closing brace at
+    ///     <c>:825</c>). Consumed by MeditationRegenSystem -- without this gate the full ~1-second regen amount
+    ///     would apply every 500 ms legacy tick instead, twice the legacy rate.
+    /// </summary>
+    public const int MeditationRegenLegacyTicks = 2;
 
     /// <summary>
     ///     Post-death territorial revive-eligibility recheck (side effect 1, <c>S07_MyGame04.cpp:257-327</c>):

@@ -14,11 +14,54 @@ public enum AttackRejectReason
     ///     never gated by this; it only applies to <see cref="CombatResolver.ResolveEnemyTribeAttack" />.
     /// </summary>
     ZonePvpDisabled,
+
+    /// <summary>
+    ///     Defender shares the attacker's tribe, OR the defender's tribe is the tribe currently allied with the
+    ///     attacker's (<c>AttackPlayer</c>'s ENEMY branch, S07_MyGame02.cpp:954) -- both halves reproduced by
+    ///     <see cref="CombatResolver.ResolveEnemyTribeAttack" />'s <c>allyOfAttackerTribe</c> parameter. Skipped
+    ///     entirely on the two FFA-exempt zones (see <see cref="ZonePvpZoneCatalog.IsSameTribeAttackExempt" />).
+    /// </summary>
     SameOrAlliedTribe,
     OutOfRange,
     AttackerProtected,
     DefenderProtected,
-    AttackerHasNoAttackSuccess
+    AttackerHasNoAttackSuccess,
+
+    /// <summary>
+    ///     Duel-specific authorization gate failed (S07_MyGame02.cpp:935-943): attacker and defender must both
+    ///     be actively dueling, in the SAME active duel, with opposite roles. Only ever produced by
+    ///     <see cref="CombatResolver.ResolveDuelAttack" />; <see cref="CombatResolver.ResolveEnemyTribeAttack" />
+    ///     uses <see cref="ZonePvpDisabled" />/<see cref="SameOrAlliedTribe" /> instead (the contrasting gate at
+    ///     :945-958) and never evaluates this one.
+    /// </summary>
+    DuelNotAuthorized,
+
+    /// <summary>
+    ///     <c>AttackPlayer</c>'s shared precondition block (S07_MyGame02.cpp:901-933, shop-open sub-check) --
+    ///     the defender's player-shop is currently open. Same concept as
+    ///     <see cref="StunRejectReason.DefenderShopOpen" />; reproduced by both
+    ///     <see cref="CombatResolver.ResolveDuelAttack" /> and <see cref="CombatResolver.ResolveEnemyTribeAttack" />.
+    /// </summary>
+    DefenderShopOpen,
+
+    /// <summary>
+    ///     <c>CheckPossibleAttackTarget</c>'s avatar-target rule (S07_MyGame02.cpp:1692-1716, folded into
+    ///     <c>AttackPlayer</c>'s own shared precondition block at 901-933): the defender's action-state is
+    ///     exactly the "no action yet" placeholder (0) or the death pose (12) -- a second, independent gate
+    ///     beyond <see cref="DefenderDead" />. Same concept as
+    ///     <see cref="StunRejectReason.DefenderActionStateBlocksTargeting" />; reproduced by both
+    ///     <see cref="CombatResolver.ResolveDuelAttack" /> and <see cref="CombatResolver.ResolveEnemyTribeAttack" />.
+    /// </summary>
+    DefenderActionStateBlocksTargeting,
+
+    /// <summary>
+    ///     Newbie-protection level gate failed: the current zone is one of the nine home-tribe-district
+    ///     sub-zones gated by
+    ///     <see cref="Fenrir.Application.Game.Domain.Combat.ZonePvpZoneCatalog.IsNewbieProtectionZone" />, the
+    ///     attacker's level is &gt;= 90, and the defender's level is &lt; 90 (S07_MyGame02.cpp:960-976). Only
+    ///     ever produced by <see cref="CombatResolver.ResolveEnemyTribeAttack" /> -- duels never evaluate it.
+    /// </summary>
+    NewbieProtectionLevelGap
 }
 
 /// <summary>A <see cref="Rejected" /> outcome carries no wire packet; a miss still echoes a zero-damage packet.</summary>

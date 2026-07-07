@@ -42,6 +42,25 @@ public sealed partial record OfflineShopItemRowDto(
 [GenerateDto]
 public sealed partial record ProxyShopNameRowDto(int CharacterId, string ShopName);
 
+/// <summary>
+///     usp_OfflineShop_GetAllOpen RS0 -- one row per for-sale slot across every currently open
+///     (ShopState=1) proxy shop, cluster-wide (not zone-scoped, since the shared database is already the
+///     one store every proxy shop persists through). Backs the market-search aggregator's proxy-shop half
+///     (CZ_PSHOP_ITEM_INFO_SEND). ItemId is never null here -- game.vw_OfflineShopListing's own INNER JOIN
+///     to world.Items already excludes empty sale slots.
+/// </summary>
+[GenerateDto]
+public sealed partial record OfflineShopOpenListingRowDto(
+    int CharacterId,
+    string AvatarName,
+    short SlotIndex,
+    int ItemId,
+    int Quantity,
+    int Value,
+    int SerialNumber,
+    int Price,
+    string? SocketData);
+
 // Mirrors game.tvp_OfflineShopItemSlot order; CharacterId is a proc scalar, not a TVP column. One row per occupied slot -- empty slots are omitted, not zero-filled.
 [GenerateTvp(Schema = "game", TvpName = "tvp_OfflineShopItemSlot")]
 public sealed partial record OfflineShopItemSlotTvp(

@@ -4,28 +4,28 @@ CREATE PROCEDURE game.usp_Guild_Disband @GuildId INT
 AS
 BEGIN
     SET
-NOCOUNT ON;
+        NOCOUNT ON;
     SET
-XACT_ABORT ON;
+        XACT_ABORT ON;
 
-BEGIN
-TRANSACTION;
+    BEGIN
+        TRANSACTION;
 
-DELETE
-FROM game.GuildNotices WITH (SNAPSHOT)
-WHERE GuildId = @GuildId;
+    DELETE
+    FROM game.GuildNotices WITH (SNAPSHOT)
+    WHERE GuildId = @GuildId;
 
-DELETE
-FROM game.GuildMembers
-WHERE GuildId = @GuildId;
+    DELETE
+    FROM game.GuildMembers
+    WHERE GuildId = @GuildId;
 
-DELETE
-FROM game.Guilds
-WHERE GuildId = @GuildId;
+    DELETE
+    FROM game.Guilds
+    WHERE GuildId = @GuildId;
 
-IF
-@@ROWCOUNT = 0
+    IF
+        @@ROWCOUNT = 0
         THROW 50235, N'Guild not found.', 1;
 
-COMMIT TRANSACTION;
+    COMMIT TRANSACTION;
 END;

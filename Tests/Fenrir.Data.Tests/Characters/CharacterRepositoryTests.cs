@@ -306,6 +306,63 @@ public class CharacterRepositoryTests
         Assert.Equal(50312, Assert.IsType<SqlException>(unknownCharacter!.InnerException).Number);
     }
 
+    [Fact]
+    public async Task AdjustDeathProtectionAsync_DecrementsShieldCharges_AndRejectsGoingNegative()
+    {
+        var accountId = await CreateTestAccountAsync();
+        // usp_Character_Create (plain, not the starter-kit path) never grants the starting 5 -- ProtectForDeath
+        // starts at the column's own DEFAULT of 0, exactly like TribeTransferPermitCount above.
+        var characterId = await CreateCharacterAsync(accountId, 0);
+
+        var afterGrant = await _characters.AdjustDeathProtectionAsync(characterId, 5, CancellationToken.None);
+        Assert.Equal(5, afterGrant);
+
+        // A qualifying death consumes exactly one charge (delta = -1).
+        var afterFirstConsume = await _characters.AdjustDeathProtectionAsync(characterId, -1, CancellationToken.None);
+        Assert.Equal(4, afterFirstConsume);
+
+        var afterDraining = await _characters.AdjustDeathProtectionAsync(characterId, -4, CancellationToken.None);
+        Assert.Equal(0, afterDraining);
+
+        // Same wrapped-CaeriusNetSqlException posture as GrantTribeTransferPermitAsync's own overspend check.
+        var overspend = await Record.ExceptionAsync(() =>
+            _characters.AdjustDeathProtectionAsync(characterId, -1, CancellationToken.None).AsTask());
+        Assert.Equal(50332, Assert.IsType<SqlException>(overspend!.InnerException).Number);
+
+        var unknownCharacter = await Record.ExceptionAsync(() =>
+            _characters.AdjustDeathProtectionAsync(-1, 1, CancellationToken.None).AsTask());
+        Assert.Equal(50332, Assert.IsType<SqlException>(unknownCharacter!.InnerException).Number);
+    }
+
+    // Database-layer backstop for the "inventory-capacity-stacking-rules" finding: CK_CharacterItems_Quantity
+    // (Migrations/034_character_items_quantity_upper_bound.sql) is the schema-level last resort for the missing
+    // 999-stack cap in ContainerMatrix.ResolveMove's merge branch (an Application/ fix tracked separately, out
+    // of this repository's charter). Legacy's own merge-cap comparison is strict ">" against
+    // MAX_ITEM_DUPLICATION_NUM (999), so exactly 999 must persist cleanly through the normal
+    // ReplaceContainerAsync call path, while 1000 must be rejected -- surfacing as a raw constraint violation
+    // (native error 547), not a catalogued admin.ErrorCatalog THROW, since this is a backstop, not the primary
+    // fix.
+    [Fact]
+    public async Task ReplaceContainerAsync_AcceptsQuantityExactlyAtThe999Cap_ButTheCheckConstraintRejectsOverCap()
+    {
+        var accountId = await CreateTestAccountAsync();
+        var characterId = await CreateCharacterAsync(accountId, 0);
+
+        await _characters.ReplaceContainerAsync(characterId, 0,
+            [new CharacterItemSlotTvp(0, 1026, 999, 0, 0, 0, 0, 0, 0, 0, 0, 0)],
+            CancellationToken.None);
+
+        var atCap = await ScalarAsync<int>(
+            $"SELECT Quantity FROM game.CharacterItems WHERE CharacterId = {characterId} AND Container = 0 AND Slot = 0;");
+        Assert.Equal(999, atCap);
+
+        var overCap = await Record.ExceptionAsync(() =>
+            _characters.ReplaceContainerAsync(characterId, 1,
+                [new CharacterItemSlotTvp(0, 1026, 1000, 0, 0, 0, 0, 0, 0, 0, 0, 0)],
+                CancellationToken.None).AsTask());
+        Assert.Equal(547, Assert.IsType<SqlException>(overCap!.InnerException).Number);
+    }
+
     private async Task<int> CreateTestAccountAsync()
     {
         var loginName = $"chartest-{Guid.NewGuid():N}";

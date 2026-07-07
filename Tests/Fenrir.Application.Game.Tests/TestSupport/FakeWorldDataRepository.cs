@@ -156,4 +156,13 @@ internal sealed class FakeWorldDataRepository : IWorldDataRepository
     {
         throw new NotImplementedException();
     }
+
+    public ValueTask<(
+            ReadOnlyCollection<TribeSkillEquivalenceRowDto> SkillEquivalences,
+            ReadOnlyCollection<TribeItemEquivalenceRowDto> ItemEquivalences,
+            ReadOnlyCollection<TribeCostumeEquivalenceRowDto> CostumeEquivalences)>
+        GetTribeConversionCatalogAsync(CancellationToken ct)
+    {
+        throw new NotImplementedException();
+    }
 }

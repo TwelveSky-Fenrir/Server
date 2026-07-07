@@ -45,7 +45,8 @@ public interface ICharacterWriteBehindFlusher : IWriteBehindFlusher
 ///         <b>Process-kill residual risk, exact bound:</b> this is the highest-value and highest-frequency
 ///         write-behind cache in the process (every combat tick and every movement re-dirties a character), so
 ///         its <see cref="WriteBehindFlusher{TKey}" /> deliberately runs at the DEFAULT cadence
-///         (<see cref="WriteBehindFlusher{TKey}.DefaultInterval" /> = 5s, <see cref="WriteBehindFlusher{TKey}.DefaultEntityThreshold" />
+///         (<see cref="WriteBehindFlusher{TKey}.DefaultInterval" /> = 5s,
+///         <see cref="WriteBehindFlusher{TKey}.DefaultEntityThreshold" />
 ///         = 512 dirty characters) rather than a shorter one: unlike the low-frequency-dirty caches
 ///         (<c>TowerWarState</c>, <c>HeroRankPointAccumulator</c>, <c>MonsterBossRespawnTracker</c>), a
 ///         character actively moving or fighting is realistically dirty on almost every drain cycle, so
@@ -63,8 +64,6 @@ public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWrite
 {
     private readonly ICharacterRepository _characters;
     private readonly WriteBehindFlusher<int> _flusher;
-    private readonly ILogger<PositionWriteBehindHost> _logger;
-    private readonly ZoneRegistry _zones;
 
     // Serializes the periodic drain callback against FlushCharacterNowAsync: both independently read a live
     // PlayerRuntimeState.FlushSequence and persist at a value derived from that read, with no other coordination
@@ -77,6 +76,8 @@ public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWrite
     // sides are already bulk/occasional operations, never a per-tick hot path, so serializing them fully is
     // cheap and removes the race entirely rather than only narrowing it.
     private readonly SemaphoreSlim _flushGate = new(1, 1);
+    private readonly ILogger<PositionWriteBehindHost> _logger;
+    private readonly ZoneRegistry _zones;
 
     public PositionWriteBehindHost(ZoneRegistry zones, DirtyTracker<int> dirtyTracker, ICharacterRepository characters,
         ProgressWriteBehindHost progress, ILogger<PositionWriteBehindHost> logger)
@@ -173,7 +174,8 @@ public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWrite
             var progressRow = new CharacterProgressTvp(characterId, state.FlushSequence, state.Level, state.Level2,
                 state.Experience, state.Life, state.MaxLife, state.Mana, state.MaxMana, state.StatVit, state.StatStr,
                 state.StatInt, state.StatDex, state.StatPoints, state.SkillPoints, state.ContributionPoints,
-                state.Exp2, state.RebirthCount);
+                state.Exp2, state.RebirthCount, state.EatLifePotion, state.EatManaPotion, state.EatStrPotion,
+                state.EatDexPotion, state.EatElePotion);
             await _characters.PersistProgressAsync([progressRow], ct).ConfigureAwait(false);
 
             var positionRow = new CharacterPositionTvp(characterId, state.FlushSequence + 1, state.MapId, state.PosX,

@@ -4,7 +4,7 @@ CREATE TABLE world.ZoneNpcSpawns
 (
     ZoneNumber SMALLINT NOT NULL,
     SlotIndex  SMALLINT NOT NULL,
-    NpcId      INT NULL,
+    NpcId      INT      NULL,
     PosX       REAL     NOT NULL,
     PosY       REAL     NOT NULL,
     PosZ       REAL     NOT NULL,

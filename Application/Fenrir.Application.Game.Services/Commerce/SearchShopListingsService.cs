@@ -7,19 +7,29 @@ using Fenrir.Network.Serialization.Packets.Zone;
 namespace Fenrir.Application.Game.Services.Commerce;
 
 /// <remarks>
-///     Two scope cuts vs. S04_MyWork02.cpp:6475's full <c>CHK_SELL_TYPE</c> switch:
-///     (1) offline/deputy (proxy) shop listings are not included -- <see cref="Data.Commerce.IOfflineShopRepository" />
-///     only supports a per-character lookup, not "every currently open shop", and adding that is a bigger
-///     prerequisite than this pass covers; (2) the item-&gt;category mapping only reproduces the
-///     <c>tITEM_INFO-&gt;iSort</c>-keyed switch (<see cref="SortToCategory" />, ~10 categories, all backed by
-///     fields Fenrir already catalogs) -- the secondary <c>IsValidCostume</c> re-check and the huge
-///     <c>tITEM_INFO-&gt;iIndex</c> whitelist (hundreds of cash/fish/misc-consumable item-id overrides) are not
-///     modeled, matching this codebase's established precedent for uncataloged legacy data (e.g.
-///     <c>CraftResolver</c>'s own scope disclaimer). An item whose sort isn't in <see cref="SortToCategory" /> is
-///     silently excluded from every search, including "show all" -- an under-approximation of the legacy (which
-///     drops it too, unless the iIndex table happens to catalog it), never an over-approximation.
+///     One remaining scope cut vs. S04_MyWork02.cpp:6475's full <c>CHK_SELL_TYPE</c> switch: the
+///     item-&gt;category mapping only reproduces the <c>tITEM_INFO-&gt;iSort</c>-keyed first pass
+///     (<see cref="SortToCategory" />, ~10 categories, all backed by fields Fenrir already catalogs) -- the
+///     secondary <c>IsValidCostume</c> re-check and the huge <c>tITEM_INFO-&gt;iIndex</c> whitelist (hundreds
+///     of cash/fish/misc-consumable item-id overrides) are not modeled, matching this codebase's established
+///     precedent for uncataloged legacy data (e.g. <c>CraftResolver</c>'s own scope disclaimer). An item
+///     whose sort isn't in <see cref="SortToCategory" /> still surfaces under an unfiltered "show all" query
+///     (<see cref="IsMatch" />'s default branch, S04_MyWork02.cpp:6681-6909's own default-inclusion rule) --
+///     it is genuinely excluded only from a search with an explicit, non-ALL category filter. The legacy
+///     catch-all "other" category code itself is not modeled (no citation available), so that one specific
+///     explicit-filter case still under-approximates.
+///     <para>
+///         Both listing pools are aggregated, matching the legacy's own two-part union
+///         (S04_MyWork02.cpp:6523-6558 proxy, :6559-6585 personal): every currently open proxy/deputy shop
+///         cluster-wide (<see cref="IOfflineShopRepository.GetAllOpenAsync" /> -- the shared database is
+///         already the one store every shard's proxy shops persist through, the Fenrir-sharded equivalent of
+///         legacy's cross-instance shared-memory table) plus every live personal shop open on this zone
+///         instance only (<see cref="Zone.Players" />, ephemeral, gone the instant its owner disconnects --
+///         deliberate legacy asymmetry, not a bug).
+///     </para>
 /// </remarks>
-public sealed class SearchShopListingsService(WorldDataCache worldData) : ISearchShopListingsService
+public sealed class SearchShopListingsService(WorldDataCache worldData, IOfflineShopRepository offlineShops)
+    : ISearchShopListingsService
 {
     private const int TypeAll = 0;
     private const int TypeCommon = 1;
@@ -42,10 +52,44 @@ public sealed class SearchShopListingsService(WorldDataCache worldData) : ISearc
         [22] = 17, [28] = 17, [30] = 17 // EPSORT_MOUNT
     };
 
-    public IReadOnlyList<SearchShopListingsResponse> Search(SearchShopListingsRequest packet, Zone zone)
+    public async ValueTask<IReadOnlyList<SearchShopListingsResponse>> SearchAsync(SearchShopListingsRequest packet,
+        Zone zone, CancellationToken cancellationToken)
     {
         var cycleTick = unchecked((uint)Environment.TickCount);
         var results = new List<SearchShopListingsResponse>();
+
+        // Proxy/deputy shops first, matching the legacy aggregation order (S04_MyWork02.cpp:6523-6558
+        // before :6559-6585) -- the shared MaxResults cap below is enforced across both pools combined, not
+        // per-pool, matching the legacy's own single running send-count check.
+        var proxyListings = await offlineShops.GetAllOpenAsync(cancellationToken);
+        foreach (var row in proxyListings)
+        {
+            if (results.Count >= MaxResults)
+                return results;
+
+            if (!worldData.ItemsById.TryGetValue(row.ItemId, out var itemDefinition) ||
+                !IsMatch(packet.Sort1, packet.Sort2, itemDefinition))
+                continue;
+
+            var page = row.SlotIndex / PshopPurchasePolicy.MaxSlots;
+            var slot = row.SlotIndex % PshopPurchasePolicy.MaxSlots;
+
+            results.Add(new SearchShopListingsResponse
+            {
+                // characterId * 2 + 1 -- the same proxy-shop wire-UniqueNumber formula
+                // OpenShopStallService.Prepare/ProxyShopBroadcastEntry already use for this same shop.
+                UniqueNumber = unchecked((uint)(row.CharacterId * 2 + 1)),
+                AvatarName = row.AvatarName,
+                Page = page,
+                Index = slot,
+                PshopItemInfo = [row.ItemId, row.Quantity, row.Value, row.SerialNumber, row.Price, 0, 0, 0, 0],
+                // OfflineShopItems.SocketData has no established encoding anywhere in this codebase yet --
+                // OpenShopStallService always persists it null today, so there is nothing to decode in
+                // practice; defaulting to zero here rather than inventing a decode format.
+                SocketInfo = [0, 0, 0],
+                CycleTick = cycleTick
+            });
+        }
 
         foreach (var seller in zone.Players)
         {
@@ -62,13 +106,8 @@ public sealed class SearchShopListingsService(WorldDataCache worldData) : ISearc
                 if (!view.IsOccupied)
                     continue;
 
-                if (!worldData.ItemsById.TryGetValue(view.ItemId, out var itemDefinition))
-                    continue;
-
-                if (!SortToCategory.TryGetValue(itemDefinition.Item.Sort, out var category))
-                    continue;
-
-                if (!Matches(packet.Sort1, packet.Sort2, category, itemDefinition.Item.Type))
+                if (!worldData.ItemsById.TryGetValue(view.ItemId, out var itemDefinition) ||
+                    !IsMatch(packet.Sort1, packet.Sort2, itemDefinition))
                     continue;
 
                 var socketBase = (page * PshopPurchasePolicy.MaxSlots + slot) * 3;
@@ -90,6 +129,20 @@ public sealed class SearchShopListingsService(WorldDataCache worldData) : ISearc
         }
 
         return results;
+    }
+
+    /// <summary>
+    ///     tITEM_INFO-&gt;iSort classification (<see cref="SortToCategory" />) plus the legacy's own
+    ///     default-inclusion rule for an item neither classification pass resolves
+    ///     (S04_MyWork02.cpp:6681-6909): still included under an unfiltered "show all" query. See this
+    ///     type's own remarks for the one remaining gap (the numeric "other" catch-all category code).
+    /// </summary>
+    private static bool IsMatch(int sort1, int sort2, ItemDefinition itemDefinition)
+    {
+        if (SortToCategory.TryGetValue(itemDefinition.Item.Sort, out var category))
+            return Matches(sort1, sort2, category, itemDefinition.Item.Type);
+
+        return sort1 == TypeAll && sort2 == SortAll;
     }
 
     /// <summary>CHK_SELL_TYPE, minus the goto-fallthrough-to-the-next-switch-table tail (out of scope, see remarks).</summary>

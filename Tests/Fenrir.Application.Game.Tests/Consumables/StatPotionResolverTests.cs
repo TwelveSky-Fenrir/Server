@@ -45,38 +45,62 @@ public class StatPotionResolverTests
     }
 
     [Fact]
-    public void ResolveG12_PreconditionsMet_AddsExactlyOneUnit_RegardlessOfBulk()
+    public void ResolveG12_PreconditionsMet_SingleUnitRequest_AddsExactlyOneUnit()
     {
-        var result = StatPotionResolver.ResolveG12(StatPotionResolver.OrdinaryTierCap, 5,
-            3);
+        var result = StatPotionResolver.ResolveG12(StatPotionResolver.OrdinaryTierCap,
+            StatPotionResolver.RequiredLevel2, 1);
 
         Assert.True(result.Succeeded);
         Assert.Equal(StatPotionResolver.OrdinaryTierCap + 1, result.NewCount);
+        Assert.Equal(1, result.UnitsConsumed);
+    }
+
+    [Fact]
+    public void ResolveG12_PreconditionsMet_BulkRequestFitsEntirely_ConsumesTheFullRequest()
+    {
+        var result = StatPotionResolver.ResolveG12(StatPotionResolver.OrdinaryTierCap,
+            StatPotionResolver.RequiredLevel2, 5);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(StatPotionResolver.OrdinaryTierCap + 5, result.NewCount);
+        Assert.Equal(5, result.UnitsConsumed);
+    }
+
+    [Fact]
+    public void ResolveG12_BulkRequestOvershootsCap_IsSilentlyReducedToWhatFits()
+    {
+        var result = StatPotionResolver.ResolveG12(StatPotionResolver.G12TierCap - 5,
+            StatPotionResolver.RequiredLevel2, 10);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(StatPotionResolver.G12TierCap, result.NewCount);
+        Assert.Equal(5, result.UnitsConsumed);
     }
 
     [Fact]
     public void ResolveG12_BelowOrdinaryCap_FailsPrecondition()
     {
         var result = StatPotionResolver.ResolveG12(StatPotionResolver.OrdinaryTierCap - 1,
-            5, 3);
+            StatPotionResolver.RequiredLevel2, 1);
 
         Assert.Equal(StatPotionResolver.Outcome.PreconditionFailed, result.Outcome);
+        Assert.Equal(0, result.UnitsConsumed);
     }
 
     [Fact]
     public void ResolveG12_AlreadyAtG12Cap_FailsPrecondition()
     {
-        var result = StatPotionResolver.ResolveG12(StatPotionResolver.G12TierCap, 5,
-            3);
+        var result = StatPotionResolver.ResolveG12(StatPotionResolver.G12TierCap,
+            StatPotionResolver.RequiredLevel2, 1);
 
         Assert.Equal(StatPotionResolver.Outcome.PreconditionFailed, result.Outcome);
     }
 
     [Fact]
-    public void ResolveG12_RebirthBelowRequiredThreshold_FailsPrecondition()
+    public void ResolveG12_Level2BelowRequiredThreshold_FailsPrecondition()
     {
-        var result = StatPotionResolver.ResolveG12(StatPotionResolver.OrdinaryTierCap, 1,
-            3);
+        var result = StatPotionResolver.ResolveG12(StatPotionResolver.OrdinaryTierCap,
+            StatPotionResolver.RequiredLevel2 - 1, 1);
 
         Assert.Equal(StatPotionResolver.Outcome.PreconditionFailed, result.Outcome);
     }

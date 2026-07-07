@@ -254,7 +254,7 @@ public class LoginHandlerTests
     public async Task HandleAsync_NonGmAccount_ZeroLengthMac_SendsInvalidDevicesResult()
     {
         var (hash, salt) = PasswordHasher.Hash("correct-password");
-        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, false, 0);
+        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, false);
         var accounts = FakeAccountRepository.WithAccount(account);
         var handler = CreateHandler(out var session, out var pipe, accounts);
 
@@ -293,7 +293,7 @@ public class LoginHandlerTests
     public async Task HandleAsync_NonGmAccount_MacEqualsPlaceholderLiteral_SendsInvalidDevicesResult()
     {
         var (hash, salt) = PasswordHasher.Hash("correct-password");
-        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, false, 0);
+        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, false);
         var accounts = FakeAccountRepository.WithAccount(account);
         var handler = CreateHandler(out var session, out var pipe, accounts);
 
@@ -311,7 +311,7 @@ public class LoginHandlerTests
     public async Task HandleAsync_NonGmAccount_AdapterGuidEqualsPlaceholderLiteral_SendsInvalidDevicesResult()
     {
         var (hash, salt) = PasswordHasher.Hash("correct-password");
-        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, false, 0);
+        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, false);
         var accounts = FakeAccountRepository.WithAccount(account);
         var handler = CreateHandler(out var session, out var pipe, accounts);
 
@@ -329,7 +329,7 @@ public class LoginHandlerTests
     public async Task HandleAsync_NonGmAccount_LoopbackRemoteIp_SendsInvalidDevicesResult()
     {
         var (hash, salt) = PasswordHasher.Hash("correct-password");
-        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, false, 0);
+        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, false);
         var accounts = FakeAccountRepository.WithAccount(account);
         var loopback = new IPEndPoint(IPAddress.Loopback, 40000);
         var handler = CreateHandler(out var session, out var pipe, accounts, remoteEndPoint: loopback);
@@ -346,7 +346,7 @@ public class LoginHandlerTests
     public async Task HandleAsync_NonGmAccount_RealDeviceTuple_Succeeds()
     {
         var (hash, salt) = PasswordHasher.Hash("correct-password");
-        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, false, 0);
+        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, false);
         var accounts = FakeAccountRepository.WithAccount(account);
         var handler = CreateHandler(out var session, out var pipe, accounts);
 

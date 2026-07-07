@@ -21,13 +21,45 @@ namespace Fenrir.Application.Game.Domain.Simulation;
 ///     Not reproduced, and why:
 ///     <list type="bullet">
 ///         <item>
-///             <c>BotHotKey</c>/<c>BotHotKeySend</c> (the hotkey-refill half of the same legacy bot loop) --
-///             Fenrir has no in-memory hotkey model at all yet (<see cref="PlayerRuntimeState" /> carries no
-///             Hotkeys collection; <c>game.CharacterHotkeys</c> is only ever written once, at character
-///             creation, never loaded back into a live Zone) and no potion/food consume-effect system exists
-///             either (<see cref="Handlers.UseInventoryItemHandler" />'s own remarks: the iSort==2 potion
-///             family is entirely unimplemented). Both are real, larger prerequisite gaps that would need their
-///             own investigation, not something to fake here.
+///             <c>BotHotKey</c>/<c>BotHotKeySend</c> (the hotkey-refill half of the same legacy bot loop,
+///             Server/ts25zone/S07_MyGame04.cpp:341-350 call site, :2499-2559 bodies,
+///             Server/ts25zone/S07_MyGame03.cpp:9165-9219 <c>ProcessHotkeyForAutoHunt</c>) -- still not
+///             reproduced. Re-checked rather than assumed stale: two of the three prerequisite gaps previously
+///             cited here have since closed elsewhere in the codebase -- <see cref="PlayerRuntimeState.Hotkeys" />
+///             now exists as an in-memory model, and pet-equipped (Equipment container slot 8) / active-mount
+///             (<c>PlayerRuntimeState.AnimalNumber</c>) state plus the two auto-hunt consumption flags
+///             (<c>AutoHunt.AnimalPreyCmd</c>/<c>AnimalFoodCmd</c>) this behavior needs are all readable today.
+///             Two concrete blockers remain:
+///             <list type="bullet">
+///                 <item>
+///                     <see cref="PlayerRuntimeState.Hotkeys" /> is never actually populated -- neither world
+///                     entry (<c>Zone.PlayerLifecycle</c>) nor an in-process zone transfer
+///                     (<see cref="World.ZoneTransfer" />) sets it from <c>game.CharacterHotkeys</c> despite
+///                     that type's own remarks claiming otherwise, and no handler reads or writes it either:
+///                     <see cref="Handlers.UseHotkeyItemHandler" />'s op22 flow addresses an inventory page/slot
+///                     directly (the client resolves the hotkey binding locally), never this dictionary, and its
+///                     own remarks still say it "does not yet apply the item's use effect or decrement
+///                     quantity." A sibling <see cref="Consumables.HotkeyItemConsumptionResolver" /> domain
+///                     resolver models the consume side against a <c>HotkeySlot</c> parameter, but nothing calls
+///                     it yet -- so no hotkey slot can be populated OR emptied through any reachable code path
+///                     today, and there is nothing live for a per-tick bucket scan to read.
+///                 </item>
+///                 <item>
+///                     The one prerequisite wire packet for this exact behavior already exists --
+///                     <c>AutoHuntHotkeyRebindResponse</c> (op120, legacy <c>ZC_SET_HOTKEY_INVENTORY_RECV</c>,
+///                     under <c>Network.Serialization.Packets.Zone</c>) -- but its three generically-named
+///                     <c>Value0</c>/<c>Value1</c>/<c>Value2</c> fields have no cited mapping onto the legacy
+///                     <c>HOTKEY_SORT</c> tagged union's raw 3-int storage. <see cref="Hotkeys.HotkeyBindingKind" />'s
+///                     own remarks already flag this exact gap: its numeric values are "a Fenrir-internal
+///                     convention, not a transcription of the legacy enum's own numbering," and "the behavior
+///                     contract this type implements deliberately does not state the legacy wire-level
+///                     binding-kind codes, so none are guessed here." The same rule blocks writing
+///                     <c>Value0</c> for this response without inventing a legacy wire code from nothing.
+///                     Needs a follow-up cpp-protocol-header-analyst/legacy-behavior-translator pass on
+///                     <c>ZONE.h:1129-1138</c> (<c>ZC_SET_HOTKEY_INVENTORY_RECV</c>) together with
+///                     <c>S04_MyWork05.cpp:122-159</c> (<c>HOTKEY_SORT</c>) before this is safe to wire up.
+///                 </item>
+///             </list>
 ///         </item>
 ///         <item>
 ///             The mid-animation <c>aAction.aSort</c> (41/60-68/75) gate -- Fenrir has no multi-tick
@@ -62,7 +94,7 @@ public sealed class AutoHuntTickSystem(
     DirtyTracker<int> dirtyTracker,
     IOptions<GameServerOptions> options) : ISimulationSystem
 {
-    /// <summary>FEQUIP_TYPE::EWEAPON slot index -- same convention as AutoHuntToggleHandler/Zone.ApplySkillCast.</summary>
+    /// <summary>FEQUIP_TYPE::EWEAPON slot index -- same convention as AutoHuntToggleHandler/Zone.ApplySkillCastManaCharge.</summary>
     private const byte WeaponSlot = 7;
 
     /// <summary>
@@ -137,13 +169,14 @@ public sealed class AutoHuntTickSystem(
             var grade = Math.Min(requestedGrade, GetMaxLearnedGrade(skillId, state.LearnedSkills));
 
             worldData.SkillsById.TryGetValue(skillId, out var skillDef);
-            var result = SkillCastResolver.TryCast(skillDef, grade, state.Mana, maxLife, weaponSort);
+            var result = SkillCastResolver.TryCast(skillDef, grade, state.Mana, maxLife, weaponSort,
+                state.SupportSkillTimeUpRatio);
             if (!result.Success || result.Kind != SkillEffectKind.SelfBuff)
                 continue;
 
             state.Mana -= result.ManaCost;
             state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
-            ApplyBuffWrites(zone, state, result.BuffWrites);
+            zone.ApplyBuffWrites(state, result.BuffWrites);
             return; // BotBuff's own `break` -- at most one auto-cast per legacy tick.
         }
     }
@@ -199,26 +232,6 @@ public sealed class AutoHuntTickSystem(
                 return true;
 
         return false;
-    }
-
-    /// <summary>Mirrors Zone's own (private) ApplySkillBuffWrites -- a small, deliberate duplicate rather than exposing it.</summary>
-    private static void ApplyBuffWrites(Zone zone, PlayerRuntimeState state,
-        ImmutableArray<SkillCastResolver.BuffWrite> writes)
-    {
-        if (writes.IsEmpty)
-            return;
-
-        var changedSlots = new int[35];
-        foreach (var write in writes)
-        {
-            if (write.Slot is < 0 or >= 35)
-                continue;
-            state.Buffs.Buff[write.Slot * 2] = write.Value;
-            state.Buffs.Buff[write.Slot * 2 + 1] = write.DurationTicks;
-            changedSlots[write.Slot] = 1;
-        }
-
-        zone.RecomputeStatsAndBroadcastBuffs(state, changedSlots);
     }
 
     /// <summary>Mirrors MyUtil::GetMaxSkillGradeNum exactly (same posture as AutoBuffSkillResolver's own independent copy).</summary>

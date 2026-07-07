@@ -114,6 +114,11 @@ internal sealed class FakeGuildRepository : IGuildRepository
         throw new NotSupportedException();
     }
 
+    public ValueTask AdjustPointsAsync(int guildId, int delta, CancellationToken ct)
+    {
+        throw new NotSupportedException();
+    }
+
     /// <summary>No character has any guild membership at all.</summary>
     public static FakeGuildRepository Empty()
     {

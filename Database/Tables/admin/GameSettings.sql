@@ -3,8 +3,10 @@
 -- unported aProxyShopDate rental field.
 CREATE TABLE admin.GameSettings
 (
-    Id                    TINYINT NOT NULL CONSTRAINT DF_GameSettings_Id DEFAULT 1,
-    ProxyShopDurationDays TINYINT NOT NULL CONSTRAINT DF_GameSettings_ProxyShopDurationDays DEFAULT 7,
+    Id                    TINYINT NOT NULL
+        CONSTRAINT DF_GameSettings_Id DEFAULT 1,
+    ProxyShopDurationDays TINYINT NOT NULL
+        CONSTRAINT DF_GameSettings_ProxyShopDurationDays DEFAULT 7,
     CONSTRAINT PK_GameSettings PRIMARY KEY CLUSTERED (Id),
     CONSTRAINT CK_GameSettings_Id CHECK (Id = 1),
     CONSTRAINT CK_GameSettings_ProxyShopDurationDays CHECK (ProxyShopDurationDays > 0)

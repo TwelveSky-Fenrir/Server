@@ -19,8 +19,13 @@ namespace Fenrir.Application.Game.Domain.Inventory;
 ///     <para>
 ///         Two things this gate deliberately does NOT model, both left to the caller: (1) the avatar's
 ///         "action-sort ready" precondition -- a distinct, softer no-op outcome (no disconnect) checked by both
-///         call sites before this gate even runs, whose exact numeric "ready" sentinel was not part of the
-///         originating contract; and (2) the source/destination bounds checks that precede this gate entirely.
+///         call sites before this gate even runs. Now implemented by the caller,
+///         <c>Fenrir.Application.Game.Services.GenericAction.GenericActionService.MoveContainerAsync</c>, per a
+///         dedicated behavior contract (idle sentinel = action-sort value 1, Server/ts25zone/S04_MyWork05.cpp:
+///         1261-1265 for the 210/equip direction, :1575-1579 for 213/unequip) -- this gate itself still never
+///         reads the avatar's action state, since both legacy call sites check it before ever reaching
+///         <c>CheckPossibleEquipItem</c>; and (2) the source/destination bounds checks that precede this gate
+///         entirely.
 ///     </para>
 ///     <para>
 ///         <paramref name="itemSortClassification" /> (see <see cref="Evaluate" />) stands in for the legacy

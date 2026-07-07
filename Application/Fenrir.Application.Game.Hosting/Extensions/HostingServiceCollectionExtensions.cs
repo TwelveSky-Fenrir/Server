@@ -85,6 +85,10 @@ public static class HostingServiceCollectionExtensions
         // Cross-process duplicate-login kick/refusal, Game-side half -- see AccountSessionKickPollHost's remarks.
         services.AddHostedService<AccountSessionKickPollHost>();
 
+        // Bounded-staleness live mute recheck (uppercom-playuser-extra-relay-opcodes) -- see
+        // MuteRefreshPollHost's own remarks.
+        services.AddHostedService<MuteRefreshPollHost>();
+
         // Same "one instance, three registrations" pattern as PositionWriteBehindHost above: *.Services
         // producers (enchant/refine/socket/rune per-attempt logging) consume IEventLogQueue only.
         services.AddSingleton<EventLogFlushHost>();
@@ -200,10 +204,16 @@ public static class HostingServiceCollectionExtensions
         // different mechanic from TribeGuardSpawner/GuardPostCatalog above (that one is MySummon::SummonGuard's
         // capital-guard spawner); this one only tracks per-checkpoint passability and re-derives it every tick,
         // with no spawning of its own. TribeGuardCorridorCatalog.Empty is the same documented "safe no-op until
-        // the real sixteen-zone/hub table is supplied" posture as GuardPostCatalog.Empty above. Registered both
-        // as its own concrete type (a future ZoneMoveService corridor-check wiring resolves TribeGuardCorridorState/
-        // TribeGuardCorridorGate directly) and as ISimulationSystem, same "one instance, two registrations"
-        // pattern as TribeGuardSpawner above.
+        // the real sixteen-zone/hub table is supplied" posture as GuardPostCatalog.Empty above -- ZoneMoveService
+        // now resolves both TribeGuardCorridorCatalog and TribeGuardCorridorState directly (constructor injection)
+        // to run TribeGuardCorridorGate.Evaluate on every zone-transfer request, so this evaluates as a documented
+        // always-allow until the real table replaces Empty, not an unwired no-op. Registered both as its own
+        // concrete type and as ISimulationSystem, same "one instance, two registrations" pattern as
+        // TribeGuardSpawner above.
+        //
+        // CROSS-SHARD SCOPE: TribeGuardCorridorState below is a per-PROCESS singleton (this AddSingleton), not a
+        // per-cluster one -- see that class's own remarks for the open, unaddressed gap if the hub zone and the
+        // sixteen corridor zones it re-derives/gates are ever split across more than one live shard.
         services.AddSingleton(TribeGuardCorridorCatalog.Empty);
         services.AddSingleton<TribeGuardCorridorState>();
         services.AddSingleton<TribeGuardCorridorStateDerivationSystem>();

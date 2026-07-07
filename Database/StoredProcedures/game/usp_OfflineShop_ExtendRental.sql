@@ -5,13 +5,13 @@
 -- the legacy's own usp-equivalent (Server/ts25extra/S08_MyDB.cpp:1085-1106 returns success both when a row
 -- was updated and when none matched).
 CREATE PROCEDURE game.usp_OfflineShop_ExtendRental @CharacterId INT,
-    @ShopDate    INT
+                                                   @ShopDate INT
 AS
 BEGIN
     SET
-NOCOUNT ON;
+        NOCOUNT ON;
 
-UPDATE game.OfflineShops
-SET ShopDate = @ShopDate
-WHERE CharacterId = @CharacterId;
+    UPDATE game.OfflineShops
+    SET ShopDate = @ShopDate
+    WHERE CharacterId = @CharacterId;
 END;

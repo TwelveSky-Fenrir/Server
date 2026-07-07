@@ -28,10 +28,20 @@ public sealed class TradeRegistry
     private readonly Dictionary<int, int> _pendingByTarget = new();
     private readonly Dictionary<int, TradeSession> _sessionByCharacter = new();
 
-    private bool IsBusy(int characterId)
+    /// <summary>
+    ///     Trade-family half of the legacy <c>CheckCommunityWork</c> exclusivity check -- covers the whole
+    ///     negotiation lifecycle (pending ask, accepted, and an actually-started session), matching legacy's
+    ///     single nonzero-throughout trade-process-state field. Public so sibling negotiation families (e.g.
+    ///     Guild ask, see <c>GuildInviteService</c>) can compose a cross-family busy check without duplicating
+    ///     this registry's own state.
+    /// </summary>
+    public bool IsBusy(int characterId)
     {
-        return _pendingByAsker.ContainsKey(characterId) || _pendingByTarget.ContainsKey(characterId) ||
-               _acceptedPairs.ContainsKey(characterId) || _sessionByCharacter.ContainsKey(characterId);
+        lock (_lock)
+        {
+            return _pendingByAsker.ContainsKey(characterId) || _pendingByTarget.ContainsKey(characterId) ||
+                   _acceptedPairs.ContainsKey(characterId) || _sessionByCharacter.ContainsKey(characterId);
+        }
     }
 
     public TradeAskOutcome TryAsk(int askerId, int targetId)

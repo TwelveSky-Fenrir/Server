@@ -4,9 +4,9 @@ CREATE PROCEDURE auth.usp_AccountPin_Get @AccountId INT
 AS
 BEGIN
     SET
-NOCOUNT ON;
+        NOCOUNT ON;
 
-SELECT PinHash, PinSalt
-FROM auth.AccountPins
-WHERE AccountId = @AccountId;
+    SELECT PinHash, PinSalt
+    FROM auth.AccountPins
+    WHERE AccountId = @AccountId;
 END;

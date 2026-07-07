@@ -8,7 +8,10 @@ public sealed class TribeAnnouncementService(ZoneRegistry zones) : ITribeAnnounc
 {
     public bool TrySendAnnouncement(PlayerRuntimeState sender, string content)
     {
-        if (sender.TribeRole is not (1 or 2))
+        // Legacy gate is "if (tTribeRole == 0) return;" -- any non-zero role passes: tribe master (1),
+        // sub-master (2), or an elected tribe-council member seated via the tribe-vote mechanism (3).
+        // Server/ts25zone/S04_MyWork02.cpp:11496-11500; Server/Header/function.h:92-114 (ReturnTribeRole).
+        if (sender.TribeRole == 0)
             return false;
 
         var response = new TribeAnnouncementResponse

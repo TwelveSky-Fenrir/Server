@@ -13,6 +13,11 @@ public interface IWithdrawProxyShopEarningsService
     ///     closed and the submitted amounts to still match current earnings (CAS guard in
     ///     <see cref="OfflineShopRepository.WithdrawMoneyAsync" />).
     /// </summary>
-    public ValueTask<WithdrawProxyShopEarningsResponse> WithdrawAsync(int characterId, int money, int bigMoney,
-        CancellationToken cancellationToken);
+    /// <param name="accountId">
+    ///     The withdrawing player's account id -- carried only for the game.EventLog audit row written once
+    ///     persistence succeeds (legacy <c>GL_1002_PXSHOP_MONEY</c>); not used for any validation or
+    ///     persistence decision.
+    /// </param>
+    public ValueTask<WithdrawProxyShopEarningsResponse> WithdrawAsync(int characterId, int accountId, int money,
+        int bigMoney, CancellationToken cancellationToken);
 }

@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using Fenrir.Application.Game.Domain.Commerce;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World;
@@ -77,13 +78,13 @@ public class OpenShopStallServiceProxyRegistrationTests
         var offlineShops = new OpenTrackingOfflineShopRepository();
         var gameSettings = new FixedGameSettingsRepository(7);
         var service = new OpenShopStallService(offlineShops, gameSettings, ZoneTestKit.EmptyWorldData(),
-            NullLogger<OpenShopStallService>.Instance);
+            new FakeEventLogRepository(), NullLogger<OpenShopStallService>.Instance);
 
         var packet = ProxyOpenRequest("MyStall");
         var listing = packet.PshopInfo with { UniqueNumber = unchecked(characterId * 2 + 1) };
 
         var response = await RunToCompletionAsync(
-            service.OpenProxyShopAsync(packet, zone, state!, characterId, listing, [], CancellationToken.None),
+            service.OpenProxyShopAsync(packet, zone, state!, characterId, 1, listing, [], CancellationToken.None),
             zone);
 
         Assert.Equal(0, response.Result);
@@ -107,12 +108,12 @@ public class OpenShopStallServiceProxyRegistrationTests
         var offlineShops = new OpenTrackingOfflineShopRepository { ThrowOnOpen = true };
         var gameSettings = new FixedGameSettingsRepository(7);
         var service = new OpenShopStallService(offlineShops, gameSettings, ZoneTestKit.EmptyWorldData(),
-            NullLogger<OpenShopStallService>.Instance);
+            new FakeEventLogRepository(), NullLogger<OpenShopStallService>.Instance);
 
         var packet = ProxyOpenRequest("MyStall");
         var listing = packet.PshopInfo with { UniqueNumber = unchecked(characterId * 2 + 1) };
 
-        var response = await service.OpenProxyShopAsync(packet, zone, state!, characterId, listing, [],
+        var response = await service.OpenProxyShopAsync(packet, zone, state!, characterId, 1, listing, [],
             CancellationToken.None);
 
         Assert.Equal(102, response.Result);
@@ -150,6 +151,11 @@ public class OpenShopStallServiceProxyRegistrationTests
 
         public ValueTask<(OfflineShopRowDto? Shop, IReadOnlyList<OfflineShopItemRowDto> Items)> GetByCharacterAsync(
             int characterId, CancellationToken ct)
+        {
+            throw new NotImplementedException();
+        }
+
+        public ValueTask<ReadOnlyCollection<OfflineShopOpenListingRowDto>> GetAllOpenAsync(CancellationToken ct)
         {
             throw new NotImplementedException();
         }

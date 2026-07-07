@@ -20,20 +20,89 @@ public sealed class OpenShopStallService(
     IOfflineShopRepository offlineShops,
     IGameSettingsRepository gameSettings,
     WorldDataCache worldData,
+    IEventLogRepository eventLog,
     ILogger<OpenShopStallService> logger) : IOpenShopStallService
 {
-    public OpenShopStallPrepareResult Prepare(OpenShopStallRequest packet, PlayerRuntimeState state)
+    /// <summary>
+    ///     mDATA.aAction.aSort's idle/ready pose sentinel -- the same value already independently established
+    ///     by <c>Zone</c>'s own private <c>IdleActionSort</c> (Zone.Stun.cs) and by the identical
+    ///     <c>ActionSort != 1</c> gate <c>MountStateResolver</c> and <c>GenericActionService</c> already apply
+    ///     for their own, unrelated actions.
+    /// </summary>
+    private const int IdleActionSort = 1;
+
+    /// <summary>
+    ///     game.EventLog.EventCode for a proxy-shop listing row (legacy <c>GL_1000_PXSHOP_REG</c>), scoped
+    ///     within <see cref="EventLogCategory.ProxyShop" /> -- see that enum member's remarks for the full
+    ///     1-4 numbering.
+    /// </summary>
+    private const short ProxyShopListEventCode = 1;
+
+    public async ValueTask<OpenShopStallPrepareResult> PrepareAsync(OpenShopStallRequest packet,
+        PlayerRuntimeState state, CancellationToken cancellationToken)
     {
         if (packet.Sort is not (1 or 2))
-            return new OpenShopStallPrepareResult(OpenShopStallPrepareOutcome.Abort, null, default, null);
+            return Abort();
+
+        // Server/ts25zone/S04_MyWork02.cpp:6056-6060 (mapcheck.h:189-244 CheckPossiblePShopRegion, zone-37
+        // case) -- the requester must be physically inside the fixed-center, 1000-unit-radius "market
+        // district" before EITHER shop type may open. Checked once here, ahead of the stationary-action-state
+        // gate below, exactly matching the legacy ordering; applies identically to both sort values (the
+        // legacy call site is made once, before the live/proxy handling paths diverge). Legacy disconnects
+        // the session outright on failure, with no response of any kind -- the same harsh treatment Abort()
+        // below already gives the adjacent invalid-sort-value and not-stationary guards.
+        if (!ProxyShopZonePolicy.IsWithinMarketDistrict(state.PosX, state.PosY, state.PosZ))
+            return Abort();
+
+        // Server/ts25zone/S04_MyWork02.cpp:6061-6065 -- the character must be recorded as stationary/idle
+        // (an exact match against the idle-pose sentinel) before EITHER shop type is allowed to open. Checked
+        // once here, ahead of the proxy/personal branch below and every later gate (already-open, name,
+        // per-slot inventory), exactly matching the legacy ordering. Legacy disconnects the session outright
+        // on any other recorded value -- the same harsh treatment the two gates immediately around it in the
+        // legacy handler apply, which Fenrir already mirrors via the shared Abort outcome below.
+        if (state.ActionSort != IdleActionSort)
+            return Abort();
 
         var isProxy = packet.Sort == 2;
 
-        if (!isProxy && state.PshopOpen)
-            return new OpenShopStallPrepareResult(OpenShopStallPrepareOutcome.Abort, null, default, null);
+        // Server/ts25zone/S04_MyWork02.cpp:6067-6078 -- the live/personal-shop-open flag blocks a request of
+        // EITHER type while it is set: a cross-type PROXY request gets a coded, non-disconnecting response
+        // (101); a same-type PERSONAL request is disconnected outright (Quit()), the same harsh treatment the
+        // two gates immediately around it in the legacy handler apply.
+        if (state.PshopOpen)
+        {
+            if (isProxy)
+                return Blocked(101, packet.PshopInfo);
+
+            return Abort();
+        }
+
+        if (!isProxy)
+        {
+            // Server/ts25zone/S04_MyWork02.cpp:6080-6095 -- opening a PERSONAL shop synchronously round-trips
+            // the proxy/offline-shop state (legacy: a ts25extra IPC call via
+            // U_ZONE_GET_PROXY_STATE_FOR_EXTRA_SEND; Fenrir: the repository the offline-shop feature itself
+            // persists through). An IPC/round-trip failure (103) and a confirmed-active proxy shop (102) are
+            // distinct legacy failure modes and must stay distinguishable here too.
+            OfflineShopRowDto? proxyShop;
+            try
+            {
+                (proxyShop, _) = await offlineShops.GetByCharacterAsync(state.CharacterId, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex,
+                    "Character {CharacterId} proxy-shop-state round trip failed while opening a personal shop",
+                    state.CharacterId);
+                return Blocked(103, packet.PshopInfo);
+            }
+
+            if (proxyShop is { ShopState: 1 })
+                return Blocked(102, packet.PshopInfo);
+        }
 
         if (string.IsNullOrWhiteSpace(packet.PshopInfo.Name))
-            return new OpenShopStallPrepareResult(OpenShopStallPrepareOutcome.Abort, null, default, null);
+            return Abort();
 
         var anyOccupied = false;
         for (var page = 0; page < PshopPurchasePolicy.MaxPages && !anyOccupied; page++)
@@ -45,7 +114,7 @@ public sealed class OpenShopStallService(
             }
 
         if (!anyOccupied)
-            return new OpenShopStallPrepareResult(OpenShopStallPrepareOutcome.Abort, null, default, null);
+            return Abort();
 
         // Validate every occupied slot against the LIVE inventory before touching anything.
         var offlineItems = new List<OfflineShopItemSlotTvp>();
@@ -59,14 +128,14 @@ public sealed class OpenShopStallService(
             if (view.InventoryPage is not (ContainerMatrix.InventoryPage0 or ContainerMatrix.InventoryPage1) ||
                 !ContainerMatrix.IsValidSlot((byte)view.InventoryPage, view.InventoryIndex) ||
                 view.PosX is < 0 or > 7 || view.PosY is < 0 or > 7)
-                return new OpenShopStallPrepareResult(OpenShopStallPrepareOutcome.Abort, null, default, null);
+                return Abort();
 
             worldData.ItemsById.TryGetValue(view.ItemId, out var itemDefinition);
             var liveSlot = state.Inventory.GetSlot((byte)view.InventoryPage, (byte)view.InventoryIndex);
 
             if (PshopPurchasePolicy.ValidateOpenSlot(view, itemDefinition, liveSlot) !=
                 PshopPurchasePolicy.OpenSlotOutcome.Success)
-                return new OpenShopStallPrepareResult(OpenShopStallPrepareOutcome.Abort, null, default, null);
+                return Abort();
 
             if (isProxy)
                 offlineItems.Add(new OfflineShopItemSlotTvp((short)(page * PshopPurchasePolicy.MaxSlots + slot),
@@ -88,11 +157,16 @@ public sealed class OpenShopStallService(
     }
 
     public async ValueTask<OpenShopStallResponse> OpenProxyShopAsync(OpenShopStallRequest packet, Zone zone,
-        PlayerRuntimeState state, int characterId, PshopInfo listing, List<OfflineShopItemSlotTvp> offlineItems,
-        CancellationToken cancellationToken)
+        PlayerRuntimeState state, int characterId, int accountId, PshopInfo listing,
+        List<OfflineShopItemSlotTvp> offlineItems, CancellationToken cancellationToken)
     {
         var page0 = state.Inventory.GetContainer(ContainerMatrix.InventoryPage0);
         var page1 = state.Inventory.GetContainer(ContainerMatrix.InventoryPage1);
+
+        // Captured per accepted slot for the GL_1000_PXSHOP_REG audit row below -- must be read from the
+        // LIVE inventory stack (not the wire-submitted PshopInfo slot, which carries no SocketGem1-3 fields
+        // at all) before that slot is removed from page0/page1.
+        var auditEntries = new List<ProxyShopListAuditEntry>();
 
         for (var page = 0; page < PshopPurchasePolicy.MaxPages; page++)
         for (var slot = 0; slot < PshopPurchasePolicy.MaxSlots; slot++)
@@ -100,6 +174,11 @@ public sealed class OpenShopStallService(
             var view = PshopPurchasePolicy.ReadSlot(packet.PshopInfo, page, slot);
             if (!view.IsOccupied)
                 continue;
+
+            var sourceContainer = view.InventoryPage == ContainerMatrix.InventoryPage0 ? page0 : page1;
+            if (sourceContainer.TryGetValue((byte)view.InventoryIndex, out var movedStack))
+                auditEntries.Add(new ProxyShopListAuditEntry(view.ItemId, view.Quantity, view.Value, view.Serial,
+                    view.Price, movedStack.SocketGem1, movedStack.SocketGem2, movedStack.SocketGem3));
 
             if (view.InventoryPage == ContainerMatrix.InventoryPage0)
                 page0 = page0.Remove((byte)view.InventoryIndex);
@@ -118,11 +197,25 @@ public sealed class OpenShopStallService(
         }
         catch (Exception ex)
         {
+            // Known overlap, not a bug: this 102 means "persisting THIS proxy-open itself failed" (the stored
+            // procedure's own CAS guard rejected an existing open/unclaimed shop row), a different cause from
+            // PrepareAsync's Blocked(102) ("a PERSONAL request found an already-active proxy shop"). Legacy's
+            // client-facing result-code space has no room for a fourth distinct code here, so both causes
+            // surface identically as 102 to the client -- this is an accepted wire-level ambiguity, not
+            // something Fenrir can resolve without inventing an unverified new code.
             logger.LogWarning(ex,
                 "Character {CharacterId} offline-shop open OpenAndReplaceContainersAsync failed (treated as already open)",
                 characterId);
             return new OpenShopStallResponse { Result = 102, PshopInfo = listing };
         }
+
+        // Logged only once OpenAndReplaceContainersAsync above has durably committed -- one row per accepted
+        // slot, matching legacy's own per-slot GL_1000_PXSHOP_REG call (Server/ts25zone/S07_MyGame09.cpp:491).
+        foreach (var entry in auditEntries)
+            await eventLog.LogAsync(ProxyShopListEventCode, EventLogCategory.ProxyShop, accountId, characterId,
+                null, null, null, null, null, entry.ItemId, entry.Quantity, 1,
+                $"Value={entry.Value};Serial={entry.Serial};Price={entry.Price};Socket1={entry.Socket1};Socket2={entry.Socket2};Socket3={entry.Socket3}",
+                cancellationToken);
 
         var response = new OpenShopStallResponse { Result = 0, PshopInfo = listing };
 
@@ -145,6 +238,21 @@ public sealed class OpenShopStallService(
         return response;
     }
 
+    private static OpenShopStallPrepareResult Abort()
+    {
+        return new OpenShopStallPrepareResult(OpenShopStallPrepareOutcome.Abort, null, default, null);
+    }
+
+    /// <summary>
+    ///     A cross-type "shop already open" outcome (result 101/102/103) -- no disconnect, no shop-state
+    ///     mutation. See <see cref="OpenShopStallPrepareOutcome.Blocked" />.
+    /// </summary>
+    private static OpenShopStallPrepareResult Blocked(int result, PshopInfo pshopInfo)
+    {
+        return new OpenShopStallPrepareResult(OpenShopStallPrepareOutcome.Blocked,
+            new OpenShopStallResponse { Result = result, PshopInfo = pshopInfo }, default, null);
+    }
+
     private static List<CharacterItemSlotTvp> ToTvps(ImmutableDictionary<byte, ItemStack> container)
     {
         var list = new List<CharacterItemSlotTvp>(container.Count);
@@ -152,4 +260,15 @@ public sealed class OpenShopStallService(
             list.Add(stack.ToTvp(slot));
         return list;
     }
+
+    /// <summary>One GL_1000_PXSHOP_REG audit row's worth of data for a single accepted listing slot.</summary>
+    private readonly record struct ProxyShopListAuditEntry(
+        int ItemId,
+        int Quantity,
+        int Value,
+        int Serial,
+        int Price,
+        int Socket1,
+        int Socket2,
+        int Socket3);
 }

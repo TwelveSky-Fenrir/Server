@@ -46,7 +46,7 @@ public class ZoneReadyServiceTests
     public void TribeMismatch_Rejects()
     {
         var zone = ZoneTestKit.CreateZone(1);
-        var (_, _, state) = Setup(zone, 10, 1);
+        var (_, _, state) = Setup(zone, 10);
         var service = new ZoneReadyService();
 
         // Client claims tribe 3 while the world-entry snapshot loaded tribe 1 -- a patched client.
@@ -60,7 +60,7 @@ public class ZoneReadyServiceTests
     public void StaleHeartbeat_Rejects()
     {
         var zone = ZoneTestKit.CreateZone(1);
-        var (_, _, state) = Setup(zone, 10, 1);
+        var (_, _, state) = Setup(zone, 10);
         state.LastSentHeartbeat = DateTime.UtcNow.AddSeconds(-11);
         var service = new ZoneReadyService();
 
@@ -73,7 +73,7 @@ public class ZoneReadyServiceTests
     public void FreshHeartbeat_Admits()
     {
         var zone = ZoneTestKit.CreateZone(1);
-        var (_, _, state) = Setup(zone, 10, 1);
+        var (_, _, state) = Setup(zone, 10);
         state.LastSentHeartbeat = DateTime.UtcNow.AddSeconds(-1);
         var service = new ZoneReadyService();
 
@@ -86,7 +86,7 @@ public class ZoneReadyServiceTests
     public void NeverSentHeartbeat_SkipsWatchdogGuard_Admits()
     {
         var zone = ZoneTestKit.CreateZone(1);
-        var (_, _, state) = Setup(zone, 10, 1);
+        var (_, _, state) = Setup(zone, 10);
         Assert.Null(state.LastSentHeartbeat); // never sent, matching legacy's mLastSentHeartbeat == -1
         var service = new ZoneReadyService();
 
@@ -99,7 +99,7 @@ public class ZoneReadyServiceTests
     public void AutoStateClaimedWithoutServerAutoHunt_RejectsOnThirdStrike()
     {
         var zone = ZoneTestKit.CreateZone(1);
-        var (_, _, state) = Setup(zone, 10, 1);
+        var (_, _, state) = Setup(zone, 10);
         state.AutoHuntEnabled = false;
         var service = new ZoneReadyService();
 
@@ -117,7 +117,7 @@ public class ZoneReadyServiceTests
     public void AutoStateClaimedWithServerAutoHuntEnabled_NeverStrikes()
     {
         var zone = ZoneTestKit.CreateZone(1);
-        var (_, _, state) = Setup(zone, 10, 1);
+        var (_, _, state) = Setup(zone, 10);
         state.AutoHuntEnabled = true;
         var service = new ZoneReadyService();
 
@@ -131,7 +131,7 @@ public class ZoneReadyServiceTests
     public void AutoStateZero_NeverStrikesRegardlessOfServerAutoHunt()
     {
         var zone = ZoneTestKit.CreateZone(1);
-        var (_, _, state) = Setup(zone, 10, 1);
+        var (_, _, state) = Setup(zone, 10);
         state.AutoHuntEnabled = false;
         var service = new ZoneReadyService();
 

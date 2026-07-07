@@ -4,11 +4,11 @@ CREATE PROCEDURE game.usp_OfflineShop_Close @CharacterId INT
 AS
 BEGIN
     SET
-NOCOUNT ON;
+        NOCOUNT ON;
     SET
-XACT_ABORT ON;
+        XACT_ABORT ON;
 
-DELETE
-FROM game.OfflineShops
-WHERE CharacterId = @CharacterId;
+    DELETE
+    FROM game.OfflineShops
+    WHERE CharacterId = @CharacterId;
 END;

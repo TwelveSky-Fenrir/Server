@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using Fenrir.Data.Abstractions.Characters;
 using Fenrir.Data.Abstractions.Commerce;
 
@@ -26,6 +27,11 @@ internal sealed class FakeOfflineShopRepository : IOfflineShopRepository
 
         return ValueTask.FromResult<(OfflineShopRowDto? Shop, IReadOnlyList<OfflineShopItemRowDto> Items)>(
             (null, Array.Empty<OfflineShopItemRowDto>()));
+    }
+
+    public ValueTask<ReadOnlyCollection<OfflineShopOpenListingRowDto>> GetAllOpenAsync(CancellationToken ct)
+    {
+        throw new NotSupportedException();
     }
 
     public ValueTask OpenAndReplaceContainersAsync(int characterId, short? zoneNumber, int shopDate,

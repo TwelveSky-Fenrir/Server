@@ -6,11 +6,8 @@ namespace Fenrir.Application.Game.Tests.TestSupport;
 // GmBlockAvatarService is the one caller that exercises CreateAsync, recorded here for assertion.
 internal sealed class FakeBanRepository(bool characterBanned = false, int nextBanId = 1) : IBanRepository
 {
-    public (int? AccountId, int? CharacterId, BanReason Reason, DateTime? ExpiresAtUtc)? LastCreatedBan
-    {
-        get;
-        private set;
-    }
+    public (int? AccountId, int? CharacterId, BanReason Reason, DateTime? ExpiresAtUtc, int? ActorAccountId,
+        int? ActorCharacterId)? LastCreatedBan { get; private set; }
 
     public ValueTask<bool> IsActiveForAccountAsync(int accountId, CancellationToken ct)
     {
@@ -23,9 +20,9 @@ internal sealed class FakeBanRepository(bool characterBanned = false, int nextBa
     }
 
     public ValueTask<int> CreateAsync(int? accountId, int? characterId, BanReason reason, DateTime? expiresAtUtc,
-        CancellationToken ct)
+        CancellationToken ct, int? actorAccountId = null, int? actorCharacterId = null)
     {
-        LastCreatedBan = (accountId, characterId, reason, expiresAtUtc);
+        LastCreatedBan = (accountId, characterId, reason, expiresAtUtc, actorAccountId, actorCharacterId);
         return ValueTask.FromResult(nextBanId);
     }
 }

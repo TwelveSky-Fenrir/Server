@@ -21,28 +21,27 @@
 -- with the five write statements wrapped in one explicit transaction. The two pre-checks (slot/name already
 -- taken) stay outside the transaction since they are read-only and the table's own UNIQUE constraints are
 -- still the concurrent-race backstop, exactly as before.
-CREATE OR ALTER PROCEDURE game.usp_Character_CreateWithStarterKit
-    @AccountId INT,
-    @Slot TINYINT,
-    @Name NVARCHAR(13),
-    @Tribe TINYINT,
-    @Gender TINYINT,
-    @HeadType TINYINT,
-    @FaceType TINYINT,
-    @MapId SMALLINT,
-    @PosX REAL,
-    @PosY REAL,
-    @PosZ REAL,
-    @Life INT,
-    @MaxLife INT,
-    @Mana INT,
-    @MaxMana INT,
-    @WelcomeBuffUntilDate INT,
-    @PremiumUntilUnixSeconds BIGINT,
-    @Equipment game.tvp_CharacterItemSlot READONLY,
-    @Inventory game.tvp_CharacterItemSlot READONLY,
-    @Skills game.tvp_CharacterSkillSlot READONLY,
-    @Hotkeys game.tvp_CharacterHotkeySlot READONLY
+CREATE OR ALTER PROCEDURE game.usp_Character_CreateWithStarterKit @AccountId INT,
+                                                                  @Slot TINYINT,
+                                                                  @Name NVARCHAR(13),
+                                                                  @Tribe TINYINT,
+                                                                  @Gender TINYINT,
+                                                                  @HeadType TINYINT,
+                                                                  @FaceType TINYINT,
+                                                                  @MapId SMALLINT,
+                                                                  @PosX REAL,
+                                                                  @PosY REAL,
+                                                                  @PosZ REAL,
+                                                                  @Life INT,
+                                                                  @MaxLife INT,
+                                                                  @Mana INT,
+                                                                  @MaxMana INT,
+                                                                  @WelcomeBuffUntilDate INT,
+                                                                  @PremiumUntilUnixSeconds BIGINT,
+                                                                  @Equipment game.tvp_CharacterItemSlot READONLY,
+                                                                  @Inventory game.tvp_CharacterItemSlot READONLY,
+                                                                  @Skills game.tvp_CharacterSkillSlot READONLY,
+                                                                  @Hotkeys game.tvp_CharacterHotkeySlot READONLY
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -54,7 +53,10 @@ BEGIN
     IF EXISTS (SELECT 1 FROM game.Characters WHERE Name = @Name)
         THROW 50202, 'Character name already taken.', 1;
 
-    DECLARE @CharacterId TABLE (CharacterId INT);
+    DECLARE @CharacterId TABLE
+                         (
+                             CharacterId INT
+                         );
 
     BEGIN TRANSACTION;
 
@@ -72,9 +74,10 @@ BEGIN
      StatPoints, SkillPoints,
      MountItemId, MountExpActivity, MountPower, MountSlotIndex, MountTime,
      DoubleExpTime1, DoubleExpTime2, AutoBuffTime, PremiumExpireUtc)
-        OUTPUT INSERTED.CharacterId INTO @CharacterId
-    VALUES
-        (@AccountId, @Slot, @Name, @Tribe, @Gender, @HeadType, @FaceType, @MapId, @PosX, @PosY, @PosZ, @Life, @MaxLife, @Mana, @MaxMana, 1, 1, 1, 1, 640000000, 100, 145, 12, 0, 2000000000, 0, 3175, 10000, 1301, 0, 5, 0, 99999999, @WelcomeBuffUntilDate, @WelcomeBuffUntilDate, @WelcomeBuffUntilDate, @PremiumUntilUnixSeconds);
+    OUTPUT INSERTED.CharacterId INTO @CharacterId
+    VALUES (@AccountId, @Slot, @Name, @Tribe, @Gender, @HeadType, @FaceType, @MapId, @PosX, @PosY, @PosZ, @Life,
+            @MaxLife, @Mana, @MaxMana, 1, 1, 1, 1, 640000000, 100, 145, 12, 0, 2000000000, 0, 3175, 10000, 1301, 0, 5,
+            0, 99999999, @WelcomeBuffUntilDate, @WelcomeBuffUntilDate, @WelcomeBuffUntilDate, @PremiumUntilUnixSeconds);
 
     DECLARE @NewCharacterId INT = (SELECT CharacterId FROM @CharacterId);
 

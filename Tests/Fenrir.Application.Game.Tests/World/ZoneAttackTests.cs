@@ -57,6 +57,17 @@ public class ZoneAttackTests
         Assert.True(zone.TryGetPlayer(2, out var defender));
         attacker!.Stats = StrongAttacker;
         defender!.Stats = WeakDefender;
+        // Legal, already-acting pose -- a real client's own attack is always preceded by an avatar-action
+        // packet that sets this, and CombatResolver.ResolveEnemyTribeAttack now rejects a defender whose
+        // ActionSort is still the never-initialized 0 (NoActionYetSort) or 12 (DeathPoseSort). See
+        // PlayerRuntimeState.ActionSort's own remarks for why this is set per-fixture rather than defaulted.
+        defender.ActionSort = 1;
+
+        // This suite exercises combat resolution, not the attack sub-packet budget/replay guard (that's
+        // AttackPacketBudgetTests' own job) -- a real client always sends a legal avatar-action packet first
+        // to establish a non-zero ceiling, which these fixtures skip. Uncapped here so a raw CombatCommand
+        // posted straight after Enter isn't silently rejected by AttackPacketBudget.TryConsume.
+        attacker.AttackSubPacketCeiling = int.MaxValue;
 
         // past both sides' zone-entry protect window, else every attack below is rejected as Attacker/DefenderProtected
         zone.Tick(CombatResolver.ProtectDuration + TimeSpan.FromSeconds(1));
@@ -103,7 +114,13 @@ public class ZoneAttackTests
         Assert.True(zone.TryGetPlayer(2, out var defender));
         attacker!.Stats = StrongAttacker;
         defender!.Stats = WeakDefender;
+        // Legal, already-acting pose -- a real client's own attack is always preceded by an avatar-action
+        // packet that sets this, and CombatResolver.ResolveEnemyTribeAttack now rejects a defender whose
+        // ActionSort is still the never-initialized 0 (NoActionYetSort) or 12 (DeathPoseSort). See
+        // PlayerRuntimeState.ActionSort's own remarks for why this is set per-fixture rather than defaulted.
+        defender.ActionSort = 1;
         defender.Life = 1; // one hit will kill regardless of exact damage roll
+        attacker.AttackSubPacketCeiling = int.MaxValue; // see TwoPlayerZone's own remarks
 
         zone.Tick(CombatResolver.ProtectDuration + TimeSpan.FromSeconds(1)); // past the zone-entry protect window
 
@@ -125,6 +142,30 @@ public class ZoneAttackTests
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.Equal(lifeBefore, defender.Life);
+    }
+
+    /// <summary>
+    ///     pvp-flagging-safezone-rules finding (Critical): zone 324 and FFAMAPNUM/335 skip the same-tribe/
+    ///     allied-tribe rejection entirely inside <c>AttackPlayer</c>'s non-duel branch
+    ///     (<c>Server/ts25zone/S07_MyGame02.cpp:952-958</c>) -- same-tribe damage must land on these two maps even
+    ///     though the identical attack is rejected everywhere else, see <see cref="SameTribe_NoDamageApplied" />.
+    /// </summary>
+    [Theory]
+    [InlineData((short)324)]
+    [InlineData((short)335)]
+    public void SameTribe_OnOpenPvpMap_DamageIsApplied(short mapId)
+    {
+        Assert.True(ZonePvpZoneCatalog.IsSameTribeAttackExempt(mapId));
+        Assert.True(ZonePvpZoneCatalog.AllowsEnemyTribeAttack(mapId)); // zone-wide gate must already pass too
+
+        var zone = TwoPlayerZone(out _, out _, 0, 0, mapId);
+        Assert.True(zone.TryGetPlayer(2, out var defender));
+        var lifeBefore = defender!.Life;
+
+        zone.PostCombatCommand(new CombatCommand { AttackerCharacterId = 1, AttackInfo = MeleeRequest(1, 2) });
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.True(defender.Life < lifeBefore);
     }
 
     /// <summary>
@@ -169,8 +210,54 @@ public class ZoneAttackTests
         Assert.True(defender.Life < lifeBefore);
     }
 
+    /// <summary>
+    ///     pvp-flagging-safezone-rules finding (Major): zone 2 (one of the nine home-tribe-district sub-zones,
+    ///     <c>Server/ts25zone/S07_MyGame02.cpp:960-976</c>) blocks a level-90+ attacker from landing a hit on a
+    ///     sub-90 defender, even though the zone-wide gate and the tribe check both already pass.
+    /// </summary>
+    [Fact]
+    public void NewbieProtectionZone_HighLevelAttacker_CannotDamageLowLevelDefender()
+    {
+        Assert.True(ZonePvpZoneCatalog.IsNewbieProtectionZone(2));
+
+        var zone = TwoPlayerZone(out _, out _, mapId: 2);
+        Assert.True(zone.TryGetPlayer(1, out var attacker));
+        Assert.True(zone.TryGetPlayer(2, out var defender));
+        attacker!.Level = 90;
+        defender!.Level = 89;
+        var lifeBefore = defender.Life;
+
+        zone.PostCombatCommand(new CombatCommand { AttackerCharacterId = 1, AttackInfo = MeleeRequest(1, 2) });
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.Equal(lifeBefore, defender.Life);
+    }
+
+    /// <summary>
+    ///     Same gate, capital-plaza exception: zone 1 is conspicuously absent from the legacy switch's case
+    ///     list, so the identical level gap that's rejected in
+    ///     <see cref="NewbieProtectionZone_HighLevelAttacker_CannotDamageLowLevelDefender" /> must land here.
+    /// </summary>
+    [Fact]
+    public void CapitalPlazaZone_HighLevelAttacker_CanStillDamageLowLevelDefender()
+    {
+        Assert.False(ZonePvpZoneCatalog.IsNewbieProtectionZone(1));
+
+        var zone = TwoPlayerZone(out _, out _, mapId: 1);
+        Assert.True(zone.TryGetPlayer(1, out var attacker));
+        Assert.True(zone.TryGetPlayer(2, out var defender));
+        attacker!.Level = 90;
+        defender!.Level = 89;
+        var lifeBefore = defender.Life;
+
+        zone.PostCombatCommand(new CombatCommand { AttackerCharacterId = 1, AttackInfo = MeleeRequest(1, 2) });
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.True(defender.Life < lifeBefore);
+    }
+
     [Theory]
-    [InlineData(1)] // duel -- no duel subsystem modeled
+    [InlineData(1)] // duel -- attacker/defender here share no active duel, see ZoneDuelCombatTests for mCase 1 itself
     [InlineData(3)] // PvM -- no monster entities yet
     [InlineData(4)] // MvP
     [InlineData(5)] // stun

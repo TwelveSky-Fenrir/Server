@@ -59,7 +59,7 @@ public class EquipmentServiceTests
 
     private static CharacterBaseAttributes NoBonusAttributes()
     {
-        return new CharacterBaseAttributes(0, 0, 0, 0, 1, 0, 0, 0, 0);
+        return new CharacterBaseAttributes(0, 0, 0, 0, 1, 0, 0, 0, 0, 0);
     }
 
     [Fact]

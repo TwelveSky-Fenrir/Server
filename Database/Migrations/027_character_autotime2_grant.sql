@@ -73,7 +73,8 @@
 --     own PlayerEnterData construction) -- adding just AutoTime2 there would be an inconsistent partial fix of
 --     a larger, separately-scoped gap, not a targeted completion of this one.
 ALTER TABLE game.Characters
-    ADD AutoTime2 INT NOT NULL CONSTRAINT DF_Characters_AutoTime2 DEFAULT 0;
+    ADD AutoTime2 INT NOT NULL
+        CONSTRAINT DF_Characters_AutoTime2 DEFAULT 0;
 GO
 
 ALTER TABLE game.Characters
@@ -85,29 +86,28 @@ GO
 -- full citation). No new stored-procedure parameter: like ProtectForDeath/DoubleExpTime1/DoubleExpTime2, the
 -- granted value is a fixed literal that does not vary by tribe/previous-tribe/gender, so it is baked directly
 -- into the VALUES clause next to those other constants rather than round-tripped as a parameter.
-CREATE OR ALTER PROCEDURE game.usp_Character_CreateWithStarterKit
-    @AccountId INT,
-    @Slot TINYINT,
-    @Name NVARCHAR(13),
-    @Tribe TINYINT,
-    @Gender TINYINT,
-    @HeadType TINYINT,
-    @FaceType TINYINT,
-    @MapId SMALLINT,
-    @PosX REAL,
-    @PosY REAL,
-    @PosZ REAL,
-    @Life INT,
-    @MaxLife INT,
-    @Mana INT,
-    @MaxMana INT,
-    @WelcomeBuffUntilDate INT,
-    @PremiumUntilUnixSeconds BIGINT,
-    @Equipment game.tvp_CharacterItemSlot READONLY,
-    @Inventory game.tvp_CharacterItemSlot READONLY,
-    @Skills game.tvp_CharacterSkillSlot READONLY,
-    @Hotkeys game.tvp_CharacterHotkeySlot READONLY,
-    @PreviousTribe TINYINT = 0
+CREATE OR ALTER PROCEDURE game.usp_Character_CreateWithStarterKit @AccountId INT,
+                                                                  @Slot TINYINT,
+                                                                  @Name NVARCHAR(13),
+                                                                  @Tribe TINYINT,
+                                                                  @Gender TINYINT,
+                                                                  @HeadType TINYINT,
+                                                                  @FaceType TINYINT,
+                                                                  @MapId SMALLINT,
+                                                                  @PosX REAL,
+                                                                  @PosY REAL,
+                                                                  @PosZ REAL,
+                                                                  @Life INT,
+                                                                  @MaxLife INT,
+                                                                  @Mana INT,
+                                                                  @MaxMana INT,
+                                                                  @WelcomeBuffUntilDate INT,
+                                                                  @PremiumUntilUnixSeconds BIGINT,
+                                                                  @Equipment game.tvp_CharacterItemSlot READONLY,
+                                                                  @Inventory game.tvp_CharacterItemSlot READONLY,
+                                                                  @Skills game.tvp_CharacterSkillSlot READONLY,
+                                                                  @Hotkeys game.tvp_CharacterHotkeySlot READONLY,
+                                                                  @PreviousTribe TINYINT = 0
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -119,7 +119,10 @@ BEGIN
     IF EXISTS (SELECT 1 FROM game.Characters WHERE Name = @Name)
         THROW 50202, 'Character name already taken.', 1;
 
-    DECLARE @CharacterId TABLE (CharacterId INT);
+    DECLARE @CharacterId TABLE
+                         (
+                             CharacterId INT
+                         );
 
     BEGIN TRANSACTION;
 
@@ -148,9 +151,10 @@ BEGIN
      MountItemId, MountExpActivity, MountPower, MountSlotIndex, MountTime,
      ProtectForDeath, AutoTime2,
      DoubleExpTime1, DoubleExpTime2, AutoBuffTime, PremiumExpireUtc)
-        OUTPUT INSERTED.CharacterId INTO @CharacterId
-    VALUES
-        (@AccountId, @Slot, @Name, @Tribe, @PreviousTribe, @Gender, @HeadType, @FaceType, @MapId, @PosX, @PosY, @PosZ, @Life, @MaxLife, @Mana, @MaxMana, 1, 1, 1, 1, 640000000, 100, 145, 12, 0, 2000000000, 0, 3175, 10000, 1301, 0, 5, 0, 99999999, 5, 1440, 300, 300, @WelcomeBuffUntilDate, @PremiumUntilUnixSeconds);
+    OUTPUT INSERTED.CharacterId INTO @CharacterId
+    VALUES (@AccountId, @Slot, @Name, @Tribe, @PreviousTribe, @Gender, @HeadType, @FaceType, @MapId, @PosX, @PosY,
+            @PosZ, @Life, @MaxLife, @Mana, @MaxMana, 1, 1, 1, 1, 640000000, 100, 145, 12, 0, 2000000000, 0, 3175, 10000,
+            1301, 0, 5, 0, 99999999, 5, 1440, 300, 300, @WelcomeBuffUntilDate, @PremiumUntilUnixSeconds);
 
     DECLARE @NewCharacterId INT = (SELECT CharacterId FROM @CharacterId);
 

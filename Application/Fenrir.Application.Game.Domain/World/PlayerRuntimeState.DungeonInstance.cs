@@ -65,9 +65,11 @@ public partial class PlayerRuntimeState
     public DungeonInstanceLifecycle DungeonInstanceLifecycleState { get; set; } = DungeonInstanceLifecycle.Idle;
 
     /// <summary>
-    ///     <c>DUNGEON_INSTANCE::mTick</c> -- elapsed ticks since the instance was last armed; reset to 0 by
-    ///     <c>Zone.TryEnterZone241PersonalInstance</c>, incremented once per tick by
-    ///     <c>Zone.AdvanceZone241PersonalDungeonInstances</c> while non-<see cref="DungeonInstanceLifecycle.Idle" />.
+    ///     <c>DUNGEON_INSTANCE::mTick</c> -- elapsed legacy (500 ms) ticks since the instance was last armed;
+    ///     reset to 0 by <c>Zone.TryEnterZone241PersonalInstance</c>, advanced by however many legacy ticks
+    ///     elapsed each time <c>Zone.AdvanceZone241PersonalDungeonInstances</c> runs (once per legacy tick that
+    ///     elapses, not once per physical 20 Hz frame -- see that method's own remarks) while
+    ///     non-<see cref="DungeonInstanceLifecycle.Idle" />.
     /// </summary>
     public int DungeonInstanceTick { get; set; }
 

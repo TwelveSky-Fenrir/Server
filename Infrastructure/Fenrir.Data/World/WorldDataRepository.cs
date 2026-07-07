@@ -203,4 +203,18 @@ public sealed record WorldDataRepository(ICaeriusNetDbContext Db) : IWorldDataRe
 
         return await Db.QueryAsReadOnlyCollectionAsync<RewardBundleItemRowDto>(sp, ct);
     }
+
+    // Fixed result-set order: skill, item, costume equivalences. Capacity is the summed real row count
+    // across all 3 result sets (40*3 + 131*3 + 27*3 = 594 -- see Tables/world/Tribe*Equivalences.sql).
+    public async ValueTask<(
+            ReadOnlyCollection<TribeSkillEquivalenceRowDto> SkillEquivalences,
+            ReadOnlyCollection<TribeItemEquivalenceRowDto> ItemEquivalences,
+            ReadOnlyCollection<TribeCostumeEquivalenceRowDto> CostumeEquivalences)>
+        GetTribeConversionCatalogAsync(CancellationToken ct)
+    {
+        var sp = new StoredProcedureParametersBuilder("world", "usp_TribeConversionCatalog_GetAll", 594).Build();
+
+        return await Db.QueryMultipleReadOnlyCollectionAsync<
+            TribeSkillEquivalenceRowDto, TribeItemEquivalenceRowDto, TribeCostumeEquivalenceRowDto>(sp, ct);
+    }
 }

@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using Fenrir.Application.Game.Domain.Commerce;
 using Fenrir.Application.Game.Domain.Movement;
 using Fenrir.Application.Game.Domain.Simulation;
@@ -110,6 +111,11 @@ public class ProxyShopExpiryFlushHostTests
 
         public ValueTask<(OfflineShopRowDto? Shop, IReadOnlyList<OfflineShopItemRowDto> Items)> GetByCharacterAsync(
             int characterId, CancellationToken ct)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask<ReadOnlyCollection<OfflineShopOpenListingRowDto>> GetAllOpenAsync(CancellationToken ct)
         {
             throw new NotSupportedException();
         }

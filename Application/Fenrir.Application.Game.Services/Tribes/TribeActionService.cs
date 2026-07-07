@@ -72,8 +72,8 @@ public sealed class TribeActionService(
         var refund = state.StatVit + state.StatStr + state.StatInt + state.StatDex - 4;
         var newStatPoints = state.StatPoints + refund;
 
-        var attributes = new CharacterBaseAttributes(1, 1, 1, 1, state.Level, state.Tribe, state.Title, state.Halo,
-            state.RebirthCount);
+        var attributes = new CharacterBaseAttributes(1, 1, 1, 1, state.Level, state.Tribe, state.PreviousTribe,
+            state.Title, state.Halo, state.RebirthCount);
         var equipmentContainer = state.Inventory.GetContainer(ContainerMatrix.Equipment);
         var updatedStats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData,
             pet: ComputePetContribution(state, equipmentContainer));
@@ -228,7 +228,7 @@ public sealed class TribeActionService(
         var newTitle = (payload.TitleSort - 1) * 100 + currentRank + 1;
 
         var attributes = new CharacterBaseAttributes(state.StatVit, state.StatStr, state.StatInt, state.StatDex,
-            state.Level, state.Tribe, newTitle, state.Halo, state.RebirthCount);
+            state.Level, state.Tribe, state.PreviousTribe, newTitle, state.Halo, state.RebirthCount);
         var equipmentContainer = state.Inventory.GetContainer(ContainerMatrix.Equipment);
         var updatedStats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData,
             pet: ComputePetContribution(state, equipmentContainer));
@@ -275,7 +275,7 @@ public sealed class TribeActionService(
         if (outcome is TribeHaloEnchantOutcome.Success or TribeHaloEnchantOutcome.Downgraded)
         {
             var attributes = new CharacterBaseAttributes(state.StatVit, state.StatStr, state.StatInt, state.StatDex,
-                state.Level, state.Tribe, state.Title, newHalo, state.RebirthCount);
+                state.Level, state.Tribe, state.PreviousTribe, state.Title, newHalo, state.RebirthCount);
             var equipmentContainer = state.Inventory.GetContainer(ContainerMatrix.Equipment);
             var updatedStats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData,
                 pet: ComputePetContribution(state, equipmentContainer));
@@ -352,7 +352,7 @@ public sealed class TribeActionService(
         bool on, CancellationToken ct)
     {
         var attributes = new CharacterBaseAttributes(state.StatVit, state.StatStr, state.StatInt, state.StatDex,
-            state.Level, state.Tribe, state.Title, state.Halo, state.RebirthCount);
+            state.Level, state.Tribe, state.PreviousTribe, state.Title, state.Halo, state.RebirthCount);
         var equipmentContainer = state.Inventory.GetContainer(ContainerMatrix.Equipment);
         var updatedStats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData,
             pet: ComputePetContribution(state, equipmentContainer));
@@ -393,7 +393,7 @@ public sealed class TribeActionService(
 
         var newRebirthCount = state.RebirthCount + 1;
         var attributes = new CharacterBaseAttributes(state.StatVit, state.StatStr, state.StatInt, state.StatDex,
-            state.Level, state.Tribe, state.Title, state.Halo, newRebirthCount);
+            state.Level, state.Tribe, state.PreviousTribe, state.Title, state.Halo, newRebirthCount);
         var equipmentContainer = state.Inventory.GetContainer(ContainerMatrix.Equipment);
         var updatedStats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData,
             pet: ComputePetContribution(state, equipmentContainer));

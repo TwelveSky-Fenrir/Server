@@ -13,7 +13,8 @@ namespace Fenrir.Application.Game.Hosting.Progression;
 ///     <see cref="Interval" /> of dirty tower state (Level/TowerType/ControllingTribeId -- see
 ///     <see cref="TowerWarState" />'s own remarks for what does and doesn't persist). <see cref="Interval" />
 ///     was tightened from the original 5s to 2s in this pass specifically BECAUSE it was free to do so:
-///     <see cref="TowerWarState.FlushDirtyAsync" />'s per-cycle cost with nothing dirty is an O(<see cref="TowerWarState.TowerCount" />
+///     <see cref="TowerWarState.FlushDirtyAsync" />'s per-cycle cost with nothing dirty is an O(
+///     <see cref="TowerWarState.TowerCount" />
 ///     = 12) array-of-bool scan, no DB round trip, and a tower only becomes dirty on a guardian
 ///     creation/level-change/death event -- rare compared to the polling cadence, unlike the continuously-dirty
 ///     Position/Progress cache (see <c>PositionWriteBehindHost</c>'s own remarks for why THAT one was not

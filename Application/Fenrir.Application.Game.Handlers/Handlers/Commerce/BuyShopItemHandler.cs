@@ -13,6 +13,15 @@ namespace Fenrir.Application.Game.Handlers.Handlers.Commerce;
 ///     CharacterId first to avoid deadlock. Gated by <see cref="NpcShopPolicy.TownZoneNumbers" />,
 ///     deliberately asymmetric with the other PShop opcodes' zone-37-only gate.
 /// </summary>
+/// <remarks>
+///     Réf. C++ : Server/ts25zone/S04_MyWork02.cpp:6925-7124. This handler's own <c>session</c> is always the
+///     BUYER's connection, so it only ever sends the buyer-facing messages (purchase-result, then listing
+///     refresh); the SELLER's own notifications (item-sold, self-view listing refresh, and -- if the sale
+///     emptied the stall -- stall-closed plus the AOI avatar-action broadcast) are delivered on the seller's
+///     own connection by the zone tick that drains the <c>PshopZoneCommand</c> this handler's service posts
+///     (<c>Zone.ApplyPshopCommand</c>) -- this handler must never itself send a seller-facing packet, since
+///     <c>session</c> here never belongs to the seller (Server/ts25zone/S04_MyWork02.cpp:7067-7071,7096-7100,7102-7120).
+/// </remarks>
 public sealed class BuyShopItemHandler(IBuyShopItemService service) : IAsyncPacketHandler<BuyShopItemRequest>
 {
     public async ValueTask HandleAsync(BuyShopItemRequest packet, IPacketSession session,
@@ -54,8 +63,8 @@ public sealed class BuyShopItemHandler(IBuyShopItemService service) : IAsyncPack
                 }
 
                 session.Send(commit.Response!.Value);
-                if (commit.ShopClosed)
-                    session.Send(new CloseShopStallResponse { Result = 1 });
+                if (commit.ListingRefresh is { } listingRefresh)
+                    session.Send(listingRefresh);
             }
             finally
             {

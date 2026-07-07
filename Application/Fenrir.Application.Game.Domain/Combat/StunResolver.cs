@@ -168,6 +168,20 @@ public static class StunResolver
     private const int OrdinaryStunRollRange = 500;
 
     /// <summary>
+    ///     The literal block-value override applied when the defender's buff slot 13 ("Stun Defense") is
+    ///     active, in the production (LNW33) build (<c>S07_MyGame02.cpp:3645-3653</c>):
+    ///     <c>
+    ///         atk.tAttackBlockValue
+    ///         = 100;
+    ///     </c>
+    ///     . A finite, beatable mitigation, not an unconditional immunity -- a sufficiently high
+    ///     stun-attack success value can still exceed it. The alternate, non-production build variant (dead
+    ///     code, <c>#ifndef LNW33</c>) instead scales the previously computed block value by the buff
+    ///     magnitude; that branch is confirmed never compiled and is not reproduced here.
+    /// </summary>
+    private const int StunDefenseBuffBlockValue = 100;
+
+    /// <summary>
     ///     The stun-resist skill family scanned among the defender's equipped/learned skills, first match wins
     ///     (<c>S07_MyGame02.cpp:3609-3634</c>) -- also the only ids <c>ProcessAttack06</c>'s own echo check
     ///     recognizes (see <see cref="UnstunResolver.StunResistSkillIds" />, the same triple).
@@ -222,11 +236,11 @@ public static class StunResolver
             // precedence over the buff-13 override below (legacy checks skill==80 first).
             block = 0;
         else if (request.DefenderHasStunImmunityBuff)
-            // Buff slot 13 ("Stun Defense") forces block to a "flat maximum" in the production (LNW33) build
-            // (:3645-3653) -- no exact literal constant is cited, so this reproduces the qualitative
-            // "practically unstunnable" behavior via a sentinel guaranteed to beat any realistic success
-            // value, rather than guessing a specific number.
-            block = int.MaxValue;
+            // Buff slot 13 ("Stun Defense") REPLACES whatever the resist-skill scan computed (skill-derived,
+            // or zero) with the literal 100 in the production (LNW33) build (:3645-3653) -- a finite, beatable
+            // mitigation, not absolute immunity: the success roll below can still exceed it for a
+            // high-enough-grade attacker skill.
+            block = StunDefenseBuffBlockValue;
         else if (request.DefenderStunResistSkill is { } resistSkill)
             block = (int)SkillCatalog.ReturnSkillValue(resistSkill, request.DefenderStunResistGradePoints,
                 SkillValueKind.StunDefense);

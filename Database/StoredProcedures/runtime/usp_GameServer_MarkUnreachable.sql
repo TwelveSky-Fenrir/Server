@@ -6,11 +6,12 @@
 -- already evicted by a concurrent caller racing the same probe failure, is a silent no-op -- "already
 -- gone" is the desired end state here, never an error.
 CREATE PROCEDURE runtime.usp_GameServer_MarkUnreachable @ShardId TINYINT
-WITH NATIVE_COMPILATION, SCHEMABINDING
+    WITH NATIVE_COMPILATION , SCHEMABINDING
 AS
-BEGIN ATOMIC
-WITH (TRANSACTION ISOLATION LEVEL = SNAPSHOT, LANGUAGE = N'us_english')
-DELETE
-FROM runtime.GameServerDirectory
-WHERE ShardId = @ShardId;
+BEGIN
+    ATOMIC
+    WITH (TRANSACTION ISOLATION LEVEL = SNAPSHOT, LANGUAGE = N'us_english')
+    DELETE
+    FROM runtime.GameServerDirectory
+    WHERE ShardId = @ShardId;
 END;

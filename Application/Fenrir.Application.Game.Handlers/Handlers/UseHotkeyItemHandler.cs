@@ -7,13 +7,25 @@ using Fenrir.Network.Serialization.Packets.Zone;
 namespace Fenrir.Application.Game.Handlers.Handlers;
 
 /// <summary>
-///     op22, CZ_USE_HOTKEY_ITEM_SEND -- NOT a hotkey assignment; the client already resolved the hotkey to an
-///     inventory page/slot locally, so this only validates that slot is occupied and echoes the result.
+///     op22, CZ_USE_HOTKEY_ITEM_SEND -- NOT a hotkey assignment; activates whatever is already bound at the
+///     given hotkey (page, index). Only item-kind bindings are resolved to a real effect today (world.Items
+///     iSort==2, the generic consumable/potion family, potion-type codes 1-5 for life/mana gain and 9 as a
+///     genuine no-op) -- see <c>HotkeyItemConsumptionResolver</c>'s own remarks for which potion-type codes
+///     (6, 12-16) are recognized but still a deliberate clean-reject pending their own wire-notification
+///     citation.
 /// </summary>
-/// <remarks>Does not yet apply the item's use effect or decrement quantity -- out of scope for this pass.</remarks>
-public sealed class UseHotkeyItemHandler(IUseHotkeyItemService service) : IInlinePacketHandler<UseHotkeyItemRequest>
+/// <remarks>
+///     Réf. C++ : Server/ts25zone/S04_MyWork02.cpp:2203-2492 (full <c>BEGIN_CZ(USE_HOTKEY_ITEM_SEND)</c>
+///     handler: page/index bounds check, hotkey-kind switch, action-state block-list, item lookup/category/
+///     quantity checks, the per-potion-type switch, the unconditional decrement-then-acknowledge tail, and the
+///     post-acknowledgment stat/effect application). See <c>HotkeyItemConsumptionResolver</c>'s own remarks
+///     for the full citation trail (MAX_HOT_KEY_PAGE/NUM, MAX_POTION_SORT_NUM, the "may eat potion" flag's two
+///     writers).
+/// </remarks>
+public sealed class UseHotkeyItemHandler(IUseHotkeyItemService service) : IAsyncPacketHandler<UseHotkeyItemRequest>
 {
-    public void Handle(in UseHotkeyItemRequest packet, IPacketSession session)
+    public async ValueTask HandleAsync(UseHotkeyItemRequest packet, IPacketSession session,
+        CancellationToken cancellationToken)
     {
         var zoneSession = (ZoneClientSession)session;
         var characterId = zoneSession.CharacterId!.Value;
@@ -25,8 +37,31 @@ public sealed class UseHotkeyItemHandler(IUseHotkeyItemService service) : IInlin
         var page = packet.Page1;
         var index = packet.Index1;
 
-        var occupied = service.IsOccupied(state, page, index);
+        UseHotkeyItemOutcome outcome;
+        await state.EconomyActionLock.WaitAsync(cancellationToken);
+        try
+        {
+            outcome = await service.UseAsync(zone, state, characterId, page, index, cancellationToken);
+        }
+        finally
+        {
+            state.EconomyActionLock.Release();
+        }
 
-        session.Send(new UseHotkeyItemResponse { Result = occupied ? 0 : 1, Page = page, Index = index });
+        switch (outcome)
+        {
+            case UseHotkeyItemOutcome.Disconnect:
+                // Malformed input or corrupted/stale state (bad page/index, non-item binding, unresolved
+                // item id, wrong item category, exhausted quantity, or an unrecognized potion-type code) --
+                // no ack is sent, matching the legacy handler's own Quit() on every one of these branches.
+                zoneSession.Abort(DisconnectReason.Malformed);
+                return;
+            case UseHotkeyItemOutcome.RejectedClean:
+                session.Send(new UseHotkeyItemResponse { Result = 1, Page = page, Index = index });
+                return;
+            default:
+                session.Send(new UseHotkeyItemResponse { Result = 0, Page = page, Index = index });
+                return;
+        }
     }
 }

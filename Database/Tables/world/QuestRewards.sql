@@ -6,8 +6,8 @@ CREATE TABLE world.QuestRewards
     QuestId    INT     NOT NULL,
     SlotIndex  TINYINT NOT NULL, -- 0..2, legacy qReward row position
     RewardType TINYINT NOT NULL, -- legacy qReward[slot][0], see header comment
-    ItemId     INT NULL,         -- legacy qReward[slot][1] as an ItemId; RewardType=6 only
-    Amount     INT NULL,         -- legacy qReward[slot][1] as a scalar amount; RewardType IN (2,3,4,5)
+    ItemId     INT     NULL,     -- legacy qReward[slot][1] as an ItemId; RewardType=6 only
+    Amount     INT     NULL,     -- legacy qReward[slot][1] as a scalar amount; RewardType IN (2,3,4,5)
     CONSTRAINT PK_QuestRewards PRIMARY KEY CLUSTERED (QuestId, SlotIndex),
     CONSTRAINT FK_QuestRewards_Quest FOREIGN KEY (QuestId) REFERENCES world.Quests (QuestId),
     CONSTRAINT FK_QuestRewards_Item FOREIGN KEY (ItemId) REFERENCES world.Items (ItemId),

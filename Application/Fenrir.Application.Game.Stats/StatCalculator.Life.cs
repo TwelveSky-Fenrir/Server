@@ -5,14 +5,14 @@ public static partial class StatCalculator
     // ---- GetBaseMaxLife ----
 
     private static int ComputeMaxLife(int vitality, LevelRowDto levelRow, int setNumber, bool isLegendarySet,
-        byte tribe, EquippedItemSlot?[] bySlot, int petLife)
+        byte previousTribe, EquippedItemSlot?[] bySlot, int petLife)
     {
         var hp = (int)(vitality * 20.0f);
         hp += levelRow.Life; // ornament/deco/elixir bonuses unmodeled, skipped
         hp = ApplyPetDoubleRule(hp, petLife); // HP-boost-pill/animal-grade/mount bonuses unmodeled
 
         hp += SetBonusTables.GetFlatLifeBonus(setNumber);
-        hp += ComputeG12CustomSetBonus(tribe, bySlot);
+        hp += ComputeG12CustomSetBonus(previousTribe, bySlot);
         if (isLegendarySet) hp += 30000;
 
         if (bySlot[0] is { } amulet) // slot EAMULET(0) -- literal index, see naming-inversion note on EquippedItemSlot
@@ -35,10 +35,14 @@ public static partial class StatCalculator
         return hp;
     }
 
-    /// <summary>G12 custom-set bonus, gated on all 6 canonical slots being in-tribe IDs.</summary>
-    private static int ComputeG12CustomSetBonus(byte tribe, EquippedItemSlot?[] bySlot)
+    /// <summary>
+    ///     G12 custom-set bonus, gated on all 6 canonical slots being in-tribe IDs. Keyed on
+    ///     <paramref name="previousTribe" /> (aPreviousTribe), not the character's current playable tribe --
+    ///     Server/Header/Protocol/MyFactor.cpp:2032-2094.
+    /// </summary>
+    private static int ComputeG12CustomSetBonus(byte previousTribe, EquippedItemSlot?[] bySlot)
     {
-        var range = tribe switch
+        var range = previousTribe switch
         {
             0 => (Lo: 84500, Hi: 84699),
             1 => (Lo: 85500, Hi: 85699),

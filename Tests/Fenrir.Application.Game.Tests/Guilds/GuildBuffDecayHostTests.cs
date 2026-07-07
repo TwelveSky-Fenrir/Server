@@ -190,5 +190,10 @@ public class GuildBuffDecayHostTests
         {
             throw new NotSupportedException();
         }
+
+        public ValueTask AdjustPointsAsync(int guildId, int delta, CancellationToken ct)
+        {
+            throw new NotSupportedException();
+        }
     }
 }

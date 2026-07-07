@@ -1,10 +1,10 @@
 CREATE PROCEDURE world.usp_ZoneSpawnPoint_GetAll
-    AS
+AS
 BEGIN
     SET
-NOCOUNT ON;
+        NOCOUNT ON;
 
-SELECT ZoneNumber, SlotIndex, FromZoneNumber, PosX, PosY, PosZ
-FROM world.ZoneSpawnPoints
-ORDER BY ZoneNumber, SlotIndex;
+    SELECT ZoneNumber, SlotIndex, FromZoneNumber, PosX, PosY, PosZ
+    FROM world.ZoneSpawnPoints
+    ORDER BY ZoneNumber, SlotIndex;
 END;

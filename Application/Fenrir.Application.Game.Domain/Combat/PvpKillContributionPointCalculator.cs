@@ -23,8 +23,11 @@ namespace Fenrir.Application.Game.Domain.Combat;
 ///         feeds them.
 ///     </para>
 ///     <para>
-///         <b>The two dedicated flat-amount overrides are a SEPARATE, fully-cited contract from the generic
-///         formula above:</b> <see cref="RegularWarOverrideFlatCpAmount" />/<see cref="FfaOverrideFlatAmount" />
+///         <b>
+///             The two dedicated flat-amount overrides are a SEPARATE, fully-cited contract from the generic
+///             formula above:
+///         </b>
+///         <see cref="RegularWarOverrideFlatCpAmount" />/<see cref="FfaOverrideFlatAmount" />
 ///         (both +20 CP), <see cref="RegularWarOverrideWarPointAmount" /> (+2 War Point), and
 ///         <see cref="RegularWarOverrideBloodPointAmount" /> (+2 Blood/DS Point) were opened and verified
 ///         directly against <c>Server/ts25zone/S07_MyGame03.cpp:2402-2504</c> -- unlike <see cref="BasePerKillAmount" />

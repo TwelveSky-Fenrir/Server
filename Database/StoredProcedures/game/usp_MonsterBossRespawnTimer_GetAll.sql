@@ -4,11 +4,11 @@
 -- this mid-tick (SQL is a durability journal, never read again once loaded).
 -- Read-only, safe to retry.
 CREATE PROCEDURE game.usp_MonsterBossRespawnTimer_GetAll
-    AS
+AS
 BEGIN
     SET
-NOCOUNT ON;
+        NOCOUNT ON;
 
-SELECT MonsterSpawnRegionId, NextSpawnUtc
-FROM game.MonsterBossRespawnTimers;
+    SELECT MonsterSpawnRegionId, NextSpawnUtc
+    FROM game.MonsterBossRespawnTimers;
 END;

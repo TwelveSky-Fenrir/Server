@@ -26,10 +26,18 @@ public sealed class MentorRegistry
     private readonly Dictionary<int, int> _pendingByMaster = new();
     private readonly Dictionary<int, int> _pendingByStudent = new();
 
-    private bool IsNegotiating(int characterId)
+    /// <summary>
+    ///     Mentor-family half of the legacy <c>CheckCommunityWork</c> exclusivity check. Public so sibling
+    ///     negotiation families (e.g. Guild ask, see <c>GuildInviteService</c>) can compose a cross-family busy
+    ///     check without duplicating this registry's own state.
+    /// </summary>
+    public bool IsNegotiating(int characterId)
     {
-        return _pendingByMaster.ContainsKey(characterId) || _pendingByStudent.ContainsKey(characterId) ||
-               _acceptedByMaster.ContainsKey(characterId) || _acceptedByMaster.ContainsValue(characterId);
+        lock (_lock)
+        {
+            return _pendingByMaster.ContainsKey(characterId) || _pendingByStudent.ContainsKey(characterId) ||
+                   _acceptedByMaster.ContainsKey(characterId) || _acceptedByMaster.ContainsValue(characterId);
+        }
     }
 
     public MentorAskOutcome TryAsk(int masterId, int studentId, bool targetAlreadyHasTeacher,

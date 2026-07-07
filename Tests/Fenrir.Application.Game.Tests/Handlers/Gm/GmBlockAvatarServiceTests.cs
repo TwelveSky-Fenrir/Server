@@ -10,11 +10,15 @@ namespace Fenrir.Application.Game.Tests.Handlers.Gm;
 
 // GM-BLOCK (Fenrir's dedicated wire command; legacy case 519 "[GM]-BLOCK",
 // Server/ts25zone/S04_MyWork04.cpp:1487-1515) -- the three legacy outcomes are asymmetric and must stay that
-// way: unauthorized -> disconnect with no reply; not found (including self-target) -> generic failure ack;
-// success -> silence (no ack at all), only the target is disconnected.
+// way: unauthorized -> disconnect with no reply; not found (including self-target) -> the shared opcode-23
+// GenericActionResponse ack (Sort=519, legacy's own real reply shape, S04_MyWork04.cpp:2121-2122), never a
+// dedicated message; success -> silence (no ack at all), only the target is disconnected.
 public class GmBlockAvatarServiceTests
 {
+    private const int GmBlockSort = 519;
+
     private const short MapId = 1;
+    private static readonly byte[] EmptyGenericActionData = new byte[130];
 
     private static (ZoneRegistry Registry, Zone Zone) CreateWorld()
     {
@@ -44,7 +48,7 @@ public class GmBlockAvatarServiceTests
     public async Task HandleAsync_CallerNotGm_AbortsWithNoReply_AndCreatesNoBan()
     {
         var (registry, zone) = CreateWorld();
-        var (caller, callerPipe, _) = Enter(zone, 10, "NotAGm", 0);
+        var (caller, callerPipe, _) = Enter(zone, 10, "NotAGm");
         var bans = new FakeBanRepository();
         var service = new GmBlockAvatarService(registry, bans, NullLogger<GmBlockAvatarService>.Instance);
 
@@ -69,7 +73,10 @@ public class GmBlockAvatarServiceTests
 
         Assert.Null(caller.DisconnectReason);
         Assert.Null(bans.LastCreatedBan);
-        await PacketAssert.AssertSentAsync(callerPipe, new GmBlockAvatarResponse { Result = 1 });
+        await PacketAssert.AssertSentAsync(callerPipe, new GenericActionResponse
+        {
+            Result = 1, Sort = GmBlockSort, Data = EmptyGenericActionData, RuneValue = 0
+        });
     }
 
     [Fact]
@@ -85,14 +92,17 @@ public class GmBlockAvatarServiceTests
 
         Assert.Null(caller.DisconnectReason);
         Assert.Null(bans.LastCreatedBan);
-        await PacketAssert.AssertSentAsync(callerPipe, new GmBlockAvatarResponse { Result = 1 });
+        await PacketAssert.AssertSentAsync(callerPipe, new GenericActionResponse
+        {
+            Result = 1, Sort = GmBlockSort, Data = EmptyGenericActionData, RuneValue = 0
+        });
     }
 
     [Fact]
     public async Task HandleAsync_GmValidTarget_CreatesTheBan_DisconnectsTheTargetSilently_AndSendsNoAckToTheCaller()
     {
         var (registry, zone) = CreateWorld();
-        var (caller, callerPipe, _) = Enter(zone, 10, "TheGm", 1, 100);
+        var (caller, callerPipe, _) = Enter(zone, 10, "TheGm", 1);
         var (target, targetPipe, targetState) = Enter(zone, 20, "Griefer", 0, 200);
         ZoneTestKit.DrainOutbound(
             callerPipe); // target's own Enter-broadcast join packet reaching the GM, not under test

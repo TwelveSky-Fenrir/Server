@@ -31,7 +31,7 @@
 -- Brand-new stored procedure (first appearance, never previously shipped) -- CREATE PROCEDURE, not CREATE OR
 -- ALTER; no already-applied script is edited by this migration.
 CREATE PROCEDURE game.usp_HeroRanking_GetPoints @CharacterId INT,
-    @PeriodKind  TINYINT
+                                                @PeriodKind TINYINT
 AS
 BEGIN
     SET NOCOUNT ON;

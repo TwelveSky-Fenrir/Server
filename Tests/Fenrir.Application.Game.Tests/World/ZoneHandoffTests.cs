@@ -1,6 +1,7 @@
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Data.WriteBehind;
+using Fenrir.Network.Serialization.Packets.Shared;
 
 namespace Fenrir.Application.Game.Tests.World;
 
@@ -121,6 +122,134 @@ public class ZoneHandoffTests
 
         Assert.True(target.TryGetPlayer(10, out var after));
         Assert.Equal(77, after!.HeroRankPoints);
+    }
+
+    [Fact]
+    public void Leave_WithHandoffTarget_CarriesTheLiveQuestProgressThrough_NotResetToDefault()
+    {
+        // A character mid-quest must not lose its step/kill-counter tracking on a same-shard zone transfer --
+        // see ZoneTransfer.CreateEnterData and PlayerEnterData.QuestProgress's own remarks.
+        var dirtyTracker = new DirtyTracker<int>();
+        var source = ZoneTestKit.CreateZone(1, dirtyTracker: dirtyTracker);
+        var target = ZoneTestKit.CreateZone(2, dirtyTracker: dirtyTracker);
+        var (session, _) = ZoneTestKit.CreateSession(1);
+
+        source.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1)));
+        source.Tick(TimeSpan.FromMilliseconds(50));
+        Assert.True(source.TryGetPlayer(10, out var before));
+        before!.QuestStepPermanent = 4;
+        before.QuestActiveFlag = 1;
+        before.QuestSort = 3;
+        before.QuestTargetPhase = 7;
+        before.QuestKillCounter = 9;
+
+        source.Post(ZoneCommand.Leave(10, target));
+        source.Tick(TimeSpan.FromMilliseconds(50));
+        target.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.True(target.TryGetPlayer(10, out var after));
+        Assert.Equal(4, after!.QuestStepPermanent);
+        Assert.Equal(1, after.QuestActiveFlag);
+        Assert.Equal(3, after.QuestSort);
+        Assert.Equal(7, after.QuestTargetPhase);
+        Assert.Equal(9, after.QuestKillCounter);
+    }
+
+    [Fact]
+    public void Leave_WithHandoffTarget_CarriesTheLiveDailyMissionCountersThrough_NotResetToZero()
+    {
+        // Daily-mission progress (join-war, faction-kill, monster-kill, play-time counters) must survive a
+        // same-shard zone transfer -- see ZoneTransfer.CreateEnterData.
+        var dirtyTracker = new DirtyTracker<int>();
+        var source = ZoneTestKit.CreateZone(1, dirtyTracker: dirtyTracker);
+        var target = ZoneTestKit.CreateZone(2, dirtyTracker: dirtyTracker);
+        var (session, _) = ZoneTestKit.CreateSession(1);
+
+        source.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1)));
+        source.Tick(TimeSpan.FromMilliseconds(50));
+        Assert.True(source.TryGetPlayer(10, out var before));
+        before!.MissionJoinWar = 1;
+        before.MissionKillOtherTribe = 12;
+        before.MissionKillMonster = 34;
+        before.MissionPlayTime = 56;
+
+        source.Post(ZoneCommand.Leave(10, target));
+        source.Tick(TimeSpan.FromMilliseconds(50));
+        target.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.True(target.TryGetPlayer(10, out var after));
+        Assert.Equal(1, after!.MissionJoinWar);
+        Assert.Equal(12, after.MissionKillOtherTribe);
+        Assert.Equal(34, after.MissionKillMonster);
+        Assert.Equal(56, after.MissionPlayTime);
+    }
+
+    [Fact]
+    public void Leave_WithHandoffTarget_CarriesTheLiveAutoHuntConfigurationThrough_NotResetToDisabled()
+    {
+        // An active auto-hunt session must resume, not silently switch off, on a same-shard zone transfer --
+        // see ZoneTransfer.CreateEnterData.
+        var dirtyTracker = new DirtyTracker<int>();
+        var source = ZoneTestKit.CreateZone(1, dirtyTracker: dirtyTracker);
+        var target = ZoneTestKit.CreateZone(2, dirtyTracker: dirtyTracker);
+        var (session, _) = ZoneTestKit.CreateSession(1);
+
+        source.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1)));
+        source.Tick(TimeSpan.FromMilliseconds(50));
+        Assert.True(source.TryGetPlayer(10, out var before));
+        before!.AutoHuntEnabled = true;
+        var config = new AutoHunt
+        {
+            BuffType = 1,
+            BuffStore = new int[16],
+            HuntType = 2,
+            AttackType = new int[4],
+            MonNum = 3,
+            ItemType = 4,
+            InvenCmd = 5,
+            DeathCmd = 6,
+            AnimalPreyCmd = 7,
+            AnimalFoodCmd = 8
+        };
+        before.AutoHuntConfig = config;
+        before.AutoLifeRatio = 2;
+        before.AutoManaRatio = 3;
+
+        source.Post(ZoneCommand.Leave(10, target));
+        source.Tick(TimeSpan.FromMilliseconds(50));
+        target.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.True(target.TryGetPlayer(10, out var after));
+        Assert.True(after!.AutoHuntEnabled);
+        Assert.Equal(config, after.AutoHuntConfig);
+        Assert.Equal((byte)2, after.AutoLifeRatio);
+        Assert.Equal((byte)3, after.AutoManaRatio);
+    }
+
+    [Fact]
+    public void Leave_WithHandoffTarget_CarriesTheLivePetGrowthAndActivityThrough_NotResetToFreshlyHatched()
+    {
+        // A pet's growth/activity feeds MaxLife/MaxMana/AttackPower/DefensePower via the pet-double rule --
+        // resetting it on a same-shard zone transfer would silently understate the character's combat stats
+        // until the next full world entry. See ZoneTransfer.CreateEnterData.
+        var dirtyTracker = new DirtyTracker<int>();
+        var source = ZoneTestKit.CreateZone(1, dirtyTracker: dirtyTracker);
+        var target = ZoneTestKit.CreateZone(2, dirtyTracker: dirtyTracker);
+        var (session, _) = ZoneTestKit.CreateSession(1);
+
+        source.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1)));
+        source.Tick(TimeSpan.FromMilliseconds(50));
+        Assert.True(source.TryGetPlayer(10, out var before));
+        before!.PetGrowth = 250;
+        before.PetActivity = 80;
+
+        source.Post(ZoneCommand.Leave(10, target));
+        source.Tick(TimeSpan.FromMilliseconds(50));
+        target.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.True(target.TryGetPlayer(10, out var after));
+        Assert.Equal(250, after!.PetGrowth);
+        Assert.Equal((byte)80, after.PetActivity);
     }
 
     [Fact]

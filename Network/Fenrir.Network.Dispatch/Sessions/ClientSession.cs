@@ -1,5 +1,6 @@
 using System.IO.Pipelines;
 using System.Net;
+using System.Threading.Channels;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Framing;
 
@@ -15,7 +16,28 @@ public abstract class ClientSession(
 {
     private const int SlowConsumerBackpressureStreakLimit = 5;
 
+    /// <summary>
+    ///     Frames that arrived while this session's own previous flush was still draining (socket
+    ///     backpressure) -- see <see cref="Send{TPacket}" />/<see cref="SendRaw" />'s own remarks for why
+    ///     <see cref="_sendLock" /> is only ever attempted, never waited on, from either entry point. Left
+    ///     unbounded deliberately: the only thing that can make this grow without bound is a session whose
+    ///     flush never resolves, and <see cref="SlowConsumerBackpressureStreakLimit" /> already tears such a
+    ///     session down (see <see cref="ObserveFlushAsync" />) well before its queue could grow large -- a hard
+    ///     capacity here would only risk silently dropping an ordinary gameplay packet (a chat line, a combat
+    ///     result) during an otherwise-recoverable stall, which is worse than the bounded memory growth it
+    ///     would save. <see cref="Channel{T}.Reader" /> is only ever drained by whichever call currently "owns"
+    ///     this session's flush cycle -- the fast-path caller that just acquired <see cref="_sendLock" />, or
+    ///     the <see cref="ObserveFlushAsync" /> continuation that inherited ownership from it -- so exactly one
+    ///     logical reader is ever active even though that can't be expressed as a single call site;
+    ///     <see cref="UnboundedChannelOptions.SingleWriter" /> is left at its default <see langword="false" />
+    ///     since any thread may call <see cref="Send{TPacket}" />/<see cref="SendRaw" /> on a shared session
+    ///     concurrently.
+    /// </summary>
+    private readonly Channel<byte[]> _pendingSends =
+        Channel.CreateUnbounded<byte[]>(new UnboundedChannelOptions { SingleReader = true });
+
     private readonly SemaphoreSlim _sendLock = new(1, 1);
+
     private int _backpressureStreak;
     private int _completed;
 
@@ -34,11 +56,28 @@ public abstract class ClientSession(
     /// <summary>Process-local, monotonically increasing — never persisted, never sent to the client.</summary>
     public long SessionId { get; } = sessionId;
 
+    /// <summary>
+    ///     Never blocks the calling thread -- even while this session's own previous flush is still draining
+    ///     under socket backpressure. The most consequential caller is a zone's own single tick thread fanning
+    ///     out a broadcast to many recipients in one synchronous pass; it must never stall on one recipient's
+    ///     slow socket (see <see cref="_pendingSends" />'s own remarks for the full reasoning).
+    /// </summary>
     public void Send<TPacket>(in TPacket packet) where TPacket : struct, IOutgoingPacket
     {
         var total = FrameWriter.FrameSizeOf<TPacket>();
 
-        _sendLock.Wait();
+        if (!_sendLock.Wait(0))
+        {
+            // A previous Send/SendRaw on this same session hasn't finished flushing yet -- never wait for it
+            // here. Copy this frame into its own buffer; whichever call currently owns the flush cycle drains
+            // it, in order, once that flush resolves (FlushLocked/ObserveFlushAsync below).
+            var queued = new byte[total];
+            FrameWriter.WriteFrame(in packet, queued);
+            _pendingSends.Writer.TryWrite(queued);
+            ClaimOwnershipIfNowFreeToAvoidStrandedFrame();
+            return;
+        }
+
         try
         {
             var span = Transport.Output.GetSpan(total);
@@ -61,10 +100,16 @@ public abstract class ClientSession(
     public abstract bool IsOpcodeAllowed(byte opcode);
 
     // Sends a fully pre-built frame as-is — the LZ4/ZPACKET path for Compressed M1 packets, whose bytes
-    // already come out of the generated MessageFactory.Encode.
+    // already come out of the generated MessageFactory.Encode. Same never-block contract as Send<T> above.
     public void SendRaw(ReadOnlySpan<byte> rawFrame)
     {
-        _sendLock.Wait();
+        if (!_sendLock.Wait(0))
+        {
+            _pendingSends.Writer.TryWrite(rawFrame.ToArray());
+            ClaimOwnershipIfNowFreeToAvoidStrandedFrame();
+            return;
+        }
+
         try
         {
             var span = Transport.Output.GetSpan(rawFrame.Length);
@@ -80,20 +125,78 @@ public abstract class ClientSession(
         FlushLocked();
     }
 
-    // Caller must already hold _sendLock; releases it once this call's flush resolves, so no second Send()
-    // can start GetSpan/Advance/FlushAsync while this one is still outstanding (unsafe per PipeWriter's docs).
+    // Caller must already hold _sendLock. Flushes what was just written, then keeps draining/flushing
+    // anything in _pendingSends before ever releasing the lock -- so a frame queued while this session was
+    // catching up from backpressure is never reordered ahead of, or interleaved with, a later direct write.
+    // Hands off to ObserveFlushAsync (without releasing the lock) the moment a flush doesn't complete
+    // synchronously, exactly as before -- backpressure now only ever suspends that async continuation, never
+    // a Send/SendRaw caller. Safe to call after only enqueuing (no direct write of your own first) --
+    // see ClaimOwnershipIfNowFreeToAvoidStrandedFrame -- flushing with nothing new pending is a harmless no-op.
     private void FlushLocked()
     {
-        var flush = Transport.Output.FlushAsync();
-
-        if (flush.IsCompletedSuccessfully)
+        while (true)
         {
+            var flush = Transport.Output.FlushAsync();
+
+            if (!flush.IsCompletedSuccessfully)
+            {
+                _ = ObserveFlushAsync(flush);
+                return;
+            }
+
             _backpressureStreak = 0;
+
+            if (!TryWriteNextQueuedFrame())
+            {
+                _sendLock.Release();
+
+                // Closes the release/enqueue TOCTOU race symmetrically to ClaimOwnershipIfNowFreeToAvoidStrandedFrame's
+                // own claim-side check: a frame can be enqueued in the tiny window between the TryRead above
+                // observing the queue empty and the Release just above actually running, and the enqueuer's own
+                // Wait(0) attempt (in Send<T>/SendRaw's fast-fail branch, or ClaimOwnershipIfNowFreeToAvoidStrandedFrame)
+                // can lose that race too if it lands before this Release completes -- stranding the frame with no
+                // thread left obligated to drain it. Re-check here: if something is now pending, try to reclaim the
+                // lock and resume draining. If another Send/SendRaw call wins the reclaim race instead, that call's
+                // own FlushLocked drains the queue itself, so nothing is lost either way -- only this thread's own
+                // obligation to drain ends.
+                if (!_pendingSends.Reader.TryPeek(out _) || !_sendLock.Wait(0))
+                    return;
+            }
+        }
+    }
+
+    // Caller must already hold _sendLock. Returns false (lock left untouched) when nothing was queued.
+    private bool TryWriteNextQueuedFrame()
+    {
+        if (!_pendingSends.Reader.TryRead(out var frame))
+            return false;
+
+        try
+        {
+            var span = Transport.Output.GetSpan(frame.Length);
+            frame.CopyTo(span);
+            Transport.Output.Advance(frame.Length);
+        }
+        catch
+        {
             _sendLock.Release();
-            return;
+            throw;
         }
 
-        _ = ObserveFlushAsync(flush);
+        return true;
+    }
+
+    // Closes the release/enqueue race on the (already rare, already-allocating) losing side instead of on
+    // every hot uncontended Send/SendRaw call: the owner that held _sendLock a moment ago may, by the time
+    // this frame reached _pendingSends, have already observed the queue as empty and released -- with
+    // nothing left to ever come back and drain this one. If the lock is free right this instant, claim it
+    // and drain (this frame and anything else queued) ourselves; if it is still held, the current owner's
+    // own in-progress FlushLocked loop has not yet reached its own "queue empty" check and will pick this up
+    // normally, so there is nothing further to do.
+    private void ClaimOwnershipIfNowFreeToAvoidStrandedFrame()
+    {
+        if (_sendLock.Wait(0))
+            FlushLocked();
     }
 
     // A ValueTask<FlushResult> that doesn't complete synchronously means this send hit the pipe's
@@ -101,20 +204,46 @@ public abstract class ClientSession(
     // not backpressure, so the synchronous-completion check above is the only backpressure signal available.
     private async ValueTask ObserveFlushAsync(ValueTask<FlushResult> flush)
     {
+        bool keepDraining;
+
         try
         {
             var result = await flush.ConfigureAwait(false);
-            if (result is { IsCanceled: false, IsCompleted: false } &&
-                ++_backpressureStreak >= SlowConsumerBackpressureStreakLimit)
+            keepDraining = result is { IsCanceled: false, IsCompleted: false };
+
+            if (keepDraining && ++_backpressureStreak >= SlowConsumerBackpressureStreakLimit)
+            {
                 Abort(Sessions.DisconnectReason.SlowConsumer);
+                keepDraining = false;
+            }
         }
         catch (Exception)
         {
-            // Receive loop will independently notice the broken pipe; a failed flush here must not fault the caller's Send<T>.
+            // Receive loop will independently notice the broken pipe; a failed flush here must not fault the
+            // caller's Send<T>/SendRaw -- both already returned by the time this continuation runs.
+            keepDraining = false;
         }
-        finally
+
+        if (!keepDraining)
         {
             _sendLock.Release();
+            return;
+        }
+
+        // The flush that was in flight when this session's lock was last handed off here has now resolved and
+        // the session is still healthy -- resume draining (still holding _sendLock) so anything queued while
+        // it was pending reaches the pipe before a fresh Send/SendRaw can observe the lock as free.
+        try
+        {
+            if (TryWriteNextQueuedFrame())
+                FlushLocked();
+            else
+                _sendLock.Release();
+        }
+        catch
+        {
+            // TryWriteNextQueuedFrame already released _sendLock before rethrowing; this discarded fire-and-
+            // forget continuation must not propagate further.
         }
     }
 

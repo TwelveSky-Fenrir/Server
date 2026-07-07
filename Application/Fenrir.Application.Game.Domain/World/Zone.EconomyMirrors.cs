@@ -21,12 +21,84 @@ namespace Fenrir.Application.Game.Domain.World;
 public sealed partial class Zone
 {
     /// <summary>
+    ///     Bounded capacity for <see cref="_guildInbox" /> -- also the basis for <see cref="GuildInboxDrainCapPerTick" />
+    ///     .
+    /// </summary>
+    private const int GuildInboxCapacity = 512;
+
+    /// <summary>
+    ///     Per-tick drain cap for <see cref="_guildInbox" /> -- same "half of this channel's own bounded
+    ///     capacity" convention as <see cref="InboxDrainCapPerTick" /> (see that constant's own remarks for the
+    ///     full rationale and the Fenrir-side-safeguard-not-legacy-parity caveat). Every channel declared in
+    ///     this file follows the same pairing.
+    /// </summary>
+    private const int GuildInboxDrainCapPerTick = GuildInboxCapacity / 2;
+
+    /// <summary>
+    ///     Bounded capacity for <see cref="_inventoryInbox" /> -- also the basis for
+    ///     <see cref="InventoryInboxDrainCapPerTick" />.
+    /// </summary>
+    private const int InventoryInboxCapacity = 2048;
+
+    /// <summary>
+    ///     Per-tick drain cap for <see cref="_inventoryInbox" /> -- see <see cref="InboxDrainCapPerTick" />'s own
+    ///     remarks.
+    /// </summary>
+    private const int InventoryInboxDrainCapPerTick = InventoryInboxCapacity / 2;
+
+    /// <summary>
+    ///     Bounded capacity for <see cref="_mentorInbox" /> -- also the basis for
+    ///     <see cref="MentorInboxDrainCapPerTick" />.
+    /// </summary>
+    private const int MentorInboxCapacity = 256;
+
+    /// <summary>Per-tick drain cap for <see cref="_mentorInbox" /> -- see <see cref="InboxDrainCapPerTick" />'s own remarks.</summary>
+    private const int MentorInboxDrainCapPerTick = MentorInboxCapacity / 2;
+
+    /// <summary>
+    ///     Bounded capacity for <see cref="_missionInbox" /> -- also the basis for
+    ///     <see cref="MissionInboxDrainCapPerTick" />.
+    /// </summary>
+    private const int MissionInboxCapacity = 256;
+
+    /// <summary>Per-tick drain cap for <see cref="_missionInbox" /> -- see <see cref="InboxDrainCapPerTick" />'s own remarks.</summary>
+    private const int MissionInboxDrainCapPerTick = MissionInboxCapacity / 2;
+
+    /// <summary>
+    ///     Bounded capacity for <see cref="_questInbox" /> -- also the basis for <see cref="QuestInboxDrainCapPerTick" />
+    ///     .
+    /// </summary>
+    private const int QuestInboxCapacity = 512;
+
+    /// <summary>Per-tick drain cap for <see cref="_questInbox" /> -- see <see cref="InboxDrainCapPerTick" />'s own remarks.</summary>
+    private const int QuestInboxDrainCapPerTick = QuestInboxCapacity / 2;
+
+    /// <summary>
+    ///     Bounded capacity for <see cref="_skillInbox" /> -- also the basis for <see cref="SkillInboxDrainCapPerTick" />
+    ///     .
+    /// </summary>
+    private const int SkillInboxCapacity = 1024;
+
+    /// <summary>Per-tick drain cap for <see cref="_skillInbox" /> -- see <see cref="InboxDrainCapPerTick" />'s own remarks.</summary>
+    private const int SkillInboxDrainCapPerTick = SkillInboxCapacity / 2;
+
+    /// <summary>
+    ///     Bounded capacity for <see cref="_tribeInbox" /> -- also the basis for <see cref="TribeInboxDrainCapPerTick" />
+    ///     .
+    /// </summary>
+    private const int TribeInboxCapacity = 512;
+
+    /// <summary>Per-tick drain cap for <see cref="_tribeInbox" /> -- see <see cref="InboxDrainCapPerTick" />'s own remarks.</summary>
+    private const int TribeInboxDrainCapPerTick = TribeInboxCapacity / 2;
+
+    /// <summary>
     ///     Already-durably-persisted guild-membership mirrors, posted by <c>GuildActionHandler</c> onto this
     ///     character's own hosting zone, whether the target is the actor or a different guild member.
     /// </summary>
     private readonly Channel<GuildMembershipZoneCommand> _guildInbox =
         Channel.CreateBounded<GuildMembershipZoneCommand>(
-            new BoundedChannelOptions(512) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+            new BoundedChannelOptions(GuildInboxCapacity)
+                { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
     /// <summary>
     ///     Separate inbox for already-validated-and-SQL-durable inventory results, posted by
@@ -35,7 +107,8 @@ public sealed partial class Zone
     ///     dropped command only leaves the in-memory mirror stale (self-heals on next world entry).
     /// </summary>
     private readonly Channel<InventoryZoneCommand> _inventoryInbox = Channel.CreateBounded<InventoryZoneCommand>(
-        new BoundedChannelOptions(2048) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+        new BoundedChannelOptions(InventoryInboxCapacity)
+            { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
     /// <summary>
     ///     Mirrors one cross-character field write (mentor bonding, posted by <c>MentorStartHandler</c>) onto
@@ -43,16 +116,19 @@ public sealed partial class Zone
     /// </summary>
     private readonly Channel<MentorZoneCommand> _mentorInbox =
         Channel.CreateBounded<MentorZoneCommand>(
-            new BoundedChannelOptions(256) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+            new BoundedChannelOptions(MentorInboxCapacity)
+                { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
     /// <summary>Already-validated, already-SQL-durable daily-mission claims, posted by <c>DailyMissionHandler</c>.</summary>
     private readonly Channel<MissionZoneCommand> _missionInbox =
         Channel.CreateBounded<MissionZoneCommand>(
-            new BoundedChannelOptions(256) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+            new BoundedChannelOptions(MissionInboxCapacity)
+                { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
     /// <summary>Already-validated, already-SQL-durable quest-state transitions, posted by <c>QuestProgressHandler</c>.</summary>
     private readonly Channel<QuestZoneCommand> _questInbox = Channel.CreateBounded<QuestZoneCommand>(
-        new BoundedChannelOptions(512) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+        new BoundedChannelOptions(QuestInboxCapacity)
+            { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
     /// <summary>
     ///     Already-validated, already-SQL-durable skill learn/upgrade results, posted by
@@ -60,7 +136,8 @@ public sealed partial class Zone
     ///     <see cref="_inventoryInbox" />'s union, same additive-only rationale.
     /// </summary>
     private readonly Channel<SkillZoneCommand> _skillInbox = Channel.CreateBounded<SkillZoneCommand>(
-        new BoundedChannelOptions(1024) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+        new BoundedChannelOptions(SkillInboxCapacity)
+            { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
     /// <summary>
     ///     Already-decided tribe-progress self-mutations posted by <c>TribeActionHandler</c> for the actor's own hosting
@@ -68,7 +145,8 @@ public sealed partial class Zone
     /// </summary>
     private readonly Channel<TribeProgressZoneCommand> _tribeInbox =
         Channel.CreateBounded<TribeProgressZoneCommand>(
-            new BoundedChannelOptions(512) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+            new BoundedChannelOptions(TribeInboxCapacity)
+                { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
     public bool PostInventoryCommand(in InventoryZoneCommand command)
     {
@@ -240,7 +318,10 @@ public sealed partial class Zone
 
     private void DrainInventoryCommands()
     {
-        while (_inventoryInbox.Reader.TryRead(out var command))
+        var processed = 0;
+        while (processed < InventoryInboxDrainCapPerTick && _inventoryInbox.Reader.TryRead(out var command))
+        {
+            processed++;
             try
             {
                 ApplyInventoryCommand(in command);
@@ -256,6 +337,10 @@ public sealed partial class Zone
                 // EconomyActionLock never hangs on a command that blew up.
                 command.Applied?.TrySetException(ex);
             }
+        }
+
+        if (processed >= InventoryInboxDrainCapPerTick)
+            LogDrainCapEngaged(_inventoryInbox.Reader, "inventory", InventoryInboxDrainCapPerTick);
     }
 
     /// <summary>
@@ -289,12 +374,43 @@ public sealed partial class Zone
         }
 
         if (command.UpdatedStats is { } stats)
+        {
             state.Stats = stats;
+
+            // SetBasicAbilityFromEquip (S07_MyGame04.cpp:158-183, called from both equip's and unequip's call
+            // sites at S04_MyWork05.cpp:1303/1615) recomputes MaxLife/MaxMana unconditionally as part of the
+            // same recompute that produced `stats` above -- there is exactly one stored max-life/max-mana
+            // value in the legacy model, not a separate "internal" copy vs. "reported" copy. Mirror it into
+            // the flat fields here too, since those (not Stats.MaxLife/Stats.MaxMana) are what the outbound
+            // broadcast (BuildAvatarActionRecv) and write-behind persistence (ProgressWriteBehindHost/
+            // PositionWriteBehindHost) actually read.
+            state.MaxLife = stats.MaxLife;
+            state.MaxMana = stats.MaxMana;
+
+            // Unequip's own inline clamp (S04_MyWork05.cpp:1616-1617: SetIntegerUp(aLifeValue, GetMaxLife(),
+            // GetMaxLife()) and the symmetric mana call; function.h:237-240 confirms SetIntegerUp is
+            // downward-only -- it overwrites only when the current value exceeds the check value, never
+            // raises it) guards against a lower max after removing a VIT/INT-boosting item. Equip's call site
+            // performs no equivalent clamp, but equip is never expected to lower Max (no cited scenario where
+            // it does), so applying this same downward-only guard regardless of direction is behaviorally
+            // identical to the legacy equip/unequip split while avoiding an equip/unequip flag threaded
+            // through InventoryZoneCommand just to gate a clamp that can only ever fire on the unequip side in
+            // practice.
+            if (state.Life > state.MaxLife)
+                state.Life = state.MaxLife;
+            if (state.Mana > state.MaxMana)
+                state.Mana = state.MaxMana;
+
+            state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
+        }
     }
 
     private void DrainSkillCommands()
     {
-        while (_skillInbox.Reader.TryRead(out var command))
+        var processed = 0;
+        while (processed < SkillInboxDrainCapPerTick && _skillInbox.Reader.TryRead(out var command))
+        {
+            processed++;
             try
             {
                 ApplySkillCommand(in command);
@@ -304,6 +420,10 @@ public sealed partial class Zone
                 logger.LogError(ex, "Zone {MapId} skill command for character {CharacterId} failed", MapId,
                     command.CharacterId);
             }
+        }
+
+        if (processed >= SkillInboxDrainCapPerTick)
+            LogDrainCapEngaged(_skillInbox.Reader, "skill", SkillInboxDrainCapPerTick);
     }
 
     /// <summary>Same posture as <see cref="ApplyInventoryCommand" />.</summary>
@@ -319,7 +439,10 @@ public sealed partial class Zone
 
     private void DrainMentorCommands()
     {
-        while (_mentorInbox.Reader.TryRead(out var command))
+        var processed = 0;
+        while (processed < MentorInboxDrainCapPerTick && _mentorInbox.Reader.TryRead(out var command))
+        {
+            processed++;
             try
             {
                 ApplyMentorCommand(in command);
@@ -329,6 +452,10 @@ public sealed partial class Zone
                 logger.LogError(ex, "Zone {MapId} mentor command for character {CharacterId} failed", MapId,
                     command.CharacterId);
             }
+        }
+
+        if (processed >= MentorInboxDrainCapPerTick)
+            LogDrainCapEngaged(_mentorInbox.Reader, "mentor", MentorInboxDrainCapPerTick);
     }
 
     /// <summary>Same posture as <see cref="ApplyInventoryCommand" />.</summary>
@@ -342,7 +469,10 @@ public sealed partial class Zone
 
     private void DrainGuildCommands()
     {
-        while (_guildInbox.Reader.TryRead(out var command))
+        var processed = 0;
+        while (processed < GuildInboxDrainCapPerTick && _guildInbox.Reader.TryRead(out var command))
+        {
+            processed++;
             try
             {
                 ApplyGuildMembershipCommand(in command);
@@ -354,6 +484,10 @@ public sealed partial class Zone
                     command.CharacterId);
                 command.Applied?.TrySetException(ex);
             }
+        }
+
+        if (processed >= GuildInboxDrainCapPerTick)
+            LogDrainCapEngaged(_guildInbox.Reader, "guild", GuildInboxDrainCapPerTick);
     }
 
     /// <summary>Same posture as <see cref="ApplyInventoryCommand" />.</summary>
@@ -370,7 +504,10 @@ public sealed partial class Zone
 
     private void DrainTribeProgressCommands()
     {
-        while (_tribeInbox.Reader.TryRead(out var command))
+        var processed = 0;
+        while (processed < TribeInboxDrainCapPerTick && _tribeInbox.Reader.TryRead(out var command))
+        {
+            processed++;
             try
             {
                 ApplyTribeProgressCommand(in command);
@@ -382,6 +519,10 @@ public sealed partial class Zone
                     command.CharacterId);
                 command.Applied?.TrySetException(ex);
             }
+        }
+
+        if (processed >= TribeInboxDrainCapPerTick)
+            LogDrainCapEngaged(_tribeInbox.Reader, "tribe-progress", TribeInboxDrainCapPerTick);
     }
 
     /// <summary>
@@ -590,6 +731,42 @@ public sealed partial class Zone
             changed = true;
         }
 
+        if (command.EatLifePotion is { } eatLifePotion)
+        {
+            state.EatLifePotion = eatLifePotion;
+            changed = true;
+        }
+
+        if (command.EatManaPotion is { } eatManaPotion)
+        {
+            state.EatManaPotion = eatManaPotion;
+            changed = true;
+        }
+
+        if (command.EatStrPotion is { } eatStrPotion)
+        {
+            state.EatStrPotion = eatStrPotion;
+            changed = true;
+        }
+
+        if (command.EatDexPotion is { } eatDexPotion)
+        {
+            state.EatDexPotion = eatDexPotion;
+            changed = true;
+        }
+
+        if (command.EatElePotion is { } eatElePotion)
+        {
+            state.EatElePotion = eatElePotion;
+            changed = true;
+        }
+
+        if (command.PetExpX2Time is { } petExpX2Time)
+        {
+            state.PetExpX2Time = petExpX2Time;
+            changed = true;
+        }
+
         if (changed)
             state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
 
@@ -602,11 +779,25 @@ public sealed partial class Zone
         // untracked wire-only counters -- sent as 0.
         if (command.RebirthBroadcast)
             BroadcastAvatarStateFlag(state, 14, state.ContributionPoints, state.RebirthCount, 0);
+
+        // Op 23 (CZ_USE_INVENTORY_ITEM_SEND) stat-potion family's own post-consumption avatar-action refresh
+        // -- see TribeProgressZoneCommand.FullActionRebroadcast's own remarks for why this sends the
+        // self-refresh once (not legacy's literal twice) plus the AOI-neighbor broadcast.
+        if (command.FullActionRebroadcast)
+        {
+            var characterId = command.CharacterId;
+            SendAvatarAction(state.Session, state);
+            var neighbors = _grid.Neighbors(state.CurrentCell).Where(id => id != characterId).ToArray();
+            BroadcastAvatarAction(neighbors, state);
+        }
     }
 
     private void DrainQuestCommands()
     {
-        while (_questInbox.Reader.TryRead(out var command))
+        var processed = 0;
+        while (processed < QuestInboxDrainCapPerTick && _questInbox.Reader.TryRead(out var command))
+        {
+            processed++;
             try
             {
                 ApplyQuestCommand(in command);
@@ -618,6 +809,10 @@ public sealed partial class Zone
                     command.CharacterId);
                 command.Applied?.TrySetException(ex);
             }
+        }
+
+        if (processed >= QuestInboxDrainCapPerTick)
+            LogDrainCapEngaged(_questInbox.Reader, "quest", QuestInboxDrainCapPerTick);
     }
 
     /// <summary>Same posture as <see cref="ApplyInventoryCommand" />.</summary>
@@ -647,7 +842,10 @@ public sealed partial class Zone
 
     private void DrainMissionCommands()
     {
-        while (_missionInbox.Reader.TryRead(out var command))
+        var processed = 0;
+        while (processed < MissionInboxDrainCapPerTick && _missionInbox.Reader.TryRead(out var command))
+        {
+            processed++;
             try
             {
                 ApplyMissionCommand(in command);
@@ -659,6 +857,10 @@ public sealed partial class Zone
                     command.CharacterId);
                 command.Applied?.TrySetException(ex);
             }
+        }
+
+        if (processed >= MissionInboxDrainCapPerTick)
+            LogDrainCapEngaged(_missionInbox.Reader, "mission", MissionInboxDrainCapPerTick);
     }
 
     /// <summary>Same posture as <see cref="ApplyInventoryCommand" />.</summary>

@@ -49,6 +49,21 @@ public sealed record GuildRepository(ICaeriusNetDbContext Db) : IGuildRepository
         return await Db.QueryAsReadOnlyCollectionAsync<GuildRankingRowDto>(sp, ct);
     }
 
+    /// <summary>
+    ///     Guild-point counter delta (e.g. the RvR four-guild-event enemy-tribe-kill credit) -- game.usp_Guild_AdjustPoints.
+    ///     See <see cref="IGuildRepository.AdjustPointsAsync" /> for the legacy citation and the gating this
+    ///     method deliberately leaves to the caller.
+    /// </summary>
+    public async ValueTask AdjustPointsAsync(int guildId, int delta, CancellationToken ct)
+    {
+        var sp = new StoredProcedureParametersBuilder("game", "usp_Guild_AdjustPoints", 0)
+            .AddParameter("GuildId", guildId, SqlDbType.Int)
+            .AddParameter("Delta", delta, SqlDbType.Int)
+            .Build();
+
+        await Db.ExecuteAsync(sp, ct);
+    }
+
     /// <summary>Full roster for one guild, master/sub-master first (GUILD_INFO.MemberNames/MemberRoles/MemberCallNames).</summary>
     public async ValueTask<ReadOnlyCollection<GuildRosterRowDto>> GetRosterAsync(int guildId, CancellationToken ct)
     {

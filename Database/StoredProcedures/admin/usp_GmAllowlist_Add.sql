@@ -4,15 +4,15 @@ CREATE PROCEDURE admin.usp_GmAllowlist_Add @IpAddress VARCHAR(45)
 AS
 BEGIN
     SET
-NOCOUNT ON;
+        NOCOUNT ON;
     SET
-XACT_ABORT ON;
+        XACT_ABORT ON;
 
     IF
-EXISTS (SELECT 1 FROM admin.GmAllowlist WHERE IpAddress = @IpAddress)
+        EXISTS (SELECT 1 FROM admin.GmAllowlist WHERE IpAddress = @IpAddress)
         THROW 50304, N'IP address is already on the GM allowlist.', 1;
 
-INSERT INTO admin.GmAllowlist (IpAddress)
+    INSERT INTO admin.GmAllowlist (IpAddress)
     OUTPUT INSERTED.GmAllowlistId
-VALUES (@IpAddress);
+    VALUES (@IpAddress);
 END;

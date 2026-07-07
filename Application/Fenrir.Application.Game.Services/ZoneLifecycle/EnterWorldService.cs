@@ -10,6 +10,7 @@ using Fenrir.Application.Game.Domain.Quests;
 using Fenrir.Application.Game.Domain.Social;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.WorldState;
+using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Stats;
 using Fenrir.Data.Security;
@@ -37,6 +38,9 @@ public sealed class EnterWorldService(
     IHeroRankingRepository heroRankings,
     ICharacterShardLocationRepository characterShardLocations,
     WorldStateService worldState,
+    TowerWarState towerWar,
+    ZoneCenterSiegeState zoneCenterSiegeState,
+    TribeGuardCorridorState tribeGuardCorridorState,
     IOptions<GameServerOptions> options,
     ILogger<EnterWorldService> logger) : IEnterWorldService
 {
@@ -148,8 +152,8 @@ public sealed class EnterWorldService(
         {
             var equipmentContainer = BuildEquipmentContainer(bundle.Items);
             var attributes = new CharacterBaseAttributes(character.StatVit, character.StatStr, character.StatInt,
-                character.StatDex, character.Level, character.Tribe, character.Title, character.Halo,
-                character.RebirthCount);
+                character.StatDex, character.Level, character.Tribe, character.PreviousTribe, character.Title,
+                character.Halo, character.RebirthCount);
 
             var petItemId = PetSlots.ResolveEquippedPetItemId(bundle.Items);
             var petContribution = PetGrowthCalculator.Compute(petItemId, character.PetGrowth, character.PetActivity,
@@ -158,7 +162,9 @@ public sealed class EnterWorldService(
             var stats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData,
                 pet: petContribution);
 
-            // Loaded once here and cached on PlayerRuntimeState -- never re-queried per chat message afterwards.
+            // Seeds PlayerRuntimeState.IsMuted for this world entry; MuteRefreshPollHost (Application/
+            // Fenrir.Application.Game.Hosting) keeps it fresh on a fixed interval afterwards -- see that
+            // host's own remarks for why a per-chat-message requery is not the right shape here.
             var isMutedTask = mutes.IsActiveForCharacterAsync(characterId, cancellationToken);
             var guildTask = guilds.GetByCharacterAsync(characterId, cancellationToken);
             var tribeRoleTask = tribes.GetRoleForCharacterAsync(characterId, cancellationToken);
@@ -171,7 +177,8 @@ public sealed class EnterWorldService(
             // own header for why that deviation from the legacy trigger point is accepted). Null (no row for
             // this character/period yet) legitimately means zero, matching legacy's own collapsed
             // no-row/query-failure semantics -- see IHeroRankingRepository.GetPointsAsync's own remarks.
-            var heroRankPointsTask = heroRankings.GetPointsAsync(characterId, HeroRankPointAccumulator.CurrentPeriodKind,
+            var heroRankPointsTask = heroRankings.GetPointsAsync(characterId,
+                HeroRankPointAccumulator.CurrentPeriodKind,
                 cancellationToken);
 
             // Cross-shard character-location directory (runtime.CharacterShardLocation): a same-shard-miss
@@ -225,14 +232,33 @@ public sealed class EnterWorldService(
 
             var broadcastWorldInfo = new WorldSnapshotResponse
             {
-                WorldInfo = WorldStateProjection.Apply(
-                    GuildRankingProjection.Apply(WorldStateTemplates.ZeroedWorldInfo, guildRanking.Top), worldState),
+                // Three overlays stacked onto the zeroed template, each covering a disjoint field slice: guild
+                // ranking board, live RvR tribe-symbol/points snapshot, and (the newest) the numbered zone-siege
+                // state machines + tribe-guard corridor passability that already have a real in-process backing
+                // model (ZoneCenterSiegeState/TribeGuardCorridorState) but previously never reached this packet
+                // -- see ZoneCenterSiegeProjection's own remarks.
+                WorldInfo = ZoneCenterSiegeProjection.Apply(
+                    WorldStateProjection.Apply(
+                        GuildRankingProjection.Apply(WorldStateTemplates.ZeroedWorldInfo, guildRanking.Top),
+                        worldState),
+                    zoneCenterSiegeState, tribeGuardCorridorState),
                 // No repository currently projects tribe master/sub-master NAMES or the vote/honor-rank rosters
                 // (ITribeRepository only ever returns CharacterIds) -- the zeroed template is the correct
                 // placeholder until that surface exists, not a regression introduced here.
                 TribeInfo = WorldStateTemplates.ZeroedTribeInfo
             };
             zoneSession.SendRaw(ZoneMessageFactory.Encode(in broadcastWorldInfo));
+
+            // Legacy pairs the full 12-tower ownership/status snapshot with the RvR world-info broadcast
+            // immediately above, unconditionally, inside this same registration-completion sequence
+            // (Server/ts25zone/S04_MyWork02.cpp:1203-1204, B_BROADCAST_CHUGSOUNG_INFO) -- for every zone
+            // entry, not just tower zones, and regardless of any tower's current siege phase. Previously
+            // Fenrir's only equivalent send fired solely from Zone.Combat.cs's ApplyTowerGuardianHitSideEffects
+            // (a guardian's own first landed hit), so a player who never witnessed that event received zero
+            // tower-ownership information for their whole session. TowerStatusResponse is not Compressed, so
+            // (unlike the two SendRaw/Encode calls above) it goes out via the plain Send<T> path -- the same
+            // call shape Zone.Combat.cs's own BroadcastTowerStatus already uses for this exact packet type.
+            zoneSession.Send(towerWar.BuildStatusSnapshot());
 
             // Self-spawn: Zone doesn't know this player exists yet (ZoneCommand.Enter below is only posted, not ticked).
             zoneSession.Send(new AvatarActionResponse
@@ -295,6 +321,13 @@ public sealed class EnterWorldService(
                         TargetLocation = [character.PosX, character.PosY, character.PosZ],
                         Front = character.Heading,
                         TargetFront = character.Heading,
+                        // Companion-pet follow sub-fields (PlayerRuntimeState.PetActionSort and its five
+                        // siblings, see that field's own remarks): correctly zero here, not a remaining
+                        // instance of the companion-pet-follow-rebroadcast gap -- this self-spawn packet is
+                        // sent before HandleEnter ever creates this character's PlayerRuntimeState, so no
+                        // CZ_UPDATE_PET_ACTION_SEND (op156) value has ever been recorded for this session yet.
+                        // Every subsequent avatar-action broadcast (built via Zone.BuildAvatarActionRecv /
+                        // Zone.PetActionFieldsOf once the character is tracked) reads the live stored value.
                         PetLocation = new float[3],
                         PetTargetLocation = new float[3],
                         PetFront = 0,
@@ -403,13 +436,28 @@ public sealed class EnterWorldService(
                 TeacherPoint: character.TeacherPoint,
                 Level2: character.Level2,
                 Exp2: character.Exp2,
-                HeroRankPoints: heroRankPoints)));
+                HeroRankPoints: heroRankPoints,
+                // Stat/elixir-potion lifetime counters (item-usage-consumables finding, Critical) --
+                // game.Characters already persisted these five, but nothing read them back into
+                // PlayerRuntimeState until now. See PlayerRuntimeState.EatLifePotion's own remarks.
+                EatLifePotion: character.EatLifePotion,
+                EatManaPotion: character.EatManaPotion,
+                EatStrPotion: character.EatStrPotion,
+                EatDexPotion: character.EatDexPotion,
+                EatElePotion: character.EatElePotion,
+                // mSupportSkillTimeUpRatio's Premium source field (behavior contract
+                // "buff-application-stacking-decay") -- the character's real persisted
+                // game.Characters.PremiumExpireUtc, not the PlayerEnterData default of 0. BuffX2Time stays at
+                // its default (no persisted source exists yet -- see PlayerRuntimeState.BuffX2Time's own
+                // remarks), so a fresh world entry always starts with that factor inactive.
+                PremiumExpireUtc: character.PremiumExpireUtc)));
 
             // A dropped Enter is never replayed -- the character would stay permanently invisible despite the two
             // packets above already telling the client registration succeeded, so treat it as fatal.
             if (!entered)
             {
-                logger.LogError("Zone {MapId} inbox full: dropped Enter for character {CharacterId} -- aborting session",
+                logger.LogError(
+                    "Zone {MapId} inbox full: dropped Enter for character {CharacterId} -- aborting session",
                     zone.MapId, characterId);
                 zoneSession.Abort(DisconnectReason.Faulted);
                 return;
@@ -476,7 +524,7 @@ public sealed class EnterWorldService(
 
     /// <summary>
     ///     Buff[slot*2]/[slot*2+1] pairing (value, remaining-ticks) -- same convention
-    ///     <see cref="Fenrir.Application.Game.Domain.World.Zone" />'s own ClearAllBuffs/ApplySkillBuffWrites use for
+    ///     <see cref="Fenrir.Application.Game.Domain.World.Zone" />'s own ClearAllBuffs/ApplyBuffWrites use for
     ///     this identical wire array. A brand-new character has no rows at all (creation never writes any buff), so
     ///     an empty <paramref name="buffs" /> collapses to the same all-zero snapshot the previous hardcode produced.
     /// </summary>
@@ -496,7 +544,10 @@ public sealed class EnterWorldService(
         return WorldStateTemplates.ZeroedBuffInfo with { Buff = buff };
     }
 
-    /// <summary>One value per slot (not the id/duration pair <see cref="BuildBuffInfo" /> produces) -- ObjectForAvatar's own view of the same buff snapshot.</summary>
+    /// <summary>
+    ///     One value per slot (not the id/duration pair <see cref="BuildBuffInfo" /> produces) -- ObjectForAvatar's own
+    ///     view of the same buff snapshot.
+    /// </summary>
     private static int[] BuildEffectValueForView(IReadOnlyList<CharacterBuffDto> buffs)
     {
         var effectValueForView = new int[35];

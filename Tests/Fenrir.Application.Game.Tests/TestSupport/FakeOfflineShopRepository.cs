@@ -1,16 +1,19 @@
+using System.Collections.ObjectModel;
 using Fenrir.Data.Abstractions.Characters;
 using Fenrir.Data.Abstractions.Commerce;
 
 namespace Fenrir.Application.Game.Tests.TestSupport;
 
 /// <summary>
-///     In-memory stand-in for IOfflineShopRepository: only the shop-lookup/rental-extension surface used by
-///     <c>UseInventoryItemServiceTests</c>' proxy-shop-rental-extension coverage is exercised here; every
-///     other member is out of scope for this test project (offline-shop lifecycle itself has its own
-///     coverage elsewhere).
+///     In-memory stand-in for IOfflineShopRepository: only the shop-lookup/rental-extension/all-open-listing
+///     surface used by <c>UseInventoryItemServiceTests</c>' proxy-shop-rental-extension coverage and
+///     <c>SearchShopListingsServiceTests</c>' proxy-shop-merge coverage is exercised here; every other
+///     member is out of scope for this test project (offline-shop lifecycle itself has its own coverage
+///     elsewhere).
 /// </summary>
 internal sealed class FakeOfflineShopRepository : IOfflineShopRepository
 {
+    private OfflineShopOpenListingRowDto[] _openListings = [];
     private OfflineShopRowDto? _shop;
 
     public bool ThrowOnExtendRental { get; set; }
@@ -20,6 +23,11 @@ internal sealed class FakeOfflineShopRepository : IOfflineShopRepository
         int characterId, CancellationToken ct)
     {
         return ValueTask.FromResult<(OfflineShopRowDto?, IReadOnlyList<OfflineShopItemRowDto>)>((_shop, []));
+    }
+
+    public ValueTask<ReadOnlyCollection<OfflineShopOpenListingRowDto>> GetAllOpenAsync(CancellationToken ct)
+    {
+        return ValueTask.FromResult(new ReadOnlyCollection<OfflineShopOpenListingRowDto>(_openListings));
     }
 
     public ValueTask OpenAndReplaceContainersAsync(int characterId, short? zoneNumber, int shopDate,
@@ -77,5 +85,10 @@ internal sealed class FakeOfflineShopRepository : IOfflineShopRepository
     public void SeedShop(OfflineShopRowDto shop)
     {
         _shop = shop;
+    }
+
+    public void SeedOpenListings(params OfflineShopOpenListingRowDto[] rows)
+    {
+        _openListings = rows;
     }
 }

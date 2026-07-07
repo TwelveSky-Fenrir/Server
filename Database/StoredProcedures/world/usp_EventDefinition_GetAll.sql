@@ -1,10 +1,10 @@
 CREATE PROCEDURE world.usp_EventDefinition_GetAll
-    AS
+AS
 BEGIN
     SET
-NOCOUNT ON;
+        NOCOUNT ON;
 
-SELECT EventDefinitionId, EventType, SortKey, Rate, ZoneNumber, Message
-FROM world.EventDefinitions
-ORDER BY EventDefinitionId;
+    SELECT EventDefinitionId, EventType, SortKey, Rate, ZoneNumber, Message
+    FROM world.EventDefinitions
+    ORDER BY EventDefinitionId;
 END;

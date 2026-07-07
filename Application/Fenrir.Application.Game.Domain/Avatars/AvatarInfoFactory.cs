@@ -32,6 +32,46 @@ public static class AvatarInfoFactory
     /// </summary>
     private const int MaxGeneralExperience = 2_000_000_000;
 
+    // wAvatar.aInventory[2][64][6] -- ServerDocs/12_ts25zone/06_MyWork03_Items_Equipement_Craft_Quetes.md:
+    // 115-117 ("Format d'inventaire, 6 entiers par slot... [0] ID objet, [3] quantité/durabilité, [4] valeur
+    // d'amélioration/option, [5] réservé") ; page/slot bounds from Database/Tables/game/CharacterItems.sql's
+    // own CK_CharacterItems_ContainerSlot (Container 0/1, Slot <= 63) ; total wire size cross-checked against
+    // ServerDocs/19_Header_Lib/06_FunctionH_Utilitaires_XOR.md:276's MAX_INVENTORY_PAGE_NUM *
+    // MAX_INVENTORY_SLOT_NUM * MAX_INVENTORY_VALUE_NUM = 2*64*6 = 768, matching AvatarInfo.Inventory's own
+    // FixedArray(768). [1]/[2] are NOT populated: the cited doc only pins [0]/[3]/[4]/[5], leaving 2 of
+    // CharacterItemSlotDto's own remaining fields (ExpireDate/Serial) as the only plausible candidates for
+    // the other 2 ints, but WHICH of [1]/[2] holds which is not established by any citation available to this
+    // pass -- left at wire-zero rather than guessed (open question, needs a cpp-protocol-header-analyst pass
+    // over Server/Header/Protocol/STRUCT.h's exact AVATAR_INFO field layout to close).
+    private const int InventoryPageCount = 2;
+    private const int InventorySlotsPerPage = 64;
+    private const int InventoryWireIntsPerSlot = 6;
+
+    // wAvatar.aStoreItem[2][28][4] -- same ItemId/ExpireDate/packed-upgrade-byte/unused convention as
+    // aEquip[13][4] above (ServerDocs/19_Header_Lib/06_FunctionH_Utilitaires_XOR.md:277's
+    // MAX_STORE_ITEM_PAGE_NUM * MAX_STORE_ITEM_SLOT_NUM * MAX_STORE_ITEM_VALUE_NUM = 2*28*4 = 224, matching
+    // AvatarInfo.StoreItem's own FixedArray(224) and confirming MAX_STORE_ITEM_VALUE_NUM = 4, the same 4 as
+    // MAX_EQUIP_VALUE_NUM). Page/slot bounds from CharacterItems.sql's CK_CharacterItems_ContainerSlot
+    // (Container 3/4, Slot <= 27). "Store" here is the persisted account storage/warehouse container
+    // (ContainerMatrix.StorePage0/1, moved between via StoreItemTransferPolicy) -- distinct from the
+    // ephemeral, never-persisted player-shop-stall (PShop) concept, which genuinely has no queryable state at
+    // this point and is correctly out of scope.
+    private const int StorePageCount = 2;
+    private const int StoreSlotsPerPage = 28;
+    private const int StoreWireIntsPerSlot = 4;
+
+    // wAvatar.aSkill[40][2] -- Database/Tables/game/CharacterSkills.sql:1's own citation
+    // ("[slot][0]=SkillId, [slot][1]=Grade"); 40*2 = 80 matches AvatarInfo.Skill's own FixedArray(80).
+    private const int SkillSlotCount = 40;
+    private const int SkillWireIntsPerSlot = 2;
+
+    // wAvatar.aHotKey[3][14][3] -- Database/Tables/game/CharacterHotkeys.sql:1's own citation
+    // ("3 pages x 14 keys x 3 ints... Sort/Value1/Value2 stored verbatim as the legacy triple");
+    // 3*14*3 = 126 matches AvatarInfo.HotKey's own FixedArray(126).
+    private const int HotkeyPageCount = 3;
+    private const int HotkeyKeysPerPage = 14;
+    private const int HotkeyWireIntsPerSlot = 3;
+
     /// <summary>
     ///     <paramref name="skills" />/<paramref name="hotkeys" /> default to null (treated as empty) rather than
     ///     being required, so every pre-existing caller that only cared about identity/stat/equipment fields
@@ -83,6 +123,16 @@ public static class AvatarInfoFactory
             Title = character.Title,
             Halo = character.Halo,
             RebirthNum = character.RebirthCount,
+            // Stat/elixir-potion lifetime counters (item-usage-consumables finding, Critical): previously
+            // left at Zeroed's 0 default on every world entry even though CharacterWorldSnapshotDto already
+            // carries the persisted values -- same "reflect the currently-persisted value, don't recompute
+            // it" precedent as Level2/Exp2/RebirthNum above. See PlayerRuntimeState.EatLifePotion's own
+            // remarks for the full wiring.
+            EatLifePotion = character.EatLifePotion,
+            EatManaPotion = character.EatManaPotion,
+            EatStrPotion = character.EatStrPotion,
+            EatDexPotion = character.EatDexPotion,
+            EatElePotion = character.EatElePotion,
             // Migrations/027_character_autotime2_grant.sql (closes the prior round's open aAutoTime2
             // question): aAutoTime2, the free auto-hunt minute allowance (Server/ts25login/S04_MyWork02.cpp:
             // 888 grants 1440 == 24h of minutes at creation; Server/ts25zone/S07_MyGame04.cpp:787-823
@@ -188,6 +238,14 @@ public static class AvatarInfoFactory
             Title = state.Title,
             Halo = state.Halo,
             RebirthNum = state.RebirthCount,
+            // Stat/elixir-potion lifetime counters -- same wiring as CreateForCharacter above, sourced from
+            // the in-memory PlayerRuntimeState fields (already carried through a zone-transfer by
+            // ZoneTransfer.CreateEnterData) rather than a fresh DB read.
+            EatLifePotion = state.EatLifePotion,
+            EatManaPotion = state.EatManaPotion,
+            EatStrPotion = state.EatStrPotion,
+            EatDexPotion = state.EatDexPotion,
+            EatElePotion = state.EatElePotion,
             // creation-persistence-full-reaudit finding (Major), zone-transfer half continued: AutoBuffTime is
             // the other field PlayerRuntimeState already carries in memory (PlayerRuntimeState.Automation.cs),
             // so it is wired here too. The active-mount grant, DoubleExpTime1/DoubleExpTime2, and Premium are
@@ -292,7 +350,10 @@ public static class AvatarInfoFactory
         return equip;
     }
 
-    /// <summary>Same pet-slot exception as <see cref="BuildEquipArrayFromRows" /> above, applied to the in-memory equipment container instead of freshly-read rows.</summary>
+    /// <summary>
+    ///     Same pet-slot exception as <see cref="BuildEquipArrayFromRows" /> above, applied to the in-memory equipment
+    ///     container instead of freshly-read rows.
+    /// </summary>
     private static int[] BuildEquipArrayFromContainer(IReadOnlyDictionary<byte, ItemStack> equipmentContainer,
         int petGrowth, byte petActivity)
     {
@@ -330,47 +391,10 @@ public static class AvatarInfoFactory
         return enchant | (combine << 8) | (refine << 16) | (socket << 24);
     }
 
-    // wAvatar.aInventory[2][64][6] -- ServerDocs/12_ts25zone/06_MyWork03_Items_Equipement_Craft_Quetes.md:
-    // 115-117 ("Format d'inventaire, 6 entiers par slot... [0] ID objet, [3] quantité/durabilité, [4] valeur
-    // d'amélioration/option, [5] réservé") ; page/slot bounds from Database/Tables/game/CharacterItems.sql's
-    // own CK_CharacterItems_ContainerSlot (Container 0/1, Slot <= 63) ; total wire size cross-checked against
-    // ServerDocs/19_Header_Lib/06_FunctionH_Utilitaires_XOR.md:276's MAX_INVENTORY_PAGE_NUM *
-    // MAX_INVENTORY_SLOT_NUM * MAX_INVENTORY_VALUE_NUM = 2*64*6 = 768, matching AvatarInfo.Inventory's own
-    // FixedArray(768). [1]/[2] are NOT populated: the cited doc only pins [0]/[3]/[4]/[5], leaving 2 of
-    // CharacterItemSlotDto's own remaining fields (ExpireDate/Serial) as the only plausible candidates for
-    // the other 2 ints, but WHICH of [1]/[2] holds which is not established by any citation available to this
-    // pass -- left at wire-zero rather than guessed (open question, needs a cpp-protocol-header-analyst pass
-    // over Server/Header/Protocol/STRUCT.h's exact AVATAR_INFO field layout to close).
-    private const int InventoryPageCount = 2;
-    private const int InventorySlotsPerPage = 64;
-    private const int InventoryWireIntsPerSlot = 6;
-
-    // wAvatar.aStoreItem[2][28][4] -- same ItemId/ExpireDate/packed-upgrade-byte/unused convention as
-    // aEquip[13][4] above (ServerDocs/19_Header_Lib/06_FunctionH_Utilitaires_XOR.md:277's
-    // MAX_STORE_ITEM_PAGE_NUM * MAX_STORE_ITEM_SLOT_NUM * MAX_STORE_ITEM_VALUE_NUM = 2*28*4 = 224, matching
-    // AvatarInfo.StoreItem's own FixedArray(224) and confirming MAX_STORE_ITEM_VALUE_NUM = 4, the same 4 as
-    // MAX_EQUIP_VALUE_NUM). Page/slot bounds from CharacterItems.sql's CK_CharacterItems_ContainerSlot
-    // (Container 3/4, Slot <= 27). "Store" here is the persisted account storage/warehouse container
-    // (ContainerMatrix.StorePage0/1, moved between via StoreItemTransferPolicy) -- distinct from the
-    // ephemeral, never-persisted player-shop-stall (PShop) concept, which genuinely has no queryable state at
-    // this point and is correctly out of scope.
-    private const int StorePageCount = 2;
-    private const int StoreSlotsPerPage = 28;
-    private const int StoreWireIntsPerSlot = 4;
-
-    // wAvatar.aSkill[40][2] -- Database/Tables/game/CharacterSkills.sql:1's own citation
-    // ("[slot][0]=SkillId, [slot][1]=Grade"); 40*2 = 80 matches AvatarInfo.Skill's own FixedArray(80).
-    private const int SkillSlotCount = 40;
-    private const int SkillWireIntsPerSlot = 2;
-
-    // wAvatar.aHotKey[3][14][3] -- Database/Tables/game/CharacterHotkeys.sql:1's own citation
-    // ("3 pages x 14 keys x 3 ints... Sort/Value1/Value2 stored verbatim as the legacy triple");
-    // 3*14*3 = 126 matches AvatarInfo.HotKey's own FixedArray(126).
-    private const int HotkeyPageCount = 3;
-    private const int HotkeyKeysPerPage = 14;
-    private const int HotkeyWireIntsPerSlot = 3;
-
-    /// <summary>See <see cref="InventoryPageCount" />'s own remarks for the exact per-slot field mapping and its one open question.</summary>
+    /// <summary>
+    ///     See <see cref="InventoryPageCount" />'s own remarks for the exact per-slot field mapping and its one open
+    ///     question.
+    /// </summary>
     private static int[] BuildInventoryArrayFromRows(IReadOnlyList<CharacterItemSlotDto> items)
     {
         var inventory = new int[InventoryPageCount * InventorySlotsPerPage * InventoryWireIntsPerSlot];
@@ -396,7 +420,10 @@ public static class AvatarInfoFactory
         return inventory;
     }
 
-    /// <summary>Same mapping as <see cref="BuildInventoryArrayFromRows" />, applied to the in-memory per-page containers instead of freshly-read rows.</summary>
+    /// <summary>
+    ///     Same mapping as <see cref="BuildInventoryArrayFromRows" />, applied to the in-memory per-page containers
+    ///     instead of freshly-read rows.
+    /// </summary>
     private static int[] BuildInventoryArrayFromContainers(IReadOnlyDictionary<byte, ItemStack> page0,
         IReadOnlyDictionary<byte, ItemStack> page1)
     {
@@ -448,7 +475,10 @@ public static class AvatarInfoFactory
         return store;
     }
 
-    /// <summary>Same mapping as <see cref="BuildStoreItemArrayFromRows" />, applied to the in-memory per-page containers instead of freshly-read rows.</summary>
+    /// <summary>
+    ///     Same mapping as <see cref="BuildStoreItemArrayFromRows" />, applied to the in-memory per-page containers
+    ///     instead of freshly-read rows.
+    /// </summary>
     private static int[] BuildStoreItemArrayFromContainers(IReadOnlyDictionary<byte, ItemStack> page0,
         IReadOnlyDictionary<byte, ItemStack> page1)
     {
@@ -492,7 +522,10 @@ public static class AvatarInfoFactory
         return skill;
     }
 
-    /// <summary>Same mapping as <see cref="BuildSkillArrayFromRows" />, applied to the in-memory learned-skill map instead of freshly-read rows.</summary>
+    /// <summary>
+    ///     Same mapping as <see cref="BuildSkillArrayFromRows" />, applied to the in-memory learned-skill map instead of
+    ///     freshly-read rows.
+    /// </summary>
     private static int[] BuildSkillArrayFromLearnedSkills(IReadOnlyDictionary<byte, LearnedSkill> learnedSkills)
     {
         var skill = new int[SkillSlotCount * SkillWireIntsPerSlot];

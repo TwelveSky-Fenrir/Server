@@ -122,9 +122,11 @@ public sealed partial record CharacterWorldSnapshotDto(
     byte PetActivity,
     // wAvatar.aTeacherPoint; appended last to match the proc's column order.
     int TeacherPoint,
-    // aAutoBuffTime/aPremium, both appended after TeacherPoint for the same reason -- neither is read into
-    // PlayerRuntimeState yet (see EnterWorldHandler), same "durably stored, runtime wiring pending" posture
-    // DoubleExpTime1/2 already have above.
+    // aAutoBuffTime/aPremium, both appended after TeacherPoint for the same reason. AutoBuffTime is still not
+    // read into PlayerRuntimeState (same "durably stored, runtime wiring pending" posture DoubleExpTime1/2
+    // have above); PremiumExpireUtc IS read into PlayerRuntimeState.PremiumExpireUtc at world entry
+    // (EnterWorldService.HandleAsync) and threaded through the premium-account drop-rate bonus
+    // (World.Loot.MonsterDropRoller.Roll's killerPremiumActive parameter) -- see that field's own remarks.
     int AutoBuffTime,
     long PremiumExpireUtc,
     // wAvatar.aExp2; appended last for the same reason AutoBuffTime/PremiumExpireUtc were -- see TribeActionHandler.HandleRebirthAsync for the one live consumer.

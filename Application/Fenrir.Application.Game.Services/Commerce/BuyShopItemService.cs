@@ -69,16 +69,16 @@ public sealed class BuyShopItemService(
         var liveSellerStack = seller.Inventory.GetSlot((byte)slot.InventoryPage, (byte)slot.InventoryIndex);
         if (liveSellerStack is not { } liveStack || liveStack.ItemId != slot.ItemId ||
             liveStack.Quantity != slot.Quantity || liveStack.Value() != slot.Value)
-            return new BuyShopItemCommitResult(false, BuildReply(4, 0, 0, 0), false);
+            return new BuyShopItemCommitResult(false, BuildReply(4, 0, 0, 0), null);
 
         if (!worldData.ItemsById.TryGetValue(slot.ItemId, out var itemDefinition))
-            return new BuyShopItemCommitResult(true, null, false);
+            return new BuyShopItemCommitResult(true, null, null);
 
         var buyerDestination = buyer.Inventory.GetSlot((byte)packet.Page2, (byte)packet.Index2);
         var resolved = PshopPurchasePolicy.ResolvePurchase(slot, itemDefinition, buyerDestination);
 
         if (!resolved.Succeeded)
-            return new BuyShopItemCommitResult(true, null, false);
+            return new BuyShopItemCommitResult(true, null, null);
 
         var projectedSellerContainer = seller.Inventory.GetContainer((byte)slot.InventoryPage)
             .Remove((byte)slot.InventoryIndex);
@@ -96,7 +96,7 @@ public sealed class BuyShopItemService(
             logger.LogWarning(ex,
                 "PShop purchase ExecutePshopPurchaseAsync failed for buyer {BuyerId}/seller {SellerId} (treated as insufficient/over-cap)",
                 buyer.CharacterId, seller.CharacterId);
-            return new BuyShopItemCommitResult(true, null, false);
+            return new BuyShopItemCommitResult(true, null, null);
         }
 
         var newStack = resolved.NewDestinationStack!.Value;
@@ -122,11 +122,24 @@ public sealed class BuyShopItemService(
                 zone.MapId, seller.CharacterId);
 
         var stillHasItems = HasAnyOtherOccupiedSlot(seller.PshopListing, packet.Page1, packet.Index1);
-        zone.PostPshopCommand(new PshopZoneCommand(seller.CharacterId, packet.Page1, packet.Index1,
-            !stillHasItems));
 
-        // Reaches only the buyer (same connection); the seller's own close mirror rides PshopZoneCommand above.
-        return new BuyShopItemCommitResult(false, response, !stillHasItems);
+        // B_BUY_PSHOP_RECV(6) "your item sold" -- seller's own source slot coordinates, same item
+        // value/socket details as the buyer's Result=0 notification above (Server/ts25zone/S04_MyWork02.cpp:7067-7071).
+        var sellerSoldNotification = BuildReply(6, slot.Price, packet.Page1, packet.Index1, newStack);
+
+        // Awaited (not fire-and-forget) so the listing snapshot read below observes the POST-clear state --
+        // the zone tick clears the sold slot and delivers the seller's own notifications as part of applying
+        // this command (Zone.ApplyPshopCommand).
+        await zone.PostPshopCommandAndWaitAsync(
+            new PshopZoneCommand(seller.CharacterId, packet.Page1, packet.Index1, !stillHasItems,
+                sellerSoldNotification),
+            cancellationToken);
+
+        // B_DEMAND_PSHOP_RECV(0) buyer-facing listing refresh (Server/ts25zone/S04_MyWork02.cpp:7096-7100) --
+        // the seller's own Result=3 counterpart is sent directly by Zone.ApplyPshopCommand.
+        var listingRefresh = new ViewShopStallResponse { Result = 0, PshopInfo = seller.PshopListing!.Value };
+
+        return new BuyShopItemCommitResult(false, response, listingRefresh);
     }
 
     private static bool HasAnyOtherOccupiedSlot(PshopInfo? listing, int soldPage, int soldSlot)

@@ -10,72 +10,73 @@
 -- so a second caller that races in just blocks until the first commits, then reads the refreshed date and
 -- no-ops. Returns whether THIS call performed the flip, purely so the caller can log it.
 CREATE PROCEDURE game.usp_HeroRanking_Rollover
-    AS
+AS
 BEGIN
     SET
-NOCOUNT ON;
+        NOCOUNT ON;
     SET
-XACT_ABORT ON;
+        XACT_ABORT ON;
 
     DECLARE
-@RolledOver BIT = 0;
+        @RolledOver BIT = 0;
 
-BEGIN
-TRANSACTION;
+    BEGIN
+        TRANSACTION;
 
     IF
-NOT EXISTS (SELECT 1 FROM game.HeroRankingRolloverState WITH (UPDLOCK, HOLDLOCK) WHERE Id = 1)
+        NOT EXISTS (SELECT 1 FROM game.HeroRankingRolloverState WITH (UPDLOCK, HOLDLOCK) WHERE Id = 1)
         INSERT INTO game.HeroRankingRolloverState (Id) VALUES (1);
 
     DECLARE
-@LastRolloverAtUtc DATETIME2(3);
-SELECT @LastRolloverAtUtc = LastRolloverAtUtc
-FROM game.HeroRankingRolloverState WITH (UPDLOCK, HOLDLOCK)
-WHERE Id = 1;
+        @LastRolloverAtUtc DATETIME2(3);
+    SELECT @LastRolloverAtUtc = LastRolloverAtUtc
+    FROM game.HeroRankingRolloverState
+    WITH (UPDLOCK, HOLDLOCK)
+    WHERE Id = 1;
 
-IF
-DATEDIFF(DAY, @LastRolloverAtUtc, SYSUTCDATETIME()) >= 7
-BEGIN
-DELETE
-FROM game.HeroRankings
-WHERE PeriodKind = 1;
+    IF
+        DATEDIFF(DAY, @LastRolloverAtUtc, SYSUTCDATETIME()) >= 7
+        BEGIN
+            DELETE
+            FROM game.HeroRankings
+            WHERE PeriodKind = 1;
 
-WITH RankedCurrent AS (SELECT CharacterId,
-                              TribeId,
-                              Points,
-                              Level,
-                              ROW_NUMBER() OVER (PARTITION BY TribeId ORDER BY Points DESC) AS Rn
-                       FROM game.HeroRankings
-                       WHERE PeriodKind = 0
-                         AND TribeId IS NOT NULL
-                         AND Points > 0)
-INSERT
-INTO game.HeroRankings (CharacterId, PeriodKind, Points, TribeId, Level, RewardClaimed, Description,
-                                        RecordedAtUtc)
-SELECT CharacterId,
-       1,
-       Points,
-       TribeId,
-       Level,
-       0,
-       NULL,
-       SYSUTCDATETIME()
-FROM RankedCurrent
-WHERE Rn <= 10;
+            WITH RankedCurrent AS (SELECT CharacterId,
+                                          TribeId,
+                                          Points,
+                                          Level,
+                                          ROW_NUMBER() OVER (PARTITION BY TribeId ORDER BY Points DESC) AS Rn
+                                   FROM game.HeroRankings
+                                   WHERE PeriodKind = 0
+                                     AND TribeId IS NOT NULL
+                                     AND Points > 0)
+            INSERT
+            INTO game.HeroRankings (CharacterId, PeriodKind, Points, TribeId, Level, RewardClaimed, Description,
+                                    RecordedAtUtc)
+            SELECT CharacterId,
+                   1,
+                   Points,
+                   TribeId,
+                   Level,
+                   0,
+                   NULL,
+                   SYSUTCDATETIME()
+            FROM RankedCurrent
+            WHERE Rn <= 10;
 
-DELETE
-FROM game.HeroRankings
-WHERE PeriodKind = 0;
+            DELETE
+            FROM game.HeroRankings
+            WHERE PeriodKind = 0;
 
-UPDATE game.HeroRankingRolloverState
-SET LastRolloverAtUtc = SYSUTCDATETIME()
-WHERE Id = 1;
+            UPDATE game.HeroRankingRolloverState
+            SET LastRolloverAtUtc = SYSUTCDATETIME()
+            WHERE Id = 1;
 
-SET
-@RolledOver = 1;
-END;
+            SET
+                @RolledOver = 1;
+        END;
 
-COMMIT TRANSACTION;
+    COMMIT TRANSACTION;
 
-SELECT @RolledOver AS RolledOver;
+    SELECT @RolledOver AS RolledOver;
 END;

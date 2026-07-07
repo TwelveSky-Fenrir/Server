@@ -1,10 +1,10 @@
 CREATE PROCEDURE world.usp_NpcGambleCost_GetAll
-    AS
+AS
 BEGIN
     SET
-NOCOUNT ON;
+        NOCOUNT ON;
 
-SELECT NpcId, GambleTier, CostIndex, Value
-FROM world.NpcGambleCosts
-ORDER BY NpcId, GambleTier, CostIndex;
+    SELECT NpcId, GambleTier, CostIndex, Value
+    FROM world.NpcGambleCosts
+    ORDER BY NpcId, GambleTier, CostIndex;
 END;

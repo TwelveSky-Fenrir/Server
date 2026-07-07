@@ -24,7 +24,8 @@ public partial class PlayerRuntimeState
 
     /// <summary>
     ///     This character's tribe role -- loaded once at world entry, matching <c>ReturnTribeRole</c>'s own
-    ///     encoding directly (0 = regular, 1 = master, 2 = sub-master).
+    ///     encoding directly (0 = regular, 1 = master, 2 = sub-master, 3 = elected tribe-council member
+    ///     seated via the tribe-vote mechanism; see <c>Server/Header/function.h:92-114</c>).
     /// </summary>
     public byte TribeRole { get; set; }
 

@@ -3,12 +3,12 @@
 -- tower (0-11 once game.usp_TowerState_EnsureInitialized has run), ordered by TowerIndex.
 -- Read-only, safe to retry.
 CREATE PROCEDURE game.usp_TowerState_GetAll
-    AS
+AS
 BEGIN
     SET
-NOCOUNT ON;
+        NOCOUNT ON;
 
-SELECT TowerIndex, Level, TowerType, ControllingTribeId, CapturedAtUtc
-FROM game.TowerState
-ORDER BY TowerIndex;
+    SELECT TowerIndex, Level, TowerType, ControllingTribeId, CapturedAtUtc
+    FROM game.TowerState
+    ORDER BY TowerIndex;
 END;

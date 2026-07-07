@@ -109,6 +109,15 @@ public sealed class TribeBankTaxAccumulator(Func<byte, byte>? resolveBeneficiary
     ///     bonus is added on top of what the killer actually receives. Additional to, never subtracted from, the
     ///     killer's own award.
     /// </summary>
+    /// <remarks>
+    ///     Not currently invoked from Fenrir's own monster-kill money-grant path
+    ///     (<see cref="World.Monsters.MonsterSpawnScheduler.Simulate" />'s death handling): in production
+    ///     <c>ts25zone</c>, the live <c>DROP_MONEY</c> block never routes through <c>ProcessForDropItem</c> (the
+    ///     one call site of <c>AddTribeBankInfo3</c>, the function this method models) -- see
+    ///     <see cref="Zone.CreditMonsterKillTribeTax" />'s own remarks for the full citation set. Kept and
+    ///     directly unit-tested as a standalone mechanism pending confirmation of whether the 9% rate has any
+    ///     other legitimate live caller elsewhere in <c>ts25zone</c>.
+    /// </remarks>
     public void CreditMonsterKillCurrencyTax(byte killerTribe, long postReductionAmount)
     {
         Credit(killerTribe, postReductionAmount, MonsterKillCurrencyTaxRate);

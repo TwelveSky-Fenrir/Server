@@ -10,7 +10,28 @@ public enum ZoneCommandKind : byte
     Enter,
     Leave,
     Move,
-    PetAction
+    PetAction,
+
+    /// <summary>
+    ///     Sets <see cref="PlayerRuntimeState.IsMovingZone" /> true on this zone's own tracked copy of
+    ///     <see cref="ZoneCommand.CharacterId" /> -- the ONLY legal way to do so, preserving the single-writer
+    ///     invariant every other <see cref="PlayerRuntimeState" /> mutation already relies on. Posted by
+    ///     <c>Fenrir.Application.Game.Services.ZoneLifecycle.ZoneMoveService.HandleCrossShardAsync</c>'s
+    ///     successful-handoff branch, from the request thread that resolved the destination shard -- never
+    ///     mutated directly from there. See <see cref="PlayerRuntimeState.IsMovingZone" />'s own remarks.
+    /// </summary>
+    MarkZoneTransferPending,
+
+    /// <summary>
+    ///     Sets <see cref="PlayerRuntimeState.IsMuted" /> to <see cref="ZoneCommand.Muted" /> on this zone's own
+    ///     tracked copy of <see cref="ZoneCommand.CharacterId" /> -- the ONLY legal way to update it once a
+    ///     character is already tracked here (world entry seeds the initial value directly, before the player
+    ///     is added to this zone's own map, so no race is possible there), same single-writer posture as
+    ///     <see cref="MarkZoneTransferPending" />. Posted by <c>MuteRefreshPollHost</c>
+    ///     (<c>Application/Fenrir.Application.Game.Hosting</c>) from its own background-timer thread, once per
+    ///     poll interval, for every online character whose batch-refreshed mute status changed.
+    /// </summary>
+    SetMuted
 }
 
 /// <summary>
@@ -53,6 +74,9 @@ public readonly struct ZoneCommand
     /// </summary>
     public (float X, float Y, float Z)? HandoffPosition { get; init; }
 
+    /// <summary>Meaningful only when <see cref="Kind" /> is <see cref="ZoneCommandKind.SetMuted" />.</summary>
+    public bool Muted { get; init; }
+
     public static ZoneCommand Enter(int characterId, PlayerEnterData data)
     {
         return new ZoneCommand { Kind = ZoneCommandKind.Enter, CharacterId = characterId, EnterData = data };
@@ -81,6 +105,18 @@ public readonly struct ZoneCommand
     public static ZoneCommand PetAction(int characterId, in ActionInfo action)
     {
         return new ZoneCommand { Kind = ZoneCommandKind.PetAction, CharacterId = characterId, Action = action };
+    }
+
+    /// <summary>See <see cref="ZoneCommandKind.MarkZoneTransferPending" />'s own remarks.</summary>
+    public static ZoneCommand MarkZoneTransferPending(int characterId)
+    {
+        return new ZoneCommand { Kind = ZoneCommandKind.MarkZoneTransferPending, CharacterId = characterId };
+    }
+
+    /// <summary>See <see cref="ZoneCommandKind.SetMuted" />'s own remarks.</summary>
+    public static ZoneCommand SetMuted(int characterId, bool muted)
+    {
+        return new ZoneCommand { Kind = ZoneCommandKind.SetMuted, CharacterId = characterId, Muted = muted };
     }
 }
 
@@ -120,6 +156,11 @@ public sealed record PlayerEnterData(
     IReadOnlyList<CharacterSkillDto>? Skills = null,
     int? TeacherCharacterId = null,
     int? StudentCharacterId = null,
+    // These, and every field down through PetActivity below, must travel here too, or PlayerRuntimeState's
+    // quest/mission/auto-hunt/pet-growth fields silently reset to their zero/empty/disabled default on every
+    // in-process zone transfer -- same "must travel or it resets" posture as the StatVit/Title/HeroRankPoints
+    // block further below. See ZoneTransfer.CreateEnterData, which carries the live source-zone values through
+    // instead of leaving these at their defaults.
     QuestProgress QuestProgress = default,
     int MissionJoinWar = 0,
     int MissionKillOtherTribe = 0,
@@ -172,4 +213,42 @@ public sealed record PlayerEnterData(
     // silently resets to 0 on every world entry AND every in-process zone transfer (see that field's own
     // remarks and ZoneTransfer.CreateEnterData, which carries the live in-memory value through a same-shard
     // hop instead of re-querying it).
-    int HeroRankPoints = 0);
+    int HeroRankPoints = 0,
+    // Stat/elixir-potion lifetime counters (PlayerRuntimeState.EatLifePotion/EatManaPotion/EatStrPotion/
+    // EatDexPotion/EatElePotion) -- must travel here too, or they silently reset to 0 on every world entry
+    // and in-process zone transfer, exactly the same "must travel or it resets" posture as the StatVit/
+    // Title/HeroRankPoints block above. game.Characters already persists all five (0-400 CHECK-constrained);
+    // this was the missing runtime-hydration link (item-usage-consumables finding, Critical).
+    int EatLifePotion = 0,
+    int EatManaPotion = 0,
+    int EatStrPotion = 0,
+    int EatDexPotion = 0,
+    int EatElePotion = 0,
+    // mSupportSkillTimeUpRatio's two source fields (behavior contract "buff-application-stacking-decay") --
+    // must travel here too, same "must travel or it resets" posture as every block above: without this, a
+    // premium account's buff-duration multiplier would silently reset to 1x on every in-process zone
+    // transfer. PremiumExpireUtc defaults 0 (no premium) for a brand-new login too, but EnterWorldService's
+    // own call site overrides it with the character's real persisted game.Characters.PremiumExpireUtc --
+    // see PlayerRuntimeState.PremiumExpireUtc's own remarks. BuffX2Time has no persisted source anywhere yet
+    // (PlayerRuntimeState.BuffX2Time's own remarks) so it stays 0 on every path until a future item-
+    // consumption pass adds one.
+    long PremiumExpireUtc = 0,
+    int BuffX2Time = 0,
+    // The transferring character's full live BUFF_INFO (Server/ts25zone/S04_MyWork02.cpp:2017-2186's
+    // DEMAND_ZONE_SERVER_INFO_2 -> REGISTER_AVATAR_SEND broker round trip, Server/Header/Protocol/STRUCT.h:1462).
+    // Null on a fresh login: EnterWorldService does not (yet) hydrate PlayerRuntimeState.Buffs from persisted
+    // rows -- only the client-facing entry snapshot does, via EnterWorldService.BuildBuffInfo -- so a brand-new
+    // session simply starts with PlayerRuntimeState.Buffs at its zero default, same as before this field
+    // existed. A same-shard zone transfer always supplies a non-null value here (ZoneTransfer.CreateEnterData,
+    // via ZoneTransferBuffRules.Resolve), which also encodes the one legacy exception: the destination zone
+    // being zone 124 (Pungun Hall) wipes the table instead of carrying it through.
+    BuffInfo? Buffs = null,
+    // World-entry hydration (EnterWorldService, from game.CharacterHotkeys) or, for an in-process handoff,
+    // the live table carried through by ZoneTransfer.CreateEnterData -- see PlayerRuntimeState.Hotkeys' own
+    // remarks. Null means "seed nothing" (a brand-new character has no rows yet), never "clear the table".
+    IReadOnlyList<CharacterHotkeyDto>? Hotkeys = null,
+    // Pet EXP boost pill running duration counter -- must travel here too, or PlayerRuntimeState.PetExpX2Time
+    // silently resets to 0 on every in-process zone transfer, same "must travel or it resets" posture as
+    // PetGrowth/PetActivity above. No persisted source exists (PlayerRuntimeState.PetExpX2Time's own remarks),
+    // so it stays 0 on a fresh world entry, same posture as BuffX2Time.
+    int PetExpX2Time = 0);

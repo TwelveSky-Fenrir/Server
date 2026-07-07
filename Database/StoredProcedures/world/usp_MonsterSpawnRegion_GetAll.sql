@@ -1,20 +1,20 @@
 CREATE PROCEDURE world.usp_MonsterSpawnRegion_GetAll
-    AS
+AS
 BEGIN
     SET
-NOCOUNT ON;
+        NOCOUNT ON;
 
-SELECT MonsterSpawnRegionId,
-       ZoneNumber,
-       SourceFileName,
-       Value01,
-       MonsterId,
-       Value03,
-       Number,
-       LocationX,
-       LocationY,
-       LocationZ,
-       Radius
-FROM world.MonsterSpawnRegions
-ORDER BY MonsterSpawnRegionId;
+    SELECT MonsterSpawnRegionId,
+           ZoneNumber,
+           SourceFileName,
+           Value01,
+           MonsterId,
+           Value03,
+           Number,
+           LocationX,
+           LocationY,
+           LocationZ,
+           Radius
+    FROM world.MonsterSpawnRegions
+    ORDER BY MonsterSpawnRegionId;
 END;

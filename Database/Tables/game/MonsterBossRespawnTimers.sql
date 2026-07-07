@@ -6,7 +6,7 @@
 -- deletes it once the slot pops again, so an empty table is the common case, not a bootstrap artifact to seed.
 CREATE TABLE game.MonsterBossRespawnTimers
 (
-    MonsterSpawnRegionId INT NOT NULL,
+    MonsterSpawnRegionId INT          NOT NULL,
     NextSpawnUtc         DATETIME2(3) NOT NULL,
     CONSTRAINT PK_MonsterBossRespawnTimers PRIMARY KEY CLUSTERED (MonsterSpawnRegionId),
     CONSTRAINT FK_MonsterBossRespawnTimers_Region FOREIGN KEY (MonsterSpawnRegionId)

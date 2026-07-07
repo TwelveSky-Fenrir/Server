@@ -126,6 +126,15 @@ public static class Opcodes
             public const byte ContinueSkillStat = 94;
             public const byte ContinueSkillUse = 95;
             public const byte PlaytimeBuff = 97;
+
+            // 98 is legacy's real (confirmed-dead) P_SOCKET_SYSTEM_SEND opcode (Server/Header/Protocol/CLIENT.h:684,
+            // gem-socket create/remove/insert/remove-gem sub-actions). Dispatch registration for it
+            // (REGWORK1( , SOCKET_SYSTEM_SEND), Server/ts25zone/S04_MyWork01.cpp:105) is compiled out in the only
+            // shipped configuration (ReleaseEU33 undefs USE_SOCKET_GEM via the M33 -> LNW33 cascade,
+            // Server/Header/Protocol/DEFINE.h:54,103-107,21-23), so a legacy client can never reach this handler.
+            // Deliberately left unassigned here rather than reused for an unrelated Fenrir feature -- see
+            // GemSocketContributionResolver's remarks for the related (also-dead-except-AttackPower) stat-read side
+            // of this same finding.
             public const byte AutoHuntToggle = 99;
             public const byte FishingLine = 103;
             public const byte FishingProgress = 104;
@@ -139,6 +148,11 @@ public static class Opcodes
             public const byte HeroRanking = 118;
             public const byte HeroRewardClaim = 119;
             public const byte TowerUpgrade = 120;
+
+            // 121 is legacy's real (confirmed-dead) P_SOCKET_SLOT_INSERT_SEND opcode (Server/Header/Protocol/CLIENT.h:730,
+            // socket-slot-count expansion). Same dead-dispatch cascade as opcode 98 above
+            // (REGWORK1( , SOCKET_SLOT_INSERT_SEND) at Server/ts25zone/S04_MyWork01.cpp:132, wrapped in the same
+            // compiled-out #ifdef USE_SOCKET_GEM block) -- deliberately left unassigned here for the same reason.
             public const byte DailyMission = 126;
             public const byte UpgradeCape = 127;
             public const byte DrinkBottle = 129;
@@ -300,8 +314,11 @@ public static class Opcodes
             public const byte RuneSocket = 199;
             public const byte ZoneWar335Countdown = 200;
 
-            /// <summary>Only sent on the "gate passed, target not found online" path -- see GmBlockAvatarResponse's own remarks.</summary>
-            public const byte GmBlockAvatar = 201;
+            // No dedicated GM-BLOCK outgoing opcode: legacy's case 519 "target not found" reply goes out on
+            // GenericAction (opcode 23, Sort=519) via the shared PROCESS_DATA_SEND/RECV envelope
+            // (Server/ts25zone/S04_MyWork04.cpp:2121-2122), never a command-specific message. 201 is legacy's
+            // real (confirmed-dead) ZCP_RUNE_PROCESSDATA_RECV opcode -- deliberately left unassigned here so a
+            // future packet reusing it must match that 21-byte shape, not whatever this command needed.
         }
     }
 }

@@ -24,6 +24,9 @@ public static partial class StatCalculator
         if (bySlot[10] is { } deco2)
             crit += deco2.Item.ItemId switch { 213 or 214 or 215 => 1, 216 or 217 or 218 => 3, _ => 0 };
 
+        if (bySlot[8] is { } petAmulet)
+            crit += PhoenixFlatBonus(petAmulet.Item.ItemId, 1, 2, 3);
+
         return crit;
     }
 

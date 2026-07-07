@@ -48,8 +48,10 @@ public sealed class MonsterEntity
     public float Heading { get; set; }
 
     /// <summary>
-    ///     Spawn anchor (legacy <c>mFirstLocation</c>) -- <see cref="MonsterAiState.ReturnToSpawn" />'s destination and
-    ///     leash origin.
+    ///     Spawn anchor (legacy <c>mFirstLocation</c>) -- <see cref="MonsterAiState.ReturnToSpawn" />'s
+    ///     destination. NOT the basis of <see cref="MonsterAiSystem.RunChase" />'s chase give-up guard, which
+    ///     compares the monster's live position against its TARGET's live position instead (see
+    ///     <see cref="LeashRadius" />'s own remarks).
     /// </summary>
     public required float HomeX { get; init; }
 
@@ -57,8 +59,12 @@ public sealed class MonsterEntity
     public required float HomeZ { get; init; }
 
     /// <summary>
-    ///     The spawn region's own scatter radius, reused as this monster's leash bound (see
-    ///     <see cref="MonsterAiSystem" />'s remarks for why).
+    ///     The spawn region's own scatter radius. An earlier revision of <see cref="MonsterAiSystem.RunChase" />
+    ///     reused this as a distance-from-home chase-leash bound with no legacy citation for that mechanic;
+    ///     legacy's actual chase give-up guard (<c>S07_MyGame05.cpp:1359-1366</c>) instead compares the
+    ///     monster's own live position against its TARGET's live position, never against home (see
+    ///     <see cref="MonsterAiSystem" />'s remarks). This field is retained only because every spawn call
+    ///     site already populates it -- it is no longer read by any give-up/leash check.
     /// </summary>
     public required float LeashRadius { get; init; }
 
@@ -94,6 +100,44 @@ public sealed class MonsterEntity
     ///     scan is still subject to the full throttle window, same as legacy's own zero-initialized timestamp.
     /// </summary>
     public int DetectionThrottleTicks { get; set; }
+
+    /// <summary>
+    ///     Legacy ticks accumulated toward the 60-second in-place re-detection grace period (legacy
+    ///     <c>mCheckFirstLocationTime</c>, <c>S07_MyGame05.cpp:1012-1031</c>) -- advances only across ticks
+    ///     spent in <see cref="MonsterAiState.Decision" /> that fail to (re)acquire a target; unconditionally
+    ///     reset to 0 the instant it crosses
+    ///     <see cref="Simulation.SimulationClock.MonsterIdleReturnHomeLegacyTicks" />, whether or not that same
+    ///     tick actually starts a return-to-spawn (an idle monster already home resets this with no other
+    ///     observable effect). NOT reset merely by losing a chase target -- see
+    ///     <see cref="MonsterAiSystem.RunChase" />'s remarks: this is a rolling clock, not a fresh countdown
+    ///     starting the moment a target is lost.
+    /// </summary>
+    /// <remarks>
+    ///     Starts at 0 for a freshly spawned, non-summon monster: the generic <c>MONSTER_OBJECT::Init</c>
+    ///     (<c>S07_MyGame05.cpp:7-26</c>) does not explicitly initialize the legacy timer this field mirrors;
+    ///     the only explicit initialization found is summon-specific (<c>S10_MySummon.cpp:797-798</c>). Zero-init
+    ///     mirrors this class's existing <see cref="DetectionThrottleTicks" /> convention for the same reason --
+    ///     flagged as an open question by the originating behavior contract, not a verified legacy default.
+    /// </remarks>
+    public int IdleReturnElapsedTicks { get; set; }
+
+    /// <summary>
+    ///     Legacy ticks accumulated toward the 40-second idle random-wander fallback (legacy
+    ///     <c>mCheckLastWalkTime</c>, <c>S07_MyGame05.cpp:1033-1057</c>) -- same accrual/reset posture and
+    ///     zero-init caveat as <see cref="IdleReturnElapsedTicks" />; additionally reset the instant this
+    ///     monster actually begins a return-to-spawn (<c>S07_MyGame05.cpp:1024</c>).
+    /// </summary>
+    public int IdleWanderElapsedTicks { get; set; }
+
+    /// <summary>
+    ///     The idle random-wander destination most recently rolled by <see cref="MonsterAiSystem" /> (legacy
+    ///     <c>aTargetLocation</c> while <c>aSort == 3</c>) -- only meaningful while <see cref="AiState" /> is
+    ///     <see cref="MonsterAiState.Patrol" />, always set immediately before that transition.
+    /// </summary>
+    public float WanderTargetX { get; set; }
+
+    /// <summary>See <see cref="WanderTargetX" />.</summary>
+    public float WanderTargetZ { get; set; }
 
     /// <summary>
     ///     This instance's own rolled anti-clump pursuer cap (legacy <c>mSameTargetPostNum</c>) -- drawn once at
@@ -192,7 +236,10 @@ public sealed class MonsterEntity
     ///     Session half of the slot key -- see <see cref="MonsterAttackDamageEntry.SessionToken" />'s own
     ///     remarks for why a <see cref="PlayerRuntimeState" /> reference fills this role.
     /// </param>
-    /// <param name="damage">Negative/zero contributes no damage and registers no entry, same convention as <see cref="TakeDamage" />.</param>
+    /// <param name="damage">
+    ///     Negative/zero contributes no damage and registers no entry, same convention as
+    ///     <see cref="TakeDamage" />.
+    /// </param>
     internal void RegisterAttackDamage(int attackerCharacterId, object sessionToken, int damage)
     {
         if (damage <= 0)

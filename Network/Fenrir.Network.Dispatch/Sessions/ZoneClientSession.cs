@@ -54,19 +54,6 @@ public sealed class ZoneClientSession(long sessionId, IDuplexPipe transport, IPE
     public short AccountGrade { get; private set; }
 
     /// <summary>
-    ///     Legacy's per-command <c>uUserSort &gt;= tier</c> gate (the same scalar backs all three thresholds
-    ///     in <see cref="GmCommandTier" />). Every future GM-command handler must call this with the exact
-    ///     tier its own legacy case uses — <see cref="GmCommandTier.Basic" />, <see cref="GmCommandTier.Elevated" />,
-    ///     or <see cref="GmCommandTier.Admin" /> — rather than assume a single elevated-or-not flag suffices
-    ///     for every command; see <see cref="IsGm" />'s own remarks for why that shortcut is only valid for
-    ///     the Basic tier.
-    /// </summary>
-    public bool MeetsGmTier(GmCommandTier tier)
-    {
-        return AccountGrade >= (short)tier;
-    }
-
-    /// <summary>
     ///     Legacy's <c>uUserSort &lt; 1</c> elevation gate (Server/ts25zone/S04_MyWork04.cpp:1489 and identical
     ///     siblings at case 518/520/521) -- a strict binary gate, not a graduated permission: any positive grade
     ///     is treated as fully elevated. Equivalent to <c>MeetsGmTier(GmCommandTier.Basic)</c> -- the lowest of
@@ -81,6 +68,19 @@ public sealed class ZoneClientSession(long sessionId, IDuplexPipe transport, IPE
     // Re-pointed by the source zone's tick on each in-process map transfer. Unsynchronized: a reference
     // write is atomic and a stale read is benign — a command posted to the old zone just finds nothing there and is dropped.
     public IZoneActor? CurrentZone { get; set; }
+
+    /// <summary>
+    ///     Legacy's per-command <c>uUserSort &gt;= tier</c> gate (the same scalar backs all three thresholds
+    ///     in <see cref="GmCommandTier" />). Every future GM-command handler must call this with the exact
+    ///     tier its own legacy case uses — <see cref="GmCommandTier.Basic" />, <see cref="GmCommandTier.Elevated" />,
+    ///     or <see cref="GmCommandTier.Admin" /> — rather than assume a single elevated-or-not flag suffices
+    ///     for every command; see <see cref="IsGm" />'s own remarks for why that shortcut is only valid for
+    ///     the Basic tier.
+    /// </summary>
+    public bool MeetsGmTier(GmCommandTier tier)
+    {
+        return AccountGrade >= (short)tier;
+    }
 
     public override bool IsOpcodeAllowed(byte opcode)
     {

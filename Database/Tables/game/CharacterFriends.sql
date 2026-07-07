@@ -3,10 +3,11 @@
 -- FriendCharacterId a friend"; the reverse is a separate row or may not exist.
 CREATE TABLE game.CharacterFriends
 (
-    CharacterId       INT     NOT NULL,
-    Slot              TINYINT NOT NULL,
-    FriendCharacterId INT     NOT NULL,
-    CreatedAtUtc      DATETIME2(3) NOT NULL CONSTRAINT DF_CharacterFriends_CreatedAtUtc DEFAULT SYSUTCDATETIME(),
+    CharacterId       INT          NOT NULL,
+    Slot              TINYINT      NOT NULL,
+    FriendCharacterId INT          NOT NULL,
+    CreatedAtUtc      DATETIME2(3) NOT NULL
+        CONSTRAINT DF_CharacterFriends_CreatedAtUtc DEFAULT SYSUTCDATETIME(),
     CONSTRAINT PK_CharacterFriends PRIMARY KEY CLUSTERED (CharacterId, Slot),
     CONSTRAINT CK_CharacterFriends_Slot CHECK (Slot BETWEEN 0 AND 9),
     CONSTRAINT FK_CharacterFriends_Character FOREIGN KEY (CharacterId) REFERENCES game.Characters (CharacterId),

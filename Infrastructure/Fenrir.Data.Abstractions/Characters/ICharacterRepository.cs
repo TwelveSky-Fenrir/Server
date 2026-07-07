@@ -102,12 +102,60 @@ public interface ICharacterRepository
     public ValueTask UpsertSkillSlotAsync(int characterId, byte slotIndex, int skillId, int grade,
         CancellationToken ct);
 
+    /// <summary>
+    ///     Durable single-slot write to game.CharacterHotkeys -- mirrors <see cref="UpsertSkillSlotAsync" />'s
+    ///     own shape. <paramref name="sort" />/<paramref name="value1" />/<paramref name="value2" /> are the
+    ///     raw legacy triple verbatim, in game.CharacterHotkeys' own column order (see that table's DDL
+    ///     comment for why this differs positionally from <c>HotkeySlot</c>'s C# (Kind, Value1, Value2) shape:
+    ///     <paramref name="sort" /> is the bound id, <paramref name="value1" /> the secondary value
+    ///     (grade/quantity), <paramref name="value2" /> the kind discriminator). A <paramref name="value2" />
+    ///     of 0 (<c>HotkeyBindingKind.None</c>) deletes the row outright instead of writing a zeroed one,
+    ///     matching "row absence = unassigned key."
+    /// </summary>
+    public ValueTask UpsertHotkeySlotAsync(int characterId, byte page, byte keyIndex, int sort, int value1,
+        int value2, CancellationToken ct);
+
+    /// <summary>
+    ///     Atomic two-character trade commit. <paramref name="itemsA0" />/<paramref name="itemsA1" />/
+    ///     <paramref name="itemsB0" />/<paramref name="itemsB1" /> are each side's FULL post-trade container
+    ///     contents (a whole-container replace, not just the traded slots) and <paramref name="deltaMoneyA" />/
+    ///     <paramref name="deltaMoneyB" /> are each side's NET money delta -- neither is enough on its own to
+    ///     reconstruct what was actually offered when both sides contribute money in the same trade.
+    /// </summary>
+    /// <param name="tradedItemsA">
+    ///     Character A's finalized trade-window offer only (legacy <c>ST_TRADE_INFO</c>, up to 8 slots,
+    ///     <c>MAX_TRADE_SLOT_NUM</c>) -- for audit logging (<c>GL_615_TRADE_ITEM</c>/<c>GL_615_TRADE_ITEM2</c>),
+    ///     distinct from <paramref name="itemsA0" />/<paramref name="itemsA1" />'s whole-container contents.
+    ///     Defaults to null/omitted (no item audit rows) so existing callers that don't pass it yet keep
+    ///     compiling -- see Migrations/037_trade_event_log.sql. Empty/null list = no occupied trade slots to log,
+    ///     not an error.
+    /// </param>
+    /// <param name="tradedItemsB">Character B's finalized trade-window offer -- symmetric to <paramref name="tradedItemsA" />.</param>
+    /// <param name="offeredMoneyA">
+    ///     Character A's own finalized money offer (regular currency) placed into the trade window -- for audit
+    ///     logging (<c>GL_616_TRADE_MONEY</c>) only, gated on being &gt; 0 together with
+    ///     <paramref name="offeredBigMoneyA" />; NOT the same value as <paramref name="deltaMoneyA" />. Defaults
+    ///     to 0 (no money audit row) so existing callers that don't pass it yet keep compiling.
+    /// </param>
+    /// <param name="offeredBigMoneyA">
+    ///     Character A's own finalized "big"/premium-currency offer -- see
+    ///     <paramref name="offeredMoneyA" />.
+    /// </param>
+    /// <param name="offeredMoneyB">Character B's own finalized money offer -- symmetric to <paramref name="offeredMoneyA" />.</param>
+    /// <param name="offeredBigMoneyB">
+    ///     Character B's own finalized "big"/premium-currency offer -- symmetric to
+    ///     <paramref name="offeredBigMoneyA" />.
+    /// </param>
     public ValueTask ExecuteTradeAsync(
         int characterA, IReadOnlyList<CharacterItemSlotTvp> itemsA0, IReadOnlyList<CharacterItemSlotTvp> itemsA1,
         long deltaMoneyA, int deltaBigMoneyA,
         int characterB, IReadOnlyList<CharacterItemSlotTvp> itemsB0, IReadOnlyList<CharacterItemSlotTvp> itemsB1,
         long deltaMoneyB, int deltaBigMoneyB,
-        CancellationToken ct);
+        CancellationToken ct,
+        IReadOnlyList<CharacterItemSlotTvp>? tradedItemsA = null,
+        IReadOnlyList<CharacterItemSlotTvp>? tradedItemsB = null,
+        long offeredMoneyA = 0, int offeredBigMoneyA = 0,
+        long offeredMoneyB = 0, int offeredBigMoneyB = 0);
 
     public ValueTask ApplyQuestTransitionAsync(int characterId, int stepPermanent, int activeQuestId,
         int qSort, int targetPhase, int killCounter, long deltaMoney,
@@ -154,4 +202,40 @@ public interface ICharacterRepository
     ///     spends) Faction Transfer Scroll permits. Returns the balance after the adjustment.
     /// </summary>
     public ValueTask<int> GrantTribeTransferPermitAsync(int characterId, int delta, CancellationToken ct);
+
+    /// <summary>
+    ///     game.Characters.ProtectForDeath -- the decrementing "aProtectForDeath" death-protection shield
+    ///     counter (Server/ts25zone/S07_MyGame02.cpp:3443-3489). A qualifying monster-kill death consumes
+    ///     exactly one charge (<paramref name="delta" /> = -1) in place of that death's CP/XP penalty; the
+    ///     shield-vs-penalty decision itself lives in the calling domain code, not here. Same forward-compat
+    ///     posture as <see cref="GrantTribeTransferPermitAsync" />'s own <c>delta</c> -- a positive delta is
+    ///     equally valid (a future GM grant or protection-charge item), on top of the fixed starting grant of
+    ///     5 already applied by <c>usp_Character_CreateWithStarterKit</c>. Returns the balance after the
+    ///     adjustment. Throws SQL 50332 on an unknown character or an adjustment that would take
+    ///     ProtectForDeath negative.
+    /// </summary>
+    public ValueTask<int> AdjustDeathProtectionAsync(int characterId, int delta, CancellationToken ct);
+
+    /// <summary>
+    ///     Book of Noble Dragon/Royal Serpent/Grand Tiger V2 tribe-conversion mechanic (world.Items
+    ///     99014/99015/99016) -- see usp_Character_ApplyTribeConversion.sql's own header for the full
+    ///     precondition list, THROW codes (50313-50320), and -- importantly -- which 3 preconditions the
+    ///     CALLER must still verify itself (zone-37 cluster connectivity, standing in the character's own
+    ///     current tribe's capital, no active party) since none of those has any durable representation in
+    ///     this database. <paramref name="itemId" /> alone (99014/99015/99016) derives the target tribe and
+    ///     re-validates the level gate server-side; the caller never supplies a target tribe directly.
+    ///     <paramref name="container" />/<paramref name="items" /> is a whole-container replace of the ONE
+    ///     inventory container the book was consumed from (same empty-list-omission rule as
+    ///     <see cref="ReplaceContainerAsync" />), with the book's own slot simply absent from
+    ///     <paramref name="items" />.
+    /// </summary>
+    /// <remarks>
+    ///     Does NOT persist the worn-costume-wardrobe remap, auto-buff skill slots, or the two auto-hunt
+    ///     skill-slot families on success -- none of those three have durable storage in this schema yet
+    ///     (see the stored procedure's own header); a caller needing byte-exact parity there must remap them
+    ///     itself using <see cref="Fenrir.Data.Abstractions.World.IWorldDataRepository.GetTribeConversionCatalogAsync" />'s
+    ///     own equivalence data.
+    /// </remarks>
+    public ValueTask ApplyTribeConversionAsync(int characterId, int itemId, byte container,
+        IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct);
 }

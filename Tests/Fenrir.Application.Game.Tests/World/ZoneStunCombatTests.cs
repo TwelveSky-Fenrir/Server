@@ -100,6 +100,14 @@ public class ZoneStunCombatTests
         Assert.True(zone.TryGetPlayer(defenderId, out var defender));
         defender!.ActionSort = defenderActionSort;
 
+        // This suite exercises stun/unstun resolution, not the attack sub-packet budget/replay guard (that's
+        // AttackPacketBudgetTests' own job) -- a real client always sends a legal avatar-action packet first
+        // to establish a non-zero ceiling, which this fixture skips. Uncapped here so a raw CombatCommand
+        // (mCase 6, unstun -- ApplyUnstunAttack) posted straight after Enter isn't silently rejected by
+        // AttackPacketBudget.TryConsume. mCase 5 (stun) is unaffected: ProcessAttack05 disables this check
+        // outright, so ApplyStunAttack deliberately never calls it.
+        attacker!.AttackSubPacketCeiling = int.MaxValue;
+
         // Past both sides' zone-entry protect window, else every stun/unstun attempt below is rejected as
         // Attacker/DefenderProtected -- StunResolver checks CombatResolver.ProtectDuration the same way the
         // mCase 2 attack path does (see ZoneAttackTests.TwoPlayerZone for the identical pattern).
@@ -296,7 +304,7 @@ public class ZoneStunCombatTests
         {
             AttackerCharacterId = attacker.CharacterId,
             AttackInfo = StunRequest(attacker.CharacterId, defender.CharacterId, defender.UniqueNumber,
-                TeamStunSkillId, 10)
+                TeamStunSkillId)
         });
         zone.Tick(SimulationClock.LegacyTick);
 
@@ -346,7 +354,7 @@ public class ZoneStunCombatTests
         {
             AttackerCharacterId = attacker.CharacterId,
             AttackInfo = StunRequest(attacker.CharacterId, defender.CharacterId, defender.UniqueNumber,
-                TeamStunSkillId, 10)
+                TeamStunSkillId)
         });
         zone.Tick(SimulationClock.LegacyTick);
 
@@ -391,7 +399,7 @@ public class ZoneStunCombatTests
         {
             AttackerCharacterId = attacker.CharacterId,
             AttackInfo = StunRequest(attacker.CharacterId, defender.CharacterId, defender.UniqueNumber,
-                TeamStunSkillId, 10)
+                TeamStunSkillId)
         });
         zone.Tick(SimulationClock.LegacyTick);
 

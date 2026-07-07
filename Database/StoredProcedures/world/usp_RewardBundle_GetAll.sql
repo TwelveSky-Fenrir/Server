@@ -1,10 +1,10 @@
 CREATE PROCEDURE world.usp_RewardBundle_GetAll
-    AS
+AS
 BEGIN
     SET
-NOCOUNT ON;
+        NOCOUNT ON;
 
-SELECT RewardBundleId
-FROM world.RewardBundles
-ORDER BY RewardBundleId;
+    SELECT RewardBundleId
+    FROM world.RewardBundles
+    ORDER BY RewardBundleId;
 END;

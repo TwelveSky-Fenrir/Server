@@ -36,8 +36,10 @@ public sealed record GameServerDirectoryRepository(ICaeriusNetDbContext Db, ICae
     ///     <see cref="GameServerDirectoryDefaults.StalenessCutoffSeconds" /> as the staleness cutoff; see
     ///     <see cref="GetDirectoryAsync(int, CancellationToken)" /> for a caller-supplied cutoff.
     /// </summary>
-    public ValueTask<ImmutableArray<ShardDirectoryEntryDto>> GetDirectoryAsync(CancellationToken ct) =>
-        GetDirectoryAsync(GameServerDirectoryDefaults.StalenessCutoffSeconds, ct);
+    public ValueTask<ImmutableArray<ShardDirectoryEntryDto>> GetDirectoryAsync(CancellationToken ct)
+    {
+        return GetDirectoryAsync(GameServerDirectoryDefaults.StalenessCutoffSeconds, ct);
+    }
 
     /// <summary>2s in-memory cache, keyed per cutoff so distinct callers never read each other's stale entry.</summary>
     public ValueTask<ImmutableArray<ShardDirectoryEntryDto>> GetDirectoryAsync(int stalenessCutoffSeconds,

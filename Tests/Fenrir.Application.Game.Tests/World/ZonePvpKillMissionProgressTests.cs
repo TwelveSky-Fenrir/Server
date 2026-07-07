@@ -79,7 +79,17 @@ public class ZonePvpKillMissionProgressTests
         {
             Assert.True(zone.TryGetPlayer(defenderId, out var defender));
             defender!.Stats = WeakDefender;
+            // Legal, already-acting pose -- see ZoneAttackTests' own TwoPlayerZone remarks for the full
+            // reasoning (CombatResolver.ResolveEnemyTribeAttack's defenderActionSort gate).
+            defender.ActionSort = 1;
         }
+
+        // This suite exercises the C05 anti-farm/mission-progress gate, not the attack sub-packet
+        // budget/replay guard (that's AttackPacketBudgetTests' own job) -- a real client always sends a legal
+        // avatar-action packet first to establish a non-zero ceiling, which this fixture skips. Uncapped here
+        // so a raw CombatCommand posted straight after Enter isn't silently rejected by
+        // AttackPacketBudget.TryConsume.
+        attacker.AttackSubPacketCeiling = int.MaxValue;
 
         zone.Tick(CombatResolver.ProtectDuration + TimeSpan.FromSeconds(1)); // past the zone-entry protect window
         return zone;

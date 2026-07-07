@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using Fenrir.Data.Abstractions.Characters;
 
 namespace Fenrir.Data.Abstractions.Commerce;
@@ -6,6 +7,15 @@ public interface IOfflineShopRepository
 {
     public ValueTask<(OfflineShopRowDto? Shop, IReadOnlyList<OfflineShopItemRowDto> Items)> GetByCharacterAsync(
         int characterId, CancellationToken ct);
+
+    /// <summary>
+    ///     Every for-sale slot across every currently open (ShopState=1) proxy shop, cluster-wide -- not
+    ///     scoped to any one zone/shard, since the shared database is already the single store every proxy
+    ///     shop persists through (the Fenrir-sharded equivalent of legacy's cross-instance shared-memory
+    ///     proxy-shop table). Backs the market-search aggregator's proxy-shop half
+    ///     (<c>CZ_PSHOP_ITEM_INFO_SEND</c>, Server/ts25zone/S04_MyWork02.cpp:6523-6558).
+    /// </summary>
+    public ValueTask<ReadOnlyCollection<OfflineShopOpenListingRowDto>> GetAllOpenAsync(CancellationToken ct);
 
     public ValueTask OpenAndReplaceContainersAsync(
         int characterId, short? zoneNumber, int shopDate, string shopName, int locationX, int locationY,

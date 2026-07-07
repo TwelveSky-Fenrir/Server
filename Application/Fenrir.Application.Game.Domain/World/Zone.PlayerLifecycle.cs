@@ -2,11 +2,13 @@ using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using Fenrir.Application.Game.Domain.Combat;
+using Fenrir.Application.Game.Domain.Hotkeys;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Movement;
 using Fenrir.Application.Game.Domain.Pets;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.Skills;
+using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Stats;
 using Fenrir.Data.Abstractions.Game;
 using Fenrir.Data.WriteBehind;
@@ -48,13 +50,116 @@ public sealed partial class Zone
     private const byte ContributionPointsLossOutcome = 1;
 
     /// <summary>
+    ///     <see cref="Movement.CharacterMotionEvaluation.SkillCategoryCode" /> value
+    ///     <see cref="Movement.CharacterMotionWhitelist" /> resolves for the real op15 skill-cast Sorts (32,
+    ///     33, and the weapon-class-dependent bands 38-90) -- <see cref="ApplySkillCastManaCharge" />'s own
+    ///     trigger. Category 1 (action-Sort 30, "stand up from death") is a DIFFERENT, non-mana-charging
+    ///     category and must never be conflated with this one -- see the skill-casting-cooldown-mechanics
+    ///     behavior contract.
+    /// </summary>
+    private const int SkillCastEffectCategoryCode = 2;
+
+    /// <summary>
+    ///     Action-category Sort for "rest"/stand-up (op15 only) -- <see cref="ApplyRestActionProtectionAndHeal" />'s own
+    ///     trigger.
+    /// </summary>
+    private const int RestActionSort = 0;
+
+    /// <summary>
+    ///     Action-category Sort for op16 (CZ_UPDATE_AVATAR_ACTION)'s "create effect value" confirm --
+    ///     <see cref="ApplySkillEffectConfirm" />'s own trigger. An unrelated value space from skill NUMBER
+    ///     30 (one specific self-buff skill) and from action-Sort 30 (stand-up-from-death) -- do not
+    ///     conflate any of these three.
+    /// </summary>
+    private const int SkillEffectConfirmActionSort = 1;
+
+    /// <summary>
+    ///     S010CHARACTER_HP -- <see cref="AvatarStatUpdateResponse.Sort" /> for the HP-changed notification
+    ///     <see cref="ApplyRestActionProtectionAndHeal" /> sends (Server/Header/Protocol/STRUCT.h:1525).
+    /// </summary>
+    private const int CharacterHpStatSort = 10;
+
+    /// <summary>
     ///     Released once per queued row so <c>DeathEventLogFlushHost</c> can flush as soon as one arrives
     ///     instead of waiting up to a full flush interval -- same signal pattern as <c>Zone.Monsters.cs</c>'s
     ///     own <c>_moneyGrantSignal</c>.
     /// </summary>
     private readonly SemaphoreSlim _deathEventLogSignal = new(0, int.MaxValue);
 
+    /// <summary>
+    ///     Kills <paramref name="characterId" /> in this zone: Life -&gt; 0, <see cref="PlayerRuntimeState.IsDead" />
+    ///     set, and the territorial revive-eligibility gate armed (<see cref="DeathGateTickSystem" /> grants it
+    ///     back via <see cref="GrantReviveEligibility" /> once eligible). Public and characterId-addressed so
+    ///     the combat handler never needs its own <see cref="PlayerRuntimeState" /> reference -- only this
+    ///     zone's own tick may construct/mutate one. A no-op if the character is not tracked here, or already
+    ///     dead (so a duplicate killing blow never re-arms the death-gate timers).
+    /// </summary>
+    /// <remarks>
+    ///     XP penalty on death is applied here, but only for <see cref="DeathCause.MonsterKill" /> -- a PvP
+    ///     death instead rewards the killer (not implemented, see <see cref="Combat.CombatResolver" />'s
+    ///     remarks) and does not dock the victim's XP.
+    /// </remarks>
+    /// <summary>
+    ///     Reusable scratch buffer for <see cref="ApplyDeath" />'s death-pose broadcast recipient list -- same
+    ///     non-allocating shape and reuse justification as <see cref="_moveNeighborScratch" />: single tick
+    ///     thread, cleared before use, consumed entirely by the immediately-following broadcast call before
+    ///     <see cref="ApplyDeath" /> returns.
+    /// </summary>
+    private readonly List<int> _deathNeighborScratch = [];
+
+    /// <summary>
+    ///     Reusable scratch buffer for <see cref="HandleEnter" />'s mutual-visibility neighbor list -- same
+    ///     non-allocating shape and reuse justification as <see cref="_moveNeighborScratch" /> (single tick
+    ///     thread; cleared before use; both consumers -- the direct per-neighbor send loop and the broadcast
+    ///     call right after -- finish reading it before <see cref="HandleEnter" /> returns, so no reentrant use
+    ///     can observe a half-built or already-cleared buffer).
+    /// </summary>
+    private readonly List<int> _enterNeighborScratch = [];
+
+    /// <summary>
+    ///     Reusable scratch buffer for <see cref="HandleMove" />'s neighbor-broadcast recipient list. Movement
+    ///     (CZ_AVATAR_ACTION_SEND/CZ_UPDATE_AVATAR_ACTION) is the single highest-frequency player-driven event
+    ///     this server handles, so computing that recipient list via <c>AoiGrid.Neighbors(...).Where(...).ToArray()</c>
+    ///     on every accepted packet -- a fresh iterator, a per-call closure, and an array, every time -- is
+    ///     worth avoiding in favor of one field reused across calls via <see cref="AoiGrid.NeighborsExcludingSelf" />.
+    ///     Safe to reuse: <c>DrainInbox</c> processes queued zone commands one at a time on this zone's own
+    ///     single tick thread (this class's own header remarks), so no two <see cref="HandleMove" /> calls, nor
+    ///     anything else touching this field, ever overlap.
+    /// </summary>
+    private readonly List<int> _moveNeighborScratch = [];
+
     private readonly ConcurrentQueue<PendingDeathEventLog> _pendingDeathEventLogs = new();
+
+    /// <summary>
+    ///     Reusable scratch buffer for <see cref="RebroadcastAvatars" />'s per-player neighbor-broadcast
+    ///     recipient list -- same non-allocating shape and reuse justification as <see cref="_moveNeighborScratch" />
+    ///     (single tick thread, cleared immediately before each per-player use within the loop, never read after
+    ///     the immediately-following broadcast call returns).
+    /// </summary>
+    private readonly List<int> _rebroadcastNeighborScratch = [];
+
+    /// <summary>
+    ///     Grants territorial revive-eligibility (side effect 1, <c>S07_MyGame04.cpp:257-327</c>): called by
+    ///     <see cref="DeathGateTickSystem" /> once its own recheck succeeds for a player who has been dead at
+    ///     least <see cref="SimulationClock.ReviveEligibilityLegacyTicks" /> legacy ticks. Clears every
+    ///     death-gate flag together (anti-abuse flag off, potions re-permitted, death-in-progress flag off,
+    ///     death sub-counter reset) and forces HP to 1 regardless of MaxLife, in place (same zone/position) --
+    ///     the legacy only auto-clears state locally; an actual "return to town" transfer is always
+    ///     client-driven (CZ_DEMAND_ZONE_SERVER_INFO_2), already handled by <c>ZoneMoveHandler</c>, never this
+    ///     path. A no-op if the character is not (or no longer) dead. Deliberately independent of, and never a
+    ///     substitute for, <see cref="ApplyRestActionProtectionAndHeal" />'s own Sort-0-triggered
+    ///     PvP-immunity re-arm + one-third-max-HP restoration -- this tick-based mechanism never touches
+    ///     <see cref="PlayerRuntimeState.ZoneEntryAtZoneClock" /> under any legacy branch (its own distinct
+    ///     timer field, <c>mTickCountFor10Second</c>, is not the immunity-window field at all), so a revived
+    ///     character has no PvP immunity and only 1 HP until it actually sends a Sort-0 action.
+    /// </summary>
+    /// <summary>
+    ///     Reusable scratch buffer for <see cref="GrantReviveEligibility" />'s neighbor-broadcast recipient
+    ///     list -- same non-allocating shape and reuse justification as <see cref="_moveNeighborScratch" />:
+    ///     single tick thread, cleared before use, consumed entirely by the immediately-following broadcast
+    ///     call before <see cref="GrantReviveEligibility" /> returns.
+    /// </summary>
+    private readonly List<int> _reviveNeighborScratch = [];
 
     /// <summary>
     ///     Queues a death-related <c>game.EventLog</c> row rather than awaiting
@@ -106,8 +211,13 @@ public sealed partial class Zone
 
             state.LastAvatarRebroadcastAt = _clock;
 
-            var neighbors = _grid.Neighbors(state.CurrentCell).Where(id => id != characterId).ToArray();
-            BroadcastAvatarAction(neighbors, state);
+            // Uses _rebroadcastNeighborScratch instead of AoiGrid.Neighbors(...).Where(...).ToArray() -- this
+            // loop runs once per connected player every tick (gated by the 3.5s per-player interval), so the
+            // per-player LINQ iterator/closure/array allocation was repeated for the whole zone population
+            // every tick a rebroadcast came due.
+            _rebroadcastNeighborScratch.Clear();
+            _grid.NeighborsExcludingSelf(_rebroadcastNeighborScratch, state.CurrentCell, characterId);
+            BroadcastAvatarAction(_rebroadcastNeighborScratch, state);
         }
     }
 
@@ -176,8 +286,11 @@ public sealed partial class Zone
             // value through yet, so this in-process ABI still needs that field added before a tribe-3
             // character's runtime state can be correct. Tracked, not silently assumed equivalent.
             PreviousTribe = data.Tribe,
-            // The only write site for this field: a one-shot ~10s combat grace period starting now, for every
-            // arrival. Combat code must never write this field again after today.
+            // One of exactly two legitimate write sites for this field -- the other is every accepted Sort-0
+            // ("rest"/stand-up) CZ_AVATAR_ACTION_SEND action, see ApplyRestActionProtectionAndHeal. A one-shot
+            // ~10s combat grace period starting now, for every arrival. Combat code must never write this
+            // field on its own (taking/dealing damage never re-arms it) -- see ZoneEntryAtZoneClock's own
+            // remarks.
             ZoneEntryAtZoneClock = _clock,
             // Carried through an in-process handoff so a client mid cash-catalog-notify window doesn't
             // silently lose that state on a map transfer -- see PlayerRuntimeState.KnownCashCatalogVersion's
@@ -188,8 +301,25 @@ public sealed partial class Zone
             DungeonInstanceRoundsRemaining = data.DungeonInstanceRoundsRemaining,
             // World-entry hydration (EnterWorldService) or, for an in-process handoff, the live value carried
             // through by ZoneTransfer.CreateEnterData -- see PlayerRuntimeState.HeroRankPoints's own remarks.
-            HeroRankPoints = data.HeroRankPoints
+            HeroRankPoints = data.HeroRankPoints,
+            // Stat/elixir-potion lifetime counters -- see PlayerRuntimeState.EatLifePotion's own remarks.
+            EatLifePotion = data.EatLifePotion,
+            EatManaPotion = data.EatManaPotion,
+            EatStrPotion = data.EatStrPotion,
+            EatDexPotion = data.EatDexPotion,
+            EatElePotion = data.EatElePotion,
+            // mSupportSkillTimeUpRatio's two source fields -- see PlayerRuntimeState.PremiumExpireUtc/
+            // BuffX2Time's own remarks. SupportSkillTimeUpRatio itself is recomputed from these just below,
+            // not copied from any prior in-memory value (zone-enter/character-load is itself one of the
+            // behavior contract's own recompute triggers).
+            PremiumExpireUtc = data.PremiumExpireUtc,
+            BuffX2Time = data.BuffX2Time
         };
+
+        // Trigger 1 of the mSupportSkillTimeUpRatio behavior contract ("buff-application-stacking-decay"):
+        // recompute on every zone-enter/character-load, fresh login and in-process zone transfer alike --
+        // never left at the field's own neutral default beyond this point.
+        state.RecomputeSupportSkillTimeUpRatio(DateTimeOffset.UtcNow.ToUnixTimeSeconds());
 
         // Items/Stats are already-computed data handed down through the command -- a plain copy, never a
         // catalog lookup, keeping this tick-thread method's cost independent of WorldDataCache size.
@@ -205,9 +335,38 @@ public sealed partial class Zone
             state.LearnedSkills = builder.ToImmutable();
         }
 
+        // game.CharacterHotkeys/CharacterHotkeyDto stores the legacy aHotKey[page][key][0..2] triple verbatim
+        // under the column names Sort/Value1/Value2, but cross-checked against real seed data (world.
+        // StarterKitHotkeys: a skill-bound key has Sort=<a real SkillId>/Value1=<grade>/Value2=1; an item-bound
+        // key has Sort=34 -- world.Items 34 "Rejuvenation Pill (L)", a real "Register in quick slot to use"
+        // consumable -- /Value1=999 (MAX_ITEM_DUPLICATION_NUM, a quantity ceiling) /Value2=3), the FIRST raw
+        // int is the bound id (skill id or item id), the SECOND is the secondary value (grade or quantity),
+        // and the THIRD is the actual HOTKEY_SORT/kind discriminator -- not the first int, despite the DB
+        // column's "Sort" name. HotkeySlot's own (Kind, Value1, Value2) shape mirrors that same tagged union
+        // positionally, so the correct construction is Kind &lt;- row.Value2, HotkeySlot.Value1 &lt;- row.Sort,
+        // HotkeySlot.Value2 &lt;- row.Value1. This mapping is inferred from already-committed repo evidence
+        // (not a fresh legacy-behavior-translator contract for op22 specifically) -- flagged for a follow-up
+        // citation check.
+        if (data.Hotkeys is { } hotkeys)
+        {
+            var hotkeyBuilder = ImmutableDictionary.CreateBuilder<(byte Page, byte Index), HotkeySlot>();
+            foreach (var hotkey in hotkeys)
+                hotkeyBuilder[(hotkey.Page, hotkey.KeyIndex)] =
+                    new HotkeySlot((HotkeyBindingKind)hotkey.Value2, hotkey.Sort, hotkey.Value1);
+            state.Hotkeys = hotkeyBuilder.ToImmutable();
+        }
+
         if (data.FriendsBySlot is { } friends)
             foreach (var (slot, friendId) in friends)
                 state.Friends[slot] = friendId;
+
+        // Carries the live BUFF_INFO through an in-process handoff (Server/ts25zone/S04_MyWork02.cpp:2017-2186's
+        // broker round trip) -- null only on a fresh login, which has no live snapshot to carry (see
+        // PlayerEnterData.Buffs' own remarks). state.Buffs itself is get-only/init-only by design (never a
+        // shared backing array across players), so its contents are copied in place rather than the reference
+        // being replaced.
+        if (data.Buffs is { } buffs)
+            buffs.Buff.CopyTo(state.Buffs.Buff, 0);
 
         state.TeacherCharacterId = data.TeacherCharacterId;
         state.StudentCharacterId = data.StudentCharacterId;
@@ -227,6 +386,7 @@ public sealed partial class Zone
         state.AutoManaRatio = data.AutoManaRatio;
         state.PetGrowth = data.PetGrowth;
         state.PetActivity = data.PetActivity;
+        state.PetExpX2Time = data.PetExpX2Time;
         state.LastSeenPetItemId = data.Items is { } petScanItems
             ? PetSlots.ResolveEquippedPetItemId(petScanItems)
             : 0;
@@ -302,17 +462,20 @@ public sealed partial class Zone
         logger.LogInformation("Character {CharacterId} entered zone {MapId}", characterId, MapId);
 
         // Mutual visibility: existing neighbors learn about the new arrival, and vice versa. The self-spawn
-        // packet is sent directly by the registration handler before this command is posted.
-        var others = _grid.Neighbors(cell).Where(id => id != characterId).ToArray();
+        // packet is sent directly by the registration handler before this command is posted. Uses
+        // _enterNeighborScratch instead of AoiGrid.Neighbors(...).Where(...).ToArray() -- see that field's own
+        // remarks.
+        _enterNeighborScratch.Clear();
+        _grid.NeighborsExcludingSelf(_enterNeighborScratch, cell, characterId);
 
         // Direct send to each neighbor's own session for the new arrival's view of them; the new arrival
         // itself is announced to neighbors via the broadcast below. Swapping these would send the new
         // arrival's own data to itself and leave it blind to everyone already there.
-        foreach (var otherId in others)
+        foreach (var otherId in _enterNeighborScratch)
             if (_players.TryGetValue(otherId, out var other))
                 SendAvatarAction(state.Session, other);
 
-        BroadcastAvatarAction(others, state);
+        BroadcastAvatarAction(_enterNeighborScratch, state);
 
         // Immediate monster-visibility exchange (parity-gap fix -- see SendExistingMonstersTo's own remarks
         // for the citation caveat): without this, a monster already alive in this zone stayed invisible to
@@ -376,6 +539,35 @@ public sealed partial class Zone
     }
 
     /// <summary>
+    ///     <see cref="ZoneCommandKind.MarkZoneTransferPending" />'s handler -- the only site permitted to set
+    ///     <see cref="PlayerRuntimeState.IsMovingZone" />, preserving the single-writer invariant this whole
+    ///     class relies on (this runs on the zone's own tick thread; the poster,
+    ///     <c>ZoneMoveService.HandleCrossShardAsync</c>, runs on a request thread and never touches
+    ///     <see cref="PlayerRuntimeState" /> directly). A no-op if the character is no longer tracked here --
+    ///     the narrow race where the source zone's own tick already removed this player (disconnect/another
+    ///     handoff) between the cross-shard resolution and this command draining, same posture as every other
+    ///     <c>_players.TryGetValue</c> miss elsewhere in this class.
+    /// </summary>
+    private void HandleMarkZoneTransferPending(int characterId)
+    {
+        if (_players.TryGetValue(characterId, out var state))
+            state.IsMovingZone = true;
+    }
+
+    /// <summary>
+    ///     <see cref="ZoneCommandKind.SetMuted" />'s handler -- the only site permitted to update
+    ///     <see cref="PlayerRuntimeState.IsMuted" /> once a character is already tracked here, same
+    ///     single-writer posture as <see cref="HandleMarkZoneTransferPending" />. A no-op if the character has
+    ///     already disconnected/handed off between <c>MuteRefreshPollHost</c>'s snapshot and this command
+    ///     draining -- the next poll simply re-evaluates whichever zone the character is tracked in by then.
+    /// </summary>
+    private void HandleSetMuted(int characterId, bool muted)
+    {
+        if (_players.TryGetValue(characterId, out var state))
+            state.IsMuted = muted;
+    }
+
+    /// <summary>
     ///     Best-effort cross-shard-directory cleanup for a true disconnect (never an in-process handoff --
     ///     <see cref="HandleLeave" />'s handoff branch never calls this, since <c>ShardId</c> doesn't change on
     ///     a same-shard hop). Deliberately awaited nowhere: <see cref="HandleLeave" /> runs on this zone's own
@@ -399,19 +591,6 @@ public sealed partial class Zone
         }
     }
 
-    /// <summary>
-    ///     Kills <paramref name="characterId" /> in this zone: Life -&gt; 0, <see cref="PlayerRuntimeState.IsDead" />
-    ///     set, and the territorial revive-eligibility gate armed (<see cref="DeathGateTickSystem" /> grants it
-    ///     back via <see cref="GrantReviveEligibility" /> once eligible). Public and characterId-addressed so
-    ///     the combat handler never needs its own <see cref="PlayerRuntimeState" /> reference -- only this
-    ///     zone's own tick may construct/mutate one. A no-op if the character is not tracked here, or already
-    ///     dead (so a duplicate killing blow never re-arms the death-gate timers).
-    /// </summary>
-    /// <remarks>
-    ///     XP penalty on death is applied here, but only for <see cref="DeathCause.MonsterKill" /> -- a PvP
-    ///     death instead rewards the killer (not implemented, see <see cref="Combat.CombatResolver" />'s
-    ///     remarks) and does not dock the victim's XP.
-    /// </remarks>
     public void ApplyDeath(int characterId, DeathCause cause = DeathCause.Unknown)
     {
         if (!_players.TryGetValue(characterId, out var state))
@@ -464,6 +643,7 @@ public sealed partial class Zone
 
         // Death pose (aAction.aSort = 12) so nearby clients see the character fall immediately. Self is
         // excluded: the combat handler tells the dying player's own client via combat-result packets instead.
+        var deathPet = PetActionFieldsOf(state);
         var deathAction = new ActionInfo
         {
             Type = 0,
@@ -473,10 +653,10 @@ public sealed partial class Zone
             TargetLocation = [state.PosX, state.PosY, state.PosZ],
             Front = state.Heading,
             TargetFront = state.Heading,
-            PetLocation = new float[3],
-            PetTargetLocation = new float[3],
-            PetFront = 0,
-            PetSort = 0,
+            PetLocation = deathPet.PetLocation,
+            PetTargetLocation = deathPet.PetTargetLocation,
+            PetFront = deathPet.PetFront,
+            PetSort = deathPet.PetSort,
             TargetObjectSort = 0,
             TargetObjectIndex = 0,
             TargetObjectUniqueNumber = 0,
@@ -486,19 +666,26 @@ public sealed partial class Zone
             SkillValue = 0
         };
 
-        var neighbors = _grid.Neighbors(state.CurrentCell).Where(id => id != characterId).ToArray();
-        BroadcastAvatarAction(neighbors, state, deathAction);
+        // Uses _deathNeighborScratch instead of AoiGrid.Neighbors(...).Where(...).ToArray() -- see that field's
+        // own remarks.
+        _deathNeighborScratch.Clear();
+        _grid.NeighborsExcludingSelf(_deathNeighborScratch, state.CurrentCell, characterId);
+        BroadcastAvatarAction(_deathNeighborScratch, state, deathAction);
     }
 
     /// <summary>
     ///     Zeroes every occupied <see cref="PlayerRuntimeState.Buffs" /> slot and broadcasts the change --
     ///     shares <see cref="Simulation.BuffExpirySystem" />'s own per-slot clearing convention (rather than
     ///     duplicating a fresh one) so a bulk clear and a natural per-tick expiry always look identical on the
-    ///     wire.
+    ///     wire, and its lazy-allocate-on-first-change posture: no notification, and no scratch-buffer clear,
+    ///     unless at least one slot was actually occupied. Uses <paramref name="state" />'s own
+    ///     <see cref="PlayerRuntimeState.BuffChangeScratch" /> instead of allocating a fresh <c>int[35]</c> per
+    ///     call.
     /// </summary>
     private void ClearAllBuffs(PlayerRuntimeState state)
     {
-        int[]? changedSlots = null;
+        var changedSlots = state.BuffChangeScratch;
+        var anyChanged = false;
 
         for (var slot = 0; slot < 35; slot++)
         {
@@ -507,10 +694,17 @@ public sealed partial class Zone
 
             state.Buffs.Buff[slot * 2] = 0;
             state.Buffs.Buff[slot * 2 + 1] = 0;
-            (changedSlots ??= new int[35])[slot] = 1;
+
+            if (!anyChanged)
+            {
+                Array.Clear(changedSlots);
+                anyChanged = true;
+            }
+
+            changedSlots[slot] = 1;
         }
 
-        if (changedSlots is not null)
+        if (anyChanged)
             RecomputeStatsAndBroadcastBuffs(state, changedSlots);
     }
 
@@ -547,16 +741,6 @@ public sealed partial class Zone
             $"Kind=Experience;Loss={loss};Level={state.Level}");
     }
 
-    /// <summary>
-    ///     Grants territorial revive-eligibility (side effect 1, <c>S07_MyGame04.cpp:257-327</c>): called by
-    ///     <see cref="DeathGateTickSystem" /> once its own recheck succeeds for a player who has been dead at
-    ///     least <see cref="SimulationClock.ReviveEligibilityLegacyTicks" /> legacy ticks. Clears every
-    ///     death-gate flag together (anti-abuse flag off, potions re-permitted, death-in-progress flag off,
-    ///     death sub-counter reset) and forces HP to 1 regardless of MaxLife, in place (same zone/position) --
-    ///     the legacy only auto-clears state locally; an actual "return to town" transfer is always
-    ///     client-driven (CZ_DEMAND_ZONE_SERVER_INFO_2), already handled by <c>ZoneMoveHandler</c>, never this
-    ///     path. A no-op if the character is not (or no longer) dead.
-    /// </summary>
     public void GrantReviveEligibility(PlayerRuntimeState state)
     {
         if (!state.IsDead)
@@ -572,8 +756,12 @@ public sealed partial class Zone
         state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
 
         SendAvatarAction(state.Session, state);
-        var neighbors = _grid.Neighbors(state.CurrentCell).Where(id => id != state.CharacterId).ToArray();
-        BroadcastAvatarAction(neighbors, state);
+
+        // Uses _reviveNeighborScratch instead of AoiGrid.Neighbors(...).Where(...).ToArray() -- see that
+        // field's own remarks.
+        _reviveNeighborScratch.Clear();
+        _grid.NeighborsExcludingSelf(_reviveNeighborScratch, state.CurrentCell, state.CharacterId);
+        BroadcastAvatarAction(_reviveNeighborScratch, state);
     }
 
     private void HandleMove(int characterId, in ActionInfo action, bool isResumeAction = false)
@@ -632,6 +820,15 @@ public sealed partial class Zone
             return;
         }
 
+        // Captured BEFORE the unconditional recorded-action overwrite just below, so ApplySkillEffectConfirm
+        // (op16 Sort==1) can compare the just-echoed skill number/grade against what this character's own
+        // most recent accepted op15 action last recorded -- the legacy op16 handler's own ordering
+        // (S04_MyWork02.cpp:1917 overwrites only AFTER the Sort==1 effect-creation check already ran against
+        // the PREVIOUS recorded action, S04_MyWork02.cpp:1818). Unused (and meaningless) for an op15 action.
+        var previousActionSkillNumber = state.ActionSkillNumber;
+        var previousActionSkillGradeNum1 = state.ActionSkillGradeNum1;
+        var previousActionSkillGradeNum2 = state.ActionSkillGradeNum2;
+
         state.PosX = action.Location[0];
         state.PosY = action.Location[1];
         state.PosZ = action.Location[2];
@@ -674,12 +871,56 @@ public sealed partial class Zone
         dirtyTracker.MarkDirty(characterId, DirtyFlags.Position);
 
         // Self is excluded: the legacy client applies its own movement locally (client-side prediction) and
-        // does not need its own action echoed back to it.
-        var neighbors = _grid.Neighbors(newCell).Where(id => id != characterId).ToArray();
-        BroadcastAvatarAction(neighbors, state, action);
+        // does not need its own action echoed back to it. Uses the reusable _moveNeighborScratch buffer (see
+        // its own remarks) instead of AoiGrid.Neighbors(...).Where(...).ToArray() -- this runs on every
+        // accepted movement packet, the highest-frequency player-driven event in the server.
+        _moveNeighborScratch.Clear();
+        _grid.NeighborsExcludingSelf(_moveNeighborScratch, newCell, characterId);
+        BroadcastAvatarAction(_moveNeighborScratch, state, action);
 
-        if (action.Sort == 30)
-            ApplySkillCast(state, action);
+        // Phase A (cast-start mana charge, op15 category-2 Sorts only) vs. Phase B (effect confirm, op16
+        // Sort==1 only) -- see the skill-casting-cooldown-mechanics behavior contract. Neither phase is
+        // keyed on action.Sort == 30: that action-Sort is the unrelated "stand up from death" request
+        // (AvatarActionService's own ReviveHackFlag gate), not a skill-cast trigger in either the
+        // action-Sort or skill-number sense.
+        if (!isResumeAction)
+        {
+            if (motion.SkillCategoryCode == SkillCastEffectCategoryCode)
+                ApplySkillCastManaCharge(state, action);
+            else if (action.Sort == RestActionSort)
+                ApplyRestActionProtectionAndHeal(state);
+        }
+        else if (action.Sort == SkillEffectConfirmActionSort)
+        {
+            ApplySkillEffectConfirm(state, action, previousActionSkillNumber, previousActionSkillGradeNum1,
+                previousActionSkillGradeNum2);
+        }
+    }
+
+    /// <summary>
+    ///     Tail of an accepted CZ_AVATAR_ACTION_SEND (op15) action whose Sort is 0 ("rest"/stand-up) --
+    ///     <c>S04_MyWork02.cpp:1779-1785</c>: re-arms the mutual PvP-attack-immunity window (the same
+    ///     <see cref="PlayerRuntimeState.ZoneEntryAtZoneClock" /> field <see cref="Combat.CombatResolver" />/
+    ///     <see cref="Combat.MonsterCombatResolver" />/<see cref="Combat.StunResolver" /> check on both the
+    ///     attacker and defender side of an attack) and unconditionally overwrites current HP to one third of
+    ///     max HP plus one. Not conditioned on <see cref="PlayerRuntimeState.IsDead" /> or any other death-gate
+    ///     flag -- the legacy handler this reproduces reads none of them before this tail step runs, so this
+    ///     fires for every accepted Sort-0 action alike, whether the character is alive or dead, and even if it
+    ///     was already at full HP (an unconditional overwrite, never a floor/clamp-if-lower). This is
+    ///     deliberately independent of, and never a substitute for, <see cref="GrantReviveEligibility" />'s own
+    ///     separate ~5s tick-based death-gate auto-clear (<see cref="Simulation.DeathGateTickSystem" />), which
+    ///     never touches HP or this timestamp under any legacy branch observed -- see that method's own remarks.
+    /// </summary>
+    private void ApplyRestActionProtectionAndHeal(PlayerRuntimeState state)
+    {
+        state.ZoneEntryAtZoneClock = _clock;
+
+        var maxLife = state.Stats?.MaxLife ?? state.MaxLife;
+        state.Life = maxLife / 3 + 1;
+        state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
+
+        state.Session.Send(new AvatarStatUpdateResponse
+            { Sort = CharacterHpStatSort, Value = state.Life, Value2 = 0 });
     }
 
     /// <summary>
@@ -703,13 +944,40 @@ public sealed partial class Zone
     }
 
     /// <summary>
-    ///     Non-attack skill cast (Sort=30). Damage-dealing skills do not go through here -- those ride
-    ///     <c>CZ_PROCESS_ATTACK_SEND</c>'s <c>AttackActionValue1==2</c> path instead. Silent no-op on every
-    ///     failure path, matching the legacy's own bare early-return contract (no dedicated failure packet).
+    ///     Phase A of a non-attack skill cast (behavior contract "skill-casting-cooldown-mechanics"):
+    ///     CZ_AVATAR_ACTION_SEND (op15) accepted with an action-category Sort that
+    ///     <see cref="Movement.CharacterMotionWhitelist" /> resolves into <see cref="SkillCastEffectCategoryCode" />
+    ///     (the real skill-cast Sorts 32, 33, 38-90 -- NOT action-Sort 30, the unrelated stand-up-from-death
+    ///     request). Charges mana unconditionally at cast-start, independent of whether the matching op16
+    ///     confirmation (<see cref="ApplySkillEffectConfirm" />) ever arrives. Silent no-op on every failure
+    ///     path (unknown/uncastable skill, wrong weapon class, insufficient mana), matching the legacy's own
+    ///     bare early-return contract -- no dedicated failure packet exists.
     /// </summary>
-    private void ApplySkillCast(PlayerRuntimeState state, ActionInfo action)
+    /// <remarks>
+    ///     Réf. C++ : Server/ts25zone/S04_MyWork02.cpp:1589-1651 (category-2 mana-cost computation +
+    ///     sufficiency check), :1680-1683 (the actual mana deduction, unconditional on any later effect
+    ///     resolving).
+    ///     <para>
+    ///         Damage-dealing skill casts ride this same op15 category-2 Sort family in the legacy source
+    ///         too, but this method's own <see cref="SkillCastResolver.TryCast" /> call only ever resolves
+    ///         the closed self-buff/heal effect-eligible skill set (<see cref="SkillEffectCatalog" />), so an
+    ///         attack-type skill number still silently falls through as UnknownSkill/NotCastable HERE and
+    ///         charges nothing via this call site -- by design, not a gap: their mana cost is charged
+    ///         instead by <c>Zone.ApplyCombatCommand</c>'s <c>mCase</c> 2 branch (<c>Zone.Combat.cs</c>), keyed
+    ///         off the SAME <see cref="SkillValueKind.ManaUse" /> lookup against the SAME per-skill/grade
+    ///         table, on the follow-up CZ_PROCESS_ATTACK_SEND attack-resolution packet rather than this
+    ///         originating op15 action -- see that method's own remarks for why (Fenrir's action/attack split
+    ///         carries no "already paid" flag forward from this earlier packet to that later one) and for the
+    ///         still-open Duel/PvM parity gaps that timing choice does not close. Net effect across both call
+    ///         sites: every op15 category-2 skill cast that reaches an effect (buff/heal here, or a damage
+    ///         attack there) pays its mana cost exactly once, matching the skill-casting-cooldown-mechanics
+    ///         behavior contract's "applies uniformly to attack-type and buff-type skill kinds" premise even
+    ///         though the two kinds are charged from two different call sites.
+    ///     </para>
+    /// </remarks>
+    private void ApplySkillCastManaCharge(PlayerRuntimeState state, ActionInfo action)
     {
-        // One skill-cast per legacy tick. Null (never cast) always passes.
+        // One skill-cast attempt per legacy tick. Null (never cast) always passes.
         if (state.LastSkillCastAtZoneClock is { } lastCast && _clock - lastCast < SimulationClock.LegacyTick)
             return;
 
@@ -721,7 +989,8 @@ public sealed partial class Zone
             : null;
         var maxLife = state.Stats?.MaxLife ?? state.MaxLife;
 
-        var result = SkillCastResolver.TryCast(skillDef, gradePoints, state.Mana, maxLife, weaponSort);
+        var result = SkillCastResolver.TryCast(skillDef, gradePoints, state.Mana, maxLife, weaponSort,
+            state.SupportSkillTimeUpRatio);
         if (!result.Success)
             return;
 
@@ -729,10 +998,84 @@ public sealed partial class Zone
         state.Mana -= result.ManaCost;
         state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
 
+        // Effect write (buff slots / targeted heal) is deliberately NOT applied here -- see
+        // ApplySkillEffectConfirm, which is what actually writes it, and only once a matching op16
+        // confirmation arrives.
+    }
+
+    /// <summary>
+    ///     Phase B of a non-attack skill cast (behavior contract "skill-casting-cooldown-mechanics"):
+    ///     CZ_UPDATE_AVATAR_ACTION (op16) accepted with action-category Sort == <see cref="SkillEffectConfirmActionSort" />.
+    ///     Re-validates the just-echoed skill number/grade numbers against whatever this character's own most
+    ///     recent accepted op15 action last recorded (<paramref name="previousSkillNumber" />/
+    ///     <paramref name="previousGradeNum1" />/<paramref name="previousGradeNum2" />, captured by the
+    ///     caller BEFORE this op16 action's own unconditional recorded-action overwrite) and, only on an
+    ///     exact match, resolves and applies the buff/heal effect. A mismatch (a confirm for a different
+    ///     cast, a stale/duplicate confirm, or no preceding cast at all) is a silent no-op -- no effect, no
+    ///     broadcast, no error.
+    /// </summary>
+    /// <remarks>
+    ///     Réf. C++ : Server/ts25zone/S04_MyWork02.cpp:1815-1922 (op16 handler body; Sort==1 branch at :1818
+    ///     calls <c>ProcessForCreateEffectValue</c>; the handler's own recorded-action overwrite at :1917 runs
+    ///     AFTER this check, against the PREVIOUS recorded action); Server/ts25zone/S07_MyGame04.cpp:1333-1563
+    ///     (<c>ProcessForCreateEffectValue</c>: echo-match gate at :1335-1338, effect write at :1509-1563).
+    ///     <para>
+    ///         Mana is never (re)charged here -- see <see cref="ApplySkillCastManaCharge" /> for the
+    ///         cast-start charge, which already ran (or silently didn't) on the preceding op15 action. This
+    ///         reuses <see cref="SkillCastResolver.TryCast" /> purely to re-derive the deterministic
+    ///         buff-write/heal-amount for the matched skill/grade/weapon; <c>int.MaxValue</c> is passed for
+    ///         the mana parameter so a balance already reduced by the op15 charge can never spuriously fail
+    ///         this second, mana-independent resolution.
+    ///     </para>
+    ///     <para>
+    ///         Formation skills 76/77/79/81 additionally require the caster's own party to have exactly
+    ///         <see cref="Social.Party.PartyRegistry.MaxMembers" /> ready members present in this same zone
+    ///         (<see cref="HasFullPartyPresent" />, checked via <see cref="SkillCastResolver.Result.RequiresFullParty" />)
+    ///         -- short of a full 5 (including solo), no buff is written even to the caster, matching
+    ///         <c>AVATAR_OBJECT::ProcessForCreateEffectValue</c>'s own all-or-nothing gate
+    ///         (S07_MyGame04.cpp:1348-1374). Not modeled here: the two-step <c>mParty_Buff_Act</c> CAST/DONE
+    ///         cast-lifecycle marker the legacy also requires (S04_MyWork02.cpp:1684-1699) -- this method's own
+    ///         skill/grade staleness check above already enforces the same "a cast must have started before
+    ///         this confirm applies" ordering, so it stands in as the structural equivalent; and the
+    ///         independent grade-bound recheck the legacy performs for every other skill number
+    ///         (S07_MyGame04.cpp:1376-1381) -- neither established by the behavior contract this satisfies
+    ///         (flagged there as further-tracing items, not guessed at here).
+    ///     </para>
+    /// </remarks>
+    private void ApplySkillEffectConfirm(PlayerRuntimeState state, ActionInfo action, int previousSkillNumber,
+        int previousGradeNum1, int previousGradeNum2)
+    {
+        if (action.SkillNumber != previousSkillNumber ||
+            action.SkillGradeNum1 != previousGradeNum1 ||
+            action.SkillGradeNum2 != previousGradeNum2)
+            return;
+
+        worldData.SkillsById.TryGetValue(action.SkillNumber, out var skillDef);
+        var gradePoints = action.SkillGradeNum1 + action.SkillGradeNum2;
+        var weaponItemId = state.Inventory.GetSlot(ContainerMatrix.Equipment, 7)?.ItemId;
+        var weaponSort = weaponItemId is { } id && worldData.ItemsById.TryGetValue(id, out var weaponDef)
+            ? (int?)weaponDef.Item.Sort
+            : null;
+        var maxLife = state.Stats?.MaxLife ?? state.MaxLife;
+
+        // int.MaxValue for casterMana: mana was already charged (or the cast already silently failed) in
+        // ApplySkillCastManaCharge -- this second resolution must never fail on a now-lower live mana
+        // balance, since Phase B's own preconditions never re-check mana (see remarks above).
+        var result = SkillCastResolver.TryCast(skillDef, gradePoints, int.MaxValue, maxLife, weaponSort,
+            state.SupportSkillTimeUpRatio);
+        if (!result.Success)
+            return;
+
+        // Formation skills 76/77/79/81 only (SkillEffectCatalog.RequiresFullParty) -- see this method's own
+        // remarks and the "Formation Party-Buff Exact-Five-Member Gate" behavior contract. Every other skill
+        // number leaves RequiresFullParty false and this check is a no-op for it.
+        if (result.RequiresFullParty && !HasFullPartyPresent(state.CharacterId))
+            return;
+
         switch (result.Kind)
         {
             case SkillEffectKind.SelfBuff:
-                ApplySkillBuffWrites(state, result.BuffWrites);
+                ApplyBuffWrites(state, result.BuffWrites);
                 break;
             case SkillEffectKind.HealLife:
                 ApplyTargetedHeal(action, true, result.HealAmount);
@@ -743,12 +1086,53 @@ public sealed partial class Zone
         }
     }
 
-    private void ApplySkillBuffWrites(PlayerRuntimeState state, ImmutableArray<SkillCastResolver.BuffWrite> writes)
+    /// <summary>
+    ///     Behavior contract "Formation Party-Buff Exact-Five-Member Gate": true only when
+    ///     <paramref name="characterId" /> belongs to a party whose full <see cref="Social.Party.PartyRegistry.MaxMembers" />
+    ///     (5) members are all currently present (spawned/registered) in this same zone -- mirrors
+    ///     <c>AVATAR_OBJECT::ProcessForCreateEffectValue</c>'s zone-local, name-matched ready-avatar count
+    ///     (S07_MyGame04.cpp:1356-1374), adapted to Fenrir's CharacterId-keyed <see cref="Social.Party.PartyRegistry" />
+    ///     instead of the legacy's party-name string match (no per-avatar party name is modeled, matching the
+    ///     same substitution <c>Zone.Stun.cs</c>'s <c>ApplyTeamStunSubMechanic</c> already makes for the
+    ///     analogous team-stun exact-5 gate). A party can never exceed 5 total members in
+    ///     <see cref="Social.Party.PartyRegistry" />, so this also implicitly requires the party to be full,
+    ///     not merely non-empty.
+    /// </summary>
+    private bool HasFullPartyPresent(int characterId)
+    {
+        var members = _partyRegistry.GetMembers(characterId);
+        if (members.Count != PartyRegistry.MaxMembers)
+            return false;
+
+        var presentCount = 0;
+        foreach (var memberId in members)
+            if (_players.ContainsKey(memberId))
+                presentCount++;
+
+        return presentCount == PartyRegistry.MaxMembers;
+    }
+
+    /// <summary>
+    ///     Applies a resolved buff-write set to <paramref name="state" />'s live buff slots and notifies
+    ///     (stat recompute + AOI broadcast) -- shared by the manual self-buff cast confirm above
+    ///     (<see cref="SkillEffectKind.SelfBuff" />) and <see cref="Simulation.AutoHuntTickSystem" />'s
+    ///     bot-buff loop. These two call sites used to be independent, byte-for-byte-identical method bodies
+    ///     (one private here, one a "small, deliberate duplicate" in <see cref="Simulation.AutoHuntTickSystem" />)
+    ///     -- unified here per the buff-slot-write-and-notify-pattern behavior contract. Uses
+    ///     <paramref name="state" />'s own <see cref="PlayerRuntimeState.BuffChangeScratch" /> instead of
+    ///     allocating a fresh <c>int[35]</c> on every call. A write whose slot falls outside 0-34 is silently
+    ///     skipped -- every other write in the same call still applies normally (preserved exactly from both
+    ///     original call sites); the mask is still sent (even if every write happened to be out of range) as
+    ///     long as <paramref name="writes" /> was non-empty, matching the original eager-allocate behavior of
+    ///     both original methods.
+    /// </summary>
+    internal void ApplyBuffWrites(PlayerRuntimeState state, ImmutableArray<SkillCastResolver.BuffWrite> writes)
     {
         if (writes.IsEmpty)
             return;
 
-        var changedSlots = new int[35];
+        var changedSlots = state.BuffChangeScratch;
+        Array.Clear(changedSlots);
         foreach (var write in writes)
         {
             if (write.Slot is < 0 or >= 35) continue;
@@ -803,7 +1187,7 @@ public sealed partial class Zone
     public void RecomputeStatsAndBroadcastBuffs(PlayerRuntimeState state, int[] changedSlots)
     {
         var attributes = new CharacterBaseAttributes(state.StatVit, state.StatStr, state.StatInt, state.StatDex,
-            state.Level, state.Tribe, state.Title, state.Halo, state.RebirthCount);
+            state.Level, state.Tribe, state.PreviousTribe, state.Title, state.Halo, state.RebirthCount);
         var equipmentContainer = state.Inventory.GetContainer(ContainerMatrix.Equipment);
 
         var petItemId = equipmentContainer.TryGetValue(PetSlots.EquipmentSlot, out var petStack)
@@ -823,12 +1207,42 @@ public sealed partial class Zone
             EffectValueState = changedSlots
         };
 
-        state.Session.Send(response);
-        foreach (var neighborId in _grid.Neighbors(state.CurrentCell))
+        // Rent-once/write-once/copy-N-times -- same idiom as BroadcastAvatarAction below: the frame is
+        // encoded exactly once and copied into each recipient's own transport, with a per-recipient failure
+        // isolated (logged, skipped) rather than aborting the rest of this broadcast.
+        var total = FrameWriter.FrameSizeOf<AvatarEffectStateResponse>();
+        var rented = ArrayPool<byte>.Shared.Rent(total);
+
+        try
         {
-            if (neighborId == state.CharacterId) continue;
-            if (_players.TryGetValue(neighborId, out var neighbor))
-                neighbor.Session.Send(response);
+            var span = rented.AsSpan(0, total);
+            FrameWriter.WriteFrame(in response, span);
+
+            SendBuffStateFrame(state.CharacterId, span);
+            foreach (var neighborId in _grid.Neighbors(state.CurrentCell))
+            {
+                if (neighborId == state.CharacterId) continue;
+                SendBuffStateFrame(neighborId, span);
+            }
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(rented);
+        }
+    }
+
+    private void SendBuffStateFrame(int recipientId, ReadOnlySpan<byte> frame)
+    {
+        try
+        {
+            if (_players.TryGetValue(recipientId, out var recipient) &&
+                recipient.Session is ClientSession clientSession)
+                clientSession.SendRaw(frame);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Zone {MapId} buff-state broadcast to character {RecipientId} failed", MapId,
+                recipientId);
         }
     }
 
@@ -896,6 +1310,8 @@ public sealed partial class Zone
 
     private static AvatarActionResponse BuildAvatarActionRecv(PlayerRuntimeState state)
     {
+        var pet = PetActionFieldsOf(state);
+
         return BuildAvatarActionRecv(state, new ActionInfo
         {
             Type = 0,
@@ -905,10 +1321,10 @@ public sealed partial class Zone
             TargetLocation = [state.PosX, state.PosY, state.PosZ],
             Front = state.Heading,
             TargetFront = state.Heading,
-            PetLocation = new float[3],
-            PetTargetLocation = new float[3],
-            PetFront = 0,
-            PetSort = 0,
+            PetLocation = pet.PetLocation,
+            PetTargetLocation = pet.PetTargetLocation,
+            PetFront = pet.PetFront,
+            PetSort = pet.PetSort,
             TargetObjectSort = 0,
             TargetObjectIndex = 0,
             TargetObjectUniqueNumber = 0,
@@ -917,6 +1333,24 @@ public sealed partial class Zone
             SkillGradeNum2 = 0,
             SkillValue = 0
         });
+    }
+
+    /// <summary>
+    ///     Companion-pet follow sub-fields (op156 CZ_UPDATE_PET_ACTION_SEND, see <see cref="HandlePetAction" />
+    ///     and <see cref="PlayerRuntimeState.PetActionSort" />'s own remarks) read back into a fresh
+    ///     <see cref="ActionInfo" /> for <paramref name="state" /> -- shared by every avatar-action broadcast
+    ///     builder in this class so the pet's last-reported pose/position finally rides along on the next
+    ///     independently-triggered avatar-action broadcast, instead of the empty/zero placeholder every one of
+    ///     these call sites used before this was wired up (companion-pet-follow-rebroadcast finding).
+    /// </summary>
+    private static (float[] PetLocation, float[] PetTargetLocation, float PetFront, int PetSort) PetActionFieldsOf(
+        PlayerRuntimeState state)
+    {
+        return (
+            [state.PetActionLocationX, state.PetActionLocationY, state.PetActionLocationZ],
+            [state.PetActionTargetLocationX, state.PetActionTargetLocationY, state.PetActionTargetLocationZ],
+            state.PetActionFront,
+            state.PetActionSort);
     }
 
     /// <summary>

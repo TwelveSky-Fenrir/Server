@@ -20,7 +20,8 @@ namespace Fenrir.Application.Game.Hosting.World.WorldState;
 ///         <c>TowerWarWriteBehindHost</c>/<c>HeroRankPointsWriteBehindHost</c>/
 ///         <c>MonsterBossRespawnWriteBehindHost</c>/<c>ProxyShopExpiryFlushHost</c>/
 ///         <c>TribeBankTaxSweepFlushHost</c> (all shortened to 2s in this pass because their per-cycle cost is
-///         a cheap in-memory dirty check with no DB round trip when clean), <see cref="WorldStateService.ReconcileAsync" />
+///         a cheap in-memory dirty check with no DB round trip when clean),
+///         <see cref="WorldStateService.ReconcileAsync" />
 ///         issues an UNCONDITIONAL <c>game.WorldState</c>/<c>WorldStateTribes</c>/<c>WorldStateAllianceOffers</c>
 ///         read every single cycle regardless of <see cref="WorldStateService.IsDirty" />, run by every live
 ///         shard on the same cadence -- tightening this interval would multiply that unconditional per-shard

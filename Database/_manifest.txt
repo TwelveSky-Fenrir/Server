@@ -48,6 +48,11 @@ Tables/world/StarterKitInventory.sql
 Tables/world/StarterKitSkills.sql
 Tables/world/StarterKitHotkeys.sql
 
+# Tribe conversion via consumable item (Book of Noble Dragon/Royal Serpent/Grand Tiger V2)
+Tables/world/TribeSkillEquivalences.sql
+Tables/world/TribeItemEquivalences.sql
+Tables/world/TribeCostumeEquivalences.sql
+
 Tables/game/Guilds.sql
 Tables/game/GuildMembers.sql
 Tables/game/GuildNotices.sql
@@ -142,6 +147,7 @@ StoredProcedures/game/usp_Character_SetAutoPotionThreshold.sql
 StoredProcedures/game/usp_Character_SetAutoHunt.sql
 StoredProcedures/game/usp_Character_SetPetGrowth.sql
 StoredProcedures/game/usp_Character_GrantTribeTransferPermit.sql
+StoredProcedures/game/usp_Character_AdjustDeathProtection.sql
 StoredProcedures/game/usp_Character_ClampVitalsFloor.sql
 StoredProcedures/game/usp_Character_CreateWithStarterKit.sql
 StoredProcedures/runtime/usp_SessionTicket_Create.sql
@@ -202,6 +208,7 @@ StoredProcedures/world/usp_EventDefinition_GetAll.sql
 StoredProcedures/world/usp_RewardBundle_GetAll.sql
 StoredProcedures/world/usp_RewardBundleItem_GetAll.sql
 StoredProcedures/world/usp_StarterKit_GetByPreviousTribe.sql
+StoredProcedures/world/usp_TribeConversionCatalog_GetAll.sql
 
 StoredProcedures/game/usp_Guild_GetAll.sql
 StoredProcedures/game/usp_Guild_GetById.sql
@@ -303,6 +310,10 @@ StoredProcedures/game/usp_EventLog_InsertBatch.sql
 # Guild-tx-hygiene: guild create/upgrade + money debit in one transaction (no caller-side compensation)
 StoredProcedures/game/usp_Guild_CreateAndDebitMoney.sql
 StoredProcedures/game/usp_Guild_UpgradeAndDebitMoney.sql
+
+# Tribe conversion via consumable item (Book of Noble Dragon/Royal Serpent/Grand Tiger V2, world.Items
+# 99014/99015/99016): atomic equip/skill/hotkey remap + tribe commit + item consumption in one procedure.
+StoredProcedures/game/usp_Character_ApplyTribeConversion.sql
 
 StoredProcedures/admin/usp_Ban_Create.sql
 StoredProcedures/admin/usp_Ban_GetActiveForAccount.sql
@@ -487,6 +498,81 @@ Migrations/031_character_experience_column_doc_correction.sql
 # itself for the full citation and fix rationale.
 Migrations/032_character_inventory_store_date_grant.sql
 
+# proxy-shop-listing-pricing (Critical): usp_OfflineShop_ExecutePurchase's seller-earnings-credit UPDATE
+# evaluated `Money + @Price` as 32-bit INT arithmetic before choosing its BigMoney-rollover CASE WHEN branch --
+# since OfflineShops.Money can legitimately sit at exactly 2,000,000,000 and Price can be as large as
+# 999,999,999, the true sum (~2.999999999e9) can exceed Int32.MaxValue and raise a raw SQL arithmetic-overflow
+# error (8115) instead of legacy's intended graceful rollover -- see the migration file itself for the full
+# citation and fix rationale (widen-then-compare via BIGINT, matching legacy's own LONGLONG-widening pattern).
+Migrations/033_offline_shop_execute_purchase_bigint_overflow_fix.sql
+
+# inventory-capacity-stacking-rules (Critical, database-layer backstop only): game.CharacterItems.Quantity
+# had no upper-bound CHECK, so the missing 999-stack cap in ContainerMatrix.ResolveMove's merge branch
+# (Application/ fix tracked separately, out of database-engineer scope) could durably persist an over-cap
+# stack with nothing at the schema level to stop it -- see the migration file itself for the full citation.
+Migrations/034_character_items_quantity_upper_bound.sql
+
+# gm-action-audit-attribution (Critical): admin.Bans gains ActorAccountId/ActorCharacterId so a ban row can be
+# attributed to the GM who issued it, and usp_Ban_Create gains two matching trailing optional parameters --
+# see the migration file itself for the full citation and rationale (this closes the "admin.Bans has no actor
+# column" half of the uppercom-center-gamelog-relay-opcodes / EventLogCategory.GmAction finding; the
+# Application-layer LogAsync wiring itself is a separate, non-database change tracked elsewhere).
+Migrations/035_bans_actor_attribution.sql
+
+# item-usage-consumables (Critical): stat/elixir-potion consumption is now wired into
+# UseInventoryItemService.ResolveAsync (StatPotionResolver), which persists its five lifetime counters
+# (EatLifePotion/EatManaPotion/EatStrPotion/EatDexPotion/EatElePotion) through the same write-behind path as
+# every other Vitals/Progression field -- game.tvp_CharacterProgress/usp_Character_PersistProgressBatch
+# never carried them; see the migration file itself for the full citation and the drop-then-recreate
+# rationale (SQL Server has no ALTER TYPE for table types).
+Migrations/036_character_progress_stat_potion_counters.sql
+
+# trade-event-log-audit (Critical, legacy parity: GL_615_TRADE_ITEM/GL_615_TRADE_ITEM2/GL_616_TRADE_MONEY):
+# EventLogCategory.Trade had zero writers -- every completed player-to-player trade was entirely unaudited,
+# both the item and money halves, on both sides. usp_CharacterTrade_Execute now writes the audit rows for
+# the completed trade in the SAME transaction as the money/container mutation -- see the migration file
+# itself for the full citation and rationale, including why the new parameters default to
+# empty/omitted/zero so the existing sole call site keeps compiling until it is updated to pass the real
+# trade-window offer data.
+Migrations/037_trade_event_log.sql
+
+# proxy-shop-listing-pricing (Major): usp_OfflineShop_WithdrawMoney's Characters.BigMoney guard only checked
+# non-negativity, never the legacy upper bound (MAX_NUMBER_SIZE2 = 999), letting repeated proxy-shop
+# list/sell/withdraw cycles push a character's own BigMoney arbitrarily above the cap enforced everywhere
+# else -- see the migration file itself for the full citation and rationale.
+Migrations/038_offline_shop_withdraw_bigmoney_cap.sql
+
+# uppercom-playuser-extra-relay-opcodes (Major): chat-time mute enforcement was checked once at world entry
+# and cached for the rest of the session (PlayerRuntimeState.IsMuted), diverging from legacy's live
+# per-message recheck across all five chat-send opcodes. Adds admin.tvp_CharacterIdList and the batched
+# admin.usp_Mute_GetActiveForCharacters that MuteRefreshPollHost (Application/Fenrir.Application.Game.
+# Hosting) polls on a fixed interval to narrow the gap to a bounded-staleness approximation instead of a
+# per-message SQL call on the IInlinePacketHandler<T> hot path -- see the migration file itself for the
+# full citation and rationale.
+Migrations/039_mute_batch_refresh.sql
+
+# proxy-shop-listing-pricing (Major): usp_OfflineShop_ExecutePurchase never checked whether a purchase sold
+# out the seller's entire 25-slot listing, so a fully-sold-out shop stayed ShopState=1 (open) indefinitely,
+# blocking usp_OfflineShop_WithdrawMoney's `ShopState = 0` gate until the owner manually closed it or the
+# periodic rental-expiry sweep force-closed it -- legacy auto-closes the instant the last item sells
+# (Server/ts25zone/S07_MyGame09.cpp:860-880) -- see the migration file itself for the full citation and
+# rationale.
+Migrations/040_offline_shop_auto_close_on_sellout.sql
+
+# auto-hunt-item-consumption (Critical): adds game.usp_CharacterHotkeys_UpsertSlot, a brand-new single-slot
+# upsert/clear procedure for game.CharacterHotkeys -- previously the table had no writer at all beyond the
+# one-time starter-kit grant, so op22 CZ_USE_HOTKEY_ITEM_SEND's potion-consumption decrement (now wired in
+# UseHotkeyItemService/HotkeyItemConsumptionResolver) had nowhere durable to persist to. See the migration
+# file itself for the full citation and the game.CharacterHotkeys column-order caveat.
+Migrations/041_hotkey_item_consumption_persistence.sql
+
+# market-wide-proxy-shop-search (Major): PSHOP_ITEM_INFO_SEND's market search previously only ever queried
+# live personal shops on the local zone instance and never the persisted proxy/deputy-shop store at all --
+# adds game.usp_OfflineShop_GetAllOpen, a brand-new cluster-wide (not zone-scoped) "every currently open
+# shop" read backing SearchShopListingsService's now-restored proxy-shop half. See the migration file itself
+# for the full citation and rationale.
+Migrations/042_market_wide_proxy_shop_search.sql
+
 Migrations/Seed/001_dev_account.sql
 
 Migrations/Seed/world/060_levels.sql
@@ -501,6 +587,9 @@ Migrations/Seed/world/083_starter_kit_inventory.sql
 Migrations/Seed/world/084_starter_kit_skills.sql
 Migrations/Seed/world/085_starter_kit_hotkeys.sql
 Migrations/Seed/world/086_starter_kit_equipment_elite_correction.sql
+Migrations/Seed/world/087_tribe_skill_equivalences.sql
+Migrations/Seed/world/088_tribe_item_equivalences.sql
+Migrations/Seed/world/089_tribe_costume_equivalences.sql
 Migrations/Seed/world/090_monsters.sql
 Migrations/Seed/world/Npcs.sql
 Migrations/Seed/world/021_zone_npc_spawns.sql
@@ -524,3 +613,15 @@ Migrations/Seed/admin/006_game_settings.sql
 Migrations/Seed/admin/007_error_catalog_c07_item_use.sql
 Migrations/Seed/admin/008_server_quota.sql
 Migrations/Seed/admin/009_error_catalog_guild_tx_hygiene.sql
+
+# character-death-respawn-penalty: registers 50332 for the new usp_Character_AdjustDeathProtection
+# procedure (game.Characters.ProtectForDeath delta adjustment/consumption primitive).
+Migrations/Seed/admin/010_error_catalog_death_protection.sql
+
+# tribe-previoustribe-runtime-gating: registers 50313-50320 for the new usp_Character_ApplyTribeConversion
+# procedure (Book of Noble Dragon/Royal Serpent/Grand Tiger V2 tribe-conversion mechanic).
+Migrations/Seed/admin/010_error_catalog_tribe_conversion.sql
+
+# proxy-shop-listing-pricing: registers 50333 for Migrations/038_offline_shop_withdraw_bigmoney_cap.sql's new
+# BigMoney-upper-bound guard on usp_OfflineShop_WithdrawMoney.
+Migrations/Seed/admin/011_error_catalog_offline_shop_withdraw_bigmoney_cap.sql

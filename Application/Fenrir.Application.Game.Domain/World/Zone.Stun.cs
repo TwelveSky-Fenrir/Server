@@ -24,8 +24,8 @@ public sealed partial class Zone
     private const int IdleActionSort = 1;
 
     /// <summary>
-    ///     Buff slot 13 ("Stun Defense") -- forces a stun attempt's block value to a flat maximum (see
-    ///     <see cref="StunResolver" />).
+    ///     Buff slot 13 ("Stun Defense") -- replaces a stun attempt's computed block value with the flat
+    ///     literal 100 (a finite, beatable mitigation, not unconditional immunity; see <see cref="StunResolver" />).
     /// </summary>
     private const int StunDefenseBuffSlot = 13;
 
@@ -34,6 +34,22 @@ public sealed partial class Zone
 
     /// <summary>Repeated-stun count at which the team-stun sub-mechanic force-kills the victim (S07_MyGame02.cpp:3727-3731).</summary>
     private const int TeamStunLockDeathThreshold = 10;
+
+    /// <summary>
+    ///     Reusable scratch buffer for <see cref="BroadcastIdleActionState" />'s neighbor-broadcast recipient
+    ///     list -- see <see cref="_stunNeighborScratch" />'s own remarks for the reuse justification.
+    /// </summary>
+    private readonly List<int> _idleNeighborScratch = [];
+
+    /// <summary>
+    ///     Reusable scratch buffer for <see cref="BroadcastStunActionState" />'s neighbor-broadcast recipient
+    ///     list -- same non-allocating shape and reuse justification as <c>Zone.PlayerLifecycle.cs</c>'s own
+    ///     <c>_moveNeighborScratch</c>: single tick thread, cleared before use, consumed entirely by the
+    ///     immediately-following broadcast call before <see cref="BroadcastStunActionState" /> returns. Kept
+    ///     distinct from <see cref="_idleNeighborScratch" /> even though the two poses are mutually exclusive,
+    ///     matching the rest of this codebase's one-scratch-field-per-call-site convention.
+    /// </summary>
+    private readonly List<int> _stunNeighborScratch = [];
 
     /// <summary>
     ///     ProcessAttack05 -- an avatar attempts to stun another avatar. Every failure path is a silent no-op;
@@ -108,6 +124,11 @@ public sealed partial class Zone
         if (!_players.TryGetValue(command.AttackInfo.ServerIndex2, out var targetState))
             return;
         if (targetState.UniqueNumber != command.AttackInfo.UniqueNumber2)
+            return;
+
+        // CheckAttackPacket (S07_MyGame02.cpp:1718-1761), counting enabled -- see AttackPacketBudget's own
+        // remarks. Silent reject, same as every other ProcessAttack06 rejection path.
+        if (!AttackPacketBudget.TryConsume(curerState, command.AttackInfo.AttackActionValue4))
             return;
 
         var usedSkillId = command.AttackInfo.AttackActionValue2;
@@ -245,8 +266,10 @@ public sealed partial class Zone
         var action = BuildActionForPose(state, StunActionSort, durationSeconds);
         state.Session.Send(BuildAvatarActionRecv(state, action));
 
-        var neighbors = _grid.Neighbors(state.CurrentCell).Where(id => id != state.CharacterId).ToArray();
-        BroadcastAvatarAction(neighbors, state, action);
+        // Uses _stunNeighborScratch instead of AoiGrid.Neighbors(...).Where(...).ToArray().
+        _stunNeighborScratch.Clear();
+        _grid.NeighborsExcludingSelf(_stunNeighborScratch, state.CurrentCell, state.CharacterId);
+        BroadcastAvatarAction(_stunNeighborScratch, state, action);
     }
 
     private void BroadcastIdleActionState(PlayerRuntimeState state)
@@ -256,12 +279,16 @@ public sealed partial class Zone
         var action = BuildActionForPose(state, IdleActionSort, 0);
         state.Session.Send(BuildAvatarActionRecv(state, action));
 
-        var neighbors = _grid.Neighbors(state.CurrentCell).Where(id => id != state.CharacterId).ToArray();
-        BroadcastAvatarAction(neighbors, state, action);
+        // Uses _idleNeighborScratch instead of AoiGrid.Neighbors(...).Where(...).ToArray().
+        _idleNeighborScratch.Clear();
+        _grid.NeighborsExcludingSelf(_idleNeighborScratch, state.CurrentCell, state.CharacterId);
+        BroadcastAvatarAction(_idleNeighborScratch, state, action);
     }
 
     private static ActionInfo BuildActionForPose(PlayerRuntimeState state, int sort, int skillValue)
     {
+        var pet = PetActionFieldsOf(state);
+
         return new ActionInfo
         {
             Type = 0,
@@ -271,10 +298,10 @@ public sealed partial class Zone
             TargetLocation = [state.PosX, state.PosY, state.PosZ],
             Front = state.Heading,
             TargetFront = state.Heading,
-            PetLocation = new float[3],
-            PetTargetLocation = new float[3],
-            PetFront = 0,
-            PetSort = 0,
+            PetLocation = pet.PetLocation,
+            PetTargetLocation = pet.PetTargetLocation,
+            PetFront = pet.PetFront,
+            PetSort = pet.PetSort,
             TargetObjectSort = 0,
             TargetObjectIndex = 0,
             TargetObjectUniqueNumber = 0,

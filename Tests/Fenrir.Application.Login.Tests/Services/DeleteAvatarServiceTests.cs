@@ -150,8 +150,8 @@ public class DeleteAvatarServiceTests
             FakeWorldStateRepository.Empty(), FakeGuildRepository.Empty(), FakeOfflineShopRepository.Empty(),
             NullLogger<DeleteAvatarService>.Instance);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => service.DeleteAvatarAsync(AccountId, Slot, CancellationToken.None).AsTask());
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.DeleteAvatarAsync(AccountId, Slot, CancellationToken.None).AsTask());
 
         Assert.Single(characters.DeleteCalls);
     }

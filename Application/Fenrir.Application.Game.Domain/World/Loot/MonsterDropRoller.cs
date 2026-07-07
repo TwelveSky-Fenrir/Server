@@ -33,13 +33,35 @@ public sealed record MonsterDropResult(long? Money, IReadOnlyList<DroppedItem> I
 ///         <see cref="BossEventDropResolver" />'s own remarks for exactly which identifiers do and don't.
 ///     </para>
 ///     <para>
+///         Immediately AFTER this pipeline (<c>Server/ts25zone/S07_MyGame05.cpp:3000-3732</c>, the remainder
+///         of <c>ProcessForDropItem</c>) sits a further two live drop tiers -- <see cref="MonsterDropTailResolver" />,
+///         also called by <c>MonsterSpawnScheduler.ProcessDeath</c>, immediately after this class's own
+///         <see cref="Roll" />. Everything else in that tail span is dead code (commented out or gated by a
+///         macro never <c>#define</c>'d anywhere in <c>Server/</c>) -- see that class's own remarks.
+///     </para>
+///     <para>
 ///         <c>item_drop</c>/<c>rare_drop</c> default 20.0, from <c>ServerInfo.ini</c>'s <c>ItemDropUpRatio=200</c>
-///         via <c>CreateRatio0(x) = x * 0.1f</c>. <c>user_drop</c> defaults 1.0; the zone-120 newbie bonus and the
-///         premium-account +1.0 bonus are not modeled -- constructor params exist so callers can supply the real
-///         values once those systems exist. The per-tribe <c>mTribeItemDropUpRatioInfo</c>/
-///         <c>mTribeItemDropUpRatioForMyoungInfo</c> modifiers (<c>S07_MyGame05.cpp:2713-2714</c>) are not applied
-///         here either -- <c>WorldInfo.TribeItemDropUpRatioInfo</c>/<c>TribeItemDropUpRatioForMyoungInfo</c> have
-///         no persisted source yet (<c>WorldStateTemplates</c> zeroes both), so there is nothing live to read.
+///         via <c>CreateRatio0(x) = x * 0.1f</c>. <c>user_drop</c> defaults 1.0; the zone-120 newbie bonus is not
+///         modeled -- constructor params exist so callers can supply the real values once that system exists. The
+///         per-tribe <c>mTribeItemDropUpRatioInfo</c>/<c>mTribeItemDropUpRatioForMyoungInfo</c> modifiers
+///         (<c>S07_MyGame05.cpp:2713-2714</c>) are not applied here either -- <c>WorldInfo.TribeItemDropUpRatioInfo</c>/
+///         <c>TribeItemDropUpRatioForMyoungInfo</c> have no persisted source yet (<c>WorldStateTemplates</c> zeroes
+///         both), so there is nothing live to read.
+///     </para>
+///     <para>
+///         The premium-account +1.0 bonus to all three of <c>user_drop</c>/<c>item_drop</c>/<c>rare_drop</c>
+///         (behavior contract "Premium-account drop-rate bonus on monster kill") IS modeled -- see
+///         <see cref="Roll" />'s own <paramref name="killerPremiumActive" /> parameter, applied locally per kill
+///         rather than baked into these constructor-level ratios, since those are shared across every kill a
+///         zone's single <see cref="MonsterDropRoller" /> instance ever rolls while premium status is per-killer.
+///         Réf. C++ : <c>Server/ts25zone/S07_MyGame05.cpp:2171-2176</c> (the premium gate itself, checked as a
+///         plain greater-than-zero comparison against the stored <c>aPremium</c> expiry timestamp, never
+///         re-validated against the current time at this call site -- a separate per-minute maintenance pass,
+///         mirrored here by <see cref="Simulation.SupportSkillTimeUpRatioMaintenanceSystem" />, is what actually
+///         zeroes an expired value) ; <c>:2101-2124</c> (the preceding non-premium setup of the same three rates)
+///         ; <c>Server/ts25zone/S07_MyGame01.cpp:442-444</c> and <c>Server/Header/function.h:1654-1656</c>
+///         (<c>CreateRatio0</c> deriving the 20.0 defaults) ; <c>Server/BuildEU33/ServerInfo.ini:164-168</c>
+///         (confirming the production config values feeding those defaults).
 ///     </para>
 /// </remarks>
 public sealed class MonsterDropRoller(
@@ -64,6 +86,13 @@ public sealed class MonsterDropRoller(
     private const int UnconditionalItem864Threshold = 1000;
 
     /// <summary>
+    ///     Flat bonus <see cref="Roll" /> adds to each of <c>user_drop</c>/<c>item_drop</c>/<c>rare_drop</c> for
+    ///     the duration of one kill's roll when <paramref name="killerPremiumActive" /> is true. See class
+    ///     remarks for the full citation chain.
+    /// </summary>
+    private const float PremiumDropRatioBonus = 1.0f;
+
+    /// <summary>
     ///     Ports <c>tCheckPossibleDrop</c>'s normal branch: eligible only when the killer is at most 9 levels
     ///     above the monster's <c>ItemLevel</c>.
     /// </summary>
@@ -85,18 +114,30 @@ public sealed class MonsterDropRoller(
     /// </param>
     /// <param name="killerQuest">The killer's live quest state, for <see cref="RollQuestItem" />.</param>
     /// <param name="killerHasItem">Killer inventory lookup, for <see cref="RollQuestItem" />.</param>
+    /// <param name="killerPremiumActive">
+    ///     Whether the killer's premium status is currently active -- see class remarks for the full citation
+    ///     chain. Callers should pass a plain greater-than-zero check on the killer's stored premium-expiry
+    ///     value (e.g. <c>PlayerRuntimeState.PremiumExpireUtc &gt; 0</c>), not a re-comparison against the
+    ///     current time: that expiry check belongs to a separate periodic maintenance pass, not this call site.
+    /// </param>
     public MonsterDropResult Roll(MonsterDefinition monster, short killerLevel, byte killerTribe, int killerLuck,
-        QuestProgress killerQuest, Func<int, bool> killerHasItem)
+        QuestProgress killerQuest, Func<int, bool> killerHasItem, bool killerPremiumActive = false)
     {
         var eligible = IsEligible(monster.Monster, killerLevel);
 
-        var money = eligible ? RollMoney(monster.DropMoney, killerLuck) : null;
+        var premiumBonus = killerPremiumActive ? PremiumDropRatioBonus : 0f;
+        var effectiveItemDropRatio = itemDropRatio + premiumBonus;
+        var effectiveRareDropRatio = rareDropRatio + premiumBonus;
+        var effectiveUserDropRatio = userDropRatio + premiumBonus;
+
+        var money = eligible ? RollMoney(monster.DropMoney, killerLuck, effectiveItemDropRatio) : null;
         var items = new List<DroppedItem>();
 
         if (eligible)
         {
-            RollPotions(monster.DropPotions, killerLuck, items);
-            RollGeneralItems(monster.Monster, monster.DropCategoryRates, killerTribe, killerLuck, items);
+            RollPotions(monster.DropPotions, killerLuck, effectiveItemDropRatio, items);
+            RollGeneralItems(monster.Monster, monster.DropCategoryRates, killerTribe, killerLuck,
+                effectiveUserDropRatio, effectiveItemDropRatio, effectiveRareDropRatio, items);
         }
 
         RollQuestItem(monster.DropQuestItem, killerQuest, killerHasItem, items);
@@ -111,12 +152,12 @@ public sealed class MonsterDropRoller(
     }
 
     /// <summary>Ports <c>DROP_MONEY</c> with the LNW33 adjustment active: a roll over 500 loses 30%, then gains a flat +2000.</summary>
-    private long? RollMoney(MonsterDropMoneyRowDto? dropMoney, int killerLuck)
+    private long? RollMoney(MonsterDropMoneyRowDto? dropMoney, int killerLuck, float effectiveItemDropRatio)
     {
         if (dropMoney is not { DropRate: > 0 })
             return null;
 
-        if (LootRandomSource.RandomNumber(random) > (int)((dropMoney.DropRate + killerLuck) * itemDropRatio))
+        if (LootRandomSource.RandomNumber(random) > (int)((dropMoney.DropRate + killerLuck) * effectiveItemDropRatio))
             return null;
 
         var size = dropMoney.MinAmount + random.Next(dropMoney.MaxAmount - dropMoney.MinAmount + 1);
@@ -129,14 +170,15 @@ public sealed class MonsterDropRoller(
     }
 
     /// <summary>Ports <c>DROP_POTION</c> -- 5 independent slots, each item id always drops quantity 1.</summary>
-    private void RollPotions(IReadOnlyList<MonsterDropPotionRowDto> potions, int killerLuck, List<DroppedItem> items)
+    private void RollPotions(IReadOnlyList<MonsterDropPotionRowDto> potions, int killerLuck,
+        float effectiveItemDropRatio, List<DroppedItem> items)
     {
         foreach (var potion in potions)
         {
             if (potion.DropRate <= 0)
                 continue;
 
-            if (LootRandomSource.RandomNumber(random) <= (int)((potion.DropRate + killerLuck) * itemDropRatio))
+            if (LootRandomSource.RandomNumber(random) <= (int)((potion.DropRate + killerLuck) * effectiveItemDropRatio))
                 items.Add(new DroppedItem(potion.PotionItemId, 1));
         }
     }
@@ -146,7 +188,8 @@ public sealed class MonsterDropRoller(
     ///     Elite is dead code in the source, so slots 9-11 are never rolled here either.
     /// </summary>
     private void RollGeneralItems(MonsterRowDto monster, IReadOnlyList<MonsterDropCategoryRateRowDto> rates,
-        byte killerTribe, int killerLuck, List<DroppedItem> items)
+        byte killerTribe, int killerLuck, float effectiveUserDropRatio, float effectiveItemDropRatio,
+        float effectiveRareDropRatio, List<DroppedItem> items)
     {
         int levelLow, levelHigh;
         if (monster.MartialItemLevel < 1)
@@ -160,8 +203,8 @@ public sealed class MonsterDropRoller(
         }
 
         // itDropCommon/itDropUnique use item_drop; itDropRare uses rare_drop instead.
-        var commonUniqueRatio = userDropRatio + itemDropRatio;
-        var rareRatio = userDropRatio + rareDropRatio;
+        var commonUniqueRatio = effectiveUserDropRatio + effectiveItemDropRatio;
+        var rareRatio = effectiveUserDropRatio + effectiveRareDropRatio;
 
         foreach (var rate in rates)
         {

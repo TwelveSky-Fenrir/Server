@@ -1,5 +1,6 @@
 using Fenrir.Application.Game.Abstractions.ZoneLifecycle;
 using Fenrir.Application.Game.Domain.Inventory;
+using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
@@ -16,10 +17,27 @@ namespace Fenrir.Application.Game.Handlers.Handlers;
 ///     iSort/iIndex family still replies with a clean Result=1 failure rather than a disconnect.
 /// </summary>
 /// <remarks>
-///     Not modeled: the per-tick anti-flood throttle (mTickForUseInventoryItem) and the page-1
-///     storage-extension gate (aInventoryDate, no <see cref="PlayerRuntimeState" /> field exists yet) -- both
-///     orthogonal to which item family is used, and neither has an acquisition/observation path through any
-///     opcode implemented so far.
+///     Not modeled: the page-1 storage-extension gate (aInventoryDate, no <see cref="PlayerRuntimeState" />
+///     field exists yet) -- orthogonal to which item family is used, and it has no acquisition/observation
+///     path through any opcode implemented so far.
+/// </remarks>
+/// <remarks>
+///     Per-avatar, item-agnostic anti-flood gate (legacy <c>mTickForUseInventoryItem</c>,
+///     Server/ts25zone/S04_MyWork03.cpp:1861-1866) -- the very first check this handler performs, before any
+///     item-specific dispatch, matching legacy's own ordering. Legacy rejects unless its discrete ~499 ms
+///     logic-tick counter (TimeLogic=500, decremented once per Server/Header/socket.h:8) has advanced by at
+///     least one full tick since the last accepted use, with zero burst tolerance. This models that same
+///     "at least one full legacy tick must elapse" rule as a continuous wall-clock comparison against
+///     <see cref="PlayerRuntimeState.LastItemUseUtc" /> (<see cref="SimulationClock.LegacyTick" />, 500 ms)
+///     rather than a discrete Zone-wide tick counter, since this handler runs on the request thread, not the
+///     Zone tick thread that owns the only Zone-wide simulated clock in this codebase -- the same
+///     request-thread/tick-thread split <see cref="PlayerRuntimeState.LastMoveUtc" />/
+///     <c>MovementRules.IsPlausible</c> already models for an analogous reason. On rejection, the client
+///     receives the same generic Result=1 failure <see cref="IUseInventoryItemService" /> uses for every
+///     other rejection reason (legacy's own <c>wUseInvFail()</c>, Server/ts25zone/S04_MyWork03.cpp:103) --
+///     it cannot distinguish "rate-limited" from any other item-use failure. On success, the field is
+///     stamped unconditionally before the service call runs, mirroring legacy's own bookkeeping (never
+///     rolled back even if a later stage of the same request fails).
 /// </remarks>
 public sealed class UseInventoryItemHandler(IUseInventoryItemService service)
     : IAsyncPacketHandler<UseInventoryItemRequest>
@@ -44,6 +62,19 @@ public sealed class UseInventoryItemHandler(IUseInventoryItemService service)
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }
+
+        // Per-avatar, item-agnostic anti-flood gate -- see this class's own remarks. Runs ahead of the
+        // EconomyActionLock/service call since legacy performs this same check before any item-specific
+        // dispatch, and it depends on nothing the lock protects.
+        var now = DateTime.UtcNow;
+        if (now - state.LastItemUseUtc < SimulationClock.LegacyTick)
+        {
+            session.Send(new UseInventoryItemResponse
+                { Result = 1, Page = page, Index = index, Value = 0, Value2 = 0 });
+            return;
+        }
+
+        state.LastItemUseUtc = now;
 
         await state.EconomyActionLock.WaitAsync(cancellationToken);
         try

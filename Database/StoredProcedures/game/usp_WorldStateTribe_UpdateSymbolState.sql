@@ -5,20 +5,20 @@
 -- overwrite is safe for these fields. Points is deliberately excluded here -- see
 -- usp_WorldStateTribe_AddPoints for the concurrently-safe delta path RvR kill-scoring needs instead.
 -- Idempotent-on-missing-row like usp_WorldStateTribe_Update: a missing row affects 0 rows and does not error.
-CREATE PROCEDURE game.usp_WorldStateTribe_UpdateSymbolState @TribeId    TINYINT,
-    @SymbolDate DATETIME2(3) = NULL,
-    @HasSymbol  BIT,
-    @IsClosed   BIT
+CREATE PROCEDURE game.usp_WorldStateTribe_UpdateSymbolState @TribeId TINYINT,
+                                                            @SymbolDate DATETIME2(3) = NULL,
+                                                            @HasSymbol BIT,
+                                                            @IsClosed BIT
 AS
 BEGIN
     SET
-NOCOUNT ON;
+        NOCOUNT ON;
     SET
-XACT_ABORT ON;
+        XACT_ABORT ON;
 
-UPDATE game.WorldStateTribes
-SET SymbolDate = @SymbolDate,
-    HasSymbol  = @HasSymbol,
-    IsClosed   = @IsClosed
-WHERE TribeId = @TribeId;
+    UPDATE game.WorldStateTribes
+    SET SymbolDate = @SymbolDate,
+        HasSymbol  = @HasSymbol,
+        IsClosed   = @IsClosed
+    WHERE TribeId = @TribeId;
 END;

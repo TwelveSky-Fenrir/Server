@@ -66,6 +66,7 @@ public sealed class CommerceCatalogCache
     private CashCatalogBuilder.CashCatalog _cashCatalog = CashCatalogBuilder.Build([]);
     private int _cashCatalogCrc = InitialVersion;
     private int _cashCatalogVersion = InitialVersion;
+    private bool _cashShopSellEnabled = true;
 
     public CommerceCatalogCache(ILogger<CommerceCatalogCache> logger)
     {
@@ -107,6 +108,26 @@ public sealed class CommerceCatalogCache
             lock (_lock)
             {
                 return _cashCatalogCrc;
+            }
+        }
+    }
+
+    /// <summary>
+    ///     Mirrors legacy's <c>CASH_INFO.mIsSellCash</c> shared-memory flag -- the administrative "cash shop is
+    ///     open for purchases" gate that <c>BuyCashItemService</c> consults ahead of every purchase, independent
+    ///     of <see cref="CashCatalogVersion" />. Unlike the version/CRC/catalog trio above, this is refreshed on
+    ///     every successful reload attempt regardless of whether the version changed -- see
+    ///     <see cref="RefreshCashCatalogAsync" />. Defaults to <c>true</c> (open) before the first reload and
+    ///     whenever no sentinel row is seeded, matching Fenrir's pre-existing always-open behavior; see
+    ///     <see cref="CashCatalogBuilder.ResolveSellEnabled" /> for the sentinel-row convention.
+    /// </summary>
+    public bool CashShopSellEnabled
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _cashShopSellEnabled;
             }
         }
     }
@@ -158,6 +179,15 @@ public sealed class CommerceCatalogCache
             _logger.LogWarning(ex,
                 "Cash-catalog reload query failed -- keeping the previous catalog/version/CRC, retrying next tick");
             return;
+        }
+
+        // Refreshed on every successful fetch, independent of the version-diff gate below -- the sell-enabled
+        // flag has no version concept of its own in legacy (it's a standalone CASH_INFO field), so it must
+        // not be skipped just because the catalog's own version happens not to have moved this tick.
+        var newSellEnabled = CashCatalogBuilder.ResolveSellEnabled(rows);
+        lock (_lock)
+        {
+            _cashShopSellEnabled = newSellEnabled;
         }
 
         var newVersion = CashCatalogBuilder.ResolveVersion(rows);

@@ -9,7 +9,8 @@
 -- consumed by either gate in that citation and are intentionally not carried over here.
 CREATE TABLE admin.ServerQuota
 (
-    Id         TINYINT NOT NULL CONSTRAINT DF_ServerQuota_Id DEFAULT 1,
+    Id         TINYINT NOT NULL
+        CONSTRAINT DF_ServerQuota_Id DEFAULT 1,
     MaxPlayers INT     NOT NULL,
     CONSTRAINT PK_ServerQuota PRIMARY KEY CLUSTERED (Id),
     CONSTRAINT CK_ServerQuota_Id CHECK (Id = 1)

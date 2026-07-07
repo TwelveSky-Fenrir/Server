@@ -60,10 +60,12 @@ public sealed record ActiveDuel(int UniqueNumber, int PlayerA, int PlayerB, bool
 ///     the 180-legacy-tick auto-timeout, all resolved once per zone tick by
 ///     <see cref="Simulation.DuelMaintenanceSystem" /> (Server/ts25zone/S07_MyGame04.cpp:595-682), never here
 ///     directly -- this class only ever holds the shared state that system reads/mutates and the registry-side
-///     half of ending a duel (<see cref="TryEndActiveDuel" />). Actual duel combat is also not unlocked:
-///     same-tribe attacks are still rejected outright by CombatResolver, so this wires the
-///     challenge/start/end lifecycle and the "potions forbidden" flag faithfully without itself enabling
-///     same-tribe PvP damage.
+///     half of ending a duel (<see cref="TryEndActiveDuel" />). <see cref="TryGetActiveDuel" /> is also the
+///     duel-authorization source of truth for actual duel combat (<c>Zone.ApplyDuelAttack</c>, <c>mCase</c> 1,
+///     <see cref="Combat.CombatResolver.ResolveDuelAttack" />) -- an ordinary same-tribe attack (<c>mCase</c> 2)
+///     is still rejected outright by <see cref="Combat.CombatResolver.ResolveEnemyTribeAttack" />'s own
+///     same-tribe guard; only a matched <see cref="ActiveDuel" /> unlocks damage between two same-tribe
+///     characters specifically.
 /// </remarks>
 public sealed class DuelRegistry
 {
@@ -96,10 +98,20 @@ public sealed class DuelRegistry
 
     private int _nextUniqueNumber;
 
-    private bool IsNegotiating(int characterId)
+    /// <summary>
+    ///     Duel-family half of the legacy <c>CheckCommunityWork</c> exclusivity check (pending ask, or accepted
+    ///     but not yet started) -- deliberately excludes <see cref="IsActivelyDueling" />, matching how this
+    ///     registry's own <see cref="TryAsk" /> already treats the two as distinct concepts. Public so sibling
+    ///     negotiation families (e.g. Guild ask, see <c>GuildInviteService</c>) can compose a cross-family busy
+    ///     check without duplicating this registry's own state.
+    /// </summary>
+    public bool IsNegotiating(int characterId)
     {
-        return _pendingByChallenger.ContainsKey(characterId) || _pendingByTarget.ContainsKey(characterId) ||
-               _acceptedPairs.ContainsKey(characterId);
+        lock (_lock)
+        {
+            return _pendingByChallenger.ContainsKey(characterId) || _pendingByTarget.ContainsKey(characterId) ||
+                   _acceptedPairs.ContainsKey(characterId);
+        }
     }
 
     private bool IsActivelyDueling(int characterId)

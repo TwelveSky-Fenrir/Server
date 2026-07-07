@@ -2,6 +2,7 @@ using System.Collections.Frozen;
 using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Guilds;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Services.ZoneLifecycle;
 using Fenrir.Application.Game.Tests.TestSupport;
@@ -36,7 +37,9 @@ public class ZoneMoveServiceTests
 
         var worldState = ZoneTestKit.CreateWorldState();
         var service = new ZoneMoveService(zones, worldData, new GuildRankingCache(), worldState,
-            new FakeGameServerDirectoryRepository(), new FakeShardMapAssignmentRepository(new Dictionary<byte, short[]>()),
+            TribeGuardCorridorCatalog.Empty, new TribeGuardCorridorState(),
+            new FakeGameServerDirectoryRepository(),
+            new FakeShardMapAssignmentRepository(new Dictionary<byte, short[]>()),
             new FakeSessionTicketRepository(),
             Options.Create(new GameServerOptions()), NullLogger<ZoneMoveService>.Instance);
 
@@ -128,7 +131,9 @@ public class ZoneMoveServiceTests
         var worldState = ZoneTestKit.CreateWorldState();
         worldState.SetAllianceOffer(0, 2, true);
         var service = new ZoneMoveService(zones, worldData, new GuildRankingCache(), worldState,
-            new FakeGameServerDirectoryRepository(), new FakeShardMapAssignmentRepository(new Dictionary<byte, short[]>()),
+            TribeGuardCorridorCatalog.Empty, new TribeGuardCorridorState(),
+            new FakeGameServerDirectoryRepository(),
+            new FakeShardMapAssignmentRepository(new Dictionary<byte, short[]>()),
             new FakeSessionTicketRepository(),
             Options.Create(new GameServerOptions()), NullLogger<ZoneMoveService>.Instance);
 
@@ -162,7 +167,9 @@ public class ZoneMoveServiceTests
         var worldState = ZoneTestKit.CreateWorldState();
         worldState.SetAllianceOffer(1, 0, true); // tribe 1 (zone 7's owner) allied with tribe 0
         var service = new ZoneMoveService(zones, worldData, new GuildRankingCache(), worldState,
-            new FakeGameServerDirectoryRepository(), new FakeShardMapAssignmentRepository(new Dictionary<byte, short[]>()),
+            TribeGuardCorridorCatalog.Empty, new TribeGuardCorridorState(),
+            new FakeGameServerDirectoryRepository(),
+            new FakeShardMapAssignmentRepository(new Dictionary<byte, short[]>()),
             new FakeSessionTicketRepository(),
             Options.Create(new GameServerOptions()), NullLogger<ZoneMoveService>.Instance);
 

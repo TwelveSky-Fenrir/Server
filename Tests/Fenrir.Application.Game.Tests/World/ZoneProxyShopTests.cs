@@ -169,7 +169,7 @@ public class ZoneProxyShopTests
     {
         var zone = ZoneTestKit.CreateZone(ProxyShopZonePolicy.ZoneNumber);
 
-        zone.RegisterProxyShop(Entry(999, "Seller", "OldName", 10f, posZ: 10f));
+        zone.RegisterProxyShop(Entry(999, "Seller", "OldName"));
         zone.RegisterProxyShop(Entry(999, "Seller", "NewName", 99f, posZ: 99f));
 
         Assert.Equal(1, zone.ProxyShopCount); // never two entries for the same character

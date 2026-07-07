@@ -31,16 +31,16 @@
 --     character it named can never log in again.
 --   * game.TribeBankLog: delete the character's own log rows outright -- same posture as HeroRankings.
 CREATE OR ALTER PROCEDURE game.usp_Character_Delete @AccountId INT,
-    @Slot TINYINT
+                                                    @Slot TINYINT
 AS
 BEGIN
     SET NOCOUNT ON;
     SET XACT_ABORT ON;
 
     DECLARE @CharacterId INT = (SELECT CharacterId
-                                 FROM game.Characters
-                                 WHERE AccountId = @AccountId
-                                   AND Slot = @Slot);
+                                FROM game.Characters
+                                WHERE AccountId = @AccountId
+                                  AND Slot = @Slot);
 
     -- Idempotent: an already-empty slot (or unknown account) affects 0 rows and raises no error (by design).
     IF @CharacterId IS NULL
@@ -55,24 +55,32 @@ BEGIN
     SET StudentCharacterId = NULL
     WHERE StudentCharacterId = @CharacterId;
 
-    DELETE FROM game.CharacterItems
+    DELETE
+    FROM game.CharacterItems
     WHERE CharacterId = @CharacterId;
-    DELETE FROM game.CharacterSkills
+    DELETE
+    FROM game.CharacterSkills
     WHERE CharacterId = @CharacterId;
-    DELETE FROM game.CharacterHotkeys
+    DELETE
+    FROM game.CharacterHotkeys
     WHERE CharacterId = @CharacterId;
-    DELETE FROM game.CharacterBuffs
+    DELETE
+    FROM game.CharacterBuffs
     WHERE CharacterId = @CharacterId;
-    DELETE FROM game.CharacterQuests
+    DELETE
+    FROM game.CharacterQuests
     WHERE CharacterId = @CharacterId;
-    DELETE FROM game.CharacterFriends
+    DELETE
+    FROM game.CharacterFriends
     WHERE CharacterId = @CharacterId
        OR FriendCharacterId = @CharacterId;
 
     -- Legacy DeleteCharacter steps 3-5 (RankInfo/HeroRankCur/ProxyInfo): unchecked, fire-and-forget cleanup.
-    DELETE FROM game.HeroRankings
+    DELETE
+    FROM game.HeroRankings
     WHERE CharacterId = @CharacterId;
-    DELETE FROM game.OfflineShops
+    DELETE
+    FROM game.OfflineShops
     WHERE CharacterId = @CharacterId;
 
     -- admin.Bans/admin.Mutes: preserve the account-side moderation record where one exists, drop only the
@@ -81,7 +89,8 @@ BEGIN
     SET CharacterId = NULL
     WHERE CharacterId = @CharacterId
       AND AccountId IS NOT NULL;
-    DELETE FROM admin.Bans
+    DELETE
+    FROM admin.Bans
     WHERE CharacterId = @CharacterId
       AND AccountId IS NULL;
 
@@ -89,16 +98,19 @@ BEGIN
     SET CharacterId = NULL
     WHERE CharacterId = @CharacterId
       AND AccountId IS NOT NULL;
-    DELETE FROM admin.Mutes
+    DELETE
+    FROM admin.Mutes
     WHERE CharacterId = @CharacterId
       AND AccountId IS NULL;
 
     -- game.TribeBankLog: CharacterId is NOT NULL, no account-level fallback exists -- unchecked cleanup,
     -- same posture as HeroRankings/OfflineShops above.
-    DELETE FROM game.TribeBankLog
+    DELETE
+    FROM game.TribeBankLog
     WHERE CharacterId = @CharacterId;
 
-    DELETE FROM game.Characters
+    DELETE
+    FROM game.Characters
     WHERE CharacterId = @CharacterId;
 
     COMMIT TRANSACTION;

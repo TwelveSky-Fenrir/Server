@@ -1,13 +1,17 @@
+using System.Buffers;
 using System.Threading.Channels;
 using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Pets;
 using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.Quests;
+using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.Domain.World.Monsters;
 using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Stats;
 using Fenrir.Data.WriteBehind;
+using Fenrir.Network.Dispatch.Sessions;
+using Fenrir.Network.Framing;
 using Fenrir.Network.Serialization.Packets.Zone;
 using Microsoft.Extensions.Logging;
 
@@ -36,9 +40,39 @@ public sealed partial class Zone
     /// </summary>
     private const int BloodPointAvatarChangeInfoSort = 300;
 
+    /// <summary>
+    ///     <c>S013CHARACTER_EXP1_2</c> (<c>Server/Header/Protocol/STRUCT.h:1528</c>) -- Exp1 (first-tier
+    ///     experience) total stat code for <c>AvatarStatUpdateResponse</c>. Fires to the recipient's own
+    ///     client only on every accepted experience gain, whether or not a level crosses
+    ///     (<c>Server/ts25zone/S07_MyGame03.cpp:217,300</c>).
+    /// </summary>
+    private const int ExperienceStatSort = 13;
+
+    /// <summary>
+    ///     Sort=1 on <c>AvatarStateFlagResponse</c> -- the ordinary (below-cap) Level1 level-up notification
+    ///     (<c>B_AVATAR_CHANGE_INFO_1(..., 1, tNextAvatarLevel, aStatPoint, aSkillPoint)</c>,
+    ///     <c>Server/ts25zone/S07_MyGame03.cpp:270-278</c>): carries the final level reached for the whole
+    ///     jump plus the post-grant stat/skill point totals, never one send per level crossed.
+    /// </summary>
+    private const int LevelUpAvatarChangeInfoSort = 1;
+
+    /// <summary>
+    ///     Bounded capacity for <see cref="_combatInbox" /> -- also the basis for
+    ///     <see cref="CombatInboxDrainCapPerTick" />.
+    /// </summary>
+    private const int CombatInboxCapacity = 4096;
+
+    /// <summary>
+    ///     Per-tick drain cap for <see cref="_combatInbox" /> -- same "half of this channel's own bounded
+    ///     capacity" convention as <see cref="InboxDrainCapPerTick" /> (see that constant's own remarks for the
+    ///     full rationale and the Fenrir-side-safeguard-not-legacy-parity caveat).
+    /// </summary>
+    private const int CombatInboxDrainCapPerTick = CombatInboxCapacity / 2;
+
     /// <summary>Raw, unvalidated CZ_PROCESS_ATTACK_SEND requests, resolved entirely on the tick thread (zero-SQL combat).</summary>
     private readonly Channel<CombatCommand> _combatInbox = Channel.CreateBounded<CombatCommand>(
-        new BoundedChannelOptions(4096) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+        new BoundedChannelOptions(CombatInboxCapacity)
+            { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
     /// <summary>
     ///     Independent 2-minute same-victim-pair cooldown for the FFA-335 flat CP override (step 5 of the
@@ -47,13 +81,6 @@ public sealed partial class Zone
     ///     "using its own separate cooldown-state table" in the source contract.
     /// </summary>
     private readonly KillCooldownTracker _ffaCpOverrideCooldown = new();
-
-    /// <summary>
-    ///     Independent 2-minute same-victim-pair cooldown for the Regular-War-host flat CP/War Point/Blood Point
-    ///     override -- its own table, entirely separate from <see cref="_ffaCpOverrideCooldown" /> and
-    ///     <see cref="_killCooldownTracker" />: a pair's cooldown state in one override never affects the others.
-    /// </summary>
-    private readonly KillCooldownTracker _regularWarCpOverrideCooldown = new();
 
     /// <summary>
     ///     Process-wide PvP anti-farm gate (C05) -- shared across every <see cref="Zone" /> via
@@ -69,6 +96,13 @@ public sealed partial class Zone
     /// </summary>
     private readonly QuestCatalog _questCatalog = questCatalog ?? new QuestCatalog(worldData);
 
+    /// <summary>
+    ///     Independent 2-minute same-victim-pair cooldown for the Regular-War-host flat CP/War Point/Blood Point
+    ///     override -- its own table, entirely separate from <see cref="_ffaCpOverrideCooldown" /> and
+    ///     <see cref="_killCooldownTracker" />: a pair's cooldown state in one override never affects the others.
+    /// </summary>
+    private readonly KillCooldownTracker _regularWarCpOverrideCooldown = new();
+
     public bool PostCombatCommand(in CombatCommand command)
     {
         return _combatInbox.Writer.TryWrite(command);
@@ -76,7 +110,10 @@ public sealed partial class Zone
 
     private void DrainCombatCommands()
     {
-        while (_combatInbox.Reader.TryRead(out var command))
+        var processed = 0;
+        while (processed < CombatInboxDrainCapPerTick && _combatInbox.Reader.TryRead(out var command))
+        {
+            processed++;
             try
             {
                 ApplyCombatCommand(in command);
@@ -86,20 +123,29 @@ public sealed partial class Zone
                 logger.LogError(ex, "Zone {MapId} combat command from character {CharacterId} failed", MapId,
                     command.AttackerCharacterId);
             }
+        }
+
+        if (processed >= CombatInboxDrainCapPerTick)
+            LogDrainCapEngaged(_combatInbox.Reader, "combat", CombatInboxDrainCapPerTick);
     }
 
     /// <summary>
     ///     Resolves one CZ_PROCESS_ATTACK_SEND request (<c>mCase</c> 1-6 dispatch) entirely on this zone's own
-    ///     tick thread. <c>mCase</c> 2 (Avatar -&gt; Avatar, enemy tribe), 3 (Avatar -&gt; Monster), 5 (Stun,
-    ///     <see cref="ApplyStunAttack" />) and 6 (UnStun, <see cref="ApplyUnstunAttack" />) are implemented --
-    ///     see <see cref="CombatResolver" />'s remarks for what else is/isn't modeled and why.
+    ///     tick thread. <c>mCase</c> 1 (Avatar -&gt; Avatar, duel, <see cref="ApplyDuelAttack" />), 2 (Avatar -&gt;
+    ///     Avatar, enemy tribe), 3 (Avatar -&gt; Monster), 5 (Stun, <see cref="ApplyStunAttack" />) and 6 (UnStun,
+    ///     <see cref="ApplyUnstunAttack" />) are implemented -- see <see cref="CombatResolver" />'s remarks for
+    ///     what else is/isn't modeled and why.
     ///     Every unimplemented case is a silent no-op, not a disconnect: <c>AttackHandler</c> already rejected
     ///     any <c>mCase</c> outside 1-6, so an in-range-but-unwired value is an in-progress feature, not a hostile packet.
     /// </summary>
     private void ApplyCombatCommand(in CombatCommand command)
     {
-        // mCase 4 is deliberately not handled here even though a client could send it: the legacy itself only
-        // ever reaches ProcessAttack04 from the monster's own AI (S07_MyGame05.cpp:3961) -- see ResolveMonsterAttack.
+        if (command.AttackInfo.Case == 1)
+        {
+            ApplyDuelAttack(command);
+            return;
+        }
+
         if (command.AttackInfo.Case == 3)
         {
             ApplyPvmAttack(command);
@@ -118,12 +164,19 @@ public sealed partial class Zone
             return;
         }
 
+        // mCase 4 is deliberately not handled here even though a client could send it: the legacy itself only
+        // ever reaches ProcessAttack04 from the monster's own AI (S07_MyGame05.cpp:3961) -- see ResolveMonsterAttack.
         if (command.AttackInfo.Case != 2)
-            return; // mCase 1/4 -- deliberately unimplemented, see method remarks.
+            return;
 
         if (!_players.TryGetValue(command.AttackerCharacterId, out var attackerState))
             return;
         if (!_players.TryGetValue(command.AttackInfo.ServerIndex2, out var defenderState))
+            return;
+
+        // CheckAttackPacket (S07_MyGame02.cpp:1718-1761), counting enabled -- see AttackPacketBudget's own
+        // remarks. Silent reject, matching every other rejection path in this method.
+        if (!AttackPacketBudget.TryConsume(attackerState, command.AttackInfo.AttackActionValue4))
             return;
 
         var attackerSnapshot = ToCombatantSnapshot(attackerState);
@@ -135,9 +188,48 @@ public sealed partial class Zone
             ? skillDef
             : null;
 
+        // Skill-attack mana cost (S04_MyWork02.cpp:1640-1682, tSkillSort==2 branch): legacy pays this ONCE on
+        // the originating op15 AVATAR_ACTION_SEND packet -- unconditionally, and independent of whatever this
+        // later CZ_PROCESS_ATTACK_SEND resolution (or resolutions -- a single accepted action can legitimately
+        // produce multiple accepted attack sub-packets, up to AttackSubPacketCeiling) ends up producing.
+        // Fenrir's action/attack split carries no "already paid" flag forward from that earlier packet to
+        // this one, so this instead charges on the FIRST accepted attack-resolution sub-packet of the current
+        // action (attackerState.AttackSubPacketsUsed == 1, just incremented by the AttackPacketBudget gate
+        // above) rather than on every accepted sub-packet -- charging per-sub-packet would drain up to
+        // AttackSubPacketCeiling-many multiples (3x-5x) of the intended cost for any multi-hit/multi-target
+        // skill Sort. When the budget isn't enforced for this character (AttackBudgetEnforced false,
+        // AttackSubPacketsUsed never incremented), every accepted sub-packet is treated as first-and-only,
+        // matching the pre-existing single-charge behavior for that case. Sequenced after the AttackPacketBudget
+        // gate above so a client spamming sub-packets past its own budget ceiling for one avatar action can't
+        // drain extra mana beyond what that action's own ceiling permits. Scoped to mCase 2 (enemy-tribe/PvP)
+        // only, matching this fix's source contract -- Duel (mCase 1) and PvM (mCase 3, which also doesn't
+        // apply the AttackPowerRatio bonus itself -- see MonsterCombatResolver.ResolvePvmAttack) skill-attack
+        // mana parity are separate, unaddressed gaps. Sibling of Zone.ApplySkillCastManaCharge
+        // (Zone.PlayerLifecycle.cs), which charges the SAME op15 category-2 ManaUse cost for the self-buff/heal
+        // skill set instead -- see that method's own remarks for why the two skill kinds are charged from two
+        // different call sites.
+        if (attackSkill is not null &&
+            (!attackerState.AttackBudgetEnforced || attackerState.AttackSubPacketsUsed == 1))
+        {
+            var manaCost = (int)SkillCatalog.ReturnSkillValue(attackSkill, command.AttackInfo.AttackActionValue3,
+                SkillValueKind.ManaUse);
+            if (manaCost > 0)
+            {
+                if (attackerState.Mana < manaCost)
+                    return; // silent reject, matching every other rejection path in this method
+
+                attackerState.Mana -= manaCost;
+                attackerState.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
+            }
+        }
+
         var outcome = CombatResolver.ResolveEnemyTribeAttack(attackerSnapshot, defenderSnapshot,
             command.AttackInfo, _clock, attackSkill, _random,
-            ZonePvpZoneCatalog.AllowsEnemyTribeAttack(MapId));
+            ZonePvpZoneCatalog.AllowsEnemyTribeAttack(MapId),
+            ZonePvpZoneCatalog.IsSameTribeAttackExempt(MapId),
+            ZonePvpZoneCatalog.IsNewbieProtectionZone(MapId),
+            defenderState.PshopOpen, defenderState.ActionSort,
+            worldState?.GetAllyOf(attackerSnapshot.Tribe));
 
         if (outcome.Rejected)
             return;
@@ -185,7 +277,7 @@ public sealed partial class Zone
     ///     <see cref="PvpKillRewardZoneCatalog" />), the tower CP-for-PvP bonus (<see cref="ApplyTowerCpForPvpBonus" />),
     ///     the CP formula and its Regular-War-host/FFA-335 flat-amount overrides
     ///     (<see cref="ApplyPvpKillContributionPointFormula" />), hero-rank points (<see cref="ApplyPvpKillHeroPoints" />),
-    ///     and character EXP (<see cref="ApplyPvpKillExperience" />).
+    ///     and character EXP plus pet-growth EXP (<see cref="ApplyPvpKillExperience" />).
     /// </summary>
     /// <remarks>
     ///     <para>
@@ -350,7 +442,8 @@ public sealed partial class Zone
     ///     <see cref="PvpKillContributionPointCalculator.RegularWarOverrideWarPointAmount" />/
     ///     <see cref="PvpKillContributionPointCalculator.RegularWarOverrideBloodPointAmount" /> are the confirmed
     ///     +2/+2 legacy amounts. Per the source contract, both grants are unconditional -- never gated by the CP
-    ///     cap-clamp below, and (unlike the CP grant) not re-clamped by <see cref="PvpKillContributionPointCalculator.ClampGrant" />
+    ///     cap-clamp below, and (unlike the CP grant) not re-clamped by
+    ///     <see cref="PvpKillContributionPointCalculator.ClampGrant" />
     ///     either, since no comparable War Point/Blood Point cap was ever given by that contract.
     /// </remarks>
     private void ApplyRegularWarCpOverride(PlayerRuntimeState attackerState, PlayerRuntimeState defenderState)
@@ -390,33 +483,51 @@ public sealed partial class Zone
     }
 
     /// <summary>
-    ///     EXP grant (step 10 of the source contract) -- reuses <see cref="ApplyCharacterExperienceGain" />, the
-    ///     same level-up cascade <see cref="GrantMonsterKillExperience" /> already runs, so a PvP kill's level-up
-    ///     behaves identically to a monster kill's. Pet-experience and mount-activity-experience grants are
-    ///     deliberately not modeled: neither a pet-experience counter nor a mount-experience counter exists on
-    ///     <see cref="PlayerRuntimeState" /> today (<see cref="PetGrowthCalculator" />'s own growth counter is
-    ///     a stat-contribution input, not an experience track;
-    ///     <see cref="Fenrir.Application.Game.Domain.Mounts.MountStateResolver" />'s own
-    ///     remarks note the per-slot experience arrays this would need don't exist yet either).
+    ///     Character-EXP and pet-growth-EXP grant (step 10 of the source contract). The character-EXP half
+    ///     reuses <see cref="ApplyCharacterExperienceGain" />, the same level-up cascade
+    ///     <see cref="GrantMonsterKillExperience" /> already runs, so a PvP kill's level-up behaves identically
+    ///     to a monster kill's. The pet-growth-EXP half is <see cref="CreditPetGrowthFromPvpKill" />, the PvP
+    ///     sibling of <see cref="CreditPetGrowthFromMonsterKill" /> -- both share the same underlying counters
+    ///     (<see cref="PlayerRuntimeState.PetGrowth" />/<see cref="PlayerRuntimeState.PetActivity" />) and the
+    ///     same crediting resolver (<see cref="PetExperienceCreditResolver" />), matching legacy's own shared
+    ///     <c>PETSYSTEM::ProcessForExperience</c> entry point for both kill types
+    ///     (<c>MyUtil::ProcessForKillOtherTribe</c>, S07_MyGame03.cpp:3173-3188, and
+    ///     <c>MONSTER_OBJECT::ProcessForExp</c>, S07_MyGame05.cpp:3855-3875). Mount-activity-experience is
+    ///     still not modeled: no per-slot experience array exists on <see cref="PlayerRuntimeState" /> yet
+    ///     (<see cref="Fenrir.Application.Game.Domain.Mounts.MountStateResolver" />'s own remarks).
     /// </summary>
+    /// <remarks>
+    ///     The pet-growth-EXP grant is deliberately evaluated unconditionally, NOT gated by
+    ///     <paramref name="profile" />'s <see cref="PvpKillZoneRewardProfile.GrantExperience" /> flag: that
+    ///     flag models a Fenrir-specific per-zone eligibility switch for the character-EXP/CP/drop/daily-mission
+    ///     reward channels only (<see cref="PvpKillRewardZoneCatalog" />) -- the cited legacy pet-exp branch has
+    ///     no zone-eligibility precondition of its own; its only gate is the pet-equipped/level-113 check
+    ///     <see cref="PvpKillPetExperienceCalculator" /> already applies. A kill in a zone where
+    ///     <see cref="PvpKillZoneRewardProfile.GrantExperience" /> is false (e.g. the FFA-335 zone) still
+    ///     grants pet-growth-EXP if the attacker has an eligible pet equipped and is at least level 113.
+    /// </remarks>
     private void ApplyPvpKillExperience(PlayerRuntimeState attackerState, PvpKillZoneRewardProfile profile,
         int attackerCombinedLevel, int defenderCombinedLevel)
     {
-        if (!profile.GrantExperience)
-            return;
+        if (profile.GrantExperience)
+        {
+            // Warrior-scroll/double-EXP-charge buffs are not modeled in Fenrir yet -- see
+            // PvpKillExperienceCalculator's own remarks for why the base amount and zone multiplier are also
+            // placeholders rather than the real per-defender-level table/per-zone table the source contract
+            // calls for.
+            var gain = PvpKillExperienceCalculator.ComputeGain(
+                PvpKillExperienceCalculator.PlaceholderBaseAmountPerKill,
+                attackerCombinedLevel,
+                defenderCombinedLevel,
+                false,
+                false);
 
-        // Warrior-scroll/double-EXP-charge buffs are not modeled in Fenrir yet -- see
-        // PvpKillExperienceCalculator's own remarks for why the base amount and zone multiplier are also
-        // placeholders rather than the real per-defender-level table/per-zone table the source contract calls for.
-        var gain = PvpKillExperienceCalculator.ComputeGain(
-            PvpKillExperienceCalculator.PlaceholderBaseAmountPerKill,
-            attackerCombinedLevel,
-            defenderCombinedLevel,
-            false,
-            false);
+            if (gain > 0)
+                ApplyCharacterExperienceGain(attackerState, gain);
+        }
 
-        if (gain > 0)
-            ApplyCharacterExperienceGain(attackerState, gain);
+        var petExpGain = PvpKillPetExperienceCalculator.ComputeGain(attackerCombinedLevel);
+        CreditPetGrowthFromPvpKill(attackerState, petExpGain);
     }
 
     /// <summary>
@@ -502,6 +613,11 @@ public sealed partial class Zone
         if (!_monsters.TryGetValue(command.AttackInfo.ServerIndex2, out var monster))
             return;
         if (monster.UniqueNumber != command.AttackInfo.UniqueNumber2)
+            return;
+
+        // CheckAttackPacket (S07_MyGame02.cpp:1718-1761), counting enabled -- see AttackPacketBudget's own
+        // remarks. Silent reject, same as every other ProcessAttack03 rejection path.
+        if (!AttackPacketBudget.TryConsume(attackerState, command.AttackInfo.AttackActionValue4))
             return;
 
         var towerIndex = TowerZoneIndexTable.GetTowerIndex(MapId);
@@ -595,21 +711,45 @@ public sealed partial class Zone
         if (towerWar is null)
             return;
 
-        var state1 = new int[TowerWarState.TowerCount];
-        var state2 = new int[TowerWarState.TowerCount];
-        for (var i = 0; i < TowerWarState.TowerCount; i++)
-        {
-            state1[i] = towerWar.GetPackedState(i);
-            // Legacy mState2Tower is filled -1 on every DB read and never appears in any SQL query of its own
-            // (ServerDocs/10_ts25center/02_HeroRank_Guilde_Discord_Votes.md:296-298) -- dead, always -1.
-            state2[i] = -1;
-        }
+        var response = towerWar.BuildStatusSnapshot();
 
-        var response = new TowerStatusResponse { State1Tower = state1, State2Tower = state2 };
-        foreach (var player in _players.Values)
-            player.Session.Send(response);
+        // Rent-once/write-once/copy-N-times -- same idiom as BroadcastAvatarAction (Zone.PlayerLifecycle.cs):
+        // the frame is encoded exactly once and copied into each recipient's own transport, with a
+        // per-recipient failure isolated (logged, skipped) rather than aborting the rest of this
+        // zone-wide broadcast.
+        var total = FrameWriter.FrameSizeOf<TowerStatusResponse>();
+        var rented = ArrayPool<byte>.Shared.Rent(total);
+
+        try
+        {
+            var span = rented.AsSpan(0, total);
+            FrameWriter.WriteFrame(in response, span);
+
+            foreach (var player in _players.Values)
+                try
+                {
+                    if (player.Session is ClientSession clientSession)
+                        clientSession.SendRaw(span);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Zone {MapId} tower-status broadcast to character {RecipientId} failed",
+                        MapId, player.CharacterId);
+                }
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(rented);
+        }
     }
 
+    /// <summary>
+    ///     Builds the immutable attack-resolution snapshot for one combatant, currently in this zone (so
+    ///     <see cref="MapId" /> is that combatant's own live zone number). Every attack path -- PvP, PvM, MvP,
+    ///     stun, unstun -- routes through this single method, so it is also the one place the FFA-335
+    ///     equal-real-stats override (<see cref="FfaEqualStatsOverride" />) needs to apply: outside zone 335 it
+    ///     is a no-op and <paramref name="state" />'s real, gear-derived stats pass through unchanged.
+    /// </summary>
     private CombatantSnapshot ToCombatantSnapshot(PlayerRuntimeState state)
     {
         return new CombatantSnapshot(
@@ -622,8 +762,10 @@ public sealed partial class Zone
             state.PosY,
             state.PosZ,
             state.ZoneEntryAtZoneClock,
-            state.Stats ?? default,
-            state.Buffs.Buff[8 * 2]);
+            FfaEqualStatsOverride.Apply(MapId, state.Stats ?? default),
+            state.Buffs.Buff[8 * 2],
+            state.Level,
+            state.IsMovingZone);
     }
 
     /// <summary>
@@ -730,6 +872,23 @@ public sealed partial class Zone
     ///     method's other caller for the PvP-kill path). Hoisted out of <see cref="GrantMonsterKillExperience" />'s
     ///     own former local closure so both reward pipelines apply an identical level-up.
     /// </summary>
+    /// <remarks>
+    ///     Client/AOI telemetry (previously entirely missing -- this method used to mutate state and never
+    ///     send anything): the Exp1 total (<see cref="ExperienceStatSort" />) always goes out at the end,
+    ///     own client only, regardless of whether a level crossed (<c>S07_MyGame03.cpp:217,300</c>). A level
+    ///     crossing additionally sends the <see cref="LevelUpAvatarChangeInfoSort" /> notification -- via
+    ///     <see cref="BroadcastAvatarStateFlag" />, which already sends to <paramref name="target" />'s own
+    ///     client plus every AOI neighbor in one call -- carrying only the FINAL level/stat/skill totals for
+    ///     the whole jump, never one send per level crossed. That send is issued TWICE in immediate
+    ///     succession with identical contents: this reproduces the only branch of
+    ///     <c>ProcessForExperience</c> ever compiled into the shipped build (<c>LNW33</c> active in every
+    ///     real build, <c>S07_MyGame03.cpp:264-280</c>) -- a verified duplicate, not a bug to dedupe. NOT
+    ///     reproduced here: the two extra skill-point bonuses legacy computes between its own two sends
+    ///     (level-145 cap bonus, level-32 milestone bonus) and the post-cap percentage-crossing/second-tier
+    ///     ("high level"/rebirth) track -- both are the level-up calculator's own already-documented gaps
+    ///     (see <see cref="LevelProgressionCalculator" />'s remarks), not something this packet-wiring fix
+    ///     introduces or closes.
+    /// </remarks>
     private void ApplyCharacterExperienceGain(PlayerRuntimeState target, int gain)
     {
         var previousExperience = target.Experience;
@@ -737,60 +896,117 @@ public sealed partial class Zone
         target.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
 
         var levelUp = LevelProgressionCalculator.ResolveLevelUp(previousExperience, gain, worldData.LevelsByLevel);
-        if (!levelUp.LeveledUp)
-            return;
-
-        target.Level = levelUp.NewLevel;
-        target.StatPoints += levelUp.StatPointsGranted;
-        target.SkillPoints += levelUp.SkillPointsGranted;
-
-        var equipmentContainer = target.Inventory.GetContainer(ContainerMatrix.Equipment);
-        var petItemId = equipmentContainer.TryGetValue(PetSlots.EquipmentSlot, out var petStack)
-            ? petStack.ItemId
-            : 0;
-        var petContribution = PetGrowthCalculator.Compute(petItemId, target.PetGrowth, target.PetActivity,
-            worldData.ItemsById);
-        var attributes = new CharacterBaseAttributes(target.StatVit, target.StatStr, target.StatInt,
-            target.StatDex, target.Level, target.Tribe, target.Title, target.Halo, target.RebirthCount);
-        var stats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData, target.Buffs,
-            petContribution);
-
-        target.Stats = stats;
-        target.MaxLife = stats.MaxLife;
-        target.MaxMana = stats.MaxMana;
-
-        // SetBasicAbilityFromEquip's aMaxLifeValue/aMaxManaValue cache-write above happens unconditionally;
-        // only the actual heal is gated on the character being alive (S07_MyGame03.cpp:285-289).
-        if (target.Life > 0)
+        if (levelUp.LeveledUp)
         {
-            target.Life = stats.MaxLife;
-            target.Mana = stats.MaxMana;
+            target.Level = levelUp.NewLevel;
+            target.StatPoints += levelUp.StatPointsGranted;
+            target.SkillPoints += levelUp.SkillPointsGranted;
+
+            var equipmentContainer = target.Inventory.GetContainer(ContainerMatrix.Equipment);
+            var petItemId = equipmentContainer.TryGetValue(PetSlots.EquipmentSlot, out var petStack)
+                ? petStack.ItemId
+                : 0;
+            var petContribution = PetGrowthCalculator.Compute(petItemId, target.PetGrowth, target.PetActivity,
+                worldData.ItemsById);
+            var attributes = new CharacterBaseAttributes(target.StatVit, target.StatStr, target.StatInt,
+                target.StatDex, target.Level, target.Tribe, target.PreviousTribe, target.Title, target.Halo,
+                target.RebirthCount);
+            var stats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData, target.Buffs,
+                petContribution);
+
+            target.Stats = stats;
+            target.MaxLife = stats.MaxLife;
+            target.MaxMana = stats.MaxMana;
+
+            // SetBasicAbilityFromEquip's aMaxLifeValue/aMaxManaValue cache-write above happens unconditionally;
+            // only the actual heal is gated on the character being alive (S07_MyGame03.cpp:285-289).
+            if (target.Life > 0)
+            {
+                target.Life = stats.MaxLife;
+                target.Mana = stats.MaxMana;
+            }
+
+            target.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
+
+            // Duplicate send is deliberate -- see this method's own <remarks/>, not a copy-paste mistake.
+            BroadcastAvatarStateFlag(target, LevelUpAvatarChangeInfoSort, target.Level, target.StatPoints,
+                target.SkillPoints);
+            BroadcastAvatarStateFlag(target, LevelUpAvatarChangeInfoSort, target.Level, target.StatPoints,
+                target.SkillPoints);
         }
 
-        target.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
+        target.Session.Send(new AvatarStatUpdateResponse
+            { Sort = ExperienceStatSort, Value = (int)target.Experience, Value2 = 0 });
     }
 
     /// <summary>
-    ///     Monster-kill-only pet-growth credit (<see cref="PetExperienceCreditResolver" />, port of
-    ///     <c>PETSYSTEM::ProcessForExperience</c>) -- deliberately not called from <see cref="ApplyPvpKillExperience" />;
-    ///     see that method's own remarks for why PvP kills never grant pet experience. Takes the monster's raw
-    ///     <c>PatExperience</c> (no global/personal-rate/double-time/premium scaling modeled yet, see
-    ///     <see cref="PetExperienceCreditResolver" />'s own remarks). The reactivation/tier-crossing ability-recalc
-    ///     broadcast the legacy fires here has no Fenrir equivalent wired yet -- the growth/activity counters are
-    ///     mutated and flushed, but no client notification is sent, a documented gap.
+    ///     Monster-kill pet-growth credit (port of <c>PETSYSTEM::ProcessForExperience</c> via
+    ///     <see cref="PetExperienceCreditResolver" />). Takes the monster's raw <c>PatExperience</c> (no
+    ///     global/personal-rate/double-time/premium scaling modeled yet, see
+    ///     <see cref="PetExperienceCreditResolver" />'s own remarks -- except for the Pet EXP boost pill
+    ///     doubling below, which now IS modeled) and forwards it to the shared <see cref="CreditPetGrowth" />
+    ///     helper -- see <see cref="CreditPetGrowthFromPvpKill" /> for the PvP sibling that credits the same
+    ///     counters from a different source amount.
     /// </summary>
+    /// <remarks>
+    ///     Réf. C++ : Server/ts25zone/S07_MyGame05.cpp:3855-3863 (<c>MONSTER_OBJECT::ProcessForExp</c>): the
+    ///     killer's pet EXP is doubled while <see cref="PlayerRuntimeState.PetExpX2Time" /> is above zero,
+    ///     then doubled AGAIN, independently and unconditionally, for premium-account status -- only the
+    ///     first doubling is reproduced here, matching this method's own documented "no premium scaling
+    ///     modeled yet" gap above. Monster-kill-only: the cited doubling lives in <c>MONSTER_OBJECT::ProcessForExp</c>
+    ///     specifically, not in the shared <c>MyUtil::ProcessForExperience</c> entry point
+    ///     <see cref="CreditPetGrowthFromPvpKill" />'s own citation (S07_MyGame03.cpp:3173-3188) uses, so it is
+    ///     not applied there.
+    /// </remarks>
     private void CreditPetGrowthFromMonsterKill(PlayerRuntimeState target, int monsterPatExperience)
     {
+        if (target.PetExpX2Time > 0)
+            monsterPatExperience *= 2;
+
         if (monsterPatExperience < 1)
             return;
 
+        CreditPetGrowth(target, monsterPatExperience);
+    }
+
+    /// <summary>
+    ///     PvP/RvR "kill other tribe" pet-growth credit -- the sibling of
+    ///     <see cref="CreditPetGrowthFromMonsterKill" /> previously missing from
+    ///     <see cref="ApplyPvpKillExperience" /> (<c>MyUtil::ProcessForKillOtherTribe</c>'s own pet-exp branch,
+    ///     S07_MyGame03.cpp:3173-3188): legacy grants pet growth-EXP from both monster kills and cross-tribe
+    ///     kills through the identical shared crediting pipeline
+    ///     (<c>MyUtil::ProcessForExperience</c>, S07_MyGame03.cpp:318-321), so this forwards
+    ///     <paramref name="petExpGain" /> (already resolved by <see cref="PvpKillPetExperienceCalculator" /> --
+    ///     the flat configured ratio, zeroed below level 113) into the same <see cref="CreditPetGrowth" />
+    ///     helper the monster-kill path uses, rather than leaving the counter permanently frozen for a
+    ///     PvP-fed pet.
+    /// </summary>
+    private void CreditPetGrowthFromPvpKill(PlayerRuntimeState target, int petExpGain)
+    {
+        if (petExpGain < 1)
+            return;
+
+        CreditPetGrowth(target, petExpGain);
+    }
+
+    /// <summary>
+    ///     Shared pet-growth-crediting core both <see cref="CreditPetGrowthFromMonsterKill" /> and
+    ///     <see cref="CreditPetGrowthFromPvpKill" /> forward into -- resolves the equipped pet item (if any),
+    ///     defers eligibility/cap/reactivation logic entirely to <see cref="PetExperienceCreditResolver" />,
+    ///     and persists the resulting counters when it credits anything. The reactivation/tier-crossing
+    ///     ability-recalc broadcast the legacy fires here has no Fenrir equivalent wired yet -- the
+    ///     growth/activity counters are mutated and flushed, but no client notification is sent, a documented
+    ///     gap for both callers.
+    /// </summary>
+    private void CreditPetGrowth(PlayerRuntimeState target, int requestedPetExperience)
+    {
         var equipmentContainer = target.Inventory.GetContainer(ContainerMatrix.Equipment);
         var petItemId = equipmentContainer.TryGetValue(PetSlots.EquipmentSlot, out var petStack)
             ? petStack.ItemId
             : 0;
 
         var credited = PetExperienceCreditResolver.Resolve(petItemId, target.PetGrowth, target.PetActivity,
-            monsterPatExperience, worldData.ItemsById);
+            requestedPetExperience, worldData.ItemsById);
 
         if (!credited.IsEligible || (credited.CreditedAmount == 0 && !credited.ReactivationApplied))
             return;

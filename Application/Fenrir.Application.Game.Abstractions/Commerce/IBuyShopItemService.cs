@@ -26,7 +26,17 @@ public readonly record struct BuyShopItemSellerResult(
     PlayerRuntimeState? Seller,
     PshopPurchasePolicy.SlotView Slot);
 
-public readonly record struct BuyShopItemCommitResult(bool Abort, BuyShopItemResponse? Response, bool ShopClosed);
+/// <summary>
+///     <paramref name="ListingRefresh" /> is the buyer-facing B_DEMAND_PSHOP_RECV(0) snapshot of the
+///     seller's shop listing AFTER the sold slot was cleared (and, if it was the last item, the stall
+///     closed) -- null only when <paramref name="Abort" /> is set. The seller's own notifications (item-sold,
+///     self-view listing refresh, stall-closed, AOI broadcast) are delivered separately by the zone tick
+///     that processes the posted <see cref="PshopZoneCommand" />, never by this handler.
+/// </summary>
+public readonly record struct BuyShopItemCommitResult(
+    bool Abort,
+    BuyShopItemResponse? Response,
+    ViewShopStallResponse? ListingRefresh);
 
 /// <summary>Business logic for CZ_BUY_PSHOP_SEND (opcode 35), extracted from <see cref="BuyShopItemHandler" />.</summary>
 public interface IBuyShopItemService

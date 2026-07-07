@@ -31,10 +31,10 @@
 -- separate, not-independently-verified, out-of-scope concern -- left for its own citation/decision, not
 -- addressed here.
 CREATE OR ALTER PROCEDURE game.usp_HeroRanking_AddPoints @CharacterId INT,
-    @PeriodKind TINYINT,
-    @Delta      INT,
-    @TribeId    TINYINT = NULL,
-    @Level      INT = NULL
+                                                         @PeriodKind TINYINT,
+                                                         @Delta INT,
+                                                         @TribeId TINYINT = NULL,
+                                                         @Level INT = NULL
 AS
 BEGIN
     SET NOCOUNT ON;

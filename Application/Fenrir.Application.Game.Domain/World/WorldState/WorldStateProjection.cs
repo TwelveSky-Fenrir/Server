@@ -26,7 +26,19 @@ public static class WorldStateProjection
             if (tribe.TribeId >= WorldStateService.TribeCount)
                 continue;
 
-            tribeSymbol[tribe.TribeId] = tribe.HasSymbol ? 1 : 0;
+            // Wire contract: WorldInfo.TribeSymbol[slot] holds the TRIBE ID (0-3) currently controlling
+            // that slot (Server/Header/Protocol/STRUCT.h:594-598: "mTribeSymbol[MAX_TRIBE_NUM];//mTribe1Symbol
+            // - mTribe4Symbol"), never a boolean/flag. When a tribe still holds its own numbered slot
+            // (HasSymbol), the correct wire value is simply that tribe's own id -- a tribe's slot index
+            // and its own tribe id are always the same number. When a tribe has lost its slot to a
+            // challenger, today's schema (game.WorldStateTribes.HasSymbol is a plain bool, not a "which
+            // tribe currently holds it" column) cannot recover the challenger's identity -- see
+            // WorldStateService.ResolveTribeSymbol's own remarks on this exact gap. 0 is used as a
+            // placeholder for that unresolved case (matching what this projection already emitted for a
+            // lost slot before this fix, so this is not a regression there); closing that residual gap
+            // requires a schema decision (e.g. an explicit owner-tribe-id column per slot) that is out of
+            // scope for this fix.
+            tribeSymbol[tribe.TribeId] = tribe.HasSymbol ? tribe.TribeId : 0;
             tribePoint[tribe.TribeId] = tribe.Points;
         }
 

@@ -18,10 +18,14 @@ public class StatCalculatorTests
 
     private static CharacterBaseAttributes Attributes(
         int vitality = 0, int strength = 0, int intelligence = 0, int dexterity = 0,
-        short level = 1, byte tribe = 0, int title = 0, int halo = 0, int rebirthCount = 0)
+        short level = 1, byte tribe = 0, byte? previousTribe = null, int title = 0, int halo = 0,
+        int rebirthCount = 0)
     {
-        return new CharacterBaseAttributes(vitality, strength, intelligence, dexterity, level, tribe, title, halo,
-            rebirthCount);
+        // previousTribe defaults to tribe, matching PlayerRuntimeState.PreviousTribe's own real-world default
+        // (see PlayerRuntimeState.Misc.cs) -- pass previousTribe explicitly only when a test needs the two to
+        // genuinely diverge (e.g. a fourth-faction character).
+        return new CharacterBaseAttributes(vitality, strength, intelligence, dexterity, level, tribe,
+            previousTribe ?? tribe, title, halo, rebirthCount);
     }
 
     private static FrozenDictionary<short, LevelRowDto> Levels(params LevelRowDto[] rows)
@@ -296,6 +300,99 @@ public class StatCalculatorTests
         Assert.Equal(3000, stats.MaxMana); // NXT-103 +3000, no MY_HP-equivalent for mana
         Assert.Equal(1500, stats.AttackPower); // NXT-103 +1500
         Assert.Equal(3000, stats.DefensePower); // NXT-103 +3000
+    }
+
+    // G12 custom-set HP bonus and NXT tier detection both key off aPreviousTribe, never the character's
+    // current playable Tribe (Server/Header/Protocol/MyFactor.cpp:2032-2094,
+    // Server/ts25zone/S07_MyGame03.cpp:7516-7626). A fourth-faction character (Tribe=3) keeps a genuinely
+    // distinct PreviousTribe (their origin race, 0-2) -- these two tests guard against a regression back to
+    // reading Tribe for either mechanic.
+    [Fact]
+    public void ComputeBaseStats_G12FullSetForOriginTribe_GrantsBonusByPreviousTribeEvenForFourthFactionTribe()
+    {
+        // Tribe=3 (fourth faction) but PreviousTribe=0 (Noble Dragon origin): the full 6-slot 84500-84699 set
+        // at Combine>=12 must still grant the +15000 bonus, keyed on PreviousTribe, not the playable Tribe=3.
+        var attributes = Attributes(level: 1, tribe: 3, previousTribe: 0);
+        var levels = Levels(LevelRow(1));
+        IReadOnlyList<EquippedItemSlot> equipment =
+        [
+            Equip(0, Item(84500), combine: 12),
+            Equip(2, Item(84501), combine: 12),
+            Equip(3, Item(84502), combine: 12),
+            Equip(4, Item(84503), combine: 12),
+            Equip(5, Item(84504), combine: 12),
+            Equip(7, Item(84505), combine: 12)
+        ];
+
+        var stats = StatCalculator.ComputeBaseStats(attributes, equipment, levels);
+
+        Assert.Equal(15000, stats.MaxLife);
+    }
+
+    [Fact]
+    public void ComputeBaseStats_G12FullSetButUnrecognizedPreviousTribe_GrantsNoBonusDespiteMatchingTribeZeroIds()
+    {
+        // Tribe=0 (would match the 84500-84699 range if the bug used Tribe) but PreviousTribe=3
+        // (unrecognized by G12/NXT, no fallback branch in legacy) -- must grant nothing.
+        var attributes = Attributes(level: 1, tribe: 0, previousTribe: 3);
+        var levels = Levels(LevelRow(1));
+        IReadOnlyList<EquippedItemSlot> equipment =
+        [
+            Equip(0, Item(84500), combine: 12),
+            Equip(2, Item(84501), combine: 12),
+            Equip(3, Item(84502), combine: 12),
+            Equip(4, Item(84503), combine: 12),
+            Equip(5, Item(84504), combine: 12),
+            Equip(7, Item(84505), combine: 12)
+        ];
+
+        var stats = StatCalculator.ComputeBaseStats(attributes, equipment, levels);
+
+        Assert.Equal(0, stats.MaxLife);
+    }
+
+    [Fact]
+    public void ComputeBaseStats_NxtSetForOriginTribe_DetectsTierByPreviousTribeEvenForFourthFactionTribe()
+    {
+        // Same fourth-faction shape as the G12 test above, but for NXT tier detection via ComputeBaseStats's
+        // own SetBonusTables.ResolveEffectiveSetNumber(attributes.PreviousTribe, ...) call.
+        var attributes = Attributes(level: 1, tribe: 3, previousTribe: 0);
+        var levels = Levels(LevelRow(1));
+        IReadOnlyList<EquippedItemSlot> equipment =
+        [
+            Equip(0, Item(77003)),
+            Equip(2, Item(77004)),
+            Equip(3, Item(77005)),
+            Equip(4, Item(77006)),
+            Equip(5, Item(77007)),
+            Equip(7, Item(77000))
+        ];
+
+        var stats = StatCalculator.ComputeBaseStats(attributes, equipment, levels);
+
+        Assert.Equal(3000 + 15000, stats.MaxLife); // NXT-103 +3000, MY_HP "any set" +15000
+    }
+
+    [Fact]
+    public void ComputeBaseStats_NxtSetButUnrecognizedPreviousTribe_DetectsNoTierDespiteMatchingTribeZeroIds()
+    {
+        // Tribe=0 (would match the tribe-0 NXT catalog if the bug used Tribe) but PreviousTribe=3
+        // (unrecognized -- DetectNxtSetNumber returns 0 rather than indexing out of bounds).
+        var attributes = Attributes(level: 1, tribe: 0, previousTribe: 3);
+        var levels = Levels(LevelRow(1));
+        IReadOnlyList<EquippedItemSlot> equipment =
+        [
+            Equip(0, Item(77003)),
+            Equip(2, Item(77004)),
+            Equip(3, Item(77005)),
+            Equip(4, Item(77006)),
+            Equip(5, Item(77007)),
+            Equip(7, Item(77000))
+        ];
+
+        var stats = StatCalculator.ComputeBaseStats(attributes, equipment, levels);
+
+        Assert.Equal(0, stats.MaxLife);
     }
 
     // EPET (slot 8) must be excluded from the coefSet multiplier in every per-slot stat loop, not just AttackPower

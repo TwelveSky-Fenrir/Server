@@ -4,6 +4,7 @@ using Fenrir.Application.Game.Domain.Avatars;
 using Fenrir.Application.Game.Domain.Guilds;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.WorldState;
+using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Shared;
@@ -19,6 +20,8 @@ public sealed class ZoneMoveService(
     WorldDataCache worldData,
     GuildRankingCache guildRanking,
     WorldStateService worldState,
+    TribeGuardCorridorCatalog corridorCatalog,
+    TribeGuardCorridorState corridorState,
     IGameServerDirectoryRepository directory,
     IShardMapAssignmentRepository shardMapAssignments,
     ISessionTicketRepository tickets,
@@ -58,6 +61,24 @@ public sealed class ZoneMoveService(
 
         var targetZoneNumber = (short)packet.ZoneNumber;
 
+        // Independent, unconditional tribe-symbol-battle zone-transfer lockout (Server/ts25zone/S04_MyWork02.cpp:
+        // 2125-2141), evaluated here -- strictly BEFORE the connection-availability/cross-shard resolution just
+        // below (zones.TryGet/HandleCrossShardAsync) -- because legacy itself evaluates this rule strictly
+        // before its own port-availability check (Server/ts25zone/S04_MyWork02.cpp:2143-2166). A shard that does
+        // not itself host zone 38 must never let this request slip through the cross-shard handoff path below
+        // unchecked just because the local ZoneRegistry lookup would otherwise delegate away before this rule
+        // ever ran -- that is exactly the leak this lockout exists to close. Needs only
+        // sourceZone.MapId/targetZoneNumber/the world flag, so unlike the mProtect_ReviveHack check further down
+        // it has no dependency on the live PlayerRuntimeState lookup: ANY player, not just one flagged by that
+        // companion guard, moving from zone 40/41/42 into zone 38 while the tribe-symbol-battle event is open is
+        // disconnected outright, with no response sent at all -- see TribeSymbolBattleZoneLockout's own remarks.
+        if (TribeSymbolBattleZoneLockout.IsLockedOut(sourceZone.MapId, targetZoneNumber,
+                worldState.World.TribeSymbolBattle))
+        {
+            zoneSession.Abort(DisconnectReason.StateViolation);
+            return ValueTask.CompletedTask;
+        }
+
         // Not hosted by THIS shard's static ZoneRegistry -- legacy never distinguishes "local" from "remote"
         // here (Server/ts25zone/S04_MyWork02.cpp:2017-2186): every zone number is resolved live against the
         // same cross-process directory (Server/ts25center/S04_MyWork02.cpp:74-109's mZoneConnectionInfo), and
@@ -94,6 +115,49 @@ public sealed class ZoneMoveService(
             return ValueTask.CompletedTask;
         }
 
+        // Tribe-guard corridor legality (MyUtil::WrapCheck, Server/ts25zone/S07_MyGame03.cpp:5721-5943), invoked
+        // exactly where the legacy handler invokes it: after the mProtect_ReviveHack companion gate just above,
+        // for every non-GM zone-transfer request regardless of reason (Server/ts25zone/S04_MyWork02.cpp:2143-2166,
+        // gated on tUserInfo->uUserSort < 1 -- zoneSession.IsGm is the same uUserSort < 1 threshold). corridorCatalog
+        // is registered as TribeGuardCorridorCatalog.Empty until the real sixteen-zone/hub table is populated (a
+        // separate, not-yet-done data-gathering task -- see the catalog's own remarks), so this evaluates as a
+        // documented always-allow for every destination today; enforcement activates automatically once that data
+        // lands, with no further change to this handler required.
+        var corridorOutcome = TribeGuardCorridorGate.Evaluate(
+            corridorCatalog,
+            corridorState,
+            state.Tribe,
+            sourceZone.MapId,
+            targetZoneNumber,
+            zoneSession.IsGm,
+            worldState.GetAllyOf);
+
+        switch (corridorOutcome)
+        {
+            case TribeGuardCorridorMoveOutcome.RejectedHardDisconnect:
+                // Reserved zone 37 involved as either origin or destination -- hard failure, no response at all
+                // (Server/ts25zone/S04_MyWork02.cpp:2152-2156).
+                zoneSession.Abort(DisconnectReason.StateViolation);
+                return ValueTask.CompletedTask;
+            case TribeGuardCorridorMoveOutcome.RejectedSoft:
+                // Routine corridor rejection -- a failure result immediately followed by the auto-zone fallback
+                // redirect, the same B_RETURN_TO_AUTO_ZONE pairing ReturnToHomeZoneResponse already models for
+                // AntiCampingForcedReturnSystem (Server/ts25zone/S05_MyTransfer.cpp:1166-1179). Legacy resolves
+                // the destination's real ip/port BEFORE this gate ever runs and pairs the soft-failure result
+                // with that already-resolved address rather than a blank one (Server/ts25zone/S04_MyWork02.cpp:
+                // 2116-2118, 2159-2160) -- this corridor branch is only reached once zones.TryGet above has
+                // already confirmed targetZoneNumber is hosted by THIS shard, so that resolved address is this
+                // shard's own PublicHost/Port, identical to the success-path values sent a few lines below.
+                zoneSession.Send(new ZoneMoveResponse
+                {
+                    Result = 1,
+                    Ip = options.Value.PublicHost,
+                    Port = options.Value.Port
+                });
+                zoneSession.Send(new ReturnToHomeZoneResponse());
+                return ValueTask.CompletedTask;
+        }
+
         var spawnPoint = targetDefinition.FindSpawnPointFrom(sourceZone.MapId);
         var (posX, posY, posZ) = spawnPoint is null
             ? (targetDefinition.Zone.DefaultSpawnX, targetDefinition.Zone.DefaultSpawnY,
@@ -109,10 +173,14 @@ public sealed class ZoneMoveService(
 
         // Fresh world-state snapshot on the same connection, built from the still-valid PlayerRuntimeState
         // (read here, before the handoff below removes it from sourceZone) rather than a fresh SQL read.
+        // BuffInfo mirrors the same carry-through-unless-zone-124 rule ZoneTransfer.CreateEnterData applies to
+        // the actual handoff payload below (ZoneTransferBuffRules) -- state.Buffs is still the source zone's
+        // live, accurate buff table at this point, not a stale/zeroed one (Server/ts25zone/S04_MyWork02.cpp:979
+        // echoes the same retrieved buff state back to the client on an ordinary transfer).
         var registerRecv = new EnterWorldResponse
         {
             AvatarInfo = AvatarInfoFactory.CreateForRuntimeState(state, targetZoneNumber, posX, posY, posZ),
-            BuffInfo = WorldStateTemplates.ZeroedBuffInfo
+            BuffInfo = ZoneTransferBuffRules.Resolve(state.Buffs, targetZoneNumber)
         };
         zoneSession.SendRaw(ZoneMessageFactory.Encode(in registerRecv));
 
@@ -125,6 +193,9 @@ public sealed class ZoneMoveService(
 
         // state.PosX/Y/Z is still the SOURCE zone's position here (single-writer invariant: only a zone's own
         // tick may mutate PlayerRuntimeState); the actual move happens later via the Leave/Enter pair below.
+        // Pet sub-fields read back from the source zone's own last-accepted CZ_UPDATE_PET_ACTION_SEND (op156)
+        // state instead of the empty placeholder every ActionInfo builder used before the companion-pet-follow
+        // wiring fix -- see PlayerRuntimeState.PetActionSort's own remarks.
         var selfSpawnAction = new ActionInfo
         {
             Type = 0,
@@ -134,10 +205,11 @@ public sealed class ZoneMoveService(
             TargetLocation = [posX, posY, posZ],
             Front = state.Heading,
             TargetFront = state.Heading,
-            PetLocation = new float[3],
-            PetTargetLocation = new float[3],
-            PetFront = 0,
-            PetSort = 0,
+            PetLocation = [state.PetActionLocationX, state.PetActionLocationY, state.PetActionLocationZ],
+            PetTargetLocation =
+                [state.PetActionTargetLocationX, state.PetActionTargetLocationY, state.PetActionTargetLocationZ],
+            PetFront = state.PetActionFront,
+            PetSort = state.PetActionSort,
             TargetObjectSort = 0,
             TargetObjectIndex = 0,
             TargetObjectUniqueNumber = 0,
@@ -211,6 +283,21 @@ public sealed class ZoneMoveService(
             logger.LogInformation(
                 "Zone {TargetZoneNumber} resolved to shard {ShardId} ({Host}:{Port}) for character {CharacterId} -- cross-shard handoff ticket minted",
                 targetZoneNumber, candidate.ShardId, candidate.Host, candidate.Port, characterId);
+
+            // Fenrir analog of legacy setting mMoveZoneResult=1 immediately before its own success reply
+            // (Server/ts25zone/S04_MyWork02.cpp:2181-2185) -- see PlayerRuntimeState.IsMovingZone's own
+            // remarks for why this matters specifically for the cross-shard path (this character stays live
+            // and targetable in this shard's own zone for the whole real-world window until its actual
+            // disconnect, unlike the same-shard handoff above). Routed through a ZoneCommand rather than
+            // mutated directly: this method runs on a request thread, and PlayerRuntimeState may only be
+            // mutated from the owning zone's own tick thread. Best-effort/fail-open: a full source-zone inbox
+            // just means this character is briefly unguarded rather than blocking the handoff reply itself.
+            if (zoneSession.CurrentZone is Zone sourceZone &&
+                !sourceZone.Post(ZoneCommand.MarkZoneTransferPending(characterId)))
+                logger.LogWarning(
+                    "Zone {SourceMapId} inbox full: character {CharacterId}'s IsMovingZone flag was not set before its cross-shard handoff to zone {TargetZoneNumber}",
+                    sourceZone.MapId, characterId, targetZoneNumber);
+
             zoneSession.Send(new ZoneMoveResponse { Result = 0, Ip = candidate.Host, Port = candidate.Port });
             return;
         }

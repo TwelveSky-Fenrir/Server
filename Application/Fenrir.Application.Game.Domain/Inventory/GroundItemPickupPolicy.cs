@@ -7,8 +7,9 @@ namespace Fenrir.Application.Game.Domain.Inventory;
 ///     Pure, Zone-independent policy for ground -> inventory pickup (ports MyWork::ProcessForGetItem,
 ///     Server/ts25zone/S04_MyWork05.cpp:250-373). Money is credited directly; a stackable item merges into a
 ///     same-id destination (capped at <see cref="MaxStackQuantity" />) or fills an empty slot; a non-stackable
-///     item requires an empty destination -- unlike ContainerMatrix.ResolveMove there is no swap-with-occupant
-///     fallback (the legacy rejects outright).
+///     item requires an empty destination -- there is no swap-with-occupant fallback (the legacy rejects
+///     outright), the same reject-on-occupied-destination posture <see cref="ContainerMatrix.ResolveMove" />
+///     itself now follows for its own family.
 /// </summary>
 /// <remarks>
 ///     Zone atomically claims the ground item before resolving this policy, so two players targeting the same

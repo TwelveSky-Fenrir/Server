@@ -1,10 +1,10 @@
 CREATE PROCEDURE world.usp_QuestSpeech_GetAll
-    AS
+AS
 BEGIN
     SET
-NOCOUNT ON;
+        NOCOUNT ON;
 
-SELECT QuestId, SpeechKind, LineIndex, Text, Color
-FROM world.QuestSpeeches
-ORDER BY QuestId, SpeechKind, LineIndex;
+    SELECT QuestId, SpeechKind, LineIndex, Text, Color
+    FROM world.QuestSpeeches
+    ORDER BY QuestId, SpeechKind, LineIndex;
 END;

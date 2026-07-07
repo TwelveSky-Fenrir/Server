@@ -30,7 +30,8 @@ public class HolyStoneWarCycleHostTests
     private static HolyStoneWarCycleHost CreateHost(short[] hostedMaps, bool holyStoneWarEnabled = true,
         short holyStoneMapId = StoneMapId)
     {
-        var options = new GameServerOptions { HolyStoneWarEnabled = holyStoneWarEnabled, HolyStoneMapId = holyStoneMapId };
+        var options = new GameServerOptions
+            { HolyStoneWarEnabled = holyStoneWarEnabled, HolyStoneMapId = holyStoneMapId };
         var worldState = new WorldStateService(new FakeWorldStateRepository(), NullLogger<WorldStateService>.Instance);
         worldState.InitializeAsync(CancellationToken.None).GetAwaiter().GetResult();
         var zoneRegistry = CreateRegistry(hostedMaps);
@@ -55,7 +56,7 @@ public class HolyStoneWarCycleHostTests
     [Fact]
     public void MapHostedByThisShard_WithoutEnabled_IsNotArmed()
     {
-        var host = CreateHost([StoneMapId], holyStoneWarEnabled: false);
+        var host = CreateHost([StoneMapId], false);
 
         Assert.False(host.IsArmed);
     }

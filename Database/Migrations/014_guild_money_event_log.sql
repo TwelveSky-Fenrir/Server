@@ -107,7 +107,8 @@ SET
 INSERT INTO game.GuildMembers (GuildId, CharacterId, Role)
 VALUES (@GuildId, @MasterCharacterId, 2); -- 2 = master (game.GuildMembers role enum)
 
-SET @Payload = CONCAT(N'GuildId=', @GuildId, N';AvatarName=', @AvatarName, N';Grade=1');
+SET
+@Payload = CONCAT(N'GuildId=', @GuildId, N';AvatarName=', @AvatarName, N';Grade=1');
 
 EXEC game.usp_EventLog_Insert
         @EventCode = 1, -- create (legacy GL_617_GUILD_MONEY tAction=1)
@@ -192,7 +193,8 @@ WHERE CharacterId = @CharacterId;
 -- Deliberate divergence: this proc's @Grade parameter IS the value just written to game.Guilds.Grade a
 -- statement ago, so logging anything else would mean carrying a second, redundant "old grade" parameter
 -- purely to reproduce a legacy quirk with no audit value of its own.
-SET @Payload = CONCAT(N'GuildId=', @GuildId, N';AvatarName=', @AvatarName, N';Grade=', @Grade);
+SET
+@Payload = CONCAT(N'GuildId=', @GuildId, N';AvatarName=', @AvatarName, N';Grade=', @Grade);
 
 EXEC game.usp_EventLog_Insert
         @EventCode = 2, -- upgrade (legacy GL_617_GUILD_MONEY tAction=2)
@@ -264,7 +266,8 @@ IF
     -- Disband decision (see this migration's own header comment): logged with DeltaMoney=0, matching
     -- legacy's own zero-value GL_617_GUILD_MONEY(..., 0, 3, ...) call for this branch -- disband is still an
     -- audit-worthy guild-state change even though no money moves, so it is not left out of game.EventLog.
-SET @Payload = CONCAT(N'GuildId=', @GuildId, N';AvatarName=', @AvatarName, N';Grade=', @Grade);
+SET
+@Payload = CONCAT(N'GuildId=', @GuildId, N';AvatarName=', @AvatarName, N';Grade=', @Grade);
 
 EXEC game.usp_EventLog_Insert
         @EventCode = 3, -- disband (legacy GL_617_GUILD_MONEY tAction=3)

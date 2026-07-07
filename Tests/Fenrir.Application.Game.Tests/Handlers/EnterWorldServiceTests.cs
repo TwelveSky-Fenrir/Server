@@ -1,18 +1,20 @@
 using System.Buffers;
+using System.Collections.Immutable;
 using System.Collections.ObjectModel;
 using System.Net;
 using System.Text;
 using Fenrir.Application.Game.Domain.Avatars;
 using Fenrir.Application.Game.Domain.Guilds;
 using Fenrir.Application.Game.Domain.Movement;
+using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.WorldState;
+using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.Services.ZoneLifecycle;
 using Fenrir.Application.Game.Tests.Handlers.Tribes;
 using Fenrir.Application.Game.Tests.Progression;
 using Fenrir.Application.Game.Tests.TestSupport;
-using Fenrir.Application.Game.Tests.World.WorldState;
 using Fenrir.Data.Abstractions.Admin;
 using Fenrir.Data.Abstractions.Characters;
 using Fenrir.Data.Abstractions.Guilds;
@@ -83,8 +85,8 @@ public class EnterWorldServiceTests
 
         var buffs = new List<CharacterBuffDto>
         {
-            new(SlotIndex: 0, Value: 42, RemainingLegacyTicks: 100),
-            new(SlotIndex: 5, Value: 7, RemainingLegacyTicks: 3)
+            new(0, 42, 100),
+            new(5, 7, 3)
         };
         var bundle = HappyPathBundle(MapId, Tribe, PreviousTribe, PosX, PosY, PosZ, buffs);
 
@@ -97,14 +99,17 @@ public class EnterWorldServiceTests
         var worldData = ZoneTestKit.EmptyWorldData();
         var zones = ZoneTestKit.CreateRegistry(worldData: worldData);
         zones.Initialize([MapId]);
+        var zoneCenterSiegeState = new ZoneCenterSiegeState();
+        var tribeGuardCorridorState = new TribeGuardCorridorState();
+        var towerWar = new TowerWarState();
 
         var service = new EnterWorldService(
             characters,
             worldData,
             zones,
             new NoOpMuteRepository(),
-            new FakeBanRepository(false),
-            new ApplicationFirewall(new FakeBlockedIpRepository(false), new FakeFirewallRuleRepository(),
+            new FakeBanRepository(),
+            new ApplicationFirewall(new FakeBlockedIpRepository(), new FakeFirewallRuleRepository(),
                 new FakeGmAllowlistRepository()),
             guilds,
             guildRanking,
@@ -114,6 +119,9 @@ public class EnterWorldServiceTests
             new FakeHeroRankingRepository(),
             new FakeCharacterShardLocationRepository(),
             worldState,
+            towerWar,
+            zoneCenterSiegeState,
+            tribeGuardCorridorState,
             Options.Create(ZoneTestKit.Options()),
             NullLogger<EnterWorldService>.Instance);
 
@@ -136,22 +144,35 @@ public class EnterWorldServiceTests
         // 2) WorldSnapshotResponse: WorldInfo must reflect the live WorldStateService snapshot, not zeros.
         var expectedWorldSnapshot = new WorldSnapshotResponse
         {
-            WorldInfo = WorldStateProjection.Apply(
-                GuildRankingProjection.Apply(WorldStateTemplates.ZeroedWorldInfo, guildRanking.Top), worldState),
+            WorldInfo = ZoneCenterSiegeProjection.Apply(
+                WorldStateProjection.Apply(
+                    GuildRankingProjection.Apply(WorldStateTemplates.ZeroedWorldInfo, guildRanking.Top), worldState),
+                zoneCenterSiegeState, tribeGuardCorridorState),
             TribeInfo = WorldStateTemplates.ZeroedTribeInfo
         };
         var expectedWorldSnapshotBytes = ZoneMessageFactory.Encode(in expectedWorldSnapshot);
 
+        // 3) TowerStatusResponse: the 12-tower ownership/status snapshot must now be sent unconditionally,
+        // immediately after WorldSnapshotResponse -- see EnterWorldService's own remarks on this send.
+        // TowerStatusResponse isn't Compressed, so (unlike the two ZoneMessageFactory.Encode-built messages
+        // above) it goes out via the plain Send<T> frame shape, built by hand here the same way the
+        // self-spawn AvatarActionResponse already is below.
+        var expectedTowerStatus = towerWar.BuildStatusSnapshot();
+        var towerStatusFrameSize = FrameWriter.FrameSizeOf<TowerStatusResponse>();
+        var expectedTowerStatusBytes = new byte[towerStatusFrameSize];
+        FrameWriter.WriteFrame(in expectedTowerStatus, expectedTowerStatusBytes);
+
         var selfSpawnFrameSize = FrameWriter.FrameSizeOf<AvatarActionResponse>();
 
-        // HandleAsync sends all three messages back-to-back with no `await` between them, so by the time
+        // HandleAsync sends all four messages back-to-back with no `await` between them, so by the time
         // control returns here every byte is already sitting in the pipe -- a single ReadAsync() call can
-        // therefore non-deterministically return anywhere from one message to all three concatenated,
+        // therefore non-deterministically return anywhere from one message to all four concatenated,
         // depending on how System.IO.Pipelines happens to have segmented the buffer. Reading exactly the
         // combined expected length up front (looping if a single read doesn't yet cover it) and slicing
         // locally avoids relying on a 1:1 read-call-to-message correspondence that isn't actually guaranteed.
         var allSent = await ReadExactlyAsync(pipe,
-            expectedEnterWorldBytes.Length + expectedWorldSnapshotBytes.Length + selfSpawnFrameSize);
+            expectedEnterWorldBytes.Length + expectedWorldSnapshotBytes.Length + towerStatusFrameSize +
+            selfSpawnFrameSize);
 
         var enterWorldActual = allSent.AsSpan(0, expectedEnterWorldBytes.Length).ToArray();
         Assert.Equal(expectedEnterWorldBytes, enterWorldActual);
@@ -160,15 +181,23 @@ public class EnterWorldServiceTests
             .AsSpan(expectedEnterWorldBytes.Length, expectedWorldSnapshotBytes.Length).ToArray();
         Assert.Equal(expectedWorldSnapshotBytes, worldSnapshotActual);
 
-        // 3) Self-spawn AvatarActionResponse: PreviousTribe/EffectValueForView/top-level PetLocation must
+        var towerStatusActual = allSent
+            .AsSpan(expectedEnterWorldBytes.Length + expectedWorldSnapshotBytes.Length, towerStatusFrameSize)
+            .ToArray();
+        Assert.Equal(expectedTowerStatusBytes, towerStatusActual);
+
+        // 4) Self-spawn AvatarActionResponse: PreviousTribe/EffectValueForView/top-level PetLocation must
         // reflect the persisted character -- decoded via ObjectForAvatar's own TryRead rather than
         // reproducing all ~50 sibling fields by hand (Data starts 8 bytes into the 1-byte-opcode-prefixed,
         // uncompressed payload: ServerIndex(int) + UniqueNumber(uint) precede it).
         var selfSpawnActual = allSent
-            .AsSpan(expectedEnterWorldBytes.Length + expectedWorldSnapshotBytes.Length, selfSpawnFrameSize)
+            .AsSpan(
+                expectedEnterWorldBytes.Length + expectedWorldSnapshotBytes.Length + towerStatusFrameSize,
+                selfSpawnFrameSize)
             .ToArray();
         var selfSpawnPayload = selfSpawnActual.AsSpan(1);
-        Assert.True(ObjectForAvatar.TryRead(selfSpawnPayload.Slice(8, ObjectForAvatar.WireSize), out var selfSpawnData));
+        Assert.True(ObjectForAvatar.TryRead(selfSpawnPayload.Slice(8, ObjectForAvatar.WireSize),
+            out var selfSpawnData));
         Assert.Equal(PreviousTribe, selfSpawnData.PreviousTribe);
         Assert.Equal([PosX, PosY, PosZ], selfSpawnData.PetLocation);
         Assert.Equal(ExpectedEffectValueForView(buffs), selfSpawnData.EffectValueForView);
@@ -183,7 +212,7 @@ public class EnterWorldServiceTests
         const short MapId = 9;
         const int PersistedHeroRankPoints = 250;
 
-        var bundle = HappyPathBundle(MapId, tribe: 1, previousTribe: 1, posX: 0f, posY: 0f, posZ: 0f, buffs: []);
+        var bundle = HappyPathBundle(MapId, 1, 1, 0f, 0f, 0f, []);
         var characters = new FakeCharacterRepository { WorldEntryBundleToReturn = bundle };
         var worldData = ZoneTestKit.EmptyWorldData();
         var zones = ZoneTestKit.CreateRegistry(worldData: worldData);
@@ -192,15 +221,15 @@ public class EnterWorldServiceTests
         // PeriodKind 0 = Current -- the only period hero points are ever earned into (see
         // HeroRankPointAccumulator.CurrentPeriodKind's own remarks).
         var heroRankings = new FakeHeroRankingRepository();
-        heroRankings.Points[(CharacterId, (byte)0)] = PersistedHeroRankPoints;
+        heroRankings.Points[(CharacterId, 0)] = PersistedHeroRankPoints;
 
         var service = new EnterWorldService(
             characters,
             worldData,
             zones,
             new NoOpMuteRepository(),
-            new FakeBanRepository(false),
-            new ApplicationFirewall(new FakeBlockedIpRepository(false), new FakeFirewallRuleRepository(),
+            new FakeBanRepository(),
+            new ApplicationFirewall(new FakeBlockedIpRepository(), new FakeFirewallRuleRepository(),
                 new FakeGmAllowlistRepository()),
             new FakeGuildRepository(),
             new GuildRankingCache(),
@@ -210,6 +239,9 @@ public class EnterWorldServiceTests
             heroRankings,
             new FakeCharacterShardLocationRepository(),
             ZoneTestKit.CreateWorldState(),
+            new TowerWarState(),
+            new ZoneCenterSiegeState(),
+            new TribeGuardCorridorState(),
             Options.Create(ZoneTestKit.Options()),
             NullLogger<EnterWorldService>.Instance);
 
@@ -241,7 +273,7 @@ public class EnterWorldServiceTests
     public async Task HandleAsync_TribeAndPreviousTribeInternallyInconsistent_AbortsSession(byte tribe,
         byte previousTribe)
     {
-        var bundle = HappyPathBundle(mapId: 7, tribe, previousTribe, posX: 0f, posY: 0f, posZ: 0f, buffs: []);
+        var bundle = HappyPathBundle(7, tribe, previousTribe, 0f, 0f, 0f, []);
         var service = CreateService(out var session, bundle: bundle);
 
         await service.HandleAsync(ValidRequest(EncodeObfuscatedAccountId(AccountId)), session, CancellationToken.None);
@@ -259,7 +291,7 @@ public class EnterWorldServiceTests
     public async Task HandleAsync_TribeAndPreviousTribeInternallyConsistent_DoesNotAbort(byte tribe,
         byte previousTribe)
     {
-        var bundle = HappyPathBundle(mapId: 7, tribe, previousTribe, posX: 0f, posY: 0f, posZ: 0f, buffs: []);
+        var bundle = HappyPathBundle(7, tribe, previousTribe, 0f, 0f, 0f, []);
         var (service, session) = CreateWorkingService(bundle);
 
         await service.HandleAsync(ValidRequest(EncodeObfuscatedAccountId(AccountId)), session, CancellationToken.None);
@@ -294,19 +326,19 @@ public class EnterWorldServiceTests
         float posX, float posY, float posZ, IReadOnlyList<CharacterBuffDto> buffs)
     {
         var character = new CharacterWorldSnapshotDto(
-            CharacterId: CharacterId, AccountId: AccountId, Slot: 0, Name: "Hero", Tribe: tribe, Gender: 0,
-            HeadType: 1, FaceType: 1, Level: 10, MapId: mapId, PosX: posX, PosY: posY, PosZ: posZ, Heading: 0f,
-            Life: 30, MaxLife: 30, Mana: 21, MaxMana: 21, FlushSequence: 1, Experience: 0, Level2: 0, StatVit: 1,
-            StatStr: 1, StatInt: 1, StatDex: 1, StatPoints: 0, SkillPoints: 0, Money: 0, BigMoney: 0, StoreMoney: 0,
-            BigStoreMoney: 0, RebirthCount: 0, Title: 0, Halo: 0, ContributionPoints: 0, EatLifePotion: 0,
-            EatManaPotion: 0, EatStrPotion: 0, EatDexPotion: 0, EatElePotion: 0, ProtectForDeath: 0,
-            ProtectForDestroy: 0, DoubleExpTime1: 0, DoubleExpTime2: 0, DropItemTime: 0, InventoryDate: 0,
-            StoreDate: 0, QuestStepPermanent: 0, QuestActiveId: 0, QuestSort: 0, QuestTargetPhase: 0,
-            QuestKillCounter: 0, JoinWar: 0, MissionKillOtherTribe: 0, MissionKillMonster: 0, MissionPlayTime: 0,
-            AutoHuntEnabled: false, AutoHuntConfig: [], AutoLifeRatio: 0, AutoManaRatio: 0, PetGrowth: 0,
-            PetActivity: 0, TeacherPoint: 0, AutoBuffTime: 0, PremiumExpireUtc: 0, Exp2: 0,
-            PreviousTribe: previousTribe, MountItemId: 0, MountExpActivity: 0, MountPower: 0, MountSlotIndex: 0,
-            MountTime: 0);
+            CharacterId, AccountId, 0, "Hero", tribe, 0,
+            1, 1, 10, mapId, posX, posY, posZ, 0f,
+            30, 30, 21, 21, 1, 0, 0, 1,
+            1, 1, 1, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0,
+            false, [], 0, 0, 0,
+            0, 0, 0, 0, 0,
+            previousTribe, 0, 0, 0, 0,
+            0);
 
         return new CharacterWorldEntryBundle(
             character,
@@ -372,6 +404,9 @@ public class EnterWorldServiceTests
             new ThrowingHeroRankingRepository(),
             new ThrowingCharacterShardLocationRepository(),
             ZoneTestKit.CreateWorldState(),
+            new TowerWarState(),
+            new ZoneCenterSiegeState(),
+            new TribeGuardCorridorState(),
             Options.Create(options),
             NullLogger<EnterWorldService>.Instance);
     }
@@ -394,8 +429,8 @@ public class EnterWorldServiceTests
             worldData,
             zones,
             new NoOpMuteRepository(),
-            new FakeBanRepository(false),
-            new ApplicationFirewall(new FakeBlockedIpRepository(false), new FakeFirewallRuleRepository(),
+            new FakeBanRepository(),
+            new ApplicationFirewall(new FakeBlockedIpRepository(), new FakeFirewallRuleRepository(),
                 new FakeGmAllowlistRepository()),
             new FakeGuildRepository(),
             new GuildRankingCache(),
@@ -405,6 +440,9 @@ public class EnterWorldServiceTests
             new FakeHeroRankingRepository(),
             new FakeCharacterShardLocationRepository(),
             ZoneTestKit.CreateWorldState(),
+            new TowerWarState(),
+            new ZoneCenterSiegeState(),
+            new TribeGuardCorridorState(),
             Options.Create(ZoneTestKit.Options()),
             NullLogger<EnterWorldService>.Instance);
 
@@ -456,6 +494,12 @@ public class EnterWorldServiceTests
     private sealed class ThrowingMuteRepository : IMuteRepository
     {
         public ValueTask<bool> IsActiveForCharacterAsync(int characterId, CancellationToken ct)
+        {
+            throw new InvalidOperationException("Must not be reached once world-entry is already rejected.");
+        }
+
+        public ValueTask<ImmutableArray<int>> GetActiveCharacterIdsAsync(IReadOnlyCollection<int> characterIds,
+            CancellationToken ct)
         {
             throw new InvalidOperationException("Must not be reached once world-entry is already rejected.");
         }
@@ -564,6 +608,11 @@ public class EnterWorldServiceTests
         {
             throw new NotSupportedException();
         }
+
+        public ValueTask AdjustPointsAsync(int guildId, int delta, CancellationToken ct)
+        {
+            throw new NotSupportedException();
+        }
     }
 
     private sealed class ThrowingFriendRepository : IFriendRepository
@@ -663,6 +712,12 @@ public class EnterWorldServiceTests
         {
             return ValueTask.FromResult(false);
         }
+
+        public ValueTask<ImmutableArray<int>> GetActiveCharacterIdsAsync(IReadOnlyCollection<int> characterIds,
+            CancellationToken ct)
+        {
+            return ValueTask.FromResult(ImmutableArray<int>.Empty);
+        }
     }
 
     private sealed class EmptyFriendRepository : IFriendRepository
@@ -702,7 +757,10 @@ public class EnterWorldServiceTests
         }
     }
 
-    /// <summary>Only <see cref="GetRoleForCharacterAsync" /> is exercised by EnterWorldService; every other member is out of scope.</summary>
+    /// <summary>
+    ///     Only <see cref="GetRoleForCharacterAsync" /> is exercised by EnterWorldService; every other member is out of
+    ///     scope.
+    /// </summary>
     private sealed class RoleOnlyTribeRepository(byte role) : ITribeRepository
     {
         public ValueTask<byte> GetRoleForCharacterAsync(int characterId, CancellationToken ct)

@@ -70,7 +70,10 @@ public readonly record struct BossDropOutcome(
 /// </remarks>
 public static class BossEventDropResolver
 {
-    /// <summary>SANTA_ID (<c>Server/Header/Protocol/DEFINE.h:211</c>) -- a live, unguarded <c>const int</c>, not an undefined macro.</summary>
+    /// <summary>
+    ///     SANTA_ID (<c>Server/Header/Protocol/DEFINE.h:211</c>) -- a live, unguarded <c>const int</c>, not an undefined
+    ///     macro.
+    /// </summary>
     public const int SantaMonsterId = 731;
 
     private const int SantaGiftItemId = 536;
@@ -133,15 +136,25 @@ public static class BossEventDropResolver
     // ---- Guaranteed/random item lists -- every one of these is an intentionally empty placeholder for a
     // ---- follow-up contract, see this class's own remarks. Do NOT fill these with a guessed id.
     private static readonly IReadOnlyList<DroppedItem> NineItemEventList = []; // :2339-2352
-    private static readonly IReadOnlyList<DroppedItem> HolyUnicornPersonalList = []; // :2396-2420 (own 6-item list; the public Labyrinth Key drop IS modeled)
+
+    private static readonly IReadOnlyList<DroppedItem>
+        HolyUnicornPersonalList = []; // :2396-2420 (own 6-item list; the public Labyrinth Key drop IS modeled)
+
     private static readonly IReadOnlyList<DroppedItem> ThreeItemEventList = []; // :2423-2428
     private static readonly IReadOnlyList<DroppedItem> EliteBossGuaranteedList = []; // :2509-2529
     private static readonly int[] DemonLordItemPool = []; // :2356-2394, 13-item pool
-    private static readonly int[] FifteenMinuteBossLowTierPool = []; // :2532-2583, roll < 25, "random animal (tier 10)" helper
-    private static readonly int[] FifteenMinuteBossLowMidTierPool = []; // roll [25,100), 2 fixed ids + "random animal (tier 5)" helper
+
+    private static readonly int[]
+        FifteenMinuteBossLowTierPool = []; // :2532-2583, roll < 25, "random animal (tier 10)" helper
+
+    private static readonly int[]
+        FifteenMinuteBossLowMidTierPool = []; // roll [25,100), 2 fixed ids + "random animal (tier 5)" helper
+
     private static readonly int[] FifteenMinuteBossMidTierPool = []; // roll [100,400), 9-item fixed pool
     private static readonly int[] FifteenMinuteBossHighTierPool = []; // roll >= 400, 3-item fixed pool
-    private static readonly int[] SharedRandomPool = []; // :2586-2662, 2 fixed ids + "random elixir" helper + 2 more fixed ids
+
+    private static readonly int[]
+        SharedRandomPool = []; // :2586-2662, 2 fixed ids + "random elixir" helper + 2 more fixed ids
 
     private static readonly IReadOnlyList<DroppedItem>[] CustomTimedBossLists =
     [
@@ -246,7 +259,8 @@ public static class BossEventDropResolver
     /// <summary>
     ///     Identifiers 746 ("Virgin Ghost") and 9001 share this one block. The routine only ever exits early when
     ///     the shared pool resolves a non-zero item -- since that pool is currently unresolved (class remarks), this
-    ///     always takes the documented "resolved item is zero" fallthrough, i.e. <see cref="BossDropOutcome.SkipGenericTiers" />
+    ///     always takes the documented "resolved item is zero" fallthrough, i.e.
+    ///     <see cref="BossDropOutcome.SkipGenericTiers" />
     ///     stays false and the generic tiers still run, same as legacy would for an actual zero roll.
     /// </summary>
     private static BossDropOutcome ResolveSharedRandomPool(int monsterId, Random random, WorldDataCache worldData)

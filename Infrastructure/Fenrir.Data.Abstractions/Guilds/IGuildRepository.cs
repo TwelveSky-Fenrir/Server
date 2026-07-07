@@ -17,6 +17,20 @@ public interface IGuildRepository
     /// <summary>Top <paramref name="count" /> guilds by Points, highest first -- game.usp_Guild_GetTopByPoints.</summary>
     public ValueTask<ReadOnlyCollection<GuildRankingRowDto>> GetTopByPointsAsync(int count, CancellationToken ct);
 
+    /// <summary>
+    ///     Guild-point counter delta -- game.usp_Guild_AdjustPoints. The RvR four-guild-event write path: the
+    ///     legacy enemy-tribe-kill pipeline credits the killer's guild +1 point per kill scored inside a
+    ///     designated war-zone-type instance (Server/ts25zone/S07_MyGame03.cpp:3098-3101, gated by
+    ///     Server/ts25zone/S07_MyGame01.cpp:647-698's zone-type flag; relayed to ts25extra's
+    ///     <c>UpdateGuildPoint</c>, Server/ts25extra/S08_MyDB.cpp:1146-1149). Deciding whether a given kill
+    ///     qualifies (zone type, killer-has-a-guild) is the caller's job -- this method is an unconditional
+    ///     delta apply keyed by <paramref name="guildId" /> rather than by guild name, since Fenrir callers
+    ///     already resolve the killer's guild membership by CharacterId (<see cref="GetByCharacterAsync" />)
+    ///     before reaching here. Throws SQL 50234 for an unknown guild or a delta that would take Points
+    ///     negative.
+    /// </summary>
+    public ValueTask AdjustPointsAsync(int guildId, int delta, CancellationToken ct);
+
     public ValueTask<ReadOnlyCollection<GuildRosterRowDto>> GetRosterAsync(int guildId, CancellationToken ct);
 
     public ValueTask<ReadOnlyCollection<GuildNoticeRowDto>> GetNoticesAsync(int guildId, CancellationToken ct);

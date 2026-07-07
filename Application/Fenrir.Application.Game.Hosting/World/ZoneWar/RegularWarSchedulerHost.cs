@@ -46,8 +46,11 @@ public sealed class RegularWarSchedulerHost(
     IRegularWarRewardValueProvider rewardValues,
     RegularWarActiveMapTracker? activeMapTracker = null) : BackgroundService
 {
-    private readonly RegularWarActiveMapTracker _activeMapTracker = activeMapTracker ?? new RegularWarActiveMapTracker();
     private readonly SimulationTickAccumulator _accumulator = new();
+
+    private readonly RegularWarActiveMapTracker
+        _activeMapTracker = activeMapTracker ?? new RegularWarActiveMapTracker();
+
     private readonly Dictionary<short, RegularWarSchedule> _schedules = new();
 
     /// <summary>

@@ -32,7 +32,9 @@ public class WorldStateProjectionTests
         Assert.Equal(0, result.TribeSymbolBattle);
         Assert.Equal(0, result.MonsterSymbol);
         Assert.Equal(0, result.MonsterSymbolEndTime);
-        Assert.Equal([1, 1, 1, 1], result.TribeSymbol); // fresh boot: every tribe starts owning its own symbol
+        // Fresh boot: every tribe starts owning its own numbered symbol slot, so each slot's wire value is
+        // that tribe's own id (0-3) -- never a boolean flag (Server/Header/Protocol/STRUCT.h:594-598).
+        Assert.Equal([0, 1, 2, 3], result.TribeSymbol);
         Assert.Equal([0, 0, 0, 0], result.TribePoint);
 
         // Untouched fields must still be the template's own zeroed defaults, not silently overwritten.
@@ -69,12 +71,17 @@ public class WorldStateProjectionTests
     {
         var worldState = CreateInitialized();
 
-        // Slot 1 is contested and lost to tribe 3 -- only index 1 flips to 0, every other slot stays owned.
-        worldState.ResolveTribeSymbol(slotTribeId: 1, winnerTribeId: 3);
+        // Slot 1 is contested and lost to tribe 3 -- every other slot stays owned by its own tribe id
+        // (0, 2, 3). The legacy-correct value for the lost slot itself would be the winning tribe's id
+        // (3), but today's schema only records HasSymbol as a bool on the slot's own row -- it cannot
+        // recover which tribe the slot was lost TO, only that it lost it (see
+        // WorldStateService.ResolveTribeSymbol's own remarks on this schema gap). 0 is the documented
+        // placeholder for that unresolved case, not a claim that tribe 0 actually won this slot.
+        worldState.ResolveTribeSymbol(1, 3);
 
         var result = WorldStateProjection.Apply(WorldStateTemplates.ZeroedWorldInfo, worldState);
 
-        Assert.Equal([1, 0, 1, 1], result.TribeSymbol);
+        Assert.Equal([0, 0, 2, 3], result.TribeSymbol);
     }
 
     [Fact]

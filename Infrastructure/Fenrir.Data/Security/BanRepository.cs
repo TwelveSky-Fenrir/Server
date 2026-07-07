@@ -30,13 +30,15 @@ public sealed record BanRepository(ICaeriusNetDbContext Db) : IBanRepository
     }
 
     public async ValueTask<int> CreateAsync(int? accountId, int? characterId, BanReason reason,
-        DateTime? expiresAtUtc, CancellationToken ct)
+        DateTime? expiresAtUtc, CancellationToken ct, int? actorAccountId = null, int? actorCharacterId = null)
     {
         var sp = new StoredProcedureParametersBuilder("admin", "usp_Ban_Create", 4)
             .AddParameter("AccountId", (object?)accountId ?? DBNull.Value, SqlDbType.Int)
             .AddParameter("CharacterId", (object?)characterId ?? DBNull.Value, SqlDbType.Int)
             .AddParameter("Reason", (byte)reason, SqlDbType.TinyInt)
             .AddParameter("ExpiresAtUtc", (object?)expiresAtUtc ?? DBNull.Value, SqlDbType.DateTime2)
+            .AddParameter("ActorAccountId", (object?)actorAccountId ?? DBNull.Value, SqlDbType.Int)
+            .AddParameter("ActorCharacterId", (object?)actorCharacterId ?? DBNull.Value, SqlDbType.Int)
             .Build();
 
         return await Db.ExecuteScalarAsync<int>(sp, ct);

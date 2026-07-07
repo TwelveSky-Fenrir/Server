@@ -29,7 +29,8 @@
 -- the fourth faction, only Tribe); DEFAULT 0 backfills every already-created row with the "Noble Dragon"
 -- template rather than leaving it nullable, since no legacy-cited placeholder value exists for "unknown".
 ALTER TABLE game.Characters
-    ADD PreviousTribe TINYINT NOT NULL CONSTRAINT DF_Characters_PreviousTribe DEFAULT 0;
+    ADD PreviousTribe TINYINT NOT NULL
+        CONSTRAINT DF_Characters_PreviousTribe DEFAULT 0;
 GO
 
 ALTER TABLE game.Characters
@@ -51,29 +52,28 @@ GO
 --     the pet/cape rows (added directly onto the equipment list, see BuildEquipmentRows), but the point
 --     stands that neither table row exists in world.StarterKitEquipment; both are 100% C# constants
 --     (StarterCapeItemId/StarterPetItemId) injected before this call, never DB catalog rows.
-CREATE OR ALTER PROCEDURE game.usp_Character_CreateWithStarterKit
-    @AccountId INT,
-    @Slot TINYINT,
-    @Name NVARCHAR(13),
-    @Tribe TINYINT,
-    @Gender TINYINT,
-    @HeadType TINYINT,
-    @FaceType TINYINT,
-    @MapId SMALLINT,
-    @PosX REAL,
-    @PosY REAL,
-    @PosZ REAL,
-    @Life INT,
-    @MaxLife INT,
-    @Mana INT,
-    @MaxMana INT,
-    @WelcomeBuffUntilDate INT,
-    @PremiumUntilUnixSeconds BIGINT,
-    @Equipment game.tvp_CharacterItemSlot READONLY,
-    @Inventory game.tvp_CharacterItemSlot READONLY,
-    @Skills game.tvp_CharacterSkillSlot READONLY,
-    @Hotkeys game.tvp_CharacterHotkeySlot READONLY,
-    @PreviousTribe TINYINT = 0
+CREATE OR ALTER PROCEDURE game.usp_Character_CreateWithStarterKit @AccountId INT,
+                                                                  @Slot TINYINT,
+                                                                  @Name NVARCHAR(13),
+                                                                  @Tribe TINYINT,
+                                                                  @Gender TINYINT,
+                                                                  @HeadType TINYINT,
+                                                                  @FaceType TINYINT,
+                                                                  @MapId SMALLINT,
+                                                                  @PosX REAL,
+                                                                  @PosY REAL,
+                                                                  @PosZ REAL,
+                                                                  @Life INT,
+                                                                  @MaxLife INT,
+                                                                  @Mana INT,
+                                                                  @MaxMana INT,
+                                                                  @WelcomeBuffUntilDate INT,
+                                                                  @PremiumUntilUnixSeconds BIGINT,
+                                                                  @Equipment game.tvp_CharacterItemSlot READONLY,
+                                                                  @Inventory game.tvp_CharacterItemSlot READONLY,
+                                                                  @Skills game.tvp_CharacterSkillSlot READONLY,
+                                                                  @Hotkeys game.tvp_CharacterHotkeySlot READONLY,
+                                                                  @PreviousTribe TINYINT = 0
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -85,7 +85,10 @@ BEGIN
     IF EXISTS (SELECT 1 FROM game.Characters WHERE Name = @Name)
         THROW 50202, 'Character name already taken.', 1;
 
-    DECLARE @CharacterId TABLE (CharacterId INT);
+    DECLARE @CharacterId TABLE
+                         (
+                             CharacterId INT
+                         );
 
     BEGIN TRANSACTION;
 
@@ -108,9 +111,11 @@ BEGIN
      StatPoints, SkillPoints,
      MountItemId, MountExpActivity, MountPower, MountSlotIndex, MountTime,
      DoubleExpTime1, DoubleExpTime2, AutoBuffTime, PremiumExpireUtc)
-        OUTPUT INSERTED.CharacterId INTO @CharacterId
-    VALUES
-        (@AccountId, @Slot, @Name, @Tribe, @PreviousTribe, @Gender, @HeadType, @FaceType, @MapId, @PosX, @PosY, @PosZ, @Life, @MaxLife, @Mana, @MaxMana, 1, 1, 1, 1, 640000000, 100, 145, 12, 0, 2000000000, 0, 3175, 10000, 1301, 0, 5, 0, 99999999, @WelcomeBuffUntilDate, @WelcomeBuffUntilDate, @WelcomeBuffUntilDate, @PremiumUntilUnixSeconds);
+    OUTPUT INSERTED.CharacterId INTO @CharacterId
+    VALUES (@AccountId, @Slot, @Name, @Tribe, @PreviousTribe, @Gender, @HeadType, @FaceType, @MapId, @PosX, @PosY,
+            @PosZ, @Life, @MaxLife, @Mana, @MaxMana, 1, 1, 1, 1, 640000000, 100, 145, 12, 0, 2000000000, 0, 3175, 10000,
+            1301, 0, 5, 0, 99999999, @WelcomeBuffUntilDate, @WelcomeBuffUntilDate, @WelcomeBuffUntilDate,
+            @PremiumUntilUnixSeconds);
 
     DECLARE @NewCharacterId INT = (SELECT CharacterId FROM @CharacterId);
 

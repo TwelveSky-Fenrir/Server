@@ -68,8 +68,9 @@ public static partial class StatCalculator
 
         if (bySlot[10] is { } deco2 && deco2.Item.Sort != 2)
         {
-            // Wing-ID list assumed shared with EATK's (not independently confirmed for EDEF).
-            var isWing = deco2.Item.ItemId is 210 or 211 or 212 or 216 or 217 or 218 or 2303 or 2304 or 2305;
+            // EDEF's own wing-ID list (207/208/209), distinct from EATK's (210/211/212) -- confirmed
+            // against Server/Header/Protocol/MyFactor.cpp:3941, contrasted with :3779 for EATK.
+            var isWing = deco2.Item.ItemId is 207 or 208 or 209 or 216 or 217 or 218 or 2303 or 2304 or 2305;
             edef += (int)(deco2.Enchant * (isWing ? 7.8f : 3.9f));
         }
 

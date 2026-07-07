@@ -9,9 +9,13 @@ using Fenrir.Data.Abstractions.World;
 namespace Fenrir.Application.Game.Tests.World.Monsters;
 
 /// <summary>
-///     Covers the tribe-bank 9% monster-kill-currency tax hook wired alongside <see cref="Zone.QueueMoneyGrant" />
-///     in <see cref="MonsterSpawnScheduler.ProcessDeath" /> -- see <c>Zone.TribeBankTax.cs</c> and
-///     <c>TribeBankTaxAccumulator</c> for the underlying mechanics this exercises end-to-end.
+///     Covers the (deliberate) absence of any tribe-bank 9% monster-kill-currency tax credit from
+///     <see cref="MonsterSpawnScheduler.ProcessDeath" />'s money-grant path -- see <c>Zone.TribeBankTax.cs</c>
+///     and <c>TribeBankTaxAccumulator.CreditMonsterKillCurrencyTax</c>'s own remarks for why this wiring was
+///     removed: in production <c>ts25zone</c>, the live <c>DROP_MONEY</c> block never reaches
+///     <c>AddTribeBankInfo3</c> (its one call site is <c>ProcessForDropItem</c>'s <c>DP_MN_TO_WD</c>/currency
+///     branch, which the monster-kill money grant never invokes -- the connecting call is commented out at
+///     <c>Server/ts25zone/S07_MyGame05.cpp:2689</c>).
 /// </summary>
 public class MonsterSpawnSchedulerTribeBankTaxTests
 {
@@ -52,7 +56,7 @@ public class MonsterSpawnSchedulerTribeBankTaxTests
     }
 
     [Fact]
-    public void MonsterKill_WithMoneyDrop_CreditsNineParcentOfTheAwardToTheKillersTribe_OnTopOfTheKillersOwnGrant()
+    public void MonsterKill_WithMoneyDrop_GrantsTheKillerButCreditsNoTribeBankTax()
     {
         // DropRate 500 -> always drops (RollMoney gates on RandomNumber <= (DropRate + luck) * itemDropRatio),
         // fixed MinAmount == MaxAmount so the resulting money grant is deterministic.
@@ -71,15 +75,10 @@ public class MonsterSpawnSchedulerTribeBankTaxTests
         Assert.Equal(10, grant.CharacterId);
         Assert.True(grant.Amount > 0);
 
-        // 9% of the exact same already-resolved amount the killer was granted -- additional to it, not a cut
-        // taken out of it (the killer's own grant above is untouched).
-        var expectedTax = (long)(grant.Amount * 0.09);
-        Assert.Equal(expectedTax, zone.GetTribeBankTaxTotal(killerTribe));
-
-        // No other tribe was credited.
+        // Legacy-parity: the monster-kill money grant never reaches AddTribeBankInfo3, so no tribe -- not
+        // even the killer's own -- is ever credited from this path.
         for (byte tribe = 0; tribe < 4; tribe++)
-            if (tribe != killerTribe)
-                Assert.Equal(0, zone.GetTribeBankTaxTotal(tribe));
+            Assert.Equal(0, zone.GetTribeBankTaxTotal(tribe));
     }
 
     [Fact]

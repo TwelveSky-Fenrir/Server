@@ -9,6 +9,12 @@ namespace Fenrir.Application.Game.GameData;
 /// </summary>
 public static class WorldDataCacheBuilder
 {
+    /// <summary>Legacy <c>MAX_LIMIT_LEVEL_NUM</c> -- see <see cref="ValidateLevels" /> for how it's used here.</summary>
+    private const int MaxLevelIndex = 145;
+
+    /// <summary>Legacy <c>Level_CheckValidElement</c>'s 0-10000 bound on every per-level combat stat field.</summary>
+    private const int MaxLevelCombatStat = 10000;
+
     /// <summary>
     ///     Throws when a critical dataset (Items, Monsters, Zones, ZonePortals, Levels, Skills) is empty -- an
     ///     unseeded GameServer must not accept a single connection.
@@ -72,12 +78,6 @@ public static class WorldDataCacheBuilder
 
         return (cache, stats);
     }
-
-    /// <summary>Legacy <c>MAX_LIMIT_LEVEL_NUM</c> -- see <see cref="ValidateLevels" /> for how it's used here.</summary>
-    private const int MaxLevelIndex = 145;
-
-    /// <summary>Legacy <c>Level_CheckValidElement</c>'s 0-10000 bound on every per-level combat stat field.</summary>
-    private const int MaxLevelCombatStat = 10000;
 
     /// <summary>
     ///     Per-row LEVEL validation: aborts the whole load on the first invalid row instead of indexing whatever
@@ -278,8 +278,12 @@ public static class WorldDataCacheBuilder
     ///         (<c>Server/ts25zone/S07_MyGame01.cpp:1658-1662</c>) strictly before the zone process ever accepts a
     ///         connection, but -- unlike every other dataset this method loads -- a missing or unparseable
     ///         <c>*.WREGION.csv</c> file is never fatal to boot there: the loader logs one diagnostic line and
-    ///         silently leaves that file's monster category empty (<c>Server/ts25zone/S10_MySummon.cpp:476-479,
-    ///         544-553,600-605</c>), and the one caller-side check written to abort boot on a WREGION failure
+    ///         silently leaves that file's monster category empty (
+    ///         <c>
+    ///             Server/ts25zone/S10_MySummon.cpp:476-479,
+    ///             544-553,600-605
+    ///         </c>
+    ///         ), and the one caller-side check written to abort boot on a WREGION failure
     ///         (<c>MySummon::Init</c>'s own return value) structurally can never fire because <c>Init()</c>
     ///         unconditionally returns success regardless of either file's outcome
     ///         (<c>Server/ts25zone/S10_MySummon.cpp:372</c>). <c>spawnRegionsWithoutZone</c>/

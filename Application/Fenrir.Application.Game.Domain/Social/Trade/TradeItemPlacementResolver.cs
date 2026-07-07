@@ -19,12 +19,13 @@ namespace Fenrir.Application.Game.Domain.Social.Trade;
 ///     layouts), :214-237 (<c>SetInventory</c>/<c>SetInventoryQuantity</c>) ; Server/Header/Protocol/DEFINE.h:73
 ///     (<c>USE_MATS_999</c>, unconditional), :287-293 (page/slot bounds), :611 (<c>MAX_ITEM_DUPLICATION_NUM</c>).
 ///     <para>
-///         <b>No-swap rule:</b> unlike <see cref="Fenrir.Application.Game.Domain.Inventory.ContainerMatrix.ResolveMove" />
-///         ,
-///         which swaps two whole stacks when the destination can't be merged into, this family never swaps --
-///         an occupied, non-mergeable destination is always a hard reject
-///         (S04_MyWork05.cpp:2198-2205, 2224-2229 / 2316-2323, 2339-2344 / 2409-2416, 2434-2440). Do not reuse
-///         <c>ContainerMatrix.ResolveMove</c> for this family.
+///         <b>No-swap rule:</b> this family never swaps -- an occupied, non-mergeable destination is always a
+///         hard reject (S04_MyWork05.cpp:2198-2205, 2224-2229 / 2316-2323, 2339-2344 / 2409-2416, 2434-2440),
+///         the same reject-on-occupied-destination posture
+///         <see cref="Fenrir.Application.Game.Domain.Inventory.ContainerMatrix.ResolveMove" /> itself now
+///         follows for its own family. Do not reuse <c>ContainerMatrix.ResolveMove</c> for this family
+///         regardless -- the trade window's slot shape and its deposit/withdrawal/rearrange split don't match
+///         ContainerMatrix's (from,to) container model.
 ///     </para>
 ///     <para>
 ///         <b>Socket-gem-triple eligibility (the <c>sourceIsSocketEligible</c> parameter on every method below):</b>

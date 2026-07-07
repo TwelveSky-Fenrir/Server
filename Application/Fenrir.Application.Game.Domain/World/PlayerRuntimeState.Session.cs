@@ -35,8 +35,15 @@ public partial class PlayerRuntimeState
     public int AutoTimeHack { get; set; }
 
     /// <summary>
-    ///     Loaded once at world entry -- a hidden flag, never re-queried per chat message. A mute lifted or
-    ///     newly applied mid-session is only picked up on the player's next world entry.
+    ///     Loaded once at world entry (a hidden flag, no per-message wire cost) and, while this character stays
+    ///     online, kept fresh by <c>MuteRefreshPollHost</c>'s periodic batch re-check
+    ///     (<c>GameServerOptions.MutePollIntervalSeconds</c>, default 15s) -- the ONLY other legal writer of
+    ///     this field besides world entry itself, via <see cref="ZoneCommandKind.SetMuted" /> so the
+    ///     single-writer-per-zone invariant every other <see cref="PlayerRuntimeState" /> mutation relies on
+    ///     still holds. A GM mute applied or lifted mid-session takes effect within one poll interval, not
+    ///     only on the player's next world entry -- a bounded-staleness approximation of legacy's genuinely
+    ///     live per-message recheck (uppercom-playuser-extra-relay-opcodes finding; see
+    ///     <c>MuteRefreshPollHost</c>'s own remarks for why a literal per-message requery was rejected).
     /// </summary>
     public bool IsMuted { get; set; }
 }

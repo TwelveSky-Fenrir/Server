@@ -161,10 +161,31 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
         throw new NotImplementedException();
     }
 
+    public ValueTask UpsertHotkeySlotAsync(int characterId, byte page, byte keyIndex, int sort, int value1,
+        int value2, CancellationToken ct)
+    {
+        throw new NotImplementedException();
+    }
+
     public ValueTask ExecuteTradeAsync(int characterA, IReadOnlyList<CharacterItemSlotTvp> itemsA0,
         IReadOnlyList<CharacterItemSlotTvp> itemsA1, long deltaMoneyA, int deltaBigMoneyA, int characterB,
         IReadOnlyList<CharacterItemSlotTvp> itemsB0, IReadOnlyList<CharacterItemSlotTvp> itemsB1, long deltaMoneyB,
-        int deltaBigMoneyB, CancellationToken ct)
+        int deltaBigMoneyB, CancellationToken ct,
+        IReadOnlyList<CharacterItemSlotTvp>? tradedItemsA = null,
+        IReadOnlyList<CharacterItemSlotTvp>? tradedItemsB = null,
+        long offeredMoneyA = 0, int offeredBigMoneyA = 0,
+        long offeredMoneyB = 0, int offeredBigMoneyB = 0)
+    {
+        throw new NotImplementedException();
+    }
+
+    public ValueTask<int> AdjustDeathProtectionAsync(int characterId, int delta, CancellationToken ct)
+    {
+        throw new NotImplementedException();
+    }
+
+    public ValueTask ApplyTribeConversionAsync(int characterId, int itemId, byte container,
+        IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct)
     {
         throw new NotImplementedException();
     }

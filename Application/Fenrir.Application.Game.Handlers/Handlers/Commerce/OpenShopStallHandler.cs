@@ -12,6 +12,13 @@ namespace Fenrir.Application.Game.Handlers.Handlers.Commerce;
 ///     never leave <see cref="PlayerRuntimeState.Inventory" />), 2 = offline/deputy shop (items physically
 ///     leave into game.OfflineShopItems). Both sorts gated to zone 37.
 /// </summary>
+/// <remarks>
+///     Réf. C++ : Server/ts25zone/S04_MyWork02.cpp:6067-6095 -- the cross-type "shop already open"
+///     exclusivity gate (<see cref="OpenShopStallPrepareOutcome.Blocked" />, results 101/102/103), enforced
+///     by <see cref="IOpenShopStallService.PrepareAsync" /> before either shop type is opened. The one
+///     same-type case (a PERSONAL request while a PERSONAL shop is already open) instead disconnects the
+///     session via <see cref="OpenShopStallPrepareOutcome.Abort" />, matching legacy's <c>Quit()</c>.
+/// </remarks>
 public sealed class OpenShopStallHandler(IOpenShopStallService service) : IAsyncPacketHandler<OpenShopStallRequest>
 {
     /// <summary>Single source of truth: <see cref="ProxyShopZonePolicy.ZoneNumber" />; see its remarks.</summary>
@@ -22,6 +29,7 @@ public sealed class OpenShopStallHandler(IOpenShopStallService service) : IAsync
     {
         var zoneSession = (ZoneClientSession)session;
         var characterId = zoneSession.CharacterId!.Value;
+        var accountId = zoneSession.AccountId!.Value;
 
         if (zoneSession.CurrentZone is not Zone zone || !zone.TryGetPlayer(characterId, out var state) ||
             state is null)
@@ -33,22 +41,23 @@ public sealed class OpenShopStallHandler(IOpenShopStallService service) : IAsync
             return;
         }
 
-        var prepared = service.Prepare(packet, state);
+        var prepared = await service.PrepareAsync(packet, state, cancellationToken);
         switch (prepared.Outcome)
         {
             case OpenShopStallPrepareOutcome.Abort:
                 zoneSession.Abort(DisconnectReason.Faulted);
                 return;
             case OpenShopStallPrepareOutcome.LiveOpened:
-                session.Send(prepared.LiveResponse!.Value);
+            case OpenShopStallPrepareOutcome.Blocked:
+                session.Send(prepared.Response!.Value);
                 return;
         }
 
         await state.EconomyActionLock.WaitAsync(cancellationToken);
         try
         {
-            var response = await service.OpenProxyShopAsync(packet, zone, state, characterId, prepared.Listing,
-                prepared.OfflineItems!, cancellationToken);
+            var response = await service.OpenProxyShopAsync(packet, zone, state, characterId, accountId,
+                prepared.Listing, prepared.OfflineItems!, cancellationToken);
             session.Send(response);
         }
         finally

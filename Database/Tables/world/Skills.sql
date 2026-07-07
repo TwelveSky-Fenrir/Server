@@ -2,16 +2,16 @@
 -- Description[10] normalizes into world.SkillDescriptions; GradeInfo[2] normalizes into world.SkillGrades (always exactly 2 rows/skill).
 CREATE TABLE world.Skills
 (
-    SkillId         INT      NOT NULL,
+    SkillId         INT          NOT NULL,
     Name            NVARCHAR(25) NOT NULL,
-    Type            TINYINT  NOT NULL,
-    AttackType      TINYINT  NOT NULL,
-    DataNumber2D    SMALLINT NOT NULL,
-    TribeInfo1      TINYINT  NOT NULL,
-    TribeInfo2      TINYINT  NOT NULL,
-    LearnSkillPoint TINYINT  NOT NULL,
-    MaxUpgradePoint TINYINT  NOT NULL,
-    TotalHitNumber  TINYINT  NOT NULL,
-    ValidRadius     SMALLINT NOT NULL,
+    Type            TINYINT      NOT NULL,
+    AttackType      TINYINT      NOT NULL,
+    DataNumber2D    SMALLINT     NOT NULL,
+    TribeInfo1      TINYINT      NOT NULL,
+    TribeInfo2      TINYINT      NOT NULL,
+    LearnSkillPoint TINYINT      NOT NULL,
+    MaxUpgradePoint TINYINT      NOT NULL,
+    TotalHitNumber  TINYINT      NOT NULL,
+    ValidRadius     SMALLINT     NOT NULL,
     CONSTRAINT PK_Skills PRIMARY KEY CLUSTERED (SkillId)
 );

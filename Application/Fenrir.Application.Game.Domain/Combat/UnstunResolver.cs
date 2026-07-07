@@ -19,6 +19,14 @@ public enum UnstunRejectReason
     TargetNotStunned,
 
     /// <summary>
+    ///     The target is mid a CROSS-shard zone transfer (<c>World.PlayerRuntimeState.IsMovingZone</c>, surfaced
+    ///     via <see cref="CombatantSnapshot.IsMovingZone" /> on <see cref="UnstunAttemptRequest.Target" />) --
+    ///     the curer's own such state is never checked, matching legacy exactly (:3758-3773). See this type's
+    ///     own remarks and the zone-transfer-in-progress-gate behavior contract (2026-07 round).
+    /// </summary>
+    TargetMovingZone,
+
+    /// <summary>
     ///     Curer's tribe must equal the target's (alliance not modeled) -- unconditional, no duel exception
     ///     (:3778-3781).
     /// </summary>
@@ -90,10 +98,15 @@ public readonly record struct UnstunAttemptRequest(
 ///         </item>
 ///         <item>
 ///             The curer's own mid-zone-transfer state is never checked (only the target's is,
-///             <c>:3758-3773</c>) -- Fenrir has no separate "mid zone-transfer" flag at all for either side: a
-///             transferring character is synchronously removed from its zone's player map the same tick the
-///             handoff begins (<c>Zone.HandleLeave</c>), so a lookup miss already reproduces
-///             <c>IsMovingZone</c>'s reject case uniformly, with no room for this asymmetry to manifest.
+///             <c>:3758-3773</c>) -- reproduced via <c>World.PlayerRuntimeState.IsMovingZone</c> (surfaced on
+///             <see cref="UnstunAttemptRequest.Target" /> only, never <see cref="UnstunAttemptRequest.Curer" />)
+///             since the zone-transfer-in-progress-gate behavior contract (2026-07 round). Fenrir's SAME-shard
+///             handoff still needs no such check at all (<c>Zone.HandleLeave</c>'s atomic remove-then-post
+///             already reproduces a reject there via a plain <c>TryGetPlayer</c> lookup miss), but a
+///             CROSS-shard transfer leaves the transferring character live and trackable in the origin
+///             shard's own zone for the whole real-world window until its actual disconnect, so a lookup
+///             alone no longer reproduces the reject case there -- see
+///             <c>World.PlayerRuntimeState.IsMovingZone</c>'s own remarks for the full citation trail.
 ///         </item>
 ///     </list>
 /// </remarks>
@@ -120,6 +133,11 @@ public static class UnstunResolver
             return UnstunAttemptOutcome.Reject(UnstunRejectReason.CurerDead);
         if (target.IsDead)
             return UnstunAttemptOutcome.Reject(UnstunRejectReason.TargetDead);
+        // Target only -- the curer's own IsMovingZone is never checked, matching legacy (see this type's own
+        // remarks). Only observably reachable for a CROSS-shard transfer; a same-shard handoff already
+        // removes the target from the zone's player map before this resolver could ever be reached with it.
+        if (target.IsMovingZone)
+            return UnstunAttemptOutcome.Reject(UnstunRejectReason.TargetMovingZone);
         if (request.TargetPshopOpen)
             return UnstunAttemptOutcome.Reject(UnstunRejectReason.TargetShopOpen);
         if (!request.TargetIsStunned)

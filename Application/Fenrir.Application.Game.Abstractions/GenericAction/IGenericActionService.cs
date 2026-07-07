@@ -19,7 +19,8 @@ public enum GenericActionStatus
 /// <summary>
 ///     Result of a <see cref="GenericActionService" /> operation. <see cref="NotifyQuestProgress" /> is only ever
 ///     set on a successful ground-item pickup that also happens to satisfy the character's active qSort-2 quest.
-///     <see cref="GrantedPetExperienceGrowth" /> is only ever set by <see cref="IGenericActionService.TimeExchangeAsync" />
+///     <see cref="GrantedPetExperienceGrowth" /> is only ever set by
+///     <see cref="IGenericActionService.TimeExchangeAsync" />
 ///     when its pet-experience credit was actually positive -- the caller sends the self-addressed
 ///     <c>AvatarStatUpdateResponse</c> (Sort=14, S014PET_EXP) carrying this value, same "service computes,
 ///     handler sends" split <see cref="NotifyQuestProgress" /> already established.

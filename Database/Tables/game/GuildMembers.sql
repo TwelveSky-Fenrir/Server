@@ -5,11 +5,14 @@
 -- character is a member of at most one guild at a time.
 CREATE TABLE game.GuildMembers
 (
-    GuildId     INT     NOT NULL,
-    CharacterId INT     NOT NULL,
-    Role        TINYINT NOT NULL CONSTRAINT DF_GuildMembers_Role DEFAULT 0,
-    CallName    NVARCHAR(4) NOT NULL CONSTRAINT DF_GuildMembers_CallName DEFAULT N'',
-    JoinedAtUtc DATETIME2(3) NOT NULL CONSTRAINT DF_GuildMembers_JoinedAtUtc DEFAULT SYSUTCDATETIME(),
+    GuildId     INT          NOT NULL,
+    CharacterId INT          NOT NULL,
+    Role        TINYINT      NOT NULL
+        CONSTRAINT DF_GuildMembers_Role DEFAULT 0,
+    CallName    NVARCHAR(4)  NOT NULL
+        CONSTRAINT DF_GuildMembers_CallName DEFAULT N'',
+    JoinedAtUtc DATETIME2(3) NOT NULL
+        CONSTRAINT DF_GuildMembers_JoinedAtUtc DEFAULT SYSUTCDATETIME(),
     CONSTRAINT PK_GuildMembers PRIMARY KEY CLUSTERED (GuildId, CharacterId),
     CONSTRAINT UQ_GuildMembers_CharacterId UNIQUE (CharacterId),
     CONSTRAINT CK_GuildMembers_Role CHECK (Role BETWEEN 0 AND 2),

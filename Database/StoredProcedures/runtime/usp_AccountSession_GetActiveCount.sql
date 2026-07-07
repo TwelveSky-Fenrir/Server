@@ -6,11 +6,11 @@
 -- Interpreted, not native-compiled, like usp_AccountSession_ReapStale/RefreshAndGetKicked: WITH (SNAPSHOT)
 -- makes the required isolation level explicit regardless of the caller's ambient transaction/autocommit state.
 CREATE PROCEDURE runtime.usp_AccountSession_GetActiveCount
-    AS
+AS
 BEGIN
     SET
-NOCOUNT ON;
+        NOCOUNT ON;
 
-SELECT COUNT(*)
-FROM runtime.AccountSessions WITH (SNAPSHOT);
+    SELECT COUNT(*)
+    FROM runtime.AccountSessions WITH (SNAPSHOT);
 END;

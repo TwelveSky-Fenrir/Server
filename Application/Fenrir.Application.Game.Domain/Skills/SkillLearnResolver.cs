@@ -97,8 +97,13 @@ public static class SkillLearnResolver
         return new UpgradeResult(true, UpgradeFailure.None, learned.Grade + 1);
     }
 
-    /// <summary>Per-sType slot ranges: 1 -> [0,10), 2 -> [20,30), 3/4 -> try [10,20) then [30,40).</summary>
-    private static bool TryFindFreeSlotForType(byte skillType, IReadOnlyDictionary<byte, LearnedSkill> learnedSkills,
+    /// <summary>
+    ///     Per-sType slot ranges: 1 -> [0,10), 2 -> [20,30), 3/4 -> try [10,20) then [30,40). Internal (not
+    ///     private) so <see cref="SkillGrimoireLearnResolver" /> can reuse the identical table rather than
+    ///     duplicating it -- both resolvers share the same underlying legacy slot-range logic, just reached
+    ///     from different triggers (NPC skill-tree offer vs. item consumption).
+    /// </summary>
+    internal static bool TryFindFreeSlotForType(byte skillType, IReadOnlyDictionary<byte, LearnedSkill> learnedSkills,
         out byte slot)
     {
         switch (skillType)

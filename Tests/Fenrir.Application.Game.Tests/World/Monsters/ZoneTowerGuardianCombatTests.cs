@@ -48,12 +48,18 @@ public class ZoneTowerGuardianCombatTests
         zone.SpawnMonster(CreateGuardian(towerIndex));
 
         var (session, _) = ZoneTestKit.CreateSession(1);
-        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, TowerZoneNumber, "Attacker",
-            100, 0, 100, tribe: attackerTribe)));
+        zone.Post(ZoneCommand.Enter(10,
+            ZoneTestKit.EnterData(session, TowerZoneNumber, "Attacker", tribe: attackerTribe)));
         zone.Tick(SimulationClock.LegacyTick); // enters + pops the guardian into _players/_monsters
 
         Assert.True(zone.TryGetPlayer(10, out var attacker));
         attacker!.Stats = StrongAttacker;
+
+        // This suite exercises the tower-guardian friendly-fire gate, not the attack sub-packet budget/replay
+        // guard (that's AttackPacketBudgetTests' own job) -- a real client always sends a legal avatar-action
+        // packet first to establish a non-zero ceiling, which this fixture skips. Uncapped here so a raw
+        // CombatCommand posted straight after Enter isn't silently rejected by AttackPacketBudget.TryConsume.
+        attacker.AttackSubPacketCeiling = int.MaxValue;
 
         // ResolvePvmAttack checks the attacker's own zone-entry protect window, even against a monster.
         zone.Tick(CombatResolver.ProtectDuration + TimeSpan.FromSeconds(1));
@@ -146,11 +152,11 @@ public class ZoneTowerGuardianCombatTests
         zone.SpawnMonster(guardian);
 
         var (session, _) = ZoneTestKit.CreateSession(1);
-        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, TowerZoneNumber, "Attacker",
-            100, 0, 100, tribe: 1)));
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, TowerZoneNumber, "Attacker")));
         zone.Tick(SimulationClock.LegacyTick);
         Assert.True(zone.TryGetPlayer(10, out var attacker));
         attacker!.Stats = StrongAttacker;
+        attacker.AttackSubPacketCeiling = int.MaxValue; // see CreateZoneWithActiveGuardian's own remarks
         zone.Tick(CombatResolver.ProtectDuration + TimeSpan.FromSeconds(1));
 
         zone.PostCombatCommand(new CombatCommand { AttackerCharacterId = 10, AttackInfo = MeleeAgainst(guardian) });
@@ -173,11 +179,11 @@ public class ZoneTowerGuardianCombatTests
         zone.SpawnMonster(monster);
 
         var (session, _) = ZoneTestKit.CreateSession(1);
-        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 39, "Attacker",
-            100, 0, 100, tribe: 0)));
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 39, "Attacker", tribe: 0)));
         zone.Tick(SimulationClock.LegacyTick);
         Assert.True(zone.TryGetPlayer(10, out var attacker));
         attacker!.Stats = StrongAttacker;
+        attacker.AttackSubPacketCeiling = int.MaxValue; // see CreateZoneWithActiveGuardian's own remarks
         zone.Tick(CombatResolver.ProtectDuration + TimeSpan.FromSeconds(1));
 
         zone.PostCombatCommand(new CombatCommand { AttackerCharacterId = 10, AttackInfo = MeleeAgainst(monster) });

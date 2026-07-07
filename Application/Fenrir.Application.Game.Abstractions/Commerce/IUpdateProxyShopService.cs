@@ -19,8 +19,13 @@ public interface IUpdateProxyShopService
     ///     <c>BuySort</c> 1 -- RETRIEVE an unsold item from the caller's own closed shop back to inventory.
     ///     Returns <c>null</c> when the caller should abort the session as faulted.
     /// </summary>
+    /// <param name="accountId">
+    ///     The acting player's account id -- carried only for the game.EventLog audit row written once
+    ///     persistence succeeds (legacy <c>GL_1001_PXSHOP_ITEM</c>, action "Retrieved"); not used for any
+    ///     validation or persistence decision.
+    /// </param>
     public ValueTask<UpdateProxyShopResponse?> RetrieveAsync(UpdateProxyShopRequest packet, Zone zone,
-        PlayerRuntimeState state, int characterId, short slotIndex, ItemDefinition itemDefinition,
+        PlayerRuntimeState state, int characterId, int accountId, short slotIndex, ItemDefinition itemDefinition,
         CancellationToken cancellationToken);
 
     /// <summary>
@@ -29,7 +34,12 @@ public interface IUpdateProxyShopService
     ///     <c>BuyShopItemService</c>'s live-PShop twin). Returns <c>null</c> when the caller should abort the
     ///     session as faulted.
     /// </summary>
+    /// <param name="accountId">
+    ///     The buyer's account id -- carried only for the game.EventLog audit row written once persistence
+    ///     succeeds (legacy <c>GL_1001_PXSHOP_ITEM</c>, action "Purchased"); not used for any validation or
+    ///     persistence decision.
+    /// </param>
     public ValueTask<UpdateProxyShopResponse?> PurchaseAsync(UpdateProxyShopRequest packet, Zone zone,
-        PlayerRuntimeState state, int characterId, short slotIndex, ItemDefinition itemDefinition,
+        PlayerRuntimeState state, int characterId, int accountId, short slotIndex, ItemDefinition itemDefinition,
         CancellationToken cancellationToken);
 }

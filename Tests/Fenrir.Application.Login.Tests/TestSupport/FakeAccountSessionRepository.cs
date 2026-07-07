@@ -27,11 +27,7 @@ internal sealed class FakeAccountSessionRepository : IAccountSessionRepository
     public int? LastTearingDownAccountId { get; private set; }
 
     public (int AccountId, AccountSessionServerKind ServerKind, byte? ShardId, Guid SessionToken)?
-        LastTearingDownOwner
-    {
-        get;
-        private set;
-    }
+        LastTearingDownOwner { get; private set; }
 
     public (int AccountId, AccountSessionServerKind ServerKind, byte? ShardId, Guid SessionToken)? LastClearedOwner
     {

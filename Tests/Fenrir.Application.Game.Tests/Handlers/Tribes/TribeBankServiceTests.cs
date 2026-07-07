@@ -170,32 +170,69 @@ public class TribeBankServiceTests
     }
 
     [Fact]
-    public async Task Deposit_RegularMemberWithNoTribeRole_StillAllowed()
+    public async Task Deposit_NotForceLeader_Aborts()
     {
-        // Unlike view/withdraw, deposit only ever moves the depositor's own money -- no privileged role
-        // (TribeRole == 0, i.e. not master/sub-master/vote-candidate) is required.
+        // Deposit is gated identically to withdraw (Force Leader role + 3-sub-master quorum) even though it
+        // only ever moves the depositor's own money -- legacy's one mutating bank operation requires this
+        // gate regardless of the money's direction of travel, and Fenrir's deposit path (a Fenrir-only
+        // addition with no legacy counterpart) mirrors that rather than leaving itself open to any member.
         var zone = ZoneTestKit.CreateZone(1);
-        var (_, _, state) = Setup(zone, 1, 0);
-        var repository = new FakeTribeRepository { MoneyAfterDeposit = 0, DepositAmount = 5_000 };
-        repository.Bank[(1, 4)] = 0;
+        var (_, _, state) = Setup(zone, 1, 2);
+        var repository = new FakeTribeRepository();
+        repository.SubMasters.AddRange(
+        [
+            new TribeSubMasterDto(1, 0, 100), new TribeSubMasterDto(1, 1, 101), new TribeSubMasterDto(1, 2, 102)
+        ]);
         var service = new TribeBankService(repository, NullLogger<TribeBankService>.Instance);
 
         var result = await service.DepositAsync(4, state, CharacterId, CancellationToken.None);
 
-        Assert.Equal(((byte)1, (byte)4, CharacterId), repository.LastDepositCall);
-        Assert.True(result.Success);
-        Assert.Equal(3, result.Sort);
+        Assert.False(result.Success);
+        Assert.Null(repository.LastDepositCall);
+    }
+
+    [Fact]
+    public async Task Deposit_RegularMemberWithNoTribeRole_Aborts()
+    {
+        var zone = ZoneTestKit.CreateZone(1);
+        var (_, _, state) = Setup(zone, 1, 0);
+        var repository = new FakeTribeRepository();
+        var service = new TribeBankService(repository, NullLogger<TribeBankService>.Instance);
+
+        var result = await service.DepositAsync(4, state, CharacterId, CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Null(repository.LastDepositCall);
+    }
+
+    [Fact]
+    public async Task Deposit_NotEnoughSubMasters_Aborts()
+    {
+        var zone = ZoneTestKit.CreateZone(1);
+        var (_, _, state) = Setup(zone, 1, 1);
+        var repository = new FakeTribeRepository();
+        repository.SubMasters.Add(new TribeSubMasterDto(1, 0, 100));
+        var service = new TribeBankService(repository, NullLogger<TribeBankService>.Instance);
+
+        var result = await service.DepositAsync(4, state, CharacterId, CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Null(repository.LastDepositCall);
     }
 
     [Fact]
     public async Task Deposit_RepositoryThrows_Aborts()
     {
         var zone = ZoneTestKit.CreateZone(1);
-        var (_, _, state) = Setup(zone, 1, 0);
+        var (_, _, state) = Setup(zone, 1, 1);
         var repository = new FakeTribeRepository
         {
             DepositException = new InvalidOperationException("character has no money to deposit")
         };
+        repository.SubMasters.AddRange(
+        [
+            new TribeSubMasterDto(1, 0, 100), new TribeSubMasterDto(1, 1, 101), new TribeSubMasterDto(1, 2, 102)
+        ]);
         var service = new TribeBankService(repository, NullLogger<TribeBankService>.Instance);
 
         var result = await service.DepositAsync(4, state, CharacterId, CancellationToken.None);
@@ -207,8 +244,12 @@ public class TribeBankServiceTests
     public async Task Deposit_Success_ReturnsUpdatedBankAndMoney()
     {
         var zone = ZoneTestKit.CreateZone(1);
-        var (_, _, state) = Setup(zone, 1, 0);
+        var (_, _, state) = Setup(zone, 1, 1);
         var repository = new FakeTribeRepository { MoneyAfterDeposit = 0, DepositAmount = 30_000 };
+        repository.SubMasters.AddRange(
+        [
+            new TribeSubMasterDto(1, 0, 100), new TribeSubMasterDto(1, 1, 101), new TribeSubMasterDto(1, 2, 102)
+        ]);
         repository.Bank[(1, 9)] = 20_000;
         var service = new TribeBankService(repository, NullLogger<TribeBankService>.Instance);
 

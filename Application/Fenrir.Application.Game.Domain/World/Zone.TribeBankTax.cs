@@ -12,13 +12,30 @@ namespace Fenrir.Application.Game.Domain.World;
 ///     Réf. C++ : Server/ts25zone/S07_MyGame01.cpp:3054-3080,2610-2620 ; Server/ts25zone/H07_MyGame.h:108-109 --
 ///     see <see cref="WorldState.TribeBankTaxAccumulator" />'s own remarks for the full citation set.
 ///     <para>
-///         <see cref="CreditMonsterKillTribeTax" /> is wired to its one real call site,
-///         <see cref="Monsters.MonsterSpawnScheduler" />'s money-grant hook. <see cref="CreditNpcServiceTribeTax" />
-///         is NOT called from anywhere in this cluster's own batch -- its eight legacy call sites
-///         (item enchant/upgrade, enchant-costume, costume material swap-enchant, item exchange, high-item
-///         upgrade, low-item downgrade) all live in <c>Fenrir.Application.Game.Services.ItemModification</c>,
-///         outside this cluster's own Domain/World + Hosting scope and reported as touched by a concurrent
-///         Commerce-adjacent workflow -- the method exists so that layer can call it once free to do so.
+///         <b>
+///             Neither <see cref="CreditMonsterKillTribeTax" /> nor <see cref="CreditNpcServiceTribeTax" /> is
+///             currently called from anywhere in this cluster.
+///         </b>
+///         <see cref="CreditMonsterKillTribeTax" /> is
+///         deliberately NOT wired to <see cref="Monsters.MonsterSpawnScheduler" />'s money-grant hook: in
+///         production <c>ts25zone</c>, <c>AddTribeBankInfo3</c> (the 9% monster-kill-currency tax this method
+///         models) has exactly one live call site, <c>ProcessForDropItem</c>'s <c>DP_MN_TO_WD</c>/currency-item
+///         branch (<c>Server/ts25zone/S07_MyGame03.cpp:486-494</c>), and the live <c>DROP_MONEY</c> block that
+///         actually grants monster-kill silver never calls <c>ProcessForDropItem</c> for its own currency
+///         grant -- the one line that would have (<c>Server/ts25zone/S07_MyGame05.cpp:2689</c>) is commented
+///         out, not live code. So crediting this tax from a monster-kill money grant would manufacture
+///         tribe-bank income the legacy production build never actually generates from that source; the method
+///         is kept (and directly unit-tested) only because whether the underlying 9% mechanism has some other,
+///         not-yet-identified live caller elsewhere in <c>ts25zone</c> is unconfirmed -- see
+///         <see cref="WorldState.TribeBankTaxAccumulator" />'s own remarks and the
+///         <c>legacy-behavior-translator</c> contract this disconnection was made from before assuming the
+///         mechanism can be removed outright. <see cref="CreditNpcServiceTribeTax" /> is separately unwired for
+///         an unrelated reason: its eight legacy call sites (item enchant/upgrade, enchant-costume, costume
+///         material swap-enchant, item exchange, high-item upgrade, low-item downgrade) all live in
+///         <c>Fenrir.Application.Game.Services.ItemModification</c>, outside this cluster's own Domain/World +
+///         Hosting scope and reported as touched by a concurrent Commerce-adjacent workflow -- the method
+///         exists so that layer can call it once free to do so, and unlike <see cref="CreditMonsterKillTribeTax" />
+///         it IS a genuinely live legacy mechanism once wired.
 ///     </para>
 /// </remarks>
 public sealed partial class Zone
@@ -34,9 +51,11 @@ public sealed partial class Zone
     }
 
     /// <summary>
-    ///     9% monster-kill-currency-item tax -- called alongside <see cref="QueueMoneyGrant" /> by
-    ///     <see cref="Monsters.MonsterSpawnScheduler" /> with the same already-resolved amount, so the killer's
-    ///     own award is never reduced to fund it.
+    ///     9% monster-kill-currency-item tax model. Deliberately NOT called by
+    ///     <see cref="Monsters.MonsterSpawnScheduler" />'s <see cref="QueueMoneyGrant" /> money-grant hook --
+    ///     see this file's own class remarks for why that specific wiring would be legacy-inaccurate. Kept and
+    ///     directly unit-tested as a standalone mechanism pending confirmation of whether it has any other
+    ///     legitimate live caller.
     /// </summary>
     public void CreditMonsterKillTribeTax(byte killerTribe, long postReductionAmount)
     {

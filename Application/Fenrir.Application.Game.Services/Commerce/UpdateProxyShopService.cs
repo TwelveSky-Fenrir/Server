@@ -18,8 +18,19 @@ public sealed class UpdateProxyShopService(
     IOfflineShopRepository offlineShops,
     ICharacterRepository characters,
     WorldDataCache worldData,
+    IEventLogRepository eventLog,
     ILogger<UpdateProxyShopService> logger) : IUpdateProxyShopService
 {
+    /// <summary>
+    ///     game.EventLog.EventCode for a proxy-shop retrieve row (legacy <c>GL_1001_PXSHOP_ITEM</c>, action
+    ///     label "Retrieved"), scoped within <see cref="EventLogCategory.ProxyShop" /> -- see that enum
+    ///     member's remarks for the full 1-4 numbering.
+    /// </summary>
+    private const short ProxyShopRetrieveEventCode = 2;
+
+    /// <summary>Same legacy call site as <see cref="ProxyShopRetrieveEventCode" />, action label "Purchased".</summary>
+    private const short ProxyShopPurchaseEventCode = 3;
+
     public UpdateProxyShopValidation Validate(UpdateProxyShopRequest packet)
     {
         if (packet.BuySort is not (1 or 2))
@@ -39,7 +50,7 @@ public sealed class UpdateProxyShopService(
     }
 
     public async ValueTask<UpdateProxyShopResponse?> RetrieveAsync(UpdateProxyShopRequest packet, Zone zone,
-        PlayerRuntimeState state, int characterId, short slotIndex, ItemDefinition itemDefinition,
+        PlayerRuntimeState state, int characterId, int accountId, short slotIndex, ItemDefinition itemDefinition,
         CancellationToken cancellationToken)
     {
         var destination = state.Inventory.GetSlot((byte)packet.SelfPage, (byte)packet.SelfIndex);
@@ -73,6 +84,20 @@ public sealed class UpdateProxyShopService(
 
         var response = BuildReply(0, packet.SelfPage, packet.SelfIndex, newStack, packet.Socket, 0);
 
+        // Logged only once RetrieveItemAndReplaceContainerAsync above has durably committed. Money is
+        // unconditionally 0 for a retrieve, matching legacy's own forced-zero before both the response and
+        // the audit write (Server/ts25zone/S07_MyGame09.cpp:838-844) -- never packet.Price, which this branch
+        // never even reads. The shop's own remaining Money/BigMoney are unaffected by a retrieve; re-read
+        // fresh (rather than threaded from elsewhere) purely so this audit row reflects the actually-stored
+        // balance, not an assumption. TargetAccountId/TargetCharacterId are left null: owner == actor here.
+        var (shopAfterRetrieve, _) = await offlineShops.GetByCharacterAsync(characterId, cancellationToken);
+        await eventLog.LogAsync(ProxyShopRetrieveEventCode, EventLogCategory.ProxyShop, accountId, characterId,
+            null, null, null, 0, null, packet.SellItemIndex, packet.Quantity, 1,
+            $"Action=Retrieved;Value={packet.Value};Serial={packet.Serial};Socket1={packet.Socket[0]};" +
+            $"Socket2={packet.Socket[1]};Socket3={packet.Socket[2]};ShopOwnerName={state.Name};" +
+            $"ShopMoneyAfter={shopAfterRetrieve?.Money ?? 0};ShopBigMoneyAfter={shopAfterRetrieve?.BigMoney ?? 0}",
+            cancellationToken);
+
         var containers =
             ImmutableArray.Create(new InventoryContainerSnapshot((byte)packet.SelfPage, projectedContainer));
         if (!await zone.PostInventoryCommandAndWaitAsync(new InventoryZoneCommand(characterId, containers, null),
@@ -85,7 +110,7 @@ public sealed class UpdateProxyShopService(
     }
 
     public async ValueTask<UpdateProxyShopResponse?> PurchaseAsync(UpdateProxyShopRequest packet, Zone zone,
-        PlayerRuntimeState state, int characterId, short slotIndex, ItemDefinition itemDefinition,
+        PlayerRuntimeState state, int characterId, int accountId, short slotIndex, ItemDefinition itemDefinition,
         CancellationToken cancellationToken)
     {
         var sellerId = await characters.GetIdByNameAsync(packet.AvatarName, cancellationToken);
@@ -127,6 +152,22 @@ public sealed class UpdateProxyShopService(
         }
 
         var response = BuildReply(0, packet.SelfPage, packet.SelfIndex, newStack, packet.Socket, packet.Price);
+
+        // Logged only once ExecutePurchaseAsync above has durably committed -- ShopMoneyAfter/BigMoneyAfter
+        // re-read fresh from the seller's shop row so this audit row reflects the actual post-credit balance
+        // (including any BigMoney rollover ExecutePurchaseAsync's own CASE WHEN applied), not a value
+        // recomputed here that could drift from the stored procedure's own rounding/rollover logic.
+        // TargetAccountId is deliberately left null: no cheap characterId->accountId lookup exists on
+        // ICharacterRepository today, and the seller may be offline (the whole point of a proxy shop) so no
+        // live PlayerRuntimeState is available either -- TargetCharacterId is still populated, and
+        // game.Characters.AccountId is trivially joinable from it for any downstream audit query.
+        var (shopAfterPurchase, _) = await offlineShops.GetByCharacterAsync(sellerId.Value, cancellationToken);
+        await eventLog.LogAsync(ProxyShopPurchaseEventCode, EventLogCategory.ProxyShop, accountId, characterId,
+            null, sellerId.Value, null, packet.Price, null, packet.SellItemIndex, packet.Quantity, 1,
+            $"Action=Purchased;Value={packet.Value};Serial={packet.Serial};Socket1={packet.Socket[0]};" +
+            $"Socket2={packet.Socket[1]};Socket3={packet.Socket[2]};ShopOwnerName={packet.AvatarName};" +
+            $"ShopMoneyAfter={shopAfterPurchase?.Money ?? 0};ShopBigMoneyAfter={shopAfterPurchase?.BigMoney ?? 0}",
+            cancellationToken);
 
         var containers =
             ImmutableArray.Create(new InventoryContainerSnapshot((byte)packet.SelfPage, projectedContainer));

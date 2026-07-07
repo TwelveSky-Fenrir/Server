@@ -2,7 +2,7 @@
 -- 504xx runtime, 509xx cross-cutting/generic.
 CREATE TABLE admin.ErrorCatalog
 (
-    ErrorNumber INT NOT NULL,
+    ErrorNumber INT           NOT NULL,
     SchemaName  NVARCHAR(64)  NOT NULL,
     Description NVARCHAR(400) NOT NULL,
     CONSTRAINT PK_ErrorCatalog PRIMARY KEY CLUSTERED (ErrorNumber)

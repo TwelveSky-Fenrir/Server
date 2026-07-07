@@ -116,13 +116,15 @@ public sealed class PositionWriteBehindHostTests
     }
 
     /// <summary>
-    ///     Disconnect-path fix (fenrir-disconnect-persistence-guarantee): <see cref="PositionWriteBehindHost.FlushCharacterNowAsync" />
+    ///     Disconnect-path fix (fenrir-disconnect-persistence-guarantee):
+    ///     <see cref="PositionWriteBehindHost.FlushCharacterNowAsync" />
     ///     must persist a live character's CURRENT Progress AND Position rows synchronously, without going
     ///     through the background <see cref="WriteBehindFlusher{TKey}" /> loop at all -- the host is never
     ///     started here, proving this path doesn't depend on that loop having woken up.
     /// </summary>
     [Fact]
-    public async Task FlushCharacterNowAsync_CharacterLiveInRegistry_PersistsProgressAndPositionWithoutTheBackgroundLoop()
+    public async Task
+        FlushCharacterNowAsync_CharacterLiveInRegistry_PersistsProgressAndPositionWithoutTheBackgroundLoop()
     {
         const int characterId = 30;
         var (registry, dirtyTracker) = CreateRegistryWithOnePlayer(1, characterId, out var state);
@@ -155,7 +157,8 @@ public sealed class PositionWriteBehindHostTests
     }
 
     /// <summary>
-    ///     A character no longer present in any zone's live registry by the time <see cref="PositionWriteBehindHost.FlushCharacterNowAsync" />
+    ///     A character no longer present in any zone's live registry by the time
+    ///     <see cref="PositionWriteBehindHost.FlushCharacterNowAsync" />
     ///     runs (e.g. an already-completed handoff, or called twice) is documented as a no-op -- must not throw,
     ///     and must not persist anything.
     /// </summary>

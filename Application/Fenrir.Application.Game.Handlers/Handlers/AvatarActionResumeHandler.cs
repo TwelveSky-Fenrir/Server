@@ -29,6 +29,6 @@ public sealed class AvatarActionResumeHandler(IAvatarActionService service)
             return;
 
         var action = packet.Action;
-        service.PostAction(zone, zoneSession.CharacterId!.Value, in action, isResumeAction: true);
+        service.PostAction(zone, zoneSession.CharacterId!.Value, in action, true);
     }
 }

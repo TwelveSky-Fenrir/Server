@@ -10,7 +10,7 @@ public sealed class AvatarActionService : IAvatarActionService
     /// <summary>Action-sort value the legacy's "stand up from death" request rides -- S04_MyWork02.cpp:1313-1320.</summary>
     private const int StandUpActionSort = 30;
 
-    public void PostAction(Zone zone, int characterId, in ActionInfo action)
+    public void PostAction(Zone zone, int characterId, in ActionInfo action, bool isResumeAction = false)
     {
         // mProtect_ReviveHack companion check (S04_MyWork02.cpp:1313-1320): a stand-up attempt while still
         // flagged from an unresolved death is kicked outright rather than silently denied. ReviveHackFlag is
@@ -23,6 +23,6 @@ public sealed class AvatarActionService : IAvatarActionService
             return;
         }
 
-        zone.Post(ZoneCommand.Move(characterId, in action));
+        zone.Post(ZoneCommand.Move(characterId, in action, isResumeAction));
     }
 }

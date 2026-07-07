@@ -25,6 +25,16 @@ public readonly struct ZoneCommand
     /// <summary>Meaningful only when <see cref="Kind" /> is <see cref="ZoneCommandKind.Move" />.</summary>
     public ActionInfo Action { get; init; }
 
+    /// <summary>
+    ///     Meaningful only when <see cref="Kind" /> is <see cref="ZoneCommandKind.Move" />: true for
+    ///     CZ_UPDATE_AVATAR_ACTION (op16), false (default) for CZ_AVATAR_ACTION_SEND (op15). The two opcodes
+    ///     run their own, separate Sort/Type legality switch in the legacy source -- see
+    ///     <see cref="Fenrir.Application.Game.Domain.Movement.AvatarActionResumeWhitelist" /> and
+    ///     <see cref="Fenrir.Application.Game.Domain.Movement.CharacterMotionWhitelist" />'s own remarks --
+    ///     so <c>Zone.HandleMove</c> needs this to pick the correct one.
+    /// </summary>
+    public bool IsResumeAction { get; init; }
+
     /// <summary>Meaningful only when <see cref="Kind" /> is <see cref="ZoneCommandKind.Enter" />.</summary>
     public PlayerEnterData? EnterData { get; init; }
 
@@ -58,9 +68,13 @@ public readonly struct ZoneCommand
         };
     }
 
-    public static ZoneCommand Move(int characterId, in ActionInfo action)
+    public static ZoneCommand Move(int characterId, in ActionInfo action, bool isResumeAction = false)
     {
-        return new ZoneCommand { Kind = ZoneCommandKind.Move, CharacterId = characterId, Action = action };
+        return new ZoneCommand
+        {
+            Kind = ZoneCommandKind.Move, CharacterId = characterId, Action = action,
+            IsResumeAction = isResumeAction
+        };
     }
 
     /// <summary>op156 CZ_UPDATE_PET_ACTION_SEND -- reuses <see cref="Action" />, only its pet sub-fields are meaningful.</summary>

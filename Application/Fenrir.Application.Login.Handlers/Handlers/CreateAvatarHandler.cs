@@ -26,10 +26,19 @@ namespace Fenrir.Application.Login.Handlers.Handlers;
 ///     (CheckNameString itself) ; Server/ts25login/S04_MyWork02.cpp:640-646 (the fourth-faction/Tribe-value-3
 ///     creation exclusion delegated to <see cref="Fenrir.Application.Login.Domain.Avatars.FourthFactionGate" />
 ///     via the service, see its own remarks for the full citation). PreviousTribe (the race/starter-kit-template
-///     field) is deliberately NOT range-checked here: Server/ts25login/S04_MyWork02.cpp:739-838's PreviousTribe
-///     switch has no case-3/default branch, so a value outside 0-2 is a genuine legacy validation gap -- the
-///     request is not rejected on this basis, only the weapon-matching rule is skipped (see
-///     <see cref="Fenrir.Application.Login.Services.CreateAvatar.CreateAvatarService" />'s own remarks).
+///     field) IS range-checked here, to the same 0-2 domain the per-race switch actually recognizes --
+///     Server/ts25login/S04_MyWork02.cpp:739-838's PreviousTribe switch has no case-3/default branch, so legacy
+///     itself never rejects an out-of-range value on this basis, only the weapon-matching rule is skipped for
+///     it (see <see cref="Fenrir.Application.Login.Services.CreateAvatar.CreateAvatarService" />'s own
+///     remarks). This is a deliberate Fenrir-side divergence, not a missed legacy citation:
+///     game.Characters.PreviousTribe carries a CK_Characters_PreviousTribe CHECK constraint enforcing that
+///     exact 0-2 range (Migrations/018_character_previous_tribe_and_mount_readpath.sql:35-36), so an
+///     out-of-range value that reached usp_Character_CreateWithStarterKit would fail there instead, on the
+///     transaction's very first INSERT, as an uncaught, uncoded SqlException -- surfacing to the client as the
+///     same generic CreateAvatarResponse{Result=1} any other undistinguished failure produces, not the clean
+///     Malformed-disconnect a structurally-invalid field gets everywhere else on this request. Rejecting it
+///     here instead closes that gap with the same treatment every other bounded field on this request already
+///     gets (db-createwithstarterkit-fieldaudit finding).
 /// </remarks>
 public sealed class CreateAvatarHandler(ICreateAvatarService createAvatarService, ILogger<CreateAvatarHandler> logger)
     : IAsyncPacketHandler<CreateAvatarRequest>
@@ -43,12 +52,14 @@ public sealed class CreateAvatarHandler(ICreateAvatarService createAvatarService
         if (packet.AvatarPost is < 0 or > 2 ||
             packet.AvatarName.Length == 0 ||
             packet.Tribe is < 0 or > 3 ||
+            packet.PreviousTribe is < 0 or > 2 ||
             packet.Head is < 0 or > 6 ||
             packet.Face is < 0 or > 2)
         {
             logger.LogWarning(
-                "Create-avatar rejected: malformed request from account {AccountId} (slot {Slot}, tribe {Tribe})",
-                accountId, packet.AvatarPost, packet.Tribe);
+                "Create-avatar rejected: malformed request from account {AccountId} (slot {Slot}, tribe {Tribe}, " +
+                "previousTribe {PreviousTribe})",
+                accountId, packet.AvatarPost, packet.Tribe, packet.PreviousTribe);
             loginSession.Abort(DisconnectReason.Malformed);
             return;
         }

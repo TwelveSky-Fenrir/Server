@@ -27,13 +27,37 @@ namespace Fenrir.Application.Login.Services.CreateAvatar;
 ///     <see cref="TryResolveWeaponItemId" />'s call site) ; Server/ts25login/S04_MyWork02.cpp:1100-1179 (starting
 ///     level/stats/skill points, the six-category Enchant/Combine grant, and the pet/cape/mount grant -- all
 ///     literal legacy constants embedded directly in usp_Character_CreateWithStarterKit, not parameters here) ;
+///     Server/ts25login/S04_MyWork02.cpp:1100-1110 specifically (<see cref="StartingLevel2" />/
+///     <see cref="StartingExp2" />/<see cref="StartingStatPoint" />/<see cref="StartingSkillPoint" /> -- these
+///     four are now also mirrored onto the create-avatar confirmation response itself, not just persisted:
+///     previously the response's narrow CharacterWorldEntryDto-backed overlay omitted them entirely, so the
+///     client was shown Level2/Exp2/StatPoint/SkillPoint = 0 immediately after creation even though the
+///     database correctly recorded 12/0/3175/10000 -- a display-only mismatch confined to this one response,
+///     self-correcting the next time the character actually enters the world via Game's own
+///     AvatarInfoFactory.CreateForCharacter reading the fuller CharacterWorldSnapshotDto) ;
+///     Server/ts25login/S04_MyWork02.cpp:1105 (<see cref="StartingExp1" /> -- aExp1 = MAX_NUMBER_SIZE) ;
+///     Server/Header/Protocol/DEFINE.h:365 (MAX_NUMBER_SIZE = 2000000000): unlike the four fields above, this
+///     one does NOT self-correct on zone entry -- Exp1 was never projected anywhere in the codebase (this
+///     response, Game's CreateForCharacter, or Game's CreateForRuntimeState), so every character showed 0 XP
+///     permanently regardless of actual progress (create-avatar-stats-fresh finding, severity blocker; the
+///     broader "not just creation, EVERY subsequent world entry too" variant is tracked separately as
+///     zone-avatarinfo-factory-parity, severity Major). This creation-time overlay -- the one legacy fact
+///     actually on record (the fixed MAX_NUMBER_SIZE sentinel, S04_MyWork02.cpp:1105) -- is fixed here. What
+///     legacy assigns aExp1 on an ordinary (non-creation) world entry / zone transfer is NOT established by
+///     any citation available to this pass and is deliberately left unresolved rather than guessed -- see
+///     <c>Fenrir.Application.Game.Domain.Avatars.AvatarInfoFactory</c>'s own Exp1 remarks (both
+///     <c>CreateForCharacter</c> and <c>CreateForRuntimeState</c>) for the open question and the
+///     cpp-ts25-explorer re-check this needs before it can be closed.
 ///     Server/ts25login/S04_MyWork02.cpp:1094-1097 (the current-life/current-mana literals, 30/21, and the
 ///     DEFINE.h:751-756 write-macro confirming those are the logout-info slots this session's own current
 ///     values, not any maximum) ; Server/ts25login/S04_MyWork02.cpp:1174-1179 (the universal starter mount --
 ///     item 1301/DEFINE.h:157 ANIMAL_NUM_TIGER1, "5%" power, slot 0, permanent expiry) ;
 ///     Server/ts25login/S04_MyWork02.cpp:885-892 (DoubleExpTime1/DoubleExpTime2 vs AutoBuffTime are two
-///     independently-sourced legacy fields, not the same value applied twice -- see the DoubleExpTime1/2
-///     assignment below for why this is flagged, not yet fixed) ;
+///     independently-sourced legacy fields -- DoubleExpTime1/2 a raw 300-tick counter, AutoBuffTime a
+///     genuine 7-day-future date -- confirmed by Server/ts25zone/S07_MyGame04.cpp:955-969's decrement-on-tick
+///     consumer, which proves the two are never compared against a calendar date; see
+///     <see cref="DoubleExpCounterStart" /> for the C# fix and
+///     Migrations/026_double_exp_time_counter_fix.sql for the stored-procedure side) ;
 ///     Server/ts25zone/S04_MyWork02.cpp:880-901 (the Tribe/PreviousTribe self-consistency check zone entry
 ///     performs against the persisted PreviousTribe this method now threads through to
 ///     <see cref="ICharacterRepository.CreateWithStarterKitAsync" /> instead of leaving it un-persisted).
@@ -72,6 +96,16 @@ public sealed class CreateAvatarService(
     private const byte StarterCapeEnchant = 40;
     private const int StarterPetItemId = 2300; // Yin Yang Free; PetGrowth/PetActivity live on game.Characters itself
 
+    // Server/ts25login/S04_MyWork02.cpp:1131-1135: tAvatarInfo.aEquip[EPET][1] = MAX_PAT_ACTIVITY_SIZE (full
+    // activity), aEquip[EPET][2] = 640,000,000 (200% growth, a raw value -- not a packed Enchant/Combine/
+    // Refine/Socket byte quad). Identical literals to the ones this method's own CreateWithStarterKitAsync
+    // call persists onto game.Characters.PetActivity/PetGrowth (Migrations/016_starter_kit_create_atomicity.sql:77),
+    // overlaid onto the immediate response the same "known at creation time, not read back" way
+    // StarterMountItemId/StartingLevel2 are above -- closes the zone-avatarinfo-factory-parity finding
+    // (starter pet always displaying 0% growth/0 activity) for the create-avatar response itself.
+    private const int StarterPetGrowth = 640_000_000;
+    private const byte StarterPetActivity = 100;
+
     // Server/ts25login/S04_MyWork02.cpp:1112-1120: SetISIUIMValue(45, 6, 0, 0) on the six elite-gear
     // categories (Weapon/Armor/Gloves/Ring/Boots/Amulet, i.e. every StarterKitEquipmentRowDto row) -- despite
     // the adjacent "Enchant[20%]" comment at line 1112, the literal first argument is 45, not 20.
@@ -92,12 +126,53 @@ public sealed class CreateAvatarService(
     private const int StarterMountTime = 99999999;
 
     // AutoBuffTime is genuinely this many days out (S04_MyWork02.cpp:892, "Starting Auto Buff Scroll: 7
-    // days") -- confirmed legacy-accurate. DoubleExpTime1/DoubleExpTime2 are a SEPARATE, confirmed-wrong
-    // concern applied to the same value below -- see that assignment's own comment for why it isn't fixed
-    // in this pass.
+    // days") -- confirmed legacy-accurate.
     private const int WelcomeBuffDurationDays = 7;
 
+    // Server/ts25login/S04_MyWork02.cpp:886-887: aDoubleExpTime1/aDoubleExpTime2 are bare integer literals
+    // (300), NOT date-derived -- Server/ts25zone/S07_MyGame04.cpp:955-969's periodic per-tick handler proves
+    // these are raw decrement-if-greater-than-zero counters (never compared against a YYYYMMDD date
+    // anywhere), wholly independent of AutoBuffTime's genuine 7-day-future date above. Previously collapsed
+    // onto the same date value as AutoBuffTime -- a confirmed-wrong ~20-million-fold inflation of the
+    // welcome-buff duration (a date like 20260714 fed into decrement-by-1-per-tick logic instead of 300).
+    // Now persisted as this literal instead, matching usp_Character_CreateWithStarterKit's own hardcoded
+    // 300/300 (Migrations/026_double_exp_time_counter_fix.sql) -- the same "literal baked directly into the
+    // stored procedure" treatment already used for the starting level/stat/pet/mount grants there. The
+    // real-world wall-clock duration one such tick represents, and the runtime decrement/notify consumer
+    // itself, are a separate, not-yet-implemented Game-side concern (see the behavior contract's own "open
+    // question" on the tick-to-wall-clock rate) -- out of scope for this creation-time fix.
+    private const int DoubleExpCounterStart = 300;
+
     private const int PremiumDurationDays = 1;
+
+    // Server/ts25login/S04_MyWork02.cpp:1100-1110 (USE_CUSTOME_CREATE block): the high-level/rebirth-ladder
+    // level, its own experience counter, and the two point pools are fixed literal constants applied
+    // unconditionally at creation, identical for every tribe/gender/previous-tribe -- already baked into
+    // usp_Character_CreateWithStarterKit's own INSERT
+    // (Migrations/018_character_previous_tribe_and_mount_readpath.sql:113) the same way DoubleExpCounterStart/
+    // StarterMountItemId above are. CharacterWorldEntryDto's narrow read doesn't carry any of these four
+    // columns back (see its own doc comment), so -- exactly like Vit/Str/Int/Dex below -- the response overlay
+    // uses these C# literals directly instead of a second round trip. Previously omitted from the overlay
+    // entirely, which left the create-avatar confirmation response showing all four at their zero/default
+    // template value even though the character record itself was persisted correctly (create-avatar-stats-
+    // fresh finding).
+    private const int StartingLevel2 = 12;
+    private const int StartingExp2 = 0;
+    private const int StartingStatPoint = 3175;
+    private const int StartingSkillPoint = 10000;
+
+    // Server/ts25login/S04_MyWork02.cpp:1105 (tAvatarInfo.aExp1 = MAX_NUMBER_SIZE) ; Server/Header/Protocol/
+    // DEFINE.h:365 (#define MAX_NUMBER_SIZE 2000000000). Same "known at creation time, not read back" overlay
+    // as StartingLevel2/StartingExp2 above -- usp_Character_CreateWithStarterKit already persists this exact
+    // literal into game.Characters.Experience (Migrations/018_character_previous_tribe_and_mount_readpath.sql:113),
+    // but CharacterWorldEntryDto doesn't carry that column back (see its own doc comment), so this was
+    // previously left at Zeroed's 0 default on the create-avatar response itself (create-avatar-stats-fresh
+    // finding). Unlike StartingLevel2/StartingExp2/StartingStatPoint/StartingSkillPoint, this one does NOT
+    // self-correct on the next zone entry -- but what SHOULD replace the 0 on that next zone entry is its own
+    // separate open question (zone-avatarinfo-factory-parity finding, Major), deliberately NOT resolved here:
+    // see AvatarInfoFactory (Game)'s own Exp1 remarks on both CreateForCharacter/CreateForRuntimeState for why
+    // that side is intentionally left unpopulated pending legacy re-verification, rather than guessed.
+    private const int StartingExp1 = 2_000_000_000;
 
     // GetReturnBornInTownLocation: Tribe (the playable faction, 0-3) decides the spawn map. PreviousTribe (the
     // Noble Dragon/Royal Serpent/Grand Tiger starting-kit template, 0-2) separately decides equipment/inventory/
@@ -143,9 +218,13 @@ public sealed class CreateAvatarService(
         var kit = await starterKits.GetByPreviousTribeAsync(previousTribe, mapId, cancellationToken);
 
         // The weapon-vs-race matching switch (S04_MyWork02.cpp:739-838) only has cases for PreviousTribe 0/1/2
-        // (Noble Dragon/Royal Serpent/Grand Tiger) and no case-3/default branch -- any other PreviousTribe value
-        // is a genuine legacy validation gap: no weapon check runs, the request is not rejected on this basis,
-        // and the weapon-equip slot is simply left unassigned rather than the client's requested weapon.
+        // (Noble Dragon/Royal Serpent/Grand Tiger) and no case-3/default branch -- legacy itself grants nothing
+        // for any other value rather than rejecting the request on this basis. CreateAvatarHandler now
+        // range-checks PreviousTribe to 0-2 before ever calling this method (see its own remarks for the full
+        // citation and the CK_Characters_PreviousTribe DB constraint that motivated it), so in practice
+        // previousTribe is always 0/1/2 by the time this line runs; the `is 0 or 1 or 2` guard below is kept as
+        // defense-in-depth for any other caller of this public service method, not because an out-of-range
+        // value is still expected to reach here from the handler.
         var weaponItemId = 0;
         if (previousTribe is 0 or 1 or 2 && !TryResolveWeaponItemId(kit.Equipment, weapon, out weaponItemId))
             return new CreateAvatarResult(CreateAvatarOutcome.InvalidWeapon, AvatarInfoFactory.Zeroed);
@@ -200,27 +279,34 @@ public sealed class CreateAvatarService(
                 Str = 1,
                 Int = 1,
                 Dex = 1,
+                // Fixed literal constants applied unconditionally at creation (see StartingLevel2's own
+                // remarks for the full citation) -- NOT read back from the row above, for the same reason
+                // Vit/Str/Int/Dex above aren't.
+                Level2 = StartingLevel2,
+                // aExp1 sentinel (see StartingExp1's own remarks for the full citation) -- closes the
+                // create-avatar-stats-fresh finding's blocker on this response.
+                Exp1 = StartingExp1,
+                Exp2 = StartingExp2,
+                StatPoint = StartingStatPoint,
+                SkillPoint = StartingSkillPoint,
                 // game.Characters.PreviousTribe (Migrations/018_character_previous_tribe_and_mount_readpath.sql)
                 // isn't projected onto CharacterWorldEntryDto either -- already known here as the request's
                 // own (unvalidated-by-design, see this method's own remarks) parameter.
                 PreviousTribe = previousTribe,
-                Equip = AvatarInfoFactory.BuildEquipArray(equipment),
+                Equip = AvatarInfoFactory.BuildEquipArray(equipment, StarterPetGrowth, StarterPetActivity),
                 Animal = SingleMountSlotArray(StarterMountItemId),
                 AnimalIndex = StarterMountSlotIndex,
                 AnimalTime = StarterMountTime,
                 AnimalPower = SingleMountSlotArray(StarterMountPower),
                 AnimalExpActivity = SingleMountSlotArray(StarterMountExpActivity),
-                // DoubleExpTime1/DoubleExpTime2 vs AutoBuffTime is a CONFIRMED-WRONG collapse, not fixed here:
-                // legacy sets DoubleExpTime1/2 to a fixed raw counter (300, S04_MyWork02.cpp:886-887) that is
-                // NOT date-derived, while AutoBuffTime genuinely is this 7-day-future date (S04_MyWork02.cpp:
-                // 892) -- but usp_Character_CreateWithStarterKit only exposes one @WelcomeBuffUntilDate
-                // parameter for all three columns (016_starter_kit_create_atomicity.sql:74,77), and the exact
-                // unit/encoding of that 300 literal was not independently confirmed. Both a new stored-
-                // procedure parameter and a fresh legacy-research pass on the literal's meaning are needed
-                // before this can change (bridge-stats-equipment contract, gap-table row 12) -- deliberately
-                // not substituted blind.
-                DoubleExpTime1 = welcomeBuffUntilDate,
-                DoubleExpTime2 = welcomeBuffUntilDate,
+                // DoubleExpTime1/DoubleExpTime2 are the raw 300-tick counter (see DoubleExpCounterStart's own
+                // remarks for the full citation) -- genuinely independent of AutoBuffTime's 7-day-future date,
+                // not the same value collapsed onto all three fields. usp_Character_CreateWithStarterKit now
+                // bakes 300/300 in directly for these two columns (Migrations/026_double_exp_time_counter_fix.sql),
+                // so the response overlay uses the same C# constant rather than re-deriving it, exactly like
+                // StarterMountItemId/StarterMountPower above.
+                DoubleExpTime1 = DoubleExpCounterStart,
+                DoubleExpTime2 = DoubleExpCounterStart,
                 AutoBuffTime = welcomeBuffUntilDate,
                 Premium = premiumUntilUnixSeconds
             };

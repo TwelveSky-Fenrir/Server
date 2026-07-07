@@ -268,7 +268,7 @@ public sealed partial class Zone(
                         break;
                     case ZoneCommandKind.Move:
                         var action = command.Action;
-                        HandleMove(command.CharacterId, in action);
+                        HandleMove(command.CharacterId, in action, command.IsResumeAction);
                         break;
                     case ZoneCommandKind.PetAction:
                         var petAction = command.Action;

@@ -13,6 +13,16 @@ namespace Fenrir.Application.Game.Hosting.World;
 ///     The 1s timer is a safety net, not the primary trigger: it's raced via <see cref="Task.WhenAny(Task[])" />
 ///     against each zone's <see cref="Zone.WaitForMoneyGrantAsync" />, so grants flush almost immediately.
 ///     A dropped/delayed grant has no retry (in-memory queue only) -- an accepted residual gap.
+///     <para>
+///         <b>Process-kill residual risk, exact bound:</b> a true (non-graceful) process kill loses whatever
+///         money grants are queued in-memory and not yet persisted -- in practice sub-tick, since
+///         <see cref="Zone.WaitForMoneyGrantAsync" /> wakes this loop the instant a grant is queued rather than
+///         waiting for the timer; the worst-case bound is <see cref="FlushInterval" /> (1s), reached only if
+///         the wake signal itself were somehow missed. This timer is left at 1s rather than tightened further
+///         in this pass: it is already a safety net racing a near-instant wake, not the primary latency driver,
+///         so shortening it further would not meaningfully shrink real-world exposure. This is an accepted,
+///         bounded tradeoff, not a silent gap.
+///     </para>
 /// </remarks>
 public sealed class MonsterLootFlushHost(
     ZoneRegistry zones,

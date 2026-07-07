@@ -233,10 +233,60 @@ public sealed partial class Zone
 
         if (!_players.TryAdd(characterId, state))
         {
-            logger.LogWarning(
-                "Character {CharacterId} entered zone {MapId} while already tracked -- ignoring duplicate Enter",
-                characterId, MapId);
-            return;
+            // TryAdd only fails when characterId is already tracked here. _players is mutated only from this
+            // zone's own tick thread (this class's own header remarks), so the TryGetValue below is
+            // guaranteed to observe the very entry TryAdd just collided with -- no other mutator can have
+            // raced it away in between.
+            _players.TryGetValue(characterId, out var existing);
+
+            if (existing is not null && !ReferenceEquals(existing.Session, state.Session))
+            {
+                // A DIFFERENT session is still tracked under this characterId: that session's own disconnect
+                // teardown (GameConnectionHost.OnAcceptedAsync's finally block, which is what posts its
+                // Leave) hasn't run yet. For a same-shard relogin that lag is normally sub-tick, but the
+                // cross-process kick path (AccountSessionKickPollHost) that is the only thing that can Abort
+                // a still-connected stale session that reconnected to a DIFFERENT shard polls only every
+                // GameServerOptions.AccountSessionPollIntervalSeconds (default 20s) -- wide enough for a fresh
+                // login to reach here first. This Enter already passed ZoneHandshakeService.ConsumeTicketAsync's
+                // own AccountSessions.TransitionToGameAsync check, the cross-process authority that proves this
+                // is the newer login for the account, so it must win here rather than silently losing to
+                // whichever Enter happened to reach this zone's single-writer tick thread first -- dropping it
+                // (the prior behavior) left the new session a permanently untracked zombie that believes it
+                // registered, since EnterWorldService.CompleteWorldEntryAsync already sent all three
+                // world-entry response payloads before this command was even posted, and zone.Post() itself
+                // reports success regardless of what HandleEnter goes on to do with the queued command.
+                //
+                // Evict the stale session in place instead: same map, same tick thread, no lock needed.
+                logger.LogWarning(
+                    "Character {CharacterId} entered zone {MapId} while a stale prior session was still tracked -- evicting the old session and adopting the newer one",
+                    characterId, MapId);
+
+                _grid.Remove(characterId, existing.CurrentCell);
+                _players[characterId] = state;
+
+                // Stops the stale session's own eventual disconnect teardown from posting a Leave for -- or
+                // flushing/logout-logging -- the character that was just replaced here under the same
+                // characterId: GameConnectionHost.OnAcceptedAsync only does any of that while CurrentZone is
+                // still non-null. Exactly as safe as HandleLeave's own CurrentZone reassignment a few lines
+                // below (and ZoneClientSession's own remarks on this field): a plain reference write is atomic,
+                // and the stale session's own next inbound action, if any slips in before its Abort below takes
+                // effect, will find CurrentZone null and simply drop it.
+                if (existing.Session is ZoneClientSession staleZoneSession)
+                    staleZoneSession.CurrentZone = null;
+
+                if (existing.Session is ClientSession staleClientSession)
+                    staleClientSession.Abort(DisconnectReason.Evicted);
+            }
+            else
+            {
+                // Same session (or, in principle, existing already null -- unreachable per the remark above,
+                // kept only as a defensive fallback): a true duplicate Enter command for a session already
+                // tracked here. Fails safe -- ignored, not applied twice.
+                logger.LogWarning(
+                    "Character {CharacterId} entered zone {MapId} while already tracked -- ignoring duplicate Enter",
+                    characterId, MapId);
+                return;
+            }
         }
 
         _grid.Add(characterId, cell);
@@ -260,6 +310,11 @@ public sealed partial class Zone
                 SendAvatarAction(state.Session, other);
 
         BroadcastAvatarAction(others, state);
+
+        // Immediate monster-visibility exchange (parity-gap fix -- see SendExistingMonstersTo's own remarks
+        // for the citation caveat): without this, a monster already alive in this zone stayed invisible to
+        // the new arrival until that specific monster's own next independent 5 s keep-alive fired.
+        SendExistingMonstersTo(state);
 
         // Trigger 2 (Server/ts25zone/S04_MyWork02.cpp:1142-1194): unconditional re-arm + personal-boss summon
         // attempt on every entry into a Zone-241-type zone, whether a fresh login or an in-process handoff.
@@ -518,7 +573,7 @@ public sealed partial class Zone
         BroadcastAvatarAction(neighbors, state);
     }
 
-    private void HandleMove(int characterId, in ActionInfo action)
+    private void HandleMove(int characterId, in ActionInfo action, bool isResumeAction = false)
     {
         if (!_players.TryGetValue(characterId, out var state))
             return;
@@ -536,12 +591,28 @@ public sealed partial class Zone
             return;
         }
 
-        // CheckValidCharacterMotionForSend: an (Sort, Type) pair outside the whitelist is a hostile-client
-        // signal (a real client only ever sends a legal combination), not an ordinary business-rule failure --
-        // the whole session is torn down, matching every other malformed-input handler in this class. Runs
-        // ahead of MovementRules.IsPlausible below (a Fenrir-only anti-speed-hack addition with no legacy
-        // analogue) since this is validating the packet's shape, not its claimed position.
-        if (!CharacterMotionWhitelist.TryEvaluate(action.Sort, action.Type, out var motion))
+        // CZ_AVATAR_ACTION_SEND (op15) and CZ_UPDATE_AVATAR_ACTION (op16) each run their own, separate
+        // inline Sort/Type legality switch in the legacy source -- CheckValidCharacterMotionForSend has
+        // exactly one call site in the whole legacy codebase, inside op15's own handler
+        // (S04_MyWork02.cpp:1544); op16's own switch (S04_MyWork02.cpp:1815-1878) is materially more
+        // permissive for several Sorts (19, 31, 92-95) that op15's table has no row for at all, and never
+        // narrower for the two Sorts (90/91) present in both. An (Sort, Type) pair outside whichever table
+        // applies to this opcode is a hostile-client signal (a real client only ever sends a legal
+        // combination for the opcode it used), not an ordinary business-rule failure -- the whole session is
+        // torn down, matching every other malformed-input handler in this class. Runs ahead of
+        // MovementRules.IsPlausible below (a Fenrir-only anti-speed-hack addition with no legacy analogue)
+        // since this is validating the packet's shape, not its claimed position.
+        var motion = default(CharacterMotionEvaluation);
+        if (isResumeAction)
+        {
+            if (!AvatarActionResumeWhitelist.IsLegal(action.Sort, action.Type))
+            {
+                if (state.Session is ClientSession client)
+                    client.Abort(DisconnectReason.Faulted);
+                return;
+            }
+        }
+        else if (!CharacterMotionWhitelist.TryEvaluate(action.Sort, action.Type, out motion))
         {
             if (state.Session is ClientSession client)
                 client.Abort(DisconnectReason.Faulted);
@@ -579,10 +650,19 @@ public sealed partial class Zone
         // action MovementRules rejects never touches ActionSort either, and letting these fall out of step
         // would let AttackPacketBudget's replay guard (compared against ActionSort) wrongly reject sub-packets
         // for an action that was never actually recorded as current.
-        state.AttackBudgetEnforced = motion.AttackBudgetEnforced;
-        state.AttackFamilyTag = motion.AttackFamilyTag;
-        state.AttackSubPacketCeiling = motion.AttackSubPacketCeiling;
-        state.AttackSubPacketsUsed = 0;
+        //
+        // Exclusive to op15: CheckValidCharacterMotionForSend's attack-budget outputs (skill-category code,
+        // enforcement flag, family tag, sub-packet ceiling) have no equivalent computation anywhere in op16's
+        // own handler body -- op16 never populates or reads them. An op16-originated action therefore leaves
+        // whatever budget op15 last established untouched instead of overwriting it with a lookup that was
+        // never legacy-accurate for this opcode.
+        if (!isResumeAction)
+        {
+            state.AttackBudgetEnforced = motion.AttackBudgetEnforced;
+            state.AttackFamilyTag = motion.AttackFamilyTag;
+            state.AttackSubPacketCeiling = motion.AttackSubPacketCeiling;
+            state.AttackSubPacketsUsed = 0;
+        }
 
         var newCell = _grid.CellOf(state.PosX, state.PosZ);
         _grid.Move(characterId, state.CurrentCell, newCell);

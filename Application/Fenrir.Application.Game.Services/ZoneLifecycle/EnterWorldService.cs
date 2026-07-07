@@ -227,11 +227,22 @@ public sealed class EnterWorldService(
                 UniqueNumber = unchecked((uint)characterId),
                 Data = new ObjectForAvatar
                 {
-                    // Legacy sources both from the character's own persisted record at this exact moment (not a
-                    // fixed value -- visibility can change between sessions), S04_MyWork02.cpp:999-1000; no
-                    // VisibleState/SpecialState column exists anywhere in game.Characters yet to source from, so
-                    // this remains a flat 0 pending a database-engineer schema addition, not a silent regression.
-                    VisibleState = 0,
+                    // Legacy sources this from the character's own persisted record at this exact moment
+                    // (Server/ts25zone/S04_MyWork02.cpp:994-999), not a fixed value -- but no VisibleState column
+                    // exists yet anywhere in game.Characters to source it from (a schema gap, not just a
+                    // wrong-constant one). Until that column -- and a GM hide/show command
+                    // (Server/ts25zone/S04_MyWork04.cpp:933-958) -- both exist on the Fenrir side, every
+                    // character's real value IS 1: creation sets it unconditionally
+                    // (Server/ts25login/S04_MyWork02.cpp:739-741), the DB column default agrees
+                    // (Server/BuildEU33/DB/nxtserver.sql:28), and no write site ever sets it to 0 without a GM
+                    // action Fenrir doesn't implement yet. 0 is the exact value legacy reserves for "this avatar
+                    // is GM-hidden" (Server/ts25zone/H07_MyGame.h:971's IsHiding) -- hardcoding it here made every
+                    // character appear self-invisible on every zone entry (the "own character not visible" bug).
+                    // 1 is legacy-accurate for every character Fenrir can currently represent, not a safer guess.
+                    VisibleState = 1,
+                    // Out of scope for the VisibleState fix above -- SpecialState's own creation-time default and
+                    // write-site semantics were not independently verified, so it stays untouched pending its own
+                    // legacy-behavior-translator contract.
                     SpecialState = 0,
                     KillOtherTribe = 0,
                     GoodFellow = 0,

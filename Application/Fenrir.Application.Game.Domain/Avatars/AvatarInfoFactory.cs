@@ -1,4 +1,5 @@
 using Fenrir.Application.Game.Domain.Inventory;
+using Fenrir.Application.Game.Domain.Pets;
 using Fenrir.Application.Game.Domain.Social;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Serialization.Packets.Shared;
@@ -25,6 +26,19 @@ public static class AvatarInfoFactory
             FaceType = character.FaceType,
             Level1 = character.Level,
             Level2 = character.Level2,
+            // aExp1 (zone-avatarinfo-factory-parity finding, Major): deliberately left at
+            // AvatarInfoTemplates.Zeroed's 0 default, NOT wired from CharacterWorldSnapshotDto.Experience.
+            // Experience is documented (Database/Tables/game/Characters.sql:34, and PlayerRuntimeState's own
+            // Experience doc comment) as "aExp1+aExp2 combined", while Exp2 immediately below is populated
+            // from its own, separately-tracked column -- naively truncating the combined total onto Exp1
+            // while Exp2 is ALSO assigned independently risks double-counting/misrepresenting the real value,
+            // unlike Money/StoreMoney below which safely narrow an un-combined BIGINT. The only confirmed
+            // aExp1 assignment on record is the creation-time MAX_NUMBER_SIZE sentinel
+            // (Server/ts25login/S04_MyWork02.cpp:1105, Server/Header/Protocol/DEFINE.h:365), a distinct,
+            // Login-only, one-time overlay (see CreateAvatarService.StartingExp1) that does not establish
+            // what an ordinary subsequent world entry should show. Left unpopulated pending a
+            // cpp-ts25-explorer pass over the legacy world-entry avatar-projection path (not
+            // S04_MyWork02.cpp's creation flow) -- do not substitute a guess here.
             Exp2 = character.Exp2,
             Vit = character.StatVit,
             Str = character.StatStr,
@@ -41,7 +55,7 @@ public static class AvatarInfoFactory
             Title = character.Title,
             Halo = character.Halo,
             RebirthNum = character.RebirthCount,
-            Equip = BuildEquipArrayFromRows(items),
+            Equip = BuildEquipArrayFromRows(items, character.PetGrowth, character.PetActivity),
             Friend = s.BuildFriendArray(),
             Teacher = s.Teacher,
             Student = s.Student,
@@ -81,6 +95,10 @@ public static class AvatarInfoFactory
             FaceType = state.FaceType,
             Level1 = state.Level,
             Level2 = state.Level2,
+            // aExp1 -- same zone-avatarinfo-factory-parity open question as CreateForCharacter above; left
+            // unset (Zeroed's 0 default) rather than guessing a decomposition of the combined
+            // PlayerRuntimeState.Experience counter onto this single field. See CreateForCharacter's own
+            // remarks for the full citation.
             Exp2 = state.Exp2,
             Vit = state.StatVit,
             Str = state.StatStr,
@@ -94,7 +112,8 @@ public static class AvatarInfoFactory
             GuildName = state.GuildName,
             GuildRole = GuildRoleCodec.DbRoleToWire(state.GuildRoleDb),
             CallName = state.GuildCallName,
-            Equip = BuildEquipArrayFromContainer(state.Inventory.GetContainer(ContainerMatrix.Equipment)),
+            Equip = BuildEquipArrayFromContainer(state.Inventory.GetContainer(ContainerMatrix.Equipment),
+                state.PetGrowth, state.PetActivity),
             QuestInfo =
             [
                 state.QuestStepPermanent, state.QuestActiveFlag, state.QuestSort, state.QuestTargetPhase,
@@ -104,8 +123,18 @@ public static class AvatarInfoFactory
         };
     }
 
-    /// <summary><c>aEquip[13][4]</c>'s 4th int per slot is unknown/unmapped -- left at wire-zero rather than guessed.</summary>
-    private static int[] BuildEquipArrayFromRows(IReadOnlyList<CharacterItemSlotDto> items)
+    /// <summary>
+    ///     <c>aEquip[13][4]</c>'s 4th int per slot is unknown/unmapped -- left at wire-zero rather than guessed.
+    /// </summary>
+    /// <remarks>
+    ///     Réf. C++ : Server/ts25login/S04_MyWork02.cpp:1131-1135 -- the pet slot (<see cref="PetSlots.EquipmentSlot" />)
+    ///     is the one exception to the generic ItemId/ExpireDate/packed-upgrade-byte mapping every other slot
+    ///     uses: its 2nd/3rd wire ints are <paramref name="petActivity" />/<paramref name="petGrowth" /> as plain
+    ///     values, since those two live on the character record itself (<see cref="PetGrowthCalculator" /> reads
+    ///     the same two fields for combat-stat math), not on the pet's own CharacterItems row.
+    /// </remarks>
+    private static int[] BuildEquipArrayFromRows(IReadOnlyList<CharacterItemSlotDto> items, int petGrowth,
+        byte petActivity)
     {
         var equip = new int[52];
 
@@ -116,14 +145,25 @@ public static class AvatarInfoFactory
 
             var baseIndex = item.Slot * 4;
             equip[baseIndex] = item.ItemId;
-            equip[baseIndex + 1] = item.ExpireDate;
-            equip[baseIndex + 2] = PackUpgradeBytes(item.Enchant, item.Combine, item.Refine, item.Socket);
+
+            if (item.Slot == PetSlots.EquipmentSlot)
+            {
+                equip[baseIndex + 1] = petActivity;
+                equip[baseIndex + 2] = petGrowth;
+            }
+            else
+            {
+                equip[baseIndex + 1] = item.ExpireDate;
+                equip[baseIndex + 2] = PackUpgradeBytes(item.Enchant, item.Combine, item.Refine, item.Socket);
+            }
         }
 
         return equip;
     }
 
-    private static int[] BuildEquipArrayFromContainer(IReadOnlyDictionary<byte, ItemStack> equipmentContainer)
+    /// <summary>Same pet-slot exception as <see cref="BuildEquipArrayFromRows" /> above, applied to the in-memory equipment container instead of freshly-read rows.</summary>
+    private static int[] BuildEquipArrayFromContainer(IReadOnlyDictionary<byte, ItemStack> equipmentContainer,
+        int petGrowth, byte petActivity)
     {
         var equip = new int[52];
 
@@ -134,8 +174,17 @@ public static class AvatarInfoFactory
 
             var baseIndex = slot * 4;
             equip[baseIndex] = stack.ItemId;
-            equip[baseIndex + 1] = stack.ExpireDate;
-            equip[baseIndex + 2] = PackUpgradeBytes(stack.Enchant, stack.Combine, stack.Refine, stack.Socket);
+
+            if (slot == PetSlots.EquipmentSlot)
+            {
+                equip[baseIndex + 1] = petActivity;
+                equip[baseIndex + 2] = petGrowth;
+            }
+            else
+            {
+                equip[baseIndex + 1] = stack.ExpireDate;
+                equip[baseIndex + 2] = PackUpgradeBytes(stack.Enchant, stack.Combine, stack.Refine, stack.Socket);
+            }
         }
 
         return equip;

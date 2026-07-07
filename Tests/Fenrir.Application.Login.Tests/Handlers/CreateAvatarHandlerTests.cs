@@ -132,15 +132,31 @@ public class CreateAvatarHandlerTests
             Str = 1,
             Int = 1,
             Dex = 1,
+            // Fixed literal constants (Server/ts25login/S04_MyWork02.cpp:1100-1110): confirms the
+            // create-avatar-stats-fresh fix -- these five are now mirrored onto the response instead of
+            // being left at Zeroed's 0 default (see CreateAvatarService.StartingLevel2/StartingExp1's own
+            // remarks). Exp1 = MAX_NUMBER_SIZE (Server/Header/Protocol/DEFINE.h:365) closes the finding's
+            // blocker: Exp1 was previously wired to 0 in every code path, not just this response.
+            Level2 = 12,
+            Exp1 = 2_000_000_000,
+            Exp2 = 0,
+            StatPoint = 3175,
+            SkillPoint = 10000,
             PreviousTribe = 0,
-            Equip = AvatarInfoFactory.BuildEquipArray(call.Equipment),
+            // zone-avatarinfo-factory-parity finding: the pet slot's 2nd/3rd wire ints are activity/growth
+            // (Server/ts25login/S04_MyWork02.cpp:1131-1135 -- MAX_PAT_ACTIVITY_SIZE/640,000,000), mirroring
+            // CreateAvatarService's own StarterPetActivity/StarterPetGrowth constants.
+            Equip = AvatarInfoFactory.BuildEquipArray(call.Equipment, petGrowth: 640_000_000, petActivity: 100),
             Animal = MountSlotArray(1301),
             AnimalIndex = 0,
             AnimalTime = 99999999,
             AnimalPower = MountSlotArray(5),
             AnimalExpActivity = MountSlotArray(0),
-            DoubleExpTime1 = call.WelcomeBuffUntilDate,
-            DoubleExpTime2 = call.WelcomeBuffUntilDate,
+            // 300, not call.WelcomeBuffUntilDate -- Server/ts25login/S04_MyWork02.cpp:886-887's bare integer
+            // literal (a raw per-tick counter, confirmed by Server/ts25zone/S07_MyGame04.cpp:955-969's
+            // decrement-on-tick consumer), genuinely independent of AutoBuffTime's date below.
+            DoubleExpTime1 = 300,
+            DoubleExpTime2 = 300,
             AutoBuffTime = call.WelcomeBuffUntilDate,
             Premium = call.PremiumUntilUnixSeconds
         };
@@ -366,6 +382,15 @@ public class CreateAvatarHandlerTests
     [InlineData(3, 0, 0, 0, 0)] // AvatarPost out of range (> MAX_USER_AVATAR_NUM-1)
     [InlineData(0, -1, 0, 0, 0)] // Tribe out of range
     [InlineData(0, 4, 0, 0, 0)] // Tribe out of range
+    // PreviousTribe out of range: db-createwithstarterkit-fieldaudit finding (Major). game.Characters carries
+    // CK_Characters_PreviousTribe (Migrations/018_character_previous_tribe_and_mount_readpath.sql:35-36)
+    // restricting this column to 0-2 -- an out-of-range value that reached usp_Character_CreateWithStarterKit
+    // would violate that constraint on the transaction's first INSERT and surface as an uncaught, uncoded
+    // SqlException instead of the clean Malformed-disconnect every other bounded field on this request already
+    // gets; see HandleAsync_PreviousTribeOutOfRange_AbortsAsMalformedWithoutQueryingOrCreating below for the
+    // dedicated regression covering the exact values (3/255) the original audit finding exercised.
+    [InlineData(0, 0, -1, 0, 0)] // PreviousTribe out of range
+    [InlineData(0, 0, 3, 0, 0)] // PreviousTribe out of range
     [InlineData(0, 0, 0, -1, 0)] // Head out of range
     [InlineData(0, 0, 0, 7, 0)] // Head out of range
     [InlineData(0, 0, 0, 0, -1)] // Face out of range
@@ -401,21 +426,28 @@ public class CreateAvatarHandlerTests
         PacketAssert.AssertNothingSent(pipe);
     }
 
-    // Server/ts25login/S04_MyWork02.cpp:739-838: the PreviousTribe/race switch has no case-3/default branch,
-    // so a PreviousTribe outside 0-2 is a genuine legacy validation gap -- unlike every other field above, it
-    // is deliberately NOT range-checked, and the request is not rejected on this basis. Uses
-    // UnseededPreviousTribeKit (not NobleDragonKit) because the real world.usp_StarterKit_GetByPreviousTribe
-    // filters Equipment/Skills/Hotkeys on PreviousTribe and returns none of them for an unmatched value -- only
-    // Inventory is unconditional -- so this exercises "the whole elite catalog is missing", not merely "the
-    // weapon is missing" (NobleDragonKit would still hand back the other 5 elite-gear rows regardless of which
-    // PreviousTribe key is passed, masking the difference).
+    // db-createwithstarterkit-fieldaudit (Major), fix regression coverage. This exact scenario (PreviousTribe 3
+    // or 255) previously had a green unit test here asserting a full CreateAvatarOutcome.Success response --
+    // but only against FakeCharacterRepository, an in-memory stand-in with no equivalent of
+    // game.Characters' CK_Characters_PreviousTribe CHECK constraint
+    // (Migrations/018_character_previous_tribe_and_mount_readpath.sql:35-36). Against the real database, the
+    // same out-of-range value would violate that constraint on usp_Character_CreateWithStarterKit's very first
+    // INSERT, roll the whole transaction back, and surface only as an uncaught, uncoded SqlException --
+    // collapsing to the same generic CreateAvatarResponse{Result=1} any other undistinguished failure
+    // produces, directly contradicting what this test used to assert. CreateAvatarHandler now range-checks
+    // PreviousTribe to 0-2 up front (see its own remarks for the full citation), so this input is rejected
+    // here, cleanly, the same way every other structurally-invalid field on this request already is. Kept as
+    // its own dedicated test (distinct from the general HandleAsync_StructuralViolation_.../-1/3 coverage
+    // above) specifically to keep 255 -- the concrete value the original audit finding exercised, and the
+    // one-byte wire domain's true upper bound -- under direct regression coverage.
     [Theory]
     [InlineData(3)]
     [InlineData(255)]
-    public async Task HandleAsync_PreviousTribeOutOfRange_CreatesNormallyWithNoWeaponEquipped(int previousTribe)
+    public async Task HandleAsync_PreviousTribeOutOfRange_AbortsAsMalformedWithoutQueryingOrCreating(
+        int previousTribe)
     {
         var characters = FakeCharacterRepository.WithNone();
-        var starterKits = FakeStarterKitRepository.UnseededPreviousTribeKit();
+        var starterKits = FakeStarterKitRepository.NobleDragonKit();
         var handler = new CreateAvatarHandler(
             new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions(),
                 NullLogger<CreateAvatarService>.Instance),
@@ -426,47 +458,10 @@ public class CreateAvatarHandlerTests
 
         await handler.HandleAsync(request, session, CancellationToken.None);
 
-        Assert.Null(session.DisconnectReason);
-        // The out-of-range value itself must still reach the repository call unchanged (not clamped/defaulted
-        // to a seeded race along the way) -- previously unasserted by this test.
-        Assert.Equal(((byte)previousTribe, (short)1), starterKits.LastCall);
-        var call = characters.LastCreateWithStarterKit;
-        Assert.NotNull(call);
-        // Even out-of-range, the value itself is still persisted verbatim (see this method's own remarks on
-        // Migrations/018_character_previous_tribe_and_mount_readpath.sql) -- no clamping/defaulting to 0.
-        Assert.Equal((byte)previousTribe, call!.PreviousTribe);
-        Assert.DoesNotContain(call!.Equipment, i => i.Slot == 7); // weapon-equip slot left unassigned
-        // No elite gear at all -- only the two universal grants (Cape + Pet) survive, since Equipment
-        // (unlike Inventory) is filtered by PreviousTribe in the real proc and comes back empty.
-        Assert.Equal(2, call.Equipment.Count);
-        Assert.Contains(call.Equipment, i => i is { Slot: 1, ItemId: 1407 });
-        Assert.Contains(call.Equipment, i => i is { Slot: 8, ItemId: 2300 });
-        Assert.Equal(4, call.Inventory.Count); // Inventory is unconditional, unlike Equipment/Skills/Hotkeys
-        Assert.Empty(call.Skills);
-        Assert.Empty(call.Hotkeys);
-
-        var createdCharacter = await characters.GetForWorldEntryAsync(1000, CancellationToken.None);
-        Assert.NotNull(createdCharacter);
-        var expectedAvatarInfo = AvatarInfoFactory.CreateForCharacter(createdCharacter!) with
-        {
-            Vit = 1,
-            Str = 1,
-            Int = 1,
-            Dex = 1,
-            PreviousTribe = previousTribe,
-            Equip = AvatarInfoFactory.BuildEquipArray(call.Equipment),
-            Animal = MountSlotArray(1301),
-            AnimalIndex = 0,
-            AnimalTime = 99999999,
-            AnimalPower = MountSlotArray(5),
-            AnimalExpActivity = MountSlotArray(0),
-            DoubleExpTime1 = call.WelcomeBuffUntilDate,
-            DoubleExpTime2 = call.WelcomeBuffUntilDate,
-            AutoBuffTime = call.WelcomeBuffUntilDate,
-            Premium = call.PremiumUntilUnixSeconds
-        };
-        await PacketAssert.AssertSentAsync(pipe,
-            new CreateAvatarResponse { Result = 0, AvatarInfo = expectedAvatarInfo });
+        Assert.Null(starterKits.LastCall);
+        Assert.Null(characters.LastCreateWithStarterKit);
+        Assert.Equal(DisconnectReason.Malformed, session.DisconnectReason);
+        PacketAssert.AssertNothingSent(pipe);
     }
 
     // Server/ts25login/S04_MyWork02.cpp:625-635: the combined slot-occupied/name-empty test silently
@@ -688,15 +683,27 @@ public class CreateAvatarHandlerTests
             Str = 1,
             Int = 1,
             Dex = 1,
+            // See the equivalent block in HandleAsync_ValidRequest_RepliesResultZeroWithFullAvatarInfo above
+            // for the full citation.
+            Level2 = 12,
+            Exp1 = 2_000_000_000,
+            Exp2 = 0,
+            StatPoint = 3175,
+            SkillPoint = 10000,
             PreviousTribe = 0,
-            Equip = AvatarInfoFactory.BuildEquipArray(call.Equipment),
+            // zone-avatarinfo-factory-parity finding: see the equivalent block in
+            // HandleAsync_ValidRequest_RepliesResultZeroWithFullAvatarInfo above for the full citation.
+            Equip = AvatarInfoFactory.BuildEquipArray(call.Equipment, petGrowth: 640_000_000, petActivity: 100),
             Animal = MountSlotArray(1301),
             AnimalIndex = 0,
             AnimalTime = 99999999,
             AnimalPower = MountSlotArray(5),
             AnimalExpActivity = MountSlotArray(0),
-            DoubleExpTime1 = call.WelcomeBuffUntilDate,
-            DoubleExpTime2 = call.WelcomeBuffUntilDate,
+            // 300, not call.WelcomeBuffUntilDate -- Server/ts25login/S04_MyWork02.cpp:886-887's bare integer
+            // literal (a raw per-tick counter, confirmed by Server/ts25zone/S07_MyGame04.cpp:955-969's
+            // decrement-on-tick consumer), genuinely independent of AutoBuffTime's date below.
+            DoubleExpTime1 = 300,
+            DoubleExpTime2 = 300,
             AutoBuffTime = call.WelcomeBuffUntilDate,
             Premium = call.PremiumUntilUnixSeconds
         };

@@ -321,6 +321,45 @@ public sealed partial class Zone
         return (IReadOnlyList<(int CharacterId, long Amount)>?)grants ?? [];
     }
 
+    /// <summary>
+    ///     Immediate monster-visibility exchange on zone entry -- closes the gap where a monster already alive
+    ///     in this zone was otherwise invisible to a new arrival until that monster's own next independent 5 s
+    ///     keep-alive fired (<see cref="RebroadcastMonsters" />). Sends a direct, one-shot, keep-alive-shaped
+    ///     (<c>checkChangeActionState = 0</c>) replication frame to <paramref name="state" />'s own session for
+    ///     every monster within <paramref name="state" />'s immediate AOI neighborhood (the same 3x3-cell
+    ///     scoping <see cref="BroadcastMonsterAction" /> already uses from the monster's own side, applied here
+    ///     by symmetry since the neighbor relation is reciprocal) and dungeon-instance visible
+    ///     (<see cref="IsVisibleAcrossDungeonInstance" />) to it -- mirroring the mutual player-to-player
+    ///     visibility exchange <see cref="HandleEnter" /> already performs for avatars.
+    /// </summary>
+    /// <remarks>
+    ///     No legacy citation confirms this restores ts25zone parity rather than diverging from it -- the
+    ///     behavior contract this was implemented from flags the underlying legacy behavior as unconfirmed (no
+    ///     <c>Server/</c> source located for what, if anything, ts25zone itself sends about pre-existing
+    ///     monsters on a player's zone entry). This is a pure one-way, one-shot send: no other session's own
+    ///     view of any monster changes because of this arrival, and no timer/state is touched --
+    ///     <see cref="MonsterEntity.LastRebroadcastAt" /> keeps running on its own independent cadence
+    ///     regardless of whether this method ever runs.
+    /// </remarks>
+    private void SendExistingMonstersTo(PlayerRuntimeState state)
+    {
+        if (_monsters.IsEmpty)
+            return;
+
+        foreach (var monster in _monsters.Values)
+        {
+            var monsterCell = _grid.CellOf(monster.PosX, monster.PosZ);
+            if (Math.Abs(monsterCell.X - state.CurrentCell.X) > 1 ||
+                Math.Abs(monsterCell.Z - state.CurrentCell.Z) > 1)
+                continue;
+
+            if (!IsVisibleAcrossDungeonInstance(monster.InstanceId, state.DungeonInstanceId))
+                continue;
+
+            state.Session.Send(BuildMonsterActionRecv(monster, 0));
+        }
+    }
+
     /// <summary>Keep-alive rebroadcast for monsters, 5 s cadence.</summary>
     private void RebroadcastMonsters()
     {

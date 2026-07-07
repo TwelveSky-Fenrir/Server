@@ -20,13 +20,23 @@ namespace Fenrir.Application.Game.Hosting.World;
 ///     way: the shop is already gone from <see cref="Zone" />'s own broadcast table the instant
 ///     <c>Zone.RebroadcastProxyShops</c> notices the expiry, regardless of when (or whether) this durable
 ///     write lands.
+///     <para>
+///         <b>Process-kill residual risk, exact bound:</b> a true (non-graceful) process kill loses at most
+///         <see cref="FlushInterval" /> of queued-but-unpersisted expiry closes -- worst case, a shop the zone
+///         already stopped broadcasting reappears as still-open (<c>ShopState</c> never reset to 0) on the
+///         next boot until the character reopens/closes it themselves. <see cref="FlushInterval" /> was
+///         tightened from the original 5s to 2s in this pass because <see cref="FlushOnceAsync" />'s per-cycle
+///         cost with an empty queue is a cheap in-memory list drain per zone, no DB round trip, and a shop
+///         naturally expiring is a rare per-zone event relative to the polling cadence. This is an accepted,
+///         bounded tradeoff, not a silent gap.
+///     </para>
 /// </remarks>
 public sealed class ProxyShopExpiryFlushHost(
     ZoneRegistry zones,
     IOfflineShopRepository offlineShops,
     ILogger<ProxyShopExpiryFlushHost> logger) : BackgroundService
 {
-    public static readonly TimeSpan FlushInterval = TimeSpan.FromSeconds(5);
+    public static readonly TimeSpan FlushInterval = TimeSpan.FromSeconds(2);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {

@@ -33,15 +33,21 @@ namespace Fenrir.Application.Game.Hosting.World;
 ///         (e.g. a player who moved AND fought within the same ~5s poll interval), whichever proc call lands
 ///         second would fail its own "FlushSequence &gt; stored" idempotence guard and silently no-op --
 ///         reproducing a differently-shaped variant of the exact bug this class exists to close. And
-///         <c>GameConnectionHost</c>'s disconnect path holds exactly one <see cref="IWriteBehindFlusher" />
-///         and calls <see cref="IWriteBehindFlusher.RequestImmediateFlush" /> once, expecting that single call to
-///         durably capture the disconnecting player's pending state -- two independent flushers racing each
-///         other is precisely the wrong time for that race to matter most.
+///         <c>GameConnectionHost</c>'s disconnect path holds exactly one <see cref="ICharacterWriteBehindFlusher" />
+///         (itself an <see cref="IWriteBehindFlusher" />): its own correctness guarantee for the disconnecting
+///         player's final state now comes from the synchronous, targeted
+///         <see cref="ICharacterWriteBehindFlusher.FlushCharacterNowAsync" /> it awaits BEFORE posting that
+///         character's Leave command (see <c>GameConnectionHost</c>'s own remarks at its call site for the full
+///         ordering argument), not from <see cref="IWriteBehindFlusher.RequestImmediateFlush" /> -- that call
+///         remains in the disconnect path only as a best-effort nudge for whichever OTHER characters are
+///         already dirty in this same shared tracker, since it is non-blocking and unsynchronized with any
+///         zone tick's own processing. Two independently-timed flushers racing each other on top of either
+///         mechanism would only compound matters, precisely the wrong time for a second race to appear.
 ///     </para>
 ///     <para>
 ///         The safe design is one coordinated drain: <see cref="PositionWriteBehindHost" /> remains the sole
-///         owner of the one <see cref="WriteBehindFlusher{TKey}" /> loop and the one <see cref="IWriteBehindFlusher" />
-///         registration (disconnect flush keeps working with zero changes to <c>GameConnectionHost</c>), and calls
+///         owner of the one <see cref="WriteBehindFlusher{TKey}" /> loop, the one <see cref="IWriteBehindFlusher" />
+///         registration, and the one <see cref="ICharacterWriteBehindFlusher" /> registration, and calls
 ///         <see cref="FlushAsync" /> from its own callback on every drained batch, before building position rows.
 ///         Within that single batch, this class always "wins" the shared <c>FlushSequence</c> slot for a character
 ///         that has Vitals/Progression flags: it persists using the CURRENT value, and <see cref="FlushAsync" />'s
@@ -50,6 +56,14 @@ namespace Fenrir.Application.Game.Hosting.World;
 ///         defer -- it was already documented as best-effort/eventually-consistent (a stale position self-heals on
 ///         the player's next move, or is caught by the disconnect flush); Progression is the exploit/durability
 ///         -critical side and must never lose its turn.
+///     </para>
+///     <para>
+///         <b>Process-kill residual risk:</b> since this class has no timer of its own and is only ever
+///         drained from inside <c>PositionWriteBehindHost</c>'s single <see cref="WriteBehindFlusher{TKey}" />
+///         callback, its bound on data lost to a true (non-graceful) process kill is identical to
+///         <see cref="PositionWriteBehindHost" />'s own -- see that class's remarks for the exact figure and
+///         why that interval was deliberately left untightened. This is an accepted, bounded tradeoff, not a
+///         silent gap.
 ///     </para>
 /// </remarks>
 public sealed class ProgressWriteBehindHost(ZoneRegistry zones, ICharacterRepository characters)
@@ -65,8 +79,9 @@ public sealed class ProgressWriteBehindHost(ZoneRegistry zones, ICharacterReposi
     /// </summary>
     /// <remarks>
     ///     A character absent from every zone (logged out, or mid-handoff) is correctly dropped here, same
-    ///     documented behavior as <see cref="PositionWriteBehindHost" />: their last state was already flushed by
-    ///     the disconnect path's immediate flush, and a handoff re-marks them dirty on arrival.
+    ///     documented behavior as <see cref="PositionWriteBehindHost" />: for a true disconnect their last state
+    ///     was already flushed synchronously by <see cref="PositionWriteBehindHost.FlushCharacterNowAsync" />
+    ///     BEFORE the zone ever removed them from its live registry, and a handoff re-marks them dirty on arrival.
     /// </remarks>
     public async ValueTask<IReadOnlySet<int>> FlushAsync(IReadOnlyDictionary<int, DirtyFlags> dirty,
         CancellationToken ct)

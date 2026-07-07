@@ -415,6 +415,26 @@ Migrations/023_account_session_dead_shard_fast_reclaim.sql
 # successful response; see the migration file itself for the full citation and fix rationale.
 Migrations/024_tribe_role_scalar_type_fix.sql
 
+# create-avatar-tribe-handling-fresh (Major): Server/ts25login/S04_MyWork02.cpp:885-889 grants every newly
+# created character a starting death-protection allowance (aProtectForDeath = 5, unconditional, same #ifdef
+# LNW33 block as the DoubleExpTime1/2 literals 018 already granted), consumed by decrementing on avatar death
+# per Server/ts25zone/S07_MyGame02.cpp:3443-3489 -- but usp_Character_CreateWithStarterKit's INSERT column
+# list never included game.Characters.ProtectForDeath, so every new character silently took the column's
+# DEFAULT of 0 instead. Fix-forward only (identical body to 018's version plus ProtectForDeath in the INSERT
+# column list/VALUES); no new stored-procedure parameter, no read-path change needed (GetForWorldEntry already
+# projects the column) -- see the migration file itself for the full citation and fix rationale.
+Migrations/025_character_protect_for_death_grant.sql
+
+# double-exp-time-counter-fix (Major, create-avatar-tribe-handling-fresh area): usp_Character_CreateWithStarterKit
+# persisted DoubleExpTime1/DoubleExpTime2 as the same ~7-day-future YYYYMMDD date as AutoBuffTime, but the
+# legacy source (Server/ts25login/S04_MyWork02.cpp:885-892) sets DoubleExpTime1/DoubleExpTime2 to the bare
+# integer literal 300 -- a raw per-tick decrementing counter (confirmed by Server/ts25zone/S07_MyGame04.cpp:
+# 955-969's decrement-if-greater-than-zero consumer), never a calendar date. Persisting a date-shaped value
+# here would have taken ~20 million decrements to reach zero instead of 300. Layered on top of 025's
+# ProtectForDeath-grant body (not 018's) so it doesn't revert that sibling fix -- see the migration file
+# itself for the full citation and fix rationale.
+Migrations/026_double_exp_time_counter_fix.sql
+
 Migrations/Seed/001_dev_account.sql
 
 Migrations/Seed/world/060_levels.sql

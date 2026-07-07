@@ -15,6 +15,23 @@ namespace Fenrir.Application.Game.Hosting.World.WorldState;
 ///         shard's concurrent flush converge here within one interval -- reversing the order, or moving
 ///         reconcile to a separately-scheduled host, would lose that ordering guarantee.
 ///     </para>
+///     <para>
+///         <b>Process-kill residual risk, exact bound, and why this interval was NOT tightened:</b> unlike
+///         <c>TowerWarWriteBehindHost</c>/<c>HeroRankPointsWriteBehindHost</c>/
+///         <c>MonsterBossRespawnWriteBehindHost</c>/<c>ProxyShopExpiryFlushHost</c>/
+///         <c>TribeBankTaxSweepFlushHost</c> (all shortened to 2s in this pass because their per-cycle cost is
+///         a cheap in-memory dirty check with no DB round trip when clean), <see cref="WorldStateService.ReconcileAsync" />
+///         issues an UNCONDITIONAL <c>game.WorldState</c>/<c>WorldStateTribes</c>/<c>WorldStateAllianceOffers</c>
+///         read every single cycle regardless of <see cref="WorldStateService.IsDirty" />, run by every live
+///         shard on the same cadence -- tightening this interval would multiply that unconditional per-shard
+///         read frequency, a real (if modest) DB load increase, not a free one. The interval therefore stays
+///         at 5s. The bound on data lost to a true (non-graceful) process kill is: up to 5 seconds of
+///         RvR world-state mutation (tribe symbols/points/gate/alliance-offer changes) on THIS shard that no
+///         other shard has reconciled yet; points-deltas specifically are additive at the DB
+///         (<see cref="Fenrir.Data.Abstractions.World.IWorldStateRepository.AddTribePointsAsync" />) so a lost
+///         in-memory delta is a genuine loss of those points, never a double-count risk. This is an accepted,
+///         bounded tradeoff, not a silent gap.
+///     </para>
 /// </summary>
 public sealed class WorldStateWriteBehindHost(WorldStateService worldState) : BackgroundService
 {

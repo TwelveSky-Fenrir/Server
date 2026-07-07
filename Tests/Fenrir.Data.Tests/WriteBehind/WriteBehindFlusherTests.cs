@@ -148,6 +148,41 @@ public sealed class WriteBehindFlusherTests
     }
 
     [Fact]
+    public async Task RunAsync_OnCancellation_PerformsAFinalDrainOfWhateverIsStillDirty()
+    {
+        // Parity fix for Server/ts25playuser/S07_MyGame01.cpp:317-372's force-save-then-poll-until-drained
+        // shutdown sequence: RunAsync must attempt one more drain-and-flush of whatever DirtyTracker still
+        // holds the instant cancellation is observed, instead of abandoning it.
+        var tracker = new DirtyTracker<int>();
+        tracker.MarkDirty(99, DirtyFlags.Position | DirtyFlags.Vitals);
+
+        var flushCount = 0;
+        IReadOnlyDictionary<int, DirtyFlags>? finalBatch = null;
+
+        var flusher = new WriteBehindFlusher<int>(
+            tracker,
+            (batch, _) =>
+            {
+                Interlocked.Increment(ref flushCount);
+                finalBatch = batch;
+                return ValueTask.CompletedTask;
+            },
+            TimeSpan.FromSeconds(30), // long enough that only the final drain (never the interval) explains this
+            1_000); // large enough that only the final drain (never the threshold) explains this
+
+        using var cts = new CancellationTokenSource();
+        var runTask = flusher.RunAsync(cts.Token);
+
+        cts.Cancel();
+        await runTask.WaitAsync(BoundedWait);
+        await flusher.DisposeAsync();
+
+        Assert.Equal(1, flushCount);
+        Assert.Equal(0, tracker.Count);
+        Assert.Equal(DirtyFlags.Position | DirtyFlags.Vitals, Assert.Single(finalBatch!).Value);
+    }
+
+    [Fact]
     public async Task DisposeAsync_StopsAStillRunningLoop_EvenIfTheCallersTokenWasNeverCancelled()
     {
         var tracker = new DirtyTracker<int>();

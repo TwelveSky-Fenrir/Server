@@ -69,9 +69,13 @@ public static class HostingServiceCollectionExtensions
         // and calls into it for the Vitals/Progression side of every drained batch.
         services.AddSingleton<ProgressWriteBehindHost>();
 
-        // Same "one instance, three registrations" pattern for a hosted service other code also needs to call directly.
+        // Same "one instance, several registrations" pattern for a hosted service other code also needs to call
+        // directly. ICharacterWriteBehindFlusher is the narrower, character-specific superset of
+        // IWriteBehindFlusher that GameConnectionHost's disconnect path needs (FlushCharacterNowAsync) -- see
+        // that interface's own remarks for why it isn't just added to IWriteBehindFlusher itself.
         services.AddSingleton<PositionWriteBehindHost>();
         services.AddSingleton<IWriteBehindFlusher>(sp => sp.GetRequiredService<PositionWriteBehindHost>());
+        services.AddSingleton<ICharacterWriteBehindFlusher>(sp => sp.GetRequiredService<PositionWriteBehindHost>());
         services.AddHostedService(sp => sp.GetRequiredService<PositionWriteBehindHost>());
 
         services.AddHostedService<GameServerDirectoryHeartbeat>();

@@ -96,11 +96,14 @@ public partial class PlayerRuntimeState
 
     /// <summary>
     ///     Mirrors the legacy's <c>mCheckMaxAttackPacketNum</c> -- whether <see cref="AttackSubPacketCeiling" />
-    ///     is enforced at all for the character's current action. Set on every accepted avatar action by
-    ///     <see cref="CharacterMotionWhitelist" /> (<see cref="Zone.HandleMove" />); pre-set to true
-    ///     here (enforced, ceiling zero) so a character that has never yet had an action accepted starts in the
-    ///     same deny-all-attacks state the legacy session itself starts in
-    ///     (Server/ts25zone/S04_MyWork02.cpp:855-869), not merely the whitelist's own per-call fallback.
+    ///     is enforced at all for the character's current action. Set on every accepted op15
+    ///     (CZ_AVATAR_ACTION_SEND) action by <see cref="CharacterMotionWhitelist" /> (<see cref="Zone.HandleMove" />);
+    ///     pre-set to true here (enforced, ceiling zero) so a character that has never yet had an action
+    ///     accepted starts in the same deny-all-attacks state the legacy session itself starts in
+    ///     (Server/ts25zone/S04_MyWork02.cpp:855-869), not merely the whitelist's own per-call fallback. Left
+    ///     untouched by an op16 (CZ_UPDATE_AVATAR_ACTION) action: op16's own legacy handler body never
+    ///     computes or reads this concept at all (see <see cref="Movement.AvatarActionResumeWhitelist" />'s
+    ///     own remarks), so overwriting it from an op16 lookup would not be legacy-accurate.
     /// </summary>
     public bool AttackBudgetEnforced { get; set; } = true;
 
@@ -121,8 +124,10 @@ public partial class PlayerRuntimeState
 
     /// <summary>
     ///     Mirrors the legacy's <c>mNowAttackPacketNum</c> -- attack-resolution sub-packets already consumed
-    ///     for the character's current action. Reset to 0 by every accepted avatar action
-    ///     (<see cref="Zone.HandleMove" />), incremented by <see cref="AttackPacketBudget.TryConsume" />.
+    ///     for the character's current action. Reset to 0 by every accepted op15 (CZ_AVATAR_ACTION_SEND)
+    ///     action (<see cref="Zone.HandleMove" />), incremented by <see cref="AttackPacketBudget.TryConsume" />.
+    ///     Left untouched by an op16 (CZ_UPDATE_AVATAR_ACTION) action, for the same reason as
+    ///     <see cref="AttackBudgetEnforced" />.
     /// </summary>
     public int AttackSubPacketsUsed { get; set; }
 

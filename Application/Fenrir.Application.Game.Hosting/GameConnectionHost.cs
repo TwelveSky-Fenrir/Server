@@ -1,10 +1,11 @@
+using System.Collections.Concurrent;
 using System.Net;
 using System.Security.Cryptography;
 using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
+using Fenrir.Application.Game.Hosting.World;
 using Fenrir.Data.Abstractions.Game;
-using Fenrir.Data.WriteBehind;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch;
 using Fenrir.Network.Dispatch.FloodProtection;
@@ -25,7 +26,7 @@ public sealed class GameConnectionHost(
     IFrameDispatcher dispatcher,
     ISessionRateLimiter rateLimiter,
     SessionRegistry registry,
-    IWriteBehindFlusher writeBehindFlusher,
+    ICharacterWriteBehindFlusher writeBehindFlusher,
     IAccountSessionRepository accountSessions,
     IEventLogRepository eventLog,
     IpFloodGuard ipFloodGuard,
@@ -41,6 +42,12 @@ public sealed class GameConnectionHost(
 
     private FenrirTcpListener<ZoneClientSession>? _listener;
 
+    // Tracks every still-running OnAcceptedAsync invocation so StopAsync can await full connection teardown
+    // (including FlushFinalCharacterStateAsync/RequestImmediateFlush/disconnect logging in its own finally
+    // block) before this host's own StopAsync returns -- see StopAsync's own remarks for the parity gap this
+    // closes.
+    private readonly ConcurrentDictionary<Task, byte> _inFlightConnections = new();
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var opts = options.Value;
@@ -54,11 +61,77 @@ public sealed class GameConnectionHost(
 
         try
         {
-            await _listener.AcceptLoopAsync(OnAcceptedAsync, stoppingToken).ConfigureAwait(false);
+            await _listener.AcceptLoopAsync(TrackInFlightAsync, stoppingToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
         }
+    }
+
+    /// <summary>
+    ///     Waits for every connection accepted by <see cref="ExecuteAsync" /> to finish its own
+    ///     <see cref="OnAcceptedAsync" /> teardown before this method returns -- the fix for the parity gap
+    ///     against legacy's force-save-then-poll-until-drained shutdown sequence (<c>MyGame::Free</c>,
+    ///     Server/ts25playuser/S07_MyGame01.cpp:317-372). Without this override, the default (non-overridden)
+    ///     <see cref="BackgroundService.StopAsync" /> would return as soon as the accept loop itself exits,
+    ///     while <c>FenrirTcpListener{TSession}</c>'s own per-connection dispatch
+    ///     (Network/Fenrir.Network.Transport/FenrirTcpListener.cs:33-73) keeps every already-accepted
+    ///     connection's lifetime running fully detached and unawaited. <c>PositionWriteBehindHost</c> is
+    ///     registered after this host in <c>HostingServiceCollectionExtensions.AddGameHosting</c>, so its own
+    ///     <c>StopAsync</c> (and the shared write-behind flusher's own final drain) only runs once this method
+    ///     returns -- letting every in-flight disconnect's own flush have a chance to land before that flusher
+    ///     is itself cancelled.
+    /// </summary>
+    public override async Task StopAsync(CancellationToken cancellationToken)
+    {
+        // Stops the accept loop first (no new connections dispatched after this): base.StopAsync cancels
+        // ExecuteAsync's stoppingToken and awaits AcceptLoopAsync's own exit.
+        await base.StopAsync(cancellationToken).ConfigureAwait(false);
+
+        var outstanding = _inFlightConnections.Keys.ToArray();
+        if (outstanding.Length == 0)
+            return;
+
+        try
+        {
+            // Bounded by the same shutdown-timeout token the Generic Host already gives every hosted
+            // service's StopAsync -- a stuck connection can't hang shutdown indefinitely.
+            await Task.WhenAll(outstanding).WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // Either the shutdown-timeout budget elapsed, or one of the outstanding connections' own
+            // OperationCanceledException fell through uncaught (OnAcceptedAsync's own catch deliberately
+            // excludes it -- see its own remarks). Either way, the remaining connections are abandoned
+            // exactly like an ungraceful kill would abandon them -- no worse than before this fix.
+            logger.LogWarning(
+                "GameServer shutdown proceeding with zone connection teardown still in flight (of {Count} originally outstanding)",
+                outstanding.Length);
+        }
+        catch (Exception ex)
+        {
+            // Every per-connection fault is already logged inside OnAcceptedAsync's own catch block; a
+            // WhenAll surfacing one of them here must not prevent shutdown from proceeding.
+            logger.LogWarning(ex, "One or more zone connections faulted while tearing down during shutdown");
+        }
+    }
+
+    /// <summary>
+    ///     Thin wrapper so <see cref="StopAsync" /> can await every still-in-flight connection: registers
+    ///     <see cref="OnAcceptedAsync" />'s own returned <see cref="Task" /> before returning it back up to
+    ///     <c>FenrirTcpListener{TSession}.RunAcceptedAsync</c>'s <c>await onAccepted(...)</c> -- synchronous up
+    ///     to that point even though <see cref="OnAcceptedAsync" /> is itself async, so the registration always
+    ///     happens-before <see cref="ExecuteAsync" />'s own accept loop can exit and race
+    ///     <see cref="StopAsync" />'s later read of <see cref="_inFlightConnections" />.
+    /// </summary>
+    private Task TrackInFlightAsync(ZoneClientSession zoneSession, SocketConnection connection, CancellationToken ct)
+    {
+        var task = OnAcceptedAsync(zoneSession, connection, ct);
+
+        _inFlightConnections[task] = 0;
+        _ = task.ContinueWith(t => _inFlightConnections.TryRemove(t, out _), TaskScheduler.Default);
+
+        return task;
     }
 
     private async Task OnAcceptedAsync(ZoneClientSession zoneSession, SocketConnection connection, CancellationToken ct)
@@ -119,6 +192,16 @@ public sealed class GameConnectionHost(
             // A session that never completed world registration has no CurrentZone -- nothing to remove, nothing to flush.
             if (zoneSession is { CharacterId: { } characterId, CurrentZone: Zone zone })
             {
+                // Ordering is load-bearing: this synchronous, targeted flush reads the character's CURRENT
+                // Position/Vitals/Progression state directly from the zone's live registry and persists it
+                // BEFORE the Leave command below is even posted -- so it can never race the zone's own
+                // tick-driven removal from that same registry (up to a 50 ms tick period, and the shared
+                // periodic flusher can itself be blocked behind an already-in-flight SQL round trip well
+                // beyond that). A signal-only RequestImmediateFlush here instead would leave whether this
+                // player's final in-play delta gets persisted or silently dropped up to that race -- see
+                // PositionWriteBehindHost.FlushCharacterNowAsync's own remarks for the full citation.
+                await FlushFinalCharacterStateAsync(characterId).ConfigureAwait(false);
+
                 // A dropped Leave (full inbox) can't be retried here, and would otherwise leave a permanent phantom
                 // in the zone's player list -- log loudly rather than silently discard.
                 if (!zone.Post(ZoneCommand.Leave(characterId)))
@@ -126,7 +209,9 @@ public sealed class GameConnectionHost(
                         "Zone {MapId} inbox full: dropped Leave for character {CharacterId} on disconnect -- character remains a phantom in the zone until its next Move/handoff",
                         zone.MapId, characterId);
 
-                // Immediate flush: the periodic 5 s/512-entity flush would otherwise leave this player's last position unpersisted.
+                // No longer this player's own correctness guarantee (the awaited flush above already durably
+                // captured their final state) -- just a courtesy nudge so the shared periodic drain catches up
+                // sooner on any OTHER character already dirty in this same batch.
                 writeBehindFlusher.RequestImmediateFlush();
 
                 await LogLogoutAsync(zoneSession.AccountId, characterId, zone.MapId).ConfigureAwait(false);
@@ -147,6 +232,29 @@ public sealed class GameConnectionHost(
             registry.Unregister(zoneSession.SessionId);
             rateLimiter.Remove(zoneSession.SessionId);
             await connection.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    ///     Best-effort synchronous, targeted persist of this one character's final Position/Vitals/Progression
+    ///     state -- must never throw out of a connection-teardown path, same posture as
+    ///     <see cref="TearDownAccountSessionAsync" />/<see cref="LogLogoutAsync" /> below. A thrown exception here
+    ///     (e.g. a transient SQL failure) falls back to the character's pre-existing dirty-tracker entry (if any)
+    ///     being picked up by the shared periodic/immediate-signal drain later -- reopening the very race this
+    ///     method exists to close, but only in this already-abnormal failure case, and strictly better than
+    ///     letting the exception abort Leave-posting/tribe-quota-release/session-teardown/socket-disposal below.
+    /// </summary>
+    private async ValueTask FlushFinalCharacterStateAsync(int characterId)
+    {
+        try
+        {
+            await writeBehindFlusher.FlushCharacterNowAsync(characterId, CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex,
+                "Failed to flush final Position/Vitals/Progression state for character {CharacterId} on disconnect -- falling back to the periodic write-behind drain",
+                characterId);
         }
     }
 

@@ -3,12 +3,36 @@ namespace Fenrir.Data.WriteBehind;
 // Non-generic handle so callers (disconnect, economic tx, level-up) don't need the closed generic type.
 public interface IWriteBehindFlusher : IAsyncDisposable
 {
-    /// <summary>Non-blocking: only raises a signal, doesn't wait for the flush.</summary>
+    /// <summary>
+    ///     Non-blocking: only raises a signal, doesn't wait for the flush. The caller gets no signal of
+    ///     whether/when the resulting drain completes, succeeds, or which entities it captured -- treat a call
+    ///     to this method as "a drain will happen sooner than the next periodic interval," never as a
+    ///     durability guarantee for any one specific entity (see <c>ICharacterWriteBehindFlusher.FlushCharacterNowAsync</c>
+    ///     for the synchronous, single-entity alternative used where that guarantee matters, e.g. a character
+    ///     disconnect).
+    /// </summary>
     public void RequestImmediateFlush();
 }
 
 /// <summary>Drains DirtyTracker on interval, immediate-flush request, or entityThreshold crossing -- whichever first.</summary>
-/// <remarks>If flushCallback throws, the batch is re-merged into the tracker (not discarded) and the loop keeps running.</remarks>
+/// <remarks>
+///     If flushCallback throws, the batch is re-merged into the tracker (not discarded) and the loop keeps running.
+///     <para>
+///         <b>Process-kill residual risk (acknowledged, not mitigated here):</b> a graceful shutdown drains
+///         whatever is dirty at the instant cancellation is observed (<see cref="RunAsync" />'s final
+///         unconditional <c>DrainAll</c> below), and <c>ICharacterWriteBehindFlusher.FlushCharacterNowAsync</c>
+///         additionally covers a single character's own graceful disconnect synchronously. Neither runs on a
+///         true (non-graceful) process kill -- SIGKILL/task-kill-9-equivalent, or a hard crash -- since no C#
+///         code executes at all once the process is gone. In that scenario, every entity dirtied since the
+///         LAST successful drain is lost, bounded by whichever of this instance's own triggers would have
+///         fired first: <paramref name="interval" /> (wall-clock periodic trigger), or the moment
+///         <c>tracker.Count</c> crosses <paramref name="entityThreshold" /> (polled every
+///         <see cref="ThresholdPollInterval" />, itself not a forcing function by itself). This is a bounded,
+///         known tradeoff -- not a silent gap -- and is deliberately not addressed by a WAL/journal here; see
+///         each concrete <see cref="IWriteBehindFlusher" />-hosting <c>BackgroundService</c>'s own remarks for
+///         its instance's specific bound and whether its interval was judged cheap enough to tighten.
+///     </para>
+/// </remarks>
 public sealed class WriteBehindFlusher<TKey> : IWriteBehindFlusher where TKey : notnull
 {
     public const int DefaultEntityThreshold = 512;
@@ -126,6 +150,22 @@ public sealed class WriteBehindFlusher<TKey> : IWriteBehindFlusher where TKey : 
                 if (batch.Count > 0)
                     await FlushBatchAsync(batch, loopCt).ConfigureAwait(false);
             }
+
+            // Best-effort final drain so a graceful shutdown doesn't abandon whatever's still dirty at this
+            // instant -- same "loop exits on cancellation, then one more unconditional flush" idiom already
+            // used by TowerWarWriteBehindHost/WorldStateWriteBehindHost/MonsterBossRespawnWriteBehindHost/
+            // HeroRankPointsWriteBehindHost (Application/Fenrir.Application.Game.Hosting), and the direct fix
+            // for the parity gap against legacy's force-save-then-poll-until-drained shutdown sequence
+            // (Server/ts25playuser/S07_MyGame01.cpp:317-372): legacy force-saves and confirms every still-valid
+            // session's save is drained before terminating; this is that same guarantee for whatever this
+            // tracker still holds the instant cancellation is observed, instead of silently dropping it. loopCt
+            // is already cancelled by this point (that's what ended the loop above), so a cancellation-aware DB
+            // call made with it would fault immediately -- CancellationToken.None matches the same already-
+            // established choice in the sibling hosts cited above. FlushBatchAsync's own re-merge-on-failure
+            // path already logs/reports via onFlushError rather than losing the batch if this attempt fails.
+            var finalBatch = _tracker.DrainAll();
+            if (finalBatch.Count > 0)
+                await FlushBatchAsync(finalBatch, CancellationToken.None).ConfigureAwait(false);
         }
         finally
         {

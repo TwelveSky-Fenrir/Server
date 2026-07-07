@@ -20,6 +20,16 @@ namespace Fenrir.Application.Game.Hosting.World;
 ///     in-world outcome either way: the death (and any XP/CP loss it caused) is already fully applied on
 ///     <see cref="PlayerRuntimeState" /> and durable via the normal progression write-behind path regardless
 ///     of whether this audit row lands.
+///     <para>
+///         <b>Process-kill residual risk, exact bound:</b> a true (non-graceful) process kill loses whatever
+///         death-audit rows are queued in-memory and not yet persisted -- in practice sub-tick, since
+///         <see cref="Zone.WaitForDeathEventLogAsync" /> wakes this loop the instant a row is queued rather
+///         than waiting for the timer; the worst-case bound is <see cref="FlushInterval" /> (1s), same
+///         "safety net, not the primary trigger" posture as <see cref="MonsterLootFlushHost" />, and left
+///         unshortened for the same reason. As noted above, this loss is audit-log-only -- it never affects
+///         the already-durable in-game outcome of the death itself. This is an accepted, bounded tradeoff, not
+///         a silent gap.
+///     </para>
 /// </remarks>
 public sealed class DeathEventLogFlushHost(
     ZoneRegistry zones,

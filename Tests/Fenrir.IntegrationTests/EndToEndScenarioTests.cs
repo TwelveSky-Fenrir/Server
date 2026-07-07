@@ -39,8 +39,11 @@ namespace Fenrir.IntegrationTests;
 ///             <see cref="ExperienceFormulas" />/<c>LevelProgressionCalculator</c> the server itself runs), but
 ///             cannot -- and does not -- assert Experience/Level via the database or the wire: there is currently
 ///             no observable channel for it. Position, inventory and money ARE independently verified via the
-///             database, since those really are persisted (position via write-behind + the disconnect's
-///             immediate flush; inventory/money synchronously inside the handler itself).
+///             database, since those really are persisted (position via write-behind, and -- for a
+///             disconnecting character specifically -- deterministically via the disconnect path's own
+///             synchronous <c>ICharacterWriteBehindFlusher.FlushCharacterNowAsync</c>, awaited before the
+///             zone's own Leave command is even posted; inventory/money synchronously inside the handler
+///             itself).
 ///         </item>
 ///     </list>
 /// </remarks>
@@ -309,7 +312,10 @@ public sealed class EndToEndScenarioTests
             await Task.Delay(TimeSpan.FromMilliseconds(500), ct);
         }
 
-        // Position: real write-behind persistence (PositionWriteBehindHost), plus the disconnect's immediate flush.
+        // MapId (part of the position row): persisted deterministically by the disconnect path's synchronous
+        // ICharacterWriteBehindFlusher.FlushCharacterNowAsync, awaited BEFORE the zone's own Leave command is
+        // even posted (see GameConnectionHost's disconnect-cleanup remarks) -- not a race against the zone
+        // tick's own registry removal, and no longer dependent on the best-effort RequestImmediateFlush nudge.
         Assert.Equal(FenrirEnvironmentFixture.SecondaryMapId, mapId);
 
         // Money: debited synchronously inside BuyShopItemHandler's own SQL call, not write-behind -- always current.

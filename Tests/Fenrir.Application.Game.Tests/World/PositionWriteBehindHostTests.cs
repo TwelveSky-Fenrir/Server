@@ -114,4 +114,65 @@ public sealed class PositionWriteBehindHostTests
 
         await host.StopAsync(CancellationToken.None);
     }
+
+    /// <summary>
+    ///     Disconnect-path fix (fenrir-disconnect-persistence-guarantee): <see cref="PositionWriteBehindHost.FlushCharacterNowAsync" />
+    ///     must persist a live character's CURRENT Progress AND Position rows synchronously, without going
+    ///     through the background <see cref="WriteBehindFlusher{TKey}" /> loop at all -- the host is never
+    ///     started here, proving this path doesn't depend on that loop having woken up.
+    /// </summary>
+    [Fact]
+    public async Task FlushCharacterNowAsync_CharacterLiveInRegistry_PersistsProgressAndPositionWithoutTheBackgroundLoop()
+    {
+        const int characterId = 30;
+        var (registry, dirtyTracker) = CreateRegistryWithOnePlayer(1, characterId, out var state);
+        var originalFlushSequence = state.FlushSequence;
+        state.PosX = 123f;
+        state.Life = 700;
+
+        var characters = new FakeCharacterRepository();
+        var progress = new ProgressWriteBehindHost(registry, characters);
+        await using var host = new PositionWriteBehindHost(registry, dirtyTracker, characters, progress,
+            NullLogger<PositionWriteBehindHost>.Instance);
+
+        // Deliberately never started (no StartAsync/RunAsync): this call must not depend on the shared drain
+        // loop being alive to durably capture the disconnecting character's state.
+        await host.FlushCharacterNowAsync(characterId, CancellationToken.None);
+
+        var progressRow = Assert.Single(characters.PersistedProgressRows);
+        Assert.Equal(characterId, progressRow.CharacterId);
+        Assert.Equal(700, progressRow.Life);
+        Assert.Equal(originalFlushSequence, progressRow.FlushSequence);
+
+        var positionRow = Assert.Single(characters.PersistedPositionRows);
+        Assert.Equal(characterId, positionRow.CharacterId);
+        Assert.Equal(123f, positionRow.PosX);
+
+        // Position is persisted at FlushSequence + 1 (not the same value Progress just used) so it can never be
+        // silently no-op'd by usp_Character_PersistBatch's "strictly greater than stored" idempotence guard,
+        // which the Progress write above has just advanced to originalFlushSequence.
+        Assert.Equal(originalFlushSequence + 1, positionRow.FlushSequence);
+    }
+
+    /// <summary>
+    ///     A character no longer present in any zone's live registry by the time <see cref="PositionWriteBehindHost.FlushCharacterNowAsync" />
+    ///     runs (e.g. an already-completed handoff, or called twice) is documented as a no-op -- must not throw,
+    ///     and must not persist anything.
+    /// </summary>
+    [Fact]
+    public async Task FlushCharacterNowAsync_CharacterNotInAnyZonesRegistry_IsANoOp()
+    {
+        var (registry, dirtyTracker) = CreateRegistryWithOnePlayer(1, 40, out _);
+
+        var characters = new FakeCharacterRepository();
+        var progress = new ProgressWriteBehindHost(registry, characters);
+        await using var host = new PositionWriteBehindHost(registry, dirtyTracker, characters, progress,
+            NullLogger<PositionWriteBehindHost>.Instance);
+
+        const int missingCharacterId = 999;
+        await host.FlushCharacterNowAsync(missingCharacterId, CancellationToken.None);
+
+        Assert.Empty(characters.PersistedProgressRows);
+        Assert.Empty(characters.PersistedPositionRows);
+    }
 }

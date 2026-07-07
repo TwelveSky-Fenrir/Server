@@ -40,6 +40,10 @@ public static class AvatarInfoFactory
     private const int EquipSlotCount = 13;
     private const int EquipWireIntsPerSlot = 4;
 
+    // FEQUIP_TYPE::EPET, index 8 -- same independent-duplication posture as EquipSlotCount/EquipWireIntsPerSlot
+    // above (Game's own copy lives at Fenrir.Application.Game.Domain.Pets.PetSlots.EquipmentSlot).
+    private const int PetEquipSlot = 8;
+
     /// <summary>
     ///     Projects the equipment rows CreateAvatarHandler is about to persist onto AVATAR_INFO's aEquip[13][4]
     ///     wire array -- independent re-implementation of GameServer's own
@@ -47,7 +51,17 @@ public static class AvatarInfoFactory
     ///     rows from the DB; this one reads the CharacterItemSlotTvp rows the handler already holds in memory, one
     ///     request earlier in the same flow). The 4th int per slot is unmapped in both, left at wire-zero.
     /// </summary>
-    public static int[] BuildEquipArray(IReadOnlyList<CharacterItemSlotTvp> equipment)
+    /// <remarks>
+    ///     Réf. C++ : Server/ts25login/S04_MyWork02.cpp:1131-1135 -- the pet slot's 2nd/3rd wire ints are the
+    ///     pet's activity/growth as plain values (NOT the expiration-date/packed-Enchant-Combine-Refine-Socket
+    ///     pair every other slot carries there), since those two values live on the character record itself
+    ///     rather than on the pet's own CharacterItems row (<paramref name="petGrowth" />/<paramref name="petActivity" />
+    ///     come from the caller's already-known creation-time literals, not from <paramref name="equipment" />'s
+    ///     own zeroed Enchant/Combine/Refine/Socket/ExpireDate fields for that row). Defaults to 0/0 so callers
+    ///     with no pet in scope (e.g. existing unit tests) are unaffected.
+    /// </remarks>
+    public static int[] BuildEquipArray(IReadOnlyList<CharacterItemSlotTvp> equipment, int petGrowth = 0,
+        byte petActivity = 0)
     {
         var equip = new int[EquipSlotCount * EquipWireIntsPerSlot];
 
@@ -58,8 +72,17 @@ public static class AvatarInfoFactory
 
             var baseIndex = item.Slot * EquipWireIntsPerSlot;
             equip[baseIndex] = item.ItemId;
-            equip[baseIndex + 1] = item.ExpireDate;
-            equip[baseIndex + 2] = item.Enchant | (item.Combine << 8) | (item.Refine << 16) | (item.Socket << 24);
+
+            if (item.Slot == PetEquipSlot)
+            {
+                equip[baseIndex + 1] = petActivity;
+                equip[baseIndex + 2] = petGrowth;
+            }
+            else
+            {
+                equip[baseIndex + 1] = item.ExpireDate;
+                equip[baseIndex + 2] = item.Enchant | (item.Combine << 8) | (item.Refine << 16) | (item.Socket << 24);
+            }
         }
 
         return equip;

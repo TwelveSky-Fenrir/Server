@@ -173,8 +173,11 @@ public class StarterKitProcTests
         Assert.Equal(1, bundle.Character.StatDex);
         Assert.Equal(640000000, bundle.Character.PetGrowth);
         Assert.Equal((byte)100, bundle.Character.PetActivity);
-        Assert.Equal(welcomeBuffUntilDate, bundle.Character.DoubleExpTime1);
-        Assert.Equal(welcomeBuffUntilDate, bundle.Character.DoubleExpTime2);
+        // DoubleExpTime1/DoubleExpTime2 are the legacy bare-integer-literal 300 (Server/ts25login/
+        // S04_MyWork02.cpp:886-887), NOT the same date as AutoBuffTime -- see
+        // Migrations/026_double_exp_time_counter_fix.sql for the full citation and fix rationale.
+        Assert.Equal(300, bundle.Character.DoubleExpTime1);
+        Assert.Equal(300, bundle.Character.DoubleExpTime2);
         Assert.Equal(welcomeBuffUntilDate, bundle.Character.AutoBuffTime);
         Assert.Equal(premiumUntilUnixSeconds, bundle.Character.PremiumExpireUtc);
 
@@ -208,6 +211,11 @@ public class StarterKitProcTests
         Assert.Equal(5, bundle.Character.MountPower);
         Assert.Equal(0, bundle.Character.MountSlotIndex);
         Assert.Equal(99999999, bundle.Character.MountTime);
+
+        // Starting death-protection allowance (S04_MyWork02.cpp:885-889, unconditional regardless of tribe/
+        // previous-tribe/gender), now granted by Migrations/025_character_protect_for_death_grant.sql instead
+        // of silently taking the column's DEFAULT of 0.
+        Assert.Equal(5, bundle.Character.ProtectForDeath);
     }
 
     [Fact]
@@ -225,6 +233,31 @@ public class StarterKitProcTests
 
         var secondCharacterId = await CreateMinimalStarterKitCharacterAsync(accountId, 1);
         Assert.True(secondCharacterId > 0);
+    }
+
+    // db-createwithstarterkit-fieldaudit (Major): closes this suite's own blind spot -- prior to this test, no
+    // test in Fenrir.Data.Tests or Fenrir.IntegrationTests ever exercised an out-of-range previousTribe against
+    // the real stored procedure (the only real-database test covering this proc used previousTribe: 2, in
+    // range). Confirms CK_Characters_PreviousTribe (Migrations/018_character_previous_tribe_and_mount_readpath.
+    // sql:35-36) actually fires as a raw, uncoded SQL Server CHECK-constraint violation (error 547) -- not one
+    // of this procedure's own purpose-coded THROW checks (50201/50202) -- on the transaction's first INSERT,
+    // confirming CreateAvatarHandler's own PreviousTribe range check (0-2) is what now stands between a
+    // malformed/tampered request and this raw database failure, rather than the handler's structural
+    // validation never mattering in practice.
+    [Fact]
+    public async Task CreateWithStarterKitAsync_PreviousTribeOutOfRange_ThrowsCheckConstraintViolation()
+    {
+        var accountId = await CreateTestAccountAsync();
+        var name = NewCharacterName();
+
+        var ex = await Record.ExceptionAsync(() => _characters.CreateWithStarterKitAsync(
+            accountId, 0, name, 0, 0, 0, 0, 1, 0f, 0f, 0f, 100, 100, 50, 50, 0, 0,
+            [], [], [], [], CancellationToken.None, previousTribe: 3).AsTask());
+
+        Assert.NotNull(ex);
+        var sqlException = ex as SqlException ?? ex!.InnerException as SqlException;
+        Assert.NotNull(sqlException);
+        Assert.Equal(547, sqlException!.Number);
     }
 
     [Fact]

@@ -4,10 +4,10 @@ namespace Fenrir.Application.Game.Domain.Movement;
 
 /// <summary>
 ///     Character-motion (animation) whitelist gating the attack sub-packet budget --
-///     <c>CheckValidCharacterMotionForSend</c>. Evaluated once per accepted CZ_AVATAR_ACTION_SEND /
-///     CZ_UPDATE_AVATAR_ACTION packet (<c>Zone.PlayerLifecycle</c>'s <c>HandleMove</c>), before
-///     any of that action's own effects (position/ActionSort write, broadcast, skill/mana deduction). A pure
-///     table lookup: no I/O, no shared state, safe to call from any thread.
+///     <c>CheckValidCharacterMotionForSend</c>. Evaluated once per accepted CZ_AVATAR_ACTION_SEND (op15)
+///     packet ONLY (<c>Zone.PlayerLifecycle</c>'s <c>HandleMove</c>), before any of that action's own effects
+///     (position/ActionSort write, broadcast, skill/mana deduction). A pure table lookup: no I/O, no shared
+///     state, safe to call from any thread.
 /// </summary>
 /// <remarks>
 ///     Réf. C++ : Server/ts25zone/S04_MyWork05.cpp:4049-4763 (<c>CheckValidCharacterMotionForSend</c>:
@@ -23,6 +23,14 @@ namespace Fenrir.Application.Game.Domain.Movement;
 ///     Server/ts25zone/H07_MyGame.h:843-847 (the four legacy session fields these outputs feed, and their
 ///     "enforced, ceiling zero" state at session start) ; ServerDocs/12_ts25zone/07_MyWork05_Helpers.md §11
 ///     (independent recount of the case table, cross-checked against the direct read above).
+///     <para>
+///         CZ_UPDATE_AVATAR_ACTION (op16) does NOT run through this table -- <c>CheckValidCharacterMotionForSend</c>
+///         has exactly one call site in the whole legacy codebase, inside op15's own handler (:1544). Op16
+///         runs its own, separate inline switch instead (S04_MyWork02.cpp:1815-1878, materially more
+///         permissive for several Sorts) -- see <see cref="AvatarActionResumeWhitelist" />. The two tables
+///         must never be conflated: doing so previously caused legitimate op16 packets to be wrongly
+///         hard-disconnected for Sort values (19, 31, 92-95) that only op16's own table legalizes.
+///     </para>
 /// </remarks>
 public static class CharacterMotionWhitelist
 {

@@ -23,9 +23,21 @@ public sealed class GenericActionService(
     WorldDataCache worldData,
     QuestCatalog questCatalog,
     PartyRegistry partyRegistry,
+    IEventLogRepository eventLog,
     ILogger<GenericActionService> logger)
     : IGenericActionService
 {
+    /// <summary>game.EventLog.EventCode for TimeExchange (legacy <c>GL_851_PLAYTIME_EXCHANGE</c>).</summary>
+    private const short TimeExchangeEventCode = 1;
+
+    private const byte TimeExchangeOutcome = 1;
+
+    /// <summary>Server/ts25zone/S04_MyWork05.cpp:4808-4826 -- 694 teacher points per accrued play-time-event minute.</summary>
+    private const int TeacherPointsPerPlayTimeMinute = 694;
+
+    /// <summary>Server/ts25zone/S04_MyWork05.cpp:4808-4826 -- 400 pet experience per accrued play-time-event minute.</summary>
+    private const int PetExperiencePerPlayTimeMinute = 400;
+
     public async ValueTask<GenericActionResult> MoveContainerAsync(int sort, byte[] data, Zone zone,
         PlayerRuntimeState state, int characterId, CancellationToken cancellationToken)
     {
@@ -501,6 +513,67 @@ public sealed class GenericActionService(
                 zone.MapId, characterId);
 
         return GenericActionResult.Succeeded;
+    }
+
+    /// <inheritdoc cref="IGenericActionService.TimeExchangeAsync" />
+    public async ValueTask<GenericActionResult> TimeExchangeAsync(Zone zone, PlayerRuntimeState state,
+        int accountId, int characterId, CancellationToken cancellationToken)
+    {
+        // The only precondition this action has (S04_MyWork05.cpp:4808-4826's own guard): fewer than 1
+        // accrued minute is a silent no-op -- no log entry, no state change, still a success echo (see
+        // GenericActionHandler.Respond).
+        var accruedMinutes = state.PlayTimeEvent;
+        if (accruedMinutes < 1)
+            return GenericActionResult.Succeeded;
+
+        var teacherPointsGranted = accruedMinutes * TeacherPointsPerPlayTimeMinute;
+        var petExperienceGranted = accruedMinutes * PetExperiencePerPlayTimeMinute;
+
+        var petItemId = state.Inventory.GetContainer(ContainerMatrix.Equipment)
+            .TryGetValue(PetSlots.EquipmentSlot, out var petStack)
+            ? petStack.ItemId
+            : 0;
+        var preGrantPetActivity = state.PetActivity;
+        var preGrantPetGrowth = state.PetGrowth;
+
+        var credited = PetExperienceCreditResolver.Resolve(petItemId, state.PetGrowth, state.PetActivity,
+            petExperienceGranted, worldData.ItemsById);
+
+        // Audit log BEFORE either reward is actually applied (S04_MyWork05.cpp:4808-4826's own ordering) --
+        // captures the PRE-grant pet-slot snapshot (identifier via ItemId, activity flag + stored
+        // growth/experience in the payload), not the post-grant one.
+        await eventLog.LogAsync(TimeExchangeEventCode, EventLogCategory.PlayTimeExchange, accountId, characterId,
+            null, null, null, null, null, petItemId, teacherPointsGranted, TimeExchangeOutcome,
+            $"PetActivity={preGrantPetActivity};PetGrowth={preGrantPetGrowth};PetExperienceGranted={petExperienceGranted}",
+            cancellationToken);
+
+        var newTeacherPoint = state.TeacherPoint + teacherPointsGranted;
+
+        // Same combined guard Zone.CreditPetGrowthFromMonsterKill already applies for its own (unrelated)
+        // call site: skip the pet-slot mirror entirely when nothing about it would actually change, rather
+        // than posting a no-op mutation.
+        int? petGrowthToApply = null;
+        byte? petActivityToApply = null;
+        if (credited.IsEligible && (credited.CreditedAmount > 0 || credited.ReactivationApplied))
+        {
+            petGrowthToApply = credited.NewGrowth;
+            petActivityToApply = (byte)credited.NewActivity;
+        }
+
+        if (!await zone.PostTribeProgressCommandAndWaitAsync(new TribeProgressZoneCommand(characterId,
+                TeacherPoint: newTeacherPoint,
+                PetGrowth: petGrowthToApply,
+                PetActivity: petActivityToApply,
+                PlayTimeEvent: 0), cancellationToken))
+            logger.LogError(
+                "Zone {MapId} tribe-progress inbox full: dropped TimeExchange mirror for character {CharacterId}",
+                zone.MapId, characterId);
+
+        // GrantedPetExperienceGrowth only when the credit was actually positive -- the reactivation-only
+        // (CreditedAmount == 0) case still mutates PetActivity above but sends no experience-changed
+        // notification, matching PetExperienceCreditResult's own remarks.
+        var grantedPetGrowth = credited is { IsEligible: true, CreditedAmount: > 0 } ? credited.NewGrowth : (int?)null;
+        return new GenericActionResult(GenericActionStatus.Succeeded, GrantedPetExperienceGrowth: grantedPetGrowth);
     }
 
     private static List<CharacterItemSlotTvp> ToTvps(ImmutableDictionary<byte, ItemStack> container)

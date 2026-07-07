@@ -78,10 +78,12 @@ public interface IGuildActionService
     ///     tSort 14 -- buff type choice, master/sub-master only. A plain member gets a clean tResult=4, not
     ///     an abort. Requires at least 1 minute of buff-time reserve (only ever recharged by tSort 15's
     ///     guild scrolls). The buff's actual gameplay stat effect is undocumented, so only the state machine
-    ///     (choose a type, track remaining reserve) is implemented -- no stat bonus is invented. Activation
-    ///     stamps BuffTimeForDiff to now: <see cref="GuildBuffDecayHost" /> reads that checkpoint to burn
-    ///     the reserve down over real time, so it must restart from here, never from whatever stale value (or
-    ///     0) the row already carried.
+    ///     (choose a type, track remaining reserve) is implemented -- no stat bonus is invented. Matches
+    ///     legacy's <c>UpdateGuildBuffType</c> (Server/ts25extra/S08_MyDB.cpp:1188-1191): only BuffType/
+    ///     BuffState are written here, whether this is a fresh activation or an ordinary type switch while
+    ///     already active -- the decay checkpoint (BuffTimeForDiff) is carried through unchanged, never
+    ///     stamped to "now" by this action. <see cref="GuildBuffDecayHost" /> is the sole owner of that
+    ///     checkpoint.
     /// </summary>
     public ValueTask<GuildActionResult> SetGuildBuffAsync(GuildActionRequest packet, PlayerRuntimeState state,
         CancellationToken ct);

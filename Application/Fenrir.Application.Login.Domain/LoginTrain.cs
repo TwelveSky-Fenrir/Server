@@ -30,7 +30,16 @@ public static class LoginTrain
     {
         VisibleState = 0,
         SpecialState = 0,
-        CostumeIndex = 0,
+        // -1, not 0: legacy's aCostumeIndex is DB-backed (Server/Header/CSQLAvatar.cpp:661's FIELD_AVATAR0(
+        // aCostumeIndex) round-trips it verbatim on every avatar load) and defaults to -1 both at creation
+        // (Server/ts25login/S04_MyWork02.cpp:1099, never overwritten again in that function -- see
+        // AvatarInfoTemplates.Zeroed's own remarks for the full citation) and in the legacy DB schema itself
+        // (Server/BuildEU33/DB/nxtserver.sql:128, `DEFAULT -1`). Fenrir doesn't persist a per-character
+        // CostumeIndex at all (game.Characters has no such column -- no costume acquisition path exists yet),
+        // so this wire-zero template value is the only value a real, populated roster slot ever shows too
+        // (BuildAvatarSlots' `with` overlay below doesn't touch CostumeIndex either) -- 0 would misrepresent
+        // "wardrobe slot 0 selected" per the -1/0-9/10-19 encoding CostumeStateResolver.Context documents.
+        CostumeIndex = -1,
         Tribe = 0,
         PreviousTribe = 0,
         EatLifePotion = 0,

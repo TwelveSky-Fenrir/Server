@@ -1,4 +1,5 @@
 using System.Net;
+using System.Runtime.CompilerServices;
 using Fenrir.Application.Login.Domain;
 using Fenrir.Application.Login.Domain.RateLimiting;
 using Fenrir.Application.Login.Handlers.Handlers;
@@ -11,6 +12,8 @@ using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Framing;
 using Fenrir.Network.Serialization.Packets.Login;
 using Fenrir.Network.Serialization.Packets.Shared;
+using Fenrir.Network.Serialization.Wire;
+using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -221,6 +224,29 @@ public class LoginHandlerTests
         await AssertFirstResponseAsync(pipe, LoginTrain.BuildLoginRecv(8, "someuser", 0, LoginTrain.FailurePinMask));
     }
 
+    // ts25playuser's RegisterUserForLogin_01 capacity-full/DB-persistence-failure exits (_failed2/_failed3,
+    // S07_MyGame01.cpp:915-923) collapse in ts25login onto tResult=5 (S04_MyWork02.cpp:285-292), always an
+    // explicit reply, never a silent drop. The claim write exhausting its own bounded retry budget (or
+    // hitting an unrelated SqlException) is the closest present-day analog -- this must translate into the
+    // same explicit LC_LOGIN_RECV{Result=5} reply rather than propagating uncaught out of LoginService.
+    [Fact]
+    public async Task HandleAsync_AccountSessionClaimThrowsSqlException_SendsSessionRegistrationFailedResult()
+    {
+        var (hash, salt) = PasswordHasher.Hash("correct-password");
+        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, false);
+        var accounts = FakeAccountRepository.WithAccount(account);
+        var accountSessions = new FakeAccountSessionRepository { ClaimException = CreateFakeSqlException() };
+        var handler = CreateHandler(out var session, out var pipe, accounts, accountSessions: accountSessions);
+
+        await handler.HandleAsync(ValidLoginRequest(password: "correct-password"), session, CancellationToken.None);
+
+        await AssertFirstResponseAsync(pipe, LoginTrain.BuildLoginRecv(5, "someuser", 0, LoginTrain.FailurePinMask));
+        Assert.Null(session.AccountId);
+        // ReArmVersionOk=true (like every other post-auth-success failure): the client can retry on this
+        // same connection without a reconnect.
+        Assert.Equal(LoginSessionState.VersionOk, session.State);
+    }
+
     // "Protect Spoofed" anti-spoofing gate (Server/ts25login/S08_MyDB.cpp:497-507): a non-GM account whose
     // declared MAC is zero-length never gets its device values populated with real data at all, so the gate
     // always trips regardless of whatever GUID/IP the client happened to declare.
@@ -406,6 +432,18 @@ public class LoginHandlerTests
     private static byte[] ParseMac(string mac)
     {
         return mac.Split('-').Select(b => Convert.ToByte(b, 16)).ToArray();
+    }
+
+    /// <summary>
+    ///     SqlException has no accessible public constructor -- it's only ever created by
+    ///     Microsoft.Data.SqlClient itself from a real server round trip. Bypassing every constructor is the
+    ///     only way to get an instance of the exact type LoginService's catch clause discriminates on; the
+    ///     fake's Message/Number are irrelevant here since only the type, not the content, drives the branch
+    ///     under test.
+    /// </summary>
+    private static SqlException CreateFakeSqlException()
+    {
+        return (SqlException)RuntimeHelpers.GetUninitializedObject(typeof(SqlException));
     }
 
     /// <summary>

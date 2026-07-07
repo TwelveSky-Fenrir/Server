@@ -14,8 +14,9 @@ namespace Fenrir.Application.Game.Handlers.Handlers;
 /// <summary>
 ///     op19, CZ_PROCESS_DATA_SEND -- catch-all dispatch on tSort: container moves (inventory&lt;-&gt;inventory,
 ///     inventory&lt;-&gt;equipment), ground pickup, manual drop-to-world, NPC teleport toll, skill learn/upgrade,
-///     NPC shop buy/sell, and rune-stone stat crafting. A tSort the legacy switch recognizes but this handler
-///     doesn't implement replies with a clean failure; a tSort absent from every legacy family gets
+///     NPC shop buy/sell, rune-stone stat crafting, and TimeExchange (play-time-event-to-teacher-point/
+///     pet-experience conversion). A tSort the legacy switch recognizes but this handler doesn't implement
+///     replies with a clean failure; a tSort absent from every legacy family gets
 ///     <see cref="ClientSession.Abort" /> (anti-fuzzing).
 /// </summary>
 /// <remarks>
@@ -31,6 +32,9 @@ public sealed class GenericActionHandler(
     IRuneStoneCraftService runeStoneCraftService)
     : IAsyncPacketHandler<GenericActionRequest>
 {
+    /// <summary>AvatarStatUpdateResponse.Sort for S014PET_EXP, self-addressed only (S05_MyTransfer.cpp:519-542).</summary>
+    private const int PetExperienceStatSort = 14;
+
     public async ValueTask HandleAsync(GenericActionRequest packet, IPacketSession session,
         CancellationToken cancellationToken)
     {
@@ -167,6 +171,22 @@ public sealed class GenericActionHandler(
                 runeMove.Page2, runeMove.Index2, runeMove.XPost2, 0,
                 true, zone, state, characterId, cancellationToken);
             RespondRune(session, zoneSession, sort, packet.Data, runeResult);
+            return;
+        }
+
+        // tSort 237 -- TimeExchange (converts accrued play-time-event minutes into teacher points + pet
+        // experience). Unlike the neighboring sort case immediately before it in the legacy dispatch
+        // (S04_MyWork04.cpp:895-921), this one has no NPC-proximity/cooldown precondition at all
+        // (S04_MyWork04.cpp:916-920). Sorts 235/236 sit adjacent in the same dispatch family but are
+        // distinct, unrelated actions -- not handled here.
+        if (sort == 237)
+        {
+            var timeExchangeResult = await genericActionService.TimeExchangeAsync(zone, state,
+                zoneSession.AccountId!.Value, characterId, cancellationToken);
+            Respond(session, zoneSession, sort, packet.Data, timeExchangeResult);
+            if (timeExchangeResult.GrantedPetExperienceGrowth is { } newPetGrowth)
+                session.Send(new AvatarStatUpdateResponse
+                    { Sort = PetExperienceStatSort, Value = newPetGrowth, Value2 = 0 });
             return;
         }
 

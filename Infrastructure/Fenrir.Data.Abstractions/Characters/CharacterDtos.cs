@@ -141,7 +141,14 @@ public sealed partial record CharacterWorldSnapshotDto(
     int MountExpActivity,
     int MountPower,
     int MountSlotIndex,
-    int MountTime);
+    int MountTime,
+    // Migrations/027_character_autotime2_grant.sql: aAutoTime2, the free auto-hunt minute allowance
+    // (Server/ts25login/S04_MyWork02.cpp:888 grants the literal 1440 == 24h of minutes at creation;
+    // Server/ts25zone/S07_MyGame04.cpp:787-823 decrements it by 1 per elapsed real minute while auto-hunt is
+    // enabled). Appended last, defaulted to 0 (same "pre-existing N-arg test construction keeps compiling"
+    // posture as AccountDtos.AuthenticateAccountDto.AccountGrade), not inserted next to MountTime, so this
+    // record's field order for every prior column is unchanged.
+    int AutoTime2 = 0);
 
 /// <summary>
 ///     RS1 of usp_Character_GetForWorldEntry. ExpireDate: legacy YYYYMMDD int, 0 = not a rental. Container: 0/1

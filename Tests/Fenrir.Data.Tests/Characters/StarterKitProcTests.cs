@@ -206,6 +206,21 @@ public class StarterKitProcTests
         // Starting mount (S04_MyWork02.cpp:1174-1179), now projected by usp_Character_GetForWorldEntry's RS0
         // (Migrations/018_character_previous_tribe_and_mount_readpath.sql) instead of needing a raw SQL
         // read -- this is the exact read path EnterWorldService will eventually consume.
+        //
+        // These 5 literals are hand-duplicated on the C# side too: Application/Fenrir.Application.Login.Services/
+        // CreateAvatar/CreateAvatarService.cs's StarterMountItemId/StarterMountExpActivity/StarterMountPower/
+        // StarterMountSlotIndex/StarterMountTime constants overlay the exact same 5 values onto the immediate
+        // create-avatar response (CharacterWorldEntryDto's narrow prefix doesn't carry Mount* -- see that DTO's
+        // own doc comment -- so CreateAvatarService can't read them back at that point and re-derives them
+        // instead). This test only pins the SQL/DB side; Fenrir.Data.Tests has no project reference to
+        // Fenrir.Application.Login.Services (by design -- Tests/*Data* stays below the Application layer), so it
+        // cannot assert the two sides stay equal in one place. If you change any of these 5 numbers here, go
+        // change CreateAvatarService's matching constants too (and vice versa) -- there is no compiler or test
+        // that will catch just one side drifting. The clean fix (tracked as a finding this round, not implemented
+        // here since it requires editing Application/, outside a database engineer's remit) is to have
+        // CreateAvatarService read the freshly-persisted row back via GetWorldEntryBundleAsync/
+        // CharacterWorldSnapshotDto -- which already carries all 5 Mount* fields, proven right here -- instead of
+        // re-declaring them as a second set of C# literals.
         Assert.Equal(1301, bundle.Character.MountItemId);
         Assert.Equal(0, bundle.Character.MountExpActivity);
         Assert.Equal(5, bundle.Character.MountPower);
@@ -216,6 +231,18 @@ public class StarterKitProcTests
         // previous-tribe/gender), now granted by Migrations/025_character_protect_for_death_grant.sql instead
         // of silently taking the column's DEFAULT of 0.
         Assert.Equal(5, bundle.Character.ProtectForDeath);
+
+        // Starting free auto-hunt minute allowance (S04_MyWork02.cpp:888, same #ifdef LNW33 block as
+        // ProtectForDeath/DoubleExpTime1/DoubleExpTime2 above), granted by
+        // Migrations/027_character_autotime2_grant.sql. Previously ungrantable (no column existed at all) and,
+        // until this assertion, granted-but-untested -- every other literal from this same creation-time block
+        // (ProtectForDeath, DoubleExpTime1/2, Mount*, Level/Level2/Experience/Exp2/StatPoints/SkillPoints) was
+        // already pinned above/elsewhere in this test, but AutoTime2 itself had no Fenrir.Data.Tests coverage
+        // anywhere -- a regression here (e.g. a future corrective migration silently reverting to the column's
+        // DEFAULT of 0, or another migration in this same procedure-editing chain rebasing off the wrong
+        // ancestor per this migration's own "must be based on the immediately preceding one" warning) would have
+        // passed silently.
+        Assert.Equal(1440, bundle.Character.AutoTime2);
     }
 
     [Fact]

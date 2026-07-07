@@ -46,6 +46,21 @@ namespace Fenrir.Application.Game.Domain.Tribes;
 /// <param name="HighItemValue">Lucky Upgrade Scroll -- see <see cref="PlayerRuntimeState.HighItemValue" />.</param>
 /// <param name="DropItemTime">Lucky Drop Scroll -- see <see cref="PlayerRuntimeState.DropItemTime" />.</param>
 /// <param name="TaiyanKeyTimer">Taiyan Key -- see <see cref="PlayerRuntimeState.TaiyanKeyTimer" />.</param>
+/// <param name="TeacherPoint">
+///     tSort 237 (TimeExchange) -- the character's new total after granting 694 points per accrued
+///     play-time-event minute. See <see cref="PlayerRuntimeState.TeacherPoint" />.
+/// </param>
+/// <param name="PetGrowth">
+///     tSort 237 (TimeExchange)'s pet-experience credit -- only set when
+///     <c>PetExperienceCreditResolver.Resolve</c> found an eligible equipped pet with something to change
+///     (credited amount &gt; 0 or a reactivation), same guard <c>Zone.CreditPetGrowthFromMonsterKill</c>
+///     already applies for its own (unrelated) call site. See <see cref="PlayerRuntimeState.PetGrowth" />.
+/// </param>
+/// <param name="PetActivity">Paired 1:1 with <see cref="PetGrowth" /> -- see <see cref="PlayerRuntimeState.PetActivity" />.</param>
+/// <param name="PlayTimeEvent">
+///     tSort 237 (TimeExchange) -- always 0 when set (every accrued minute is consumed in full on each
+///     conversion). See <see cref="PlayerRuntimeState.PlayTimeEvent" />.
+/// </param>
 /// <param name="Applied">
 ///     Completed once actually mirrored -- see InventoryZoneCommand.Applied for why this matters while
 ///     EconomyActionLock is held.
@@ -83,6 +98,10 @@ public readonly record struct TribeProgressZoneCommand(
     int? HighItemValue = null,
     int? DropItemTime = null,
     int? TaiyanKeyTimer = null,
+    int? TeacherPoint = null,
+    int? PetGrowth = null,
+    byte? PetActivity = null,
+    int? PlayTimeEvent = null,
     TaskCompletionSource? Applied = null);
 
 /// <summary>One ground-item drop request -- see TribeProgressZoneCommand.DropItems.</summary>

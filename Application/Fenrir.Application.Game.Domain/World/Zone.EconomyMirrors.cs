@@ -566,6 +566,30 @@ public sealed partial class Zone
             changed = true;
         }
 
+        if (command.TeacherPoint is { } teacherPoint)
+        {
+            state.TeacherPoint = teacherPoint;
+            changed = true;
+        }
+
+        if (command.PetGrowth is { } petGrowth)
+        {
+            state.PetGrowth = petGrowth;
+            changed = true;
+        }
+
+        if (command.PetActivity is { } petActivity)
+        {
+            state.PetActivity = petActivity;
+            changed = true;
+        }
+
+        if (command.PlayTimeEvent is { } playTimeEvent)
+        {
+            state.PlayTimeEvent = playTimeEvent;
+            changed = true;
+        }
+
         if (changed)
             state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
 

@@ -312,7 +312,11 @@ public sealed class GuildActionService(
 
         try
         {
-            await guilds.SetBuffAsync(guildId, payload.GuildBuffType, 1, guild.BuffTime, DateTime.UtcNow.Ticks, ct);
+            // Legacy's UpdateGuildBuffType (Server/ts25extra/S08_MyDB.cpp:1188-1191) writes only gBuffType/
+            // gBuffState -- gBuffTime/gBuffTimeForDiff are never touched by this action, whether this is a
+            // fresh activation or an ordinary type switch while already active. Carry the existing checkpoint
+            // through unchanged rather than stamping "now" here; GuildBuffDecayHost owns that field exclusively.
+            await guilds.SetBuffAsync(guildId, payload.GuildBuffType, 1, guild.BuffTime, guild.BuffTimeForDiff, ct);
         }
         catch (Exception ex)
         {

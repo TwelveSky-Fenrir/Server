@@ -36,18 +36,18 @@ namespace Fenrir.Application.Login.Services.CreateAvatar;
 ///     self-correcting the next time the character actually enters the world via Game's own
 ///     AvatarInfoFactory.CreateForCharacter reading the fuller CharacterWorldSnapshotDto) ;
 ///     Server/ts25login/S04_MyWork02.cpp:1105 (<see cref="StartingExp1" /> -- aExp1 = MAX_NUMBER_SIZE) ;
-///     Server/Header/Protocol/DEFINE.h:365 (MAX_NUMBER_SIZE = 2000000000): unlike the four fields above, this
-///     one does NOT self-correct on zone entry -- Exp1 was never projected anywhere in the codebase (this
-///     response, Game's CreateForCharacter, or Game's CreateForRuntimeState), so every character showed 0 XP
-///     permanently regardless of actual progress (create-avatar-stats-fresh finding, severity blocker; the
-///     broader "not just creation, EVERY subsequent world entry too" variant is tracked separately as
-///     zone-avatarinfo-factory-parity, severity Major). This creation-time overlay -- the one legacy fact
-///     actually on record (the fixed MAX_NUMBER_SIZE sentinel, S04_MyWork02.cpp:1105) -- is fixed here. What
-///     legacy assigns aExp1 on an ordinary (non-creation) world entry / zone transfer is NOT established by
-///     any citation available to this pass and is deliberately left unresolved rather than guessed -- see
-///     <c>Fenrir.Application.Game.Domain.Avatars.AvatarInfoFactory</c>'s own Exp1 remarks (both
-///     <c>CreateForCharacter</c> and <c>CreateForRuntimeState</c>) for the open question and the
-///     cpp-ts25-explorer re-check this needs before it can be closed.
+///     Server/Header/Protocol/DEFINE.h:365 (MAX_NUMBER_SIZE = 2000000000): fixed here at creation
+///     (create-avatar-stats-fresh finding, severity blocker, previously showing 0 XP permanently regardless
+///     of actual progress). The broader "not just creation, EVERY subsequent world entry too" variant
+///     (zone-avatarinfo-factory-parity, severity Major) is now also resolved, NOT left unset as a prior
+///     revision of this comment said: aExp1 is a fixed constant (MAX_NUMBER_SIZE) for every Fenrir
+///     character's entire lifetime, not a value requiring decomposition from the combined Experience
+///     counter, because every character is created already at the general-level cap and
+///     MyUtil::ProcessForExperience never reassigns aExp1 once it already equals MAX_NUMBER_SIZE
+///     (Server/ts25zone/S07_MyGame03.cpp:196-198,341) -- see
+///     <c>Fenrir.Application.Game.Domain.Avatars.AvatarInfoFactory.MaxGeneralExperience</c>'s own remarks
+///     (consumed by both <c>CreateForCharacter</c> and <c>CreateForRuntimeState</c>) for the full citation
+///     chain.
 ///     Server/ts25login/S04_MyWork02.cpp:1094-1097 (the current-life/current-mana literals, 30/21, and the
 ///     DEFINE.h:751-756 write-macro confirming those are the logout-info slots this session's own current
 ///     values, not any maximum) ; Server/ts25login/S04_MyWork02.cpp:1174-1179 (the universal starter mount --
@@ -142,6 +142,36 @@ public sealed class CreateAvatarService(
     // itself, are a separate, not-yet-implemented Game-side concern (see the behavior contract's own "open
     // question" on the tick-to-wall-clock rate) -- out of scope for this creation-time fix.
     private const int DoubleExpCounterStart = 300;
+
+    // Server/ts25login/S04_MyWork02.cpp:889: aProtectForDeath = 5, a bare integer literal in the same live
+    // #ifdef LNW33 block as DoubleExpCounterStart/StarterAutoTime2Minutes above/below -- the starting
+    // death-protection allowance (qualifying deaths the character may suffer before the normal XP/
+    // contribution-point death penalty resumes applying, Server/ts25zone/S07_MyGame02.cpp:3443-3489).
+    // Migrations/025_character_protect_for_death_grant.sql already persists this same literal into
+    // game.Characters.ProtectForDeath; that migration's own text deferred whether the value is additionally
+    // echoed back to the client on this response as a separate open question -- closed here for the
+    // creation-response path only (S04_MyWork02.cpp:582-605/1181-1182 establish the same local AVATAR_INFO
+    // instance that receives this grant is the one passed to the create-avatar response transfer call).
+    // "Known at creation time, not read back" overlay, same posture as StarterAutoTime2Minutes/
+    // DoubleExpCounterStart: CharacterWorldEntryDto doesn't project ProtectForDeath at all (see its own doc
+    // comment -- it's a deliberately narrow DTO), so this literal is used directly rather than a second round
+    // trip. The world-entry (Game's AvatarInfoFactory.CreateForCharacter) and zone-to-zone-transfer
+    // (CreateForRuntimeState) projections are NOT touched by this fix -- both remain open questions
+    // (unverified ts25zone world-entry citation, and a missing PlayerRuntimeState field respectively), see
+    // each factory method's own remarks.
+    private const int StartingProtectForDeath = 5;
+
+    // Server/ts25login/S04_MyWork02.cpp:888: aAutoTime2 = 1440, a bare integer literal in the same live
+    // #ifdef LNW33 block as DoubleExpCounterStart/ProtectForDeath above -- the free auto-hunt time allowance
+    // granted at creation. Confirmed by direct legacy re-read (this session, closing the prior audit round's
+    // open "aAutoTime2 completely unrepresented" question): Server/ts25zone/S07_MyGame04.cpp:787-823 (itself
+    // under the always-compiled `#ifndef FREE_HUNT` -- FREE_HUNT is declared only in DEFINE.h's never-taken
+    // `#else` arm of `#ifdef M33`, the same arm that would otherwise skip LNW33 too) decrements this counter
+    // by exactly 1 per elapsed real minute (GetMinuteFromTick(1) == TICK_MINUTE == 60000ms, Server/Header/
+    // datetime.h:29,33) while auto-hunt is active, so 1440 == 24h of free auto-hunt minutes -- corroborated by
+    // the "auto hunt 5hr"/"3hr" cash items (Server/ts25zone/S04_MyWork03.cpp:5387-5407) adding 300/180 minutes
+    // respectively. See Migrations/027_character_autotime2_grant.sql for the stored-procedure side.
+    private const int StarterAutoTime2Minutes = 1440;
 
     private const int PremiumDurationDays = 1;
 
@@ -294,11 +324,24 @@ public sealed class CreateAvatarService(
                 // own (unvalidated-by-design, see this method's own remarks) parameter.
                 PreviousTribe = previousTribe,
                 Equip = AvatarInfoFactory.BuildEquipArray(equipment, StarterPetGrowth, StarterPetActivity),
+                // zone-avatarinfo-factory-parity finding: Inventory/Skill/HotKey were previously left at
+                // Zeroed's all-zero default even though this method already builds the exact TVP rows it's
+                // about to persist -- StoreItem stays at 0 deliberately (no starter kit ever grants a
+                // warehouse/Store-container row, see AvatarInfoFactory.BuildInventoryArray's own remarks).
+                Inventory = AvatarInfoFactory.BuildInventoryArray(inventory),
+                Skill = AvatarInfoFactory.BuildSkillArray(skills),
+                HotKey = AvatarInfoFactory.BuildHotKeyArray(hotkeys),
                 Animal = SingleMountSlotArray(StarterMountItemId),
                 AnimalIndex = StarterMountSlotIndex,
                 AnimalTime = StarterMountTime,
                 AnimalPower = SingleMountSlotArray(StarterMountPower),
                 AnimalExpActivity = SingleMountSlotArray(StarterMountExpActivity),
+                // Closes the creation-response slice of the ProtectForDeath display gap (see
+                // StartingProtectForDeath's own remarks for the full citation) -- usp_Character_CreateWithStarterKit
+                // already bakes 5 in directly for this column (Migrations/025_character_protect_for_death_grant.sql),
+                // so the response overlay uses the same C# constant rather than re-deriving it, exactly like
+                // AutoTime2/DoubleExpTime1/DoubleExpTime2 below.
+                ProtectForDeath = StartingProtectForDeath,
                 // DoubleExpTime1/DoubleExpTime2 are the raw 300-tick counter (see DoubleExpCounterStart's own
                 // remarks for the full citation) -- genuinely independent of AutoBuffTime's 7-day-future date,
                 // not the same value collapsed onto all three fields. usp_Character_CreateWithStarterKit now
@@ -308,6 +351,11 @@ public sealed class CreateAvatarService(
                 DoubleExpTime1 = DoubleExpCounterStart,
                 DoubleExpTime2 = DoubleExpCounterStart,
                 AutoBuffTime = welcomeBuffUntilDate,
+                // Closes this session's own aAutoTime2 finding (see StarterAutoTime2Minutes' own remarks for
+                // the full citation) -- usp_Character_CreateWithStarterKit now bakes 1440 in directly for this
+                // column (Migrations/027_character_autotime2_grant.sql), so the response overlay uses the same
+                // C# constant rather than re-deriving it, exactly like DoubleExpTime1/DoubleExpTime2 above.
+                AutoTime2 = StarterAutoTime2Minutes,
                 Premium = premiumUntilUnixSeconds
             };
 

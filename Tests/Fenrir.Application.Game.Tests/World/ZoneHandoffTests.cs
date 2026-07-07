@@ -100,6 +100,30 @@ public class ZoneHandoffTests
     }
 
     [Fact]
+    public void Leave_WithHandoffTarget_CarriesTheLiveHeroRankPointsThrough_NotResetToStalePersistedValue()
+    {
+        // A character who earns hero-rank points mid-session must not see the counter reset to whatever
+        // world-entry hydrated on a same-shard zone transfer -- see PlayerRuntimeState.HeroRankPoints's own
+        // remarks and ZoneTransfer.CreateEnterData.
+        var dirtyTracker = new DirtyTracker<int>();
+        var source = ZoneTestKit.CreateZone(1, dirtyTracker: dirtyTracker);
+        var target = ZoneTestKit.CreateZone(2, dirtyTracker: dirtyTracker);
+        var (session, _) = ZoneTestKit.CreateSession(1);
+
+        source.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1)));
+        source.Tick(TimeSpan.FromMilliseconds(50));
+        Assert.True(source.TryGetPlayer(10, out var before));
+        before!.HeroRankPoints = 77;
+
+        source.Post(ZoneCommand.Leave(10, target));
+        source.Tick(TimeSpan.FromMilliseconds(50));
+        target.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.True(target.TryGetPlayer(10, out var after));
+        Assert.Equal(77, after!.HeroRankPoints);
+    }
+
+    [Fact]
     public void Enter_OnAFreshLogin_StartsAtTheCashCatalogVersionUnknownSentinel_NotZero()
     {
         var zone = ZoneTestKit.CreateZone(1);

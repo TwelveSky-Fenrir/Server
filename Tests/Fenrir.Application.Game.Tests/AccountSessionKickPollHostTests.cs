@@ -3,6 +3,7 @@ using Fenrir.Application.Game.Hosting;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Data.Abstractions.Runtime;
 using Fenrir.Network.Dispatch.Sessions;
+using Fenrir.Network.Serialization.Packets.Zone;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -51,6 +52,30 @@ public class AccountSessionKickPollHostTests
         Assert.Contains(accountId, refreshCall.AccountIds);
         var cleared = Assert.Single(accountSessions.ClearedOwners);
         Assert.Equal((accountId, AccountSessionServerKind.Game, (byte?)ShardId, kickToken), cleared);
+    }
+
+    [Fact]
+    public async Task PollOnceAsync_AccountFlaggedForKick_SendsLoginFromAnotherNotice_BeforeAborting()
+    {
+        // Server/ts25zone/S01_MainApplication.cpp:123-129: legacy sends the OLD session one
+        // B_AVATAR_CHANGE_INFO_2(sort=S903LOGIN_FROM_ANOTHER=903, value=0) before tearing the connection down.
+        const int accountId = 42;
+        var registry = new SessionRegistry();
+        var (session, pipe) = ZoneTestKit.CreateSession(1);
+        registry.Register(session);
+        registry.AssociateAccount(session.SessionId, accountId);
+
+        var kickToken = Guid.NewGuid();
+        var accountSessions = new FakeAccountSessionRepository
+        {
+            KickedAccounts = [new KickedAccountDto(accountId, kickToken)]
+        };
+        var host = CreateHost(registry, accountSessions);
+
+        await host.PollOnceAsync(CancellationToken.None);
+
+        await PacketAssert.AssertSentAsync(pipe, new AvatarStatUpdateResponse { Sort = 903, Value = 0, Value2 = 0 });
+        Assert.Equal(DisconnectReason.Evicted, session.DisconnectReason);
     }
 
     [Fact]

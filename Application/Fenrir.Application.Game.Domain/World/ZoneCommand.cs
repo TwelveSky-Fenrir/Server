@@ -166,4 +166,10 @@ public sealed record PlayerEnterData(
     int DeathSubCounter = 0,
     // Zone-241 "LOD" personal-dungeon quota -- see PlayerRuntimeState.DungeonInstanceRoundsRemaining's own
     // remarks (no persisted source populates a non-zero value yet).
-    int DungeonInstanceRoundsRemaining = 0);
+    int DungeonInstanceRoundsRemaining = 0,
+    // The character's persisted Current-period hero-rank point total (EnterWorldService's world-entry
+    // hydration read, legacy MyDB::GetHeroPoint) -- must travel here too, or PlayerRuntimeState.HeroRankPoints
+    // silently resets to 0 on every world entry AND every in-process zone transfer (see that field's own
+    // remarks and ZoneTransfer.CreateEnterData, which carries the live in-memory value through a same-shard
+    // hop instead of re-querying it).
+    int HeroRankPoints = 0);

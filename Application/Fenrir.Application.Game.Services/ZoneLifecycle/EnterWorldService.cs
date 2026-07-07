@@ -5,6 +5,7 @@ using Fenrir.Application.Game.Domain.Avatars;
 using Fenrir.Application.Game.Domain.Guilds;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Pets;
+using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.Quests;
 using Fenrir.Application.Game.Domain.Social;
 using Fenrir.Application.Game.Domain.World;
@@ -33,6 +34,7 @@ public sealed class EnterWorldService(
     ITribeRepository tribes,
     IFriendRepository friends,
     IMentorRepository mentors,
+    IHeroRankingRepository heroRankings,
     ICharacterShardLocationRepository characterShardLocations,
     WorldStateService worldState,
     IOptions<GameServerOptions> options,
@@ -163,6 +165,15 @@ public sealed class EnterWorldService(
             var friendsTask = friends.GetByCharacterAsync(characterId, cancellationToken);
             var mentorTask = mentors.GetForCharacterAsync(characterId, cancellationToken);
 
+            // World-entry hydration for PlayerRuntimeState.HeroRankPoints (legacy MyDB::GetHeroPoint,
+            // Server/ts25login/S08_MyDB.cpp:1178-1188 -- read here, Zone-side, rather than threaded through
+            // the Login-side session ticket; see Migrations/030_hero_rank_points_world_entry_hydration.sql's
+            // own header for why that deviation from the legacy trigger point is accepted). Null (no row for
+            // this character/period yet) legitimately means zero, matching legacy's own collapsed
+            // no-row/query-failure semantics -- see IHeroRankingRepository.GetPointsAsync's own remarks.
+            var heroRankPointsTask = heroRankings.GetPointsAsync(characterId, HeroRankPointAccumulator.CurrentPeriodKind,
+                cancellationToken);
+
             // Cross-shard character-location directory (runtime.CharacterShardLocation): a same-shard-miss
             // fallback for whisper/friend-locate/guild-find. Per-connection, once-per-world-entry cost, not a
             // tick or per-packet hot path, so an extra awaited stored-procedure call here alongside the others is
@@ -173,13 +184,15 @@ public sealed class EnterWorldService(
                 character.MapId, character.Name, character.Tribe, cancellationToken);
 
             await Task.WhenAll(isMutedTask.AsTask(), guildTask.AsTask(), tribeRoleTask.AsTask(),
-                friendsTask.AsTask(), mentorTask.AsTask(), shardLocationUpsertTask.AsTask());
+                friendsTask.AsTask(), mentorTask.AsTask(), heroRankPointsTask.AsTask(),
+                shardLocationUpsertTask.AsTask());
 
             var isMuted = isMutedTask.Result;
             var guildMembership = guildTask.Result;
             var tribeRole = tribeRoleTask.Result;
             var friendRows = friendsTask.Result;
             var mentorBond = mentorTask.Result;
+            var heroRankPoints = heroRankPointsTask.Result ?? 0;
 
             var guildRoleWire = guildMembership is { } gm ? GuildRoleCodec.DbRoleToWire(gm.Role) : 0;
             var friendNameBySlot = friendRows.ToDictionary(f => f.Slot, f => f.FriendName);
@@ -204,7 +217,8 @@ public sealed class EnterWorldService(
             {
                 // A brand-new character legitimately has no buff rows yet (creation never writes any); a
                 // returning character's own persisted snapshot must ride along here instead of a flat zero.
-                AvatarInfo = AvatarInfoFactory.CreateForCharacter(character, bundle.Items, socialSnapshot),
+                AvatarInfo = AvatarInfoFactory.CreateForCharacter(character, bundle.Items, socialSnapshot,
+                    bundle.Skills, bundle.Hotkeys),
                 BuffInfo = BuildBuffInfo(bundle.Buffs)
             };
             zoneSession.SendRaw(ZoneMessageFactory.Encode(in registerRecv));
@@ -388,7 +402,8 @@ public sealed class EnterWorldService(
                 ContributionPoints: character.ContributionPoints,
                 TeacherPoint: character.TeacherPoint,
                 Level2: character.Level2,
-                Exp2: character.Exp2)));
+                Exp2: character.Exp2,
+                HeroRankPoints: heroRankPoints)));
 
             // A dropped Enter is never replayed -- the character would stay permanently invisible despite the two
             // packets above already telling the client registration succeeded, so treat it as fatal.

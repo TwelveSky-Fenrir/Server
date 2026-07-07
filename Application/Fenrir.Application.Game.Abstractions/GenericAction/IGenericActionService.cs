@@ -19,8 +19,15 @@ public enum GenericActionStatus
 /// <summary>
 ///     Result of a <see cref="GenericActionService" /> operation. <see cref="NotifyQuestProgress" /> is only ever
 ///     set on a successful ground-item pickup that also happens to satisfy the character's active qSort-2 quest.
+///     <see cref="GrantedPetExperienceGrowth" /> is only ever set by <see cref="IGenericActionService.TimeExchangeAsync" />
+///     when its pet-experience credit was actually positive -- the caller sends the self-addressed
+///     <c>AvatarStatUpdateResponse</c> (Sort=14, S014PET_EXP) carrying this value, same "service computes,
+///     handler sends" split <see cref="NotifyQuestProgress" /> already established.
 /// </summary>
-public readonly record struct GenericActionResult(GenericActionStatus Status, bool NotifyQuestProgress = false)
+public readonly record struct GenericActionResult(
+    GenericActionStatus Status,
+    bool NotifyQuestProgress = false,
+    int? GrantedPetExperienceGrowth = null)
 {
     public static readonly GenericActionResult Aborted = new(GenericActionStatus.Aborted);
     public static readonly GenericActionResult Failed = new(GenericActionStatus.Failed);
@@ -63,4 +70,24 @@ public interface IGenericActionService
     /// <param name="addValue">tAddValue, only meaningful for category codes 9-12.</param>
     public ValueTask<GenericActionResult> AllocateStatPointAsync(int statSort, int addValue, Zone zone,
         PlayerRuntimeState state, int characterId, CancellationToken cancellationToken);
+
+    /// <summary>
+    ///     tSort 237 -- TimeExchange: converts every accrued play-time-event minute
+    ///     (<see cref="PlayerRuntimeState.PlayTimeEvent" />, itself produced by
+    ///     <c>PlayTimeAccrualSystem</c>'s per-real-minute tick) into 694 teacher points and 400 pet experience
+    ///     per minute, then resets the accrued counter to 0. A no-op (still a success echo, per the source
+    ///     contract) when fewer than 1 minute has accrued -- no precondition beyond that guard. The
+    ///     pet-experience portion silently drops if no valid pet is equipped; the teacher-point portion still
+    ///     grants normally either way (not an atomic pair).
+    /// </summary>
+    /// <remarks>
+    ///     Réf. C++ : Server/ts25zone/S04_MyWork04.cpp:916-920 (dispatch case) ;
+    ///     Server/ts25zone/S04_MyWork05.cpp:4808-4826 (guard, formulas, counter reset, audit log ordering,
+    ///     reward grants) ; Server/ts25zone/GameSystem/GameSystem_07_Pet.cpp:1920-1971 (the general
+    ///     pet-experience-grant routine, ported here via <c>PetExperienceCreditResolver</c> -- its
+    ///     reactivation/tier-crossing ability-recalculation broadcast is NOT sent here, the same documented
+    ///     gap <c>Zone.CreditPetGrowthFromMonsterKill</c>'s own remarks already carry for the same routine).
+    /// </remarks>
+    public ValueTask<GenericActionResult> TimeExchangeAsync(Zone zone, PlayerRuntimeState state, int accountId,
+        int characterId, CancellationToken cancellationToken);
 }

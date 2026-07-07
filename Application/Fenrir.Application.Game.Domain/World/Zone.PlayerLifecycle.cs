@@ -185,7 +185,10 @@ public sealed partial class Zone
             KnownCashCatalogVersion = data.KnownCashCatalogVersion,
             // Zone-241 "LOD" personal-dungeon quota -- see PlayerRuntimeState.DungeonInstanceRoundsRemaining's
             // own remarks (always 0 today, no persisted source wired up yet).
-            DungeonInstanceRoundsRemaining = data.DungeonInstanceRoundsRemaining
+            DungeonInstanceRoundsRemaining = data.DungeonInstanceRoundsRemaining,
+            // World-entry hydration (EnterWorldService) or, for an in-process handoff, the live value carried
+            // through by ZoneTransfer.CreateEnterData -- see PlayerRuntimeState.HeroRankPoints's own remarks.
+            HeroRankPoints = data.HeroRankPoints
         };
 
         // Items/Stats are already-computed data handed down through the command -- a plain copy, never a

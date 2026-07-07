@@ -46,7 +46,7 @@ public class StatAllocationServiceTests
     private static GenericActionService CreateService(WorldDataCache worldData)
     {
         return new GenericActionService(new FakeCharacterRepository(), worldData, new QuestCatalog(worldData),
-            new PartyRegistry(), NullLogger<GenericActionService>.Instance);
+            new PartyRegistry(), new FakeEventLogRepository(), NullLogger<GenericActionService>.Instance);
     }
 
     [Fact]

@@ -63,10 +63,23 @@ public partial class PlayerRuntimeState
     ///     S06_MyUpperCom02.cpp:774-820) -- incremented synchronously the instant a grant happens, while the
     ///     durable game.HeroRankings row is updated later by
     ///     <see cref="Fenrir.Application.Game.Domain.Progression.HeroRankPointAccumulator" />'s periodic flush.
-    ///     Starts at 0 for every session:
-    ///     hydrating this from the character's pre-existing Current-period total at world entry is not wired
-    ///     yet, so this mirror under-reports a character's true lifetime Current-period score until that
-    ///     lands -- it only ever reflects points earned since the last world entry.
+    ///     Seeded at world entry from the character's persisted Current-period total (legacy
+    ///     <c>MyDB::GetHeroPoint</c>, Server/ts25login/S08_MyDB.cpp:1178-1188 -&gt;
+    ///     Server/ts25playuser/S07_MyGame01.cpp:1002's unconditional copy into the zone's own live per-character
+    ///     state) by <see cref="Fenrir.Application.Game.Services.ZoneLifecycle.EnterWorldService" />, threaded
+    ///     through <see cref="PlayerEnterData.HeroRankPoints" />, not merely started at 0 -- so this mirror
+    ///     reflects the character's true accumulated total from the instant of registration, exactly like the
+    ///     legacy field it stands in for. Fenrir performs this read Zone-side (inside EnterWorldService,
+    ///     alongside its other per-character world-entry reads) rather than Login-side at the wire trigger
+    ///     legacy uses (DEMAND_ZONE_SERVER_INFO_SEND) threaded through the session-ticket hand-off -- see
+    ///     Migrations/030_hero_rank_points_world_entry_hydration.sql's own header for why that deviation is
+    ///     accepted; the seeded value is identical either way, since nothing can grant this character a point
+    ///     between the two reads. An in-process zone transfer carries the LIVE value through instead
+    ///     (<see cref="Fenrir.Application.Game.Domain.World.ZoneTransfer.CreateEnterData" />), so points earned
+    ///     earlier in the same session are never lost to a same-shard hop. Also force-reset to 0 by
+    ///     <c>Zone.ApplyHeroRankingRolloverReset</c> on the weekly Current-&gt;Previous rollover, for any
+    ///     character connected at that moment whose live total was greater than 0 (with a matching
+    ///     <c>S904UPDATE_HERO_POINT</c> push to that same connection) -- see that method's own remarks.
     /// </summary>
     public int HeroRankPoints { get; set; }
 }

@@ -73,4 +73,20 @@ public sealed record HeroRankingRepository(ICaeriusNetDbContext Db) : IHeroRanki
 
         return await Db.ExecuteScalarAsync<int>(sp, ct);
     }
+
+    /// <summary>
+    ///     World-entry hydration read (usp_HeroRanking_GetPoints, Migrations/030); null when the character
+    ///     has no row yet for <paramref name="periodKind" /> -- see
+    ///     <see cref="IHeroRankingRepository.GetPointsAsync" />'s own remarks for why that is not an error.
+    /// </summary>
+    public async ValueTask<int?> GetPointsAsync(int characterId, byte periodKind, CancellationToken ct)
+    {
+        var sp = new StoredProcedureParametersBuilder("game", "usp_HeroRanking_GetPoints", 1)
+            .AddParameter("CharacterId", characterId, SqlDbType.Int)
+            .AddParameter("PeriodKind", periodKind, SqlDbType.TinyInt)
+            .Build();
+
+        var row = await Db.FirstQueryAsync<HeroRankingPointsDto>(sp, ct);
+        return row?.Points;
+    }
 }

@@ -101,6 +101,11 @@ public static class ZoneTransfer
             ReviveHackFlag: state.ReviveHackFlag,
             CanUseConsumables: state.CanUseConsumables,
             DeathSubCounter: state.DeathSubCounter,
-            DungeonInstanceRoundsRemaining: state.DungeonInstanceRoundsRemaining);
+            DungeonInstanceRoundsRemaining: state.DungeonInstanceRoundsRemaining,
+            // Carries the live in-memory total through a same-shard hop instead of re-querying it -- without
+            // this, a character who earned hero-rank points this session would see the counter silently reset
+            // to its last-persisted (stale) value on every zone transfer. See PlayerRuntimeState.HeroRankPoints's
+            // own remarks.
+            HeroRankPoints: state.HeroRankPoints);
     }
 }

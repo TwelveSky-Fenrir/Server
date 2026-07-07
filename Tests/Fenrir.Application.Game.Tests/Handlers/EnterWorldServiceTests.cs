@@ -10,11 +10,13 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Services.ZoneLifecycle;
 using Fenrir.Application.Game.Tests.Handlers.Tribes;
+using Fenrir.Application.Game.Tests.Progression;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Application.Game.Tests.World.WorldState;
 using Fenrir.Data.Abstractions.Admin;
 using Fenrir.Data.Abstractions.Characters;
 using Fenrir.Data.Abstractions.Guilds;
+using Fenrir.Data.Abstractions.Progression;
 using Fenrir.Data.Abstractions.Runtime;
 using Fenrir.Data.Abstractions.Social;
 using Fenrir.Data.Abstractions.Tribes;
@@ -109,6 +111,7 @@ public class EnterWorldServiceTests
             new RoleOnlyTribeRepository(0),
             new EmptyFriendRepository(),
             new NoMentorRepository(),
+            new FakeHeroRankingRepository(),
             new FakeCharacterShardLocationRepository(),
             worldState,
             Options.Create(ZoneTestKit.Options()),
@@ -125,7 +128,7 @@ public class EnterWorldServiceTests
         var expectedEnterWorld = new EnterWorldResponse
         {
             AvatarInfo = AvatarInfoFactory.CreateForCharacter(bundle.Character, bundle.Items,
-                AvatarSocialSnapshot.Empty),
+                AvatarSocialSnapshot.Empty, bundle.Skills, bundle.Hotkeys),
             BuffInfo = ExpectedBuffInfo(buffs)
         };
         var expectedEnterWorldBytes = ZoneMessageFactory.Encode(in expectedEnterWorld);
@@ -169,6 +172,58 @@ public class EnterWorldServiceTests
         Assert.Equal(PreviousTribe, selfSpawnData.PreviousTribe);
         Assert.Equal([PosX, PosY, PosZ], selfSpawnData.PetLocation);
         Assert.Equal(ExpectedEffectValueForView(buffs), selfSpawnData.EffectValueForView);
+    }
+
+    // hero-rank-points-world-entry-hydration (Major): a returning character's already-persisted Current-period
+    // hero-rank point total must seed PlayerRuntimeState.HeroRankPoints at world entry, not merely start at 0
+    // -- see that field's own remarks (legacy MyDB::GetHeroPoint) and Migrations/030.
+    [Fact]
+    public async Task HandleAsync_ReturningCharacterWithPersistedHeroRankPoints_SeedsThePlayerRuntimeStateMirror()
+    {
+        const short MapId = 9;
+        const int PersistedHeroRankPoints = 250;
+
+        var bundle = HappyPathBundle(MapId, tribe: 1, previousTribe: 1, posX: 0f, posY: 0f, posZ: 0f, buffs: []);
+        var characters = new FakeCharacterRepository { WorldEntryBundleToReturn = bundle };
+        var worldData = ZoneTestKit.EmptyWorldData();
+        var zones = ZoneTestKit.CreateRegistry(worldData: worldData);
+        zones.Initialize([MapId]);
+
+        // PeriodKind 0 = Current -- the only period hero points are ever earned into (see
+        // HeroRankPointAccumulator.CurrentPeriodKind's own remarks).
+        var heroRankings = new FakeHeroRankingRepository();
+        heroRankings.Points[(CharacterId, (byte)0)] = PersistedHeroRankPoints;
+
+        var service = new EnterWorldService(
+            characters,
+            worldData,
+            zones,
+            new NoOpMuteRepository(),
+            new FakeBanRepository(false),
+            new ApplicationFirewall(new FakeBlockedIpRepository(false), new FakeFirewallRuleRepository(),
+                new FakeGmAllowlistRepository()),
+            new FakeGuildRepository(),
+            new GuildRankingCache(),
+            new RoleOnlyTribeRepository(0),
+            new EmptyFriendRepository(),
+            new NoMentorRepository(),
+            heroRankings,
+            new FakeCharacterShardLocationRepository(),
+            ZoneTestKit.CreateWorldState(),
+            Options.Create(ZoneTestKit.Options()),
+            NullLogger<EnterWorldService>.Instance);
+
+        var (session, _) = ZoneTestKit.CreateSession(1);
+        session.MarkTicketConsumed(AccountId, CharacterId);
+
+        await service.HandleAsync(ValidRequest(EncodeObfuscatedAccountId(AccountId)), session, CancellationToken.None);
+
+        Assert.Null(session.DisconnectReason);
+        Assert.True(zones.TryGet(MapId, out var zone));
+        zone!.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.True(zone.TryGetPlayer(CharacterId, out var state));
+        Assert.Equal(PersistedHeroRankPoints, state!.HeroRankPoints);
     }
 
     // Covers the bridge-tribe-validation contract's Behavior C (Server/ts25zone/S04_MyWork02.cpp:880-901): the
@@ -314,6 +369,7 @@ public class EnterWorldServiceTests
             new FakeTribeRepository(),
             new ThrowingFriendRepository(),
             new ThrowingMentorRepository(),
+            new ThrowingHeroRankingRepository(),
             new ThrowingCharacterShardLocationRepository(),
             ZoneTestKit.CreateWorldState(),
             Options.Create(options),
@@ -346,6 +402,7 @@ public class EnterWorldServiceTests
             new RoleOnlyTribeRepository(0),
             new EmptyFriendRepository(),
             new NoMentorRepository(),
+            new FakeHeroRankingRepository(),
             new FakeCharacterShardLocationRepository(),
             ZoneTestKit.CreateWorldState(),
             Options.Create(ZoneTestKit.Options()),
@@ -541,6 +598,36 @@ public class EnterWorldServiceTests
         }
 
         public ValueTask ClearForCharacterAsync(int characterId, CancellationToken ct)
+        {
+            throw new NotSupportedException();
+        }
+    }
+
+    private sealed class ThrowingHeroRankingRepository : IHeroRankingRepository
+    {
+        public ValueTask<int?> GetPointsAsync(int characterId, byte periodKind, CancellationToken ct)
+        {
+            throw new InvalidOperationException("Must not be reached once world-entry is already rejected.");
+        }
+
+        public ValueTask<ReadOnlyCollection<HeroRankingRowDto>> GetByPeriodAsync(byte periodKind, CancellationToken ct)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask MarkRewardClaimedAsync(int characterId, byte periodKind, int points, byte? tribeId,
+            int? level, CancellationToken ct)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask<int> AddPointsAsync(int characterId, byte periodKind, int delta, byte? tribeId, int? level,
+            CancellationToken ct)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask<bool> RolloverIfDueAsync(CancellationToken ct)
         {
             throw new NotSupportedException();
         }

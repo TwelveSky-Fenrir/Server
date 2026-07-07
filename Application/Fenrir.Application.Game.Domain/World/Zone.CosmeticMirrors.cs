@@ -19,6 +19,16 @@ namespace Fenrir.Application.Game.Domain.World;
 public sealed partial class Zone
 {
     /// <summary>
+    ///     <c>S904UPDATE_HERO_POINT</c> (Server/Header/Protocol/STRUCT.h:1650) -- the <c>AvatarStatUpdateResponse</c>
+    ///     Sort code the weekly hero-rank rollover reset (<see cref="ApplyHeroRankingRolloverReset" />) pushes.
+    ///     Also used, per the same wire tag, by the separate per-kill grant path
+    ///     (<c>MyCenterCom::AddHeroRankPoint</c>, Server/ts25zone/UpperCom/S06_MyUpperCom02.cpp:774-820) and the
+    ///     on-login initial-state sync (Server/ts25zone/S04_MyWork02.cpp:1113-1116) -- neither of those two is
+    ///     wired to push this packet yet; only the rollover reset below is in scope here.
+    /// </summary>
+    private const int HeroRankPointStatSort = 904;
+
+    /// <summary>
     ///     Op 94/95 (<c>ContinueSkillStat</c>/<c>ContinueSkillUse</c>) auto-buff registration + activation
     ///     mirror. See <see cref="ApplyAutoBuffCommand" />'s remarks for what this stub does/doesn't mirror yet.
     /// </summary>
@@ -62,6 +72,17 @@ public sealed partial class Zone
     private readonly Channel<HeroRankingQueryZoneCommand> _heroRankingInbox =
         Channel.CreateBounded<HeroRankingQueryZoneCommand>(
             new BoundedChannelOptions(256) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+
+    /// <summary>
+    ///     Weekly hero-ranking Current-&gt;Previous rollover reset trigger -- posted once per successful flip by
+    ///     <c>HeroRankingRolloverHost</c> (Hosting), once per hosted zone. Carries no per-instance data: draining
+    ///     one just means "sweep every currently connected player once," see
+    ///     <see cref="ApplyHeroRankingRolloverReset" />. A 4-slot capacity is generous for an event this rare
+    ///     (weekly, at most one post per host check interval).
+    /// </summary>
+    private readonly Channel<HeroRankingRolloverZoneCommand> _heroRankingRolloverInbox =
+        Channel.CreateBounded<HeroRankingRolloverZoneCommand>(
+            new BoundedChannelOptions(4) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
     /// <summary>
     ///     Op 87/113 (<c>MountState</c>/<c>MountAbsorb</c>) self-mutation mirror. See
@@ -108,6 +129,14 @@ public sealed partial class Zone
     public bool PostHeroRankingQueryCommand(in HeroRankingQueryZoneCommand command)
     {
         return _heroRankingInbox.Writer.TryWrite(command);
+    }
+
+    /// <summary>
+    ///     Posted once per successful weekly rollover flip -- see <see cref="ApplyHeroRankingRolloverReset" />.
+    /// </summary>
+    public bool PostHeroRankingRolloverReset()
+    {
+        return _heroRankingRolloverInbox.Writer.TryWrite(default);
     }
 
     public bool PostFishingCommand(in FishingZoneCommand command)
@@ -247,6 +276,50 @@ public sealed partial class Zone
             state.LastHeroRankingPreviousQueryAtZoneClock = command.QueriedAtZoneClock;
         else
             state.LastHeroRankingCurrentQueryAtZoneClock = command.QueriedAtZoneClock;
+    }
+
+    private void DrainHeroRankingRolloverCommands()
+    {
+        while (_heroRankingRolloverInbox.Reader.TryRead(out _))
+            try
+            {
+                ApplyHeroRankingRolloverReset();
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Zone {MapId} hero-ranking rollover reset failed", MapId);
+            }
+    }
+
+    /// <summary>
+    ///     Legacy per-tick Monday-00:00 wall-clock check (<c>FIX_HERO_RANK_RESET_PROBLEM</c>, unconditionally
+    ///     compiled, Server/ts25zone/S07_MyGame01.cpp:2507-2515): every connected character whose live,
+    ///     session-scoped <see cref="PlayerRuntimeState.HeroRankPoints" /> mirror is currently greater than zero
+    ///     has it reset to zero and receives a single <see cref="HeroRankPointStatSort" />-coded
+    ///     <c>AvatarStatUpdateResponse</c> (value 0) on their own connection only -- never an AOI/zone-wide
+    ///     broadcast, matching the legacy <c>B_AVATAR_CHANGE_INFO_2</c> <c>MyUser*</c>-targeted overload
+    ///     (Server/ts25zone/S05_MyTransfer.cpp:519-542), not the AOI-broadcast one. A character whose mirror is
+    ///     already zero is left untouched and receives no notice, matching legacy's own "counter &gt; 0" gate.
+    /// </summary>
+    /// <remarks>
+    ///     Fires at most once per rollover event per zone (one <see cref="HeroRankingRolloverZoneCommand" />
+    ///     posted per flip detected by <c>HeroRankingRolloverHost</c>, drained exactly once here) -- unlike
+    ///     legacy's own "re-evaluate every tick while the current second is still 0 or 1" gate, this does not
+    ///     rely on the counter happening to already be zero to avoid re-notifying within the same rollover event.
+    ///     Only ever changes this zone's own live <see cref="PlayerRuntimeState" /> instances -- never a database
+    ///     write; the durable Current-&gt;Previous flip already happened, atomically, inside
+    ///     <c>game.usp_HeroRanking_Rollover</c> before this is ever posted.
+    /// </remarks>
+    private void ApplyHeroRankingRolloverReset()
+    {
+        foreach (var state in _players.Values)
+        {
+            if (state.HeroRankPoints <= 0)
+                continue;
+
+            state.HeroRankPoints = 0;
+            state.Session.Send(new AvatarStatUpdateResponse { Sort = HeroRankPointStatSort, Value = 0, Value2 = 0 });
+        }
     }
 
     private void DrainFishingCommands()
@@ -797,6 +870,12 @@ public readonly record struct DrinkBottleZoneCommand(
 ///     directly by the handler.
 /// </summary>
 public readonly record struct HeroRankingQueryZoneCommand(int CharacterId, bool Previous, TimeSpan QueriedAtZoneClock);
+
+/// <summary>
+///     Weekly hero-ranking rollover reset trigger -- see <see cref="Zone.ApplyHeroRankingRolloverReset" />. Carries
+///     no per-instance data; posting one just means "sweep every currently connected player once."
+/// </summary>
+public readonly record struct HeroRankingRolloverZoneCommand;
 
 /// <summary>
 ///     Op 103/104/105 (<c>FishingLine</c>/<c>FishingProgress</c>/<c>FishingCatch</c>) shared state-machine

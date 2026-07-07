@@ -42,4 +42,11 @@ internal sealed class FakeHeroRankingRepository : IHeroRankingRepository
         Points[key] = newTotal;
         return ValueTask.FromResult(newTotal);
     }
+
+    /// <summary>Mirrors game.usp_HeroRanking_GetPoints -- null (not 0) when the key was never seeded/added-to.</summary>
+    public ValueTask<int?> GetPointsAsync(int characterId, byte periodKind, CancellationToken ct)
+    {
+        var key = (characterId, periodKind);
+        return ValueTask.FromResult(Points.TryGetValue(key, out var points) ? points : (int?)null);
+    }
 }

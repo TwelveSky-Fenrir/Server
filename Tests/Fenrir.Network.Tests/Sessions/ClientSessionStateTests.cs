@@ -127,4 +127,40 @@ public class ClientSessionStateTests
 
         Assert.Equal((short)1, session.AccountGrade);
     }
+
+    // Three-tier uUserSort gate (Server/ts25zone/S04_MyWork04.cpp): grade 1 clears Basic only, not Elevated
+    // or Admin -- a bare IsGm/grade>=1 check must not stand in for the two higher tiers.
+    [Theory]
+    [InlineData(0, false, false, false)]
+    [InlineData(1, true, false, false)]
+    [InlineData(9, true, false, false)]
+    [InlineData(10, true, true, false)]
+    [InlineData(99, true, true, false)]
+    [InlineData(100, true, true, true)]
+    public void Zone_MeetsGmTier_GatesEachThresholdIndependently(int grade, bool basic, bool elevated, bool admin)
+    {
+        var session = new ZoneClientSession(1, new FakeDuplexPipe());
+
+        session.MarkTicketConsumed(1, 10, null, (short)grade);
+
+        Assert.Equal(basic, session.MeetsGmTier(GmCommandTier.Basic));
+        Assert.Equal(elevated, session.MeetsGmTier(GmCommandTier.Elevated));
+        Assert.Equal(admin, session.MeetsGmTier(GmCommandTier.Admin));
+    }
+
+    // IsGm is exactly the Basic tier of the same gate -- it must never silently drift from
+    // MeetsGmTier(GmCommandTier.Basic).
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(10)]
+    [InlineData(100)]
+    public void Zone_IsGm_MatchesMeetsGmTierBasic(int grade)
+    {
+        var session = new ZoneClientSession(1, new FakeDuplexPipe());
+
+        session.MarkTicketConsumed(1, 10, null, (short)grade);
+
+        Assert.Equal(session.MeetsGmTier(GmCommandTier.Basic), session.IsGm);
+    }
 }

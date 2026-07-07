@@ -435,6 +435,58 @@ Migrations/025_character_protect_for_death_grant.sql
 # itself for the full citation and fix rationale.
 Migrations/026_double_exp_time_counter_fix.sql
 
+# autotime2-grant (this session's closeout of the prior round's open aAutoTime2 question, create-avatar-
+# tribe-handling-fresh area): Server/ts25login/S04_MyWork02.cpp:888 grants aAutoTime2 = 1440 (24h of free
+# auto-hunt minutes) in the same live #ifdef LNW33 block as ProtectForDeath/DoubleExpTime1/DoubleExpTime2
+# (025/026), but game.Characters never had an AutoTime2 column at all -- completely unrepresented, not just
+# wrong-valued. Server/ts25zone/S07_MyGame04.cpp:787-823 (itself under the always-compiled #ifndef FREE_HUNT)
+# confirms aAutoTime2 is a per-real-minute-decrementing auto-hunt time budget (GetMinuteFromTick(1) ==
+# TICK_MINUTE == 60000ms, Server/Header/datetime.h:29,33), corroborated by the "auto hunt 5hr"/"3hr" cash
+# items (Server/ts25zone/S04_MyWork03.cpp:5387-5407) adding 300/180 minutes respectively. Adds the column,
+# grants the literal 1440 in usp_Character_CreateWithStarterKit (fix-forward on 026's body), projects it in
+# usp_Character_GetForWorldEntry/CharacterWorldSnapshotDto (appended last, defaulted, so existing direct-
+# construction test call sites keep compiling), and wires the existing (not newly added)
+# Network/.../AvatarInfo.cs AutoTime2 field on both the Login create-response overlay and Game's
+# AvatarInfoFactory.CreateForCharacter -- see the migration file itself for the full citation, and this
+# session's findings for what is deliberately still left open (AutoTime itself; PlayerRuntimeState wiring).
+Migrations/027_character_autotime2_grant.sql
+
+# starter-kit-equipment-doc-correction: Tables/world/StarterKitEquipment.sql's own DDL header comment has been
+# stale/misleading since 015/086 landed (still claims the dead non-USE_CUSTOME_CREATE branch and only
+# Armor/Gloves/Boots/Weapon, omitting Amulet/Ring and the RawWeaponCode column 015 added) -- that file is
+# already applied/journaled so its comment is never edited in place; this attaches a corrected MS_Description
+# extended property to the table and to RawWeaponCode instead. See the migration file itself for the full
+# citation.
+Migrations/028_starter_kit_equipment_doc_correction.sql
+
+# hero-rank-guild-buff-field-audit (Minor): usp_HeroRanking_AddPoints refreshed Level on every grant via
+# `Level = COALESCE(@Level, Level)`, but legacy's AddOrUpdateHeroRank (Server/ts25center/S08_MyDB.cpp:
+# 213-216) omits hLevel from its ON DUPLICATE KEY UPDATE clause entirely, freezing it at whatever level the
+# character was when they first ever earned a hero point for that ranking period -- see the migration file
+# itself for the full citation and fix rationale.
+Migrations/029_hero_ranking_level_freeze_fix.sql
+
+# hero-rank-points-world-entry-hydration (Major): adds game.usp_HeroRanking_GetPoints, a brand-new
+# single-character/period point-total read used by EnterWorldService to hydrate
+# PlayerRuntimeState.HeroRankPoints at world entry from the character's already-persisted Current-period
+# total (previously always started at 0 for every session/zone transfer) -- see the migration file itself
+# for the full citation and the zone-side-read-vs-ticket-schema-extension rationale.
+Migrations/030_hero_rank_points_world_entry_hydration.sql
+
+# creation-persistence-full-reaudit (Minor): game.Characters.Experience's own DDL comment ("aExp1+aExp2
+# combined") is factually wrong per direct legacy schema/persistence-call verification -- corrected via an
+# MS_Description extended property (the table script is already applied/journaled, never edited in place) --
+# see the migration file itself for the full citation trail and the deliberately-unresolved open question it
+# flags rather than guesses at.
+Migrations/031_character_experience_column_doc_correction.sql
+
+# starter-kit-inventory-store-date-grant (Minor, creation-persistence-full-reaudit area):
+# usp_Character_CreateWithStarterKit never included InventoryDate/StoreDate in its INSERT column list, so
+# every new character silently took the columns' DEFAULT of 0 instead of the legacy 7-day-future second-page
+# rental grant (Server/ts25login/S04_MyWork02.cpp:863-872, live LNW33 branch) -- see the migration file
+# itself for the full citation and fix rationale.
+Migrations/032_character_inventory_store_date_grant.sql
+
 Migrations/Seed/001_dev_account.sql
 
 Migrations/Seed/world/060_levels.sql

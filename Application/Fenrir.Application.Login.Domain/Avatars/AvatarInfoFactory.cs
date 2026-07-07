@@ -87,4 +87,92 @@ public static class AvatarInfoFactory
 
         return equip;
     }
+
+    // wAvatar.aInventory[2][64][6] -- ServerDocs/12_ts25zone/06_MyWork03_Items_Equipement_Craft_Quetes.md:
+    // 115-117 ("Format d'inventaire, 6 entiers par slot... [0] ID objet, [3] quantité/durabilité, [4] valeur
+    // d'amélioration/option, [5] réservé"); total wire size cross-checked against ServerDocs/19_Header_Lib/
+    // 06_FunctionH_Utilitaires_XOR.md:276's MAX_INVENTORY_PAGE_NUM * MAX_INVENTORY_SLOT_NUM *
+    // MAX_INVENTORY_VALUE_NUM = 2*64*6 = 768, matching AvatarInfo.Inventory's own FixedArray(768). Same
+    // "[1]/[2] left at wire-zero, not established by any available citation" open question as GameServer's
+    // own AvatarInfoFactory.BuildInventoryArrayFromRows -- see that method's remarks for the full citation.
+    // Only page 0 is modeled: usp_Character_CreateWithStarterKit always inserts starter-kit inventory rows at
+    // Container=0 (Database/StoredProcedures/game/usp_Character_CreateWithStarterKit.sql), so no starter kit
+    // ever populates page 1 -- there is nothing to project there at creation time, not a gap.
+    private const int InventorySlotsPerPage = 64;
+    private const int InventoryWireIntsPerSlot = 6;
+
+    // wAvatar.aSkill[40][2] -- Database/Tables/game/CharacterSkills.sql:1's own citation
+    // ("[slot][0]=SkillId, [slot][1]=Grade"); 40*2 = 80 matches AvatarInfo.Skill's own FixedArray(80).
+    private const int SkillSlotCount = 40;
+    private const int SkillWireIntsPerSlot = 2;
+
+    // wAvatar.aHotKey[3][14][3] -- Database/Tables/game/CharacterHotkeys.sql:1's own citation
+    // ("3 pages x 14 keys x 3 ints... Sort/Value1/Value2 stored verbatim as the legacy triple");
+    // 3*14*3 = 126 matches AvatarInfo.HotKey's own FixedArray(126).
+    private const int HotkeyPageCount = 3;
+    private const int HotkeyKeysPerPage = 14;
+    private const int HotkeyWireIntsPerSlot = 3;
+
+    /// <summary>
+    ///     Projects the starter-kit inventory rows CreateAvatarService is about to persist (always Container=0,
+    ///     see <see cref="InventorySlotsPerPage" />'s own remarks) onto AVATAR_INFO's aInventory[2][64][6] wire
+    ///     array -- independent re-implementation of GameServer's own
+    ///     AvatarInfoFactory.BuildInventoryArrayFromRows, the same "reads the in-memory TVP rows one request
+    ///     earlier in the same flow" relationship <see cref="BuildEquipArray" /> already has to
+    ///     BuildEquipArrayFromRows.
+    /// </summary>
+    public static int[] BuildInventoryArray(IReadOnlyList<CharacterItemSlotTvp> page0Items)
+    {
+        var inventory = new int[2 * InventorySlotsPerPage * InventoryWireIntsPerSlot];
+
+        foreach (var item in page0Items)
+        {
+            if (item.Slot >= InventorySlotsPerPage)
+                continue;
+
+            var baseIndex = item.Slot * InventoryWireIntsPerSlot;
+            inventory[baseIndex] = item.ItemId;
+            inventory[baseIndex + 3] = item.Quantity;
+            inventory[baseIndex + 4] = item.Enchant | (item.Combine << 8) | (item.Refine << 16) | (item.Socket << 24);
+        }
+
+        return inventory;
+    }
+
+    /// <summary>See <see cref="SkillSlotCount" />'s own remarks for the citation.</summary>
+    public static int[] BuildSkillArray(IReadOnlyList<CharacterSkillSlotTvp> skills)
+    {
+        var skill = new int[SkillSlotCount * SkillWireIntsPerSlot];
+
+        foreach (var row in skills)
+        {
+            if (row.SlotIndex >= SkillSlotCount)
+                continue;
+
+            var baseIndex = row.SlotIndex * SkillWireIntsPerSlot;
+            skill[baseIndex] = row.SkillId;
+            skill[baseIndex + 1] = row.Grade;
+        }
+
+        return skill;
+    }
+
+    /// <summary>See <see cref="HotkeyPageCount" />'s own remarks for the citation.</summary>
+    public static int[] BuildHotKeyArray(IReadOnlyList<CharacterHotkeySlotTvp> hotkeys)
+    {
+        var hotkey = new int[HotkeyPageCount * HotkeyKeysPerPage * HotkeyWireIntsPerSlot];
+
+        foreach (var row in hotkeys)
+        {
+            if (row.Page >= HotkeyPageCount || row.KeyIndex >= HotkeyKeysPerPage)
+                continue;
+
+            var baseIndex = (row.Page * HotkeyKeysPerPage + row.KeyIndex) * HotkeyWireIntsPerSlot;
+            hotkey[baseIndex] = row.Sort;
+            hotkey[baseIndex + 1] = row.Value1;
+            hotkey[baseIndex + 2] = row.Value2;
+        }
+
+        return hotkey;
+    }
 }

@@ -6,6 +6,7 @@ using Fenrir.Application.Login.Domain.Security;
 using Fenrir.Data.Security;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Login;
+using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -49,6 +50,19 @@ public sealed class LoginService(
     private const int ResultIpBlocked = 2; // MyDB::CheckGMIP/CheckBanIP (S04_MyWork02.cpp:195-215)
     private const int ResultServerFull = 3; // MyGame::mPresentPlayerNum >= mMaxPlayerNum (S04_MyWork02.cpp:155-160)
     private const int ResultVersionMismatch = 4; // tVersion != mServerVersion
+
+    /// <summary>
+    ///     Shared code for ts25playuser's RegisterUserForLogin_01 capacity-full (<c>_failed2</c>,
+    ///     Server/ts25playuser/S07_MyGame01.cpp:915-918, its own fixed 2000-slot table full -- practically
+    ///     unreachable under the shipped MaxUser=1000 login quota, but still live code) and
+    ///     DB-persistence-failure (<c>_failed3</c>, S07_MyGame01.cpp:920-923) exits, plus an unrelated
+    ///     catch-all default case (Server/ts25login/S04_MyWork02.cpp:297-300) -- all three collapse onto this
+    ///     one tResult (S04_MyWork02.cpp:285-292); the client cannot distinguish any of them. Fenrir has no
+    ///     fixed-size registration table to overflow, so only the persistence-failure analog is reachable
+    ///     here: see the catch around <see cref="IAccountSessionRepository.ClaimOrSignalKickAsync" /> below.
+    /// </summary>
+    private const int ResultSessionRegistrationFailed = 5;
+
     private const int ResultUnknownAccount = 6; // mDB.Login: account not found
     private const int ResultWrongPassword = 7; // mDB.Login: password mismatch
 
@@ -173,7 +187,25 @@ public sealed class LoginService(
         // once; the claim's own atomic side effect (clear a stale row / flag a live Game row for kick / refuse a
         // tearing-down row) happens server-side in usp_AccountSession_ClaimOrSignalKick.
         var newToken = Guid.NewGuid();
-        var claim = await accountSessions.ClaimOrSignalKickAsync(accountId, newToken, cancellationToken);
+        AccountSessionClaimDto claim;
+        try
+        {
+            claim = await accountSessions.ClaimOrSignalKickAsync(accountId, newToken, cancellationToken);
+        }
+        catch (SqlException ex)
+        {
+            // Closest present-day analog to legacy's PlayUser _failed2/_failed3 exits (see
+            // ResultSessionRegistrationFailed's remarks): the claim write exhausted its own bounded retry
+            // budget (AccountSessionRepository.MaxClaimAttempts) or hit an unrelated SqlException (e.g. a
+            // timeout), after authentication already succeeded. Legacy never leaves the client without a
+            // reply on this path (tResult=5, S04_MyWork02.cpp:285-292) -- reply explicitly here instead of
+            // letting the exception propagate uncaught to SessionLoop's generic dispatch catch, which would
+            // tear the connection down without ever sending a wire-level failure code first.
+            logger.LogError(ex,
+                "Login failed: account-session claim errored for account {AccountId} after authentication succeeded",
+                accountId);
+            return Failure(ResultSessionRegistrationFailed, "", true);
+        }
 
         switch ((AccountSessionClaimOutcome)claim.Outcome)
         {

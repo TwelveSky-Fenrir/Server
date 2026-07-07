@@ -77,6 +77,14 @@ public static class GuildInfoProjection
             if (notice.NoticeIndex < MaxNotices)
                 noticeTexts[notice.NoticeIndex] = notice.Text;
 
+        // Legacy parity (Server/ts25login/S08_MyDB.cpp:661-662): "is the buff active" is derived fresh at
+        // read time as BuffTime > 0 AND BuffState != 0, never read as a pre-computed persisted flag --
+        // GuildBuffDecay.Apply intentionally leaves BuffState set (sticky) once a guild has ever activated a
+        // buff, even after its reserve is exhausted, so this projection is the one place that must compute
+        // "active" instead of passing the column through. BuffType, by contrast, is copied unconditionally
+        // (line 662), regardless of whether the derived active flag below is true.
+        var buffActive = guild.BuffTime > 0 && guild.BuffState != 0;
+
         return new GuildInfo
         {
             Name = guild.Name,
@@ -90,7 +98,7 @@ public static class GuildInfoProjection
             Notices = noticeTexts,
             Point = guild.Points,
             BuffType = guild.BuffType,
-            BuffState = guild.BuffState,
+            BuffState = buffActive ? 1 : 0,
             BuffTime = guild.BuffTime,
             ChangeLeader = 0
         };

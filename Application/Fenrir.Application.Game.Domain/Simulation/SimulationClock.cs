@@ -30,6 +30,13 @@ public static class SimulationClock
     public const int PetActivityDecayLegacyTicks = 60;
 
     /// <summary>
+    ///     Play-time accrual cadence (<c>S07_MyGame04.cpp:887-911</c>'s strict
+    ///     <c>(mGAME.mTickCount - user-&gt;mTickCountFor01Minute) == 120</c> gate): a full real minute is 120
+    ///     legacy ticks at TimeLogic=500ms (<c>ServerInfo.ini:143</c>). Consumed by PlayTimeAccrualSystem.
+    /// </summary>
+    public const int PlayTimeAccrualLegacyTicks = 120;
+
+    /// <summary>
     ///     Stun/knockdown duration countdown cadence: -1 every 2 legacy ticks (~1 s, strict equality gate in
     ///     the legacy -- <c>S07_MyGame04.cpp:378-380,438-459</c>). Consumed by StunCountdownSystem.
     /// </summary>

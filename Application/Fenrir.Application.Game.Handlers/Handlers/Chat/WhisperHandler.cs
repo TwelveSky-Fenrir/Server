@@ -50,6 +50,8 @@ public sealed class WhisperHandler(IWhisperService whisperService, ILogger<Whisp
                 return;
 
             case WhisperOutcome.TargetNotFound:
+                // AuthType is always the fixed non-elevated value here, never the sender's own flag -- legacy's
+                // "target not found" branch passes a literal 0, not uAuthInfo.AuthType (Server/ts25zone/S04_MyWork02.cpp:8036).
                 session.Send(new WhisperResponse
                 {
                     Result = 1,
@@ -85,6 +87,14 @@ public sealed class WhisperHandler(IWhisperService whisperService, ILogger<Whisp
                 var targetZone = resolution.TargetZone!;
 
                 // Echo to the sender (Result=0) before delivering to the target (Result=3) -- legacy ordering.
+                // The two responses do NOT share the same AuthType: the direct sender-echo (Result=0) hardcodes
+                // a literal 0 in legacy (Server/ts25zone/S04_MyWork02.cpp:8046, B_SECRET_CHAT_RECV(0, ..., 0, ...)
+                // -- never uUserSort/AuthInfo-derived), so even a GM whispering sees AuthType=0 on their own
+                // echo. Only the actual delivery-to-target packet (Result=3), reconstructed from the inter-zone
+                // relay message, carries the sender's real elevated-status flag (RELAY_SECRET_CHAT_SEND's
+                // `tAuth = tUserInfo->mPlayInfo->uAuthInfo.AuthType`, S04_MyWork02.cpp:8067, forwarded verbatim
+                // by S04_MyWork04.cpp:39-40's B_SECRET_CHAT_RECV(3, ..., tAuthType, ...)) -- so only that one
+                // response uses the sender's own IsGm flag.
                 session.Send(new WhisperResponse
                 {
                     Result = 0,
@@ -101,7 +111,7 @@ public sealed class WhisperHandler(IWhisperService whisperService, ILogger<Whisp
                     ZoneNumber = 0,
                     AvatarName = sender.Name,
                     Content = packet.Content,
-                    AuthType = 0,
+                    AuthType = zoneSession.IsGm ? 1 : 0,
                     Link = packet.Link
                 });
                 return;

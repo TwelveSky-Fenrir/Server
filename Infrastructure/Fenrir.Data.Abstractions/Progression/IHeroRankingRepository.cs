@@ -27,4 +27,15 @@ public interface IHeroRankingRepository
     ///     shard on every tick -- returns whether THIS call was the one that performed the flip.
     /// </summary>
     public ValueTask<bool> RolloverIfDueAsync(CancellationToken ct);
+
+    /// <summary>
+    ///     Reads the character's currently stored Points for <paramref name="periodKind" /> -- the
+    ///     world-entry hydration read this project's behavior contract maps to legacy's login-time
+    ///     <c>MyDB::GetHeroPoint</c> (Server/ts25login/S08_MyDB.cpp:1178-1188). Null means no row exists yet
+    ///     for this (CharacterId, PeriodKind) pair (the character never earned a hero-rank point during that
+    ///     period) -- legacy's own exactly-one-row success gate collapses that case, and an outright query
+    ///     failure, to the identical zero outcome; callers are expected to default a null result to zero
+    ///     exactly like legacy's own unconditional pre-query initialization does, not treat it as an error.
+    /// </summary>
+    public ValueTask<int?> GetPointsAsync(int characterId, byte periodKind, CancellationToken ct);
 }

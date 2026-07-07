@@ -143,10 +143,19 @@ public class CreateAvatarHandlerTests
             StatPoint = 3175,
             SkillPoint = 10000,
             PreviousTribe = 0,
+            // creation-persistence-full-reaudit finding: ProtectForDeath = 5 is now persisted at creation
+            // (Migration 025) and mirrored onto this response the same way -- previously left at Zeroed's 0.
+            ProtectForDeath = 5,
             // zone-avatarinfo-factory-parity finding: the pet slot's 2nd/3rd wire ints are activity/growth
             // (Server/ts25login/S04_MyWork02.cpp:1131-1135 -- MAX_PAT_ACTIVITY_SIZE/640,000,000), mirroring
             // CreateAvatarService's own StarterPetActivity/StarterPetGrowth constants.
             Equip = AvatarInfoFactory.BuildEquipArray(call.Equipment, petGrowth: 640_000_000, petActivity: 100),
+            // zone-avatarinfo-factory-parity finding: see CreateAvatarService's own remarks (Inventory/Skill/
+            // HotKey overlay, right after Equip) for the full citation. StoreItem stays at Zeroed's 0 default
+            // -- no starter kit grants a warehouse row.
+            Inventory = AvatarInfoFactory.BuildInventoryArray(call.Inventory),
+            Skill = AvatarInfoFactory.BuildSkillArray(call.Skills),
+            HotKey = AvatarInfoFactory.BuildHotKeyArray(call.Hotkeys),
             Animal = MountSlotArray(1301),
             AnimalIndex = 0,
             AnimalTime = 99999999,
@@ -158,6 +167,10 @@ public class CreateAvatarHandlerTests
             DoubleExpTime1 = 300,
             DoubleExpTime2 = 300,
             AutoBuffTime = call.WelcomeBuffUntilDate,
+            // 1440 == CreateAvatarService.StarterAutoTime2Minutes (Server/ts25login/S04_MyWork02.cpp:888):
+            // the free auto-hunt minute allowance, mirrored onto this response the same "known at creation
+            // time, not read back" way DoubleExpTime1/2 above are.
+            AutoTime2 = 1440,
             Premium = call.PremiumUntilUnixSeconds
         };
 
@@ -464,6 +477,65 @@ public class CreateAvatarHandlerTests
         PacketAssert.AssertNothingSent(pipe);
     }
 
+    // db-createavatar-gender-narrowing-parity finding (closing a prior round's open question, not restating
+    // it). Gender was the one field among AvatarPost/Tribe/PreviousTribe/Head/Face that
+    // HandleAsync_StructuralViolation_... above never covered -- it genuinely had no range check at all
+    // before this fix, so an adversarial value here reached an unchecked `(byte)packet.Gender` narrowing cast
+    // in HandleAsync with no rejection, silently wrapping (e.g. 256 -> 0, -1 -> 255, 1000 -> 232 via C#'s
+    // unchecked int->byte truncation) into a different persisted value than legacy's own unclamped 32-bit int
+    // column would have stored. Covers both directions (negative, and the first value that no longer fits a
+    // byte) plus a dramatically out-of-range value a real attacker might actually send.
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(256)]
+    [InlineData(int.MaxValue)]
+    public async Task HandleAsync_GenderOutOfRange_AbortsAsMalformedWithoutQueryingOrCreating(int gender)
+    {
+        var characters = FakeCharacterRepository.WithNone();
+        var starterKits = FakeStarterKitRepository.NobleDragonKit();
+        var handler = new CreateAvatarHandler(
+            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions(),
+                NullLogger<CreateAvatarService>.Instance),
+            NullLogger<CreateAvatarHandler>.Instance);
+        var (session, pipe) = CreateSessionInCharSelect();
+
+        var request = ValidRequest() with { Gender = gender };
+
+        await handler.HandleAsync(request, session, CancellationToken.None);
+
+        Assert.Null(starterKits.LastCall);
+        Assert.Null(characters.LastCreateWithStarterKit);
+        Assert.Equal(DisconnectReason.Malformed, session.DisconnectReason);
+        PacketAssert.AssertNothingSent(pipe);
+    }
+
+    // Companion to the out-of-range coverage above: confirms 0-255 (the byte/TINYINT storage width's own
+    // natural bound, not a guessed male/female-style domain) is accepted end to end, not just "doesn't throw".
+    // 255 in particular is the one-byte wire domain's true upper bound, mirroring the dedicated 255 case
+    // HandleAsync_PreviousTribeOutOfRange_... above keeps under direct regression coverage for that field.
+    [Theory]
+    [InlineData(0)]
+    [InlineData(255)]
+    public async Task HandleAsync_GenderAtStorageWidthBoundary_CreatesNormallyWithExactValuePersisted(int gender)
+    {
+        var characters = FakeCharacterRepository.WithNone();
+        var starterKits = FakeStarterKitRepository.NobleDragonKit();
+        var handler = new CreateAvatarHandler(
+            new CreateAvatarService(characters, starterKits, FakeTribeRepository.Empty(), DefaultOptions(),
+                NullLogger<CreateAvatarService>.Instance),
+            NullLogger<CreateAvatarHandler>.Instance);
+        var (session, _) = CreateSessionInCharSelect();
+
+        var request = ValidRequest() with { Gender = gender };
+
+        await handler.HandleAsync(request, session, CancellationToken.None);
+
+        Assert.Null(session.DisconnectReason);
+        var call = characters.LastCreateWithStarterKit;
+        Assert.NotNull(call);
+        Assert.Equal((byte)gender, call!.Gender);
+    }
+
     // Server/ts25login/S04_MyWork02.cpp:625-635: the combined slot-occupied/name-empty test silently
     // disconnects the session -- unlike a name already taken (or any other stored-procedure-level failure),
     // which replies with a normal Result=1 response (see HandleAsync_RepositoryThrows_RepliesResult1WithZeroedAvatarInfo).
@@ -691,9 +763,15 @@ public class CreateAvatarHandlerTests
             StatPoint = 3175,
             SkillPoint = 10000,
             PreviousTribe = 0,
+            // creation-persistence-full-reaudit finding: see the equivalent block in
+            // HandleAsync_ValidRequest_RepliesResultZeroWithFullAvatarInfo above for the full citation.
+            ProtectForDeath = 5,
             // zone-avatarinfo-factory-parity finding: see the equivalent block in
             // HandleAsync_ValidRequest_RepliesResultZeroWithFullAvatarInfo above for the full citation.
             Equip = AvatarInfoFactory.BuildEquipArray(call.Equipment, petGrowth: 640_000_000, petActivity: 100),
+            Inventory = AvatarInfoFactory.BuildInventoryArray(call.Inventory),
+            Skill = AvatarInfoFactory.BuildSkillArray(call.Skills),
+            HotKey = AvatarInfoFactory.BuildHotKeyArray(call.Hotkeys),
             Animal = MountSlotArray(1301),
             AnimalIndex = 0,
             AnimalTime = 99999999,
@@ -705,6 +783,9 @@ public class CreateAvatarHandlerTests
             DoubleExpTime1 = 300,
             DoubleExpTime2 = 300,
             AutoBuffTime = call.WelcomeBuffUntilDate,
+            // 1440 == CreateAvatarService.StarterAutoTime2Minutes -- see the equivalent block in
+            // HandleAsync_ValidRequest_RepliesResultZeroWithFullAvatarInfo above for the full citation.
+            AutoTime2 = 1440,
             Premium = call.PremiumUntilUnixSeconds
         };
         await PacketAssert.AssertSentAsync(pipe,

@@ -119,7 +119,20 @@ public static class AvatarInfoTemplates
         Costume = new int[10],
         CostumeDate = new int[10],
         CostumeExpireDate = new int[10],
-        CostumeIndex = 0,
+        // aCostumeIndex: legacy always initializes this to -1 ("no costume selected/worn") at avatar creation
+        // (Server/ts25login/S04_MyWork02.cpp:1099) and never overwrites it afterward in that same function --
+        // unlike aAnimalIndex (same file, initialized -1 at l.1098, then unconditionally re-set to 0 at
+        // l.1178 because a starter mount IS always granted). No starter-kit costume grant exists anywhere in
+        // S04_MyWork02.cpp (confirmed: aCostumeIndex is assigned exactly once in that file), so -1 is both the
+        // initial AND final creation-time value, not merely a transient default. Server/BuildEU33/DB/
+        // nxtserver.sql:128 (`aCostumeIndex int(11) NULL DEFAULT -1`) confirms the legacy DB column itself
+        // defaults to -1 too. 0 here would misrepresent "wardrobe slot 0 selected" per the -1/0-9/10-19
+        // encoding CostumeStateResolver.Context documents. Fenrir has no persisted CostumeIndex column at all
+        // (no acquisition path exists yet -- see PlayerRuntimeState.CostumeIndex's own remarks, which already
+        // defaults to -1 in memory); this template's default is the only place a freshly-created or
+        // ordinary-world-entry AvatarInfo response gets its CostumeIndex from, since neither Login's nor
+        // Game's AvatarInfoFactory overrides this field.
+        CostumeIndex = -1,
         DmgBoost = 0,
         HPBoost = 0,
         CriBoost = 0,

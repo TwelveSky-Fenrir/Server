@@ -195,6 +195,7 @@ public sealed partial class Zone(
         DrainMissionCommands();
         DrainDrinkBottleCommands();
         DrainHeroRankingQueryCommands();
+        DrainHeroRankingRolloverCommands();
         DrainFishingCommands();
         DrainMountCommands();
         DrainCostumeCommands();

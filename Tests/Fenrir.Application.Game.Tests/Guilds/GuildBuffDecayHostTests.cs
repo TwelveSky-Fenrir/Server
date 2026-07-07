@@ -9,8 +9,10 @@ namespace Fenrir.Application.Game.Tests.Guilds;
 public class GuildBuffDecayHostTests
 {
     [Fact]
-    public async Task DecayOnceAsync_ExpiredGuild_PersistsTheDeactivatedRow()
+    public async Task DecayOnceAsync_ExpiredGuild_PersistsOnlyTheFlooredBuffTime_LeavesTypeAndStateUntouched()
     {
+        // Legacy parity (Server/ts25center/S07_MyGame01.cpp:316-330): the expiry write only ever rewrites
+        // gBuffTime -- BuffType/BuffState must reach the repository unchanged from the seeded row.
         var repository = new FakeGuildRepository();
         repository.Seed(Guild(1, 1, 5, DateTime.UtcNow.AddMinutes(-10).Ticks));
         var host = new GuildBuffDecayHost(repository, NullLogger<GuildBuffDecayHost>.Instance);
@@ -20,8 +22,8 @@ public class GuildBuffDecayHostTests
         Assert.NotNull(repository.LastSetBuff);
         var (guildId, buffType, buffState, buffTime, _) = repository.LastSetBuff!.Value;
         Assert.Equal(1, guildId);
-        Assert.Equal(0, buffType);
-        Assert.Equal(0, buffState);
+        Assert.Equal(2, buffType);
+        Assert.Equal(1, buffState);
         Assert.Equal(0, buffTime);
     }
 
@@ -35,6 +37,24 @@ public class GuildBuffDecayHostTests
         await host.DecayOnceAsync(CancellationToken.None);
 
         Assert.Null(repository.LastSetBuff);
+    }
+
+    [Fact]
+    public async Task DecayOnceAsync_NeverActivated_ButReserveAndCheckpointBothPresent_StillPersistsTheDecrementedTime()
+    {
+        // Legacy parity (Server/ts25center/S07_MyGame01.cpp:291-331): MyGame::LogicGuildBuff's row-selection
+        // query has no gBuffState condition -- a guild that topped up its reserve but never chose/activated a
+        // buff type (BuffState=0) still decays every pass exactly like an already-active one.
+        var repository = new FakeGuildRepository();
+        repository.Seed(Guild(1, 0, 60, DateTime.UtcNow.AddMinutes(-7).Ticks));
+        var host = new GuildBuffDecayHost(repository, NullLogger<GuildBuffDecayHost>.Instance);
+
+        await host.DecayOnceAsync(CancellationToken.None);
+
+        Assert.NotNull(repository.LastSetBuff);
+        var (_, _, buffState, buffTime, _) = repository.LastSetBuff!.Value;
+        Assert.Equal(0, buffState); // decay never itself flips BuffState to "activated"
+        Assert.Equal(53, buffTime);
     }
 
     [Fact]

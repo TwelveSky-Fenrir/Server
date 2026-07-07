@@ -216,8 +216,13 @@ public sealed partial class Zone
         if (attackerState.CharacterId == defenderState.CharacterId)
             return;
 
-        var attackerCombinedLevel = attackerState.Level + attackerState.RebirthCount;
-        var defenderCombinedLevel = defenderState.Level + defenderState.RebirthCount;
+        // aLevel1 == Level + Level2 (the post-cap high-level ladder), NEVER RebirthCount -- confirmed against
+        // MyUtil::ProcessForKillOtherTribe, S07_MyGame03.cpp:2660-2661. RebirthCount (aRebirthNum) is a
+        // distinct 0-6 counter that only ever reaches nonzero once Level2 is already pinned at its own cap
+        // (12), so substituting it here silently understated combined level for every rebirthed/high-level
+        // character feeding the gap cap, the hero-point floor, and the experience-gain formula below.
+        var attackerCombinedLevel = attackerState.Level + attackerState.Level2;
+        var defenderCombinedLevel = defenderState.Level + defenderState.Level2;
         if (attackerCombinedLevel - defenderCombinedLevel > CombinedLevelGapCap)
             return;
 

@@ -17,7 +17,19 @@ namespace Fenrir.Network.Serialization.Packets.Login;
 ///     rejecting it here up front, with the same Malformed-disconnect treatment as every other
 ///     structurally-invalid field on this request, is a deliberate Fenrir-side divergence from legacy's own
 ///     permissiveness, not a missed parity citation.
-///     <see cref="Gender" /> is read and persisted but never range-checked nor referenced by any grant.
+///     <see cref="Gender" /> is read and persisted, and (like <see cref="PreviousTribe" />) referenced by no
+///     grant/formula anywhere -- purely cosmetic. Legacy itself never range-checks it either (no bounds test
+///     anywhere near tGender in Server/ts25login/S04_MyWork02.cpp:610,744, unlike the explicit checks a few
+///     lines away for tAvatarPost/tTribe/tHead/tFace), and legacy's own AVATAR_INFO.aGender/DB column are a
+///     genuinely unclamped 32-bit int (Server/Header/Protocol/STRUCT.h:340,748,832 ; Server/Header/unity.h:43 ;
+///     Server/Header/Protocol/LOGIN.h:145 ; Server/BuildEU33/DB/nxtserver.sql:37's `aGender int(11)`).
+///     CreateAvatarHandler nonetheless now range-checks <see cref="Gender" /> to 0-255 before narrowing it to
+///     the TINYINT/byte game.Characters.Gender column stores it as -- not because legacy documents a narrower
+///     legal domain (it doesn't; asserting e.g. a male/female 0-1 split here would be invented, not read off
+///     any cited source), but because 0-255 is the chosen storage width's own natural bound: rejecting
+///     anything wider closes the one field on this request that used to reach an unchecked, silently-wrapping
+///     `(byte)` cast with a fully out-of-range value (db-createavatar-gender-narrowing-parity finding -- see
+///     CreateAvatarHandler's own remarks for the full citation).
 /// </summary>
 /// <remarks>
 ///     Réf. C++ : Server/ts25login/S04_MyWork02.cpp:582-751 (full precondition sequence: slot/name, tribe

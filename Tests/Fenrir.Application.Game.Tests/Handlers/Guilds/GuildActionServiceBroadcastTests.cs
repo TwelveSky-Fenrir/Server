@@ -103,21 +103,24 @@ public class GuildActionServiceBroadcastTests
         AssertGuildActionResponse(ZoneTestKit.DrainOutbound(memberPipe), 10);
     }
 
+    // Legacy parity: UpdateGuildBuffType (Server/ts25extra/S08_MyDB.cpp:1188-1191) writes only gBuffType/
+    // gBuffState -- it never references gBuffTime/gBuffTimeForDiff, for a fresh activation or an ordinary
+    // type switch while already active alike. GuildBuffDecayHost is the sole owner of that checkpoint.
     [Fact]
-    public async Task Buff_Activation_StampsFreshCheckpoint_AndBroadcastsToOnlineMember()
+    public async Task Buff_Activation_CarriesThroughExistingCheckpoint_AndBroadcastsToOnlineMember()
     {
         var (zones, guilds) = CreateWorld();
         var (masterSession, masterPipe, masterState) = EnterZone(zones, 1, MasterId, "Odin", GuildId, 2);
         var (_, memberPipe, _) = EnterZone(zones, 2, MemberId, "Thor", GuildId, 0);
 
-        guilds.Seed(SeedGuild(2, 60, 0));
+        const long seededCheckpoint = 123L;
+        guilds.Seed(SeedGuild(2, 60, seededCheckpoint));
 
         var service = CreateService(zones, guilds);
 
         var data = new byte[500];
         new GuildWorkBuffPayload { GuildBuffType = 2 }.Write(data);
 
-        var before = DateTime.UtcNow.Ticks;
         var result = await service.SetGuildBuffAsync(new GuildActionRequest { Sort = 14, Data = data }, masterState,
             CancellationToken.None);
         Respond(masterSession, result);
@@ -128,10 +131,37 @@ public class GuildActionServiceBroadcastTests
         Assert.Equal(2, buffType);
         Assert.Equal(1, buffState);
         Assert.Equal(60, buffTime);
-        Assert.True(buffTimeForDiff >= before, "Activation must stamp a fresh checkpoint, not carry the stale 0.");
+        Assert.Equal(seededCheckpoint, buffTimeForDiff);
 
         AssertGuildActionResponse(ZoneTestKit.DrainOutbound(masterPipe), 14);
         AssertGuildActionResponse(ZoneTestKit.DrainOutbound(memberPipe), 14);
+    }
+
+    [Fact]
+    public async Task Buff_SwitchTypeWhileAlreadyActive_NeverResetsTheDecayCheckpoint()
+    {
+        var (zones, guilds) = CreateWorld();
+        var (masterSession, masterPipe, masterState) = EnterZone(zones, 1, MasterId, "Odin", GuildId, 2);
+
+        var existingCheckpoint = DateTime.UtcNow.AddMinutes(-30).Ticks;
+        guilds.Seed(SeedGuild(1, 60, existingCheckpoint) with { BuffType = 1, BuffState = 1 });
+
+        var service = CreateService(zones, guilds);
+
+        var data = new byte[500];
+        new GuildWorkBuffPayload { GuildBuffType = 3 }.Write(data);
+
+        var result = await service.SetGuildBuffAsync(new GuildActionRequest { Sort = 14, Data = data }, masterState,
+            CancellationToken.None);
+        Respond(masterSession, result);
+
+        Assert.NotNull(guilds.LastSetBuff);
+        var (_, buffType, buffState, _, buffTimeForDiff) = guilds.LastSetBuff!.Value;
+        Assert.Equal(3, buffType);
+        Assert.Equal(1, buffState);
+        Assert.Equal(existingCheckpoint, buffTimeForDiff);
+
+        AssertGuildActionResponse(ZoneTestKit.DrainOutbound(masterPipe), 14);
     }
 
     private static GuildActionService CreateService(ZoneRegistry zones, FakeGuildRepository guilds)

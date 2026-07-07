@@ -46,7 +46,14 @@ public enum EventLogCategory : byte
     ///     the mutation -- see Database/Migrations/014_guild_money_event_log.sql), so there is no
     ///     Application-layer <see cref="IEventLogRepository.LogAsync" /> call site to point to for this one.
     /// </summary>
-    GuildMoney = 11
+    GuildMoney = 11,
+
+    /// <summary>
+    ///     A player-triggered TimeExchange conversion (legacy <c>GL_851_PLAYTIME_EXCHANGE</c>, generic-action
+    ///     tSort 237): accrued play-time-event minutes converted into teacher points + pet experience. First
+    ///     consumer: Fenrir.Application.Game.Services.GenericAction.GenericActionService.TimeExchangeAsync.
+    /// </summary>
+    PlayTimeExchange = 12
 }
 
 /// <summary>

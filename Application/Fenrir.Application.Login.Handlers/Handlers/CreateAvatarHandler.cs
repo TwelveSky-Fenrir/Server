@@ -39,6 +39,24 @@ namespace Fenrir.Application.Login.Handlers.Handlers;
 ///     Malformed-disconnect a structurally-invalid field gets everywhere else on this request. Rejecting it
 ///     here instead closes that gap with the same treatment every other bounded field on this request already
 ///     gets (db-createwithstarterkit-fieldaudit finding).
+///     <see cref="CreateAvatarRequest.Gender" /> gets the same 0-255 range check for a distinct reason:
+///     legacy's AVATAR_INFO.aGender is a genuinely unclamped 32-bit int (Server/Header/Protocol/STRUCT.h:340,
+///     748, 832 ; Server/Header/unity.h:43 ; Server/Header/Protocol/LOGIN.h:145 -- all `int aGender`,
+///     confirmed by Server/BuildEU33/DB/nxtserver.sql:37's `aGender int(11) NULL DEFAULT 0` legacy DB column),
+///     and Server/ts25login/S04_MyWork02.cpp:610,744 never bounds-checks it at all -- unlike tAvatarPost/
+///     tTribe/tHead/tFace, which each get their own explicit range check a few lines apart in the same
+///     function. Fenrir stores Gender in a TINYINT/byte (Database/Tables/game/Characters.sql:19), narrowed
+///     from this packet's own wire-level `int Gender` via an unchecked `(byte)` cast below. Before this fix,
+///     that cast was reachable with a fully out-of-range value (this field, uniquely among the six checked
+///     here, was never included in the range test above), so an adversarial Gender outside 0-255 would wrap
+///     silently (256 -&gt; 0, -1 -&gt; 255, 1000 -&gt; 232 via C#'s unchecked int-&gt;byte truncation) instead of
+///     being rejected -- a genuinely different, silently-corrupted persisted value from what legacy's own
+///     unclamped int column would have stored verbatim. The bound chosen (0-255) is the byte/TINYINT storage
+///     width's own natural limit, not a guessed game-design-specific domain: no cited Server/ source documents
+///     a narrower legal range (e.g. a male/female 0-1 split) for this field, so asserting one would be
+///     inventing legacy behavior rather than reading it off the source -- see <see cref="CreateAvatarRequest" />'s
+///     own remarks for the same point. Once Gender is provably in 0-255 here, the existing `(byte)` narrowing
+///     below is lossless by construction, so no change to the TINYINT storage type itself was needed.
 /// </remarks>
 public sealed class CreateAvatarHandler(ICreateAvatarService createAvatarService, ILogger<CreateAvatarHandler> logger)
     : IAsyncPacketHandler<CreateAvatarRequest>
@@ -53,6 +71,7 @@ public sealed class CreateAvatarHandler(ICreateAvatarService createAvatarService
             packet.AvatarName.Length == 0 ||
             packet.Tribe is < 0 or > 3 ||
             packet.PreviousTribe is < 0 or > 2 ||
+            packet.Gender is < 0 or > 255 ||
             packet.Head is < 0 or > 6 ||
             packet.Face is < 0 or > 2)
         {

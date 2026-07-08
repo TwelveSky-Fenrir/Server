@@ -1,6 +1,6 @@
 using System.Collections.Immutable;
 using System.Net;
-using Fenrir.Data.Abstractions.Characters;
+using Fenrir.Application.Login.Domain.Avatars;
 using Fenrir.Network.Serialization.Packets.Login;
 
 namespace Fenrir.Application.Login.Abstractions.Login;
@@ -37,11 +37,13 @@ public enum LoginOutcome
 ///     <c>AuthenticateAccountDto</c> (legacy <c>uUserSort</c>), carried into <c>LoginClientSession.AccountGrade</c>
 ///     and from there into the zone-transfer ticket, so the Zone session never has to re-query auth.Accounts for it.
 /// </param>
-/// <param name="GuildNamesByCharacterId">
-///     Populated only on <see cref="LoginOutcome.Success" /> -- one entry per <see cref="Characters" /> row that
-///     currently belongs to a guild (absent, not empty-string, for a guildless character), resolved live via
-///     <c>IGuildRepository.GetByCharacterAsync</c>. Feeds <c>LoginTrain.BuildAvatarSlots</c>' GuildName field; see
-///     that method's own remarks for the full citation.
+/// <param name="Characters">
+///     Populated only on <see cref="LoginOutcome.Success" /> -- one <see cref="AvatarRosterEntry" /> per
+///     occupied roster slot, each already carrying its own equipment/inventory/store items and live
+///     guild/friend/teacher/student lookups (resolved by <c>LoginService</c> via
+///     <c>ICharacterRepository.GetAccountRosterAsync</c> plus <c>IGuildRepository</c>/<c>IFriendRepository</c>/
+///     <c>IMentorRepository</c>). Feeds <c>LoginTrain.BuildAvatarSlots</c> directly; see that method's own
+///     remarks for the full citation.
 /// </param>
 public sealed record LoginResult(
     LoginOutcome Outcome,
@@ -51,18 +53,16 @@ public sealed record LoginResult(
     int AccountId,
     bool RequirePin,
     string PinMask,
-    ImmutableArray<CharacterSummaryDto> Characters,
-    ImmutableDictionary<int, string> GuildNamesByCharacterId,
+    ImmutableArray<AvatarRosterEntry> Characters,
     Guid? SessionToken = null,
     short AccountGrade = 0)
 {
     public static LoginResult RateLimitedResult { get; } =
-        new(LoginOutcome.RateLimited, 0, "", false, 0, false, "", [], ImmutableDictionary<int, string>.Empty);
+        new(LoginOutcome.RateLimited, 0, "", false, 0, false, "", []);
 
     /// <summary>Identical wire shape to <see cref="RateLimitedResult" /> -- both are a silent, no-reply drop.</summary>
     public static LoginResult SilentDropResult { get; } =
-        new(LoginOutcome.DuplicateSessionEvicted, 0, "", false, 0, false, "", [],
-            ImmutableDictionary<int, string>.Empty);
+        new(LoginOutcome.DuplicateSessionEvicted, 0, "", false, 0, false, "", []);
 }
 
 public interface ILoginService

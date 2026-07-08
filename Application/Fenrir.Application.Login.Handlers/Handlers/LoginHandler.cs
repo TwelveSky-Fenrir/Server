@@ -55,7 +55,7 @@ public sealed class LoginHandler(ILoginService loginService, ILogger<LoginHandle
                 LoginTrain.Send(session,
                     LoginTrain.BuildLoginRecv(ResultSuccess, "MG" + result.AccountId, secondLoginSort,
                         result.PinMask),
-                    LoginTrain.BuildAvatarSlots(result.Characters, result.GuildNamesByCharacterId));
+                    LoginTrain.BuildAvatarSlots(result.Characters));
                 return;
         }
     }

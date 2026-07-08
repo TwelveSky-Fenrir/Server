@@ -1,3 +1,4 @@
+using Fenrir.Application.Login.Domain.Avatars;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Serialization.Packets.Login;
 
@@ -94,45 +95,93 @@ public static class LoginTrain
     ///     Exactly <see cref="AvatarSlotCount" /> entries, always in slot order, zeroed for an empty slot —
     ///     never fewer (report §4.11.9: the legacy loops over MAX_USER_AVATAR_NUM unconditionally).
     /// </summary>
-    /// <param name="characters">The account's character-select rows, in any order.</param>
-    /// <param name="guildNamesByCharacterId">
-    ///     Live guild-membership lookup keyed by CharacterId, resolved by the caller (LoginService, which alone
-    ///     has access to IGuildRepository — this Domain project stays I/O-free). A character absent from this
-    ///     lookup (or an entirely <see langword="null" /> lookup, e.g. every existing pre-guild caller/test) gets
-    ///     the same "" GuildName the wire-zero template already carries.
+    /// <param name="characters">
+    ///     The account's resolved roster entries (occupied slots only, any order). Every field this response
+    ///     carries beyond identity/appearance -- equipment, both inventory pages, both store pages,
+    ///     progression scalars/potion counters, and guild/friend/teacher/student names -- is already resolved
+    ///     onto each entry by the caller (LoginService, the only place with I/O access); this method stays a
+    ///     pure projection, matching this Domain project's own "no I/O" rule.
     /// </param>
     /// <remarks>
-    ///     Réf. C++ : Server/ts25login/S08_MyDB.cpp:638-671 (the legacy guild lookup this reproduces) ;
-    ///     Server/Header/Protocol/LOGIN.h:134-174 (LC_USER_AVATAR_RECV2 — aGuildName is the only guild-related
-    ///     field this wire struct carries). Legacy caches aGuildName on the character row once at account-login
-    ///     time and self-heals it against the live guild table on mismatch/not-found (S08_MyDB.cpp:638-671);
-    ///     Fenrir's normalized schema has no such cached column at all (guild membership lives only in
-    ///     game.GuildMembers, resolved live via <c>IGuildRepository.GetByCharacterAsync</c>), so a straight live
-    ///     lookup naturally reproduces the correct end state without needing to replicate that two-step
-    ///     cache-then-validate mechanic — a deliberate simplification, not an assumed equivalence.
+    ///     Réf. C++ : Server/ts25login/S04_MyWork02.cpp:129-434 (CL_LOGIN_SEND as a whole; the per-slot loop at
+    ///     324-419) ; Server/ts25login/S04_MyWork02.cpp:42-67 (SEND_LOGIN's unconditional 3-slot send) ;
+    ///     Server/ts25login/S05_MyTransfer.cpp:133-169 (the exact field-by-field copy this response's own
+    ///     population reproduces) ; Server/ts25login/S08_MyDB.cpp:563-671 (the per-slot persisted-data read
+    ///     plus the live guild self-heal this method's <paramref name="characters" /> parameter is pre-resolved
+    ///     from) ; Server/Header/Protocol/LOGIN.h:134-174 (this response's own field declaration, 19 scalars/5
+    ///     strings/6 arrays, independently confirmed to already match <c>AvatarRosterResponse</c> one-for-one).
+    ///     See the "Account-login avatar roster population" legacy-behavior-translator contract for the full
+    ///     citation set (including <c>usp_Character_GetAccountRoster.sql</c>'s own header) this fix rests on.
+    ///     <para>
+    ///         Deliberately NOT overlaid here, per that contract's own "never invent legacy formulas from
+    ///         memory" boundary: the logout-position tribe-consistency correction and the forced logout-flag
+    ///         pair (<c>LogoutInfo</c> stays at the zero template -- the four fixed tribe-specific town-spawn
+    ///         value sets behind <c>Server/Header/mapcheck.h:298-326</c> were never enumerated by the
+    ///         contract, only cited by location), and the two hardcoded blacklisted-item-id resets (their
+    ///         actual item ids were likewise never established). <c>VisibleState</c>/<c>SpecialState</c>/
+    ///         <c>CostumeIndex</c>/<c>PetBag</c>/<c>Costume</c> stay at the wire-zero/-1 template too -- no
+    ///         persisted storage exists anywhere in this schema for any of the five yet (see
+    ///         <c>usp_Character_GetAccountRoster.sql</c>'s own header for the same admission on the read side).
+    ///         Closing any of these needs its own follow-up legacy-behavior-translator pass, not a guess here.
+    ///     </para>
     /// </remarks>
-    public static AvatarRosterResponse[] BuildAvatarSlots(IReadOnlyCollection<CharacterSummaryDto> characters,
-        IReadOnlyDictionary<int, string>? guildNamesByCharacterId = null)
+    public static AvatarRosterResponse[] BuildAvatarSlots(IReadOnlyCollection<AvatarRosterEntry> characters)
     {
         var slots = new AvatarRosterResponse[AvatarSlotCount];
         for (var slot = 0; slot < AvatarSlotCount; slot++)
         {
-            var character = characters.FirstOrDefault(c => c.Slot == slot);
-            slots[slot] = character is null
-                ? EmptyAvatarSlot
-                : EmptyAvatarSlot with
-                {
-                    Tribe = character.Tribe,
-                    Gender = character.Gender,
-                    HeadType = character.HeadType,
-                    FaceType = character.FaceType,
-                    Level1 = character.Level,
-                    Name = character.Name,
-                    GuildName = guildNamesByCharacterId?.GetValueOrDefault(character.CharacterId) ?? ""
-                };
+            var entry = characters.FirstOrDefault(c => c.Character.Slot == slot);
+            slots[slot] = entry is null ? EmptyAvatarSlot : BuildOccupiedSlot(entry);
         }
 
         return slots;
+    }
+
+    private static AvatarRosterResponse BuildOccupiedSlot(AvatarRosterEntry entry)
+    {
+        var character = entry.Character;
+
+        return EmptyAvatarSlot with
+        {
+            Tribe = character.Tribe,
+            PreviousTribe = character.PreviousTribe,
+            Gender = character.Gender,
+            HeadType = character.HeadType,
+            FaceType = character.FaceType,
+            Level1 = character.Level,
+            Level2 = character.Level2,
+            Halo = character.Halo,
+            RebirthNum = character.RebirthCount,
+            KillOtherTribe = character.ContributionPoints,
+            SkillPoint = character.SkillPoints,
+            EatLifePotion = character.EatLifePotion,
+            EatManaPotion = character.EatManaPotion,
+            EatStrPotion = character.EatStrPotion,
+            EatDexPotion = character.EatDexPotion,
+            EatElePotion = character.EatElePotion,
+            Name = character.Name,
+            GuildName = entry.GuildName,
+            Teacher = entry.Teacher,
+            Student = entry.Student,
+            Friend = BuildFriendArray(entry.FriendNameBySlot),
+            Equip = AvatarInfoFactory.BuildEquipArrayFromRosterItems(entry.Items, character.PetGrowth,
+                character.PetActivity),
+            Inventory = AvatarInfoFactory.BuildInventoryArrayFromRosterItems(entry.Items),
+            StoreItem = AvatarInfoFactory.BuildStoreItemArrayFromRosterItems(entry.Items)
+        };
+    }
+
+    /// <summary>Slots are client-chosen, so gaps in the sparse map are normal -- unfilled slots stay empty string.</summary>
+    private static string[] BuildFriendArray(IReadOnlyDictionary<byte, string> friendNameBySlot)
+    {
+        var friends = new string[10];
+        Array.Fill(friends, "");
+
+        foreach (var (slot, name) in friendNameBySlot)
+            if (slot < 10)
+                friends[slot] = name;
+
+        return friends;
     }
 
     /// <summary>The failure train's avatar block: 3 zeroed slots (the legacy mAvatarInfo is still zero pre-login).</summary>

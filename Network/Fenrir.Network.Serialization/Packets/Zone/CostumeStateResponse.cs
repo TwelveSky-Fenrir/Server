@@ -5,7 +5,7 @@ namespace Fenrir.Network.Serialization.Packets.Zone;
 
 // USE_ENCHANT_COSTUME is active: CostumeDate is present (33-byte payload, not 29).
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.CostumeState, ExpectedSize = 33)]
-public readonly record struct CostumeStateResponse : IOutgoingPacket
+public readonly partial record struct CostumeStateResponse : IOutgoingPacket
 {
     /// <summary><c>tValue00</c>: 0=ok, 1=invalid slot, 2=inventory full.</summary>
     public required int Result { get; init; }

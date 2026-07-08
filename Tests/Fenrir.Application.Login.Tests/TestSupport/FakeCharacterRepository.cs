@@ -11,6 +11,19 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
     private readonly Dictionary<(int CharacterId, byte Container, byte Slot), int> _itemIdBySlot = new();
     private readonly List<CharacterSummaryDto> _summaries;
     private readonly Dictionary<int, CharacterWorldEntryDto> _worldEntriesByCharacterId;
+
+    /// <summary>
+    ///     Overrides <see cref="GetAccountRosterAsync" />'s auto-derived RS0 row for a character -- only needed
+    ///     by tests exercising the roster-overlay scalar/potion/progression fields
+    ///     <see cref="CharacterSummaryDto" /> alone can't carry (LoginService/LoginTrain roster tests). Every
+    ///     other test that never calls <see cref="WithRosterCharacter" /> gets a row auto-derived from the
+    ///     matching <see cref="CharacterSummaryDto" />, with every field beyond that DTO's own 8 defaulted to 0.
+    /// </summary>
+    private readonly Dictionary<int, CharacterRosterDto> _rosterOverridesByCharacterId = new();
+
+    /// <summary>Seeded rows for <see cref="GetAccountRosterAsync" />'s RS1 -- empty by default (no items).</summary>
+    private readonly List<CharacterRosterItemDto> _rosterItems = [];
+
     private int _nextCharacterId = 1000;
 
     private FakeCharacterRepository(IEnumerable<CharacterSummaryDto> summaries,
@@ -52,6 +65,64 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
     public ValueTask<ReadOnlyCollection<CharacterSummaryDto>> GetByAccountAsync(int accountId, CancellationToken ct)
     {
         return ValueTask.FromResult(new ReadOnlyCollection<CharacterSummaryDto>(_summaries));
+    }
+
+    public ValueTask<CharacterAccountRosterBundle> GetAccountRosterAsync(int accountId, CancellationToken ct)
+    {
+        var rosterCharacters = _summaries
+            .Select(s => _rosterOverridesByCharacterId.GetValueOrDefault(s.CharacterId) ?? ToRosterDto(s))
+            .ToList();
+
+        return ValueTask.FromResult(new CharacterAccountRosterBundle(
+            new ReadOnlyCollection<CharacterRosterDto>(rosterCharacters),
+            new ReadOnlyCollection<CharacterRosterItemDto>(_rosterItems)));
+    }
+
+    /// <summary>The auto-derivation <see cref="GetAccountRosterAsync" /> falls back to for any character not seeded via <see cref="WithRosterCharacter" />.</summary>
+    private static CharacterRosterDto ToRosterDto(CharacterSummaryDto summary)
+    {
+        return new CharacterRosterDto(
+            CharacterId: summary.CharacterId,
+            Slot: summary.Slot,
+            Name: summary.Name,
+            Tribe: summary.Tribe,
+            PreviousTribe: 0,
+            Gender: summary.Gender,
+            HeadType: summary.HeadType,
+            FaceType: summary.FaceType,
+            Level: summary.Level,
+            Level2: 0,
+            Halo: 0,
+            RebirthCount: 0,
+            ContributionPoints: 0,
+            SkillPoints: 0,
+            EatLifePotion: 0,
+            EatManaPotion: 0,
+            EatStrPotion: 0,
+            EatDexPotion: 0,
+            EatElePotion: 0,
+            PetGrowth: 0,
+            PetActivity: 0,
+            MapId: 0,
+            PosX: 0f,
+            PosY: 0f,
+            PosZ: 0f,
+            Life: 0,
+            Mana: 0);
+    }
+
+    /// <summary>Seeds a richer RS0 row for a character already present via <see cref="WithSummaries" />/<see cref="With" /> -- see <see cref="_rosterOverridesByCharacterId" />'s own remarks.</summary>
+    public FakeCharacterRepository WithRosterCharacter(CharacterRosterDto rosterCharacter)
+    {
+        _rosterOverridesByCharacterId[rosterCharacter.CharacterId] = rosterCharacter;
+        return this;
+    }
+
+    /// <summary>Seeds one occupied RS1 item row for <see cref="GetAccountRosterAsync" /> -- roster equip/inventory/store-overlay tests.</summary>
+    public FakeCharacterRepository WithRosterItem(CharacterRosterItemDto item)
+    {
+        _rosterItems.Add(item);
+        return this;
     }
 
     public ValueTask<CharacterWorldEntryDto?> GetForWorldEntryAsync(int characterId, CancellationToken ct)

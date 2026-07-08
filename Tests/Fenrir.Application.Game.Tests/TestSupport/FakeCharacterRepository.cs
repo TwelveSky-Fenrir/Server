@@ -94,6 +94,11 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
         throw new NotImplementedException();
     }
 
+    public ValueTask<CharacterAccountRosterBundle> GetAccountRosterAsync(int accountId, CancellationToken ct)
+    {
+        throw new NotImplementedException();
+    }
+
     public ValueTask<int> CreateAsync(int accountId, byte slot, string name, byte tribe, byte gender, byte headType,
         byte faceType, short mapId, float posX, float posY, float posZ, int life, int maxLife, int mana,
         int maxMana, CancellationToken ct)

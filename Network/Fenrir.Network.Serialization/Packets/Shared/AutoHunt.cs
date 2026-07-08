@@ -3,7 +3,7 @@ using Fenrir.Network.Serialization.Attributes;
 namespace Fenrir.Network.Serialization.Packets.Shared;
 
 [FenrirWireType(112)]
-public readonly record struct AutoHunt : IFenrirWireType<AutoHunt>
+public readonly partial record struct AutoHunt : IFenrirWireType<AutoHunt>
 {
     public required int BuffType { get; init; }
     [FixedArray(16)] public required int[] BuffStore { get; init; }

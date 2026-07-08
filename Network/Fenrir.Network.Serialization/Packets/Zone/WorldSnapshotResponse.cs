@@ -6,7 +6,7 @@ namespace Fenrir.Network.Serialization.Packets.Zone;
 
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.WorldSnapshot,
     Compressed = true, ExpectedSize = 3841)]
-public readonly record struct WorldSnapshotResponse : IOutgoingPacket
+public readonly partial record struct WorldSnapshotResponse : IOutgoingPacket
 {
     public required WorldInfo WorldInfo { get; init; }
     public required TribeInfo TribeInfo { get; init; }

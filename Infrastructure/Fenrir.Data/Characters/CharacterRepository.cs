@@ -28,6 +28,23 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         return await Db.QueryAsReadOnlyCollectionAsync<CharacterSummaryDto>(sp, ct);
     }
 
+    /// <summary>
+    ///     Richer companion to <see cref="GetByAccountAsync" /> -- see <see cref="ICharacterRepository.GetAccountRosterAsync" />'s
+    ///     own doc for scope. Capacity 3 (like <see cref="GetByAccountAsync" />) sizes RS0; RS1 (items) has no
+    ///     fixed cap since it spans up to 3 characters' full containers.
+    /// </summary>
+    public async ValueTask<CharacterAccountRosterBundle> GetAccountRosterAsync(int accountId, CancellationToken ct)
+    {
+        var sp = new StoredProcedureParametersBuilder("game", "usp_Character_GetAccountRoster", 3)
+            .AddParameter("AccountId", accountId, SqlDbType.Int)
+            .Build();
+
+        var (characters, items) = await Db
+            .QueryMultipleReadOnlyCollectionAsync<CharacterRosterDto, CharacterRosterItemDto>(sp, ct);
+
+        return new CharacterAccountRosterBundle(characters, items);
+    }
+
     /// <summary>Creates a character in the given slot; returns the new CharacterId (usp_Character_Create's scalar result).</summary>
     public async ValueTask<int> CreateAsync(
         int accountId,

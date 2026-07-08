@@ -8,7 +8,7 @@ namespace Fenrir.Network.Serialization.Packets.Login;
 // Fenrir.Application.Login.Abstractions.ClaimGift.ClaimGiftOutcome for the C# side of this mapping.
 [FenrirPacket(FenrirServer.Login, FenrirDirection.Outgoing, Opcodes.Login.Outgoing.ClaimGift,
     ExpectedSize = 5)]
-public readonly record struct ClaimGiftResponse : IOutgoingPacket
+public readonly partial record struct ClaimGiftResponse : IOutgoingPacket
 {
     public required int Result { get; init; }
 }

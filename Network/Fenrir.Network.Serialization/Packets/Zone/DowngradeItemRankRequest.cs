@@ -5,7 +5,7 @@ namespace Fenrir.Network.Serialization.Packets.Zone;
 
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.DowngradeItemRank, ExpectedSize = 29,
     AllowedStates = [(byte)ZoneSessionState.Registering, (byte)ZoneSessionState.InWorld])]
-public readonly record struct DowngradeItemRankRequest : IIncomingPacket<DowngradeItemRankRequest>
+public readonly partial record struct DowngradeItemRankRequest : IIncomingPacket<DowngradeItemRankRequest>
 {
     public required int Page1 { get; init; }
 

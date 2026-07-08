@@ -8,7 +8,7 @@ namespace Fenrir.Network.Serialization.Packets.Zone;
 // (ZC_SET_INVENTORY_ITEM_RECV, opcode 194) sent before this one -- see DailyMissionService.ClaimAsync's own remarks.
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.DailyMission,
     ExpectedSize = 25)]
-public readonly record struct DailyMissionResponse : IOutgoingPacket
+public readonly partial record struct DailyMissionResponse : IOutgoingPacket
 {
     public required int Sort { get; init; }
     public required int Result { get; init; }

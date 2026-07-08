@@ -20,7 +20,7 @@ namespace Fenrir.Network.Serialization.Packets.Zone;
 /// </remarks>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.EnterWorld,
     ExpectedSize = 381, AllowedStates = [(byte)ZoneSessionState.TicketConsumed])]
-public readonly record struct EnterWorldRequest : IIncomingPacket<EnterWorldRequest>
+public readonly partial record struct EnterWorldRequest : IIncomingPacket<EnterWorldRequest>
 {
     [FixedString(255)] public required string Id { get; init; }
     [FixedString(13)] public required string AvatarName { get; init; }

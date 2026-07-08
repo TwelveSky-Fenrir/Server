@@ -26,6 +26,77 @@ public sealed partial record CharacterSummaryDto(
     byte FaceType,
     short Level);
 
+// game.usp_Character_GetAccountRoster RS0; ordinal-mapped, ctor order must match the SELECT. Richer sibling of
+// CharacterSummaryDto for the CL_LOGIN_SEND avatar-roster response (LC_USER_AVATAR_RECV2) -- see the
+// "Account-login avatar roster population" legacy-behavior-translator contract and the procedure's own header
+// for exactly which fields are (and, just as deliberately, are NOT) carried here. MapId/PosX/PosY/PosZ/Life/Mana
+// are the raw LogoutInfo[0..5] source values -- the contract's logout-position tribe-consistency correction and
+// forced-flag overwrite are call-site transforms, not applied by this read.
+[GenerateDto]
+public sealed partial record CharacterRosterDto(
+    int CharacterId,
+    byte Slot,
+    string Name,
+    byte Tribe,
+    byte PreviousTribe,
+    byte Gender,
+    byte HeadType,
+    byte FaceType,
+    short Level,
+    short Level2,
+    int Halo,
+    int RebirthCount,
+    int ContributionPoints,
+    int SkillPoints,
+    int EatLifePotion,
+    int EatManaPotion,
+    int EatStrPotion,
+    int EatDexPotion,
+    int EatElePotion,
+    int PetGrowth,
+    byte PetActivity,
+    short MapId,
+    float PosX,
+    float PosY,
+    float PosZ,
+    int Life,
+    int Mana);
+
+/// <summary>
+///     RS1 of usp_Character_GetAccountRoster -- every occupied CharacterItems row for every character on one
+///     account in one round trip, tagged with CharacterId (unlike CharacterItemSlotDto, which covers exactly
+///     one character since usp_Character_GetForWorldEntry is always called per-character). Same per-slot shape
+///     as CharacterItemSlotDto otherwise; project onto AvatarRosterResponse's Equip/Inventory/StoreItem arrays
+///     the same way AvatarInfoFactory.BuildEquipArrayFromRows/BuildInventoryArrayFromRows/
+///     BuildStoreItemArrayFromRows already do for CharacterItemSlotDto.
+/// </summary>
+[GenerateDto]
+public sealed partial record CharacterRosterItemDto(
+    int CharacterId,
+    byte Container,
+    byte Slot,
+    int ItemId,
+    int Quantity,
+    byte Enchant,
+    byte Combine,
+    byte Refine,
+    byte Socket,
+    int SocketGem1,
+    int SocketGem2,
+    int SocketGem3,
+    int ExpireDate,
+    int Serial);
+
+/// <summary>
+///     Both result sets of usp_Character_GetAccountRoster, stitched -- not a [GenerateDto] since it spans result
+///     sets. Unlike CharacterWorldEntryBundle, an empty Characters collection is NOT collapsed to null: a
+///     brand-new account with zero characters yet is a legitimate, common state for this read (straight after
+///     account creation, before CL_CREATE_AVATAR_SEND2), not a "not found" error.
+/// </summary>
+public sealed record CharacterAccountRosterBundle(
+    ReadOnlyCollection<CharacterRosterDto> Characters,
+    ReadOnlyCollection<CharacterRosterItemDto> Items);
+
 // game.usp_Character_GetForWorldEntry; drives ZC_REGISTER_AVATAR_RECV/AVATAR_INFO. Mirrors game.Characters minus audit timestamps.
 // Deliberately does NOT carry PreviousTribe/Mount* (added to CharacterWorldSnapshotDto by
 // Migrations/018_character_previous_tribe_and_mount_readpath.sql): this type's only current consumers

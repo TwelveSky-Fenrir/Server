@@ -8,7 +8,7 @@ namespace Fenrir.Network.Serialization.Packets.Zone;
 // CheckChangeActionState: 1 = spawn/update, 0 = periodic re-broadcast (no animation replay).
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.ProxyShopStallState,
     ExpectedSize = 65)]
-public readonly record struct ProxyShopStallStateResponse : IOutgoingPacket
+public readonly partial record struct ProxyShopStallStateResponse : IOutgoingPacket
 {
     public required int ServerIndex { get; init; }
     public required int UniqueNumber { get; init; }

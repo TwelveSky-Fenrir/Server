@@ -11,7 +11,7 @@ namespace Fenrir.Network.Serialization.Packets.Zone;
 ///     zero live callers. Kept as real production API for whichever future cluster wires the item-667 repair path.
 /// </summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.TowerRepairInfo, ExpectedSize = 14)]
-public readonly record struct TowerRepairInfoResponse : IOutgoingPacket
+public readonly partial record struct TowerRepairInfoResponse : IOutgoingPacket
 {
     [FixedString(13)] public required string AvatarName { get; init; }
 }

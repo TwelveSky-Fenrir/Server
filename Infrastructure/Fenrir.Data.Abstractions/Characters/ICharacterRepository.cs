@@ -7,6 +7,19 @@ public interface ICharacterRepository
 {
     public ValueTask<ReadOnlyCollection<CharacterSummaryDto>> GetByAccountAsync(int accountId, CancellationToken ct);
 
+    /// <summary>
+    ///     Richer companion to <see cref="GetByAccountAsync" /> for the CL_LOGIN_SEND avatar-roster response
+    ///     (LC_USER_AVATAR_RECV2) -- see the "Account-login avatar roster population" legacy-behavior-translator
+    ///     contract and usp_Character_GetAccountRoster.sql's own header for the exact field scope, and for what
+    ///     is deliberately NOT sourced here (GuildName/Friend/Teacher/Student -- already resolved live by
+    ///     IGuildRepository/IFriendRepository/IMentorRepository, the same composition EnterWorldService.
+    ///     HandleAsync already uses for the single-character world-entry path; PetBag/Costume/CostumeIndex/
+    ///     VisibleState/SpecialState -- no persisted storage exists anywhere in this schema yet). Does not
+    ///     collapse an empty roster to null -- a brand-new account with zero characters is a legitimate result,
+    ///     not a "not found" error (see <see cref="CharacterAccountRosterBundle" />'s own remarks).
+    /// </summary>
+    public ValueTask<CharacterAccountRosterBundle> GetAccountRosterAsync(int accountId, CancellationToken ct);
+
     public ValueTask<int> CreateAsync(
         int accountId,
         byte slot,

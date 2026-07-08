@@ -5,7 +5,7 @@ namespace Fenrir.Network.Serialization.Packets.Zone;
 
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.SkyUpgradeItem, ExpectedSize = 25,
     AllowedStates = [(byte)ZoneSessionState.Registering, (byte)ZoneSessionState.InWorld])]
-public readonly record struct SkyUpgradeItemRequest : IIncomingPacket<SkyUpgradeItemRequest>
+public readonly partial record struct SkyUpgradeItemRequest : IIncomingPacket<SkyUpgradeItemRequest>
 {
     public required int Page1 { get; init; }
 

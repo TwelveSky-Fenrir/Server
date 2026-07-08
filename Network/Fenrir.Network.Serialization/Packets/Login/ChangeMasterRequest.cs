@@ -6,7 +6,7 @@ namespace Fenrir.Network.Serialization.Packets.Login;
 // Dead legacy opcode: handler never reads these fields or replies; kept only so the decoder knows the frame size.
 [FenrirPacket(FenrirServer.Login, FenrirDirection.Incoming, Opcodes.Login.Incoming.ChangeMaster,
     ExpectedSize = 62)]
-public readonly record struct ChangeMasterRequest : IIncomingPacket<ChangeMasterRequest>
+public readonly partial record struct ChangeMasterRequest : IIncomingPacket<ChangeMasterRequest>
 {
     public required int AvatarPost { get; init; }
 

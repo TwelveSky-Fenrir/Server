@@ -5,6 +5,7 @@ using Fenrir.Application.Login.Hosting;
 using Fenrir.Application.Login.Hosting.Extensions;
 using Fenrir.Application.Login.Services.Extensions;
 using Fenrir.Data;
+using Fenrir.Network.Dispatch;
 using Fenrir.Network.Dispatch.RateLimiting;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.ServiceDefaults;

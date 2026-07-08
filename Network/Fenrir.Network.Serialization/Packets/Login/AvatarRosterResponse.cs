@@ -5,7 +5,7 @@ namespace Fenrir.Network.Serialization.Packets.Login;
 
 [FenrirPacket(FenrirServer.Login, FenrirDirection.Outgoing, Opcodes.Login.Outgoing.AvatarRoster,
     Obfuscation = WireObfuscationMode.XorFieldAvatar, ExpectedSize = 4579)]
-public readonly record struct AvatarRosterResponse : IOutgoingPacket
+public readonly partial record struct AvatarRosterResponse : IOutgoingPacket
 {
     [AvatarXorKind(AvatarXorKind.Int)] public required int VisibleState { get; init; }
     [AvatarXorKind(AvatarXorKind.Int)] public required int SpecialState { get; init; }

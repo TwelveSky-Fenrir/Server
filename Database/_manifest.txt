@@ -132,6 +132,12 @@ StoredProcedures/auth/usp_Account_RecordLoginAttempt.sql
 StoredProcedures/auth/usp_AccountPin_Get.sql
 StoredProcedures/auth/usp_AccountPin_Set.sql
 StoredProcedures/game/usp_Character_GetByAccount.sql
+
+# Account-login avatar roster population fix (legacy-behavior-translator contract "Account-login avatar
+# roster population", CL_LOGIN_SEND / LC_USER_AVATAR_RECV2): richer companion read to
+# usp_Character_GetByAccount above -- see the new procedure's own header for the full scope/citation.
+StoredProcedures/game/usp_Character_GetAccountRoster.sql
+
 StoredProcedures/game/usp_Character_Create.sql
 StoredProcedures/game/usp_Character_Delete.sql
 StoredProcedures/game/usp_Character_Rename.sql

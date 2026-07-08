@@ -1,6 +1,7 @@
 using System.Net;
 using System.Runtime.CompilerServices;
 using Fenrir.Application.Login.Domain;
+using Fenrir.Application.Login.Domain.Avatars;
 using Fenrir.Application.Login.Domain.RateLimiting;
 using Fenrir.Application.Login.Handlers.Handlers;
 using Fenrir.Application.Login.Services.Login;
@@ -471,8 +472,12 @@ public class LoginHandlerTests
 
         var actual = await PacketAssert.ReadSentBytesAsync(pipe);
 
-        var expectedSlots = LoginTrain.BuildAvatarSlots([guildedCharacter, guildlessCharacter],
-            new Dictionary<int, string> { [guildedCharacter.CharacterId] = "TestGuild" });
+        var expectedSlots = LoginTrain.BuildAvatarSlots([
+            new AvatarRosterEntry(ToRosterDto(guildedCharacter), [], "TestGuild",
+                new Dictionary<byte, string>(), "", ""),
+            new AvatarRosterEntry(ToRosterDto(guildlessCharacter), [], "",
+                new Dictionary<byte, string>(), "", "")
+        ]);
 
         var loginRecvSize = FrameWriter.FrameSizeOf<LoginResponse>();
         var avatarSlotSize = FrameWriter.FrameSizeOf<AvatarRosterResponse>();
@@ -489,13 +494,71 @@ public class LoginHandlerTests
         Assert.Equal("", expectedSlots[1].GuildName);
     }
 
+    // Fixes the confirmed gap this session's root-cause read found: the roster response used to always show
+    // zeroed equipment/inventory/stats for a returning character regardless of what was actually persisted.
+    // LoginService now reads usp_Character_GetAccountRoster (ICharacterRepository.GetAccountRosterAsync) and
+    // LoginTrain.BuildAvatarSlots overlays the real equipped-item/progression-scalar data onto the wire
+    // response -- see that method's own remarks for the full legacy citation and the fields deliberately left
+    // at their wire-zero/-1 template (LogoutInfo correction, blacklist pruning, VisibleState/SpecialState/
+    // CostumeIndex/PetBag/Costume).
+    [Fact]
+    public async Task HandleAsync_Success_PopulatesEquipmentAndProgressionScalarsFromTheAccountRosterRead()
+    {
+        var (hash, salt) = PasswordHasher.Hash("correct-password");
+        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, false);
+        var accounts = FakeAccountRepository.WithAccount(account);
+
+        var summary = new CharacterSummaryDto(201, 0, "Hero", 2, 1, 3, 4, 12);
+        var richCharacter = new CharacterRosterDto(
+            CharacterId: 201, Slot: 0, Name: "Hero", Tribe: 2, PreviousTribe: 1, Gender: 1, HeadType: 3,
+            FaceType: 4, Level: 12, Level2: 3, Halo: 5, RebirthCount: 2, ContributionPoints: 40, SkillPoints: 7,
+            EatLifePotion: 1, EatManaPotion: 2, EatStrPotion: 3, EatDexPotion: 4, EatElePotion: 5,
+            PetGrowth: 10, PetActivity: 50, MapId: 6, PosX: 1f, PosY: 2f, PosZ: 3f, Life: 30, Mana: 21);
+        var equippedWeapon = new CharacterRosterItemDto(201, Container: 2, Slot: 7, ItemId: 9001, Quantity: 1,
+            Enchant: 0, Combine: 0, Refine: 0, Socket: 0, SocketGem1: 0, SocketGem2: 0, SocketGem3: 0,
+            ExpireDate: 0, Serial: 1);
+
+        var characters = FakeCharacterRepository.WithSummaries(summary)
+            .WithRosterCharacter(richCharacter)
+            .WithRosterItem(equippedWeapon);
+
+        var handler = CreateHandler(out var session, out var pipe, accounts, characters: characters);
+
+        await handler.HandleAsync(ValidLoginRequest(password: "correct-password"), session, CancellationToken.None);
+
+        var actual = await PacketAssert.ReadSentBytesAsync(pipe);
+
+        var expectedSlots = LoginTrain.BuildAvatarSlots([
+            new AvatarRosterEntry(richCharacter, [equippedWeapon], "", new Dictionary<byte, string>(), "", "")
+        ]);
+
+        var loginRecvSize = FrameWriter.FrameSizeOf<LoginResponse>();
+        var avatarSlotSize = FrameWriter.FrameSizeOf<AvatarRosterResponse>();
+
+        var expectedSlot0Frame = new byte[avatarSlotSize];
+        FrameWriter.WriteFrame(in expectedSlots[0], expectedSlot0Frame);
+
+        Assert.Equal(expectedSlot0Frame, actual.AsSpan(loginRecvSize, avatarSlotSize).ToArray());
+
+        // Sanity-check the actual values, not just a byte-for-byte match against a second call to the same
+        // production code -- proves the weapon really landed in equip slot 7 and the progression scalars
+        // really came from CharacterRosterDto, not from a coincidentally-matching zero default.
+        Assert.Equal(9001, expectedSlots[0].Equip[7 * 4]);
+        Assert.Equal(5, expectedSlots[0].Halo);
+        Assert.Equal(2, expectedSlots[0].RebirthNum);
+        Assert.Equal(40, expectedSlots[0].KillOtherTribe);
+        Assert.Equal(7, expectedSlots[0].SkillPoint);
+        Assert.Equal(1, expectedSlots[0].PreviousTribe);
+    }
+
     private static LoginHandler CreateHandler(out LoginClientSession session, out FakeDuplexPipe pipe,
         FakeAccountRepository accounts, bool blockedIp = false, bool firewallRuleBlocked = false,
         bool gmAllowlisted = false, bool accountBanned = false, string[]? bannedMacAddresses = null,
         SessionRegistry? registry = null, FakeAccountSessionRepository? accountSessions = null,
         IPEndPoint? remoteEndPoint = null, LoginCapacityState? capacity = null,
         FakeEventLogRepository? eventLog = null, bool onlyAdminCanLogin = false,
-        FakeCharacterRepository? characters = null, FakeGuildRepository? guilds = null)
+        FakeCharacterRepository? characters = null, FakeGuildRepository? guilds = null,
+        FakeFriendRepository? friends = null, FakeMentorRepository? mentor = null)
     {
         pipe = new FakeDuplexPipe();
         session = new LoginClientSession(1, pipe, remoteEndPoint ?? RemoteEndPoint);
@@ -526,6 +589,8 @@ public class LoginHandlerTests
                 accountSessions ?? new FakeAccountSessionRepository(),
                 eventLog ?? new FakeEventLogRepository(),
                 guilds ?? FakeGuildRepository.Empty(),
+                friends ?? FakeFriendRepository.Empty(),
+                mentor ?? FakeMentorRepository.Empty(),
                 NullLogger<LoginService>.Instance),
             NullLogger<LoginHandler>.Instance);
     }
@@ -571,6 +636,45 @@ public class LoginHandlerTests
     private static byte[] ParseMac(string mac)
     {
         return mac.Split('-').Select(b => Convert.ToByte(b, 16)).ToArray();
+    }
+
+    /// <summary>
+    ///     Mirrors FakeCharacterRepository's own private ToRosterDto -- the auto-derivation
+    ///     <see cref="FakeCharacterRepository.GetAccountRosterAsync" /> falls back to for a character seeded only
+    ///     via <see cref="FakeCharacterRepository.WithSummaries" />, every field beyond CharacterSummaryDto's own
+    ///     8 defaulted to 0. Duplicated here (not shared) so this expected-value construction doesn't reach into
+    ///     the fake's private implementation detail.
+    /// </summary>
+    private static CharacterRosterDto ToRosterDto(CharacterSummaryDto summary)
+    {
+        return new CharacterRosterDto(
+            CharacterId: summary.CharacterId,
+            Slot: summary.Slot,
+            Name: summary.Name,
+            Tribe: summary.Tribe,
+            PreviousTribe: 0,
+            Gender: summary.Gender,
+            HeadType: summary.HeadType,
+            FaceType: summary.FaceType,
+            Level: summary.Level,
+            Level2: 0,
+            Halo: 0,
+            RebirthCount: 0,
+            ContributionPoints: 0,
+            SkillPoints: 0,
+            EatLifePotion: 0,
+            EatManaPotion: 0,
+            EatStrPotion: 0,
+            EatDexPotion: 0,
+            EatElePotion: 0,
+            PetGrowth: 0,
+            PetActivity: 0,
+            MapId: 0,
+            PosX: 0f,
+            PosY: 0f,
+            PosZ: 0f,
+            Life: 0,
+            Mana: 0);
     }
 
     /// <summary>

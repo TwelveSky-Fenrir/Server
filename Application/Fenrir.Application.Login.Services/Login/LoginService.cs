@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Net;
 using Fenrir.Application.Login.Abstractions.Login;
 using Fenrir.Application.Login.Domain;
+using Fenrir.Application.Login.Domain.Avatars;
 using Fenrir.Application.Login.Domain.RateLimiting;
 using Fenrir.Application.Login.Domain.Security;
 using Fenrir.Data.Security;
@@ -47,6 +48,8 @@ public sealed class LoginService(
     IAccountSessionRepository accountSessions,
     IEventLogRepository eventLog,
     IGuildRepository guilds,
+    IFriendRepository friends,
+    IMentorRepository mentor,
     ILogger<LoginService> logger) : ILoginService
 {
     // Legacy tResult codes actually producible by Fenrir's flows (S04_MyWork02.cpp W_LOGIN_SEND / S08_MyDB Login):
@@ -281,8 +284,8 @@ public sealed class LoginService(
         // only ever sees sessions on this same process.
         registry.AssociateAccount(sessionId, accountId);
 
-        var chars = await characters.GetByAccountAsync(accountId, cancellationToken);
-        var guildNamesByCharacterId = await ResolveGuildNamesAsync(chars, cancellationToken);
+        var roster = await characters.GetAccountRosterAsync(accountId, cancellationToken);
+        var rosterEntries = await ResolveRosterEntriesAsync(roster, cancellationToken);
 
         // Session-lifecycle audit row: this is the "Login" leg (see LoginSucceededEventCode's remarks for the
         // other three legs). No character is chosen yet at this point in the flow, so ActorCharacterId is null.
@@ -291,33 +294,56 @@ public sealed class LoginService(
 
         logger.LogInformation(
             "Login succeeded: account {AccountId} authenticated, {CharacterCount} character(s), PIN required {RequirePin}",
-            accountId, chars.Count, requirePin);
+            accountId, roster.Characters.Count, requirePin);
 
         return new LoginResult(LoginOutcome.Success, ResultSuccess, "", false, accountId, requirePin, pinMask,
-            [..chars], guildNamesByCharacterId, newToken, account.AccountGrade);
+            rosterEntries, newToken, account.AccountGrade);
     }
 
     /// <summary>
-    ///     Live per-character guild-membership lookup for the character-select roster's GuildName field -- see
-    ///     <c>LoginTrain.BuildAvatarSlots</c>' own remarks for the full legacy citation and the "no cached column
-    ///     to self-heal" simplification. At most <see cref="LoginTrain.AvatarSlotCount" /> characters per account,
-    ///     so a bounded fan-out costs nothing meaningful on this (already multi-round-trip) login path.
+    ///     Turns the raw <see cref="CharacterAccountRosterBundle" /> read into one <see cref="AvatarRosterEntry" />
+    ///     per occupied slot, fanning out the live guild/friend/mentor lookups per character -- same "bounded
+    ///     fan-out costs nothing meaningful on this already multi-round-trip login path" posture the prior
+    ///     guild-only resolution already established, extended to the two additional lookups
+    ///     <c>usp_Character_GetAccountRoster</c>'s own header deliberately leaves to the caller (same
+    ///     composition <c>EnterWorldService.HandleAsync</c> already uses for the single-character world-entry
+    ///     path). See <c>LoginTrain.BuildAvatarSlots</c>' own remarks for the full legacy citation.
     /// </summary>
-    private async ValueTask<ImmutableDictionary<int, string>> ResolveGuildNamesAsync(
-        IReadOnlyCollection<CharacterSummaryDto> chars, CancellationToken ct)
+    private async ValueTask<ImmutableArray<AvatarRosterEntry>> ResolveRosterEntriesAsync(
+        CharacterAccountRosterBundle roster, CancellationToken ct)
     {
-        if (chars.Count == 0)
-            return ImmutableDictionary<int, string>.Empty;
+        if (roster.Characters.Count == 0)
+            return [];
 
-        var memberships =
-            await Task.WhenAll(chars.Select(c => guilds.GetByCharacterAsync(c.CharacterId, ct).AsTask()));
+        var itemsByCharacterId = roster.Items
+            .GroupBy(i => i.CharacterId)
+            .ToDictionary(g => g.Key, g => (IReadOnlyList<CharacterRosterItemDto>)g.ToArray());
 
-        var builder = ImmutableDictionary.CreateBuilder<int, string>();
-        foreach (var (character, membership) in chars.Zip(memberships))
-            if (membership is not null)
-                builder[character.CharacterId] = membership.GuildName;
+        var guildTasks = roster.Characters.Select(c => guilds.GetByCharacterAsync(c.CharacterId, ct).AsTask());
+        var friendTasks = roster.Characters.Select(c => friends.GetByCharacterAsync(c.CharacterId, ct).AsTask());
+        var mentorTasks = roster.Characters.Select(c => mentor.GetForCharacterAsync(c.CharacterId, ct).AsTask());
 
-        return builder.ToImmutable();
+        var guildMemberships = await Task.WhenAll(guildTasks);
+        var friendRows = await Task.WhenAll(friendTasks);
+        var mentorBonds = await Task.WhenAll(mentorTasks);
+
+        var entries = ImmutableArray.CreateBuilder<AvatarRosterEntry>(roster.Characters.Count);
+        for (var i = 0; i < roster.Characters.Count; i++)
+        {
+            var character = roster.Characters[i];
+            var friendNameBySlot = friendRows[i].ToDictionary(f => f.Slot, f => f.FriendName);
+            var mentorBond = mentorBonds[i];
+
+            entries.Add(new AvatarRosterEntry(
+                character,
+                itemsByCharacterId.GetValueOrDefault(character.CharacterId, []),
+                guildMemberships[i]?.GuildName ?? "",
+                friendNameBySlot,
+                mentorBond?.TeacherName ?? "",
+                mentorBond?.StudentName ?? ""));
+        }
+
+        return entries.ToImmutable();
     }
 
     /// <summary>
@@ -351,7 +377,6 @@ public sealed class LoginService(
 
     private static LoginResult Failure(int resultCode, string resultString, bool reArmVersionOk)
     {
-        return new LoginResult(LoginOutcome.Failure, resultCode, resultString, reArmVersionOk, 0, false, "", [],
-            ImmutableDictionary<int, string>.Empty);
+        return new LoginResult(LoginOutcome.Failure, resultCode, resultString, reArmVersionOk, 0, false, "", []);
     }
 }

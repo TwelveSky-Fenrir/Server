@@ -33,6 +33,30 @@ public static class AvatarInfoFactory
     private const int InventorySlotsPerPage = 64;
     private const int InventoryWireIntsPerSlot = 6;
 
+    // Both inventory pages (unlike the creation-time-only, page-0-only BuildInventoryArray above -- a returning
+    // character's account-login roster read can carry occupied rows on page 1 too, see
+    // BuildInventoryArrayFromRosterItems' own remarks).
+    private const int InventoryPageCount = 2;
+
+    // wAvatar.aStoreItem[2][28][4] -- same ItemId/ExpireDate/packed-upgrade-byte/unused convention as
+    // aEquip[13][4] above (ServerDocs/19_Header_Lib/06_FunctionH_Utilitaires_XOR.md:277's
+    // MAX_STORE_ITEM_PAGE_NUM * MAX_STORE_ITEM_SLOT_NUM * MAX_STORE_ITEM_VALUE_NUM = 2*28*4 = 224, matching
+    // AvatarRosterResponse.StoreItem's own FixedArray(224)) -- the same citation GameServer's own
+    // AvatarInfoFactory.StorePageCount/StoreSlotsPerPage/StoreWireIntsPerSlot already established, duplicated
+    // here (not shared) since Login has no reference to the Game project.
+    private const int StorePageCount = 2;
+    private const int StoreSlotsPerPage = 28;
+    private const int StoreWireIntsPerSlot = 4;
+
+    // game.CharacterItems.Container convention (Application.Game.Domain.Inventory.ContainerMatrix's own
+    // header comment, duplicated here for the same "no cross-project reference" reason as above): 0/1 the two
+    // Inventory pages, 2 Equipment, 3/4 the two Store pages.
+    private const byte ContainerInventoryPage0 = 0;
+    private const byte ContainerInventoryPage1 = 1;
+    private const byte ContainerEquipment = 2;
+    private const byte ContainerStorePage0 = 3;
+    private const byte ContainerStorePage1 = 4;
+
     // wAvatar.aSkill[40][2] -- Database/Tables/game/CharacterSkills.sql:1's own citation
     // ("[slot][0]=SkillId, [slot][1]=Grade"); 40*2 = 80 matches AvatarInfo.Skill's own FixedArray(80).
     private const int SkillSlotCount = 40;
@@ -154,6 +178,105 @@ public static class AvatarInfoFactory
         }
 
         return skill;
+    }
+
+    /// <summary>
+    ///     Projects a returning character's persisted equipment rows (usp_Character_GetAccountRoster's RS1,
+    ///     pre-filtered by the caller to one character's rows only) onto the character-select roster's
+    ///     aEquip[13][4] wire array -- same per-slot mapping as <see cref="BuildEquipArray" /> above, sourced
+    ///     from freshly-read <see cref="CharacterRosterItemDto" /> rows instead of the in-memory
+    ///     <see cref="CharacterItemSlotTvp" /> rows a creation response already holds.
+    /// </summary>
+    /// <remarks>
+    ///     Réf. C++ : Server/ts25login/S04_MyWork02.cpp:1131-1135 -- the pet slot's 2nd/3rd wire ints are the
+    ///     pet's activity/growth as plain values (NOT the expiration-date/packed-Enchant-Combine-Refine-Socket
+    ///     pair every other slot carries there), since those two values live on the character record itself
+    ///     rather than on the pet's own CharacterItems row. Independent re-implementation of GameServer's own
+    ///     AvatarInfoFactory.BuildEquipArrayFromRows (same citation) -- Login has no project reference to Game.
+    /// </remarks>
+    public static int[] BuildEquipArrayFromRosterItems(IReadOnlyList<CharacterRosterItemDto> items,
+        int petGrowth = 0, byte petActivity = 0)
+    {
+        var equip = new int[EquipSlotCount * EquipWireIntsPerSlot];
+
+        foreach (var item in items)
+        {
+            if (item.Container != ContainerEquipment || item.Slot >= EquipSlotCount)
+                continue;
+
+            var baseIndex = item.Slot * EquipWireIntsPerSlot;
+            equip[baseIndex] = item.ItemId;
+
+            if (item.Slot == PetEquipSlot)
+            {
+                equip[baseIndex + 1] = petActivity;
+                equip[baseIndex + 2] = petGrowth;
+            }
+            else
+            {
+                equip[baseIndex + 1] = item.ExpireDate;
+                equip[baseIndex + 2] = item.Enchant | (item.Combine << 8) | (item.Refine << 16) | (item.Socket << 24);
+            }
+        }
+
+        return equip;
+    }
+
+    /// <summary>
+    ///     Both inventory pages (Container 0/1) from usp_Character_GetAccountRoster's RS1, unlike
+    ///     <see cref="BuildInventoryArray" />'s creation-time page-0-only projection -- a returning character
+    ///     can genuinely have occupied rows on page 1 (e.g. the bonus-page rental grant), which a fresh
+    ///     creation response never needs to represent.
+    /// </summary>
+    public static int[] BuildInventoryArrayFromRosterItems(IReadOnlyList<CharacterRosterItemDto> items)
+    {
+        var inventory = new int[InventoryPageCount * InventorySlotsPerPage * InventoryWireIntsPerSlot];
+
+        foreach (var item in items)
+        {
+            var page = item.Container switch
+            {
+                ContainerInventoryPage0 => 0,
+                ContainerInventoryPage1 => 1,
+                _ => -1
+            };
+
+            if (page < 0 || item.Slot >= InventorySlotsPerPage)
+                continue;
+
+            var baseIndex = (page * InventorySlotsPerPage + item.Slot) * InventoryWireIntsPerSlot;
+            inventory[baseIndex] = item.ItemId;
+            inventory[baseIndex + 3] = item.Quantity;
+            inventory[baseIndex + 4] = item.Enchant | (item.Combine << 8) | (item.Refine << 16) | (item.Socket << 24);
+        }
+
+        return inventory;
+    }
+
+    /// <summary>See <see cref="StorePageCount" />'s own remarks for the citation.</summary>
+    public static int[] BuildStoreItemArrayFromRosterItems(IReadOnlyList<CharacterRosterItemDto> items)
+    {
+        var store = new int[StorePageCount * StoreSlotsPerPage * StoreWireIntsPerSlot];
+
+        foreach (var item in items)
+        {
+            var page = item.Container switch
+            {
+                ContainerStorePage0 => 0,
+                ContainerStorePage1 => 1,
+                _ => -1
+            };
+
+            if (page < 0 || item.Slot >= StoreSlotsPerPage)
+                continue;
+
+            var baseIndex = (page * StoreSlotsPerPage + item.Slot) * StoreWireIntsPerSlot;
+            store[baseIndex] = item.ItemId;
+            store[baseIndex + 1] = item.ExpireDate;
+            store[baseIndex + 2] = item.Enchant | (item.Combine << 8) | (item.Refine << 16) | (item.Socket << 24);
+        }
+
+        return store;
     }
 
     /// <summary>See <see cref="HotkeyPageCount" />'s own remarks for the citation.</summary>

@@ -20,7 +20,7 @@ namespace Fenrir.Network.Serialization.Packets.Zone;
 /// </remarks>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.ZoneHandshake, ExpectedSize = 272,
     AllowedStates = [(byte)ZoneSessionState.Connected])]
-public readonly record struct ZoneHandshakeRequest : IIncomingPacket<ZoneHandshakeRequest>
+public readonly partial record struct ZoneHandshakeRequest : IIncomingPacket<ZoneHandshakeRequest>
 {
     // XOR USE_XOR_UID: de-obfuscated by the handler/Network layer, not by TryRead here.
     [FixedString(255)] public required string Id { get; init; }

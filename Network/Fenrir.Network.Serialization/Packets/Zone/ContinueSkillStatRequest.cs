@@ -7,7 +7,7 @@ namespace Fenrir.Network.Serialization.Packets.Zone;
 // (Skill[i*2]=skillId, Skill[i*2+1]=requested grade). Always replies Result=0, even for unlearned skills.
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.ContinueSkillStat,
     ExpectedSize = 73, AllowedStates = [(byte)ZoneSessionState.Registering, (byte)ZoneSessionState.InWorld])]
-public readonly record struct ContinueSkillStatRequest : IIncomingPacket<ContinueSkillStatRequest>
+public readonly partial record struct ContinueSkillStatRequest : IIncomingPacket<ContinueSkillStatRequest>
 {
     [FixedArray(16)] public required int[] Skill { get; init; }
 }

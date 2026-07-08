@@ -5,7 +5,7 @@ using Fenrir.Network.Serialization.Wire;
 namespace Fenrir.Network.Serialization.Packets.Zone;
 
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.AvatarAction, ExpectedSize = 645)]
-public readonly record struct AvatarActionResponse : IOutgoingPacket
+public readonly partial record struct AvatarActionResponse : IOutgoingPacket
 {
     public required int ServerIndex { get; init; }
     public required uint UniqueNumber { get; init; }

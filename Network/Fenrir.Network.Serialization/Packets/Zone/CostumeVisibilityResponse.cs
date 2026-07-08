@@ -5,7 +5,7 @@ namespace Fenrir.Network.Serialization.Packets.Zone;
 
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.CostumeVisibility,
     ExpectedSize = 13)]
-public readonly record struct CostumeVisibilityResponse : IOutgoingPacket
+public readonly partial record struct CostumeVisibilityResponse : IOutgoingPacket
 {
     /// <summary>Echo of CZ 139's <c>tSort</c> (0/1).</summary>
     public required int Sort { get; init; }

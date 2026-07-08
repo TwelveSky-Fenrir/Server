@@ -5,7 +5,7 @@ namespace Fenrir.Network.Serialization.Packets.Zone;
 
 // Result: 0=ok, 1=catalog unavailable, 2/3=funds/inventory errors.
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.BuyBloodMarkItem, ExpectedSize = 41)]
-public readonly record struct BuyBloodMarkItemResponse : IOutgoingPacket
+public readonly partial record struct BuyBloodMarkItemResponse : IOutgoingPacket
 {
     public required int Result { get; init; }
     public required int BloodCoin { get; init; }

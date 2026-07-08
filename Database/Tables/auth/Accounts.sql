@@ -3,8 +3,8 @@
 CREATE TABLE auth.Accounts
 (
     AccountId        INT IDENTITY (1,1) NOT NULL,
-    LoginName        NVARCHAR(64)       NOT NULL,      -- wire buffer is 255 bytes (MAX_USER_ID_LENGTH); real IDs are far shorter
-    PasswordHash     VARBINARY(32)      NOT NULL,      -- Argon2id output, Fenrir.Data.Security.PasswordHasher
+    LoginName        NVARCHAR(64)       NOT NULL, -- wire buffer is 255 bytes (MAX_USER_ID_LENGTH); real IDs are far shorter
+    PasswordHash     VARBINARY(32)      NOT NULL, -- Argon2id output, Fenrir.Data.Security.PasswordHasher
     PasswordSalt     VARBINARY(16)      NOT NULL,
     FailedLoginCount INT                NOT NULL
         CONSTRAINT DF_Accounts_FailedLoginCount DEFAULT 0,

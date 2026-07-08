@@ -31,8 +31,8 @@
 -- ever reached, and KickRequested/SessionState = 1 (TearingDown) still refuse the claim exactly as before --
 -- widening ServerKind does not weaken either guard.
 CREATE OR ALTER PROCEDURE runtime.usp_AccountSession_TransitionToGame @AccountId INT,
-                                                                      @ExpectedSessionToken UNIQUEIDENTIFIER,
-                                                                      @ShardId TINYINT
+                                                             @ExpectedSessionToken UNIQUEIDENTIFIER,
+                                                             @ShardId TINYINT
     WITH NATIVE_COMPILATION , SCHEMABINDING
 AS
 BEGIN

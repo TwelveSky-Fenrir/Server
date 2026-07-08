@@ -153,7 +153,7 @@ CREATE TABLE game.Characters
         CONSTRAINT DF_Characters_PremiumExpireUtc DEFAULT 0,                                     -- aPremium, Unix epoch seconds (0 = none); distinct scale from the YYYYMMDD ints above
     PreviousTribe            TINYINT            NOT NULL
         CONSTRAINT DF_Characters_PreviousTribe DEFAULT 0
-        CONSTRAINT CK_Characters_PreviousTribe CHECK (PreviousTribe BETWEEN 0 AND 2),            -- the Noble Dragon/Royal Serpent/Grand Tiger starter-kit template (0-2, never 3) that selected this character's equipment/skills/hotkeys -- genuinely independent from Tribe (0-3), checked for self-consistency at every zone entry (Server/ts25zone/S04_MyWork02.cpp:880-901)
+        CONSTRAINT CK_Characters_PreviousTribe CHECK (PreviousTribe BETWEEN 0 AND 2),             -- the Noble Dragon/Royal Serpent/Grand Tiger starter-kit template (0-2, never 3) that selected this character's equipment/skills/hotkeys -- genuinely independent from Tribe (0-3), checked for self-consistency at every zone entry (Server/ts25zone/S04_MyWork02.cpp:880-901)
     MountItemId              INT                NOT NULL
         CONSTRAINT DF_Characters_MountItemId DEFAULT 0,                                          -- 0 = no mount; ANIMAL_NUM_TIGER1 (1301) granted at creation
     MountExpActivity         INT                NOT NULL
@@ -166,10 +166,10 @@ CREATE TABLE game.Characters
         CONSTRAINT DF_Characters_MountTime DEFAULT 0,                                            -- aAnimalTime
     AutoTime2                INT                NOT NULL
         CONSTRAINT DF_Characters_AutoTime2 DEFAULT 0
-        CONSTRAINT CK_Characters_AutoTime2 CHECK (AutoTime2 >= 0),                               -- aAutoTime2: per-real-minute-decrementing free auto-hunt allowance (Server/ts25zone/S07_MyGame04.cpp:787-823); 1440 (24h) granted at creation (Server/ts25login/S04_MyWork02.cpp:888)
+        CONSTRAINT CK_Characters_AutoTime2 CHECK (AutoTime2 >= 0),                                -- aAutoTime2: per-real-minute-decrementing free auto-hunt allowance (Server/ts25zone/S07_MyGame04.cpp:787-823); 1440 (24h) granted at creation (Server/ts25login/S04_MyWork02.cpp:888)
     Zone241Time              INT                NOT NULL
         CONSTRAINT DF_Characters_Zone241Time DEFAULT 0
-        CONSTRAINT CK_Characters_Zone241Time CHECK (Zone241Time >= 0),                           -- aZone241Time (Server/Header/Protocol/STRUCT.h:751-757's persisted avatar snapshot field, always wired as literal 0 today). First durable consumer: Rebirth-advancement Path B ("Max Rebirth", CZ_TRIBE_WORK_SEND tSort 11) unconditionally += 10 on precondition pass (Server/ts25zone/S04_MyWork02.cpp:11342-11390); see usp_Character_AdjustZone241Time for the write-path primitive.
+        CONSTRAINT CK_Characters_Zone241Time CHECK (Zone241Time >= 0),                            -- aZone241Time (Server/Header/Protocol/STRUCT.h:751-757's persisted avatar snapshot field, always wired as literal 0 today). First durable consumer: Rebirth-advancement Path B ("Max Rebirth", CZ_TRIBE_WORK_SEND tSort 11) unconditionally += 10 on precondition pass (Server/ts25zone/S04_MyWork02.cpp:11342-11390); see usp_Character_AdjustZone241Time for the write-path primitive.
     FlushSequence            BIGINT             NOT NULL
         CONSTRAINT DF_Characters_FlushSequence DEFAULT 0,                                        -- idempotent write-behind
     CreatedAtUtc             DATETIME2(3)       NOT NULL

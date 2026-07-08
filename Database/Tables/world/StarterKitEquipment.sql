@@ -8,10 +8,10 @@
 -- must match one of them) -- 8 rows per PreviousTribe, 24 total.
 CREATE TABLE world.StarterKitEquipment
 (
-    PreviousTribe TINYINT NOT NULL,
-    EquipSlot     TINYINT NOT NULL,
-    ItemId        INT     NOT NULL,
-    RawWeaponCode TINYINT NULL, -- NULL for the 5 unconditional per-race grants; holds the raw client-selectable weapon code (5/6/7, 11/12/13, or 17/18/19) for each of the 3 Weapon rows per race
+    PreviousTribe  TINYINT NOT NULL,
+    EquipSlot      TINYINT NOT NULL,
+    ItemId         INT     NOT NULL,
+    RawWeaponCode  TINYINT NULL, -- NULL for the 5 unconditional per-race grants; holds the raw client-selectable weapon code (5/6/7, 11/12/13, or 17/18/19) for each of the 3 Weapon rows per race
     CONSTRAINT PK_StarterKitEquipment PRIMARY KEY CLUSTERED (PreviousTribe, EquipSlot, ItemId),
     CONSTRAINT CK_StarterKitEquipment_PreviousTribe CHECK (PreviousTribe BETWEEN 0 AND 2),
     CONSTRAINT FK_StarterKitEquipment_Item FOREIGN KEY (ItemId) REFERENCES world.Items (ItemId)

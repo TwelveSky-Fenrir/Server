@@ -6,9 +6,9 @@
 -- short of the row being deleted outright). Called best-effort from both connection hosts' finally blocks,
 -- wrapped in try/catch-log there so a failure here must never throw out of a finally block.
 CREATE PROCEDURE runtime.usp_AccountSession_MarkTearingDown @AccountId INT,
-                                                            @ServerKind TINYINT,
-                                                            @ShardId TINYINT NULL,
-                                                            @SessionToken UNIQUEIDENTIFIER
+                                                             @ServerKind TINYINT,
+                                                             @ShardId TINYINT NULL,
+                                                             @SessionToken UNIQUEIDENTIFIER
     WITH NATIVE_COMPILATION , SCHEMABINDING
 AS
 BEGIN

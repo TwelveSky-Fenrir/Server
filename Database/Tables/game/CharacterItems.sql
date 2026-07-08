@@ -34,9 +34,9 @@ CREATE TABLE game.CharacterItems
     CONSTRAINT PK_CharacterItems PRIMARY KEY CLUSTERED (CharacterId, Container, Slot),
     CONSTRAINT CK_CharacterItems_Quantity CHECK (Quantity BETWEEN 1 AND 999), -- MAX_ITEM_DUPLICATION_NUM (Server/Header/Protocol/DEFINE.h:611); schema-level backstop, not a substitute for ContainerMatrix.ResolveMove's own merge-cap check
     CONSTRAINT CK_CharacterItems_ContainerSlot CHECK (
-        (Container IN (0, 1) AND Slot <= 63)                                  -- inventory pages, 8x8
-            OR (Container = 2 AND Slot <= 12)                                 -- equipment, MAX_EQUIP_SLOT_NUM = 13
-            OR (Container IN (3, 4) AND Slot <= 27)),                         -- store pages, MAX_STORE_ITEM_SLOT_NUM = 28
+        (Container IN (0, 1) AND Slot <= 63)          -- inventory pages, 8x8
+            OR (Container = 2 AND Slot <= 12)         -- equipment, MAX_EQUIP_SLOT_NUM = 13
+            OR (Container IN (3, 4) AND Slot <= 27)), -- store pages, MAX_STORE_ITEM_SLOT_NUM = 28
     CONSTRAINT FK_CharacterItems_Character FOREIGN KEY (CharacterId) REFERENCES game.Characters (CharacterId),
     CONSTRAINT FK_CharacterItems_Item FOREIGN KEY (ItemId) REFERENCES world.Items (ItemId),
     INDEX IX_CharacterItems_ItemId NONCLUSTERED (ItemId)

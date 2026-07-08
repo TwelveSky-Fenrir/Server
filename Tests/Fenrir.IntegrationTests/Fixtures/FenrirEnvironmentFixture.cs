@@ -5,6 +5,7 @@ using System.Text;
 using Aspire.Hosting.Testing;
 using Fenrir.Application.Game.Hosting;
 using Fenrir.Application.Login.Hosting;
+using Fenrir.Data.Abstractions.Security;
 using Fenrir.Data.Security;
 using Microsoft.Data.SqlClient;
 
@@ -191,6 +192,7 @@ public sealed class FenrirEnvironmentFixture : IAsyncLifetime
                 await Task.Delay(TimeSpan.FromSeconds(5));
                 await ApplyManifestAsync();
                 await SeedSecondShardMapAsync();
+                await SeedGmAllowlistAsync();
                 var accountId = await SeedTestAccountAsync(TestAccountLoginName, TestAccountPassword);
                 var accountId2 = await SeedTestAccountAsync(TestAccountLoginName2, TestAccountPassword2);
                 return (accountId, accountId2);
@@ -270,6 +272,28 @@ public sealed class FenrirEnvironmentFixture : IAsyncLifetime
             "INSERT INTO admin.ShardMapAssignments (ShardId, MapId) VALUES (@ShardId, @MapId);", connection);
         command.Parameters.AddWithValue("@ShardId", ShardId);
         command.Parameters.AddWithValue("@MapId", SecondaryMapId);
+        await command.ExecuteNonQueryAsync();
+    }
+
+    /// <summary>
+    ///     Both test accounts are seeded at GM-tier (<see cref="SeedTestAccountAsync" />'s own remarks) purely
+    ///     to dodge <c>DeviceSpoofingGuard.IsSpoofedDeviceTuple</c>'s unconditional loopback rejection -- but
+    ///     GM-tier also makes them subject to <c>LoginService</c>'s separate "# GM Enable Login IP #" gate
+    ///     (<c>account.AccountGrade &gt;= DeviceSpoofingGuard.GmGradeThreshold</c> requiring
+    ///     <see cref="IGmAllowlistRepository" /> to allow the connecting IP), which admin.GmAllowlist ships with
+    ///     no default rows for by design (see that table's own "deliberately not ported as seed data" comment).
+    ///     Without this row every one of this fixture's own bot logins -- real loopback TCP connections, not a
+    ///     unit test's null <c>remoteEndPoint</c> fail-open -- would be rejected with ResultIpBlocked before
+    ///     this fixture's own GM-tier workaround for the OTHER gate ever gets a chance to matter. Lands before
+    ///     either server process starts, same ordering rationale as <see cref="SeedSecondShardMapAsync" />.
+    /// </summary>
+    private async Task SeedGmAllowlistAsync()
+    {
+        await using var connection = new SqlConnection(ConnectionString);
+        await connection.OpenAsync();
+        await using var command = new SqlCommand(
+            "INSERT INTO admin.GmAllowlist (IpAddress) VALUES (@IpAddress);", connection);
+        command.Parameters.AddWithValue("@IpAddress", IPAddress.Loopback.ToString());
         await command.ExecuteNonQueryAsync();
     }
 

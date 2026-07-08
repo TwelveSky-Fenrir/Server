@@ -4,15 +4,15 @@
 -- DATEADD(SECOND, tBanUntilDate, '1970-01-01').
 CREATE TABLE admin.Bans
 (
-    BanId            INT IDENTITY (1,1) NOT NULL,
-    AccountId        INT                NULL,
-    CharacterId      INT                NULL,
-    Reason           TINYINT            NOT NULL,
-    ExpiresAtUtc     DATETIME2(3)       NULL,
-    CreatedAtUtc     DATETIME2(3)       NOT NULL
+    BanId        INT IDENTITY (1,1) NOT NULL,
+    AccountId    INT                NULL,
+    CharacterId  INT                NULL,
+    Reason       TINYINT            NOT NULL,
+    ExpiresAtUtc DATETIME2(3)       NULL,
+    CreatedAtUtc DATETIME2(3)       NOT NULL
         CONSTRAINT DF_Bans_CreatedAtUtc DEFAULT SYSUTCDATETIME(),
-    ActorAccountId   INT                NULL, -- the GM who issued this ban (independently nullable like the target columns -- a system-imposed/legacy-import ban legitimately has no GM actor); deliberately NO FK, must survive deletion of the actor's own account/character
-    ActorCharacterId INT                NULL,
+    ActorAccountId   INT NULL, -- the GM who issued this ban (independently nullable like the target columns -- a system-imposed/legacy-import ban legitimately has no GM actor); deliberately NO FK, must survive deletion of the actor's own account/character
+    ActorCharacterId INT NULL,
     CONSTRAINT PK_Bans PRIMARY KEY CLUSTERED (BanId),
     CONSTRAINT CK_Bans_AccountOrCharacter CHECK (AccountId IS NOT NULL OR CharacterId IS NOT NULL),
     CONSTRAINT FK_Bans_Account FOREIGN KEY (AccountId) REFERENCES auth.Accounts (AccountId),

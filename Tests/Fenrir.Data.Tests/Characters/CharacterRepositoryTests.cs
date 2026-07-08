@@ -363,6 +363,85 @@ public class CharacterRepositoryTests
         Assert.Equal(547, Assert.IsType<SqlException>(overCap!.InnerException).Number);
     }
 
+    // Confirmed root-cause regression test (user's exact reported scenario, DB layer): the character-select
+    // roster used to always show a returning character's equipped items/stats as zero because
+    // usp_Character_GetByAccount (GetByAccountAsync/CharacterSummaryDto, exercised in the narrow-read
+    // assertion below) never selected them -- confirmed still true and unchanged by this fix. This creates a
+    // character carrying the real weapon+torso starter kit (CreateAvatarService.WeaponEquipSlot=7/
+    // ArmorEquipSlot=2) against real SQL Server, then re-reads via GetAccountRosterAsync (usp_Character_
+    // GetAccountRoster) -- the richer read a second CL_LOGIN_SEND now uses instead of GetByAccountAsync, NOT
+    // GetForWorldEntryAsync/usp_Character_GetForWorldEntry, the world-entry path this bug never affected --
+    // and asserts the real equipped items/progression scalars come back instead of zeros.
+    [Fact]
+    public async Task GetAccountRosterAsync_AfterCreateWithStarterKit_ReturnsTheRealEquippedWeaponAndTorsoArmor()
+    {
+        var accountId = await CreateTestAccountAsync();
+        var name = NewCharacterName();
+
+        const int weaponItemId = 84527; // Blade of the Moon (Noble Dragon starter-kit weapon alternative)
+        const int torsoItemId = 84575; // Kahn Guardian Armor (Noble Dragon starter-kit torso/armor)
+
+        var characterId = await _characters.CreateWithStarterKitAsync(
+            accountId, 0, name, 0, 1, 2, 1,
+            1, 6f, 0f, -7f,
+            30, 100, 21, 50,
+            20260101, 0L,
+            [
+                new CharacterItemSlotTvp(7, weaponItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                new CharacterItemSlotTvp(2, torsoItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+            ],
+            [],
+            [],
+            [],
+            CancellationToken.None);
+
+        // The pre-existing narrow read (still used by CreateAvatarService's slot-occupancy check and
+        // DeleteAvatarService's slot resolution) is untouched by this fix and never carried equipment at
+        // all -- confirms this test isn't accidentally exercising a read that was already correct.
+        var narrowRoster = await _characters.GetByAccountAsync(accountId, CancellationToken.None);
+        Assert.Single(narrowRoster);
+
+        // Simulates the disconnect/relogin: a fresh call to the new richer read, exactly what LoginService
+        // now calls on every CL_LOGIN_SEND instead of GetByAccountAsync.
+        var roster = await _characters.GetAccountRosterAsync(accountId, CancellationToken.None);
+
+        var character = Assert.Single(roster.Characters);
+        Assert.Equal(characterId, character.CharacterId);
+        Assert.Equal((byte)0, character.Slot);
+        Assert.Equal(name, character.Name);
+        Assert.Equal((byte)0, character.Tribe);
+        Assert.Equal((byte)1, character.Gender);
+        Assert.Equal((byte)2, character.HeadType);
+        Assert.Equal((byte)1, character.FaceType);
+        Assert.Equal(1, character.Level); // DF_Characters_Level default -- genuine Level 1 character
+
+        // The real fix: the weapon and torso armor actually persisted now come back, tagged with the right
+        // CharacterId/Container, instead of the roster response having nothing to draw equipment from at all.
+        Assert.Equal(2, roster.Items.Count);
+        var weaponRow = Assert.Single(roster.Items, i => i.Slot == 7);
+        var torsoRow = Assert.Single(roster.Items, i => i.Slot == 2);
+        Assert.Equal(characterId, weaponRow.CharacterId);
+        Assert.Equal((byte)2, weaponRow.Container); // Equipment container (AvatarInfoFactory.ContainerEquipment)
+        Assert.Equal(weaponItemId, weaponRow.ItemId);
+        Assert.Equal(characterId, torsoRow.CharacterId);
+        Assert.Equal((byte)2, torsoRow.Container);
+        Assert.Equal(torsoItemId, torsoRow.ItemId);
+    }
+
+    // A brand-new account with zero characters yet (straight after CL_LOGIN_SEND, before
+    // CL_CREATE_AVATAR_SEND2) is a legitimate state, not an error -- both result sets come back empty rather
+    // than the bundle collapsing to null (see CharacterAccountRosterBundle's own remarks).
+    [Fact]
+    public async Task GetAccountRosterAsync_AccountWithNoCharactersYet_ReturnsEmptyCharactersAndItems()
+    {
+        var accountId = await CreateTestAccountAsync();
+
+        var roster = await _characters.GetAccountRosterAsync(accountId, CancellationToken.None);
+
+        Assert.Empty(roster.Characters);
+        Assert.Empty(roster.Items);
+    }
+
     private async Task<int> CreateTestAccountAsync()
     {
         var loginName = $"chartest-{Guid.NewGuid():N}";

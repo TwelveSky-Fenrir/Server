@@ -29,7 +29,12 @@ public sealed class CombineItemService(
         var index2 = packet.Index2;
 
         if (!IsValidInventorySlot(page1, index1) || !IsValidInventorySlot(page2, index2))
+        {
+            logger.LogDebug(
+                "Character {CharacterId} combine-item rejected: invalid slot(s) ({Page1}:{Index1} / {Page2}:{Index2})",
+                characterId, page1, index1, page2, index2);
             return new CombineItemResult(CombineItemOutcome.Rejected, 0, 0);
+        }
 
         var targetStack = state.Inventory.GetSlot((byte)page1, (byte)index1);
         var materialStack = state.Inventory.GetSlot((byte)page2, (byte)index2);
@@ -37,7 +42,12 @@ public sealed class CombineItemService(
         if (targetStack is not { } target || materialStack is not { } material ||
             !worldData.ItemsById.TryGetValue(target.ItemId, out var targetDefinition) ||
             !worldData.ItemsById.TryGetValue(material.ItemId, out var materialDefinition))
+        {
+            logger.LogDebug(
+                "Character {CharacterId} combine-item rejected: target or material slot empty/unresolvable",
+                characterId);
             return new CombineItemResult(CombineItemOutcome.Rejected, 0, 0);
+        }
 
         var luck = state.Stats?.Luck ?? 0;
 
@@ -45,7 +55,12 @@ public sealed class CombineItemService(
             luck, 0, SystemRandomSource.Instance);
 
         if (resolved.IsRejected)
+        {
+            logger.LogInformation(
+                "Character {CharacterId} combine-item rejected by resolver (target {TargetItemId}, material {MaterialItemId})",
+                characterId, target.ItemId, material.ItemId);
             return new CombineItemResult(CombineItemOutcome.Rejected, 0, 0);
+        }
 
         var newTargetStack = target with { Combine = (byte)resolved.NewCombine };
 
@@ -90,6 +105,13 @@ public sealed class CombineItemService(
             return new CombineItemResult(CombineItemOutcome.Rejected, 0, 0);
         }
 
+        // Server/ts25zone/S04_MyWork02.cpp:3690-3698 -- AddTribeBankInfo2 credits 1% of the already-charged
+        // combine cost to the paying character's tribe bank immediately after the debit, unconditionally
+        // (before the scroll/material-vs-equip roll). CombineResolver itself stays Zone-free (see its own
+        // remarks, now stale on this point); the credit is applied here once the debit has actually
+        // succeeded, via Zone.CreditNpcServiceTribeTax.
+        zone.CreditNpcServiceTribeTax(state.Tribe, resolved.Cost);
+
         var containers = page1 == page2
             ? ImmutableArray.Create(new InventoryContainerSnapshot((byte)page1, projectedTargetContainer))
             : ImmutableArray.Create(
@@ -101,6 +123,10 @@ public sealed class CombineItemService(
             logger.LogError(
                 "Zone {MapId} inventory inbox full: dropped combine mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
                 zone.MapId, characterId);
+
+        logger.LogInformation(
+            "Character {CharacterId} combine-item applied: target {TargetItemId} now Combine={NewCombine}, cost {Cost}, resultCode {ResultCode}",
+            characterId, target.ItemId, resolved.NewCombine, resolved.Cost, resolved.ResultCode);
 
         return new CombineItemResult(CombineItemOutcome.Applied, resolved.ResultCode, resolved.Cost);
     }

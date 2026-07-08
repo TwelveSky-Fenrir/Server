@@ -8,6 +8,7 @@ using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Services.Social;
 using Fenrir.Application.Game.Tests.TestSupport;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Social;
 
@@ -48,7 +49,8 @@ public class GuildInviteServiceTests
     {
         return new GuildInviteService(ZoneTestKit.CreateRegistry(), new GuildInviteRegistry(),
             duels ?? new DuelRegistry(), trades ?? new TradeRegistry(), friends ?? new FriendRegistry(),
-            parties ?? new PartyRegistry(), mentors ?? new MentorRegistry());
+            parties ?? new PartyRegistry(), mentors ?? new MentorRegistry(),
+            NullLogger<GuildInviteService>.Instance);
     }
 
     [Fact]

@@ -37,7 +37,8 @@ public readonly record struct FriendAddResult(FriendAddResultKind Kind, string O
 /// <summary>Outcome of CZ_FRIEND_DELETE_SEND, as branched on by <see cref="FriendRemoveHandler" />.</summary>
 public enum FriendRemoveResultKind
 {
-    InvalidSlot, // Abort
+    IndexOutOfRange, // silent no-op, not Abort
+    SlotEmpty, // Abort
     Removed
 }
 

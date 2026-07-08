@@ -4,6 +4,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Tribes;
 
@@ -20,13 +21,17 @@ namespace Fenrir.Application.Game.Handlers.Handlers.Tribes;
 ///     legacy build -- its handler unconditionally disconnected the client as the very first statement
 ///     (Server/ts25zone/S04_MyWork02.cpp:7567-7568) -- and becomes reachable here for the first time.
 /// </remarks>
-public sealed class TribeMigrationHandler(ITribeMigrationService tribeMigrationService)
-    : IAsyncPacketHandler<TribeMigrationRequest>
+public sealed class TribeMigrationHandler(
+    ITribeMigrationService tribeMigrationService,
+    ILogger<TribeMigrationHandler>? logger = null) : IAsyncPacketHandler<TribeMigrationRequest>
 {
     public async ValueTask HandleAsync(TribeMigrationRequest packet, IPacketSession session,
         CancellationToken cancellationToken)
     {
         var zoneSession = (ZoneClientSession)session;
+
+        logger?.LogDebug("Session {SessionId}: CZ_CHANGE_TO_TRIBE4_SEND received (character {CharacterId})",
+            session.SessionId, zoneSession.CharacterId);
 
         if (zoneSession.CurrentZone is not Zone zone)
             return;

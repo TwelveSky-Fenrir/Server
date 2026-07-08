@@ -18,7 +18,9 @@ public sealed class GetCashBalanceService(ICashRepository cash, ILogger<GetCashB
     {
         try
         {
-            return await cash.GetBalanceAsync(accountId, cancellationToken);
+            var balance = await cash.GetBalanceAsync(accountId, cancellationToken);
+            logger.LogDebug("Get cash balance: account {AccountId} balance {Balance}", accountId, balance);
+            return balance;
         }
         catch (Exception ex)
         {

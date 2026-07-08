@@ -1,6 +1,7 @@
 using Fenrir.Application.Login.Abstractions.RenameAvatar;
 using Fenrir.Application.Login.Domain.Avatars;
 using Fenrir.Application.Login.Services.AccountSecurity;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Login.Services.RenameAvatar;
 
@@ -33,7 +34,8 @@ public sealed class RenameAvatarService(
     IFriendRepository friends,
     IMentorRepository mentors,
     ICharacterRenameRepository renames,
-    IEventLogRepository eventLog) : IRenameAvatarService
+    IEventLogRepository eventLog,
+    ILogger<RenameAvatarService> logger) : IRenameAvatarService
 {
     public async ValueTask<RenameAvatarResult> RenameAvatarAsync(int accountId, byte avatarPost,
         string changeAvatarName, byte itemContainer, byte itemSlot, CancellationToken cancellationToken)
@@ -58,8 +60,13 @@ public sealed class RenameAvatarService(
             code = await renames.RenameAndConsumeItemAsync(accountId, avatarPost, changeAvatarName, itemContainer,
                 itemSlot, cancellationToken);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            // Previously swallowed with no trace at all -- logged here (the only place the exception itself is
+            // still in scope) so a real rename failure is diagnosable instead of vanishing silently, matching
+            // DeleteAvatarService/CreateAvatarService's own equivalent catch blocks.
+            logger.LogError(ex, "Character rename failed for account {AccountId} slot {AvatarPost}", accountId,
+                avatarPost);
             return new RenameAvatarResult(RenameAvatarOutcome.SqlError);
         }
 

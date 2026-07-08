@@ -3,6 +3,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
@@ -15,12 +16,16 @@ namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 ///     self-directed, but must stay a <see cref="System.Collections.Concurrent.ConcurrentDictionary{TKey,TValue}" />
 ///     since <c>Zone.HandleEnter</c> enumerates it concurrently during zone transfer.
 /// </remarks>
-public sealed class FriendAddHandler(IFriendService friendService) : IAsyncPacketHandler<FriendAddRequest>
+public sealed class FriendAddHandler(IFriendService friendService, ILogger<FriendAddHandler> logger)
+    : IAsyncPacketHandler<FriendAddRequest>
 {
     public async ValueTask HandleAsync(FriendAddRequest packet, IPacketSession session,
         CancellationToken cancellationToken)
     {
         var zoneSession = (ZoneClientSession)session;
+
+        logger.LogDebug("FriendAdd: session {SessionId} character {CharacterId} slot {Index}", session.SessionId,
+            zoneSession.CharacterId, packet.Index);
 
         if (zoneSession.CurrentZone is not Zone zone)
             return;

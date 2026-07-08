@@ -27,6 +27,14 @@ public interface ITribeRepository
     ///     balance, never a partial amount -- matches the legacy PlayUser process's
     ///     ZONE_TRIBE_BANK_LOAD_FOR_PLAYUSER_SEND). Returns the character's new Money total. Throws on an
     ///     empty slot or on a resulting balance that would exceed the legacy money cap.
+    ///     Not reachable via CZ_TRIBE_BANK_SEND (opcode 82): a freshly re-derived behavior contract off
+    ///     Server/ts25zone/S04_MyWork02.cpp:11560-11607 confirms that opcode has no client-invocable
+    ///     sub-command that moves money from the tribe bank to a player (an earlier revision of
+    ///     TribeBankService wired this method to that opcode's sort 2 by mistake -- since fixed to route
+    ///     sort 2 to <see cref="DepositBankAsync" /> instead). This method currently has no application-layer
+    ///     caller; whether it should be wired to whatever actually triggers
+    ///     ZONE_TRIBE_BANK_LOAD_FOR_PLAYUSER_SEND in the legacy PlayUser process, or removed, needs its own
+    ///     behavior contract before either action is taken.
     /// </summary>
     public ValueTask<long> WithdrawBankAsync(byte tribeId, byte slotIndex, int characterId, CancellationToken ct);
 
@@ -34,7 +42,8 @@ public interface ITribeRepository
     ///     Atomically moves <paramref name="characterId" />'s entire current Money (the whole balance, never a
     ///     partial amount -- the mirror image of <see cref="WithdrawBankAsync" />; CZ_TRIBE_BANK_SEND carries no
     ///     separate amount field) into one tribe-bank slot. Returns the character's new (post-deposit) Money
-    ///     total. Throws if the character currently has no money to deposit.
+    ///     total. Throws if the character currently has no money to deposit. Backs CZ_TRIBE_BANK_SEND sort 2,
+    ///     the legacy client-invoked deposit path (Server/ts25zone/S04_MyWork02.cpp:11560-11607).
     /// </summary>
     public ValueTask<long> DepositBankAsync(byte tribeId, byte slotIndex, int characterId, CancellationToken ct);
 }

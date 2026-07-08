@@ -3,6 +3,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
@@ -10,13 +11,17 @@ namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 ///     CZ_TRADE_END_SEND (opcode 52) -- abandons an in-progress trade; nothing was ever committed, so no rollback is
 ///     needed.
 /// </summary>
-public sealed class TradeEndHandler(ZoneRegistry zones, ITradeEndService tradeEndService)
-    : IInlinePacketHandler<TradeEndRequest>
+public sealed class TradeEndHandler(
+    ZoneRegistry zones,
+    ITradeEndService tradeEndService,
+    ILogger<TradeEndHandler> logger) : IInlinePacketHandler<TradeEndRequest>
 {
     public void Handle(in TradeEndRequest packet, IPacketSession session)
     {
         var zoneSession = (ZoneClientSession)session;
         var characterId = zoneSession.CharacterId!.Value;
+
+        logger.LogDebug("TradeEnd: session {SessionId} character {CharacterId}", session.SessionId, characterId);
 
         var result = tradeEndService.End(characterId);
         if (!result.Handled)

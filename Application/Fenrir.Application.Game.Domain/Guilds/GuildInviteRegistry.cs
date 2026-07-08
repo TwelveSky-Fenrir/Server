@@ -21,7 +21,14 @@ public sealed class GuildInviteRegistry
     private readonly Dictionary<int, int> _pendingByAsker = new();
     private readonly Dictionary<int, int> _pendingByTarget = new();
 
-    private bool IsNegotiating(int characterId)
+    /// <summary>
+    ///     Guild-family half of the legacy <c>CheckCommunityWork</c> exclusivity check (pending ask, either
+    ///     direction). Public so sibling negotiation families (e.g. Trade ask, see <c>TradeInviteService</c>)
+    ///     can compose a cross-family busy check without duplicating this registry's own state -- the same
+    ///     reason <see cref="Fenrir.Application.Game.Domain.Social.Duel.DuelRegistry.IsNegotiating" />/
+    ///     <see cref="Fenrir.Application.Game.Domain.Social.Trade.TradeRegistry.IsBusy" /> are public.
+    /// </summary>
+    public bool IsNegotiating(int characterId)
     {
         return _pendingByAsker.ContainsKey(characterId) || _pendingByTarget.ContainsKey(characterId);
     }

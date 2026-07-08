@@ -4,6 +4,7 @@ using Fenrir.Application.Login.Tests.TestSupport;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Login;
 using Fenrir.Network.Serialization.Wire;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Login.Tests.Handlers;
 
@@ -17,7 +18,9 @@ public class ClChangeMousePasswordSendHandlerTests
     public async Task HandleAsync_CorrectCurrentPin_StoresNewPinAndOpensCharSelect()
     {
         var pins = FakeAccountPinRepository.WithPin("1111");
-        var handler = new ChangeMousePinHandler(new ChangeMousePinService(pins));
+        var handler = new ChangeMousePinHandler(
+            new ChangeMousePinService(pins, NullLogger<ChangeMousePinService>.Instance),
+            NullLogger<ChangeMousePinHandler>.Instance);
         var (session, pipe) = CreateSessionInPinRequired();
 
         await handler.HandleAsync(
@@ -33,7 +36,9 @@ public class ClChangeMousePasswordSendHandlerTests
     public async Task HandleAsync_NoPinStored_AbortsAsStateViolation()
     {
         var pins = FakeAccountPinRepository.WithNoPin();
-        var handler = new ChangeMousePinHandler(new ChangeMousePinService(pins));
+        var handler = new ChangeMousePinHandler(
+            new ChangeMousePinService(pins, NullLogger<ChangeMousePinService>.Instance),
+            NullLogger<ChangeMousePinHandler>.Instance);
         var (session, pipe) = CreateSessionInPinRequired();
 
         await handler.HandleAsync(
@@ -48,7 +53,9 @@ public class ClChangeMousePasswordSendHandlerTests
     public async Task HandleAsync_InvalidNewFormat_AbortsAsMalformed()
     {
         var pins = FakeAccountPinRepository.WithPin("1111");
-        var handler = new ChangeMousePinHandler(new ChangeMousePinService(pins));
+        var handler = new ChangeMousePinHandler(
+            new ChangeMousePinService(pins, NullLogger<ChangeMousePinService>.Instance),
+            NullLogger<ChangeMousePinHandler>.Instance);
         var (session, pipe) = CreateSessionInPinRequired();
 
         await handler.HandleAsync(
@@ -63,7 +70,9 @@ public class ClChangeMousePasswordSendHandlerTests
     public async Task HandleAsync_WrongCurrentPin_RepliesResultOneAndStrikes_ThirdDisconnects()
     {
         var pins = FakeAccountPinRepository.WithPin("1111");
-        var handler = new ChangeMousePinHandler(new ChangeMousePinService(pins));
+        var handler = new ChangeMousePinHandler(
+            new ChangeMousePinService(pins, NullLogger<ChangeMousePinService>.Instance),
+            NullLogger<ChangeMousePinHandler>.Instance);
         var (session, pipe) = CreateSessionInPinRequired();
         var attempt = new ChangeMousePinRequest { MousePassword = "0000", ChangeMousePassword = "2222" };
 
@@ -85,7 +94,9 @@ public class ClChangeMousePasswordSendHandlerTests
     {
         var pins = FakeAccountPinRepository.WithPin("1111");
         pins.ThrowOnSet = true;
-        var handler = new ChangeMousePinHandler(new ChangeMousePinService(pins));
+        var handler = new ChangeMousePinHandler(
+            new ChangeMousePinService(pins, NullLogger<ChangeMousePinService>.Instance),
+            NullLogger<ChangeMousePinHandler>.Instance);
         var (session, pipe) = CreateSessionInPinRequired();
 
         await handler.HandleAsync(

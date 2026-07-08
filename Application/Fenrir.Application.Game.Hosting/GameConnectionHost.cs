@@ -174,14 +174,25 @@ public sealed class GameConnectionHost(
             // The only point in this whole per-connection chain that catches every exception type.
             // SessionLoop's own dispatch try/catch (Network/Fenrir.Network.Dispatch/SessionLoop.cs) already
             // turns an in-handler fault into a logged (LogError), reason-recorded Abort() before returning
-            // cleanly, so anything still reaching here bypassed that guard entirely -- e.g. a fault
-            // decoding a frame outside FrameDecoder's own ProtocolViolationException branch, or elsewhere
-            // in SessionLoop.RunAsync's own read loop. Logging this at Debug would vanish below
-            // GameServer's configured Information floor (Servers/Fenrir.GameServer/appsettings.json's
-            // Logging:LogLevel:Default) with zero trace anywhere -- log it loudly instead so an unhandled
-            // fault is never silently indistinguishable from an ordinary disconnect.
-            logger.LogError(ex, "Zone session {SessionId} ended abnormally due to an unhandled exception",
-                zoneSession.SessionId);
+            // cleanly, so anything still reaching here bypassed that guard entirely -- most commonly
+            // SocketConnection.ReceiveLoopAsync/SendLoopAsync's own captured fault propagating out of
+            // SessionLoop.RunAsync's PipeReader.ReadAsync (System.IO.Pipelines rethrows a faulted writer's
+            // exception to its reader) rather than a fault inside a packet handler. TransportFaultClassifier
+            // separates the routine case -- the peer closed abruptly (app closed, crash, network drop,
+            // NAT/firewall reset), which is not a server bug -- from a genuine unexpected fault: logging
+            // both identically at Error made an ordinary disconnect indistinguishable from a real crash in
+            // this exact log line, which is what one such benign disconnect was misread as. A genuine
+            // unhandled fault (anything else -- e.g. a bug decoding a frame outside FrameDecoder's own
+            // ProtocolViolationException branch) still needs to stay loud: logging it at Debug would vanish
+            // below GameServer's configured Information floor (Servers/Fenrir.GameServer/appsettings.json's
+            // Logging:LogLevel:Default) with zero trace anywhere.
+            if (TransportFaultClassifier.IsExpectedDisconnect(ex))
+                logger.LogInformation(
+                    "Zone session {SessionId} disconnected ({ExceptionType}: {Message})", zoneSession.SessionId,
+                    ex.GetType().Name, ex.Message);
+            else
+                logger.LogError(ex, "Zone session {SessionId} ended abnormally due to an unhandled exception",
+                    zoneSession.SessionId);
         }
         // OperationCanceledException falls through uncaught: it is an expected shutdown/external-abort
         // signal (matching SessionLoop.RunAsync's own posture), not a fault, and is swallowed without

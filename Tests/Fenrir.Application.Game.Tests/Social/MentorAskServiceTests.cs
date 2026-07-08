@@ -1,5 +1,10 @@
 using Fenrir.Application.Game.Abstractions.Social;
+using Fenrir.Application.Game.Domain.Guilds;
+using Fenrir.Application.Game.Domain.Social.Duel;
+using Fenrir.Application.Game.Domain.Social.Friends;
 using Fenrir.Application.Game.Domain.Social.Mentor;
+using Fenrir.Application.Game.Domain.Social.Party;
+using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Services.Social;
 using Fenrir.Application.Game.Tests.TestSupport;
@@ -20,7 +25,9 @@ public class MentorAskServiceTests
         var mentors = new MentorRegistry();
         var zones = ZoneTestKit.CreateRegistry();
         zones.Initialize([mapId]);
-        return (new MentorAskService(mentors), zones, mentors);
+        return (new MentorAskService(mentors, new DuelRegistry(), new TradeRegistry(), new FriendRegistry(),
+            new PartyRegistry(), new GuildInviteRegistry(), new CapturingLogger<MentorAskService>()), zones,
+            mentors);
     }
 
     private static PlayerRuntimeState Enter(ZoneRegistry zones, short mapId, int characterId, string name,

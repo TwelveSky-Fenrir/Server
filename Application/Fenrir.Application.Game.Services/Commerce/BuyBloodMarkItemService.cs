@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using Fenrir.Application.Game.Abstractions.Commerce;
 using Fenrir.Application.Game.Domain.Commerce;
 using Fenrir.Application.Game.Domain.Inventory;
+using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Network.Serialization.Packets.Zone;
@@ -9,6 +10,14 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Commerce;
 
+/// <summary>
+///     Réf. C++ : Server/ts25zone/S04_MyWork02.cpp:134-152 (<c>CheckInv0</c>) -- the destination-slot gate
+///     (see <see cref="ResolveAndApplyAsync" />) also disconnects when the destination page is the
+///     account's premium/rental inventory page (<see cref="ContainerMatrix.InventoryPage1" />) and that
+///     page's <c>InventoryDate</c> expiry has already passed, same "hard disconnect, no soft reject"
+///     posture as BuyCashItem's own destination-slot gate
+///     (<see cref="Fenrir.Application.Game.Services.Commerce.BuyCashItemService" />).
+/// </summary>
 public sealed class BuyBloodMarkItemService(
     ICharacterRepository characters,
     WorldDataCache worldData,
@@ -23,32 +32,63 @@ public sealed class BuyBloodMarkItemService(
         var bloodShop = BloodShopBuilder.Build(catalog.BloodExchangeCatalog, worldData.ItemsById);
 
         if (packet.BloodIndex < 0 || packet.BloodIndex >= bloodShop.BloodNum)
+        {
+            logger.LogWarning(
+                "Buy blood mark item rejected: character {CharacterId} sent out-of-range bloodIndex {BloodIndex} -- session will be disconnected",
+                characterId, packet.BloodIndex);
             return null;
+        }
 
         var page = packet.Page;
         var slot = packet.Index;
         if (page is not (ContainerMatrix.InventoryPage0 or ContainerMatrix.InventoryPage1) ||
             !ContainerMatrix.IsValidSlot((byte)page, slot) ||
+            (page == ContainerMatrix.InventoryPage1 && state.InventoryDate < GameDate.Today()) ||
             packet.Value[1] is < 0 or > 7 || packet.Value[2] is < 0 or > 7)
+        {
+            logger.LogWarning(
+                "Buy blood mark item rejected: character {CharacterId} sent invalid or expired-premium-page destination slot {Page}/{Index} -- session will be disconnected",
+                characterId, page, slot);
             return null;
+        }
 
         var buyQuantity = packet.Value[3];
         if (buyQuantity is < 1 or > GroundItemPickupPolicy.MaxStackQuantity)
+        {
+            logger.LogInformation(
+                "Buy blood mark item rejected: character {CharacterId} sent out-of-range quantity {BuyQuantity}",
+                characterId, buyQuantity);
             return new BuyBloodMarkItemResponse
                 { Result = ShopSpecificError, BloodCoin = 0, Page1 = page, Index1 = slot, Value = packet.Value };
+        }
 
         if (!worldData.ItemsById.TryGetValue(packet.Value[0], out var itemDefinition))
+        {
+            logger.LogWarning(
+                "Buy blood mark item rejected: character {CharacterId} item {ItemId} is unresolvable -- session will be disconnected",
+                characterId, packet.Value[0]);
             return null;
+        }
 
         var isStackable = ContainerMatrix.IsStackableSort(itemDefinition.Item.Sort);
         if (buyQuantity > 1 && !isStackable)
+        {
+            logger.LogInformation(
+                "Buy blood mark item rejected: character {CharacterId} requested quantity {BuyQuantity} for non-stackable item {ItemId}",
+                characterId, buyQuantity, packet.Value[0]);
             return new BuyBloodMarkItemResponse
                 { Result = ShopSpecificError, BloodCoin = 0, Page1 = page, Index1 = slot, Value = packet.Value };
+        }
 
         var entry = bloodShop.Data[packet.BloodIndex];
         if (entry.ItemId != packet.Value[0])
+        {
+            logger.LogInformation(
+                "Buy blood mark item rejected: character {CharacterId} bloodIndex {BloodIndex} item mismatch (catalog {CatalogItemId}, requested {RequestedItemId})",
+                characterId, packet.BloodIndex, entry.ItemId, packet.Value[0]);
             return new BuyBloodMarkItemResponse
                 { Result = 2, BloodCoin = 0, Page1 = page, Index1 = slot, Value = packet.Value };
+        }
 
         var destination = state.Inventory.GetSlot((byte)page, (byte)slot);
         var mergesIntoExisting = destination is { } d && d.ItemId == entry.ItemId;
@@ -57,19 +97,34 @@ public sealed class BuyBloodMarkItemService(
         if (isStackable)
         {
             if (entry.Quantity < 1)
+            {
+                logger.LogWarning(
+                    "Buy blood mark item rejected: character {CharacterId} bloodIndex {BloodIndex} has a non-positive catalog quantity -- session will be disconnected",
+                    characterId, packet.BloodIndex);
                 return null;
+            }
 
             price = entry.Price * entry.Quantity;
 
             if (mergesIntoExisting &&
                 destination!.Value.Quantity + entry.Quantity > GroundItemPickupPolicy.MaxStackQuantity)
+            {
+                logger.LogWarning(
+                    "Buy blood mark item rejected: character {CharacterId} destination slot {Page}/{Index} would overflow the max stack quantity -- session will be disconnected",
+                    characterId, page, slot);
                 return null;
+            }
         }
         else
         {
             price = entry.Price;
             if (destination is not null)
+            {
+                logger.LogWarning(
+                    "Buy blood mark item rejected: character {CharacterId} destination slot {Page}/{Index} is occupied (non-stackable item) -- session will be disconnected",
+                    characterId, page, slot);
                 return null;
+            }
         }
 
         // Blood-mark items never carry sockets.

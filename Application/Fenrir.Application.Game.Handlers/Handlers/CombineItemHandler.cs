@@ -3,6 +3,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers;
 
@@ -11,7 +12,7 @@ namespace Fenrir.Application.Game.Handlers.Handlers;
 ///     <see cref="Forge.CombineResolver" /> (delegated to <see cref="ICombineItemService" />). A normal
 ///     (non-scroll) material survives a failed attempt; only scrolls (2001/2002/2003) are always consumed.
 /// </summary>
-public sealed class CombineItemHandler(ICombineItemService combineItemService)
+public sealed class CombineItemHandler(ICombineItemService combineItemService, ILogger<CombineItemHandler> logger)
     : IAsyncPacketHandler<CombineItemRequest>
 {
     public async ValueTask HandleAsync(CombineItemRequest packet, IPacketSession session,
@@ -20,9 +21,19 @@ public sealed class CombineItemHandler(ICombineItemService combineItemService)
         var zoneSession = (ZoneClientSession)session;
         var characterId = zoneSession.CharacterId!.Value;
 
+        if (logger.IsEnabled(LogLevel.Debug))
+            logger.LogDebug(
+                "Session {SessionId} character {CharacterId}: CombineItemRequest received ({Page1}:{Index1} + {Page2}:{Index2})",
+                zoneSession.SessionId, characterId, packet.Page1, packet.Index1, packet.Page2, packet.Index2);
+
         if (zoneSession.CurrentZone is not Zone zone || !zone.TryGetPlayer(characterId, out var state) ||
             state is null)
+        {
+            logger.LogDebug(
+                "Session {SessionId} character {CharacterId}: CombineItemRequest dropped, no live zone/player state",
+                zoneSession.SessionId, characterId);
             return;
+        }
 
         await state.EconomyActionLock.WaitAsync(cancellationToken);
         try

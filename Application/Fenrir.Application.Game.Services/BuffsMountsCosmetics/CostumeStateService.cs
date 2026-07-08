@@ -49,6 +49,8 @@ public sealed class CostumeStateService(
                 zone.PostCostumeCommand(new CostumeZoneCommand(characterId, result.NewCostumeIndex,
                     result.NewCostumeNumber, Life: maxLife, Mana: maxMana,
                     Broadcast: CostumeBroadcastKind.Equip));
+                logger.LogInformation("Character {CharacterId} equipped costume {CostumeNumber} at slot {CostumeIndex}",
+                    characterId, result.NewCostumeNumber, result.NewCostumeIndex);
                 return new CostumeStateResult(CostumeStateOutcome.Reply);
             }
 
@@ -58,6 +60,8 @@ public sealed class CostumeStateService(
                 var maxMana = state.Stats?.MaxMana ?? state.MaxMana;
                 zone.PostCostumeCommand(new CostumeZoneCommand(characterId, result.NewCostumeIndex,
                     0, Life: maxLife, Mana: maxMana, Broadcast: CostumeBroadcastKind.Remove));
+                logger.LogInformation("Character {CharacterId} removed costume at slot {CostumeIndex}",
+                    characterId, result.NewCostumeIndex);
                 return new CostumeStateResult(CostumeStateOutcome.Reply);
             }
 
@@ -77,11 +81,20 @@ public sealed class CostumeStateService(
         int characterId, int accountId, CostumeStateResolver.Result result, CancellationToken cancellationToken)
     {
         if (!worldData.ItemsById.TryGetValue(result.GrantedItemId, out _))
+        {
+            logger.LogWarning(
+                "Costume return-to-inventory denied for character {CharacterId}: unknown item {ItemId}",
+                characterId, result.GrantedItemId);
             return new CostumeStateResult(CostumeStateOutcome.Reply, 2);
+        }
 
         var freeSlot = FindFreeSlot(state.Inventory);
         if (freeSlot is not { } destination)
+        {
+            logger.LogInformation(
+                "Costume return-to-inventory denied for character {CharacterId}: inventory full", characterId);
             return new CostumeStateResult(CostumeStateOutcome.Reply, 2);
+        }
 
         var newStack = new ItemStack(result.GrantedItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0);
         var projectedContainer =
@@ -107,6 +120,10 @@ public sealed class CostumeStateService(
             logger.LogError(
                 "Zone {MapId} inventory inbox full: dropped costume-return-to-inventory mirror for character {CharacterId}",
                 zone.MapId, characterId);
+
+        logger.LogInformation(
+            "Character {CharacterId} returned costume {ItemId} to inventory container {Container} slot {Slot}",
+            characterId, result.GrantedItemId, destination.Container, destination.Slot);
 
         return new CostumeStateResult(CostumeStateOutcome.Reply, 0, destination.Container,
             0, 0, result.GrantedItemId);

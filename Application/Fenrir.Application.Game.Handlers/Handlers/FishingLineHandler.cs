@@ -3,6 +3,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers;
 
@@ -11,7 +12,7 @@ namespace Fenrir.Application.Game.Handlers.Handlers;
 ///     never have registered this opcode in the legacy, so it disconnects here too. Sort 1=cast (gated by a
 ///     mesh check under the caster's own position), 2=reel; anything else disconnects.
 /// </summary>
-public sealed class FishingLineHandler(IFishingLineService fishingLineService)
+public sealed class FishingLineHandler(IFishingLineService fishingLineService, ILogger<FishingLineHandler> logger)
     : IInlinePacketHandler<FishingLineRequest>
 {
     public const short FishingZoneNumber = 52;
@@ -25,8 +26,15 @@ public sealed class FishingLineHandler(IFishingLineService fishingLineService)
             state is null)
             return;
 
+        logger.LogDebug(
+            "Session {SessionId}: FishingLineRequest (op103) received for character {CharacterId}, sort {Sort}",
+            session.SessionId, characterId, packet.Sort);
+
         if (zone.MapId != FishingZoneNumber)
         {
+            logger.LogWarning(
+                "Fishing-line request rejected for character {CharacterId}: map {MapId} is not the fishing zone -- aborting session",
+                characterId, zone.MapId);
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }
@@ -36,11 +44,18 @@ public sealed class FishingLineHandler(IFishingLineService fishingLineService)
         {
             case 1:
                 result = fishingLineService.Cast(zone, state, characterId);
+                logger.LogInformation("Character {CharacterId} cast fishing line (result {Result})", characterId,
+                    result.Result);
                 break;
             case 2:
                 result = fishingLineService.Reel(zone, state, characterId);
+                logger.LogInformation("Character {CharacterId} reeled fishing line (result {Result})", characterId,
+                    result.Result);
                 break;
             default:
+                logger.LogWarning(
+                    "Fishing-line request rejected for character {CharacterId}: invalid sort {Sort} -- aborting session",
+                    characterId, packet.Sort);
                 zoneSession.Abort(DisconnectReason.Faulted);
                 return;
         }

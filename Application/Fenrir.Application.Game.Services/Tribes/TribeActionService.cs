@@ -68,6 +68,9 @@ public sealed class TribeActionService(
             StatVit: 1, StatStr: 1, StatInt: 1, StatDex: 1, StatPoints: newStatPoints,
             Life: 1, Mana: 0, UpdatedStats: updatedStats), ct);
 
+        logger.LogInformation("Character {CharacterId} reset base stats, refunding {Refund} points", characterId,
+            refund);
+
         return TribeActionOutcome.Ok();
     }
 
@@ -110,20 +113,42 @@ public sealed class TribeActionService(
             }
 
         if (target is null)
+        {
+            logger.LogDebug("Tribe {Tribe} sub-master appointment rejected: target {TargetName} not online in zone",
+                state.Tribe, targetName);
             return TribeActionOutcome.Ok(1);
+        }
 
         if (target.Level < 113)
+        {
+            logger.LogDebug(
+                "Tribe {Tribe} sub-master appointment of {TargetCharacterId} rejected: level {Level} below 113",
+                state.Tribe, target.CharacterId, target.Level);
             return TribeActionOutcome.Ok(2);
+        }
 
         if (target.ContributionPoints < 1000)
+        {
+            logger.LogDebug(
+                "Tribe {Tribe} sub-master appointment of {TargetCharacterId} rejected: contribution points below 1000",
+                state.Tribe, target.CharacterId);
             return TribeActionOutcome.Ok(3);
+        }
 
         if (subMasters.Any(s => s.CharacterId == target.CharacterId))
+        {
+            logger.LogDebug(
+                "Tribe {Tribe} sub-master appointment of {TargetCharacterId} rejected: already a sub-master",
+                state.Tribe, target.CharacterId);
             return TribeActionOutcome.Ok(4);
+        }
 
         await tribes.SetSubMasterAsync(state.Tribe, (byte)freeSlot, target.CharacterId, ct);
 
         zone.PostTribeProgressCommand(new TribeProgressZoneCommand(target.CharacterId, TribeRole: 2));
+
+        logger.LogInformation("Tribe {Tribe} appointed character {TargetCharacterId} as sub-master (slot {Slot})",
+            state.Tribe, target.CharacterId, freeSlot);
 
         return TribeActionOutcome.Ok();
     }
@@ -148,6 +173,9 @@ public sealed class TribeActionService(
         if (zones.TryGetPlayerAndZone(targetId.Value, out _, out var targetZone))
             targetZone.PostTribeProgressCommand(new TribeProgressZoneCommand(targetId.Value, TribeRole: 0));
 
+        logger.LogInformation("Tribe {Tribe} removed character {TargetCharacterId} as sub-master", state.Tribe,
+            targetId.Value);
+
         return TribeActionOutcome.Ok();
     }
 
@@ -169,10 +197,14 @@ public sealed class TribeActionService(
         }
         catch (Exception ex)
         {
-            logger.LogInformation(ex, "Character {CharacterId} tribe-weapon money debit failed (insufficient funds)",
+            // Economy gate (insufficient funds) -- Warning, not Information.
+            logger.LogWarning(ex, "Character {CharacterId} tribe-weapon money debit failed (insufficient funds)",
                 characterId);
             return TribeActionOutcome.Abort;
         }
+
+        logger.LogInformation("Character {CharacterId} purchased tribe weapon (item {ItemId}) for tribe {Tribe}",
+            characterId, itemId, state.Tribe);
 
         await zone.PostTribeProgressCommandAndWaitAsync(new TribeProgressZoneCommand(characterId,
             DropItems: [new TribeGroundItemDrop(itemId, 1)]), ct);
@@ -224,6 +256,10 @@ public sealed class TribeActionService(
             state.ContributionPoints - cost, Title: newTitle,
             Life: updatedStats.MaxLife, Mana: updatedStats.MaxMana, UpdatedStats: updatedStats), ct);
 
+        logger.LogInformation(
+            "Character {CharacterId} purchased title tier, new title {NewTitle} (spent {Cost} CP)", characterId,
+            newTitle, cost);
+
         return TribeActionOutcome.Ok();
     }
 
@@ -243,7 +279,8 @@ public sealed class TribeActionService(
         }
         catch (Exception ex)
         {
-            logger.LogInformation(ex, "Character {CharacterId} halo-enchant money debit failed (insufficient funds)",
+            // Economy gate (insufficient funds) -- Warning, not Information.
+            logger.LogWarning(ex, "Character {CharacterId} halo-enchant money debit failed (insufficient funds)",
                 characterId);
             return TribeActionOutcome.Abort;
         }
@@ -275,6 +312,9 @@ public sealed class TribeActionService(
             await zone.PostTribeProgressCommandAndWaitAsync(new TribeProgressZoneCommand(characterId,
                 state.ContributionPoints - HaloEnchantCpCost, ProtectForHalo: newProtect), ct);
         }
+
+        logger.LogInformation("Character {CharacterId} halo-enchant {Outcome}: halo {OldHalo} -> {NewHalo}",
+            characterId, outcome, state.Halo, newHalo);
 
         return TribeActionOutcome.Ok(result);
     }
@@ -330,6 +370,9 @@ public sealed class TribeActionService(
         await zone.PostTribeProgressCommandAndWaitAsync(new TribeProgressZoneCommand(characterId,
             BonusItemLevel: 0, BonusItemValue: false, DropItems: drops), ct);
 
+        logger.LogInformation("Character {CharacterId} claimed level-milestone bonus for tier {Tier} ({DropCount} items)",
+            characterId, state.BonusItemLevel, drops.Length);
+
         return TribeActionOutcome.Ok();
     }
 
@@ -350,6 +393,9 @@ public sealed class TribeActionService(
                 Mana: updatedStats.MaxMana, UpdatedStats: updatedStats);
 
         await zone.PostTribeProgressCommandAndWaitAsync(command, ct);
+
+        // Routine, purely cosmetic per-request toggle -- Debug, not Information.
+        logger.LogDebug("Character {CharacterId} set tribe ornament to {OnOff}", characterId, on ? "on" : "off");
 
         return TribeActionOutcome.Ok();
     }
@@ -386,7 +432,12 @@ public sealed class TribeActionService(
         // Path-specific cap, checked only once every other precondition already passed -- see this method's
         // own <remarks> for why nothing above this line may ever mutate state.
         if (state.RebirthCount >= MaxRebirth)
+        {
+            logger.LogDebug(
+                "Character {CharacterId} Max Rebirth (Path B) rejected: already at the path-specific cap ({RebirthCount}/{MaxRebirth})",
+                characterId, state.RebirthCount, MaxRebirth);
             return TribeActionOutcome.Ok(1);
+        }
 
         var newRebirthCount = state.RebirthCount + 1;
         var attributes = new CharacterBaseAttributes(state.StatVit, state.StatStr, state.StatInt, state.StatDex,
@@ -402,7 +453,7 @@ public sealed class TribeActionService(
         }
         catch (Exception ex)
         {
-            logger.LogInformation(ex, "Character {CharacterId} rebirth Zone241Time adjustment failed", characterId);
+            logger.LogWarning(ex, "Character {CharacterId} rebirth Zone241Time adjustment failed", characterId);
             return TribeActionOutcome.Abort;
         }
 
@@ -418,6 +469,11 @@ public sealed class TribeActionService(
         // wording, and this project's policy against reproducing/guessing legacy-parity content from memory
         // means fabricating either is worse than leaving this an explicit, documented gap. Flagged for a
         // dedicated legacy-behavior-translator follow-up before this pass is wired in for either path.
+
+        // A major, infrequent progression milestone -- Information regardless of how routine other tSorts are.
+        logger.LogInformation(
+            "Character {CharacterId} completed Max Rebirth (Path B): generation {OldGeneration} -> {NewGeneration}",
+            characterId, state.RebirthCount, newRebirthCount);
 
         return TribeActionOutcome.Ok();
     }
@@ -452,13 +508,17 @@ public sealed class TribeActionService(
         }
         catch (Exception ex)
         {
-            logger.LogInformation(ex, "Character {CharacterId} tower-scroll money debit failed (insufficient funds)",
+            // Economy gate (insufficient funds) -- Warning, not Information.
+            logger.LogWarning(ex, "Character {CharacterId} tower-scroll money debit failed (insufficient funds)",
                 characterId);
             return TribeActionOutcome.Abort;
         }
 
         await zone.PostTribeProgressCommandAndWaitAsync(new TribeProgressZoneCommand(characterId,
             DropItems: [new TribeGroundItemDrop(665, 1)]), ct);
+
+        logger.LogInformation("Character {CharacterId} purchased a tower-construction scroll for tribe {Tribe}",
+            characterId, state.Tribe);
 
         return TribeActionOutcome.Ok();
     }
@@ -473,6 +533,9 @@ public sealed class TribeActionService(
         await zone.PostTribeProgressCommandAndWaitAsync(new TribeProgressZoneCommand(characterId,
             state.ContributionPoints - cpCost,
             DropItems: [new TribeGroundItemDrop(itemId, 1)]), ct);
+
+        logger.LogInformation("Character {CharacterId} redeemed item {ItemId} for {CpCost} CP", characterId, itemId,
+            cpCost);
 
         return TribeActionOutcome.Ok();
     }

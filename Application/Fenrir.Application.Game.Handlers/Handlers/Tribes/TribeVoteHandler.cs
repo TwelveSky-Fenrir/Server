@@ -4,6 +4,7 @@ using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Tribes;
 
@@ -14,7 +15,8 @@ namespace Fenrir.Application.Game.Handlers.Handlers.Tribes;
 ///     consumes the phase it finds. Sort 2 (client-side candidacy reset) is compiled out in this build
 ///     (MG5ORIGIN).
 /// </summary>
-public sealed class TribeVoteHandler(ITribeVoteService voteService) : IAsyncPacketHandler<TribeVoteRequest>
+public sealed class TribeVoteHandler(ITribeVoteService voteService, ILogger<TribeVoteHandler>? logger = null)
+    : IAsyncPacketHandler<TribeVoteRequest>
 {
     private const int SlotCount = 10;
 
@@ -23,8 +25,15 @@ public sealed class TribeVoteHandler(ITribeVoteService voteService) : IAsyncPack
     {
         var zoneSession = (ZoneClientSession)session;
 
+        logger?.LogDebug(
+            "Session {SessionId}: CZ_TRIBE_VOTE_SEND received (character {CharacterId}, sort {Sort}, value {Value})",
+            session.SessionId, zoneSession.CharacterId, packet.Sort, packet.Value);
+
         if (packet.Sort is not (1 or 3) || packet.Value is < 0 or >= SlotCount)
         {
+            logger?.LogWarning(
+                "Session {SessionId}: CZ_TRIBE_VOTE_SEND malformed (sort {Sort}, value {Value}) -- aborting",
+                session.SessionId, packet.Sort, packet.Value);
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }

@@ -25,8 +25,13 @@ public sealed class ClaimDailyRewardService(
             return null;
 
         if (claimState.RewardClaimDate == today || claimState.RewardClaimDay > 6)
+        {
+            logger.LogInformation(
+                "Daily-reward claim denied for character {CharacterId}: already claimed today or cycle exhausted (day {RewardClaimDay})",
+                characterId, claimState.RewardClaimDay);
             return new ClaimDailyRewardResponse
                 { Result = 1, Value = new int[6], InvenPage = -1, InvenX = -1, InvenY = -1 };
+        }
 
         if (!worldData.RewardBundleItemsByBundleId.TryGetValue(RewardBundleId, out var slots))
             return null;
@@ -45,10 +50,15 @@ public sealed class ClaimDailyRewardService(
 
         var freeSlot = FindFreeSlot(state.Inventory);
         if (freeSlot is not { } destination)
+        {
+            logger.LogInformation("Daily-reward claim denied for character {CharacterId}: inventory full",
+                characterId);
             return new ClaimDailyRewardResponse
                 { Result = 2, Value = new int[6], InvenPage = -1, InvenX = -1, InvenY = -1 };
+        }
 
-        var newStack = new ItemStack(itemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+        var coupon = itemDefinition.Item.Sort == 99 ? 1 : 0;
+        var newStack = new ItemStack(itemId, coupon, 0, 0, 0, 0, 0, 0, 0, 0, 0);
         var projectedContainer =
             state.Inventory.GetContainer(destination.Container).SetItem(destination.Slot, newStack);
 
@@ -66,7 +76,6 @@ public sealed class ClaimDailyRewardService(
                 { Result = 1, Value = new int[6], InvenPage = -1, InvenX = -1, InvenY = -1 };
         }
 
-        var coupon = itemDefinition.Item.Sort == 99 ? 1 : 0;
         var response = new ClaimDailyRewardResponse
         {
             Result = 0,
@@ -83,6 +92,10 @@ public sealed class ClaimDailyRewardService(
             logger.LogError(
                 "Zone {MapId} inventory inbox full: dropped daily-reward mirror for character {CharacterId}",
                 zone.MapId, characterId);
+
+        logger.LogInformation(
+            "Character {CharacterId} claimed daily reward day {RewardClaimDay}: item {ItemId} into container {Container}",
+            characterId, day, itemId, destination.Container);
 
         return response;
     }

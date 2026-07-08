@@ -3,6 +3,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Commerce;
 
@@ -11,11 +12,15 @@ namespace Fenrir.Application.Game.Handlers.Handlers.Commerce;
 ///     cached version differs; Fenrir always replies with the current catalog instead (harmless -- see
 ///     <see cref="IGetCashCatalogService" />'s own remarks).
 /// </summary>
-public sealed class GetCashCatalogHandler(IGetCashCatalogService service) : IInlinePacketHandler<GetCashCatalogRequest>
+public sealed class GetCashCatalogHandler(IGetCashCatalogService service, ILogger<GetCashCatalogHandler> logger)
+    : IInlinePacketHandler<GetCashCatalogRequest>
 {
     public void Handle(in GetCashCatalogRequest packet, IPacketSession session)
     {
         var zoneSession = (ZoneClientSession)session;
+
+        logger.LogDebug("GetCashCatalog: session {SessionId} character {CharacterId}", session.SessionId,
+            zoneSession.CharacterId);
 
         // Benign staleness window around world entry/transfer, same posture as HeartbeatHandler/ZoneReadyHandler:
         // if the player isn't resolvable yet, the catalog is still sent, just with nothing to record the

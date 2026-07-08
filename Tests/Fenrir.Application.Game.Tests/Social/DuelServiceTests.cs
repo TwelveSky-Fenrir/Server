@@ -5,6 +5,7 @@ using Fenrir.Application.Game.Services.Social;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Network.Framing;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Social;
 
@@ -22,7 +23,7 @@ public class DuelServiceTests
         var duels = new DuelRegistry();
         var zones = ZoneTestKit.CreateRegistry();
         zones.Initialize([mapId]);
-        return (new DuelService(zones, duels), zones, duels);
+        return (new DuelService(zones, duels, NullLogger<DuelService>.Instance), zones, duels);
     }
 
     private static PlayerRuntimeState Enter(ZoneRegistry zones, short mapId, int characterId, string name, byte tribe)

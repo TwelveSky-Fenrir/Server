@@ -131,7 +131,7 @@ public class OpenShopStallServiceProxyRegistrationTests
         Assert.Equal(1, zone.ProxyShopCount);
 
         var offlineShops = new OpenTrackingOfflineShopRepository();
-        var service = new CloseShopStallService(offlineShops);
+        var service = new CloseShopStallService(offlineShops, NullLogger<CloseShopStallService>.Instance);
 
         await service.CloseOfflineShopAsync(characterId, zone, CancellationToken.None);
 
@@ -192,7 +192,7 @@ public class OpenShopStallServiceProxyRegistrationTests
             throw new NotImplementedException();
         }
 
-        public ValueTask WithdrawMoneyAsync(int characterId, int expectedMoney, int expectedBigMoney,
+        public ValueTask WithdrawMoneyAsync(int characterId, int expectedMoney, int expectedBigMoney, int todayDate,
             CancellationToken ct)
         {
             throw new NotImplementedException();

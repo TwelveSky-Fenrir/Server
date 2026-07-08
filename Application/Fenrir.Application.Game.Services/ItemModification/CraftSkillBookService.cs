@@ -4,6 +4,7 @@ using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Crafting;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Application.Game.GameData;
 using Fenrir.Network.Serialization.Packets.Zone;
 using Microsoft.Extensions.Logging;
 
@@ -11,10 +12,13 @@ namespace Fenrir.Application.Game.Services.ItemModification;
 
 /// <summary>
 ///     Business logic for op30, CZ_MAKE_SKILL_SEND -- extracted from <see cref="CraftSkillBookHandler" />, see
-///     that handler's remarks.
+///     that handler's remarks. Recipe 3 (War God) additionally stands in for legacy's <c>MakeNotice</c> call
+///     (Server/ts25zone/S04_MyWork02.cpp:6011) via <see cref="CenterRelayNoticeLog.LogNotableCraft" /> -- see
+///     that type's own remarks for why this is a log line, not a client-facing broadcast.
 /// </summary>
 public sealed class CraftSkillBookService(
     ICharacterRepository characters,
+    WorldDataCache worldData,
     ILogger<CraftSkillBookService> logger)
     : ICraftSkillBookService
 {
@@ -23,7 +27,10 @@ public sealed class CraftSkillBookService(
     {
         if (!IsValidSlot(packet.Page1, packet.Index1) || !IsValidSlot(packet.Page2, packet.Index2) ||
             !IsValidSlot(packet.Page3, packet.Index3) || !IsValidSlot(packet.Page4, packet.Index4))
+        {
+            logger.LogDebug("Character {CharacterId} craft-skill-book rejected: invalid slot(s)", characterId);
             return new CraftSkillBookResult(CraftSkillBookOutcome.Rejected, 0, 0);
+        }
 
         var material1 = state.Inventory.GetSlot((byte)packet.Page1, (byte)packet.Index1);
         var material2 = state.Inventory.GetSlot((byte)packet.Page2, (byte)packet.Index2);
@@ -32,7 +39,11 @@ public sealed class CraftSkillBookService(
 
         if (material1 is not { } m1 || material2 is not { } m2 || material3 is not { } m3 ||
             material4 is not { } m4)
+        {
+            logger.LogDebug(
+                "Character {CharacterId} craft-skill-book rejected: one or more material slots empty", characterId);
             return new CraftSkillBookResult(CraftSkillBookOutcome.Rejected, 0, 0);
+        }
 
         var resolved = packet.Sort == SkillBookCraftCatalog.WarGodSort
             ? SkillBookCraftResolver.ResolveWarGod(m1.ItemId, m2.ItemId, m3.ItemId, m4.ItemId, state.PreviousTribe,
@@ -40,7 +51,12 @@ public sealed class CraftSkillBookService(
             : SkillBookCraftResolver.ResolveFragments(packet.Sort, m1.ItemId, m2.ItemId, m3.ItemId, m4.ItemId);
 
         if (!resolved.Succeeded)
+        {
+            logger.LogInformation(
+                "Character {CharacterId} craft-skill-book rejected by resolver (sort {Sort}, materials {M1}/{M2}/{M3}/{M4})",
+                characterId, packet.Sort, m1.ItemId, m2.ItemId, m3.ItemId, m4.ItemId);
             return new CraftSkillBookResult(CraftSkillBookOutcome.Rejected, 0, 0);
+        }
 
         var newBook = m1 with
         {
@@ -73,6 +89,16 @@ public sealed class CraftSkillBookService(
             logger.LogError(
                 "Zone {MapId} inventory inbox full: dropped craft-skill-book mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
                 zone.MapId, characterId);
+
+        logger.LogInformation(
+            "Character {CharacterId} craft-skill-book applied: result item {ResultItemId}", characterId,
+            resolved.ResultItemId);
+
+        // Recipe 3 (War God) is the only one of the four that calls MakeNotice -- Server/ts25zone/
+        // S04_MyWork02.cpp:6011. Recipes 0-2 never call it, so they get no log here.
+        if (packet.Sort == SkillBookCraftCatalog.WarGodSort)
+            CenterRelayNoticeLog.LogNotableCraft(logger, worldData, state.Tribe, state.Name, resolved.ResultItemId,
+                "craft-skill-book (War God)");
 
         return new CraftSkillBookResult(CraftSkillBookOutcome.Applied, resolved.ResultItemId, newBook.Serial);
     }

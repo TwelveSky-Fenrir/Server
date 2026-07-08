@@ -36,6 +36,10 @@ public sealed class HeroRewardClaimService(IHeroRankingRepository heroRankings, 
                 "Zone {MapId} tribe-progress inbox full: dropped hero-reward CP mirror for character {CharacterId} -- unlike sibling handlers this is NOT self-healing, the DB reward-claim row is already committed",
                 zone.MapId, characterId);
 
+        logger.LogInformation(
+            "Character {CharacterId} claimed hero-rank reward: rank {Rank} awards {Points} contribution points",
+            characterId, resolved.Rank, points);
+
         return new HeroRewardClaimResult(HeroRewardClaimOutcome.Claimed);
     }
 }

@@ -14,8 +14,9 @@ public enum MentorAskOutcome
 ///     Process-wide teacher/student ("mentor") negotiation authority (named Mentor to avoid colliding with
 ///     the wire's own Teacher/Student AvatarInfo properties). The durable bond lives in
 ///     game.Characters.TeacherCharacterId/StudentCharacterId; this registry only tracks the
-///     ask/cancel/answer handshake. Unlike Friend, CZ_TEACHER_START_SEND is a single action taken by the
-///     master that bonds both sides at once, so the accepted state is remembered keyed by master only.
+///     ask/cancel/answer handshake. Accepted state is currently remembered keyed by master (the original
+///     asker) only, so only the asker side can consume <see cref="TryConsumeStart" /> -- see the
+///     <c>LEGACY-PARITY RISK</c> remark on that method before relying on this as confirmed legacy behavior.
 /// </summary>
 public sealed class MentorRegistry
 {
@@ -89,6 +90,22 @@ public sealed class MentorRegistry
     }
 
     /// <summary>CZ_TEACHER_START_SEND -- consumes the accepted negotiation; only the master may call this.</summary>
+    /// <remarks>
+    ///     <b>LEGACY-PARITY RISK (open, not resolved by inference):</b> this master-only restriction traces
+    ///     back to a research finding claiming teacher/student roles are fixed at ask-time. A direct re-read
+    ///     of Server/ts25zone/S04_MyWork02.cpp:9406-9457 (MentorAnswer) shows BOTH the answering recipient
+    ///     (line 9415) and the original asker (line 9447) are symmetrically promoted to negotiation state 3
+    ///     on accept, and Server/ts25zone/S04_MyWork02.cpp:9459-9499 (MentorStart) only requires the SENDING
+    ///     connection's own state to equal 3, with no check anywhere in that handler for which side sent the
+    ///     original ask. Read literally, either mutually-accepted party could become teacher by transmitting
+    ///     CZ_TEACHER_START_SEND first, with the resulting role determined by transmission order rather than
+    ///     ask direction -- see lines 9489-9497 for the sender-determines-role field writes. It remains
+    ///     possible the legacy CLIENT only ever sends this opcode from the original asker by convention
+    ///     (client source is out of scope for this repository), so this has NOT been confirmed either way.
+    ///     Do not widen this registry to accept a student-side <c>TryConsumeStart</c> without a fresh
+    ///     <c>cpp-zone-gameplay-analyst</c> / <c>legacy-behavior-translator</c> finding confirming which
+    ///     reading is legacy-accurate -- tracked here as an explicit open item, not a silently-kept guess.
+    /// </remarks>
     public bool TryConsumeStart(int masterId, out int studentId)
     {
         lock (_lock)

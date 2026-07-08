@@ -3,7 +3,7 @@ using Fenrir.Network.Serialization.Wire;
 
 namespace Fenrir.Network.Serialization.Packets.Zone;
 
-/// <summary>Result: 0=ok, 1-4=error (proxy state, currency caps, IPC).</summary>
+/// <summary>Result: 0=ok, 3=stale-client mismatch/shop not closed/shop expired, 4=nothing to withdraw.</summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.WithdrawProxyShopEarnings,
     ExpectedSize = 13)]
 public readonly partial record struct WithdrawProxyShopEarningsResponse : IOutgoingPacket

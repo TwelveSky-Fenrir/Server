@@ -3,6 +3,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
@@ -12,13 +13,18 @@ namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 ///     fallback is an awaited DB call on the miss branch, and both handler kinds already run on the
 ///     per-connection session loop, never the zone tick.
 /// </summary>
-public sealed class FindGuildMemberHandler(IFindGuildMemberService findGuildMemberService)
-    : IAsyncPacketHandler<FindGuildMemberRequest>
+public sealed class FindGuildMemberHandler(
+    IFindGuildMemberService findGuildMemberService,
+    ILogger<FindGuildMemberHandler>? logger = null) : IAsyncPacketHandler<FindGuildMemberRequest>
 {
     public async ValueTask HandleAsync(FindGuildMemberRequest packet, IPacketSession session,
         CancellationToken cancellationToken)
     {
         var zoneSession = (ZoneClientSession)session;
+
+        logger?.LogDebug(
+            "Session {SessionId}: CZ_GUILD_FIND_SEND received (character {CharacterId}, target {AvatarName})",
+            session.SessionId, zoneSession.CharacterId, packet.AvatarName);
 
         if (zoneSession.CurrentZone is not Zone zone)
             return;

@@ -4,15 +4,21 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Chat;
 
 /// <summary>CZ_TRIBE_CHAT_SEND (opcode 81) -- zone-local only, no inter-zone relay; alliance not modeled.</summary>
-public sealed class TribeChatHandler(ITribeChatService tribeChatService) : IInlinePacketHandler<TribeChatRequest>
+public sealed class TribeChatHandler(ITribeChatService tribeChatService, ILogger<TribeChatHandler>? logger = null)
+    : IInlinePacketHandler<TribeChatRequest>
 {
     public void Handle(in TribeChatRequest packet, IPacketSession session)
     {
         var zoneSession = (ZoneClientSession)session;
+
+        logger?.LogDebug(
+            "Session {SessionId}: CZ_TRIBE_CHAT_SEND received (character {CharacterId}, content length {ContentLength})",
+            session.SessionId, zoneSession.CharacterId, packet.Content.Length);
 
         if (ChatRouter.IsContentEmpty(packet.Content))
         {

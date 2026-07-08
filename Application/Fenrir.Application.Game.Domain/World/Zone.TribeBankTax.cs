@@ -13,8 +13,10 @@ namespace Fenrir.Application.Game.Domain.World;
 ///     see <see cref="WorldState.TribeBankTaxAccumulator" />'s own remarks for the full citation set.
 ///     <para>
 ///         <b>
-///             Neither <see cref="CreditMonsterKillTribeTax" /> nor <see cref="CreditNpcServiceTribeTax" /> is
-///             currently called from anywhere in this cluster.
+///             <see cref="CreditMonsterKillTribeTax" /> is NOT called from anywhere in this cluster;
+///             <see cref="CreditNpcServiceTribeTax" /> IS wired, but only from
+///             <c>Fenrir.Application.Game.Services.ItemModification</c>, outside this cluster's own
+///             Domain/World + Hosting scope.
 ///         </b>
 ///         <see cref="CreditMonsterKillTribeTax" /> is
 ///         deliberately NOT wired to <see cref="Monsters.MonsterSpawnScheduler" />'s money-grant hook: in
@@ -29,13 +31,18 @@ namespace Fenrir.Application.Game.Domain.World;
 ///         not-yet-identified live caller elsewhere in <c>ts25zone</c> is unconfirmed -- see
 ///         <see cref="WorldState.TribeBankTaxAccumulator" />'s own remarks and the
 ///         <c>legacy-behavior-translator</c> contract this disconnection was made from before assuming the
-///         mechanism can be removed outright. <see cref="CreditNpcServiceTribeTax" /> is separately unwired for
-///         an unrelated reason: its eight legacy call sites (item enchant/upgrade, enchant-costume, costume
-///         material swap-enchant, item exchange, high-item upgrade, low-item downgrade) all live in
-///         <c>Fenrir.Application.Game.Services.ItemModification</c>, outside this cluster's own Domain/World +
-///         Hosting scope and reported as touched by a concurrent Commerce-adjacent workflow -- the method
-///         exists so that layer can call it once free to do so, and unlike <see cref="CreditMonsterKillTribeTax" />
-///         it IS a genuinely live legacy mechanism once wired.
+///         mechanism can be removed outright. <see cref="CreditNpcServiceTribeTax" />'s eight legacy call sites
+///         (item enchant/upgrade, enchant-costume, costume material swap-enchant, item exchange, high-item
+///         upgrade, low-item downgrade -- <c>AddTribeBankInfo2</c> at <c>Server/ts25zone/
+///         S04_MyWork02.cpp:2604,2647,2745,3322,3698,3858,4078,4229</c>) all live in
+///         <c>Fenrir.Application.Game.Services.ItemModification</c>. Five of those eight are now wired --
+///         <c>EnchantItemService</c> (normal-equipment/wings branch only; the costume/stellar-core branches at
+///         lines 2604/2647/2745 remain out of scope, see <c>EnchantResolver</c>'s own remarks),
+///         <c>CombineItemService</c>, <c>RerollItemService</c>, <c>UpgradeItemRankService</c>, and
+///         <c>DowngradeItemRankService</c> -- each crediting 1% of its own already-charged/already-checked cost
+///         via this method once the corresponding debit has actually succeeded (or, for
+///         <c>RerollItemService</c>'s NoCandidate path specifically, a faithfully-preserved legacy asymmetry
+///         where the tribe bank is credited with no matching player debit -- see that service's own remarks).
 ///     </para>
 /// </remarks>
 public sealed partial class Zone

@@ -82,16 +82,17 @@ public enum EventLogCategory : byte
 
     /// <summary>
     ///     A cosmetic entitlement is permanently removed from the character's active collection -- legacy
-    ///     <c>CZ_COSTUME_STATE_SEND</c>/<c>CZ_ANIMAL_STATE_SEND</c> Sort 5 ("Delete"). Today this only ever
-    ///     fires for the costume side: the wardrobe slot is cleared and, as a make-good, a plain inventory
-    ///     item is granted back (<c>CostumeStateResolver.ResultKind.ReturnToInventorySuccess</c>) -- distinct
-    ///     from <see cref="ItemCreate" /> since nothing new is minted, an existing entitlement is merely
-    ///     converted back to its inventory form. The mount equivalent (op87 Sort 5) is deliberately NOT wired
-    ///     to this category: <c>MountStateResolver</c> treats it as an out-of-scope disconnect -- a documented
-    ///     exploit-surface closure (a "delete mount id 0" quirk would grant free Contribution Points with no
-    ///     real mount required), not a missing-instrumentation gap -- see that type's own remarks. First
-    ///     consumer: Fenrir.Application.Game.Services.BuffsMountsCosmetics.CostumeStateService's
-    ///     return-to-inventory branch.
+    ///     <c>CZ_COSTUME_STATE_SEND</c> Sort 5 ("Delete"): the wardrobe slot is cleared and, as a make-good, a
+    ///     plain inventory item is granted back (<c>CostumeStateResolver.ResultKind.ReturnToInventorySuccess</c>)
+    ///     -- distinct from <see cref="ItemCreate" /> since nothing new is minted, an existing entitlement is
+    ///     merely converted back to its inventory form. The mount equivalent (op87 Sort 5,
+    ///     <c>CZ_ANIMAL_STATE_SEND</c>) does NOT use this category -- see <see cref="MountAttribute" />
+    ///     instead, since Sort 5 grants CP as compensation rather than returning an inventory item, and was
+    ///     previously left an out-of-scope disconnect specifically to close a "delete mount id 0" free-CP
+    ///     quirk (see <c>MountStateResolver</c>'s own remarks for how that quirk is now closed by a narrower,
+    ///     targeted guard instead of leaving the whole sub-action unimplemented). First consumer:
+    ///     Fenrir.Application.Game.Services.BuffsMountsCosmetics.CostumeStateService's return-to-inventory
+    ///     branch.
     /// </summary>
     CosmeticDelete = 15,
 
@@ -141,7 +142,21 @@ public enum EventLogCategory : byte
     ///     EventCode convention as <see cref="StoreSlotItem" />. First consumer:
     ///     GenericActionService.TransferBankMoneyAsync.
     /// </summary>
-    SaveSlotMoney = 20
+    SaveSlotMoney = 20,
+
+    /// <summary>
+    ///     CZ_ANIMAL_STATE_SEND (op87) mount-attribute management: Sort 5 (Delete Mount, a +250 CP
+    ///     compensation grant) / Sort 7 (Delete Rolled Attribute, item 1225 consumed) -- legacy
+    ///     Server/ts25zone/S04_MyWork02.cpp:11907-11919/:11977-11991. EventCode is app-owned within this
+    ///     category: 1 = delete mount, 2 = delete rolled attribute. Sort 6 (Convert)/8 (Transfer) never reach
+    ///     a loggable success path yet -- see <c>MountStateResolver</c>'s own remarks for the uncataloged
+    ///     roll/transfer formula this is blocked on. <see cref="IEventLogRepository.LogAsync" />'s
+    ///     <c>deltaMoney</c> parameter carries the CP delta for EventCode 1 (there is no dedicated
+    ///     Contribution-Points column on game.EventLog); Sort 5 does not touch actual wallet money despite
+    ///     the legacy audit line also displaying it. First consumer:
+    ///     Fenrir.Application.Game.Services.BuffsMountsCosmetics.MountStateService.
+    /// </summary>
+    MountAttribute = 21
 }
 
 /// <summary>

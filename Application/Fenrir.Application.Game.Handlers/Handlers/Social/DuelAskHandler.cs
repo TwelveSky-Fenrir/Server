@@ -3,11 +3,13 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
 /// <summary>CZ_DUEL_ASK_SEND (opcode 43) -- map 124 (scripted-duel server) always refuses immediately.</summary>
-public sealed class DuelAskHandler(IDuelService duelService) : IInlinePacketHandler<DuelChallengeRequest>
+public sealed class DuelAskHandler(IDuelService duelService, ILogger<DuelAskHandler>? logger = null)
+    : IInlinePacketHandler<DuelChallengeRequest>
 {
     public void Handle(in DuelChallengeRequest packet, IPacketSession session)
     {
@@ -17,6 +19,11 @@ public sealed class DuelAskHandler(IDuelService duelService) : IInlinePacketHand
             return;
 
         var challengerId = zoneSession.CharacterId!.Value;
+
+        logger?.LogDebug(
+            "Duel ask received: session {SessionId} character {CharacterId} -> target {TargetAvatarName} (sort {Sort})",
+            session.SessionId, challengerId, packet.AvatarName, packet.Sort);
+
         if (!zone.TryGetPlayer(challengerId, out var challenger) || challenger is null)
             return;
 

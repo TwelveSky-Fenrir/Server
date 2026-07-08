@@ -10,6 +10,7 @@ using Fenrir.Data.Abstractions.Commerce;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Shared;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Handlers.Commerce;
 
@@ -63,7 +64,7 @@ public class SearchShopListingsServiceTests
         }.ToFrozenDictionary();
 
         return new SearchShopListingsService(ZoneTestKit.EmptyWorldData(itemsById),
-            offlineShops ?? new FakeOfflineShopRepository());
+            offlineShops ?? new FakeOfflineShopRepository(), NullLogger<SearchShopListingsService>.Instance);
     }
 
     [Fact]

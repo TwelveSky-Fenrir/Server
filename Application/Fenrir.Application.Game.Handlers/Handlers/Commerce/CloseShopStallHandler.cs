@@ -3,6 +3,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Commerce;
 
@@ -11,7 +12,7 @@ namespace Fenrir.Application.Game.Handlers.Handlers.Commerce;
 ///     actually open. <c>Sort</c> 2 closes the offline/deputy shop (ShopState only, items/money stay
 ///     attached) and sends no unicast reply, matching the legacy.
 /// </summary>
-public sealed class CloseShopStallHandler(ICloseShopStallService service)
+public sealed class CloseShopStallHandler(ICloseShopStallService service, ILogger<CloseShopStallHandler> logger)
     : IAsyncPacketHandler<CloseShopStallRequest>
 {
     public async ValueTask HandleAsync(CloseShopStallRequest packet, IPacketSession session,
@@ -20,12 +21,18 @@ public sealed class CloseShopStallHandler(ICloseShopStallService service)
         var zoneSession = (ZoneClientSession)session;
         var characterId = zoneSession.CharacterId!.Value;
 
+        logger.LogDebug("CloseShopStall: session {SessionId} character {CharacterId} sort {Sort}",
+            session.SessionId, characterId, packet.Sort);
+
         if (zoneSession.CurrentZone is not Zone zone || !zone.TryGetPlayer(characterId, out var state) ||
             state is null)
             return;
 
         if (zone.MapId != OpenShopStallHandler.PshopZoneNumber)
         {
+            logger.LogWarning(
+                "Close shop stall rejected: character {CharacterId} is outside the market district (zone {MapId}) -- session will be disconnected",
+                characterId, zone.MapId);
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }

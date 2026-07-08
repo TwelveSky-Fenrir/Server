@@ -67,7 +67,8 @@ public class CraftItemServiceTests
 
     private static CraftItemService CreateService(FakeCharacterRepository characters, FakeEventLogRepository eventLog)
     {
-        return new CraftItemService(characters, eventLog, NullLogger<CraftItemService>.Instance);
+        return new CraftItemService(characters, eventLog, ZoneTestKit.EmptyWorldData(),
+            NullLogger<CraftItemService>.Instance);
     }
 
     private static ItemStack Jade(int quantity, int serial)

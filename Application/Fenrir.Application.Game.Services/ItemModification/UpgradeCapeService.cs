@@ -1,10 +1,12 @@
 using System.Collections.Immutable;
+using Fenrir.Application.Game.Abstractions.Chat;
 using Fenrir.Application.Game.Abstractions.ItemModification;
 using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Enchant;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.Loot;
+using Fenrir.Application.Game.GameData;
 using Fenrir.Network.Serialization.Packets.Zone;
 using Microsoft.Extensions.Logging;
 
@@ -14,9 +16,22 @@ namespace Fenrir.Application.Game.Services.ItemModification;
 ///     Business logic for op127, CZ_UP_LEVEL_ITEM_SEND -- extracted from <see cref="UpgradeCapeHandler" />, see
 ///     that handler's remarks.
 /// </summary>
+/// <remarks>
+///     <c>premiumActive</c> (Server/Header/function.h:449-461, <c>GetDiscountForPremium</c>) is resolved here
+///     from <see cref="PlayerRuntimeState.PremiumExpireUtc" /> against the current wall clock and handed to
+///     <see cref="CapeUpgradeResolver.Resolve" />, which applies the flat 20% discount to the cost it returns
+///     -- see <see cref="CapeUpgradeResolver" />'s own remarks. Unlike that resolver's own doc comment (written
+///     before this notice was wired up), the legacy "RANKUP" chat notice (<c>BroadcastNotice</c>,
+///     Server/ts25zone/S04_MyWork02.cpp:14746-14750) now IS reproduced, via <see cref="IWorldNoticeService" />
+///     -- see that interface's own remarks for why this specific relay (sort 102) has a safe, already-shipped
+///     Fenrir equivalent that EnchantItem's/CraftItem's OWN cap/notable-craft notices (a different relay
+///     mechanism, sorts 115/2000/2001) do not.
+/// </remarks>
 public sealed class UpgradeCapeService(
     ICharacterRepository characters,
     IEventLogQueue eventLogQueue,
+    IWorldNoticeService worldNotice,
+    WorldDataCache worldData,
     ILogger<UpgradeCapeService> logger)
     : IUpgradeCapeService
 {
@@ -53,7 +68,9 @@ public sealed class UpgradeCapeService(
             return new UpgradeCapeResult(UpgradeCapeOutcome.Rejected, false, [0, 0, 0, 0, 0, 0]);
 
         var luck = state.Stats?.Luck ?? 0;
-        var resolved = CapeUpgradeResolver.Resolve(target.ItemId, material.ItemId, luck, 0,
+        var nowUnixSeconds = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var premiumActive = state.PremiumExpireUtc >= nowUnixSeconds;
+        var resolved = CapeUpgradeResolver.Resolve(target.ItemId, material.ItemId, luck, 0, premiumActive,
             SystemRandomSource.Instance);
 
         if (resolved.Outcome == CapeUpgradeResolver.Outcome.Rejected)
@@ -87,10 +104,10 @@ public sealed class UpgradeCapeService(
         try
         {
             if (page1 == page2)
-                await characters.AdjustMoneyAndReplaceContainerAsync(characterId, -CapeUpgradeResolver.Cost, 0,
+                await characters.AdjustMoneyAndReplaceContainerAsync(characterId, -resolved.Cost, 0,
                     (byte)page1, ToTvps(projectedTargetContainer), cancellationToken);
             else
-                await characters.AdjustMoneyAndReplaceTwoContainersAsync(characterId, -CapeUpgradeResolver.Cost, 0,
+                await characters.AdjustMoneyAndReplaceTwoContainersAsync(characterId, -resolved.Cost, 0,
                     (byte)page1, ToTvps(projectedTargetContainer), (byte)page2, ToTvps(projectedMaterialContainer),
                     cancellationToken);
         }
@@ -103,7 +120,7 @@ public sealed class UpgradeCapeService(
         }
 
         if (!eventLogQueue.Enqueue(new EventLogEntryTvp(UpgradeCapeEventCode, (byte)EventLogCategory.Enchant, null,
-                characterId, null, null, null, -(long)CapeUpgradeResolver.Cost, null, target.ItemId, target.Quantity,
+                characterId, null, null, null, -(long)resolved.Cost, null, target.ItemId, target.Quantity,
                 resolved.Succeeded ? SuccessOutcome : FailedOutcome,
                 $"Serial={target.Serial};Material={material.ItemId};NewItemId={(resolved.Succeeded ? resolved.NewItemId : target.ItemId)}",
                 DateTime.UtcNow)))
@@ -129,6 +146,13 @@ public sealed class UpgradeCapeService(
                 newTargetStack.ItemId, index1 % 8, index1 / 8, target.Quantity, EncodedValue(target), target.Serial
             }
             : [0, 0, 0, 0, 0, 0];
+
+        // Server/ts25zone/S04_MyWork02.cpp:14746-14750 -- fires on EVERY ordinary success, not gated by any
+        // tier/allow-list (unlike EnchantItem's/CraftItem's own notices), so this is unconditional here too.
+        // Content format is byte-for-byte the legacy sprintf: "%s RANKUP [%s]!!!" (avatar name, result item's
+        // display name).
+        if (resolved.Succeeded && worldData.ItemsById.TryGetValue(resolved.NewItemId, out var resultDefinition))
+            worldNotice.Broadcast($"{state.Name} RANKUP [{resultDefinition.Item.Name}]!!!");
 
         return new UpgradeCapeResult(UpgradeCapeOutcome.Applied, resolved.Succeeded, value);
     }

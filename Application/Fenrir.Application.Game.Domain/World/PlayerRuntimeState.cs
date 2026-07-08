@@ -125,14 +125,19 @@ public sealed partial class PlayerRuntimeState
     public int TeacherPoint { get; set; }
 
     /// <summary>
-    ///     aZone241Time -- an unrelated "zone241 time" counter incremented by 10 on every successful CP-funded
-    ///     rebirth transition (<c>TribeActionService.RebirthAsync</c>'s Path B only; the Rebirth-Pill Path A
-    ///     never touches it). Wire-exposed via <c>AvatarInfo.Zone241Time</c> and as Value03 of the
-    ///     rebirth-transition's own AVATAR_CHANGE_INFO_1 sort-14 broadcast. Durably persisted via
-    ///     <c>ICharacterRepository.AdjustZone241TimeAsync</c> (game.Characters.Zone241Time,
-    ///     Migrations/041_character_rebirth_zone241_time.sql) -- already synchronously persisted by the time a
-    ///     <c>TribeProgressZoneCommand</c> mirrors the new value here, same "no dirty mark, nothing left to
-    ///     flush" posture as <see cref="Tribe" />/<c>QuestProgress</c>/<c>TribeFourReturnAllowance</c>.
+    ///     aZone241Time -- an unrelated "zone241 time" counter with two independent increment sources: every
+    ///     successful CP-funded rebirth transition (<c>TribeActionService.RebirthAsync</c>'s Path B only, +10;
+    ///     the Rebirth-Pill Path A never touches it) and, separately, a CZ_MISSION_COMPLETE_SEND daily-mission
+    ///     claim landing while the avatar sits exactly at the second-tier level cap
+    ///     (<c>DailyMissionService.ClaimAsync</c>'s own <c>GrantSecondTierZone241TimeBonusAsync</c>, +1). Wire-
+    ///     exposed via <c>AvatarInfo.Zone241Time</c> and as Value03 of an AVATAR_CHANGE_INFO_1 sort-14 push from
+    ///     either source (AOI-wide for the rebirth-transition broadcast; a direct self-only unicast for the
+    ///     daily-mission bonus -- see that method's own remarks for why). Durably persisted via
+    ///     <c>ICharacterRepository.AdjustZone241TimeAsync</c> (game.Characters.Zone241Time --
+    ///     Database/Tables/game/Characters.sql's own column comment for the column's citation) -- already
+    ///     synchronously persisted by the time a <c>TribeProgressZoneCommand</c> mirrors the new value here,
+    ///     same "no dirty mark, nothing left to flush" posture as <see cref="Tribe" />/<c>QuestProgress</c>/
+    ///     <c>TribeFourReturnAllowance</c>.
     /// </summary>
     public int Zone241Time { get; set; }
 
@@ -189,6 +194,23 @@ public sealed partial class PlayerRuntimeState
     ///     (Server/ts25zone/S04_MyWork03.cpp:1861-1866).
     /// </summary>
     public DateTime LastItemUseUtc { get; set; } = DateTime.UtcNow;
+
+    /// <summary>
+    ///     Wall-clock instant of this character's last op24 (CZ_IMPROVE_ITEM_SEND) enchant attempt -- the
+    ///     per-avatar same-tick anti-spam gate mirroring legacy's own tick-marker equality check
+    ///     (Server/ts25zone/S04_MyWork02.cpp:2523-2528): stamped unconditionally, before any further
+    ///     validation, so a same-tick retry is rejected even if the rest of that first attempt later fails
+    ///     its own validation. Modeled as a continuous wall-clock comparison against
+    ///     <see cref="Simulation.SimulationClock.LegacyTick" /> (500 ms) rather than a discrete tick-counter
+    ///     equality check, for the same request-thread/Zone-tick-thread split documented on
+    ///     <see cref="LastItemUseUtc" /> -- <c>EnchantItemHandler</c> also runs on the request thread, not the
+    ///     Zone tick thread that owns the only Zone-wide simulated clock in this codebase. Defaulted to
+    ///     <see cref="DateTime.UtcNow" /> at construction time so a freshly (re)registered avatar's very first
+    ///     enchant attempt is subject to the same gate as any later one. Checked and stamped by
+    ///     <c>EnchantItemService.EnchantAsync</c>, immediately after the town-zone gate and before any
+    ///     item-slot validation, matching legacy's own ordering.
+    /// </summary>
+    public DateTime LastEnchantAttemptUtc { get; set; } = DateTime.UtcNow;
 
     /// <summary>
     ///     Server-side monotonic counter, independent of the DB's own FlushSequence baseline -- incremented

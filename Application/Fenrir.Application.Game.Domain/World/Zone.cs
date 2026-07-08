@@ -8,6 +8,7 @@ using Fenrir.Application.Game.Domain.Quests;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.Social.Duel;
 using Fenrir.Application.Game.Domain.Social.Party;
+using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Domain.World.Geometry;
 using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
@@ -58,6 +59,7 @@ public sealed partial class Zone(
     WorldStateService? worldState = null,
     PartyRegistry? partyRegistry = null,
     DuelRegistry? duelRegistry = null,
+    TradeRegistry? tradeRegistry = null,
     HeroRankPointAccumulator? heroRankPointAccumulator = null,
     ICharacterShardLocationRepository? characterShardLocations = null,
     TribeBankTaxAccumulator? tribeBankTax = null,
@@ -130,6 +132,13 @@ public sealed partial class Zone(
 
     /// <summary>Combat/skill RNG -- <see cref="SystemRandomSource" /> in production, injectable for deterministic tests.</summary>
     private readonly IRandomSource _random = randomSource ?? SystemRandomSource.Instance;
+
+    /// <summary>
+    ///     Process-wide secure-trade authority (disconnect-cleanup half of the trade lifecycle,
+    ///     <see cref="ClearTradeOnDisconnect" />) -- defaults to a private instance in tests, same posture as
+    ///     <see cref="_duelRegistry" />/<see cref="_partyRegistry" />.
+    /// </summary>
+    private readonly TradeRegistry _tradeRegistry = tradeRegistry ?? new TradeRegistry();
 
     /// <summary>
     ///     This zone's own monotonic simulated clock, the sum of every elapsed span fed to <see cref="Tick" />.
@@ -439,6 +448,9 @@ public sealed partial class Zone(
                         break;
                     case ZoneCommandKind.SetMuted:
                         HandleSetMuted(command.CharacterId, command.Muted);
+                        break;
+                    case ZoneCommandKind.CreditRegularWarConclusion:
+                        HandleRegularWarConclusionCredit(command.CharacterId);
                         break;
                 }
             }

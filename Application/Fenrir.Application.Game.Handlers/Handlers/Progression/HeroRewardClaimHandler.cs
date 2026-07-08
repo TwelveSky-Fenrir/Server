@@ -3,6 +3,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Progression;
 
@@ -13,7 +14,9 @@ namespace Fenrir.Application.Game.Handlers.Handlers.Progression;
 ///     the real reward is CP -- ZC_HEROREWARD_RECV's item-drop fields are dead code in this build
 ///     (S04_MyWork02.cpp:14225-14243 is commented out) and are always sent as 0.
 /// </summary>
-public sealed class HeroRewardClaimHandler(IHeroRewardClaimService heroRewardClaimService)
+public sealed class HeroRewardClaimHandler(
+    IHeroRewardClaimService heroRewardClaimService,
+    ILogger<HeroRewardClaimHandler> logger)
     : IAsyncPacketHandler<HeroRewardClaimRequest>
 {
     public async ValueTask HandleAsync(HeroRewardClaimRequest packet, IPacketSession session,
@@ -24,6 +27,11 @@ public sealed class HeroRewardClaimHandler(IHeroRewardClaimService heroRewardCla
             return;
 
         var characterId = zoneSession.CharacterId!.Value;
+
+        logger.LogDebug(
+            "Session {SessionId}: HeroRewardClaimRequest (op119) received for character {CharacterId}",
+            session.SessionId, characterId);
+
         if (!zone.TryGetPlayer(characterId, out var state) || state is null)
             return;
 
@@ -35,6 +43,8 @@ public sealed class HeroRewardClaimHandler(IHeroRewardClaimService heroRewardCla
             switch (result.Outcome)
             {
                 case HeroRewardClaimOutcome.AlreadyClaimed:
+                    logger.LogInformation("Hero-reward claim denied for character {CharacterId}: already claimed",
+                        characterId);
                     session.Send(EmptyResponse(3));
                     break;
                 case HeroRewardClaimOutcome.Claimed:
@@ -42,6 +52,8 @@ public sealed class HeroRewardClaimHandler(IHeroRewardClaimService heroRewardCla
                     break;
                 case HeroRewardClaimOutcome.NotRanked:
                 default:
+                    logger.LogDebug("Hero-reward claim ignored for character {CharacterId}: not ranked",
+                        characterId);
                     break;
             }
         }

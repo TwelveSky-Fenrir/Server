@@ -12,9 +12,13 @@ namespace Fenrir.Application.Game.Domain.Forge;
 ///     therefore always false in the legacy -- verified dead code, not reproduced here. <c>aAddItemValue</c>
 ///     (the "lucky combine" +5% charge) has no acquisition path yet, so <see cref="Resolve" /> is always called
 ///     with 0 charges, same open issue as <see cref="Enchant.EnchantResolver" />'s <c>protectForDestroyCharges</c>.
-///     <c>AddTribeBankInfo2</c>'s 1% cost skim into the tribe bank is not reproduced: it targets an entirely
-///     unimplemented "tribe symbol battle" world subsystem (<c>mWorldInfo-&gt;mTribeSymbol</c>), invisible to
-///     the paying character either way -- same gap as <c>RerollResolver</c>/<c>RankChangeResolver</c>.
+///     <c>AddTribeBankInfo2</c>'s 1% cost skim into the tribe bank is deliberately NOT computed here: this
+///     resolver stays Zone-free by design (see the type summary), and the tribe-symbol indirection
+///     (<c>mWorldInfo-&gt;mTribeSymbol</c>) it ultimately targets is modeled one layer up, in
+///     <see cref="World.WorldState.TribeBankTaxAccumulator" />'s own optional beneficiary-resolver seam.
+///     <c>CombineItemService</c> credits it via <c>Zone.CreditNpcServiceTribeTax</c> once this resolver's
+///     <see cref="CombineResult.Cost" /> has actually been debited -- same posture as
+///     <c>RerollResolver</c>/<c>RankChangeResolver</c>, whose own services do the same.
 /// </remarks>
 public static class CombineResolver
 {

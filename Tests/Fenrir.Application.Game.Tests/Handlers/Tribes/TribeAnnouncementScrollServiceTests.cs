@@ -54,7 +54,8 @@ public class TribeAnnouncementScrollServiceTests
         registry.TryGetPlayer(10, out var sender);
         sender!.TribeNotifyScrollCount = 3;
 
-        var service = new TribeAnnouncementScrollService(registry);
+        var service = new TribeAnnouncementScrollService(registry, new FakeGuildTribeBroadcastRelayQueue(),
+            Options.Create(ZoneTestKit.Options()), NullLogger<TribeAnnouncementScrollService>.Instance);
         var succeeded = service.TryBroadcast(registry[1], sender, 10, senderSession, "Scroll used!");
 
         Assert.True(succeeded);
@@ -103,7 +104,8 @@ public class TribeAnnouncementScrollServiceTests
         registry.TryGetPlayer(10, out var sender);
         sender!.TribeNotifyScrollCount = 0;
 
-        var service = new TribeAnnouncementScrollService(registry);
+        var service = new TribeAnnouncementScrollService(registry, new FakeGuildTribeBroadcastRelayQueue(),
+            Options.Create(ZoneTestKit.Options()), NullLogger<TribeAnnouncementScrollService>.Instance);
         var succeeded = service.TryBroadcast(registry[1], sender, 10, senderSession, "No charges");
 
         Assert.False(succeeded);
@@ -124,7 +126,9 @@ public class TribeAnnouncementScrollServiceTests
         registry.TryGetPlayer(10, out var sender);
         sender!.TribeNotifyScrollCount = 5;
 
-        var handler = new TribeAnnouncementScrollHandler(new TribeAnnouncementScrollService(registry));
+        var handler = new TribeAnnouncementScrollHandler(
+            new TribeAnnouncementScrollService(registry, new FakeGuildTribeBroadcastRelayQueue(),
+                Options.Create(ZoneTestKit.Options()), NullLogger<TribeAnnouncementScrollService>.Instance));
         handler.Handle(new TribeAnnouncementScrollRequest { Content = "" }, senderSession);
 
         Assert.Equal(DisconnectReason.Faulted, senderSession.DisconnectReason);

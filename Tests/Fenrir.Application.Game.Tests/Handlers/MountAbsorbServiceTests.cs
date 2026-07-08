@@ -5,6 +5,7 @@ using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Framing;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Handlers;
 
@@ -110,7 +111,7 @@ public class MountAbsorbServiceTests
         // abort the service itself never sees -- exercise the real handler here.
         var zone = ZoneTestKit.CreateZone(1);
         var (session, _, _) = Setup(zone, 10);
-        var handler = new MountAbsorbHandler(new MountAbsorbService());
+        var handler = new MountAbsorbHandler(new MountAbsorbService(), NullLogger<MountAbsorbHandler>.Instance);
 
         handler.Handle(new MountAbsorbRequest { Sort = 3 }, session);
 

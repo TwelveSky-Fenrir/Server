@@ -274,7 +274,7 @@ public class CommerceProcTests
         Assert.NotNull(staleEx);
 
         await _offlineShops.SetStateAsync(sellerId, 0, CancellationToken.None);
-        await _offlineShops.WithdrawMoneyAsync(sellerId, 500, 0, CancellationToken.None);
+        await _offlineShops.WithdrawMoneyAsync(sellerId, 500, 0, 20260101, CancellationToken.None);
 
         Assert.Equal(500L, await ScalarAsync<long>($"SELECT Money FROM game.Characters WHERE CharacterId={sellerId};"));
         var (shopAfterWithdraw, _) = await _offlineShops.GetByCharacterAsync(sellerId, CancellationToken.None);
@@ -314,7 +314,7 @@ public class CommerceProcTests
 
         // Withdrawal is still refused while the shop remains open (ShopState = 0 gate).
         var earlyWithdrawEx = await Record.ExceptionAsync(() =>
-            _offlineShops.WithdrawMoneyAsync(sellerId, 100, 0, CancellationToken.None).AsTask());
+            _offlineShops.WithdrawMoneyAsync(sellerId, 100, 0, 20260101, CancellationToken.None).AsTask());
         Assert.NotNull(earlyWithdrawEx);
 
         // Second purchase (slot 1) sells the last listed item -- the shop must auto-close.
@@ -328,8 +328,58 @@ public class CommerceProcTests
         Assert.Equal(200, afterSecond.Money);
 
         // Withdrawal now succeeds immediately -- no explicit SetStateAsync close was ever called.
-        await _offlineShops.WithdrawMoneyAsync(sellerId, 200, 0, CancellationToken.None);
+        await _offlineShops.WithdrawMoneyAsync(sellerId, 200, 0, 20260101, CancellationToken.None);
         Assert.Equal(200L, await ScalarAsync<long>($"SELECT Money FROM game.Characters WHERE CharacterId={sellerId};"));
+    }
+
+    [Fact]
+    public async Task OfflineShop_WithdrawMoney_ZeroPendingBalance_ThrowsDistinctNothingToWithdrawError()
+    {
+        // Regression test for the shop-and-proxyshop legacy-parity audit finding: the contract requires a
+        // withdrawal of a zero pending balance on both components to fail with its own distinct error
+        // (mapped to client Result=4, "nothing to withdraw"), separate from the generic
+        // stale/not-closed/expired error (50276, mapped to Result=3). Both used to share SQL error 50276,
+        // making the distinction unreachable.
+        var sellerAccount = await CreateAccountAsync();
+        var sellerId = await CreateCharacterAsync(sellerAccount);
+
+        var ex = await Record.ExceptionAsync(() =>
+            _offlineShops.WithdrawMoneyAsync(sellerId, 0, 0, 20260101, CancellationToken.None).AsTask());
+
+        Assert.NotNull(ex);
+        var sqlException = ex as SqlException ?? ex!.InnerException as SqlException;
+        if (sqlException is not null)
+            Assert.Equal(50340, sqlException.Number);
+    }
+
+    [Fact]
+    public async Task OfflineShop_WithdrawMoney_ExpiredShop_IsRefused_EvenWhenClosedAndAmountsMatch()
+    {
+        // Regression test for the shop-and-proxyshop legacy-parity audit finding: the contract requires the
+        // shop be "closed and not expired" before a withdrawal is allowed, but the guarded UPDATE
+        // previously only checked ShopState = 0 and never consulted ShopDate at all -- an expired-but-closed
+        // shop's earnings could be withdrawn indefinitely.
+        var sellerAccount = await CreateAccountAsync();
+        var sellerId = await CreateCharacterAsync(sellerAccount);
+        var itemId = await MinItemIdAsync();
+
+        await _offlineShops.OpenAndReplaceContainersAsync(sellerId, 37, 20260101,
+            "MyShop", 1, 1, 1,
+            [new OfflineShopItemSlotTvp(0, itemId, 1, 0, 0, 500, null)],
+            [], [], CancellationToken.None);
+
+        await ExecAsync(
+            $"UPDATE game.OfflineShops SET ShopState = 0, ShopDate = 20260101, Money = 500 WHERE CharacterId = {sellerId};");
+
+        var ex = await Record.ExceptionAsync(() =>
+            _offlineShops.WithdrawMoneyAsync(sellerId, 500, 0, 20260201, CancellationToken.None).AsTask());
+
+        Assert.NotNull(ex);
+        var sqlException = ex as SqlException ?? ex!.InnerException as SqlException;
+        if (sqlException is not null)
+            Assert.Equal(50276, sqlException.Number);
+
+        Assert.Equal(0L, await ScalarAsync<long>($"SELECT Money FROM game.Characters WHERE CharacterId={sellerId};"));
     }
 
     [Fact]

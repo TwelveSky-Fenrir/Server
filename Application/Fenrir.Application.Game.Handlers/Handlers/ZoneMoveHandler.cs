@@ -2,6 +2,7 @@ using Fenrir.Application.Game.Abstractions.ZoneLifecycle;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers;
 
@@ -20,11 +21,18 @@ namespace Fenrir.Application.Game.Handlers.Handlers;
 ///     Unverified against a real client: it may attempt its own reconnect upon receiving ip:port regardless of
 ///     whether it already names the current socket -- if so this simplification needs revisiting.
 /// </remarks>
-public sealed class ZoneMoveHandler(IZoneMoveService service) : IAsyncPacketHandler<ZoneMoveRequest>
+public sealed class ZoneMoveHandler(IZoneMoveService service, ILogger<ZoneMoveHandler>? logger = null)
+    : IAsyncPacketHandler<ZoneMoveRequest>
 {
     public ValueTask HandleAsync(ZoneMoveRequest packet, IPacketSession session,
         CancellationToken cancellationToken)
     {
-        return service.HandleAsync(packet, (ZoneClientSession)session, cancellationToken);
+        var zoneSession = (ZoneClientSession)session;
+
+        logger?.LogDebug(
+            "Session {SessionId}: ZoneMoveRequest (op20) received for character {CharacterId} -- target zone {TargetZone} (from {PresentZone}), sort {Sort}",
+            session.SessionId, zoneSession.CharacterId, packet.ZoneNumber, packet.PresentZoneNumber, packet.Sort);
+
+        return service.HandleAsync(packet, zoneSession, cancellationToken);
     }
 }

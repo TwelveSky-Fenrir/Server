@@ -3,6 +3,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
@@ -10,12 +11,15 @@ namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 ///     CZ_TRADE_ASK_SEND (opcode 47) -- the displayed level delegates to <c>TradeInviteService.Invite</c>,
 ///     which uses <see cref="PlayerRuntimeState.CombinedLevel" /> (aLevel1+aLevel2).
 /// </summary>
-public sealed class TradeInviteHandler(ITradeInviteService tradeInviteService)
+public sealed class TradeInviteHandler(ITradeInviteService tradeInviteService, ILogger<TradeInviteHandler> logger)
     : IInlinePacketHandler<TradeInviteRequest>
 {
     public void Handle(in TradeInviteRequest packet, IPacketSession session)
     {
         var zoneSession = (ZoneClientSession)session;
+
+        logger.LogDebug("TradeInvite: session {SessionId} character {CharacterId} target {TargetAvatarName}",
+            session.SessionId, zoneSession.CharacterId, packet.AvatarName);
 
         if (zoneSession.CurrentZone is not Zone zone)
             return;

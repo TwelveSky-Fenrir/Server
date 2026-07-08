@@ -101,14 +101,24 @@ public sealed class LoginConnectionHost(
             // The only point in this whole per-connection chain that catches every exception type.
             // SessionLoop's own dispatch try/catch (Network/Fenrir.Network.Dispatch/SessionLoop.cs) already
             // turns an in-handler fault into a logged (LogError), reason-recorded Abort() before returning
-            // cleanly, so anything still reaching here bypassed that guard entirely -- e.g. a fault
-            // decoding a frame outside FrameDecoder's own ProtocolViolationException branch, or elsewhere
-            // in SessionLoop.RunAsync's own read loop. Logging this at Debug would vanish below
-            // LoginServer's configured Information floor (Servers/Fenrir.LoginServer/appsettings.json's
-            // Logging:LogLevel:Default) with zero trace anywhere -- log it loudly instead so an unhandled
-            // fault is never silently indistinguishable from an ordinary disconnect.
-            logger.LogError(ex, "Login session {SessionId} ended abnormally due to an unhandled exception",
-                loginSession.SessionId);
+            // cleanly, so anything still reaching here bypassed that guard entirely -- most commonly
+            // SocketConnection.ReceiveLoopAsync/SendLoopAsync's own captured fault propagating out of
+            // SessionLoop.RunAsync's PipeReader.ReadAsync (System.IO.Pipelines rethrows a faulted writer's
+            // exception to its reader) rather than a fault inside a packet handler. TransportFaultClassifier
+            // separates the routine case -- the peer closed abruptly (app closed, crash, network drop,
+            // NAT/firewall reset), which is not a server bug -- from a genuine unexpected fault: logging
+            // both identically at Error made an ordinary disconnect indistinguishable from a real crash in
+            // this exact log line. A genuine unhandled fault (anything else -- e.g. a bug decoding a frame
+            // outside FrameDecoder's own ProtocolViolationException branch) still needs to stay loud:
+            // logging it at Debug would vanish below LoginServer's configured Information floor
+            // (Servers/Fenrir.LoginServer/appsettings.json's Logging:LogLevel:Default) with zero trace anywhere.
+            if (TransportFaultClassifier.IsExpectedDisconnect(ex))
+                logger.LogInformation(
+                    "Login session {SessionId} disconnected ({ExceptionType}: {Message})", loginSession.SessionId,
+                    ex.GetType().Name, ex.Message);
+            else
+                logger.LogError(ex, "Login session {SessionId} ended abnormally due to an unhandled exception",
+                    loginSession.SessionId);
         }
         // OperationCanceledException falls through uncaught: it is an expected shutdown/external-abort
         // signal (matching SessionLoop.RunAsync's own posture), not a fault, and is swallowed without
@@ -124,7 +134,32 @@ public sealed class LoginConnectionHost(
                 logger.LogInformation(
                     "Login session {SessionId} ended for account {AccountId} in state {State}",
                     loginSession.SessionId, accountId, loginSession.State);
-                await TearDownAccountSessionAsync(accountId, loginSession.AccountSessionToken).ConfigureAwait(false);
+
+                // Bug fix (found investigating EndToEndScenarioTests' zone-handshake "peer closed after 0 of 5
+                // bytes" failure): a session that reached HandoverIssued closed this Login connection ON
+                // PURPOSE, because it already received its zone-transfer ticket and is expected to reconnect to
+                // a GameServer shard next (ZoneTransferHandler's own remarks) -- that reconnect is GUARANTEED to
+                // happen strictly after this Login socket closes, never before, since the same physical client
+                // can't hold both legs open at once. At the moment this finally block runs, runtime.AccountSessions
+                // still has ServerKind=Login (ZoneHandshakeService.ConsumeTicketAsync's own
+                // usp_AccountSession_TransitionToGame call is what flips it to Game, and that hasn't run yet) --
+                // so TearDownAccountSessionAsync's ownership match (ServerKind=Login, SessionToken=the same
+                // token the ticket carries) ALWAYS matches and ALWAYS clears the row before the GameServer's own
+                // handshake ever gets a chance to claim it, unconditionally turning every successful zone
+                // transfer into a spurious ZoneHandshakeOutcome.SessionSuperseded silent disconnect. This is not
+                // a rare interleaving to guard against defensively -- it is the deterministic, 100%-reproducible
+                // ordering of the designed handoff, confirmed by re-running EndToEndScenarioTests in full
+                // isolation (no other process touching the same database) and observing the identical failure
+                // every time. Skip the teardown call for exactly this one terminal state; every earlier state
+                // (an abandoned/failed login, or a session that disconnected before ever reaching char-select)
+                // still tears its row down exactly as before -- usp_AccountSession_MarkTearingDown's own remarks
+                // already anticipated this exact "Login-teardown-first" race as a way to "wrongly reject a
+                // legitimate player as SessionSuperseded" but the ownership-match SQL alone can't distinguish an
+                // intentional handoff from an abandoned session; only the caller (this class) has that context.
+                if (loginSession.State != LoginSessionState.HandoverIssued)
+                    await TearDownAccountSessionAsync(accountId, loginSession.AccountSessionToken)
+                        .ConfigureAwait(false);
+
                 await LogLoginSessionEndedAsync(accountId, loginSession.State).ConfigureAwait(false);
             }
 
@@ -195,13 +230,25 @@ public sealed class LoginConnectionHost(
         session.InboundStreamXorKey = unchecked((byte)randomNumber);
         connection.GetInboundXorKey = () => session.InboundStreamXorKey;
 
+        var presentPlayerNum = await ReadLivePlayerCountAsync(ct).ConfigureAwait(false);
+
         session.Send(new LoginGreetingResponse
         {
             RandomNumber = randomNumber,
             MaxPlayerNum = options.Value.MaxPlayerNum,
             GagePlayerNum = 0,
-            PresentPlayerNum = await ReadLivePlayerCountAsync(ct).ConfigureAwait(false)
+            PresentPlayerNum = presentPlayerNum
         });
+
+        // Deliberately does not log the XOR key/random number itself (same posture as PacketLog never logging
+        // raw payload bytes -- a stream-cipher seed has no business in an operational log sink). Debug, not
+        // Information: this fires once per accepted connection, right after the "connection accepted" line
+        // above, so it would be pure noise at the default level -- useful only when actively diagnosing the
+        // greet/cipher-seed step itself.
+        if (logger.IsEnabled(LogLevel.Debug))
+            logger.LogDebug(
+                "Login session {SessionId}: greeted (max {MaxPlayerNum}, present {PresentPlayerNum})",
+                session.SessionId, options.Value.MaxPlayerNum, presentPlayerNum);
     }
 
     /// <summary>

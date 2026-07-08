@@ -4,6 +4,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers;
 
@@ -14,7 +15,7 @@ namespace Fenrir.Application.Game.Handlers.Handlers;
 ///     reproduced here, matching the precedent set for other cross-server notices (e.g. TribeBank's audit
 ///     trail).
 /// </summary>
-public sealed class CraftPetHandler(ICraftPetService craftPetService)
+public sealed class CraftPetHandler(ICraftPetService craftPetService, ILogger<CraftPetHandler> logger)
     : IAsyncPacketHandler<CraftPetRequest>
 {
     public async ValueTask HandleAsync(CraftPetRequest packet, IPacketSession session,
@@ -23,6 +24,10 @@ public sealed class CraftPetHandler(ICraftPetService craftPetService)
         var zoneSession = (ZoneClientSession)session;
         var characterId = zoneSession.CharacterId!.Value;
         var accountId = zoneSession.AccountId!.Value;
+
+        logger.LogDebug(
+            "Session {SessionId}: CraftPetRequest (op88) received for character {CharacterId}, sort {Sort}",
+            session.SessionId, characterId, packet.Sort);
 
         if (zoneSession.CurrentZone is not Zone zone || !zone.TryGetPlayer(characterId, out var state) ||
             state is null)
@@ -62,15 +67,25 @@ public sealed class CraftPetHandler(ICraftPetService craftPetService)
                     accountId, cancellationToken);
                 break;
             default:
+                logger.LogWarning(
+                    "Craft-pet request rejected for character {CharacterId}: invalid sort {Sort} -- aborting session",
+                    characterId, packet.Sort);
                 zoneSession.Abort(DisconnectReason.Faulted);
                 return;
         }
 
         if (result.Outcome != CraftPetOutcome.Applied)
         {
+            logger.LogWarning(
+                "Craft-pet recipe rejected for character {CharacterId}: sort {Sort} -- aborting session",
+                characterId, packet.Sort);
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }
+
+        logger.LogInformation(
+            "Character {CharacterId} crafted pet: result item {ResultItemId}x{ResultQuantity} (recipe sort {Sort})",
+            characterId, result.ResultItemId, result.ResultQuantity, packet.Sort);
 
         session.Send(new CraftPetResponse
         {

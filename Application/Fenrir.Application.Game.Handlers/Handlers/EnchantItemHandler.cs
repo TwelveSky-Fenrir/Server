@@ -3,19 +3,25 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers;
 
 /// <summary>
-///     op24, CZ_IMPROVE_ITEM_SEND -- standard equipment enchant (delegated to <see cref="IEnchantItemService" />).
-///     Wings, costumes and stellar cores are out of scope and reply with a clean failure rather than a
-///     disconnect.
+///     op24, CZ_IMPROVE_ITEM_SEND -- normal-equipment/wings enchant (delegated to
+///     <see cref="IEnchantItemService" />, which now resolves wings too -- see <c>EnchantResolver</c>'s
+///     remarks). Costumes and stellar cores remain out of scope; those targets fall outside the resolver's
+///     slot-type band and are reported as <see cref="EnchantItemOutcome.Rejected" />, which this handler
+///     disconnects on, same as every other legacy Quit() condition in this cluster.
 /// </summary>
 /// <remarks>
-///     <c>ProtectForDestroy</c> has no acquisition path yet, so <c>EnchantResolver.Resolve</c> is always called
-///     with 0 charges and its <c>Protected</c> outcome is currently unreachable.
+///     <c>ProtectForDestroy</c> (Protection Charm) and <c>ImproveItemValue</c> ("sweet potato" Lucky Enchant
+///     Scroll) both have real acquisition paths via <c>UseInventoryItemService</c> (op23) and are read from
+///     live character state by <see cref="IEnchantItemService" /> -- <c>EnchantOutcome.Protected</c> is
+///     reachable in production, not dead code. See <c>EnchantResolver</c>'s own remarks for the sweet-potato
+///     bonus-probability magnitude, which is still not cited/applied.
 /// </remarks>
-public sealed class EnchantItemHandler(IEnchantItemService enchantItemService)
+public sealed class EnchantItemHandler(IEnchantItemService enchantItemService, ILogger<EnchantItemHandler> logger)
     : IAsyncPacketHandler<EnchantItemRequest>
 {
     public async ValueTask HandleAsync(EnchantItemRequest packet, IPacketSession session,
@@ -24,9 +30,19 @@ public sealed class EnchantItemHandler(IEnchantItemService enchantItemService)
         var zoneSession = (ZoneClientSession)session;
         var characterId = zoneSession.CharacterId!.Value;
 
+        if (logger.IsEnabled(LogLevel.Debug))
+            logger.LogDebug(
+                "Session {SessionId} character {CharacterId}: EnchantItemRequest received ({Page1}:{Index1} + {Page2}:{Index2})",
+                zoneSession.SessionId, characterId, packet.Page1, packet.Index1, packet.Page2, packet.Index2);
+
         if (zoneSession.CurrentZone is not Zone zone || !zone.TryGetPlayer(characterId, out var state) ||
             state is null)
+        {
+            logger.LogDebug(
+                "Session {SessionId} character {CharacterId}: EnchantItemRequest dropped, no live zone/player state",
+                zoneSession.SessionId, characterId);
             return;
+        }
 
         // Serializes the read/SQL/mirror sequence per character to close an item/money-duplication window.
         await state.EconomyActionLock.WaitAsync(cancellationToken);
@@ -34,14 +50,10 @@ public sealed class EnchantItemHandler(IEnchantItemService enchantItemService)
         {
             var result = await enchantItemService.EnchantAsync(packet, zone, state, characterId, cancellationToken);
 
-            switch (result.Outcome)
+            if (result.Outcome == EnchantItemOutcome.Rejected)
             {
-                case EnchantItemOutcome.Rejected:
-                    zoneSession.Abort(DisconnectReason.Faulted);
-                    return;
-                case EnchantItemOutcome.NotSupported:
-                    session.Send(new EnchantItemResponse { Result = 1, Cost = 0, Value = 0 });
-                    return;
+                zoneSession.Abort(DisconnectReason.Faulted);
+                return;
             }
 
             session.Send(new EnchantItemResponse

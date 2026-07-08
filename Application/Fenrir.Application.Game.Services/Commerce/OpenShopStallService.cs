@@ -42,7 +42,7 @@ public sealed class OpenShopStallService(
         PlayerRuntimeState state, CancellationToken cancellationToken)
     {
         if (packet.Sort is not (1 or 2))
-            return Abort();
+            return Abort(state.CharacterId, $"invalid sort value {packet.Sort}");
 
         // Server/ts25zone/S04_MyWork02.cpp:6056-6060 (mapcheck.h:189-244 CheckPossiblePShopRegion, zone-37
         // case) -- the requester must be physically inside the fixed-center, 1000-unit-radius "market
@@ -52,7 +52,7 @@ public sealed class OpenShopStallService(
         // the session outright on failure, with no response of any kind -- the same harsh treatment Abort()
         // below already gives the adjacent invalid-sort-value and not-stationary guards.
         if (!ProxyShopZonePolicy.IsWithinMarketDistrict(state.PosX, state.PosY, state.PosZ))
-            return Abort();
+            return Abort(state.CharacterId, "outside the market district");
 
         // Server/ts25zone/S04_MyWork02.cpp:6061-6065 -- the character must be recorded as stationary/idle
         // (an exact match against the idle-pose sentinel) before EITHER shop type is allowed to open. Checked
@@ -61,7 +61,7 @@ public sealed class OpenShopStallService(
         // on any other recorded value -- the same harsh treatment the two gates immediately around it in the
         // legacy handler apply, which Fenrir already mirrors via the shared Abort outcome below.
         if (state.ActionSort != IdleActionSort)
-            return Abort();
+            return Abort(state.CharacterId, $"not stationary/idle (action sort {state.ActionSort})");
 
         var isProxy = packet.Sort == 2;
 
@@ -72,9 +72,10 @@ public sealed class OpenShopStallService(
         if (state.PshopOpen)
         {
             if (isProxy)
-                return Blocked(101, packet.PshopInfo);
+                return Blocked(101, packet.PshopInfo, state.CharacterId,
+                    "a live personal shop is already open (cross-type proxy request)");
 
-            return Abort();
+            return Abort(state.CharacterId, "a live personal shop is already open (same-type request)");
         }
 
         if (!isProxy)
@@ -94,15 +95,16 @@ public sealed class OpenShopStallService(
                 logger.LogWarning(ex,
                     "Character {CharacterId} proxy-shop-state round trip failed while opening a personal shop",
                     state.CharacterId);
-                return Blocked(103, packet.PshopInfo);
+                return Blocked(103, packet.PshopInfo, state.CharacterId, "proxy-shop-state round trip failed");
             }
 
             if (proxyShop is { ShopState: 1 })
-                return Blocked(102, packet.PshopInfo);
+                return Blocked(102, packet.PshopInfo, state.CharacterId,
+                    "a proxy/deputy shop is already open (cross-type personal request)");
         }
 
         if (string.IsNullOrWhiteSpace(packet.PshopInfo.Name))
-            return Abort();
+            return Abort(state.CharacterId, "empty shop name");
 
         var anyOccupied = false;
         for (var page = 0; page < PshopPurchasePolicy.MaxPages && !anyOccupied; page++)
@@ -114,7 +116,7 @@ public sealed class OpenShopStallService(
             }
 
         if (!anyOccupied)
-            return Abort();
+            return Abort(state.CharacterId, "no occupied slots submitted");
 
         // Validate every occupied slot against the LIVE inventory before touching anything.
         var offlineItems = new List<OfflineShopItemSlotTvp>();
@@ -128,14 +130,14 @@ public sealed class OpenShopStallService(
             if (view.InventoryPage is not (ContainerMatrix.InventoryPage0 or ContainerMatrix.InventoryPage1) ||
                 !ContainerMatrix.IsValidSlot((byte)view.InventoryPage, view.InventoryIndex) ||
                 view.PosX is < 0 or > 7 || view.PosY is < 0 or > 7)
-                return Abort();
+                return Abort(state.CharacterId, $"slot {page}/{slot} has invalid inventory coordinates");
 
             worldData.ItemsById.TryGetValue(view.ItemId, out var itemDefinition);
             var liveSlot = state.Inventory.GetSlot((byte)view.InventoryPage, (byte)view.InventoryIndex);
 
             if (PshopPurchasePolicy.ValidateOpenSlot(view, itemDefinition, liveSlot) !=
                 PshopPurchasePolicy.OpenSlotOutcome.Success)
-                return Abort();
+                return Abort(state.CharacterId, $"slot {page}/{slot} failed live-inventory validation");
 
             if (isProxy)
                 offlineItems.Add(new OfflineShopItemSlotTvp((short)(page * PshopPurchasePolicy.MaxSlots + slot),
@@ -149,11 +151,24 @@ public sealed class OpenShopStallService(
         {
             state.PshopOpen = true;
             state.PshopListing = listing;
+            logger.LogInformation(
+                "Personal shop opened: character {CharacterId} name {ShopName} ({OccupiedSlots} occupied slots, display-only, no items left inventory)",
+                state.CharacterId, listing.Name, CountOccupiedSlots(listing));
             return new OpenShopStallPrepareResult(OpenShopStallPrepareOutcome.LiveOpened,
                 new OpenShopStallResponse { Result = 0, PshopInfo = listing }, listing, null);
         }
 
         return new OpenShopStallPrepareResult(OpenShopStallPrepareOutcome.ProxyReady, null, listing, offlineItems);
+    }
+
+    private static int CountOccupiedSlots(PshopInfo listing)
+    {
+        var count = 0;
+        for (var page = 0; page < PshopPurchasePolicy.MaxPages; page++)
+        for (var slot = 0; slot < PshopPurchasePolicy.MaxSlots; slot++)
+            if (PshopPurchasePolicy.ReadSlot(listing, page, slot).IsOccupied)
+                count++;
+        return count;
     }
 
     public async ValueTask<OpenShopStallResponse> OpenProxyShopAsync(OpenShopStallRequest packet, Zone zone,
@@ -217,6 +232,10 @@ public sealed class OpenShopStallService(
                 $"Value={entry.Value};Serial={entry.Serial};Price={entry.Price};Socket1={entry.Socket1};Socket2={entry.Socket2};Socket3={entry.Socket3}",
                 cancellationToken);
 
+        logger.LogInformation(
+            "Proxy shop opened: character {CharacterId} name {ShopName} rental until {ShopDate} ({ItemCount} items moved out of inventory)",
+            characterId, listing.Name, shopDate, auditEntries.Count);
+
         var response = new OpenShopStallResponse { Result = 0, PshopInfo = listing };
 
         // Zone.RebroadcastProxyShops's periodic-broadcast table entry -- independent of PlayerRuntimeState
@@ -238,8 +257,11 @@ public sealed class OpenShopStallService(
         return response;
     }
 
-    private static OpenShopStallPrepareResult Abort()
+    private OpenShopStallPrepareResult Abort(int characterId, string reason)
     {
+        logger.LogWarning(
+            "Open shop stall rejected: character {CharacterId} session will be disconnected ({Reason})",
+            characterId, reason);
         return new OpenShopStallPrepareResult(OpenShopStallPrepareOutcome.Abort, null, default, null);
     }
 
@@ -247,8 +269,10 @@ public sealed class OpenShopStallService(
     ///     A cross-type "shop already open" outcome (result 101/102/103) -- no disconnect, no shop-state
     ///     mutation. See <see cref="OpenShopStallPrepareOutcome.Blocked" />.
     /// </summary>
-    private static OpenShopStallPrepareResult Blocked(int result, PshopInfo pshopInfo)
+    private OpenShopStallPrepareResult Blocked(int result, PshopInfo pshopInfo, int characterId, string reason)
     {
+        logger.LogInformation("Open shop stall blocked: character {CharacterId} result {Result} ({Reason})",
+            characterId, result, reason);
         return new OpenShopStallPrepareResult(OpenShopStallPrepareOutcome.Blocked,
             new OpenShopStallResponse { Result = result, PshopInfo = pshopInfo }, default, null);
     }

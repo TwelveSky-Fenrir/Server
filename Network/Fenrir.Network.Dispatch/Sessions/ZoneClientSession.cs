@@ -63,9 +63,11 @@ public sealed class ZoneClientSession(
     ///     siblings at case 518/520/521) -- a strict binary gate, not a graduated permission: any positive grade
     ///     is treated as fully elevated. Equivalent to <c>MeetsGmTier(GmCommandTier.Basic)</c> -- the lowest of
     ///     the three thresholds ts25zone's GM command switch actually uses (see <see cref="GmCommandTier" />).
-    ///     Correct for every GM command implemented in Fenrir today (GM-BLOCK, case 519, and the Whisper
-    ///     elevated-flag stamp), because both are Basic-tier concerns, but it must NOT be reused as-is for a
-    ///     future command whose legacy case gates at Elevated (&lt; 10) or Admin (&lt; 100) -- call
+    ///     Correct for every Basic-tier GM concern implemented in Fenrir today (GM-BLOCK case 519, the Whisper
+    ///     elevated-flag stamp, and LocalChat's outer any-GM-tier guard plus its own "where"/"kill200"/"?clear"
+    ///     sub-commands -- see <c>Fenrir.Application.Game.Services.Chat.LocalChatService</c>), but it must NOT
+    ///     be reused as-is for a future command whose legacy case gates at Elevated (&lt; 10) or Admin
+    ///     (&lt; 100) -- LocalChat's own "ygdrop"/"lab"/"boss" sub-commands are exactly such a case and call
     ///     <see cref="MeetsGmTier" /> with that command's own tier instead.
     /// </summary>
     public bool IsGm => MeetsGmTier(GmCommandTier.Basic);
@@ -97,20 +99,26 @@ public sealed class ZoneClientSession(
     // production caller that consumes a real runtime.SessionTickets row) always supplies both.
     public void MarkTicketConsumed(int accountId, int characterId, Guid? sessionToken = null, short accountGrade = 0)
     {
+        var previous = State;
         AccountId = accountId;
         CharacterId = characterId;
         AccountSessionToken = sessionToken;
         AccountGrade = accountGrade;
         State = ZoneSessionState.TicketConsumed;
+        LogSessionStateChanged(previous, State);
     }
 
     public void MarkRegistering()
     {
+        var previous = State;
         State = ZoneSessionState.Registering;
+        LogSessionStateChanged(previous, State);
     }
 
     public void MarkInWorld()
     {
+        var previous = State;
         State = ZoneSessionState.InWorld;
+        LogSessionStateChanged(previous, State);
     }
 }

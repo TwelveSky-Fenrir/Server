@@ -3,6 +3,7 @@ using Fenrir.Application.Login.Services.GiftList;
 using Fenrir.Application.Login.Tests.TestSupport;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Login;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Login.Tests.Handlers;
 
@@ -14,7 +15,9 @@ public class ClGiftInfoSendHandlerTests
     [Fact]
     public async Task HandleAsync_NoPendingGifts_RepliesResultZeroWithEmptyMatrix()
     {
-        var handler = new GiftListHandler(new GiftListService(FakeGiftRepository.Empty()));
+        var handler = new GiftListHandler(
+            new GiftListService(FakeGiftRepository.Empty(), NullLogger<GiftListService>.Instance),
+            NullLogger<GiftListHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
 
         await handler.HandleAsync(new GiftListRequest(), session, CancellationToken.None);
@@ -26,7 +29,10 @@ public class ClGiftInfoSendHandlerTests
     [Fact]
     public async Task HandleAsync_PendingGifts_FillsOldestFirstWithProductIdAndZeroSecondColumn()
     {
-        var handler = new GiftListHandler(new GiftListService(FakeGiftRepository.WithPending((1, 1211), (2, 99700))));
+        var handler = new GiftListHandler(
+            new GiftListService(FakeGiftRepository.WithPending((1, 1211), (2, 99700)),
+                NullLogger<GiftListService>.Instance),
+            NullLogger<GiftListHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
 
         await handler.HandleAsync(new GiftListRequest(), session, CancellationToken.None);
@@ -41,7 +47,9 @@ public class ClGiftInfoSendHandlerTests
     public async Task HandleAsync_MoreThanTenPendingGifts_OnlyShowsFirstTen()
     {
         var pending = Enumerable.Range(1, 15).Select(i => (i, (int?)i)).ToArray();
-        var handler = new GiftListHandler(new GiftListService(FakeGiftRepository.WithPending(pending)));
+        var handler = new GiftListHandler(
+            new GiftListService(FakeGiftRepository.WithPending(pending), NullLogger<GiftListService>.Instance),
+            NullLogger<GiftListHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
 
         await handler.HandleAsync(new GiftListRequest(), session, CancellationToken.None);

@@ -3,11 +3,13 @@ using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Serialization.Packets.Shared;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Progression;
 
 /// <summary>Business logic extracted from <c>AutoHuntToggleHandler</c> (CZ_AUTO_CONFIG_SEND, opcode 99).</summary>
-public sealed class AutoHuntToggleService(ICharacterRepository characters) : IAutoHuntToggleService
+public sealed class AutoHuntToggleService(ICharacterRepository characters, ILogger<AutoHuntToggleService> logger)
+    : IAutoHuntToggleService
 {
     /// <summary>FEQUIP_TYPE::EWEAPON slot index.</summary>
     private const byte WeaponSlot = 7;
@@ -39,7 +41,12 @@ public sealed class AutoHuntToggleService(ICharacterRepository characters) : IAu
                                  (packet.AutoHunt.AttackType[0] != 0 || packet.AutoHunt.AttackType[2] != 0);
 
             if (DisallowedZones.Contains(zone.MapId) || !hasWeapon || !hasAttackSkill)
+            {
+                logger.LogDebug(
+                    "Auto-hunt enable rejected for character {CharacterId} on map {MapId}: disallowedZone={DisallowedZone} hasWeapon={HasWeapon} hasAttackSkill={HasAttackSkill}",
+                    characterId, zone.MapId, DisallowedZones.Contains(zone.MapId), hasWeapon, hasAttackSkill);
                 return new AutoHuntToggleResult(true, false);
+            }
         }
 
         var enabled = packet.Sort == 1;

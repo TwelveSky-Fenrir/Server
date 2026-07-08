@@ -5,6 +5,7 @@ using Fenrir.Data.Abstractions.Characters;
 using Fenrir.Data.Abstractions.Guilds;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Login;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Login.Tests.Handlers;
 
@@ -54,8 +55,9 @@ public class ClChangeAvatarNameSendHandlerTests
             friends ?? FakeFriendRepository.Empty(),
             mentors ?? FakeMentorRepository.Empty(),
             renames ?? FakeCharacterRenameRepository.ReturningResult(0),
-            eventLog ?? new FakeEventLogRepository());
-        return new RenameAvatarHandler(service);
+            eventLog ?? new FakeEventLogRepository(),
+            NullLogger<RenameAvatarService>.Instance);
+        return new RenameAvatarHandler(service, NullLogger<RenameAvatarHandler>.Instance);
     }
 
     private static FakeCharacterRepository CharactersWithRenameScroll()

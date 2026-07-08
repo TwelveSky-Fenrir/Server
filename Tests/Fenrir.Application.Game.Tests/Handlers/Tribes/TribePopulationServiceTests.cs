@@ -21,7 +21,7 @@ public class TribePopulationServiceTests
     }
 
     [Fact]
-    public void GetConnectedUserCounts_CountsEveryTribeAcrossEveryZone()
+    public void GetConnectedUserCounts_ScopesToRequestersOwnZoneOnly()
     {
         var registry = CreateRegistry(1, 2);
 
@@ -35,24 +35,31 @@ public class TribePopulationServiceTests
         registry[1].Tick(TimeSpan.FromMilliseconds(50));
         registry[2].Tick(TimeSpan.FromMilliseconds(50));
 
-        var service = new TribePopulationService(registry);
+        var service = new TribePopulationService(NullLogger<TribePopulationService>.Instance);
 
-        var counts = service.GetConnectedUserCounts();
+        // Requester on map 1 only sees map 1's population, not map 2's -- matching the legacy
+        // one-process-per-map semantics (TribePopulation behavior contract).
+        var counts = service.GetConnectedUserCounts(registry[1]);
 
         Assert.Equal(4, counts.Count);
         Assert.Equal(2, counts[0]);
-        Assert.Equal(1, counts[1]);
+        Assert.Equal(0, counts[1]);
         Assert.Equal(0, counts[2]);
         Assert.Equal(0, counts[3]);
+
+        var countsOnMap2 = service.GetConnectedUserCounts(registry[2]);
+
+        Assert.Equal(0, countsOnMap2[0]);
+        Assert.Equal(1, countsOnMap2[1]);
     }
 
     [Fact]
-    public void GetConnectedUserCounts_NoPlayersAnywhere_AllZero()
+    public void GetConnectedUserCounts_NoPlayersInZone_AllZero()
     {
         var registry = CreateRegistry(1);
-        var service = new TribePopulationService(registry);
+        var service = new TribePopulationService(NullLogger<TribePopulationService>.Instance);
 
-        var counts = service.GetConnectedUserCounts();
+        var counts = service.GetConnectedUserCounts(registry[1]);
 
         Assert.Equal(4, counts.Count);
         for (var i = 0; i < 4; i++)

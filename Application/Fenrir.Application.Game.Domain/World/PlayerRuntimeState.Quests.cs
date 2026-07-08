@@ -29,10 +29,11 @@ public partial class PlayerRuntimeState
     public int QuestKillCounter { get; set; }
 
     /// <summary>
-    ///     Legacy <c>aMissionDate.aJoinWar</c> -- gates the daily-mission reward claim (&gt;= 1). Its only
-    ///     verified increment hook lives inside the war-event state machines (out of scope here), so this
-    ///     stays 0 for every character until that subsystem exists -- a real, correctly-gated, but currently
-    ///     unreachable mechanic, not a stub.
+    ///     Legacy <c>aMissionDate.aJoinWar</c> -- gates the daily-mission reward claim (&gt;= 1). Incremented
+    ///     (capped at 1) by <see cref="Zone.HandleRegularWarConclusionCredit" /> for every ready,
+    ///     non-zone-transferring character present in a map when that map's own Regular War (Zone049)
+    ///     concludes -- see that method's own remarks for the citation and for why only Regular War, not the
+    ///     three uncited near-duplicate legacy call sites for other war-type state machines, is wired today.
     /// </summary>
     public int MissionJoinWar { get; set; }
 

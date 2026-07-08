@@ -3,6 +3,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
@@ -11,12 +12,18 @@ namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 ///     CZ_PARTY_BREAK_SEND). Deviation: dropping to 1 member auto-disbands here; legacy leaves a lone
 ///     leader "partied" until an explicit Break.
 /// </summary>
-public sealed class PartyLeaveHandler(ZoneRegistry zones, IPartyLeaveService partyLeaveService)
-    : IInlinePacketHandler<PartyLeaveRequest>
+public sealed class PartyLeaveHandler(
+    ZoneRegistry zones,
+    IPartyLeaveService partyLeaveService,
+    ILogger<PartyLeaveHandler> logger) : IInlinePacketHandler<PartyLeaveRequest>
 {
     public void Handle(in PartyLeaveRequest packet, IPacketSession session)
     {
         var zoneSession = (ZoneClientSession)session;
+
+        logger.LogDebug("PartyLeave: session {SessionId} character {CharacterId}", session.SessionId,
+            zoneSession.CharacterId);
+
         var characterId = zoneSession.CharacterId!.Value;
 
         if (!zones.TryGetPlayer(characterId, out var leaver))

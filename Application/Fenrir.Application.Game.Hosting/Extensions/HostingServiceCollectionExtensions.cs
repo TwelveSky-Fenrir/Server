@@ -101,6 +101,14 @@ public static class HostingServiceCollectionExtensions
         services.AddSingleton<IEventLogQueue>(sp => sp.GetRequiredService<EventLogFlushHost>());
         services.AddHostedService(sp => sp.GetRequiredService<EventLogFlushHost>());
 
+        // Cross-shard fan-out for GuildAnnouncement/GuildChat/TribeAnnouncement/TribeAnnouncementScroll --
+        // same "one instance, three registrations" pattern as EventLogFlushHost above: the four cluster-wide
+        // broadcast *.Services producers consume IGuildTribeBroadcastRelayQueue only.
+        services.AddSingleton<GuildTribeBroadcastRelayHost>();
+        services.AddSingleton<IGuildTribeBroadcastRelayQueue>(sp =>
+            sp.GetRequiredService<GuildTribeBroadcastRelayHost>());
+        services.AddHostedService(sp => sp.GetRequiredService<GuildTribeBroadcastRelayHost>());
+
         services.AddSingleton(sp =>
         {
             var opts = sp.GetRequiredService<IOptions<GameServerOptions>>().Value;

@@ -5,6 +5,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers;
 
@@ -17,7 +18,7 @@ namespace Fenrir.Application.Game.Handlers.Handlers;
 ///     is not reproduced here -- same precedent as <see cref="CraftPetHandler" />'s own remarks (no
 ///     single-process equivalent for that cross-server notice).
 /// </summary>
-public sealed class CraftItemHandler(ICraftItemService craftItemService)
+public sealed class CraftItemHandler(ICraftItemService craftItemService, ILogger<CraftItemHandler> logger)
     : IAsyncPacketHandler<CraftItemRequest>
 {
     public async ValueTask HandleAsync(CraftItemRequest packet, IPacketSession session,
@@ -27,9 +28,19 @@ public sealed class CraftItemHandler(ICraftItemService craftItemService)
         var characterId = zoneSession.CharacterId!.Value;
         var accountId = zoneSession.AccountId!.Value;
 
+        if (logger.IsEnabled(LogLevel.Debug))
+            logger.LogDebug(
+                "Session {SessionId} character {CharacterId}: CraftItemRequest received, recipe sort {Sort}",
+                zoneSession.SessionId, characterId, packet.Sort);
+
         if (zoneSession.CurrentZone is not Zone zone || !zone.TryGetPlayer(characterId, out var state) ||
             state is null)
+        {
+            logger.LogDebug(
+                "Session {SessionId} character {CharacterId}: CraftItemRequest dropped, no live zone/player state",
+                zoneSession.SessionId, characterId);
             return;
+        }
 
         // Serializes the read/SQL/mirror sequence per character to close an item-duplication window.
         await state.EconomyActionLock.WaitAsync(cancellationToken);
@@ -216,6 +227,9 @@ public sealed class CraftItemHandler(ICraftItemService craftItemService)
                     return;
                 }
                 default:
+                    logger.LogInformation(
+                        "Session {SessionId} character {CharacterId}: CraftItemRequest aborted, unrecognized recipe sort {Sort}",
+                        zoneSession.SessionId, characterId, packet.Sort);
                     zoneSession.Abort(DisconnectReason.Faulted);
                     return;
             }

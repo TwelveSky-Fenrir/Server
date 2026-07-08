@@ -50,19 +50,24 @@ public sealed class LoginClientSession(
 
     public void MarkVersionOk()
     {
+        var previous = State;
         State = LoginSessionState.VersionOk;
+        LogSessionStateChanged(previous, State);
     }
 
     // accountGrade is optional so every existing call site that never dealt with GM elevation keeps
     // compiling unchanged; LoginService's success branch always supplies the real value.
     public void MarkAuthenticated(int accountId, short accountGrade = 0)
     {
+        var previous = State;
         AccountId = accountId;
         AccountGrade = accountGrade;
         State = LoginSessionState.Authenticated;
+        LogSessionStateChanged(previous, State);
     }
 
     /// <summary>Records the token <c>usp_AccountSession_ClaimOrSignalKick</c> minted for this login epoch.</summary>
+    /// <remarks>Never changes <see cref="State" /> -- an ancillary fact, not a state transition, so no log here.</remarks>
     public void MarkAccountSessionToken(Guid token)
     {
         AccountSessionToken = token;
@@ -74,8 +79,10 @@ public sealed class LoginClientSession(
     /// </summary>
     public void MarkPinRequired()
     {
+        var previous = State;
         PinFailureCount = 0;
         State = LoginSessionState.PinRequired;
+        LogSessionStateChanged(previous, State);
     }
 
     /// <summary>Returns the new consecutive-mismatch count (legacy <c>++mSecondLoginTryNum</c>).</summary>
@@ -86,11 +93,15 @@ public sealed class LoginClientSession(
 
     public void MarkCharSelect()
     {
+        var previous = State;
         State = LoginSessionState.CharSelect;
+        LogSessionStateChanged(previous, State);
     }
 
     public void MarkHandoverIssued()
     {
+        var previous = State;
         State = LoginSessionState.HandoverIssued;
+        LogSessionStateChanged(previous, State);
     }
 }

@@ -3,19 +3,24 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
 /// <summary>
-///     CZ_TEACHER_STATE_SEND (opcode 64) -- open issue: a character with both a teacher and a student
-///     prefers the teacher-side check here, not fully re-verified against source.
+///     CZ_TEACHER_STATE_SEND (opcode 64). See <c>MentorStatusService</c>'s own remarks for why a character
+///     holding both a teacher and a student simultaneously is structurally unreachable under the legacy
+///     Mentor-Ask gate, not an unresolved teacher-vs-student precedence rule.
 /// </summary>
-public sealed class MentorStatusHandler(IMentorStatusService mentorStatusService)
+public sealed class MentorStatusHandler(IMentorStatusService mentorStatusService, ILogger<MentorStatusHandler> logger)
     : IInlinePacketHandler<MentorStatusRequest>
 {
     public void Handle(in MentorStatusRequest packet, IPacketSession session)
     {
         var zoneSession = (ZoneClientSession)session;
+
+        logger.LogDebug("MentorStatus: session {SessionId} character {CharacterId}", session.SessionId,
+            zoneSession.CharacterId);
 
         if (zoneSession.CurrentZone is not Zone zone)
             return;

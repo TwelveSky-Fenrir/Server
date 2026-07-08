@@ -169,11 +169,13 @@ public static class Opcodes
             public const byte PetActionUpdate = 156;
             public const byte RuneSocket = 157;
 
-            /// <summary>
-            ///     Fenrir-only dedicated GM command; legacy multiplexed this as PROCESS_DATA_SEND sub-command 519
-            ///     (Server/ts25zone/S04_MyWork04.cpp:1487-1515), which Fenrir does not reuse.
-            /// </summary>
-            public const byte GmBlockAvatar = 158;
+            // 158 was previously a Fenrir-only synthetic assignment for GM-BLOCK. Retired: legacy has no
+            // dedicated wire opcode for that command at all -- it is PROCESS_DATA_SEND sub-command 519
+            // (Server/ts25zone/S04_MyWork04.cpp:1487-1515), riding inside the generic GenericAction envelope
+            // (opcode 19) every other tSort in that family already uses. No real client ever transmits opcode
+            // 158, so routing GM-BLOCK through a dedicated opcode made it unreachable; see
+            // GmBlockAvatarPayload/GmBlockAvatarService and GenericActionHandler's own tSort 519 branch.
+            // Deliberately left unassigned rather than reused for an unrelated Fenrir feature.
         }
 
         public static class Outgoing

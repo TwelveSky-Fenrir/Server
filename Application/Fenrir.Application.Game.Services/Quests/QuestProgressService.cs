@@ -57,6 +57,9 @@ public sealed class QuestProgressService(
 
         await PersistAndMirrorAsync(zone, characterId, result.NewProgress, 0, 0, 0, 0, edits, ct);
 
+        logger.LogInformation("Character {CharacterId} accepted quest step {StepPermanent} (activeFlag {ActiveFlag})",
+            characterId, result.NewProgress.StepPermanent, result.NewProgress.ActiveFlag);
+
         return new QuestActionResult(true);
     }
 
@@ -125,6 +128,11 @@ public sealed class QuestProgressService(
                     : null,
                 ct);
 
+        logger.LogInformation(
+            "Character {CharacterId} completed quest step {StepPermanent}: money {MoneyReward}, experience {ExperienceReward}, item {RewardItemId}x{RewardItemQuantity} granted={ItemRewardGranted}",
+            characterId, result.NewProgress.StepPermanent, result.MoneyReward, result.ExperienceReward,
+            result.RewardItemId, result.RewardItemQuantity, itemRewardGranted);
+
         return new QuestActionResult(true);
     }
 
@@ -160,6 +168,9 @@ public sealed class QuestProgressService(
                 "Zone {MapId} inventory inbox full: dropped quest-receive mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
                 zone.MapId, characterId);
 
+        logger.LogInformation("Character {CharacterId} received quest item {ItemId} into container {Container} slot {Slot}",
+            characterId, depositItemId, container, slot);
+
         return new QuestActionResult(true);
     }
 
@@ -180,11 +191,19 @@ public sealed class QuestProgressService(
         if (!result.Success)
             return new QuestActionResult(false);
 
-        if (!edits.TryReplaceFirstMatch(result.FromItemId, _ =>
-                new ItemStack(result.ToItemId, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)))
-            return new QuestActionResult(false);
+        // Legacy quirk (ChangeQuestItem, Server/ts25zone/S07_MyGame04.cpp:2223-2244): the inventory
+        // scan-and-swap's found/not-found signal is discarded by the caller. If the avatar no longer holds
+        // the "before" item anywhere (already exchanged, traded away, or otherwise missing), no item is
+        // physically changed, but quest-progress state still advances to "after exchange" exactly as if the
+        // swap had succeeded -- there is no failure path tied to the swap itself.
+        edits.TryReplaceFirstMatch(result.FromItemId, _ =>
+            new ItemStack(result.ToItemId, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0));
 
         await PersistAndMirrorAsync(zone, characterId, result.NewProgress, 0, 0, 0, 0, edits, ct);
+
+        logger.LogInformation(
+            "Character {CharacterId} exchanged quest item {FromItemId} for {ToItemId} (step {StepPermanent})",
+            characterId, result.FromItemId, result.ToItemId, result.NewProgress.StepPermanent);
 
         return new QuestActionResult(true);
     }
@@ -216,6 +235,9 @@ public sealed class QuestProgressService(
             logger.LogError(
                 "Zone {MapId} quest inbox full: dropped abandon mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
                 zone.MapId, characterId);
+
+        logger.LogInformation("Character {CharacterId} abandoned quest step {StepPermanent}", characterId,
+            newProgress.StepPermanent);
 
         return new QuestActionResult(true);
     }

@@ -130,7 +130,40 @@ public sealed class RegularWarSchedulerHost(
         var rewards = RegularWarRewardCalculator.Compute(outcome, winningTribe, allyOfWinningTribe, mapConfig,
             participants, topKillers, rewardValues);
 
+        CreditDailyMissionAndWaterfallQuest(zone);
+
         sink.OnWarConcluded(mapConfig.MapId, outcome, winningTribe, rewards, bossMonstersShouldSpawn);
+    }
+
+    /// <summary>
+    ///     Daily-mission "join war" credit and archetype-8 waterfall-quest step credit -- this cluster's own
+    ///     behavior contract ("War Conclusion -- Daily-Mission 'Join War' Credit and Waterfall-Quest Step
+    ///     Credit"), Réf. C++ : Server/ts25zone/S07_MyGame01.cpp:5293-5314. Applies to every character this
+    ///     host still finds tracked in <paramref name="zone" /> at conclusion time, excluding only
+    ///     <see cref="PlayerRuntimeState.IsMovingZone" /> ("non-zone-transferring" per the contract) --
+    ///     deliberately NOT restricted to <see cref="BuildParticipants" />'s own list (which
+    ///     <see cref="RegularWarRewardCalculator" /> turns into money/XP/CP grants): the contract states this
+    ///     credit "is unrelated to a given player's own participation beyond having that specific quest
+    ///     active," so every present, ready, non-transferring character qualifies, not only ones who fought.
+    /// </summary>
+    /// <remarks>
+    ///     Posts one <see cref="ZoneCommand.CreditRegularWarConclusion" /> per qualifying character rather than
+    ///     mutating <see cref="PlayerRuntimeState" /> directly from this host's own background-timer thread --
+    ///     preserving the single-writer-per-zone invariant, same precedent as
+    ///     <c>MuteRefreshPollHost.PollOnceAsync</c>'s own <see cref="ZoneCommand.SetMuted" /> posting loop. A
+    ///     dropped post (full inbox, or the character already left between this snapshot and the command
+    ///     draining) just means this specific credit is missed for that character this cycle -- same
+    ///     never-blocks-never-retries posture as every other <see cref="Zone.Post" /> caller in this codebase.
+    /// </remarks>
+    private static void CreditDailyMissionAndWaterfallQuest(Zone zone)
+    {
+        foreach (var player in zone.Players)
+        {
+            if (player.IsMovingZone)
+                continue;
+
+            zone.Post(ZoneCommand.CreditRegularWarConclusion(player.CharacterId));
+        }
     }
 
     private RegularWarSchedule GetOrCreateSchedule(RegularWarMapConfig mapConfig)

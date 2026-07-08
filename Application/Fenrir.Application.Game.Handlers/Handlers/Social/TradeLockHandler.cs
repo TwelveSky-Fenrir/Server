@@ -3,6 +3,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
@@ -17,14 +18,18 @@ namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 ///     Both players' <see cref="PlayerRuntimeState.EconomyActionLock" /> are acquired in a fixed order
 ///     (smaller CharacterId first) to rule out lock-ordering deadlock.
 /// </remarks>
-public sealed class TradeLockHandler(ZoneRegistry zones, ITradeLockService tradeLockService)
-    : IAsyncPacketHandler<TradeLockRequest>
+public sealed class TradeLockHandler(
+    ZoneRegistry zones,
+    ITradeLockService tradeLockService,
+    ILogger<TradeLockHandler> logger) : IAsyncPacketHandler<TradeLockRequest>
 {
     public async ValueTask HandleAsync(TradeLockRequest packet, IPacketSession session,
         CancellationToken cancellationToken)
     {
         var zoneSession = (ZoneClientSession)session;
         var characterId = zoneSession.CharacterId!.Value;
+
+        logger.LogDebug("TradeLock: session {SessionId} character {CharacterId}", session.SessionId, characterId);
 
         var attempt = tradeLockService.TryLock(characterId);
         if (!attempt.Locked)

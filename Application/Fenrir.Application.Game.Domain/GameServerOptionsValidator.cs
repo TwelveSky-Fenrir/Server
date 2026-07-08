@@ -48,6 +48,12 @@ public sealed class GameServerOptionsValidator : IValidateOptions<GameServerOpti
         if (options.SessionLivenessSweepIntervalSeconds <= 0)
             errors.Add(
                 $"Game:SessionLivenessSweepIntervalSeconds must be positive (was {options.SessionLivenessSweepIntervalSeconds}).");
+        if (options.GuildTribeBroadcastPollIntervalSeconds <= 0)
+            errors.Add(
+                $"Game:GuildTribeBroadcastPollIntervalSeconds must be positive (was {options.GuildTribeBroadcastPollIntervalSeconds}).");
+        if (options.GuildTribeBroadcastRetentionSeconds <= 0)
+            errors.Add(
+                $"Game:GuildTribeBroadcastRetentionSeconds must be positive (was {options.GuildTribeBroadcastRetentionSeconds}).");
 
         // Each singleton RvR scheduler is armed by "does this shard host the designated map", not ShardId --
         // an operator who flips the *Enabled flag on must also name which map arms it, or the scheduler is

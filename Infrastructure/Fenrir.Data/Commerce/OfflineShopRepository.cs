@@ -110,14 +110,20 @@ public sealed record OfflineShopRepository(ICaeriusNetDbContext Db) : IOfflineSh
         await Db.ExecuteAsync(builder.Build(), ct);
     }
 
-    /// <summary>Atomic earnings withdrawal; throws SQL 50276 (stale/not closed/nothing to withdraw) or 50261 (money cap).</summary>
+    /// <summary>
+    ///     Atomic earnings withdrawal; throws SQL 50340 (both pending amounts are zero -- "nothing to
+    ///     withdraw", checked first and independently of the shop row itself), 50276 (stale-client
+    ///     mismatch, shop not closed, or shop expired as of <paramref name="todayDate" />), 50333 (BigMoney
+    ///     cap), or 50261 (money cap).
+    /// </summary>
     public async ValueTask WithdrawMoneyAsync(int characterId, int expectedMoney, int expectedBigMoney,
-        CancellationToken ct)
+        int todayDate, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_OfflineShop_WithdrawMoney", 0)
             .AddParameter("CharacterId", characterId, SqlDbType.Int)
             .AddParameter("ExpectedMoney", expectedMoney, SqlDbType.Int)
             .AddParameter("ExpectedBigMoney", expectedBigMoney, SqlDbType.Int)
+            .AddParameter("TodayDate", todayDate, SqlDbType.Int)
             .Build();
 
         await Db.ExecuteAsync(sp, ct);

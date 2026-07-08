@@ -2,6 +2,7 @@ using System.Collections.Frozen;
 using System.Collections.Immutable;
 using Fenrir.Application.Game.Abstractions.ItemModification;
 using Fenrir.Application.Game.Domain.Inventory;
+using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Services.ItemModification;
@@ -88,6 +89,9 @@ public class EnchantItemServiceTests
     public async Task GuaranteedSuccessMaterial_AppliedAndLogsAttempt()
     {
         var (session, _, zone, state, repo, eventLog) = SetUp();
+        // See WingTarget_DeductsContributionPoints_NotMoney's own remarks: back-date past the same-tick
+        // anti-spam gate so this test exercises the guaranteed-success roll itself, not that unrelated gate.
+        state.LastEnchantAttemptUtc = DateTime.UtcNow - SimulationClock.LegacyTick - TimeSpan.FromMilliseconds(1);
         SeedInventory(zone, new ItemStack(TargetItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 777),
             new ItemStack(GuaranteedSuccessMaterialId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0));
         var service = CreateService(repo, eventLog);
@@ -131,18 +135,61 @@ public class EnchantItemServiceTests
         Assert.Empty(eventLog.Enqueued);
     }
 
+    /// <summary>
+    ///     Wings (Sort==6) now resolve through the same <c>EnchantResolver</c> machinery as any other
+    ///     equipment slot (see that type's remarks) -- the only observable difference is that
+    ///     <c>EnchantResolver.EnchantResult.IsWing</c> routes Cost to CP instead of money/tribe-bank credit.
+    /// </summary>
     [Fact]
-    public async Task WingTarget_NotSupported_NotLogged()
+    public async Task WingTarget_DeductsContributionPoints_NotMoney()
     {
         var itemsById = new Dictionary<int, ItemDefinition>
         {
             [TargetItemId] = new(WorldDataTestRows.Item(TargetItemId) with { Sort = 6, CheckImprove = 2 }, []),
-            [GuaranteedSuccessMaterialId] = new(WorldDataTestRows.Item(GuaranteedSuccessMaterialId), [])
+            [PaidMaterialId] = new(WorldDataTestRows.Item(PaidMaterialId), [])
         }.ToFrozenDictionary();
 
         var (_, _, zone, state, repo, eventLog) = SetUp();
+        state.ContributionPoints = 50_000;
+        // PlayerRuntimeState.LastEnchantAttemptUtc defaults to DateTime.UtcNow at construction (see its own
+        // remarks) so op24's same-tick anti-spam gate applies even to a freshly-entered avatar's first
+        // attempt -- back-date it past SimulationClock.LegacyTick so this test exercises the CP-deduction
+        // path itself, not that unrelated gate.
+        state.LastEnchantAttemptUtc = DateTime.UtcNow - SimulationClock.LegacyTick - TimeSpan.FromMilliseconds(1);
         SeedInventory(zone, new ItemStack(TargetItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1),
-            new ItemStack(GuaranteedSuccessMaterialId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0));
+            new ItemStack(PaidMaterialId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0));
+        var service = new EnchantItemService(repo, ZoneTestKit.EmptyWorldData(itemsById), eventLog,
+            NullLogger<EnchantItemService>.Instance);
+
+        var result = await RunToCompletionAsync(
+            service.EnchantAsync(new EnchantItemRequest { Page1 = 0, Index1 = 0, Page2 = 0, Index2 = 1, Luck = 0 },
+                zone, state, 10, CancellationToken.None), zone);
+
+        Assert.Equal(EnchantItemOutcome.Applied, result.Outcome);
+        Assert.Equal(0, result.ResultCode);
+        Assert.Equal(10_000, result.Cost);
+        Assert.NotNull(repo.LastAdjustMoneyAndReplaceContainer);
+        Assert.Equal(0, repo.LastAdjustMoneyAndReplaceContainer!.Value.DeltaMoney);
+        Assert.Equal(40_000, state.ContributionPoints);
+
+        var logged = Assert.Single(eventLog.Enqueued);
+        Assert.Null(logged.DeltaMoney);
+    }
+
+    [Fact]
+    public async Task WingTarget_InsufficientContributionPoints_RejectedBeforeAnyMutation()
+    {
+        var itemsById = new Dictionary<int, ItemDefinition>
+        {
+            [TargetItemId] = new(WorldDataTestRows.Item(TargetItemId) with { Sort = 6, CheckImprove = 2 }, []),
+            [PaidMaterialId] = new(WorldDataTestRows.Item(PaidMaterialId), [])
+        }.ToFrozenDictionary();
+
+        var (_, _, zone, state, repo, eventLog) = SetUp();
+        state.ContributionPoints = 1;
+        state.LastEnchantAttemptUtc = DateTime.UtcNow - SimulationClock.LegacyTick - TimeSpan.FromMilliseconds(1);
+        SeedInventory(zone, new ItemStack(TargetItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1),
+            new ItemStack(PaidMaterialId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0));
         var service = new EnchantItemService(repo, ZoneTestKit.EmptyWorldData(itemsById), eventLog,
             NullLogger<EnchantItemService>.Instance);
 
@@ -150,7 +197,8 @@ public class EnchantItemServiceTests
             new EnchantItemRequest { Page1 = 0, Index1 = 0, Page2 = 0, Index2 = 1, Luck = 0 }, zone, state, 10,
             CancellationToken.None);
 
-        Assert.Equal(EnchantItemOutcome.NotSupported, result.Outcome);
+        Assert.Equal(EnchantItemOutcome.Rejected, result.Outcome);
+        Assert.Equal(1, state.ContributionPoints);
         Assert.Null(repo.LastAdjustMoneyAndReplaceContainer);
         Assert.Empty(eventLog.Enqueued);
     }
@@ -170,5 +218,49 @@ public class EnchantItemServiceTests
 
         Assert.Equal(EnchantItemOutcome.Rejected, result.Outcome);
         Assert.Empty(eventLog.Enqueued);
+    }
+
+    /// <summary>
+    ///     "Sweet potato" (Lucky Enchant Scroll, <see cref="PlayerRuntimeState.ImproveItemValue" />) is
+    ///     unconditionally consumed and durably mirrored once the roll has happened -- exercised here via the
+    ///     guaranteed-success material so the outcome (and therefore charge consumption) is deterministic; the
+    ///     probability-bonus magnitude itself is not yet applied, see <c>EnchantResolver</c>'s own remarks.
+    /// </summary>
+    [Fact]
+    public async Task ImproveItemValueCharge_Present_ConsumedAndMirroredOnSuccess()
+    {
+        var (_, _, zone, state, repo, eventLog) = SetUp();
+        state.ImproveItemValue = 3;
+        // See WingTarget_DeductsContributionPoints_NotMoney's own remarks: back-date past the same-tick
+        // anti-spam gate so this test exercises charge consumption, not that unrelated gate.
+        state.LastEnchantAttemptUtc = DateTime.UtcNow - SimulationClock.LegacyTick - TimeSpan.FromMilliseconds(1);
+        SeedInventory(zone, new ItemStack(TargetItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 777),
+            new ItemStack(GuaranteedSuccessMaterialId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0));
+        var service = CreateService(repo, eventLog);
+
+        var result = await RunToCompletionAsync(
+            service.EnchantAsync(new EnchantItemRequest { Page1 = 0, Index1 = 0, Page2 = 0, Index2 = 1, Luck = 0 },
+                zone, state, 10, CancellationToken.None), zone);
+
+        Assert.Equal(EnchantItemOutcome.Applied, result.Outcome);
+        Assert.Equal(2, state.ImproveItemValue);
+    }
+
+    /// <summary>No charge present -- ImproveItemValue must stay untouched (still 0), no spurious mirror posted.</summary>
+    [Fact]
+    public async Task ImproveItemValueCharge_Absent_NotTouched()
+    {
+        var (_, _, zone, state, repo, eventLog) = SetUp();
+        state.LastEnchantAttemptUtc = DateTime.UtcNow - SimulationClock.LegacyTick - TimeSpan.FromMilliseconds(1);
+        SeedInventory(zone, new ItemStack(TargetItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 777),
+            new ItemStack(GuaranteedSuccessMaterialId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0));
+        var service = CreateService(repo, eventLog);
+
+        var result = await RunToCompletionAsync(
+            service.EnchantAsync(new EnchantItemRequest { Page1 = 0, Index1 = 0, Page2 = 0, Index2 = 1, Luck = 0 },
+                zone, state, 10, CancellationToken.None), zone);
+
+        Assert.Equal(EnchantItemOutcome.Applied, result.Outcome);
+        Assert.Equal(0, state.ImproveItemValue);
     }
 }

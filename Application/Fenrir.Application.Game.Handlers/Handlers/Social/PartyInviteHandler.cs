@@ -3,6 +3,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
@@ -10,12 +11,16 @@ namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 ///     CZ_PARTY_ASK_SEND (opcode 65) -- level-gap check delegates to <c>PartyInviteService.Invite</c>, which
 ///     uses <see cref="PlayerRuntimeState.CombinedLevel" /> (aLevel1+aLevel2) on both sides.
 /// </summary>
-public sealed class PartyInviteHandler(IPartyInviteService partyInviteService)
+public sealed class PartyInviteHandler(IPartyInviteService partyInviteService, ILogger<PartyInviteHandler> logger)
     : IInlinePacketHandler<PartyInviteRequest>
 {
     public void Handle(in PartyInviteRequest packet, IPacketSession session)
     {
         var zoneSession = (ZoneClientSession)session;
+
+        logger.LogDebug(
+            "PartyInvite: session {SessionId} character {CharacterId} target {TargetAvatarName}",
+            session.SessionId, zoneSession.CharacterId, packet.AvatarName);
 
         if (zoneSession.CurrentZone is not Zone zone)
             return;

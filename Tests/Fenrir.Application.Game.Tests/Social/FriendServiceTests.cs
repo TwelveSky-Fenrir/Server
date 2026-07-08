@@ -1,6 +1,11 @@
 using System.Collections.ObjectModel;
 using Fenrir.Application.Game.Abstractions.Social;
+using Fenrir.Application.Game.Domain.Guilds;
+using Fenrir.Application.Game.Domain.Social.Duel;
 using Fenrir.Application.Game.Domain.Social.Friends;
+using Fenrir.Application.Game.Domain.Social.Mentor;
+using Fenrir.Application.Game.Domain.Social.Party;
+using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Services.Social;
 using Fenrir.Application.Game.Tests.TestSupport;
@@ -39,7 +44,9 @@ public class FriendServiceTests
     private static FriendService CreateService(ZoneRegistry zones, FriendRegistry friends,
         ICharacterShardLocationRepository directory)
     {
-        return new FriendService(zones, friends, new ThrowingFriendRepository(), directory);
+        return new FriendService(zones, friends, new DuelRegistry(), new TradeRegistry(), new PartyRegistry(),
+            new GuildInviteRegistry(), new MentorRegistry(), new ThrowingFriendRepository(), directory,
+            new CapturingLogger<FriendService>());
     }
 
     /// <summary>

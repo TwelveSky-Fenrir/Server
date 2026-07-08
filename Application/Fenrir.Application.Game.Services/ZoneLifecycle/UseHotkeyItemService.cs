@@ -32,7 +32,12 @@ public sealed class UseHotkeyItemService(
         // real slot (same discipline this service's own predecessor used for the inventory-page check it no
         // longer performs).
         if (!HotkeyActionResolver.IsValidPage(page) || !HotkeyActionResolver.IsValidIndex(index))
+        {
+            logger.LogInformation(
+                "Character {CharacterId} use-hotkey-item disconnect: invalid page/index ({Page}:{Index})",
+                characterId, page, index);
             return UseHotkeyItemOutcome.Disconnect;
+        }
 
         var pageByte = (byte)page;
         var indexByte = (byte)index;
@@ -61,8 +66,14 @@ public sealed class UseHotkeyItemService(
         switch (resolved.Outcome)
         {
             case HotkeyItemConsumptionResolver.Outcome.Disconnect:
+                logger.LogInformation(
+                    "Character {CharacterId} use-hotkey-item disconnect: resolver rejected slot ({Page}:{Index}) as malformed/stale",
+                    characterId, page, index);
                 return UseHotkeyItemOutcome.Disconnect;
             case HotkeyItemConsumptionResolver.Outcome.RejectedClean:
+                logger.LogDebug(
+                    "Character {CharacterId} use-hotkey-item rejected (clean) at slot ({Page}:{Index})",
+                    characterId, page, index);
                 return UseHotkeyItemOutcome.RejectedClean;
         }
 
@@ -96,6 +107,10 @@ public sealed class UseHotkeyItemService(
             logger.LogError(
                 "Zone {MapId} hotkey-slot inbox full: dropped hotkey-item-use mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
                 zone.MapId, characterId);
+
+        logger.LogInformation(
+            "Character {CharacterId} use-hotkey-item applied: slot ({Page}:{Index}) effect {Effect}, life+{LifeGain} mana+{ManaGain}",
+            characterId, page, index, resolved.Effect, lifeGain ?? 0, manaGain ?? 0);
 
         return UseHotkeyItemOutcome.Success;
     }

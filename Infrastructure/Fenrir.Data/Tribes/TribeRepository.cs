@@ -89,7 +89,10 @@ public sealed record TribeRepository(ICaeriusNetDbContext Db) : ITribeRepository
         return await Db.QueryAsReadOnlyCollectionAsync<TribeBankSlotDto>(sp, ct);
     }
 
-    /// <summary>CZ_TRIBE_BANK_SEND sort 2; throws SQL 50210 (empty slot) or 50261 (would exceed the legacy money cap).</summary>
+    /// <summary>
+    ///     Not reachable via CZ_TRIBE_BANK_SEND -- see the remarks on <see cref="ITribeRepository.WithdrawBankAsync" />.
+    ///     Throws SQL 50210 (empty slot) or 50261 (would exceed the legacy money cap).
+    /// </summary>
     public async ValueTask<long> WithdrawBankAsync(byte tribeId, byte slotIndex, int characterId, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_TribeBank_Withdraw", 1)

@@ -15,6 +15,10 @@ namespace Fenrir.Application.Game.Domain.Forge;
 ///     <c>ReturnWarlordForUpgrade</c>/a Warlord item catalog Fenrir doesn't have. Both degrade gracefully: the
 ///     plain (non-Warlord) result item is granted instead. <c>aHighItemValue</c> (the "lucky upgrade" charge)
 ///     has no acquisition path yet, same open issue as <see cref="CombineResolver" />'s <c>luckyComboCharges</c>.
+///     Unlike <c>luckyComboCharges</c>, the lucky-upgrade charge does NOT add a probability bonus in the source
+///     (S04_MyWork02.cpp:4051-4078, 4202-4230) -- it is consumed and reported unconditionally, but the roll
+///     probability itself is untouched. <see cref="RankChangeResult.ConsumesLuckyCharge" /> still reflects
+///     consumption for once an acquisition path exists.
 /// </remarks>
 public static class RankChangeResolver
 {
@@ -114,8 +118,6 @@ public static class RankChangeResolver
             return new RankChangeResult(RankChangeOutcome.NoCandidate, cost, 0, 0, 0, false);
 
         var luckyChargeConsumed = luckyUpgradeCharges > 0;
-        if (luckyChargeConsumed)
-            probability += 50;
 
         probability += (int)(luck / 300.0f);
 
@@ -153,8 +155,6 @@ public static class RankChangeResolver
             return new RankChangeResult(RankChangeOutcome.NoCandidate, cost, 0, 0, 0, false);
 
         var luckyChargeConsumed = luckyUpgradeCharges > 0;
-        if (luckyChargeConsumed)
-            probability += 5;
 
         probability += (int)(luck / 300.0f);
 

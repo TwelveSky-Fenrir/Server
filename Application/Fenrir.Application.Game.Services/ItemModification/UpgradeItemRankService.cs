@@ -43,7 +43,12 @@ public sealed class UpgradeItemRankService(
         var index2 = packet.Index2;
 
         if (!IsValidInventorySlot(page1, index1) || !IsValidInventorySlot(page2, index2))
+        {
+            logger.LogDebug(
+                "Character {CharacterId} upgrade-item-rank rejected: invalid slot(s) ({Page1}:{Index1} / {Page2}:{Index2})",
+                characterId, page1, index1, page2, index2);
             return new UpgradeItemRankResult(UpgradeItemRankOutcome.Rejected, false, 0, [0, 0, 0, 0, 0, 0]);
+        }
 
         var targetStack = state.Inventory.GetSlot((byte)page1, (byte)index1);
         var materialStack = state.Inventory.GetSlot((byte)page2, (byte)index2);
@@ -51,7 +56,12 @@ public sealed class UpgradeItemRankService(
         if (targetStack is not { } target || materialStack is not { } material ||
             !worldData.ItemsById.TryGetValue(target.ItemId, out var targetDefinition) ||
             !worldData.ItemsById.TryGetValue(material.ItemId, out var materialDefinition))
+        {
+            logger.LogDebug(
+                "Character {CharacterId} upgrade-item-rank rejected: target or material slot empty/unresolvable",
+                characterId);
             return new UpgradeItemRankResult(UpgradeItemRankOutcome.Rejected, false, 0, [0, 0, 0, 0, 0, 0]);
+        }
 
         var luck = state.Stats?.Luck ?? 0;
 
@@ -59,11 +69,21 @@ public sealed class UpgradeItemRankService(
             worldData.ItemsById.Values, SystemRandomSource.Instance);
 
         if (resolved.Outcome == RankChangeResolver.RankChangeOutcome.Rejected)
+        {
+            logger.LogInformation(
+                "Character {CharacterId} upgrade-item-rank rejected by resolver (target {TargetItemId}, material {MaterialItemId})",
+                characterId, target.ItemId, material.ItemId);
             return new UpgradeItemRankResult(UpgradeItemRankOutcome.Rejected, false, 0, [0, 0, 0, 0, 0, 0]);
+        }
 
         if (resolved.Outcome == RankChangeResolver.RankChangeOutcome.NoCandidate)
+        {
+            logger.LogInformation(
+                "Character {CharacterId} upgrade-item-rank found no candidate result item for target {TargetItemId}",
+                characterId, target.ItemId);
             return new UpgradeItemRankResult(UpgradeItemRankOutcome.NoCandidate, false, resolved.Cost,
                 [0, 0, 0, 0, 0, 0]);
+        }
 
         var succeeded = resolved.Outcome == RankChangeResolver.RankChangeOutcome.Success;
 
@@ -114,6 +134,13 @@ public sealed class UpgradeItemRankService(
             return new UpgradeItemRankResult(UpgradeItemRankOutcome.Rejected, false, 0, [0, 0, 0, 0, 0, 0]);
         }
 
+        // Server/ts25zone/S04_MyWork02.cpp:4077-4078 -- AddTribeBankInfo2 credits 1% of the already-charged
+        // upgrade cost to the tribe bank immediately after the debit. Never reached on the NoCandidate/
+        // result-2 path above -- matching legacy exactly, since the replacement-lookup failure there
+        // returns before either the debit or this credit line (S04_MyWork02.cpp:4060-4067 precedes the
+        // debit/credit at :4077-4078).
+        zone.CreditNpcServiceTribeTax(state.Tribe, resolved.Cost);
+
         if (!eventLogQueue.Enqueue(new EventLogEntryTvp(UpgradeItemRankEventCode, (byte)EventLogCategory.Enchant,
                 null, characterId, null, null, null, -(long)resolved.Cost, null, target.ItemId, target.Quantity,
                 succeeded ? SuccessOutcome : FailedOutcome,
@@ -144,6 +171,10 @@ public sealed class UpgradeItemRankService(
             logger.LogError(
                 "Zone {MapId} inventory inbox full: dropped upgrade-item-rank mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
                 zone.MapId, characterId);
+
+        logger.LogInformation(
+            "Character {CharacterId} upgrade-item-rank applied: target {TargetItemId} succeeded={Succeeded}, cost {Cost}",
+            characterId, target.ItemId, succeeded, resolved.Cost);
 
         return new UpgradeItemRankResult(UpgradeItemRankOutcome.Applied, succeeded, resolved.Cost, value);
     }

@@ -1,8 +1,10 @@
 using Fenrir.Application.Game.Abstractions.ZoneLifecycle;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Application.Game.Handlers.Logging;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers;
 
@@ -18,8 +20,9 @@ namespace Fenrir.Application.Game.Handlers.Handlers;
 ///     reaches <c>Zone.PlayerLifecycle.HandleMove</c> -- misapplying op15's table here previously caused
 ///     legitimate op16 packets (Sort 19, 31, 92-95 among others) to be wrongly hard-disconnected.
 /// </summary>
-public sealed class AvatarActionResumeHandler(IAvatarActionService service)
-    : IInlinePacketHandler<AvatarActionResumeRequest>
+public sealed class AvatarActionResumeHandler(
+    IAvatarActionService service,
+    ILogger<AvatarActionResumeHandler>? logger = null) : IInlinePacketHandler<AvatarActionResumeRequest>
 {
     public void Handle(in AvatarActionResumeRequest packet, IPacketSession session)
     {
@@ -29,6 +32,10 @@ public sealed class AvatarActionResumeHandler(IAvatarActionService service)
             return;
 
         var action = packet.Action;
-        service.PostAction(zone, zoneSession.CharacterId!.Value, in action, true);
+        var characterId = zoneSession.CharacterId!.Value;
+
+        logger?.AvatarActionReceived(session.SessionId, characterId, opcode: 16, action.Type, action.Sort);
+
+        service.PostAction(zone, characterId, in action, true);
     }
 }

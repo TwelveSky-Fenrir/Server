@@ -3,6 +3,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Tribes;
 
@@ -10,12 +11,18 @@ namespace Fenrir.Application.Game.Handlers.Handlers.Tribes;
 ///     CZ_TRIBE_BANK_SEND (opcode 82). Any gate failure disconnects (matches legacy <c>Quit()</c>), never a
 ///     graceful error reply.
 /// </summary>
-public sealed class TribeBankHandler(ITribeBankService bankService) : IAsyncPacketHandler<TribeBankRequest>
+public sealed class TribeBankHandler(ITribeBankService bankService, ILogger<TribeBankHandler>? logger = null)
+    : IAsyncPacketHandler<TribeBankRequest>
 {
     public async ValueTask HandleAsync(TribeBankRequest packet, IPacketSession session,
         CancellationToken cancellationToken)
     {
         var zoneSession = (ZoneClientSession)session;
+
+        logger?.LogDebug(
+            "Session {SessionId}: CZ_TRIBE_BANK_SEND received (character {CharacterId}, sort {Sort}, value {Value})",
+            session.SessionId, zoneSession.CharacterId, packet.Sort, packet.Value);
+
         if (zoneSession.CurrentZone is not Zone zone)
             return;
 
@@ -28,9 +35,8 @@ public sealed class TribeBankHandler(ITribeBankService bankService) : IAsyncPack
         {
             var result = packet.Sort switch
             {
-                1 => await bankService.ViewAsync(state, cancellationToken),
-                2 => await bankService.WithdrawAsync(packet.Value, state, characterId, cancellationToken),
-                3 => await bankService.DepositAsync(packet.Value, state, characterId, cancellationToken),
+                1 => await bankService.ViewAsync(zoneSession, state, cancellationToken),
+                2 => await bankService.DepositAsync(packet.Value, state, characterId, cancellationToken),
                 _ => TribeBankResult.Aborted
             };
 

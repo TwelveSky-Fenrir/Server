@@ -1,6 +1,8 @@
+using Fenrir.Application.Game.Domain.Buffs;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Services.BuffsMountsCosmetics;
 using Fenrir.Application.Game.Tests.TestSupport;
+using Fenrir.Application.Game.Tests.World.WorldState;
 using Fenrir.Network.Dispatch.Sessions;
 
 namespace Fenrir.Application.Game.Tests.Handlers;
@@ -35,7 +37,7 @@ public class RankBuffServiceTests
         state.Life = 1;
         state.Mana = 1;
 
-        var service = new RankBuffService();
+        var service = new RankBuffService(ZoneTestKit.CreateWorldState());
         var result = service.Apply(zone, state, 10, 1);
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
@@ -52,11 +54,12 @@ public class RankBuffServiceTests
     {
         var zone = ZoneTestKit.CreateZone(1);
         var (_, _, state) = Setup(zone, 10);
-        var service = new RankBuffService();
+        var service = new RankBuffService(ZoneTestKit.CreateWorldState());
 
         var result = service.Apply(zone, state, 10, 2);
 
         Assert.False(result.Succeeded);
+        Assert.False(result.SilentlyIgnored);
     }
 
     [Fact]
@@ -64,10 +67,45 @@ public class RankBuffServiceTests
     {
         var zone = ZoneTestKit.CreateZone(1);
         var (_, _, state) = Setup(zone, 10);
-        var service = new RankBuffService();
+        var service = new RankBuffService(ZoneTestKit.CreateWorldState());
 
         var result = service.Apply(zone, state, 10, 8);
 
         Assert.False(result.Succeeded);
+    }
+
+    [Fact]
+    public void IsMovingZone_Fails_EvenWithOtherwiseValidTier()
+    {
+        var zone = ZoneTestKit.CreateZone(1);
+        var (_, _, state) = Setup(zone, 10);
+        state.IsMovingZone = true;
+        var service = new RankBuffService(ZoneTestKit.CreateWorldState());
+
+        var result = service.Apply(zone, state, 10, 1);
+
+        Assert.False(result.Succeeded);
+        Assert.False(result.SilentlyIgnored);
+        Assert.Equal(RankBuffResolver.Outcome.Rejected, result.Outcome);
+    }
+
+    [Fact]
+    public void WorldTribeSymbolBattleActive_SilentlyIgnored_EvenWithOtherwiseValidTier()
+    {
+        var zone = ZoneTestKit.CreateZone(1);
+        var (_, _, state) = Setup(zone, 10);
+        var repository = new FakeWorldStateRepository
+        {
+            Row = new(Id: 1, Zone038WinTribe: null, Zone038WinTribeTime: 0, TribeSymbolBattle: true,
+                MonsterSymbol: null, MonsterSymbolEndTime: 0, HighTribe: null, UpdateTribePoint: 0,
+                UpdatedAtUtc: DateTime.UtcNow)
+        };
+        var service = new RankBuffService(ZoneTestKit.CreateWorldState(repository));
+
+        var result = service.Apply(zone, state, 10, 1);
+
+        Assert.False(result.Succeeded);
+        Assert.True(result.SilentlyIgnored);
+        Assert.Equal(RankBuffResolver.Outcome.WorldBattleActive, result.Outcome);
     }
 }

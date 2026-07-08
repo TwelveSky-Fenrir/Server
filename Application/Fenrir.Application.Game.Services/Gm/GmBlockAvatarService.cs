@@ -1,6 +1,7 @@
 using Fenrir.Application.Game.Abstractions.Gm;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Dispatch.Sessions;
+using Fenrir.Network.Serialization.Packets.Shared;
 using Fenrir.Network.Serialization.Packets.Zone;
 using Microsoft.Extensions.Logging;
 
@@ -31,18 +32,19 @@ public sealed class GmBlockAvatarService(
     // that falls through to the shared epilogue.
     private const int GmBlockSort = 519;
 
-    // Legacy echoes back the same 130-byte opaque tData buffer it received (S04_MyWork04.cpp:2121-2122).
-    // GmBlockAvatarRequest is Fenrir's own compact dedicated shape (AvatarName only), not the generic
-    // envelope, so there is no original opaque payload here to echo -- a zero-filled buffer is sent instead.
-    // The client does not derive anything from Data's content on this failure path; only the total wire size
-    // (143 bytes) has to match what an unmodified client's dispatch table expects at opcode 23.
+    // Legacy echoes back the same 130-byte opaque tData buffer it received (S04_MyWork04.cpp:2121-2122). This
+    // service only receives the decoded GmBlockAvatarPayload (AvatarName), not GenericActionHandler's own raw
+    // 130-byte tData buffer that payload was read out of, so there is no opaque payload here to echo verbatim
+    // -- a zero-filled buffer is sent instead. The client does not derive anything from Data's content on this
+    // failure path; only the total wire size (143 bytes) has to match what an unmodified client's dispatch
+    // table expects at opcode 23.
     private static readonly byte[] EmptyGenericActionData = new byte[130];
 
     // Legacy: ReturnAddDate(0, 365*30) -- "today plus 10,950 days," a concrete future date, not NULL/forever
     // (Database/Tables/admin/Bans.sql's own null-vs-concrete-date convention).
     private static readonly TimeSpan BlockDuration = TimeSpan.FromDays(365 * 30);
 
-    public async ValueTask HandleAsync(GmBlockAvatarRequest packet, ZoneClientSession zoneSession,
+    public async ValueTask HandleAsync(GmBlockAvatarPayload packet, ZoneClientSession zoneSession,
         CancellationToken cancellationToken)
     {
         // uUserSort < 1 gate (Server/ts25zone/S04_MyWork04.cpp:1489): unauthorized caller is disconnected

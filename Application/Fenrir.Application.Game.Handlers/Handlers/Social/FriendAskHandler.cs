@@ -3,6 +3,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
@@ -10,11 +11,15 @@ namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 ///     CZ_FRIEND_ASK_SEND (opcode 53) -- map 124 silently ignored (scripted-duel server). Tribe mismatch
 ///     always refuses; no inter-tribe exception here unlike duel/trade/party.
 /// </summary>
-public sealed class FriendAskHandler(IFriendService friendService) : IInlinePacketHandler<FriendRequest>
+public sealed class FriendAskHandler(IFriendService friendService, ILogger<FriendAskHandler> logger)
+    : IInlinePacketHandler<FriendRequest>
 {
     public void Handle(in FriendRequest packet, IPacketSession session)
     {
         var zoneSession = (ZoneClientSession)session;
+
+        logger.LogDebug("FriendAsk: session {SessionId} character {CharacterId} target {TargetAvatarName}",
+            session.SessionId, zoneSession.CharacterId, packet.AvatarName);
 
         if (zoneSession.CurrentZone is not Zone zone)
             return;

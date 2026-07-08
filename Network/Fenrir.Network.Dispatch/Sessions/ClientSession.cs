@@ -171,6 +171,26 @@ public abstract class ClientSession(
         logger?.PacketSent(SessionId, opcode, byteSize);
     }
 
+    /// <summary>
+    ///     Called by <see cref="LoginClientSession" />/<see cref="ZoneClientSession" />'s own Mark* state-
+    ///     transition setters, one call per setter that actually changes <c>State</c> (a setter that only
+    ///     records an ancillary fact -- e.g. <c>MarkAccountSessionToken</c> -- has nothing to log here).
+    ///     Deliberately Information, not Debug: unlike <see cref="PacketLog" />'s per-packet convention, a
+    ///     session-state transition happens at most a handful of times over a connection's whole lifetime
+    ///     (Connected -&gt; ... -&gt; InWorld / HandoverIssued), so it is exactly the kind of infrequent,
+    ///     high-signal event an operator watching live logs wants visible by default. Centralized here
+    ///     (rather than left to each call site that happens to invoke a Mark* setter to also remember to log)
+    ///     so coverage is structural, not incidental -- every transition is guaranteed to be observed exactly
+    ///     once, regardless of whether the calling handler/service also logs its own business-outcome line
+    ///     next to the same call.
+    /// </summary>
+    protected void LogSessionStateChanged<TState>(TState previousState, TState newState) where TState : struct, Enum
+    {
+        logger?.LogInformation(
+            "Session {SessionId} ({Server}) state changed: {PreviousState} -> {NewState}",
+            SessionId, Server, previousState, newState);
+    }
+
     // Caller must already hold _sendLock. Flushes what was just written, then keeps draining/flushing
     // anything in _pendingSends before ever releasing the lock -- so a frame queued while this session was
     // catching up from backpressure is never reordered ahead of, or interleaved with, a later direct write.
@@ -259,6 +279,14 @@ public abstract class ClientSession(
 
             if (keepDraining && ++_backpressureStreak >= SlowConsumerBackpressureStreakLimit)
             {
+                // Fires at most once per aborted session -- only when the streak actually trips the limit,
+                // never on every non-synchronous flush -- so this is nowhere near the per-packet hot path
+                // PacketLog exists to guard. Without this, an operator watching live logs sees this session's
+                // socket simply close with no detail beyond SessionLoop's own terminal "connection loop ended,
+                // disconnect reason SlowConsumer" line, which carries no indication of *why* it was flagged.
+                logger?.LogWarning(
+                    "Session {SessionId}: aborting as a slow consumer -- {Streak} consecutive non-synchronous TX flushes",
+                    SessionId, _backpressureStreak);
                 Abort(Sessions.DisconnectReason.SlowConsumer);
                 keepDraining = false;
             }

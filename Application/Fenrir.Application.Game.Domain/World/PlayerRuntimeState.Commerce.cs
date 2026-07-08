@@ -25,4 +25,17 @@ public partial class PlayerRuntimeState
     ///     <see cref="LastSentHeartbeat" />/<see cref="PrevSentHeartbeat" />.
     /// </summary>
     public int KnownCashCatalogVersion { get; set; } = CashCatalogVersionUnknown;
+
+    /// <summary>
+    ///     Wall-clock instant of this character's last <em>successfully completed</em> CZ_BUY_CASH_ITEM_SEND
+    ///     (op42) purchase -- deliberately not touched by any earlier-rejection path (stale catalog version,
+    ///     shop disabled, or any structural validation failure), matching legacy's own throttle timestamp,
+    ///     which the handler only restamps after the debit/inventory write succeeds
+    ///     (Server/ts25zone/S04_MyWork02.cpp:8243). <see cref="Services.Commerce.BuyCashItemService" />
+    ///     disconnects the session outright if the next purchase attempt arrives within 200ms of this instant,
+    ///     mirroring legacy's hard disconnect-on-throttle-violation (no soft reject exists for this opcode).
+    ///     Null means "no successful purchase yet this session," which can never be within the throttle
+    ///     window.
+    /// </summary>
+    public DateTime? LastCashItemPurchaseAtUtc { get; set; }
 }

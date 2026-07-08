@@ -170,7 +170,8 @@ public class RuneSocketServiceTests
         var (session, pipe, zone, _, repo, eventLog) = SetUp();
 
         var handler =
-            new RuneSocketHandler(new RuneSocketService(repo, eventLog, NullLogger<RuneSocketService>.Instance));
+            new RuneSocketHandler(new RuneSocketService(repo, eventLog, NullLogger<RuneSocketService>.Instance),
+                NullLogger<RuneSocketHandler>.Instance);
         await handler.HandleAsync(
             new RuneSocketRequest { Sort = 2, RuneIndex = 0, ItemIndex = 0, Page = 0, Index = 0 }, session,
             CancellationToken.None);

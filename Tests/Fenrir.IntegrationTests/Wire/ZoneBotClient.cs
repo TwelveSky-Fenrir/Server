@@ -89,7 +89,10 @@ public sealed class ZoneBotClient : IAsyncDisposable
 
     /// <summary>
     ///     op12 CL_REGISTER_AVATAR_SEND. Reads the full self-registration train: compressed EnterWorldResponse,
-    ///     compressed WorldSnapshotResponse, then the self-spawn AvatarActionResponse (see EnterWorldHandler).
+    ///     compressed WorldSnapshotResponse, the (uncompressed, plain <c>Send</c>) TowerStatusResponse legacy
+    ///     pairs with that same broadcast unconditionally for every zone entry (see EnterWorldService's own
+    ///     remarks -- Server/ts25zone/S04_MyWork02.cpp:1203-1204, not gated on this being a tower zone), then
+    ///     the self-spawn AvatarActionResponse (see EnterWorldHandler).
     /// </summary>
     public async Task<EnterWorldResult> EnterWorldAsync(int accountId, string avatarName, CancellationToken ct)
     {
@@ -104,6 +107,11 @@ public sealed class ZoneBotClient : IAsyncDisposable
             throw new InvalidOperationException("Failed to decode AvatarInfo from EnterWorldResponse.");
 
         await ReadCompressedPayloadAsync(Opcodes.Zone.Outgoing.WorldSnapshot, ct); // WorldSnapshotResponse, unused
+
+        var towerStatusFrame = await _connection.ReadExactAsync(1 + TowerStatusResponse.PayloadSize, ct);
+        if (towerStatusFrame[0] != TowerStatusResponse.Opcode)
+            throw new InvalidOperationException(
+                $"Expected TowerStatusResponse (op {TowerStatusResponse.Opcode}), got op {towerStatusFrame[0]}.");
 
         var selfSpawnFrame = await _connection.ReadExactAsync(1 + AvatarActionResponse.PayloadSize, ct);
         if (selfSpawnFrame[0] != AvatarActionResponse.Opcode)

@@ -97,6 +97,15 @@ public class RegularWarSchedulerHostTests
         Assert.Equal((byte)0, conclusion.WinningTribe);
         Assert.Equal(2, conclusion.Rewards.Length);
         Assert.All(conclusion.Rewards, r => Assert.True(r.IsWinningSide));
+
+        // War-conclusion daily-mission "join war" credit (S07_MyGame01.cpp:5293-5314): both present
+        // characters get credited, regardless of the reward/outcome side above -- but only once this
+        // host's posted ZoneCommand.CreditRegularWarConclusion is actually drained by the zone's own tick.
+        registry[49].Tick(TimeSpan.FromMilliseconds(50));
+        Assert.True(registry[49].TryGetPlayer(10, out var playerA));
+        Assert.True(registry[49].TryGetPlayer(11, out var playerB));
+        Assert.Equal(1, playerA!.MissionJoinWar);
+        Assert.Equal(1, playerB!.MissionJoinWar);
     }
 
     private sealed class RecordingSink : IRegularWarEventSink

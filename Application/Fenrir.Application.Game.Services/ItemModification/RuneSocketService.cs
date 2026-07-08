@@ -126,7 +126,7 @@ public sealed class RuneSocketService(
                 "Zone {MapId} inventory inbox full: dropped rune-remove inventory mirror for character {CharacterId}",
                 zone.MapId, characterId);
 
-        return new RuneRemoveResult(RuneSocketOutcome.Applied, container, slot, resolved.ItemId);
+        return new RuneRemoveResult(RuneSocketOutcome.Applied, container, slot, resolved.ItemId, newStack);
     }
 
     private static (byte Container, byte Slot)? FindFreeSlot(InventoryState inventory)

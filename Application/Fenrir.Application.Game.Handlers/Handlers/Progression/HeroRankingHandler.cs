@@ -3,6 +3,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Progression;
 
@@ -13,7 +14,7 @@ namespace Fenrir.Application.Game.Handlers.Handlers.Progression;
 ///     (S04_MyWork02.cpp:14159-14176). Fenrir has no separate ranking-refresh job, so this reproduces the
 ///     same observable cadence as a flat per-connection 2.5s throttle instead, always querying live.
 /// </summary>
-public sealed class HeroRankingHandler(IHeroRankingService heroRankingService)
+public sealed class HeroRankingHandler(IHeroRankingService heroRankingService, ILogger<HeroRankingHandler> logger)
     : IAsyncPacketHandler<HeroRankingRequest>
 {
     public async ValueTask HandleAsync(HeroRankingRequest packet, IPacketSession session,
@@ -24,6 +25,11 @@ public sealed class HeroRankingHandler(IHeroRankingService heroRankingService)
             return;
 
         var characterId = zoneSession.CharacterId!.Value;
+
+        logger.LogDebug(
+            "Session {SessionId}: HeroRankingRequest (op118) received for character {CharacterId}",
+            session.SessionId, characterId);
+
         if (!zone.TryGetPlayer(characterId, out var state) || state is null)
             return;
 

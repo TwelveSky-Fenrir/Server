@@ -8,6 +8,7 @@ using Fenrir.Application.Game.Domain.Quests;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.Social.Duel;
 using Fenrir.Application.Game.Domain.Social.Party;
+using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.GameData;
@@ -35,6 +36,7 @@ public sealed class ZoneRegistry
     private readonly RegularWarActiveMapTracker? _regularWarActiveMapTracker;
     private readonly ImmutableArray<ISimulationSystem> _systems;
     private readonly TowerWarState? _towerWar;
+    private readonly TradeRegistry? _tradeRegistry;
     private readonly WorldDataCache _worldData;
     private readonly WorldStateService? _worldState;
     private readonly ILogger<Zone> _zoneLogger;
@@ -47,7 +49,8 @@ public sealed class ZoneRegistry
         WorldStateService? worldState = null, PartyRegistry? partyRegistry = null,
         DuelRegistry? duelRegistry = null, HeroRankPointAccumulator? heroRankPointAccumulator = null,
         ICharacterShardLocationRepository? characterShardLocations = null,
-        RegularWarActiveMapTracker? regularWarActiveMapTracker = null)
+        RegularWarActiveMapTracker? regularWarActiveMapTracker = null,
+        TradeRegistry? tradeRegistry = null)
     {
         _options = options.Value;
         _movementRules = movementRules;
@@ -79,6 +82,11 @@ public sealed class ZoneRegistry
         // every other social feature already depends on.
         _partyRegistry = partyRegistry;
         _duelRegistry = duelRegistry;
+
+        // Optional: null only in test call sites that don't exercise the trade-disconnect cleanup path
+        // (Zone.PlayerLifecycle.cs's HandleLeave) -- every zone shares the same process-wide TradeRegistry
+        // singleton every trade opcode handler already depends on.
+        _tradeRegistry = tradeRegistry;
 
         // Optional: null only in test call sites that don't exercise the PvP-kill hero-point grant -- every
         // zone shares the same process-wide HeroRankPointAccumulator singleton so a farmed kill in one zone
@@ -126,6 +134,7 @@ public sealed class ZoneRegistry
             mapId => new Zone(mapId, _options, _movementRules, _dirtyTracker, _systems, _zoneLogger, _worldData,
                 questCatalog: _questCatalog, killCooldownTracker: _killCooldownTracker, towerWar: _towerWar,
                 worldState: _worldState, partyRegistry: _partyRegistry, duelRegistry: _duelRegistry,
+                tradeRegistry: _tradeRegistry,
                 heroRankPointAccumulator: _heroRankPointAccumulator,
                 characterShardLocations: _characterShardLocations,
                 regularWarActiveMapTracker: _regularWarActiveMapTracker,

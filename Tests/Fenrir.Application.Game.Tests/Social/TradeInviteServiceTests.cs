@@ -1,8 +1,14 @@
 using Fenrir.Application.Game.Abstractions.Social;
+using Fenrir.Application.Game.Domain.Guilds;
+using Fenrir.Application.Game.Domain.Social.Duel;
+using Fenrir.Application.Game.Domain.Social.Friends;
+using Fenrir.Application.Game.Domain.Social.Mentor;
+using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Services.Social;
 using Fenrir.Application.Game.Tests.TestSupport;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Social;
 
@@ -13,12 +19,16 @@ namespace Fenrir.Application.Game.Tests.Social;
 /// </summary>
 public class TradeInviteServiceTests
 {
-    private static (TradeInviteService Service, ZoneRegistry Zones, TradeRegistry Trades) CreateService(short mapId)
+    private static (TradeInviteService Service, ZoneRegistry Zones, TradeRegistry Trades) CreateService(short mapId,
+        DuelRegistry? duels = null, FriendRegistry? friends = null, PartyRegistry? parties = null,
+        MentorRegistry? mentors = null, GuildInviteRegistry? guildInvites = null)
     {
         var trades = new TradeRegistry();
         var zones = ZoneTestKit.CreateRegistry();
         zones.Initialize([mapId]);
-        return (new TradeInviteService(trades), zones, trades);
+        return (new TradeInviteService(trades, duels ?? new DuelRegistry(), friends ?? new FriendRegistry(),
+            parties ?? new PartyRegistry(), mentors ?? new MentorRegistry(),
+            guildInvites ?? new GuildInviteRegistry(), NullLogger<TradeInviteService>.Instance), zones, trades);
     }
 
     private static PlayerRuntimeState Enter(ZoneRegistry zones, short mapId, int characterId, string name,

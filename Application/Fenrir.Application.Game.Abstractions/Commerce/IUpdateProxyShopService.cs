@@ -17,7 +17,11 @@ public interface IUpdateProxyShopService
 
     /// <summary>
     ///     <c>BuySort</c> 1 -- RETRIEVE an unsold item from the caller's own closed shop back to inventory.
-    ///     Returns <c>null</c> when the caller should abort the session as faulted.
+    ///     A successful reply carries <c>Result=0</c> -- distinct from <see cref="PurchaseAsync" />'s
+    ///     <c>Result=1000</c> on success, the same opcode/packet legacy asymmetry
+    ///     <see cref="IOpenShopStallService" />'s personal/proxy 0-vs-100 split already preserves; do not
+    ///     normalize both variants to the same success code. Returns <c>null</c> when the caller should
+    ///     abort the session as faulted.
     /// </summary>
     /// <param name="accountId">
     ///     The acting player's account id -- carried only for the game.EventLog audit row written once
@@ -31,8 +35,9 @@ public interface IUpdateProxyShopService
     /// <summary>
     ///     <c>BuySort</c> 2 -- PURCHASE from another character's open shop. Only the buyer/retriever is ever a
     ///     live participant -- the seller's shop lives purely in SQL, so no dual-lock is needed here (unlike
-    ///     <c>BuyShopItemService</c>'s live-PShop twin). Returns <c>null</c> when the caller should abort the
-    ///     session as faulted.
+    ///     <c>BuyShopItemService</c>'s live-PShop twin). A successful reply carries <c>Result=1000</c> --
+    ///     never <c>Result=0</c>, which is reserved for <see cref="RetrieveAsync" />'s own success (see that
+    ///     method's remarks). Returns <c>null</c> when the caller should abort the session as faulted.
     /// </summary>
     /// <param name="accountId">
     ///     The buyer's account id -- carried only for the game.EventLog audit row written once persistence

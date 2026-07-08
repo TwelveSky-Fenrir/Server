@@ -38,7 +38,17 @@ public interface IQuestProgressService
     public ValueTask<QuestActionResult> ReceiveAsync(QuestProgressRequest packet, PlayerRuntimeState state, Zone zone,
         int characterId, CancellationToken ct);
 
-    /// <summary>tSort 4, "mission exchange".</summary>
+    /// <summary>
+    ///     tSort 4, "mission exchange". The inventory swap of the "before" item for the "after" item is
+    ///     attempted but never gates success: if the "before" item is no longer held anywhere in inventory
+    ///     (already exchanged, traded away, or otherwise missing), the swap is silently a no-op and
+    ///     quest-progress state still advances to "after exchange" as if it had succeeded -- there is no
+    ///     failure path tied to the swap itself.
+    /// </summary>
+    /// <remarks>
+    ///     Réf. C++ : Server/ts25zone/S04_MyWork02.cpp:7505-7528 (action-code-4 branch) ; Server/ts25zone/S07_MyGame04.cpp:2223-2244
+    ///     (ChangeQuestItem -- confirms the found/not-found scan result is discarded by the caller).
+    /// </remarks>
     public ValueTask<QuestActionResult> ExchangeAsync(QuestProgressRequest packet, PlayerRuntimeState state, Zone zone,
         int characterId, CancellationToken ct);
 

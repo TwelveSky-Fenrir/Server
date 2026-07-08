@@ -5,6 +5,7 @@ using Fenrir.Data.Abstractions.Game;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Login;
 using Fenrir.Network.Serialization.Wire;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Login.Tests.Handlers;
 
@@ -21,7 +22,9 @@ public class ClLoginMousePasswordSendHandlerTests
     {
         var pins = FakeAccountPinRepository.WithPin("4242");
         var eventLog = new FakeEventLogRepository();
-        var handler = new VerifyMousePinHandler(new VerifyMousePinService(pins, eventLog));
+        var handler = new VerifyMousePinHandler(
+            new VerifyMousePinService(pins, eventLog, NullLogger<VerifyMousePinService>.Instance),
+            NullLogger<VerifyMousePinHandler>.Instance);
         var (session, pipe) = CreateSessionInPinRequired();
 
         await handler.HandleAsync(new VerifyMousePinRequest { MousePasswordInput = "4242" }, session,
@@ -38,7 +41,9 @@ public class ClLoginMousePasswordSendHandlerTests
     {
         var pins = FakeAccountPinRepository.WithNoPin();
         var eventLog = new FakeEventLogRepository();
-        var handler = new VerifyMousePinHandler(new VerifyMousePinService(pins, eventLog));
+        var handler = new VerifyMousePinHandler(
+            new VerifyMousePinService(pins, eventLog, NullLogger<VerifyMousePinService>.Instance),
+            NullLogger<VerifyMousePinHandler>.Instance);
         var (session, pipe) = CreateSessionInPinRequired();
 
         await handler.HandleAsync(new VerifyMousePinRequest { MousePasswordInput = "4242" }, session,
@@ -54,7 +59,9 @@ public class ClLoginMousePasswordSendHandlerTests
     {
         var pins = FakeAccountPinRepository.WithPin("4242");
         var eventLog = new FakeEventLogRepository();
-        var handler = new VerifyMousePinHandler(new VerifyMousePinService(pins, eventLog));
+        var handler = new VerifyMousePinHandler(
+            new VerifyMousePinService(pins, eventLog, NullLogger<VerifyMousePinService>.Instance),
+            NullLogger<VerifyMousePinHandler>.Instance);
         var (session, pipe) = CreateSessionInPinRequired();
 
         await handler.HandleAsync(new VerifyMousePinRequest { MousePasswordInput = "42x2" }, session,
@@ -70,7 +77,9 @@ public class ClLoginMousePasswordSendHandlerTests
     {
         var pins = FakeAccountPinRepository.WithPin("4242");
         var eventLog = new FakeEventLogRepository();
-        var handler = new VerifyMousePinHandler(new VerifyMousePinService(pins, eventLog));
+        var handler = new VerifyMousePinHandler(
+            new VerifyMousePinService(pins, eventLog, NullLogger<VerifyMousePinService>.Instance),
+            NullLogger<VerifyMousePinHandler>.Instance);
         var (session, pipe) = CreateSessionInPinRequired();
 
         await handler.HandleAsync(new VerifyMousePinRequest { MousePasswordInput = "0000" }, session,

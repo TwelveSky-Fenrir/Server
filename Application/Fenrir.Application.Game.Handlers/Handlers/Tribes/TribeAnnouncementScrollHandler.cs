@@ -3,6 +3,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Tribes;
 
@@ -13,12 +14,17 @@ namespace Fenrir.Application.Game.Handlers.Handlers.Tribes;
 ///     (op 80), there is no role gate at all. <see cref="TribeAnnouncementScrollResponse.TribeRole" /> on the
 ///     wire actually carries the sender's tribe number, not a role (see that contract's own docstring).
 /// </summary>
-public sealed class TribeAnnouncementScrollHandler(ITribeAnnouncementScrollService announcementService)
-    : IInlinePacketHandler<TribeAnnouncementScrollRequest>
+public sealed class TribeAnnouncementScrollHandler(
+    ITribeAnnouncementScrollService announcementService,
+    ILogger<TribeAnnouncementScrollHandler>? logger = null) : IInlinePacketHandler<TribeAnnouncementScrollRequest>
 {
     public void Handle(in TribeAnnouncementScrollRequest packet, IPacketSession session)
     {
         var zoneSession = (ZoneClientSession)session;
+
+        logger?.LogDebug(
+            "Session {SessionId}: CZ_TRIBE_NOTIFY_SEND received (character {CharacterId}, content length {ContentLength})",
+            session.SessionId, zoneSession.CharacterId, packet.Content.Length);
 
         if (string.IsNullOrEmpty(packet.Content))
         {

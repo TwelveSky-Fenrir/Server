@@ -29,7 +29,7 @@ public class EnchantResolverTests
     {
         var target = Equip(1, 5);
         var result = EnchantResolver.Resolve(target, Target(0), Material(1019), 0, 0,
-            new ScriptedRandomSource(0));
+            0, new ScriptedRandomSource(0));
 
         Assert.Equal(EnchantResolver.EnchantOutcome.Rejected, result.Outcome);
     }
@@ -39,7 +39,7 @@ public class EnchantResolverTests
     {
         var target = Equip(1, checkImprove: 0);
         var result = EnchantResolver.Resolve(target, Target(0), Material(1019), 0, 0,
-            new ScriptedRandomSource(0));
+            0, new ScriptedRandomSource(0));
 
         Assert.Equal(EnchantResolver.EnchantOutcome.Rejected, result.Outcome);
     }
@@ -49,20 +49,36 @@ public class EnchantResolverTests
     {
         var target = Equip(1);
         var result = EnchantResolver.Resolve(target, Target(50), Material(1019), 0, 0,
-            new ScriptedRandomSource(0));
+            0, new ScriptedRandomSource(0));
 
         Assert.Equal(EnchantResolver.EnchantOutcome.Rejected, result.Outcome);
     }
 
     [Fact]
-    public void WingTarget_IsNotSupported_NotRejected()
+    public void WingTarget_UsesSameMachineryAsEquipment_SucceedsAndFlagsIsWing()
     {
+        // Sort 6 (wings) now resolves through the identical ResolveStandard path as any other equipment
+        // slot in the 6..29 band -- same p1/material table as StoneMaterial_SuccessRoll_IncrementsEnchantByBaseValue,
+        // only IsWing distinguishes it so the caller routes Cost to CP instead of money.
         var target = Equip(1, 6);
         var result = EnchantResolver.Resolve(target, Target(0), Material(1019), 0, 0,
-            new ScriptedRandomSource(0));
+            0, new ScriptedRandomSource(0));
 
-        Assert.Equal(EnchantResolver.EnchantOutcome.NotSupported, result.Outcome);
-        Assert.False(result.ConsumesMaterial);
+        Assert.Equal(EnchantResolver.EnchantOutcome.Success, result.Outcome);
+        Assert.Equal(1, result.NewEnchant);
+        Assert.Equal(10000, result.Cost);
+        Assert.True(result.IsWing);
+        Assert.True(result.ConsumesMaterial);
+    }
+
+    [Fact]
+    public void NonWingEquipTarget_IsWingFalse()
+    {
+        var target = Equip(1, 7);
+        var result = EnchantResolver.Resolve(target, Target(0), Material(1019), 0, 0,
+            0, new ScriptedRandomSource(0));
+
+        Assert.False(result.IsWing);
     }
 
     [Fact]
@@ -70,7 +86,7 @@ public class EnchantResolverTests
     {
         var target = Equip(1);
         var result = EnchantResolver.Resolve(target, Target(0), Material(999999), 0, 0,
-            new ScriptedRandomSource(0));
+            0, new ScriptedRandomSource(0));
 
         Assert.Equal(EnchantResolver.EnchantOutcome.Rejected, result.Outcome);
     }
@@ -81,7 +97,7 @@ public class EnchantResolverTests
         var target = Equip(1);
         // p1 = 103 - 3*1 + 0 = 100 -- rolling 0 (< 100) always succeeds at +0 -> +1.
         var result = EnchantResolver.Resolve(target, Target(0), Material(1019), 0, 0,
-            new ScriptedRandomSource(0));
+            0, new ScriptedRandomSource(0));
 
         Assert.Equal(EnchantResolver.EnchantOutcome.Success, result.Outcome);
         Assert.Equal(1, result.NewEnchant);
@@ -96,7 +112,7 @@ public class EnchantResolverTests
         // a guaranteed-fail first roll.
         var target = Equip(1);
         var result = EnchantResolver.Resolve(target, Target(10), Material(1019), 0, 0,
-            new ScriptedRandomSource(99,
+            0, new ScriptedRandomSource(99,
                 0)); // fail the success roll (99 >= p1), then would-be destroy roll unreachable
 
         Assert.Equal(EnchantResolver.EnchantOutcome.Failed, result.Outcome);
@@ -110,7 +126,7 @@ public class EnchantResolverTests
         // the destroy, falls through to plain failure.
         var target = Equip(1);
         var result = EnchantResolver.Resolve(target, Target(25), Material(1019), 0, 0,
-            new ScriptedRandomSource(99, 50));
+            0, new ScriptedRandomSource(99, 50));
 
         Assert.Equal(EnchantResolver.EnchantOutcome.Failed, result.Outcome);
         Assert.Equal(24, result.NewEnchant);
@@ -121,7 +137,7 @@ public class EnchantResolverTests
     {
         var target = Equip(1);
         var result = EnchantResolver.Resolve(target, Target(25), Material(1019), 0, 0,
-            new ScriptedRandomSource(99, 0));
+            0, new ScriptedRandomSource(99, 0));
 
         Assert.Equal(EnchantResolver.EnchantOutcome.Destroyed, result.Outcome);
     }
@@ -131,7 +147,7 @@ public class EnchantResolverTests
     {
         var target = Equip(1);
         var result = EnchantResolver.Resolve(target, Target(25), Material(1019), 0, 1,
-            new ScriptedRandomSource(99, 0));
+            0, new ScriptedRandomSource(99, 0));
 
         Assert.Equal(EnchantResolver.EnchantOutcome.Protected, result.Outcome);
         Assert.Equal(24, result.NewEnchant);
@@ -144,7 +160,7 @@ public class EnchantResolverTests
         // current=0, material 1023 (+5): p1=103-15+0=88, roll 90 fails -- must floor at 0, not go negative
         var target = Equip(1);
         var result = EnchantResolver.Resolve(target, Target(0), Material(1023), 0, 0,
-            new ScriptedRandomSource(90));
+            0, new ScriptedRandomSource(90));
 
         Assert.Equal(EnchantResolver.EnchantOutcome.Failed, result.Outcome);
         Assert.Equal(0, result.NewEnchant);
@@ -156,7 +172,7 @@ public class EnchantResolverTests
         // current=38, material 1023 (+5) would reach 43 -- clamped to 40.
         var target = Equip(1);
         var result = EnchantResolver.Resolve(target, Target(38), Material(1023), 0, 0,
-            new ScriptedRandomSource(0));
+            0, new ScriptedRandomSource(0));
 
         Assert.Equal(EnchantResolver.EnchantOutcome.Success, result.Outcome);
         Assert.Equal(40, result.NewEnchant);
@@ -167,7 +183,7 @@ public class EnchantResolverTests
     {
         var target = Equip(1, type: 0);
         var result = EnchantResolver.Resolve(target, Target(5), Material(633), 0, 0,
-            new ScriptedRandomSource(99));
+            0, new ScriptedRandomSource(99));
 
         Assert.Equal(EnchantResolver.EnchantOutcome.Success, result.Outcome);
         Assert.Equal(6, result.NewEnchant);
@@ -179,7 +195,7 @@ public class EnchantResolverTests
     {
         var target = Equip(1, type: 0); // neither Rare(3) nor Elite(4)
         var result = EnchantResolver.Resolve(target, Target(5), Material(619), 0, 0,
-            new ScriptedRandomSource(0));
+            0, new ScriptedRandomSource(0));
 
         Assert.Equal(EnchantResolver.EnchantOutcome.Rejected, result.Outcome);
     }
@@ -189,7 +205,7 @@ public class EnchantResolverTests
     {
         var target = Equip(1, type: 3); // IRARE
         var result = EnchantResolver.Resolve(target, Target(12), Material(619), 0, 0,
-            new ScriptedRandomSource(0));
+            0, new ScriptedRandomSource(0));
 
         Assert.Equal(EnchantResolver.EnchantOutcome.Success, result.Outcome);
         Assert.Equal(40, result.NewEnchant);
@@ -200,7 +216,7 @@ public class EnchantResolverTests
     {
         var target = Equip(1, type: 3);
         var result = EnchantResolver.Resolve(target, Target(30), Material(540), 0, 0,
-            new ScriptedRandomSource(0));
+            0, new ScriptedRandomSource(0));
 
         Assert.Equal(EnchantResolver.EnchantOutcome.Rejected, result.Outcome);
     }
@@ -210,7 +226,7 @@ public class EnchantResolverTests
     {
         var target = Equip(1, type: 4); // IELITE
         var result = EnchantResolver.Resolve(target, Target(3), Material(825), 0, 0,
-            new ScriptedRandomSource(0));
+            0, new ScriptedRandomSource(0));
 
         Assert.Equal(EnchantResolver.EnchantOutcome.Success, result.Outcome);
         Assert.Equal(50, result.NewEnchant);
@@ -222,7 +238,7 @@ public class EnchantResolverTests
     {
         var target = Equip(1, type: 3);
         var result = EnchantResolver.Resolve(target, Target(40), Material(1019), 0, 0,
-            new ScriptedRandomSource(0));
+            0, new ScriptedRandomSource(0));
 
         Assert.Equal(EnchantResolver.EnchantOutcome.Rejected, result.Outcome);
     }
@@ -232,7 +248,7 @@ public class EnchantResolverTests
     {
         var target = Equip(1, type: 3);
         var result = EnchantResolver.Resolve(target, Target(40), Material(EnchantMaterialCatalog.UnsealItemId),
-            0, 0, new ScriptedRandomSource(99));
+            0, 0, 0, new ScriptedRandomSource(99));
 
         Assert.Equal(EnchantResolver.EnchantOutcome.Unsealed, result.Outcome);
         Assert.Equal(41, result.NewEnchant);
@@ -244,7 +260,7 @@ public class EnchantResolverTests
     {
         var target = Equip(1, type: 0);
         var result = EnchantResolver.Resolve(target, Target(41), Material(1023), 0, 0,
-            new ScriptedRandomSource(0));
+            0, new ScriptedRandomSource(0));
 
         Assert.Equal(EnchantResolver.EnchantOutcome.Rejected, result.Outcome);
     }
@@ -254,7 +270,7 @@ public class EnchantResolverTests
     {
         var target = Equip(1, type: 3);
         var result = EnchantResolver.Resolve(target, Target(41), Material(1023), 0, 0,
-            new ScriptedRandomSource(19));
+            0, new ScriptedRandomSource(19));
 
         Assert.Equal(EnchantResolver.EnchantOutcome.Success, result.Outcome);
         Assert.Equal(42, result.NewEnchant);
@@ -265,7 +281,7 @@ public class EnchantResolverTests
     {
         var target = Equip(1, type: 3);
         var result = EnchantResolver.Resolve(target, Target(41), Material(1023), 0, 0,
-            new ScriptedRandomSource(20));
+            0, new ScriptedRandomSource(20));
 
         Assert.Equal(EnchantResolver.EnchantOutcome.ResetToForty, result.Outcome);
         Assert.Equal(40, result.NewEnchant);
@@ -276,7 +292,7 @@ public class EnchantResolverTests
     {
         var target = Equip(1, type: 3);
         var result = EnchantResolver.Resolve(target, Target(45), Material(1023), 0, 0,
-            new ScriptedRandomSource(99));
+            0, new ScriptedRandomSource(99));
 
         Assert.Equal(EnchantResolver.EnchantOutcome.ResetToForty, result.Outcome);
         Assert.Equal(40, result.NewEnchant);
@@ -287,7 +303,7 @@ public class EnchantResolverTests
     {
         var target = Equip(1, type: 3);
         var result = EnchantResolver.Resolve(target, Target(45), Material(1023), 0, 1,
-            new ScriptedRandomSource(99));
+            0, new ScriptedRandomSource(99));
 
         Assert.Equal(EnchantResolver.EnchantOutcome.Protected, result.Outcome);
         Assert.Equal(44, result.NewEnchant);
@@ -298,7 +314,7 @@ public class EnchantResolverTests
     {
         var target = Equip(1, type: 3);
         var result = EnchantResolver.Resolve(target, Target(49), Material(1023), 0, 0,
-            new ScriptedRandomSource(99));
+            0, new ScriptedRandomSource(99));
 
         Assert.NotEqual(EnchantResolver.EnchantOutcome.Destroyed, result.Outcome);
     }
@@ -308,9 +324,70 @@ public class EnchantResolverTests
     {
         var target = Equip(1, type: 3);
         var result = EnchantResolver.Resolve(target, Target(45), Material(825), 0, 0,
-            new ScriptedRandomSource(99));
+            0, new ScriptedRandomSource(99));
 
         Assert.Equal(EnchantResolver.EnchantOutcome.Success, result.Outcome);
         Assert.Equal(50, result.NewEnchant);
+    }
+
+    /// <summary>
+    ///     "Sweet potato" (Lucky Enchant Scroll / ImproveItemValue) is consumed on a rolled success just like
+    ///     any other rolled outcome -- see this type's own remarks for why no probability bonus is applied yet.
+    /// </summary>
+    [Fact]
+    public void ImproveCharge_Present_ConsumedOnRolledSuccess()
+    {
+        var target = Equip(1);
+        var result = EnchantResolver.Resolve(target, Target(0), Material(1019), 0, 0,
+            1, new ScriptedRandomSource(0));
+
+        Assert.Equal(EnchantResolver.EnchantOutcome.Success, result.Outcome);
+        Assert.True(result.ConsumesImproveCharge);
+    }
+
+    /// <summary>Not refunded on failure -- consumed regardless of whether the roll actually succeeded.</summary>
+    [Fact]
+    public void ImproveCharge_Present_ConsumedOnRolledFailure()
+    {
+        var target = Equip(1);
+        var result = EnchantResolver.Resolve(target, Target(0), Material(1023), 0, 0,
+            1, new ScriptedRandomSource(90));
+
+        Assert.Equal(EnchantResolver.EnchantOutcome.Failed, result.Outcome);
+        Assert.True(result.ConsumesImproveCharge);
+    }
+
+    [Fact]
+    public void ImproveCharge_Absent_NeverConsumed()
+    {
+        var target = Equip(1);
+        var result = EnchantResolver.Resolve(target, Target(0), Material(1019), 0, 0,
+            0, new ScriptedRandomSource(0));
+
+        Assert.False(result.ConsumesImproveCharge);
+    }
+
+    /// <summary>+40 -&gt; +41 unseal never rolls, so the charge is not consulted/consumed even if present.</summary>
+    [Fact]
+    public void ImproveCharge_Present_NotConsumedOnNoRollUnseal()
+    {
+        var target = Equip(1, type: 3);
+        var result = EnchantResolver.Resolve(target, Target(40), Material(EnchantMaterialCatalog.UnsealItemId),
+            0, 0, 1, new ScriptedRandomSource(99));
+
+        Assert.Equal(EnchantResolver.EnchantOutcome.Unsealed, result.Outcome);
+        Assert.False(result.ConsumesImproveCharge);
+    }
+
+    /// <summary>Advanced (+41..+50) regime consumes the charge on its own rolled outcomes too.</summary>
+    [Fact]
+    public void ImproveCharge_Present_ConsumedInAdvancedRegime()
+    {
+        var target = Equip(1, type: 3);
+        var result = EnchantResolver.Resolve(target, Target(41), Material(1023), 0, 0,
+            1, new ScriptedRandomSource(19));
+
+        Assert.Equal(EnchantResolver.EnchantOutcome.Success, result.Outcome);
+        Assert.True(result.ConsumesImproveCharge);
     }
 }

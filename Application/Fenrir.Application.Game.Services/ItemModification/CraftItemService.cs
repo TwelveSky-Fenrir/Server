@@ -5,6 +5,7 @@ using Fenrir.Application.Game.Domain.Crafting;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Application.Game.GameData;
 using Fenrir.Network.Serialization.Packets.Zone;
 using Microsoft.Extensions.Logging;
 
@@ -12,11 +13,14 @@ namespace Fenrir.Application.Game.Services.ItemModification;
 
 /// <summary>
 ///     Business logic for op29, CZ_MAKE_ITEM_SEND -- extracted from <see cref="CraftItemHandler" />, see that
-///     handler's remarks.
+///     handler's remarks. On a qualifying recipe success, also stands in for legacy's shared <c>MakeNotice</c>
+///     helper (Server/ts25zone/S04_MyWork02.cpp:309-493) via <see cref="CenterRelayNoticeLog.LogNotableCraft" />
+///     -- see that type's own remarks for why this is a log line, not a client-facing broadcast.
 /// </summary>
 public sealed class CraftItemService(
     ICharacterRepository characters,
     IEventLogRepository eventLog,
+    WorldDataCache worldData,
     ILogger<CraftItemService> logger)
     : ICraftItemService
 {
@@ -59,17 +63,29 @@ public sealed class CraftItemService(
         var index2 = packet.Index2;
 
         if (!IsValidInventorySlot(page1, index1) || !IsValidInventorySlot(page2, index2))
+        {
+            logger.LogDebug("Character {CharacterId} craft (jade-upgrade) rejected: invalid slot(s)", characterId);
             return new JadeUpgradeResult(JadeUpgradeOutcome.Rejected, 0, 0);
+        }
 
         var material1 = state.Inventory.GetSlot((byte)page1, (byte)index1);
         var material2 = state.Inventory.GetSlot((byte)page2, (byte)index2);
 
         if (material1 is not { } m1 || material2 is not { } m2)
+        {
+            logger.LogDebug("Character {CharacterId} craft (jade-upgrade) rejected: material slot(s) empty",
+                characterId);
             return new JadeUpgradeResult(JadeUpgradeOutcome.Rejected, 0, 0);
+        }
 
         var resolved = CraftResolver.ResolveJadeUpgrade(m1, m2);
         if (!resolved.Succeeded)
+        {
+            logger.LogInformation(
+                "Character {CharacterId} craft (jade-upgrade) rejected by resolver (materials {M1}/{M2})",
+                characterId, m1.ItemId, m2.ItemId);
             return new JadeUpgradeResult(JadeUpgradeOutcome.Rejected, 0, 0);
+        }
 
         var result = resolved.ResultStack!.Value;
 
@@ -112,6 +128,12 @@ public sealed class CraftItemService(
                 "Zone {MapId} inventory inbox full: dropped craft (jade) mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
                 zone.MapId, characterId);
 
+        logger.LogInformation("Character {CharacterId} craft (jade-upgrade) applied: result item {ResultItemId}",
+            characterId, result.ItemId);
+
+        CenterRelayNoticeLog.LogNotableCraft(logger, worldData, state.Tribe, state.Name, result.ItemId,
+            "jade-upgrade");
+
         return new JadeUpgradeResult(JadeUpgradeOutcome.Applied, result.ItemId, result.Serial);
     }
 
@@ -122,11 +144,18 @@ public sealed class CraftItemService(
         var index1 = packet.Index1;
 
         if (!IsValidInventorySlot(page1, index1))
+        {
+            logger.LogDebug("Character {CharacterId} craft (advanced-elixir) rejected: invalid slot", characterId);
             return new AdvancedElixirResult(AdvancedElixirOutcome.Rejected, null, 0, 0, null);
+        }
 
         var materialStack = state.Inventory.GetSlot((byte)page1, (byte)index1);
         if (materialStack is not { } material)
+        {
+            logger.LogDebug("Character {CharacterId} craft (advanced-elixir) rejected: material slot empty",
+                characterId);
             return new AdvancedElixirResult(AdvancedElixirOutcome.Rejected, null, 0, 0, null);
+        }
 
         // Free-slot scan happens before rolling, while the material's own slot is still occupied, so it can
         // never be picked as its own destination.
@@ -135,7 +164,12 @@ public sealed class CraftItemService(
         var resolved = CraftResolver.ResolveAdvancedElixir(material, hasFreeSlot, SystemRandomSource.Instance);
 
         if (resolved.Outcome == CraftResolver.ElixirOutcome.Rejected)
+        {
+            logger.LogInformation(
+                "Character {CharacterId} craft (advanced-elixir) rejected by resolver (material {MaterialItemId}, hasFreeSlot={HasFreeSlot})",
+                characterId, material.ItemId, hasFreeSlot);
             return new AdvancedElixirResult(AdvancedElixirOutcome.Rejected, null, 0, 0, null);
+        }
 
         var projectedMaterialContainer = resolved.RemainingMaterial is { } remainingMaterial
             ? state.Inventory.GetContainer((byte)page1).SetItem((byte)index1, remainingMaterial)
@@ -196,6 +230,14 @@ public sealed class CraftItemService(
             ? AdvancedElixirOutcome.Success
             : AdvancedElixirOutcome.Failed;
 
+        logger.LogInformation(
+            "Character {CharacterId} craft (advanced-elixir) applied: outcome {Outcome}, resultItem {ResultItemId}",
+            characterId, outcome, newItemStack?.ItemId);
+
+        if (newItemStack is { } mintedElixir)
+            CenterRelayNoticeLog.LogNotableCraft(logger, worldData, state.Tribe, state.Name, mintedElixir.ItemId,
+                "advanced-elixir");
+
         return new AdvancedElixirResult(outcome, newItemStack, resultPage, resultIndex, resolved.RemainingMaterial);
     }
 
@@ -208,18 +250,31 @@ public sealed class CraftItemService(
     {
         if (!IsValidInventorySlot(packet.Page1, packet.Index1) || !IsValidInventorySlot(packet.Page2, packet.Index2) ||
             !IsValidInventorySlot(packet.Page3, packet.Index3) || !IsValidInventorySlot(packet.Page4, packet.Index4))
+        {
+            logger.LogDebug("Character {CharacterId} craft (stone-mat-combine) rejected: invalid slot(s)",
+                characterId);
             return RejectedFamilyResult;
+        }
 
         if (state.Inventory.GetSlot((byte)packet.Page1, (byte)packet.Index1) is not { } material1 ||
             state.Inventory.GetSlot((byte)packet.Page2, (byte)packet.Index2) is not { } material2 ||
             state.Inventory.GetSlot((byte)packet.Page3, (byte)packet.Index3) is not { } material3 ||
             state.Inventory.GetSlot((byte)packet.Page4, (byte)packet.Index4) is not { } material4)
+        {
+            logger.LogDebug("Character {CharacterId} craft (stone-mat-combine) rejected: material slot(s) empty",
+                characterId);
             return RejectedFamilyResult;
+        }
 
         var resolved = CraftResolver.ResolveStoneMatCombine(material1, material2, material3, material4,
             SystemRandomSource.Instance);
         if (!resolved.Succeeded)
+        {
+            logger.LogInformation(
+                "Character {CharacterId} craft (stone-mat-combine) rejected by resolver (materials {M1}/{M2}/{M3}/{M4})",
+                characterId, material1.ItemId, material2.ItemId, material3.ItemId, material4.ItemId);
             return RejectedFamilyResult;
+        }
 
         var resultStack = material1 with
         {
@@ -248,6 +303,13 @@ public sealed class CraftItemService(
                 "Zone {MapId} inventory inbox full: dropped craft (stone-mat) mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
                 zone.MapId, characterId);
 
+        logger.LogInformation(
+            "Character {CharacterId} craft (stone-mat-combine) applied: result item {ResultItemId}", characterId,
+            resultStack.ItemId);
+
+        CenterRelayNoticeLog.LogNotableCraft(logger, worldData, state.Tribe, state.Name, resultStack.ItemId,
+            "stone-mat-combine");
+
         return new CraftFamilyResult(CraftFamilyOutcome.Applied, resultStack.ItemId, 0, resultStack.Serial, null, 0,
             0);
     }
@@ -258,18 +320,30 @@ public sealed class CraftItemService(
     {
         if (!IsValidInventorySlot(packet.Page1, packet.Index1) || !IsValidInventorySlot(packet.Page2, packet.Index2) ||
             !IsValidInventorySlot(packet.Page3, packet.Index3) || !IsValidInventorySlot(packet.Page4, packet.Index4))
+        {
+            logger.LogDebug("Character {CharacterId} craft (mount-fusion) rejected: invalid slot(s)", characterId);
             return RejectedFamilyResult;
+        }
 
         if (state.Inventory.GetSlot((byte)packet.Page1, (byte)packet.Index1) is not { } material1 ||
             state.Inventory.GetSlot((byte)packet.Page2, (byte)packet.Index2) is not { } material2 ||
             state.Inventory.GetSlot((byte)packet.Page3, (byte)packet.Index3) is not { } material3 ||
             state.Inventory.GetSlot((byte)packet.Page4, (byte)packet.Index4) is not { } catalyst)
+        {
+            logger.LogDebug("Character {CharacterId} craft (mount-fusion) rejected: material slot(s) empty",
+                characterId);
             return RejectedFamilyResult;
+        }
 
         var resolved = CraftResolver.ResolveMountFusion(packet.Sort, material1.ItemId, material2.ItemId,
             material3.ItemId, catalyst.ItemId, SystemRandomSource.Instance);
         if (!resolved.Succeeded)
+        {
+            logger.LogInformation(
+                "Character {CharacterId} craft (mount-fusion) rejected by resolver (materials {M1}/{M2}/{M3}, catalyst {Catalyst})",
+                characterId, material1.ItemId, material2.ItemId, material3.ItemId, catalyst.ItemId);
             return RejectedFamilyResult;
+        }
 
         // Dust consolation is a genuine stack (quantity 3 or 9); the real mount win is always a single fresh
         // unit (quantity 0) -- :4602-4630.
@@ -303,6 +377,13 @@ public sealed class CraftItemService(
                 "Zone {MapId} inventory inbox full: dropped craft (mount-fusion) mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
                 zone.MapId, characterId);
 
+        logger.LogInformation(
+            "Character {CharacterId} craft (mount-fusion) applied: result item {ResultItemId} x{Quantity}",
+            characterId, resultStack.ItemId, quantity);
+
+        CenterRelayNoticeLog.LogNotableCraft(logger, worldData, state.Tribe, state.Name, resultStack.ItemId,
+            "mount-fusion");
+
         return new CraftFamilyResult(CraftFamilyOutcome.Applied, resultStack.ItemId, quantity, resultStack.Serial,
             null, 0, 0);
     }
@@ -313,13 +394,20 @@ public sealed class CraftItemService(
     {
         if (!IsValidInventorySlot(packet.Page1, packet.Index1) || !IsValidInventorySlot(packet.Page2, packet.Index2) ||
             !IsValidInventorySlot(packet.Page3, packet.Index3) || !IsValidInventorySlot(packet.Page4, packet.Index4))
+        {
+            logger.LogDebug("Character {CharacterId} craft (wing-assembly) rejected: invalid slot(s)", characterId);
             return RejectedFamilyResult;
+        }
 
         if (state.Inventory.GetSlot((byte)packet.Page1, (byte)packet.Index1) is not { } material1 ||
             state.Inventory.GetSlot((byte)packet.Page2, (byte)packet.Index2) is not { } material2 ||
             state.Inventory.GetSlot((byte)packet.Page3, (byte)packet.Index3) is not { } material3 ||
             state.Inventory.GetSlot((byte)packet.Page4, (byte)packet.Index4) is not { } catalyst)
+        {
+            logger.LogDebug("Character {CharacterId} craft (wing-assembly) rejected: material slot(s) empty",
+                characterId);
             return RejectedFamilyResult;
+        }
 
         var isTownZone = CraftRecipeCatalog.WingAssemblyTownMapIds.Contains(zone.MapId);
         var hasSufficientCp = state.ContributionPoints >= CraftRecipeCatalog.WingAssemblyContributionPointCost;
@@ -327,7 +415,13 @@ public sealed class CraftItemService(
         var resolved = CraftResolver.ResolveWingAssembly(isTownZone, hasSufficientCp, material1.ItemId,
             material2.ItemId, material3.ItemId, catalyst.ItemId, state.PreviousTribe, SystemRandomSource.Instance);
         if (!resolved.Succeeded)
+        {
+            logger.LogInformation(
+                "Character {CharacterId} craft (wing-assembly) rejected by resolver (isTownZone={IsTownZone}, hasSufficientCp={HasSufficientCp}, materials {M1}/{M2}/{M3}, catalyst {Catalyst})",
+                characterId, isTownZone, hasSufficientCp, material1.ItemId, material2.ItemId, material3.ItemId,
+                catalyst.ItemId);
             return RejectedFamilyResult;
+        }
 
         // The 50 CP cost is paid before the roll, win or lose -- :5140.
         var newContributionPoints = state.ContributionPoints - CraftRecipeCatalog.WingAssemblyContributionPointCost;
@@ -380,6 +474,14 @@ public sealed class CraftItemService(
                 "Zone {MapId} tribe-progress inbox full: dropped CP mirror for character {CharacterId} after craft (wing-assembly)",
                 zone.MapId, characterId);
 
+        logger.LogInformation(
+            "Character {CharacterId} craft (wing-assembly) applied: outcome {Outcome}, result item {ResultItemId}, CP now {NewContributionPoints}",
+            characterId, resolved.Outcome, resultItemId, newContributionPoints);
+
+        if (resultItemId != 0)
+            CenterRelayNoticeLog.LogNotableCraft(logger, worldData, state.Tribe, state.Name, resultItemId,
+                "wing-assembly");
+
         // material1.Serial is preserved by the `with` expression above in both branches (only ItemId/Quantity
         // change), matching the legacy's own tValue[5] capture before either branch runs.
         return new CraftFamilyResult(CraftFamilyOutcome.Applied, resultItemId, 0, material1.Serial, null, 0, 0);
@@ -390,14 +492,26 @@ public sealed class CraftItemService(
         PlayerRuntimeState state, int characterId, int accountId, CancellationToken cancellationToken)
     {
         if (!IsValidInventorySlot(packet.Page1, packet.Index1))
+        {
+            logger.LogDebug("Character {CharacterId} craft (feather-tier-up) rejected: invalid slot", characterId);
             return RejectedFamilyResult;
+        }
 
         if (state.Inventory.GetSlot((byte)packet.Page1, (byte)packet.Index1) is not { } material)
+        {
+            logger.LogDebug("Character {CharacterId} craft (feather-tier-up) rejected: material slot empty",
+                characterId);
             return RejectedFamilyResult;
+        }
 
         var resolved = CraftResolver.ResolveFeatherTierUp(packet.Sort, material.ItemId, material.Quantity);
         if (!resolved.Succeeded)
+        {
+            logger.LogInformation(
+                "Character {CharacterId} craft (feather-tier-up) rejected by resolver (material {MaterialItemId} x{Quantity})",
+                characterId, material.ItemId, material.Quantity);
             return RejectedFamilyResult;
+        }
 
         var working = new Dictionary<byte, ImmutableDictionary<byte, ItemStack>>();
         EnsureContainer(working, state, (byte)packet.Page1);
@@ -426,7 +540,12 @@ public sealed class CraftItemService(
             // Over-quantity: slot1 keeps the ORIGINAL feather with 10 units deducted; the gained feather is
             // granted as a brand-new single-unit stack in a free slot -- :5310-5335.
             if (!TryFindEmptySlot(state, out grantedPage, out grantedIndex))
+            {
+                logger.LogInformation(
+                    "Character {CharacterId} craft (feather-tier-up) rejected: no free inventory slot for granted item",
+                    characterId);
                 return RejectedFamilyResult;
+            }
 
             var remainingMaterial = material with
             {
@@ -464,6 +583,16 @@ public sealed class CraftItemService(
                 "Zone {MapId} inventory inbox full: dropped craft (feather-tier-up) mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
                 zone.MapId, characterId);
 
+        logger.LogInformation(
+            "Character {CharacterId} craft (feather-tier-up) applied: remaining {ResultItemId} x{ResultQuantity}, granted {GrantedItemId}",
+            characterId, resultItemId, resultQuantity, grantedItem?.ItemId);
+
+        // The actually-crafted (gained) feather is grantedItem when the over-quantity branch ran; resultItemId
+        // is the ORIGINAL material's own id in that branch, not the craft's own result -- see this method's
+        // own remarks.
+        CenterRelayNoticeLog.LogNotableCraft(logger, worldData, state.Tribe, state.Name,
+            grantedItem?.ItemId ?? resultItemId, "feather-tier-up");
+
         return new CraftFamilyResult(CraftFamilyOutcome.Applied, resultItemId, resultQuantity, serial, grantedItem,
             grantedPage, grantedIndex);
     }
@@ -474,18 +603,31 @@ public sealed class CraftItemService(
     {
         if (!IsValidInventorySlot(packet.Page1, packet.Index1) || !IsValidInventorySlot(packet.Page2, packet.Index2) ||
             !IsValidInventorySlot(packet.Page3, packet.Index3) || !IsValidInventorySlot(packet.Page4, packet.Index4))
+        {
+            logger.LogDebug("Character {CharacterId} craft (wing-tier-reroll) rejected: invalid slot(s)",
+                characterId);
             return RejectedFamilyResult;
+        }
 
         if (state.Inventory.GetSlot((byte)packet.Page1, (byte)packet.Index1) is not { } material1 ||
             state.Inventory.GetSlot((byte)packet.Page2, (byte)packet.Index2) is not { } material2 ||
             state.Inventory.GetSlot((byte)packet.Page3, (byte)packet.Index3) is not { } material3 ||
             state.Inventory.GetSlot((byte)packet.Page4, (byte)packet.Index4) is not { } catalyst)
+        {
+            logger.LogDebug("Character {CharacterId} craft (wing-tier-reroll) rejected: material slot(s) empty",
+                characterId);
             return RejectedFamilyResult;
+        }
 
         var resolved = CraftResolver.ResolveWingTierReroll(material1.ItemId, material2.ItemId, material3.ItemId,
             catalyst.ItemId, catalyst.Quantity, state.PreviousTribe, SystemRandomSource.Instance);
         if (!resolved.Succeeded)
+        {
+            logger.LogInformation(
+                "Character {CharacterId} craft (wing-tier-reroll) rejected by resolver (materials {M1}/{M2}/{M3}, catalyst {Catalyst})",
+                characterId, material1.ItemId, material2.ItemId, material3.ItemId, catalyst.ItemId);
             return RejectedFamilyResult;
+        }
 
         var quantity = resolved.Outcome == CraftResolver.WingTierRerollOutcome.DustConsolation
             ? CraftRecipeCatalog.WingTierRerollFailureDustQuantity
@@ -523,6 +665,13 @@ public sealed class CraftItemService(
                 "Zone {MapId} inventory inbox full: dropped craft (wing-tier-reroll) mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
                 zone.MapId, characterId);
 
+        logger.LogInformation(
+            "Character {CharacterId} craft (wing-tier-reroll) applied: result item {ResultItemId} x{Quantity}",
+            characterId, resultStack.ItemId, quantity);
+
+        CenterRelayNoticeLog.LogNotableCraft(logger, worldData, state.Tribe, state.Name, resultStack.ItemId,
+            "wing-tier-reroll");
+
         return new CraftFamilyResult(CraftFamilyOutcome.Applied, resultStack.ItemId, quantity, resultStack.Serial,
             null, 0, 0);
     }
@@ -542,18 +691,31 @@ public sealed class CraftItemService(
     {
         if (!IsValidInventorySlot(packet.Page1, packet.Index1) || !IsValidInventorySlot(packet.Page2, packet.Index2) ||
             !IsValidInventorySlot(packet.Page3, packet.Index3) || !IsValidInventorySlot(packet.Page4, packet.Index4))
+        {
+            logger.LogDebug("Character {CharacterId} craft (wing-fifth-tier) rejected: invalid slot(s)",
+                characterId);
             return RejectedFamilyResult;
+        }
 
         if (state.Inventory.GetSlot((byte)packet.Page1, (byte)packet.Index1) is not { } material1 ||
             state.Inventory.GetSlot((byte)packet.Page2, (byte)packet.Index2) is not { } material2 ||
             state.Inventory.GetSlot((byte)packet.Page3, (byte)packet.Index3) is not { } material3 ||
             state.Inventory.GetSlot((byte)packet.Page4, (byte)packet.Index4) is not { } catalyst)
+        {
+            logger.LogDebug("Character {CharacterId} craft (wing-fifth-tier) rejected: material slot(s) empty",
+                characterId);
             return RejectedFamilyResult;
+        }
 
         var resolved = CraftResolver.ResolveWingFifthTier(packet.Sort, material1.ItemId, material2.ItemId,
             material3.ItemId, catalyst.ItemId, SystemRandomSource.Instance);
         if (!resolved.Succeeded)
+        {
+            logger.LogInformation(
+                "Character {CharacterId} craft (wing-fifth-tier) rejected by resolver (sort {Sort}, materials {M1}/{M2}/{M3}, catalyst {Catalyst})",
+                characterId, packet.Sort, material1.ItemId, material2.ItemId, material3.ItemId, catalyst.ItemId);
             return RejectedFamilyResult;
+        }
 
         var quantity = resolved.Outcome == CraftResolver.WingFifthTierOutcome.DustConsolation
             ? CraftRecipeCatalog.WingFifthFailureDustQuantity
@@ -585,6 +747,13 @@ public sealed class CraftItemService(
                 "Zone {MapId} inventory inbox full: dropped craft (wing-fifth-tier) mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
                 zone.MapId, characterId);
 
+        logger.LogInformation(
+            "Character {CharacterId} craft (wing-fifth-tier) applied: result item {ResultItemId} x{Quantity}",
+            characterId, resultStack.ItemId, quantity);
+
+        CenterRelayNoticeLog.LogNotableCraft(logger, worldData, state.Tribe, state.Name, resultStack.ItemId,
+            "wing-fifth-tier");
+
         return new CraftFamilyResult(CraftFamilyOutcome.Applied, resultStack.ItemId, quantity, resultStack.Serial,
             null, 0, 0);
     }
@@ -594,15 +763,27 @@ public sealed class CraftItemService(
         PlayerRuntimeState state, int characterId, int accountId, CancellationToken cancellationToken)
     {
         if (!IsValidInventorySlot(packet.Page1, packet.Index1))
+        {
+            logger.LogDebug("Character {CharacterId} craft (dust-recycle) rejected: invalid slot", characterId);
             return RejectedFamilyResult;
+        }
 
         if (state.Inventory.GetSlot((byte)packet.Page1, (byte)packet.Index1) is not { } material)
+        {
+            logger.LogDebug("Character {CharacterId} craft (dust-recycle) rejected: material slot empty",
+                characterId);
             return RejectedFamilyResult;
+        }
 
         var resolved = CraftResolver.ResolveDustRecycle(packet.Sort, material.ItemId, material.Quantity,
             state.PreviousTribe, SystemRandomSource.Instance);
         if (!resolved.Succeeded)
+        {
+            logger.LogInformation(
+                "Character {CharacterId} craft (dust-recycle) rejected by resolver (sort {Sort}, material {MaterialItemId} x{Quantity})",
+                characterId, packet.Sort, material.ItemId, material.Quantity);
             return RejectedFamilyResult;
+        }
 
         var threshold = CraftResolver.DustRecycleThreshold(packet.Sort);
 
@@ -630,7 +811,12 @@ public sealed class CraftItemService(
         else
         {
             if (!TryFindEmptySlot(state, out grantedPage, out grantedIndex))
+            {
+                logger.LogInformation(
+                    "Character {CharacterId} craft (dust-recycle) rejected: no free inventory slot for granted item",
+                    characterId);
                 return RejectedFamilyResult;
+            }
 
             var remainingMaterial = material with { Quantity = material.Quantity - threshold };
             working[(byte)packet.Page1] = working[(byte)packet.Page1].SetItem((byte)packet.Index1, remainingMaterial);
@@ -664,6 +850,14 @@ public sealed class CraftItemService(
             logger.LogError(
                 "Zone {MapId} inventory inbox full: dropped craft (dust-recycle) mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
                 zone.MapId, characterId);
+
+        logger.LogInformation(
+            "Character {CharacterId} craft (dust-recycle) applied: remaining {ResultItemId} x{ResultQuantity}, granted {GrantedItemId}",
+            characterId, resultItemId, resultQuantity, grantedItem?.ItemId);
+
+        // Same grantedItem-vs-resultItemId caveat as ResolveFeatherTierUpAsync above.
+        CenterRelayNoticeLog.LogNotableCraft(logger, worldData, state.Tribe, state.Name,
+            grantedItem?.ItemId ?? resultItemId, "dust-recycle");
 
         return new CraftFamilyResult(CraftFamilyOutcome.Applied, resultItemId, resultQuantity, serial, grantedItem,
             grantedPage, grantedIndex);

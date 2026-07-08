@@ -4,6 +4,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers;
 
@@ -19,7 +20,7 @@ namespace Fenrir.Application.Game.Handlers.Handlers;
 ///     Stat recompute (SetBasicAbilityFromEquip) is skipped: no stat input in this codebase depends on bottle
 ///     state, so recomputing today would be a pure no-op.
 /// </remarks>
-public sealed class DrinkBottleHandler(IDrinkBottleService drinkBottleService)
+public sealed class DrinkBottleHandler(IDrinkBottleService drinkBottleService, ILogger<DrinkBottleHandler> logger)
     : IInlinePacketHandler<DrinkBottleRequest>
 {
     public void Handle(in DrinkBottleRequest packet, IPacketSession session)
@@ -31,6 +32,10 @@ public sealed class DrinkBottleHandler(IDrinkBottleService drinkBottleService)
             state is null)
             return;
 
+        logger.LogDebug(
+            "Session {SessionId}: DrinkBottleRequest (op129) received for character {CharacterId}, sort {Sort} value {Value}",
+            session.SessionId, characterId, packet.Sort, packet.Value);
+
         var result = drinkBottleService.Drink(zone, state, characterId, packet.Sort, packet.Value);
 
         switch (result.Outcome)
@@ -38,9 +43,15 @@ public sealed class DrinkBottleHandler(IDrinkBottleService drinkBottleService)
             case DrinkBottleOutcome.Silent:
                 return;
             case DrinkBottleOutcome.Rejected:
+                logger.LogInformation(
+                    "Drink-bottle rejected for character {CharacterId}: sort {Sort} value {Value}", characterId,
+                    packet.Sort, packet.Value);
                 session.Send(new DrunkStateResponse { Sort = packet.Sort, Result = 1, BottleIndex = 0 });
                 return;
         }
+
+        logger.LogInformation("Character {CharacterId} drank bottle slot {BottleIndex}", characterId,
+            result.BottleIndex);
 
         session.Send(new DrunkStateResponse { Sort = 0, Result = 0, BottleIndex = result.BottleIndex });
         session.Send(new AvatarStatUpdateResponse

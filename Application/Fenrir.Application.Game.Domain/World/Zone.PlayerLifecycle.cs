@@ -11,6 +11,7 @@ using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.Domain.Social.Duel;
 using Fenrir.Application.Game.Domain.Social.Party;
+using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Stats;
 using Fenrir.Data.Abstractions.Game;
 using Fenrir.Data.WriteBehind;
@@ -543,6 +544,11 @@ public sealed partial class Zone
             if (!state.IsMovingZone)
                 BreakPartyOnDisconnect(characterId, state.Name);
 
+            // Unlike BreakPartyOnDisconnect, deliberately NOT gated on IsMovingZone -- see
+            // ClearTradeOnDisconnect's own remarks for why a cross-shard transfer must still release this
+            // shard's trade slot.
+            ClearTradeOnDisconnect(characterId);
+
             // Plain leave (disconnect). No despawn/logout opcode exists in the M1 client protocol -- nearby
             // clients simply stop receiving updates for this entity. A documented gap, not an oversight.
             if (characterShardLocations is not null)
@@ -640,6 +646,47 @@ public sealed partial class Zone
 
                 return;
             }
+        }
+    }
+
+    /// <summary>
+    ///     <see cref="HandleLeave" />'s disconnect-time trade cleanup: unconditionally clears any trade-process
+    ///     state <paramref name="characterId" /> holds (<see cref="TradeRegistry.ClearForDisconnect" />) and, if
+    ///     a partner was recorded, notifies them with the same CZ_TRADE_CANCEL_SEND/CZ_TRADE_END_SEND
+    ///     notification shape (<c>Fenrir.Application.Game.Handlers.Handlers.Social.TradeCancelHandler</c>/
+    ///     <c>TradeEndHandler</c>, via their own services) already send on the voluntary path, so a
+    ///     disconnect-triggered teardown looks identical on the wire to a normal cancel/end. Closes the gap that
+    ///     previously left
+    ///     <see cref="TradeRegistry.IsBusy" /> permanently true for a character who disconnected mid-negotiation
+    ///     -- see <see cref="TradeRegistry.ClearForDisconnect" />'s own remarks for why no legacy
+    ///     <c>Server/path:line</c> citation backs this specific method (Fenrir-only availability fix).
+    ///     <para>
+    ///         Unlike <see cref="BreakPartyOnDisconnect" />, deliberately NOT gated on
+    ///         <see cref="PlayerRuntimeState.IsMovingZone" />: <see cref="TradeRegistry" /> is one instance per
+    ///         <c>GameServer</c> shard process (same same-zone-process-only scope the six trade opcode handlers
+    ///         already enforce, per this behavior's own contract), so a character leaving this shard entirely --
+    ///         whether by a genuine disconnect or the OLD shard's own connection teardown for a cross-shard
+    ///         transfer -- must release its slot in THIS shard's registry either way, or a partner still tracked
+    ///         here would stay stuck exactly as before. This is a different architectural scope than
+    ///         <see cref="PartyRegistry" />'s own IsMovingZone gate, which exists for party-specific reasons, not
+    ///         reproduced here.
+    ///     </para>
+    ///     A no-op if the character had no live trade-process state at all (the overwhelmingly common case, so
+    ///     this stays cheap on the hot disconnect path).
+    /// </summary>
+    private void ClearTradeOnDisconnect(int characterId)
+    {
+        var result = _tradeRegistry.ClearForDisconnect(characterId);
+
+        switch (result.Notification)
+        {
+            case TradeDisconnectNotification.Cancel:
+                SendToCharacter(result.PartnerId, new TradeCancelResponse());
+                return;
+
+            case TradeDisconnectNotification.End:
+                SendToCharacter(result.PartnerId, new TradeEndResponse { Result = 1 });
+                return;
         }
     }
 

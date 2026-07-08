@@ -18,7 +18,7 @@ public class PartyInviteServiceTests
         var parties = new PartyRegistry();
         var zones = ZoneTestKit.CreateRegistry();
         zones.Initialize([mapId]);
-        return (new PartyInviteService(parties), zones, parties);
+        return (new PartyInviteService(parties, new CapturingLogger<PartyInviteService>()), zones, parties);
     }
 
     private static PlayerRuntimeState Enter(ZoneRegistry zones, short mapId, int characterId, string name,

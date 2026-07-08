@@ -3,6 +3,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Commerce;
 
@@ -11,7 +12,7 @@ namespace Fenrir.Application.Game.Handlers.Handlers.Commerce;
 ///     against game.Characters.RewardClaimDate rather than a per-session flag. Granted quantity is always
 ///     1 -- the legacy's quantity param is really just a Sort==99 coupon display flag, not a stack size.
 /// </summary>
-public sealed class ClaimDailyRewardHandler(IClaimDailyRewardService service)
+public sealed class ClaimDailyRewardHandler(IClaimDailyRewardService service, ILogger<ClaimDailyRewardHandler> logger)
     : IAsyncPacketHandler<ClaimDailyRewardRequest>
 {
     public async ValueTask HandleAsync(ClaimDailyRewardRequest packet, IPacketSession session,
@@ -19,6 +20,10 @@ public sealed class ClaimDailyRewardHandler(IClaimDailyRewardService service)
     {
         var zoneSession = (ZoneClientSession)session;
         var characterId = zoneSession.CharacterId!.Value;
+
+        logger.LogDebug(
+            "Session {SessionId}: ClaimDailyRewardRequest (op155) received for character {CharacterId}",
+            session.SessionId, characterId);
 
         if (zoneSession.CurrentZone is not Zone zone || !zone.TryGetPlayer(characterId, out var state) ||
             state is null)
@@ -30,6 +35,9 @@ public sealed class ClaimDailyRewardHandler(IClaimDailyRewardService service)
             var result = await service.ResolveAndApplyAsync(packet, zone, state, characterId, cancellationToken);
             if (result is null)
             {
+                logger.LogWarning(
+                    "Daily-reward claim rejected for character {CharacterId} -- aborting session",
+                    characterId);
                 zoneSession.Abort(DisconnectReason.Faulted);
                 return;
             }

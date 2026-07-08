@@ -3,6 +3,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Commerce;
 
@@ -17,7 +18,8 @@ namespace Fenrir.Application.Game.Handlers.Handlers.Commerce;
 ///     (Réf. C++ : <c>Server/ts25zone/S04_MyWork02.cpp:8208-8223</c>) -- the debit itself still only ever
 ///     charges for one catalog-defined unit, regardless of that multiplier.
 /// </summary>
-public sealed class BuyCashItemHandler(IBuyCashItemService service) : IAsyncPacketHandler<BuyCashItemRequest>
+public sealed class BuyCashItemHandler(IBuyCashItemService service, ILogger<BuyCashItemHandler> logger)
+    : IAsyncPacketHandler<BuyCashItemRequest>
 {
     public async ValueTask HandleAsync(BuyCashItemRequest packet, IPacketSession session,
         CancellationToken cancellationToken)
@@ -25,6 +27,10 @@ public sealed class BuyCashItemHandler(IBuyCashItemService service) : IAsyncPack
         var zoneSession = (ZoneClientSession)session;
         var characterId = zoneSession.CharacterId!.Value;
         var accountId = zoneSession.AccountId!.Value;
+
+        logger.LogDebug(
+            "BuyCashItem: session {SessionId} character {CharacterId} costInfoIndex {CostInfoIndex} slot {Page}/{Index}",
+            session.SessionId, characterId, packet.CostInfoIndex, packet.Page, packet.Index);
 
         if (zoneSession.CurrentZone is not Zone zone || !zone.TryGetPlayer(characterId, out var state) ||
             state is null)
@@ -37,6 +43,9 @@ public sealed class BuyCashItemHandler(IBuyCashItemService service) : IAsyncPack
                 cancellationToken);
             if (result is null)
             {
+                logger.LogWarning(
+                    "Buy cash item rejected: character {CharacterId} request failed structural validation -- session will be disconnected",
+                    characterId);
                 zoneSession.Abort(DisconnectReason.Faulted);
                 return;
             }

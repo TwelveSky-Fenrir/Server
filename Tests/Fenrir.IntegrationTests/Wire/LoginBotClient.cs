@@ -101,22 +101,29 @@ public sealed class LoginBotClient : IAsyncDisposable
     }
 
     /// <summary>
-    ///     op17 CL_CREATE_AVATAR_SEND2. <paramref name="weapon" /> must be one of the CALLING tribe's own three
-    ///     legal <c>RawWeaponCode</c> values (tribe 0: 5/6/7, tribe 1: 11/12/13, tribe 2: 17/18/19 --
-    ///     Server/ts25login/S04_MyWork02.cpp:756-778/784-806/812-834) or
+    ///     op17 CL_CREATE_AVATAR_SEND2. <paramref name="weapon" /> must be one of the CALLING
+    ///     <paramref name="previousTribe" />'s own three legal <c>RawWeaponCode</c> values (previousTribe 0:
+    ///     5/6/7, previousTribe 1: 11/12/13, previousTribe 2: 17/18/19 --
+    ///     Server/ts25login/S04_MyWork02.cpp:756-778/784-806/812-834, corroborated by
+    ///     <c>world.StarterKitEquipment</c>'s own seed, keyed by <c>PreviousTribe</c> not <c>Tribe</c> --
+    ///     see <c>Database/Migrations/Seed/world/082_starter_kit_equipment.sql</c>) or
     ///     <c>CreateAvatarService.TryResolveWeaponItemId</c> can't resolve a starter-kit weapon item and the
     ///     whole request is rejected as <c>CreateAvatarOutcome.InvalidWeapon</c> (a hard disconnect, no reply
     ///     frame at all -- NOT the "server ignores this field" behavior an earlier version of this method
-    ///     assumed). Defaults to 5 (tribe 0's first legal code), matching every current caller's own
-    ///     tribe-0 avatar.
+    ///     assumed). <paramref name="previousTribe" /> defaults to 0 (matching every pre-existing caller's own
+    ///     tribe-0/previousTribe-0 avatar, where the two happen to coincide) -- pass it explicitly whenever
+    ///     <paramref name="tribe" /> isn't 0, since <c>EnterWorldService.IsTribeAndPreviousTribeConsistent</c>
+    ///     requires a main-faction Tribe (0-2) to carry a PreviousTribe exactly equal to itself (the fourth
+    ///     faction, Tribe 3, is the one legitimate case where they may differ) or the character can never
+    ///     enter the world at all. Weapon defaults to 5 (previousTribe 0's first legal code).
     /// </summary>
     public async Task<int> CreateAvatarAsync(int avatarPost, int tribe, int gender, int head, int face,
-        string avatarName, CancellationToken ct, int weapon = 5)
+        string avatarName, CancellationToken ct, int weapon = 5, int previousTribe = 0)
     {
         var payload = new byte[CreateAvatarRequest.PayloadSize];
         WireScalars.WriteInt32(payload.AsSpan(0, 4), avatarPost);
         WireScalars.WriteInt32(payload.AsSpan(4, 4), tribe);
-        WireScalars.WriteInt32(payload.AsSpan(8, 4), 0); // PreviousTribe
+        WireScalars.WriteInt32(payload.AsSpan(8, 4), previousTribe);
         WireScalars.WriteInt32(payload.AsSpan(12, 4), gender);
         WireScalars.WriteInt32(payload.AsSpan(16, 4), head);
         WireScalars.WriteInt32(payload.AsSpan(20, 4), face);

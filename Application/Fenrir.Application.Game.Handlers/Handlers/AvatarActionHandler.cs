@@ -1,13 +1,16 @@
 using Fenrir.Application.Game.Abstractions.ZoneLifecycle;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Application.Game.Handlers.Logging;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers;
 
 /// <summary>CZ_AVATAR_ACTION_SEND (op15).</summary>
-public sealed class AvatarActionHandler(IAvatarActionService service) : IInlinePacketHandler<AvatarActionRequest>
+public sealed class AvatarActionHandler(IAvatarActionService service, ILogger<AvatarActionHandler>? logger = null)
+    : IInlinePacketHandler<AvatarActionRequest>
 {
     public void Handle(in AvatarActionRequest packet, IPacketSession session)
     {
@@ -18,6 +21,10 @@ public sealed class AvatarActionHandler(IAvatarActionService service) : IInlineP
             return;
 
         var action = packet.Action;
-        service.PostAction(zone, zoneSession.CharacterId!.Value, in action);
+        var characterId = zoneSession.CharacterId!.Value;
+
+        logger?.AvatarActionReceived(session.SessionId, characterId, opcode: 15, action.Type, action.Sort);
+
+        service.PostAction(zone, characterId, in action);
     }
 }

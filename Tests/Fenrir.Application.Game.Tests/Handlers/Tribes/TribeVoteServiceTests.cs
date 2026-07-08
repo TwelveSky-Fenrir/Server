@@ -70,7 +70,7 @@ public class TribeVoteServiceTests
         // Sort/slot-range validation lives on the handler itself, ahead of the service call -- exercise the
         // real handler here, which the service's own (Sort-less) API can't express at all.
         var (session, _, _, election, _) = Setup();
-        var handler = new TribeVoteHandler(new TribeVoteService(election));
+        var handler = new TribeVoteHandler(new TribeVoteService(election, NullLogger<TribeVoteService>.Instance));
 
         await handler.HandleAsync(new TribeVoteRequest { Sort = sort, Value = value }, session,
             CancellationToken.None);
@@ -85,7 +85,7 @@ public class TribeVoteServiceTests
     public async Task UnsupportedSort_Aborts(int sort)
     {
         var (session, _, _, election, _) = Setup();
-        var handler = new TribeVoteHandler(new TribeVoteService(election));
+        var handler = new TribeVoteHandler(new TribeVoteService(election, NullLogger<TribeVoteService>.Instance));
 
         await handler.HandleAsync(new TribeVoteRequest { Sort = sort, Value = 0 }, session, CancellationToken.None);
 
@@ -96,7 +96,7 @@ public class TribeVoteServiceTests
     public async Task Candidacy_WithNoElectionWindowOpen_Aborts()
     {
         var (_, _, state, election, _) = Setup();
-        var service = new TribeVoteService(election);
+        var service = new TribeVoteService(election, NullLogger<TribeVoteService>.Instance);
 
         var result = await service.RegisterCandidacyAsync(state, 0, CancellationToken.None);
 
@@ -108,7 +108,7 @@ public class TribeVoteServiceTests
     {
         var (_, _, state, election, repository) = Setup();
         await election.OpenCandidacyWindowAsync(CancellationToken.None);
-        var service = new TribeVoteService(election);
+        var service = new TribeVoteService(election, NullLogger<TribeVoteService>.Instance);
 
         var result = await service.RegisterCandidacyAsync(state, 3, CancellationToken.None);
 
@@ -124,7 +124,7 @@ public class TribeVoteServiceTests
     {
         var (_, _, state, election, _) = Setup(100);
         await election.OpenCandidacyWindowAsync(CancellationToken.None);
-        var service = new TribeVoteService(election);
+        var service = new TribeVoteService(election, NullLogger<TribeVoteService>.Instance);
 
         var result = await service.RegisterCandidacyAsync(state, 0, CancellationToken.None);
 
@@ -135,7 +135,7 @@ public class TribeVoteServiceTests
     public async Task Vote_WithNoElectionWindowOpen_Aborts()
     {
         var (_, _, state, election, _) = Setup();
-        var service = new TribeVoteService(election);
+        var service = new TribeVoteService(election, NullLogger<TribeVoteService>.Instance);
 
         var result = await service.CastVoteAsync(state, 0, CancellationToken.None);
 
@@ -148,7 +148,7 @@ public class TribeVoteServiceTests
         var (_, _, state, election, repository) = Setup(tribe: 2);
         repository.VotesByTribe[2] = [new TribeVoteDto(2, 5, 999, 150, 1200, 0, DateTime.UtcNow)];
         election.OpenVotingWindow();
-        var service = new TribeVoteService(election);
+        var service = new TribeVoteService(election, NullLogger<TribeVoteService>.Instance);
 
         var result = await service.CastVoteAsync(state, 5, CancellationToken.None);
 
@@ -161,7 +161,7 @@ public class TribeVoteServiceTests
     {
         var (_, _, state, election, _) = Setup(tribe: 2);
         election.OpenVotingWindow();
-        var service = new TribeVoteService(election);
+        var service = new TribeVoteService(election, NullLogger<TribeVoteService>.Instance);
 
         var result = await service.CastVoteAsync(state, 5, CancellationToken.None);
 
@@ -174,7 +174,7 @@ public class TribeVoteServiceTests
         var (_, _, state, election, repository) = Setup(tribe: 2);
         repository.VotesByTribe[2] = [new TribeVoteDto(2, 5, 999, 150, 1200, 0, DateTime.UtcNow)];
         election.OpenVotingWindow();
-        var service = new TribeVoteService(election);
+        var service = new TribeVoteService(election, NullLogger<TribeVoteService>.Instance);
         await service.CastVoteAsync(state, 5, CancellationToken.None);
 
         var result = await service.CastVoteAsync(state, 5, CancellationToken.None);

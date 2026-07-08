@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Runtime.CompilerServices;
 using Fenrir.Application.Game.Abstractions.ZoneLifecycle;
 using Fenrir.Application.Game.Domain.Commerce;
 using Fenrir.Application.Game.Domain.Consumables;
@@ -138,7 +139,7 @@ public sealed class UseInventoryItemService(
     {
         var itemStack = state.Inventory.GetSlot(page, index);
         if (itemStack is not { } item || !worldData.ItemsById.TryGetValue(item.ItemId, out var itemDefinition))
-            return Fail(page, index);
+            return Fail(characterId, itemStack, page, index);
 
         if (itemDefinition.Item.Sort == BottleSort)
             return await ResolveBottleAsync(zone, state, characterId, page, index, item, cancellationToken);
@@ -203,7 +204,7 @@ public sealed class UseInventoryItemService(
         if (IsRebirthPill(item.ItemId))
             return await ResolveRebirthPillAsync(zone, state, characterId, page, index, item, cancellationToken);
 
-        return Fail(page, index);
+        return Fail(characterId, item, page, index);
     }
 
     /// <summary>
@@ -233,7 +234,7 @@ public sealed class UseInventoryItemService(
     {
         var resolved = BottleResolver.ResolveAcquire(state.BottleSlots, item.ItemId);
         if (resolved.Outcome == BottleResolver.AcquireOutcome.Rejected)
-            return Fail(page, index);
+            return Fail(characterId, item, page, index);
 
         var projected = state.Inventory.GetContainer(page).Remove(index);
 
@@ -257,6 +258,10 @@ public sealed class UseInventoryItemService(
             logger.LogError(
                 "Zone {MapId} bottle inbox full: dropped bottle-acquire mirror for character {CharacterId}",
                 zone.MapId, characterId);
+
+        logger.LogInformation(
+            "Character {CharacterId} use-inventory-item (bottle) applied: item {ItemId} acquired bottle slot {SlotIndex}",
+            characterId, item.ItemId, resolved.SlotIndex);
 
         return response;
     }
@@ -300,7 +305,7 @@ public sealed class UseInventoryItemService(
             state.LearnedSkills, state.SkillPoints);
 
         if (resolved.Outcome != SkillGrimoireLearnResolver.Outcome.Success)
-            return Fail(page, index);
+            return Fail(characterId, item, page, index);
 
         var newSkillPoints = state.SkillPoints - resolved.Cost;
         var learned = new LearnedSkill(resolved.SkillId, resolved.Cost);
@@ -374,7 +379,7 @@ public sealed class UseInventoryItemService(
             logger.LogWarning(ex,
                 "Account {AccountId} GP ticket credit failed for item {ItemId} (character {CharacterId}); item left untouched",
                 accountId, item.ItemId, characterId);
-            return Fail(page, index);
+            return Fail(characterId, item, page, index);
         }
 
         await eventLog.LogAsync(GpTicketRedeemedEventCode, EventLogCategory.Currency, accountId, characterId,
@@ -395,6 +400,10 @@ public sealed class UseInventoryItemService(
                 "Zone {MapId} inventory inbox full: dropped use-inventory-item (GP ticket) mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
                 zone.MapId, characterId);
 
+        logger.LogInformation(
+            "Account {AccountId} use-inventory-item (GP ticket) applied: item {ItemId} credited {CreditAmount} to character {CharacterId}",
+            accountId, item.ItemId, creditAmount, characterId);
+
         return response;
     }
 
@@ -411,11 +420,11 @@ public sealed class UseInventoryItemService(
         int characterId, byte page, byte index, ItemStack item, int minutes, CancellationToken cancellationToken)
     {
         if (state.GuildId is not { } guildId)
-            return Fail(page, index);
+            return Fail(characterId, item, page, index);
 
         var guild = await guilds.GetByIdAsync(guildId, cancellationToken);
         if (guild is null)
-            return Fail(page, index);
+            return Fail(characterId, item, page, index);
 
         try
         {
@@ -426,7 +435,7 @@ public sealed class UseInventoryItemService(
         {
             logger.LogInformation(ex,
                 "Character {CharacterId} guild scroll recharge failed for guild {GuildId}", characterId, guildId);
-            return Fail(page, index);
+            return Fail(characterId, item, page, index);
         }
 
         return await ConsumeAndMirrorAsync(zone, state, characterId, page, index, item, cancellationToken);
@@ -515,8 +524,13 @@ public sealed class UseInventoryItemService(
 
         var resolved = ProxyShopRentalExtensionResolver.Resolve(item.ItemId, today, currentExpiration);
         if (resolved.Outcome != ProxyShopRentalExtensionResolver.Outcome.Success)
+        {
+            logger.LogInformation(
+                "Character {CharacterId} use-inventory-item (proxy-shop rental extension) rejected by resolver (item {ItemId}, outcome {Outcome})",
+                characterId, item.ItemId, resolved.Outcome);
             return new UseInventoryItemResponse
                 { Result = 1, Page = page, Index = index, Value = resolved.NewExpirationDate, Value2 = 0 };
+        }
 
         try
         {
@@ -557,6 +571,10 @@ public sealed class UseInventoryItemService(
         // expected and not logged as an error.
         zone.TryUpdateProxyShopExpiration(characterId, resolved.NewExpirationDate);
 
+        logger.LogInformation(
+            "Character {CharacterId} use-inventory-item (proxy-shop rental extension) applied: item {ItemId}, new expiration {NewExpirationDate}",
+            characterId, item.ItemId, resolved.NewExpirationDate);
+
         return response;
     }
 
@@ -594,11 +612,15 @@ public sealed class UseInventoryItemService(
         int accountId, byte page, byte index, ItemStack item, int value, CancellationToken cancellationToken)
     {
         if (item.Quantity < 1)
-            return Fail(page, index);
+            return Fail(characterId, item, page, index);
 
         await eventLog.LogAsync(TeleportRecallScrollUsedEventCode, EventLogCategory.ItemUse, accountId, characterId,
             null, null, null, null, null, item.ItemId, item.Quantity, TeleportRecallScrollSuccessOutcome,
             $"Serial={item.Serial};ExpireDate={item.ExpireDate}", cancellationToken);
+
+        logger.LogInformation(
+            "Character {CharacterId} use-inventory-item (teleport/recall scroll) applied: item {ItemId} (no inventory mutation)",
+            characterId, item.ItemId);
 
         // No inventory mutation and no zone command: the legacy decrement/clear block never runs in any
         // build (see this method's own remarks), and there is no other durable side effect to mirror.
@@ -761,7 +783,7 @@ public sealed class UseInventoryItemService(
         {
             var g12 = StatPotionResolver.ResolveG12(currentSubValue, state.Level2, bulkRequested);
             if (!g12.Succeeded)
-                return Fail(page, index);
+                return Fail(characterId, item, page, index);
 
             newSubValue = g12.NewCount;
             unitsConsumed = g12.UnitsConsumed;
@@ -771,7 +793,7 @@ public sealed class UseInventoryItemService(
             var perUnitAmount = tier == StatPotionTier.TenStack ? 10 : 1;
             var ordinary = StatPotionResolver.ResolveOrdinary(currentSubValue, perUnitAmount, bulkRequested);
             if (!ordinary.Succeeded)
-                return Fail(page, index);
+                return Fail(characterId, item, page, index);
 
             newSubValue = ordinary.NewCount;
             unitsConsumed = ordinary.UnitsConsumed;
@@ -833,6 +855,10 @@ public sealed class UseInventoryItemService(
                 "Zone {MapId} inventory inbox full: dropped stat-potion mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
                 zone.MapId, characterId);
 
+        logger.LogInformation(
+            "Character {CharacterId} use-inventory-item (stat potion) applied: item {ItemId} kind {Kind} tier {Tier}, {UnitsConsumed} unit(s) consumed, new counter {NewSubValue}",
+            characterId, item.ItemId, kind, tier, unitsConsumed, newSubValue);
+
         // Value echoes the client's own raw requested count unmodified -- see this method's own <summary>.
         return new UseInventoryItemResponse
             { Result = 0, Page = page, Index = index, Value = requestedValue, Value2 = 0 };
@@ -850,7 +876,7 @@ public sealed class UseInventoryItemService(
     {
         var resolved = LodTicketResolver.Resolve(state.Level, state.RebirthCount, item.Quantity, state.LodRounds);
         if (!resolved.Succeeded)
-            return Fail(page, index);
+            return Fail(characterId, item, page, index);
 
         if (!await zone.PostTribeProgressCommandAndWaitAsync(
                 new TribeProgressZoneCommand(characterId, LodRounds: resolved.NewLodRounds), cancellationToken))
@@ -903,7 +929,7 @@ public sealed class UseInventoryItemService(
     {
         if (!StatResetResolver.TryResolveLevelBand(state.Level, state.RebirthCount, out var actualBand) ||
             actualBand != requiredBand)
-            return Fail(page, index);
+            return Fail(characterId, item, page, index);
 
         var resolved = StatResetResolver.ResolveStatsClear(state.StatVit, state.StatStr, state.StatInt, state.StatDex);
 
@@ -936,11 +962,11 @@ public sealed class UseInventoryItemService(
         CancellationToken cancellationToken)
     {
         if (selector is < 1 or > 4)
-            return Fail(page, index);
+            return Fail(characterId, item, page, index);
 
         if (!StatResetResolver.TryResolveLevelBand(state.Level, state.RebirthCount, out var actualBand) ||
             actualBand != requiredBand)
-            return Fail(page, index);
+            return Fail(characterId, item, page, index);
 
         var currentValue = (StatResetResolver.StatSelector)selector switch
         {
@@ -953,7 +979,7 @@ public sealed class UseInventoryItemService(
 
         var resolved = StatResetResolver.ResolveStatCleanse(currentValue);
         if (!resolved.Succeeded)
-            return Fail(page, index);
+            return Fail(characterId, item, page, index);
 
         var newVit = state.StatVit;
         var newStr = state.StatStr;
@@ -1053,7 +1079,7 @@ public sealed class UseInventoryItemService(
             : ProtectionChargeResolver.ResolveCharmCharge(current, perUnitAmount, bulkCount);
 
         if (!charged.Succeeded)
-            return Fail(page, index);
+            return Fail(characterId, item, page, index);
 
         var command = kind switch
         {
@@ -1089,6 +1115,10 @@ public sealed class UseInventoryItemService(
             logger.LogError(
                 "Zone {MapId} inventory inbox full: dropped protection-charm mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
                 zone.MapId, characterId);
+
+        logger.LogInformation(
+            "Character {CharacterId} use-inventory-item (protection charm) applied: item {ItemId} kind {Kind}, {UnitsConsumed} unit(s) consumed, new counter {NewCounterValue}",
+            characterId, item.ItemId, kind, charged.UnitsConsumed, charged.NewCounterValue);
 
         return new UseInventoryItemResponse
         {
@@ -1139,7 +1169,7 @@ public sealed class UseInventoryItemService(
 
         var charged = ProtectionChargeResolver.ResolveScrollCharge(current, fixedAmount);
         if (!charged.Succeeded)
-            return Fail(page, index);
+            return Fail(characterId, item, page, index);
 
         var command = kind switch
         {
@@ -1200,7 +1230,7 @@ public sealed class UseInventoryItemService(
 
         var charged = PetExpBoostPillResolver.ResolveCharge(state.PetExpX2Time, bulkCount);
         if (!charged.Succeeded)
-            return Fail(page, index);
+            return Fail(characterId, item, page, index);
 
         if (!await zone.PostTribeProgressCommandAndWaitAsync(
                 new TribeProgressZoneCommand(characterId, PetExpX2Time: charged.NewCounterValue),
@@ -1232,6 +1262,10 @@ public sealed class UseInventoryItemService(
             logger.LogError(
                 "Zone {MapId} inventory inbox full: dropped Pet-EXP-boost-pill mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
                 zone.MapId, characterId);
+
+        logger.LogInformation(
+            "Character {CharacterId} use-inventory-item (pet EXP boost pill) applied: item {ItemId}, {BulkCount} unit(s) consumed, new counter {NewCounterValue}",
+            characterId, item.ItemId, bulkCount, charged.NewCounterValue);
 
         // Value carries the resulting counter total, Value2 the bulk count actually consumed -- per this
         // family's own Outputs contract, distinct from ResolveProtectionCharmAsync's identically-shaped
@@ -1288,7 +1322,7 @@ public sealed class UseInventoryItemService(
     {
         if (!RebirthProgression.IsHighLevelExperienceFull(state.Level2, state.Exp2) ||
             state.RebirthCount >= RebirthProgression.MaxRebirthGeneration)
-            return Fail(page, index);
+            return Fail(characterId, item, page, index);
 
         var newRebirthCount = state.RebirthCount + 1;
         var attributes = new CharacterBaseAttributes(state.StatVit, state.StatStr, state.StatInt, state.StatDex,
@@ -1313,6 +1347,10 @@ public sealed class UseInventoryItemService(
                 "Zone {MapId} tribe-progress inbox full: dropped Rebirth-Pill mirror for character {CharacterId}",
                 zone.MapId, characterId);
 
+        logger.LogInformation(
+            "Character {CharacterId} rebirth advanced to generation {NewRebirthCount} via item {ItemId}",
+            characterId, newRebirthCount, item.ItemId);
+
         return response;
     }
 
@@ -1326,7 +1364,7 @@ public sealed class UseInventoryItemService(
     {
         var resolved = CashTimerResolver.ResolveFactionNotice(state.TribeNotifyScrollCount);
         if (!resolved.Succeeded)
-            return Fail(page, index);
+            return Fail(characterId, item, page, index);
 
         if (!await zone.PostTribeProgressCommandAndWaitAsync(
                 new TribeProgressZoneCommand(characterId, TribeNotifyScrollCount: resolved.NewValue),
@@ -1350,7 +1388,7 @@ public sealed class UseInventoryItemService(
     {
         var resolved = CashTimerResolver.ResolveTaiyanKey(state.Level, state.TaiyanKeyTimer);
         if (!resolved.Succeeded)
-            return Fail(page, index);
+            return Fail(characterId, item, page, index);
 
         if (!await zone.PostTribeProgressCommandAndWaitAsync(
                 new TribeProgressZoneCommand(characterId, TaiyanKeyTimer: resolved.NewValue), cancellationToken))
@@ -1368,7 +1406,8 @@ public sealed class UseInventoryItemService(
     ///     cache. Result=0/Value=0/Value2=0 -- none of these families carry a documented per-family payload.
     /// </summary>
     private async ValueTask<UseInventoryItemResponse> ConsumeAndMirrorAsync(Zone zone, PlayerRuntimeState state,
-        int characterId, byte page, byte index, ItemStack item, CancellationToken cancellationToken)
+        int characterId, byte page, byte index, ItemStack item, CancellationToken cancellationToken,
+        [CallerMemberName] string resolver = "")
     {
         var remaining = item.Quantity - 1;
         var container = state.Inventory.GetContainer(page);
@@ -1387,6 +1426,10 @@ public sealed class UseInventoryItemService(
             logger.LogError(
                 "Zone {MapId} inventory inbox full: dropped use-inventory-item mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
                 zone.MapId, characterId);
+
+        logger.LogInformation(
+            "Character {CharacterId} use-inventory-item applied in {Resolver}: item {ItemId} consumed from slot {Page}:{Index} (remaining {Remaining})",
+            characterId, resolver, item.ItemId, page, index, remaining);
 
         return response;
     }
@@ -1427,8 +1470,23 @@ public sealed class UseInventoryItemService(
         return itemId is 632 or 1241 or 2462;
     }
 
-    private static UseInventoryItemResponse Fail(byte page, byte index)
+    /// <summary>
+    ///     Shared clean-rejection tail for every family in this file -- centralizes the "why" logging so every
+    ///     one of this file's ~20 <c>Resolve*Async</c> reject branches gets an observable trail without each
+    ///     call site needing its own hand-written log line. <paramref name="resolver" /> is filled in
+    ///     automatically with the calling method's name (<see cref="CallerMemberNameAttribute" />), which is
+    ///     the finest-grained "which family/precondition rejected this" signal available without a bespoke
+    ///     reason string per call site. Debug level: item-use rejections are routine (stale client cache,
+    ///     player double-click, or a precondition simply not met yet), not inherently a security signal --
+    ///     unlike the anti-cheat/economy gates elsewhere in this feature area that log at Information.
+    /// </summary>
+    private UseInventoryItemResponse Fail(int characterId, ItemStack? item, byte page, byte index,
+        [CallerMemberName] string resolver = "")
     {
+        if (logger.IsEnabled(LogLevel.Debug))
+            logger.LogDebug(
+                "Character {CharacterId} use-inventory-item rejected in {Resolver} (item {ItemId}, slot {Page}:{Index})",
+                characterId, resolver, item?.ItemId, page, index);
         return new UseInventoryItemResponse { Result = 1, Page = page, Index = index, Value = 0, Value2 = 0 };
     }
 

@@ -34,6 +34,11 @@ public sealed class ZoneHandshakeHandler(
         CancellationToken cancellationToken)
     {
         var zoneSession = (ZoneClientSession)session;
+
+        logger?.LogDebug(
+            "Session {SessionId}: ZoneHandshakeRequest (op11) received, declared tribe {DeclaredTribe}",
+            session.SessionId, packet.Tribe);
+
         var result = await service.ConsumeTicketAsync(packet.Id, packet.Tribe, zoneSession, cancellationToken);
 
         switch (result.Outcome)

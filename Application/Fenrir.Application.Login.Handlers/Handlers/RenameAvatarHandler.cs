@@ -3,6 +3,7 @@ using Fenrir.Application.Login.Domain.Avatars;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Login;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Login.Handlers.Handlers;
 
@@ -20,7 +21,7 @@ namespace Fenrir.Application.Login.Handlers.Handlers;
 ///     refusals, all collapsing to Result=3 -- see RenameAvatarService/AvatarRenameGate for the per-rule
 ///     citations and ordering).
 /// </remarks>
-public sealed class RenameAvatarHandler(IRenameAvatarService renameAvatarService)
+public sealed class RenameAvatarHandler(IRenameAvatarService renameAvatarService, ILogger<RenameAvatarHandler> logger)
     : IAsyncPacketHandler<RenameAvatarRequest>
 {
     private const int MaxAvatarPost = 2; // MAX_USER_AVATAR_NUM - 1
@@ -33,6 +34,11 @@ public sealed class RenameAvatarHandler(IRenameAvatarService renameAvatarService
         var loginSession = (LoginClientSession)session;
         var accountId = loginSession.AccountId!.Value;
 
+        if (logger.IsEnabled(LogLevel.Debug))
+            logger.LogDebug(
+                "Session {SessionId}: op19 CL_CHANGE_AVATAR_NAME_SEND received for account {AccountId} slot {Slot}",
+                session.SessionId, accountId, packet.AvatarPost);
+
         // Legacy Quit() guards (S04_MyWork02.cpp l.1310-1348).
         if (packet.AvatarPost is < 0 or > MaxAvatarPost ||
             packet.ChangeAvatarName.Length == 0 ||
@@ -40,6 +46,9 @@ public sealed class RenameAvatarHandler(IRenameAvatarService renameAvatarService
             packet.Index is < 0 or >= InventorySlotCount ||
             !AvatarNameValidator.HasOnlyWhitelistedCharacters(packet.ChangeAvatarName))
         {
+            logger.LogWarning(
+                "Avatar rename rejected: malformed request from account {AccountId} (slot {Slot}) -- aborting",
+                accountId, packet.AvatarPost);
             loginSession.Abort(DisconnectReason.Malformed);
             return;
         }
@@ -50,9 +59,14 @@ public sealed class RenameAvatarHandler(IRenameAvatarService renameAvatarService
         switch (result.Outcome)
         {
             case RenameAvatarOutcome.Success:
+                logger.LogInformation("Avatar renamed: account {AccountId} slot {Slot} -> {NewName}", accountId,
+                    packet.AvatarPost, packet.ChangeAvatarName);
                 session.Send(new RenameAvatarResponse { Result = 0 });
                 return;
             case RenameAvatarOutcome.NameTaken:
+                logger.LogInformation(
+                    "Avatar rename rejected: account {AccountId} slot {Slot} -- name unchanged/taken", accountId,
+                    packet.AvatarPost);
                 session.Send(new RenameAvatarResponse { Result = 2 });
                 return;
             case RenameAvatarOutcome.TribeRoleRefusal:
@@ -60,15 +74,26 @@ public sealed class RenameAvatarHandler(IRenameAvatarService renameAvatarService
             case RenameAvatarOutcome.FriendListRefusal:
             case RenameAvatarOutcome.TeacherBondRefusal:
             case RenameAvatarOutcome.StudentBondRefusal:
+                logger.LogWarning(
+                    "Avatar rename refused: account {AccountId} slot {Slot} outcome {Outcome}", accountId,
+                    packet.AvatarPost, result.Outcome);
                 session.Send(new RenameAvatarResponse { Result = 3 });
                 return;
             case RenameAvatarOutcome.SqlError:
+                // The exception itself is already logged at RenameAvatarService; this is just the outcome summary.
+                logger.LogWarning("Avatar rename failed: account {AccountId} slot {Slot} (SQL error)", accountId,
+                    packet.AvatarPost);
                 session.Send(new RenameAvatarResponse { Result = 101 });
                 return;
             case RenameAvatarOutcome.SlotMissing:
+                logger.LogWarning("Avatar rename rejected: account {AccountId} slot {Slot} holds no character",
+                    accountId, packet.AvatarPost);
                 session.Send(new RenameAvatarResponse { Result = 102 });
                 return;
             case RenameAvatarOutcome.ItemMismatch:
+                logger.LogWarning(
+                    "Avatar rename rejected: account {AccountId} slot {Slot} -- rename scroll not found at the claimed slot -- aborting",
+                    accountId, packet.AvatarPost);
                 loginSession.Abort(DisconnectReason.Malformed);
                 return;
             default:

@@ -4,6 +4,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers;
 
@@ -13,7 +14,7 @@ namespace Fenrir.Application.Game.Handlers.Handlers;
 ///     <see cref="AutoBuffSkillResolver" />'s remarks). Always replies Result=0, even when every slot clamps to
 ///     an unlearned skill's -1.
 /// </summary>
-public sealed class ContinueSkillStatHandler(IContinueSkillStatService service)
+public sealed class ContinueSkillStatHandler(IContinueSkillStatService service, ILogger<ContinueSkillStatHandler> logger)
     : IInlinePacketHandler<ContinueSkillStatRequest>
 {
     public void Handle(in ContinueSkillStatRequest packet, IPacketSession session)
@@ -26,7 +27,12 @@ public sealed class ContinueSkillStatHandler(IContinueSkillStatService service)
         if (!zone.TryGetPlayer(characterId, out var state) || state is null)
             return;
 
+        logger.LogDebug(
+            "Session {SessionId}: ContinueSkillStatRequest (op94) received for character {CharacterId}",
+            session.SessionId, characterId);
+
         service.RegisterAutoBuffs(zone, characterId, state, packet.Skill);
+        logger.LogInformation("Character {CharacterId} registered auto-buff skill slots", characterId);
         session.Send(new AutoBuffRegisterResponse { Value = 0 });
     }
 }

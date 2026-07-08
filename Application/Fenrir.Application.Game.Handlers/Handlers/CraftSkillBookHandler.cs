@@ -3,6 +3,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers;
 
@@ -11,7 +12,9 @@ namespace Fenrir.Application.Game.Handlers.Handlers;
 ///     <see cref="ICraftSkillBookService" />. Recipes 0-2 are unconditional (no roll); recipe 3 (War God)
 ///     additionally rolls the granted skill via <c>SkillBookCraftResolver.ResolveWarGod</c>.
 /// </summary>
-public sealed class CraftSkillBookHandler(ICraftSkillBookService craftSkillBookService)
+public sealed class CraftSkillBookHandler(
+    ICraftSkillBookService craftSkillBookService,
+    ILogger<CraftSkillBookHandler> logger)
     : IAsyncPacketHandler<CraftSkillBookRequest>
 {
     public async ValueTask HandleAsync(CraftSkillBookRequest packet, IPacketSession session,
@@ -20,9 +23,19 @@ public sealed class CraftSkillBookHandler(ICraftSkillBookService craftSkillBookS
         var zoneSession = (ZoneClientSession)session;
         var characterId = zoneSession.CharacterId!.Value;
 
+        if (logger.IsEnabled(LogLevel.Debug))
+            logger.LogDebug(
+                "Session {SessionId} character {CharacterId}: CraftSkillBookRequest received, sort {Sort}",
+                zoneSession.SessionId, characterId, packet.Sort);
+
         if (zoneSession.CurrentZone is not Zone zone || !zone.TryGetPlayer(characterId, out var state) ||
             state is null)
+        {
+            logger.LogDebug(
+                "Session {SessionId} character {CharacterId}: CraftSkillBookRequest dropped, no live zone/player state",
+                zoneSession.SessionId, characterId);
             return;
+        }
 
         // Serializes the read/SQL/mirror sequence per character to close an item-duplication window.
         await state.EconomyActionLock.WaitAsync(cancellationToken);

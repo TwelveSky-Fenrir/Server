@@ -65,7 +65,8 @@ public class UpgradeCapeServiceTests
         var (session, _, zone, state, repo, eventLog) = SetUp();
         SeedInventory(zone, new ItemStack(1401, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1),
             new ItemStack(984, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0));
-        var service = new UpgradeCapeService(repo, eventLog, NullLogger<UpgradeCapeService>.Instance);
+        var service = new UpgradeCapeService(repo, eventLog, new FakeWorldNoticeService(), ZoneTestKit.EmptyWorldData(),
+            NullLogger<UpgradeCapeService>.Instance);
 
         var result = await RunToCompletionAsync(
             service.UpgradeAsync(new UpgradeCapeRequest { Page1 = 0, Index1 = 0, Page2 = 0, Index2 = 1 }, zone, state,
@@ -91,12 +92,36 @@ public class UpgradeCapeServiceTests
     }
 
     [Fact]
+    public async Task PremiumActive_DeductsTwentyPercentDiscountedCost()
+    {
+        var (session, _, zone, state, repo, eventLog) = SetUp();
+        state.PremiumExpireUtc = DateTimeOffset.UtcNow.AddDays(1).ToUnixTimeSeconds();
+        SeedInventory(zone, new ItemStack(1401, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1),
+            new ItemStack(984, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0));
+        var service = new UpgradeCapeService(repo, eventLog, new FakeWorldNoticeService(), ZoneTestKit.EmptyWorldData(),
+            NullLogger<UpgradeCapeService>.Instance);
+
+        var result = await RunToCompletionAsync(
+            service.UpgradeAsync(new UpgradeCapeRequest { Page1 = 0, Index1 = 0, Page2 = 0, Index2 = 1 }, zone, state,
+                10, CancellationToken.None), zone);
+
+        Assert.Null(session.DisconnectReason);
+        Assert.Equal(UpgradeCapeOutcome.Applied, result.Outcome);
+        Assert.NotNull(repo.LastAdjustMoneyAndReplaceContainer);
+        Assert.Equal(-16_000_000, repo.LastAdjustMoneyAndReplaceContainer!.Value.DeltaMoney);
+
+        var logged = Assert.Single(eventLog.Enqueued);
+        Assert.Equal(-16_000_000, logged.DeltaMoney);
+    }
+
+    [Fact]
     public async Task InvalidTargetItem_Rejected()
     {
         var (_, _, zone, state, repo, eventLog) = SetUp();
         SeedInventory(zone, new ItemStack(9999, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1),
             new ItemStack(984, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0));
-        var service = new UpgradeCapeService(repo, eventLog, NullLogger<UpgradeCapeService>.Instance);
+        var service = new UpgradeCapeService(repo, eventLog, new FakeWorldNoticeService(), ZoneTestKit.EmptyWorldData(),
+            NullLogger<UpgradeCapeService>.Instance);
 
         var result = await service.UpgradeAsync(
             new UpgradeCapeRequest { Page1 = 0, Index1 = 0, Page2 = 0, Index2 = 1 }, zone, state, 10,
@@ -113,7 +138,8 @@ public class UpgradeCapeServiceTests
         var (_, _, zone, state, repo, eventLog) = SetUp();
         SeedInventory(zone, new ItemStack(1401, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1),
             new ItemStack(12345, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0));
-        var service = new UpgradeCapeService(repo, eventLog, NullLogger<UpgradeCapeService>.Instance);
+        var service = new UpgradeCapeService(repo, eventLog, new FakeWorldNoticeService(), ZoneTestKit.EmptyWorldData(),
+            NullLogger<UpgradeCapeService>.Instance);
 
         var result = await service.UpgradeAsync(
             new UpgradeCapeRequest { Page1 = 0, Index1 = 0, Page2 = 0, Index2 = 1 }, zone, state, 10,
@@ -130,7 +156,8 @@ public class UpgradeCapeServiceTests
         SeedInventory(zone, new ItemStack(1401, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1),
             new ItemStack(984, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0));
         repo.ThrowOnAdjustMoney = true;
-        var service = new UpgradeCapeService(repo, eventLog, NullLogger<UpgradeCapeService>.Instance);
+        var service = new UpgradeCapeService(repo, eventLog, new FakeWorldNoticeService(), ZoneTestKit.EmptyWorldData(),
+            NullLogger<UpgradeCapeService>.Instance);
 
         var result = await service.UpgradeAsync(
             new UpgradeCapeRequest { Page1 = 0, Index1 = 0, Page2 = 0, Index2 = 1 }, zone, state, 10,

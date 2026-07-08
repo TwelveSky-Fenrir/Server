@@ -3,6 +3,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers;
 
@@ -14,7 +15,7 @@ namespace Fenrir.Application.Game.Handlers.Handlers;
 ///     Legacy quirk (kept, not "fixed" per D8): a successful/miss catch does NOT reset FishingState/FishingStep,
 ///     so a repeated CZ_FISHING_REWARD_SEND while still in step 4 re-rolls and re-grants another item.
 /// </summary>
-public sealed class FishingCatchHandler(IFishingCatchService fishingCatchService)
+public sealed class FishingCatchHandler(IFishingCatchService fishingCatchService, ILogger<FishingCatchHandler> logger)
     : IAsyncPacketHandler<FishingCatchRequest>
 {
     public async ValueTask HandleAsync(FishingCatchRequest packet, IPacketSession session,
@@ -23,12 +24,19 @@ public sealed class FishingCatchHandler(IFishingCatchService fishingCatchService
         var zoneSession = (ZoneClientSession)session;
         var characterId = zoneSession.CharacterId!.Value;
 
+        logger.LogDebug(
+            "Session {SessionId}: FishingCatchRequest (op105) received for character {CharacterId}",
+            session.SessionId, characterId);
+
         if (zoneSession.CurrentZone is not Zone zone || !zone.TryGetPlayer(characterId, out var state) ||
             state is null)
             return;
 
         if (zone.MapId != FishingLineHandler.FishingZoneNumber)
         {
+            logger.LogWarning(
+                "Fishing-catch request rejected for character {CharacterId}: map {MapId} is not the fishing zone -- aborting session",
+                characterId, zone.MapId);
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }

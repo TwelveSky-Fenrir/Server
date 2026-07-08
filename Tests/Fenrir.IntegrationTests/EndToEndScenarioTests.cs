@@ -117,12 +117,32 @@ public sealed class EndToEndScenarioTests
         // ---- Enter world ----
         var zone = await ZoneBotClient.ConnectAsync(_environment.GamePort, ct);
 
-        var handshakeResult = await zone.HandshakeAsync(_environment.TestAccountId, 0, 0, ct);
+        int handshakeResult;
+        try
+        {
+            handshakeResult = await zone.HandshakeAsync(_environment.TestAccountId, 0, 0, ct);
+        }
+        catch (Exception ex)
+        {
+            // Same posture as the LoginAsync call site above: a bare "peer closed the connection"
+            // IOException gives zero insight into WHY GameServer ended the session (decode fault,
+            // session-state-gate rejection, an unhandled handler exception, ...) -- surface the captured
+            // GameServer stdout/stderr so a handshake failure is actionable on the first run instead of
+            // requiring a manual re-run with a debugger attached.
+            throw new InvalidOperationException(
+                $"HandshakeAsync failed -- see inner exception. Captured GameServer output:\n{_environment.GameServerLogSnapshot()}",
+                ex);
+        }
+
         Assert.Equal(0, handshakeResult);
 
         var enterResult = await zone.EnterWorldAsync(_environment.TestAccountId, AvatarName, ct);
         Assert.Equal(AvatarName, enterResult.AvatarInfo.Name);
-        Assert.Equal(1, enterResult.AvatarInfo.Level1);
+        // Every Fenrir character is created already at the general-level cap (Level1 = MAX_LIMIT_LEVEL_NUM =
+        // 145, usp_Character_CreateWithStarterKit's own hardcoded literal) under the EU33/USE_CUSTOME_CREATE
+        // creation grant -- see AvatarInfoFactory.MaxGeneralExperience's own remarks for the full citation.
+        // Not 1: this assertion previously encoded a stale pre-EU33-grant expectation.
+        Assert.Equal(145, enterResult.AvatarInfo.Level1);
 
         await zone.ReadyAsync(0, ct);
         zone.StartBackgroundPump();
@@ -133,10 +153,22 @@ public sealed class EndToEndScenarioTests
         // StrengthPointsToAllocate 1:1 from the character's starting StatPoints balance
         // (CreateAvatarService.StartingStatPoint = 3175 -- ample headroom) so StatCalculator.ComputeAttackSuccess
         // clears MonsterCombatResolver.ResolvePvmAttack's AttackSuccess floor for real, not via direct SQL.
-        await zone.AllocateStatPointAsync(StrengthVariableStatSort, StrengthPointsToAllocate, ct);
-        var statAllocationResult = await WaitForGenericActionResultAsync(zone, 206, TimeSpan.FromSeconds(10));
+        // Retried (not a single fire-and-wait) to absorb the same benign staleness window
+        // ZoneReadyHandler's own remarks describe: GenericActionHandler silently no-ops if Zone.TryGetPlayer
+        // hasn't observed this character yet because the zone tick hasn't drained the posted ZoneCommand.Enter
+        // -- a single unacknowledged send is therefore not proof of a wire bug, only of hitting that window
+        // once. Same pattern as ShardTwoZoneEntryScenarioTests' own identical retry loop.
+        GenericActionResult? statAllocationResult = null;
+        var statAllocationDeadline = DateTime.UtcNow + TimeSpan.FromSeconds(15);
+        while (DateTime.UtcNow < statAllocationDeadline && statAllocationResult is null)
+        {
+            await zone.AllocateStatPointAsync(StrengthVariableStatSort, StrengthPointsToAllocate, ct);
+            statAllocationResult = await WaitForGenericActionResultAsync(zone, 206, TimeSpan.FromSeconds(1));
+        }
+
         Assert.True(statAllocationResult is not null,
-            "GenericActionResponse for the real-wire stat-point allocation (tSort 206) never arrived.");
+            "GenericActionResponse for the real-wire stat-point allocation (tSort 206) never arrived. " +
+            $"Captured GameServer output:\n{_environment.GameServerLogSnapshot()}");
         Assert.Equal(0, statAllocationResult!.Value.Result);
 
         var currentX = plan.MonsterX;

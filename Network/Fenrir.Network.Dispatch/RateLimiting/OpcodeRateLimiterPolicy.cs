@@ -15,13 +15,6 @@ public static class OpcodeRateLimiterPolicy
     private static readonly (int Capacity, double TokensPerSecond) Heartbeat = (2, 1d / 5d);
 
     /// <summary>
-    ///     Rare, powerful, DB-hitting admin/GM commands (e.g. GM-BLOCK) -- kept as its own named budget rather
-    ///     than folded into <see cref="Auth" /> even though the numbers currently match, since operators retune
-    ///     GM-tier commands independently of the login/handshake path as more of them are added.
-    /// </summary>
-    private static readonly (int Capacity, double TokensPerSecond) GmAction = (3, 1d / 5d);
-
-    /// <summary>
     ///     CZ_PROCESS_ATTACK_SEND (Zone op18) -- network-layer defense-in-depth only, NOT a replacement for
     ///     <see cref="Fenrir.Application.Game.Domain.Combat.AttackPacketBudget" />, which remains the real
     ///     per-action anti-cheat gate (that check runs on the tick thread against the accepting character's
@@ -51,7 +44,6 @@ public static class OpcodeRateLimiterPolicy
         _ = new TokenBucket(Auth.Capacity, Auth.TokensPerSecond);
         _ = new TokenBucket(Movement.Capacity, Movement.TokensPerSecond);
         _ = new TokenBucket(Heartbeat.Capacity, Heartbeat.TokensPerSecond);
-        _ = new TokenBucket(GmAction.Capacity, GmAction.TokensPerSecond);
         _ = new TokenBucket(Attack.Capacity, Attack.TokensPerSecond);
         _ = new TokenBucket(Default.Capacity, Default.TokensPerSecond);
     }
@@ -71,7 +63,10 @@ public static class OpcodeRateLimiterPolicy
 
             (FenrirServer.Zone, Opcodes.Zone.Incoming.Heartbeat) => Heartbeat,
 
-            (FenrirServer.Zone, Opcodes.Zone.Incoming.GmBlockAvatar) => GmAction,
+            // GM-BLOCK (tSort 519) rides the shared GenericAction envelope (opcode 19) alongside every other
+            // ProcessForData sub-command -- there is no dedicated GM-tier opcode to gate independently of that
+            // envelope's own budget (Default, below), since legacy itself never assigned GM-BLOCK a distinct
+            // wire opcode. See GenericActionHandler's own tSort 519 branch.
 
             (FenrirServer.Zone, Opcodes.Zone.Incoming.Attack) => Attack,
 

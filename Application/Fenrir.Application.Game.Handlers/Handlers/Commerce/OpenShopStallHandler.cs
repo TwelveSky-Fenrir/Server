@@ -4,6 +4,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Commerce;
 
@@ -19,7 +20,8 @@ namespace Fenrir.Application.Game.Handlers.Handlers.Commerce;
 ///     same-type case (a PERSONAL request while a PERSONAL shop is already open) instead disconnects the
 ///     session via <see cref="OpenShopStallPrepareOutcome.Abort" />, matching legacy's <c>Quit()</c>.
 /// </remarks>
-public sealed class OpenShopStallHandler(IOpenShopStallService service) : IAsyncPacketHandler<OpenShopStallRequest>
+public sealed class OpenShopStallHandler(IOpenShopStallService service, ILogger<OpenShopStallHandler> logger)
+    : IAsyncPacketHandler<OpenShopStallRequest>
 {
     /// <summary>Single source of truth: <see cref="ProxyShopZonePolicy.ZoneNumber" />; see its remarks.</summary>
     public const short PshopZoneNumber = ProxyShopZonePolicy.ZoneNumber;
@@ -31,12 +33,19 @@ public sealed class OpenShopStallHandler(IOpenShopStallService service) : IAsync
         var characterId = zoneSession.CharacterId!.Value;
         var accountId = zoneSession.AccountId!.Value;
 
+        logger.LogDebug(
+            "OpenShopStall: session {SessionId} character {CharacterId} sort {Sort} name {ShopName}",
+            session.SessionId, characterId, packet.Sort, packet.PshopInfo.Name);
+
         if (zoneSession.CurrentZone is not Zone zone || !zone.TryGetPlayer(characterId, out var state) ||
             state is null)
             return;
 
         if (zone.MapId != PshopZoneNumber)
         {
+            logger.LogWarning(
+                "Open shop stall rejected: character {CharacterId} is outside the market district (zone {MapId}) -- session will be disconnected",
+                characterId, zone.MapId);
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }

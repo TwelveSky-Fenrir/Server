@@ -3,6 +3,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Chat;
 
@@ -10,12 +11,17 @@ namespace Fenrir.Application.Game.Handlers.Handlers.Chat;
 ///     CZ_GUILD_NOTICE_SEND (opcode 76). Restricted to the guild master (<c>GuildRoleCodec.IsMaster</c>);
 ///     a non-master sender is silently ignored, not disconnected. No mute gate applies to this channel.
 /// </summary>
-public sealed class GuildAnnouncementHandler(IGuildAnnouncementService guildAnnouncementService)
-    : IInlinePacketHandler<GuildAnnouncementRequest>
+public sealed class GuildAnnouncementHandler(
+    IGuildAnnouncementService guildAnnouncementService,
+    ILogger<GuildAnnouncementHandler>? logger = null) : IInlinePacketHandler<GuildAnnouncementRequest>
 {
     public void Handle(in GuildAnnouncementRequest packet, IPacketSession session)
     {
         var zoneSession = (ZoneClientSession)session;
+
+        logger?.LogDebug(
+            "Session {SessionId}: CZ_GUILD_NOTICE_SEND received (character {CharacterId}, content length {ContentLength})",
+            session.SessionId, zoneSession.CharacterId, packet.Content.Length);
 
         if (string.IsNullOrEmpty(packet.Content))
         {

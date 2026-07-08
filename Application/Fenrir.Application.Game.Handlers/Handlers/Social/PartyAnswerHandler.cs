@@ -4,6 +4,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
@@ -11,12 +12,18 @@ namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 ///     CZ_PARTY_ANSWER_SEND (opcode 67) -- on accept, collapses legacy's separate PARTY_JOIN/PARTY_INFO
 ///     emissions into one fan-out; a full party (<see cref="PartyJoinOutcome.PartyWasFull" />) is a silent no-op.
 /// </summary>
-public sealed class PartyAnswerHandler(ZoneRegistry zones, IPartyAnswerService partyAnswerService)
-    : IInlinePacketHandler<PartyAnswerRequest>
+public sealed class PartyAnswerHandler(
+    ZoneRegistry zones,
+    IPartyAnswerService partyAnswerService,
+    ILogger<PartyAnswerHandler> logger) : IInlinePacketHandler<PartyAnswerRequest>
 {
     public void Handle(in PartyAnswerRequest packet, IPacketSession session)
     {
         var zoneSession = (ZoneClientSession)session;
+
+        logger.LogDebug("PartyAnswer: session {SessionId} character {CharacterId} answer {Answer}",
+            session.SessionId, zoneSession.CharacterId, packet.Answer);
+
         var inviteeId = zoneSession.CharacterId!.Value;
 
         var result = partyAnswerService.Answer(inviteeId, packet.Answer);

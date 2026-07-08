@@ -61,13 +61,25 @@ public sealed class TribeMigrationService(
 
         var outcome = TribeMigrationGate.Evaluate(context);
         if (outcome != TribeMigrationOutcome.Success)
+        {
+            logger.LogDebug(
+                "Character {CharacterId} fourth-tribe conversion rejected: {Outcome} (tribe {OldTribe})",
+                characterId, outcome, oldTribe);
             return outcome;
+        }
 
         // Hardened ordering (deliberate deviation from the legacy's own quota-first bug): every
         // character-specific gate above already passed, so this attempt is the only kind allowed to spend the
         // shared quota -- see TribeMigrationOutcome.QuotaExhausted's own remarks.
         if (!await quota.TryConsumeAsync(ct).ConfigureAwait(false))
+        {
+            // Worth Information, not Debug: a server-wide shared quota just blocked an otherwise-eligible
+            // character, which affects every other character attempting the same conversion today.
+            logger.LogInformation(
+                "Character {CharacterId} fourth-tribe conversion rejected: shared daily quota exhausted",
+                characterId);
             return TribeMigrationOutcome.QuotaExhausted;
+        }
 
         var result = TribeMigrationConversion.Resolve(oldTribe, state.PreviousTribe, questCatalog);
         var isReturnBranch = oldTribe == TribeMigrationGate.TribeFour;

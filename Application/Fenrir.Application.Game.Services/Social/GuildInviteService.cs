@@ -8,6 +8,7 @@ using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Social;
 
@@ -32,37 +33,75 @@ public sealed class GuildInviteService(
     TradeRegistry trades,
     FriendRegistry friends,
     PartyRegistry parties,
-    MentorRegistry mentors) : IGuildInviteService
+    MentorRegistry mentors,
+    ILogger<GuildInviteService> logger) : IGuildInviteService
 {
     public GuildInviteAskResultKind Ask(Zone zone, PlayerRuntimeState asker, string targetAvatarName)
     {
         if (asker.GuildId is null || !GuildRoleCodec.IsMasterOrSubMaster(asker.GuildRoleDb))
+        {
+            logger.LogDebug(
+                "Character {CharacterId} guild invite-ask rejected: caller is not guild master/sub-master",
+                asker.CharacterId);
             return GuildInviteAskResultKind.NotAuthorized;
+        }
 
         if (IsExcludedByCommunityWorkOrStunDeath(asker))
+        {
+            logger.LogDebug(
+                "Character {CharacterId} guild invite-ask rejected: caller busy (community-work/stun/death gate)",
+                asker.CharacterId);
             return GuildInviteAskResultKind.AskerBusy;
+        }
 
         var target = FindPlayerByName(zone, targetAvatarName);
         if (target is null)
+        {
+            logger.LogDebug("Character {CharacterId} guild invite-ask target {TargetName} not found in zone",
+                asker.CharacterId, targetAvatarName);
             return GuildInviteAskResultKind.TargetNotFound;
+        }
 
         if (target.GuildId is not null)
+        {
+            logger.LogDebug(
+                "Character {CharacterId} guild invite-ask rejected: target {TargetCharacterId} already guilded",
+                asker.CharacterId, target.CharacterId);
             return GuildInviteAskResultKind.TargetAlreadyGuilded;
+        }
 
         if (asker.Tribe != target.Tribe)
+        {
+            logger.LogDebug(
+                "Character {CharacterId} guild invite-ask rejected: tribe mismatch with target {TargetCharacterId}",
+                asker.CharacterId, target.CharacterId);
             return GuildInviteAskResultKind.TribeMismatch;
+        }
 
         if (IsExcludedByCommunityWorkOrStunDeath(target))
+        {
+            logger.LogDebug(
+                "Character {CharacterId} guild invite-ask rejected: target {TargetCharacterId} busy",
+                asker.CharacterId, target.CharacterId);
             return GuildInviteAskResultKind.TargetBusy;
+        }
 
         switch (invites.TryAsk(asker.CharacterId, target.CharacterId))
         {
             case GuildInviteAskOutcome.AskerBusy:
+                logger.LogDebug(
+                    "Character {CharacterId} guild invite-ask rejected: caller already has a pending negotiation",
+                    asker.CharacterId);
                 return GuildInviteAskResultKind.AskerBusy;
             case GuildInviteAskOutcome.TargetBusy:
+                logger.LogDebug(
+                    "Character {CharacterId} guild invite-ask rejected: target {TargetCharacterId} already has a pending negotiation",
+                    asker.CharacterId, target.CharacterId);
                 return GuildInviteAskResultKind.TargetBusy;
             case GuildInviteAskOutcome.Sent:
                 target.Session.Send(new GuildInviteResponse { AvatarName = asker.Name });
+                logger.LogInformation("Character {CharacterId} sent a guild invite to character {TargetCharacterId}",
+                    asker.CharacterId, target.CharacterId);
                 return GuildInviteAskResultKind.Sent;
             default:
                 return GuildInviteAskResultKind.AskerBusy;
@@ -72,19 +111,32 @@ public sealed class GuildInviteService(
     public void Answer(int targetId, int answerCode)
     {
         if (!invites.TryAnswer(targetId, answerCode == 0, out var askerId))
+        {
+            logger.LogDebug("Character {TargetId} guild invite answer ignored: no pending invite found", targetId);
             return;
+        }
 
         if (zones.TryGetPlayer(askerId, out var asker))
             asker.Session.Send(new GuildInviteAnswerResponse { Answer = answerCode });
+
+        logger.LogInformation(
+            "Character {TargetId} answered guild invite from character {AskerId}: accepted={Accepted}", targetId,
+            askerId, answerCode == 0);
     }
 
     public void Cancel(int askerId)
     {
         if (!invites.TryCancel(askerId, out var targetId))
+        {
+            logger.LogDebug("Character {AskerId} guild invite cancel ignored: no pending invite found", askerId);
             return;
+        }
 
         if (zones.TryGetPlayer(targetId, out var target))
             target.Session.Send(new GuildInviteCancelResponse());
+
+        logger.LogInformation("Character {AskerId} cancelled guild invite to character {TargetId}", askerId,
+            targetId);
     }
 
     /// <summary>

@@ -5,6 +5,7 @@ using Fenrir.Data.Abstractions.Characters;
 using Fenrir.Data.Abstractions.Guilds;
 using Fenrir.Data.Abstractions.Social;
 using Fenrir.Data.Abstractions.World;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Login.Tests.Services;
 
@@ -42,7 +43,8 @@ public class RenameAvatarServiceTests
             friends ?? FakeFriendRepository.Empty(),
             mentors ?? FakeMentorRepository.Empty(),
             renames ?? FakeCharacterRenameRepository.ReturningResult(0),
-            eventLog ?? new FakeEventLogRepository());
+            eventLog ?? new FakeEventLogRepository(),
+            NullLogger<RenameAvatarService>.Instance);
     }
 
     [Fact]

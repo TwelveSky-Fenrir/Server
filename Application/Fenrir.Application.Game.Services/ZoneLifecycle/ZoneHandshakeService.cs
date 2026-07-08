@@ -110,7 +110,11 @@ public sealed class ZoneHandshakeService(
             logger?.LogWarning(
                 "Zone handshake superseded for account {AccountId} character {CharacterId}: a newer login already claimed the session",
                 accountId, consumed.CharacterId);
-            return new ZoneHandshakeResult(ZoneHandshakeOutcome.SessionSuperseded);
+            // AccountId/CharacterId must be carried through here -- ZoneHandshakeResult's own AccountId default
+            // is 0, and ZoneHandshakeHandler logs result.AccountId (not the locally-scoped accountId) in its own
+            // "superseded by a newer login for account {AccountId}" line; omitting it here previously made that
+            // line always read "account 0" regardless of which account actually hit this branch.
+            return new ZoneHandshakeResult(ZoneHandshakeOutcome.SessionSuperseded, accountId, consumed.CharacterId);
         }
 
         // Session-lifecycle audit row: this is the "zone-transfer" leg (see ZoneTransferAcceptedEventCode's

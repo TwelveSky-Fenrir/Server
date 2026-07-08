@@ -43,7 +43,12 @@ public sealed class DowngradeItemRankService(
         var index2 = packet.Index2;
 
         if (!IsValidInventorySlot(page1, index1) || !IsValidInventorySlot(page2, index2))
+        {
+            logger.LogDebug(
+                "Character {CharacterId} downgrade-item-rank rejected: invalid slot(s) ({Page1}:{Index1} / {Page2}:{Index2})",
+                characterId, page1, index1, page2, index2);
             return new DowngradeItemRankResult(DowngradeItemRankOutcome.Rejected, false, 0, [0, 0, 0, 0, 0, 0]);
+        }
 
         var targetStack = state.Inventory.GetSlot((byte)page1, (byte)index1);
         var materialStack = state.Inventory.GetSlot((byte)page2, (byte)index2);
@@ -51,7 +56,12 @@ public sealed class DowngradeItemRankService(
         if (targetStack is not { } target || materialStack is not { } material ||
             !worldData.ItemsById.TryGetValue(target.ItemId, out var targetDefinition) ||
             !worldData.ItemsById.TryGetValue(material.ItemId, out var materialDefinition))
+        {
+            logger.LogDebug(
+                "Character {CharacterId} downgrade-item-rank rejected: target or material slot empty/unresolvable",
+                characterId);
             return new DowngradeItemRankResult(DowngradeItemRankOutcome.Rejected, false, 0, [0, 0, 0, 0, 0, 0]);
+        }
 
         var luck = state.Stats?.Luck ?? 0;
 
@@ -61,8 +71,14 @@ public sealed class DowngradeItemRankService(
         switch (resolved.Outcome)
         {
             case RankChangeResolver.RankChangeOutcome.Rejected:
+                logger.LogInformation(
+                    "Character {CharacterId} downgrade-item-rank rejected by resolver (target {TargetItemId}, material {MaterialItemId})",
+                    characterId, target.ItemId, material.ItemId);
                 return new DowngradeItemRankResult(DowngradeItemRankOutcome.Rejected, false, 0, [0, 0, 0, 0, 0, 0]);
             case RankChangeResolver.RankChangeOutcome.NoCandidate:
+                logger.LogInformation(
+                    "Character {CharacterId} downgrade-item-rank found no candidate result item for target {TargetItemId}",
+                    characterId, target.ItemId);
                 return new DowngradeItemRankResult(DowngradeItemRankOutcome.NoCandidate, false, resolved.Cost,
                     [0, 0, 0, 0, 0, 0]);
         }
@@ -111,6 +127,11 @@ public sealed class DowngradeItemRankService(
             return new DowngradeItemRankResult(DowngradeItemRankOutcome.Rejected, false, 0, [0, 0, 0, 0, 0, 0]);
         }
 
+        // Server/ts25zone/S04_MyWork02.cpp:4228-4229 -- same AddTribeBankInfo2 credit as UpgradeItemRank's
+        // (see that service's own remark), mirrored for the downgrade path; also never reached on the
+        // NoCandidate/result-2 path above.
+        zone.CreditNpcServiceTribeTax(state.Tribe, resolved.Cost);
+
         if (!eventLogQueue.Enqueue(new EventLogEntryTvp(DowngradeItemRankEventCode, (byte)EventLogCategory.Enchant,
                 null, characterId, null, null, null, -(long)resolved.Cost, null, target.ItemId, target.Quantity,
                 succeeded ? SuccessOutcome : FailedOutcome,
@@ -140,6 +161,10 @@ public sealed class DowngradeItemRankService(
             logger.LogError(
                 "Zone {MapId} inventory inbox full: dropped downgrade-item-rank mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
                 zone.MapId, characterId);
+
+        logger.LogInformation(
+            "Character {CharacterId} downgrade-item-rank applied: target {TargetItemId} succeeded={Succeeded}, cost {Cost}",
+            characterId, target.ItemId, succeeded, resolved.Cost);
 
         return new DowngradeItemRankResult(DowngradeItemRankOutcome.Applied, succeeded, resolved.Cost, value);
     }

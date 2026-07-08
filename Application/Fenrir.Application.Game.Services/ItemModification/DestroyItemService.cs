@@ -47,16 +47,29 @@ public sealed class DestroyItemService(
 
         if (page1 is not (ContainerMatrix.InventoryPage0 or ContainerMatrix.InventoryPage1) ||
             !ContainerMatrix.IsValidSlot((byte)page1, index1))
+        {
+            logger.LogDebug("Character {CharacterId} destroy-item rejected: invalid slot ({Page1}:{Index1})",
+                characterId, page1, index1);
             return new DestroyItemResult(DestroyItemOutcome.Rejected, 0, 0, 0, 0);
+        }
 
         var targetStack = state.Inventory.GetSlot((byte)page1, (byte)index1);
         if (targetStack is not { } target || !worldData.ItemsById.TryGetValue(target.ItemId, out var targetDefinition))
+        {
+            logger.LogDebug("Character {CharacterId} destroy-item rejected: target slot empty/unresolvable",
+                characterId);
             return new DestroyItemResult(DestroyItemOutcome.Rejected, 0, 0, 0, 0);
+        }
 
         var resolved = DestroyResolver.Resolve(targetDefinition.Item, target);
         if (resolved.Outcome == DestroyResolver.DestroyOutcome.Rejected ||
             !worldData.ItemsById.TryGetValue(resolved.StoneItemId, out var stoneDefinition))
+        {
+            logger.LogInformation(
+                "Character {CharacterId} destroy-item rejected by resolver (target {TargetItemId})", characterId,
+                target.ItemId);
             return new DestroyItemResult(DestroyItemOutcome.Rejected, 0, 0, 0, 0);
+        }
 
         var quantity = stoneDefinition.Item.Sort == 99 ? 1 : 0;
         var newStack = new ItemStack(resolved.StoneItemId, quantity, 0, 0, 0, 0, 0, 0, 0, target.ExpireDate,
@@ -89,6 +102,10 @@ public sealed class DestroyItemService(
             logger.LogError(
                 "Zone {MapId} inventory inbox full: dropped destroy-item mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
                 zone.MapId, characterId);
+
+        logger.LogInformation(
+            "Character {CharacterId} destroy-item applied: target {TargetItemId} dissolved into {Money} money + {StoneItemId} x{Quantity}",
+            characterId, target.ItemId, resolved.Money, resolved.StoneItemId, quantity);
 
         return new DestroyItemResult(DestroyItemOutcome.Applied, resolved.Money, resolved.StoneItemId, quantity,
             target.Serial);

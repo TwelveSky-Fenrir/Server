@@ -78,8 +78,11 @@ public class BanProcTests
     [Fact]
     public async Task Ban_Create_RequiresATarget()
     {
-        var targetless = await Assert.ThrowsAsync<SqlException>(() => CreateBanAsync(null, null, 1, null));
-        Assert.Equal(50301, targetless.Number);
+        // BanRepository goes through CaeriusNet (see CreateBanAsync's own remarks), which wraps the driver's
+        // SqlException in its own CaeriusNetSqlException -- assert on the wrapped exception's inner
+        // SqlException.Number, same posture as CharacterRepositoryTests' overspend checks.
+        var targetless = await Record.ExceptionAsync(() => CreateBanAsync(null, null, 1, null));
+        Assert.Equal(50301, Assert.IsType<SqlException>(targetless!.InnerException).Number);
     }
 
     // GM-BLOCK (item A): IBanRepository.CreateAsync is the new create path -- covers the BanId it returns and
@@ -114,10 +117,11 @@ public class BanProcTests
     [Fact]
     public async Task CreateAsync_NeitherAccountNorCharacterGiven_Throws50301()
     {
-        var ex = await Assert.ThrowsAsync<SqlException>(() =>
+        // Same wrapped-CaeriusNetSqlException posture as Ban_Create_RequiresATarget above.
+        var ex = await Record.ExceptionAsync(() =>
             _bans.CreateAsync(null, null, BanReason.GmManualBlock, null, CancellationToken.None).AsTask());
 
-        Assert.Equal(50301, ex.Number);
+        Assert.Equal(50301, Assert.IsType<SqlException>(ex!.InnerException).Number);
     }
 
     // gm-action-audit-attribution (Migrations/035_bans_actor_attribution.sql): admin.Bans now records which GM

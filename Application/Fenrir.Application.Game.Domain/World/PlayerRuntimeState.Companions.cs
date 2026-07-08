@@ -1,4 +1,7 @@
 using System.Collections.Immutable;
+using System.Linq;
+using Fenrir.Application.Game.Domain.Mounts;
+using Fenrir.Application.Game.Stats;
 
 namespace Fenrir.Application.Game.Domain.World;
 
@@ -93,6 +96,35 @@ public partial class PlayerRuntimeState
     ///     <see cref="AnimalTime" />.
     /// </summary>
     public int AnimalAbsorbTime { get; set; }
+
+    /// <summary>
+    ///     aAnimalExpActivity[10] -- per-garage-slot accumulated mount experience/activity gating
+    ///     CZ_ANIMAL_STATE_SEND Sort 6 (Convert Attribute)'s ==MAX_MOUNT_EXP (100000) requirement, reset to 0
+    ///     by a successful convert. Same "no acquisition/gain path yet" posture as <see cref="MountGarage" />:
+    ///     every slot stays 0 until a mount-experience-gain system lands, so Sort 6 stays
+    ///     reachable-but-never-completable by construction today, not by an explicit scope cut -- see
+    ///     <see cref="MountStateResolver" />'s own remarks.
+    /// </summary>
+    public ImmutableArray<int> MountAccumulatedExp { get; set; } = ImmutableArray.Create(0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+
+    /// <summary>
+    ///     aAnimalPower[10] -- per-garage-slot rolled-attribute total, gating Sort 6's &lt;25 cap and (once a
+    ///     probability table is cataloged) accumulating that sub-action's own roll output on success. See
+    ///     <see cref="MountStateResolver" />'s remarks for why the roll itself is not modeled yet.
+    /// </summary>
+    public ImmutableArray<int> MountRolledAttributeTotal { get; set; } =
+        ImmutableArray.Create(0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+
+    /// <summary>
+    ///     Per-garage-slot, per-stat-slot (wire values 1-8, stored 0-based; flattened via
+    ///     <see cref="MountStateResolver.AttributeIndex" />) rolled mount-attribute value -- Sort 7 (Delete)
+    ///     zeroes the addressed entry; Sort 8 (Transfer) would move one once a transfer mechanic is
+    ///     cataloged (see <see cref="MountStateResolver" />'s remarks). Not yet wired into
+    ///     <see cref="StatCalculator" />: no combat-stat contribution formula for a mount's rolled
+    ///     attributes has been cataloged either, same "not modeled" posture as <see cref="WarPoint" />.
+    /// </summary>
+    public ImmutableArray<int> MountRolledAttributes { get; set; } =
+        Enumerable.Repeat(0, MountStateResolver.SlotCount * MountStateResolver.StatSlotCount).ToImmutableArray();
 
     /// <summary>
     ///     aCostume[10] wardrobe -- same "no acquisition path yet" posture as <see cref="MountGarage" />. A

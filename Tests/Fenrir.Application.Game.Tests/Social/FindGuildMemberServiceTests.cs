@@ -2,6 +2,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Services.Social;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Data.Abstractions.Runtime;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Social;
 
@@ -35,7 +36,7 @@ public class FindGuildMemberServiceTests
         var directory = new FakeCharacterShardLocationRepository { ThrowOnUpsert = true };
         var zones = ZoneTestKit.CreateRegistry();
         zones.Initialize([]);
-        var service = new FindGuildMemberService(zones, directory);
+        var service = new FindGuildMemberService(zones, directory, NullLogger<FindGuildMemberService>.Instance);
         var asker = MakePlayer(1, "Asker", null);
 
         var result = await service.FindZoneAsync(asker, "Anyone", CancellationToken.None);
@@ -55,7 +56,7 @@ public class FindGuildMemberServiceTests
         zone!.Post(ZoneCommand.Enter(2, ZoneTestKit.EnterData(session, 6, "Target")));
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
-        var service = new FindGuildMemberService(zones, directory);
+        var service = new FindGuildMemberService(zones, directory, NullLogger<FindGuildMemberService>.Instance);
         var asker = MakePlayer(1, "Asker", 10);
 
         var result = await service.FindZoneAsync(asker, "Target", CancellationToken.None);
@@ -72,7 +73,7 @@ public class FindGuildMemberServiceTests
             DateTime.UtcNow));
         var zones = ZoneTestKit.CreateRegistry();
         zones.Initialize([]);
-        var service = new FindGuildMemberService(zones, directory);
+        var service = new FindGuildMemberService(zones, directory, NullLogger<FindGuildMemberService>.Instance);
         var asker = MakePlayer(1, "Asker", 10);
 
         var result = await service.FindZoneAsync(asker, "Target", CancellationToken.None);
@@ -87,7 +88,7 @@ public class FindGuildMemberServiceTests
         var directory = new FakeCharacterShardLocationRepository();
         var zones = ZoneTestKit.CreateRegistry();
         zones.Initialize([]);
-        var service = new FindGuildMemberService(zones, directory);
+        var service = new FindGuildMemberService(zones, directory, NullLogger<FindGuildMemberService>.Instance);
         var asker = MakePlayer(1, "Asker", 10);
 
         var result = await service.FindZoneAsync(asker, "Nobody", CancellationToken.None);

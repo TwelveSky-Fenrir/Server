@@ -3,6 +3,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
@@ -12,12 +13,16 @@ namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 ///     (not inline): the fallback is an awaited DB call on the miss branch, and both handler kinds already
 ///     run on the per-connection session loop, never the zone tick.
 /// </summary>
-public sealed class FriendLocateHandler(IFriendService friendService) : IAsyncPacketHandler<FriendLocateRequest>
+public sealed class FriendLocateHandler(IFriendService friendService, ILogger<FriendLocateHandler> logger)
+    : IAsyncPacketHandler<FriendLocateRequest>
 {
     public async ValueTask HandleAsync(FriendLocateRequest packet, IPacketSession session,
         CancellationToken cancellationToken)
     {
         var zoneSession = (ZoneClientSession)session;
+
+        logger.LogDebug("FriendLocate: session {SessionId} character {CharacterId} slot {Index}", session.SessionId,
+            zoneSession.CharacterId, packet.Index);
 
         if (zoneSession.CurrentZone is not Zone zone)
             return;

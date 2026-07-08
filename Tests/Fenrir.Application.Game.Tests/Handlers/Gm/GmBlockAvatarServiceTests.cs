@@ -3,16 +3,19 @@ using Fenrir.Application.Game.Services.Gm;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Data.Abstractions.Security;
 using Fenrir.Network.Dispatch.Sessions;
+using Fenrir.Network.Serialization.Packets.Shared;
 using Fenrir.Network.Serialization.Packets.Zone;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Handlers.Gm;
 
-// GM-BLOCK (Fenrir's dedicated wire command; legacy case 519 "[GM]-BLOCK",
-// Server/ts25zone/S04_MyWork04.cpp:1487-1515) -- the three legacy outcomes are asymmetric and must stay that
-// way: unauthorized -> disconnect with no reply; not found (including self-target) -> the shared opcode-23
-// GenericActionResponse ack (Sort=519, legacy's own real reply shape, S04_MyWork04.cpp:2121-2122), never a
-// dedicated message; success -> silence (no ack at all), only the target is disconnected.
+// GM-BLOCK (legacy PROCESS_DATA_SEND, opcode 19, tSort 519 "[GM]-BLOCK" --
+// Server/ts25zone/S04_MyWork04.cpp:1487-1515 -- there is no dedicated legacy wire opcode for this command;
+// GenericActionHandler decodes GmBlockAvatarPayload out of GenericActionRequest.Data before calling into this
+// service) -- the three legacy outcomes are asymmetric and must stay that way: unauthorized -> disconnect with
+// no reply; not found (including self-target) -> the shared opcode-23 GenericActionResponse ack (Sort=519,
+// legacy's own real reply shape, S04_MyWork04.cpp:2121-2122), never a dedicated message; success -> silence (no
+// ack at all), only the target is disconnected.
 public class GmBlockAvatarServiceTests
 {
     private const int GmBlockSort = 519;
@@ -52,7 +55,7 @@ public class GmBlockAvatarServiceTests
         var bans = new FakeBanRepository();
         var service = new GmBlockAvatarService(registry, bans, NullLogger<GmBlockAvatarService>.Instance);
 
-        await service.HandleAsync(new GmBlockAvatarRequest { AvatarName = "AnyoneAtAll" }, caller,
+        await service.HandleAsync(new GmBlockAvatarPayload { AvatarName = "AnyoneAtAll" }, caller,
             CancellationToken.None);
 
         Assert.Equal(DisconnectReason.Faulted, caller.DisconnectReason);
@@ -68,7 +71,7 @@ public class GmBlockAvatarServiceTests
         var bans = new FakeBanRepository();
         var service = new GmBlockAvatarService(registry, bans, NullLogger<GmBlockAvatarService>.Instance);
 
-        await service.HandleAsync(new GmBlockAvatarRequest { AvatarName = "NobodyOnline" }, caller,
+        await service.HandleAsync(new GmBlockAvatarPayload { AvatarName = "NobodyOnline" }, caller,
             CancellationToken.None);
 
         Assert.Null(caller.DisconnectReason);
@@ -88,7 +91,7 @@ public class GmBlockAvatarServiceTests
         var bans = new FakeBanRepository();
         var service = new GmBlockAvatarService(registry, bans, NullLogger<GmBlockAvatarService>.Instance);
 
-        await service.HandleAsync(new GmBlockAvatarRequest { AvatarName = "TheGm" }, caller, CancellationToken.None);
+        await service.HandleAsync(new GmBlockAvatarPayload { AvatarName = "TheGm" }, caller, CancellationToken.None);
 
         Assert.Null(caller.DisconnectReason);
         Assert.Null(bans.LastCreatedBan);
@@ -109,7 +112,7 @@ public class GmBlockAvatarServiceTests
         var bans = new FakeBanRepository();
         var service = new GmBlockAvatarService(registry, bans, NullLogger<GmBlockAvatarService>.Instance);
 
-        await service.HandleAsync(new GmBlockAvatarRequest { AvatarName = "Griefer" }, caller, CancellationToken.None);
+        await service.HandleAsync(new GmBlockAvatarPayload { AvatarName = "Griefer" }, caller, CancellationToken.None);
 
         Assert.NotNull(bans.LastCreatedBan);
         var ban = bans.LastCreatedBan!.Value;

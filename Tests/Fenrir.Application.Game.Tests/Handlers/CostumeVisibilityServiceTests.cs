@@ -5,6 +5,7 @@ using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Framing;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Handlers;
 
@@ -60,7 +61,8 @@ public class CostumeVisibilityServiceTests
         // real handler here rather than the service, which never sees an out-of-range sort at all.
         var zone = ZoneTestKit.CreateZone(1);
         var (session, pipe, _) = Setup(zone, 10);
-        var handler = new CostumeVisibilityHandler(new CostumeVisibilityService());
+        var handler = new CostumeVisibilityHandler(new CostumeVisibilityService(),
+            NullLogger<CostumeVisibilityHandler>.Instance);
 
         handler.Handle(new CostumeVisibilityRequest { Sort = 2 }, session);
 

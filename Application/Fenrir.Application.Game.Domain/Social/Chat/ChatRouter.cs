@@ -8,8 +8,11 @@ namespace Fenrir.Application.Game.Domain.Social.Chat;
 /// </summary>
 /// <remarks>
 ///     Quirks worth knowing: Party chat's tLink field is dead server-side, never propagated, despite existing
-///     on the wire; Guild chat's tLink IS transported; World chat refuses senders below level 10; GM notice is
-///     permanently inert (no GM-rank concept modeled yet).
+///     on the wire; Guild chat's tLink IS transported; World chat refuses senders below level 10; GM notice
+///     (opcode 17) requires the sender meet <c>GmCommandTier.Basic</c>
+///     (<c>Fenrir.Network.Dispatch.Sessions.ZoneClientSession.MeetsGmTier</c>) and, uniquely among every
+///     GM-gated command in Fenrir, never disconnects a denied sender -- see
+///     <c>Fenrir.Application.Game.Abstractions.Chat.IGlobalAnnouncementService</c>'s own remarks.
 /// </remarks>
 public static class ChatRouter
 {

@@ -3,6 +3,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Chat;
 
@@ -14,12 +15,17 @@ namespace Fenrir.Application.Game.Handlers.Handlers.Chat;
 ///     Réf. C++ : Server/ts25zone/S04_MyWork02.cpp:11488-11520 (empty-content disconnect, role gate,
 ///     broadcast/relay); Server/Header/function.h:92-114 (ReturnTribeRole three-tier resolution).
 /// </summary>
-public sealed class TribeAnnouncementHandler(ITribeAnnouncementService tribeAnnouncementService)
-    : IInlinePacketHandler<TribeAnnouncementRequest>
+public sealed class TribeAnnouncementHandler(
+    ITribeAnnouncementService tribeAnnouncementService,
+    ILogger<TribeAnnouncementHandler>? logger = null) : IInlinePacketHandler<TribeAnnouncementRequest>
 {
     public void Handle(in TribeAnnouncementRequest packet, IPacketSession session)
     {
         var zoneSession = (ZoneClientSession)session;
+
+        logger?.LogDebug(
+            "Session {SessionId}: CZ_TRIBE_NOTICE_SEND received (character {CharacterId}, content length {ContentLength})",
+            session.SessionId, zoneSession.CharacterId, packet.Content.Length);
 
         if (string.IsNullOrEmpty(packet.Content))
         {

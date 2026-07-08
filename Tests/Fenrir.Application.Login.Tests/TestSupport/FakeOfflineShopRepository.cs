@@ -61,7 +61,7 @@ internal sealed class FakeOfflineShopRepository : IOfflineShopRepository
         throw new NotSupportedException();
     }
 
-    public ValueTask WithdrawMoneyAsync(int characterId, int expectedMoney, int expectedBigMoney,
+    public ValueTask WithdrawMoneyAsync(int characterId, int expectedMoney, int expectedBigMoney, int todayDate,
         CancellationToken ct)
     {
         throw new NotSupportedException();

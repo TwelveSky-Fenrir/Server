@@ -166,19 +166,23 @@ public class RankChangeResolverTests
     }
 
     [Fact]
-    public void Upgrade_LuckyCharge_AddsFiftyOutOfAThousand()
+    public void Upgrade_LuckyCharge_DoesNotAlterProbabilityButIsReportedConsumed()
     {
         var target = Def(Row(1, RankChangeResolver.RareItemType, 9, 45));
         var candidate = Def(Row(2, RankChangeResolver.RareItemType, 9, 55));
 
-        // P(1024)=520; roll 550 fails without a charge, succeeds with +50 => 570.
+        // P(1024)=520; roll 550 fails whether or not a lucky-upgrade charge is available -- unlike
+        // CombineResolver's lucky-combo charge, this charge is consumed/reported unconditionally but does
+        // NOT add a probability bonus (S04_MyWork02.cpp:4051-4078: the charge is spent before the roll, but
+        // the roll's probability value is untouched by it).
         var withoutCharge = RankChangeResolver.ResolveUpgrade(target, Stack(4, 1), Material1024(), 0, 0,
             [target, candidate], new ScriptedRandomSource(0, 550));
         var withCharge = RankChangeResolver.ResolveUpgrade(target, Stack(4, 1), Material1024(), 0, 1,
             [target, candidate], new ScriptedRandomSource(0, 550));
 
         Assert.Equal(RankChangeResolver.RankChangeOutcome.Failed, withoutCharge.Outcome);
-        Assert.Equal(RankChangeResolver.RankChangeOutcome.Success, withCharge.Outcome);
+        Assert.Equal(RankChangeResolver.RankChangeOutcome.Failed, withCharge.Outcome);
+        Assert.False(withoutCharge.ConsumesLuckyCharge);
         Assert.True(withCharge.ConsumesLuckyCharge);
     }
 

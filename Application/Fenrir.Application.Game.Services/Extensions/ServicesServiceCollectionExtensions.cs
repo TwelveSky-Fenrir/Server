@@ -86,6 +86,7 @@ public static class ServicesServiceCollectionExtensions
 
     private static void AddChatServices(IServiceCollection services)
     {
+        services.AddSingleton<IGlobalAnnouncementService, GlobalAnnouncementService>();
         services.AddSingleton<IGuildAnnouncementService, GuildAnnouncementService>();
         services.AddSingleton<IGuildChatService, GuildChatService>();
         services.AddSingleton<ILocalChatService, LocalChatService>();
@@ -95,6 +96,7 @@ public static class ServicesServiceCollectionExtensions
         services.AddSingleton<ITribeChatService, TribeChatService>();
         services.AddSingleton<IWhisperService, WhisperService>();
         services.AddSingleton<IWorldChatService, WorldChatService>();
+        services.AddSingleton<IWorldNoticeService, WorldNoticeService>();
     }
 
     private static void AddCommerceServices(IServiceCollection services)

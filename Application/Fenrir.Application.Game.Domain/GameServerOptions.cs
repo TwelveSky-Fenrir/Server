@@ -322,4 +322,29 @@ public sealed class GameServerOptions
     ///     <see cref="HolyStoneBattleEnabled" />).
     /// </summary>
     public bool TribeFourConversionEnabled { get; set; }
+
+    /// <summary>
+    ///     How often <c>GuildTribeBroadcastRelayHost</c> both flushes this shard's own queued outbound
+    ///     GuildAnnouncement/GuildChat/TribeAnnouncement/TribeAnnouncementScroll broadcasts to
+    ///     <c>runtime.GuildTribeBroadcastRelay</c> and polls that same table for broadcasts published by every
+    ///     OTHER live shard, delivering matches to this shard's own locally-hosted players -- Fenrir's
+    ///     SQL-mediated stand-in for legacy's <c>ts25zone</c>&lt;-&gt;<c>ts25center</c> relay uplink (opcodes
+    ///     55-57 riding the same persistent connection, Server/ts25zone/H06_MyUpperCom.h:380,
+    ///     Server/Header/Protocol/RELAY.h:6-29), since Fenrir has no <c>ts25center</c>-equivalent process. This
+    ///     is a NEW, Fenrir-internal operational knob, not a reproduction of a legacy-cited value -- the
+    ///     same-shard half of every one of these four opcodes' delivery is unaffected and stays
+    ///     synchronous/immediate; only the OTHER-shard fan-out lags by up to this many seconds.
+    /// </summary>
+    public int GuildTribeBroadcastPollIntervalSeconds { get; set; } = 2;
+
+    /// <summary>
+    ///     How long a row survives in <c>runtime.GuildTribeBroadcastRelay</c> before
+    ///     <c>GuildTribeBroadcastRelayHost</c>'s own poll cycle reaps it, regardless of whether every live
+    ///     shard has already consumed it -- a crashed/never-polling shard simply misses broadcasts older than
+    ///     this window rather than pinning the table's memory-optimized storage forever (same "safe direction
+    ///     to fail toward" posture as every other SCHEMA_ONLY <c>runtime.*</c> table). Comfortably wider than
+    ///     <see cref="GuildTribeBroadcastPollIntervalSeconds" />'s default so a normally-alive shard never
+    ///     races its own poll cadence.
+    /// </summary>
+    public int GuildTribeBroadcastRetentionSeconds { get; set; } = 30;
 }

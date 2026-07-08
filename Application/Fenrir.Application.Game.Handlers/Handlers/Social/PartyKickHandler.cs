@@ -3,6 +3,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
@@ -10,12 +11,18 @@ namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 ///     CZ_PARTY_EXILE_SEND (opcode 70) -- a self-targeted kick isn't specially guarded, matching legacy's
 ///     own lack of a guard.
 /// </summary>
-public sealed class PartyKickHandler(ZoneRegistry zones, IPartyKickService partyKickService)
-    : IInlinePacketHandler<PartyKickRequest>
+public sealed class PartyKickHandler(
+    ZoneRegistry zones,
+    IPartyKickService partyKickService,
+    ILogger<PartyKickHandler> logger) : IInlinePacketHandler<PartyKickRequest>
 {
     public void Handle(in PartyKickRequest packet, IPacketSession session)
     {
         var zoneSession = (ZoneClientSession)session;
+
+        logger.LogDebug("PartyKick: session {SessionId} character {CharacterId} target {TargetAvatarName}",
+            session.SessionId, zoneSession.CharacterId, packet.AvatarName);
+
         var leaderId = zoneSession.CharacterId!.Value;
 
         var result = partyKickService.Kick(leaderId, packet.AvatarName);

@@ -10,6 +10,10 @@ Tables/runtime/GameServerDirectory.sql
 Tables/runtime/CharacterShardLocation.sql
 Tables/runtime/AccountSessions.sql
 
+# Cross-shard fan-out outbox for GuildAnnouncement/GuildChat/TribeAnnouncement/TribeAnnouncementScroll
+Tables/runtime/GuildTribeBroadcastRelay.sql
+Tables/runtime/GuildTribeBroadcastCursor.sql
+
 Tables/world/Levels.sql
 Tables/world/Skills.sql
 Tables/world/SkillDescriptions.sql
@@ -173,6 +177,11 @@ StoredProcedures/runtime/usp_AccountSession_ClearIfOwner.sql
 StoredProcedures/runtime/usp_AccountSession_RefreshAndGetKicked.sql
 StoredProcedures/runtime/usp_AccountSession_ReapStale.sql
 StoredProcedures/runtime/usp_AccountSession_GetActiveCount.sql
+
+# Cross-shard fan-out for GuildAnnouncement/GuildChat/TribeAnnouncement/TribeAnnouncementScroll
+# (runtime.GuildTribeBroadcastRelay/runtime.GuildTribeBroadcastCursor) -- see GuildTribeBroadcastRelayHost.
+StoredProcedures/runtime/usp_GuildTribeBroadcastRelay_Publish.sql
+StoredProcedures/runtime/usp_GuildTribeBroadcastRelay_Poll.sql
 
 StoredProcedures/world/usp_Level_GetAll.sql
 StoredProcedures/world/usp_Skill_GetAll.sql
@@ -386,6 +395,13 @@ Migrations/019_character_previous_tribe_backfill.sql
 # see the script's own header for the full citation trail.
 Migrations/025_account_session_transition_game_to_game.sql
 
+# Fix-forward (shop-and-proxyshop legacy-parity audit): usp_OfflineShop_WithdrawMoney threw the same SQL
+# error (50276) for both a zero-pending-balance withdrawal and a stale/not-closed shop, making the
+# contract's required distinct result-4 "nothing to withdraw" case unreachable; also adds the missing
+# ShopDate expiry check the contract requires alongside the existing ShopState=0 gate. See the script's own
+# header for the full citation trail.
+Migrations/026_offline_shop_withdraw_split_nothing_and_expiry.sql
+
 Migrations/Seed/001_dev_account.sql
 
 Migrations/Seed/world/060_levels.sql
@@ -452,3 +468,8 @@ Migrations/Seed/admin/014_error_catalog_character_zone241_time.sql
 # npc-talk gap fix: registers 50337-50339 for the new usp_Character_AdjustStoreMoney/
 # usp_AccountVault_TransferMoneyWithCharacter procedures.
 Migrations/Seed/admin/015_error_catalog_store_and_account_vault_transfers.sql
+
+# shop-and-proxyshop legacy-parity audit: registers 50340 for usp_OfflineShop_WithdrawMoney's new distinct
+# "nothing to withdraw" case (Migrations/026_offline_shop_withdraw_split_nothing_and_expiry.sql), and
+# refreshes 50276's catalog description now that it no longer covers that case.
+Migrations/Seed/admin/016_error_catalog_offline_shop_withdraw_nothing.sql

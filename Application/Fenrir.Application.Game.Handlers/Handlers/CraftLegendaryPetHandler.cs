@@ -4,6 +4,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers;
 
@@ -14,7 +15,9 @@ namespace Fenrir.Application.Game.Handlers.Handlers;
 ///     (delegated to <see cref="ICraftLegendaryPetService" />). The server-wide "notable craft" announcement
 ///     (<c>MakeNotice</c>) is not reproduced -- see <see cref="CraftPetHandler" />'s own remarks.
 /// </summary>
-public sealed class CraftLegendaryPetHandler(ICraftLegendaryPetService craftLegendaryPetService)
+public sealed class CraftLegendaryPetHandler(
+    ICraftLegendaryPetService craftLegendaryPetService,
+    ILogger<CraftLegendaryPetHandler> logger)
     : IAsyncPacketHandler<CraftLegendaryPetRequest>
 {
     public async ValueTask HandleAsync(CraftLegendaryPetRequest packet, IPacketSession session,
@@ -23,6 +26,10 @@ public sealed class CraftLegendaryPetHandler(ICraftLegendaryPetService craftLege
         var zoneSession = (ZoneClientSession)session;
         var characterId = zoneSession.CharacterId!.Value;
         var accountId = zoneSession.AccountId!.Value;
+
+        logger.LogDebug(
+            "Session {SessionId}: CraftLegendaryPetRequest (op131) received for character {CharacterId}",
+            session.SessionId, characterId);
 
         if (zoneSession.CurrentZone is not Zone zone || !zone.TryGetPlayer(characterId, out var state) ||
             state is null)
@@ -37,9 +44,15 @@ public sealed class CraftLegendaryPetHandler(ICraftLegendaryPetService craftLege
 
             if (result.Outcome != CraftLegendaryPetOutcome.Applied)
             {
+                logger.LogWarning(
+                    "Craft-legendary-pet rejected for character {CharacterId} -- aborting session", characterId);
                 zoneSession.Abort(DisconnectReason.Faulted);
                 return;
             }
+
+            logger.LogInformation(
+                "Character {CharacterId} crafted legendary pet: result item {ResultItemId}", characterId,
+                result.ResultItemId);
 
             session.Send(new CraftLegendaryPetResponse
             {

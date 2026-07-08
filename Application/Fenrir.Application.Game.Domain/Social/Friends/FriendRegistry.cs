@@ -28,13 +28,16 @@ public sealed class FriendRegistry
     /// <summary>
     ///     Friend-family half of the legacy <c>CheckCommunityWork</c> exclusivity check. Public so sibling
     ///     negotiation families (e.g. Guild ask, see <c>GuildInviteService</c>) can compose a cross-family busy
-    ///     check without duplicating this registry's own state.
+    ///     check without duplicating this registry's own state. Includes <see cref="_acceptedFor" /> (state 3,
+    ///     mutually accepted and awaiting the accepting side's own CZ_FRIEND_MAKE_SEND commit) -- mirrors
+    ///     <c>MentorRegistry.IsNegotiating</c>'s own inclusion of <c>_acceptedByMaster</c>.
     /// </summary>
     public bool IsNegotiating(int characterId)
     {
         lock (_lock)
         {
-            return _pendingByAsker.ContainsKey(characterId) || _pendingByTarget.ContainsKey(characterId);
+            return _pendingByAsker.ContainsKey(characterId) || _pendingByTarget.ContainsKey(characterId) ||
+                   _acceptedFor.ContainsKey(characterId) || _acceptedFor.ContainsValue(characterId);
         }
     }
 

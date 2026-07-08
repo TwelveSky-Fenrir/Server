@@ -4,6 +4,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers;
 
@@ -13,7 +14,7 @@ namespace Fenrir.Application.Game.Handlers.Handlers;
 ///     Remove/ReturnToInventorySuccess never actually fire against today's always-empty wardrobe. Same shape as
 ///     <see cref="CostumeStateHandler" />.
 /// </summary>
-public sealed class StellarCoreStateHandler(IStellarCoreStateService service)
+public sealed class StellarCoreStateHandler(IStellarCoreStateService service, ILogger<StellarCoreStateHandler> logger)
     : IAsyncPacketHandler<StellarCoreStateRequest>
 {
     public async ValueTask HandleAsync(StellarCoreStateRequest packet, IPacketSession session,
@@ -21,6 +22,10 @@ public sealed class StellarCoreStateHandler(IStellarCoreStateService service)
     {
         var zoneSession = (ZoneClientSession)session;
         var characterId = zoneSession.CharacterId!.Value;
+
+        logger.LogDebug(
+            "Session {SessionId}: StellarCoreStateRequest (op153) received for character {CharacterId}, sort {Sort} value {Value}",
+            session.SessionId, characterId, packet.Sort, packet.Value);
 
         if (zoneSession.CurrentZone is not Zone zone || !zone.TryGetPlayer(characterId, out var state) ||
             state is null)
@@ -38,6 +43,9 @@ public sealed class StellarCoreStateHandler(IStellarCoreStateService service)
                     return;
 
                 case StellarCoreStateOutcome.Disconnect:
+                    logger.LogWarning(
+                        "Stellar-core-state rejected for character {CharacterId}: sort {Sort} value {Value} -- aborting session",
+                        characterId, packet.Sort, packet.Value);
                     zoneSession.Abort(DisconnectReason.Faulted);
                     return;
 

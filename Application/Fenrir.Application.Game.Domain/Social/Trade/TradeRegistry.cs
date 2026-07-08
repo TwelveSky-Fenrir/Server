@@ -9,6 +9,37 @@ public enum TradeAskOutcome
 }
 
 /// <summary>
+///     Which wire notification (if any) <see cref="TradeRegistry.ClearForDisconnect" />'s caller should send to
+///     the partner it returns -- reuses the two notification shapes the six live opcode handlers already send,
+///     so a disconnect-triggered cleanup looks identical on the wire to its voluntary counterpart.
+/// </summary>
+public enum TradeDisconnectNotification
+{
+    /// <summary>The disconnecting character had no trade-process state at all -- nothing to notify.</summary>
+    None,
+
+    /// <summary>
+    ///     The disconnecting character was still negotiating (a pending ask in either direction, or an accepted
+    ///     pair that never opened a trade window) -- send the partner the same empty-payload notice
+    ///     <see cref="TradeRegistry.TryCancel" /> already triggers (CZ_TRADE_CANCEL_SEND's own partner notice).
+    /// </summary>
+    Cancel,
+
+    /// <summary>
+    ///     The disconnecting character had an open trade window -- send the partner the same "closed/aborted
+    ///     without exchange" notice <see cref="TradeRegistry.TryEnd" /> already triggers (CZ_TRADE_END_SEND's own
+    ///     Result=1 notice).
+    /// </summary>
+    End
+}
+
+/// <summary>Result of <see cref="TradeRegistry.ClearForDisconnect" />.</summary>
+public readonly record struct TradeDisconnectResult(TradeDisconnectNotification Notification, int PartnerId)
+{
+    public static readonly TradeDisconnectResult None = new(TradeDisconnectNotification.None, 0);
+}
+
+/// <summary>
 ///     Process-wide secure-trade authority. Same ask/cancel/answer shape as DuelRegistry, but acceptance is
 ///     symmetric (CZ_TRADE_START_SEND requires "state 3" on both sides, unlike Mentor's asymmetric
 ///     master-only start), so <see cref="TryStart" /> is callable by either accepted side once both have
@@ -127,6 +158,81 @@ public sealed class TradeRegistry
 
             _sessionByCharacter.Remove(session.OpponentOf(characterId));
             return true;
+        }
+    }
+
+    /// <summary>
+    ///     CZ_TRADE_START_SEND failure-path rollback -- reverts ONLY <paramref name="callerId" />'s own
+    ///     session index entry back to idle (trade-process-state 0), deliberately leaving the partner's
+    ///     entry (if any) untouched even though both entries reference the same <see cref="TradeSession" />
+    ///     instance committed by <see cref="TryStart" />. Used when the caller's post-commit re-validation
+    ///     of either side's presence fails; the partner is left "stuck" referencing a session whose other
+    ///     side has gone idle, matching legacy's asymmetric partial-effect behavior rather than a full
+    ///     two-sided rollback.
+    /// </summary>
+    public bool TryAbortStartForCaller(int callerId)
+    {
+        lock (_lock)
+        {
+            return _sessionByCharacter.Remove(callerId);
+        }
+    }
+
+    /// <summary>
+    ///     Unconditional per-character trade-process-state teardown for a true disconnect (or, if ever needed
+    ///     for zone-re-entry safety the way <c>DuelRegistry.ForceClearOnZoneEntry</c> is, a stale-state guard on
+    ///     re-entry) -- closes the gap this registry had no counterpart to
+    ///     <see cref="Duel.DuelRegistry.ForceClearOnZoneEntry" />/<c>PartyRegistry.LeaveForDisconnect</c> for: a
+    ///     character who disconnects mid-negotiation (pending ask, accepted-but-not-started, or an open
+    ///     <see cref="TradeSession" />) previously kept <see cref="IsBusy" /> returning true forever, since
+    ///     nothing but the six live opcode handlers themselves ever removed a dictionary entry. Safe to call for
+    ///     any characterId, including one with no trade-process state at all (the overwhelmingly common case, so
+    ///     this stays cheap on the hot disconnect path) -- returns <see cref="TradeDisconnectResult.None" /> then.
+    ///     Checks pending-as-asker, pending-as-target, accepted-pair, and open-session in that order; a
+    ///     characterId can only ever be present in exactly one of those four indexes at a time (the same
+    ///     invariant <see cref="IsBusy" /> already relies on), so this never needs to check more than one branch.
+    /// </summary>
+    /// <remarks>
+    ///     Fenrir-only robustness fix, not a specific legacy line-for-line reproduction -- no
+    ///     <c>Server/path:line</c> citation was supplied or independently located in this task for Trade's own
+    ///     disconnect-cleanup analogue of the legacy Exit handler (contrast
+    ///     <c>PartyRegistry.LeaveForDisconnect</c>'s own remarks, which cites
+    ///     <c>Server/ts25zone/S03_MyUser.cpp:338-411</c> for party specifically). Flagged for a
+    ///     <c>cpp-ts25-explorer</c> re-check if the exact legacy Exit-handler behavior for
+    ///     <c>mTradeProcessState</c> on disconnect becomes relevant; this method exists to close a
+    ///     stuck-forever-busy availability bug regardless of the precise legacy notification semantics on that
+    ///     path.
+    /// </remarks>
+    public TradeDisconnectResult ClearForDisconnect(int characterId)
+    {
+        lock (_lock)
+        {
+            if (_pendingByAsker.Remove(characterId, out var target))
+            {
+                _pendingByTarget.Remove(target);
+                return new TradeDisconnectResult(TradeDisconnectNotification.Cancel, target);
+            }
+
+            if (_pendingByTarget.Remove(characterId, out var asker))
+            {
+                _pendingByAsker.Remove(asker);
+                return new TradeDisconnectResult(TradeDisconnectNotification.Cancel, asker);
+            }
+
+            if (_acceptedPairs.Remove(characterId, out var acceptedPartner))
+            {
+                _acceptedPairs.Remove(acceptedPartner);
+                return new TradeDisconnectResult(TradeDisconnectNotification.Cancel, acceptedPartner);
+            }
+
+            if (_sessionByCharacter.Remove(characterId, out var session))
+            {
+                var opponentId = session.OpponentOf(characterId);
+                _sessionByCharacter.Remove(opponentId);
+                return new TradeDisconnectResult(TradeDisconnectNotification.End, opponentId);
+            }
+
+            return TradeDisconnectResult.None;
         }
     }
 }

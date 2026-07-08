@@ -3,6 +3,7 @@ using Fenrir.Application.Login.Tests.TestSupport;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Login;
 using Fenrir.Network.Serialization.Wire;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Login.Tests.Handlers;
 
@@ -13,7 +14,7 @@ public class ClFailMoveZone1SendHandlerTests
     [Fact]
     public void Handle_RollsSessionBackToCharSelect_AndRepliesNothing()
     {
-        var handler = new ZoneTransferFailureHandler();
+        var handler = new ZoneTransferFailureHandler(NullLogger<ZoneTransferFailureHandler>.Instance);
         var pipe = new FakeDuplexPipe();
         var session = new LoginClientSession(1, pipe);
         session.MarkAuthenticated(1);

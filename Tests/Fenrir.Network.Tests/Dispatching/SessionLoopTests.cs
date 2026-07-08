@@ -250,7 +250,10 @@ public sealed class SessionLoopTests
 
     // Packet-level observability (Fenrir.Network.Dispatch.Logging.PacketLog): every successfully decoded
     // frame must emit exactly one Debug-level "packet received" entry, carrying session id/opcode/byte size,
-    // when Debug is enabled -- before this feature existed there was only an ad-hoc LogDebug call here.
+    // when Debug is enabled -- before this feature existed there was only an ad-hoc LogDebug call here. A
+    // successfully dispatched frame (RecordingFrameDispatcher never throws) must additionally emit exactly
+    // one "packet dispatched" entry, distinct from "packet received" -- it fires after dispatch completes,
+    // not before dispatch resolution like PacketReceived.
     [Fact]
     public async Task RunAsync_DebugLoggingEnabled_LogsPacketReceivedWithOpcodeAndSize()
     {
@@ -266,14 +269,22 @@ public sealed class SessionLoopTests
 
         await AwaitLoopAsync(loopTask);
 
-        var received = Assert.Single(logger.Entries, e => e.Level == LogLevel.Debug);
+        var debugEntries = logger.Entries.Where(e => e.Level == LogLevel.Debug).ToArray();
+
+        var received = Assert.Single(debugEntries, e => e.Message.Contains("packet received"));
         Assert.Contains("20", received.Message);
         Assert.Contains(HeartbeatRequest.Opcode.ToString(), received.Message);
         Assert.Contains(HeartbeatRequest.PayloadSize.ToString(), received.Message);
+
+        var dispatched = Assert.Single(debugEntries, e => e.Message.Contains("packet dispatched"));
+        Assert.Contains("20", dispatched.Message);
+        Assert.Contains(HeartbeatRequest.Opcode.ToString(), dispatched.Message);
     }
 
     // Mirrors the generated method's own IsEnabled(LogLevel.Debug) short-circuit -- SessionLoop itself must
-    // never even capture a Stopwatch timestamp when Debug is disabled, let alone log anything.
+    // never even capture a Stopwatch timestamp when Debug is disabled, let alone log anything at Debug. The
+    // terminal "connection loop ended" entry is still expected at Information (the client's own graceful
+    // close, DisconnectReason.ClientClosed) since that log is independent of Debug-level packet chatter.
     [Fact]
     public async Task RunAsync_DebugLoggingDisabled_NeverLogsPacketReceived()
     {
@@ -289,7 +300,9 @@ public sealed class SessionLoopTests
 
         await AwaitLoopAsync(loopTask);
 
-        Assert.Empty(logger.Entries);
+        Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Debug);
+        var ended = Assert.Single(logger.Entries, e => e.Level == LogLevel.Information);
+        Assert.Contains(DisconnectReason.ClientClosed.ToString(), ended.Message);
     }
 
     private static ZoneClientSession InWorldZoneSession(long sessionId, FakeDuplexPipe pipe)

@@ -1,6 +1,7 @@
 using Fenrir.Application.Game.Abstractions.Social;
 using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.World;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Social;
 
@@ -8,7 +9,8 @@ namespace Fenrir.Application.Game.Services.Social;
 ///     Level-gap check uses <see cref="PlayerRuntimeState.CombinedLevel" /> (aLevel1+aLevel2) on both sides,
 ///     per the party-invite level-gate behavior contract.
 /// </summary>
-public sealed class PartyInviteService(PartyRegistry parties) : IPartyInviteService
+public sealed class PartyInviteService(PartyRegistry parties, ILogger<PartyInviteService> logger)
+    : IPartyInviteService
 {
     /// <remarks>
     ///     Réf. C++ : Server/ts25zone/S04_MyWork02.cpp:8259-8277,8459-8471,9088-9101,9311-9324 (the shared
@@ -31,9 +33,21 @@ public sealed class PartyInviteService(PartyRegistry parties) : IPartyInviteServ
     public PartyInviteResult Invite(Zone zone, PlayerRuntimeState inviter, string targetAvatarName)
     {
         if (parties.IsInParty(inviter.CharacterId) && !parties.IsLeader(inviter.CharacterId))
+        {
+            // Protocol violation: a legitimate client never lets a non-leader party member open a new invite --
+            // the inviter's own session is aborted by the caller, so this is worth surfacing by default.
+            logger.LogWarning(
+                "Party invite rejected: character {InviterCharacterId} is already partied and not the leader -- session will be disconnected",
+                inviter.CharacterId);
             return new PartyInviteResult(PartyInviteResultKind.InviterMustDisconnect);
+        }
+
         if (parties.IsNegotiating(inviter.CharacterId))
+        {
+            logger.LogDebug("Party invite rejected: character {InviterCharacterId} already has a pending invite",
+                inviter.CharacterId);
             return new PartyInviteResult(PartyInviteResultKind.InviterBusy);
+        }
 
         PlayerRuntimeState? target = null;
         foreach (var candidate in zone.Players)
@@ -44,20 +58,41 @@ public sealed class PartyInviteService(PartyRegistry parties) : IPartyInviteServ
             }
 
         if (target is null)
+        {
+            logger.LogDebug(
+                "Party invite rejected: character {InviterCharacterId} target {TargetAvatarName} not found in map {MapId}",
+                inviter.CharacterId, targetAvatarName, zone.MapId);
             return new PartyInviteResult(PartyInviteResultKind.TargetNotFound);
+        }
 
         var outcome = parties.TryInvite(inviter.CharacterId, inviter.CombinedLevel, inviter.Tribe,
             target.CharacterId, target.CombinedLevel, target.Tribe);
 
-        return outcome switch
+        switch (outcome)
         {
-            PartyInviteOutcome.InviterMustDisconnect => new PartyInviteResult(PartyInviteResultKind
-                .InviterMustDisconnect),
-            PartyInviteOutcome.InviterBusy => new PartyInviteResult(PartyInviteResultKind.InviterBusy),
-            PartyInviteOutcome.TargetBusy => new PartyInviteResult(PartyInviteResultKind.TargetBusy),
-            PartyInviteOutcome.TargetAlreadyPartied =>
-                new PartyInviteResult(PartyInviteResultKind.TargetAlreadyPartied),
-            _ => new PartyInviteResult(PartyInviteResultKind.Sent, target.CharacterId, target.Name, inviter.Name)
-        };
+            case PartyInviteOutcome.InviterMustDisconnect:
+                logger.LogWarning(
+                    "Party invite rejected: character {InviterCharacterId} must disconnect (registry check against target {TargetCharacterId})",
+                    inviter.CharacterId, target.CharacterId);
+                return new PartyInviteResult(PartyInviteResultKind.InviterMustDisconnect);
+            case PartyInviteOutcome.InviterBusy:
+                logger.LogDebug("Party invite rejected: character {InviterCharacterId} is busy",
+                    inviter.CharacterId);
+                return new PartyInviteResult(PartyInviteResultKind.InviterBusy);
+            case PartyInviteOutcome.TargetBusy:
+                logger.LogDebug("Party invite rejected: target character {TargetCharacterId} is busy",
+                    target.CharacterId);
+                return new PartyInviteResult(PartyInviteResultKind.TargetBusy);
+            case PartyInviteOutcome.TargetAlreadyPartied:
+                logger.LogDebug("Party invite rejected: target character {TargetCharacterId} is already partied",
+                    target.CharacterId);
+                return new PartyInviteResult(PartyInviteResultKind.TargetAlreadyPartied);
+            default:
+                logger.LogDebug(
+                    "Party invite sent: character {InviterCharacterId} ({InviterName}) -> character {TargetCharacterId} ({TargetName})",
+                    inviter.CharacterId, inviter.Name, target.CharacterId, target.Name);
+                return new PartyInviteResult(PartyInviteResultKind.Sent, target.CharacterId, target.Name,
+                    inviter.Name);
+        }
     }
 }

@@ -4,7 +4,7 @@ using Fenrir.Network.Serialization.Packets.Zone;
 
 namespace Fenrir.Application.Game.Abstractions.Commerce;
 
-/// <summary>The three ways <see cref="BuyShopItemService.FindSeller" /> can leave <see cref="BuyShopItemHandler" />.</summary>
+/// <summary>The four ways <see cref="BuyShopItemService.FindSellerAsync" /> can leave <see cref="BuyShopItemHandler" />.</summary>
 public enum BuyShopItemSellerOutcome
 {
     /// <summary>A protocol-level fault -- the handler should abort the session.</summary>
@@ -14,17 +14,26 @@ public enum BuyShopItemSellerOutcome
     Reply,
 
     /// <summary>
-    ///     Seller/slot resolved -- the handler should acquire both economy locks and call
-    ///     <see cref="IBuyShopItemService.CommitAsync" />.
+    ///     A LIVE personal shop's seller/slot resolved -- the handler should acquire BOTH participants'
+    ///     economy locks (smaller CharacterId first) and call <see cref="IBuyShopItemService.CommitAsync" />.
     /// </summary>
-    Proceed
+    Proceed,
+
+    /// <summary>
+    ///     A registered, currently-open OFFLINE/proxy shop's seller/slot resolved
+    ///     (<see cref="BuyShopItemSellerResult.ProxySellerId" />) -- the seller has no live
+    ///     <see cref="PlayerRuntimeState" /> to lock at all, so the handler should acquire only the BUYER's
+    ///     own economy lock and call <see cref="IBuyShopItemService.CommitProxyPurchaseAsync" />.
+    /// </summary>
+    ProxyProceed
 }
 
 public readonly record struct BuyShopItemSellerResult(
     BuyShopItemSellerOutcome Outcome,
     BuyShopItemResponse? Reply,
     PlayerRuntimeState? Seller,
-    PshopPurchasePolicy.SlotView Slot);
+    PshopPurchasePolicy.SlotView Slot,
+    int ProxySellerId = 0);
 
 /// <summary>
 ///     <paramref name="ListingRefresh" /> is the buyer-facing B_DEMAND_PSHOP_RECV(0) snapshot of the
@@ -42,14 +51,25 @@ public readonly record struct BuyShopItemCommitResult(
 public interface IBuyShopItemService
 {
     /// <summary>
-    ///     Pre-lock validation: resolves the named seller and the advertised slot from their live personal-shop
-    ///     listing. Must run BEFORE either economy lock is acquired.
+    ///     Pre-lock resolution: dispatch always attempts the OFFLINE/proxy shop first (only reachable when the
+    ///     hosting zone is the proxy-shop hub AND a matching OPEN proxy shop is registered under the given
+    ///     seller name), falling through to the named LIVE/personal-shop lookup otherwise. Must run BEFORE
+    ///     either flavor's economy lock is acquired.
     /// </summary>
-    public BuyShopItemSellerResult FindSeller(BuyShopItemRequest packet, Zone zone, PlayerRuntimeState buyer,
-        int buyerId);
+    public ValueTask<BuyShopItemSellerResult> FindSellerAsync(BuyShopItemRequest packet, Zone zone,
+        PlayerRuntimeState buyer, int buyerId, CancellationToken cancellationToken);
 
-    /// <summary>Commits the purchase. Both participants' economy locks must already be held.</summary>
+    /// <summary>Commits a LIVE personal-shop purchase. Both participants' economy locks must already be held.</summary>
     public ValueTask<BuyShopItemCommitResult> CommitAsync(BuyShopItemRequest packet, Zone zone,
         PlayerRuntimeState buyer,
         PlayerRuntimeState seller, PshopPurchasePolicy.SlotView slot, CancellationToken cancellationToken);
+
+    /// <summary>
+    ///     Commits a purchase from a registered, currently-open OFFLINE/proxy shop. Only the BUYER's own
+    ///     economy lock must already be held -- the seller need not be (and, per the whole point of a proxy
+    ///     shop, usually is not) online at all.
+    /// </summary>
+    public ValueTask<BuyShopItemCommitResult> CommitProxyPurchaseAsync(BuyShopItemRequest packet, Zone zone,
+        PlayerRuntimeState buyer, int sellerId, int accountId, PshopPurchasePolicy.SlotView slot,
+        CancellationToken cancellationToken);
 }

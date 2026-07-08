@@ -41,17 +41,27 @@ public sealed class ZoneReadyHandler(IZoneReadyService service, ILogger<ZoneRead
     {
         var zoneSession = (ZoneClientSession)session;
 
+        logger?.LogDebug(
+            "Session {SessionId}: ZoneReadyRequest (op13) received for character {CharacterId}, current state {State}, claimed tribe {ClaimedTribe}",
+            session.SessionId, zoneSession.CharacterId, zoneSession.State, packet.Tribe);
+
         // Idempotency guard: the handshake already completed once for this session. Re-running the guards
         // below on a duplicate send would risk accumulating anti-hack strikes (Guard 3) against an already
         // in-world, legitimately playing session -- treat a repeat as a safe no-op instead.
         if (zoneSession.State == ZoneSessionState.InWorld)
+        {
+            logger?.LogDebug(
+                "Zone-ready request ignored for character {CharacterId} (session {SessionId}): session is already InWorld",
+                zoneSession.CharacterId, session.SessionId);
             return;
+        }
 
         // Benign staleness window around world entry: the posted ZoneCommand.Enter may not have been ticked
         // yet. Nothing to validate against in that case -- fall through and still admit the session, same as
         // the handler's pre-existing (unconditional) behavior.
         if (zoneSession.CurrentZone is Zone zone && zoneSession.CharacterId is { } characterId &&
             zone.TryGetPlayer(characterId, out var state) && state is not null)
+        {
             if (service.Validate(state, packet.Tribe, packet.AutoState) == ZoneReadyOutcome.Rejected)
             {
                 logger?.LogWarning(
@@ -60,6 +70,13 @@ public sealed class ZoneReadyHandler(IZoneReadyService service, ILogger<ZoneRead
                 zoneSession.Abort(DisconnectReason.Faulted);
                 return;
             }
+        }
+        else
+        {
+            logger?.LogDebug(
+                "Zone-ready validation skipped for session {SessionId}: player state not yet ticked into the zone (benign staleness window)",
+                session.SessionId);
+        }
 
         zoneSession.MarkInWorld();
 

@@ -84,4 +84,37 @@ internal static partial class PacketLog
         Level = LogLevel.Debug,
         Message = "Session {SessionId}: packet sent, opcode {Opcode} ({ByteSize} bytes)")]
     public static partial void PacketSent(this ILogger logger, long sessionId, byte opcode, int byteSize);
+
+    /// <summary>
+    ///     Every decoded frame whose dispatch (<c>IFrameDispatcher.DispatchAsync</c> -- the generated
+    ///     <c>MessageDispatcher</c>'s handler resolution and invocation together) completed without throwing,
+    ///     logged once from <c>SessionLoop.ProcessBufferAsync</c> immediately after the
+    ///     <c>await dispatcher.DispatchAsync(...)</c> call returns, right before <c>ClientSession.Touch()</c>
+    ///     stamps liveness. <paramref name="dispatchMicroseconds" /> times handler resolution AND execution
+    ///     together -- unlike <see cref="PacketReceived" />'s <c>decodeMicroseconds</c>, which times only the
+    ///     frame decode itself. There is deliberately no separate "handler resolved, not yet invoked" log
+    ///     point: the generated <c>MessageDispatcher</c> switch (<c>Fenrir.Generators.Dispatch.
+    ///     HandlerDispatchIncrementalGenerator</c>) resolves a handler and invokes it in the same generated
+    ///     statement with no externally observable seam between the two, so this method's placement -- right
+    ///     after dispatch completes -- is the finest dispatch-timing granularity obtainable from
+    ///     <c>Fenrir.Network.Dispatch</c> without a generator change (out of this project's territory; see
+    ///     that generator's own file for who owns it). Never fires for a frame rejected before reaching
+    ///     dispatch (state-gate/rate-limit -- see <c>SessionLoop</c>'s own <c>LogWarning</c> calls for those)
+    ///     or whose handler threw (see <c>SessionLoop</c>'s own <c>LogError</c> call for that) -- so, read
+    ///     together with those, this entry's mere presence already confirms "resolved a handler and it ran to
+    ///     completion" for that opcode. Same caller-gated-<see cref="System.Diagnostics.Stopwatch" />-capture
+    ///     contract as <see cref="PacketReceived" />.
+    /// </summary>
+    [LoggerMessage(
+        EventId = 4003,
+        EventName = "PacketDispatched",
+        Level = LogLevel.Debug,
+        Message =
+            "Session {SessionId}: packet dispatched, server {Server} opcode {Opcode} (handled in {DispatchMicroseconds:F1} us)")]
+    public static partial void PacketDispatched(
+        this ILogger logger,
+        long sessionId,
+        FenrirServer server,
+        byte opcode,
+        double dispatchMicroseconds);
 }

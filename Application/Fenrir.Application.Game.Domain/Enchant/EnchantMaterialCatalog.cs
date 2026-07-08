@@ -1,8 +1,9 @@
 namespace Fenrir.Application.Game.Domain.Enchant;
 
 /// <summary>
-///     Static material tables for CZ_IMPROVE_ITEM_SEND's standard equipment regime. Wings and the
-///     costume/stellar-core branches are out of scope -- see <see cref="EnchantResolver" />'s remarks.
+///     Static material tables for CZ_IMPROVE_ITEM_SEND's normal-equipment/wings regime -- shared by both,
+///     see <see cref="EnchantResolver" />'s remarks for why wings use the identical tables. The
+///     costume/stellar-core branches remain out of scope.
 /// </summary>
 /// <remarks>
 ///     <c>USE_IMPROVE_RATE_100</c> is unconditionally defined, so all materials here are live in every build (not

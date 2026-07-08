@@ -11,8 +11,20 @@ using Microsoft.Extensions.Logging;
 namespace Fenrir.Application.Game.Services.Commerce;
 
 /// <remarks>
-///     The legacy's larger result-code taxonomy is collapsed here to 0 (success) / 1 (mismatch or unknown
-///     shop) / 2 (insufficient funds or a cap).
+///     Legacy replies to CZ_SET_DEPUTY_PSHOP_SEND (opcode 109) with one of ten distinct result codes, and
+///     -- exactly like <see cref="OpenShopStallService" />'s already-preserved personal/proxy 0-vs-100 split
+///     -- the *same* opcode uses two different success codes depending on which sub-operation ran: 0 for a
+///     successful RETRIEVE, 1000 for a successful PURCHASE (contract: Shop Stalls and Proxy Shops,
+///     UpdateProxyShop Outputs section; ServerDocs/12_ts25zone/15_MyGame08_09_EventsCenter_ProxyShops.md
+///     §5.7 confirms <c>case 1</c> of <c>PROXY_SHOP_SYSTEM::Process</c>, Server/ts25zone/S07_MyGame09.cpp:557-884,
+///     is where both sub-operations are dispatched). That success split is preserved below.
+///     The remaining eight legacy failure codes are NOT itemized by the behavior contract or by
+///     ServerDocs (both explicitly flag the retrieval mutation and the full result-code enumeration as "not
+///     observed / needs a follow-up finding" before implementing them faithfully) -- per this project's "no
+///     legacy parity from memory" rule, they are intentionally left collapsed to 1 (mismatch, unknown shop,
+///     or any other RetrieveItemAndReplaceContainerAsync failure) / 2 (insufficient funds, a cap, or any
+///     other ExecutePurchaseAsync failure) until a dedicated legacy-behavior-translator follow-up contract
+///     supplies the full ten-code enumeration and the exact SQL error each stored procedure throws per case.
 /// </remarks>
 public sealed class UpdateProxyShopService(
     IOfflineShopRepository offlineShops,
@@ -34,17 +46,27 @@ public sealed class UpdateProxyShopService(
     public UpdateProxyShopValidation Validate(UpdateProxyShopRequest packet)
     {
         if (packet.BuySort is not (1 or 2))
+        {
+            logger.LogDebug("Update proxy shop validation failed: invalid buySort {BuySort}", packet.BuySort);
             return new UpdateProxyShopValidation(true, 0, null);
+        }
 
         var slotIndex = (short)(packet.SellPage * 5 + packet.SellIndex);
         if (packet.SellPage is < 0 or >= 5 || packet.SellIndex is < 0 or >= 5 ||
             packet.SelfPage is not (ContainerMatrix.InventoryPage0 or ContainerMatrix.InventoryPage1) ||
             !ContainerMatrix.IsValidSlot((byte)packet.SelfPage, packet.SelfIndex) ||
             packet.SelfX is < 0 or > 7 || packet.SelfY is < 0 or > 7)
+        {
+            logger.LogDebug("Update proxy shop validation failed: out-of-range slot coordinates");
             return new UpdateProxyShopValidation(true, 0, null);
+        }
 
         if (!worldData.ItemsById.TryGetValue(packet.SellItemIndex, out var itemDefinition))
+        {
+            logger.LogDebug("Update proxy shop validation failed: item {ItemId} is unresolvable",
+                packet.SellItemIndex);
             return new UpdateProxyShopValidation(true, 0, null);
+        }
 
         return new UpdateProxyShopValidation(false, slotIndex, itemDefinition);
     }
@@ -59,7 +81,12 @@ public sealed class UpdateProxyShopService(
         if (destination is { } existing &&
             (existing.ItemId != packet.SellItemIndex || !isStackable ||
              existing.Quantity + packet.Quantity > GroundItemPickupPolicy.MaxStackQuantity))
+        {
+            logger.LogWarning(
+                "Offline-shop retrieve rejected: character {CharacterId} destination slot {SelfPage}/{SelfIndex} cannot accept item {ItemId} -- session will be disconnected",
+                characterId, packet.SelfPage, packet.SelfIndex, packet.SellItemIndex);
             return null;
+        }
 
         var finalQuantity = destination is { } d ? d.Quantity + packet.Quantity : packet.Quantity;
         var (enchant, combine, refine, socket) = ItemValueCodec.Decode(packet.Value);
@@ -106,6 +133,10 @@ public sealed class UpdateProxyShopService(
                 "Zone {MapId} inventory inbox full: dropped offline-shop retrieve mirror for character {CharacterId}",
                 zone.MapId, characterId);
 
+        logger.LogInformation(
+            "Offline-shop item retrieved: character {CharacterId} retrieved item {ItemId} x{Quantity} from their own closed shop",
+            characterId, packet.SellItemIndex, packet.Quantity);
+
         return response;
     }
 
@@ -115,12 +146,22 @@ public sealed class UpdateProxyShopService(
     {
         var sellerId = await characters.GetIdByNameAsync(packet.AvatarName, cancellationToken);
         if (sellerId is null)
+        {
+            logger.LogDebug(
+                "Offline-shop purchase rejected: character {CharacterId} seller {SellerAvatarName} does not exist",
+                characterId, packet.AvatarName);
             return BuildReply(1, packet.SelfPage, packet.SelfIndex, null, packet.Socket, 0);
+        }
 
         // Buying from one's own open shop would bypass RETRIEVE's "must be closed" gate and refund the
         // price into the shop's own earnings -- rejected as the safe, conservative choice.
         if (sellerId.Value == characterId)
+        {
+            logger.LogWarning(
+                "Offline-shop purchase rejected: character {CharacterId} attempted to buy from its own proxy shop -- session will be disconnected",
+                characterId);
             return null;
+        }
 
         var destination = state.Inventory.GetSlot((byte)packet.SelfPage, (byte)packet.SelfIndex);
         var isStackable = ContainerMatrix.IsStackableSort(itemDefinition.Item.Sort);
@@ -128,7 +169,12 @@ public sealed class UpdateProxyShopService(
         if (destination is { } existing &&
             (existing.ItemId != packet.SellItemIndex || !isStackable ||
              existing.Quantity + packet.Quantity > GroundItemPickupPolicy.MaxStackQuantity))
+        {
+            logger.LogWarning(
+                "Offline-shop purchase rejected: character {CharacterId} destination slot {SelfPage}/{SelfIndex} cannot accept item {ItemId} -- session will be disconnected",
+                characterId, packet.SelfPage, packet.SelfIndex, packet.SellItemIndex);
             return null;
+        }
 
         var finalQuantity = destination is { } d ? d.Quantity + packet.Quantity : packet.Quantity;
         var (enchant, combine, refine, socket) = ItemValueCodec.Decode(packet.Value);
@@ -151,7 +197,11 @@ public sealed class UpdateProxyShopService(
             return BuildReply(2, packet.SelfPage, packet.SelfIndex, null, packet.Socket, 0);
         }
 
-        var response = BuildReply(0, packet.SelfPage, packet.SelfIndex, newStack, packet.Socket, packet.Price);
+        // Result=1000 marks a successful PURCHASE, distinct from RETRIEVE's Result=0 above -- the same
+        // legacy asymmetry OpenShopStall already preserves via its personal/proxy 0-vs-100 split. If the
+        // legacy client branches its UI/state handling on the specific success code (as it does there), a
+        // purchase misreported as Result=0 would be misinterpreted client-side as a retrieval.
+        var response = BuildReply(1000, packet.SelfPage, packet.SelfIndex, newStack, packet.Socket, packet.Price);
 
         // Logged only once ExecutePurchaseAsync above has durably committed -- ShopMoneyAfter/BigMoneyAfter
         // re-read fresh from the seller's shop row so this audit row reflects the actual post-credit balance
@@ -176,6 +226,10 @@ public sealed class UpdateProxyShopService(
             logger.LogError(
                 "Zone {MapId} inventory inbox full: dropped offline-shop purchase mirror for character {CharacterId}",
                 zone.MapId, characterId);
+
+        logger.LogInformation(
+            "Offline-shop purchase completed: buyer {BuyerId} bought item {ItemId} x{Quantity} from seller {SellerId} for {Price}",
+            characterId, packet.SellItemIndex, packet.Quantity, sellerId.Value, packet.Price);
 
         return response;
     }

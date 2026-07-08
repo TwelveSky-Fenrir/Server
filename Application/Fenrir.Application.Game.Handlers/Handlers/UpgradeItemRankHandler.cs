@@ -3,6 +3,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers;
 
@@ -11,7 +12,9 @@ namespace Fenrir.Application.Game.Handlers.Handlers;
 ///     <see cref="IUpgradeItemRankService" />). Cost is charged and the material consumed on both success and
 ///     roll-failure; only a missing replacement candidate (Result=2) skips both.
 /// </summary>
-public sealed class UpgradeItemRankHandler(IUpgradeItemRankService upgradeItemRankService)
+public sealed class UpgradeItemRankHandler(
+    IUpgradeItemRankService upgradeItemRankService,
+    ILogger<UpgradeItemRankHandler> logger)
     : IAsyncPacketHandler<UpgradeItemRankRequest>
 {
     public async ValueTask HandleAsync(UpgradeItemRankRequest packet, IPacketSession session,
@@ -20,9 +23,19 @@ public sealed class UpgradeItemRankHandler(IUpgradeItemRankService upgradeItemRa
         var zoneSession = (ZoneClientSession)session;
         var characterId = zoneSession.CharacterId!.Value;
 
+        if (logger.IsEnabled(LogLevel.Debug))
+            logger.LogDebug(
+                "Session {SessionId} character {CharacterId}: UpgradeItemRankRequest received ({Page1}:{Index1} + {Page2}:{Index2})",
+                zoneSession.SessionId, characterId, packet.Page1, packet.Index1, packet.Page2, packet.Index2);
+
         if (zoneSession.CurrentZone is not Zone zone || !zone.TryGetPlayer(characterId, out var state) ||
             state is null)
+        {
+            logger.LogDebug(
+                "Session {SessionId} character {CharacterId}: UpgradeItemRankRequest dropped, no live zone/player state",
+                zoneSession.SessionId, characterId);
             return;
+        }
 
         await state.EconomyActionLock.WaitAsync(cancellationToken);
         try

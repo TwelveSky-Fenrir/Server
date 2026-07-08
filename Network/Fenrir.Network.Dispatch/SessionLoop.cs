@@ -102,6 +102,33 @@ public static class SessionLoop
         }
         finally
         {
+            // Every normal break path above already calls session.Abort(reason) before breaking (decode
+            // violation/state violation/rate limit/client FIN), and the IsCanceled break path only runs after
+            // some external caller's own Abort(reason) already ran (idle-liveness sweep, slow-consumer
+            // detector, IP flood guard, account-session eviction, GM ban, ...) -- collectively around 150
+            // Abort call sites across Login/Game Handlers, Services, and Domain, most of which have no
+            // dedicated log line of their own today. Logging the resulting DisconnectReason once, here,
+            // rather than relying on every one of those call sites to also remember to log, gives every
+            // connection's ending a guaranteed, structured entry -- the same "structural, not incidental"
+            // reasoning ClientSession.LogSessionStateChanged already applies to session-state transitions.
+            // Deliberately Information, not Debug: this fires at most once per connection's whole lifetime,
+            // exactly the kind of infrequent, high-signal event an operator watching live logs wants visible
+            // by default.
+            if (session.DisconnectReason is { } reason)
+                logger?.LogInformation(
+                    "Session {SessionId} ({Server}, {RemoteEndPoint}): connection loop ended, disconnect reason {DisconnectReason}",
+                    session.SessionId, session.Server, session.RemoteEndPoint, reason);
+            else
+                // DisconnectReason is null only when the loop ended via an external CancellationToken (server
+                // shutdown) with no session.Abort() call, or when an uncaught transport exception is about to
+                // propagate out of this method to the connection host's own TransportFaultClassifier-gated log
+                // (GameConnectionHost/LoginConnectionHost's OnAcceptedAsync catch block) -- both already
+                // produce their own signal one layer up, so this stays at Debug rather than a second, less-
+                // specific Information line duplicating whatever the host is about to log.
+                logger?.LogDebug(
+                    "Session {SessionId} ({Server}, {RemoteEndPoint}): connection loop ended without an explicit disconnect reason",
+                    session.SessionId, session.Server, session.RemoteEndPoint);
+
             await session.CompleteAsync().ConfigureAwait(false);
         }
     }
@@ -195,8 +222,20 @@ public static class SessionLoop
 
             try
             {
+                // Same gating rationale as decodeStartTimestamp above: only captured when Debug is enabled, so
+                // a disabled logger never pays for the Stopwatch call on this per-frame hot path.
+                var dispatchStartTimestamp = debugEnabled ? Stopwatch.GetTimestamp() : 0L;
+
                 await dispatcher.DispatchAsync(frameServer, frameOpcode, framePayload, session, cancellationToken)
                     .ConfigureAwait(false);
+
+                if (debugEnabled)
+                    // See PacketLog.PacketDispatched's own remarks for why this is the finest dispatch-timing
+                    // granularity available here (no observable seam between handler resolution and invocation
+                    // inside the generated MessageDispatcher switch) and why it deliberately only fires for a
+                    // frame that both resolved a handler AND ran it to completion without throwing.
+                    logger!.PacketDispatched(session.SessionId, frameServer, frameOpcode,
+                        Stopwatch.GetElapsedTime(dispatchStartTimestamp).TotalMicroseconds);
 
                 // Liveness signal for the per-server idle-session sweep (session.LastActivityUtc's own
                 // remarks) -- stamped only once a frame clears every prior gate (decode/state/rate-limit) AND

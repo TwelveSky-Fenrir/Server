@@ -3,6 +3,7 @@ using Fenrir.Application.Game.Domain.Social.Pshop;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Commerce;
 
@@ -17,7 +18,11 @@ namespace Fenrir.Application.Game.Services.Commerce;
 ///     (<see cref="IsMatch" />'s default branch, S04_MyWork02.cpp:6681-6909's own default-inclusion rule) --
 ///     it is genuinely excluded only from a search with an explicit, non-ALL category filter. The legacy
 ///     catch-all "other" category code itself is not modeled (no citation available), so that one specific
-///     explicit-filter case still under-approximates.
+///     explicit-filter case still under-approximates. The one exception to this default-inclusion behavior
+///     is <see cref="ExcludedRawSort" /> (raw <c>iSort</c> 3): the legacy switch's arm for that value is an
+///     empty <c>break</c> performing no inclusion check at all, so it is excluded unconditionally, even from
+///     an unfiltered "show all" query -- <see cref="IsMatch" /> special-cases it ahead of the
+///     default-inclusion fallback rather than letting it fall through.
 ///     <para>
 ///         Both listing pools are aggregated, matching the legacy's own two-part union
 ///         (S04_MyWork02.cpp:6523-6558 proxy, :6559-6585 personal): every currently open proxy/deputy shop
@@ -28,8 +33,8 @@ namespace Fenrir.Application.Game.Services.Commerce;
 ///         deliberate legacy asymmetry, not a bug).
 ///     </para>
 /// </remarks>
-public sealed class SearchShopListingsService(WorldDataCache worldData, IOfflineShopRepository offlineShops)
-    : ISearchShopListingsService
+public sealed class SearchShopListingsService(WorldDataCache worldData, IOfflineShopRepository offlineShops,
+    ILogger<SearchShopListingsService> logger) : ISearchShopListingsService
 {
     private const int TypeAll = 0;
     private const int TypeCommon = 1;
@@ -37,6 +42,17 @@ public sealed class SearchShopListingsService(WorldDataCache worldData, IOffline
     private const int TypeRare = 3;
     private const int SortAll = 0;
     private const int MaxResults = 1000;
+
+    /// <summary>
+    ///     tITEM_INFO-&gt;iSort raw value that is unconditionally excluded from every search result
+    ///     regardless of the requested filters -- the legacy <c>switch (tITEM_INFO-&gt;iSort)</c> arm for
+    ///     this value is an empty <c>break</c> with no <c>CHK_SELL_TYPE</c>/inclusion check at all
+    ///     (S04_MyWork02.cpp:6636-6639, directly confirmed). This is a raw item-info sort value, numerically
+    ///     unrelated to the classified <c>PROXY_ITEM_SORT</c> category constant <c>EPSORT_CLOAK</c> (also
+    ///     3, S04_MyWork02.cpp:6456) that <see cref="SortToCategory" /> assigns to raw sorts 8 and 29 --
+    ///     the two "3"s live in different enums and only collide numerically by coincidence.
+    /// </summary>
+    private const byte ExcludedRawSort = 3;
 
     /// <summary>tITEM_INFO->iSort -> PROXY_ITEM_SORT category (S04_MyWork02.cpp:6636-6679).</summary>
     private static readonly Dictionary<byte, int> SortToCategory = new()
@@ -65,7 +81,12 @@ public sealed class SearchShopListingsService(WorldDataCache worldData, IOffline
         foreach (var row in proxyListings)
         {
             if (results.Count >= MaxResults)
+            {
+                logger.LogDebug(
+                    "Search shop listings: result cap ({MaxResults}) reached while scanning proxy listings",
+                    MaxResults);
                 return results;
+            }
 
             if (!worldData.ItemsById.TryGetValue(row.ItemId, out var itemDefinition) ||
                 !IsMatch(packet.Sort1, packet.Sort2, itemDefinition))
@@ -94,7 +115,12 @@ public sealed class SearchShopListingsService(WorldDataCache worldData, IOffline
         foreach (var seller in zone.Players)
         {
             if (results.Count >= MaxResults)
+            {
+                logger.LogDebug(
+                    "Search shop listings: result cap ({MaxResults}) reached while scanning live personal shops",
+                    MaxResults);
                 return results;
+            }
 
             if (!seller.PshopOpen || seller.PshopListing is not { } listing)
                 continue;
@@ -136,9 +162,15 @@ public sealed class SearchShopListingsService(WorldDataCache worldData, IOffline
     ///     default-inclusion rule for an item neither classification pass resolves
     ///     (S04_MyWork02.cpp:6681-6909): still included under an unfiltered "show all" query. See this
     ///     type's own remarks for the one remaining gap (the numeric "other" catch-all category code).
+    ///     <see cref="ExcludedRawSort" /> is checked first and short-circuits both the classification and
+    ///     the default-inclusion fallback, matching the legacy switch's own empty-<c>break</c> arm for that
+    ///     raw sort value (S04_MyWork02.cpp:6638-6639).
     /// </summary>
     private static bool IsMatch(int sort1, int sort2, ItemDefinition itemDefinition)
     {
+        if (itemDefinition.Item.Sort == ExcludedRawSort)
+            return false;
+
         if (SortToCategory.TryGetValue(itemDefinition.Item.Sort, out var category))
             return Matches(sort1, sort2, category, itemDefinition.Item.Type);
 

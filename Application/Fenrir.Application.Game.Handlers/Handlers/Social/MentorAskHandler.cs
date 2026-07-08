@@ -3,15 +3,20 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
 /// <summary>CZ_TEACHER_ASK_SEND (opcode 59) -- sender becomes master (MG5ORIGIN branch, active in this build).</summary>
-public sealed class MentorAskHandler(IMentorAskService mentorAskService) : IInlinePacketHandler<MentorRequest>
+public sealed class MentorAskHandler(IMentorAskService mentorAskService, ILogger<MentorAskHandler> logger)
+    : IInlinePacketHandler<MentorRequest>
 {
     public void Handle(in MentorRequest packet, IPacketSession session)
     {
         var zoneSession = (ZoneClientSession)session;
+
+        logger.LogDebug("MentorAsk: session {SessionId} character {CharacterId} target {TargetAvatarName}",
+            session.SessionId, zoneSession.CharacterId, packet.AvatarName);
 
         if (zoneSession.CurrentZone is not Zone zone)
             return;

@@ -4,6 +4,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers;
 
@@ -12,7 +13,8 @@ namespace Fenrir.Application.Game.Handlers.Handlers;
 ///     switch exactly -- see <see cref="CostumeStateResolver" />'s remarks for why Select/Equip/Remove/
 ///     ReturnToInventorySuccess never actually fire against today's always-empty wardrobe.
 /// </summary>
-public sealed class CostumeStateHandler(ICostumeStateService service) : IAsyncPacketHandler<CostumeStateRequest>
+public sealed class CostumeStateHandler(ICostumeStateService service, ILogger<CostumeStateHandler> logger)
+    : IAsyncPacketHandler<CostumeStateRequest>
 {
     public async ValueTask HandleAsync(CostumeStateRequest packet, IPacketSession session,
         CancellationToken cancellationToken)
@@ -20,6 +22,10 @@ public sealed class CostumeStateHandler(ICostumeStateService service) : IAsyncPa
         var zoneSession = (ZoneClientSession)session;
         var characterId = zoneSession.CharacterId!.Value;
         var accountId = zoneSession.AccountId!.Value;
+
+        logger.LogDebug(
+            "Session {SessionId}: CostumeStateRequest (op90) received for character {CharacterId}, sort {Sort} value {Value}",
+            session.SessionId, characterId, packet.Sort, packet.Value);
 
         if (zoneSession.CurrentZone is not Zone zone || !zone.TryGetPlayer(characterId, out var state) ||
             state is null)
@@ -37,6 +43,9 @@ public sealed class CostumeStateHandler(ICostumeStateService service) : IAsyncPa
                     return;
 
                 case CostumeStateOutcome.Disconnect:
+                    logger.LogWarning(
+                        "Costume-state rejected for character {CharacterId}: sort {Sort} value {Value} -- aborting session",
+                        characterId, packet.Sort, packet.Value);
                     zoneSession.Abort(DisconnectReason.Faulted);
                     return;
 

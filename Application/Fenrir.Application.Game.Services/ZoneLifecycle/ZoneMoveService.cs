@@ -34,14 +34,27 @@ public sealed class ZoneMoveService(
         var characterId = zoneSession.CharacterId!.Value;
 
         if (zoneSession.CurrentZone is not Zone sourceZone)
+        {
+            logger.LogWarning(
+                "Zone-move rejected for character {CharacterId}: session has no current zone",
+                characterId);
             return ValueTask.CompletedTask;
+        }
 
         // Same zone requested -- silent ignore, matching the legacy's bare return (no response at all).
         if (packet.ZoneNumber == sourceZone.MapId)
+        {
+            logger.LogDebug(
+                "Zone-move ignored for character {CharacterId}: target zone {TargetZoneNumber} is already the current zone",
+                characterId, packet.ZoneNumber);
             return ValueTask.CompletedTask;
+        }
 
         if (packet.ZoneNumber is < 1 or >= 350 || packet.PresentZoneNumber != sourceZone.MapId)
         {
+            logger.LogWarning(
+                "Zone-move aborted for character {CharacterId}: malformed target zone {TargetZoneNumber} or present-zone mismatch (claimed {ClaimedPresentZone}, actual {ActualPresentZone})",
+                characterId, packet.ZoneNumber, packet.PresentZoneNumber, sourceZone.MapId);
             zoneSession.Abort(DisconnectReason.Faulted);
             return ValueTask.CompletedTask;
         }
@@ -49,12 +62,18 @@ public sealed class ZoneMoveService(
         // Sort==2 (GM transfer) requires GM rank, which Fenrir has no concept of yet -- always rejected.
         if (packet.Sort == 2)
         {
+            logger.LogWarning(
+                "Zone-move aborted for character {CharacterId}: GM transfer (sort 2) requested but GM rank is not modeled",
+                characterId);
             zoneSession.Abort(DisconnectReason.Faulted);
             return ValueTask.CompletedTask;
         }
 
         if (packet.Sort is < 2 or > 12)
         {
+            logger.LogWarning(
+                "Zone-move aborted for character {CharacterId}: malformed sort {Sort}",
+                characterId, packet.Sort);
             zoneSession.Abort(DisconnectReason.Faulted);
             return ValueTask.CompletedTask;
         }
@@ -75,6 +94,9 @@ public sealed class ZoneMoveService(
         if (TribeSymbolBattleZoneLockout.IsLockedOut(sourceZone.MapId, targetZoneNumber,
                 worldState.World.TribeSymbolBattle))
         {
+            logger.LogWarning(
+                "Zone-move aborted for character {CharacterId}: tribe-symbol-battle zone lockout ({SourceMapId} -> {TargetZoneNumber})",
+                characterId, sourceZone.MapId, targetZoneNumber);
             zoneSession.Abort(DisconnectReason.StateViolation);
             return ValueTask.CompletedTask;
         }
@@ -101,7 +123,12 @@ public sealed class ZoneMoveService(
         // Narrow race: the source zone's own tick already removed this player between the CurrentZone read
         // above and this lookup (disconnect/another handoff) -- nothing to transfer.
         if (!sourceZone.TryGetPlayer(characterId, out var state) || state is null)
+        {
+            logger.LogDebug(
+                "Zone-move ignored for character {CharacterId}: no longer present in source zone {SourceMapId} (narrow race)",
+                characterId, sourceZone.MapId);
             return ValueTask.CompletedTask;
+        }
 
         // mProtect_ReviveHack companion check (S04_MyWork02.cpp:2017-2064): a session still flagged from an
         // unresolved death is kicked outright on any zone-transfer attempt, unless the destination is zone 38
@@ -111,6 +138,9 @@ public sealed class ZoneMoveService(
             !ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(sourceZone.MapId, targetZoneNumber, state.Tribe,
                 worldState.GetAllyOf))
         {
+            logger.LogWarning(
+                "Zone-move aborted for character {CharacterId}: revive-hack flag set, transfer {SourceMapId} -> {TargetZoneNumber} not allowed while flagged",
+                characterId, sourceZone.MapId, targetZoneNumber);
             zoneSession.Abort(DisconnectReason.StateViolation);
             return ValueTask.CompletedTask;
         }
@@ -137,6 +167,9 @@ public sealed class ZoneMoveService(
             case TribeGuardCorridorMoveOutcome.RejectedHardDisconnect:
                 // Reserved zone 37 involved as either origin or destination -- hard failure, no response at all
                 // (Server/ts25zone/S04_MyWork02.cpp:2152-2156).
+                logger.LogWarning(
+                    "Zone-move aborted for character {CharacterId}: tribe-guard corridor hard-disconnect ({SourceMapId} -> {TargetZoneNumber})",
+                    characterId, sourceZone.MapId, targetZoneNumber);
                 zoneSession.Abort(DisconnectReason.StateViolation);
                 return ValueTask.CompletedTask;
             case TribeGuardCorridorMoveOutcome.RejectedSoft:
@@ -148,6 +181,9 @@ public sealed class ZoneMoveService(
                 // 2116-2118, 2159-2160) -- this corridor branch is only reached once zones.TryGet above has
                 // already confirmed targetZoneNumber is hosted by THIS shard, so that resolved address is this
                 // shard's own PublicHost/Port, identical to the success-path values sent a few lines below.
+                logger.LogWarning(
+                    "Zone-move redirected to auto-zone for character {CharacterId}: tribe-guard corridor rejected {SourceMapId} -> {TargetZoneNumber}",
+                    characterId, sourceZone.MapId, targetZoneNumber);
                 zoneSession.Send(new ZoneMoveResponse
                 {
                     Result = 1,
@@ -163,6 +199,10 @@ public sealed class ZoneMoveService(
             ? (targetDefinition.Zone.DefaultSpawnX, targetDefinition.Zone.DefaultSpawnY,
                 targetDefinition.Zone.DefaultSpawnZ)
             : (spawnPoint.PosX, spawnPoint.PosY, spawnPoint.PosZ);
+
+        logger.LogInformation(
+            "Character {CharacterId} transferring same-shard: {SourceMapId} -> {TargetMapId} (sort {Sort})",
+            characterId, sourceZone.MapId, targetZoneNumber, packet.Sort);
 
         zoneSession.Send(new ZoneMoveResponse
         {

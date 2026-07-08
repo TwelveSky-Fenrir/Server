@@ -6,6 +6,7 @@ using Fenrir.Application.Game.Domain.Pets;
 using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.Quests;
 using Fenrir.Application.Game.Domain.Skills;
+using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.World.Monsters;
 using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Stats;
@@ -56,6 +57,29 @@ public sealed partial class Zone
     ///     jump plus the post-grant stat/skill point totals, never one send per level crossed.
     /// </summary>
     private const int LevelUpAvatarChangeInfoSort = 1;
+
+    /// <summary>
+    ///     QuestProgressResponse.Sort marker for the archetype-1 (kill-monster) SOLO kill-credit push to the
+    ///     killer's own client only -- never used for the party-relay case, see
+    ///     <see cref="QuestKillCreditRelayOrArchetype5Sort" /> for that asymmetry.
+    /// </summary>
+    /// <remarks>
+    ///     Réf. C++ : Server/ts25zone/S07_MyGame02.cpp:2493-2504.
+    /// </remarks>
+    private const int QuestKillCreditArchetype1SoloSort = 6;
+
+    /// <summary>
+    ///     QuestProgressResponse.Sort marker shared by two distinct cases per the source contract's own
+    ///     "asymmetry ... is exactly what the cited code does" note: the archetype-1 (kill-monster) PARTY-RELAY
+    ///     credit, and BOTH the solo and party-relay archetype-5 (kill-captain) credit (archetype 5's own,
+    ///     non-relayed credit intentionally reuses this marker instead of
+    ///     <see cref="QuestKillCreditArchetype1SoloSort" />).
+    /// </summary>
+    /// <remarks>
+    ///     Réf. C++ : Server/ts25zone/S07_MyGame02.cpp:2507-2552 (archetype-1 party relay loop), 2555-2564
+    ///     (archetype-5 solo credit), 2567-2611 (archetype-5 party relay loop).
+    /// </remarks>
+    private const int QuestKillCreditRelayOrArchetype5Sort = 8;
 
     /// <summary>
     ///     Bounded capacity for <see cref="_combatInbox" /> -- also the basis for
@@ -1087,16 +1111,66 @@ public sealed partial class Zone
 
     /// <summary>
     ///     Quest kill-hook alongside <see cref="GrantMonsterKillExperience" />, from the same kill. Increments
-    ///     <see cref="PlayerRuntimeState.QuestKillCounter" /> by 1 when the killer's active quest is qSort 1 or
-    ///     5 and <paramref name="monsterId" /> matches <see cref="PlayerRuntimeState.QuestTargetPhase" />, but
-    ///     only while the counter is still below its target (qSort 1: below Solution2; qSort 5: still 0) --
-    ///     this is the clamp, not an unbounded increment. Party propagation is not modeled here.
+    ///     <see cref="PlayerRuntimeState.QuestKillCounter" /> by 1 -- for the killer, then independently once
+    ///     per OTHER qualifying member of <paramref name="partyMemberIds" /> -- whenever that player's own
+    ///     active quest is qSort 1 or 5 and <paramref name="monsterId" /> matches their own
+    ///     <see cref="PlayerRuntimeState.QuestTargetPhase" />, but only while their own counter is still below
+    ///     its target (qSort 1: below Solution2; qSort 5: still 0) -- this is the clamp, not an unbounded
+    ///     increment. Each qualifying credit also pushes a unicast <see cref="QuestProgressResponse" /> to that
+    ///     player's own client (destination-slot fields always zero, they carry no meaning for this push) --
+    ///     see <see cref="QuestKillCreditArchetype1SoloSort" />/<see cref="QuestKillCreditRelayOrArchetype5Sort" />
+    ///     for which marker each case sends.
     /// </summary>
-    public void ApplyQuestKillProgress(int killerCharacterId, int monsterId)
+    /// <param name="killerCharacterId">The character whose attack actually killed the monster.</param>
+    /// <param name="monsterId">The killed monster's definition id.</param>
+    /// <param name="partyMemberIds">
+    ///     Killer's full party roster (leader first, killer included), or null/empty for solo -- same shape
+    ///     <see cref="GrantMonsterKillExperience" /> already takes from <c>MonsterSpawnScheduler.ProcessDeath</c>.
+    ///     The killer's own id is skipped in this loop (already credited above); every other member is checked
+    ///     entirely independently against their own quest state -- a member with a different archetype/target,
+    ///     or already at their own clamp, gets no credit and no push, matching "the same credit relayed ... who
+    ///     independently has the same archetype/target active." <see cref="PlayerRuntimeState.IsMovingZone" />
+    ///     (cross-shard zone transfer in flight) and <see cref="PlayerRuntimeState.IsDead" /> members are
+    ///     skipped, matching the source contract's "non-dead, non-zone-transferring" wording -- same gate
+    ///     ordering as <see cref="Monsters.MonsterAiSystem" />'s own detection loop. "Hiding" is not modeled in
+    ///     Fenrir yet (same documented gap as that loop) so it is not filtered on here either. Party-name
+    ///     equality matching is collapsed onto <see cref="PartyRegistry" /> membership -- already the Fenrir
+    ///     analog of legacy's shared party-name identity, see <see cref="PartyIdentityResolver" />'s own
+    ///     remarks -- rather than independently re-deriving a name comparison here.
+    /// </param>
+    /// <remarks>
+    ///     Réf. C++ : Server/ts25zone/S07_MyGame02.cpp:2493-2504 (archetype-1 solo credit), 2507-2552
+    ///     (archetype-1 party relay loop), 2555-2564 (archetype-5 solo credit), 2567-2611 (archetype-5 party
+    ///     relay loop).
+    /// </remarks>
+    public void ApplyQuestKillProgress(int killerCharacterId, int monsterId,
+        IReadOnlyList<int>? partyMemberIds = null)
     {
-        if (!_players.TryGetValue(killerCharacterId, out var state))
+        if (_players.TryGetValue(killerCharacterId, out var killerState))
+            ApplyQuestKillProgressToOne(killerState, monsterId, isPartyRelay: false);
+
+        if (partyMemberIds is not { Count: > 0 })
             return;
 
+        foreach (var memberId in partyMemberIds)
+        {
+            if (memberId == killerCharacterId)
+                continue;
+            if (!_players.TryGetValue(memberId, out var memberState) || memberState.IsMovingZone ||
+                memberState.IsDead)
+                continue;
+
+            ApplyQuestKillProgressToOne(memberState, monsterId, isPartyRelay: true);
+        }
+    }
+
+    /// <summary>
+    ///     One player's own independent kill-credit check-and-notify -- shared by the killer and every party
+    ///     relay recipient in <see cref="ApplyQuestKillProgress" />, see that method's own remarks for the
+    ///     citations and the marker asymmetry <paramref name="isPartyRelay" /> selects between.
+    /// </summary>
+    private void ApplyQuestKillProgressToOne(PlayerRuntimeState state, int monsterId, bool isPartyRelay)
+    {
         if (state.QuestActiveFlag != 1 || state.QuestTargetPhase != monsterId)
             return;
 
@@ -1110,6 +1184,14 @@ public sealed partial class Zone
                 {
                     state.QuestKillCounter++;
                     state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
+                    state.Session.Send(new QuestProgressResponse
+                    {
+                        Sort = isPartyRelay ? QuestKillCreditRelayOrArchetype5Sort : QuestKillCreditArchetype1SoloSort,
+                        Page = 0,
+                        Index = 0,
+                        XPost = 0,
+                        YPost = 0
+                    });
                 }
 
                 break;
@@ -1118,6 +1200,10 @@ public sealed partial class Zone
                 {
                     state.QuestKillCounter++;
                     state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
+                    state.Session.Send(new QuestProgressResponse
+                    {
+                        Sort = QuestKillCreditRelayOrArchetype5Sort, Page = 0, Index = 0, XPost = 0, YPost = 0
+                    });
                 }
 
                 break;

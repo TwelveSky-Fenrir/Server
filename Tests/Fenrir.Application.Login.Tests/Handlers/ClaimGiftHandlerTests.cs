@@ -14,7 +14,8 @@ public class ClWantGiftSendHandlerTests
     public async Task HandleAsync_IndexWithinPendingList_ClaimsThatGiftAndRepliesResultZero()
     {
         var gifts = FakeGiftRepository.WithPending((501, 1211), (502, 99700));
-        var handler = new ClaimGiftHandler(new ClaimGiftService(gifts, NullLogger<ClaimGiftService>.Instance));
+        var handler = new ClaimGiftHandler(new ClaimGiftService(gifts, NullLogger<ClaimGiftService>.Instance),
+            NullLogger<ClaimGiftHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
 
         await handler.HandleAsync(new ClaimGiftRequest { Sort = 0, GiftInfoIndex = 1 }, session,
@@ -29,7 +30,8 @@ public class ClWantGiftSendHandlerTests
     public async Task HandleAsync_IndexBeyondPendingList_RepliesResultOneWithoutClaiming()
     {
         var gifts = FakeGiftRepository.WithPending((501, 1211));
-        var handler = new ClaimGiftHandler(new ClaimGiftService(gifts, NullLogger<ClaimGiftService>.Instance));
+        var handler = new ClaimGiftHandler(new ClaimGiftService(gifts, NullLogger<ClaimGiftService>.Instance),
+            NullLogger<ClaimGiftHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
 
         await handler.HandleAsync(new ClaimGiftRequest { Sort = 0, GiftInfoIndex = 5 }, session,
@@ -43,7 +45,8 @@ public class ClWantGiftSendHandlerTests
     public async Task HandleAsync_NoPendingGifts_RepliesResultOne()
     {
         var gifts = FakeGiftRepository.Empty();
-        var handler = new ClaimGiftHandler(new ClaimGiftService(gifts, NullLogger<ClaimGiftService>.Instance));
+        var handler = new ClaimGiftHandler(new ClaimGiftService(gifts, NullLogger<ClaimGiftService>.Instance),
+            NullLogger<ClaimGiftHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
 
         await handler.HandleAsync(new ClaimGiftRequest { Sort = 0, GiftInfoIndex = 0 }, session,
@@ -56,7 +59,8 @@ public class ClWantGiftSendHandlerTests
     public async Task HandleAsync_ClaimThrows_RepliesResultTwoWithoutDisconnecting()
     {
         var gifts = FakeGiftRepository.ThrowingOnClaim(new InvalidOperationException("vault full"), (501, 1211));
-        var handler = new ClaimGiftHandler(new ClaimGiftService(gifts, NullLogger<ClaimGiftService>.Instance));
+        var handler = new ClaimGiftHandler(new ClaimGiftService(gifts, NullLogger<ClaimGiftService>.Instance),
+            NullLogger<ClaimGiftHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
 
         await handler.HandleAsync(new ClaimGiftRequest { Sort = 0, GiftInfoIndex = 0 }, session,
@@ -72,7 +76,8 @@ public class ClWantGiftSendHandlerTests
     public async Task HandleAsync_IndexOutOfRange_AbortsAsMalformed(int index)
     {
         var gifts = FakeGiftRepository.Empty();
-        var handler = new ClaimGiftHandler(new ClaimGiftService(gifts, NullLogger<ClaimGiftService>.Instance));
+        var handler = new ClaimGiftHandler(new ClaimGiftService(gifts, NullLogger<ClaimGiftService>.Instance),
+            NullLogger<ClaimGiftHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
 
         await handler.HandleAsync(new ClaimGiftRequest { Sort = 0, GiftInfoIndex = index }, session,

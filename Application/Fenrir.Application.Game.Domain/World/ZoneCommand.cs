@@ -31,7 +31,18 @@ public enum ZoneCommandKind : byte
     ///     (<c>Application/Fenrir.Application.Game.Hosting</c>) from its own background-timer thread, once per
     ///     poll interval, for every online character whose batch-refreshed mute status changed.
     /// </summary>
-    SetMuted
+    SetMuted,
+
+    /// <summary>
+    ///     War Conclusion daily-mission "join war" credit and archetype-8 waterfall-quest step credit -- see
+    ///     <see cref="Zone.HandleRegularWarConclusionCredit" />'s own remarks for the full behavior and
+    ///     citation. Posted once per still-tracked, non-zone-transferring character present in the map at
+    ///     Regular War (Zone049) conclusion by
+    ///     <see cref="Fenrir.Application.Game.Hosting.World.ZoneWar.RegularWarSchedulerHost" />, from that
+    ///     host's own background-timer thread -- same single-writer-preserving posture as
+    ///     <see cref="MarkZoneTransferPending" />/<see cref="SetMuted" />.
+    /// </summary>
+    CreditRegularWarConclusion
 }
 
 /// <summary>
@@ -117,6 +128,12 @@ public readonly struct ZoneCommand
     public static ZoneCommand SetMuted(int characterId, bool muted)
     {
         return new ZoneCommand { Kind = ZoneCommandKind.SetMuted, CharacterId = characterId, Muted = muted };
+    }
+
+    /// <summary>See <see cref="ZoneCommandKind.CreditRegularWarConclusion" />'s own remarks.</summary>
+    public static ZoneCommand CreditRegularWarConclusion(int characterId)
+    {
+        return new ZoneCommand { Kind = ZoneCommandKind.CreditRegularWarConclusion, CharacterId = characterId };
     }
 }
 

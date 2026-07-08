@@ -225,10 +225,14 @@ public interface ICharacterRepository
     public ValueTask<int> AdjustDeathProtectionAsync(int characterId, int delta, CancellationToken ct);
 
     /// <summary>
-    ///     game.Characters.Zone241Time -- the "aZone241Time" counter (Migrations/041_character_rebirth_zone241_time.sql
-    ///     for the column's own citation). First durable consumer is the legacy-behavior-translator
+    ///     game.Characters.Zone241Time -- the "aZone241Time" counter (Database/Tables/game/Characters.sql's own
+    ///     column comment for the column's citation). First durable consumer is the legacy-behavior-translator
     ///     Rebirth-advancement contract's Path B ("Max Rebirth", CZ_TRIBE_WORK_SEND tSort 11), whose legacy
-    ///     success branch does <c>aZone241Time += 10</c> (Server/ts25zone/S04_MyWork02.cpp:11342-11390). Same
+    ///     success branch does <c>aZone241Time += 10</c> (Server/ts25zone/S04_MyWork02.cpp:11342-11390). Second
+    ///     consumer is the quest-and-daily-systems contract's DailyMission-claim behavior ("Claim", opcode 126)
+    ///     side effect 5, whose legacy success branch does <c>aZone241Time += 1</c> when the avatar is exactly
+    ///     at the second-tier level cap (Server/ts25zone/S04_MyWork02.cpp:14538-14606,14611-14618) --
+    ///     <c>DailyMissionService.ClaimAsync</c>'s own <c>GrantSecondTierZone241TimeBonusAsync</c>. Same
     ///     forward-compat <paramref name="delta" />-sign posture as <see cref="AdjustDeathProtectionAsync" />/
     ///     <see cref="GrantTribeTransferPermitAsync" /> -- this is a dumb delta-adjust primitive; whether an
     ///     increment should be applied unconditionally on passing preconditions (the legacy's own quirk) or

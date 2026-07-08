@@ -31,7 +31,7 @@ public class GetCashCatalogServiceTests
     public async Task GetCatalog_ReturnsTheLiveCacheVersionAndDisplayGrid()
     {
         var cache = await CacheAtVersionAsync(9);
-        var service = new GetCashCatalogService(cache);
+        var service = new GetCashCatalogService(cache, NullLogger<GetCashCatalogService>.Instance);
 
         var response = service.GetCatalog(null);
 
@@ -44,7 +44,7 @@ public class GetCashCatalogServiceTests
     public async Task GetCatalog_WithAResolvedPlayer_RecordsTheReturnedVersionOntoTheSession()
     {
         var cache = await CacheAtVersionAsync(9);
-        var service = new GetCashCatalogService(cache);
+        var service = new GetCashCatalogService(cache, NullLogger<GetCashCatalogService>.Instance);
         var (zone, state) = SetUpPlayer();
 
         service.GetCatalog(state);
@@ -57,7 +57,7 @@ public class GetCashCatalogServiceTests
     public async Task GetCatalog_WithNoResolvedPlayer_StillReturnsTheCatalog_WithoutThrowing()
     {
         var cache = await CacheAtVersionAsync(9);
-        var service = new GetCashCatalogService(cache);
+        var service = new GetCashCatalogService(cache, NullLogger<GetCashCatalogService>.Instance);
 
         var response = service.GetCatalog(null);
 

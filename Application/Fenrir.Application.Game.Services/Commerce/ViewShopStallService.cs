@@ -2,10 +2,11 @@ using Fenrir.Application.Game.Abstractions.Commerce;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Serialization.Packets.Shared;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Commerce;
 
-public sealed class ViewShopStallService : IViewShopStallService
+public sealed class ViewShopStallService(ILogger<ViewShopStallService> logger) : IViewShopStallService
 {
     // Placeholder for "requester never opened a stall" -- must not be default(PshopInfo): its null
     // Name/arrays can't serialize on the wire.
@@ -26,11 +27,22 @@ public sealed class ViewShopStallService : IViewShopStallService
         var ownListing = requester.PshopListing ?? EmptyPshopInfo;
 
         if (target is null)
+        {
+            logger.LogDebug(
+                "View shop stall: character {RequesterId} target {TargetAvatarName} not found in zone {MapId}",
+                requester.CharacterId, packet.AvatarName, zone.MapId);
             return new ViewShopStallResponse { Result = 1, PshopInfo = ownListing };
+        }
 
         if (!target.PshopOpen || target.PshopListing is not { } listing)
+        {
+            logger.LogDebug("View shop stall: character {RequesterId} target {TargetCharacterId} has no shop open",
+                requester.CharacterId, target.CharacterId);
             return new ViewShopStallResponse { Result = 2, PshopInfo = ownListing };
+        }
 
+        logger.LogDebug("View shop stall: character {RequesterId} viewed target {TargetCharacterId}'s stall",
+            requester.CharacterId, target.CharacterId);
         return new ViewShopStallResponse { Result = 0, PshopInfo = listing };
     }
 }

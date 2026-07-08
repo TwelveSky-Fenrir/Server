@@ -39,6 +39,8 @@ public sealed class StellarCoreStateService(
                 zone.PostStellarCoreCommand(new StellarCoreZoneCommand(characterId,
                     result.NewCoreIndex, result.NewCoreNumber, Life: maxLife, Mana: maxMana,
                     Broadcast: StellarCoreBroadcastKind.Equip));
+                logger.LogInformation("Character {CharacterId} equipped stellar core {CoreNumber} at slot {CoreIndex}",
+                    characterId, result.NewCoreNumber, result.NewCoreIndex);
                 return new StellarCoreStateResult(StellarCoreStateOutcome.Reply);
             }
 
@@ -49,6 +51,8 @@ public sealed class StellarCoreStateService(
                 zone.PostStellarCoreCommand(new StellarCoreZoneCommand(characterId,
                     result.NewCoreIndex, 0, Life: maxLife, Mana: maxMana,
                     Broadcast: StellarCoreBroadcastKind.Remove));
+                logger.LogInformation("Character {CharacterId} removed stellar core at slot {CoreIndex}",
+                    characterId, result.NewCoreIndex);
                 return new StellarCoreStateResult(StellarCoreStateOutcome.Reply);
             }
 
@@ -67,11 +71,20 @@ public sealed class StellarCoreStateService(
         int characterId, StellarCoreStateResolver.Result result, CancellationToken cancellationToken)
     {
         if (!worldData.ItemsById.TryGetValue(result.GrantedItemId, out _))
+        {
+            logger.LogWarning(
+                "Stellar-core return-to-inventory denied for character {CharacterId}: unknown item {ItemId}",
+                characterId, result.GrantedItemId);
             return new StellarCoreStateResult(StellarCoreStateOutcome.Reply, 2);
+        }
 
         var freeSlot = FindFreeSlot(state.Inventory);
         if (freeSlot is not { } destination)
+        {
+            logger.LogInformation(
+                "Stellar-core return-to-inventory denied for character {CharacterId}: inventory full", characterId);
             return new StellarCoreStateResult(StellarCoreStateOutcome.Reply, 2);
+        }
 
         var newStack = new ItemStack(result.GrantedItemId, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
         var projectedContainer =
@@ -90,6 +103,10 @@ public sealed class StellarCoreStateService(
             logger.LogError(
                 "Zone {MapId} inventory inbox full: dropped stellar-core-return-to-inventory mirror for character {CharacterId}",
                 zone.MapId, characterId);
+
+        logger.LogInformation(
+            "Character {CharacterId} returned stellar core {ItemId} to inventory container {Container} slot {Slot}",
+            characterId, result.GrantedItemId, destination.Container, destination.Slot);
 
         return new StellarCoreStateResult(StellarCoreStateOutcome.Reply, 0, destination.Container,
             0, 0, result.GrantedItemId);

@@ -68,6 +68,11 @@ public static class FenrirDataServiceCollectionExtensions
         builder.Services.AddSingleton<IGameServerDirectoryRepository, GameServerDirectoryRepository>();
         builder.Services.AddSingleton<ICharacterShardLocationRepository, CharacterShardLocationRepository>();
         builder.Services.AddSingleton<IAccountSessionRepository, AccountSessionRepository>();
+
+        // Cross-shard fan-out for GuildAnnouncement/GuildChat/TribeAnnouncement/TribeAnnouncementScroll --
+        // consumed by GuildTribeBroadcastRelayHost (Fenrir.Application.Game.Hosting), not by *.Services
+        // directly (see IGuildTribeBroadcastRelayQueue's own remarks for that boundary).
+        builder.Services.AddSingleton<IGuildTribeBroadcastRelayRepository, GuildTribeBroadcastRelayRepository>();
         builder.Services.AddSingleton<IShardMapAssignmentRepository, ShardMapAssignmentRepository>();
         builder.Services.AddSingleton<IGameSettingsRepository, GameSettingsRepository>();
         builder.Services.AddSingleton<IServerQuotaRepository, ServerQuotaRepository>();

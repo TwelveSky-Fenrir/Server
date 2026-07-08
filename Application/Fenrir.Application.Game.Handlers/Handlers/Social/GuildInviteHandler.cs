@@ -4,6 +4,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
@@ -24,12 +25,17 @@ namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 ///     wiring a guess at the exact failure-vs-silent-drop semantics/reply code here would risk a wrong wire
 ///     contract, so this remains open and tracked, not guessed at.
 /// </remarks>
-public sealed class GuildInviteHandler(IGuildInviteService guildInviteService)
-    : IInlinePacketHandler<GuildInviteRequest>
+public sealed class GuildInviteHandler(
+    IGuildInviteService guildInviteService,
+    ILogger<GuildInviteHandler>? logger = null) : IInlinePacketHandler<GuildInviteRequest>
 {
     public void Handle(in GuildInviteRequest packet, IPacketSession session)
     {
         var zoneSession = (ZoneClientSession)session;
+
+        logger?.LogDebug(
+            "Session {SessionId}: CZ_GUILD_ASK_SEND received (character {CharacterId}, target {AvatarName})",
+            session.SessionId, zoneSession.CharacterId, packet.AvatarName);
 
         if (zoneSession.CurrentZone is not Zone zone)
             return;

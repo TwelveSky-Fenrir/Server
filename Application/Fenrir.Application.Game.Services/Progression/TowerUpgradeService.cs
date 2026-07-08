@@ -72,6 +72,10 @@ public sealed class TowerUpgradeService(
 
         towerWar.BeginUpgrade(resolved.TowerIndex, resolved.NewPackedState, state.Tribe);
 
+        logger.LogInformation(
+            "Character {CharacterId} armed tower {TowerIndex} upgrade on map {MapId} for tribe {Tribe}",
+            characterId, resolved.TowerIndex, zone.MapId, state.Tribe);
+
         var packedPage = herbPage + 10000 + barPage * 100;
         var packedIndex = herbSlot + 10000 + barSlot * 100;
 

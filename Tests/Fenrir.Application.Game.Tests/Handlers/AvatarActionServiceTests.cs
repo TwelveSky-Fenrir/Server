@@ -3,6 +3,7 @@ using Fenrir.Application.Game.Services.ZoneLifecycle;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Shared;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Handlers;
 
@@ -61,7 +62,7 @@ public class AvatarActionServiceTests
     public void StandUpAction_WhileFlagged_KicksTheSession_AndDoesNotPostTheMove()
     {
         var (zone, session) = SetUp(true);
-        var service = new AvatarActionService();
+        var service = new AvatarActionService(NullLogger<AvatarActionService>.Instance);
 
         var action = Action(30);
         service.PostAction(zone, CharacterId, in action);
@@ -73,7 +74,7 @@ public class AvatarActionServiceTests
     public void StandUpAction_WhileNotFlagged_IsForwardedNormally()
     {
         var (zone, session) = SetUp(false);
-        var service = new AvatarActionService();
+        var service = new AvatarActionService(NullLogger<AvatarActionService>.Instance);
 
         var action = Action(30);
         service.PostAction(zone, CharacterId, in action);
@@ -85,7 +86,7 @@ public class AvatarActionServiceTests
     public void OrdinaryMoveAction_WhileFlagged_IsNotKicked_OnlyStandUpSortIsGated()
     {
         var (zone, session) = SetUp(true);
-        var service = new AvatarActionService();
+        var service = new AvatarActionService(NullLogger<AvatarActionService>.Instance);
 
         var action = Action(0); // ordinary movement, not the stand-up sort
         service.PostAction(zone, CharacterId, in action);

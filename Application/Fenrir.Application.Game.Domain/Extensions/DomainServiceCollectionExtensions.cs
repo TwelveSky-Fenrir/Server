@@ -89,6 +89,12 @@ public static class DomainServiceCollectionExtensions
         // below), so its position relative to every other system here doesn't matter.
         services.AddSingleton<ISimulationSystem, HoisundoCountdownSystem>();
 
+        // Fishing FishingStep 2->3 "bite window arming" server-driven auto transition, zone-52 only --
+        // self-contained (only reads/writes its own PlayerRuntimeState fields and its own MapId gate, and
+        // never broadcasts beyond the affected player's own session), so its position relative to every
+        // other system here doesn't matter.
+        services.AddSingleton<ISimulationSystem, FishingBiteWindowSystem>();
+
         // Active-duel death/departure/180-tick-timeout resolution (DuelMaintenanceSystem) -- reads
         // IsDead/player-presence state that every combat/movement command already settled during this same
         // tick's DrainInbox stage, so ordering relative to the systems above doesn't matter; kept ahead of

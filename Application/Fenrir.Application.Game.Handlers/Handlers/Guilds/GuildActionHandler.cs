@@ -3,6 +3,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Guilds;
 
@@ -21,12 +22,16 @@ namespace Fenrir.Application.Game.Handlers.Handlers.Guilds;
 ///     <see cref="IGuildActionService" />'s implementation), not just the actor (who already gets it
 ///     through this handler's own response send).
 /// </remarks>
-public sealed class GuildActionHandler(IGuildActionService service) : IAsyncPacketHandler<GuildActionRequest>
+public sealed class GuildActionHandler(IGuildActionService service, ILogger<GuildActionHandler>? logger = null)
+    : IAsyncPacketHandler<GuildActionRequest>
 {
     public async ValueTask HandleAsync(GuildActionRequest packet, IPacketSession session,
         CancellationToken cancellationToken)
     {
         var zoneSession = (ZoneClientSession)session;
+
+        logger?.LogDebug("Session {SessionId}: CZ_GUILD_WORK_SEND received (character {CharacterId}, sort {Sort})",
+            session.SessionId, zoneSession.CharacterId, packet.Sort);
 
         if (zoneSession.CurrentZone is not Zone zone)
             return;
@@ -53,61 +58,87 @@ public sealed class GuildActionHandler(IGuildActionService service) : IAsyncPack
         switch (packet.Sort)
         {
             case 1:
-                Respond(session, zoneSession, await service.CreateGuildAsync(packet, zone, state, characterId, ct));
+                Respond(session, zoneSession, characterId, packet.Sort,
+                    await service.CreateGuildAsync(packet, zone, state, characterId, ct));
                 return;
             case 2:
-                Respond(session, zoneSession, await service.GetGuildInfoAsync(state, ct));
+                Respond(session, zoneSession, characterId, packet.Sort, await service.GetGuildInfoAsync(state, ct));
                 return;
             case 3:
-                Respond(session, zoneSession, await service.FinalizeInviteAsync(state, characterId, ct));
+                Respond(session, zoneSession, characterId, packet.Sort,
+                    await service.FinalizeInviteAsync(state, characterId, ct));
                 return;
             case 4:
-                Respond(session, zoneSession, await service.ExitGuildAsync(zone, state, characterId, ct));
+                Respond(session, zoneSession, characterId, packet.Sort,
+                    await service.ExitGuildAsync(zone, state, characterId, ct));
                 return;
             case 5:
-                Respond(session, zoneSession, await service.UpdateGuildNoticeAsync(packet, state, ct));
+                Respond(session, zoneSession, characterId, packet.Sort,
+                    await service.UpdateGuildNoticeAsync(packet, state, ct));
                 return;
             case 6:
-                Respond(session, zoneSession, await service.DisbandGuildAsync(zone, state, characterId, ct));
+                Respond(session, zoneSession, characterId, packet.Sort,
+                    await service.DisbandGuildAsync(zone, state, characterId, ct));
                 return;
             case 7:
-                Respond(session, zoneSession, await service.UpgradeGuildAsync(state, characterId, ct));
+                Respond(session, zoneSession, characterId, packet.Sort,
+                    await service.UpgradeGuildAsync(state, characterId, ct));
                 return;
             case 8:
-                Respond(session, zoneSession, await service.KickMemberAsync(packet, state, ct));
+                Respond(session, zoneSession, characterId, packet.Sort,
+                    await service.KickMemberAsync(packet, state, ct));
                 return;
             case 9:
-                Respond(session, zoneSession, await service.SetAgmRoleAsync(packet, state, ct));
+                Respond(session, zoneSession, characterId, packet.Sort,
+                    await service.SetAgmRoleAsync(packet, state, ct));
                 return;
             case 10:
-                Respond(session, zoneSession, await service.SetMemberTitleAsync(packet, state, ct));
+                Respond(session, zoneSession, characterId, packet.Sort,
+                    await service.SetMemberTitleAsync(packet, state, ct));
                 return;
             case 11:
+                // Dead sub-command: the legacy's own abort call for this sort is unconditional (see class
+                // remarks) -- Debug, not Warning, since an unmodified legacy client can send this too, it is
+                // not itself a sign of a misbehaving/modified client.
+                logger?.LogDebug(
+                    "Character {CharacterId} sent CZ_GUILD_WORK_SEND sort 11 (dead sub-command) -- aborting session {SessionId}",
+                    characterId, session.SessionId);
                 zoneSession.Abort(DisconnectReason.Faulted);
                 return;
             case 12:
             case 13:
                 return;
             case 14:
-                Respond(session, zoneSession, await service.SetGuildBuffAsync(packet, state, ct));
+                Respond(session, zoneSession, characterId, packet.Sort,
+                    await service.SetGuildBuffAsync(packet, state, ct));
                 return;
             case 17:
-                Respond(session, zoneSession,
+                Respond(session, zoneSession, characterId, packet.Sort,
                     await service.TransferLeadershipAsync(packet, zone, state, characterId, ct));
                 return;
             case 1001:
-                Respond(session, zoneSession, await service.SetGuildLogoAsync(packet, state, ct));
+                Respond(session, zoneSession, characterId, packet.Sort,
+                    await service.SetGuildLogoAsync(packet, state, ct));
                 return;
             default:
+                // Unrecognized tSort -- an unmodified legacy client never sends one, so this is worth a
+                // higher-visibility trace than the known-dead sort 11 case above.
+                logger?.LogWarning(
+                    "Character {CharacterId} sent CZ_GUILD_WORK_SEND with unrecognized sort {Sort} -- aborting session {SessionId}",
+                    characterId, packet.Sort, session.SessionId);
                 zoneSession.Abort(DisconnectReason.Faulted);
                 return;
         }
     }
 
-    private static void Respond(IPacketSession session, ZoneClientSession zoneSession, GuildActionResult result)
+    private void Respond(IPacketSession session, ZoneClientSession zoneSession, int characterId, int sort,
+        GuildActionResult result)
     {
         if (result.Abort)
         {
+            logger?.LogWarning(
+                "Character {CharacterId} guild action sort {Sort} aborted session {SessionId}: precondition/authorization gate failed",
+                characterId, sort, session.SessionId);
             zoneSession.Abort(DisconnectReason.Faulted);
             return;
         }

@@ -3,6 +3,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers;
 
@@ -22,7 +23,8 @@ namespace Fenrir.Application.Game.Handlers.Handlers;
 ///     for the full citation trail (MAX_HOT_KEY_PAGE/NUM, MAX_POTION_SORT_NUM, the "may eat potion" flag's two
 ///     writers).
 /// </remarks>
-public sealed class UseHotkeyItemHandler(IUseHotkeyItemService service) : IAsyncPacketHandler<UseHotkeyItemRequest>
+public sealed class UseHotkeyItemHandler(IUseHotkeyItemService service, ILogger<UseHotkeyItemHandler> logger)
+    : IAsyncPacketHandler<UseHotkeyItemRequest>
 {
     public async ValueTask HandleAsync(UseHotkeyItemRequest packet, IPacketSession session,
         CancellationToken cancellationToken)
@@ -30,9 +32,19 @@ public sealed class UseHotkeyItemHandler(IUseHotkeyItemService service) : IAsync
         var zoneSession = (ZoneClientSession)session;
         var characterId = zoneSession.CharacterId!.Value;
 
+        if (logger.IsEnabled(LogLevel.Debug))
+            logger.LogDebug(
+                "Session {SessionId} character {CharacterId}: UseHotkeyItemRequest received ({Page1}:{Index1})",
+                zoneSession.SessionId, characterId, packet.Page1, packet.Index1);
+
         if (zoneSession.CurrentZone is not Zone zone || !zone.TryGetPlayer(characterId, out var state) ||
             state is null)
+        {
+            logger.LogDebug(
+                "Session {SessionId} character {CharacterId}: UseHotkeyItemRequest dropped, no live zone/player state",
+                zoneSession.SessionId, characterId);
             return;
+        }
 
         var page = packet.Page1;
         var index = packet.Index1;

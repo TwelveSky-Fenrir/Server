@@ -34,7 +34,13 @@ public interface IOfflineShopRepository
         int expectedQuantity, int expectedValue, int price, int buyerCharacterId, byte buyerContainer,
         IReadOnlyList<CharacterItemSlotTvp> buyerItems, CancellationToken ct);
 
-    public ValueTask WithdrawMoneyAsync(int characterId, int expectedMoney, int expectedBigMoney,
+    /// <summary>
+    ///     Atomic earnings withdrawal. <paramref name="todayDate" /> is the caller's compact YYYYMMDD
+    ///     "today" (<c>GameDate.Today()</c>), used to reject an expired shop the same way
+    ///     <c>Zone.ProxyShops</c>'s own periodic sweep does (<c>entry.ShopDate &lt; today</c>) -- see
+    ///     <see cref="OfflineShopRepository.WithdrawMoneyAsync" /> for the full THROW-number contract.
+    /// </summary>
+    public ValueTask WithdrawMoneyAsync(int characterId, int expectedMoney, int expectedBigMoney, int todayDate,
         CancellationToken ct);
 
     public ValueTask<ProxyShopNameRowDto?> GetProxyShopNameAsync(int characterId, CancellationToken ct);

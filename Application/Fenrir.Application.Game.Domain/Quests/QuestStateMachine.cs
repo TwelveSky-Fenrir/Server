@@ -66,8 +66,12 @@ public static class QuestStateMachine
                 : // meet NPC: end condition is PresentState == 2, holding the matching TargetPhase already satisfies it
                 return progress.TargetPhase == (q.Solution1 ?? 0) ? StateInProgress : StateInvalid;
 
-            case 8: // "Waterfall occupation" (zone038 event): its increment hook lives in the zone038 tick loop
-                // (out of Fenrir's scope), so KillCounter can never advance past 0 yet.
+            case 8: // "Waterfall occupation" (zone038 event): its own live-occupation increment hook still
+                // lives in the zone038 tick loop (out of Fenrir's scope). A second, independently-cited
+                // increment hook DOES exist now -- Zone.HandleRegularWarConclusionCredit credits any
+                // holder present when a Regular War (Zone049) map whose id matches this quest's own
+                // TargetPhase concludes (Server/ts25zone/S07_MyGame01.cpp:5293-5314) -- so KillCounter can
+                // advance to 1 via that path even though the zone038-native path remains unported.
                 if (progress.TargetPhase != (q.Solution1 ?? 0)) return StateInvalid;
                 return progress.KillCounter < 1 ? StateInProgress : StateConditionMet;
 

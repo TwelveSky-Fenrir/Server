@@ -46,20 +46,35 @@ public sealed class SkyUpgradeItemService(
             !ContainerMatrix.IsValidSlot((byte)page1, index1) ||
             page2 is not (ContainerMatrix.InventoryPage0 or ContainerMatrix.InventoryPage1) ||
             !ContainerMatrix.IsValidSlot((byte)page2, index2))
+        {
+            logger.LogDebug(
+                "Character {CharacterId} sky-upgrade rejected: invalid slot(s) ({Page1}:{Index1} / {Page2}:{Index2})",
+                characterId, page1, index1, page2, index2);
             return new SkyUpgradeItemResult(SkyUpgradeItemOutcome.Rejected, false, [0, 0, 0, 0, 0, 0]);
+        }
 
         var targetStack = state.Inventory.GetSlot((byte)page1, (byte)index1);
         var materialStack = state.Inventory.GetSlot((byte)page2, (byte)index2);
 
         if (targetStack is not { } target || materialStack is not { } material ||
             !worldData.ItemsById.TryGetValue(target.ItemId, out var targetDefinition))
+        {
+            logger.LogDebug(
+                "Character {CharacterId} sky-upgrade rejected: target or material slot empty/unresolvable",
+                characterId);
             return new SkyUpgradeItemResult(SkyUpgradeItemOutcome.Rejected, false, [0, 0, 0, 0, 0, 0]);
+        }
 
         var resolved = SkyUpgradeResolver.Resolve(targetDefinition.Item, target.Enchant, material.ItemId,
             SystemRandomSource.Instance);
 
         if (resolved.Outcome == SkyUpgradeResolver.Outcome.Rejected)
+        {
+            logger.LogInformation(
+                "Character {CharacterId} sky-upgrade rejected by resolver (target {TargetItemId}, material {MaterialItemId})",
+                characterId, target.ItemId, material.ItemId);
             return new SkyUpgradeItemResult(SkyUpgradeItemOutcome.Rejected, false, [0, 0, 0, 0, 0, 0]);
+        }
 
         var remainingMaterialQuantity = material.Quantity - 1;
         var newMaterialStack = remainingMaterialQuantity > 0
@@ -129,6 +144,10 @@ public sealed class SkyUpgradeItemService(
             logger.LogError(
                 "Zone {MapId} inventory inbox full: dropped sky-upgrade mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
                 zone.MapId, characterId);
+
+        logger.LogInformation(
+            "Character {CharacterId} sky-upgrade applied: target {TargetItemId} succeeded={Succeeded}, cost {Cost}",
+            characterId, target.ItemId, resolved.Succeeded, SkyUpgradeResolver.Cost);
 
         return new SkyUpgradeItemResult(SkyUpgradeItemOutcome.Applied, resolved.Succeeded,
             [newTargetStack.ItemId, index1 % 8, index1 / 8, target.Quantity, packedValue, target.Serial]);

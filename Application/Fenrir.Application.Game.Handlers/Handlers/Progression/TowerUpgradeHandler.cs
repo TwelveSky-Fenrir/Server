@@ -4,6 +4,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Progression;
 
@@ -20,7 +21,7 @@ namespace Fenrir.Application.Game.Handlers.Handlers.Progression;
 ///         tower's own zone tick -- see <see cref="TowerGuardianSystem" />.
 ///     </para>
 /// </summary>
-public sealed class TowerUpgradeHandler(ITowerUpgradeService towerUpgradeService)
+public sealed class TowerUpgradeHandler(ITowerUpgradeService towerUpgradeService, ILogger<TowerUpgradeHandler> logger)
     : IAsyncPacketHandler<TowerUpgradeRequest>
 {
     public async ValueTask HandleAsync(TowerUpgradeRequest packet, IPacketSession session,
@@ -31,6 +32,11 @@ public sealed class TowerUpgradeHandler(ITowerUpgradeService towerUpgradeService
             return;
 
         var characterId = zoneSession.CharacterId!.Value;
+
+        logger.LogDebug(
+            "Session {SessionId}: TowerUpgradeRequest (op120) received for character {CharacterId}, index {Index}",
+            session.SessionId, characterId, packet.Index);
+
         if (!zone.TryGetPlayer(characterId, out var state) || state is null)
             return;
 
@@ -41,6 +47,9 @@ public sealed class TowerUpgradeHandler(ITowerUpgradeService towerUpgradeService
 
             if (result.Outcome != TowerUpgradeOutcome.Success)
             {
+                logger.LogWarning(
+                    "Tower-upgrade rejected for character {CharacterId} on map {MapId} -- aborting session",
+                    characterId, zone.MapId);
                 zoneSession.Abort(DisconnectReason.Faulted);
                 return;
             }

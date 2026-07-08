@@ -344,7 +344,7 @@ public sealed class MonsterSpawnScheduler(
             monster.Template.GeneralExperience, partyMemberIds,
             monster.Template.PatExperience, monster.Template.Life);
 
-        zone.ApplyQuestKillProgress(killer.CharacterId, monster.Template.MonsterId);
+        zone.ApplyQuestKillProgress(killer.CharacterId, monster.Template.MonsterId, partyMemberIds);
 
         ApplyTowerCpForPvmMilestone(zone, killer, monster.Template.RealLevel);
 

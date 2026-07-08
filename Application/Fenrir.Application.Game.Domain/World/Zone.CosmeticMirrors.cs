@@ -2,6 +2,7 @@ using System.Buffers;
 using System.Collections.Immutable;
 using System.Threading.Channels;
 using Fenrir.Application.Game.Domain.Hotkeys;
+using Fenrir.Application.Game.Domain.Mounts;
 using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.Domain.Social.Pshop;
 using Fenrir.Application.Game.Stats;
@@ -369,6 +370,34 @@ public sealed partial class Zone
     public bool PostMountCommand(in MountZoneCommand command)
     {
         return _mountInbox.Writer.TryWrite(command);
+    }
+
+    /// <summary>
+    ///     Same contract as <see cref="PostInventoryCommandAndWaitAsync" />. Callers must already hold
+    ///     <see cref="PlayerRuntimeState.EconomyActionLock" /> and leave <see cref="MountZoneCommand.Applied" />
+    ///     at its default -- overwritten here. Used by Sort 5/7's own I/O-backed success paths
+    ///     (<c>MountStateService</c>) so the acknowledgment is only sent once the garage/attribute mirror is
+    ///     actually applied, matching every other economy-adjacent handler's own
+    ///     "wait for the mirror before replying" posture.
+    /// </summary>
+    public async Task<bool> PostMountCommandAndWaitAsync(MountZoneCommand command, CancellationToken ct,
+        TimeSpan? timeout = null)
+    {
+        var applied = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var withSignal = command with { Applied = applied };
+
+        if (!PostMountCommand(in withSignal))
+            return false;
+
+        try
+        {
+            await applied.Task.WaitAsync(timeout ?? TimeSpan.FromSeconds(2), ct).ConfigureAwait(false);
+        }
+        catch (TimeoutException)
+        {
+        }
+
+        return true;
     }
 
     public bool PostCostumeCommand(in CostumeZoneCommand command)
@@ -755,6 +784,25 @@ public sealed partial class Zone
         if (command.UpdatedStats is { } stats)
             state.Stats = stats;
 
+        // Sort 5 (Delete Mount)/7 (Delete Rolled Attribute) garage/attribute mirrors -- session-only state
+        // with no persisted column yet (see PlayerRuntimeState.MountGarage/MountRolledAttributes' own
+        // remarks), so neither branch marks progression dirty, matching CostumeWardrobe's own
+        // WardrobeSlotCleared precedent in ApplyCostumeCommand.
+        if (command.DeleteGarageSlot is { } deleteGarageSlot)
+        {
+            state.MountGarage = state.MountGarage.SetItem(deleteGarageSlot, 0);
+            state.MountAccumulatedExp = state.MountAccumulatedExp.SetItem(deleteGarageSlot, 0);
+            state.MountRolledAttributeTotal = state.MountRolledAttributeTotal.SetItem(deleteGarageSlot, 0);
+            for (var statSlotIndex = 0; statSlotIndex < MountStateResolver.StatSlotCount; statSlotIndex++)
+                state.MountRolledAttributes = state.MountRolledAttributes.SetItem(
+                    MountStateResolver.AttributeIndex(deleteGarageSlot, statSlotIndex), 0);
+        }
+
+        if (command.AttributeDeleteGarageSlot is { } attributeGarageSlot &&
+            command.AttributeDeleteStatSlotIndex is { } attributeStatSlotIndex)
+            state.MountRolledAttributes = state.MountRolledAttributes.SetItem(
+                MountStateResolver.AttributeIndex(attributeGarageSlot, attributeStatSlotIndex), 0);
+
         if (changed)
             state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
 
@@ -967,7 +1015,7 @@ public sealed partial class Zone
         }
 
         if (command.WardrobeSlotCleared is { } clearedSlot)
-            state.StellarCoreWardrobe = state.StellarCoreWardrobe.SetItem(clearedSlot, 0);
+            state.StellarCoreWardrobe = CompactStellarCoreWardrobe(state.StellarCoreWardrobe, clearedSlot);
 
         if (command.Life is { } life)
         {
@@ -996,6 +1044,22 @@ public sealed partial class Zone
                 BroadcastAvatarStateFlag(state, 38, 0, 0, 0);
                 break;
         }
+    }
+
+    /// <summary>
+    ///     Left-shift compaction for CZ case 5 (extract): the legacy clears <paramref name="clearedSlot" /> and
+    ///     then shifts every following entry down by one, so the array never has a gap in the middle -- a later
+    ///     Select (sort 1) or Equip (sort 3) always sees a contiguous slot list. Without this, a subsequent
+    ///     select/extract cycle can address a slot the legacy would never have left populated at that index.
+    /// </summary>
+    /// <remarks>Réf. C++ : Server/ts25zone/S04_MyWork02.cpp:15511-15629 (CZ_STELLAR_STATE_SEND case 5).</remarks>
+    private static ImmutableArray<int> CompactStellarCoreWardrobe(ImmutableArray<int> wardrobe, int clearedSlot)
+    {
+        var builder = wardrobe.ToBuilder();
+        for (var i = clearedSlot; i < builder.Count - 1; i++)
+            builder[i] = builder[i + 1];
+        builder[^1] = 0;
+        return builder.MoveToImmutable();
     }
 
     private void DrainAvatarBuffCommands()
@@ -1032,6 +1096,10 @@ public sealed partial class Zone
     ///     tick thread (a concurrent buff expiry, gear change, or level-up could have moved the cap in between).
     ///     Deriving Life/Mana from <c>state.Stats</c>/<c>state.MaxLife</c>/<c>state.MaxMana</c> here, at apply
     ///     time, closes that stale-cap race -- see the items-skills-fenrir-self-critique finding this fixes.
+    ///     <see cref="AvatarBuffZoneCommand.PlayTime2" /> reproduces op97's second legacy defect (see
+    ///     <see cref="Buffs.PlaytimeBuffResolver" />'s remarks): it clobbers <see cref="PlayerRuntimeState.PlayTime2" />
+    ///     on every op97 request, unconditionally, independently of whether <see cref="AvatarBuffZoneCommand.StateTimeEffect" />
+    ///     was set for that same request -- so it is applied here regardless of the other fields' presence.
     /// </summary>
     private void ApplyAvatarBuffCommand(in AvatarBuffZoneCommand command)
     {
@@ -1045,6 +1113,9 @@ public sealed partial class Zone
 
         if (command.RankBuffType is { } rankBuffType)
             state.RankBuffType = rankBuffType;
+
+        if (command.PlayTime2 is { } playTime2)
+            state.PlayTime2 = playTime2;
 
         if (command.HealToMax)
         {
@@ -1362,6 +1433,17 @@ public enum MountBroadcastKind : byte
 ///     Op 87/113 (<c>MountState</c>/<c>MountAbsorb</c>) self-mutation mirror. Nullable/optional-field shape,
 ///     same convention as <see cref="TribeProgressZoneCommand" />.
 /// </summary>
+/// <param name="DeleteGarageSlot">
+///     Sort 5 (Delete Mount) success -- the owned-mount garage slot to clear (item id, accumulated exp, and
+///     rolled-attribute total/values all reset to 0). See <see cref="Zone.ApplyMountCommand" />'s own remarks
+///     for why this never marks <see cref="PlayerRuntimeState.MarkProgressDirty" />.
+/// </param>
+/// <param name="AttributeDeleteGarageSlot">
+///     Sort 7 (Delete Rolled Attribute) success -- paired with <see cref="AttributeDeleteStatSlotIndex" />
+///     (both must be set together); zeroes that one (garage slot, stat slot) entry in
+///     <see cref="PlayerRuntimeState.MountRolledAttributes" />.
+/// </param>
+/// <param name="AttributeDeleteStatSlotIndex">See <see cref="AttributeDeleteGarageSlot" />.</param>
 public readonly record struct MountZoneCommand(
     int CharacterId,
     int? AnimalIndex = null,
@@ -1371,6 +1453,9 @@ public readonly record struct MountZoneCommand(
     int? Mana = null,
     EffectiveStats? UpdatedStats = null,
     MountBroadcastKind Broadcast = MountBroadcastKind.None,
+    int? DeleteGarageSlot = null,
+    int? AttributeDeleteGarageSlot = null,
+    int? AttributeDeleteStatSlotIndex = null,
     TaskCompletionSource? Applied = null);
 
 /// <summary>
@@ -1430,7 +1515,9 @@ public readonly record struct StellarCoreZoneCommand(
 ///     <see cref="MountZoneCommand" />. <see cref="HealToMax" /> is a request ("heal to whatever the current
 ///     cap is"), not a literal Life/Mana value -- see <see cref="Zone.ApplyAvatarBuffCommand" />'s remarks for
 ///     why the derivation must happen on the tick thread, at apply time, rather than on the posting session
-///     thread.
+///     thread. <see cref="PlayTime2" /> carries op97's second, independent legacy defect -- see
+///     <see cref="Buffs.PlaytimeBuffResolver" />'s remarks for why it is set on every op97 request regardless
+///     of <see cref="StateTimeEffect" />.
 /// </summary>
 public readonly record struct AvatarBuffZoneCommand(
     int CharacterId,
@@ -1438,6 +1525,7 @@ public readonly record struct AvatarBuffZoneCommand(
     int? RankBuffType = null,
     bool HealToMax = false,
     EffectiveStats? UpdatedStats = null,
+    int? PlayTime2 = null,
     TaskCompletionSource? Applied = null);
 
 /// <summary>

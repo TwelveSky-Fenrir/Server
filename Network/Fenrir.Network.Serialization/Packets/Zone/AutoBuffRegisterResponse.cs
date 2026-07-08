@@ -5,7 +5,7 @@ namespace Fenrir.Network.Serialization.Packets.Zone;
 
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.AutoBuffRegister,
     ExpectedSize = 5)]
-public readonly partial record struct AutoBuffRegisterResponse : IOutgoingPacket
+public readonly record struct AutoBuffRegisterResponse : IOutgoingPacket
 {
     public required int Value { get; init; }
 }

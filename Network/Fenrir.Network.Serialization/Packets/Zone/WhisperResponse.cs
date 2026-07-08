@@ -6,7 +6,7 @@ namespace Fenrir.Network.Serialization.Packets.Zone;
 
 /// <summary>Also used as this fork's system-message channel ("[-Server-]", "[-GM-]", AFK checker) via Result=3.</summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.Whisper, ExpectedSize = 111)]
-public readonly partial record struct WhisperResponse : IOutgoingPacket
+public readonly record struct WhisperResponse : IOutgoingPacket
 {
     /// <summary>
     ///     0 = sender echo + target zone ok; 1 = target offline; 2 = cross-tribe refused (disabled in this fork); 3 =

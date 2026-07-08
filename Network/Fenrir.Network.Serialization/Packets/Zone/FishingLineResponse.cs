@@ -4,7 +4,7 @@ using Fenrir.Network.Serialization.Wire;
 namespace Fenrir.Network.Serialization.Packets.Zone;
 
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.FishingLine, ExpectedSize = 21)]
-public readonly partial record struct FishingLineResponse : IOutgoingPacket
+public readonly record struct FishingLineResponse : IOutgoingPacket
 {
     /// <summary>Server-side avatar index.</summary>
     public required int ServerIndex { get; init; }

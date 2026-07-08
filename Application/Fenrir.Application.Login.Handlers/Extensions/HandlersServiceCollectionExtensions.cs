@@ -1,6 +1,5 @@
 using Fenrir.Application.Login.Handlers.Dispatching;
 using Fenrir.Network.Abstractions;
-using Fenrir.Network.Dispatch;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Fenrir.Application.Login.Handlers.Extensions;

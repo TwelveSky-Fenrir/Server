@@ -5,7 +5,7 @@ namespace Fenrir.Network.Serialization.Packets.Login;
 
 [FenrirPacket(FenrirServer.Login, FenrirDirection.Outgoing, Opcodes.Login.Outgoing.Loggedin,
     Obfuscation = WireObfuscationMode.XorPacketGlobal, ExpectedSize = 693)]
-public readonly partial record struct LoginResponse : IOutgoingPacket
+public readonly record struct LoginResponse : IOutgoingPacket
 {
     public required int Result { get; init; }
 

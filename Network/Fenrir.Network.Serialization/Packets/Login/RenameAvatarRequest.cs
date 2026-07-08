@@ -7,7 +7,7 @@ namespace Fenrir.Network.Serialization.Packets.Login;
 [FenrirPacket(FenrirServer.Login, FenrirDirection.Incoming, Opcodes.Login.Incoming.RenameAvatar,
     ExpectedSize = 34,
     AllowedStates = [(byte)LoginSessionState.Authenticated, (byte)LoginSessionState.CharSelect])]
-public readonly partial record struct RenameAvatarRequest : IIncomingPacket<RenameAvatarRequest>
+public readonly record struct RenameAvatarRequest : IIncomingPacket<RenameAvatarRequest>
 {
     public required int AvatarPost { get; init; }
 

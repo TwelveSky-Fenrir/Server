@@ -6,7 +6,7 @@ namespace Fenrir.Network.Serialization.Packets.Zone;
 
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.MonsterReplication,
     ExpectedSize = 125)]
-public readonly partial record struct MonsterReplicationResponse : IOutgoingPacket
+public readonly record struct MonsterReplicationResponse : IOutgoingPacket
 {
     public required int ServerIndex { get; init; }
     public required uint UniqueNumber { get; init; }

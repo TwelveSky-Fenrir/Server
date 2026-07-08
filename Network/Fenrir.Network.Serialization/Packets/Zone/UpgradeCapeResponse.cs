@@ -8,7 +8,7 @@ namespace Fenrir.Network.Serialization.Packets.Zone;
 ///     only covers bytes before a field.
 /// </summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.UpgradeCape, ExpectedSize = 30)]
-public readonly partial record struct UpgradeCapeResponse : IOutgoingPacket
+public readonly record struct UpgradeCapeResponse : IOutgoingPacket
 {
     public required int Result { get; init; }
 

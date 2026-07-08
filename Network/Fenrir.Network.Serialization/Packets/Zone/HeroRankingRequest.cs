@@ -9,6 +9,6 @@ namespace Fenrir.Network.Serialization.Packets.Zone;
 /// </summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.HeroRanking, ExpectedSize = 9,
     AllowedStates = [(byte)ZoneSessionState.Registering, (byte)ZoneSessionState.InWorld])]
-public readonly partial record struct HeroRankingRequest : IIncomingPacket<HeroRankingRequest>
+public readonly record struct HeroRankingRequest : IIncomingPacket<HeroRankingRequest>
 {
 }

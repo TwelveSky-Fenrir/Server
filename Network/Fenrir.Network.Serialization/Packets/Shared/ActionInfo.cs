@@ -3,7 +3,7 @@ using Fenrir.Network.Serialization.Attributes;
 namespace Fenrir.Network.Serialization.Packets.Shared;
 
 [FenrirWireType(104)]
-public readonly partial record struct ActionInfo : IFenrirWireType<ActionInfo>
+public readonly record struct ActionInfo : IFenrirWireType<ActionInfo>
 {
     public required int Type { get; init; }
     public required int Sort { get; init; }

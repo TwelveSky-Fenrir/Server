@@ -10,7 +10,7 @@ namespace Fenrir.Network.Serialization.Packets.Zone;
 /// </summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.ViewShopStall,
     ExpectedSize = 1237)]
-public readonly partial record struct ViewShopStallResponse : IOutgoingPacket
+public readonly record struct ViewShopStallResponse : IOutgoingPacket
 {
     public required int Result { get; init; }
     public required PshopInfo PshopInfo { get; init; }

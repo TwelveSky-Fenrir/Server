@@ -6,7 +6,7 @@ namespace Fenrir.Network.Serialization.Packets.Zone;
 // USE_EXCHANGE_ITEM_V2 is off in EU33: no Tribe field (20-byte payload only).
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.RerollItem, ExpectedSize = 29,
     AllowedStates = [(byte)ZoneSessionState.Registering, (byte)ZoneSessionState.InWorld])]
-public readonly partial record struct RerollItemRequest : IIncomingPacket<RerollItemRequest>
+public readonly record struct RerollItemRequest : IIncomingPacket<RerollItemRequest>
 {
     public required int Sort { get; init; }
 

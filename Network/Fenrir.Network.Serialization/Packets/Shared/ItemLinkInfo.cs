@@ -3,7 +3,7 @@ using Fenrir.Network.Serialization.Attributes;
 namespace Fenrir.Network.Serialization.Packets.Shared;
 
 [FenrirWireType(24)]
-public readonly partial record struct ItemLinkInfo : IFenrirWireType<ItemLinkInfo>
+public readonly record struct ItemLinkInfo : IFenrirWireType<ItemLinkInfo>
 {
     public required int Index { get; init; }
 

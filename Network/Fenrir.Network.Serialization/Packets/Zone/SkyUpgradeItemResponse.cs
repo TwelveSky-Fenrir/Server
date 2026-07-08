@@ -4,7 +4,7 @@ using Fenrir.Network.Serialization.Wire;
 namespace Fenrir.Network.Serialization.Packets.Zone;
 
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.SkyUpgradeItem, ExpectedSize = 33)]
-public readonly partial record struct SkyUpgradeItemResponse : IOutgoingPacket
+public readonly record struct SkyUpgradeItemResponse : IOutgoingPacket
 {
     public required int Result { get; init; }
 

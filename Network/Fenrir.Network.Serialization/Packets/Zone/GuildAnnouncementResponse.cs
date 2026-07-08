@@ -4,7 +4,7 @@ using Fenrir.Network.Serialization.Wire;
 namespace Fenrir.Network.Serialization.Packets.Zone;
 
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.GuildAnnouncement, ExpectedSize = 75)]
-public readonly partial record struct GuildAnnouncementResponse : IOutgoingPacket
+public readonly record struct GuildAnnouncementResponse : IOutgoingPacket
 {
     /// <summary>Guild master (sender) name.</summary>
     [FixedString(13)]

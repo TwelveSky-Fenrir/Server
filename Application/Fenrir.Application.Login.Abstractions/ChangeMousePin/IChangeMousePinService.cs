@@ -25,7 +25,8 @@ public interface IChangeMousePinService
 
     /// <summary>
     ///     Records a game.EventLog AccountSecurity row for one rejected mouse-PIN CHANGE attempt (op14).
-    ///     Mirrors <see cref="Fenrir.Application.Login.Abstractions.VerifyMousePin.IVerifyMousePinService.LogFailedAttemptAsync" />
+    ///     Mirrors
+    ///     <see cref="Fenrir.Application.Login.Abstractions.VerifyMousePin.IVerifyMousePinService.LogFailedAttemptAsync" />
     ///     exactly -- see that method's own remarks for the full rationale. Added to close a Fenrir-authored
     ///     asymmetry: without this, an attacker guessing the PIN entirely through op14 (which shares the
     ///     exact same LoginClientSession.PinFailureCount counter and 3-strike disconnect as op15) left zero

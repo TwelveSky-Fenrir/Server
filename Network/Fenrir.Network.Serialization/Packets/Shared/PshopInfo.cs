@@ -3,7 +3,7 @@ using Fenrir.Network.Serialization.Attributes;
 namespace Fenrir.Network.Serialization.Packets.Shared;
 
 [FenrirWireType(1232)]
-public readonly partial record struct PshopInfo : IFenrirWireType<PshopInfo>
+public readonly record struct PshopInfo : IFenrirWireType<PshopInfo>
 {
     public required uint UniqueNumber { get; init; }
 

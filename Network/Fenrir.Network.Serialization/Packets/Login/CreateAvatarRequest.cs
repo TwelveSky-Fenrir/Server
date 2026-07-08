@@ -43,7 +43,7 @@ namespace Fenrir.Network.Serialization.Packets.Login;
 /// </remarks>
 [FenrirPacket(FenrirServer.Login, FenrirDirection.Incoming, Opcodes.Login.Incoming.CreateAvatar,
     ExpectedSize = 50, AllowedStates = [(byte)LoginSessionState.Authenticated, (byte)LoginSessionState.CharSelect])]
-public readonly partial record struct CreateAvatarRequest : IIncomingPacket<CreateAvatarRequest>
+public readonly record struct CreateAvatarRequest : IIncomingPacket<CreateAvatarRequest>
 {
     public required int AvatarPost { get; init; }
     public required int Tribe { get; init; }

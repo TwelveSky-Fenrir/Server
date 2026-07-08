@@ -20,7 +20,6 @@ using Fenrir.Data.Abstractions.Guilds;
 using Fenrir.Data.Abstractions.Progression;
 using Fenrir.Data.Abstractions.Runtime;
 using Fenrir.Data.Abstractions.World;
-using Fenrir.Network.Dispatch;
 using Fenrir.Network.Dispatch.RateLimiting;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.ServiceDefaults;

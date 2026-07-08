@@ -12,7 +12,7 @@ namespace Fenrir.Network.Serialization.Packets.Zone;
 ///     and state-13 notices (Server/ts25zone/S04_MyWork02.cpp:11862-11888).
 /// </remarks>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.MountState, ExpectedSize = 9)]
-public readonly partial record struct MountStateResponse : IOutgoingPacket
+public readonly record struct MountStateResponse : IOutgoingPacket
 {
     public required int Sort { get; init; }
     public required int Value { get; init; }

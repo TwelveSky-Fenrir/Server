@@ -5,6 +5,6 @@ namespace Fenrir.Network.Serialization.Packets.Zone;
 
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.TradeCancel, ExpectedSize = 9,
     AllowedStates = [(byte)ZoneSessionState.Registering, (byte)ZoneSessionState.InWorld])]
-public readonly partial record struct TradeCancelRequest : IIncomingPacket<TradeCancelRequest>
+public readonly record struct TradeCancelRequest : IIncomingPacket<TradeCancelRequest>
 {
 }

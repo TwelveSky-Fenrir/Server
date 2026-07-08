@@ -279,8 +279,10 @@ public sealed class CreateAvatarService(
     ///     The client's raw weapon code must match one of the tribe's 3 catalogued RawWeaponCode values
     ///     (EquipSlot 7 rows) -- anything else is the same "not one of my 3 offered weapons" case the legacy
     ///     Quit()s on. The returned id is the row's ItemId, i.e. the weapon the raw code remaps to
-    ///     (Server/ts25login/S04_MyWork02.cpp:773-778/801-806/829-834's `if (tWeapon == N) tWeapon = <id>`),
-    ///     never the raw code itself.
+    ///     (Server/ts25login/S04_MyWork02.cpp:773-778/801-806/829-834's `if (tWeapon == N) tWeapon =
+    ///     <id>
+    ///         `),
+    ///         never the raw code itself.
     /// </summary>
     private static bool TryResolveWeaponItemId(IReadOnlyList<StarterKitEquipmentRowDto> equipment,
         int requestedWeapon, out int weaponItemId)

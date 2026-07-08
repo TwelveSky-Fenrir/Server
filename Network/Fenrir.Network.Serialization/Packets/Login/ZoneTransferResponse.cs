@@ -5,7 +5,7 @@ namespace Fenrir.Network.Serialization.Packets.Login;
 
 [FenrirPacket(FenrirServer.Login, FenrirDirection.Outgoing, Opcodes.Login.Outgoing.ZoneTransfer,
     ExpectedSize = 29)]
-public readonly partial record struct ZoneTransferResponse : IOutgoingPacket
+public readonly record struct ZoneTransferResponse : IOutgoingPacket
 {
     public required int Result { get; init; }
     [FixedString(16)] public required string Ip { get; init; }

@@ -17,7 +17,7 @@ namespace Fenrir.Network.Serialization.Packets.Zone;
 /// </remarks>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.MountState, ExpectedSize = 17,
     AllowedStates = [(byte)ZoneSessionState.Registering, (byte)ZoneSessionState.InWorld])]
-public readonly partial record struct MountStateRequest : IIncomingPacket<MountStateRequest>
+public readonly record struct MountStateRequest : IIncomingPacket<MountStateRequest>
 {
     public required int Sort { get; init; }
     public required int Value { get; init; }

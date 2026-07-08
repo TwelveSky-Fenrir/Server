@@ -5,7 +5,7 @@ namespace Fenrir.Network.Serialization.Packets.Zone;
 
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.FishingCatch,
     ExpectedSize = 21)]
-public readonly partial record struct FishingCatchResponse : IOutgoingPacket
+public readonly record struct FishingCatchResponse : IOutgoingPacket
 {
     /// <summary>1=item granted, 2=inventory full.</summary>
     public required int Result { get; init; }

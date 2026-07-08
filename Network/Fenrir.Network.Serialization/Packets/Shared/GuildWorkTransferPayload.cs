@@ -3,7 +3,7 @@ using Fenrir.Network.Serialization.Attributes;
 namespace Fenrir.Network.Serialization.Packets.Shared;
 
 [FenrirWireType(26)]
-public readonly partial record struct GuildWorkTransferPayload : IFenrirWireType<GuildWorkTransferPayload>
+public readonly record struct GuildWorkTransferPayload : IFenrirWireType<GuildWorkTransferPayload>
 {
     [FixedString(13)] public required string NewMasterName { get; init; }
 

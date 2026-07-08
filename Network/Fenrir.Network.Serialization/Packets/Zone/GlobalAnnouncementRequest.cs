@@ -11,7 +11,7 @@ namespace Fenrir.Network.Serialization.Packets.Zone;
 /// </summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.GlobalAnnouncement, ExpectedSize = 70,
     AllowedStates = [(byte)ZoneSessionState.Registering, (byte)ZoneSessionState.InWorld])]
-public readonly partial record struct GlobalAnnouncementRequest : IIncomingPacket<GlobalAnnouncementRequest>
+public readonly record struct GlobalAnnouncementRequest : IIncomingPacket<GlobalAnnouncementRequest>
 {
     [FixedString(61)] public required string Content { get; init; }
 }

@@ -4,7 +4,7 @@ using Fenrir.Network.Serialization.Wire;
 namespace Fenrir.Network.Serialization.Packets.Zone;
 
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.UpgradeItemRank, ExpectedSize = 33)]
-public readonly partial record struct UpgradeItemRankResponse : IOutgoingPacket
+public readonly record struct UpgradeItemRankResponse : IOutgoingPacket
 {
     public required int Result { get; init; }
 

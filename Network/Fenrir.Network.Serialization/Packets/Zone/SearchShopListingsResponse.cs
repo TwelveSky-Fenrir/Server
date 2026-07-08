@@ -6,7 +6,7 @@ namespace Fenrir.Network.Serialization.Packets.Zone;
 // PshopItemInfo: [0]=itemID [1]=qty [2]=value [3]=serial [4]=price, [5..8]=0 (page/x/y unused in market view).
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.SearchShopListings,
     ExpectedSize = 78)]
-public readonly partial record struct SearchShopListingsResponse : IOutgoingPacket
+public readonly record struct SearchShopListingsResponse : IOutgoingPacket
 {
     public required uint UniqueNumber { get; init; }
     [FixedString(13)] public required string AvatarName { get; init; }

@@ -4,7 +4,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Handlers.Handlers;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Network.Framing;
-using Fenrir.Network.Serialization.Packets.Zone;
+using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Application.Game.Tests.Fishing;
 

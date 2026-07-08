@@ -1,6 +1,6 @@
 using Fenrir.Application.Game.Abstractions.Chat;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Network.Serialization.Packets.Zone;
+using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Application.Game.Services.Chat;
 

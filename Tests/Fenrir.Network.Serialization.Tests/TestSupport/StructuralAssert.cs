@@ -43,7 +43,7 @@ internal static class StructuralAssert
             }
         }
 
-        if (type is { Namespace: "Fenrir.Network.Serialization.Packets.Shared", IsValueType: true })
+        if (type is { Namespace: "Fenrir.Network.Serialization.Shared.Packets.Shared", IsValueType: true })
         {
             foreach (var property in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
                 Compare(property.PropertyType, property.GetValue(expected), property.GetValue(actual));

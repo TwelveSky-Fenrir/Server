@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Using Include="Fenrir.Network.Abstractions"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Fenrir.Network.Abstractions\Fenrir.Network.Abstractions.csproj"/>
+    <ProjectReference Include="..\Fenrir.Network.Serialization.Wire\Fenrir.Network.Serialization.Wire.csproj"/>
+    <ProjectReference Include="..\Fenrir.Network.Serialization.Shared\Fenrir.Network.Serialization.Shared.csproj"/>
+    <!-- Field-level XOR ([AvatarXorKind]/[ObfuscatedUidField], only ever declared on Login packets) is baked
+         directly into every generated Write(). -->
+    <ProjectReference Include="..\Fenrir.Network.Compression\Fenrir.Network.Compression.csproj"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Analysis\Fenrir.Generators.Analysis\Fenrir.Generators.Analysis.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false"/>
+    <ProjectReference Include="..\..\Generators\Fenrir.Generators.Protocol\Fenrir.Generators.Protocol.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false"/>
+  </ItemGroup>
+
+</Project>

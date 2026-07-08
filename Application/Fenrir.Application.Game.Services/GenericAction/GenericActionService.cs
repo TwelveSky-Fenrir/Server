@@ -13,7 +13,7 @@ using Fenrir.Application.Game.Domain.World.Loot;
 using Fenrir.Application.Game.Domain.World.Npcs;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Stats;
-using Fenrir.Network.Serialization.Packets.Shared;
+using Fenrir.Network.Serialization.Shared.Packets.Shared;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.GenericAction;

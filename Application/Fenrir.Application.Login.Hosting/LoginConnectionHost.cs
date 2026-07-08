@@ -7,9 +7,11 @@ using Fenrir.Data.Abstractions.Runtime;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch;
 using Fenrir.Network.Dispatch.FloodProtection;
+using Fenrir.Network.Dispatch.Login.Sessions;
 using Fenrir.Network.Dispatch.RateLimiting;
 using Fenrir.Network.Dispatch.Sessions;
-using Fenrir.Network.Serialization.Packets.Login;
+using Fenrir.Network.Serialization.Login.Packets.Login;
+using Fenrir.Network.Serialization.Login.Wire;
 using Fenrir.Network.Serialization.Wire;
 using Fenrir.Network.Transport;
 using Microsoft.Extensions.Hosting;
@@ -25,6 +27,7 @@ namespace Fenrir.Application.Login.Hosting;
 public sealed class LoginConnectionHost(
     IOptions<LoginServerOptions> options,
     IFrameDispatcher dispatcher,
+    IOpcodeFrameSizeProvider opcodeRegistry,
     ISessionRateLimiter rateLimiter,
     SessionRegistry registry,
     LoginCapacityState capacity,
@@ -46,12 +49,12 @@ public sealed class LoginConnectionHost(
     // Fenrir.Application.Game.Hosting.GameConnectionHost's own _inFlightConnections field.
     private readonly ConcurrentDictionary<Task, byte> _inFlightConnections = new();
 
-    private FenrirTcpListener<LoginClientSession>? _listener;
+    private TcpServer<LoginClientSession>? _server;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var opts = options.Value;
-        _listener = new FenrirTcpListener<LoginClientSession>(
+        _server = new TcpServer<LoginClientSession>(
             new IPEndPoint(IPAddress.Any, opts.Port),
             // Not `static` anymore: captures `logger` so every accepted session can emit its own Debug-level
             // packet-sent log through the same ILogger<LoginConnectionHost> instance SessionLoop already logs
@@ -59,13 +62,18 @@ public sealed class LoginConnectionHost(
             // startup (not per connection: the delegate itself is reused for every accepted socket), well
             // within the "closure allocated once and reused is fine" budget.
             (sessionId, transport, remoteEndPoint) =>
-                new LoginClientSession(sessionId, transport, remoteEndPoint, logger));
+                new LoginClientSession(sessionId, transport, remoteEndPoint, logger),
+            dispatcher,
+            opcodeRegistry,
+            rateLimiter,
+            ipFloodGuard,
+            logger);
 
         logger.LogInformation("LoginServer listening on port {Port}", opts.Port);
 
         try
         {
-            await _listener.AcceptLoopAsync(TrackInFlightAsync, stoppingToken).ConfigureAwait(false);
+            await _server.AcceptLoopAsync(TrackInFlightAsync, stoppingToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
@@ -165,8 +173,7 @@ public sealed class LoginConnectionHost(
 
             Greet(loginSession, connection);
 
-            await SessionLoop.RunConnectionAsync(connection, loginSession, dispatcher, rateLimiter, ipFloodGuard, ct,
-                logger).ConfigureAwait(false);
+            await _server!.RunSessionAsync(connection, loginSession, ct).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -345,7 +352,7 @@ public sealed class LoginConnectionHost(
 
     public override void Dispose()
     {
-        _listener?.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        _server?.DisposeAsync().AsTask().GetAwaiter().GetResult();
         base.Dispose();
     }
 }

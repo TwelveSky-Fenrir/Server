@@ -1,6 +1,7 @@
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Network.Serialization.Wire;
+using Fenrir.Network.Serialization.Zone.Wire;
 
 namespace Fenrir.Application.Game.Tests.World.ZoneWar;
 

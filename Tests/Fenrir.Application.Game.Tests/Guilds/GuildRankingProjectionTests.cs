@@ -1,7 +1,7 @@
 using System.Collections.Immutable;
 using Fenrir.Application.Game.Domain.Guilds;
 using Fenrir.Data.Abstractions.Guilds;
-using Fenrir.Network.Serialization.Packets.Shared;
+using Fenrir.Network.Serialization.Shared.Packets.Shared;
 
 namespace Fenrir.Application.Game.Tests.Guilds;
 

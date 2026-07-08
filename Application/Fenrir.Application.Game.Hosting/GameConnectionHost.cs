@@ -11,7 +11,9 @@ using Fenrir.Network.Dispatch;
 using Fenrir.Network.Dispatch.FloodProtection;
 using Fenrir.Network.Dispatch.RateLimiting;
 using Fenrir.Network.Dispatch.Sessions;
-using Fenrir.Network.Serialization.Packets.Zone;
+using Fenrir.Network.Dispatch.Zone.Sessions;
+using Fenrir.Network.Serialization.Zone.Packets.Zone;
+using Fenrir.Network.Serialization.Wire;
 using Fenrir.Network.Transport;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -24,6 +26,7 @@ public sealed class GameConnectionHost(
     IOptions<GameServerOptions> options,
     ZoneRegistry zones,
     IFrameDispatcher dispatcher,
+    IOpcodeFrameSizeProvider opcodeRegistry,
     ISessionRateLimiter rateLimiter,
     SessionRegistry registry,
     ICharacterWriteBehindFlusher writeBehindFlusher,
@@ -46,12 +49,12 @@ public sealed class GameConnectionHost(
     // closes.
     private readonly ConcurrentDictionary<Task, byte> _inFlightConnections = new();
 
-    private FenrirTcpListener<ZoneClientSession>? _listener;
+    private TcpServer<ZoneClientSession>? _server;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var opts = options.Value;
-        _listener = new FenrirTcpListener<ZoneClientSession>(
+        _server = new TcpServer<ZoneClientSession>(
             new IPEndPoint(IPAddress.Any, opts.Port),
             // Not `static` anymore: captures `logger` so every accepted session can emit its own Debug-level
             // packet-sent log through the same ILogger<GameConnectionHost> instance SessionLoop already logs
@@ -59,14 +62,19 @@ public sealed class GameConnectionHost(
             // startup (not per connection: the delegate itself is reused for every accepted socket), well
             // within the "closure allocated once and reused is fine" budget.
             (sessionId, transport, remoteEndPoint) =>
-                new ZoneClientSession(sessionId, transport, remoteEndPoint, logger));
+                new ZoneClientSession(sessionId, transport, remoteEndPoint, logger),
+            dispatcher,
+            opcodeRegistry,
+            rateLimiter,
+            ipFloodGuard,
+            logger);
 
         logger.LogInformation("GameServer listening on port {Port} (shard {ShardId}, maps [{Maps}])", opts.Port,
             opts.ShardId, string.Join(", ", zones.Zones.Select(z => z.MapId).Order()));
 
         try
         {
-            await _listener.AcceptLoopAsync(TrackInFlightAsync, stoppingToken).ConfigureAwait(false);
+            await _server.AcceptLoopAsync(TrackInFlightAsync, stoppingToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
@@ -166,8 +174,7 @@ public sealed class GameConnectionHost(
 
             Greet(zoneSession, connection);
 
-            await SessionLoop.RunConnectionAsync(connection, zoneSession, dispatcher, rateLimiter, ipFloodGuard, ct,
-                logger).ConfigureAwait(false);
+            await _server!.RunSessionAsync(connection, zoneSession, ct).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -351,7 +358,7 @@ public sealed class GameConnectionHost(
 
     public override void Dispose()
     {
-        _listener?.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        _server?.DisposeAsync().AsTask().GetAwaiter().GetResult();
         base.Dispose();
     }
 }

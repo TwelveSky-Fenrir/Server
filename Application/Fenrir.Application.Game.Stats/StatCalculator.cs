@@ -1,5 +1,5 @@
 using System.Collections.Frozen;
-using Fenrir.Network.Serialization.Packets.Shared;
+using Fenrir.Network.Serialization.Shared.Packets.Shared;
 
 namespace Fenrir.Application.Game.Stats;
 

@@ -16,8 +16,10 @@ using Fenrir.Data.Abstractions.Game;
 using Fenrir.Data.Abstractions.Security;
 using Fenrir.Data.World;
 using Fenrir.Data.WriteBehind;
+using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.FloodProtection;
 using Fenrir.Network.Dispatch.Sessions;
+using Fenrir.Network.Serialization.Wire;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
@@ -34,6 +36,8 @@ public static class HostingServiceCollectionExtensions
 {
     public static IServiceCollection AddGameHosting(this IServiceCollection services)
     {
+        services.AddSingleton<IOpcodeFrameSizeProvider>(ZoneOpcodeRegistry.Provider);
+
         AddWorldState(services);
         AddZoneWar(services);
         AddMonsterBossRespawnTracking(services);

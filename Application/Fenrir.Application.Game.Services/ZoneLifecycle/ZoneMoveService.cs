@@ -7,8 +7,9 @@ using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Network.Dispatch.Sessions;
-using Fenrir.Network.Serialization.Packets.Shared;
-using Fenrir.Network.Serialization.Packets.Zone;
+using Fenrir.Network.Dispatch.Zone.Sessions;
+using Fenrir.Network.Serialization.Shared.Packets.Shared;
+using Fenrir.Network.Serialization.Zone.Packets.Zone;
 using Fenrir.Network.Serialization.Wire;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -222,14 +223,14 @@ public sealed class ZoneMoveService(
             AvatarInfo = AvatarInfoFactory.CreateForRuntimeState(state, targetZoneNumber, posX, posY, posZ),
             BuffInfo = ZoneTransferBuffRules.Resolve(state.Buffs, targetZoneNumber)
         };
-        zoneSession.SendRaw(ZoneMessageFactory.Encode(in registerRecv));
+        zoneSession.Send(in registerRecv);
 
         var broadcastWorldInfo = new WorldSnapshotResponse
         {
             WorldInfo = GuildRankingProjection.Apply(WorldStateTemplates.ZeroedWorldInfo, guildRanking.Top),
             TribeInfo = WorldStateTemplates.ZeroedTribeInfo
         };
-        zoneSession.SendRaw(ZoneMessageFactory.Encode(in broadcastWorldInfo));
+        zoneSession.Send(in broadcastWorldInfo);
 
         // state.PosX/Y/Z is still the SOURCE zone's position here (single-writer invariant: only a zone's own
         // tick may mutate PlayerRuntimeState); the actual move happens later via the Leave/Enter pair below.

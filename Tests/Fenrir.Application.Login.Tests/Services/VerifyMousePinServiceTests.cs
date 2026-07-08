@@ -4,6 +4,8 @@ using Fenrir.Application.Login.Tests.TestSupport;
 using Fenrir.Data.Abstractions.Game;
 using Microsoft.Extensions.Logging.Abstractions;
 
+using Fenrir.Network.Dispatch.Login.Sessions;
+
 namespace Fenrir.Application.Login.Tests.Services;
 
 // op15 CL_LOGIN_MOUSE_PASSWORD_SEND business logic: the Fenrir-only account-scoped, cross-reconnect PIN

@@ -2,8 +2,8 @@ using Fenrir.Application.Game.Handlers.Handlers.Combat;
 using Fenrir.Application.Game.Services.ZoneLifecycle;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Network.Dispatch.Sessions;
-using Fenrir.Network.Serialization.Packets.Shared;
-using Fenrir.Network.Serialization.Packets.Zone;
+using Fenrir.Network.Serialization.Shared.Packets.Shared;
+using Fenrir.Network.Serialization.Zone.Packets.Zone;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Tests.Handlers.Combat;

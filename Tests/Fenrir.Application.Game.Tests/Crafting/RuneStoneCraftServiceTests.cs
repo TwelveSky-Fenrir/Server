@@ -5,6 +5,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Services.ItemModification;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Network.Dispatch.Sessions;
+using Fenrir.Network.Dispatch.Zone.Sessions;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Crafting;

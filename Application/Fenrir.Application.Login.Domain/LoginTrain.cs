@@ -1,6 +1,6 @@
 using Fenrir.Application.Login.Domain.Avatars;
 using Fenrir.Network.Abstractions;
-using Fenrir.Network.Serialization.Packets.Login;
+using Fenrir.Network.Serialization.Login.Packets.Login;
 
 namespace Fenrir.Application.Login.Domain;
 

@@ -1,6 +1,7 @@
 using System.Net;
 using Fenrir.Network.Dispatch.FloodProtection;
 using Fenrir.Network.Dispatch.Sessions;
+using Fenrir.Network.Dispatch.Zone.Sessions;
 using Fenrir.Network.Tests.Sessions;
 
 namespace Fenrir.Network.Tests.FloodProtection;

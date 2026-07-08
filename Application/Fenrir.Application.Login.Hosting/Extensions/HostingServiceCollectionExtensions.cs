@@ -1,7 +1,9 @@
 using Fenrir.Application.Login.Domain;
 using Fenrir.Data.Abstractions.Security;
+using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.FloodProtection;
 using Fenrir.Network.Dispatch.Sessions;
+using Fenrir.Network.Serialization.Wire;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -12,6 +14,7 @@ public static class HostingServiceCollectionExtensions
 {
     public static IServiceCollection AddLoginHosting(this IServiceCollection services)
     {
+        services.AddSingleton<IOpcodeFrameSizeProvider>(LoginOpcodeRegistry.Provider);
         services.AddHostedService<LoginConnectionHost>();
 
         // Forcibly disconnects any Login TCP connection -- pre-auth or post-auth alike -- idle 60+ seconds

@@ -1,5 +1,5 @@
 using Fenrir.Application.Game.Domain.World.ZoneWar;
-using Fenrir.Network.Serialization.Packets.Shared;
+using Fenrir.Network.Serialization.Shared.Packets.Shared;
 
 namespace Fenrir.Application.Game.Tests.World.ZoneWar;
 

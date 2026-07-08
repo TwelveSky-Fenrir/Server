@@ -3,16 +3,20 @@ namespace Fenrir.Generators.Analysis.Support;
 /// <summary>Fully-qualified names on the never-referenced <c>Fenrir.Contracts</c> side, for Roslyn symbol resolution.</summary>
 internal static class WellKnownNames
 {
-    public const string FenrirPacketAttribute = "Fenrir.Network.Serialization.Attributes.FenrirPacketAttribute";
-    public const string FenrirWireTypeAttribute = "Fenrir.Network.Serialization.Attributes.FenrirWireTypeAttribute";
-    public const string FixedStringAttribute = "Fenrir.Network.Serialization.Attributes.FixedStringAttribute";
-    public const string FixedArrayAttribute = "Fenrir.Network.Serialization.Attributes.FixedArrayAttribute";
-    public const string ReservedAttribute = "Fenrir.Network.Serialization.Attributes.ReservedAttribute";
+    public const string FenrirPacketAttribute = "Fenrir.Network.Serialization.Wire.Attributes.FenrirPacketAttribute";
+
+    public const string FenrirWireTypeAttribute =
+        "Fenrir.Network.Serialization.Wire.Attributes.FenrirWireTypeAttribute";
+
+    public const string FixedStringAttribute = "Fenrir.Network.Serialization.Wire.Attributes.FixedStringAttribute";
+    public const string FixedArrayAttribute = "Fenrir.Network.Serialization.Wire.Attributes.FixedArrayAttribute";
+    public const string ReservedAttribute = "Fenrir.Network.Serialization.Wire.Attributes.ReservedAttribute";
 
     public const string ObfuscatedUidFieldAttribute =
-        "Fenrir.Network.Serialization.Attributes.ObfuscatedUidFieldAttribute";
+        "Fenrir.Network.Serialization.Wire.Attributes.ObfuscatedUidFieldAttribute";
 
-    public const string AvatarXorKindAttribute = "Fenrir.Network.Serialization.Attributes.AvatarXorKindAttribute";
+    public const string AvatarXorKindAttribute =
+        "Fenrir.Network.Serialization.Wire.Attributes.AvatarXorKindAttribute";
 
     public const string IFenrirWireType = "Fenrir.Network.Abstractions.IFenrirWireType`1";
     public const string IIncomingPacket = "Fenrir.Network.Abstractions.IIncomingPacket`1";
@@ -25,6 +29,6 @@ internal static class WellKnownNames
     public const string WireHeaderSizes = "global::Fenrir.Network.Serialization.Wire.WireHeaderSizes";
     public const string FenrirServerEnum = "global::Fenrir.Network.Abstractions.FenrirServer";
     public const string FenrirDirectionEnum = "global::Fenrir.Network.Serialization.Wire.FenrirDirection";
-    public const string LoginSessionStateEnum = "global::Fenrir.Network.Serialization.Wire.LoginSessionState";
-    public const string ZoneSessionStateEnum = "global::Fenrir.Network.Serialization.Wire.ZoneSessionState";
+    public const string LoginSessionStateEnum = "global::Fenrir.Network.Serialization.Login.Wire.LoginSessionState";
+    public const string ZoneSessionStateEnum = "global::Fenrir.Network.Serialization.Zone.Wire.ZoneSessionState";
 }

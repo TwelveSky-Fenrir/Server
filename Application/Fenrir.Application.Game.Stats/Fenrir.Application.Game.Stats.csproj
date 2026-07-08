@@ -5,7 +5,9 @@
          calculators here — this is not a zero-dependency leaf, only zero Application-layer (Domain/Services)
          dependency, which is what actually matters for keeping Stats decoupled from gameplay state. -->
     <ProjectReference Include="..\..\Infrastructure\Fenrir.Data.Abstractions\Fenrir.Data.Abstractions.csproj"/>
-    <ProjectReference Include="..\..\Network\Fenrir.Network.Serialization\Fenrir.Network.Serialization.csproj"/>
+    <ProjectReference Include="..\..\Network\Fenrir.Network.Serialization.Wire\Fenrir.Network.Serialization.Wire.csproj"/>
+    <ProjectReference Include="..\..\Network\Fenrir.Network.Serialization.Shared\Fenrir.Network.Serialization.Shared.csproj"/>
+    <ProjectReference Include="..\..\Network\Fenrir.Network.Serialization.Zone\Fenrir.Network.Serialization.Zone.csproj"/>
   </ItemGroup>
 
   <ItemGroup>

@@ -6,7 +6,7 @@ using Fenrir.Application.Game.Hosting.World.ZoneWar;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Data.WriteBehind;
 using Fenrir.Network.Framing;
-using Fenrir.Network.Serialization.Packets.Zone;
+using Fenrir.Network.Serialization.Zone.Packets.Zone;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 

@@ -2,7 +2,7 @@ using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Social.Pshop;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Data.Abstractions.World;
-using Fenrir.Network.Serialization.Packets.Shared;
+using Fenrir.Network.Serialization.Shared.Packets.Shared;
 
 namespace Fenrir.Application.Game.Tests.Social.Pshop;
 

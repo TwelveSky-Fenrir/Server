@@ -1,7 +1,7 @@
 using Fenrir.Application.Game.Abstractions.Progression;
 using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Network.Serialization.Packets.Shared;
+using Fenrir.Network.Serialization.Shared.Packets.Shared;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Progression;

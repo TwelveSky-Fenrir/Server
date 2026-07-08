@@ -3,8 +3,9 @@ using Fenrir.Application.Login.Services.RenameAvatar;
 using Fenrir.Application.Login.Tests.TestSupport;
 using Fenrir.Data.Abstractions.Characters;
 using Fenrir.Data.Abstractions.Guilds;
+using Fenrir.Network.Dispatch.Login.Sessions;
 using Fenrir.Network.Dispatch.Sessions;
-using Fenrir.Network.Serialization.Packets.Login;
+using Fenrir.Network.Serialization.Login.Packets.Login;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Login.Tests.Handlers;

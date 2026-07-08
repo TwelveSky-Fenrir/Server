@@ -37,6 +37,8 @@ internal static class PacketEmitter
             writer.Line();
             writer.Line(
                 $"public static global::Fenrir.Network.Abstractions.WireObfuscationMode Obfuscation => global::Fenrir.Network.Abstractions.WireObfuscationMode.{model.Obfuscation};");
+            writer.Line();
+            writer.Line($"public static bool Compressed => {(model.Compressed ? "true" : "false")};");
         }
 
         if (emitTryRead)
@@ -68,39 +70,41 @@ internal static class PacketEmitter
         writer.CloseBrace();
 
         if (model.Fields.Length > 0)
+        {
             writer.Line();
+            writer.Line("var reader = new global::Fenrir.Network.Serialization.Wire.MessageReader(source);");
+        }
 
         foreach (var field in model.Fields)
         {
+            if (field.ReservedBefore > 0)
+                writer.Line($"reader.Skip({field.ReservedBefore});");
+
             var localName = "v_" + field.PropertyName;
-            var slice = $"source.Slice({field.Offset}, {field.OwnSize})";
 
             // Switch EXPRESSION (not statement): an unhandled FieldShape trips CS8509, a solution-wide
             // build ERROR via TreatWarningsAsErrors, instead of silently emitting zero bytes for that field.
             Action emitField = field.Shape switch
             {
-                FieldShape.Int32 => () => writer.Line(
-                    $"var {localName} = global::System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian({slice});"),
-                FieldShape.UInt32 => () => writer.Line(
-                    $"var {localName} = global::System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian({slice});"),
-                FieldShape.Byte => () => writer.Line($"var {localName} = source[{field.Offset}];"),
-                FieldShape.Single => () => writer.Line(
-                    $"var {localName} = global::System.Buffers.Binary.BinaryPrimitives.ReadSingleLittleEndian({slice});"),
-                FieldShape.Int64 => () => writer.Line(
-                    $"var {localName} = global::System.Buffers.Binary.BinaryPrimitives.ReadInt64LittleEndian({slice});"),
+                FieldShape.Int32 => () => writer.Line($"var {localName} = reader.ReadInt32();"),
+                FieldShape.UInt32 => () => writer.Line($"var {localName} = reader.ReadUInt32();"),
+                FieldShape.Byte => () => writer.Line($"var {localName} = reader.ReadByte();"),
+                FieldShape.Single => () => writer.Line($"var {localName} = reader.ReadSingle();"),
+                FieldShape.Int64 => () => writer.Line($"var {localName} = reader.ReadInt64();"),
                 FieldShape.FixedString => () => writer.Line(
-                    $"var {localName} = global::Fenrir.Network.Serialization.Wire.LegacyWireCodec.ReadFixedString({slice});"),
+                    $"var {localName} = reader.ReadFixedString({field.StringLength});"),
                 FieldShape.Int32Array => () => writer.Line(
-                    $"var {localName} = global::Fenrir.Network.Serialization.Wire.LegacyWireCodec.ReadInt32Array({slice});"),
+                    $"var {localName} = reader.ReadInt32Array({field.OwnSize});"),
                 FieldShape.SingleArray => () => writer.Line(
-                    $"var {localName} = global::Fenrir.Network.Serialization.Wire.LegacyWireCodec.ReadSingleArray({slice});"),
+                    $"var {localName} = reader.ReadSingleArray({field.OwnSize});"),
                 FieldShape.ByteArray => () => writer.Line(
-                    $"var {localName} = global::Fenrir.Network.Serialization.Wire.LegacyWireCodec.ReadByteArray({slice});"),
+                    $"var {localName} = reader.ReadByteArray({field.OwnSize});"),
                 FieldShape.FixedStringArray => () => writer.Line(
-                    $"var {localName} = global::Fenrir.Network.Serialization.Wire.LegacyWireCodec.ReadFixedStringRows({slice}, {field.StringLength});"),
+                    $"var {localName} = reader.ReadFixedStringRows({field.OwnSize}, {field.StringLength});"),
                 FieldShape.Nested => () =>
                 {
-                    writer.Line($"if (!{field.NestedTypeFullName}.TryRead({slice}, out var {localName}))");
+                    writer.Line(
+                        $"if (!{field.NestedTypeFullName}.TryRead(reader.ReadSlice({field.OwnSize}), out var {localName}))");
                     writer.OpenBrace();
                     writer.Line("packet = default;");
                     writer.Line("return false;");
@@ -108,11 +112,12 @@ internal static class PacketEmitter
                 },
                 FieldShape.NestedArray => () =>
                 {
+                    writer.Line($"var {localName}_slice = reader.ReadSlice({field.OwnSize});");
                     writer.Line($"var {localName} = new {field.NestedTypeFullName}[{field.ElementCount}];");
                     writer.Line($"for (var i = 0; i < {field.ElementCount}; i++)");
                     writer.OpenBrace();
                     writer.Line(
-                        $"if (!{field.NestedTypeFullName}.TryRead(source.Slice({field.Offset} + i * {field.NestedSize}, {field.NestedSize}), out {localName}[i]))");
+                        $"if (!{field.NestedTypeFullName}.TryRead({localName}_slice.Slice(i * {field.NestedSize}, {field.NestedSize}), out {localName}[i]))");
                     writer.OpenBrace();
                     writer.Line("packet = default;");
                     writer.Line("return false;");
@@ -157,47 +162,59 @@ internal static class PacketEmitter
         writer.Line("public int Write(global::System.Span<byte> destination)");
         writer.OpenBrace();
 
+        if (model.Fields.Length > 0)
+            writer.Line("var writer = new global::Fenrir.Network.Serialization.Wire.MessageWriter(destination);");
+
         FieldModel? legacyUidField = null;
 
         foreach (var field in model.Fields)
         {
             if (field.ReservedBefore > 0)
-                writer.Line(
-                    $"destination.Slice({field.Offset - field.ReservedBefore}, {field.ReservedBefore}).Clear();");
+                writer.Line($"writer.Skip({field.ReservedBefore});");
 
-            var slice = $"destination.Slice({field.Offset}, {field.OwnSize})";
             var access = field.PropertyName;
+
+            // Nested/NestedArray always capture the reserved slice locally: Nested needs it as the argument
+            // to the nested type's own Write(Span<byte>) (whose return is the nested PayloadSize, not a
+            // span, so it can't double as the post-processing target below); NestedArray needs it to slice
+            // per element in the loop. Every other shape only captures its written slice into a local when
+            // [AvatarXorKind]/[ObfuscatedUidField] actually needs to XOR it afterward - otherwise the typed
+            // Write* call below is emitted as a bare statement, since capturing an unread local would trip
+            // CS0219 (a build ERROR here via TreatWarningsAsErrors).
+            var needsSliceLocal = field.AvatarXor != AvatarXorKind.None || field.IsLegacyUidField;
+            var localName = "v_" + field.PropertyName + "_slice";
+            var assignPrefix = needsSliceLocal ? $"var {localName} = " : "";
 
             // Switch EXPRESSION (not statement): an unhandled FieldShape trips CS8509, a solution-wide
             // build ERROR via TreatWarningsAsErrors, instead of silently emitting zero bytes for that field.
             Action emitField = field.Shape switch
             {
-                FieldShape.Int32 => () => writer.Line(
-                    $"global::System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian({slice}, {access});"),
-                FieldShape.UInt32 => () => writer.Line(
-                    $"global::System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian({slice}, {access});"),
-                FieldShape.Byte => () => writer.Line($"destination[{field.Offset}] = {access};"),
-                FieldShape.Single => () => writer.Line(
-                    $"global::System.Buffers.Binary.BinaryPrimitives.WriteSingleLittleEndian({slice}, {access});"),
-                FieldShape.Int64 => () => writer.Line(
-                    $"global::System.Buffers.Binary.BinaryPrimitives.WriteInt64LittleEndian({slice}, {access});"),
+                FieldShape.Int32 => () => writer.Line($"{assignPrefix}writer.WriteInt32({access});"),
+                FieldShape.UInt32 => () => writer.Line($"{assignPrefix}writer.WriteUInt32({access});"),
+                FieldShape.Byte => () => writer.Line($"{assignPrefix}writer.WriteByte({access});"),
+                FieldShape.Single => () => writer.Line($"{assignPrefix}writer.WriteSingle({access});"),
+                FieldShape.Int64 => () => writer.Line($"{assignPrefix}writer.WriteInt64({access});"),
                 FieldShape.FixedString => () => writer.Line(
-                    $"global::Fenrir.Network.Serialization.Wire.LegacyWireCodec.WriteFixedString({slice}, {access});"),
+                    $"{assignPrefix}writer.WriteFixedString({access}, {field.StringLength});"),
                 FieldShape.Int32Array => () => writer.Line(
-                    $"global::Fenrir.Network.Serialization.Wire.LegacyWireCodec.WriteInt32Array({slice}, {access});"),
+                    $"{assignPrefix}writer.WriteInt32Array({access}, {field.OwnSize});"),
                 FieldShape.SingleArray => () => writer.Line(
-                    $"global::Fenrir.Network.Serialization.Wire.LegacyWireCodec.WriteSingleArray({slice}, {access});"),
+                    $"{assignPrefix}writer.WriteSingleArray({access}, {field.OwnSize});"),
                 FieldShape.ByteArray => () => writer.Line(
-                    $"global::Fenrir.Network.Serialization.Wire.LegacyWireCodec.WriteByteArray({slice}, {access});"),
+                    $"{assignPrefix}writer.WriteByteArray({access}, {field.OwnSize});"),
                 FieldShape.FixedStringArray => () => writer.Line(
-                    $"global::Fenrir.Network.Serialization.Wire.LegacyWireCodec.WriteFixedStringRows({slice}, {access}, {field.StringLength});"),
-                FieldShape.Nested => () => writer.Line($"{access}.Write({slice});"),
+                    $"{assignPrefix}writer.WriteFixedStringRows({access}, {field.OwnSize}, {field.StringLength});"),
+                FieldShape.Nested => () =>
+                {
+                    writer.Line($"var {localName} = writer.Reserve({field.OwnSize});");
+                    writer.Line($"{access}.Write({localName});");
+                },
                 FieldShape.NestedArray => () =>
                 {
+                    writer.Line($"var {localName} = writer.Reserve({field.OwnSize});");
                     writer.Line($"for (var i = 0; i < {field.ElementCount}; i++)");
                     writer.OpenBrace();
-                    writer.Line(
-                        $"{access}[i].Write(destination.Slice({field.Offset} + i * {field.NestedSize}, {field.NestedSize}));");
+                    writer.Line($"{access}[i].Write({localName}.Slice(i * {field.NestedSize}, {field.NestedSize}));");
                     writer.CloseBrace();
                 },
                 // See the matching discard arm in EmitTryRead: Roslyn can't prove enum-switch exhaustiveness
@@ -214,17 +231,17 @@ internal static class PacketEmitter
                 switch (field.AvatarXor)
                 {
                     case AvatarXorKind.Int:
-                        writer.Line($"global::Fenrir.Network.Compression.WireXor.XorInt({slice});");
+                        writer.Line($"global::Fenrir.Network.Compression.WireXor.XorInt({localName});");
                         break;
                     case AvatarXorKind.IntArray:
-                        writer.Line($"global::Fenrir.Network.Compression.WireXor.XorIntArray({slice});");
+                        writer.Line($"global::Fenrir.Network.Compression.WireXor.XorIntArray({localName});");
                         break;
                     case AvatarXorKind.Char:
-                        writer.Line($"global::Fenrir.Network.Compression.WireXor.XorChar({slice});");
+                        writer.Line($"global::Fenrir.Network.Compression.WireXor.XorChar({localName});");
                         break;
                     case AvatarXorKind.Char2:
                         writer.Line(
-                            $"global::Fenrir.Network.Compression.WireXor.XorChar2Rows({slice}, {field.AvatarXorRowLength});");
+                            $"global::Fenrir.Network.Compression.WireXor.XorChar2Rows({localName}, {field.AvatarXorRowLength});");
                         break;
                 }
 
@@ -238,7 +255,7 @@ internal static class PacketEmitter
             writer.Line(
                 "// [ObfuscatedUidField] (§3.3): double-XOR of tID, independent of the global XOR_PACKET applied later by the send layer.");
             writer.Line(
-                $"global::Fenrir.Network.Compression.WireXor.ApplyUidXor(destination.Slice({legacyUidField.Offset}, {legacyUidField.OwnSize}));");
+                $"global::Fenrir.Network.Compression.WireXor.ApplyUidXor(v_{legacyUidField.PropertyName}_slice);");
         }
 
         writer.Line();

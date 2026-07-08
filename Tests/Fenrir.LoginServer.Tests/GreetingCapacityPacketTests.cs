@@ -73,10 +73,11 @@ public class GreetingCapacityPacketTests
 
     private static LoginConnectionHost CreateHost(LoginCapacityState capacity)
     {
-        // dispatcher/rateLimiter are never touched by BuildGreetingPacket -- only Greet()'s I/O-pump
+        // dispatcher/opcodeRegistry/rateLimiter are never touched by BuildGreetingPacket -- only Greet()'s I/O-pump
         // continuation (not exercised here) would need them.
         return new LoginConnectionHost(
             Options.Create(new LoginServerOptions()),
+            null!,
             null!,
             null!,
             new SessionRegistry(),

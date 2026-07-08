@@ -19,11 +19,18 @@ namespace Fenrir.Generators.Protocol.Emitters;
 ///     Fenrir feature needs a combined state+flag gate at the dispatch layer, so extending the generator (e.g.
 ///     a per-packet predicate delegate alongside <c>AllowedStates</c>) is deliberately deferred until one
 ///     actually does. The dispatch-side call site is <c>ClientSession.IsOpcodeAllowed</c>
-///     (<c>Network/Fenrir.Network.Dispatch/Sessions/ClientSession.cs:100</c>, overridden per-server in
-///     <c>ZoneClientSession.cs:85-88</c>/<c>LoginClientSession.cs</c>), invoked from
-///     <c>SessionLoop.ProcessBufferAsync</c> before every dispatch
-///     (<c>Network/Fenrir.Network.Dispatch/SessionLoop.cs:112</c>) -- see that call site's own remarks for
-///     the same limitation from the dispatch side.
+///     (<c>Network/Fenrir.Network.Dispatch/Sessions/ClientSession.cs</c>), overridden per-server in
+///     <c>ZoneClientSession.cs</c>/<c>LoginClientSession.cs</c> (now in the <c>Dispatch.Zone</c>/
+///     <c>Dispatch.Login</c> projects), invoked from <c>SessionLoop.ProcessBufferAsync</c> before every
+///     dispatch -- see that call site's own remarks for the same limitation from the dispatch side.
+/// </remarks>
+/// <remarks>
+///     Named per-server -- <c>LoginSessionStateGate</c>/<c>ZoneSessionStateGate</c>, never a bare
+///     <c>SessionStateGate</c> -- for the exact same reason <see cref="OpcodeRegistryEmitter" /> is: both
+///     <c>Fenrir.Network.Serialization.Login</c> and <c>.Zone</c> emit into the same namespace, and a bare
+///     name would collide (CS0433) the instant a project references both together, even though no current
+///     call site happens to trigger it (only <c>LoginClientSession</c>/<c>ZoneClientSession</c>, each
+///     compiled against exactly one of the two, ever reference it by name today).
 /// </remarks>
 internal static class SessionStateGateEmitter
 {
@@ -31,15 +38,18 @@ internal static class SessionStateGateEmitter
 
     public static string Emit(ImmutableArray<TypeModel> packets)
     {
-        var loginEntries = packets
-            .Where(p => p.Server == FenrirServer.Login &&
-                        p is { Direction: FenrirDirection.Incoming, AllowedStates.Length: > 0 })
-            .OrderBy(p => p.Opcode)
-            .ToImmutableArray();
+        // Safe: ProtocolIncrementalGenerator.EmitAggregates already returns early when packets is empty, and
+        // every remaining compilation contains exactly one server's [FenrirPacket]s post packet-project split.
+        // stateEnum is fully qualified (not a short name relying on same-namespace resolution): this class is
+        // always emitted into Fenrir.Network.Serialization.Wire, but LoginSessionState/ZoneSessionState
+        // themselves live in Fenrir.Network.Serialization.{Login,Zone}.Wire respectively.
+        var server = packets[0].Server;
+        var (className, stateEnum) = server == FenrirServer.Login
+            ? ("LoginSessionStateGate", WellKnownNames.LoginSessionStateEnum)
+            : ("ZoneSessionStateGate", WellKnownNames.ZoneSessionStateEnum);
 
-        var zoneEntries = packets
-            .Where(p => p.Server == FenrirServer.Zone &&
-                        p is { Direction: FenrirDirection.Incoming, AllowedStates.Length: > 0 })
+        var entries = packets
+            .Where(p => p is { Direction: FenrirDirection.Incoming, AllowedStates.Length: > 0 })
             .OrderBy(p => p.Opcode)
             .ToImmutableArray();
 
@@ -54,12 +64,10 @@ internal static class SessionStateGateEmitter
             "/// An opcode with no declared [FenrirPacket(AllowedStates = [...])] is legal in any session state");
         writer.Line("/// (e.g. handshake op 0): <c>Allows</c> then always returns <c>true</c> for that opcode.");
         writer.Line("/// </summary>");
-        writer.Line("public static class SessionStateGate");
+        writer.Line($"public static class {className}");
         writer.OpenBrace();
 
-        EmitAllows(writer, "LoginSessionState", loginEntries);
-        writer.Line();
-        EmitAllows(writer, "ZoneSessionState", zoneEntries);
+        EmitAllows(writer, stateEnum, entries);
 
         writer.CloseBrace();
         return writer.ToString();

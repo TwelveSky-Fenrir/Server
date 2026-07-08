@@ -1,6 +1,7 @@
 using Fenrir.Network.Abstractions;
+using Fenrir.Network.Dispatch.Login.Sessions;
 using Fenrir.Network.Dispatch.Sessions;
-using Fenrir.Network.Serialization.Packets.Login;
+using Fenrir.Network.Serialization.Login.Packets.Login;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Login.Handlers.Handlers;

@@ -10,7 +10,7 @@ using Fenrir.Application.Game.Tests.GameData;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Data.Abstractions.World;
 using Fenrir.Data.WriteBehind;
-using Fenrir.Network.Serialization.Packets.Shared;
+using Fenrir.Network.Serialization.Shared.Packets.Shared;
 using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.Simulation;

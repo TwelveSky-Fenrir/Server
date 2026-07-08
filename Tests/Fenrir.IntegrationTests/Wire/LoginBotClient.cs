@@ -1,6 +1,6 @@
 using Fenrir.Network.Compression;
-using Fenrir.Network.Serialization.Packets.Login;
-using Fenrir.Network.Serialization.Packets.Shared;
+using Fenrir.Network.Serialization.Login.Packets.Login;
+using Fenrir.Network.Serialization.Shared.Packets.Shared;
 using Fenrir.Network.Serialization.Wire;
 
 namespace Fenrir.IntegrationTests.Wire;
@@ -160,10 +160,10 @@ public sealed class LoginBotClient : IAsyncDisposable
     /// <summary>
     ///     Every client-&gt;server frame is <c>CLIENT_PACKET</c>-framed on the wire (<c>WireHeaderSizes.ClientPacketSize</c>
     ///     = 9: <c>int tPacket1 + int tPacket2 + BYTE tProtocol</c>, opcode at header offset 8), not the bare
-    ///     opcode-then-payload shape a server response uses -- <see cref="Fenrir.Network.Framing.FrameDecoder" />
+    ///     opcode-then-payload shape a server response uses -- <see cref="Fenrir.Network.Framing.FrameReader" />
     ///     unconditionally requires and slices off those leading 9 bytes before locating the opcode/payload for
     ///     any INCOMING frame, on both LoginServer and GameServer. tPacket1/tPacket2 carry no framing
-    ///     information the server ever validates (see FrameDecoder's own remarks), so any filler value works --
+    ///     information the server ever validates (see FrameReader's own remarks), so any filler value works --
     ///     left zero here.
     /// </summary>
     private async Task SendAsync(byte opcode, byte[] payload, CancellationToken ct)

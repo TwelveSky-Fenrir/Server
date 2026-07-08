@@ -20,7 +20,7 @@ namespace Fenrir.Network.Dispatch;
 public static class SessionLoop
 {
     /// <summary>
-    ///     Runs one connection's I/O pump (<see cref="SocketConnection.RunIOAsync" />) and its dispatch loop
+    ///     Runs one connection's I/O pump (<see cref="SocketConnection.RunIoAsync" />) and its dispatch loop
     ///     (<see cref="RunAsync" />) together, the way every connection host (<c>GameConnectionHost</c>,
     ///     <c>LoginConnectionHost</c>) wires up an accepted socket. Prefer this over a bare
     ///     <c>Task.WhenAll(connection.RunIOAsync(ct), RunAsync(...))</c> at the call site: this method
@@ -29,24 +29,25 @@ public static class SessionLoop
     ///     idle/liveness sweep, the peer's own graceful FIN, or the caller's own cancellation) --
     ///     <see cref="SocketConnection.Abort" />'s own remarks explain why that call is otherwise needed: a
     ///     session torn down while its peer stays silent (never sends another byte, never closes) would
-    ///     otherwise leave <see cref="SocketConnection.RunIOAsync" /> parked on its own blocking socket receive
+    ///     otherwise leave <see cref="SocketConnection.RunIoAsync" /> parked on its own blocking socket receive
     ///     indefinitely, holding open every resource a connection host's teardown path only frees once
-    ///     <see cref="SocketConnection.RunIOAsync" /> itself completes.
+    ///     <see cref="SocketConnection.RunIoAsync" /> itself completes.
     /// </summary>
     public static async Task RunConnectionAsync(
         SocketConnection connection,
         ClientSession session,
         IFrameDispatcher dispatcher,
+        IOpcodeFrameSizeProvider registry,
         ISessionRateLimiter? rateLimiter,
         IpFloodGuard? ipFloodGuard,
         CancellationToken cancellationToken,
         ILogger? logger = null)
     {
-        var ioTask = connection.RunIOAsync(cancellationToken);
+        var ioTask = connection.RunIoAsync(cancellationToken);
 
         try
         {
-            await RunAsync(session, dispatcher, rateLimiter, ipFloodGuard, cancellationToken, logger)
+            await RunAsync(session, dispatcher, registry, rateLimiter, ipFloodGuard, cancellationToken, logger)
                 .ConfigureAwait(false);
         }
         finally
@@ -65,6 +66,7 @@ public static class SessionLoop
     public static async Task RunAsync(
         ClientSession session,
         IFrameDispatcher dispatcher,
+        IOpcodeFrameSizeProvider registry,
         ISessionRateLimiter? rateLimiter,
         IpFloodGuard? ipFloodGuard,
         CancellationToken cancellationToken,
@@ -82,7 +84,7 @@ public static class SessionLoop
                     break; // Abort() called (externally or by a previous iteration) — reason already recorded
 
                 var outcome =
-                    await ProcessBufferAsync(session, dispatcher, rateLimiter, ipFloodGuard, result.Buffer,
+                    await ProcessBufferAsync(session, dispatcher, registry, rateLimiter, ipFloodGuard, result.Buffer,
                             cancellationToken, logger)
                         .ConfigureAwait(false);
 
@@ -136,6 +138,7 @@ public static class SessionLoop
     private static async ValueTask<BufferOutcome> ProcessBufferAsync(
         ClientSession session,
         IFrameDispatcher dispatcher,
+        IOpcodeFrameSizeProvider registry,
         ISessionRateLimiter? rateLimiter,
         IpFloodGuard? ipFloodGuard,
         ReadOnlySequence<byte> buffer,
@@ -162,7 +165,7 @@ public static class SessionLoop
 
             try
             {
-                decoded = FrameDecoder.TryReadFrame(ref remaining, session.Server, out var frame);
+                decoded = FrameReader.TryReadFrame(ref remaining, registry, session.Server, out var frame);
                 frameServer = frame.Server;
                 frameOpcode = frame.Opcode;
                 framePayload = frame.Payload;

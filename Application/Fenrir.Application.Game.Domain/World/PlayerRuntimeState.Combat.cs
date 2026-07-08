@@ -1,6 +1,6 @@
 using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Movement;
-using Fenrir.Network.Serialization.Packets.Shared;
+using Fenrir.Network.Serialization.Shared.Packets.Shared;
 
 namespace Fenrir.Application.Game.Domain.World;
 
@@ -197,7 +197,7 @@ public partial class PlayerRuntimeState
     /// </summary>
     /// <remarks>
     ///     Deliberately a fresh per-instance array (never
-    ///     <c>Fenrir.Network.Serialization.Packets.Shared.WorldStateTemplates.ZeroedBuffInfo</c>,
+    ///     <c>Fenrir.Network.Serialization.Shared.Packets.Shared.WorldStateTemplates.ZeroedBuffInfo</c>,
     ///     a shared static instance) -- reusing that template would let every player's buffs alias the same backing
     ///     <c>int[]</c>.
     /// </remarks>

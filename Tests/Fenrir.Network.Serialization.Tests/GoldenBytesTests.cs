@@ -1,9 +1,9 @@
 using System.Buffers.Binary;
 using System.Text;
 using Fenrir.Network.Compression;
-using Fenrir.Network.Serialization.Packets.Login;
-using Fenrir.Network.Serialization.Packets.Shared;
-using Fenrir.Network.Serialization.Packets.Zone;
+using Fenrir.Network.Serialization.Login.Packets.Login;
+using Fenrir.Network.Serialization.Shared.Packets.Shared;
+using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Network.Serialization.Tests;
 

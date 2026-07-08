@@ -1,7 +1,7 @@
 using System.Buffers.Binary;
 using System.Text;
 using Fenrir.Network.Compression;
-using Fenrir.Network.Serialization.Packets.Login;
+using Fenrir.Network.Serialization.Login.Packets.Login;
 
 namespace Fenrir.Network.Serialization.Tests.Packets.Login;
 

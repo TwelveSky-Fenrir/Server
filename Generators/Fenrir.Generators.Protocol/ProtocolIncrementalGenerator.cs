@@ -17,9 +17,6 @@ public sealed class ProtocolIncrementalGenerator : IIncrementalGenerator
 {
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-        context.RegisterPostInitializationOutput(static ctx =>
-            ctx.AddSource(RuntimeHelpersEmitter.HintName, RuntimeHelpersEmitter.Source));
-
         var packetResults = context.SyntaxProvider.ForAttributeWithMetadataName(
             WellKnownNames.FenrirPacketAttribute,
             static (node, _) => node is TypeDeclarationSyntax,
@@ -60,15 +57,14 @@ public sealed class ProtocolIncrementalGenerator : IIncrementalGenerator
         foreach (var diagnostic in collisionDiagnostics)
             context.ReportDiagnostic(diagnostic);
 
+        // No [FenrirPacket] in this compilation (e.g. Fenrir.Network.Serialization.Shared, [FenrirWireType]
+        // only) -- must not emit an empty OpcodeRegistry/SessionStateGate here: any project referencing both
+        // this one and a real Login/Zone protocol project would see two same-named, same-namespace types
+        // (CS0433) the moment both assemblies are in scope together.
+        if (deduplicated.IsEmpty)
+            return;
+
         context.AddSource(OpcodeRegistryEmitter.HintName, OpcodeRegistryEmitter.Emit(deduplicated));
         context.AddSource(SessionStateGateEmitter.HintName, SessionStateGateEmitter.Emit(deduplicated));
-
-        var loginFactory = MessageFactoryEmitter.Emit(FenrirServer.Login, deduplicated);
-        if (loginFactory is not null)
-            context.AddSource(MessageFactoryEmitter.HintNameFor(FenrirServer.Login), loginFactory);
-
-        var zoneFactory = MessageFactoryEmitter.Emit(FenrirServer.Zone, deduplicated);
-        if (zoneFactory is not null)
-            context.AddSource(MessageFactoryEmitter.HintNameFor(FenrirServer.Zone), zoneFactory);
     }
 }

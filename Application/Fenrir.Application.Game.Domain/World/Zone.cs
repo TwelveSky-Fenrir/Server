@@ -15,6 +15,7 @@ using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Data.WriteBehind;
 using Fenrir.Network.Dispatch.Sessions;
+using Fenrir.Network.Dispatch.Zone.Sessions;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Domain.World;

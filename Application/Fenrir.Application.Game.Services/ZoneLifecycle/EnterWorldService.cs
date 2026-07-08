@@ -15,8 +15,9 @@ using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Stats;
 using Fenrir.Data.Security;
 using Fenrir.Network.Dispatch.Sessions;
-using Fenrir.Network.Serialization.Packets.Shared;
-using Fenrir.Network.Serialization.Packets.Zone;
+using Fenrir.Network.Dispatch.Zone.Sessions;
+using Fenrir.Network.Serialization.Shared.Packets.Shared;
+using Fenrir.Network.Serialization.Zone.Packets.Zone;
 using Fenrir.Network.Serialization.Wire;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -228,7 +229,7 @@ public sealed class EnterWorldService(
                     bundle.Skills, bundle.Hotkeys),
                 BuffInfo = BuildBuffInfo(bundle.Buffs)
             };
-            zoneSession.SendRaw(ZoneMessageFactory.Encode(in registerRecv));
+            zoneSession.Send(in registerRecv);
 
             var broadcastWorldInfo = new WorldSnapshotResponse
             {
@@ -247,7 +248,7 @@ public sealed class EnterWorldService(
                 // placeholder until that surface exists, not a regression introduced here.
                 TribeInfo = WorldStateTemplates.ZeroedTribeInfo
             };
-            zoneSession.SendRaw(ZoneMessageFactory.Encode(in broadcastWorldInfo));
+            zoneSession.Send(in broadcastWorldInfo);
 
             // Legacy pairs the full 12-tower ownership/status snapshot with the RvR world-info broadcast
             // immediately above, unconditionally, inside this same registration-completion sequence

@@ -26,9 +26,10 @@ using Fenrir.Data.Security;
 using Fenrir.Data.WriteBehind;
 using Fenrir.Network.Compression;
 using Fenrir.Network.Dispatch.Sessions;
+using Fenrir.Network.Dispatch.Zone.Sessions;
 using Fenrir.Network.Framing;
-using Fenrir.Network.Serialization.Packets.Shared;
-using Fenrir.Network.Serialization.Packets.Zone;
+using Fenrir.Network.Serialization.Shared.Packets.Shared;
+using Fenrir.Network.Serialization.Zone.Packets.Zone;
 using Fenrir.Network.Serialization.Wire;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -139,7 +140,7 @@ public class EnterWorldServiceTests
                 AvatarSocialSnapshot.Empty, bundle.Skills, bundle.Hotkeys),
             BuffInfo = ExpectedBuffInfo(buffs)
         };
-        var expectedEnterWorldBytes = ZoneMessageFactory.Encode(in expectedEnterWorld);
+        var expectedEnterWorldBytes = FrameWriter.WriteCompressedFrame(in expectedEnterWorld);
 
         // 2) WorldSnapshotResponse: WorldInfo must reflect the live WorldStateService snapshot, not zeros.
         var expectedWorldSnapshot = new WorldSnapshotResponse
@@ -150,7 +151,7 @@ public class EnterWorldServiceTests
                 zoneCenterSiegeState, tribeGuardCorridorState),
             TribeInfo = WorldStateTemplates.ZeroedTribeInfo
         };
-        var expectedWorldSnapshotBytes = ZoneMessageFactory.Encode(in expectedWorldSnapshot);
+        var expectedWorldSnapshotBytes = FrameWriter.WriteCompressedFrame(in expectedWorldSnapshot);
 
         // 3) TowerStatusResponse: the 12-tower ownership/status snapshot must now be sent unconditionally,
         // immediately after WorldSnapshotResponse -- see EnterWorldService's own remarks on this send.

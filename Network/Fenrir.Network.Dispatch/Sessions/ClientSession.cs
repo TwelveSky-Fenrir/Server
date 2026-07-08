@@ -78,6 +78,16 @@ public abstract class ClientSession(
     /// </summary>
     public void Send<TPacket>(in TPacket packet) where TPacket : struct, IOutgoingPacket
     {
+        // TPacket.Compressed is a static abstract member resolved per closed-generic instantiation -- zero
+        // runtime branch cost, the same mechanism FrameWriter.WriteFrame already uses for TPacket.Obfuscation.
+        // Routes every Compressed packet through the ZPACKET+LZ4 envelope (a different header shape than the
+        // plain frame below) without requiring any call site to know or care which path its packet takes.
+        if (TPacket.Compressed)
+        {
+            SendRaw(FrameWriter.WriteCompressedFrame(in packet));
+            return;
+        }
+
         var total = FrameWriter.FrameSizeOf<TPacket>();
 
         if (!_sendLock.Wait(0))
@@ -121,8 +131,10 @@ public abstract class ClientSession(
     /// </summary>
     public abstract bool IsOpcodeAllowed(byte opcode);
 
-    // Sends a fully pre-built frame as-is — the LZ4/ZPACKET path for Compressed M1 packets, whose bytes
-    // already come out of the generated MessageFactory.Encode. Same never-block contract as Send<T> above.
+    // Sends a fully pre-built frame as-is — used internally by Send<T> for the LZ4/ZPACKET path (see its own
+    // TPacket.Compressed branch), whose bytes come out of FrameWriter.WriteCompressedFrame. Same never-block
+    // contract as Send<T> above; public so a caller already holding a raw frame from elsewhere doesn't need
+    // to round-trip it through a fake packet type.
     public void SendRaw(ReadOnlySpan<byte> rawFrame)
     {
         if (!_sendLock.Wait(0))
@@ -150,8 +162,8 @@ public abstract class ClientSession(
     }
 
     /// <summary>
-    ///     Every producer of a pre-built raw frame (<see cref="FrameWriter.WriteFrame{TPacket}" />, the
-    ///     generated <c>LoginMessageFactory</c>/<c>ZoneMessageFactory.Encode</c> ZPACKET envelope) writes the
+    ///     Every producer of a pre-built raw frame (<see cref="FrameWriter.WriteFrame{TPacket}" />,
+    ///     <see cref="FrameWriter.WriteCompressedFrame{TPacket}" />'s ZPACKET envelope) writes the
     ///     opcode as the frame's first byte -- safe to read back here purely for <see cref="LogPacketSent" />,
     ///     without requiring every <see cref="SendRaw" /> call site to separately supply its own opcode.
     /// </summary>

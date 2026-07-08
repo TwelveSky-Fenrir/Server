@@ -6,6 +6,7 @@ using Fenrir.Application.Login.Hosting;
 using Fenrir.Data.Abstractions.Game;
 using Fenrir.Data.Abstractions.Runtime;
 using Fenrir.Network.Dispatch.FloodProtection;
+using Fenrir.Network.Dispatch.Login.Sessions;
 using Fenrir.Network.Dispatch.RateLimiting;
 using Fenrir.Network.Dispatch.Sessions;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -42,6 +43,7 @@ public sealed class LoginConnectionHostShutdownDrainTests
         var host = new LoginConnectionHost(
             Options.Create(new LoginServerOptions { Port = port }),
             null!, // IFrameDispatcher: never invoked -- this test sends zero bytes over the accepted socket
+            null!, // IOpcodeFrameSizeProvider: same -- no frame is ever decoded on this connection
             new SessionRateLimiter(),
             registry,
             new LoginCapacityState(),

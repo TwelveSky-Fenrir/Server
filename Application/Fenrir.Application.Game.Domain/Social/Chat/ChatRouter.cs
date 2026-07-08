@@ -1,3 +1,5 @@
+using Fenrir.Network.Dispatch.Zone.Sessions;
+
 namespace Fenrir.Application.Game.Domain.Social.Chat;
 
 /// <summary>

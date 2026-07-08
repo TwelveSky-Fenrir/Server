@@ -1,10 +1,12 @@
+using Fenrir.Network.Serialization.Shared.Packets.Shared;
+
 namespace Fenrir.Application.Game.Domain.World.Monsters;
 
 /// <summary>
 ///     Finite-state machine for <see cref="MonsterEntity" />, modeled on legacy <c>mDATA.mAction.aSort</c>
 ///     (<c>Server/ts25zone/S07_MyGame05.cpp</c>). Values match the legacy aSort codes exactly (not renumbered)
 ///     so <c>(int)state</c> can be written straight into
-///     <see cref="Fenrir.Network.Serialization.Packets.Shared.ActionInfo.Sort" />
+///     <see cref="ActionInfo.Sort" />
 ///     without a translation table.
 /// </summary>
 public enum MonsterAiState : byte

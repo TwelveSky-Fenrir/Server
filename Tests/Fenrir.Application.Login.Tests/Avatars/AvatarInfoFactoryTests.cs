@@ -1,6 +1,6 @@
 using Fenrir.Application.Login.Domain.Avatars;
 using Fenrir.Data.Abstractions.Characters;
-using Fenrir.Network.Serialization.Packets.Shared;
+using Fenrir.Network.Serialization.Shared.Packets.Shared;
 
 namespace Fenrir.Application.Login.Tests.Avatars;
 

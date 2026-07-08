@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Net;
 using System.Net.Sockets;
+using Fenrir.Network.Dispatch.Login.Sessions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Transport;
 
@@ -31,7 +32,7 @@ public sealed class SocketConnectionSmokeTests
             (_, connection, acceptCt) =>
             {
                 accepted.TrySetResult(connection);
-                return connection.RunIOAsync(acceptCt); // keeps pumping the socket for the rest of this test
+                return connection.RunIoAsync(acceptCt); // keeps pumping the socket for the rest of this test
             },
             ct);
 

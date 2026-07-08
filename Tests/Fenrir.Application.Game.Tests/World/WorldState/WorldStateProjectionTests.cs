@@ -1,5 +1,5 @@
 using Fenrir.Application.Game.Domain.World.WorldState;
-using Fenrir.Network.Serialization.Packets.Shared;
+using Fenrir.Network.Serialization.Shared.Packets.Shared;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.World.WorldState;

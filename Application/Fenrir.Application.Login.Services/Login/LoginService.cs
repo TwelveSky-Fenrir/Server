@@ -7,7 +7,7 @@ using Fenrir.Application.Login.Domain.RateLimiting;
 using Fenrir.Application.Login.Domain.Security;
 using Fenrir.Data.Security;
 using Fenrir.Network.Dispatch.Sessions;
-using Fenrir.Network.Serialization.Packets.Login;
+using Fenrir.Network.Serialization.Login.Packets.Login;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;

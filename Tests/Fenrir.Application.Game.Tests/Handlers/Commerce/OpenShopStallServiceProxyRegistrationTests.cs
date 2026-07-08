@@ -7,8 +7,8 @@ using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Data.Abstractions.Admin;
 using Fenrir.Data.Abstractions.Characters;
 using Fenrir.Data.Abstractions.Commerce;
-using Fenrir.Network.Serialization.Packets.Shared;
-using Fenrir.Network.Serialization.Packets.Zone;
+using Fenrir.Network.Serialization.Shared.Packets.Shared;
+using Fenrir.Network.Serialization.Zone.Packets.Zone;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.Handlers.Commerce;

@@ -2,7 +2,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Fenrir.Application.Login.Domain\Fenrir.Application.Login.Domain.csproj"/>
-    <ProjectReference Include="..\..\Network\Fenrir.Network.Serialization\Fenrir.Network.Serialization.csproj"/>
+    <ProjectReference Include="..\..\Network\Fenrir.Network.Serialization.Wire\Fenrir.Network.Serialization.Wire.csproj"/>
+    <ProjectReference Include="..\..\Network\Fenrir.Network.Serialization.Shared\Fenrir.Network.Serialization.Shared.csproj"/>
+    <ProjectReference Include="..\..\Network\Fenrir.Network.Serialization.Login\Fenrir.Network.Serialization.Login.csproj"/>
     <ProjectReference Include="..\..\Network\Fenrir.Network.Dispatch\Fenrir.Network.Dispatch.csproj"/>
   </ItemGroup>
 

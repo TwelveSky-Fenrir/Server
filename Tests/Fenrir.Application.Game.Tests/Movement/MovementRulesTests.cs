@@ -4,7 +4,7 @@ using Fenrir.Application.Game.Domain.Movement;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.Geometry;
 using Fenrir.Application.Game.Tests.TestSupport;
-using Fenrir.Network.Serialization.Packets.Shared;
+using Fenrir.Network.Serialization.Shared.Packets.Shared;
 using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.Movement;

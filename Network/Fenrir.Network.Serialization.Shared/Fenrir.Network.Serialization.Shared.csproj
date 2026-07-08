@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Every wire-type declaration references Opcodes.*/FenrirServer (living in Fenrir.Network.Abstractions);
+         a project-wide implicit using avoids repeating it in every file. -->
+    <Using Include="Fenrir.Network.Abstractions"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Fenrir.Network.Abstractions\Fenrir.Network.Abstractions.csproj"/>
+    <ProjectReference Include="..\Fenrir.Network.Serialization.Wire\Fenrir.Network.Serialization.Wire.csproj"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Both must be loaded into the analyzer host: Protocol calls into Analysis at generator
+         runtime, and a ProjectReference-as-Analyzer only loads the directly referenced assembly,
+         not its own transitive references. -->
+    <ProjectReference Include="..\..\Analysis\Fenrir.Generators.Analysis\Fenrir.Generators.Analysis.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false"/>
+    <ProjectReference Include="..\..\Generators\Fenrir.Generators.Protocol\Fenrir.Generators.Protocol.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false"/>
+  </ItemGroup>
+
+</Project>

@@ -2,8 +2,8 @@ using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using Fenrir.Application.Game.Handlers.Handlers.Dispatching;
 using Fenrir.Network.Abstractions;
-using Fenrir.Network.Serialization.Attributes;
 using Fenrir.Network.Serialization.Wire;
+using Fenrir.Network.Serialization.Wire.Attributes;
 
 namespace Fenrir.Application.Game.Tests;
 

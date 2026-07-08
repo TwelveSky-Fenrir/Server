@@ -9,5 +9,8 @@ public interface IOutgoingPacket : IFenrirPacket
     /// </summary>
     public static abstract WireObfuscationMode Obfuscation { get; }
 
+    /// <summary>ZPACKET + LZ4 envelope on send (<c>Fenrir.Network.Compression.Lz4Envelope</c>), instead of the plain frame.</summary>
+    public static abstract bool Compressed { get; }
+
     public int Write(Span<byte> destination);
 }

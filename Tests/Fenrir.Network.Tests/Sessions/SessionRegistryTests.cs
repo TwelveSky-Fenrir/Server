@@ -1,5 +1,6 @@
 using System.Net;
 using Fenrir.Network.Dispatch.Sessions;
+using Fenrir.Network.Dispatch.Zone.Sessions;
 
 namespace Fenrir.Network.Tests.Sessions;
 

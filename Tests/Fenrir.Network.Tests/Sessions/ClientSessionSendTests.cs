@@ -1,7 +1,8 @@
 using System.Buffers;
 using System.IO.Pipelines;
 using Fenrir.Network.Dispatch.Sessions;
-using Fenrir.Network.Serialization.Packets.Zone;
+using Fenrir.Network.Dispatch.Zone.Sessions;
+using Fenrir.Network.Serialization.Zone.Packets.Zone;
 using Fenrir.Network.Tests.TestSupport;
 using Microsoft.Extensions.Logging;
 
@@ -183,7 +184,7 @@ public class ClientSessionSendTests
     }
 
     // SendRaw has no TPacket to read Opcode from -- it must recover the opcode from the pre-built frame's own
-    // first byte instead (every producer, FrameWriter.WriteFrame and the generated MessageFactory.Encode,
+    // first byte instead (every producer, FrameWriter.WriteFrame and FrameWriter.WriteCompressedFrame,
     // writes it there).
     [Fact]
     public async Task SendRaw_LogsPacketSentWithOpcodeFromFirstByte_WhenDebugEnabled()

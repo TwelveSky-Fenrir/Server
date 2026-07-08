@@ -1,5 +1,5 @@
 using System.Buffers.Binary;
-using Fenrir.Network.Serialization.Packets.Login;
+using Fenrir.Network.Serialization.Login.Packets.Login;
 
 namespace Fenrir.Network.Serialization.Tests.Packets.Login;
 

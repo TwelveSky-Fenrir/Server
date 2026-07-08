@@ -105,7 +105,7 @@ public sealed class IpFloodGuard(
     /// <summary>
     ///     Records one unknown-opcode protocol violation for <paramref name="ipAddress" /> within the current
     ///     wall-clock hour. Call once per <c>Fenrir.Network.Framing.ProtocolViolationException</c> raised by
-    ///     <c>FrameDecoder</c> for an already-connected session (contract Trigger B).
+    ///     <c>FrameReader</c> for an already-connected session (contract Trigger B).
     /// </summary>
     public async ValueTask RecordProtocolViolationAsync(string ipAddress, CancellationToken ct)
     {

@@ -45,7 +45,7 @@ internal static partial class PacketLog
 {
     /// <summary>
     ///     Every successfully decoded incoming frame, logged once from <c>SessionLoop.ProcessBufferAsync</c>
-    ///     immediately after <c>FrameDecoder.TryReadFrame</c> succeeds (before the state-gate/rate-limit/
+    ///     immediately after <c>FrameReader.TryReadFrame</c> succeeds (before the state-gate/rate-limit/
     ///     dispatch steps that can still abort the session). <paramref name="decodeMicroseconds" /> times only
     ///     the decode call itself (a 9-byte header copy + an <c>OpcodeRegistry</c> size lookup, no payload
     ///     copy) -- callers must gate the <see cref="System.Diagnostics.Stopwatch" /> capture behind an

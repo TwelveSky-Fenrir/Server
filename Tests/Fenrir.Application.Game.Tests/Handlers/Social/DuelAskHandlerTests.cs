@@ -3,7 +3,8 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Handlers.Handlers.Social;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Network.Dispatch.Sessions;
-using Fenrir.Network.Serialization.Packets.Zone;
+using Fenrir.Network.Dispatch.Zone.Sessions;
+using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Application.Game.Tests.Handlers.Social;
 

@@ -285,11 +285,25 @@ public sealed class EndToEndScenarioTests
     }
 
     /// <summary>
-    ///     Picks the (monster spawn region, town NPC shop) pair in <paramref name="zoneNumber" /> whose members
-    ///     are closest to each other -- entirely data-driven (no hardcoded monster/NPC/item ids), so this adapts
-    ///     to whatever the seed actually contains. Also precomputes, from the real <see cref="ExperienceFormulas" />,
-    ///     how many kills of that specific monster a level-1 character needs to cross level 1's XP band.
+    ///     Picks the (monster spawn region, town NPC shop) pair in <paramref name="zoneNumber" /> whose monster
+    ///     is the lowest <c>RealLevel</c> available (distance used only as a tiebreaker) -- entirely
+    ///     data-driven (no hardcoded monster/NPC/item ids), so this adapts to whatever the seed actually
+    ///     contains. Also precomputes, from the real <see cref="ExperienceFormulas" />, how many kills of that
+    ///     specific monster a level-1 character needs to cross level 1's XP band.
     /// </summary>
+    /// <remarks>
+    ///     character-creation-level1-redesign (CONFIRMED PRODUCT DECISION) fallout: this used to order purely
+    ///     by (monster spawn region, NPC shop) proximity, which was fine when a freshly created character was
+    ///     the old EU33 max-level/elite-gear grant and could one-shot anything on this map regardless of which
+    ///     pair happened to be geometrically closest. Now that a fresh character is genuinely Level 1 with only
+    ///     <see cref="StrengthPointsToAllocate" /> unspent Strength and an unenchanted starter weapon (see this
+    ///     class's own remarks on that constant), the nearest-pair choice could just as easily land on a
+    ///     RealLevel-16+ monster (world.Monsters seed data on this map ranges from RealLevel 1/Life 35 up past
+    ///     RealLevel 16/Life 1130+) as the RealLevel-1 one, and <see cref="KillMonsterAsync" />'s 30-second
+    ///     combat budget only tolerates the weakest monster actually available. RealLevel first, distance
+    ///     second, keeps this a genuine data-driven pick (whatever the seed's lowest-level monster on this map
+    ///     turns out to be) rather than hardcoding a specific MonsterId.
+    /// </remarks>
     private async Task<EncounterPlan> BuildEncounterPlanAsync(short zoneNumber, CancellationToken ct)
     {
         await using var connection = await _environment.OpenConnectionAsync();
@@ -309,6 +323,7 @@ public sealed class EndToEndScenarioTests
                              zns.NpcId, zns.PosX, zns.PosY, zns.PosZ,
                              nsi.ItemId, i.BuyCost, i.Name
                          FROM world.MonsterSpawnRegions msr
+                         JOIN world.Monsters m ON m.MonsterId = msr.MonsterId
                          CROSS JOIN world.ZoneNpcSpawns zns
                          JOIN world.NpcMenuOptions mo ON mo.NpcId = zns.NpcId AND mo.SlotIndex = 4 AND mo.OptionId = 2
                          JOIN world.NpcShopItems nsi ON nsi.NpcId = zns.NpcId
@@ -316,7 +331,8 @@ public sealed class EndToEndScenarioTests
                          WHERE msr.ZoneNumber = @Zone AND zns.ZoneNumber = @Zone
                            AND msr.MonsterId IS NOT NULL AND nsi.ItemId IS NOT NULL
                            AND i.CheckNpcShop = 2 AND i.BuyCost BETWEEN 1 AND 200000
-                         ORDER BY (SQUARE(msr.LocationX - zns.PosX) + SQUARE(msr.LocationZ - zns.PosZ)) ASC;
+                         ORDER BY m.RealLevel ASC,
+                             (SQUARE(msr.LocationX - zns.PosX) + SQUARE(msr.LocationZ - zns.PosZ)) ASC;
                          """, connection))
         {
             command.Parameters.AddWithValue("@Zone", zoneNumber);

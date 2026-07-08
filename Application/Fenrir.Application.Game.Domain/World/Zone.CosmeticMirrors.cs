@@ -1098,7 +1098,8 @@ public sealed partial class Zone
     ///     time, closes that stale-cap race -- see the items-skills-fenrir-self-critique finding this fixes.
     ///     <see cref="AvatarBuffZoneCommand.PlayTime2" /> reproduces op97's second legacy defect (see
     ///     <see cref="Buffs.PlaytimeBuffResolver" />'s remarks): it clobbers <see cref="PlayerRuntimeState.PlayTime2" />
-    ///     on every op97 request, unconditionally, independently of whether <see cref="AvatarBuffZoneCommand.StateTimeEffect" />
+    ///     on every op97 request, unconditionally, independently of whether
+    ///     <see cref="AvatarBuffZoneCommand.StateTimeEffect" />
     ///     was set for that same request -- so it is applied here regardless of the other fields' presence.
     /// </summary>
     private void ApplyAvatarBuffCommand(in AvatarBuffZoneCommand command)

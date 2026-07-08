@@ -2,7 +2,7 @@ using Fenrir.Data.Abstractions.Game;
 
 namespace Fenrir.LoginServer.Tests.TestSupport;
 
-// In-memory stand-in for IEventLogRepository: never exercised by ReadLivePlayerCountAsync itself, only needed
+// In-memory stand-in for IEventLogRepository: never exercised by BuildGreetingPacket itself, only needed
 // to satisfy LoginConnectionHost's constructor.
 internal sealed class FakeEventLogRepository : IEventLogRepository
 {

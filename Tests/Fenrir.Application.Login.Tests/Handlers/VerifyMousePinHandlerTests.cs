@@ -116,6 +116,29 @@ public class ClLoginMousePasswordSendHandlerTests
         Assert.Equal((byte)3, eventLog.LoggedEvents[2].Outcome);
     }
 
+    [Fact]
+    public async Task HandleAsync_AccountScopedLockout_AbortsSilentlyWithoutReplyEvenForACorrectPin()
+    {
+        var pins = FakeAccountPinRepository.WithLockedPin("4242", DateTime.UtcNow.AddMinutes(1));
+        var eventLog = new FakeEventLogRepository();
+        var handler = new VerifyMousePinHandler(
+            new VerifyMousePinService(pins, eventLog, NullLogger<VerifyMousePinService>.Instance),
+            NullLogger<VerifyMousePinHandler>.Instance);
+        var (session, pipe) = CreateSessionInPinRequired();
+
+        // Correct PIN, but the account-scoped lockout (Migrations/028_account_pin_lockout.sql) must still
+        // reject it outright -- silent abort, no wire reply, matching NoPinConfigured/InvalidFormat's
+        // posture rather than WrongPassword's Result=1.
+        await handler.HandleAsync(new VerifyMousePinRequest { MousePasswordInput = "4242" }, session,
+            CancellationToken.None);
+
+        Assert.Equal(DisconnectReason.StateViolation, session.DisconnectReason);
+        PacketAssert.AssertNothingSent(pipe);
+        var logged = Assert.Single(eventLog.LoggedEvents);
+        Assert.Equal((short)6, logged.EventCode); // MousePinAttemptRejectedLocked
+        Assert.Equal(EventLogCategory.AccountSecurity, logged.Category);
+    }
+
     private static (LoginClientSession Session, FakeDuplexPipe Pipe) CreateSessionInPinRequired()
     {
         var pipe = new FakeDuplexPipe();

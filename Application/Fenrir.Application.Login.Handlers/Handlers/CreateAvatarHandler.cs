@@ -8,19 +8,23 @@ using Microsoft.Extensions.Logging;
 namespace Fenrir.Application.Login.Handlers.Handlers;
 
 /// <summary>
-///     op17 CL_CREATE_AVATAR_SEND2 -- creates a new character in the requested slot, grants the EU33 starter kit
-///     (tribe equipment/inventory/skills/hotkeys, stats, pet, welcome buffs, one premium day) and returns its full
-///     AVATAR_INFO payload.
+///     op17 CL_CREATE_AVATAR_SEND2 -- creates a new character in the requested slot at Level 1, grants a basic
+///     weapon + torso-armor starter kit (tribe base inventory/skills/hotkeys, stats, welcome buffs -- see
+///     <see cref="Fenrir.Application.Login.Services.CreateAvatar.CreateAvatarService" />'s own remarks for the
+///     full character-creation-level1-redesign rationale) and returns its full AVATAR_INFO payload.
 /// </summary>
 /// <remarks>
 ///     Réf. C++ : Server/ts25login/S04_MyWork02.cpp:582-1183 -- USE_CUSTOME_CREATE branch. This macro is
 ///     force-defined unconditionally at S04_MyWork02.cpp:1 (before any other header, no matching #undef
 ///     anywhere under Server/, no ExcludedFromBuild condition in ts25login.vcxproj), bypassing the M33/
-///     LNW33EU build-variant chain every other file in the codebase is subject to -- so the elite-gear/
-///     weapon-remap/boosted-starting-level branch is what ships in every build configuration, not the
-///     small-id branch a prior version of this comment assumed. See
-///     Migrations/015_starter_kit_elite_grant.sql's header comment for the full citation ;
-///     Server/Header/mapcheck.h:298-326 (GetReturnBornInTownLocation) ;
+///     LNW33EU build-variant chain every other file in the codebase is subject to -- so the weapon-remap
+///     branch (tWeapon raw code -&gt; concrete ItemId, still honored below and by
+///     <see cref="Fenrir.Application.Login.Services.CreateAvatar.CreateAvatarService.TryResolveWeaponItemId" />)
+///     is what ships in every build configuration, not the small-id branch a prior version of this comment
+///     assumed. The instant-elite-gear/boosted-starting-level portion of that same USE_CUSTOME_CREATE branch
+///     is deliberately NOT replicated anymore -- see CreateAvatarService's own &lt;remarks&gt; for the
+///     character-creation-level1-redesign rationale. Server/Header/mapcheck.h:298-326
+///     (GetReturnBornInTownLocation) ;
 ///     Server/ts25login/S04_MyWork02.cpp:625-662 (slot/name/tribe/head/face precondition sequence culminating in
 ///     the <see cref="AvatarNameValidator" /> whitelist call at l.658) ; Server/Header/safestring.h:43-81
 ///     (CheckNameString itself) ; Server/ts25login/S04_MyWork02.cpp:640-646 (the fourth-faction/Tribe-value-3

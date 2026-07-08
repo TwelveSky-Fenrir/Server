@@ -57,12 +57,27 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
 
     public (int CharacterId, int Delta)? LastGrantTribeTransferPermit { get; private set; }
 
-    /// <summary>Last call ever made to <see cref="UpsertHotkeySlotAsync" /> -- (Sort, Value1, Value2) is the raw legacy triple.</summary>
+    /// <summary>
+    ///     Last call ever made to <see cref="UpsertHotkeySlotAsync" /> -- (Sort, Value1, Value2) is the raw legacy
+    ///     triple.
+    /// </summary>
     public (int CharacterId, byte Page, byte KeyIndex, int Sort, int Value1, int Value2)? LastUpsertHotkeySlot
     {
         get;
         private set;
     }
+
+    public (int CharacterId, long DeltaMoney, long DeltaStoreMoney)? LastAdjustStoreMoney { get; private set; }
+
+    public bool ThrowOnAdjustZone241Time { get; set; }
+
+    public (int CharacterId, int Delta)? LastAdjustZone241Time { get; private set; }
+
+    public int Zone241Time { get; private set; }
+
+    /// <summary>Every call ever made to <see cref="ApplyTribeFourConversionAsync" />, most-recent last -- append-only.</summary>
+    public List<(int CharacterId, byte NewTribe, int StepPermanent, int ActiveQuestId, int QSort, int TargetPhase,
+        int KillCounter)> TribeFourConversions { get; } = [];
 
     public ValueTask ReplaceContainerAsync(int characterId, byte container,
         IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct)
@@ -141,8 +156,6 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
         throw new NotImplementedException();
     }
 
-    public (int CharacterId, long DeltaMoney, long DeltaStoreMoney)? LastAdjustStoreMoney { get; private set; }
-
     public ValueTask AdjustStoreMoneyAsync(int characterId, long deltaMoney, long deltaStoreMoney,
         CancellationToken ct)
     {
@@ -204,12 +217,6 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
         throw new NotImplementedException();
     }
 
-    public bool ThrowOnAdjustZone241Time { get; set; }
-
-    public (int CharacterId, int Delta)? LastAdjustZone241Time { get; private set; }
-
-    public int Zone241Time { get; private set; }
-
     public ValueTask<int> AdjustZone241TimeAsync(int characterId, int delta, CancellationToken ct)
     {
         if (ThrowOnAdjustZone241Time)
@@ -233,10 +240,6 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
             killCounter));
         return ValueTask.CompletedTask;
     }
-
-    /// <summary>Every call ever made to <see cref="ApplyTribeFourConversionAsync" />, most-recent last -- append-only.</summary>
-    public List<(int CharacterId, byte NewTribe, int StepPermanent, int ActiveQuestId, int QSort, int TargetPhase,
-        int KillCounter)> TribeFourConversions { get; } = [];
 
     public ValueTask ApplyQuestTransitionAsync(int characterId, int stepPermanent, int activeQuestId, int qSort,
         int targetPhase, int killCounter, long deltaMoney, byte? container1,

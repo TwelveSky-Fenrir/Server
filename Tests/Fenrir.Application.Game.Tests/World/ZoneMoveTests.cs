@@ -96,7 +96,7 @@ public class ZoneMoveTests
         // client nor its neighbors ever see this update over the wire; the state change is applied
         // server-side only, matching legacy's documented server-knows/clients-don't-know staleness gap for
         // this opcode.
-        zone.Post(ZoneCommand.Move(10, MoveTo(10.5f, 10f), isResumeAction: true));
+        zone.Post(ZoneCommand.Move(10, MoveTo(10.5f, 10f), true));
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.True(zone.TryGetPlayer(10, out var mover10));

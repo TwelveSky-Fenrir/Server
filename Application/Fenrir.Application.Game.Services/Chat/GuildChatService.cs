@@ -51,20 +51,20 @@ public sealed class GuildChatService(
         relay.Enqueue(new GuildTribeBroadcastRelayEntry(
             GuildTribeBroadcastKind.GuildChat,
             options.Value.ShardId,
-            GuildId: guildId,
-            Tribe: null,
-            RoleField: 0,
-            AvatarName: sender.Name,
-            Content: content,
-            HasItemLink: true,
-            ItemLinkIndex: link.Index,
-            ItemLinkActivity: link.Activity,
-            ItemLinkValue: link.Value,
+            guildId,
+            null,
+            0,
+            sender.Name,
+            content,
+            true,
+            link.Index,
+            link.Activity,
+            link.Value,
             // Socket is a fixed 3-element array on the wire ([FixedArray(3)]) -- always present, never
             // shorter, so direct indexing is safe.
-            ItemLinkSocket0: link.Socket[0],
-            ItemLinkSocket1: link.Socket[1],
-            ItemLinkSocket2: link.Socket[2]));
+            link.Socket[0],
+            link.Socket[1],
+            link.Socket[2]));
 
         // Debug, not Information: routine per-message chatter, matching how WhisperHandler's own successful
         // delivery path stays silent beyond PacketLog's packet-sent trace -- content itself is never logged.

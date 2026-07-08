@@ -66,6 +66,61 @@ public class RenameAvatarServiceTests
         Assert.Contains("NewName", logged.Payload);
     }
 
+    // Server/ts25login/S04_MyWork02.cpp:1325-1329: the identical-name short circuit runs first, before the
+    // item gate and before any relationship refusal -- a same-name request never requires a rename scroll.
+    [Fact]
+    public async Task RenameAvatarAsync_NameUnchanged_ReturnsNameTakenWithoutQueryingItemSlotOrRelationships()
+    {
+        var characters = FakeCharacterRepository.WithSummaries(Summary);
+        var guilds = FakeGuildRepository.Empty();
+        var renames = FakeCharacterRenameRepository.ReturningResult(0);
+        var service = BuildService(characters, renames, guilds: guilds);
+
+        var result = await service.RenameAvatarAsync(AccountId, Slot, Summary.Name, ItemContainer, ItemSlot,
+            CancellationToken.None);
+
+        Assert.Equal(RenameAvatarOutcome.NameTaken, result.Outcome);
+        Assert.Null(renames.LastCall);
+        Assert.Empty(characters.QueriedItemSlots);
+        Assert.Empty(guilds.QueriedCharacterIds);
+    }
+
+    // Case-insensitive: a pure case change is "no change" under the schema's default (case-insensitive)
+    // collation, matching the underlying uniqueness check's own self-inclusive semantics.
+    [Fact]
+    public async Task RenameAvatarAsync_NameUnchangedDifferentCase_ReturnsNameTaken()
+    {
+        var characters = FakeCharacterRepository.WithSummaries(Summary);
+        var renames = FakeCharacterRenameRepository.ReturningResult(0);
+        var service = BuildService(characters, renames);
+
+        var result = await service.RenameAvatarAsync(AccountId, Slot, Summary.Name.ToUpperInvariant(),
+            ItemContainer, ItemSlot, CancellationToken.None);
+
+        Assert.Equal(RenameAvatarOutcome.NameTaken, result.Outcome);
+        Assert.Null(renames.LastCall);
+    }
+
+    // A same-name request from a relationship-blocked character still gets "name unchanged" (Result=2), not
+    // the relationship refusal (Result=3) -- the identical-name short circuit runs strictly before the
+    // relationship checks, matching legacy's ordering.
+    [Fact]
+    public async Task RenameAvatarAsync_NameUnchangedFromTribeRoleBlockedCharacter_ReturnsNameTakenNotTribeRoleRefusal()
+    {
+        var characters = FakeCharacterRepository.WithSummaries(Summary)
+            .WithItemAtSlot(CharacterId, ItemContainer, ItemSlot, RenameScrollItemId);
+        var tribes = FakeTribeRepository.WithRole(CharacterId, 1);
+        var renames = FakeCharacterRenameRepository.ReturningResult(0);
+        var service = BuildService(characters, renames, tribes);
+
+        var result = await service.RenameAvatarAsync(AccountId, Slot, Summary.Name, ItemContainer, ItemSlot,
+            CancellationToken.None);
+
+        Assert.Equal(RenameAvatarOutcome.NameTaken, result.Outcome);
+        Assert.Null(renames.LastCall);
+        Assert.Empty(characters.QueriedItemSlots);
+    }
+
     [Fact]
     public async Task RenameAvatarAsync_EmptySlot_ReturnsSlotMissingWithoutQueryingAnything()
     {

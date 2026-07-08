@@ -72,7 +72,7 @@ public class TribeBankServiceTests
         // (GmCommandTier.Basic or higher) skips the ReturnTribeRole != 0 check entirely and can view any
         // tribe's bank, scoped to whatever tribe id is recorded on their own avatar.
         var zone = ZoneTestKit.CreateZone(1);
-        var (session, _, state) = Setup(zone, 3, 0, accountGrade: 1);
+        var (session, _, state) = Setup(zone, 3, 0, 1);
         var repository = new FakeTribeRepository();
         repository.Bank[(3, 2)] = 4_500;
         var service = new TribeBankService(repository, NullLogger<TribeBankService>.Instance);

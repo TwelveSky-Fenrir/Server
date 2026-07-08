@@ -18,12 +18,12 @@
 -- Réf. C++ : Server/ts25zone/S04_MyWork02.cpp:7565-7758 (full handler, side effects at :7739-7756) per the
 -- "Fourth-tribe (Fujin) conversion and return" behavior contract.
 CREATE PROCEDURE game.usp_Character_ApplyTribeFourConversion @CharacterId INT,
-                                                              @NewTribe TINYINT,
-                                                              @StepPermanent INT,
-                                                              @ActiveQuestId INT,
-                                                              @QSort INT,
-                                                              @TargetPhase INT,
-                                                              @KillCounter INT
+                                                             @NewTribe TINYINT,
+                                                             @StepPermanent INT,
+                                                             @ActiveQuestId INT,
+                                                             @QSort INT,
+                                                             @TargetPhase INT,
+                                                             @KillCounter INT
 AS
 BEGIN
     SET NOCOUNT ON;

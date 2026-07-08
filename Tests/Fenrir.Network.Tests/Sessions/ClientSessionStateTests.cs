@@ -163,4 +163,36 @@ public class ClientSessionStateTests
 
         Assert.Equal(session.MeetsGmTier(GmCommandTier.Basic), session.IsGm);
     }
+
+    // Cross-shard (Game-to-Game) zone-transfer teardown-race fix: ZoneMoveService.HandleCrossShardAsync calls
+    // MarkCrossShardTransferPending() right before its own success reply, so GameConnectionHost.OnAcceptedAsync
+    // can skip runtime.AccountSessions teardown for exactly this one connection-closing-on-purpose case --
+    // mirrors LoginClientSession.MarkHandoverIssued's role for the Login->Game handoff.
+    [Fact]
+    public void Zone_IsCrossShardTransferPending_DefaultsFalse_AndIsSetByMarkCrossShardTransferPending()
+    {
+        var session = new ZoneClientSession(1, new FakeDuplexPipe());
+
+        Assert.False(session.IsCrossShardTransferPending);
+
+        session.MarkCrossShardTransferPending();
+
+        Assert.True(session.IsCrossShardTransferPending);
+    }
+
+    // Ancillary fact, not a state transition -- same posture as MarkAccountSessionToken -- so State must be
+    // left completely untouched regardless of which state the session was in when the flag is set.
+    [Fact]
+    public void Zone_MarkCrossShardTransferPending_NeverChangesState()
+    {
+        var session = new ZoneClientSession(1, new FakeDuplexPipe());
+        session.MarkTicketConsumed(1, 10);
+        session.MarkRegistering();
+        session.MarkInWorld();
+        var stateBefore = session.State;
+
+        session.MarkCrossShardTransferPending();
+
+        Assert.Equal(stateBefore, session.State);
+    }
 }

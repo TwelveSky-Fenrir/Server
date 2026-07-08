@@ -17,16 +17,16 @@ public class HotkeyItemConsumptionResolverTests
     {
         var slot = new HotkeySlot(HotkeyBindingKind.Item, 12345, quantity);
         return HotkeyItemConsumptionResolver.Resolve(
-            page: 0, index: 0, slot,
-            isStunned: false, isDead: false, canUseConsumables: true,
-            itemResolved: true, itemCategory: ConsumableSort, potionType1: potionType1, potionType2: 0,
-            life: 100, effectiveMaxLife: 100, mana: 100, effectiveMaxMana: 100);
+            0, 0, slot,
+            false, false, true,
+            true, ConsumableSort, potionType1, 0,
+            100, 100, 100, 100);
     }
 
     [Fact]
     public void AssassinScroll_PotionType12_WritesSlot15_Value3_Duration40Seconds()
     {
-        var result = ResolveBuffItem(potionType1: 12, quantity: 3);
+        var result = ResolveBuffItem(12, 3);
 
         Assert.Equal(HotkeyItemConsumptionResolver.Outcome.Success, result.Outcome);
         Assert.Equal(HotkeyItemConsumptionResolver.EffectKind.Buff, result.Effect);
@@ -40,7 +40,7 @@ public class HotkeyItemConsumptionResolverTests
     [Fact]
     public void DepartedSpiritScroll_PotionType13_WritesSlot15_Value3_Duration60Seconds()
     {
-        var result = ResolveBuffItem(potionType1: 13, quantity: 5);
+        var result = ResolveBuffItem(13, 5);
 
         Assert.Equal(HotkeyItemConsumptionResolver.Outcome.Success, result.Outcome);
         Assert.Equal(HotkeyItemConsumptionResolver.EffectKind.Buff, result.Effect);
@@ -53,7 +53,7 @@ public class HotkeyItemConsumptionResolverTests
     [Fact]
     public void AttackIncreaseBook_PotionType14_WritesSlot17_Value25_Duration60Seconds()
     {
-        var result = ResolveBuffItem(potionType1: 14, quantity: 1);
+        var result = ResolveBuffItem(14, 1);
 
         Assert.Equal(HotkeyItemConsumptionResolver.Outcome.Success, result.Outcome);
         Assert.Equal(HotkeyItemConsumptionResolver.EffectKind.Buff, result.Effect);
@@ -66,7 +66,7 @@ public class HotkeyItemConsumptionResolverTests
     [Fact]
     public void DodgeIncreaseBook_PotionType15_WritesSlot18_Value25_Duration60Seconds()
     {
-        var result = ResolveBuffItem(potionType1: 15, quantity: 1);
+        var result = ResolveBuffItem(15, 1);
 
         Assert.Equal(HotkeyItemConsumptionResolver.Outcome.Success, result.Outcome);
         Assert.Equal(HotkeyItemConsumptionResolver.EffectKind.Buff, result.Effect);
@@ -83,7 +83,7 @@ public class HotkeyItemConsumptionResolverTests
     [InlineData(15)]
     public void BuffItem_LastUnit_ClearsTheSlotInsteadOfDecrementing(int potionType1)
     {
-        var result = ResolveBuffItem(potionType1, quantity: 1);
+        var result = ResolveBuffItem(potionType1, 1);
 
         Assert.True(result.NewSlot.IsEmpty);
     }
@@ -95,7 +95,7 @@ public class HotkeyItemConsumptionResolverTests
     [InlineData(15)]
     public void BuffItem_MultipleUnits_DecrementsQuantityByOne_AndKeepsTheBinding(int potionType1)
     {
-        var result = ResolveBuffItem(potionType1, quantity: 4);
+        var result = ResolveBuffItem(potionType1, 4);
 
         Assert.False(result.NewSlot.IsEmpty);
         Assert.Equal(HotkeyBindingKind.Item, result.NewSlot.Kind);
@@ -110,7 +110,7 @@ public class HotkeyItemConsumptionResolverTests
     [InlineData(15)]
     public void BuffItem_DoesNotGrantLifeOrMana(int potionType1)
     {
-        var result = ResolveBuffItem(potionType1, quantity: 1);
+        var result = ResolveBuffItem(potionType1, 1);
 
         Assert.Equal(0, result.LifeGain);
         Assert.Equal(0, result.ManaGain);
@@ -122,10 +122,10 @@ public class HotkeyItemConsumptionResolverTests
     {
         var slot = new HotkeySlot(HotkeyBindingKind.Item, 2, 1);
         var result = HotkeyItemConsumptionResolver.Resolve(
-            page: 0, index: 0, slot,
-            isStunned: false, isDead: false, canUseConsumables: true,
-            itemResolved: true, itemCategory: ConsumableSort, potionType1: 1, potionType2: 30,
-            life: 50, effectiveMaxLife: 100, mana: 100, effectiveMaxMana: 100);
+            0, 0, slot,
+            false, false, true,
+            true, ConsumableSort, 1, 30,
+            50, 100, 100, 100);
 
         Assert.Equal(HotkeyItemConsumptionResolver.EffectKind.Life, result.Effect);
         Assert.Empty(result.BuffWrites);
@@ -137,7 +137,7 @@ public class HotkeyItemConsumptionResolverTests
     [InlineData(16)]
     public void StillUnwiredPotionTypes_AreCleanlyRejected_NotTreatedAsABuff(int potionType1)
     {
-        var result = ResolveBuffItem(potionType1, quantity: 1);
+        var result = ResolveBuffItem(potionType1, 1);
 
         Assert.Equal(HotkeyItemConsumptionResolver.Outcome.RejectedClean, result.Outcome);
         Assert.Empty(result.BuffWrites);

@@ -13,7 +13,8 @@ namespace Fenrir.Application.Game.Handlers.Handlers.Commerce;
 ///     to zone 37 like <see cref="ViewShopStallHandler" />. One <see cref="SearchShopListingsResponse" />
 ///     per matching listing (a burst, not a single reply). Async -- the proxy-shop half is a database read.
 /// </summary>
-public sealed class SearchShopListingsHandler(ISearchShopListingsService service,
+public sealed class SearchShopListingsHandler(
+    ISearchShopListingsService service,
     ILogger<SearchShopListingsHandler> logger) : IAsyncPacketHandler<SearchShopListingsRequest>
 {
     public async ValueTask HandleAsync(SearchShopListingsRequest packet, IPacketSession session,

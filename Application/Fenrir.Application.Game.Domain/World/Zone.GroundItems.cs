@@ -19,15 +19,6 @@ public sealed partial class Zone
     /// </summary>
     private readonly ConcurrentQueue<GroundItemEntity> _claimedGroundItemDespawns = new();
 
-    /// <summary>Tick-owned only -- see <see cref="_groundItems" />'s remarks.</summary>
-    private readonly Dictionary<int, TimeSpan> _groundItemLastRebroadcast = new();
-
-    // Populated/expired only by this zone's own tick; claimed (removed) via an atomic compare-and-remove
-    // callable from any thread -- see TryClaimGroundItem's remarks for why pickup is the one exception.
-    private readonly ConcurrentDictionary<int, GroundItemEntity> _groundItems = new();
-
-    private int _groundItemServerIndexSeed;
-
     /// <summary>
     ///     Reusable scratch buffer for <see cref="BroadcastGroundItemAction" />'s recipient list -- same
     ///     non-allocating shape and reuse justification as <c>Zone.PlayerLifecycle</c>'s
@@ -38,6 +29,15 @@ public sealed partial class Zone
     ///     that SAME tick, not once per zone.
     /// </summary>
     private readonly List<int> _groundItemBroadcastNeighborScratch = [];
+
+    /// <summary>Tick-owned only -- see <see cref="_groundItems" />'s remarks.</summary>
+    private readonly Dictionary<int, TimeSpan> _groundItemLastRebroadcast = new();
+
+    // Populated/expired only by this zone's own tick; claimed (removed) via an atomic compare-and-remove
+    // callable from any thread -- see TryClaimGroundItem's remarks for why pickup is the one exception.
+    private readonly ConcurrentDictionary<int, GroundItemEntity> _groundItems = new();
+
+    private int _groundItemServerIndexSeed;
 
     private int _groundItemUniqueNumberSeed;
 

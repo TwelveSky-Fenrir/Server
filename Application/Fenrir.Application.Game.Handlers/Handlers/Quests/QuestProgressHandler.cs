@@ -16,7 +16,9 @@ namespace Fenrir.Application.Game.Handlers.Handlers.Quests;
 ///     <see cref="IQuestProgressService" />; this handler only resolves session-scoped state, holds the
 ///     per-character economy lock while the service runs, and translates the result into a wire response.
 /// </remarks>
-public sealed class QuestProgressHandler(IQuestProgressService questProgressService, ILogger<QuestProgressHandler> logger)
+public sealed class QuestProgressHandler(
+    IQuestProgressService questProgressService,
+    ILogger<QuestProgressHandler> logger)
     : IAsyncPacketHandler<QuestProgressRequest>
 {
     public async ValueTask HandleAsync(QuestProgressRequest packet, IPacketSession session,

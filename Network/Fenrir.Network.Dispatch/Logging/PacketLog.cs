@@ -93,8 +93,12 @@ internal static partial class PacketLog
     ///     stamps liveness. <paramref name="dispatchMicroseconds" /> times handler resolution AND execution
     ///     together -- unlike <see cref="PacketReceived" />'s <c>decodeMicroseconds</c>, which times only the
     ///     frame decode itself. There is deliberately no separate "handler resolved, not yet invoked" log
-    ///     point: the generated <c>MessageDispatcher</c> switch (<c>Fenrir.Generators.Dispatch.
-    ///     HandlerDispatchIncrementalGenerator</c>) resolves a handler and invokes it in the same generated
+    ///     point: the generated <c>MessageDispatcher</c> switch (
+    ///     <c>
+    ///         Fenrir.Generators.Dispatch.
+    ///         HandlerDispatchIncrementalGenerator
+    ///     </c>
+    ///     ) resolves a handler and invokes it in the same generated
     ///     statement with no externally observable seam between the two, so this method's placement -- right
     ///     after dispatch completes -- is the finest dispatch-timing granularity obtainable from
     ///     <c>Fenrir.Network.Dispatch</c> without a generator change (out of this project's territory; see

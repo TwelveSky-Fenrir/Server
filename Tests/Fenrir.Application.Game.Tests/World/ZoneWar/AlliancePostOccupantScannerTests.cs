@@ -8,8 +8,8 @@ public class AlliancePostOccupantScannerTests
 {
     private const short MapId = 37;
 
-    private static readonly AlliancePostSite Site = new(MapId, Post0X: 100f, Post0Z: 100f, Post1X: 200f,
-        Post1Z: 200f, Radius: 10f);
+    private static readonly AlliancePostSite Site = new(MapId, 100f, 100f, 200f,
+        200f, 10f);
 
     private static Zone CreateZoneWithPlayer(int characterId, byte tribe, float posX, float posZ,
         byte tribeRole = 1, bool isDead = false, bool isMovingZone = false)
@@ -42,7 +42,7 @@ public class AlliancePostOccupantScannerTests
     [Fact]
     public void TribeMasterInsidePost0Radius_ReturnsAsPostOne_PostTwoStaysNull()
     {
-        var zone = CreateZoneWithPlayer(1, tribe: 2, posX: Site.Post0X, posZ: Site.Post0Z);
+        var zone = CreateZoneWithPlayer(1, 2, Site.Post0X, Site.Post0Z);
 
         var (postOne, postTwo) = AlliancePostOccupantScanner.Scan(zone, Site);
 
@@ -53,7 +53,7 @@ public class AlliancePostOccupantScannerTests
     [Fact]
     public void TribeMasterInsidePost1Radius_ReturnsAsPostTwo()
     {
-        var zone = CreateZoneWithPlayer(1, tribe: 3, posX: Site.Post1X, posZ: Site.Post1Z);
+        var zone = CreateZoneWithPlayer(1, 3, Site.Post1X, Site.Post1Z);
 
         var (postOne, postTwo) = AlliancePostOccupantScanner.Scan(zone, Site);
 
@@ -64,7 +64,7 @@ public class AlliancePostOccupantScannerTests
     [Fact]
     public void NonMasterTribeRole_NeverQualifies()
     {
-        var zone = CreateZoneWithPlayer(1, tribe: 2, posX: Site.Post0X, posZ: Site.Post0Z, tribeRole: 0);
+        var zone = CreateZoneWithPlayer(1, 2, Site.Post0X, Site.Post0Z, 0);
 
         var (postOne, _) = AlliancePostOccupantScanner.Scan(zone, Site);
 
@@ -74,7 +74,7 @@ public class AlliancePostOccupantScannerTests
     [Fact]
     public void SubMasterTribeRole_DoesNotQualify_OnlyExactMasterDoes()
     {
-        var zone = CreateZoneWithPlayer(1, tribe: 2, posX: Site.Post0X, posZ: Site.Post0Z, tribeRole: 2);
+        var zone = CreateZoneWithPlayer(1, 2, Site.Post0X, Site.Post0Z, 2);
 
         var (postOne, _) = AlliancePostOccupantScanner.Scan(zone, Site);
 
@@ -84,7 +84,7 @@ public class AlliancePostOccupantScannerTests
     [Fact]
     public void OutsideRadius_DoesNotQualify()
     {
-        var zone = CreateZoneWithPlayer(1, tribe: 2, posX: Site.Post0X + 1000f, posZ: Site.Post0Z);
+        var zone = CreateZoneWithPlayer(1, 2, Site.Post0X + 1000f, Site.Post0Z);
 
         var (postOne, _) = AlliancePostOccupantScanner.Scan(zone, Site);
 
@@ -94,7 +94,7 @@ public class AlliancePostOccupantScannerTests
     [Fact]
     public void Dead_DoesNotQualify()
     {
-        var zone = CreateZoneWithPlayer(1, tribe: 2, posX: Site.Post0X, posZ: Site.Post0Z, isDead: true);
+        var zone = CreateZoneWithPlayer(1, 2, Site.Post0X, Site.Post0Z, isDead: true);
 
         var (postOne, _) = AlliancePostOccupantScanner.Scan(zone, Site);
 
@@ -104,7 +104,7 @@ public class AlliancePostOccupantScannerTests
     [Fact]
     public void MovingZone_DoesNotQualify()
     {
-        var zone = CreateZoneWithPlayer(1, tribe: 2, posX: Site.Post0X, posZ: Site.Post0Z, isMovingZone: true);
+        var zone = CreateZoneWithPlayer(1, 2, Site.Post0X, Site.Post0Z, isMovingZone: true);
 
         var (postOne, _) = AlliancePostOccupantScanner.Scan(zone, Site);
 

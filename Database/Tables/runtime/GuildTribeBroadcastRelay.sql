@@ -31,21 +31,21 @@
 CREATE TABLE runtime.GuildTribeBroadcastRelay
 (
     RelayId          BIGINT IDENTITY (1,1) NOT NULL,
-    Kind             TINYINT      NOT NULL, -- 0 GuildAnnouncement, 1 GuildChat, 2 TribeAnnouncement, 3 TribeAnnouncementScroll
-    SourceShardId    TINYINT      NOT NULL, -- never re-delivered back to this shard; it already delivered locally
-    GuildId          INT          NULL,     -- Kind 0/1 only
-    Tribe            TINYINT      NULL,     -- Kind 2/3 only
-    RoleField        TINYINT      NOT NULL, -- see header comment
-    AvatarName       NVARCHAR(13) NOT NULL,
-    Content          NVARCHAR(61) NOT NULL,
-    HasItemLink      BIT          NOT NULL,
-    ItemLinkIndex    INT          NULL,
-    ItemLinkActivity INT          NULL,
-    ItemLinkValue    INT          NULL,
-    ItemLinkSocket0  INT          NULL,
-    ItemLinkSocket1  INT          NULL,
-    ItemLinkSocket2  INT          NULL,
-    CreatedAtUtc     DATETIME2(3) NOT NULL,
+    Kind             TINYINT               NOT NULL, -- 0 GuildAnnouncement, 1 GuildChat, 2 TribeAnnouncement, 3 TribeAnnouncementScroll
+    SourceShardId    TINYINT               NOT NULL, -- never re-delivered back to this shard; it already delivered locally
+    GuildId          INT                   NULL,     -- Kind 0/1 only
+    Tribe            TINYINT               NULL,     -- Kind 2/3 only
+    RoleField        TINYINT               NOT NULL, -- see header comment
+    AvatarName       NVARCHAR(13)          NOT NULL,
+    Content          NVARCHAR(61)          NOT NULL,
+    HasItemLink      BIT                   NOT NULL,
+    ItemLinkIndex    INT                   NULL,
+    ItemLinkActivity INT                   NULL,
+    ItemLinkValue    INT                   NULL,
+    ItemLinkSocket0  INT                   NULL,
+    ItemLinkSocket1  INT                   NULL,
+    ItemLinkSocket2  INT                   NULL,
+    CreatedAtUtc     DATETIME2(3)          NOT NULL,
     CONSTRAINT PK_GuildTribeBroadcastRelay PRIMARY KEY NONCLUSTERED (RelayId)
 )
     WITH (MEMORY_OPTIMIZED = ON, DURABILITY = SCHEMA_ONLY);

@@ -44,8 +44,8 @@ public sealed class FenrirEnvironmentFixture : IAsyncLifetime
 
     private static readonly string[] NoArgs = [];
     private readonly StringBuilder _gameLog = new();
-    private readonly Lock _gameLogLock = new();
     private readonly StringBuilder _gameLog2 = new();
+    private readonly Lock _gameLogLock = new();
     private readonly Lock _gameLogLock2 = new();
     private readonly StringBuilder _loginLog = new();
     private readonly Lock _loginLogLock = new();

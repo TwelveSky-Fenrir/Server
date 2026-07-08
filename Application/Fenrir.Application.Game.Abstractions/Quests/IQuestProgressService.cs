@@ -46,7 +46,8 @@ public interface IQuestProgressService
     ///     failure path tied to the swap itself.
     /// </summary>
     /// <remarks>
-    ///     Réf. C++ : Server/ts25zone/S04_MyWork02.cpp:7505-7528 (action-code-4 branch) ; Server/ts25zone/S07_MyGame04.cpp:2223-2244
+    ///     Réf. C++ : Server/ts25zone/S04_MyWork02.cpp:7505-7528 (action-code-4 branch) ;
+    ///     Server/ts25zone/S07_MyGame04.cpp:2223-2244
     ///     (ChangeQuestItem -- confirms the found/not-found scan result is discarded by the caller).
     /// </remarks>
     public ValueTask<QuestActionResult> ExchangeAsync(QuestProgressRequest packet, PlayerRuntimeState state, Zone zone,

@@ -12,7 +12,9 @@ namespace Fenrir.Application.Game.Handlers.Handlers.Progression;
 ///     configured attack skill. OPEN ISSUE: legacy also mentions unenumerated "level-gated battle zones", not
 ///     modeled here.
 /// </summary>
-public sealed class AutoHuntToggleHandler(IAutoHuntToggleService autoHuntToggleService, ILogger<AutoHuntToggleHandler> logger)
+public sealed class AutoHuntToggleHandler(
+    IAutoHuntToggleService autoHuntToggleService,
+    ILogger<AutoHuntToggleHandler> logger)
     : IAsyncPacketHandler<AutoHuntToggleRequest>
 {
     public async ValueTask HandleAsync(AutoHuntToggleRequest packet, IPacketSession session,

@@ -13,19 +13,19 @@ public class TribeMigrationGateTests
         // Tribe 0: raw 200 (unique max among 0/1/2, >=100), alliance-adjusted 200 (no allies) is also the
         // unique max, and tribe 3's own 0 points is nowhere near that bloc -- every outbound gate passes.
         return new TribeMigrationEligibilityContext(
-            FeatureEnabled: true,
-            NowLocal: SaturdayWithinWindow,
-            CurrentTribe: 0,
-            PreviousTribe: 0,
-            Level: TribeMigrationGate.MinLevel,
-            TribeRole: 0,
-            GuildId: null,
-            TeacherCharacterId: null,
-            StudentCharacterId: null,
-            HasAnyFriend: false,
-            ReturnAllowance: 0,
-            TribePoints: [200, 50, 100, 0],
-            AllyOf: _ => null);
+            true,
+            SaturdayWithinWindow,
+            0,
+            0,
+            TribeMigrationGate.MinLevel,
+            0,
+            null,
+            null,
+            null,
+            false,
+            0,
+            [200, 50, 100, 0],
+            _ => null);
     }
 
     private static TribeMigrationEligibilityContext ReturnValid()
@@ -33,19 +33,19 @@ public class TribeMigrationGateTests
         // Tribe 3 (current), origin tribe 1 -- origin's 50 points does not exceed tribe 3's own 60, and one
         // banked return allowance is available.
         return new TribeMigrationEligibilityContext(
-            FeatureEnabled: true,
-            NowLocal: WednesdayOutsideWindow, // deliberately NOT a Saturday -- the return branch must not care
-            CurrentTribe: TribeMigrationGate.TribeFour,
-            PreviousTribe: 1,
-            Level: TribeMigrationGate.MinLevel,
-            TribeRole: 0,
-            GuildId: null,
-            TeacherCharacterId: null,
-            StudentCharacterId: null,
-            HasAnyFriend: false,
-            ReturnAllowance: 1,
-            TribePoints: [100, 50, 300, 60],
-            AllyOf: _ => null);
+            true,
+            WednesdayOutsideWindow, // deliberately NOT a Saturday -- the return branch must not care
+            TribeMigrationGate.TribeFour,
+            1,
+            TribeMigrationGate.MinLevel,
+            0,
+            null,
+            null,
+            null,
+            false,
+            1,
+            [100, 50, 300, 60],
+            _ => null);
     }
 
     [Fact]
@@ -160,7 +160,7 @@ public class TribeMigrationGateTests
         var context = OutboundValid() with
         {
             TribePoints = new[] { 150, 200, 100, 0 },
-            AllyOf = tribe => tribe switch { 0 => (byte)1, 1 => (byte)0, _ => null }
+            AllyOf = tribe => tribe switch { 0 => 1, 1 => 0, _ => null }
         };
 
         Assert.Equal(TribeMigrationOutcome.NotDominantTribe, TribeMigrationGate.Evaluate(context));

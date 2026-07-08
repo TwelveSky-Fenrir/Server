@@ -10,10 +10,13 @@ namespace Fenrir.Data.Security;
 ///     wouldn't stop a client that reaches Zone directly with a valid ticket).
 /// </summary>
 /// <remarks>
-///     Legacy also gated this on account grade (<c>uUserSort != 0</c> = GM account must connect from an
-///     allowlisted IP, <c>Server/ts25login/S04_MyWork02.cpp:192-201</c>) -- <c>auth.Accounts</c> has no
-///     account-grade/GM flag in Fenrir today, so that half isn't ported; only the safe, identity-independent
-///     half is: an allowlisted IP always bypasses the deny-lists below.
+///     Only the identity-independent half of legacy's <c>gmip</c> check lives here: an allowlisted IP always
+///     bypasses the deny-lists below, for any account. Legacy's other half -- an elevated/GM-tier account
+///     (<c>uUserSort != 0</c>) may only log in from an allow-listed IP,
+///     <c>Server/ts25login/S04_MyWork02.cpp:192-201</c> -- is identity-dependent (it needs the authenticated
+///     account's grade, not just the connecting IP) and is enforced separately, post-authentication, in
+///     <c>Fenrir.Application.Login.Services.Login.LoginService.LoginAsync</c> against the same
+///     <see cref="IGmAllowlistRepository" /> data.
 /// </remarks>
 public sealed class ApplicationFirewall(
     IBlockedIpRepository blockedIps,

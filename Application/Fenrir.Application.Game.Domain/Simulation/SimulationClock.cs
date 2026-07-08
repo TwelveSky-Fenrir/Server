@@ -209,7 +209,7 @@ public static class SimulationClock
         if (bucketCount <= 0)
             return TimeSpan.Zero;
 
-        var bucket = ((entityId % bucketCount) + bucketCount) % bucketCount;
+        var bucket = (entityId % bucketCount + bucketCount) % bucketCount;
         return TimeSpan.FromTicks(interval.Ticks * bucket / bucketCount);
     }
 

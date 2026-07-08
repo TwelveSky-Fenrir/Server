@@ -1,4 +1,3 @@
-using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Handlers.Handlers.Combat;
 using Fenrir.Application.Game.Services.ZoneLifecycle;
 using Fenrir.Application.Game.Tests.TestSupport;
@@ -47,7 +46,7 @@ public class AttackHandlerLoggingTests
         var logger = new CapturingLogger<AttackHandler>();
         var handler = new AttackHandler(new AttackService(), logger);
 
-        handler.Handle(new AttackRequest { AttackInfo = Attack(mCase: 3, targetServerIndex: 42) }, session);
+        handler.Handle(new AttackRequest { AttackInfo = Attack(3, 42) }, session);
 
         var entry = Assert.Single(logger.Entries, e => e.Level == LogLevel.Debug);
         Assert.Contains("55", entry.Message); // session id
@@ -70,7 +69,7 @@ public class AttackHandlerLoggingTests
         var logger = new CapturingLogger<AttackHandler>();
         var handler = new AttackHandler(new AttackService(), logger);
 
-        handler.Handle(new AttackRequest { AttackInfo = Attack(mCase: 99, targetServerIndex: 1) }, session);
+        handler.Handle(new AttackRequest { AttackInfo = Attack(99, 1) }, session);
 
         Assert.Contains(logger.Entries, e => e.Level == LogLevel.Debug && e.Message.Contains("case 99"));
         Assert.Equal(DisconnectReason.Faulted, session.DisconnectReason);

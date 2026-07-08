@@ -1,10 +1,10 @@
 using System.Collections.Frozen;
+using Fenrir.Application.Game.Abstractions.ZoneLifecycle;
 using Fenrir.Application.Game.Domain.Consumables;
 using Fenrir.Application.Game.Domain.Hotkeys;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Services.ZoneLifecycle;
-using Fenrir.Application.Game.Abstractions.ZoneLifecycle;
 using Fenrir.Application.Game.Tests.GameData;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -32,7 +32,10 @@ public class UseHotkeyItemServiceBuffTests
         var itemsById = new Dictionary<int, ItemDefinition>
         {
             [itemId] = new(
-                WorldDataTestRows.Item(itemId) with { Sort = ConsumableSort, PotionType1 = (short)potionType1, PotionType2 = 0 },
+                WorldDataTestRows.Item(itemId) with
+                {
+                    Sort = ConsumableSort, PotionType1 = (short)potionType1, PotionType2 = 0
+                },
                 [])
         }.ToFrozenDictionary();
         var worldData = ZoneTestKit.EmptyWorldData(itemsById);
@@ -53,7 +56,7 @@ public class UseHotkeyItemServiceBuffTests
     [Fact]
     public async Task AssassinScroll_WritesBuffSlot15_AndPersistsTheDecrementedSlot()
     {
-        var (zone, state, characters, service) = SetUp(AssassinScrollItemId, potionType1: 12, quantity: 2);
+        var (zone, state, characters, service) = SetUp(AssassinScrollItemId, 12, 2);
 
         var outcome = await service.UseAsync(zone, state, 10, 0, 0, CancellationToken.None);
         zone.Tick(TimeSpan.FromMilliseconds(50));
@@ -72,7 +75,7 @@ public class UseHotkeyItemServiceBuffTests
     [Fact]
     public async Task DepartedSpiritScroll_WritesBuffSlot15_Duration60Seconds()
     {
-        var (zone, state, characters, service) = SetUp(DepartedSpiritScrollItemId, potionType1: 13, quantity: 1);
+        var (zone, state, characters, service) = SetUp(DepartedSpiritScrollItemId, 13, 1);
 
         var outcome = await service.UseAsync(zone, state, 10, 0, 0, CancellationToken.None);
         zone.Tick(TimeSpan.FromMilliseconds(50));
@@ -91,7 +94,7 @@ public class UseHotkeyItemServiceBuffTests
     [Fact]
     public async Task AttackIncreaseBook_WritesBuffSlot17_HitRatePercent()
     {
-        var (zone, state, characters, service) = SetUp(AttackIncreaseBookItemId, potionType1: 14, quantity: 1);
+        var (zone, state, characters, service) = SetUp(AttackIncreaseBookItemId, 14, 1);
 
         var outcome = await service.UseAsync(zone, state, 10, 0, 0, CancellationToken.None);
         zone.Tick(TimeSpan.FromMilliseconds(50));
@@ -105,7 +108,7 @@ public class UseHotkeyItemServiceBuffTests
     [Fact]
     public async Task DodgeIncreaseBook_WritesBuffSlot18_DodgeRatePercent()
     {
-        var (zone, state, characters, service) = SetUp(DodgeIncreaseBookItemId, potionType1: 15, quantity: 1);
+        var (zone, state, characters, service) = SetUp(DodgeIncreaseBookItemId, 15, 1);
 
         var outcome = await service.UseAsync(zone, state, 10, 0, 0, CancellationToken.None);
         zone.Tick(TimeSpan.FromMilliseconds(50));

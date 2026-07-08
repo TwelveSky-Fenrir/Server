@@ -158,7 +158,8 @@ public class CostumeStateServiceTests
     }
 
     [Fact]
-    public async Task ReturnToInventory_Success_GrantsItemToInventoryAndClearsWardrobeSlot_AndLogsACosmeticDeleteAuditRow()
+    public async Task
+        ReturnToInventory_Success_GrantsItemToInventoryAndClearsWardrobeSlot_AndLogsACosmeticDeleteAuditRow()
     {
         var zone = ZoneTestKit.CreateZone(1);
         var (session, _, state) = Setup(zone, 10);

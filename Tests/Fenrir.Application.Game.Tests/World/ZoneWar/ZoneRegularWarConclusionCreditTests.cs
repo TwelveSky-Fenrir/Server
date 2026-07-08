@@ -6,7 +6,8 @@ using Fenrir.Application.Game.Tests.TestSupport;
 namespace Fenrir.Application.Game.Tests.World.ZoneWar;
 
 /// <summary>
-///     Covers <c>Zone.HandleRegularWarConclusionCredit</c> -- the <see cref="ZoneCommandKind.CreditRegularWarConclusion" />
+///     Covers <c>Zone.HandleRegularWarConclusionCredit</c> -- the
+///     <see cref="ZoneCommandKind.CreditRegularWarConclusion" />
 ///     handler closing the "DailyMission claim's join-war precondition can never be satisfied" gap. The
 ///     posting side (<c>RegularWarSchedulerHost.CreditDailyMissionAndWaterfallQuest</c>) is covered by
 ///     <see cref="RegularWarSchedulerHostTests" />; this file only exercises the Zone-side mutation in
@@ -69,7 +70,7 @@ public class ZoneRegularWarConclusionCreditTests
     {
         // qSort 8 (waterfall occupation), TargetPhase == this zone's own map id (49), still in progress
         // (KillCounter 0).
-        var progress = new QuestProgress(StepPermanent: 3, ActiveFlag: 1, QSort: 8, TargetPhase: 49, KillCounter: 0);
+        var progress = new QuestProgress(3, 1, 8, 49, 0);
         var (zone, state, pipe) = SetUp(49, progress);
         ZoneTestKit.DrainOutbound(pipe); // discard the Enter-time traffic
 
@@ -91,7 +92,7 @@ public class ZoneRegularWarConclusionCreditTests
     [Fact]
     public void Archetype8QuestHolder_AlreadyAtCap_DoesNotDoubleCreditOrPushAgain()
     {
-        var progress = new QuestProgress(StepPermanent: 3, ActiveFlag: 1, QSort: 8, TargetPhase: 49, KillCounter: 1);
+        var progress = new QuestProgress(3, 1, 8, 49, 1);
         var (zone, state, pipe) = SetUp(49, progress);
         ZoneTestKit.DrainOutbound(pipe);
 
@@ -106,7 +107,7 @@ public class ZoneRegularWarConclusionCreditTests
     public void NonArchetype8Quest_NeverAdvancesKillCounter()
     {
         // qSort 1 (kill-monster) -- a different archetype entirely; must be untouched by this hook.
-        var progress = new QuestProgress(StepPermanent: 3, ActiveFlag: 1, QSort: 1, TargetPhase: 49, KillCounter: 0);
+        var progress = new QuestProgress(3, 1, 1, 49, 0);
         var (zone, state, _) = SetUp(49, progress);
 
         zone.Post(ZoneCommand.CreditRegularWarConclusion(1));
@@ -119,7 +120,7 @@ public class ZoneRegularWarConclusionCreditTests
     public void Archetype8Quest_TargetingADifferentZone_IsNotCredited()
     {
         // TargetPhase (146) does not match this zone's own map id (49).
-        var progress = new QuestProgress(StepPermanent: 3, ActiveFlag: 1, QSort: 8, TargetPhase: 146, KillCounter: 0);
+        var progress = new QuestProgress(3, 1, 8, 146, 0);
         var (zone, state, _) = SetUp(49, progress);
 
         zone.Post(ZoneCommand.CreditRegularWarConclusion(1));

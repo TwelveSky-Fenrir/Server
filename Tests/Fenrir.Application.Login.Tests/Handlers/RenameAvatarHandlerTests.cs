@@ -120,6 +120,24 @@ public class ClChangeAvatarNameSendHandlerTests
         Assert.Empty(eventLog.LoggedEvents);
     }
 
+    // Server/ts25login/S04_MyWork02.cpp:1325-1329: the identical-name short circuit runs first, before the
+    // item-1133 gate -- a same-name request with no rename scroll present still gets a graceful Result=2
+    // response instead of the silent disconnect an item mismatch would otherwise trigger.
+    [Fact]
+    public async Task HandleAsync_NameUnchangedAndNoScrollPresent_RepliesResultTwoWithoutDisconnecting()
+    {
+        var characters = FakeCharacterRepository.WithSummaries(Summary);
+        var renames = FakeCharacterRenameRepository.ReturningResult(0);
+        var handler = BuildHandler(characters, renames);
+        var (session, pipe) = CreateSessionInCharSelect();
+
+        await handler.HandleAsync(Request(name: Summary.Name), session, CancellationToken.None);
+
+        await PacketAssert.AssertSentAsync(pipe, new RenameAvatarResponse { Result = 2 });
+        Assert.Null(renames.LastCall);
+        Assert.Null(session.DisconnectReason);
+    }
+
     [Fact]
     public async Task HandleAsync_NoCharacterAtSlot_RepliesResult102WithoutCallingRenameRepository()
     {

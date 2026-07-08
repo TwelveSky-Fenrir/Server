@@ -21,7 +21,10 @@ public sealed class MountStateService(
     /// <summary>Sort 7 (Delete Rolled Attribute)'s consumed material.</summary>
     private const int AttributeDeleteItemId = 1225;
 
-    /// <summary>Sort 8 (Transfer Rolled Attribute)'s primary consumed material -- checked before <see cref="AttributeTransferItemIdSecondary" />.</summary>
+    /// <summary>
+    ///     Sort 8 (Transfer Rolled Attribute)'s primary consumed material -- checked before
+    ///     <see cref="AttributeTransferItemIdSecondary" />.
+    /// </summary>
     private const int AttributeTransferItemIdPrimary = 8425;
 
     /// <summary>Sort 8 (Transfer Rolled Attribute)'s fallback consumed material.</summary>
@@ -132,7 +135,7 @@ public sealed class MountStateService(
                 zone.MapId, characterId);
 
         if (!await zone.PostMountCommandAndWaitAsync(
-                new MountZoneCommand(characterId, AnimalIndex: -1, DeleteGarageSlot: garageSlot),
+                new MountZoneCommand(characterId, -1, DeleteGarageSlot: garageSlot),
                 cancellationToken))
             logger.LogError(
                 "Zone {MapId} mount inbox full: dropped garage-slot clear mirror for character {CharacterId} after mount delete",

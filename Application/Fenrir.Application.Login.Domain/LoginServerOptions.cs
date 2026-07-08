@@ -27,9 +27,6 @@ public sealed class LoginServerOptions
     /// </summary>
     public int ShardReachabilityProbeTimeoutMilliseconds { get; set; } = 750;
 
-    /// <summary>Reported to client as tMaxPlayerNum; informational only, not enforced as a hard cap in M1.</summary>
-    public int MaxPlayerNum { get; set; } = 1000;
-
     /// <summary>Legacy <c>P2ndPassword</c> (=1 in prod EU33): when true, mouse PIN is mandatory before character select.</summary>
     public bool RequireSecondPassword { get; set; } = true;
 
@@ -61,6 +58,17 @@ public sealed class LoginServerOptions
     public int MaxProtocolViolationsPerIpPerHour { get; set; } = 30;
 
     /// <summary>
+    ///     How often <c>LoginSessionLivenessSweepHost</c> polls every currently-registered Login connection for
+    ///     <c>LoginSessionLivenessSweep.IdleTimeout</c>'s 60-second no-successfully-dispatched-frame window
+    ///     (Server/ts25login/S07_MyGame01.cpp:37-73). A poll cadence, not the timeout itself -- a real
+    ///     forced-disconnect never lags the 60-second cutoff by more than one cycle. Deliberately a much
+    ///     tighter default than GameServer's equivalent (<c>GameServerOptions.SessionLivenessSweepIntervalSeconds</c>,
+    ///     30s) because Login's own idle threshold is a minute, not three -- a 30s cadence against a 60s threshold
+    ///     would let a forced-disconnect lag by up to half the threshold itself.
+    /// </summary>
+    public int IdleSweepIntervalSeconds { get; set; } = 1;
+
+    /// <summary>
     ///     op17 CL_CREATE_AVATAR_SEND2's fourth-faction (Tribe value 3) creation exclusion toggle -- when false
     ///     (the default), a create-avatar request for Tribe value 3 is rejected; see
     ///     <see cref="Fenrir.Application.Login.Domain.Avatars.FourthFactionGate" /> for the gate itself. Default
@@ -75,4 +83,15 @@ public sealed class LoginServerOptions
     ///     ServerDocs/03_BUILD_VARIANTS_ET_PREPROCESSEUR.md:56-59 (LNW33 always active in ReleaseEU33).
     /// </remarks>
     public bool EnableFourthFaction { get; set; }
+
+    /// <summary>
+    ///     Legacy <c>mSERVER_INFO.mOnlyAdmin</c> operator lockdown flag: when true, a non-GM-tier account
+    ///     (<c>AccountGrade &lt; 1</c>) is rejected at login with the fixed application message "Only Admin
+    ///     can login", while GM-tier accounts still log in normally. Intended for maintenance windows where
+    ///     only staff should be able to connect. Whether this flag was ever enabled in the shipped EU33
+    ///     production configuration was not confirmed when this option was added -- defaults to
+    ///     <see langword="false" /> (disabled) so it changes nothing unless an operator explicitly opts in.
+    /// </summary>
+    /// <remarks>Réf. C++ : Server/ts25login/S04_MyWork02.cpp:202-208.</remarks>
+    public bool OnlyAdminCanLogin { get; set; }
 }

@@ -4,7 +4,8 @@ using Fenrir.IntegrationTests.Wire;
 namespace Fenrir.IntegrationTests;
 
 /// <summary>
-///     Drives Login -&gt; GameServer -&gt; InWorld against shard 2 specifically (<see cref="FenrirEnvironmentFixture.ShardId2" />,
+///     Drives Login -&gt; GameServer -&gt; InWorld against shard 2 specifically (
+///     <see cref="FenrirEnvironmentFixture.ShardId2" />,
 ///     hosting maps 6/11/140 per the real seed <c>Database/Migrations/Seed/admin/005_shard_map_assignments.sql</c>),
 ///     unlike <see cref="EndToEndScenarioTests" /> which only ever exercises shard 1 (map 1). This closes a gap a
 ///     prior audit round left open: every existing wire-level integration coverage only ever connected to a
@@ -37,8 +38,17 @@ public sealed class ShardTwoZoneEntryScenarioTests
     private const int WeaponRawCode = 11;
     private const short ExpectedSpawnMapId = 6;
 
+    // character-creation-level1-redesign (CONFIRMED PRODUCT DECISION): a fresh character now seeds with
+    // CreateAvatarService.StartingStatPoint = 50 unspent StatPoints (a Fenrir product default, NOT
+    // legacy-cited -- see that constant's own remarks), down from the old EU33-grant pool of 3175 this
+    // constant used to be sized against with headroom to spare. This scenario only needs a real round trip
+    // to succeed (see class remarks -- no combat leg here), so allocating the full starting pool keeps the
+    // request comfortably affordable without needing to track the exact new pool size at two call sites.
     private const int StrengthVariableStatSort = 9; // StatAllocationResolver.BaseStat.Strength
-    private const int StrengthPointsToAllocate = 250;
+    private const int StrengthPointsToAllocate = 50;
+
+    private const string MousePin = "4343";
+    private const int LoginClientVersion = 90354; // LoginServerOptions.ExpectedClientVersion default
 
     private readonly FenrirEnvironmentFixture _environment;
 
@@ -77,7 +87,8 @@ public sealed class ShardTwoZoneEntryScenarioTests
 
         var createResult = await login.CreateAvatarAsync(0, Tribe, 0, 0, 0, AvatarName, ct, WeaponRawCode,
             PreviousTribe);
-        Assert.Equal(0, createResult);
+        Assert.True(createResult == 0,
+            $"createResult was {createResult}, not 0. Captured LoginServer output:\n{_environment.LoginServerLogSnapshot()}");
 
         // ---- Zone transfer: must resolve to shard 2's own live Host:Port, not shard 1's ----
         var zoneTransfer = await login.ZoneTransferAsync(0, ct);
@@ -119,16 +130,13 @@ public sealed class ShardTwoZoneEntryScenarioTests
 
         Assert.Equal(AvatarName, enterResult.AvatarInfo.Name);
 
-        // NOT asserting AvatarInfo.Level1 == 1 here: this connectivity scenario uncovered that every freshly
-        // created character (any tribe, any shard) is persisted with game.Characters.Level = 145, not 1 --
-        // Database/StoredProcedures/game/usp_Character_CreateWithStarterKit.sql's own INSERT literal (column
-        // list "Level, Level2, RebirthCount, Experience, Exp2" against value list "145, 12, 0, 2000000000, 0")
-        // has no corresponding documented C# starting-level constant the way Level2/Exp1/Exp2 do in
-        // CreateAvatarService, and EndToEndScenarioTests' own (never-yet-reached, see that class's remarks on
-        // the pre-existing zone-handshake blocker) assertion expects exactly 1. This is a real, separately
-        // reportable data bug outside this Network-territory scenario's scope (Database/stored-procedure
-        // literal, not Transport/Framing/Dispatch) -- left for fenrir-database-engineer, not fixed here so this
-        // scenario stays focused on proving the shard-2 wire path itself.
+        // character-creation-level1-redesign (CONFIRMED PRODUCT DECISION): every freshly created character
+        // (any tribe, any shard) now genuinely persists at Level 1 (Database/Migrations/
+        // 027_character_create_level1_basic_kit.sql), closing the discrepancy this test used to document --
+        // this assertion previously could not be added here because the pre-redesign stored procedure
+        // hardcoded Level = 145 with no corresponding C# constant to even name. Now asserted the same way
+        // EndToEndScenarioTests asserts it for shard 1.
+        Assert.Equal(1, enterResult.AvatarInfo.Level1);
 
         // ---- Ready: op13 CL_MOVE_ZONE_OK_SEND, no reply, session transitions to InWorld server-side ----
         await zone.ReadyAsync(0, ct);
@@ -155,9 +163,6 @@ public sealed class ShardTwoZoneEntryScenarioTests
 
         await zone.DisposeAsync();
     }
-
-    private const string MousePin = "4343";
-    private const int LoginClientVersion = 90354; // LoginServerOptions.ExpectedClientVersion default
 
     private static async Task<GenericActionResult?> WaitForGenericActionResultAsync(ZoneBotClient zone, int sort,
         TimeSpan timeout)

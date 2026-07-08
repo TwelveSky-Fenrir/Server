@@ -1,4 +1,3 @@
-using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Wire;
 using Fenrir.Network.Tests.TestSupport;

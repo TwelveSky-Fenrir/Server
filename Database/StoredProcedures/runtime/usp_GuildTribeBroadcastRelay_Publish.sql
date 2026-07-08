@@ -4,20 +4,20 @@
 -- for that boundary). Single-row INSERT, no dependencies -- natively compiled like this feature's sibling
 -- single-row hot-path procs (usp_GameServer_Heartbeat, usp_CharacterShardLocation_Upsert).
 CREATE PROCEDURE runtime.usp_GuildTribeBroadcastRelay_Publish @Kind TINYINT,
-                                                               @SourceShardId TINYINT,
-                                                               @GuildId INT NULL,
-                                                               @Tribe TINYINT NULL,
-                                                               @RoleField TINYINT,
-                                                               @AvatarName NVARCHAR(13),
-                                                               @Content NVARCHAR(61),
-                                                               @HasItemLink BIT,
-                                                               @ItemLinkIndex INT NULL,
-                                                               @ItemLinkActivity INT NULL,
-                                                               @ItemLinkValue INT NULL,
-                                                               @ItemLinkSocket0 INT NULL,
-                                                               @ItemLinkSocket1 INT NULL,
-                                                               @ItemLinkSocket2 INT NULL
-    WITH NATIVE_COMPILATION, SCHEMABINDING
+                                                              @SourceShardId TINYINT,
+                                                              @GuildId INT NULL,
+                                                              @Tribe TINYINT NULL,
+                                                              @RoleField TINYINT,
+                                                              @AvatarName NVARCHAR(13),
+                                                              @Content NVARCHAR(61),
+                                                              @HasItemLink BIT,
+                                                              @ItemLinkIndex INT NULL,
+                                                              @ItemLinkActivity INT NULL,
+                                                              @ItemLinkValue INT NULL,
+                                                              @ItemLinkSocket0 INT NULL,
+                                                              @ItemLinkSocket1 INT NULL,
+                                                              @ItemLinkSocket2 INT NULL
+    WITH NATIVE_COMPILATION , SCHEMABINDING
 AS
 BEGIN
     ATOMIC

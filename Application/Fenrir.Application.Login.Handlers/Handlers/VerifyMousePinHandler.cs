@@ -59,6 +59,15 @@ public sealed class VerifyMousePinHandler(
                 if (lockedOut)
                     loginSession.Abort(DisconnectReason.StateViolation);
                 return;
+            case VerifyMousePinOutcome.Locked:
+                // Fenrir-only account-scoped lockout (Migrations/028_account_pin_lockout.sql): silent abort,
+                // matching NoPinConfigured/InvalidFormat's posture -- no wire reply, no legacy analog to
+                // preserve. VerifyMousePinService already wrote the durable audit row for this rejection.
+                logger.LogWarning(
+                    "PIN verify rejected: account {AccountId} is locked out from PIN attempts -- aborting",
+                    accountId);
+                loginSession.Abort(DisconnectReason.StateViolation);
+                return;
             default:
                 loginSession.MarkCharSelect();
                 logger.LogInformation("PIN verified for account {AccountId}; session moved to CharSelect",

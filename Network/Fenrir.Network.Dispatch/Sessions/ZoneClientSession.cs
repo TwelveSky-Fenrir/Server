@@ -77,6 +77,23 @@ public sealed class ZoneClientSession(
     public IZoneActor? CurrentZone { get; set; }
 
     /// <summary>
+    ///     Set by <see cref="MarkCrossShardTransferPending" /> — this connection is closing on purpose because a
+    ///     Game(sourceShard)->Game(destinationShard) cross-shard zone transfer already minted a fresh
+    ///     <c>runtime.SessionTickets</c> row reusing this connection's own <see cref="AccountSessionToken" />
+    ///     (<c>ZoneMoveService.HandleCrossShardAsync</c>). Mirrors <see cref="LoginClientSession.MarkHandoverIssued" />'s
+    ///     role for the Login-&gt;Game handoff, but deliberately implemented as an ancillary flag rather than a
+    ///     fifth <see cref="ZoneSessionState" /> value: <see cref="IsOpcodeAllowed" /> (via <c>SessionStateGate</c>,
+    ///     generated from the wire-protocol model) only ever reads <see cref="State" />, never this flag, and
+    ///     nothing about opcode gating needs to change for this connection to close cleanly. Never changes
+    ///     <see cref="State" /> — an ancillary fact, not a state transition, so no log here (same posture as
+    ///     <see cref="LoginClientSession.MarkAccountSessionToken" />). Must only ever be set on the one code path
+    ///     that actually mints a cross-shard ticket — never speculatively, since the connection host uses this
+    ///     flag to skip its own <c>runtime.AccountSessions</c> teardown on disconnect, and a session that is
+    ///     genuinely abandoned (not mid-handoff) must still have that row cleared.
+    /// </summary>
+    public bool IsCrossShardTransferPending { get; private set; }
+
+    /// <summary>
     ///     Legacy's per-command <c>uUserSort &gt;= tier</c> gate (the same scalar backs all three thresholds
     ///     in <see cref="GmCommandTier" />). Every future GM-command handler must call this with the exact
     ///     tier its own legacy case uses — <see cref="GmCommandTier.Basic" />, <see cref="GmCommandTier.Elevated" />,
@@ -120,5 +137,15 @@ public sealed class ZoneClientSession(
         var previous = State;
         State = ZoneSessionState.InWorld;
         LogSessionStateChanged(previous, State);
+    }
+
+    /// <summary>
+    ///     Records that this connection is closing on purpose because a cross-shard zone-transfer ticket was
+    ///     just minted for it — see <see cref="IsCrossShardTransferPending" />'s own remarks for the full
+    ///     rationale and the exact single caller this must stay scoped to.
+    /// </summary>
+    public void MarkCrossShardTransferPending()
+    {
+        IsCrossShardTransferPending = true;
     }
 }

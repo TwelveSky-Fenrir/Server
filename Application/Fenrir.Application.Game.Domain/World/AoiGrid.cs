@@ -174,7 +174,8 @@ public sealed class AoiGrid(float cellSize)
     ///     <see cref="Zone.BroadcastGroundItemAction" />, <see cref="Zone.BroadcastProxyShopState" />): true if
     ///     any of the <c>(2*scale+1)^2</c> candidate cells around <paramref name="cell" /> currently holds at
     ///     least one occupant. Those call sites used to compute <c>NeighborsOfPosition(...).ToArray()</c>
-    ///     unconditionally just to test <c>Length == 0</c> before an early return -- allocating <see cref="Neighbors(ValueTuple{int,int})" />'s
+    ///     unconditionally just to test <c>Length == 0</c> before an early return -- allocating
+    ///     <see cref="Neighbors(ValueTuple{int,int})" />'s
     ///     own compiler-generated iterator plus a LINQ <see cref="Enumerable.ToArray{TSource}" /> buffer on every
     ///     single broadcast, even the overwhelmingly common case of a solitary monster/item/shop with nobody
     ///     nearby to tell. This does the same <c>+/-scale</c> box scan as <see cref="Neighbors(ValueTuple{int,int})" />
@@ -206,7 +207,8 @@ public sealed class AoiGrid(float cellSize)
     /// <summary>
     ///     Non-allocating, coarse-only counterpart to <see cref="Neighbors(ValueTuple{int,int})" /> for hot
     ///     per-packet call sites: appends every character id in the 3x3 neighborhood of <paramref name="cell" />
-    ///     to <paramref name="buffer" />, excluding <paramref name="excludeCharacterId" />. <see cref="Neighbors(ValueTuple{int,int})" />
+    ///     to <paramref name="buffer" />, excluding <paramref name="excludeCharacterId" />.
+    ///     <see cref="Neighbors(ValueTuple{int,int})" />
     ///     is a <c>yield return</c> iterator, so every call allocates a compiler-generated enumerator; chaining a
     ///     LINQ <c>Where(id => id != x)</c> onto it additionally allocates a closure (the excluded id varies per
     ///     call, so the delegate can't be cached) plus the `Where` wrapper, and a trailing <c>ToArray()</c>
@@ -226,7 +228,8 @@ public sealed class AoiGrid(float cellSize)
     }
 
     /// <summary>
-    ///     Non-allocating, legacy-parity two-stage counterpart to <see cref="NeighborsExcludingSelf(List{int},ValueTuple{int,int},int)" />:
+    ///     Non-allocating, legacy-parity two-stage counterpart to
+    ///     <see cref="NeighborsExcludingSelf(List{int},ValueTuple{int,int},int)" />:
     ///     same <c>+/-scale</c> box scan and inline filter, plus the same exact-distance check documented on
     ///     <see cref="Neighbors(ValueTuple{int,int},float,float,float,int)" />. This is the overload every
     ///     production avatar-broadcast call site in <see cref="Zone" /> uses.
@@ -249,7 +252,8 @@ public sealed class AoiGrid(float cellSize)
     ///     is no self id to exclude, unlike <see cref="NeighborsExcludingSelf(List{int},ValueTuple{int,int},int)" />).
     ///     Appends every character id in the 3x3 neighborhood of <paramref name="cell" /> to
     ///     <paramref name="buffer" />. Same "iterator + LINQ ToArray() per call" avoidance rationale as
-    ///     <see cref="NeighborsExcludingSelf(List{int},ValueTuple{int,int},int)" /> -- <see cref="Zone.BroadcastMonsterAction" />
+    ///     <see cref="NeighborsExcludingSelf(List{int},ValueTuple{int,int},int)" /> --
+    ///     <see cref="Zone.BroadcastMonsterAction" />
     ///     and <see cref="Zone.BroadcastGroundItemAction" /> call this once per due keep-alive, and during a
     ///     rebroadcast burst that is once per due entity in that single tick, not once per whole zone.
     /// </summary>

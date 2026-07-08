@@ -168,7 +168,8 @@ public sealed class QuestProgressService(
                 "Zone {MapId} inventory inbox full: dropped quest-receive mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
                 zone.MapId, characterId);
 
-        logger.LogInformation("Character {CharacterId} received quest item {ItemId} into container {Container} slot {Slot}",
+        logger.LogInformation(
+            "Character {CharacterId} received quest item {ItemId} into container {Container} slot {Slot}",
             characterId, depositItemId, container, slot);
 
         return new QuestActionResult(true);

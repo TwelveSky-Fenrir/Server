@@ -35,10 +35,13 @@ public sealed class DeleteAvatarService(
         var roster = await characters.GetByAccountAsync(accountId, cancellationToken);
         var character = roster.FirstOrDefault(c => c.Slot == avatarPost);
 
-        // No character in this slot: there is nothing to run the three business rules against. Slot-occupancy
-        // is one of this contract's out-of-scope preconditions (already gated earlier in the legacy handler);
-        // the delete call below is itself idempotent (usp_Character_Delete is a no-op on an already-empty slot),
-        // so falling through to it here is safe rather than an error.
+        // No character in this slot: there is nothing to run the three business rules against. Legacy silently
+        // disconnects on an out-of-range/empty slot instead (Server/ts25login/S04_MyWork02.cpp:1188-1213), but no
+        // such upstream gate exists anywhere in Fenrir's wire path for this packet (DeleteAvatarRequest only
+        // gates on session state). This is a deliberate, accepted divergence rather than an unverified
+        // assumption: the delete call below is itself idempotent (usp_Character_Delete is a no-op on an
+        // already-empty slot), so falling through to it here and answering with a normal Success response is
+        // treated as intentional hardening (a graceful no-op instead of legacy's silent disconnect), not a gap.
         if (character is not null)
         {
             var outcome = await CheckBusinessRulesAsync(character, cancellationToken);
@@ -52,12 +55,13 @@ public sealed class DeleteAvatarService(
         }
         catch (Exception ex)
         {
-            // Previously invisible: usp_Character_Delete failing here left no trace anywhere (see
-            // DeleteAvatarHandler's own remarks on the "1=DB delete failure, not modeled here" gap) -- logged for
-            // observability only, behavior/semantics unchanged (still rethrows, caller still sees an unhandled fault).
+            // usp_Character_Delete faulting is a mapped, dedicated outcome (B_DELETE_AVATAR_RECV Result=1,
+            // Server/ts25login/S04_MyWork02.cpp:1275-1283), not an unhandled fault: the caller gets a normal
+            // failure response and the session survives, matching RenameAvatarService's equivalent SqlError
+            // handling for the exact same class of failure.
             logger.LogError(ex, "Character delete failed for account {AccountId} slot {AvatarPost}", accountId,
                 avatarPost);
-            throw;
+            return new DeleteAvatarResult(DeleteAvatarOutcome.SqlError);
         }
 
         return new DeleteAvatarResult(DeleteAvatarOutcome.Success);

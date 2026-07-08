@@ -53,10 +53,20 @@ public sealed class EndToEndScenarioTests
     private const int LoginClientVersion = 90354; // LoginServerOptions.ExpectedClientVersion default
 
     // StatAllocationResolver.BaseStat.Strength, variable regime (tStatSort 9-12 = Str/Dex/Vit/Int, cost ==
-    // credited amount 1:1). CreateAvatarService.StartingStatPoint seeds every fresh character with 3175
-    // unspent StatPoints, so 500 is well within budget with margin to spare.
+    // credited amount 1:1). character-creation-level1-redesign (CONFIRMED PRODUCT DECISION): a fresh
+    // character now seeds with CreateAvatarService.StartingStatPoint = 50 unspent StatPoints (a Fenrir
+    // product default, NOT legacy-cited -- see that constant's own remarks), a ~60x reduction from the old
+    // EU33-grant pool of 3175 this constant used to be sized against. Allocating the ENTIRE starting pool
+    // into Strength (rather than a fraction "with margin to spare" the way 500-of-3175 was) is a deliberate
+    // choice for this combat leg: the character's starter weapon is now unenchanted/uncombined (Enchant 0/
+    // Combine 0, see CreateAvatarService.StarterGearEnchant/StarterGearCombine) instead of the old
+    // Enchant45/Combine6 elite grant, so maximizing raw Strength is this test's best available lever for
+    // clearing StatCalculator.ComputeAttackSuccess's combat-viability floor. This is a genuinely reduced
+    // combat-power scenario relative to the old EU33 design; if combat kills start timing out under this
+    // budget, the fix is a design change (e.g. an easier planned encounter), not a bigger StatPoints pool --
+    // see StartingStatPoint's own remarks for why 50 was chosen.
     private const int StrengthVariableStatSort = 9;
-    private const int StrengthPointsToAllocate = 500;
+    private const int StrengthPointsToAllocate = 50;
 
     private readonly FenrirEnvironmentFixture _environment;
 
@@ -138,11 +148,16 @@ public sealed class EndToEndScenarioTests
 
         var enterResult = await zone.EnterWorldAsync(_environment.TestAccountId, AvatarName, ct);
         Assert.Equal(AvatarName, enterResult.AvatarInfo.Name);
-        // Every Fenrir character is created already at the general-level cap (Level1 = MAX_LIMIT_LEVEL_NUM =
-        // 145, usp_Character_CreateWithStarterKit's own hardcoded literal) under the EU33/USE_CUSTOME_CREATE
-        // creation grant -- see AvatarInfoFactory.MaxGeneralExperience's own remarks for the full citation.
-        // Not 1: this assertion previously encoded a stale pre-EU33-grant expectation.
-        Assert.Equal(145, enterResult.AvatarInfo.Level1);
+        // character-creation-level1-redesign (CONFIRMED PRODUCT DECISION): every Fenrir character now starts
+        // at a genuine Level 1 (usp_Character_CreateWithStarterKit's own literal, Database/Migrations/
+        // 027_character_create_level1_basic_kit.sql), not the old EU33/USE_CUSTOME_CREATE instant-cap grant
+        // (Level1 = MAX_LIMIT_LEVEL_NUM = 145) this assertion used to encode. NOTE: Application/
+        // Fenrir.Application.Game.Domain/Avatars/AvatarInfoFactory.MaxGeneralExperience still unconditionally
+        // reports Exp1 = 2,000,000,000 on this same response, on the now-stale assumption every character is
+        // created at the general-level cap -- that Game-side factory is a deferred follow-up gap outside this
+        // LoginServer-scoped redesign (see CreateAvatarService's own <remarks>), so Exp1 is deliberately NOT
+        // asserted here.
+        Assert.Equal(1, enterResult.AvatarInfo.Level1);
 
         await zone.ReadyAsync(0, ct);
         zone.StartBackgroundPump();
@@ -150,9 +165,9 @@ public sealed class EndToEndScenarioTests
         // ---- Real-wire stat-point allocation (tSort 206, ProcessForStatPlus -- now wired by GenericActionHandler) ----
         // Replaces the former SQL-seeded StatStr workaround (see class remarks): category 9 is the
         // variable-regime Strength credit (StatAllocationResolver.BaseStat.Strength), crediting
-        // StrengthPointsToAllocate 1:1 from the character's starting StatPoints balance
-        // (CreateAvatarService.StartingStatPoint = 3175 -- ample headroom) so StatCalculator.ComputeAttackSuccess
-        // clears MonsterCombatResolver.ResolvePvmAttack's AttackSuccess floor for real, not via direct SQL.
+        // StrengthPointsToAllocate (the character's ENTIRE starting StatPoints balance -- see that constant's
+        // own remarks for why) 1:1 so StatCalculator.ComputeAttackSuccess clears
+        // MonsterCombatResolver.ResolvePvmAttack's AttackSuccess floor for real, not via direct SQL.
         // Retried (not a single fire-and-wait) to absorb the same benign staleness window
         // ZoneReadyHandler's own remarks describe: GenericActionHandler silently no-ops if Zone.TryGetPlayer
         // hasn't observed this character yet because the zone tick hasn't drained the posted ZoneCommand.Enter

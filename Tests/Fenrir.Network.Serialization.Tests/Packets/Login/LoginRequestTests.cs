@@ -50,6 +50,33 @@ public class ClLoginSendTests
         Assert.False(LoginRequest.TryRead(buffer, out _));
     }
 
+    // Finding 4 (ServerDocs/11_ts25login/03_Plaintext_Passwords_Secrets.md): this wire type still carries the
+    // password in clear text for legacy-client compatibility, so its ToString() must never echo it back --
+    // guards against a future "{Packet}"-style structured log or debugger watch leaking the raw credential.
+    [Fact]
+    public void ToString_NeverIncludesThePlaintextPassword()
+    {
+        var packet = new LoginRequest
+        {
+            Id = "PlayerOne",
+            Password = "Sup3rSecret!",
+            Version = 733,
+            Adapter = new LoginAdapterInfo
+            {
+                AdapterName = "Intel(R) Ethernet Connection",
+                PhysicalAddressLength = 6,
+                PhysicalAddress = [0x02, 0x04, 0x06, 0x08, 0x0A, 0x0C, 0x00, 0x00],
+                IPAddress = "10.0.0.42"
+            }
+        };
+
+        var text = packet.ToString();
+
+        Assert.DoesNotContain("Sup3rSecret!", text);
+        Assert.Contains("PlayerOne", text);
+        Assert.Contains("[REDACTED]", text);
+    }
+
     private static void WriteFixedString(Span<byte> destination, string value)
     {
         destination.Clear();

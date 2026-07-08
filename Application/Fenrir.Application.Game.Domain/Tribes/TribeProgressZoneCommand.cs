@@ -116,7 +116,8 @@ namespace Fenrir.Application.Game.Domain.Tribes;
 /// </param>
 /// <param name="StoreMoney">
 ///     CZ_PROCESS_DATA_SEND tSort 226/227 (Store/coffre money deposit/withdraw) -- the character's new
-///     Store-money total after <see cref="Fenrir.Data.Abstractions.Characters.ICharacterRepository.AdjustStoreMoneyAsync" />
+///     Store-money total after
+///     <see cref="Fenrir.Data.Abstractions.Characters.ICharacterRepository.AdjustStoreMoneyAsync" />
 ///     has already durably persisted it, so applying it here (like <see cref="Zone241Time" />/
 ///     <see cref="Tribe" />/<see cref="QuestProgress" /> above) never marks
 ///     <see cref="PlayerRuntimeState.MarkProgressDirty" /> -- see

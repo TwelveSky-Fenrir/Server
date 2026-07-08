@@ -6,7 +6,12 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 ///     found by the translating behavior contract, so defaulted to inert zero), these are literal, cited
 ///     legacy world-space coordinates -- see <see cref="AlliancePostOccupantScanner" />'s own remarks.
 /// </summary>
-public sealed record AlliancePostSite(short MapId, float Post0X, float Post0Z, float Post1X, float Post1Z,
+public sealed record AlliancePostSite(
+    short MapId,
+    float Post0X,
+    float Post0Z,
+    float Post1X,
+    float Post1Z,
     float Radius);
 
 /// <summary>

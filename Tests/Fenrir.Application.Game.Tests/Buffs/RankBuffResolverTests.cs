@@ -7,7 +7,7 @@ public class RankBuffResolverTests
     [Fact]
     public void Sort1_WithOneStone_Succeeds()
     {
-        var result = RankBuffResolver.Resolve(1, 1, isMovingZone: false, worldBattleActive: false);
+        var result = RankBuffResolver.Resolve(1, 1, false, false);
 
         Assert.True(result.Succeeded);
     }
@@ -15,7 +15,7 @@ public class RankBuffResolverTests
     [Fact]
     public void Sort1_WithZeroStones_Rejected()
     {
-        var result = RankBuffResolver.Resolve(1, 0, isMovingZone: false, worldBattleActive: false);
+        var result = RankBuffResolver.Resolve(1, 0, false, false);
 
         Assert.False(result.Succeeded);
         Assert.False(result.SilentlyIgnored);
@@ -30,7 +30,7 @@ public class RankBuffResolverTests
     [InlineData(7, 3)]
     public void HigherSorts_RequireMoreStonesThanTypicalDefault_Rejected(int sort, int stoneCount)
     {
-        var result = RankBuffResolver.Resolve(sort, stoneCount, isMovingZone: false, worldBattleActive: false);
+        var result = RankBuffResolver.Resolve(sort, stoneCount, false, false);
 
         Assert.False(result.Succeeded);
     }
@@ -44,7 +44,7 @@ public class RankBuffResolverTests
     [InlineData(7, 4)]
     public void HigherSorts_WithExactRequiredStoneCount_Succeeds(int sort, int stoneCount)
     {
-        var result = RankBuffResolver.Resolve(sort, stoneCount, isMovingZone: false, worldBattleActive: false);
+        var result = RankBuffResolver.Resolve(sort, stoneCount, false, false);
 
         Assert.True(result.Succeeded);
     }
@@ -54,7 +54,7 @@ public class RankBuffResolverTests
     [InlineData(8)]
     public void OutOfRangeSort_Rejected(int sort)
     {
-        var result = RankBuffResolver.Resolve(sort, 100, isMovingZone: false, worldBattleActive: false);
+        var result = RankBuffResolver.Resolve(sort, 100, false, false);
 
         Assert.False(result.Succeeded);
     }
@@ -62,7 +62,7 @@ public class RankBuffResolverTests
     [Fact]
     public void IsMovingZone_Rejected_RegardlessOfOtherwiseValidTierAndStoneCount()
     {
-        var result = RankBuffResolver.Resolve(1, 100, isMovingZone: true, worldBattleActive: false);
+        var result = RankBuffResolver.Resolve(1, 100, true, false);
 
         Assert.False(result.Succeeded);
         Assert.False(result.SilentlyIgnored);
@@ -72,7 +72,7 @@ public class RankBuffResolverTests
     [Fact]
     public void WorldBattleActive_SilentlyIgnored_RegardlessOfOtherwiseValidTierAndStoneCount()
     {
-        var result = RankBuffResolver.Resolve(1, 100, isMovingZone: false, worldBattleActive: true);
+        var result = RankBuffResolver.Resolve(1, 100, false, true);
 
         Assert.False(result.Succeeded);
         Assert.True(result.SilentlyIgnored);
@@ -82,7 +82,7 @@ public class RankBuffResolverTests
     [Fact]
     public void IsMovingZone_TakesPrecedenceOverWorldBattleActive()
     {
-        var result = RankBuffResolver.Resolve(1, 100, isMovingZone: true, worldBattleActive: true);
+        var result = RankBuffResolver.Resolve(1, 100, true, true);
 
         Assert.Equal(RankBuffResolver.Outcome.Rejected, result.Outcome);
     }

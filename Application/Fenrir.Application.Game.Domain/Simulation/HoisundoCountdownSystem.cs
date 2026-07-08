@@ -11,8 +11,12 @@ namespace Fenrir.Application.Game.Domain.Simulation;
 ///     session, and disconnects it once the countdown drops below one.
 /// </summary>
 /// <remarks>
-///     Réf. C++ : Server/ts25zone/S07_MyGame01.cpp:1748-1865 (the <c>mServerNumber &gt;= 234 &amp;&amp;
-///     &lt;= 240</c> gate and the one-case-per-zone-number switch, each decrementing its own
+///     Réf. C++ : Server/ts25zone/S07_MyGame01.cpp:1748-1865 (the
+///     <c>
+///         mServerNumber &gt;= 234 &amp;&amp;
+///         &lt;= 240
+///     </c>
+///     gate and the one-case-per-zone-number switch, each decrementing its own
 ///     <c>aZoneNNNTime</c> avatar field, broadcasting via <c>B_AVATAR_CHANGE_INFO_2</c>, and calling
 ///     <c>user-&gt;Quit()</c> once the value drops below 1) ; Server/Header/Protocol/STRUCT.h:1548-1554
 ///     (<c>S033ZONE_234_TIME</c>..<c>S039ZONE_240_TIME</c> broadcast sort codes, one per zone number) ;

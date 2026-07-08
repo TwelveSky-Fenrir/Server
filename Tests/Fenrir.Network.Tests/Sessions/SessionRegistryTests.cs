@@ -188,6 +188,49 @@ public class SessionRegistryTests
         Assert.Empty(snapshot);
     }
 
+    // Backs the per-server idle-connection sweeps (GameServer's SessionLivenessSweep, Login's own
+    // LoginSessionLivenessSweep) -- the comparison is deliberately strict `>`, not `>=`: a connection whose
+    // silence exactly equals the threshold at the instant of a sweep pass is not yet idle, it is caught on a
+    // later pass once the threshold is strictly exceeded (matches legacy's own comparison).
+    [Fact]
+    public void SnapshotIdle_ExcludesASessionExactlyAtTheThreshold()
+    {
+        var registry = new SessionRegistry();
+        var session = NewSession(1);
+        registry.Register(session);
+        var idleTimeout = TimeSpan.FromSeconds(60);
+
+        var snapshot = registry.SnapshotIdle(idleTimeout, session.LastActivityUtc + idleTimeout);
+
+        Assert.Empty(snapshot);
+    }
+
+    [Fact]
+    public void SnapshotIdle_IncludesASessionStrictlyPastTheThreshold()
+    {
+        var registry = new SessionRegistry();
+        var session = NewSession(1);
+        registry.Register(session);
+        var idleTimeout = TimeSpan.FromSeconds(60);
+
+        var snapshot = registry.SnapshotIdle(idleTimeout, session.LastActivityUtc + idleTimeout + TimeSpan.FromTicks(1));
+
+        Assert.Contains(session, snapshot);
+    }
+
+    [Fact]
+    public void SnapshotIdle_ExcludesASessionYoungerThanTheThreshold()
+    {
+        var registry = new SessionRegistry();
+        var session = NewSession(1);
+        registry.Register(session);
+        var idleTimeout = TimeSpan.FromSeconds(60);
+
+        var snapshot = registry.SnapshotIdle(idleTimeout, session.LastActivityUtc + idleTimeout - TimeSpan.FromTicks(1));
+
+        Assert.Empty(snapshot);
+    }
+
     private static ZoneClientSession NewSession(long sessionId)
     {
         return new ZoneClientSession(sessionId, new FakeDuplexPipe());

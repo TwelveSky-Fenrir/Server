@@ -70,14 +70,14 @@ BEGIN
     SET @Payload = CONCAT(N'GuildId=', @GuildId, N';AvatarName=', @AvatarName, N';Grade=', @Grade);
 
     EXEC game.usp_EventLog_Insert
-        @EventCode = 2, -- upgrade (legacy GL_617_GUILD_MONEY tAction=2)
-        @Category = 11, -- game.EventLogCategory.GuildMoney
-        @ActorAccountId = @ActorAccountId,
-        @ActorCharacterId = @CharacterId,
-        @DeltaMoney = @DeltaMoney,
-        @DeltaBigMoney = @DeltaBigMoney,
-        @Outcome = 1,
-        @Payload = @Payload;
+         @EventCode = 2, -- upgrade (legacy GL_617_GUILD_MONEY tAction=2)
+         @Category = 11, -- game.EventLogCategory.GuildMoney
+         @ActorAccountId = @ActorAccountId,
+         @ActorCharacterId = @CharacterId,
+         @DeltaMoney = @DeltaMoney,
+         @DeltaBigMoney = @DeltaBigMoney,
+         @Outcome = 1,
+         @Payload = @Payload;
 
     COMMIT TRANSACTION;
 END;

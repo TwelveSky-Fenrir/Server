@@ -58,7 +58,8 @@ public class NpcShopTradeServiceTests
     /// <summary>
     ///     Builds a single-NPC, single-zone <see cref="WorldDataCache" />: the NPC offers
     ///     <see cref="NpcFunctionGate.NpcShop" /> and sits at the same position <see cref="ZoneTestKit.EnterData" />
-    ///     places the player, so <c>NpcFunctionGate.IsAvailable</c> is always satisfied. <paramref name="shopCatalogItemIds" />
+    ///     places the player, so <c>NpcFunctionGate.IsAvailable</c> is always satisfied.
+    ///     <paramref name="shopCatalogItemIds" />
     ///     defaults to every item in <paramref name="itemsById" /> when omitted; pass a narrower set to exercise
     ///     <see cref="NpcShopPolicy.BuyOutcome.NotInCatalog" />.
     /// </summary>
@@ -68,7 +69,7 @@ public class NpcShopTradeServiceTests
 
         var npc = new NpcDefinition(
             WorldDataTestRows.Npc(NpcId) with { Type = 1 },
-            [new NpcMenuOptionRowDto(NpcId, (short)NpcFunctionGate.NpcShop, 2)],
+            [new NpcMenuOptionRowDto(NpcId, NpcFunctionGate.NpcShop, 2)],
             catalogIds.Select((id, i) => new NpcShopItemRowDto(NpcId, 0, (byte)i, id)).ToImmutableArray(),
             [], [], []);
 
@@ -86,7 +87,8 @@ public class NpcShopTradeServiceTests
             NpcsById = new Dictionary<int, NpcDefinition> { [NpcId] = npc }.ToFrozenDictionary(),
             QuestsById = FrozenDictionary<int, QuestDefinition>.Empty,
             LevelsByLevel = FrozenDictionary<short, LevelRowDto>.Empty,
-            ZonesByNumber = new Dictionary<short, ZoneDefinition> { [ZoneNumber] = zoneDefinition }.ToFrozenDictionary(),
+            ZonesByNumber =
+                new Dictionary<short, ZoneDefinition> { [ZoneNumber] = zoneDefinition }.ToFrozenDictionary(),
             GemSocketsById = FrozenDictionary<int, GemSocketRowDto>.Empty,
             BloodExchangeCatalog = [],
             EventDefinitions = [],

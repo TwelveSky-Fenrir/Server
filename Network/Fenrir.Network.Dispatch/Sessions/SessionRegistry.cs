@@ -67,18 +67,22 @@ public sealed class SessionRegistry
     }
 
     /// <summary>
-    ///     Every currently-registered session whose <see cref="ClientSession.LastActivityUtc" /> is at least
-    ///     <paramref name="idleTimeout" /> old as of <paramref name="nowUtc" /> -- the abandoned-connection set a
-    ///     per-server idle sweep (e.g. GameServer's <c>SessionLivenessSweep</c>) forcibly disconnects. A plain
-    ///     scan, same "rare, defensive, not a hot path" posture as <see cref="SnapshotByRemoteAddress" /> --
-    ///     called at most once per sweep interval (seconds, not per-tick), never per-frame.
+    ///     Every currently-registered session whose <see cref="ClientSession.LastActivityUtc" /> is STRICTLY more
+    ///     than <paramref name="idleTimeout" /> old as of <paramref name="nowUtc" /> -- the abandoned-connection
+    ///     set a per-server idle sweep (e.g. GameServer's <c>SessionLivenessSweep</c> or Login's own
+    ///     <c>LoginSessionLivenessSweep</c>) forcibly disconnects. A plain scan, same "rare, defensive, not a hot
+    ///     path" posture as <see cref="SnapshotByRemoteAddress" /> -- called at most once per sweep interval
+    ///     (seconds, not per-tick), never per-frame.
+    ///     Deliberately a strict `&gt;`, not `&gt;=`: a connection whose silence exactly equals the threshold at
+    ///     the instant of a given sweep pass is not yet disconnected -- it is caught on a later pass once the
+    ///     threshold is strictly exceeded, matching legacy's own comparison.
     /// </summary>
     public ImmutableArray<ClientSession> SnapshotIdle(TimeSpan idleTimeout, DateTimeOffset nowUtc)
     {
         var builder = ImmutableArray.CreateBuilder<ClientSession>();
 
         foreach (var session in _sessions.Values)
-            if (nowUtc - session.LastActivityUtc >= idleTimeout)
+            if (nowUtc - session.LastActivityUtc > idleTimeout)
                 builder.Add(session);
 
         return builder.ToImmutable();

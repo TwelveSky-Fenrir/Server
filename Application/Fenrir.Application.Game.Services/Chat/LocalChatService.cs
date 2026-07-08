@@ -25,14 +25,14 @@ namespace Fenrir.Application.Game.Services.Chat;
 /// </summary>
 public sealed class LocalChatService(ILogger<LocalChatService> logger) : ILocalChatService
 {
-    // Socket is a reference-type array; a bare `default` would leave it null and crash the wire writer (same
-    // fix as WhisperHandler's own EmptyLink).
-    private static readonly ItemLinkInfo EmptyLink = new() { Index = 0, Activity = 0, Value = 0, Socket = new int[3] };
-
     // Every synthetic self-only reply this service sends (the "where" echo and every "no permission" denial)
     // is addressed from this fixed name, matching the contract's "a fixed system-looking sender name" for the
     // ygdrop/lab confirmations and extended here to every other synthetic reply for consistency.
     private const string SystemSenderName = "SYSTEM";
+
+    // Socket is a reference-type array; a bare `default` would leave it null and crash the wire writer (same
+    // fix as WhisperHandler's own EmptyLink).
+    private static readonly ItemLinkInfo EmptyLink = new() { Index = 0, Activity = 0, Value = 0, Socket = new int[3] };
 
     public bool TryPostChat(Zone zone, ZoneClientSession zoneSession, PlayerRuntimeState sender, string content,
         ItemLinkInfo link)

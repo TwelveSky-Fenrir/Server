@@ -1,5 +1,4 @@
 using Fenrir.Application.Game.Domain.World.Loot;
-using Fenrir.Data.Abstractions.Accounts;
 
 namespace Fenrir.Application.Game.Domain.Inventory;
 
@@ -53,7 +52,10 @@ public readonly record struct ItemStack(
             ItemValueCodec.Encode(Enchant, Combine, Refine, Socket), Serial, null);
     }
 
-    /// <summary>Inverse of <see cref="ToVaultTvp" />; SocketGem1-3/ExpireDate always come back zero -- see that method's own remarks.</summary>
+    /// <summary>
+    ///     Inverse of <see cref="ToVaultTvp" />; SocketGem1-3/ExpireDate always come back zero -- see that method's own
+    ///     remarks.
+    /// </summary>
     public static ItemStack FromVaultRow(AccountVaultItemSlotDto row)
     {
         var (enchant, combine, refine, socket) = ItemValueCodec.Decode(row.Value);

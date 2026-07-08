@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Net;
 using Fenrir.Application.Login.Abstractions.Login;
 using Fenrir.Application.Login.Domain;
@@ -15,9 +16,10 @@ namespace Fenrir.Application.Login.Services.Login;
 /// <summary>
 ///     op11 CL_LOGIN_SEND business logic -- IP rate limit (Fenrir-only, no legacy analog), then maintenance
 ///     lockdown, then server-full quota, then the application firewall, then version, then MAC restriction,
-///     then auth, then the device anti-spoofing gate, run in that order so an under-maintenance/over-capacity/
-///     over-budget/blocked/incompatible/banned-PC/spoofed-device attempt never reaches Argon2id/SQL account
-///     lookup (or, for the spoofing gate, never reaches PIN/session-claim) unnecessarily.
+///     then auth, then the GM-IP allowlist gate, then the "Only Admin can login" lockdown, then the device
+///     anti-spoofing gate, run in that order so an under-maintenance/over-capacity/over-budget/blocked/
+///     incompatible/banned-PC attempt never reaches Argon2id/SQL account lookup, and a GM-IP/admin-lockdown/
+///     spoofed-device rejection never reaches PIN/session-claim, unnecessarily.
 /// </summary>
 /// <remarks>
 ///     Réf. C++ (maintenance/quota) : Server/ts25login/S04_MyWork02.cpp:149-154 (maintenance, tResult=1) et
@@ -37,12 +39,14 @@ public sealed class LoginService(
     LoginIpRateLimiter ipRateLimiter,
     LoginCapacityState capacity,
     ApplicationFirewall firewall,
+    IGmAllowlistRepository gmAllowlist,
     IBanRepository bans,
     IMacRestrictionRepository macRestrictions,
     IOptions<LoginServerOptions> options,
     SessionRegistry registry,
     IAccountSessionRepository accountSessions,
     IEventLogRepository eventLog,
+    IGuildRepository guilds,
     ILogger<LoginService> logger) : ILoginService
 {
     // Legacy tResult codes actually producible by Fenrir's flows (S04_MyWork02.cpp W_LOGIN_SEND / S08_MyDB Login):
@@ -86,6 +90,7 @@ public sealed class LoginService(
 
     private const string MacBannedMessage = "Your PC has been banned.";
     private const string InvalidDevicesMessage = "Invalid devices!";
+    private const string OnlyAdminMessage = "Only Admin can login";
 
     /// <summary>
     ///     game.EventLog.EventCode for a successful authentication (Category=Session) -- an app-owned numbering
@@ -164,12 +169,37 @@ public sealed class LoginService(
         }
 
         var accountId = account!.AccountId;
+        var remoteIp = remoteEndPoint?.Address.ToString();
+
+        // "# GM Enable Login IP #" gate (Server/ts25login/S04_MyWork02.cpp:192-201, re-checked a second time
+        // at the DB layer itself at Server/ts25login/S08_MyDB.cpp:339-356): a GM-tier account must additionally
+        // connect from an allow-listed IP, even after its credentials already matched -- runs post-
+        // authentication, gated on the exact same AccountGrade field/threshold as the anti-spoofing gate right
+        // below. Fails open when no remote address is known (unit tests / non-TCP transport), matching
+        // ApplicationFirewall.IsAllowedAsync's own documented fail-open rationale for the identical condition.
+        if (account.AccountGrade >= DeviceSpoofingGuard.GmGradeThreshold && remoteIp is not null &&
+            !await gmAllowlist.IsAllowedAsync(remoteIp, cancellationToken))
+        {
+            logger.LogWarning(
+                "Login rejected: GM-tier account {AccountId} attempted login from non-allowlisted IP {RemoteIp}",
+                accountId, remoteIp);
+            return Failure(ResultIpBlocked, "", true);
+        }
+
+        // Legacy "Only Admin can login" operator lockdown (Server/ts25login/S04_MyWork02.cpp:202-208): when
+        // enabled, only GM-tier accounts may proceed past this point. Disabled by default (see
+        // LoginServerOptions.OnlyAdminCanLogin's own remarks).
+        if (options.Value.OnlyAdminCanLogin && account.AccountGrade < DeviceSpoofingGuard.GmGradeThreshold)
+        {
+            logger.LogWarning(
+                "Login rejected: only-admin lockdown is active and account {AccountId} is not GM-tier", accountId);
+            return Failure(ResultCustomMessage, OnlyAdminMessage, true);
+        }
 
         // "Protect Spoofed" anti-spoofing gate: runs after the account row is located, the password has
         // matched, and the block/ban check has already passed (see AuthenticateConstantTimeAsync above) --
         // the same point the legacy routine evaluates it at. Re-arms VersionOk like every other post-auth-
         // success failure (ConflictLogin/ConflictGameKicked/ConflictTearingDown below do the same).
-        var remoteIp = remoteEndPoint?.Address.ToString();
         if (DeviceSpoofingGuard.IsSpoofedDeviceTuple(account.AccountGrade, macAddress, packet.Adapter.AdapterName,
                 remoteIp))
         {
@@ -252,6 +282,7 @@ public sealed class LoginService(
         registry.AssociateAccount(sessionId, accountId);
 
         var chars = await characters.GetByAccountAsync(accountId, cancellationToken);
+        var guildNamesByCharacterId = await ResolveGuildNamesAsync(chars, cancellationToken);
 
         // Session-lifecycle audit row: this is the "Login" leg (see LoginSucceededEventCode's remarks for the
         // other three legs). No character is chosen yet at this point in the flow, so ActorCharacterId is null.
@@ -263,7 +294,30 @@ public sealed class LoginService(
             accountId, chars.Count, requirePin);
 
         return new LoginResult(LoginOutcome.Success, ResultSuccess, "", false, accountId, requirePin, pinMask,
-            [..chars], newToken, account.AccountGrade);
+            [..chars], guildNamesByCharacterId, newToken, account.AccountGrade);
+    }
+
+    /// <summary>
+    ///     Live per-character guild-membership lookup for the character-select roster's GuildName field -- see
+    ///     <c>LoginTrain.BuildAvatarSlots</c>' own remarks for the full legacy citation and the "no cached column
+    ///     to self-heal" simplification. At most <see cref="LoginTrain.AvatarSlotCount" /> characters per account,
+    ///     so a bounded fan-out costs nothing meaningful on this (already multi-round-trip) login path.
+    /// </summary>
+    private async ValueTask<ImmutableDictionary<int, string>> ResolveGuildNamesAsync(
+        IReadOnlyCollection<CharacterSummaryDto> chars, CancellationToken ct)
+    {
+        if (chars.Count == 0)
+            return ImmutableDictionary<int, string>.Empty;
+
+        var memberships =
+            await Task.WhenAll(chars.Select(c => guilds.GetByCharacterAsync(c.CharacterId, ct).AsTask()));
+
+        var builder = ImmutableDictionary.CreateBuilder<int, string>();
+        foreach (var (character, membership) in chars.Zip(memberships))
+            if (membership is not null)
+                builder[character.CharacterId] = membership.GuildName;
+
+        return builder.ToImmutable();
     }
 
     /// <summary>
@@ -297,6 +351,7 @@ public sealed class LoginService(
 
     private static LoginResult Failure(int resultCode, string resultString, bool reArmVersionOk)
     {
-        return new LoginResult(LoginOutcome.Failure, resultCode, resultString, reArmVersionOk, 0, false, "", []);
+        return new LoginResult(LoginOutcome.Failure, resultCode, resultString, reArmVersionOk, 0, false, "", [],
+            ImmutableDictionary<int, string>.Empty);
     }
 }

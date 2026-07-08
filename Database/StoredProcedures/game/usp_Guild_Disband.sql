@@ -50,13 +50,13 @@ BEGIN
     SET @Payload = CONCAT(N'GuildId=', @GuildId, N';AvatarName=', @AvatarName, N';Grade=', @Grade);
 
     EXEC game.usp_EventLog_Insert
-        @EventCode = 3, -- disband (legacy GL_617_GUILD_MONEY tAction=3)
-        @Category = 11, -- game.EventLogCategory.GuildMoney
-        @ActorAccountId = @ActorAccountId,
-        @ActorCharacterId = @CharacterId,
-        @DeltaMoney = 0,
-        @Outcome = 1,
-        @Payload = @Payload;
+         @EventCode = 3, -- disband (legacy GL_617_GUILD_MONEY tAction=3)
+         @Category = 11, -- game.EventLogCategory.GuildMoney
+         @ActorAccountId = @ActorAccountId,
+         @ActorCharacterId = @CharacterId,
+         @DeltaMoney = 0,
+         @Outcome = 1,
+         @Payload = @Payload;
 
     COMMIT TRANSACTION;
 END;

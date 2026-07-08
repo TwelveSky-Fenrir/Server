@@ -33,6 +33,11 @@ public class CraftLegendaryPetServiceTests
     /// <summary>Registered in the test catalog with the default (non-31/32) Sort, for the wrong-sort rejection test.</summary>
     private const int WrongSortItemId = 5001;
 
+    private static readonly IReadOnlySet<int> AllPossibleResultItemIds = new HashSet<int>(
+        LegendaryPetCraftCatalog.LegendaryPool1
+            .Concat(LegendaryPetCraftCatalog.LegendaryPool2)
+            .Concat(LegendaryPetCraftCatalog.GuardianPool));
+
     private static async Task<T> RunToCompletionAsync<T>(ValueTask<T> pending, Zone zone)
     {
         var task = pending.AsTask();
@@ -102,11 +107,6 @@ public class CraftLegendaryPetServiceTests
             Index3 = 2, Page4 = -1, Index4 = -1
         };
     }
-
-    private static readonly IReadOnlySet<int> AllPossibleResultItemIds = new HashSet<int>(
-        LegendaryPetCraftCatalog.LegendaryPool1
-            .Concat(LegendaryPetCraftCatalog.LegendaryPool2)
-            .Concat(LegendaryPetCraftCatalog.GuardianPool));
 
     [Fact]
     public async Task Success_LogsAnItemCreateAuditRow_ForTheMintedLegendaryPet()

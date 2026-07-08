@@ -25,9 +25,9 @@
 -- New parameter appended at the end of the existing signature per convention -- CaeriusNet's
 -- StoredProcedureParametersBuilder binds by name, but existing parameters are never reordered.
 CREATE OR ALTER PROCEDURE game.usp_OfflineShop_WithdrawMoney @CharacterId INT,
-                                                     @ExpectedMoney INT,
-                                                     @ExpectedBigMoney INT,
-                                                     @TodayDate INT
+                                                             @ExpectedMoney INT,
+                                                             @ExpectedBigMoney INT,
+                                                             @TodayDate INT
 AS
 BEGIN
     SET NOCOUNT ON;

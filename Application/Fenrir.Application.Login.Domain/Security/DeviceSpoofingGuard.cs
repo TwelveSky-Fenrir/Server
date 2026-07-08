@@ -33,8 +33,13 @@ public static class DeviceSpoofingGuard
     private const string PlaceholderAdapterGuid = "{0-0-0-0-0}";
     private const string PlaceholderRemoteIp = "127.0.0.1";
 
-    /// <summary>Grade values at or above this threshold are GM-tier and exempt from this gate.</summary>
-    private const int GmGradeThreshold = 1;
+    /// <summary>
+    ///     Grade values at or above this threshold are GM-tier and exempt from this gate. Also reused by
+    ///     <c>Fenrir.Application.Login.Services.Login.LoginService</c>'s own GM-IP allowlist gate (the "# GM
+    ///     Enable Login IP #" check, Server/ts25login/S04_MyWork02.cpp:192-201) so both AccountGrade-gated
+    ///     post-authentication checks share the exact same elevation threshold.
+    /// </summary>
+    public const int GmGradeThreshold = 1;
 
     /// <summary>
     ///     Evaluates the gate. <paramref name="declaredMacAddress" /> is the already-formatted

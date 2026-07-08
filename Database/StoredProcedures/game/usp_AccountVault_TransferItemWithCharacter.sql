@@ -7,10 +7,10 @@
 -- vault panel to have been opened first.
 -- Réf. C++ : Server/ts25zone/S04_MyWork05.cpp:2971-3182 (ProcessForInventoryToSave/ProcessForSaveToInventory).
 CREATE PROCEDURE game.usp_AccountVault_TransferItemWithCharacter @CharacterId INT,
-                                                                  @Container TINYINT,
-                                                                  @Items game.tvp_CharacterItemSlot READONLY,
-                                                                  @AccountId INT,
-                                                                  @VaultItems game.tvp_AccountVaultItemSlot READONLY
+                                                                 @Container TINYINT,
+                                                                 @Items game.tvp_CharacterItemSlot READONLY,
+                                                                 @AccountId INT,
+                                                                 @VaultItems game.tvp_AccountVaultItemSlot READONLY
 AS
 BEGIN
     SET

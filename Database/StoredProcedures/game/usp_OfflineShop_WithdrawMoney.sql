@@ -7,8 +7,8 @@
 -- push a character's BigMoney arbitrarily above 999 even though each shop's own accumulation is separately
 -- capped there by usp_OfflineShop_ExecutePurchase.
 CREATE PROCEDURE game.usp_OfflineShop_WithdrawMoney @CharacterId INT,
-                                                     @ExpectedMoney INT,
-                                                     @ExpectedBigMoney INT
+                                                    @ExpectedMoney INT,
+                                                    @ExpectedBigMoney INT
 AS
 BEGIN
     SET NOCOUNT ON;

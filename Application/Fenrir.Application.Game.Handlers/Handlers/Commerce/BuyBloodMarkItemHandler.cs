@@ -11,7 +11,8 @@ namespace Fenrir.Application.Game.Handlers.Handlers.Commerce;
 ///     CZ_BUY_BLOOD_MARK_SEND (opcode 141). The client's submitted quantity is only a plausibility bound --
 ///     the quantity actually granted always comes from the catalog's own fixed <c>Quantity</c>.
 /// </summary>
-public sealed class BuyBloodMarkItemHandler(IBuyBloodMarkItemService service,
+public sealed class BuyBloodMarkItemHandler(
+    IBuyBloodMarkItemService service,
     ILogger<BuyBloodMarkItemHandler> logger) : IAsyncPacketHandler<BuyBloodMarkItemRequest>
 {
     public async ValueTask HandleAsync(BuyBloodMarkItemRequest packet, IPacketSession session,

@@ -14,7 +14,9 @@ namespace Fenrir.Application.Game.Handlers.Handlers;
 ///     <see cref="AutoBuffSkillResolver" />'s remarks). Always replies Result=0, even when every slot clamps to
 ///     an unlearned skill's -1.
 /// </summary>
-public sealed class ContinueSkillStatHandler(IContinueSkillStatService service, ILogger<ContinueSkillStatHandler> logger)
+public sealed class ContinueSkillStatHandler(
+    IContinueSkillStatService service,
+    ILogger<ContinueSkillStatHandler> logger)
     : IInlinePacketHandler<ContinueSkillStatRequest>
 {
     public void Handle(in ContinueSkillStatRequest packet, IPacketSession session)

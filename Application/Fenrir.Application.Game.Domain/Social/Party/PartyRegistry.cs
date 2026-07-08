@@ -386,7 +386,9 @@ public sealed class PartyRegistry
             var membersBeforeLeave = party.Members.ToArray();
 
             if (!party.TryRemoveMember(characterId))
-                return PartyDisconnectResult.NotInParty; // unreachable given the _leaderByMember check above; defensive only
+                return
+                    PartyDisconnectResult
+                        .NotInParty; // unreachable given the _leaderByMember check above; defensive only
 
             _leaderByMember.Remove(characterId);
 

@@ -116,7 +116,10 @@ public static class MountStateResolver
         }
     }
 
-    /// <summary>Flattens a (garage slot, 0-based stat slot) pair into <see cref="PlayerRuntimeState.MountRolledAttributes" />'s index space.</summary>
+    /// <summary>
+    ///     Flattens a (garage slot, 0-based stat slot) pair into <see cref="PlayerRuntimeState.MountRolledAttributes" />
+    ///     's index space.
+    /// </summary>
     public static int AttributeIndex(int garageSlot, int statSlotIndex)
     {
         return garageSlot * StatSlotCount + statSlotIndex;

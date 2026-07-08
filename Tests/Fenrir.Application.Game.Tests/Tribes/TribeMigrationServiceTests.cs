@@ -24,6 +24,10 @@ public class TribeMigrationServiceTests
 {
     private const int CharacterId = 500;
 
+    /// <summary>Saturday 2024-01-06, 17:00 UTC -- deterministic "always within the conversion window" instant.</summary>
+    private static readonly TimeProvider SaturdayWithinWindow =
+        new FixedTimeProvider(new DateTimeOffset(2024, 1, 6, 17, 0, 0, TimeSpan.Zero));
+
     private static async Task<T> RunToCompletionAsync<T>(ValueTask<T> pending, Zone zone)
     {
         var task = pending.AsTask();
@@ -78,10 +82,6 @@ public class TribeMigrationServiceTests
         return (zone, state!, worldState);
     }
 
-    /// <summary>Saturday 2024-01-06, 17:00 UTC -- deterministic "always within the conversion window" instant.</summary>
-    private static readonly TimeProvider SaturdayWithinWindow =
-        new FixedTimeProvider(new DateTimeOffset(2024, 1, 6, 17, 0, 0, TimeSpan.Zero));
-
     private static TribeMigrationService CreateService(FakeCharacterRepository characters,
         FakeTribeFourQuotaRepository quota, WorldStateService worldState, GameServerOptions options,
         QuestCatalog? catalog = null, TimeProvider? timeProvider = null)
@@ -91,22 +91,11 @@ public class TribeMigrationServiceTests
             NullLogger<TribeMigrationService>.Instance);
     }
 
-    /// <summary>A deterministic <see cref="TimeProvider" /> whose "local" time is always the supplied UTC instant.</summary>
-    private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
-    {
-        public override DateTimeOffset GetUtcNow()
-        {
-            return utcNow;
-        }
-
-        public override TimeZoneInfo LocalTimeZone => TimeZoneInfo.Utc;
-    }
-
     [Fact]
     public async Task ConvertAsync_OutboundHappyPath_MovesToTribeThreeAndResetsQuestsOnly()
     {
         var options = new GameServerOptions { TribeFourConversionEnabled = true };
-        var (zone, state, worldState) = SetUp(options, WithTribePoints(200, 50, 100, 0), tribe: 0);
+        var (zone, state, worldState) = SetUp(options, WithTribePoints(200, 50, 100, 0), 0);
         state.QuestStepPermanent = 7;
         state.QuestActiveFlag = 1;
         state.QuestSort = 2;
@@ -151,7 +140,7 @@ public class TribeMigrationServiceTests
     public async Task ConvertAsync_ReturnHappyPath_RestoresTribeAndTerminalQuestStepAndDecrementsAllowance()
     {
         var options = new GameServerOptions { TribeFourConversionEnabled = true };
-        var (zone, state, worldState) = SetUp(options, WithTribePoints(0, 50, 0, 60), tribe: 3);
+        var (zone, state, worldState) = SetUp(options, WithTribePoints(0, 50, 0, 60), 3);
         state.PreviousTribe = 1;
         state.TribeFourReturnAllowance = 1;
 
@@ -180,7 +169,7 @@ public class TribeMigrationServiceTests
     public async Task ConvertAsync_QuotaExhausted_NoStateMutationAndOutcomeReported()
     {
         var options = new GameServerOptions { TribeFourConversionEnabled = true };
-        var (zone, state, worldState) = SetUp(options, WithTribePoints(200, 50, 100, 0), tribe: 0);
+        var (zone, state, worldState) = SetUp(options, WithTribePoints(200, 50, 100, 0), 0);
         var characters = new FakeCharacterRepository();
         var quota = new FakeTribeFourQuotaRepository { RemainingGrants = 0 };
         var service = CreateService(characters, quota, worldState, options);
@@ -200,7 +189,7 @@ public class TribeMigrationServiceTests
         // has already passed -- an otherwise-ineligible attempt (level too low here) must leave the quota
         // completely untouched, unlike the legacy's own quota-first bug.
         var options = new GameServerOptions { TribeFourConversionEnabled = true };
-        var (zone, state, worldState) = SetUp(options, WithTribePoints(200, 50, 100, 0), tribe: 0, level: 1);
+        var (zone, state, worldState) = SetUp(options, WithTribePoints(200, 50, 100, 0), 0, 1);
         var characters = new FakeCharacterRepository();
         var quota = new FakeTribeFourQuotaRepository { RemainingGrants = 1 };
         var service = CreateService(characters, quota, worldState, options);
@@ -218,7 +207,7 @@ public class TribeMigrationServiceTests
     public async Task ConvertAsync_FeatureDisabled_NeverConsumesTheSharedQuotaOrMutatesState()
     {
         var options = new GameServerOptions { TribeFourConversionEnabled = false };
-        var (zone, state, worldState) = SetUp(options, WithTribePoints(200, 50, 100, 0), tribe: 0);
+        var (zone, state, worldState) = SetUp(options, WithTribePoints(200, 50, 100, 0), 0);
         var characters = new FakeCharacterRepository();
         var quota = new FakeTribeFourQuotaRepository();
         var service = CreateService(characters, quota, worldState, options);
@@ -229,6 +218,17 @@ public class TribeMigrationServiceTests
         Assert.Equal(TribeMigrationOutcome.FeatureDisabled, outcome);
         Assert.Equal(0, quota.ConsumeCallCount);
         Assert.Empty(characters.TribeFourConversions);
+    }
+
+    /// <summary>A deterministic <see cref="TimeProvider" /> whose "local" time is always the supplied UTC instant.</summary>
+    private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
+    {
+        public override TimeZoneInfo LocalTimeZone => TimeZoneInfo.Utc;
+
+        public override DateTimeOffset GetUtcNow()
+        {
+            return utcNow;
+        }
     }
 
     private sealed class FakeTribeFourQuotaRepository : ITribeFourQuotaRepository

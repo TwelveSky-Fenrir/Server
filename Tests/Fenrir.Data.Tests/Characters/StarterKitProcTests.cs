@@ -131,19 +131,24 @@ public class StarterKitProcTests
         Assert.Null(bundle.Spawn);
     }
 
+    // character-creation-level1-redesign (CONFIRMED PRODUCT DECISION, see
+    // Database/Migrations/027_character_create_level1_basic_kit.sql's own header -- NOT a legacy-parity
+    // assertion): a fresh character now persists at Level 1 with a weapon+torso-armor-only equipment set, no
+    // mount/pet-growth/premium/death-protection/auto-hunt/double-exp grant. Renamed from the old
+    // ..._PersistsStatsPetBuffsPremium_... name, which asserted exactly the EU33 instant-elite grant this
+    // redesign removes.
     [Fact]
-    public async Task CreateWithStarterKitAsync_PersistsStatsPetBuffsPremium_AndEveryCatalogRow()
+    public async Task CreateWithStarterKitAsync_PersistsLevel1StatsAndBasicWeaponArmorKit()
     {
         var accountId = await CreateTestAccountAsync();
         var name = NewCharacterName();
         var welcomeBuffUntilDate = 20260712; // arbitrary YYYYMMDD, opaque to the proc
-        var premiumUntilUnixSeconds = 1_800_000_000L;
+        var premiumUntilUnixSeconds = 1_800_000_000L; // no longer written anywhere -- see assertion below
 
         List<CharacterItemSlotTvp> equipment =
         [
             new(2, 8, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0),
-            new(7, 6, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0),
-            new(1, 1407, 1, 40, 0, 0, 0, 0, 0, 0, 0, 0)
+            new(7, 6, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0)
         ];
         List<CharacterItemSlotTvp> inventory = [new(0, 1026, 999, 0, 0, 0, 0, 0, 0, 0, 0, 0)];
         List<CharacterSkillSlotTvp> skills = [new(0, 1, 1), new(1, 2, 1)];
@@ -171,30 +176,44 @@ public class StarterKitProcTests
         Assert.Equal(1, bundle.Character.StatStr);
         Assert.Equal(1, bundle.Character.StatInt);
         Assert.Equal(1, bundle.Character.StatDex);
-        Assert.Equal(640000000, bundle.Character.PetGrowth);
-        Assert.Equal((byte)100, bundle.Character.PetActivity);
-        // DoubleExpTime1/DoubleExpTime2 are the legacy bare-integer-literal 300 (Server/ts25login/
-        // S04_MyWork02.cpp:886-887), NOT the same date as AutoBuffTime -- see
-        // Migrations/026_double_exp_time_counter_fix.sql for the full citation and fix rationale.
-        Assert.Equal(300, bundle.Character.DoubleExpTime1);
-        Assert.Equal(300, bundle.Character.DoubleExpTime2);
+        // No pet is ever granted under this redesign -- PetGrowth/PetActivity take game.Characters' own
+        // column DEFAULTs (0/0) instead of the old 640,000,000/100 literal.
+        Assert.Equal(0, bundle.Character.PetGrowth);
+        Assert.Equal((byte)0, bundle.Character.PetActivity);
+        // DoubleExpTime1/DoubleExpTime2 were the legacy bare-integer-literal 300 (Server/ts25login/
+        // S04_MyWork02.cpp:886-887) under the old EU33 design -- this redesign drops that "instant boost"
+        // grant entirely, so both take game.Characters' own column DEFAULT of 0.
+        Assert.Equal(0, bundle.Character.DoubleExpTime1);
+        Assert.Equal(0, bundle.Character.DoubleExpTime2);
+        // AutoBuffTime (the welcome-buff/second-inventory-page/second-store-page rental grant) is unaffected
+        // by the redesign and still the caller-supplied date.
         Assert.Equal(welcomeBuffUntilDate, bundle.Character.AutoBuffTime);
-        Assert.Equal(premiumUntilUnixSeconds, bundle.Character.PremiumExpireUtc);
+        // No premium-day grant anymore -- PremiumExpireUtc takes the column's own DEFAULT of 0 regardless of
+        // the (now-ignored) @PremiumUntilUnixSeconds argument passed above. See
+        // Database/Migrations/027_character_create_level1_basic_kit.sql's own header for why the parameter
+        // is kept declared but unused.
+        Assert.Equal(0L, bundle.Character.PremiumExpireUtc);
 
-        // Server/ts25login/S04_MyWork02.cpp:1100-1120 (USE_CUSTOME_CREATE, force-defined for this whole file --
-        // see Migrations/015_starter_kit_elite_grant.sql's header comment): starting level/rebirth/experience/
-        // stat-skill-point grant, literal in usp_Character_CreateWithStarterKit regardless of tribe/kit contents.
-        Assert.Equal(145, bundle.Character.Level);
-        Assert.Equal(12, bundle.Character.Level2);
+        // CONFIRMED PRODUCT DECISION (character-creation-level1-redesign, NOT a legacy citation): a genuine
+        // Level 1 character, zero experience, zero rebirths, no post-cap "high level" ladder progress.
+        // StatPoints/SkillPoints are Fenrir product defaults -- see the migration's own header for the full
+        // "why 50/0" reasoning (also mirrored on the C# side by CreateAvatarService.StartingStatPoint/
+        // StartingSkillPoint).
+        Assert.Equal(1, bundle.Character.Level);
+        Assert.Equal(0, bundle.Character.Level2);
         Assert.Equal(0, bundle.Character.RebirthCount);
-        Assert.Equal(2_000_000_000L, bundle.Character.Experience);
+        Assert.Equal(0L, bundle.Character.Experience);
         Assert.Equal(0, bundle.Character.Exp2);
-        Assert.Equal(3175, bundle.Character.StatPoints);
-        Assert.Equal(10000, bundle.Character.SkillPoints);
+        Assert.Equal(50, bundle.Character.StatPoints);
+        Assert.Equal(0, bundle.Character.SkillPoints);
 
-        Assert.Equal(3, bundle.Items.Count(i => i.Container == 2));
+        // Exactly the chosen Weapon + the tribe's Armor/torso row -- no Amulet/Gloves/Ring/Boots, no Cape, no
+        // Pet.
+        Assert.Equal(2, bundle.Items.Count(i => i.Container == 2));
         Assert.Contains(bundle.Items, i => i is { Container: 2, Slot: 7, ItemId: 6 });
-        Assert.Contains(bundle.Items, i => i is { Container: 2, Slot: 1, ItemId: 1407, Enchant: 40 });
+        Assert.Contains(bundle.Items, i => i is { Container: 2, Slot: 2, ItemId: 8 });
+        Assert.DoesNotContain(bundle.Items, i => i is { Container: 2, Slot: 1 }); // Cape
+        Assert.DoesNotContain(bundle.Items, i => i is { Container: 2, Slot: 8 }); // Pet
         Assert.Contains(bundle.Items, i => i is { Container: 0, Slot: 0, ItemId: 1026, Quantity: 999 });
 
         Assert.Equal(2, bundle.Skills.Count);
@@ -203,46 +222,18 @@ public class StarterKitProcTests
         Assert.Single(bundle.Hotkeys);
         Assert.Contains(bundle.Hotkeys, h => h is { Page: 0, KeyIndex: 0, Sort: 1 });
 
-        // Starting mount (S04_MyWork02.cpp:1174-1179), now projected by usp_Character_GetForWorldEntry's RS0
-        // (Migrations/018_character_previous_tribe_and_mount_readpath.sql) instead of needing a raw SQL
-        // read -- this is the exact read path EnterWorldService will eventually consume.
-        //
-        // These 5 literals are hand-duplicated on the C# side too: Application/Fenrir.Application.Login.Services/
-        // CreateAvatar/CreateAvatarService.cs's StarterMountItemId/StarterMountExpActivity/StarterMountPower/
-        // StarterMountSlotIndex/StarterMountTime constants overlay the exact same 5 values onto the immediate
-        // create-avatar response (CharacterWorldEntryDto's narrow prefix doesn't carry Mount* -- see that DTO's
-        // own doc comment -- so CreateAvatarService can't read them back at that point and re-derives them
-        // instead). This test only pins the SQL/DB side; Fenrir.Data.Tests has no project reference to
-        // Fenrir.Application.Login.Services (by design -- Tests/*Data* stays below the Application layer), so it
-        // cannot assert the two sides stay equal in one place. If you change any of these 5 numbers here, go
-        // change CreateAvatarService's matching constants too (and vice versa) -- there is no compiler or test
-        // that will catch just one side drifting. The clean fix (tracked as a finding this round, not implemented
-        // here since it requires editing Application/, outside a database engineer's remit) is to have
-        // CreateAvatarService read the freshly-persisted row back via GetWorldEntryBundleAsync/
-        // CharacterWorldSnapshotDto -- which already carries all 5 Mount* fields, proven right here -- instead of
-        // re-declaring them as a second set of C# literals.
-        Assert.Equal(1301, bundle.Character.MountItemId);
+        // No starter mount anymore -- Mount* all take game.Characters' own column DEFAULTs (MountSlotIndex's
+        // is specifically -1, "no mount active"), not the old universal-tiger-mount literals.
+        Assert.Equal(0, bundle.Character.MountItemId);
         Assert.Equal(0, bundle.Character.MountExpActivity);
-        Assert.Equal(5, bundle.Character.MountPower);
-        Assert.Equal(0, bundle.Character.MountSlotIndex);
-        Assert.Equal(99999999, bundle.Character.MountTime);
+        Assert.Equal(0, bundle.Character.MountPower);
+        Assert.Equal(-1, bundle.Character.MountSlotIndex);
+        Assert.Equal(0, bundle.Character.MountTime);
 
-        // Starting death-protection allowance (S04_MyWork02.cpp:885-889, unconditional regardless of tribe/
-        // previous-tribe/gender), now granted by Migrations/025_character_protect_for_death_grant.sql instead
-        // of silently taking the column's DEFAULT of 0.
-        Assert.Equal(5, bundle.Character.ProtectForDeath);
-
-        // Starting free auto-hunt minute allowance (S04_MyWork02.cpp:888, same #ifdef LNW33 block as
-        // ProtectForDeath/DoubleExpTime1/DoubleExpTime2 above), granted by
-        // Migrations/027_character_autotime2_grant.sql. Previously ungrantable (no column existed at all) and,
-        // until this assertion, granted-but-untested -- every other literal from this same creation-time block
-        // (ProtectForDeath, DoubleExpTime1/2, Mount*, Level/Level2/Experience/Exp2/StatPoints/SkillPoints) was
-        // already pinned above/elsewhere in this test, but AutoTime2 itself had no Fenrir.Data.Tests coverage
-        // anywhere -- a regression here (e.g. a future corrective migration silently reverting to the column's
-        // DEFAULT of 0, or another migration in this same procedure-editing chain rebasing off the wrong
-        // ancestor per this migration's own "must be based on the immediately preceding one" warning) would have
-        // passed silently.
-        Assert.Equal(1440, bundle.Character.AutoTime2);
+        // No starting death-protection allowance or free auto-hunt minute allowance anymore -- both take
+        // game.Characters' own column DEFAULT of 0, not the old LNW33 "instant boost" literals (5/1440).
+        Assert.Equal(0, bundle.Character.ProtectForDeath);
+        Assert.Equal(0, bundle.Character.AutoTime2);
     }
 
     [Fact]

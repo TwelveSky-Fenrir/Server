@@ -164,12 +164,11 @@ public class DeleteAvatarHandlerTests
         PacketAssert.AssertNothingSent(pipe);
     }
 
-    // Documents today's known, not-yet-closed gap (see this handler's own remarks on the "1=DB delete failure,
-    // not modeled here" code): legacy answers with a dedicated B_DELETE_AVATAR_RECV Result=1 for exactly this
-    // case, but DeleteAvatarOutcome has no member for it yet, so the handler has no branch to catch it and the
-    // failure propagates out of HandleAsync unmapped instead of a Result=1 response ever being sent.
+    // Legacy answers with a dedicated B_DELETE_AVATAR_RECV Result=1 for exactly this case
+    // (Server/ts25login/S04_MyWork02.cpp:1275-1283): a faulting usp_Character_Delete call must reply with a
+    // normal Result=1 response, not tear down the session with an unhandled exception.
     [Fact]
-    public async Task HandleAsync_DatabaseDeleteFails_PropagatesWithoutSendingAResponse()
+    public async Task HandleAsync_DatabaseDeleteFails_RepliesResultOneWithoutDisconnecting()
     {
         var characters = FakeCharacterRepository.WithSummaries(Summary);
         characters.DeleteException = new InvalidOperationException("usp_Character_Delete failed");
@@ -180,10 +179,10 @@ public class DeleteAvatarHandlerTests
             NullLogger<DeleteAvatarHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            handler.HandleAsync(Request(), session, CancellationToken.None).AsTask());
+        await handler.HandleAsync(Request(), session, CancellationToken.None);
 
-        PacketAssert.AssertNothingSent(pipe);
+        await PacketAssert.AssertSentAsync(pipe, new DeleteAvatarResponse { Result = 1 });
+        Assert.Null(session.DisconnectReason);
     }
 
     private static (LoginClientSession Session, FakeDuplexPipe Pipe) CreateSessionInCharSelect()

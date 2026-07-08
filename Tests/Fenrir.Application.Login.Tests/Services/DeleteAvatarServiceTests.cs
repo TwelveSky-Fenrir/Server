@@ -137,12 +137,11 @@ public class DeleteAvatarServiceTests
         Assert.Empty(guilds.QueriedCharacterIds);
     }
 
-    // Documents today's known, not-yet-closed gap (see DeleteAvatarHandler's own remarks on the "1=DB delete
-    // failure, not modeled here" code): legacy has a dedicated B_DELETE_AVATAR_RECV Result=1 for exactly this
-    // case (Server/ts25login/S04_MyWork02.cpp:1275-1283), but DeleteAvatarOutcome has no member for it yet, so
-    // the failure still surfaces as an unhandled exception instead of a mapped outcome.
+    // Legacy has a dedicated B_DELETE_AVATAR_RECV Result=1 for exactly this case
+    // (Server/ts25login/S04_MyWork02.cpp:1275-1283): a faulting usp_Character_Delete call must surface as a
+    // normal mapped outcome, not an unhandled exception that tears down the whole session.
     [Fact]
-    public async Task DeleteAvatarAsync_DatabaseDeleteFails_PropagatesUnmappedPendingADedicatedOutcome()
+    public async Task DeleteAvatarAsync_DatabaseDeleteFails_ReturnsSqlErrorWithoutThrowing()
     {
         var characters = FakeCharacterRepository.WithSummaries(Summary);
         characters.DeleteException = new InvalidOperationException("usp_Character_Delete failed");
@@ -150,9 +149,9 @@ public class DeleteAvatarServiceTests
             FakeWorldStateRepository.Empty(), FakeGuildRepository.Empty(), FakeOfflineShopRepository.Empty(),
             NullLogger<DeleteAvatarService>.Instance);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            service.DeleteAvatarAsync(AccountId, Slot, CancellationToken.None).AsTask());
+        var result = await service.DeleteAvatarAsync(AccountId, Slot, CancellationToken.None);
 
+        Assert.Equal(DeleteAvatarOutcome.SqlError, result.Outcome);
         Assert.Single(characters.DeleteCalls);
     }
 }

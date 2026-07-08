@@ -1147,7 +1147,7 @@ public sealed partial class Zone
         IReadOnlyList<int>? partyMemberIds = null)
     {
         if (_players.TryGetValue(killerCharacterId, out var killerState))
-            ApplyQuestKillProgressToOne(killerState, monsterId, isPartyRelay: false);
+            ApplyQuestKillProgressToOne(killerState, monsterId, false);
 
         if (partyMemberIds is not { Count: > 0 })
             return;
@@ -1160,7 +1160,7 @@ public sealed partial class Zone
                 memberState.IsDead)
                 continue;
 
-            ApplyQuestKillProgressToOne(memberState, monsterId, isPartyRelay: true);
+            ApplyQuestKillProgressToOne(memberState, monsterId, true);
         }
     }
 

@@ -320,6 +320,17 @@ public sealed class ZoneMoveService(
                 options.Value.TicketTtlSeconds, zoneSession.AccountSessionToken!.Value, zoneSession.AccountGrade,
                 cancellationToken);
 
+            // Fix (cross-shard analog of the Login->Game HandoverIssued guard, see
+            // GameConnectionHost.OnAcceptedAsync's own remarks): this connection is now guaranteed to close on
+            // purpose, either on the client's own disconnect-then-reconnect-elsewhere or on a later abort --
+            // mark it BEFORE the ZoneMoveResponse below is sent, so there is no window where the client could
+            // already be reconnecting to the destination shard while this flag is still unset. Without this,
+            // GameConnectionHost's own teardown races ahead of the destination shard's
+            // ZoneHandshakeService.ConsumeTicketAsync -> TransitionToGameAsync claim and deletes the
+            // runtime.AccountSessions row out from under it, turning a legitimate transfer into a spurious
+            // ZoneHandshakeOutcome.SessionSuperseded disconnect.
+            zoneSession.MarkCrossShardTransferPending();
+
             logger.LogInformation(
                 "Zone {TargetZoneNumber} resolved to shard {ShardId} ({Host}:{Port}) for character {CharacterId} -- cross-shard handoff ticket minted",
                 targetZoneNumber, candidate.ShardId, candidate.Host, candidate.Port, characterId);

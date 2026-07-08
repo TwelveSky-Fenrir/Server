@@ -20,4 +20,5 @@ IF NOT EXISTS (SELECT 1
                FROM admin.ErrorCatalog
                WHERE ErrorNumber = 50339)
     INSERT INTO admin.ErrorCatalog (ErrorNumber, SchemaName, Description)
-    VALUES (50339, N'game', N'usp_AccountVault_TransferMoneyWithCharacter: insufficient account vault balance for this transfer.');
+    VALUES (50339, N'game',
+            N'usp_AccountVault_TransferMoneyWithCharacter: insufficient account vault balance for this transfer.');

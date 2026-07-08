@@ -3,6 +3,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Services.BuffsMountsCosmetics;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Application.Game.Tests.World.WorldState;
+using Fenrir.Data.Abstractions.World;
 using Fenrir.Network.Dispatch.Sessions;
 
 namespace Fenrir.Application.Game.Tests.Handlers;
@@ -96,9 +97,9 @@ public class RankBuffServiceTests
         var (_, _, state) = Setup(zone, 10);
         var repository = new FakeWorldStateRepository
         {
-            Row = new(Id: 1, Zone038WinTribe: null, Zone038WinTribeTime: 0, TribeSymbolBattle: true,
-                MonsterSymbol: null, MonsterSymbolEndTime: 0, HighTribe: null, UpdateTribePoint: 0,
-                UpdatedAtUtc: DateTime.UtcNow)
+            Row = new WorldStateRowDto(1, null, 0, true,
+                null, 0, null, 0,
+                DateTime.UtcNow)
         };
         var service = new RankBuffService(ZoneTestKit.CreateWorldState(repository));
 

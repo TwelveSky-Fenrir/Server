@@ -11,8 +11,11 @@ using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Login.Tests.Handlers;
 
-// op17 CL_CREATE_AVATAR_SEND2 -- EU33 starter kit (equipment/inventory/skills/hotkeys per tribe, stats,
-// welcome buffs, one premium day). Réf. C++ : Server/ts25login/S04_MyWork02.cpp:582-1183.
+// op17 CL_CREATE_AVATAR_SEND2 -- character-creation-level1-redesign (CONFIRMED PRODUCT DECISION, see
+// CreateAvatarService's own <remarks>): a fresh character starts at Level 1 with a basic weapon + torso-armor
+// kit only, not the EU33 instant-elite grant this file used to assert. Réf. C++ : Server/ts25login/
+// S04_MyWork02.cpp:582-1183 (preconditions/weapon-remap only -- the instant-elite/mount/pet/cape/premium
+// grant that same block also compiles is deliberately NOT replicated anymore).
 public class CreateAvatarHandlerTests
 {
     private const int AccountId = 42;
@@ -33,7 +36,7 @@ public class CreateAvatarHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_ValidRequest_PersistsTheFullStarterKit()
+    public async Task HandleAsync_ValidRequest_PersistsTheBasicStarterKit()
     {
         var characters = FakeCharacterRepository.WithNone();
         var starterKits = FakeStarterKitRepository.NobleDragonKit();
@@ -62,9 +65,10 @@ public class CreateAvatarHandlerTests
         Assert.Equal(6f, call.PosX);
         Assert.Equal(0f, call.PosY);
         Assert.Equal(-7f, call.PosZ);
-        // S04_MyWork02.cpp:1096-1097: current life/mana are 30/21, not "full" values -- MaxLife/MaxMana have
-        // no creation-time legacy value at all (recomputed dynamically on world entry), so these two remain
-        // an unresolved placeholder pending a dedicated MyFactor-formula contract.
+        // S04_MyWork02.cpp:1096-1097: current life/mana are 30/21 -- unaffected by the level-1 redesign, see
+        // CreateAvatarService.StartLife/StartMana's own remarks. MaxLife/MaxMana have no creation-time legacy
+        // value at all (recomputed dynamically on world entry), so these two remain an unresolved placeholder
+        // pending a dedicated MyFactor-formula contract.
         Assert.Equal(30, call.Life);
         Assert.Equal(100, call.MaxLife);
         Assert.Equal(21, call.Mana);
@@ -74,20 +78,21 @@ public class CreateAvatarHandlerTests
         // relying on ICharacterRepository.CreateWithStarterKitAsync's byte previousTribe = 0 default.
         Assert.Equal((byte)0, call.PreviousTribe);
 
-        // Amulet/Armor/Gloves/Ring/Boots + the chosen Weapon (raw code 6 -> elite 84527, not the other 2
-        // alternatives) + universal Cape/Pet. Every elite-gear row carries the SetISIUIMValue(45, 6, 0, 0)
-        // encoding (Enchant=45, Combine=6); Cape keeps its own distinct Enchant=40 encoding.
-        Assert.Equal(8, call.Equipment.Count);
-        Assert.Contains(call.Equipment, i => i is { Slot: 0, ItemId: 84671, Enchant: 45, Combine: 6 });
-        Assert.Contains(call.Equipment, i => i is { Slot: 2, ItemId: 84575, Enchant: 45, Combine: 6 });
-        Assert.Contains(call.Equipment, i => i is { Slot: 3, ItemId: 84623, Enchant: 45, Combine: 6 });
-        Assert.Contains(call.Equipment, i => i is { Slot: 4, ItemId: 84647, Enchant: 45, Combine: 6 });
-        Assert.Contains(call.Equipment, i => i is { Slot: 5, ItemId: 84599, Enchant: 45, Combine: 6 });
-        Assert.Contains(call.Equipment, i => i is { Slot: 7, ItemId: 84527, Enchant: 45, Combine: 6 });
+        // Exactly the chosen Weapon (raw code 6 -> 84527, not the other 2 alternatives) + the tribe's own
+        // Armor/torso row -- Amulet/Gloves/Ring/Boots and the old universal Cape/Pet are no longer granted at
+        // all. Both remaining rows are unenchanted/uncombined (Enchant 0, Combine 0), not the old
+        // SetISIUIMValue(45, 6, 0, 0) elite-gear stamp.
+        Assert.Equal(2, call.Equipment.Count);
+        Assert.Contains(call.Equipment, i => i is { Slot: 2, ItemId: 84575, Enchant: 0, Combine: 0 });
+        Assert.Contains(call.Equipment, i => i is { Slot: 7, ItemId: 84527, Enchant: 0, Combine: 0 });
+        Assert.DoesNotContain(call.Equipment, i => i.Slot == 0); // Amulet
+        Assert.DoesNotContain(call.Equipment, i => i.Slot == 3); // Gloves
+        Assert.DoesNotContain(call.Equipment, i => i.Slot == 4); // Ring
+        Assert.DoesNotContain(call.Equipment, i => i.Slot == 5); // Boots
+        Assert.DoesNotContain(call.Equipment, i => i.Slot == 1); // Cape
+        Assert.DoesNotContain(call.Equipment, i => i.Slot == 8); // Pet
         Assert.DoesNotContain(call.Equipment, i => i is { Slot: 7, ItemId: 84503 });
         Assert.DoesNotContain(call.Equipment, i => i is { Slot: 7, ItemId: 84551 });
-        Assert.Contains(call.Equipment, i => i is { Slot: 1, ItemId: 1407, Enchant: 40 });
-        Assert.Contains(call.Equipment, i => i is { Slot: 8, ItemId: 2300 });
 
         Assert.Equal(4, call.Inventory.Count);
         Assert.Contains(call.Inventory, i => i is { Slot: 0, ItemId: 1026, Quantity: 999 });
@@ -99,14 +104,16 @@ public class CreateAvatarHandlerTests
         Assert.Single(call.Hotkeys);
         Assert.Contains(call.Hotkeys, h => h is { Page: 0, KeyIndex: 0, Sort: 1, Value1: 1, Value2: 1 });
 
-        // Welcome buff = today + 7 days (YYYYMMDD); premium = now + 1 day (Unix seconds) -- both computed from
-        // the wall clock, so asserted as "within the [before,after] call window" rather than an exact literal.
+        // Welcome buff = today + 7 days (YYYYMMDD) -- unaffected by the level-1 redesign, computed from the
+        // wall clock so asserted as "within the [before,after] call window" rather than an exact literal.
         var expectedWelcomeBuff = DateOnly.FromDateTime(before.UtcDateTime.AddDays(7));
         var actualWelcomeBuff = call.WelcomeBuffUntilDate;
         Assert.Equal(expectedWelcomeBuff.Year * 10000 + expectedWelcomeBuff.Month * 100 + expectedWelcomeBuff.Day,
             actualWelcomeBuff);
-        Assert.InRange(call.PremiumUntilUnixSeconds, before.AddDays(1).ToUnixTimeSeconds(),
-            after.AddDays(1).ToUnixTimeSeconds());
+        // No premium-day grant anymore (see CreateAvatarService.NoPremiumGrant's own remarks) -- @before/@after
+        // are still captured above purely to bound the welcome-buff date computation.
+        Assert.Equal(0L, call.PremiumUntilUnixSeconds);
+        _ = after;
     }
 
     [Fact]
@@ -132,59 +139,39 @@ public class CreateAvatarHandlerTests
             Str = 1,
             Int = 1,
             Dex = 1,
-            // Fixed literal constants (Server/ts25login/S04_MyWork02.cpp:1100-1110): confirms the
-            // create-avatar-stats-fresh fix -- these five are now mirrored onto the response instead of
-            // being left at Zeroed's 0 default (see CreateAvatarService.StartingLevel2/StartingExp1's own
-            // remarks). Exp1 = MAX_NUMBER_SIZE (Server/Header/Protocol/DEFINE.h:365) closes the finding's
-            // blocker: Exp1 was previously wired to 0 in every code path, not just this response.
-            Level2 = 12,
-            Exp1 = 2_000_000_000,
+            // A genuine Level 1 character: no post-cap "high level" ladder progress (Level2), no experience of
+            // either kind (Exp1/Exp2) -- see CreateAvatarService's own remarks. StatPoint/SkillPoint are Fenrir
+            // product defaults (NOT legacy-cited), see CreateAvatarService.StartingStatPoint/
+            // StartingSkillPoint's own remarks.
+            Level2 = 0,
+            Exp1 = 0,
             Exp2 = 0,
-            StatPoint = 3175,
-            SkillPoint = 10000,
+            StatPoint = 50,
+            SkillPoint = 0,
             PreviousTribe = 0,
-            // creation-persistence-full-reaudit finding: ProtectForDeath = 5 is now persisted at creation
-            // (Migration 025) and mirrored onto this response the same way -- previously left at Zeroed's 0.
-            ProtectForDeath = 5,
-            // zone-avatarinfo-factory-parity finding: the pet slot's 2nd/3rd wire ints are activity/growth
-            // (Server/ts25login/S04_MyWork02.cpp:1131-1135 -- MAX_PAT_ACTIVITY_SIZE/640,000,000), mirroring
-            // CreateAvatarService's own StarterPetActivity/StarterPetGrowth constants.
-            Equip = AvatarInfoFactory.BuildEquipArray(call.Equipment, 640_000_000, 100),
-            // zone-avatarinfo-factory-parity finding: see CreateAvatarService's own remarks (Inventory/Skill/
-            // HotKey overlay, right after Equip) for the full citation. StoreItem stays at Zeroed's 0 default
-            // -- no starter kit grants a warehouse row.
+            // No petGrowth/petActivity: BuildEquipArray's own defaults (0/0) apply -- no pet is ever granted
+            // under this redesign.
+            Equip = AvatarInfoFactory.BuildEquipArray(call.Equipment),
             Inventory = AvatarInfoFactory.BuildInventoryArray(call.Inventory),
             Skill = AvatarInfoFactory.BuildSkillArray(call.Skills),
             HotKey = AvatarInfoFactory.BuildHotKeyArray(call.Hotkeys),
-            Animal = MountSlotArray(1301),
-            AnimalIndex = 0,
-            AnimalTime = 99999999,
-            AnimalPower = MountSlotArray(5),
-            AnimalExpActivity = MountSlotArray(0),
-            // 300, not call.WelcomeBuffUntilDate -- Server/ts25login/S04_MyWork02.cpp:886-887's bare integer
-            // literal (a raw per-tick counter, confirmed by Server/ts25zone/S07_MyGame04.cpp:955-969's
-            // decrement-on-tick consumer), genuinely independent of AutoBuffTime's date below.
-            DoubleExpTime1 = 300,
-            DoubleExpTime2 = 300,
-            AutoBuffTime = call.WelcomeBuffUntilDate,
-            // 1440 == CreateAvatarService.StarterAutoTime2Minutes (Server/ts25login/S04_MyWork02.cpp:888):
-            // the free auto-hunt minute allowance, mirrored onto this response the same "known at creation
-            // time, not read back" way DoubleExpTime1/2 above are.
-            AutoTime2 = 1440,
-            Premium = call.PremiumUntilUnixSeconds
+            // AutoBuffTime is the only remaining "known at creation time" overlay -- Animal*/ProtectForDeath/
+            // DoubleExpTime1-2/AutoTime2/Premium are deliberately left at AvatarInfoFactory.Zeroed's own 0/
+            // empty-array defaults (see CreateAvatarService's own remarks): this redesign grants none of them.
+            AutoBuffTime = call.WelcomeBuffUntilDate
         };
 
         await PacketAssert.AssertSentAsync(pipe,
             new CreateAvatarResponse { Result = 0, AvatarInfo = expectedAvatarInfo });
     }
 
-    // Raw client codes 5/6/7 remap to Noble Dragon's elite weapons (Dragon's Fang Sword/Blade of the Moon/
-    // Great Dragon Eye Marble) -- see FakeStarterKitRepository.NobleDragonKit's RawWeaponCode rows.
+    // Raw client codes 5/6/7 remap to Noble Dragon's own weapons (Dragon's Fang Sword/Blade of the Moon/Great
+    // Dragon Eye Marble) -- see FakeStarterKitRepository.NobleDragonKit's RawWeaponCode rows.
     [Theory]
     [InlineData(5, 84503)]
     [InlineData(6, 84527)]
     [InlineData(7, 84551)]
-    public async Task HandleAsync_AnyOfTheThreeWeaponAlternatives_IsAccepted(int weapon, int eliteItemId)
+    public async Task HandleAsync_AnyOfTheThreeWeaponAlternatives_IsAccepted(int weapon, int itemId)
     {
         var characters = FakeCharacterRepository.WithNone();
         var starterKits = FakeStarterKitRepository.NobleDragonKit();
@@ -197,22 +184,22 @@ public class CreateAvatarHandlerTests
         await handler.HandleAsync(ValidRequest(weapon), session, CancellationToken.None);
 
         Assert.NotNull(characters.LastCreateWithStarterKit);
-        Assert.Contains(characters.LastCreateWithStarterKit!.Equipment, i => i.Slot == 7 && i.ItemId == eliteItemId);
+        Assert.Contains(characters.LastCreateWithStarterKit!.Equipment, i => i.Slot == 7 && i.ItemId == itemId);
         Assert.Null(session.DisconnectReason);
     }
 
-    // Adversarial gap fix: every other "elite equipment" assertion in this file went through NobleDragonKit
+    // Adversarial gap fix: every other "starter equipment" assertion in this file went through NobleDragonKit
     // (PreviousTribe 0) exclusively -- PreviousTribe 1 (Royal Serpent) and 2 (Grand Tiger) had no handler-level
-    // coverage at all asserting THEIR OWN elite item ids, even though the pass-through logic in
-    // CreateAvatarService (BuildEquipmentRows et al.) is generic across races and the
-    // "previousTribe is 0 or 1 or 2" weapon-validation gate (S04_MyWork02.cpp:739-838) was only ever exercised
-    // at value 0 (true branch) and 3/255 (false branch) -- never at 1 or 2. This closes both gaps at once: a
-    // regression that narrowed that gate to `previousTribe is 0` only, or one that let one race's item ids
-    // leak into another's flow, would go undetected without these two tests (mirrors
-    // StarterKitProcTests.GetByPreviousTribeAsync_RoyalSerpent_.../_GrandTiger_... at the DB layer, using the
-    // exact same seeded ids so a mismatch between the two layers would be self-evident).
+    // coverage at all asserting THEIR OWN item ids, even though the pass-through logic in CreateAvatarService
+    // (BuildEquipmentRows et al.) is generic across races and the "previousTribe is 0 or 1 or 2"
+    // weapon-validation gate (S04_MyWork02.cpp:739-838) was only ever exercised at value 0 (true branch) and
+    // 3/255 (false branch) -- never at 1 or 2. This closes both gaps at once: a regression that narrowed that
+    // gate to `previousTribe is 0` only, or one that let one race's item ids leak into another's flow, would go
+    // undetected without these two tests (mirrors StarterKitProcTests.GetByPreviousTribeAsync_RoyalSerpent_.../
+    // _GrandTiger_... at the DB layer, using the exact same seeded ids so a mismatch between the two layers
+    // would be self-evident).
     [Fact]
-    public async Task HandleAsync_RoyalSerpentPreviousTribe_PersistsItsOwnEliteEquipmentNotNobleDragons()
+    public async Task HandleAsync_RoyalSerpentPreviousTribe_PersistsItsOwnStarterEquipmentNotNobleDragons()
     {
         var characters = FakeCharacterRepository.WithNone();
         var starterKits = FakeStarterKitRepository.RoyalSerpentKit();
@@ -237,13 +224,9 @@ public class CreateAvatarHandlerTests
         // Confirms PreviousTribe (1, independent of Tribe's own value) reaches the repository unchanged,
         // matching Server/ts25zone/S04_MyWork02.cpp:880-901's expectation that the two stay in lockstep here.
         Assert.Equal((byte)1, call.PreviousTribe);
-        Assert.Equal(8, call.Equipment.Count);
-        Assert.Contains(call.Equipment, i => i is { Slot: 0, ItemId: 85671, Enchant: 45, Combine: 6 });
-        Assert.Contains(call.Equipment, i => i is { Slot: 2, ItemId: 85575, Enchant: 45, Combine: 6 });
-        Assert.Contains(call.Equipment, i => i is { Slot: 3, ItemId: 85623, Enchant: 45, Combine: 6 });
-        Assert.Contains(call.Equipment, i => i is { Slot: 4, ItemId: 85647, Enchant: 45, Combine: 6 });
-        Assert.Contains(call.Equipment, i => i is { Slot: 5, ItemId: 85599, Enchant: 45, Combine: 6 });
-        Assert.Contains(call.Equipment, i => i is { Slot: 7, ItemId: 85527, Enchant: 45, Combine: 6 });
+        Assert.Equal(2, call.Equipment.Count);
+        Assert.Contains(call.Equipment, i => i is { Slot: 2, ItemId: 85575, Enchant: 0, Combine: 0 });
+        Assert.Contains(call.Equipment, i => i is { Slot: 7, ItemId: 85527, Enchant: 0, Combine: 0 });
         Assert.DoesNotContain(call.Equipment, i => i is { Slot: 7, ItemId: 85503 });
         Assert.DoesNotContain(call.Equipment, i => i is { Slot: 7, ItemId: 85551 });
         // Guards against a seed/catalog mixup leaking Noble Dragon's ids into this race's flow.
@@ -274,7 +257,7 @@ public class CreateAvatarHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_GrandTigerPreviousTribe_PersistsItsOwnEliteEquipmentNotTheOtherTwoRaces()
+    public async Task HandleAsync_GrandTigerPreviousTribe_PersistsItsOwnStarterEquipmentNotTheOtherTwoRaces()
     {
         var characters = FakeCharacterRepository.WithNone();
         var starterKits = FakeStarterKitRepository.GrandTigerKit();
@@ -296,13 +279,9 @@ public class CreateAvatarHandlerTests
         Assert.Equal((byte)2, call!.Tribe);
         Assert.Equal((short)11, call.MapId);
         Assert.Equal((byte)2, call.PreviousTribe);
-        Assert.Equal(8, call.Equipment.Count);
-        Assert.Contains(call.Equipment, i => i is { Slot: 0, ItemId: 86671, Enchant: 45, Combine: 6 });
-        Assert.Contains(call.Equipment, i => i is { Slot: 2, ItemId: 86575, Enchant: 45, Combine: 6 });
-        Assert.Contains(call.Equipment, i => i is { Slot: 3, ItemId: 86623, Enchant: 45, Combine: 6 });
-        Assert.Contains(call.Equipment, i => i is { Slot: 4, ItemId: 86647, Enchant: 45, Combine: 6 });
-        Assert.Contains(call.Equipment, i => i is { Slot: 5, ItemId: 86599, Enchant: 45, Combine: 6 });
-        Assert.Contains(call.Equipment, i => i is { Slot: 7, ItemId: 86527, Enchant: 45, Combine: 6 });
+        Assert.Equal(2, call.Equipment.Count);
+        Assert.Contains(call.Equipment, i => i is { Slot: 2, ItemId: 86575, Enchant: 0, Combine: 0 });
+        Assert.Contains(call.Equipment, i => i is { Slot: 7, ItemId: 86527, Enchant: 0, Combine: 0 });
         Assert.DoesNotContain(call.Equipment, i => i is { Slot: 7, ItemId: 86503 });
         Assert.DoesNotContain(call.Equipment, i => i is { Slot: 7, ItemId: 86551 });
         Assert.DoesNotContain(call.Equipment, i => i.ItemId is 84671 or 84575 or 84623 or 84647 or 84599
@@ -368,9 +347,9 @@ public class CreateAvatarHandlerTests
         Assert.Equal((byte)0, call!.Tribe);
         Assert.Equal((short)1, call.MapId);
         Assert.Equal((byte)1, call.PreviousTribe);
-        // Royal Serpent's own elite weapon persisted (not Noble Dragon's), confirming the kit selection
-        // followed PreviousTribe, not the mismatched Tribe.
-        Assert.Contains(call.Equipment, i => i is { Slot: 7, ItemId: 85527, Enchant: 45, Combine: 6 });
+        // Royal Serpent's own weapon persisted (not Noble Dragon's), confirming the kit selection followed
+        // PreviousTribe, not the mismatched Tribe.
+        Assert.Contains(call.Equipment, i => i is { Slot: 7, ItemId: 85527, Enchant: 0, Combine: 0 });
     }
 
     [Fact]
@@ -759,36 +738,17 @@ public class CreateAvatarHandlerTests
             Dex = 1,
             // See the equivalent block in HandleAsync_ValidRequest_RepliesResultZeroWithFullAvatarInfo above
             // for the full citation.
-            Level2 = 12,
-            Exp1 = 2_000_000_000,
+            Level2 = 0,
+            Exp1 = 0,
             Exp2 = 0,
-            StatPoint = 3175,
-            SkillPoint = 10000,
+            StatPoint = 50,
+            SkillPoint = 0,
             PreviousTribe = 0,
-            // creation-persistence-full-reaudit finding: see the equivalent block in
-            // HandleAsync_ValidRequest_RepliesResultZeroWithFullAvatarInfo above for the full citation.
-            ProtectForDeath = 5,
-            // zone-avatarinfo-factory-parity finding: see the equivalent block in
-            // HandleAsync_ValidRequest_RepliesResultZeroWithFullAvatarInfo above for the full citation.
-            Equip = AvatarInfoFactory.BuildEquipArray(call.Equipment, 640_000_000, 100),
+            Equip = AvatarInfoFactory.BuildEquipArray(call.Equipment),
             Inventory = AvatarInfoFactory.BuildInventoryArray(call.Inventory),
             Skill = AvatarInfoFactory.BuildSkillArray(call.Skills),
             HotKey = AvatarInfoFactory.BuildHotKeyArray(call.Hotkeys),
-            Animal = MountSlotArray(1301),
-            AnimalIndex = 0,
-            AnimalTime = 99999999,
-            AnimalPower = MountSlotArray(5),
-            AnimalExpActivity = MountSlotArray(0),
-            // 300, not call.WelcomeBuffUntilDate -- Server/ts25login/S04_MyWork02.cpp:886-887's bare integer
-            // literal (a raw per-tick counter, confirmed by Server/ts25zone/S07_MyGame04.cpp:955-969's
-            // decrement-on-tick consumer), genuinely independent of AutoBuffTime's date below.
-            DoubleExpTime1 = 300,
-            DoubleExpTime2 = 300,
-            AutoBuffTime = call.WelcomeBuffUntilDate,
-            // 1440 == CreateAvatarService.StarterAutoTime2Minutes -- see the equivalent block in
-            // HandleAsync_ValidRequest_RepliesResultZeroWithFullAvatarInfo above for the full citation.
-            AutoTime2 = 1440,
-            Premium = call.PremiumUntilUnixSeconds
+            AutoBuffTime = call.WelcomeBuffUntilDate
         };
         await PacketAssert.AssertSentAsync(pipe,
             new CreateAvatarResponse { Result = 0, AvatarInfo = expectedAvatarInfo });
@@ -799,7 +759,7 @@ public class CreateAvatarHandlerTests
     // legitimate fourth-faction origins (PreviousTribe 1/Royal Serpent, 2/Grand Tiger -- Server/ts25zone/
     // S04_MyWork02.cpp:880-901's own "transferred in from an original tribe" case) had no coverage at all
     // proving THEIR starter kit, not Noble Dragon's, gets threaded through for a Tribe-3 character. Mirrors
-    // the per-race coverage the three HandleAsync_*PreviousTribe_PersistsItsOwnEliteEquipment... tests above
+    // the per-race coverage the three HandleAsync_*PreviousTribe_PersistsItsOwnStarterEquipment... tests above
     // already give the main-faction tribes.
     [Theory]
     [InlineData((byte)0, 6, 84527)] // Noble Dragon origin (raw code 6 -> Blade of the Moon)
@@ -836,7 +796,7 @@ public class CreateAvatarHandlerTests
         Assert.Equal((short)140, call.MapId);
         Assert.Equal(previousTribe, call.PreviousTribe);
         Assert.Contains(call.Equipment,
-            i => i is { Slot: 7, Enchant: 45, Combine: 6 } && i.ItemId == expectedWeaponItemId);
+            i => i is { Slot: 7, Enchant: 0, Combine: 0 } && i.ItemId == expectedWeaponItemId);
     }
 
     // EnableFourthFaction defaults to false, matching legacy's own unconditional shipped behavior (see
@@ -845,15 +805,6 @@ public class CreateAvatarHandlerTests
     private static IOptions<LoginServerOptions> DefaultOptions()
     {
         return Options.Create(new LoginServerOptions());
-    }
-
-    // AVATAR_INFO's Animal/AnimalPower/AnimalExpActivity arrays are sized for 10 possible owned-mount slots
-    // (S04_MyWork02.cpp:1174-1179); creation only ever grants the one universal starter mount at slot 0.
-    // Written as an explicit literal (not a call into CreateAvatarService's own private helper) so this
-    // asserts the actual wire-level expected values, not just "whatever the implementation computes".
-    private static int[] MountSlotArray(int value)
-    {
-        return [value, 0, 0, 0, 0, 0, 0, 0, 0, 0];
     }
 
     private static (LoginClientSession Session, FakeDuplexPipe Pipe) CreateSessionInCharSelect()

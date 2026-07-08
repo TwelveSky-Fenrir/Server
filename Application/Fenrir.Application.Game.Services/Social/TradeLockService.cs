@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using System.Linq;
 using Fenrir.Application.Game.Abstractions.Social;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Social.Trade;
@@ -9,7 +8,9 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Social;
 
-public sealed class TradeLockService(TradeRegistry trades, ICharacterRepository characters,
+public sealed class TradeLockService(
+    TradeRegistry trades,
+    ICharacterRepository characters,
     ILogger<TradeLockService> logger) : ITradeLockService
 {
     public TradeLockAttempt TryLock(int characterId)

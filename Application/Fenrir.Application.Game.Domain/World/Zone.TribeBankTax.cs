@@ -33,8 +33,12 @@ namespace Fenrir.Application.Game.Domain.World;
 ///         <c>legacy-behavior-translator</c> contract this disconnection was made from before assuming the
 ///         mechanism can be removed outright. <see cref="CreditNpcServiceTribeTax" />'s eight legacy call sites
 ///         (item enchant/upgrade, enchant-costume, costume material swap-enchant, item exchange, high-item
-///         upgrade, low-item downgrade -- <c>AddTribeBankInfo2</c> at <c>Server/ts25zone/
-///         S04_MyWork02.cpp:2604,2647,2745,3322,3698,3858,4078,4229</c>) all live in
+///         upgrade, low-item downgrade -- <c>AddTribeBankInfo2</c> at
+///         <c>
+///             Server/ts25zone/
+///             S04_MyWork02.cpp:2604,2647,2745,3322,3698,3858,4078,4229
+///         </c>
+///         ) all live in
 ///         <c>Fenrir.Application.Game.Services.ItemModification</c>. Five of those eight are now wired --
 ///         <c>EnchantItemService</c> (normal-equipment/wings branch only; the costume/stellar-core branches at
 ///         lines 2604/2647/2745 remain out of scope, see <c>EnchantResolver</c>'s own remarks),

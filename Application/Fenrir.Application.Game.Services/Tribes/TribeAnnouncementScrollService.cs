@@ -53,21 +53,21 @@ public sealed class TribeAnnouncementScrollService(
         relay.Enqueue(new GuildTribeBroadcastRelayEntry(
             GuildTribeBroadcastKind.TribeAnnouncementScroll,
             options.Value.ShardId,
-            GuildId: null,
-            Tribe: sender.Tribe,
+            null,
+            sender.Tribe,
             // Wire-field quirk: this opcode's "role" field position actually carries the sender's raw tribe
             // number, not a role (see TribeAnnouncementScrollResponse's own docstring) -- mirrored exactly
             // here so GuildTribeBroadcastRelayHost's delivery loop needs no opcode-specific special case.
-            RoleField: sender.Tribe,
-            AvatarName: sender.Name,
-            Content: content,
-            HasItemLink: false,
-            ItemLinkIndex: null,
-            ItemLinkActivity: null,
-            ItemLinkValue: null,
-            ItemLinkSocket0: null,
-            ItemLinkSocket1: null,
-            ItemLinkSocket2: null));
+            sender.Tribe,
+            sender.Name,
+            content,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null));
 
         zone.PostTribeProgressCommand(new TribeProgressZoneCommand(characterId, TribeNotifyScrollCount: newCount));
 

@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using System.Linq;
 using Fenrir.Application.Game.Domain.Mounts;
 using Fenrir.Application.Game.Stats;
 

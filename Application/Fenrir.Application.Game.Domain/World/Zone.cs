@@ -141,13 +141,6 @@ public sealed partial class Zone(
     private readonly TradeRegistry _tradeRegistry = tradeRegistry ?? new TradeRegistry();
 
     /// <summary>
-    ///     This zone's own monotonic simulated clock, the sum of every elapsed span fed to <see cref="Tick" />.
-    ///     Periodic cadences are measured against this, not wall clock, so a test can drive simulated hours
-    ///     through <see cref="Tick" /> in microseconds.
-    /// </summary>
-    private TimeSpan _clock;
-
-    /// <summary>
     ///     This zone's own owning registry -- used only to resolve OTHER zones' tracked players when this zone's
     ///     tick needs to reach someone outside its own <see cref="_players" /> (currently:
     ///     <see cref="BreakPartyOnDisconnect" />'s cross-zone party-changed broadcast). Passed as <c>this</c> by
@@ -160,6 +153,13 @@ public sealed partial class Zone(
     ///     other optional cross-cutting dependency here.
     /// </summary>
     private readonly ZoneRegistry? _zoneRegistry = zoneRegistry;
+
+    /// <summary>
+    ///     This zone's own monotonic simulated clock, the sum of every elapsed span fed to <see cref="Tick" />.
+    ///     Periodic cadences are measured against this, not wall clock, so a test can drive simulated hours
+    ///     through <see cref="Tick" /> in microseconds.
+    /// </summary>
+    private TimeSpan _clock;
 
     /// <summary>The legacy map this actor simulates -- its key in <see cref="ZoneRegistry" />.</summary>
     public short MapId { get; } = mapId;

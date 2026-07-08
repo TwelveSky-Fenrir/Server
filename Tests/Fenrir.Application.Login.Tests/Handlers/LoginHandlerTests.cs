@@ -6,6 +6,8 @@ using Fenrir.Application.Login.Handlers.Handlers;
 using Fenrir.Application.Login.Services.Login;
 using Fenrir.Application.Login.Tests.TestSupport;
 using Fenrir.Data.Abstractions.Accounts;
+using Fenrir.Data.Abstractions.Characters;
+using Fenrir.Data.Abstractions.Guilds;
 using Fenrir.Data.Abstractions.Runtime;
 using Fenrir.Data.Security;
 using Fenrir.Network.Dispatch.Sessions;
@@ -247,6 +249,90 @@ public class LoginHandlerTests
         Assert.Equal(LoginSessionState.VersionOk, session.State);
     }
 
+    // "# GM Enable Login IP #" gate (Server/ts25login/S04_MyWork02.cpp:192-201): a GM-tier account whose
+    // credentials matched must still come from an allow-listed IP, or the whole login is refused with the
+    // same IP-blocked result code (2) a plain banned IP gets.
+    [Fact]
+    public async Task HandleAsync_GmAccount_NonAllowlistedIp_SendsIpBlockedResult_AndNeverCompletesLogin()
+    {
+        var (hash, salt) = PasswordHasher.Hash("correct-password");
+        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, false, 1);
+        var accounts = FakeAccountRepository.WithAccount(account);
+        var handler = CreateHandler(out var session, out var pipe, accounts, gmAllowlisted: false);
+
+        await handler.HandleAsync(ValidLoginRequest(password: "correct-password"), session, CancellationToken.None);
+
+        await AssertFirstResponseAsync(pipe, LoginTrain.BuildLoginRecv(2, "someuser", 0, LoginTrain.FailurePinMask));
+        Assert.Null(session.AccountId);
+        // ReArmVersionOk=true: this trips post-authentication, so the client can retry on this same
+        // connection, unlike the pre-auth IpIsBlocked case above.
+        Assert.Equal(LoginSessionState.VersionOk, session.State);
+    }
+
+    // Symmetric positive case: a GM-tier account from an allow-listed IP proceeds normally, proving the gate
+    // is a real check (not an always-reject) and doesn't interfere with a legitimate GM login.
+    [Fact]
+    public async Task HandleAsync_GmAccount_AllowlistedIp_Succeeds()
+    {
+        var (hash, salt) = PasswordHasher.Hash("correct-password");
+        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, false, 1);
+        var accounts = FakeAccountRepository.WithAccount(account);
+        var handler = CreateHandler(out var session, out var pipe, accounts, gmAllowlisted: true);
+
+        await handler.HandleAsync(ValidLoginRequest(password: "correct-password"), session, CancellationToken.None);
+
+        await AssertFirstResponseAsync(pipe, LoginTrain.BuildLoginRecv(0, "MG7", 1, ""));
+        Assert.Equal((short)1, session.AccountGrade);
+    }
+
+    // A non-GM account is entirely unaffected by the GM-IP gate regardless of allowlist state -- the
+    // condition is gated on AccountGrade, not evaluated unconditionally for every login.
+    [Fact]
+    public async Task HandleAsync_NonGmAccount_NonAllowlistedIp_StillSucceeds()
+    {
+        var (hash, salt) = PasswordHasher.Hash("correct-password");
+        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, false);
+        var accounts = FakeAccountRepository.WithAccount(account);
+        var handler = CreateHandler(out var session, out var pipe, accounts, gmAllowlisted: false);
+
+        await handler.HandleAsync(ValidLoginRequest(password: "correct-password"), session, CancellationToken.None);
+
+        await AssertFirstResponseAsync(pipe, LoginTrain.BuildLoginRecv(0, "MG7", 1, ""));
+    }
+
+    // Legacy "Only Admin can login" operator lockdown (Server/ts25login/S04_MyWork02.cpp:202-208): when
+    // enabled, a non-GM-tier account is refused with the fixed application message, even with fully valid
+    // credentials and no other restriction in play.
+    [Fact]
+    public async Task HandleAsync_OnlyAdminLockdownEnabled_NonGmAccount_SendsCustomMessageResult()
+    {
+        var (hash, salt) = PasswordHasher.Hash("correct-password");
+        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, false);
+        var accounts = FakeAccountRepository.WithAccount(account);
+        var handler = CreateHandler(out var session, out var pipe, accounts, onlyAdminCanLogin: true);
+
+        await handler.HandleAsync(ValidLoginRequest(password: "correct-password"), session, CancellationToken.None);
+
+        await AssertFirstResponseAsync(pipe,
+            LoginTrain.BuildLoginRecv(10000, "someuser", 0, LoginTrain.FailurePinMask, "Only Admin can login"));
+        Assert.Null(session.AccountId);
+    }
+
+    // A GM-tier account is exempt from the lockdown -- the flag only turns away non-elevated accounts.
+    [Fact]
+    public async Task HandleAsync_OnlyAdminLockdownEnabled_GmAccount_Succeeds()
+    {
+        var (hash, salt) = PasswordHasher.Hash("correct-password");
+        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, false, 1);
+        var accounts = FakeAccountRepository.WithAccount(account);
+        var handler = CreateHandler(out var session, out var pipe, accounts, gmAllowlisted: true,
+            onlyAdminCanLogin: true);
+
+        await handler.HandleAsync(ValidLoginRequest(password: "correct-password"), session, CancellationToken.None);
+
+        await AssertFirstResponseAsync(pipe, LoginTrain.BuildLoginRecv(0, "MG7", 1, ""));
+    }
+
     // "Protect Spoofed" anti-spoofing gate (Server/ts25login/S08_MyDB.cpp:497-507): a non-GM account whose
     // declared MAC is zero-length never gets its device values populated with real data at all, so the gate
     // always trips regardless of whatever GUID/IP the client happened to declare.
@@ -276,7 +362,9 @@ public class LoginHandlerTests
         var (hash, salt) = PasswordHasher.Hash("correct-password");
         var account = new AuthenticateAccountDto(7, hash, salt, 0, null, false, 1);
         var accounts = FakeAccountRepository.WithAccount(account);
-        var handler = CreateHandler(out var session, out var pipe, accounts);
+        // gmAllowlisted:true -- this test targets the anti-spoofing gate's GM exemption, not the separate
+        // GM-IP allowlist gate (covered on its own below); an allowlisted IP keeps that gate out of the way.
+        var handler = CreateHandler(out var session, out var pipe, accounts, gmAllowlisted: true);
 
         await handler.HandleAsync(ValidLoginRequest(password: "correct-password", physicalAddress: []), session,
             CancellationToken.None);
@@ -358,35 +446,86 @@ public class LoginHandlerTests
         Assert.NotNull(session.AccountSessionToken);
     }
 
+    // Major audit gap (ts25extra-scope-confirmation cluster): the character-select roster used to always send
+    // GuildName="" regardless of actual guild membership. LoginService now resolves each roster character's live
+    // guild membership (IGuildRepository.GetByCharacterAsync) and LoginTrain.BuildAvatarSlots wires it onto the
+    // wire GuildName field -- see LoginTrain.BuildAvatarSlots' own remarks for the full legacy citation.
+    [Fact]
+    public async Task HandleAsync_Success_PopulatesGuildNameForGuildedCharacter_AndLeavesGuildlessCharacterEmpty()
+    {
+        var (hash, salt) = PasswordHasher.Hash("correct-password");
+        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, false);
+        var accounts = FakeAccountRepository.WithAccount(account);
+
+        var guildedCharacter = new CharacterSummaryDto(101, 0, "Hero", 2, 1, 3, 4, 12);
+        var guildlessCharacter = new CharacterSummaryDto(102, 1, "Sidekick", 1, 0, 1, 2, 5);
+        var characters = FakeCharacterRepository.WithSummaries(guildedCharacter, guildlessCharacter);
+
+        var guilds = FakeGuildRepository.WithMembership(guildedCharacter.CharacterId,
+            new CharacterGuildMembershipDto(55, "TestGuild", 0, ""));
+
+        var handler = CreateHandler(out var session, out var pipe, accounts, characters: characters,
+            guilds: guilds);
+
+        await handler.HandleAsync(ValidLoginRequest(password: "correct-password"), session, CancellationToken.None);
+
+        var actual = await PacketAssert.ReadSentBytesAsync(pipe);
+
+        var expectedSlots = LoginTrain.BuildAvatarSlots([guildedCharacter, guildlessCharacter],
+            new Dictionary<int, string> { [guildedCharacter.CharacterId] = "TestGuild" });
+
+        var loginRecvSize = FrameWriter.FrameSizeOf<LoginResponse>();
+        var avatarSlotSize = FrameWriter.FrameSizeOf<AvatarRosterResponse>();
+
+        var expectedSlot0Frame = new byte[avatarSlotSize];
+        FrameWriter.WriteFrame(in expectedSlots[0], expectedSlot0Frame);
+        var expectedSlot1Frame = new byte[avatarSlotSize];
+        FrameWriter.WriteFrame(in expectedSlots[1], expectedSlot1Frame);
+
+        Assert.Equal(expectedSlot0Frame, actual.AsSpan(loginRecvSize, avatarSlotSize).ToArray());
+        Assert.Equal(expectedSlot1Frame, actual.AsSpan(loginRecvSize + avatarSlotSize, avatarSlotSize).ToArray());
+
+        Assert.Equal("TestGuild", expectedSlots[0].GuildName);
+        Assert.Equal("", expectedSlots[1].GuildName);
+    }
+
     private static LoginHandler CreateHandler(out LoginClientSession session, out FakeDuplexPipe pipe,
         FakeAccountRepository accounts, bool blockedIp = false, bool firewallRuleBlocked = false,
         bool gmAllowlisted = false, bool accountBanned = false, string[]? bannedMacAddresses = null,
         SessionRegistry? registry = null, FakeAccountSessionRepository? accountSessions = null,
         IPEndPoint? remoteEndPoint = null, LoginCapacityState? capacity = null,
-        FakeEventLogRepository? eventLog = null)
+        FakeEventLogRepository? eventLog = null, bool onlyAdminCanLogin = false,
+        FakeCharacterRepository? characters = null, FakeGuildRepository? guilds = null)
     {
         pipe = new FakeDuplexPipe();
         session = new LoginClientSession(1, pipe, remoteEndPoint ?? RemoteEndPoint);
 
+        // Same fake instance backs both the generic block-list bypass (ApplicationFirewall) and the
+        // GM-tier-specific post-authentication gate (LoginService) -- legacy checks the identical `gmip`
+        // table for both (S04_MyWork02.cpp:195, S08_MyDB.cpp:339-356), so one allowlist fake is correct here.
+        var gmAllowlistRepository = new FakeGmAllowlistRepository(gmAllowlisted);
         var firewall = new ApplicationFirewall(
             new FakeBlockedIpRepository(blockedIp),
             new FakeFirewallRuleRepository(firewallRuleBlocked),
-            new FakeGmAllowlistRepository(gmAllowlisted));
+            gmAllowlistRepository);
 
         return new LoginHandler(
             new LoginService(
                 accounts,
                 FakeAccountPinRepository.WithNoPin(),
-                FakeCharacterRepository.WithNone(),
+                characters ?? FakeCharacterRepository.WithNone(),
                 new LoginIpRateLimiter(),
                 capacity ?? AllowedCapacity(),
                 firewall,
+                gmAllowlistRepository,
                 new FakeBanRepository(accountBanned),
                 new FakeMacRestrictionRepository(bannedMacAddresses ?? []),
-                Options.Create(new LoginServerOptions { ExpectedClientVersion = ClientVersion }),
+                Options.Create(new LoginServerOptions
+                    { ExpectedClientVersion = ClientVersion, OnlyAdminCanLogin = onlyAdminCanLogin }),
                 registry ?? new SessionRegistry(),
                 accountSessions ?? new FakeAccountSessionRepository(),
                 eventLog ?? new FakeEventLogRepository(),
+                guilds ?? FakeGuildRepository.Empty(),
                 NullLogger<LoginService>.Instance),
             NullLogger<LoginHandler>.Instance);
     }

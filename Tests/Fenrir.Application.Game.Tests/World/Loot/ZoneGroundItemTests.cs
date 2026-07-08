@@ -194,7 +194,8 @@ public class ZoneGroundItemTests
     /// <summary>
     ///     Covers <c>Zone.BroadcastGroundItemAction</c>'s <see cref="AoiGrid.HasAnyNeighbor" /> emptiness
     ///     pre-check, the ground-item counterpart of the same refactor already covered for monsters
-    ///     (<c>ZoneMonsterAoiGridTests</c>) and proxy shops (<c>ZoneProxyShopTests.ShopWithNoNeighbors_IsNeverBroadcastTo</c>):
+    ///     (<c>ZoneMonsterAoiGridTests</c>) and proxy shops (<c>ZoneProxyShopTests.ShopWithNoNeighbors_IsNeverBroadcastTo</c>
+    ///     ):
     ///     a drop with nobody nearby must neither throw nor send anything, while a drop next to a player must
     ///     still reach them exactly as before.
     /// </summary>

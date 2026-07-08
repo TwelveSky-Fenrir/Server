@@ -28,4 +28,14 @@ public sealed record AccountPinRepository(ICaeriusNetDbContext Db) : IAccountPin
 
         await Db.ExecuteAsync(sp, ct);
     }
+
+    public async ValueTask RecordAttemptAsync(int accountId, bool success, CancellationToken ct)
+    {
+        var sp = new StoredProcedureParametersBuilder("auth", "usp_AccountPin_RecordAttempt", 0)
+            .AddParameter("AccountId", accountId, SqlDbType.Int)
+            .AddParameter("Success", success, SqlDbType.Bit)
+            .Build();
+
+        await Db.ExecuteAsync(sp, ct);
+    }
 }

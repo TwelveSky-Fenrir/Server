@@ -61,17 +61,18 @@ public sealed class GuildTribeBroadcastRelayHost(
     private const int QueueCapacity = 1024;
     private const int MaxDrainedPerCycle = 512;
 
-    private readonly Channel<GuildTribeBroadcastRelayEntry> _outbox = Channel.CreateBounded<GuildTribeBroadcastRelayEntry>(
-        new BoundedChannelOptions(QueueCapacity)
-        {
-            SingleReader = true,
-            SingleWriter = false,
-            AllowSynchronousContinuations = false,
-            // Wait mode's TryWrite returns false immediately when full (only WriteAsync actually awaits
-            // space) -- the honest, non-blocking backpressure signal Enqueue needs, since it only ever calls
-            // TryWrite. Same reasoning as EventLogQueue's own choice of Wait over DropWrite.
-            FullMode = BoundedChannelFullMode.Wait
-        });
+    private readonly Channel<GuildTribeBroadcastRelayEntry> _outbox =
+        Channel.CreateBounded<GuildTribeBroadcastRelayEntry>(
+            new BoundedChannelOptions(QueueCapacity)
+            {
+                SingleReader = true,
+                SingleWriter = false,
+                AllowSynchronousContinuations = false,
+                // Wait mode's TryWrite returns false immediately when full (only WriteAsync actually awaits
+                // space) -- the honest, non-blocking backpressure signal Enqueue needs, since it only ever calls
+                // TryWrite. Same reasoning as EventLogQueue's own choice of Wait over DropWrite.
+                FullMode = BoundedChannelFullMode.Wait
+            });
 
     /// <inheritdoc />
     public bool Enqueue(GuildTribeBroadcastRelayEntry entry)
@@ -101,7 +102,8 @@ public sealed class GuildTribeBroadcastRelayHost(
                 // A missed cycle just delays cross-shard delivery by one more poll interval -- never worth
                 // crashing the GameServer over (same-shard delivery for every one of these four opcodes is
                 // entirely unaffected).
-                logger.LogError(ex, "Guild/tribe broadcast relay poll failed for shard {ShardId}", options.Value.ShardId);
+                logger.LogError(ex, "Guild/tribe broadcast relay poll failed for shard {ShardId}",
+                    options.Value.ShardId);
             }
         } while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false));
     }

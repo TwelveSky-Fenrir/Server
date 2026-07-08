@@ -4,9 +4,9 @@ using Fenrir.Data.Abstractions.Guilds;
 namespace Fenrir.Application.Login.Tests.TestSupport;
 
 /// <summary>
-///     In-memory stand-in for IGuildRepository, used only for DeleteAvatarService's guild-membership refusal
-///     check -- every member besides <see cref="GetByCharacterAsync" /> throws, since nothing else on this path
-///     calls them.
+///     In-memory stand-in for IGuildRepository, used for DeleteAvatarService's guild-membership refusal check and
+///     LoginService's character-select GuildName lookup -- every member besides <see cref="GetByCharacterAsync" />
+///     throws, since nothing else on either of those paths calls them.
 /// </summary>
 internal sealed class FakeGuildRepository : IGuildRepository
 {

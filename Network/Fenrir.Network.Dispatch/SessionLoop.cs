@@ -241,6 +241,19 @@ public static class SessionLoop
                 // remarks) -- stamped only once a frame clears every prior gate (decode/state/rate-limit) AND
                 // its handler ran without throwing, so a session spamming garbage that gets rejected below
                 // never counts as "active" for idle-timeout purposes.
+                //
+                // Deliberately opcode-agnostic, including for Login's op24 CL_CHANGE_MASTER_SEND
+                // (Fenrir.Application.Login.Handlers.Handlers.ChangeMasterHandler): legacy's own per-connection
+                // liveness loop (Server/ts25login/S07_MyGame01.cpp:37-73) happens not to refresh its idle-timer
+                // marker from op24 traffic specifically, an asymmetry inherited from the dead teacher/master
+                // feature op24 used to serve, not a deliberate anti-abuse boundary. Reproducing that one-opcode
+                // exception here would mean threading an opcode-level allow/deny table into this per-frame hot
+                // path (see the dotnet-game-server-performance skill on SessionLoop.ProcessBufferAsync) for zero
+                // real benefit: any client that wants to dodge LoginSessionLivenessSweep by spamming a single
+                // harmless opcode can already do so with op12 CL_CLIENT_OK_FOR_LOGIN_SEND (a real, always-
+                // allowed keepalive) just as easily as with op24, so excluding op24 alone closes no exploitable
+                // path. Left generic on purpose -- see the change-master-stub-and-misc-opcodes audit for the
+                // full reasoning.
                 session.Touch();
             }
             catch (OperationCanceledException)

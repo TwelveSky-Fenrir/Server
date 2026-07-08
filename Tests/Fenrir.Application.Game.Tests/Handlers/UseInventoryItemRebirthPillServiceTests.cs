@@ -55,7 +55,7 @@ public class UseInventoryItemRebirthPillServiceTests
 
     private static (ZoneClientSession Session, FakeDuplexPipe Pipe, Zone Zone, PlayerRuntimeState State,
         FakeCharacterRepository Characters) SetUp(short level2 = RebirthProgression.MaxHighLevel,
-        int exp2 = MaxHighLevelExp, int rebirthCount = 0)
+            int exp2 = MaxHighLevelExp, int rebirthCount = 0)
     {
         var zone = ZoneTestKit.CreateZone(1);
         var (session, pipe) = ZoneTestKit.CreateSession(CharacterId);
@@ -173,7 +173,7 @@ public class UseInventoryItemRebirthPillServiceTests
     [Fact]
     public async Task RebirthPill_Level2NotAtCap_FailsCleanly_LeavesStateAndItemUntouched()
     {
-        var (session, _, zone, state, characters) = SetUp(level2: (short)(RebirthProgression.MaxHighLevel - 1));
+        var (session, _, zone, state, characters) = SetUp(RebirthProgression.MaxHighLevel - 1);
         SeedInventory(zone, new ItemStack(RebirthPillItemIdA, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1));
         var service = CreateService(characters);
 

@@ -33,7 +33,8 @@ public static class LocalChatGmCommandParser
     {
         if (string.Equals(content, "where", StringComparison.Ordinal))
         {
-            command = new LocalChatGmCommand { Kind = LocalChatGmCommandKind.Where, RequiredTier = GmCommandTier.Basic };
+            command = new LocalChatGmCommand
+                { Kind = LocalChatGmCommandKind.Where, RequiredTier = GmCommandTier.Basic };
             return true;
         }
 
@@ -72,13 +73,15 @@ public static class LocalChatGmCommandParser
 
         if (string.Equals(content, "kill200", StringComparison.Ordinal))
         {
-            command = new LocalChatGmCommand { Kind = LocalChatGmCommandKind.Kill200, RequiredTier = GmCommandTier.Basic };
+            command = new LocalChatGmCommand
+                { Kind = LocalChatGmCommandKind.Kill200, RequiredTier = GmCommandTier.Basic };
             return true;
         }
 
         if (string.Equals(content, "?clear", StringComparison.Ordinal))
         {
-            command = new LocalChatGmCommand { Kind = LocalChatGmCommandKind.ClearInventory, RequiredTier = GmCommandTier.Basic };
+            command = new LocalChatGmCommand
+                { Kind = LocalChatGmCommandKind.ClearInventory, RequiredTier = GmCommandTier.Basic };
             return true;
         }
 

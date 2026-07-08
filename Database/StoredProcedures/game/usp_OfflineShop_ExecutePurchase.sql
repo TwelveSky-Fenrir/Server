@@ -14,14 +14,14 @@
 -- slots), not just the slot that was just sold, and inside this procedure's single transaction so there is no
 -- new cross-call TOCTOU window.
 CREATE PROCEDURE game.usp_OfflineShop_ExecutePurchase @SellerCharacterId INT,
-                                                       @SlotIndex SMALLINT,
-                                                       @ExpectedItemId INT,
-                                                       @ExpectedQuantity INT,
-                                                       @ExpectedValue INT,
-                                                       @Price INT,
-                                                       @BuyerCharacterId INT,
-                                                       @BuyerContainer TINYINT,
-                                                       @BuyerItems game.tvp_CharacterItemSlot READONLY
+                                                      @SlotIndex SMALLINT,
+                                                      @ExpectedItemId INT,
+                                                      @ExpectedQuantity INT,
+                                                      @ExpectedValue INT,
+                                                      @Price INT,
+                                                      @BuyerCharacterId INT,
+                                                      @BuyerContainer TINYINT,
+                                                      @BuyerItems game.tvp_CharacterItemSlot READONLY
 AS
 BEGIN
     SET NOCOUNT ON;

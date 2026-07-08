@@ -10,6 +10,11 @@ namespace Fenrir.Application.Login.Handlers.Handlers;
 ///     op21 CL_WANT_GIFT_SEND — GiftInfoIndex is a POSITION in GiftListHandler's oldest-first pending list, not a
 ///     database key.
 /// </summary>
+/// <remarks>
+///     Réf. C++ : Server/ts25login/S04_MyWork02.cpp:1435-1480 — the wire response distinguishes three failure
+///     signals plus success, not one generic failure code; see <see cref="ClaimGiftOutcome" />'s own remarks for
+///     what each of the four <see cref="ClaimGiftResponse.Result" /> values means.
+/// </remarks>
 public sealed class ClaimGiftHandler(IClaimGiftService claimGiftService, ILogger<ClaimGiftHandler> logger)
     : IAsyncPacketHandler<ClaimGiftRequest>
 {
@@ -43,15 +48,13 @@ public sealed class ClaimGiftHandler(IClaimGiftService claimGiftService, ILogger
                 logger.LogInformation("Gift claimed: account {AccountId} index {GiftInfoIndex}", accountId,
                     packet.GiftInfoIndex);
                 break;
-            case ClaimGiftOutcome.IndexNotPending:
-                logger.LogWarning(
-                    "Gift claim rejected: account {AccountId} index {GiftInfoIndex} is not a pending gift",
-                    accountId, packet.GiftInfoIndex);
-                break;
-            default:
-                // ClaimFailed: the exception itself is already logged at ClaimGiftService; this is the summary.
-                logger.LogWarning("Gift claim failed for account {AccountId} index {GiftInfoIndex}", accountId,
-                    packet.GiftInfoIndex);
+            case ClaimGiftOutcome.GiftUnavailable:
+            case ClaimGiftOutcome.VaultFull:
+            case ClaimGiftOutcome.PersistenceFailure:
+                // ClaimGiftService already logged the specific reason (stale index, claim race, full vault, or
+                // unexpected failure); this is just the per-request summary.
+                logger.LogWarning("Gift claim failed for account {AccountId} index {GiftInfoIndex} ({Outcome})",
+                    accountId, packet.GiftInfoIndex, result.Outcome);
                 break;
         }
 
@@ -60,8 +63,10 @@ public sealed class ClaimGiftHandler(IClaimGiftService claimGiftService, ILogger
             Result = result.Outcome switch
             {
                 ClaimGiftOutcome.Success => 0,
-                ClaimGiftOutcome.IndexNotPending => 1,
-                _ => 2
+                ClaimGiftOutcome.GiftUnavailable => 1,
+                ClaimGiftOutcome.VaultFull => 2,
+                ClaimGiftOutcome.PersistenceFailure => 101,
+                _ => throw new ArgumentOutOfRangeException(nameof(result), result.Outcome, null)
             }
         });
     }

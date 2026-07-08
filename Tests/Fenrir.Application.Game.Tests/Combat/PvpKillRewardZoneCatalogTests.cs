@@ -4,6 +4,13 @@ namespace Fenrir.Application.Game.Tests.Combat;
 
 public class PvpKillRewardZoneCatalogTests
 {
+    // Zone id 999 stands in for any zone number not listed in any of the catalog's modeled groups (city,
+    // FFA, unconditional-full) -- it deliberately does NOT collide with a real switch case label from
+    // S07_MyGame03.cpp:2839-3043, unlike the zone id 1 previously (incorrectly) used here for these two
+    // tests: zone 1 is actually one of the four "city" zones (see CityZone_* tests below), which do NOT
+    // grant nothing on a stun kill -- only CP is withheld there.
+    private const short UnlistedZoneId = 999;
+
     [Fact]
     public void FfaZone_DisablesGenericCpAndExpAndDailyMission_ButEnablesDropAndHeroPoint()
     {
@@ -40,13 +47,6 @@ public class PvpKillRewardZoneCatalogTests
         Assert.True(profile.GrantDailyMissionProgress);
         Assert.Equal(0, profile.HeroPointAmount);
     }
-
-    // Zone id 999 stands in for any zone number not listed in any of the catalog's modeled groups (city,
-    // FFA, unconditional-full) -- it deliberately does NOT collide with a real switch case label from
-    // S07_MyGame03.cpp:2839-3043, unlike the zone id 1 previously (incorrectly) used here for these two
-    // tests: zone 1 is actually one of the four "city" zones (see CityZone_* tests below), which do NOT
-    // grant nothing on a stun kill -- only CP is withheld there.
-    private const short UnlistedZoneId = 999;
 
     [Fact]
     public void DefaultZone_NonStunKill_GrantsEverythingExceptHeroPoint()

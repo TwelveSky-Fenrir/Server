@@ -48,18 +48,18 @@ public sealed class TribeAnnouncementService(
         relay.Enqueue(new GuildTribeBroadcastRelayEntry(
             GuildTribeBroadcastKind.TribeAnnouncement,
             options.Value.ShardId,
-            GuildId: null,
-            Tribe: sender.Tribe,
-            RoleField: sender.TribeRole,
-            AvatarName: sender.Name,
-            Content: content,
-            HasItemLink: false,
-            ItemLinkIndex: null,
-            ItemLinkActivity: null,
-            ItemLinkValue: null,
-            ItemLinkSocket0: null,
-            ItemLinkSocket1: null,
-            ItemLinkSocket2: null));
+            null,
+            sender.Tribe,
+            sender.TribeRole,
+            sender.Name,
+            content,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null));
 
         logger.LogInformation(
             "Character {CharacterId} (tribe role {TribeRole}) broadcast a tribe announcement to tribe {Tribe} ({RecipientCount} same-shard recipients, {ContentLength} chars)",

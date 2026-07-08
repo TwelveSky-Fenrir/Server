@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net;
 using System.Security.Cryptography;
 using Fenrir.Application.Login.Domain;
@@ -26,7 +27,7 @@ public sealed class LoginConnectionHost(
     IFrameDispatcher dispatcher,
     ISessionRateLimiter rateLimiter,
     SessionRegistry registry,
-    IGameServerDirectoryRepository directory,
+    LoginCapacityState capacity,
     IAccountSessionRepository accountSessions,
     IEventLogRepository eventLog,
     IpFloodGuard ipFloodGuard,
@@ -38,6 +39,12 @@ public sealed class LoginConnectionHost(
     ///     four-code cross-reference within this category.
     /// </summary>
     private const short LoginSessionEndedEventCode = 2;
+
+    // Tracks every still-running OnAcceptedAsync invocation so StopAsync can await full connection teardown
+    // (including TearDownAccountSessionAsync/LogLoginSessionEndedAsync in its own finally block) before this
+    // host's own StopAsync returns -- see StopAsync's own remarks for the parity gap this closes. Mirrors
+    // Fenrir.Application.Game.Hosting.GameConnectionHost's own _inFlightConnections field.
+    private readonly ConcurrentDictionary<Task, byte> _inFlightConnections = new();
 
     private FenrirTcpListener<LoginClientSession>? _listener;
 
@@ -58,11 +65,76 @@ public sealed class LoginConnectionHost(
 
         try
         {
-            await _listener.AcceptLoopAsync(OnAcceptedAsync, stoppingToken).ConfigureAwait(false);
+            await _listener.AcceptLoopAsync(TrackInFlightAsync, stoppingToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
         }
+    }
+
+    /// <summary>
+    ///     Waits for every connection accepted by <see cref="ExecuteAsync" /> to finish its own
+    ///     <see cref="OnAcceptedAsync" /> teardown before this method returns -- the fix for the parity gap
+    ///     against legacy's force-save-then-poll-until-drained shutdown sequence (<c>MyGame::Free</c>,
+    ///     Server/ts25playuser/S07_MyGame01.cpp:317-372). Without this override, the default (non-overridden)
+    ///     <see cref="BackgroundService.StopAsync" /> would return as soon as the accept loop itself exits,
+    ///     while <c>FenrirTcpListener{TSession}</c>'s own per-connection dispatch
+    ///     (Network/Fenrir.Network.Transport/FenrirTcpListener.cs:33-73) keeps every already-accepted
+    ///     connection's lifetime running fully detached and unawaited -- letting the process exit while a
+    ///     still-in-flight connection's own TearDownAccountSessionAsync/LogLoginSessionEndedAsync write is
+    ///     still pending or hasn't even started. Exact port of
+    ///     <c>Fenrir.Application.Game.Hosting.GameConnectionHost.StopAsync</c>, which already carries this fix.
+    /// </summary>
+    public override async Task StopAsync(CancellationToken cancellationToken)
+    {
+        // Stops the accept loop first (no new connections dispatched after this): base.StopAsync cancels
+        // ExecuteAsync's stoppingToken and awaits AcceptLoopAsync's own exit.
+        await base.StopAsync(cancellationToken).ConfigureAwait(false);
+
+        var outstanding = _inFlightConnections.Keys.ToArray();
+        if (outstanding.Length == 0)
+            return;
+
+        try
+        {
+            // Bounded by the same shutdown-timeout token the Generic Host already gives every hosted
+            // service's StopAsync -- a stuck connection can't hang shutdown indefinitely.
+            await Task.WhenAll(outstanding).WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // Either the shutdown-timeout budget elapsed, or one of the outstanding connections' own
+            // OperationCanceledException fell through uncaught (OnAcceptedAsync's own catch deliberately
+            // excludes it -- see its own remarks). Either way, the remaining connections are abandoned
+            // exactly like an ungraceful kill would abandon them -- no worse than before this fix.
+            logger.LogWarning(
+                "LoginServer shutdown proceeding with login connection teardown still in flight (of {Count} originally outstanding)",
+                outstanding.Length);
+        }
+        catch (Exception ex)
+        {
+            // Every per-connection fault is already logged inside OnAcceptedAsync's own catch block; a
+            // WhenAll surfacing one of them here must not prevent shutdown from proceeding.
+            logger.LogWarning(ex, "One or more login connections faulted while tearing down during shutdown");
+        }
+    }
+
+    /// <summary>
+    ///     Thin wrapper so <see cref="StopAsync" /> can await every still-in-flight connection: registers
+    ///     <see cref="OnAcceptedAsync" />'s own returned <see cref="Task" /> before returning it back up to
+    ///     <c>FenrirTcpListener{TSession}.RunAcceptedAsync</c>'s <c>await onAccepted(...)</c> -- synchronous up
+    ///     to that point even though <see cref="OnAcceptedAsync" /> is itself async, so the registration always
+    ///     happens-before <see cref="ExecuteAsync" />'s own accept loop can exit and race
+    ///     <see cref="StopAsync" />'s later read of <see cref="_inFlightConnections" />.
+    /// </summary>
+    private Task TrackInFlightAsync(LoginClientSession loginSession, SocketConnection connection, CancellationToken ct)
+    {
+        var task = OnAcceptedAsync(loginSession, connection, ct);
+
+        _inFlightConnections[task] = 0;
+        _ = task.ContinueWith(t => _inFlightConnections.TryRemove(t, out _), TaskScheduler.Default);
+
+        return task;
     }
 
     private async Task OnAcceptedAsync(LoginClientSession loginSession, SocketConnection connection,
@@ -81,7 +153,7 @@ public sealed class LoginConnectionHost(
         {
             // Trigger A (contract): the concurrent-connection gauge must already be incremented and read back
             // before any connect-acknowledgement is sent (Server/ts25login/S03_MyUser.cpp:194-209's early-return
-            // ordering) -- so this runs before GreetAsync, not after.
+            // ordering) -- so this runs before Greet, not after.
             if (remoteIp is not null &&
                 !await ipFloodGuard.TryAcquireConnectionAsync(remoteIp, ct).ConfigureAwait(false))
             {
@@ -91,7 +163,7 @@ public sealed class LoginConnectionHost(
                 return; // IP just got persistently blocked and every session sharing it (this one included) aborted
             }
 
-            await GreetAsync(loginSession, connection, ct).ConfigureAwait(false);
+            Greet(loginSession, connection);
 
             await SessionLoop.RunConnectionAsync(connection, loginSession, dispatcher, rateLimiter, ipFloodGuard, ct,
                 logger).ConfigureAwait(false);
@@ -222,7 +294,7 @@ public sealed class LoginConnectionHost(
     }
 
     /// <summary>Seeds the stream cipher key BEFORE the I/O pump starts, so no inbound byte is decoded with the wrong key.</summary>
-    private async Task GreetAsync(LoginClientSession session, SocketConnection connection, CancellationToken ct)
+    private void Greet(LoginClientSession session, SocketConnection connection)
     {
         // Legacy rand_nor()%1001 * rand_nor()%1001 need not be reproduced byte-for-byte, only "look random".
         var randomNumber = RandomNumberGenerator.GetInt32(int.MinValue, int.MaxValue);
@@ -230,15 +302,8 @@ public sealed class LoginConnectionHost(
         session.InboundStreamXorKey = unchecked((byte)randomNumber);
         connection.GetInboundXorKey = () => session.InboundStreamXorKey;
 
-        var presentPlayerNum = await ReadLivePlayerCountAsync(ct).ConfigureAwait(false);
-
-        session.Send(new LoginGreetingResponse
-        {
-            RandomNumber = randomNumber,
-            MaxPlayerNum = options.Value.MaxPlayerNum,
-            GagePlayerNum = 0,
-            PresentPlayerNum = presentPlayerNum
-        });
+        var packet = BuildGreetingPacket(randomNumber);
+        session.Send(packet);
 
         // Deliberately does not log the XOR key/random number itself (same posture as PacketLog never logging
         // raw payload bytes -- a stream-cipher seed has no business in an operational log sink). Debug, not
@@ -248,37 +313,34 @@ public sealed class LoginConnectionHost(
         if (logger.IsEnabled(LogLevel.Debug))
             logger.LogDebug(
                 "Login session {SessionId}: greeted (max {MaxPlayerNum}, present {PresentPlayerNum})",
-                session.SessionId, options.Value.MaxPlayerNum, presentPlayerNum);
+                session.SessionId, packet.MaxPlayerNum, packet.PresentPlayerNum);
     }
 
     /// <summary>
-    ///     Real CCU across every live shard (<c>runtime.GameServerDirectory</c>, the same directory
-    ///     <c>ZoneTransferHandler</c>/<c>ShardPartitionGuard</c> already use for shard selection), not
-    ///     <see cref="SessionRegistry.Count" /> -- that only counts sockets currently mid-login on this one
-    ///     process, unrelated to how many players are actually in the world.
-    ///     A directory read failure must not block the greet (the count is purely cosmetic), so it degrades to 0.
+    ///     Builds the connect-time greeting packet straight from <see cref="LoginCapacityState" /> -- the exact
+    ///     same live, ~1s-refreshed (<c>ServerQuotaRefreshHost</c>) snapshot <c>LoginCapacityGate.Evaluate</c>
+    ///     reads on every login attempt (<c>LoginService.LoginAsync</c>). Both figures used to come from two
+    ///     different, disconnected sources -- a static <c>Login:MaxPlayerNum</c> config value bound once at
+    ///     process startup, and a separate CCU sum over <c>runtime.GameServerDirectory</c> -- so a client that
+    ///     merely connected (before attempting to log in) could never see a live maintenance-mode toggle, and
+    ///     the displayed population could diverge from the number the gate actually enforces. Reading
+    ///     <see cref="LoginCapacityState" /> directly here closes both gaps: this is an in-memory
+    ///     <c>Volatile.Read</c>, no I/O, so unlike the CCU sum it needs no failure-degrades-to-0 fallback.
     ///     Public (was internal + InternalsVisibleTo when this type lived in the Fenrir.LoginServer executable
-    ///     assembly): now that it lives in Fenrir.Application.Login.Hosting, Fenrir.LoginServer.Tests needs
-    ///     ordinary cross-assembly access, and this method is still only ever called from production code via
-    ///     <see cref="GreetAsync" /> above.
+    ///     assembly, and <c>ReadLivePlayerCountAsync</c> carried the same public-for-testability rationale before
+    ///     this fix superseded it): Fenrir.LoginServer.Tests needs ordinary cross-assembly access to observe the
+    ///     greeting's value-selection without standing up a real socket, and this method is still only ever
+    ///     called from production code via <see cref="Greet" /> above.
     /// </summary>
-    public async ValueTask<int> ReadLivePlayerCountAsync(CancellationToken ct)
+    public LoginGreetingResponse BuildGreetingPacket(int randomNumber)
     {
-        try
+        return new LoginGreetingResponse
         {
-            var shards = await directory.GetDirectoryAsync(ct).ConfigureAwait(false);
-
-            var total = 0;
-            foreach (var shard in shards)
-                total += shard.Ccu;
-            return total;
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            logger.LogWarning(ex,
-                "Failed to read runtime.GameServerDirectory for the login greeting's player count; reporting 0");
-            return 0;
-        }
+            RandomNumber = randomNumber,
+            MaxPlayerNum = capacity.MaxPlayers,
+            GagePlayerNum = 0,
+            PresentPlayerNum = capacity.CurrentPlayers
+        };
     }
 
     public override void Dispose()

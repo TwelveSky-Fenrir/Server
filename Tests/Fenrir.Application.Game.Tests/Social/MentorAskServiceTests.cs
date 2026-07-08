@@ -26,7 +26,7 @@ public class MentorAskServiceTests
         var zones = ZoneTestKit.CreateRegistry();
         zones.Initialize([mapId]);
         return (new MentorAskService(mentors, new DuelRegistry(), new TradeRegistry(), new FriendRegistry(),
-            new PartyRegistry(), new GuildInviteRegistry(), new CapturingLogger<MentorAskService>()), zones,
+                new PartyRegistry(), new GuildInviteRegistry(), new CapturingLogger<MentorAskService>()), zones,
             mentors);
     }
 

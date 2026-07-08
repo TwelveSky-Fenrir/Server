@@ -107,6 +107,39 @@ public class LoginTrainTests
         Assert.Equal(5, slots[2].Level1);
     }
 
+    // Major audit gap fix: GuildName must reflect actual live guild membership, resolved by the caller
+    // (LoginService, via IGuildRepository) and handed in as a CharacterId-keyed lookup -- Domain itself stays
+    // I/O-free, see LoginTrain.BuildAvatarSlots' own remarks.
+    [Fact]
+    public void BuildAvatarSlots_GuildLookupProvided_SetsGuildNameOnlyForMembersPresentInIt()
+    {
+        CharacterSummaryDto[] characters =
+        [
+            new(1, 0, "Hero", 2, 1, 3, 4, 12),
+            new(2, 1, "Guildless", 1, 0, 1, 2, 5)
+        ];
+        var guildNamesByCharacterId = new Dictionary<int, string> { [1] = "TestGuild" };
+
+        var slots = LoginTrain.BuildAvatarSlots(characters, guildNamesByCharacterId);
+
+        Assert.Equal("TestGuild", slots[0].GuildName);
+        Assert.Equal("", slots[1].GuildName);
+        // Empty slot (no character in it at all) is unaffected.
+        Assert.Equal("", slots[2].GuildName);
+    }
+
+    // No lookup at all (every pre-existing caller/test) must be indistinguishable from "nobody has a guild" --
+    // proves the new optional parameter is backward compatible, not just defaulted away silently.
+    [Fact]
+    public void BuildAvatarSlots_NoGuildLookupProvided_GuildNameStaysEmptyForEveryOccupiedSlot()
+    {
+        CharacterSummaryDto[] characters = [new(1, 0, "Hero", 2, 1, 3, 4, 12)];
+
+        var slots = LoginTrain.BuildAvatarSlots(characters);
+
+        Assert.Equal("", slots[0].GuildName);
+    }
+
     private static byte[] FrameOf<TPacket>(TPacket packet) where TPacket : struct, IOutgoingPacket
     {
         var buffer = new byte[FrameWriter.FrameSizeOf<TPacket>()];

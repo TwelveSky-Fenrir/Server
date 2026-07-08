@@ -55,10 +55,12 @@ public class ClWantGiftSendHandlerTests
         await PacketAssert.AssertSentAsync(pipe, new ClaimGiftResponse { Result = 1 });
     }
 
+    // usp_Gift_ClaimIntoVault.sql THROWs SQL 50274 when the account's 28-slot vault has no free slot -- the
+    // gift itself was claimable, so this must not be confused with "no gift at index" (Result=1).
     [Fact]
-    public async Task HandleAsync_ClaimThrows_RepliesResultTwoWithoutDisconnecting()
+    public async Task HandleAsync_ClaimThrowsVaultFullSqlError_RepliesResultTwoWithoutDisconnecting()
     {
-        var gifts = FakeGiftRepository.ThrowingOnClaim(new InvalidOperationException("vault full"), (501, 1211));
+        var gifts = FakeGiftRepository.ThrowingOnClaim(SqlExceptionTestFactory.WithNumber(50274), (501, 1211));
         var handler = new ClaimGiftHandler(new ClaimGiftService(gifts, NullLogger<ClaimGiftService>.Instance),
             NullLogger<ClaimGiftHandler>.Instance);
         var (session, pipe) = CreateSessionInCharSelect();
@@ -68,6 +70,43 @@ public class ClWantGiftSendHandlerTests
 
         Assert.Null(session.DisconnectReason);
         await PacketAssert.AssertSentAsync(pipe, new ClaimGiftResponse { Result = 2 });
+    }
+
+    // usp_Gift_ClaimIntoVault.sql THROWs SQL 50220 when the gift was already claimed/removed by a racing
+    // request between GiftListHandler's read and this claim -- must read as "no gift at index" (Result=1),
+    // never "vault full" (Result=2), which would misdirect the player to clear vault space that was never
+    // the actual problem.
+    [Fact]
+    public async Task HandleAsync_ClaimThrowsGiftUnavailableSqlError_RepliesResultOneWithoutDisconnecting()
+    {
+        var gifts = FakeGiftRepository.ThrowingOnClaim(SqlExceptionTestFactory.WithNumber(50220), (501, 1211));
+        var handler = new ClaimGiftHandler(new ClaimGiftService(gifts, NullLogger<ClaimGiftService>.Instance),
+            NullLogger<ClaimGiftHandler>.Instance);
+        var (session, pipe) = CreateSessionInCharSelect();
+
+        await handler.HandleAsync(new ClaimGiftRequest { Sort = 0, GiftInfoIndex = 0 }, session,
+            CancellationToken.None);
+
+        Assert.Null(session.DisconnectReason);
+        await PacketAssert.AssertSentAsync(pipe, new ClaimGiftResponse { Result = 1 });
+    }
+
+    // Anything else -- a dropped connection, a command timeout, an unrelated SqlException -- is neither of
+    // the two known business outcomes above and must not be collapsed into either one.
+    [Fact]
+    public async Task HandleAsync_ClaimThrowsUnexpectedError_RepliesResult101WithoutDisconnecting()
+    {
+        var gifts = FakeGiftRepository.ThrowingOnClaim(new InvalidOperationException("connection dropped"),
+            (501, 1211));
+        var handler = new ClaimGiftHandler(new ClaimGiftService(gifts, NullLogger<ClaimGiftService>.Instance),
+            NullLogger<ClaimGiftHandler>.Instance);
+        var (session, pipe) = CreateSessionInCharSelect();
+
+        await handler.HandleAsync(new ClaimGiftRequest { Sort = 0, GiftInfoIndex = 0 }, session,
+            CancellationToken.None);
+
+        Assert.Null(session.DisconnectReason);
+        await PacketAssert.AssertSentAsync(pipe, new ClaimGiftResponse { Result = 101 });
     }
 
     [Theory]

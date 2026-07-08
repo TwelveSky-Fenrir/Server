@@ -49,6 +49,28 @@ public class ClCreateMousePasswordSendHandlerTests
         PacketAssert.AssertNothingSent(pipe);
     }
 
+    // Regression test for the pincode-second-password audit's Minor finding (existence-before-format
+    // guard order, see CreateMousePinServiceTests for the service-level equivalent): a malformed PIN
+    // against an account that already has a PIN must abort as StateViolation (AlreadyExists), not
+    // Malformed (InvalidFormat) -- these two outcomes map to genuinely different wire-observable
+    // DisconnectReason values, so this is verifiable end-to-end through the handler.
+    [Fact]
+    public async Task HandleAsync_PinAlreadyExistsAndSubmittedFormatAlsoMalformed_AbortsAsStateViolationNotMalformed()
+    {
+        var pins = FakeAccountPinRepository.WithPin("5678");
+        var handler = new CreateMousePinHandler(
+            new CreateMousePinService(pins, NullLogger<CreateMousePinService>.Instance),
+            NullLogger<CreateMousePinHandler>.Instance);
+        var (session, pipe) = CreateSessionInPinRequired();
+
+        await handler.HandleAsync(new CreateMousePinRequest { MousePassword = "12a4" }, session,
+            CancellationToken.None);
+
+        Assert.Equal(DisconnectReason.StateViolation, session.DisconnectReason);
+        Assert.Equal(0, pins.SetCallCount);
+        PacketAssert.AssertNothingSent(pipe);
+    }
+
     [Theory]
     [InlineData("123")] // too short
     [InlineData("12345")] // too long

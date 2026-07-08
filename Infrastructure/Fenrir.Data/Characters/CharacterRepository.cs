@@ -140,7 +140,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
     ///     an already-empty slot (no-op, no error). The procedure itself also deletes every normalized child
     ///     row (items/skills/hotkeys/buffs/quest state/friends, plus the HeroRankings/OfflineShops rows that
     ///     mirror legacy's unconditional HeroRankCur/ProxyInfo cleanup) so the delete never fails with an FK
-    ///     violation -- see usp_Character_Delete_CleanupChildTables.sql's own header for the full rationale.
+    ///     violation -- see usp_Character_Delete.sql's own header for the full rationale.
     /// </summary>
     public async ValueTask DeleteAsync(int accountId, byte slot, CancellationToken ct)
     {
@@ -283,7 +283,10 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(sp, ct);
     }
 
-    /// <summary>Atomic wallet/Store-money transfer; throws SQL 50337 instead of clamping when either pool would go negative/over cap.</summary>
+    /// <summary>
+    ///     Atomic wallet/Store-money transfer; throws SQL 50337 instead of clamping when either pool would go
+    ///     negative/over cap.
+    /// </summary>
     public async ValueTask AdjustStoreMoneyAsync(int characterId, long deltaMoney, long deltaStoreMoney,
         CancellationToken ct)
     {

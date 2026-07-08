@@ -94,7 +94,25 @@ public static class LoginTrain
     ///     Exactly <see cref="AvatarSlotCount" /> entries, always in slot order, zeroed for an empty slot —
     ///     never fewer (report §4.11.9: the legacy loops over MAX_USER_AVATAR_NUM unconditionally).
     /// </summary>
-    public static AvatarRosterResponse[] BuildAvatarSlots(IReadOnlyCollection<CharacterSummaryDto> characters)
+    /// <param name="characters">The account's character-select rows, in any order.</param>
+    /// <param name="guildNamesByCharacterId">
+    ///     Live guild-membership lookup keyed by CharacterId, resolved by the caller (LoginService, which alone
+    ///     has access to IGuildRepository — this Domain project stays I/O-free). A character absent from this
+    ///     lookup (or an entirely <see langword="null" /> lookup, e.g. every existing pre-guild caller/test) gets
+    ///     the same "" GuildName the wire-zero template already carries.
+    /// </param>
+    /// <remarks>
+    ///     Réf. C++ : Server/ts25login/S08_MyDB.cpp:638-671 (the legacy guild lookup this reproduces) ;
+    ///     Server/Header/Protocol/LOGIN.h:134-174 (LC_USER_AVATAR_RECV2 — aGuildName is the only guild-related
+    ///     field this wire struct carries). Legacy caches aGuildName on the character row once at account-login
+    ///     time and self-heals it against the live guild table on mismatch/not-found (S08_MyDB.cpp:638-671);
+    ///     Fenrir's normalized schema has no such cached column at all (guild membership lives only in
+    ///     game.GuildMembers, resolved live via <c>IGuildRepository.GetByCharacterAsync</c>), so a straight live
+    ///     lookup naturally reproduces the correct end state without needing to replicate that two-step
+    ///     cache-then-validate mechanic — a deliberate simplification, not an assumed equivalence.
+    /// </remarks>
+    public static AvatarRosterResponse[] BuildAvatarSlots(IReadOnlyCollection<CharacterSummaryDto> characters,
+        IReadOnlyDictionary<int, string>? guildNamesByCharacterId = null)
     {
         var slots = new AvatarRosterResponse[AvatarSlotCount];
         for (var slot = 0; slot < AvatarSlotCount; slot++)
@@ -109,7 +127,8 @@ public static class LoginTrain
                     HeadType = character.HeadType,
                     FaceType = character.FaceType,
                     Level1 = character.Level,
-                    Name = character.Name
+                    Name = character.Name,
+                    GuildName = guildNamesByCharacterId?.GetValueOrDefault(character.CharacterId) ?? ""
                 };
         }
 

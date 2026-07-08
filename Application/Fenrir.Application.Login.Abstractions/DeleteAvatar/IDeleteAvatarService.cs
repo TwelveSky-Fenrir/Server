@@ -15,7 +15,10 @@ public enum DeleteAvatarOutcome
     GuildMembershipRefusal,
 
     /// <summary>Pending items/state/money in an offline proxy shop (B_DELETE_AVATAR_RECV Result=5).</summary>
-    ProxyShopRefusal
+    ProxyShopRefusal,
+
+    /// <summary>The underlying usp_Character_Delete call faulted (B_DELETE_AVATAR_RECV Result=1).</summary>
+    SqlError
 }
 
 public readonly record struct DeleteAvatarResult(DeleteAvatarOutcome Outcome);

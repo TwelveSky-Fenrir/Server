@@ -14,6 +14,13 @@ public static class HostingServiceCollectionExtensions
     {
         services.AddHostedService<LoginConnectionHost>();
 
+        // Forcibly disconnects any Login TCP connection -- pre-auth or post-auth alike -- idle 60+ seconds
+        // (Server/ts25login/S07_MyGame01.cpp:37-73), the Login-side counterpart to GameServer's own
+        // SessionLivenessSweep. Singleton (not just AddHostedService<T>) so a future direct-resolve caller (e.g.
+        // a health check) can share the same instance the generic host also drives.
+        services.AddSingleton<LoginSessionLivenessSweep>();
+        services.AddHostedService<LoginSessionLivenessSweepHost>();
+
         // Cross-process duplicate-login kick/refusal: keeps this process's live sessions' runtime.AccountSessions
         // rows warm, and reaps rows any process (Login or Game) abandoned without running its own teardown path.
         services.AddHostedService<AccountSessionLivenessHost>();

@@ -28,13 +28,24 @@ public enum DisconnectReason
     Banned,
 
     /// <summary>
-    ///     Torn down by one of the Game-side idle-connection sweeps mirroring legacy's per-tick user-liveness
-    ///     loop (Server/ts25zone/S07_MyGame01.cpp:1963-2006): either the narrower TEMP_REGISTER_SEND
-    ///     (op11/ZoneHandshake) sweep -- a connection that completed the tribe-quota handshake but never
-    ///     followed up with avatar-selection/ready within three minutes -- or the general connection-liveness
-    ///     sweep covering every other case (never authenticated at all, or authenticated and then went silent)
-    ///     using the same three-minute threshold. See <c>TempRegistrationIdleSweep</c> and
-    ///     <c>Fenrir.Application.Game.Domain.World.SessionLivenessSweep</c> for the two consumers.
+    ///     Torn down by one of several idle-connection sweeps across both servers, each mirroring its own
+    ///     process's per-tick/per-loop user-liveness check:
+    ///     <list type="bullet">
+    ///         <item>
+    ///             GameServer, mirroring Server/ts25zone/S07_MyGame01.cpp:1963-2006: either the narrower
+    ///             TEMP_REGISTER_SEND (op11/ZoneHandshake) sweep -- a connection that completed the tribe-quota
+    ///             handshake but never followed up with avatar-selection/ready within three minutes -- or the
+    ///             general connection-liveness sweep covering every other case (never authenticated at all, or
+    ///             authenticated and then went silent) using the same three-minute threshold. See
+    ///             <c>TempRegistrationIdleSweep</c> and <c>Fenrir.Application.Game.Domain.World.SessionLivenessSweep</c>
+    ///             for the two consumers.
+    ///         </item>
+    ///         <item>
+    ///             LoginServer, mirroring Server/ts25login/S07_MyGame01.cpp:37-73: a connection idle 60+ seconds
+    ///             -- pre-authentication or post-authentication alike -- is disconnected. See
+    ///             <c>Fenrir.Application.Login.Domain.LoginSessionLivenessSweep</c> for the one consumer.
+    ///         </item>
+    ///     </list>
     /// </summary>
     IdleTimeout,
 

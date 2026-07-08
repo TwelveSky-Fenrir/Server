@@ -31,7 +31,8 @@ public sealed class DailyMissionService(
     /// <summary>
     ///     AVATAR_CHANGE_INFO_1 sort 14 -- the same ContributionPoints/RebirthCount/Zone241Time wire triple
     ///     <see cref="Fenrir.Application.Game.Domain.World.Zone.ApplyTribeProgressCommand" />'s own
-    ///     <c>RebirthBroadcast</c> uses (see <see cref="Fenrir.Application.Game.Domain.World.PlayerRuntimeState.Zone241Time" />'s
+    ///     <c>RebirthBroadcast</c> uses (see
+    ///     <see cref="Fenrir.Application.Game.Domain.World.PlayerRuntimeState.Zone241Time" />'s
     ///     remarks) -- reused here for the unrelated Zone241Time source this claim adds, since it is the only
     ///     wire meaning this codebase has ever established for that field. Sent as a direct self-only unicast
     ///     (<see cref="Fenrir.Application.Game.Domain.World.PlayerRuntimeState.Session" />), NOT through

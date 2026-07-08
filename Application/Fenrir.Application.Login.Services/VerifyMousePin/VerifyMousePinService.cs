@@ -21,13 +21,32 @@ public sealed class VerifyMousePinService(
         if (storedPin is null)
             return new VerifyMousePinResult(VerifyMousePinOutcome.NoPinConfigured);
 
+        // Fenrir-only account-scoped, cross-reconnect lockout (Migrations/028_account_pin_lockout.sql) --
+        // checked before format/hash so a locked-out account never even reaches PasswordHasher.Verify.
+        // See IVerifyMousePinService.LogFailedAttemptAsync's remarks and the pincode-second-password audit's
+        // Major finding for the full rationale.
+        if (storedPin.LockedUntilUtc is { } lockedUntil && lockedUntil > DateTime.UtcNow)
+        {
+            logger.LogWarning(
+                "PIN verify rejected: account {AccountId} is locked out until {LockedUntilUtc} after {FailedAttempts} cumulative mismatches",
+                accountId, lockedUntil, storedPin.FailedAttempts);
+            await eventLog.LogAsync(AccountSecurityEventCodes.MousePinAttemptRejectedLocked,
+                EventLogCategory.AccountSecurity, accountId, null, null, null, null, null, null, null, null,
+                (byte)Math.Min(storedPin.FailedAttempts, byte.MaxValue), null, cancellationToken);
+            return new VerifyMousePinResult(VerifyMousePinOutcome.Locked);
+        }
+
         if (!MousePinFormat.IsValid(mousePasswordInput))
             return new VerifyMousePinResult(VerifyMousePinOutcome.InvalidFormat);
 
-        if (!PasswordHasher.Verify(mousePasswordInput, storedPin.PinHash, storedPin.PinSalt))
-            return new VerifyMousePinResult(VerifyMousePinOutcome.WrongPassword);
+        var pinOk = PasswordHasher.Verify(mousePasswordInput, storedPin.PinHash, storedPin.PinSalt);
 
-        return new VerifyMousePinResult(VerifyMousePinOutcome.Success);
+        // Every real comparison (success or failure) is reported to the account-scoped lockout counter --
+        // the Fenrir-only analog of LoginService.AuthenticateConstantTimeAsync's own
+        // accounts.RecordLoginAttemptAsync call for the primary password.
+        await pins.RecordAttemptAsync(accountId, pinOk, cancellationToken);
+
+        return new VerifyMousePinResult(pinOk ? VerifyMousePinOutcome.Success : VerifyMousePinOutcome.WrongPassword);
     }
 
     public async ValueTask LogFailedAttemptAsync(int accountId, int failureCount, bool lockedOut,

@@ -17,7 +17,8 @@ namespace Fenrir.Application.Game.Handlers.Handlers.Commerce;
 ///     gate to <c>GET_DEPUTY_PSHOP_SEND</c> (:13961-13970, <see cref="GetProxyShopHandler" />) and
 ///     <c>SET_DEPUTY_PSHOP_SEND</c> (:13972-13981, <see cref="UpdateProxyShopHandler" />).
 /// </remarks>
-public sealed class WithdrawProxyShopEarningsHandler(IWithdrawProxyShopEarningsService service,
+public sealed class WithdrawProxyShopEarningsHandler(
+    IWithdrawProxyShopEarningsService service,
     ILogger<WithdrawProxyShopEarningsHandler> logger) : IAsyncPacketHandler<WithdrawProxyShopEarningsRequest>
 {
     public async ValueTask HandleAsync(WithdrawProxyShopEarningsRequest packet, IPacketSession session,

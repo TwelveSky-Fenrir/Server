@@ -285,7 +285,8 @@ public class TribeActionServiceTests
         var second = await service.RebirthAsync(zone, state, CharacterId, CancellationToken.None);
         Respond(session, RebirthRequest(), second);
 
-        Assert.Equal(DisconnectReason.Faulted, session.DisconnectReason); // combined-precondition failure, not the 6-cap
+        Assert.Equal(DisconnectReason.Faulted,
+            session.DisconnectReason); // combined-precondition failure, not the 6-cap
         Assert.Equal(1, state.RebirthCount); // unchanged by the rejected second attempt
     }
 }

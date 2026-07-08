@@ -13,7 +13,6 @@ using Fenrir.Application.Game.Domain.World.Loot;
 using Fenrir.Application.Game.Domain.World.Npcs;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Stats;
-using Fenrir.Data.Abstractions.Accounts;
 using Fenrir.Network.Serialization.Packets.Shared;
 using Microsoft.Extensions.Logging;
 
@@ -881,7 +880,7 @@ public sealed class GenericActionService(
 
         var isDeposit = sort == 226;
         var deltaMoney = isDeposit ? -(long)move.Quantity1 : move.Quantity1;
-        var deltaStoreMoney = isDeposit ? (long)move.Quantity1 : -(long)move.Quantity1;
+        var deltaStoreMoney = isDeposit ? move.Quantity1 : -(long)move.Quantity1;
 
         try
         {
@@ -1113,7 +1112,7 @@ public sealed class GenericActionService(
 
         var isDeposit = sort == 231;
         var deltaCharacterMoney = isDeposit ? -(long)move.Quantity1 : move.Quantity1;
-        var deltaVaultMoney = isDeposit ? (long)move.Quantity1 : -(long)move.Quantity1;
+        var deltaVaultMoney = isDeposit ? move.Quantity1 : -(long)move.Quantity1;
 
         try
         {
@@ -1137,70 +1136,6 @@ public sealed class GenericActionService(
             characterId, isDeposit, move.Quantity1);
 
         return GenericActionResult.Succeeded;
-    }
-
-    /// <summary>Bounds-checked-before-cast slot read -- see <see cref="MoveContainerAsync" />'s own identical pattern.</summary>
-    private static ItemStack? GetSlotOrNull(PlayerRuntimeState state, byte container, int slot)
-    {
-        return ContainerMatrix.IsValidSlot(container, slot) ? state.Inventory.GetSlot(container, (byte)slot) : null;
-    }
-
-    private static ItemStack? GetVaultSlotOrNull(IReadOnlyDictionary<short, ItemStack> vaultBySlot, int slot)
-    {
-        return SaveBankItemTransferPolicy.IsValidSlot(slot) && vaultBySlot.TryGetValue((short)slot, out var stack)
-            ? stack
-            : null;
-    }
-
-    private static void ApplyVaultSlotChange(Dictionary<short, ItemStack> vaultBySlot, short slot,
-        ItemStack? newValue)
-    {
-        if (newValue is { } value)
-            vaultBySlot[slot] = value;
-        else
-            vaultBySlot.Remove(slot);
-    }
-
-    private static List<AccountVaultItemSlotTvp> ToVaultTvps(Dictionary<short, ItemStack> vaultBySlot)
-    {
-        var list = new List<AccountVaultItemSlotTvp>(vaultBySlot.Count);
-        foreach (var (slot, stack) in vaultBySlot)
-            list.Add(stack.ToVaultTvp(slot));
-        return list;
-    }
-
-    private static ImmutableDictionary<byte, ItemStack> ApplySlotChange(
-        ImmutableDictionary<byte, ItemStack> current, byte slot, ItemStack? newValue)
-    {
-        return newValue is { } value ? current.SetItem(slot, value) : current.Remove(slot);
-    }
-
-    /// <summary>
-    ///     Resolves <paramref name="candidate" />'s catalog definition, collapsing both "truly empty" and "item
-    ///     id no longer resolves to a known item definition" into a single null <c>Source</c> -- the exact
-    ///     collapse <see cref="StoreItemTransferPolicy" />/<see cref="SaveBankItemTransferPolicy" />'s own
-    ///     <c>SourceEmpty</c> remarks document, since neither pure policy touches the item catalog itself.
-    ///     <c>SupportsSocket</c> is always <see langword="false" /> -- Fenrir's <c>ItemDefinition</c> has no
-    ///     <c>IsValidSocket</c>-equivalent flag yet, same pre-existing gap both policies' own remarks flag,
-    ///     conservative default until that data exists rather than a guessed formula.
-    /// </summary>
-    private (ItemStack? Source, bool IsStackable, bool SupportsSocket) ResolveTransferSource(ItemStack? candidate)
-    {
-        if (candidate is not { } stack || !worldData.ItemsById.TryGetValue(stack.ItemId, out var definition))
-            return (null, false, false);
-
-        return (stack, ContainerMatrix.IsStackableSort(definition.Item.Sort), false);
-    }
-
-    private async ValueTask MirrorInventoryContainerAsync(Zone zone, int characterId, byte container,
-        ImmutableDictionary<byte, ItemStack> contents, CancellationToken cancellationToken)
-    {
-        var containers = ImmutableArray.Create(new InventoryContainerSnapshot(container, contents));
-        if (!await zone.PostInventoryCommandAndWaitAsync(new InventoryZoneCommand(characterId, containers, null),
-                cancellationToken))
-            logger.LogError(
-                "Zone {MapId} inventory inbox full: dropped account-vault transfer mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
-                zone.MapId, characterId);
     }
 
     /// <summary>
@@ -1337,6 +1272,70 @@ public sealed class GenericActionService(
             characterId, accruedMinutes, teacherPointsGranted, grantedPetGrowth);
 
         return new GenericActionResult(GenericActionStatus.Succeeded, GrantedPetExperienceGrowth: grantedPetGrowth);
+    }
+
+    /// <summary>Bounds-checked-before-cast slot read -- see <see cref="MoveContainerAsync" />'s own identical pattern.</summary>
+    private static ItemStack? GetSlotOrNull(PlayerRuntimeState state, byte container, int slot)
+    {
+        return ContainerMatrix.IsValidSlot(container, slot) ? state.Inventory.GetSlot(container, (byte)slot) : null;
+    }
+
+    private static ItemStack? GetVaultSlotOrNull(IReadOnlyDictionary<short, ItemStack> vaultBySlot, int slot)
+    {
+        return SaveBankItemTransferPolicy.IsValidSlot(slot) && vaultBySlot.TryGetValue((short)slot, out var stack)
+            ? stack
+            : null;
+    }
+
+    private static void ApplyVaultSlotChange(Dictionary<short, ItemStack> vaultBySlot, short slot,
+        ItemStack? newValue)
+    {
+        if (newValue is { } value)
+            vaultBySlot[slot] = value;
+        else
+            vaultBySlot.Remove(slot);
+    }
+
+    private static List<AccountVaultItemSlotTvp> ToVaultTvps(Dictionary<short, ItemStack> vaultBySlot)
+    {
+        var list = new List<AccountVaultItemSlotTvp>(vaultBySlot.Count);
+        foreach (var (slot, stack) in vaultBySlot)
+            list.Add(stack.ToVaultTvp(slot));
+        return list;
+    }
+
+    private static ImmutableDictionary<byte, ItemStack> ApplySlotChange(
+        ImmutableDictionary<byte, ItemStack> current, byte slot, ItemStack? newValue)
+    {
+        return newValue is { } value ? current.SetItem(slot, value) : current.Remove(slot);
+    }
+
+    /// <summary>
+    ///     Resolves <paramref name="candidate" />'s catalog definition, collapsing both "truly empty" and "item
+    ///     id no longer resolves to a known item definition" into a single null <c>Source</c> -- the exact
+    ///     collapse <see cref="StoreItemTransferPolicy" />/<see cref="SaveBankItemTransferPolicy" />'s own
+    ///     <c>SourceEmpty</c> remarks document, since neither pure policy touches the item catalog itself.
+    ///     <c>SupportsSocket</c> is always <see langword="false" /> -- Fenrir's <c>ItemDefinition</c> has no
+    ///     <c>IsValidSocket</c>-equivalent flag yet, same pre-existing gap both policies' own remarks flag,
+    ///     conservative default until that data exists rather than a guessed formula.
+    /// </summary>
+    private (ItemStack? Source, bool IsStackable, bool SupportsSocket) ResolveTransferSource(ItemStack? candidate)
+    {
+        if (candidate is not { } stack || !worldData.ItemsById.TryGetValue(stack.ItemId, out var definition))
+            return (null, false, false);
+
+        return (stack, ContainerMatrix.IsStackableSort(definition.Item.Sort), false);
+    }
+
+    private async ValueTask MirrorInventoryContainerAsync(Zone zone, int characterId, byte container,
+        ImmutableDictionary<byte, ItemStack> contents, CancellationToken cancellationToken)
+    {
+        var containers = ImmutableArray.Create(new InventoryContainerSnapshot(container, contents));
+        if (!await zone.PostInventoryCommandAndWaitAsync(new InventoryZoneCommand(characterId, containers, null),
+                cancellationToken))
+            logger.LogError(
+                "Zone {MapId} inventory inbox full: dropped account-vault transfer mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
+                zone.MapId, characterId);
     }
 
     private static List<CharacterItemSlotTvp> ToTvps(ImmutableDictionary<byte, ItemStack> container)

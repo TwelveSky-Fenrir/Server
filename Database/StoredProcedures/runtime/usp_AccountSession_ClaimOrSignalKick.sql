@@ -26,9 +26,9 @@
 -- owns it), 3 = ConflictTearingDown (row mid-teardown, no change made), 4 = ReclaimedDeadShard (Game row on a
 -- provably dead shard fast-cleared and reclaimed, proceed exactly like Registered).
 CREATE PROCEDURE runtime.usp_AccountSession_ClaimOrSignalKick @AccountId INT,
-                                                               @NewSessionToken UNIQUEIDENTIFIER,
-                                                               @AttemptNumber TINYINT NOT NULL
-                                                                                      WITH NATIVE_COMPILATION, SCHEMABINDING
+                                                              @NewSessionToken UNIQUEIDENTIFIER,
+                                                              @AttemptNumber TINYINT NOT NULL
+                                                                                     WITH NATIVE_COMPILATION, SCHEMABINDING
     AS
 BEGIN
     ATOMIC

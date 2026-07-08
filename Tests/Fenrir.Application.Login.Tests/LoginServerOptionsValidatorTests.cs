@@ -8,14 +8,14 @@ public sealed class LoginServerOptionsValidatorTests
         int? port = null,
         int? expectedClientVersion = null,
         int? ticketTtlSeconds = null,
-        int? maxPlayerNum = null)
+        int? idleSweepIntervalSeconds = null)
     {
         return new LoginServerOptions
         {
             Port = port ?? 29998,
             ExpectedClientVersion = expectedClientVersion ?? 90354,
             TicketTtlSeconds = ticketTtlSeconds ?? 15,
-            MaxPlayerNum = maxPlayerNum ?? 1000
+            IdleSweepIntervalSeconds = idleSweepIntervalSeconds ?? 1
         };
     }
 
@@ -64,13 +64,13 @@ public sealed class LoginServerOptionsValidatorTests
     }
 
     [Fact]
-    public void Validate_WithZeroMaxPlayerNum_FailsAndMentionsField()
+    public void Validate_WithZeroIdleSweepIntervalSeconds_FailsAndMentionsField()
     {
-        var options = Valid(maxPlayerNum: 0);
+        var options = Valid(idleSweepIntervalSeconds: 0);
 
         var result = new LoginServerOptionsValidator().Validate(null, options);
 
         Assert.True(result.Failed);
-        Assert.Contains(result.Failures!, f => f.Contains("Login:MaxPlayerNum"));
+        Assert.Contains(result.Failures!, f => f.Contains("Login:IdleSweepIntervalSeconds"));
     }
 }

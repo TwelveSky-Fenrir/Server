@@ -10,11 +10,7 @@ internal sealed class FakeAccountVaultRepository : IAccountVaultRepository
         _byAccount = new();
 
     public (int CharacterId, byte Container, IReadOnlyList<CharacterItemSlotTvp> Items, int AccountId,
-        IReadOnlyList<AccountVaultItemSlotTvp> VaultItems)? LastItemTransfer
-    {
-        get;
-        private set;
-    }
+        IReadOnlyList<AccountVaultItemSlotTvp> VaultItems)? LastItemTransfer { get; private set; }
 
     public (int CharacterId, long DeltaCharacterMoney, int AccountId, long DeltaVaultMoney)? LastMoneyTransfer
     {
@@ -24,13 +20,6 @@ internal sealed class FakeAccountVaultRepository : IAccountVaultRepository
 
     public Exception? ThrowOnMoneyTransfer { get; set; }
     public Exception? ThrowOnItemTransfer { get; set; }
-
-    /// <summary>Seeds a vault balance/items for a test to assert against, bypassing the transfer methods.</summary>
-    public void Seed(int accountId, long money, long money2, params (short SlotIndex, AccountVaultItemSlotDto Row)[] items)
-    {
-        var slots = items.ToDictionary(i => i.SlotIndex, i => i.Row);
-        _byAccount[accountId] = (money, money2, slots);
-    }
 
     public ValueTask<(AccountVaultBalanceDto? Balance, IReadOnlyList<AccountVaultItemSlotDto> Items)> GetAsync(
         int accountId, CancellationToken ct)
@@ -88,5 +77,13 @@ internal sealed class FakeAccountVaultRepository : IAccountVaultRepository
                 i.SocketData));
         _byAccount[accountId] = (vault.Money, vault.Money2, slots);
         return ValueTask.CompletedTask;
+    }
+
+    /// <summary>Seeds a vault balance/items for a test to assert against, bypassing the transfer methods.</summary>
+    public void Seed(int accountId, long money, long money2,
+        params (short SlotIndex, AccountVaultItemSlotDto Row)[] items)
+    {
+        var slots = items.ToDictionary(i => i.SlotIndex, i => i.Row);
+        _byAccount[accountId] = (money, money2, slots);
     }
 }

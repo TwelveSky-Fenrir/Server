@@ -20,7 +20,7 @@ public class TribeMigrationConversionTests
     {
         var catalog = Catalog();
 
-        var result = TribeMigrationConversion.Resolve(currentTribe: 0, previousTribe: 0, catalog);
+        var result = TribeMigrationConversion.Resolve(0, 0, catalog);
 
         Assert.Equal((byte)3, result.NewTribe);
         Assert.Equal(QuestProgress.None, result.NewQuestProgress);
@@ -32,8 +32,8 @@ public class TribeMigrationConversionTests
     {
         var catalog = Catalog();
 
-        var fromTribeZero = TribeMigrationConversion.Resolve(currentTribe: 0, previousTribe: 0, catalog);
-        var fromTribeTwo = TribeMigrationConversion.Resolve(currentTribe: 2, previousTribe: 1, catalog);
+        var fromTribeZero = TribeMigrationConversion.Resolve(0, 0, catalog);
+        var fromTribeTwo = TribeMigrationConversion.Resolve(2, 1, catalog);
 
         Assert.Equal(fromTribeZero.NewTribe, fromTribeTwo.NewTribe);
         Assert.Equal(fromTribeZero.NewQuestProgress, fromTribeTwo.NewQuestProgress);
@@ -48,7 +48,7 @@ public class TribeMigrationConversionTests
         var stepTwo = WorldDataTestRows.Quest(2) with { Category = 2, Step = 2 };
         var catalog = Catalog(stepOne, stepTwo);
 
-        var result = TribeMigrationConversion.Resolve(currentTribe: 3, previousTribe: 1, catalog);
+        var result = TribeMigrationConversion.Resolve(3, 1, catalog);
 
         Assert.Equal((byte)1, result.NewTribe);
         Assert.Equal(2, result.NewQuestProgress.StepPermanent);
@@ -66,7 +66,7 @@ public class TribeMigrationConversionTests
     {
         var catalog = Catalog();
 
-        var result = TribeMigrationConversion.Resolve(currentTribe: 3, previousTribe: 2, catalog);
+        var result = TribeMigrationConversion.Resolve(3, 2, catalog);
 
         Assert.Equal((byte)2, result.NewTribe);
         Assert.Equal(0, result.NewQuestProgress.StepPermanent);

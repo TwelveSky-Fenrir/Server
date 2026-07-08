@@ -6,9 +6,9 @@
 -- Réf. C++ : Server/ts25zone/S04_MyWork05.cpp:3275-3341 (ProcessForInventoryMoneyToSaveMoney/
 -- ProcessForSaveMoneyToInventoryMoney) ; Server/Header/Protocol/DEFINE.h:365 (MAX_NUMBER_SIZE = 2,000,000,000).
 CREATE PROCEDURE game.usp_AccountVault_TransferMoneyWithCharacter @CharacterId INT,
-                                                                   @DeltaCharacterMoney BIGINT,
-                                                                   @AccountId INT,
-                                                                   @DeltaVaultMoney BIGINT
+                                                                  @DeltaCharacterMoney BIGINT,
+                                                                  @AccountId INT,
+                                                                  @DeltaVaultMoney BIGINT
 AS
 BEGIN
     SET

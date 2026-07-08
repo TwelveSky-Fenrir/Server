@@ -125,7 +125,7 @@ public class ZoneDuelCombatTests
     public void DuelAttack_SameTribe_DamageIsApplied()
     {
         var duels = new DuelRegistry();
-        var zone = TwoDuelingPlayers(duels, out _, out _, 0, 0);
+        var zone = TwoDuelingPlayers(duels, out _, out _);
         Assert.True(zone.TryGetPlayer(2, out var defender));
         var lifeBefore = defender!.Life;
 

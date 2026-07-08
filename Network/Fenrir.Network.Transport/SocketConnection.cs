@@ -10,15 +10,15 @@ namespace Fenrir.Network.Transport;
 public sealed class SocketConnection : IDuplexPipe, IAsyncDisposable
 {
     private const int ReceiveBufferSize = 4096;
-    private readonly Pipe _rxPipe;
-
-    private readonly Socket _socket;
-    private readonly Pipe _txPipe;
 
     // Governs ONLY the two loops' own blocking socket calls (_socket.ReceiveAsync/SendAsync) -- see Abort's
     // own remarks for why this exists separately from the pipe-level cancellation ClientSession.Abort already
     // performs on Transport.Input/Output.
     private readonly CancellationTokenSource _abortCts = new();
+    private readonly Pipe _rxPipe;
+
+    private readonly Socket _socket;
+    private readonly Pipe _txPipe;
 
     public SocketConnection(Socket socket)
     {

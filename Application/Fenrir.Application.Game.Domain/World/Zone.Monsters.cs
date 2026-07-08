@@ -34,6 +34,16 @@ public sealed partial class Zone
     private readonly SemaphoreSlim _moneyGrantSignal = new(0, int.MaxValue);
 
     /// <summary>
+    ///     Reusable scratch buffer for <see cref="BroadcastMonsterAction" />'s recipient list -- same
+    ///     non-allocating shape and reuse justification as <see cref="Zone.PlayerLifecycle" />'s
+    ///     <c>_rebroadcastNeighborScratch</c>: single tick thread, cleared immediately before each call, never
+    ///     read after the immediately-following send loop returns. Replaces a per-call
+    ///     <c>AoiGrid.Neighbors(cell).ToArray()</c> (iterator + LINQ buffer) that used to run once per due
+    ///     monster -- during a keep-alive burst, once per due monster in that SAME tick, not once per zone.
+    /// </summary>
+    private readonly List<int> _monsterBroadcastNeighborScratch = [];
+
+    /// <summary>
     ///     Monster-side counterpart to <see cref="_grid" />, keyed by <see cref="MonsterEntity.ServerIndex" />
     ///     instead of character id -- lets <see cref="SendExistingMonstersTo" /> query nearby monsters directly
     ///     instead of scanning every monster this zone holds. Tick-owned only, same posture as <see cref="_grid" />
@@ -58,16 +68,6 @@ public sealed partial class Zone
     private readonly ConcurrentQueue<(int CharacterId, long Amount)> _pendingMoneyGrants = new();
 
     private int _monsterUniqueNumberSeed;
-
-    /// <summary>
-    ///     Reusable scratch buffer for <see cref="BroadcastMonsterAction" />'s recipient list -- same
-    ///     non-allocating shape and reuse justification as <see cref="Zone.PlayerLifecycle" />'s
-    ///     <c>_rebroadcastNeighborScratch</c>: single tick thread, cleared immediately before each call, never
-    ///     read after the immediately-following send loop returns. Replaces a per-call
-    ///     <c>AoiGrid.Neighbors(cell).ToArray()</c> (iterator + LINQ buffer) that used to run once per due
-    ///     monster -- during a keep-alive burst, once per due monster in that SAME tick, not once per zone.
-    /// </summary>
-    private readonly List<int> _monsterBroadcastNeighborScratch = [];
 
     public int MonsterCount => _monsters.Count;
 
@@ -139,7 +139,8 @@ public sealed partial class Zone
     ///     whatever position mutation that pass applied) -- the monster-side counterpart to
     ///     <see cref="HandleMove" />'s own <c>_grid.Move</c> call for players. Keeps <see cref="_monsterGrid" />
     ///     in sync with <paramref name="monster" />'s live position -- cell MEMBERSHIP churn (the
-    ///     dictionary/hash-set mutation <see cref="AoiGrid.Move(int,ValueTuple{int,int},ValueTuple{int,int},float,float,float)" />
+    ///     dictionary/hash-set mutation
+    ///     <see cref="AoiGrid.Move(int,ValueTuple{int,int},ValueTuple{int,int},float,float,float)" />
     ///     itself skips when <c>from == to</c>) still only happens on the minority of passes that actually
     ///     crossed a cell boundary, same as before. Always still refreshes the monster's own tracked exact
     ///     position, though, even within the same cell -- <see cref="AoiGrid" />'s exact-distance pass

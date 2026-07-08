@@ -370,7 +370,8 @@ public sealed class TribeActionService(
         await zone.PostTribeProgressCommandAndWaitAsync(new TribeProgressZoneCommand(characterId,
             BonusItemLevel: 0, BonusItemValue: false, DropItems: drops), ct);
 
-        logger.LogInformation("Character {CharacterId} claimed level-milestone bonus for tier {Tier} ({DropCount} items)",
+        logger.LogInformation(
+            "Character {CharacterId} claimed level-milestone bonus for tier {Tier} ({DropCount} items)",
             characterId, state.BonusItemLevel, drops.Length);
 
         return TribeActionOutcome.Ok();

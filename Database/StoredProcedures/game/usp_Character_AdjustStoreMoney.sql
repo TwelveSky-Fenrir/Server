@@ -6,8 +6,8 @@
 -- ProcessForStoreMoneyToInventoryMoney) ; Server/Header/Protocol/DEFINE.h:365 (MAX_NUMBER_SIZE = 2,000,000,000,
 -- the cap both pools share).
 CREATE PROCEDURE game.usp_Character_AdjustStoreMoney @CharacterId INT,
-                                                      @DeltaMoney BIGINT,
-                                                      @DeltaStoreMoney BIGINT
+                                                     @DeltaMoney BIGINT,
+                                                     @DeltaStoreMoney BIGINT
 AS
 BEGIN
     SET

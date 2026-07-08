@@ -33,7 +33,9 @@ namespace Fenrir.Application.Game.Services.Commerce;
 ///         deliberate legacy asymmetry, not a bug).
 ///     </para>
 /// </remarks>
-public sealed class SearchShopListingsService(WorldDataCache worldData, IOfflineShopRepository offlineShops,
+public sealed class SearchShopListingsService(
+    WorldDataCache worldData,
+    IOfflineShopRepository offlineShops,
     ILogger<SearchShopListingsService> logger) : ISearchShopListingsService
 {
     private const int TypeAll = 0;

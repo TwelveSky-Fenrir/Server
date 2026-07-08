@@ -18,7 +18,8 @@ public sealed class LoginServerOptionsValidator : IValidateOptions<LoginServerOp
         if (options.ShardReachabilityProbeTimeoutMilliseconds <= 0)
             errors.Add(
                 $"Login:ShardReachabilityProbeTimeoutMilliseconds must be positive (was {options.ShardReachabilityProbeTimeoutMilliseconds}).");
-        if (options.MaxPlayerNum <= 0) errors.Add($"Login:MaxPlayerNum must be positive (was {options.MaxPlayerNum}).");
+        if (options.IdleSweepIntervalSeconds <= 0)
+            errors.Add($"Login:IdleSweepIntervalSeconds must be positive (was {options.IdleSweepIntervalSeconds}).");
 
         return errors.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(errors);
     }

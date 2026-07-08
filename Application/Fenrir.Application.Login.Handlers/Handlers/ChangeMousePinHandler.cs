@@ -47,19 +47,27 @@ public sealed class ChangeMousePinHandler(
                 loginSession.Abort(DisconnectReason.Malformed);
                 return;
             case ChangeMousePinOutcome.WrongPassword:
-                var failureCount = loginSession.RegisterPinFailure();
-                logger.LogWarning(
-                    "PIN change rejected: wrong current PIN for account {AccountId} (attempt {FailureCount}/{MaxPinFailures})",
-                    accountId, failureCount, MaxPinFailures);
                 session.Send(new ChangeMousePinResponse { Result = 1, MousePassword = ZeroPin });
-                if (failureCount >= MaxPinFailures)
-                {
-                    logger.LogWarning(
-                        "Account {AccountId} exceeded {MaxPinFailures} consecutive PIN-change mismatches -- aborting",
-                        accountId, MaxPinFailures);
+                var failureCount = loginSession.RegisterPinFailure();
+                var lockedOut = failureCount >= MaxPinFailures;
+                // ChangeMousePinService.LogFailedAttemptAsync itself already logs the operational Warning
+                // line (mismatch vs. lockout) alongside the durable game.EventLog AccountSecurity row --
+                // nothing further to add here beyond the Abort itself. Mirrors VerifyMousePinHandler's
+                // identical shape (see that handler's own remarks).
+                await changeMousePinService.LogFailedAttemptAsync(accountId, failureCount, lockedOut,
+                    cancellationToken);
+                if (lockedOut)
                     loginSession.Abort(DisconnectReason.StateViolation);
-                }
 
+                return;
+            case ChangeMousePinOutcome.Locked:
+                // Fenrir-only account-scoped lockout (Migrations/028_account_pin_lockout.sql): silent abort,
+                // matching NoPinConfigured/InvalidFormat's posture -- no wire reply, no legacy analog to
+                // preserve. ChangeMousePinService already wrote the durable audit row for this rejection.
+                logger.LogWarning(
+                    "PIN change rejected: account {AccountId} is locked out from PIN attempts -- aborting",
+                    accountId);
+                loginSession.Abort(DisconnectReason.StateViolation);
                 return;
             case ChangeMousePinOutcome.StorageFailure:
                 // Legacy: storage failure replies 2 without disconnecting (S04_MyWork02.cpp l.525-530). The

@@ -34,7 +34,7 @@ public sealed class AvatarActionResumeHandler(
         var action = packet.Action;
         var characterId = zoneSession.CharacterId!.Value;
 
-        logger?.AvatarActionReceived(session.SessionId, characterId, opcode: 16, action.Type, action.Sort);
+        logger?.AvatarActionReceived(session.SessionId, characterId, 16, action.Type, action.Sort);
 
         service.PostAction(zone, characterId, in action, true);
     }

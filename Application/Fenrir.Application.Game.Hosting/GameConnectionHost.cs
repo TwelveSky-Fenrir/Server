@@ -235,7 +235,23 @@ public sealed class GameConnectionHost(
                     characterId, zone.MapId);
             }
 
-            if (zoneSession.AccountId is { } accountId)
+            // Bug fix (Game->Game cross-shard analog of LoginConnectionHost.OnAcceptedAsync's own
+            // HandoverIssued guard -- see that method's remarks for the fully-worked-out Login-side race this
+            // mirrors): a session that minted a cross-shard zone-transfer ticket
+            // (ZoneMoveService.HandleCrossShardAsync) closes THIS connection on purpose, because the client is
+            // expected to reconnect to a different shard and complete its own ZoneHandshakeService.
+            // ConsumeTicketAsync -> TransitionToGameAsync claim there. Unlike the Login case, this ordering is
+            // a genuine race between two independent completions (this shard's local FIN-triggered teardown
+            // vs. the client establishing a brand-new connection to a different physical host and completing
+            // a multi-step handshake there) rather than a provably deterministic single-client ordering -- but
+            // skipping this teardown can never leave a stale row behind: TransitionToGameAsync's own
+            // ownership-gated claim (widened to accept a prior ServerKind of either Login or Game, see
+            // Database/Migrations/025_account_session_transition_game_to_game.sql) overwrites this exact row
+            // the moment the destination shard's handshake succeeds, and the destination's own
+            // GameConnectionHost eventually tears its (now-owning) copy down normally on ITS OWN disconnect.
+            // A session that never actually reaches HandleCrossShardAsync never gets this flag, so a genuinely
+            // abandoned session still tears its row down exactly as before.
+            if (zoneSession is { AccountId: { } accountId, IsCrossShardTransferPending: false })
                 await TearDownAccountSessionAsync(accountId, zoneSession.AccountSessionToken).ConfigureAwait(false);
 
             // Unconditional and idempotent: frees this connection's counted tribe-quota slot regardless of how

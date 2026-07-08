@@ -74,7 +74,7 @@ public class EnchantResolverTests
     [Fact]
     public void NonWingEquipTarget_IsWingFalse()
     {
-        var target = Equip(1, 7);
+        var target = Equip(1);
         var result = EnchantResolver.Resolve(target, Target(0), Material(1019), 0, 0,
             0, new ScriptedRandomSource(0));
 

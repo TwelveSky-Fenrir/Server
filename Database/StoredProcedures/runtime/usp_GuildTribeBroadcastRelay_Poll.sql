@@ -12,7 +12,7 @@
 -- usp_AccountSession_ReapStale's own headers for the same reasoning). WITH (SNAPSHOT) table hints make the
 -- required isolation level explicit regardless of the caller's ambient transaction/autocommit state.
 CREATE PROCEDURE runtime.usp_GuildTribeBroadcastRelay_Poll @ShardId TINYINT,
-                                                            @RetentionSeconds INT
+                                                           @RetentionSeconds INT
 AS
 BEGIN
     SET

@@ -272,70 +272,6 @@ public sealed class BuyShopItemService(
         return new BuyShopItemCommitResult(false, response, listingRefresh);
     }
 
-    /// <summary>
-    ///     The OFFLINE/proxy-shop half of <see cref="FindSellerAsync" />'s dispatch. Returns <see langword="null" />
-    ///     when the entry gate itself fails -- no character by that name, or none with a currently-open
-    ///     (ShopState=1) proxy shop -- so the caller falls through to the LIVE/personal lookup with no reply
-    ///     of its own. Once past that entry gate, every further rejection (self-purchase, out-of-range/empty
-    ///     slot, unresolvable item) IS surfaced here directly rather than falling through, mirroring the
-    ///     legacy's single-entry-condition goto structure (Server/ts25zone/S04_MyWork02.cpp:6925-6957).
-    /// </summary>
-    private async ValueTask<BuyShopItemSellerResult?> TryResolveProxySellerAsync(BuyShopItemRequest packet,
-        int buyerId, CancellationToken cancellationToken)
-    {
-        var sellerId = await characters.GetIdByNameAsync(packet.AvatarName, cancellationToken);
-        if (sellerId is null)
-            return null;
-
-        var (shop, items) = await offlineShops.GetByCharacterAsync(sellerId.Value, cancellationToken);
-        if (shop is not { ShopState: 1 })
-            return null;
-
-        // Same conservative rejection OfflineShop purchases already apply for the equivalent BuySort=2 path
-        // (UpdateProxyShopService.PurchaseAsync) -- buying from one's own open shop would bypass the normal
-        // "must be closed" retrieval gate and refund the price into the shop's own earnings.
-        if (sellerId.Value == buyerId)
-        {
-            logger.LogWarning(
-                "Buy shop item rejected: character {CharacterId} attempted to buy from its own proxy shop -- session will be disconnected",
-                buyerId);
-            return new BuyShopItemSellerResult(BuyShopItemSellerOutcome.Abort, null, null, default);
-        }
-
-        if (packet.Page1 is < 0 || packet.Page1 >= PshopPurchasePolicy.MaxPages ||
-            packet.Index1 is < 0 || packet.Index1 >= PshopPurchasePolicy.MaxSlots)
-        {
-            logger.LogWarning(
-                "Buy shop item rejected: buyer {BuyerId} sent out-of-range proxy-shop slot {Page1}/{Index1} -- session will be disconnected",
-                buyerId, packet.Page1, packet.Index1);
-            return new BuyShopItemSellerResult(BuyShopItemSellerOutcome.Abort, null, null, default);
-        }
-
-        var slotIndex = (short)(packet.Page1 * PshopPurchasePolicy.MaxSlots + packet.Index1);
-        var item = items.FirstOrDefault(row => row.SlotIndex == slotIndex);
-        if (item is null || item.ItemId is not { } itemId)
-        {
-            logger.LogDebug("Buy shop item rejected: proxy seller {SellerId} slot {Page1}/{Index1} is empty",
-                sellerId.Value, packet.Page1, packet.Index1);
-            return new BuyShopItemSellerResult(BuyShopItemSellerOutcome.Reply, BuildReply(3, 0, 0, 0), null, default);
-        }
-
-        if (!worldData.ItemsById.ContainsKey(itemId))
-        {
-            logger.LogWarning(
-                "Buy shop item rejected: proxy seller {SellerId} item {ItemId} is unresolvable in the world data catalog -- session will be disconnected",
-                sellerId.Value, itemId);
-            return new BuyShopItemSellerResult(BuyShopItemSellerOutcome.Abort, null, null, default);
-        }
-
-        // InventoryPage/InventoryIndex/PosX/PosY are unused by ResolvePurchase/CommitProxyPurchaseAsync --
-        // there is no live seller-side inventory container for a proxy shop to remove from, that half of the
-        // mutation is the DELETE FROM game.OfflineShopItems inside ExecutePurchaseAsync's own SQL transaction.
-        var slot = new PshopPurchasePolicy.SlotView(itemId, item.Quantity, item.Value, item.SerialNumber,
-            item.Price, 0, 0, 0, 0);
-        return new BuyShopItemSellerResult(BuyShopItemSellerOutcome.ProxyProceed, null, null, slot, sellerId.Value);
-    }
-
     public async ValueTask<BuyShopItemCommitResult> CommitProxyPurchaseAsync(BuyShopItemRequest packet, Zone zone,
         PlayerRuntimeState buyer, int sellerId, int accountId, PshopPurchasePolicy.SlotView slot,
         CancellationToken cancellationToken)
@@ -429,6 +365,70 @@ public sealed class BuyShopItemService(
         // proxy shop's state lives purely in SQL with no PlayerRuntimeState cache to refresh, matching
         // UpdateProxyShopService.PurchaseAsync's identical scope for the equivalent BuySort=2 purchase.
         return new BuyShopItemCommitResult(false, response, null);
+    }
+
+    /// <summary>
+    ///     The OFFLINE/proxy-shop half of <see cref="FindSellerAsync" />'s dispatch. Returns <see langword="null" />
+    ///     when the entry gate itself fails -- no character by that name, or none with a currently-open
+    ///     (ShopState=1) proxy shop -- so the caller falls through to the LIVE/personal lookup with no reply
+    ///     of its own. Once past that entry gate, every further rejection (self-purchase, out-of-range/empty
+    ///     slot, unresolvable item) IS surfaced here directly rather than falling through, mirroring the
+    ///     legacy's single-entry-condition goto structure (Server/ts25zone/S04_MyWork02.cpp:6925-6957).
+    /// </summary>
+    private async ValueTask<BuyShopItemSellerResult?> TryResolveProxySellerAsync(BuyShopItemRequest packet,
+        int buyerId, CancellationToken cancellationToken)
+    {
+        var sellerId = await characters.GetIdByNameAsync(packet.AvatarName, cancellationToken);
+        if (sellerId is null)
+            return null;
+
+        var (shop, items) = await offlineShops.GetByCharacterAsync(sellerId.Value, cancellationToken);
+        if (shop is not { ShopState: 1 })
+            return null;
+
+        // Same conservative rejection OfflineShop purchases already apply for the equivalent BuySort=2 path
+        // (UpdateProxyShopService.PurchaseAsync) -- buying from one's own open shop would bypass the normal
+        // "must be closed" retrieval gate and refund the price into the shop's own earnings.
+        if (sellerId.Value == buyerId)
+        {
+            logger.LogWarning(
+                "Buy shop item rejected: character {CharacterId} attempted to buy from its own proxy shop -- session will be disconnected",
+                buyerId);
+            return new BuyShopItemSellerResult(BuyShopItemSellerOutcome.Abort, null, null, default);
+        }
+
+        if (packet.Page1 is < 0 || packet.Page1 >= PshopPurchasePolicy.MaxPages ||
+            packet.Index1 is < 0 || packet.Index1 >= PshopPurchasePolicy.MaxSlots)
+        {
+            logger.LogWarning(
+                "Buy shop item rejected: buyer {BuyerId} sent out-of-range proxy-shop slot {Page1}/{Index1} -- session will be disconnected",
+                buyerId, packet.Page1, packet.Index1);
+            return new BuyShopItemSellerResult(BuyShopItemSellerOutcome.Abort, null, null, default);
+        }
+
+        var slotIndex = (short)(packet.Page1 * PshopPurchasePolicy.MaxSlots + packet.Index1);
+        var item = items.FirstOrDefault(row => row.SlotIndex == slotIndex);
+        if (item is null || item.ItemId is not { } itemId)
+        {
+            logger.LogDebug("Buy shop item rejected: proxy seller {SellerId} slot {Page1}/{Index1} is empty",
+                sellerId.Value, packet.Page1, packet.Index1);
+            return new BuyShopItemSellerResult(BuyShopItemSellerOutcome.Reply, BuildReply(3, 0, 0, 0), null, default);
+        }
+
+        if (!worldData.ItemsById.ContainsKey(itemId))
+        {
+            logger.LogWarning(
+                "Buy shop item rejected: proxy seller {SellerId} item {ItemId} is unresolvable in the world data catalog -- session will be disconnected",
+                sellerId.Value, itemId);
+            return new BuyShopItemSellerResult(BuyShopItemSellerOutcome.Abort, null, null, default);
+        }
+
+        // InventoryPage/InventoryIndex/PosX/PosY are unused by ResolvePurchase/CommitProxyPurchaseAsync --
+        // there is no live seller-side inventory container for a proxy shop to remove from, that half of the
+        // mutation is the DELETE FROM game.OfflineShopItems inside ExecutePurchaseAsync's own SQL transaction.
+        var slot = new PshopPurchasePolicy.SlotView(itemId, item.Quantity, item.Value, item.SerialNumber,
+            item.Price, 0, 0, 0, 0);
+        return new BuyShopItemSellerResult(BuyShopItemSellerOutcome.ProxyProceed, null, null, slot, sellerId.Value);
     }
 
     private static bool HasAnyOtherOccupiedSlot(PshopInfo? listing, int soldPage, int soldSlot)

@@ -5,7 +5,14 @@ public enum VerifyMousePinOutcome
     NoPinConfigured,
     InvalidFormat,
     WrongPassword,
-    Success
+    Success,
+
+    /// <summary>
+    ///     Fenrir-only addition, no legacy analog: the account-scoped, cross-reconnect PIN lockout
+    ///     (auth.AccountPins.LockedUntilUtc, Migrations/028_account_pin_lockout.sql) is currently active.
+    ///     Never counted as a further attempt against the lockout counter itself.
+    /// </summary>
+    Locked
 }
 
 public readonly record struct VerifyMousePinResult(VerifyMousePinOutcome Outcome);

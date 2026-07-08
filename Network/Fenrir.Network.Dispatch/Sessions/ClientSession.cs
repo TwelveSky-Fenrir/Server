@@ -56,9 +56,6 @@ public abstract class ClientSession(
 
     public DisconnectReason? DisconnectReason { get; private set; }
 
-    /// <summary>Process-local, monotonically increasing — never persisted, never sent to the client.</summary>
-    public long SessionId { get; } = sessionId;
-
     /// <summary>
     ///     UTC instant of this session's own last liveness signal: seeded to accept time (the connect-time
     ///     baseline a session that never sends anything is measured against) and re-stamped by <see cref="Touch" />
@@ -70,11 +67,8 @@ public abstract class ClientSession(
     /// </summary>
     public DateTimeOffset LastActivityUtc { get; private set; } = DateTimeOffset.UtcNow;
 
-    /// <summary>Re-stamps <see cref="LastActivityUtc" /> to now — see that property's own remarks for callers/consumers.</summary>
-    public void Touch()
-    {
-        LastActivityUtc = DateTimeOffset.UtcNow;
-    }
+    /// <summary>Process-local, monotonically increasing — never persisted, never sent to the client.</summary>
+    public long SessionId { get; } = sessionId;
 
     /// <summary>
     ///     Never blocks the calling thread -- even while this session's own previous flush is still draining
@@ -113,6 +107,12 @@ public abstract class ClientSession(
 
         LogPacketSent(TPacket.Opcode, total);
         FlushLocked();
+    }
+
+    /// <summary>Re-stamps <see cref="LastActivityUtc" /> to now — see that property's own remarks for callers/consumers.</summary>
+    public void Touch()
+    {
+        LastActivityUtc = DateTimeOffset.UtcNow;
     }
 
     /// <summary>

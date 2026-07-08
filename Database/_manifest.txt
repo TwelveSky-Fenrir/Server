@@ -402,6 +402,25 @@ Migrations/025_account_session_transition_game_to_game.sql
 # header for the full citation trail.
 Migrations/026_offline_shop_withdraw_split_nothing_and_expiry.sql
 
+# character-creation-level1-redesign (CONFIRMED PRODUCT DECISION, not a legacy-parity fix): replaces
+# usp_Character_CreateWithStarterKit's EU33/USE_CUSTOME_CREATE instant-elite creation grant (Level=145,
+# 6-slot Enchant45/Combine6 gear, starter mount/pet/cape, one premium day, ProtectForDeath/AutoTime2/
+# DoubleExpTime1-2 instant-boost counters) with a genuine Level 1 start and a weapon+torso-armor-only
+# starter kit. See the script's own header for the full literal-by-literal rationale.
+Migrations/027_character_create_level1_basic_kit.sql
+
+# pincode-second-password security audit (Major finding, Fenrir-only addition, no legacy analog): adds
+# auth.AccountPins.FailedAttempts/LockedUntilUtc and the new auth.usp_AccountPin_RecordAttempt procedure,
+# an account-scoped/cross-reconnect brute-force lockout for the mouse PIN mirroring auth.Accounts'
+# existing FailedLoginCount/LockoutUntilUtc pattern for the primary password. See the script's own header
+# for the full citation trail.
+Migrations/028_account_pin_lockout.sql
+
+# Fix-forward for auth.usp_AccountPin_Get (see Migrations/028_account_pin_lockout.sql): exposes the two
+# new FailedAttempts/LockedUntilUtc columns so VerifyMousePinService/ChangeMousePinService can check the
+# account-scoped lockout before ever touching PasswordHasher.Verify.
+Migrations/029_account_pin_lockout_get.sql
+
 Migrations/Seed/001_dev_account.sql
 
 Migrations/Seed/world/060_levels.sql

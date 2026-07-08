@@ -1,4 +1,3 @@
-using System.IO;
 using System.Net.Sockets;
 
 namespace Fenrir.Network.Transport;
@@ -11,11 +10,14 @@ namespace Fenrir.Network.Transport;
 // (GameConnectionHost/LoginConnectionHost's OnAcceptedAsync) for why that distinction matters for logging.
 public static class TransportFaultClassifier
 {
-    public static bool IsExpectedDisconnect(Exception ex) => ex switch
+    public static bool IsExpectedDisconnect(Exception ex)
     {
-        SocketException => true,
-        ObjectDisposedException => true,
-        IOException { InnerException: SocketException } => true,
-        _ => false
-    };
+        return ex switch
+        {
+            SocketException => true,
+            ObjectDisposedException => true,
+            IOException { InnerException: SocketException } => true,
+            _ => false
+        };
+    }
 }

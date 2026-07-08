@@ -25,7 +25,7 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
 
     /// <summary>
     ///     Set by a test to make the next <see cref="DeleteAsync" /> call throw instead -- for exercising
-    ///     DeleteAvatarService's current (unmapped) database-delete-failure path.
+    ///     DeleteAvatarService's mapped database-delete-failure path (DeleteAvatarOutcome.SqlError).
     /// </summary>
     public Exception? DeleteException { get; set; }
 

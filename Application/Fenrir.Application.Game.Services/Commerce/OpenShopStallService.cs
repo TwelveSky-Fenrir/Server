@@ -161,16 +161,6 @@ public sealed class OpenShopStallService(
         return new OpenShopStallPrepareResult(OpenShopStallPrepareOutcome.ProxyReady, null, listing, offlineItems);
     }
 
-    private static int CountOccupiedSlots(PshopInfo listing)
-    {
-        var count = 0;
-        for (var page = 0; page < PshopPurchasePolicy.MaxPages; page++)
-        for (var slot = 0; slot < PshopPurchasePolicy.MaxSlots; slot++)
-            if (PshopPurchasePolicy.ReadSlot(listing, page, slot).IsOccupied)
-                count++;
-        return count;
-    }
-
     public async ValueTask<OpenShopStallResponse> OpenProxyShopAsync(OpenShopStallRequest packet, Zone zone,
         PlayerRuntimeState state, int characterId, int accountId, PshopInfo listing,
         List<OfflineShopItemSlotTvp> offlineItems, CancellationToken cancellationToken)
@@ -255,6 +245,16 @@ public sealed class OpenShopStallService(
                 zone.MapId, characterId);
 
         return response;
+    }
+
+    private static int CountOccupiedSlots(PshopInfo listing)
+    {
+        var count = 0;
+        for (var page = 0; page < PshopPurchasePolicy.MaxPages; page++)
+        for (var slot = 0; slot < PshopPurchasePolicy.MaxSlots; slot++)
+            if (PshopPurchasePolicy.ReadSlot(listing, page, slot).IsOccupied)
+                count++;
+        return count;
     }
 
     private OpenShopStallPrepareResult Abort(int characterId, string reason)

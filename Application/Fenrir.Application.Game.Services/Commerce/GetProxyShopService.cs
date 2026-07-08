@@ -6,7 +6,9 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Services.Commerce;
 
-public sealed class GetProxyShopService(IOfflineShopRepository offlineShops, ICharacterRepository characters,
+public sealed class GetProxyShopService(
+    IOfflineShopRepository offlineShops,
+    ICharacterRepository characters,
     ILogger<GetProxyShopService> logger) : IGetProxyShopService
 {
     public async ValueTask<GetProxyShopResponse> GetAsync(GetProxyShopRequest packet, Zone zone, int characterId,
@@ -23,7 +25,8 @@ public sealed class GetProxyShopService(IOfflineShopRepository offlineShops, ICh
                 logger.LogDebug("Get proxy shop: character {CharacterId} has no proxy shop of their own",
                     characterId);
             else
-                logger.LogDebug("Get proxy shop: character {CharacterId} fetched their own proxy shop ({ItemCount} items)",
+                logger.LogDebug(
+                    "Get proxy shop: character {CharacterId} fetched their own proxy shop ({ItemCount} items)",
                     characterId, items.Count);
 
             return new GetProxyShopResponse

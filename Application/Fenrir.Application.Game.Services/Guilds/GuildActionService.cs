@@ -458,7 +458,8 @@ public sealed class GuildActionService(
         zone.PostGuildCommand(new GuildMembershipZoneCommand(newMaster.CharacterId, guildId, state.GuildName,
             GuildRoleCodec.WireRoleToDb(0), ""));
 
-        logger.LogInformation("Character {CharacterId} transferred leadership of guild {GuildId} to character {NewMasterId}",
+        logger.LogInformation(
+            "Character {CharacterId} transferred leadership of guild {GuildId} to character {NewMasterId}",
             characterId, guildId, newMaster.CharacterId);
 
         return GuildActionResult.Success(17, info, 2);

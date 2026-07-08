@@ -42,7 +42,8 @@ internal static partial class MovementCombatLog
         int actionSort);
 
     /// <summary>
-    ///     Every CZ_PROCESS_ATTACK_SEND (op18) received, logged from <see cref="Fenrir.Application.Game.Handlers.Handlers.Combat.AttackHandler" />
+    ///     Every CZ_PROCESS_ATTACK_SEND (op18) received, logged from
+    ///     <see cref="Fenrir.Application.Game.Handlers.Handlers.Combat.AttackHandler" />
     ///     before the case-range (anti-fuzzing) check runs.
     /// </summary>
     [LoggerMessage(

@@ -68,7 +68,7 @@ public sealed class MonsterEntity
     ///     mechanic arms it; the owner-name-lock check treats null the same as "not enough time has elapsed
     ///     yet," matching legacy's own zero-elapsed state immediately after spawn
     ///     (<c>Server/ts25zone/S07_MyGame05.cpp:14</c>, <c>MONSTER_OBJECT::Init</c> sets it to the current tick).
-    /// </remarks>
+    ///     </remarks>
     public TimeSpan? OwnerNameLockExemptionArmedAt { get; init; }
 
     public float PosX { get; set; }

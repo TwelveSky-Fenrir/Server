@@ -195,7 +195,7 @@ public sealed class EnchantItemService(
             // contract's side effects only describe crediting the tribe bank "when money is deducted".
             var newContributionPoints = state.ContributionPoints - resolved.Cost;
             if (!await zone.PostTribeProgressCommandAndWaitAsync(
-                    new TribeProgressZoneCommand(characterId, ContributionPoints: newContributionPoints,
+                    new TribeProgressZoneCommand(characterId, newContributionPoints,
                         ProtectForDestroy: newProtectForDestroy, ImproveItemValue: newImproveItemValue),
                     cancellationToken))
                 logger.LogError(

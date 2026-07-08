@@ -12,12 +12,19 @@ public sealed class CreateMousePinService(IAccountPinRepository pins, ILogger<Cr
     public async ValueTask<CreateMousePinResult> CreateMousePinAsync(int accountId, string mousePassword,
         CancellationToken cancellationToken)
     {
-        if (!MousePinFormat.IsValid(mousePassword))
-            return new CreateMousePinResult(CreateMousePinOutcome.InvalidFormat);
-
-        // Legacy: creating over an existing PIN is a protocol violation (client should send op15/op14 instead).
+        // Legacy: creating over an existing PIN is a protocol violation (client should send op15/op14
+        // instead). Checked before format -- existence-before-format, matching the cited legacy guard
+        // order exactly: Server/ts25login/S04_MyWork02.cpp:461 (!IsEmptyString(uMousePassword) => Quit)
+        // runs before :468 (CheckMousePassword(...) => Quit). Previously this project checked format
+        // first; the pincode-second-password audit's Minor finding flagged the inversion. The two orders
+        // only disagree on the "PIN already exists AND the submitted format is also malformed" double-
+        // violation case, which stays wire-unobservable either way (silent Abort both ways) but this order
+        // now correctly attributes that rejection to AlreadyExists rather than InvalidFormat.
         if (await pins.GetAsync(accountId, cancellationToken) is not null)
             return new CreateMousePinResult(CreateMousePinOutcome.AlreadyExists);
+
+        if (!MousePinFormat.IsValid(mousePassword))
+            return new CreateMousePinResult(CreateMousePinOutcome.InvalidFormat);
 
         try
         {

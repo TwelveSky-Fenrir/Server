@@ -78,6 +78,18 @@ public abstract class ClientSession(
     /// </summary>
     public void Send<TPacket>(in TPacket packet) where TPacket : struct, IOutgoingPacket
     {
+        // SessionLoop.RunAsync's own finally-block contract guarantees Abort() (which sets _completed
+        // synchronously) always runs before CompleteAsync() ever completes Transport.Output -- across every
+        // one of its ~150 call sites, not just this session's own receive loop. A broadcast fan-out (Zone's
+        // own tick thread iterating every AOI neighbor) can still be mid-loop when one recipient's Abort()
+        // already ran but the zone hasn't drained that character's queued Leave command yet; without this
+        // check every such recipient throws InvalidOperationException ("writer was completed") once per
+        // broadcast until the Leave is processed, which is pure wasted per-tick cost -- see this session's own
+        // git history for the observed case (a departing character's zone kept re-throwing on every queued
+        // monster-replication send for the rest of that tick and the next).
+        if (Volatile.Read(ref _completed) != 0)
+            return;
+
         // TPacket.Compressed is a static abstract member resolved per closed-generic instantiation -- zero
         // runtime branch cost, the same mechanism FrameWriter.WriteFrame already uses for TPacket.Obfuscation.
         // Routes every Compressed packet through the ZPACKET+LZ4 envelope (a different header shape than the
@@ -137,6 +149,10 @@ public abstract class ClientSession(
     // to round-trip it through a fake packet type.
     public void SendRaw(ReadOnlySpan<byte> rawFrame)
     {
+        // See Send<TPacket>'s own remarks for why this check is safe and load-bearing, not just an optimization.
+        if (Volatile.Read(ref _completed) != 0)
+            return;
+
         if (!_sendLock.Wait(0))
         {
             _pendingSends.Writer.TryWrite(rawFrame.ToArray());

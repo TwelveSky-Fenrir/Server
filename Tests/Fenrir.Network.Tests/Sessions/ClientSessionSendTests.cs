@@ -218,6 +218,30 @@ public class ClientSessionSendTests
         await DrainAsync(pipe);
     }
 
+    // Regression test: SessionLoop.RunAsync's own finally-block contract guarantees Abort() always precedes
+    // CompleteAsync() on every disconnect path (~150 call sites). A zone's broadcast fan-out (its own tick
+    // thread iterating every AOI neighbor) can still reach a just-departed recipient before the zone's queued
+    // Leave command is drained -- Send/SendRaw must silently no-op once the transport is torn down rather than
+    // throwing InvalidOperationException("Writing is not allowed after writer was completed"), which previously
+    // fired once per broadcast for every tick until the Leave was processed.
+    [Fact]
+    public async Task Send_AfterAbortAndComplete_IsSilentNoOp()
+    {
+        var pipe = new FakeDuplexPipe();
+        var session = new ZoneClientSession(1, pipe);
+        var packet = new ZoneGreetingResponse { RandomNumber = 1 };
+
+        session.Abort(DisconnectReason.Faulted);
+        await session.CompleteAsync();
+
+        session.Send(packet);
+        session.SendRaw([0xAB, 0xBE, 0xEF]);
+
+        Assert.True(pipe.SessionToPeer.TryRead(out var result));
+        Assert.True(result.IsCompleted);
+        Assert.True(result.Buffer.IsEmpty);
+    }
+
     private static async Task DrainAsync(FakeDuplexPipe pipe)
     {
         var result = await pipe.SessionToPeer.ReadAsync();

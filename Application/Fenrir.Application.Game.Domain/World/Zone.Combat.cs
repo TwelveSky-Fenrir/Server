@@ -298,7 +298,16 @@ public sealed partial class Zone
         if (attackSkill is not null &&
             (!attackerState.AttackBudgetEnforced || attackerState.AttackSubPacketsUsed == 1))
         {
-            var manaCost = (int)SkillCatalog.ReturnSkillValue(attackSkill, command.AttackInfo.AttackActionValue3,
+            // Mana cost uses the caster's INVESTED grade only (aSkillGradeNum1, recorded from the originating
+            // op15 action onto ActionSkillGradeNum1), NOT AttackActionValue3. AttackActionValue3 carries the
+            // combined num1+num2 grade the DAMAGE ratio legitimately needs (ReturnSkillValue factor 7,
+            // AttackPowerRatio, CombatResolver.ResolveEnemyTribeAttack) but would over-charge mana for any
+            // item-skill-bonus holder. Réf. C++ : Server/ts25zone/S04_MyWork02.cpp:1640 -- the op15
+            // tSkillSort==2 mana charge (which legacy pays for this skill on the originating action, not on
+            // this later attack packet) passes r->tAction.aSkillGradeNum1 alone to ReturnSkillValue factor 1;
+            // contrast the num1+num2 lookups it sits beside. GetReduceManaRatio (S04_MyWork02.cpp:1641-1645)
+            // is a separate, still-unmodeled reduction that would further lower this on certain capes.
+            var manaCost = (int)SkillCatalog.ReturnSkillValue(attackSkill, attackerState.ActionSkillGradeNum1,
                 SkillValueKind.ManaUse);
             if (manaCost > 0)
             {
@@ -333,7 +342,9 @@ public sealed partial class Zone
                 AttackResultValue = outcome.Hit ? 1 + attackerWeaponItemId : 0,
                 AttackCriticalExist = outcome.Critical ? 1 : 0,
                 AttackElementDamage = outcome.ElementDamage,
-                AttackViewDamageValue = outcome.DamageApplied,
+                // View = full (pre-life-cap) hit size the client displays; Real = the life-capped amount
+                // actually applied -- diverge only on a killing/overkill blow (S07_MyGame02.cpp:1361-1366).
+                AttackViewDamageValue = outcome.ViewDamage,
                 AttackRealDamageValue = outcome.DamageApplied
             }
         };
@@ -752,7 +763,9 @@ public sealed partial class Zone
                 AttackResultValue = outcome.Hit ? 1 + attackerWeaponItemId : 0,
                 AttackCriticalExist = outcome.Critical ? 1 : 0,
                 AttackElementDamage = outcome.ElementDamage,
-                AttackViewDamageValue = outcome.DamageApplied,
+                // View = full (pre-life-cap) hit size the client displays; Real = the life-capped amount
+                // actually applied -- diverge only on a killing/overkill blow (S07_MyGame02.cpp:2371-2376).
+                AttackViewDamageValue = outcome.ViewDamage,
                 AttackRealDamageValue = outcome.DamageApplied
             }
         };

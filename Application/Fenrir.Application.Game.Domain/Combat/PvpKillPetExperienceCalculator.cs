@@ -43,8 +43,7 @@ public static class PvpKillPetExperienceCalculator
     ///     <c>Server/Header/api.h:155</c>), loaded from an ini key at server startup
     ///     (<c>Server/ts25zone/S07_MyGame01.cpp:453</c>, <c>Server/Header/ini.h:326</c>) -- a per-deployment
     ///     operator value, not a compile-time constant in the legacy source. No production number was plumbed
-    ///     to this contract, so this is a placeholder, not real game-balance tuning (same posture as
-    ///     <see cref="Fenrir.Application.Game.Domain.GameServerOptions.MaxPlausibleSpeedPerSecond" />) -- an
+    ///     to this contract, so this is a placeholder, not real game-balance tuning -- an
     ///     operator-configurable option should replace this constant once the real deployment value is known.
     /// </summary>
     public const int PlaceholderPetExpRatio = 10;

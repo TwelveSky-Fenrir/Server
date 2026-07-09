@@ -227,9 +227,14 @@ public sealed class MonsterAiSystem(IRandomSource? random = null) : ISimulationS
                     monster.PosX = monster.HomeX;
                     monster.PosY = monster.HomeY;
                     monster.PosZ = monster.HomeZ;
-                    monster.TargetCharacterId = null;
+                    monster.ReleaseTarget();
                     monster.AiState = MonsterAiState.Spawning; // aSort 19 -> teleport home -> aSort 0
                     monster.StateTicks = 0;
+
+                    // Legacy A020 broadcasts the teleport-home + reset-to-idle frame (aSort 0 at mFirstLocation)
+                    // unconditionally via B_MONSTER_ACTION_RECV(...,1)+Send1 (S07_MyGame05.cpp:1666-1672) -- fires
+                    // at the new (home) position, so players near home see the monster reappear idle there.
+                    zone.BroadcastMonsterActionChange(monster);
                 }
 
                 break;
@@ -274,6 +279,10 @@ public sealed class MonsterAiSystem(IRandomSource? random = null) : ISimulationS
                 monster.AiState = MonsterAiState.ReturnToSpawn;
                 monster.StateTicks = 0;
                 monster.IdleWanderElapsedTicks = 0; // S07_MyGame05.cpp:1024 -- also reset once a return actually begins
+
+                // Legacy A002 broadcasts the return-home transition (aSort 19) via
+                // B_MONSTER_ACTION_RECV(...,1)+Send1 (S07_MyGame05.cpp:1025-1028).
+                zone.BroadcastMonsterActionChange(monster);
                 return;
             }
 
@@ -296,8 +305,18 @@ public sealed class MonsterAiSystem(IRandomSource? random = null) : ISimulationS
 
         monster.WanderTargetX = destX;
         monster.WanderTargetZ = destZ;
+        // Mirror the wander destination into the broadcast target descriptor (legacy aSort=3 sets
+        // aTargetLocation = tPossibleLocation, S07_MyGame05.cpp:1059-1061) so a wandering monster renders
+        // walking toward the point it actually walks to.
+        monster.TargetLocationX = destX;
+        monster.TargetLocationY = monster.PosY;
+        monster.TargetLocationZ = destZ;
         monster.AiState = MonsterAiState.Patrol;
         monster.StateTicks = 0;
+
+        // Legacy A002 broadcasts the wander transition (aSort 3) via B_MONSTER_ACTION_RECV(...,1)+Send1
+        // (S07_MyGame05.cpp:1057-1064).
+        zone.BroadcastMonsterActionChange(monster);
     }
 
     /// <summary>
@@ -398,7 +417,10 @@ public sealed class MonsterAiSystem(IRandomSource? random = null) : ISimulationS
             if (_random.NextInt32(2) != 0)
                 continue;
 
-            monster.TargetCharacterId = characterId;
+            // Capture the full target descriptor together (index + unique number + location), matching
+            // legacy's single-beat aTargetObjectIndex/aTargetObjectUniqueNumber/aTargetLocation write at the
+            // chase transition (S07_MyGame05.cpp:1104-1105,1166-1171,1373-1374).
+            monster.AssignTarget(characterId, player.UniqueNumber, player.PosX, player.PosY, player.PosZ);
 
             // Acquisition write-through (SetAttackInfoWithAvatar called with a zero damage argument from the
             // acquisition call sites, S07_MyGame05.cpp:1068/:1321): zero-seeds a slot for this candidate in
@@ -408,6 +430,11 @@ public sealed class MonsterAiSystem(IRandomSource? random = null) : ISimulationS
             monster.RegisterAcquisition(characterId, player);
             monster.AiState = MonsterAiState.Chase;
             monster.StateTicks = 0;
+
+            // Legacy broadcasts the aggro transition (aSort 4) immediately via B_MONSTER_ACTION_RECV(...,1)+
+            // Send1 (S07_MyGame05.cpp:1164-1173) -- this is the frame a real client needs to start rendering
+            // the chase toward a correctly-identified target, instead of only finding out via the keep-alive.
+            zone.BroadcastMonsterActionChange(monster);
             return true;
         }
 
@@ -451,9 +478,13 @@ public sealed class MonsterAiSystem(IRandomSource? random = null) : ISimulationS
             // next idle tick immediately re-attempts the same wide-radius proximity scan used for original
             // aggro (RunDecision -> TryAcquireTarget) at the monster's CURRENT position, and only gives up and
             // heads home after a continuous 60-second grace period with zero re-engagement -- see RunDecision.
-            monster.TargetCharacterId = null;
+            monster.ReleaseTarget();
             monster.AiState = MonsterAiState.Decision;
             monster.StateTicks = 0;
+
+            // Legacy A005 broadcasts the drop-to-idle (aSort 1) on an invalid/dead target via
+            // B_MONSTER_ACTION_RECV(...,1)+Send1 (S07_MyGame05.cpp:1351-1356).
+            zone.BroadcastMonsterActionChange(monster);
             return;
         }
 
@@ -469,11 +500,22 @@ public sealed class MonsterAiSystem(IRandomSource? random = null) : ISimulationS
         var detectionRadiusSq = (float)monster.Template.RadiusInfo2 * monster.Template.RadiusInfo2;
         if (distanceToTargetSq > detectionRadiusSq)
         {
-            monster.TargetCharacterId = null;
+            monster.ReleaseTarget();
             monster.AiState = MonsterAiState.Decision;
             monster.StateTicks = 0;
+
+            // Legacy A005 broadcasts the give-up-to-idle (aSort 1) when the target drifts out of range via
+            // B_MONSTER_ACTION_RECV(...,1)+Send1 (S07_MyGame05.cpp:1359-1364).
+            zone.BroadcastMonsterActionChange(monster);
             return;
         }
+
+        // Keep the broadcast target descriptor tracking the pursued avatar's live position while actively
+        // engaged (legacy re-derives aTargetLocation toward the target each chase pass) so the keep-alive and
+        // the next state-change frame both carry a fresh waypoint, never a stale chase-start one.
+        monster.TargetLocationX = target.PosX;
+        monster.TargetLocationY = target.PosY;
+        monster.TargetLocationZ = target.PosZ;
 
         // Attack-windup transition threshold uses RadiusInfo1 (melee range), distinct from the more lenient
         // RadiusInfo2 give-up/detection radius above -- do not swap these two.
@@ -482,6 +524,10 @@ public sealed class MonsterAiSystem(IRandomSource? random = null) : ISimulationS
         {
             monster.AiState = MonsterAiState.AttackWindup;
             monster.StateTicks = 0;
+
+            // Legacy A005 broadcasts the attack transition (aSort 5) via B_MONSTER_ACTION_RECV(...,1)+Send1
+            // (S07_MyGame05.cpp:1370-1381).
+            zone.BroadcastMonsterActionChange(monster);
             return;
         }
 
@@ -495,6 +541,10 @@ public sealed class MonsterAiSystem(IRandomSource? random = null) : ISimulationS
         {
             monster.AiState = MonsterAiState.RangedAttackWindup;
             monster.StateTicks = 0;
+
+            // Legacy A002_FOR_ZONE_175_TYPE_BOSS broadcasts the ranged-attack transition (aSort 7) via
+            // B_MONSTER_ACTION_RECV(...,1)+Send3 (S07_MyGame05.cpp:1219-1228).
+            zone.BroadcastMonsterActionChange(monster);
             return;
         }
 

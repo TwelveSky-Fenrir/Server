@@ -103,7 +103,9 @@ public sealed partial class Zone
                 AttackResultValue = outcome.Hit ? 1 + attackerWeaponItemId : 0,
                 AttackCriticalExist = outcome.Critical ? 1 : 0,
                 AttackElementDamage = outcome.ElementDamage,
-                AttackViewDamageValue = outcome.DamageApplied,
+                // View = full (pre-life-cap) hit size the client displays; Real = the life-capped amount
+                // actually applied -- duel shares AttackPlayer's split (S07_MyGame02.cpp:1361-1366).
+                AttackViewDamageValue = outcome.ViewDamage,
                 AttackRealDamageValue = outcome.DamageApplied
             }
         };

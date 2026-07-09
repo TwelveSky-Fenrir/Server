@@ -95,23 +95,36 @@ public enum AttackRejectReason
 }
 
 /// <summary>A <see cref="Rejected" /> outcome carries no wire packet; a miss still echoes a zero-damage packet.</summary>
+/// <param name="DamageApplied">
+///     The life-capped "real" damage -- the amount actually subtracted from the defender's life, and the value
+///     the legacy writes to <c>mAttackRealDamageValue</c> AFTER its life-cap clamp (S07_MyGame02.cpp:1366/2376/3433).
+///     Never exceeds the defender's remaining life.
+/// </param>
+/// <param name="ViewDamage">
+///     The pre-life-cap "view" damage (element bonus already included) -- the full computed hit size the client
+///     uses purely to display the floating damage number, and the value the legacy writes to
+///     <c>mAttackViewDamageValue</c> BEFORE its life-cap clamp (S07_MyGame02.cpp:1361/2371/3428). Equal to
+///     <paramref name="DamageApplied" /> for a non-lethal blow; strictly greater on any killing/overkill blow,
+///     which is the sole case the two diverge. Zero on a miss/reject.
+/// </param>
 public readonly record struct AttackOutcome(
     bool Rejected,
     AttackRejectReason RejectReason,
     bool Hit,
     bool Critical,
     int DamageApplied,
+    int ViewDamage,
     int ElementDamage,
     bool ChargeConsumed)
 {
     public static AttackOutcome Reject(AttackRejectReason reason)
     {
-        return new AttackOutcome(true, reason, false, false, 0, 0, false);
+        return new AttackOutcome(true, reason, false, false, 0, 0, 0, false);
     }
 
     /// <summary>Charge buff is spent the moment an attack is attempted, win or miss -- callers with one must pass true.</summary>
     public static AttackOutcome Miss(bool chargeConsumed = false)
     {
-        return new AttackOutcome(false, AttackRejectReason.None, false, false, 0, 0, chargeConsumed);
+        return new AttackOutcome(false, AttackRejectReason.None, false, false, 0, 0, 0, chargeConsumed);
     }
 }

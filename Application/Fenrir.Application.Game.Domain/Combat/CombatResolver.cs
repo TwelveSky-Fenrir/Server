@@ -327,10 +327,14 @@ public static class CombatResolver
             elementDamage = attacker.Stats.ElementAttackPower - defender.Stats.ElementDefensePower;
         damage += elementDamage;
 
+        // "View" damage (S07_MyGame02.cpp:1361) is captured BEFORE the life-cap clamp (:1362-1365); "real"
+        // damage (:1366) is the clamped value. On a killing/overkill blow the client still displays the full
+        // hit size even though only the defender's remaining life is actually subtracted.
+        var viewDamage = damage;
         if (damage > defender.Life)
             damage = defender.Life;
 
-        return new AttackOutcome(false, AttackRejectReason.None, true, critical, damage, elementDamage,
+        return new AttackOutcome(false, AttackRejectReason.None, true, critical, damage, viewDamage, elementDamage,
             chargeConsumed);
     }
 

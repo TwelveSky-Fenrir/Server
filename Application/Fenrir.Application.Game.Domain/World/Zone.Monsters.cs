@@ -428,7 +428,9 @@ public sealed partial class Zone
                 AttackResultValue = outcome.Hit ? 1 : 0,
                 AttackCriticalExist = outcome.Critical ? 1 : 0,
                 AttackElementDamage = outcome.ElementDamage,
-                AttackViewDamageValue = outcome.DamageApplied,
+                // View = full (pre-life-cap) hit size the client displays; Real = the life-capped amount
+                // actually applied -- MvP shares the same split (S07_MyGame02.cpp:3428-3433).
+                AttackViewDamageValue = outcome.ViewDamage,
                 AttackRealDamageValue = outcome.DamageApplied
             }
         };
@@ -486,21 +488,25 @@ public sealed partial class Zone
     ///     Immediate monster-visibility exchange on zone entry -- closes the gap where a monster already alive
     ///     in this zone was otherwise invisible to a new arrival until that monster's own next independent 5 s
     ///     keep-alive fired (<see cref="RebroadcastMonsters" />). Sends a direct, one-shot, keep-alive-shaped
-    ///     (<c>checkChangeActionState = 0</c>) replication frame to <paramref name="state" />'s own session for
-    ///     every monster within <paramref name="state" />'s immediate AOI neighborhood (the same 3x3-cell
-    ///     scoping <see cref="BroadcastMonsterAction" /> already uses from the monster's own side, applied here
-    ///     by symmetry since the neighbor relation is reciprocal) and dungeon-instance visible
-    ///     (<see cref="IsVisibleAcrossDungeonInstance" />) to it -- mirroring the mutual player-to-player
-    ///     visibility exchange <see cref="HandleEnter" /> already performs for avatars.
+    ///     (<c>checkChangeActionState = 2</c>, "re-sync to this state") replication frame to
+    ///     <paramref name="state" />'s own session for every monster within <paramref name="state" />'s
+    ///     immediate AOI neighborhood (the same 3x3-cell scoping <see cref="BroadcastMonsterAction" /> already
+    ///     uses from the monster's own side, applied here by symmetry since the neighbor relation is reciprocal)
+    ///     and dungeon-instance visible (<see cref="IsVisibleAcrossDungeonInstance" />) to it -- mirroring the
+    ///     mutual player-to-player visibility exchange <see cref="HandleEnter" /> already performs for avatars.
     /// </summary>
     /// <remarks>
-    ///     No legacy citation confirms this restores ts25zone parity rather than diverging from it -- the
-    ///     behavior contract this was implemented from flags the underlying legacy behavior as unconfirmed (no
-    ///     <c>Server/</c> source located for what, if anything, ts25zone itself sends about pre-existing
-    ///     monsters on a player's zone entry). This is a pure one-way, one-shot send: no other session's own
-    ///     view of any monster changes because of this arrival, and no timer/state is touched --
-    ///     <see cref="MonsterEntity.LastRebroadcastAt" /> keeps running on its own independent cadence
-    ///     regardless of whether this method ever runs.
+    ///     Re-verified 2026-07: ts25zone has no dedicated on-enter monster burst -- neither the periodic tick
+    ///     (<c>Server/ts25zone/S07_MyGame01.cpp:2518-2567</c>) nor <c>ZoneWorker::UpdateMonster</c>
+    ///     (<c>Server/ts25zone/ZoneWorker.cpp:112-155</c>) sends anything targeted at a single entering user, and
+    ///     no per-enter monster loop exists in the enter path; the legacy client already knows monster spawns
+    ///     from its own map data and is driven purely by the action broadcasts (state-change + special-monster
+    ///     keep-alive). This method therefore remains a deliberate Fenrir-only latency improvement -- a
+    ///     well-formed <c>checkChangeActionState = 2</c> re-sync of the server's authoritative state, the exact
+    ///     shape the keep-alive sends, just delivered eagerly on entry instead of up to 5 s later. It is a pure
+    ///     one-way, one-shot send: no other session's own view of any monster changes because of this arrival,
+    ///     and no timer/state is touched -- <see cref="MonsterEntity.LastRebroadcastAt" /> keeps running on its
+    ///     own independent cadence regardless of whether this method ever runs.
     ///     <para>
     ///         Queries <see cref="_monsterGrid" /> instead of scanning every <see cref="_monsters" /> entry --
     ///         this runs once per player <see cref="HandleEnter" />, so on a busy zone the old brute-force scan
@@ -533,11 +539,38 @@ public sealed partial class Zone
             if (!IsVisibleAcrossDungeonInstance(monster.InstanceId, state.DungeonInstanceId))
                 continue;
 
-            state.Session.Send(BuildMonsterActionRecv(monster, 0));
+            // checkChangeActionState = 2 (re-sync), the same value the 5 s keep-alive uses -- this is a
+            // catch-up of pre-existing state, not a fresh action. Never 0 (never a value legacy sends for a
+            // monster action frame); see RebroadcastMonsters' remarks.
+            state.Session.Send(BuildMonsterActionRecv(monster, 2));
         }
     }
 
-    /// <summary>Keep-alive rebroadcast for monsters, 5 s cadence.</summary>
+    /// <summary>
+    ///     Immediate monster action/state-change broadcast (legacy <c>checkChangeActionState = 1</c>) -- the
+    ///     tick-owned caller (<see cref="Monsters.MonsterAiSystem" />) fires this at every FSM transition that
+    ///     changes the monster's visible action or target, matching legacy's unconditional
+    ///     <c>B_MONSTER_ACTION_RECV(..., 1)</c> + <c>Send1</c>/<c>Send2</c>/<c>Send3</c> at each such transition
+    ///     (<c>Server/ts25zone/S07_MyGame05.cpp:1027-1028,1063-1064,1172-1173,1354-1356,1362-1364,1380-1381,
+    ///     1671-1672</c>). This is the piece that was missing: previously monsters only ever reached clients via
+    ///     the 5 s keep-alive below, so a real client learned about an aggro/attack/return only up to 5 s late
+    ///     (and, before the descriptor fix, malformed) -- which desynced and reset the client's monster
+    ///     simulation. <c>1</c> tells the client "this is a new action, render it," distinct from the keep-alive's
+    ///     <c>2</c> ("re-sync to this state").
+    /// </summary>
+    public void BroadcastMonsterActionChange(MonsterEntity monster)
+    {
+        BroadcastMonsterAction(monster, 1);
+    }
+
+    /// <summary>
+    ///     Keep-alive rebroadcast for monsters, 5 s cadence. <c>checkChangeActionState = 2</c>: legacy's own
+    ///     periodic monster catch-up uses <c>2</c> ("re-sync to this state"), never <c>0</c>
+    ///     (<c>Server/ts25zone/S07_MyGame01.cpp:2548</c>, <c>Server/ts25zone/ZoneWorker.cpp:132</c> --
+    ///     <c>B_MONSTER_ACTION_RECV(..., 2)</c>; the <c>0</c> literal in <c>Send1</c>/<c>Send2</c>/<c>Send3</c> is
+    ///     the <c>Broadcast11</c> <c>type</c> argument selecting the send buffer, NOT this field, which the
+    ///     earlier revision conflated). <c>0</c> is never a value legacy sends for a monster action frame.
+    /// </summary>
     private void RebroadcastMonsters()
     {
         foreach (var monster in _monsters.Values)
@@ -546,7 +579,7 @@ public sealed partial class Zone
                 continue;
 
             monster.LastRebroadcastAt = _clock;
-            BroadcastMonsterAction(monster, 0);
+            BroadcastMonsterAction(monster, 2);
         }
     }
 
@@ -673,9 +706,29 @@ public sealed partial class Zone
         return false;
     }
 
+    /// <summary>
+    ///     Builds the op18 monster-action replication frame from the monster's cached action descriptor.
+    /// </summary>
+    /// <remarks>
+    ///     Réf. C++ : the target descriptor mirrors <c>mDATA.mAction</c> as legacy fills it at each state
+    ///     transition. When a target is locked, <c>aTargetObjectIndex</c> and <c>aTargetObjectUniqueNumber</c>
+    ///     are the pursued avatar's own index+unique number (never one without the other --
+    ///     <c>Server/ts25zone/S07_MyGame05.cpp:945-946,1104-1105,1373-1374</c>), and <c>aTargetLocation</c> is
+    ///     the movement/attack destination toward that avatar. When idle, legacy's <c>aTargetObjectIndex</c> is
+    ///     <c>-1</c> (NOT 0 -- 0 is a valid avatar slot the client would resolve as a real player), its unique
+    ///     number 0, and <c>aTargetObjectSort</c> 0 (the monster-spawn init at
+    ///     <c>Server/ts25zone/S10_MySummon.cpp:784-786</c>; <c>aTargetObjectSort</c> is never reassigned for a
+    ///     monster anywhere in the AI update, so it stays 0). The previous implementation hardcoded index
+    ///     <c>?? 0</c>, unique number 0, and <c>aTargetLocation</c> to the monster's own position -- a malformed
+    ///     descriptor a wire-bot stores harmlessly but a real client's renderer chokes on.
+    /// </remarks>
     private static MonsterReplicationResponse BuildMonsterActionRecv(MonsterEntity monster,
         int checkChangeActionState)
     {
+        // Idle: index -1 (legacy sentinel, S10_MySummon.cpp:785 -- NOT 0, which is a valid avatar slot), unique
+        // number 0. Locked: the pursued avatar's own index + unique number, always paired.
+        var targetIndex = monster.TargetCharacterId ?? -1;
+        var targetUniqueNumber = monster.TargetCharacterId is null ? 0 : unchecked((int)monster.TargetUniqueNumber);
         return new MonsterReplicationResponse
         {
             ServerIndex = monster.ServerIndex,
@@ -689,7 +742,7 @@ public sealed partial class Zone
                     Sort = (int)monster.AiState,
                     Frame = 0,
                     Location = [monster.PosX, monster.PosY, monster.PosZ],
-                    TargetLocation = [monster.PosX, monster.PosY, monster.PosZ],
+                    TargetLocation = [monster.TargetLocationX, monster.TargetLocationY, monster.TargetLocationZ],
                     Front = monster.Heading,
                     TargetFront = monster.Heading,
                     PetLocation = new float[3],
@@ -697,8 +750,8 @@ public sealed partial class Zone
                     PetFront = 0,
                     PetSort = 0,
                     TargetObjectSort = 0,
-                    TargetObjectIndex = monster.TargetCharacterId ?? 0,
-                    TargetObjectUniqueNumber = 0,
+                    TargetObjectIndex = targetIndex,
+                    TargetObjectUniqueNumber = targetUniqueNumber,
                     SkillNumber = 0,
                     SkillGradeNum1 = 0,
                     SkillGradeNum2 = 0,

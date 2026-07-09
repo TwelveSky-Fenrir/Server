@@ -408,6 +408,34 @@ public class CombatResolverTests
         Assert.Equal(50, outcome.DamageApplied);
     }
 
+    [Fact]
+    public void OverkillBlow_ViewDamageIsFullHit_RealDamageIsCappedToLife()
+    {
+        // S07_MyGame02.cpp:1361-1366 -- mAttackViewDamageValue (the floating damage number the client shows)
+        // is captured BEFORE the life-cap clamp; mAttackRealDamageValue (life actually lost) AFTER it. On a
+        // killing/overkill blow the two MUST diverge: the client still displays the full hit size.
+        var attacker = Combatant(1, 0, 1_000_000);
+        var defender = Combatant(2, 1, defensePower: 0, life: 50);
+        var outcome = CombatResolver.ResolveEnemyTribeAttack(attacker, defender, MeleeRequest(1, 2), TimeSpan.Zero,
+            null, new ScriptedRandomSource(0, 0));
+        // (1_000_000-0) -> variance no-op -> no crit -> /5 = 200_000 (the full "view" hit), capped to 50 life.
+        Assert.Equal(200_000, outcome.ViewDamage);
+        Assert.Equal(50, outcome.DamageApplied);
+    }
+
+    [Fact]
+    public void NonLethalBlow_ViewDamageEqualsRealDamage()
+    {
+        // The two numbers coincide whenever the computed hit is at most the defender's remaining life.
+        var attacker = Combatant(1, 0, 1000);
+        var defender = Combatant(2, 1, defensePower: 200);
+        var outcome = CombatResolver.ResolveEnemyTribeAttack(attacker, defender, MeleeRequest(1, 2), TimeSpan.Zero,
+            null, new ScriptedRandomSource(0, 0));
+        // (1000-200)/5 = 160, far below the defender's 100_000 life -> no clamp -> view == real.
+        Assert.Equal(160, outcome.DamageApplied);
+        Assert.Equal(160, outcome.ViewDamage);
+    }
+
     private static AttackForProtocol DuelRequest(int attackerId, int defenderId)
     {
         return new AttackForProtocol
@@ -531,6 +559,18 @@ public class CombatResolverTests
         var outcome = CombatResolver.ResolveDuelAttack(attacker, defender, DuelRequest(1, 2), TimeSpan.Zero, null,
             new ScriptedRandomSource(0, 0), true, false, 2);
         Assert.False(outcome.Rejected);
+        Assert.Equal(50, outcome.DamageApplied);
+    }
+
+    [Fact]
+    public void Duel_OverkillBlow_ViewDamageIsFullHit_RealDamageIsCappedToLife()
+    {
+        // Duel shares AttackPlayer's view-before-clamp / real-after-clamp split (S07_MyGame02.cpp:1361-1366).
+        var attacker = Combatant(1, 0, 1_000_000);
+        var defender = Combatant(2, 0, defensePower: 0, life: 50);
+        var outcome = CombatResolver.ResolveDuelAttack(attacker, defender, DuelRequest(1, 2), TimeSpan.Zero, null,
+            new ScriptedRandomSource(0, 0), true, false, 2);
+        Assert.Equal(200_000, outcome.ViewDamage);
         Assert.Equal(50, outcome.DamageApplied);
     }
 }

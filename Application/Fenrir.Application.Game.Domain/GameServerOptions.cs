@@ -76,10 +76,24 @@ public sealed class GameServerOptions
     public float AoiCellSize { get; set; } = 1000f;
 
     /// <summary>
-    ///     Anti-speed-hack budget. No legacy source documents an exact speed for M1's map, so this is a generous
-    ///     placeholder, not real game-balance tuning.
+    ///     Anti-teleport backstop: the maximum straight-line 3D distance a single accepted move
+    ///     (CZ_AVATAR_ACTION_SEND / op15) may jump from the player's last accepted position, in world units.
+    ///     Default 666 -- the sole numeric threshold that ever existed in the legacy op15 handler's DISABLED
+    ///     "# Defense Hack #" block (<c>Server/ts25zone/S04_MyWork02.cpp:1741</c>: <c>fRange > 666.0f</c> where
+    ///     <c>fRange = mUTIL.ReturnLengthXYZ(...)</c>, the full 3-axis distance -- ReturnLengthXYZ is 3D,
+    ///     <c>Server/ts25zone/S07_MyGame03.cpp:5040-5043</c>). Legacy shipped that entire block commented out
+    ///     (<c>S04_MyWork02.cpp:1738-1768</c>; corroborated <c>ServerDocs/12_ts25zone/04_MyWork02_PartieA.md:150-156</c>),
+    ///     so legacy movement is fully client-authoritative with NO server speed/position check at all. Fenrir
+    ///     reinstates only that one cited 666-unit ceiling and its 3D formula as an active backstop against gross
+    ///     teleport hacks -- applied per consecutive accepted move (see MovementRules for why this corrects, and
+    ///     is safer than, legacy's stale-<c>mPRE_LOCATION</c> reference), strictly more protective than legacy and
+    ///     never less permissive for legitimate play (666 units is roughly ten times an ordinary walk step, so
+    ///     normal movement never trips it). This deliberately replaces the earlier Fenrir-invented units/second
+    ///     budget, which at the real world-coordinate scale (a zone spans thousands of units) rejected ordinary
+    ///     walking and snapped legitimate clients back. Set to a very large value to effectively disable it
+    ///     (closest to raw legacy behavior).
     /// </summary>
-    public float MaxPlausibleSpeedPerSecond { get; set; } = 20f;
+    public float MaxPlausibleMoveDistance { get; set; } = 666f;
 
     /// <summary>How often this shard refreshes its <c>runtime.GameServerDirectory</c> heartbeat row.</summary>
     public int HeartbeatIntervalSeconds { get; set; } = 5;

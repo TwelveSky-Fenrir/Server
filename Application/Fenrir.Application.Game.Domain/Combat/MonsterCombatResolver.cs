@@ -140,10 +140,14 @@ public static class MonsterCombatResolver
             elementDamage = attacker.Stats.ElementAttackPower - monster.Template.ElementDefensePower;
         damage += elementDamage;
 
+        // "View" damage (S07_MyGame02.cpp:2371) is captured BEFORE the life-cap clamp (:2372-2375); "real"
+        // damage (:2376) is the clamped value -- same view-before-clamp / real-after-clamp split as PvP.
+        var viewDamage = damage;
         if (damage > monster.Life)
             damage = monster.Life;
 
-        return new AttackOutcome(false, AttackRejectReason.None, true, critical, damage, elementDamage, chargeConsumed);
+        return new AttackOutcome(false, AttackRejectReason.None, true, critical, damage, viewDamage, elementDamage,
+            chargeConsumed);
     }
 
     /// <summary>
@@ -202,9 +206,13 @@ public static class MonsterCombatResolver
             elementDamage = monster.Template.ElementAttackPower - defender.Stats.ElementDefensePower;
         damage += elementDamage;
 
+        // "View" damage (S07_MyGame02.cpp:3428) is captured BEFORE the life-cap clamp (:3429-3432); "real"
+        // damage (:3433) is the clamped value -- same view-before-clamp / real-after-clamp split as PvP/PvM.
+        var viewDamage = damage;
         if (damage > defender.Life)
             damage = defender.Life;
 
-        return new AttackOutcome(false, AttackRejectReason.None, true, critical, damage, elementDamage, false);
+        return new AttackOutcome(false, AttackRejectReason.None, true, critical, damage, viewDamage, elementDamage,
+            false);
     }
 }

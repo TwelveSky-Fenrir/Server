@@ -29,8 +29,8 @@ public sealed class GameServerOptionsValidator : IValidateOptions<GameServerOpti
         // finding this comment was added for.
         if (options.TickRateHz <= 0) errors.Add($"Game:TickRateHz must be positive (was {options.TickRateHz}).");
         if (options.AoiCellSize <= 0) errors.Add($"Game:AoiCellSize must be positive (was {options.AoiCellSize}).");
-        if (options.MaxPlausibleSpeedPerSecond <= 0)
-            errors.Add($"Game:MaxPlausibleSpeedPerSecond must be positive (was {options.MaxPlausibleSpeedPerSecond}).");
+        if (options.MaxPlausibleMoveDistance <= 0)
+            errors.Add($"Game:MaxPlausibleMoveDistance must be positive (was {options.MaxPlausibleMoveDistance}).");
         if (options.HeartbeatIntervalSeconds <= 0)
             errors.Add($"Game:HeartbeatIntervalSeconds must be positive (was {options.HeartbeatIntervalSeconds}).");
         if (options.HeroRankingRolloverCheckIntervalMinutes <= 0)

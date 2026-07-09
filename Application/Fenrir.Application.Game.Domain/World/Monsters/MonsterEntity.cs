@@ -117,7 +117,59 @@ public sealed class MonsterEntity
     public int StateTicks { get; set; }
 
     /// <summary>The currently-locked pursuit target, or null when idle/patrolling/returning.</summary>
-    public int? TargetCharacterId { get; set; }
+    /// <remarks>
+    ///     Set and cleared only through <see cref="AssignTarget" />/<see cref="ReleaseTarget" /> so the wire
+    ///     target descriptor (index AND unique number) is always written as one unit -- legacy never sets
+    ///     <c>aTargetObjectIndex</c> without also setting <c>aTargetObjectUniqueNumber</c> in the same beat
+    ///     (<c>Server/ts25zone/S07_MyGame05.cpp:945-946,992-993,1104-1105,1373-1374</c>).
+    /// </remarks>
+    public int? TargetCharacterId { get; private set; }
+
+    /// <summary>
+    ///     The locked target avatar's own wire unique number (legacy <c>aTargetObjectUniqueNumber</c>), cached
+    ///     alongside <see cref="TargetCharacterId" /> so a monster-action broadcast can re-send the full target
+    ///     descriptor the client validates (index and unique number together). 0 while idle.
+    /// </summary>
+    public uint TargetUniqueNumber { get; private set; }
+
+    /// <summary>
+    ///     The monster's current broadcast action destination (legacy <c>aTargetLocation</c>): the wander point
+    ///     while patrolling, the pursued avatar's live position while chasing/attacking. Broadcast so a moving
+    ///     monster renders walking toward its real destination instead of standing on its own coordinates
+    ///     (the previous hardcode set this to the monster's own position, a wire divergence from legacy).
+    /// </summary>
+    public float TargetLocationX { get; set; }
+
+    public float TargetLocationY { get; set; }
+
+    public float TargetLocationZ { get; set; }
+
+    /// <summary>
+    ///     Locks <paramref name="characterId" /> as the pursuit target and captures its wire identity and live
+    ///     position as the broadcast target descriptor -- legacy sets <c>aTargetObjectIndex</c>,
+    ///     <c>aTargetObjectUniqueNumber</c>, and (for the moving/attacking transitions) <c>aTargetLocation</c>
+    ///     together (<c>Server/ts25zone/S07_MyGame05.cpp:1104-1105,1166-1171,1373-1374</c>).
+    /// </summary>
+    public void AssignTarget(int characterId, uint uniqueNumber, float x, float y, float z)
+    {
+        TargetCharacterId = characterId;
+        TargetUniqueNumber = uniqueNumber;
+        TargetLocationX = x;
+        TargetLocationY = y;
+        TargetLocationZ = z;
+    }
+
+    /// <summary>
+    ///     Clears the pursuit-target descriptor -- legacy routes an invalid/out-of-range chase target back to the
+    ///     idle state with no target (<c>Server/ts25zone/S07_MyGame05.cpp:1351-1365</c>). Deliberately leaves
+    ///     <see cref="TargetLocationX" />/Y/Z at their last value, matching legacy's retention of the stale
+    ///     <c>aTargetLocation</c> across the transition back to idle.
+    /// </summary>
+    public void ReleaseTarget()
+    {
+        TargetCharacterId = null;
+        TargetUniqueNumber = 0;
+    }
 
     public TimeSpan LastRebroadcastAt { get; set; }
 
@@ -215,6 +267,11 @@ public sealed class MonsterEntity
             PosX = homeX,
             PosY = homeY,
             PosZ = homeZ,
+            // aTargetLocation seeded at home so an idle monster's broadcast destination is its own resting
+            // spot until the first Patrol/Chase transition sets a real one (legacy retains the last value).
+            TargetLocationX = homeX,
+            TargetLocationY = homeY,
+            TargetLocationZ = homeZ,
             InstanceId = instanceId,
             PursuerCapacity = pursuerCapacity
         };

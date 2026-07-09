@@ -80,8 +80,7 @@ public static class PvpKillRewardZoneCatalog
 
     /// <summary>
     ///     No legacy source value plumbed to this contract for the FFA branch's fixed hero-point amount --
-    ///     "only worth exactly a fixed small amount." Placeholder, not real game-balance tuning (same posture
-    ///     as <see cref="Fenrir.Application.Game.Domain.GameServerOptions.MaxPlausibleSpeedPerSecond" />).
+    ///     "only worth exactly a fixed small amount." Placeholder, not real game-balance tuning.
     /// </summary>
     public const int FfaHeroPointAmount = 1;
 

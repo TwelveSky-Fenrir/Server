@@ -34,8 +34,7 @@ public static class PvpKillExperienceCalculator
 
     /// <summary>
     ///     No per-defender-level EXP table was given to the source contract -- see class remarks. Flat
-    ///     placeholder, not real game-balance tuning (same posture as
-    ///     <see cref="Fenrir.Application.Game.Domain.GameServerOptions.MaxPlausibleSpeedPerSecond" />).
+    ///     placeholder, not real game-balance tuning.
     /// </summary>
     public const int PlaceholderBaseAmountPerKill = 50;
 

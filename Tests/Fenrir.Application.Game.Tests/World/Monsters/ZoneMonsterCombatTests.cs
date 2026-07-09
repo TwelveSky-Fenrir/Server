@@ -7,6 +7,7 @@ using Fenrir.Application.Game.Stats;
 using Fenrir.Application.Game.Tests.GameData;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Network.Serialization.Shared.Packets.Shared;
+using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Application.Game.Tests.World.Monsters;
 
@@ -15,11 +16,12 @@ public class ZoneMonsterCombatTests
 {
     private static readonly EffectiveStats StrongAttacker = new(1000, 1000, 500, 0, 1000, 0, 0, 0, 0, 0, 0);
 
-    private static WorldDataCache CacheWithOneRegion(int monsterDefensePower = 0, int monsterAttackBlock = 0)
+    private static WorldDataCache CacheWithOneRegion(int monsterDefensePower = 0, int monsterAttackBlock = 0,
+        int monsterLife = 1000)
     {
         var monster = WorldDataTestRows.Monster(700) with
         {
-            Life = 1000,
+            Life = monsterLife,
             ItemLevel = 1,
             RealLevel = 1,
             GeneralExperience = 10,
@@ -132,6 +134,43 @@ public class ZoneMonsterCombatTests
 
         Assert.True(zone.TryGetMonster(1, out var damaged));
         Assert.True(damaged!.Life < startingLife);
+    }
+
+    /// <summary>
+    ///     Legacy-parity regression (S07_MyGame02.cpp:2371-2376): PvM shares AttackPlayer's view-before-clamp /
+    ///     real-after-clamp split. A monster with 10 HP left struck for a computed 500 must broadcast
+    ///     <c>mAttackViewDamageValue</c> = 500 (the full hit the client displays) but
+    ///     <c>mAttackRealDamageValue</c> = 10 (the life actually lost) -- before the fix both were collapsed onto
+    ///     the capped 10.
+    /// </summary>
+    [Fact]
+    public void PvmAttack_KillingBlow_BroadcastCarriesUncappedViewDamage_ButCappedRealDamage()
+    {
+        // Monster spawns with only 10 HP -- StrongAttacker's 500 attack power (no monster defence) far overkills
+        // it in one hit, so the computed 500 exceeds the 10 remaining life and the two damage numbers diverge.
+        var zone = CreateZoneWithSpawnedMonster(CacheWithOneRegion(monsterLife: 10), 10, out var attackerPipe);
+        Assert.True(zone.TryGetMonster(1, out var monster));
+
+        ZoneTestKit.DrainOutbound(attackerPipe); // clear enter/spawn chatter before the measured attack
+
+        zone.PostCombatCommand(new CombatCommand
+        {
+            AttackerCharacterId = 10,
+            AttackInfo = MeleeAgainstMonster(10, monster!)
+        });
+        zone.Tick(SimulationClock.LegacyTick);
+
+        Assert.Equal(0, zone.MonsterCount); // the blow was lethal (real damage capped to the 10 remaining life)
+
+        // First frame on the attacker's wire is the ZC_PROCESS_ATTACK_RECV broadcast (emitted before the
+        // monster-death broadcast that follows): [1-byte opcode][68-byte AttackForProtocol payload].
+        var actual = ZoneTestKit.DrainOutbound(attackerPipe);
+        Assert.True(actual.Length >= 1 + AttackForProtocol.WireSize);
+        Assert.Equal(AttackResponse.Opcode, actual[0]);
+        Assert.True(AttackForProtocol.TryRead(actual.AsSpan(1, AttackForProtocol.WireSize), out var info));
+
+        Assert.Equal(500, info.AttackViewDamageValue); // full computed hit, BEFORE the life cap (no PvM /5)
+        Assert.Equal(10, info.AttackRealDamageValue); // capped to the monster's remaining life
     }
 
     [Fact]

@@ -38,8 +38,7 @@ public static class PvpKillContributionPointCalculator
 {
     /// <summary>
     ///     "Starts from a configured base value" -- no legacy source value plumbed to this contract.
-    ///     Placeholder, not real game-balance tuning (same posture as
-    ///     <see cref="Fenrir.Application.Game.Domain.GameServerOptions.MaxPlausibleSpeedPerSecond" />).
+    ///     Placeholder, not real game-balance tuning.
     /// </summary>
     public const int BasePerKillAmount = 2;
 

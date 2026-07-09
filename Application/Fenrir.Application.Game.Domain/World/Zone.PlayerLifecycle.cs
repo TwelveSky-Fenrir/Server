@@ -1036,8 +1036,9 @@ public sealed partial class Zone
         // applies to this opcode is a hostile-client signal (a real client only ever sends a legal
         // combination for the opcode it used), not an ordinary business-rule failure -- the whole session is
         // torn down, matching every other malformed-input handler in this class. Runs ahead of
-        // MovementRules.IsPlausible below (a Fenrir-only anti-speed-hack addition with no legacy analogue)
-        // since this is validating the packet's shape, not its claimed position.
+        // MovementRules.IsPlausible below (which reinstates the legacy's DISABLED 666-unit per-move distance
+        // backstop, S04_MyWork02.cpp:1738-1768 "# Defense Hack #") since this is validating the packet's shape,
+        // not its claimed position.
         var motion = default(CharacterMotionEvaluation);
         if (isResumeAction)
         {
@@ -1057,10 +1058,16 @@ public sealed partial class Zone
 
         var now = DateTime.UtcNow;
 
-        if (!movementRules.IsPlausible(state, in action, now, Geometry))
+        if (!movementRules.IsPlausible(state, in action, Geometry))
         {
             // Reject: reply with the player's own last-known-good state so the client corrects itself -- no
             // dedicated ForcePositionSync packet exists in the M1 protocol, so this reuses ZC_AVATAR_ACTION_RECV.
+            // With the distance backstop set to the legacy 666-unit ceiling, this only ever fires for a gross
+            // teleport hack (a single move jumping 10x+ an ordinary walk step), never for legitimate movement --
+            // so, unlike the earlier units/second budget, it no longer snaps back ordinary walking. Legacy's own
+            // equivalent snap-back (restore mPRE_LOCATION, S04_MyWork02.cpp:1755-1759) shipped commented out, so
+            // this is Fenrir hardening beyond legacy, deliberately gated behind a threshold legitimate play never
+            // reaches.
             SendAvatarAction(state.Session, state);
             return;
         }
@@ -1251,14 +1258,24 @@ public sealed partial class Zone
             return;
 
         worldData.SkillsById.TryGetValue(action.SkillNumber, out var skillDef);
-        var gradePoints = action.SkillGradeNum1 + action.SkillGradeNum2;
+        // Mana cost is derived from the caster's INVESTED grade points (aSkillGradeNum1) ONLY -- never the
+        // item-bonus grade (aSkillGradeNum2, the GetBonusSkillValue the client echoes). Réf. C++ :
+        // Server/ts25zone/S04_MyWork02.cpp:1640 (op15 tSkillSort==2 mana charge passes aSkillGradeNum1 alone
+        // to ReturnSkillValue, factor 1), in deliberate contrast to EVERY effect-value lookup
+        // (ProcessForCreateBuff, S07_MyGame03.cpp:9328-9618), which always uses
+        // aSkillGradeNum1 + aSkillGradeNum2. Phase A here consumes only result.ManaCost (and the success
+        // gate, whose mana-sufficiency check the legacy also runs against this same num1-only cost at
+        // S04_MyWork02.cpp:1646); the buff writes it also computes are DISCARDED and re-derived, from the full
+        // num1+num2 grade, by ApplySkillEffectConfirm on the op16 confirm -- so passing num1 alone yields the
+        // exact legacy mana cost without altering any effect value.
+        var manaGradePoints = action.SkillGradeNum1;
         var weaponItemId = state.Inventory.GetSlot(ContainerMatrix.Equipment, 7)?.ItemId;
         var weaponSort = weaponItemId is { } id && worldData.ItemsById.TryGetValue(id, out var weaponDef)
             ? (int?)weaponDef.Item.Sort
             : null;
         var maxLife = state.Stats?.MaxLife ?? state.MaxLife;
 
-        var result = SkillCastResolver.TryCast(skillDef, gradePoints, state.Mana, maxLife, weaponSort,
+        var result = SkillCastResolver.TryCast(skillDef, manaGradePoints, state.Mana, maxLife, weaponSort,
             state.SupportSkillTimeUpRatio);
         if (!result.Success)
             return;

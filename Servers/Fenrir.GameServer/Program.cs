@@ -155,7 +155,7 @@ if (mapsMissingGeometry.Count > 0)
     bootLogger.LogWarning(
         "{MissingCount} of {HostedCount} hosted map(s) loaded without navmesh (.WM) data: [{MapIds}] -- on these " +
         "maps, monster pathing (MonsterAiSystem.MoveToward) is unconstrained by terrain/obstacles and " +
-        "player-movement validation (MovementRules.IsPlausible) degrades to its speed-only check, until real " +
+        "player-movement validation (MovementRules.IsPlausible) degrades to its per-move distance check only, until real " +
         ".WM assets are deployed for them. See the per-map warning/error already logged above by " +
         "Zone.TryLoadGeometry for each map's specific cause (missing file vs. parse failure).",
         mapsMissingGeometry.Count, hostedMaps.Count, string.Join(", ", mapsMissingGeometry));

@@ -553,7 +553,7 @@ public sealed partial class Zone(
                 "No world geometry found at {Path} for MapId {MapId} -- monster pathing (MonsterAiSystem.MoveToward) " +
                 "will not be constrained by terrain/obstacles and will not snap to ground height, and player-movement " +
                 "validation (MovementRules.IsPlausible) will skip its walkability/ground-height sub-checks (the " +
-                "independent speed-budget check still applies). Expected until real .WM navmesh assets are deployed " +
+                "independent per-move distance backstop still applies). Expected until real .WM navmesh assets are deployed " +
                 "for this map -- see GameServerOptionsValidator's remarks for why this is not a startup-blocking check",
                 wmPath, mapId);
             return null;

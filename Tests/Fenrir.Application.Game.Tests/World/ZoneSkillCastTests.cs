@@ -29,6 +29,22 @@ public class ZoneSkillCastTests
         return new SkillDefinition(row, ImmutableArray<SkillDescriptionRowDto>.Empty, [grade0, grade1]);
     }
 
+    /// <summary>
+    ///     Holy Shield with distinct per-grade ManaUse/ShieldLifeUp so a mismatch between the grade used for
+    ///     the mana cost (invested only) and the grade used for the effect (invested + item bonus) is
+    ///     observable -- unlike <see cref="HolyShieldSkill" />, which holds both constant across grades.
+    /// </summary>
+    private static SkillDefinition HolyShieldSkillGraded(byte maxUpgradePoint,
+        (short Mana, byte Shield, short RunTime) grade0, (short Mana, byte Shield, short RunTime) grade1)
+    {
+        var row = new SkillRowDto(82, "Holy Shield", 0, 0, 0, 0, 0, 1, maxUpgradePoint, 1, 0);
+        var g0 = new SkillGradeRowDto(82, 0, grade0.Mana, 0, 0, 0, 0, 0, 0, 0, 0, grade0.RunTime, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, grade0.Shield, 0, 0, 0, 0, 0);
+        var g1 = new SkillGradeRowDto(82, 1, grade1.Mana, 0, 0, 0, 0, 0, 0, 0, 0, grade1.RunTime, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, grade1.Shield, 0, 0, 0, 0, 0);
+        return new SkillDefinition(row, ImmutableArray<SkillDescriptionRowDto>.Empty, [g0, g1]);
+    }
+
     private static SkillDefinition HealLifeSkill(byte maxUpgradePoint, short manaUse, byte healAmount)
     {
         var row = new SkillRowDto(106, "Heal", 0, 0, 0, 0, 0, 1, maxUpgradePoint, 1, 0);
@@ -44,7 +60,7 @@ public class ZoneSkillCastTests
     ///     <c>CharacterMotionWhitelist</c>'s skill-cast category (2) for any Type -- charges mana only, never
     ///     writes an effect.
     /// </summary>
-    private static ActionInfo SkillCastStartAction(int skillNumber, int gradeNum1)
+    private static ActionInfo SkillCastStartAction(int skillNumber, int gradeNum1, int gradeNum2 = 0)
     {
         return new ActionInfo
         {
@@ -53,7 +69,7 @@ public class ZoneSkillCastTests
             Front = 0, TargetFront = 0,
             PetLocation = new float[3], PetTargetLocation = new float[3], PetFront = 0, PetSort = 0,
             TargetObjectSort = 0, TargetObjectIndex = 0, TargetObjectUniqueNumber = 0,
-            SkillNumber = skillNumber, SkillGradeNum1 = gradeNum1, SkillGradeNum2 = 0, SkillValue = 0
+            SkillNumber = skillNumber, SkillGradeNum1 = gradeNum1, SkillGradeNum2 = gradeNum2, SkillValue = 0
         };
     }
 
@@ -61,7 +77,8 @@ public class ZoneSkillCastTests
     ///     Phase B (op16, effect confirm): action-Sort 1, echoing the same skill number/grade Phase A last
     ///     recorded -- this is what actually writes the buff/heal effect.
     /// </summary>
-    private static ActionInfo SkillEffectConfirmAction(int skillNumber, int gradeNum1, int targetCharacterId = 0)
+    private static ActionInfo SkillEffectConfirmAction(int skillNumber, int gradeNum1, int targetCharacterId = 0,
+        int gradeNum2 = 0)
     {
         return new ActionInfo
         {
@@ -71,7 +88,7 @@ public class ZoneSkillCastTests
             PetLocation = new float[3], PetTargetLocation = new float[3], PetFront = 0, PetSort = 0,
             TargetObjectSort = 0, TargetObjectIndex = targetCharacterId,
             TargetObjectUniqueNumber = unchecked((int)(uint)targetCharacterId),
-            SkillNumber = skillNumber, SkillGradeNum1 = gradeNum1, SkillGradeNum2 = 0, SkillValue = 0
+            SkillNumber = skillNumber, SkillGradeNum1 = gradeNum1, SkillGradeNum2 = gradeNum2, SkillValue = 0
         };
     }
 
@@ -104,6 +121,52 @@ public class ZoneSkillCastTests
 
         Assert.Equal(manaBefore - 30, state.Mana); // Phase B never (re)charges mana
         Assert.Equal(168, state.Buffs.Buff[9 * 2]); // 20% of MaxLife(840) = 168
+        Assert.Equal(40, state.Buffs.Buff[9 * 2 + 1]);
+    }
+
+    /// <summary>
+    ///     Legacy-parity regression: a skill cast's MANA cost is derived from the caster's invested grade
+    ///     points (<c>aSkillGradeNum1</c>) ALONE, while the buff/heal EFFECT is derived from the combined
+    ///     grade (<c>aSkillGradeNum1 + aSkillGradeNum2</c>, the item-granted <c>GetBonusSkillValue</c> the
+    ///     client echoes). Réf. C++ : <c>Server/ts25zone/S04_MyWork02.cpp:1640</c> (op15 mana charge passes
+    ///     <c>aSkillGradeNum1</c> alone to <c>ReturnSkillValue</c> factor 1) vs
+    ///     <c>Server/ts25zone/S07_MyGame03.cpp:9398-9399</c> (<c>ProcessForCreateBuff</c> case 82 computes the
+    ///     shield value/duration from <c>aSkillGradeNum1 + aSkillGradeNum2</c>). Before the fix, Phase A
+    ///     charged the combined grade -- over-charging every player holding a skill-bonus item.
+    /// </summary>
+    [Fact]
+    public void SkillCast_ManaUsesInvestedGradeOnly_EffectUsesInvestedPlusItemBonusGrade()
+    {
+        // ManaUse interpolates 0 (grade0) -> 100 (grade1) over MaxUpgradePoint 10; ShieldLifeUp 0 -> 20%.
+        var skillsById = new Dictionary<int, SkillDefinition>
+        {
+            [82] = HolyShieldSkillGraded(10, grade0: (0, 0, 40), grade1: (100, 20, 40))
+        }.ToFrozenDictionary();
+        var worldData = ZoneTestKit.EmptyWorldData(skillsById: skillsById);
+        var zone = ZoneTestKit.CreateZone(1, worldData: worldData);
+        var (session, _) = ZoneTestKit.CreateSession(1);
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.True(zone.TryGetPlayer(10, out var state));
+        var manaBefore = state!.Mana; // 300 (EnterData default), MaxLife=840
+
+        // Invested points num1=5, item-bonus num2=5 -> combined grade 10 (== MaxUpgradePoint, the max value).
+        // Phase A charges from num1=5 alone: ReturnSkillValue(sPoint=5) = 0 + (100-0)*5/10 = 50.
+        // The pre-fix bug charged the combined grade 10 -> ReturnSkillValue(10) = 100.
+        zone.Post(ZoneCommand.Move(10, SkillCastStartAction(82, 5, 5)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.Equal(manaBefore - 50, state.Mana);
+        Assert.Equal(0, state.Buffs.Buff[9 * 2]); // effect not written until Phase B
+
+        // Phase B echoes num1=5, num2=5 -> effect uses the combined grade 10: ShieldLifeUp = 20% of MaxLife
+        // (840) = 168, proving the effect still honors the full invested+bonus grade after the mana fix.
+        zone.Post(ZoneCommand.Move(10, SkillEffectConfirmAction(82, 5, 0, 5), true));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+
+        Assert.Equal(manaBefore - 50, state.Mana); // Phase B never (re)charges mana
+        Assert.Equal(168, state.Buffs.Buff[9 * 2]);
         Assert.Equal(40, state.Buffs.Buff[9 * 2 + 1]);
     }
 

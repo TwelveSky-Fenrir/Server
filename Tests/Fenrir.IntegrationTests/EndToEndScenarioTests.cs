@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.IntegrationTests.Fixtures;
@@ -527,18 +526,19 @@ public sealed class EndToEndScenarioTests
     }
 
     /// <summary>
-    ///     Repeated small, MovementRules.IsPlausible-respecting steps rather than one big teleport -- every step
-    ///     is a genuine, independently validated CZ_AVATAR_ACTION_SEND, not a single lucky first-move exemption.
-    ///     Returns the resulting position (async methods can't take ref/out parameters).
+    ///     Repeated steps each within MovementRules' per-move distance backstop
+    ///     (<c>GameServerOptions.MaxPlausibleMoveDistance</c>, 666 units, 3D) rather than one unbounded teleport
+    ///     -- every step is a genuine, independently validated CZ_AVATAR_ACTION_SEND, not a single lucky
+    ///     first-move exemption. Unlike the previous units/second budget, this no longer needs to be throttled to
+    ///     a wall-clock rate: the backstop is a flat per-packet distance ceiling with no time coupling, matching
+    ///     the legacy (disabled) <c>fRange &gt; 666.0f</c> check, so a fixed sub-666 step size is all that is
+    ///     required. Returns the resulting position (async methods can't take ref/out parameters).
     /// </summary>
     private static async Task<(float X, float Y, float Z)> MoveToAsync(ZoneBotClient zone, float x, float y,
         float z, float targetX, float targetY, float targetZ, CancellationToken ct)
     {
-        const float maxPlausibleSpeedPerSecond = 20f; // GameServerOptions.MaxPlausibleSpeedPerSecond default
-        const float slackUnits = 1f; // MovementRules.SlackUnits
-        const float safetyFactor = 0.7f;
-
-        var stopwatch = Stopwatch.StartNew();
+        const float maxPlausibleMoveDistance = 666f; // GameServerOptions.MaxPlausibleMoveDistance default
+        const float stepDistance = maxPlausibleMoveDistance * 0.6f; // comfortably under the per-move 3D ceiling
 
         while (true)
         {
@@ -554,15 +554,13 @@ public sealed class EndToEndScenarioTests
                 return (x, y, z);
             }
 
-            var elapsedSeconds = (float)stopwatch.Elapsed.TotalSeconds;
-            stopwatch.Restart();
-            var budget = (maxPlausibleSpeedPerSecond * MathF.Max(elapsedSeconds, 0.05f) + slackUnits) *
-                         safetyFactor;
-            var step = MathF.Min(remaining, budget);
-
-            x += dx / remaining * step;
-            z += dz / remaining * step;
-            y = targetY; // MovementRules only speed-checks X/Z; Y (height) isn't part of the plausibility gate
+            var step = MathF.Min(remaining, stepDistance);
+            var fraction = step / remaining;
+            x += dx * fraction;
+            z += dz * fraction;
+            // Move Y in lockstep with the XZ fraction -- the backstop distance is now 3D (includes Y), so a large
+            // one-shot Y jump could otherwise push a single step over the 666 ceiling.
+            y += (targetY - y) * fraction;
 
             await zone.MoveAsync(x, y, z, 0f, ct);
             await Task.Delay(TimeSpan.FromMilliseconds(200), ct);

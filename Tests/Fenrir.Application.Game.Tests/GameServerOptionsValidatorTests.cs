@@ -13,7 +13,7 @@ public class GameServerOptionsValidatorTests
         string? publicHost = "127.0.0.1",
         int tickRateHz = 20,
         float aoiCellSize = 75f,
-        float maxPlausibleSpeedPerSecond = 20f,
+        float maxPlausibleMoveDistance = 666f,
         int heartbeatIntervalSeconds = 5,
         int capacity = 300,
         string? gameDataDirectory = "GameData",
@@ -41,7 +41,7 @@ public class GameServerOptionsValidatorTests
             PublicHost = publicHost!,
             TickRateHz = tickRateHz,
             AoiCellSize = aoiCellSize,
-            MaxPlausibleSpeedPerSecond = maxPlausibleSpeedPerSecond,
+            MaxPlausibleMoveDistance = maxPlausibleMoveDistance,
             HeartbeatIntervalSeconds = heartbeatIntervalSeconds,
             Capacity = capacity,
             GameDataDirectory = gameDataDirectory!,
@@ -130,12 +130,12 @@ public class GameServerOptionsValidatorTests
     [Theory]
     [InlineData(0f)]
     [InlineData(-1f)]
-    public void Validate_MaxPlausibleSpeedPerSecondNotPositive_Fails(float speed)
+    public void Validate_MaxPlausibleMoveDistanceNotPositive_Fails(float distance)
     {
-        var result = Validator.Validate(null, Options(maxPlausibleSpeedPerSecond: speed));
+        var result = Validator.Validate(null, Options(maxPlausibleMoveDistance: distance));
 
         Assert.True(result.Failed);
-        Assert.Contains(result.Failures!, f => f.Contains("Game:MaxPlausibleSpeedPerSecond"));
+        Assert.Contains(result.Failures!, f => f.Contains("Game:MaxPlausibleMoveDistance"));
     }
 
     [Theory]

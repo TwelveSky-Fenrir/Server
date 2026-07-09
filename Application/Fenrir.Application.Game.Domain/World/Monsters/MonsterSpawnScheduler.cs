@@ -75,6 +75,12 @@ internal sealed class MonsterZoneSpawnState
 ///         ZoneRegistry). Deferring the lookup until first use (i.e. the first monster kill) resolves it after
 ///         every singleton, including <see cref="ZoneRegistry" /> itself, is already constructed and cached.
 ///     </para>
+///     <para>
+///         <paramref name="valleyWarKillRegistry" /> needs no such deferral: <see cref="ZoneWar.ValleyWarKillRegistry" />
+///         is a plain leaf singleton with no <see cref="ZoneRegistry" /> dependency of its own, so a direct
+///         reference here carries no constructor-cycle risk. See <see cref="ProcessDeath" />'s own call site for
+///         the Valley of the Deceased (Zone 200/297/298/299) kill-race quota decrement this feeds.
+///     </para>
 /// </remarks>
 public sealed class MonsterSpawnScheduler(
     WorldDataCache worldData,
@@ -82,7 +88,8 @@ public sealed class MonsterSpawnScheduler(
     PartyRegistry? partyRegistry = null,
     Lazy<ZoneEventBroadcaster>? zoneEventBroadcaster = null,
     MonsterBossRespawnTracker? bossRespawnTracker = null,
-    TowerWarState? towerWar = null)
+    TowerWarState? towerWar = null,
+    ValleyWarKillRegistry? valleyWarKillRegistry = null)
     : ISimulationSystem
 {
     /// <summary>
@@ -338,6 +345,11 @@ public sealed class MonsterSpawnScheduler(
 
         if (killer is null)
             return; // no resolvable killer -- nothing to roll
+
+        // Valley of the Deceased (Zone 200/297/298/299) kill-race quota decrement -- no-op on every other map
+        // (ValleyWarKillRegistry.RegisterMonsterKill gates on ValleyWarMapCatalog itself) and no-op outside that
+        // schedule's own KillRace phase. Réf. C++ : Server/ts25zone/S07_MyGame02.cpp:3162-3170.
+        valleyWarKillRegistry?.RegisterMonsterKill(zone.MapId, killer.Tribe);
 
         var partyMemberIds = partyRegistry?.GetMembers(killer.CharacterId);
         zone.GrantMonsterKillExperience(killer.CharacterId, monster.Template.RealLevel,

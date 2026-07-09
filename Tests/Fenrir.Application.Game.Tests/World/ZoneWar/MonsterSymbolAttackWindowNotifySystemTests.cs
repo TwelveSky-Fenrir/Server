@@ -61,6 +61,9 @@ public class MonsterSymbolAttackWindowNotifySystemTests
         return (registry[mapId], pipe);
     }
 
+    private static Lazy<ZoneEventBroadcaster> LazyBroadcaster(ZoneEventBroadcaster broadcaster)
+        => new(() => broadcaster);
+
     [Fact]
     public void Disabled_NeverBroadcasts_EvenIfHolderAndMapMatch()
     {
@@ -71,7 +74,7 @@ public class MonsterSymbolAttackWindowNotifySystemTests
         worldState.ResolveMonsterSymbol(0);
         var tracker = new MonsterSymbolAttackWindowTracker();
         var broadcaster = new ZoneEventBroadcaster(worldState, registry, NullLogger<ZoneEventBroadcaster>.Instance);
-        var system = new MonsterSymbolAttackWindowNotifySystem(worldState, tracker, broadcaster,
+        var system = new MonsterSymbolAttackWindowNotifySystem(worldState, tracker, LazyBroadcaster(broadcaster),
             Options.Create(BuildGameOptions(enabled: false)));
 
         system.Simulate(zone, LegacyTicksPerMinute * 10);
@@ -88,7 +91,7 @@ public class MonsterSymbolAttackWindowNotifySystemTests
         var worldState = CreateWorldState(); // MonsterSymbol never resolved -- null
         var tracker = new MonsterSymbolAttackWindowTracker();
         var broadcaster = new ZoneEventBroadcaster(worldState, registry, NullLogger<ZoneEventBroadcaster>.Instance);
-        var system = new MonsterSymbolAttackWindowNotifySystem(worldState, tracker, broadcaster,
+        var system = new MonsterSymbolAttackWindowNotifySystem(worldState, tracker, LazyBroadcaster(broadcaster),
             Options.Create(BuildGameOptions()));
 
         system.Simulate(zone, LegacyTicksPerMinute * 10);
@@ -107,7 +110,7 @@ public class MonsterSymbolAttackWindowNotifySystemTests
         worldState.ResolveMonsterSymbol(0); // holder tribe 0 -> mapped to HolderMapId, not OtherMapId
         var tracker = new MonsterSymbolAttackWindowTracker();
         var broadcaster = new ZoneEventBroadcaster(worldState, registry, NullLogger<ZoneEventBroadcaster>.Instance);
-        var system = new MonsterSymbolAttackWindowNotifySystem(worldState, tracker, broadcaster,
+        var system = new MonsterSymbolAttackWindowNotifySystem(worldState, tracker, LazyBroadcaster(broadcaster),
             Options.Create(BuildGameOptions()));
 
         system.Simulate(otherZone, LegacyTicksPerMinute * 10);
@@ -126,7 +129,7 @@ public class MonsterSymbolAttackWindowNotifySystemTests
         worldState.ResolveMonsterSymbol(2); // tribe 2 has no configured mapping in BuildGameOptions (only 0/1)
         var tracker = new MonsterSymbolAttackWindowTracker();
         var broadcaster = new ZoneEventBroadcaster(worldState, registry, NullLogger<ZoneEventBroadcaster>.Instance);
-        var system = new MonsterSymbolAttackWindowNotifySystem(worldState, tracker, broadcaster,
+        var system = new MonsterSymbolAttackWindowNotifySystem(worldState, tracker, LazyBroadcaster(broadcaster),
             Options.Create(BuildGameOptions()));
 
         system.Simulate(zone, LegacyTicksPerMinute * 10);
@@ -144,7 +147,7 @@ public class MonsterSymbolAttackWindowNotifySystemTests
         worldState.ResolveMonsterSymbol(0);
         var tracker = new MonsterSymbolAttackWindowTracker();
         var broadcaster = new ZoneEventBroadcaster(worldState, registry, NullLogger<ZoneEventBroadcaster>.Instance);
-        var system = new MonsterSymbolAttackWindowNotifySystem(worldState, tracker, broadcaster,
+        var system = new MonsterSymbolAttackWindowNotifySystem(worldState, tracker, LazyBroadcaster(broadcaster),
             Options.Create(BuildGameOptions(delayMinutes: 1)));
 
         system.Simulate(zone, LegacyTicksPerMinute - 1); // one tick short of the 1-minute delay
@@ -168,7 +171,7 @@ public class MonsterSymbolAttackWindowNotifySystemTests
         worldState.ResolveMonsterSymbol(0);
         var tracker = new MonsterSymbolAttackWindowTracker();
         var broadcaster = new ZoneEventBroadcaster(worldState, registry, NullLogger<ZoneEventBroadcaster>.Instance);
-        var system = new MonsterSymbolAttackWindowNotifySystem(worldState, tracker, broadcaster,
+        var system = new MonsterSymbolAttackWindowNotifySystem(worldState, tracker, LazyBroadcaster(broadcaster),
             Options.Create(BuildGameOptions(delayMinutes: 1)));
 
         system.Simulate(zone, LegacyTicksPerMinute);
@@ -189,7 +192,7 @@ public class MonsterSymbolAttackWindowNotifySystemTests
         worldState.ResolveMonsterSymbol(0); // tribe 0 -> HolderMapId
         var tracker = new MonsterSymbolAttackWindowTracker();
         var broadcaster = new ZoneEventBroadcaster(worldState, registry, NullLogger<ZoneEventBroadcaster>.Instance);
-        var system = new MonsterSymbolAttackWindowNotifySystem(worldState, tracker, broadcaster,
+        var system = new MonsterSymbolAttackWindowNotifySystem(worldState, tracker, LazyBroadcaster(broadcaster),
             Options.Create(BuildGameOptions(delayMinutes: 1)));
 
         system.Simulate(holderZone, LegacyTicksPerMinute);

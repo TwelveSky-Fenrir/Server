@@ -31,7 +31,7 @@ namespace Fenrir.Application.Game.Services.Social;
 public sealed class PartyCrossShardRelayHandler(
     ZoneRegistry zones,
     PartyRegistry parties,
-    ISocialCrossShardRelayQueue crossShardRelay,
+    Lazy<ISocialCrossShardRelayQueue> crossShardRelay,
     IOptions<GameServerOptions> options,
     ILogger<PartyCrossShardRelayHandler> logger) : ISocialCrossShardRelayHandler
 {
@@ -122,7 +122,7 @@ public sealed class PartyCrossShardRelayHandler(
 
     private void PublishDecline(SocialCrossShardRelayDto ask, byte reasonCode)
     {
-        crossShardRelay.Enqueue(new SocialCrossShardRelayEntry(
+        crossShardRelay.Value.Enqueue(new SocialCrossShardRelayEntry(
             SocialCrossShardRelayKind.Party,
             SocialCrossShardRelayMessageType.Answer,
             false,

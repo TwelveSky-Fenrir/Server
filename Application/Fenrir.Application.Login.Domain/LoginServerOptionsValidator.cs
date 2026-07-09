@@ -20,6 +20,11 @@ public sealed class LoginServerOptionsValidator : IValidateOptions<LoginServerOp
                 $"Login:ShardReachabilityProbeTimeoutMilliseconds must be positive (was {options.ShardReachabilityProbeTimeoutMilliseconds}).");
         if (options.IdleSweepIntervalSeconds <= 0)
             errors.Add($"Login:IdleSweepIntervalSeconds must be positive (was {options.IdleSweepIntervalSeconds}).");
+        if (options.MaxConnectionsPerIp <= 0)
+            errors.Add($"Login:MaxConnectionsPerIp must be positive (was {options.MaxConnectionsPerIp}).");
+        if (options.MaxProtocolViolationsPerIpPerHour <= 0)
+            errors.Add(
+                $"Login:MaxProtocolViolationsPerIpPerHour must be positive (was {options.MaxProtocolViolationsPerIpPerHour}).");
 
         return errors.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(errors);
     }

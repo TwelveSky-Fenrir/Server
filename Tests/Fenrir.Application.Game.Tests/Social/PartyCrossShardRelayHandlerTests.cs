@@ -28,7 +28,8 @@ public class PartyCrossShardRelayHandlerTests
         var zones = ZoneTestKit.CreateRegistry();
         zones.Initialize([1]);
         var relay = new FakeSocialCrossShardRelayQueue();
-        var handler = new PartyCrossShardRelayHandler(zones, parties, relay,
+        var handler = new PartyCrossShardRelayHandler(zones, parties,
+            new Lazy<ISocialCrossShardRelayQueue>(() => relay),
             Options.Create(new GameServerOptions { ShardId = OwnShardId }),
             NullLogger<PartyCrossShardRelayHandler>.Instance);
         return (handler, zones, parties, relay);

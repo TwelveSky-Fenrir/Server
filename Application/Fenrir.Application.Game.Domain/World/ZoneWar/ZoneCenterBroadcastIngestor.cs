@@ -1,10 +1,12 @@
 using System.Buffers;
 using System.Buffers.Binary;
+using Fenrir.Data.Abstractions.Runtime;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Framing;
 using Fenrir.Network.Serialization.Zone.Packets.Zone;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 
@@ -73,17 +75,49 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 ///         codes resets to idle" without saying which). Upgrading to byte-exact constants needs a fresh
 ///         legacy-behavior-translator pass over the individual case bodies.
 ///     </para>
+///     <para>
+///         Zone049 (siege-zone-slot family, sub-codes 1-9, S04_MyWork02.cpp:212-253) IS byte-exact: the
+///         rvr-siege behavior contract gives the full sub-code-to-(state,stampTime) table directly (see
+///         <see cref="ApplyZone049" />), unlike Zone175/Zone267's own placeholder values above. Sub-code 1
+///         carries no state mutation (its own remaining-seconds field only ever fed the build/runtime-gated
+///         Discord announcement, never the primary state machine) -- <see cref="ApplyStateEffect" /> simply has
+///         no case for it, matching the legacy's own "falls through with zero state effect" behavior for it.
+///     </para>
+///     <para>
+///         CROSS-SHARD RELAY (rvr-siege): <paramref name="relayQueue" /> is the one piece of this class that is
+///         NOT a reproduction of legacy behavior -- Fenrir shards <see cref="ZoneRegistry" /> disjointly by map,
+///         so <see cref="BroadcastToEveryZone{TPacket}" /> only ever reaches players on THIS shard's own hosted
+///         maps, unlike the legacy's single ts25center process relaying to literally every connected zone
+///         process cluster-wide. <see cref="Ingest" /> enqueues Zone049 sub-codes (1-9) onto
+///         <see cref="IRvrSiegeEventRelayQueue" /> (SQL-mediated fan-out, same precedent as
+///         <c>GuildTribeBroadcastRelayHost</c>/<c>ProxyShopExpirationRelayHost</c>) so every OTHER live shard's
+///         own <c>RvrSiegeEventRelayHost</c> poll cycle replays the identical (sub-code, payload) pair through
+///         <see cref="ApplyRelayedEvent" /> -- otherwise a Zone049 slot mutated on one shard would never become
+///         visible to players on any other shard at all, since <see cref="ZoneCenterSiegeState" /> is itself a
+///         per-process singleton with no other cross-shard convergence path (unlike
+///         <see cref="WorldState.WorldStateService" />'s own DB-backed reconcile). Optional purely so every
+///         existing hand-written test call site (which doesn't need cross-shard relay) keeps compiling; a
+///         production instance always has it, since <see cref="IRvrSiegeEventRelayQueue" /> is registered
+///         alongside this class.
+///     </para>
 /// </summary>
 public sealed class ZoneCenterBroadcastIngestor(
     ZoneCenterSiegeState state,
     ZoneRegistry zones,
-    ILogger<ZoneCenterBroadcastIngestor> logger)
+    ILogger<ZoneCenterBroadcastIngestor> logger,
+    IRvrSiegeEventRelayQueue? relayQueue = null,
+    IOptions<GameServerOptions>? gameOptions = null)
 {
     /// <summary>
     ///     Fixed opaque payload size (<c>Server/Header/Protocol/ZONE.h:19-24</c>), matching
     ///     <see cref="ZoneEventInfoResponse.Data" />.
     /// </summary>
     public const int PayloadSize = 130;
+
+    /// <summary>Zone049 siege-zone-slot family -- sub-code 1 has no state effect, see class remarks.</summary>
+    public const int Zone049RangeStart = 1;
+
+    public const int Zone049RangeEnd = 9;
 
     public const int Zone175RangeStart = 64;
     public const int Zone175RangeEnd = 100;
@@ -118,13 +152,16 @@ public sealed class ZoneCenterBroadcastIngestor(
     public const int PingEventCode = 4000;
 
     /// <summary>
-    ///     The full two-step ingestion: (1) apply whatever shared-state write this event code carries, if
-    ///     any (a data-driven range table, not one branch per individual code); (2) unconditionally relay the
-    ///     same event code and raw payload to every zone this shard owns, with the case-4000 ping additionally
-    ///     firing its own extra broadcast first. Never throws for an unrecognized or malformed-content event
-    ///     code -- matches the legacy's own no-acknowledgement, no-failure-indicator posture; the only
-    ///     rejection this method performs is a payload of the wrong length, an API misuse guard that has no
-    ///     legacy-parity meaning of its own.
+    ///     The full ingestion from THIS shard's own originating caller: (1) apply whatever shared-state write
+    ///     this event code carries, if any (a data-driven range table, not one branch per individual code);
+    ///     (2) unconditionally relay the same event code and raw payload to every zone this shard owns, with
+    ///     the case-4000 ping additionally firing its own extra broadcast first; (3) for the Zone049 family
+    ///     (sub-codes 1-9) only, enqueue the identical pair onto the cross-shard relay so every OTHER live
+    ///     shard's own poll cycle reaches the same state via <see cref="ApplyRelayedEvent" /> -- see class
+    ///     remarks, CROSS-SHARD RELAY. Never throws for an unrecognized or malformed-content event code --
+    ///     matches the legacy's own no-acknowledgement, no-failure-indicator posture; the only rejection this
+    ///     method performs is a payload of the wrong length, an API misuse guard that has no legacy-parity
+    ///     meaning of its own.
     /// </summary>
     public void Ingest(int eventCode, ReadOnlySpan<byte> data)
     {
@@ -138,12 +175,46 @@ public sealed class ZoneCenterBroadcastIngestor(
             BroadcastAllZonesPing();
 
         Relay(eventCode, data);
+
+        if (eventCode is >= Zone049RangeStart and <= Zone049RangeEnd)
+            EnqueueForOtherShards(eventCode, data);
+    }
+
+    /// <summary>
+    ///     The replay entry point a sibling shard's own <c>RvrSiegeEventRelayHost</c> calls for a row this
+    ///     shard did NOT originate: applies the identical shared-state write <see cref="Ingest" /> would have
+    ///     applied, then relays to this shard's own hosted zones -- but does NOT re-enqueue onto the cross-shard
+    ///     relay (that would echo the row back out to every other shard forever) and does NOT fire the
+    ///     case-4000 ping's extra broadcast (only Zone049 sub-codes are ever relayed today, see
+    ///     <see cref="Ingest" />, so that branch is unreachable from here regardless).
+    /// </summary>
+    public void ApplyRelayedEvent(int eventCode, ReadOnlySpan<byte> data)
+    {
+        if (data.Length != PayloadSize)
+            throw new ArgumentException($"Zone-center broadcast payload must be exactly {PayloadSize} bytes.",
+                nameof(data));
+
+        ApplyStateEffect(eventCode, data);
+        Relay(eventCode, data);
+    }
+
+    private void EnqueueForOtherShards(int eventCode, ReadOnlySpan<byte> data)
+    {
+        if (relayQueue is null)
+            return;
+
+        var shardId = gameOptions?.Value.ShardId ?? 0;
+        relayQueue.Enqueue(new RvrSiegeEventRelayEntry(shardId, eventCode, data.ToArray()));
     }
 
     private void ApplyStateEffect(int eventCode, ReadOnlySpan<byte> data)
     {
         switch (eventCode)
         {
+            case >= Zone049RangeStart and <= Zone049RangeEnd:
+                ApplyZone049(eventCode, data);
+                break;
+
             case Zone175ResetEventCode:
                 ApplyZone175(eventCode, data, true);
                 break;
@@ -174,6 +245,44 @@ public sealed class ZoneCenterBroadcastIngestor(
             // through with zero state effect, which is exactly the legacy's own observable behavior for
             // those ranges.
         }
+    }
+
+    /// <summary>
+    ///     Sub-codes 1-9, S04_MyWork02.cpp:212-253: sub-code 1 mutates nothing (its remaining-seconds field
+    ///     only fed the Discord/diagnostic announcement, never the primary state machine, and is not
+    ///     independently reproduced here -- see class remarks). Sub-codes 2-9 read the zone slot index from the
+    ///     first 4 payload bytes and write a fixed (state, stampTime) pair to it, exactly the legacy table:
+    ///     2-&gt;(1,false), 3-&gt;(2,false), 4-&gt;(3,false), 5-&gt;(5,true), 6-&gt;(4,true), 7-&gt;(4,true),
+    ///     8-&gt;(5,true), 9-&gt;(0,false). 5/8 and 6/7 are deliberately identical -- the source contract
+    ///     confirms no distinguishing behavior exists between each pair.
+    /// </summary>
+    private void ApplyZone049(int eventCode, ReadOnlySpan<byte> data)
+    {
+        if (eventCode == Zone049RangeStart)
+            return;
+
+        var slot = ReadInt32(data, 0);
+        if (!ZoneCenterSiegeState.IsValidZone049Slot(slot))
+        {
+            logger.LogWarning("Zone049 sub-code {EventCode} referenced out-of-range slot {Slot} -- ignored",
+                eventCode, slot);
+            return;
+        }
+
+        var (value, stampTime) = eventCode switch
+        {
+            2 => (1, false),
+            3 => (2, false),
+            4 => (3, false),
+            5 => (5, true),
+            6 => (4, true),
+            7 => (4, true),
+            8 => (5, true),
+            9 => (0, false),
+            _ => (0, false)
+        };
+
+        state.SetZone049State(slot, value, stampTime);
     }
 
     private void ApplyZone175(int eventCode, ReadOnlySpan<byte> data, bool isReset)

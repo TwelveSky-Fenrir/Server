@@ -20,6 +20,28 @@ Tables/runtime/GuildTribeBroadcastCursor.sql
 Tables/runtime/SocialCrossShardRelay.sql
 Tables/runtime/SocialCrossShardRelayCursor.sql
 
+# proxy-shop-rental-sync: cross-shard fan-out for the proxy/deputy-shop rental-extension consumables'
+# best-effort live-registry mirror update -- single-purpose sibling of the GuildTribeBroadcastRelay/Cursor
+# pair above (same fan-out shape, no Kind column), see ProxyShopExpirationRelay.sql's own header for the
+# full legacy-limitation/hardening trail.
+Tables/runtime/ProxyShopExpirationRelay.sql
+Tables/runtime/ProxyShopExpirationRelayCursor.sql
+
+# guild-buff-expiry: cross-shard fan-out outbox for the guild-buff-reserve-exhaustion immediate strip-effect
+# push (Server/ts25center/S07_MyGame01.cpp:291-331's edge-triggered gBuffTime<1 branch) -- single-purpose
+# fan-out sibling of the GuildTribeBroadcastRelay/Cursor pair above, see GuildBuffExpiryRelay.sql's own
+# header for the full design.
+Tables/runtime/GuildBuffExpiryRelay.sql
+Tables/runtime/GuildBuffExpiryCursor.sql
+
+# rvr-siege: cross-shard fan-out outbox for the Zone049 siege-zone-slot family (sub-codes 1-9,
+# ZoneCenterBroadcastIngestor) and the tribe-symbol/alliance tSort family (38/39/40/42/45/46/47,
+# ZoneEventBroadcaster) -- single-purpose fan-out sibling of the GuildTribeBroadcastRelay/Cursor pair above
+# (same shape, no Kind column -- every sort already funnels through one generic Sort+Data payload), see
+# RvrSiegeEventRelay.sql's own header for the full design.
+Tables/runtime/RvrSiegeEventRelay.sql
+Tables/runtime/RvrSiegeEventRelayCursor.sql
+
 Tables/world/Levels.sql
 Tables/world/Skills.sql
 Tables/world/SkillDescriptions.sql
@@ -135,6 +157,12 @@ Views/admin/vw_ActiveBans.sql
 StoredProcedures/auth/usp_Account_Authenticate.sql
 StoredProcedures/auth/usp_Account_Create.sql
 StoredProcedures/auth/usp_Account_RecordLoginAttempt.sql
+
+# Operational gap fix: there was no write path anywhere to grant an account GM privilege
+# (AccountGrade/legacy uUserSort), making the GM command tier work (Application/Fenrir.Application.
+# Game.Services/Gm/*) unreachable/untestable end-to-end. Tools/Fenrir.Tools.AccountProvisioning's
+# new "grant-gm" subcommand is the CLI surface over this.
+StoredProcedures/auth/usp_Account_SetGrade.sql
 StoredProcedures/auth/usp_AccountPin_Get.sql
 StoredProcedures/auth/usp_AccountPin_Set.sql
 StoredProcedures/game/usp_Character_GetByAccount.sql
@@ -203,6 +231,29 @@ StoredProcedures/runtime/usp_GuildTribeBroadcastRelay_Poll.sql
 # (Fenrir.Application.Game.Hosting, not part of this DB-layer change).
 StoredProcedures/runtime/usp_SocialCrossShardRelay_Publish.sql
 StoredProcedures/runtime/usp_SocialCrossShardRelay_Poll.sql
+
+# proxy-shop-rental-sync: cross-shard fan-out for the proxy/deputy-shop rental-extension consumables'
+# best-effort live-registry mirror update (runtime.ProxyShopExpirationRelay/
+# runtime.ProxyShopExpirationRelayCursor). Fan-out (SourceShardId <> @ShardId), same shape as
+# usp_GuildTribeBroadcastRelay_Publish/_Poll above, single-purpose (no Kind column). Consumed by
+# ProxyShopExpirationRelayHost (Fenrir.Application.Game.Hosting, not part of this DB-layer change).
+StoredProcedures/runtime/usp_ProxyShopExpirationRelay_Publish.sql
+StoredProcedures/runtime/usp_ProxyShopExpirationRelay_Poll.sql
+
+# guild-buff-expiry: cross-shard fan-out for the guild-buff-reserve-exhaustion immediate strip-effect push
+# (runtime.GuildBuffExpiryRelay/runtime.GuildBuffExpiryCursor). Fan-out (SourceShardId <> @ShardId), same
+# shape as usp_GuildTribeBroadcastRelay_Publish/_Poll above, single-purpose (no Kind column). Consumed by
+# GuildBuffExpiryRelayHost (Fenrir.Application.Game.Hosting, not part of this DB-layer change).
+StoredProcedures/runtime/usp_GuildBuffExpiryRelay_Publish.sql
+StoredProcedures/runtime/usp_GuildBuffExpiryRelay_Poll.sql
+
+# rvr-siege: cross-shard fan-out for the Zone049 siege-zone-slot family (sub-codes 1-9) and the tribe-symbol/
+# alliance tSort family (38/39/40/42/45/46/47) (runtime.RvrSiegeEventRelay/runtime.RvrSiegeEventRelayCursor).
+# Fan-out (SourceShardId <> @ShardId), same shape as usp_GuildTribeBroadcastRelay_Publish/_Poll above,
+# single-purpose (no Kind column -- one generic Sort+Data payload carries every sort). Consumed by
+# RvrSiegeEventRelayHost (Fenrir.Application.Game.Hosting, not part of this DB-layer change).
+StoredProcedures/runtime/usp_RvrSiegeEventRelay_Publish.sql
+StoredProcedures/runtime/usp_RvrSiegeEventRelay_Poll.sql
 
 StoredProcedures/world/usp_Level_GetAll.sql
 StoredProcedures/world/usp_Skill_GetAll.sql

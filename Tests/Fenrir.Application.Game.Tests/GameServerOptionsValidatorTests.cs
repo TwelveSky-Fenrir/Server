@@ -29,7 +29,10 @@ public class GameServerOptionsValidatorTests
         bool allianceTribeEnabled = false,
         short allianceTribeMapId = 0,
         bool monsterSymbolAttackNotifyEnabled = false,
-        int monsterSymbolAttackNotifyDelayMinutes = 0)
+        int monsterSymbolAttackNotifyDelayMinutes = 0,
+        bool holyStoneTestMode = false,
+        ISet<DayOfWeek>? holyStoneBattleDays = null,
+        IReadOnlyDictionary<byte, short>? monsterSymbolAttackNotifyMapIds = null)
     {
         return new GameServerOptions
         {
@@ -54,7 +57,10 @@ public class GameServerOptionsValidatorTests
             AllianceTribeEnabled = allianceTribeEnabled,
             AllianceTribeMapId = allianceTribeMapId,
             MonsterSymbolAttackNotifyEnabled = monsterSymbolAttackNotifyEnabled,
-            MonsterSymbolAttackNotifyDelayMinutes = monsterSymbolAttackNotifyDelayMinutes
+            MonsterSymbolAttackNotifyDelayMinutes = monsterSymbolAttackNotifyDelayMinutes,
+            HolyStoneTestMode = holyStoneTestMode,
+            HolyStoneBattleDays = holyStoneBattleDays ?? new HashSet<DayOfWeek>(),
+            MonsterSymbolAttackNotifyMapIds = monsterSymbolAttackNotifyMapIds ?? new Dictionary<byte, short>()
         };
     }
 
@@ -236,7 +242,27 @@ public class GameServerOptionsValidatorTests
     [Fact]
     public void Validate_HolyStoneBattleEnabledWithMapId_Succeeds()
     {
+        var result = Validator.Validate(null,
+            Options(holyStoneBattleEnabled: true, tribeSymbolBattleMapId: 37,
+                holyStoneBattleDays: new HashSet<DayOfWeek> { DayOfWeek.Saturday }));
+
+        Assert.True(result.Succeeded);
+    }
+
+    [Fact]
+    public void Validate_HolyStoneBattleEnabledWithoutBattleDaysOutsideTestMode_Fails()
+    {
         var result = Validator.Validate(null, Options(holyStoneBattleEnabled: true, tribeSymbolBattleMapId: 37));
+
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures!, f => f.Contains("Game:HolyStoneBattleDays"));
+    }
+
+    [Fact]
+    public void Validate_HolyStoneBattleEnabledWithoutBattleDaysInTestMode_Succeeds()
+    {
+        var result = Validator.Validate(null,
+            Options(holyStoneBattleEnabled: true, tribeSymbolBattleMapId: 37, holyStoneTestMode: true));
 
         Assert.True(result.Succeeded);
     }
@@ -298,7 +324,14 @@ public class GameServerOptionsValidatorTests
     public void Validate_MonsterSymbolAttackNotifyEnabledWithPositiveDelayMinutes_Succeeds()
     {
         var result = Validator.Validate(null,
-            Options(monsterSymbolAttackNotifyEnabled: true, monsterSymbolAttackNotifyDelayMinutes: 30));
+            Options(monsterSymbolAttackNotifyEnabled: true, monsterSymbolAttackNotifyDelayMinutes: 30,
+                monsterSymbolAttackNotifyMapIds: new Dictionary<byte, short>
+                {
+                    [0] = 4,
+                    [1] = 9,
+                    [2] = 14,
+                    [3] = 143
+                }));
 
         Assert.True(result.Succeeded);
     }
@@ -309,5 +342,163 @@ public class GameServerOptionsValidatorTests
         var result = Validator.Validate(null, Options(monsterSymbolAttackNotifyDelayMinutes: 0));
 
         Assert.True(result.Succeeded);
+    }
+
+    [Fact]
+    public void Validate_MonsterSymbolAttackNotifyEnabledWithEmptyMapIds_Fails()
+    {
+        var result = Validator.Validate(null,
+            Options(monsterSymbolAttackNotifyEnabled: true, monsterSymbolAttackNotifyDelayMinutes: 30));
+
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures!, f => f.Contains("Game:MonsterSymbolAttackNotifyMapIds"));
+    }
+
+    [Fact]
+    public void Validate_MonsterSymbolAttackNotifyEnabledWithPartialMapIds_Fails()
+    {
+        var result = Validator.Validate(null,
+            Options(monsterSymbolAttackNotifyEnabled: true, monsterSymbolAttackNotifyDelayMinutes: 30,
+                monsterSymbolAttackNotifyMapIds: new Dictionary<byte, short> { [0] = 4, [1] = 9 }));
+
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures!, f => f.Contains("Game:MonsterSymbolAttackNotifyMapIds"));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void Validate_MaxConnectionsPerIpNotPositive_Fails(int maxConnectionsPerIp)
+    {
+        var options = Options();
+        options.MaxConnectionsPerIp = maxConnectionsPerIp;
+        var result = Validator.Validate(null, options);
+
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures!, f => f.Contains("Game:MaxConnectionsPerIp"));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void Validate_MaxProtocolViolationsPerIpPerHourNotPositive_Fails(int maxProtocolViolationsPerIpPerHour)
+    {
+        var options = Options();
+        options.MaxProtocolViolationsPerIpPerHour = maxProtocolViolationsPerIpPerHour;
+        var result = Validator.Validate(null, options);
+
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures!, f => f.Contains("Game:MaxProtocolViolationsPerIpPerHour"));
+    }
+
+    [Theory]
+    [InlineData(0f)]
+    [InlineData(-1f)]
+    public void Validate_AlliancePostRadiusNotPositive_Fails(float alliancePostRadius)
+    {
+        var options = Options();
+        options.AlliancePostRadius = alliancePostRadius;
+        var result = Validator.Validate(null, options);
+
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures!, f => f.Contains("Game:AlliancePostRadius"));
+    }
+
+    [Theory]
+    [InlineData(0f)]
+    [InlineData(-1f)]
+    public void Validate_HolyStoneCaptureRadiusNotPositive_Fails(float holyStoneCaptureRadius)
+    {
+        var options = Options();
+        options.HolyStoneCaptureRadius = holyStoneCaptureRadius;
+        var result = Validator.Validate(null, options);
+
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures!, f => f.Contains("Game:HolyStoneCaptureRadius"));
+    }
+
+    [Theory]
+    [InlineData(0f)]
+    [InlineData(-1f)]
+    public void Validate_HolyStoneParticipationRadiusNotPositive_Fails(float holyStoneParticipationRadius)
+    {
+        var options = Options();
+        options.HolyStoneParticipationRadius = holyStoneParticipationRadius;
+        var result = Validator.Validate(null, options);
+
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures!, f => f.Contains("Game:HolyStoneParticipationRadius must be positive"));
+    }
+
+    [Fact]
+    public void Validate_HolyStoneParticipationRadiusLessThanCaptureRadius_Fails()
+    {
+        var options = Options();
+        options.HolyStoneCaptureRadius = 5f;
+        options.HolyStoneParticipationRadius = 2f;
+        var result = Validator.Validate(null, options);
+
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures!, f => f.Contains("Game:HolyStoneParticipationRadius"));
+    }
+
+    [Fact]
+    public void Validate_GuildTribeBroadcastRetentionNotGreaterThanPollInterval_Fails()
+    {
+        var options = Options();
+        options.GuildTribeBroadcastPollIntervalSeconds = 30;
+        options.GuildTribeBroadcastRetentionSeconds = 30;
+        var result = Validator.Validate(null, options);
+
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures!, f => f.Contains("Game:GuildTribeBroadcastRetentionSeconds"));
+    }
+
+    [Fact]
+    public void Validate_SocialCrossShardRelayRetentionNotGreaterThanPollInterval_Fails()
+    {
+        var options = Options();
+        options.SocialCrossShardRelayPollIntervalSeconds = 30;
+        options.SocialCrossShardRelayRetentionSeconds = 10;
+        var result = Validator.Validate(null, options);
+
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures!, f => f.Contains("Game:SocialCrossShardRelayRetentionSeconds"));
+    }
+
+    [Fact]
+    public void Validate_ProxyShopExpirationRelayRetentionNotGreaterThanPollInterval_Fails()
+    {
+        var options = Options();
+        options.ProxyShopExpirationRelayPollIntervalSeconds = 30;
+        options.ProxyShopExpirationRelayRetentionSeconds = 30;
+        var result = Validator.Validate(null, options);
+
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures!, f => f.Contains("Game:ProxyShopExpirationRelayRetentionSeconds"));
+    }
+
+    [Fact]
+    public void Validate_RvrSiegeEventRelayRetentionNotGreaterThanPollInterval_Fails()
+    {
+        var options = Options();
+        options.RvrSiegeEventRelayPollIntervalSeconds = 30;
+        options.RvrSiegeEventRelayRetentionSeconds = 30;
+        var result = Validator.Validate(null, options);
+
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures!, f => f.Contains("Game:RvrSiegeEventRelayRetentionSeconds"));
+    }
+
+    [Fact]
+    public void Validate_GuildBuffExpiryRelayRetentionNotGreaterThanPollInterval_Fails()
+    {
+        var options = Options();
+        options.GuildBuffExpiryRelayPollIntervalSeconds = 30;
+        options.GuildBuffExpiryRelayRetentionSeconds = 30;
+        var result = Validator.Validate(null, options);
+
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures!, f => f.Contains("Game:GuildBuffExpiryRelayRetentionSeconds"));
     }
 }

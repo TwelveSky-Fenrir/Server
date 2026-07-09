@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.Tests.TestSupport;
@@ -6,6 +7,7 @@ using Fenrir.Network.Framing;
 using Fenrir.Network.Serialization.Zone.Packets.Zone;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.World.ZoneWar;
 
@@ -274,5 +276,129 @@ public class ZoneCenterBroadcastIngestorTests
         // The write still happens locally (it doesn't depend on any zone existing); what this test actually
         // guards is that relaying to an empty zone-player set never throws.
         Assert.Equal(70, state.GetZone175(0, 0));
+    }
+
+    [Fact]
+    public void Ingest_Zone049SubCode1_NoStateMutation_ButStillRelays()
+    {
+        var registry = CreateRegistry(1);
+        var (session, pipe) = ZoneTestKit.CreateSession(1);
+        registry[1].Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1)));
+        registry[1].Tick(TimeSpan.FromMilliseconds(50));
+        ZoneTestKit.DrainOutbound(pipe);
+
+        var state = new ZoneCenterSiegeState();
+        var ingestor = new ZoneCenterBroadcastIngestor(state, registry,
+            NullLogger<ZoneCenterBroadcastIngestor>.Instance);
+
+        ingestor.Ingest(1, Payload(3, 10));
+
+        for (var slot = 0; slot < ZoneCenterSiegeState.Zone049Slots; slot++)
+            Assert.Equal(0, state.GetZone049State(slot));
+
+        var frame = ZoneTestKit.DrainOutbound(pipe);
+        Assert.Equal(1, ReadFrame(frame).Sort);
+    }
+
+    [Theory]
+    [InlineData(2, 1, false)]
+    [InlineData(3, 2, false)]
+    [InlineData(4, 3, false)]
+    [InlineData(5, 5, true)]
+    [InlineData(6, 4, true)]
+    [InlineData(7, 4, true)]
+    [InlineData(8, 5, true)]
+    [InlineData(9, 0, false)]
+    public void Ingest_Zone049SubCode2Through9_WritesTheExpectedStateAndStampsTimeWhenApplicable(int subCode,
+        int expectedState, bool expectedStamp)
+    {
+        var registry = CreateRegistry(1);
+        var state = new ZoneCenterSiegeState();
+        var ingestor = new ZoneCenterBroadcastIngestor(state, registry,
+            NullLogger<ZoneCenterBroadcastIngestor>.Instance);
+
+        ingestor.Ingest(subCode, Payload(4));
+
+        Assert.Equal(expectedState, state.GetZone049State(4));
+        Assert.Equal(expectedStamp, state.GetZone049StateTime(4) != 0);
+    }
+
+    [Fact]
+    public void Ingest_Zone049Code_OutOfRangeSlot_DoesNotWrite_ButStillRelays()
+    {
+        var registry = CreateRegistry(1);
+        var (session, pipe) = ZoneTestKit.CreateSession(1);
+        registry[1].Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1)));
+        registry[1].Tick(TimeSpan.FromMilliseconds(50));
+        ZoneTestKit.DrainOutbound(pipe);
+
+        var state = new ZoneCenterSiegeState();
+        var ingestor = new ZoneCenterBroadcastIngestor(state, registry,
+            NullLogger<ZoneCenterBroadcastIngestor>.Instance);
+
+        ingestor.Ingest(2, Payload(99));
+
+        for (var slot = 0; slot < ZoneCenterSiegeState.Zone049Slots; slot++)
+            Assert.Equal(0, state.GetZone049State(slot));
+
+        var frame = ZoneTestKit.DrainOutbound(pipe);
+        Assert.Equal(2, ReadFrame(frame).Sort);
+    }
+
+    [Fact]
+    public void Ingest_Zone049Code_EnqueuesForOtherShards_WithTheSameSortAndPayload()
+    {
+        var registry = CreateRegistry(1);
+        var state = new ZoneCenterSiegeState();
+        var relayQueue = new FakeRvrSiegeEventRelayQueue();
+        var ingestor = new ZoneCenterBroadcastIngestor(state, registry,
+            NullLogger<ZoneCenterBroadcastIngestor>.Instance, relayQueue,
+            Options.Create(new GameServerOptions { ShardId = 7 }));
+
+        ingestor.Ingest(5, Payload(2));
+
+        var entry = Assert.Single(relayQueue.Enqueued);
+        Assert.Equal((byte)7, entry.SourceShardId);
+        Assert.Equal(5, entry.Sort);
+        Assert.Equal(2, BinaryPrimitives.ReadInt32LittleEndian(entry.Data));
+    }
+
+    [Fact]
+    public void Ingest_NonZone049Code_DoesNotEnqueueForOtherShards()
+    {
+        var registry = CreateRegistry(1);
+        var state = new ZoneCenterSiegeState();
+        var relayQueue = new FakeRvrSiegeEventRelayQueue();
+        var ingestor = new ZoneCenterBroadcastIngestor(state, registry,
+            NullLogger<ZoneCenterBroadcastIngestor>.Instance, relayQueue,
+            Options.Create(new GameServerOptions { ShardId = 7 }));
+
+        ingestor.Ingest(70, Payload(2, 5));
+
+        Assert.Empty(relayQueue.Enqueued);
+    }
+
+    [Fact]
+    public void ApplyRelayedEvent_AppliesTheSameStateWrite_AndRelaysLocally_WithoutReEnqueueing()
+    {
+        var registry = CreateRegistry(1);
+        var (session, pipe) = ZoneTestKit.CreateSession(1);
+        registry[1].Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1)));
+        registry[1].Tick(TimeSpan.FromMilliseconds(50));
+        ZoneTestKit.DrainOutbound(pipe);
+
+        var state = new ZoneCenterSiegeState();
+        var relayQueue = new FakeRvrSiegeEventRelayQueue();
+        var ingestor = new ZoneCenterBroadcastIngestor(state, registry,
+            NullLogger<ZoneCenterBroadcastIngestor>.Instance, relayQueue,
+            Options.Create(new GameServerOptions { ShardId = 7 }));
+
+        ingestor.ApplyRelayedEvent(4, Payload(6));
+
+        Assert.Equal(3, state.GetZone049State(6));
+        Assert.Empty(relayQueue.Enqueued);
+
+        var frame = ZoneTestKit.DrainOutbound(pipe);
+        Assert.Equal(4, ReadFrame(frame).Sort);
     }
 }

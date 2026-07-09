@@ -78,6 +78,23 @@ public static class FenrirDataServiceCollectionExtensions
         // -- point-to-point sibling of the fan-out registration above; consumed by a future
         // SocialCrossShardRelayHost (Fenrir.Application.Game.Hosting), not by *.Services directly.
         builder.Services.AddSingleton<ISocialCrossShardRelayRepository, SocialCrossShardRelayRepository>();
+
+        // proxy-shop-rental-sync: cross-shard fan-out for the proxy/deputy-shop rental-extension consumables'
+        // best-effort live-registry mirror update -- single-purpose sibling of the fan-out registration
+        // above; consumed by ProxyShopExpirationRelayHost (Fenrir.Application.Game.Hosting), not by
+        // *.Services directly.
+        builder.Services.AddSingleton<IProxyShopExpirationRelayRepository, ProxyShopExpirationRelayRepository>();
+
+        // guild-buff-expiry: cross-shard fan-out for the guild-buff-reserve-exhaustion immediate strip-effect
+        // push -- single-purpose sibling of the fan-out registration above; consumed by
+        // GuildBuffExpiryRelayHost (Fenrir.Application.Game.Hosting), not by *.Services directly.
+        builder.Services.AddSingleton<IGuildBuffExpiryRelayRepository, GuildBuffExpiryRelayRepository>();
+
+        // rvr-siege: cross-shard fan-out for the Zone049 siege-zone-slot family (sub-codes 1-9) and the
+        // tribe-symbol/alliance family (tSort 38/39/40/42/45/46/47) -- single-purpose sibling of the fan-out
+        // registrations above; consumed by RvrSiegeEventRelayHost (Fenrir.Application.Game.Hosting), not by
+        // *.Domain/*.Services directly.
+        builder.Services.AddSingleton<IRvrSiegeEventRelayRepository, RvrSiegeEventRelayRepository>();
         builder.Services.AddSingleton<IShardMapAssignmentRepository, ShardMapAssignmentRepository>();
         builder.Services.AddSingleton<IGameSettingsRepository, GameSettingsRepository>();
         builder.Services.AddSingleton<IServerQuotaRepository, ServerQuotaRepository>();

@@ -54,6 +54,13 @@ public static class HostingServiceCollectionExtensions
         services.AddHostedService<GuildBuffDecayHost>();
         services.AddHostedService<GuildRankingRefreshHost>();
 
+        // guild-buff-expiry: cross-shard fan-out for the guild-buff-reserve-exhaustion immediate strip-effect
+        // push -- same "one instance, two registrations" pattern as GuildTribeBroadcastRelayHost below:
+        // GuildBuffDecayHost (the sole producer, registered just above) consumes IGuildBuffExpiryRelayQueue only.
+        services.AddSingleton<GuildBuffExpiryRelayHost>();
+        services.AddSingleton<IGuildBuffExpiryRelayQueue>(sp => sp.GetRequiredService<GuildBuffExpiryRelayHost>());
+        services.AddHostedService(sp => sp.GetRequiredService<GuildBuffExpiryRelayHost>());
+
         // Cash-shop/blood-exchange catalog reload (seeded once in Program.cs before ZoneConnectionHost starts
         // accepting connections, same "initial fill in Program.cs, this host only covers refreshes after
         // that" shape as GuildRankingRefreshHost above).
@@ -115,14 +122,40 @@ public static class HostingServiceCollectionExtensions
 
         // WS1.4 cross-shard social-negotiation relay (Party/Friend/Mentor/Duel/Trade/GuildInvite Ask+Answer)
         // -- point-to-point sibling of GuildTribeBroadcastRelayHost above, same "one instance, three
-        // registrations" pattern. IEnumerable<ISocialCrossShardRelayHandler> resolves empty until each of
-        // the six negotiation *.Services registries registers its own handler in a follow-up change (see
-        // SocialCrossShardRelayHost's own remarks) -- that is safe today, a delivered row for an
-        // unregistered Kind is simply logged and dropped.
+        // registrations" pattern. IEnumerable<ISocialCrossShardRelayHandler> still resolves empty for any
+        // negotiation kind whose *.Services registry has not yet registered its own handler (see
+        // SocialCrossShardRelayHost's own remarks) -- that is safe, a delivered row for an unregistered Kind
+        // is simply logged and dropped.
         services.AddSingleton<SocialCrossShardRelayHost>();
         services.AddSingleton<ISocialCrossShardRelayQueue>(sp =>
             sp.GetRequiredService<SocialCrossShardRelayHost>());
         services.AddHostedService(sp => sp.GetRequiredService<SocialCrossShardRelayHost>());
+
+        // Registered as a factory (opaque to the DI container's constructor-graph cycle check), same
+        // "Lazy<T> breaks the cycle" pattern as Lazy<ZoneEventBroadcaster>/Lazy<ZoneCenterBroadcastIngestor>/
+        // Lazy<ZoneRegistry> in AddZoneWar below -- FriendCrossShardRelayHandler/PartyCrossShardRelayHandler
+        // (registered as ISocialCrossShardRelayHandler by Fenrir.Application.Game.Services' own
+        // AddGameServices) both need to publish a decline back onto ISocialCrossShardRelayQueue, but
+        // ISocialCrossShardRelayQueue's own factory just above resolves SocialCrossShardRelayHost, whose own
+        // constructor resolves IEnumerable<ISocialCrossShardRelayHandler> -- a direct ISocialCrossShardRelayQueue
+        // constructor dependency on either handler would recurse the DI container into resolving
+        // SocialCrossShardRelayHost -> handlers -> ISocialCrossShardRelayQueue -> SocialCrossShardRelayHost
+        // forever (invisible to the container's static cycle detector, since the factory lambda's own
+        // GetRequiredService call is opaque to it) instead of throwing a clean circular-dependency error. The
+        // factory closure only captures the container; it does not resolve ISocialCrossShardRelayQueue until
+        // something actually calls .Value, by which point SocialCrossShardRelayHost is already constructed
+        // and cached.
+        services.AddSingleton(sp =>
+            new Lazy<ISocialCrossShardRelayQueue>(sp.GetRequiredService<ISocialCrossShardRelayQueue>));
+
+        // proxy-shop-rental-sync: cross-shard fan-out for the proxy/deputy-shop rental-extension consumables'
+        // best-effort live-registry mirror update -- single-purpose sibling of GuildTribeBroadcastRelayHost
+        // above, same "one instance, three registrations" pattern. UseInventoryItemService consumes
+        // IProxyShopExpirationRelayQueue only.
+        services.AddSingleton<ProxyShopExpirationRelayHost>();
+        services.AddSingleton<IProxyShopExpirationRelayQueue>(sp =>
+            sp.GetRequiredService<ProxyShopExpirationRelayHost>());
+        services.AddHostedService(sp => sp.GetRequiredService<ProxyShopExpirationRelayHost>());
 
         services.AddSingleton(sp =>
         {
@@ -193,13 +226,17 @@ public static class HostingServiceCollectionExtensions
         services.AddSingleton<ZoneCenterBroadcastIngestor>();
 
         // Elevated-tier zone-wide FFA-start GM command (tSort 333) process-local countdown/start-trigger
-        // bookkeeping -- same "plain, not-yet-consumed in-memory singleton" posture as ZoneCenterSiegeState
-        // just above, but deliberately a distinct object from it; see Zone335StartTrigger's own remarks for
-        // why. Consumed by GmFfaEventStartService (Fenrir.Application.Game.Services); no reader is wired up
-        // yet (the FFA-335 autonomous tick, legacy Process_Zone_335_FFA, is a separate, currently unmodeled
-        // system), same "real API, not yet called by anything" posture as ZoneWarTickService before anything
-        // calls StartWar.
+        // bookkeeping -- same "plain in-memory singleton" posture as ZoneCenterSiegeState just above, but
+        // deliberately a distinct object from it; see Zone335StartTrigger's own remarks for why. Armed by
+        // GmFfaEventStartService (Fenrir.Application.Game.Services), consumed every tick by
+        // Zone335FfaEventCycleSystem below (the FFA-335 autonomous tick, legacy Process_Zone_335_FFA).
         services.AddSingleton<Zone335StartTrigger>();
+
+        // FFA-335 autonomous tick state machine -- a per-zone ISimulationSystem (not a separate host/timer:
+        // its own MapId==FFAMAPNUM gate at the top of Simulate already makes it a no-op on every shard/zone
+        // except the one hosting map 335, see its own remarks). Depends on ZoneEventBroadcaster/
+        // ZoneCenterSiegeState/Zone335StartTrigger, all registered above in this same AddZoneWar call.
+        services.AddSingleton<ISimulationSystem, Zone335FfaEventCycleSystem>();
 
         // Registered as a factory (opaque to the DI container's constructor-graph cycle check) so that
         // MonsterSpawnScheduler -- an ISimulationSystem that ZoneRegistry itself resolves at construction
@@ -208,6 +245,31 @@ public static class HostingServiceCollectionExtensions
         // the container; it does not resolve ZoneEventBroadcaster until something actually calls .Value,
         // by which point every singleton (including ZoneRegistry) is already constructed and cached.
         services.AddSingleton(sp => new Lazy<ZoneEventBroadcaster>(sp.GetRequiredService<ZoneEventBroadcaster>));
+
+        // Same factory-opacity reasoning as the Lazy<ZoneEventBroadcaster> registration immediately above, for
+        // the same underlying reason: RvrSiegeEventRelayHost (registered below) needs ZoneCenterBroadcastIngestor
+        // back (to replay a relayed Zone049 row via ApplyRelayedEvent) without a same-container cycle back
+        // through ZoneCenterBroadcastIngestor's own IRvrSiegeEventRelayQueue dependency, which resolves to that
+        // same host.
+        services.AddSingleton(sp =>
+            new Lazy<ZoneCenterBroadcastIngestor>(sp.GetRequiredService<ZoneCenterBroadcastIngestor>));
+
+        // Same factory-opacity reasoning as the Lazy<ZoneEventBroadcaster> registration immediately above --
+        // ValleyWarSystem is itself one of the ISimulationSystem instances ZoneRegistry resolves at
+        // construction time, and needs ZoneRegistry back (to reach a winning-tribe member's reward drop onto
+        // whichever OTHER zone currently hosts them, see that class's own remarks) without a same-container cycle.
+        services.AddSingleton(sp => new Lazy<ZoneRegistry>(sp.GetRequiredService<ZoneRegistry>));
+
+        // rvr-siege: cross-shard fan-out for the Zone049 siege-zone-slot family (sub-codes 1-9, owned by
+        // ZoneCenterBroadcastIngestor above) and the tribe-symbol/alliance family (tSort 38/39/40/42/45/46/47,
+        // owned by ZoneEventBroadcaster above) -- same "one instance, three registrations" pattern as
+        // GuildTribeBroadcastRelayHost. Both producers consume IRvrSiegeEventRelayQueue only, immediately after
+        // each one's own unchanged, synchronous same-shard mutation/broadcast; RvrSiegeEventRelayHost's own
+        // Lazy<ZoneCenterBroadcastIngestor>/Lazy<ZoneEventBroadcaster> dependencies (registered above) are what
+        // let it replay a delivered row straight back through either producer's own logic without a DI cycle.
+        services.AddSingleton<RvrSiegeEventRelayHost>();
+        services.AddSingleton<IRvrSiegeEventRelayQueue>(sp => sp.GetRequiredService<RvrSiegeEventRelayHost>());
+        services.AddHostedService(sp => sp.GetRequiredService<RvrSiegeEventRelayHost>());
 
         services.AddSingleton<ZoneWarTickService>();
         services.AddHostedService(static provider => provider.GetRequiredService<ZoneWarTickService>());

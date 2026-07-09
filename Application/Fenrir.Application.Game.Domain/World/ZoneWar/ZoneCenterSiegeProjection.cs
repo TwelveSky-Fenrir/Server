@@ -7,11 +7,11 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 ///     Projects <see cref="ZoneCenterSiegeState" /> and <see cref="TribeGuardCorridorState" /> onto WorldInfo's own
 ///     fields -- same "overlay onto an otherwise-zeroed template" shape as
 ///     <see cref="Guilds.GuildRankingProjection" />/<see cref="WorldStateProjection" />. This covers exactly the
-///     WorldInfo field groups that already have a real, process-wide backing model (Zone175/Zone267/Zone241/
-///     Zone335 siege-event state, the per-tribe Zone038 DTM value, the three tribe bonus-ratio arrays plus the
-///     kill-other-tribe bonus, and the tribe-guard corridor passability table) but that neither sibling projection
-///     merges onto the outbound packet -- both those classes' own remarks explicitly flag this as an open gap
-///     (see the "WORLD_INFO field-group backing state" behavior contract's Outputs section).
+///     WorldInfo field groups that already have a real, process-wide backing model (Zone049/Zone175/Zone267/
+///     Zone241/Zone335 siege-event state, the per-tribe Zone038 DTM value, the three tribe bonus-ratio arrays plus
+///     the kill-other-tribe bonus, and the tribe-guard corridor passability table) but that neither sibling
+///     projection merges onto the outbound packet -- both those classes' own remarks explicitly flag this as an
+///     open gap (see the "WORLD_INFO field-group backing state" behavior contract's Outputs section).
 ///     <para>
 ///         Every other WorldInfo field is passed through unchanged: no backing state exists yet for the
 ///         remaining numbered zone-siege machines, alliance/vote bookkeeping, guild battle, four-guild,
@@ -34,6 +34,14 @@ public static class ZoneCenterSiegeProjection
 {
     public static WorldInfo Apply(WorldInfo template, ZoneCenterSiegeState siege, TribeGuardCorridorState tribeGuard)
     {
+        var zone049State = new int[ZoneCenterSiegeState.Zone049Slots];
+        var zone049StateTime = new int[ZoneCenterSiegeState.Zone049Slots];
+        for (var slot = 0; slot < ZoneCenterSiegeState.Zone049Slots; slot++)
+        {
+            zone049State[slot] = siege.GetZone049State(slot);
+            zone049StateTime[slot] = siege.GetZone049StateTime(slot);
+        }
+
         var zone175 = new int[ZoneCenterSiegeState.Zone175Instances * ZoneCenterSiegeState.Zone175Slots];
         for (var instance = 0; instance < ZoneCenterSiegeState.Zone175Instances; instance++)
         for (var slot = 0; slot < ZoneCenterSiegeState.Zone175Slots; slot++)
@@ -67,6 +75,8 @@ public static class ZoneCenterSiegeProjection
 
         return template with
         {
+            Zone049TypeState = zone049State,
+            Zone049TypeStateTime = zone049StateTime,
             Zone175TypeState = zone175,
             TribeGuardState = tribeGuardState,
             Zone038DTMValue = zone038Dtm,

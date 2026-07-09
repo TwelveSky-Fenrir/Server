@@ -62,6 +62,15 @@ public static class DomainServiceCollectionExtensions
         services.AddSingleton<ISimulationSystem, MeditationRegenSystem>();
         services.AddSingleton<ISimulationSystem, MonsterAiSystem>();
         services.AddSingleton<ISimulationSystem, MonsterSpawnScheduler>();
+
+        // Valley of the Deceased (Zone 200/297/298/299) gate/door/kill-race/boss-window/conclusion broadcast
+        // lifecycle -- a distinct legacy state machine from the Zone049 RegularWar family below, see
+        // ValleyWarSchedule's own remarks. ValleyWarKillRegistry is registered once here (a plain leaf
+        // singleton MonsterSpawnScheduler above also depends on, for its own kill-race quota decrement) so
+        // both systems always share the SAME per-map ValleyWarSchedule instance.
+        services.AddSingleton<ValleyWarKillRegistry>();
+        services.AddSingleton<ISimulationSystem, ValleyWarSystem>();
+
         services.AddSingleton<ISimulationSystem, TowerGuardianSystem>();
         services.AddSingleton<ISimulationSystem, TowerRewardBonusSystem>();
         services.AddSingleton<ISimulationSystem, PetActivitySystem>();

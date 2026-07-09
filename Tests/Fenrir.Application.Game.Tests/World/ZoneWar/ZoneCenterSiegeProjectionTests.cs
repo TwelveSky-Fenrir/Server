@@ -20,6 +20,8 @@ public class ZoneCenterSiegeProjectionTests
 
         var result = ZoneCenterSiegeProjection.Apply(WorldStateTemplates.ZeroedWorldInfo, siege, tribeGuard);
 
+        Assert.Equal(new int[13], result.Zone049TypeState);
+        Assert.Equal(new int[13], result.Zone049TypeStateTime);
         Assert.Equal(new int[32], result.Zone175TypeState);
         Assert.Equal(new int[4], result.Zone267TypeState);
         Assert.Equal(new int[20], result.Zone241TypeState);
@@ -36,6 +38,23 @@ public class ZoneCenterSiegeProjectionTests
         // Untouched fields must still be the template's own zeroed defaults, not silently overwritten.
         Assert.Equal(WorldStateTemplates.ZeroedWorldInfo.TribeCloseInfo, result.TribeCloseInfo);
         Assert.Equal(WorldStateTemplates.ZeroedWorldInfo.GuildName1, result.GuildName1);
+    }
+
+    [Fact]
+    public void Apply_Zone049Written_ReflectsStateAndStampedTime()
+    {
+        var siege = new ZoneCenterSiegeState();
+        siege.SetZone049State(3, 5, true);
+        siege.SetZone049State(7, 1, false);
+        var tribeGuard = new TribeGuardCorridorState();
+
+        var result = ZoneCenterSiegeProjection.Apply(WorldStateTemplates.ZeroedWorldInfo, siege, tribeGuard);
+
+        Assert.Equal(5, result.Zone049TypeState[3]);
+        Assert.NotEqual(0, result.Zone049TypeStateTime[3]);
+        Assert.Equal(1, result.Zone049TypeState[7]);
+        Assert.Equal(0, result.Zone049TypeStateTime[7]);
+        Assert.Equal(0, result.Zone049TypeState[0]);
     }
 
     [Fact]

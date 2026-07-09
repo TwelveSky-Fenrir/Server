@@ -35,7 +35,7 @@ public sealed class FriendCrossShardRelayHandler(
     PartyRegistry parties,
     GuildInviteRegistry guildInvites,
     MentorRegistry mentors,
-    ISocialCrossShardRelayQueue crossShardRelay,
+    Lazy<ISocialCrossShardRelayQueue> crossShardRelay,
     IOptions<GameServerOptions> options,
     ILogger<FriendCrossShardRelayHandler> logger) : ISocialCrossShardRelayHandler
 {
@@ -102,7 +102,7 @@ public sealed class FriendCrossShardRelayHandler(
 
     private void PublishDecline(SocialCrossShardRelayDto ask, byte reasonCode)
     {
-        crossShardRelay.Enqueue(new SocialCrossShardRelayEntry(
+        crossShardRelay.Value.Enqueue(new SocialCrossShardRelayEntry(
             SocialCrossShardRelayKind.Friend,
             SocialCrossShardRelayMessageType.Answer,
             false,

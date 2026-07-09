@@ -41,9 +41,12 @@ namespace Fenrir.Application.Game.Domain.World;
 ///     <c>Zone.CosmeticMirrors.cs</c> (drink-bottle/hero-ranking/fishing/mount/costume/stellar-core/avatar-buff/
 ///     rune-socket/auto-buff/pshop mirrors), <c>Zone.ProxyShops.cs</c> (the offline/deputy shop periodic
 ///     radius rebroadcast + expiry force-close sweep), <c>Zone.TribeBankTax.cs</c> (the 1%/9% tribe-bank
-///     income tax accumulator and its 10-minute sweep), and <c>Zone.Gm.cs</c> (the Elevated-tier GM-EXP
+///     income tax accumulator and its 10-minute sweep), <c>Zone.Gm.cs</c> (the Elevated-tier GM-EXP
 ///     command's own read-decide-mutate mirror, the one GM-command concern that cannot be folded into
-///     <c>Zone.EconomyMirrors.cs</c>'s already-decided-field-mirror shape). This file keeps the constructor, the fields/state
+///     <c>Zone.EconomyMirrors.cs</c>'s already-decided-field-mirror shape), and <c>Zone.GuildBuffExpiry.cs</c>
+///     (the guild-buff-reserve-exhaustion immediate strip-effect push, posted by
+///     <c>Hosting.Guilds.GuildBuffDecayHost</c>/<c>Hosting.GuildBuffExpiryRelayHost</c> rather than by any
+///     opcode handler). This file keeps the constructor, the fields/state
 ///     shared across several of those concerns (the AOI grid, the player map, the tick clock, RNG), and the
 ///     tick loop itself.
 /// </remarks>
@@ -310,6 +313,7 @@ public sealed partial class Zone(
         DrainAvatarBuffCommands();
         DrainRuneSocketCommands();
         DrainAutoBuffCommands();
+        DrainGuildBuffExpiryCommands();
         var t1 = Stopwatch.GetTimestamp();
         var legacyTicksElapsed = _accumulator.Advance(elapsed);
         Simulate(legacyTicksElapsed);
@@ -476,6 +480,9 @@ public sealed partial class Zone(
                         break;
                     case ZoneCommandKind.CreditRegularWarConclusion:
                         HandleRegularWarConclusionCredit(command.CharacterId);
+                        break;
+                    case ZoneCommandKind.GrantValleyWarRewardDrop:
+                        HandleGrantValleyWarRewardDrop(command.CharacterId);
                         break;
                 }
             }

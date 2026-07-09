@@ -3,11 +3,22 @@ using Fenrir.Application.Game.Hosting.Guilds;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Data.Abstractions.Guilds;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.Guilds;
 
 public class GuildBuffDecayHostTests
 {
+    private static GuildBuffDecayHost CreateHost(IGuildRepository repository, FakeGuildBuffExpiryRelayQueue? relay = null,
+        byte shardId = 1)
+    {
+        var options = ZoneTestKit.Options();
+        options.ShardId = shardId;
+        return new GuildBuffDecayHost(repository, ZoneTestKit.CreateRegistry(options),
+            relay ?? new FakeGuildBuffExpiryRelayQueue(), Options.Create(options),
+            NullLogger<GuildBuffDecayHost>.Instance);
+    }
+
     [Fact]
     public async Task DecayOnceAsync_ExpiredGuild_PersistsOnlyTheFlooredBuffTime_LeavesTypeAndStateUntouched()
     {
@@ -15,7 +26,7 @@ public class GuildBuffDecayHostTests
         // gBuffTime -- BuffType/BuffState must reach the repository unchanged from the seeded row.
         var repository = new FakeGuildRepository();
         repository.Seed(Guild(1, 1, 5, DateTime.UtcNow.AddMinutes(-10).Ticks));
-        var host = new GuildBuffDecayHost(repository, NullLogger<GuildBuffDecayHost>.Instance);
+        var host = CreateHost(repository);
 
         await host.DecayOnceAsync(CancellationToken.None);
 
@@ -32,7 +43,7 @@ public class GuildBuffDecayHostTests
     {
         var repository = new FakeGuildRepository();
         repository.Seed(Guild(1, 0, 0, 0));
-        var host = new GuildBuffDecayHost(repository, NullLogger<GuildBuffDecayHost>.Instance);
+        var host = CreateHost(repository);
 
         await host.DecayOnceAsync(CancellationToken.None);
 
@@ -47,7 +58,7 @@ public class GuildBuffDecayHostTests
         // buff type (BuffState=0) still decays every pass exactly like an already-active one.
         var repository = new FakeGuildRepository();
         repository.Seed(Guild(1, 0, 60, DateTime.UtcNow.AddMinutes(-7).Ticks));
-        var host = new GuildBuffDecayHost(repository, NullLogger<GuildBuffDecayHost>.Instance);
+        var host = CreateHost(repository);
 
         await host.DecayOnceAsync(CancellationToken.None);
 
@@ -62,7 +73,7 @@ public class GuildBuffDecayHostTests
     {
         var repository = new FakeGuildRepository();
         repository.Seed(Guild(1, 1, 60, DateTime.UtcNow.AddMinutes(-7).Ticks));
-        var host = new GuildBuffDecayHost(repository, NullLogger<GuildBuffDecayHost>.Instance);
+        var host = CreateHost(repository);
 
         await host.DecayOnceAsync(CancellationToken.None);
 
@@ -75,9 +86,67 @@ public class GuildBuffDecayHostTests
     [Fact]
     public async Task DecayOnceAsync_RepositoryScanThrows_DoesNotPropagate()
     {
-        var host = new GuildBuffDecayHost(new ThrowingGuildRepository(), NullLogger<GuildBuffDecayHost>.Instance);
+        var host = CreateHost(new ThrowingGuildRepository());
 
         await host.DecayOnceAsync(CancellationToken.None); // must not throw
+    }
+
+    // guild-buff-expiry: the edge-triggered push (Server/ts25center/S07_MyGame01.cpp:316-330's own
+    // gBuffTime < 1 branch) fires exactly once, at the pass the reserve first reaches exhaustion.
+    [Fact]
+    public async Task DecayOnceAsync_ReserveReachesZero_EnqueuesOneClusterWideExpiryPush()
+    {
+        var repository = new FakeGuildRepository();
+        repository.Seed(Guild(1, 1, 5, DateTime.UtcNow.AddMinutes(-10).Ticks));
+        var relay = new FakeGuildBuffExpiryRelayQueue();
+        var host = CreateHost(repository, relay, 3);
+
+        await host.DecayOnceAsync(CancellationToken.None);
+
+        var entry = Assert.Single(relay.Enqueued);
+        Assert.Equal(3, entry.SourceShardId);
+        Assert.Equal(1, entry.GuildId);
+        Assert.Equal(0, entry.NewBuffTime);
+    }
+
+    [Fact]
+    public async Task DecayOnceAsync_ReserveStillPositive_NeverEnqueuesAnExpiryPush()
+    {
+        var repository = new FakeGuildRepository();
+        repository.Seed(Guild(1, 1, 60, DateTime.UtcNow.AddMinutes(-7).Ticks));
+        var relay = new FakeGuildBuffExpiryRelayQueue();
+        var host = CreateHost(repository, relay);
+
+        await host.DecayOnceAsync(CancellationToken.None);
+
+        Assert.Empty(relay.Enqueued);
+    }
+
+    [Fact]
+    public async Task DecayOnceAsync_AlreadyExhausted_StructurallyNeverReselected_NeverReEnqueues()
+    {
+        // Guild.BuffTime already 0 -- GuildBuffDecay.Apply's own eligibility gate excludes it from the pass
+        // entirely (matches legacy's own row-selection query, which cannot select an already-zero reserve).
+        var repository = new FakeGuildRepository();
+        repository.Seed(Guild(1, 1, 0, DateTime.UtcNow.AddMinutes(-10).Ticks));
+        var relay = new FakeGuildBuffExpiryRelayQueue();
+        var host = CreateHost(repository, relay);
+
+        await host.DecayOnceAsync(CancellationToken.None);
+
+        Assert.Null(repository.LastSetBuff);
+        Assert.Empty(relay.Enqueued);
+    }
+
+    [Fact]
+    public async Task DecayOnceAsync_PersistFails_NeverEnqueuesAnExpiryPush()
+    {
+        var relay = new FakeGuildBuffExpiryRelayQueue();
+        var host = CreateHost(new ThrowingSetBuffGuildRepository(), relay);
+
+        await host.DecayOnceAsync(CancellationToken.None);
+
+        Assert.Empty(relay.Enqueued);
     }
 
     private static GuildSummaryDto Guild(int guildId, int buffState, int buffTime, long buffTimeForDiff)
@@ -184,6 +253,118 @@ public class GuildBuffDecayHostTests
             CancellationToken ct)
         {
             throw new NotSupportedException();
+        }
+
+        public ValueTask SetNoticeAsync(int guildId, byte noticeIndex, string text, CancellationToken ct)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask AdjustPointsAsync(int guildId, int delta, CancellationToken ct)
+        {
+            throw new NotSupportedException();
+        }
+    }
+
+    /// <summary>
+    ///     One decay-eligible guild on scan, but <see cref="SetBuffAsync" /> always throws -- exercises
+    ///     <c>GuildBuffDecayHost.DecayOnceAsync</c>'s own "persist failed, skip this guild's expiry push
+    ///     entirely" branch.
+    /// </summary>
+    private sealed class ThrowingSetBuffGuildRepository : IGuildRepository
+    {
+        public ValueTask<CharacterGuildMembershipDto?> GetByCharacterAsync(int characterId, CancellationToken ct)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask<GuildSummaryDto?> GetByIdAsync(int guildId, CancellationToken ct)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask<ReadOnlyCollection<GuildSummaryDto>> GetAllAsync(CancellationToken ct)
+        {
+            return ValueTask.FromResult(new ReadOnlyCollection<GuildSummaryDto>(
+                [Guild(1, 1, 5, DateTime.UtcNow.AddMinutes(-10).Ticks)]));
+        }
+
+        public ValueTask<ReadOnlyCollection<GuildRankingRowDto>> GetTopByPointsAsync(int count, CancellationToken ct)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask<ReadOnlyCollection<GuildRosterRowDto>> GetRosterAsync(int guildId, CancellationToken ct)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask<ReadOnlyCollection<GuildNoticeRowDto>> GetNoticesAsync(int guildId, CancellationToken ct)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask<int> CreateAsync(string name, int masterCharacterId, CancellationToken ct)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask<int> CreateAndDebitMoneyAsync(string name, int masterCharacterId, long deltaMoney,
+            int deltaBigMoney, CancellationToken ct)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask DisbandAsync(int guildId, int characterId, CancellationToken ct)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask AddMemberAsync(int guildId, int characterId, CancellationToken ct)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask RemoveMemberAsync(int guildId, int characterId, CancellationToken ct)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask SetRoleAsync(int guildId, int characterId, byte role, CancellationToken ct)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask SetCallNameAsync(int guildId, int characterId, string callName, CancellationToken ct)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask SetMasterAsync(int guildId, int newMasterCharacterId, CancellationToken ct)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask SetLogoAsync(int guildId, int logo, CancellationToken ct)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask SetGradeAsync(int guildId, int grade, CancellationToken ct)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask UpgradeAndDebitMoneyAsync(int guildId, int grade, int characterId, long deltaMoney,
+            int deltaBigMoney, CancellationToken ct)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask SetBuffAsync(int guildId, int buffType, int buffState, int buffTime, long buffTimeForDiff,
+            CancellationToken ct)
+        {
+            throw new InvalidOperationException("Simulated SQL failure");
         }
 
         public ValueTask SetNoticeAsync(int guildId, byte noticeIndex, string text, CancellationToken ct)

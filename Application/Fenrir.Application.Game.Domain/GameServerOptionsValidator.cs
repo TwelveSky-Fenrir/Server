@@ -37,6 +37,11 @@ public sealed class GameServerOptionsValidator : IValidateOptions<GameServerOpti
             errors.Add(
                 $"Game:HeroRankingRolloverCheckIntervalMinutes must be positive (was {options.HeroRankingRolloverCheckIntervalMinutes}).");
         if (options.Capacity <= 0) errors.Add($"Game:Capacity must be positive (was {options.Capacity}).");
+        if (options.MaxConnectionsPerIp <= 0)
+            errors.Add($"Game:MaxConnectionsPerIp must be positive (was {options.MaxConnectionsPerIp}).");
+        if (options.MaxProtocolViolationsPerIpPerHour <= 0)
+            errors.Add(
+                $"Game:MaxProtocolViolationsPerIpPerHour must be positive (was {options.MaxProtocolViolationsPerIpPerHour}).");
         if (options.AccountSessionPollIntervalSeconds <= 0)
             errors.Add(
                 $"Game:AccountSessionPollIntervalSeconds must be positive (was {options.AccountSessionPollIntervalSeconds}).");
@@ -60,6 +65,59 @@ public sealed class GameServerOptionsValidator : IValidateOptions<GameServerOpti
         if (options.SocialCrossShardRelayRetentionSeconds <= 0)
             errors.Add(
                 $"Game:SocialCrossShardRelayRetentionSeconds must be positive (was {options.SocialCrossShardRelayRetentionSeconds}).");
+        if (options.ProxyShopExpirationRelayPollIntervalSeconds <= 0)
+            errors.Add(
+                $"Game:ProxyShopExpirationRelayPollIntervalSeconds must be positive (was {options.ProxyShopExpirationRelayPollIntervalSeconds}).");
+        if (options.ProxyShopExpirationRelayRetentionSeconds <= 0)
+            errors.Add(
+                $"Game:ProxyShopExpirationRelayRetentionSeconds must be positive (was {options.ProxyShopExpirationRelayRetentionSeconds}).");
+        if (options.GuildBuffExpiryRelayPollIntervalSeconds <= 0)
+            errors.Add(
+                $"Game:GuildBuffExpiryRelayPollIntervalSeconds must be positive (was {options.GuildBuffExpiryRelayPollIntervalSeconds}).");
+        if (options.GuildBuffExpiryRelayRetentionSeconds <= 0)
+            errors.Add(
+                $"Game:GuildBuffExpiryRelayRetentionSeconds must be positive (was {options.GuildBuffExpiryRelayRetentionSeconds}).");
+        if (options.RvrSiegeEventRelayPollIntervalSeconds <= 0)
+            errors.Add(
+                $"Game:RvrSiegeEventRelayPollIntervalSeconds must be positive (was {options.RvrSiegeEventRelayPollIntervalSeconds}).");
+        if (options.RvrSiegeEventRelayRetentionSeconds <= 0)
+            errors.Add(
+                $"Game:RvrSiegeEventRelayRetentionSeconds must be positive (was {options.RvrSiegeEventRelayRetentionSeconds}).");
+
+        // Every cross-shard relay's *RetentionSeconds must outlive its own *PollIntervalSeconds: each relay host
+        // reaps rows older than RetentionSeconds on every poll cycle, so a RetentionSeconds <= PollIntervalSeconds
+        // (e.g. an accidental swap, or tightening retention without noticing the coupling) lets a shard's own
+        // cleanup pass reap a row before a normally-cadenced peer shard's next poll can ever observe it -- the
+        // process still boots fine, but cross-shard delivery silently degrades or breaks.
+        if (options.GuildTribeBroadcastRetentionSeconds <= options.GuildTribeBroadcastPollIntervalSeconds)
+            errors.Add(
+                $"Game:GuildTribeBroadcastRetentionSeconds ({options.GuildTribeBroadcastRetentionSeconds}) must be greater than Game:GuildTribeBroadcastPollIntervalSeconds ({options.GuildTribeBroadcastPollIntervalSeconds}).");
+        if (options.SocialCrossShardRelayRetentionSeconds <= options.SocialCrossShardRelayPollIntervalSeconds)
+            errors.Add(
+                $"Game:SocialCrossShardRelayRetentionSeconds ({options.SocialCrossShardRelayRetentionSeconds}) must be greater than Game:SocialCrossShardRelayPollIntervalSeconds ({options.SocialCrossShardRelayPollIntervalSeconds}).");
+        if (options.ProxyShopExpirationRelayRetentionSeconds <= options.ProxyShopExpirationRelayPollIntervalSeconds)
+            errors.Add(
+                $"Game:ProxyShopExpirationRelayRetentionSeconds ({options.ProxyShopExpirationRelayRetentionSeconds}) must be greater than Game:ProxyShopExpirationRelayPollIntervalSeconds ({options.ProxyShopExpirationRelayPollIntervalSeconds}).");
+        if (options.RvrSiegeEventRelayRetentionSeconds <= options.RvrSiegeEventRelayPollIntervalSeconds)
+            errors.Add(
+                $"Game:RvrSiegeEventRelayRetentionSeconds ({options.RvrSiegeEventRelayRetentionSeconds}) must be greater than Game:RvrSiegeEventRelayPollIntervalSeconds ({options.RvrSiegeEventRelayPollIntervalSeconds}).");
+        if (options.GuildBuffExpiryRelayRetentionSeconds <= options.GuildBuffExpiryRelayPollIntervalSeconds)
+            errors.Add(
+                $"Game:GuildBuffExpiryRelayRetentionSeconds ({options.GuildBuffExpiryRelayRetentionSeconds}) must be greater than Game:GuildBuffExpiryRelayPollIntervalSeconds ({options.GuildBuffExpiryRelayPollIntervalSeconds}).");
+
+        // Zero/negative squared-distance-check radii make their feature permanently, silently inert (no boot-time
+        // signal) rather than a validation failure -- see AlliancePostRadius/HolyStoneCaptureRadius/
+        // HolyStoneParticipationRadius's own doc comments.
+        if (options.AlliancePostRadius <= 0)
+            errors.Add($"Game:AlliancePostRadius must be positive (was {options.AlliancePostRadius}).");
+        if (options.HolyStoneCaptureRadius <= 0)
+            errors.Add($"Game:HolyStoneCaptureRadius must be positive (was {options.HolyStoneCaptureRadius}).");
+        if (options.HolyStoneParticipationRadius <= 0)
+            errors.Add(
+                $"Game:HolyStoneParticipationRadius must be positive (was {options.HolyStoneParticipationRadius}).");
+        if (options.HolyStoneParticipationRadius < options.HolyStoneCaptureRadius)
+            errors.Add(
+                $"Game:HolyStoneParticipationRadius ({options.HolyStoneParticipationRadius}) must be greater than or equal to Game:HolyStoneCaptureRadius ({options.HolyStoneCaptureRadius}).");
 
         // Each singleton RvR scheduler is armed by "does this shard host the designated map", not ShardId --
         // an operator who flips the *Enabled flag on must also name which map arms it, or the scheduler is
@@ -77,6 +135,19 @@ public sealed class GameServerOptionsValidator : IValidateOptions<GameServerOpti
         if (options.MonsterSymbolAttackNotifyEnabled && options.MonsterSymbolAttackNotifyDelayMinutes <= 0)
             errors.Add(
                 "Game:MonsterSymbolAttackNotifyDelayMinutes must be positive when Game:MonsterSymbolAttackNotifyEnabled is true.");
+        if (options.HolyStoneBattleEnabled && !options.HolyStoneTestMode && options.HolyStoneBattleDays.Count == 0)
+            errors.Add(
+                "Game:HolyStoneBattleDays must be non-empty when Game:HolyStoneBattleEnabled is true and Game:HolyStoneTestMode is false (the schedule would otherwise never fire).");
+        if (options.MonsterSymbolAttackNotifyEnabled)
+        {
+            var missingTribeIds = new List<byte>();
+            for (byte tribeId = 0; tribeId < 4; tribeId++)
+                if (!options.MonsterSymbolAttackNotifyMapIds.ContainsKey(tribeId))
+                    missingTribeIds.Add(tribeId);
+            if (missingTribeIds.Count > 0)
+                errors.Add(
+                    $"Game:MonsterSymbolAttackNotifyMapIds must contain an entry for every tribe id (0-3) when Game:MonsterSymbolAttackNotifyEnabled is true (missing: {string.Join(", ", missingTribeIds)}).");
+        }
 
         return errors.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(errors);
     }

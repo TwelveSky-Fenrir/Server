@@ -32,7 +32,8 @@ public class FriendCrossShardRelayHandlerTests
         zones.Initialize([1]);
         var relay = new FakeSocialCrossShardRelayQueue();
         var handler = new FriendCrossShardRelayHandler(zones, friends, new DuelRegistry(), new TradeRegistry(),
-            new PartyRegistry(), new GuildInviteRegistry(), new MentorRegistry(), relay,
+            new PartyRegistry(), new GuildInviteRegistry(), new MentorRegistry(),
+            new Lazy<ISocialCrossShardRelayQueue>(() => relay),
             Options.Create(new GameServerOptions { ShardId = OwnShardId }),
             NullLogger<FriendCrossShardRelayHandler>.Instance);
         return (handler, zones, friends, relay);

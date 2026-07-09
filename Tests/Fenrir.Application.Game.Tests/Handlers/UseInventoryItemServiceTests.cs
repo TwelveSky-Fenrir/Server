@@ -1,5 +1,6 @@
 using System.Collections.Frozen;
 using System.Collections.Immutable;
+using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Guilds;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Simulation;
@@ -14,6 +15,7 @@ using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Dispatch.Zone.Sessions;
 using Fenrir.Network.Serialization.Zone.Packets.Zone;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.Handlers;
 
@@ -40,6 +42,7 @@ public class UseInventoryItemServiceTests
     private const int ProxyShopSevenDayItemId = 592;
     private const int ProxyShopSevenDayReskinItemId = 8423;
     private const int AccountId = 1;
+    private const byte ShardId = 1;
 
     private static async Task<UseInventoryItemResponse> RunToCompletionAsync(
         ValueTask<UseInventoryItemResponse> pending, Zone zone)
@@ -90,7 +93,7 @@ public class UseInventoryItemServiceTests
 
     private static UseInventoryItemService CreateService(FakeCharacterRepository characters,
         FakeGuildRepository guilds, FakeCashRepository cash, FakeEventLogRepository eventLog,
-        FakeOfflineShopRepository? offlineShops = null)
+        FakeOfflineShopRepository? offlineShops = null, FakeProxyShopExpirationRelayQueue? relay = null)
     {
         var itemsById = new Dictionary<int, ItemDefinition>
         {
@@ -117,7 +120,9 @@ public class UseInventoryItemServiceTests
         }.ToFrozenDictionary();
 
         return new UseInventoryItemService(characters, guilds, cash, offlineShops ?? new FakeOfflineShopRepository(),
-            eventLog, ZoneTestKit.EmptyWorldData(itemsById), NullLogger<UseInventoryItemService>.Instance);
+            eventLog, relay ?? new FakeProxyShopExpirationRelayQueue(),
+            Options.Create(new GameServerOptions { ShardId = ShardId }), ZoneTestKit.EmptyWorldData(itemsById),
+            NullLogger<UseInventoryItemService>.Instance);
     }
 
     [Fact]
@@ -357,7 +362,8 @@ public class UseInventoryItemServiceTests
         var (session, _, zone, state, characters, guilds, cash, eventLog) = SetUp();
         SeedInventory(zone, new ItemStack(ProxyShopOneDayItemId, 1, 0, 0, 0, 0, 0, 0, 0, 42, 7));
         var offlineShops = new FakeOfflineShopRepository();
-        var service = CreateService(characters, guilds, cash, eventLog, offlineShops);
+        var relay = new FakeProxyShopExpirationRelayQueue();
+        var service = CreateService(characters, guilds, cash, eventLog, offlineShops, relay);
         var expected = GameDate.Today();
         Assert.True(GameDate.TryAddDays(expected, 1, out expected));
 
@@ -371,6 +377,14 @@ public class UseInventoryItemServiceTests
         Assert.Equal(0, response.Value2);
 
         Assert.Equal(expected, offlineShops.LastExtendRentalNewShopDate);
+
+        // Always relayed cross-shard on success, regardless of whether this shard's own zone-37 instance
+        // (there is none here) happened to hold a matching entry -- see ProxyShopExpirationRelayHost's own
+        // remarks for why this hardens past the legacy single-process-only limitation.
+        var relayed = Assert.Single(relay.Enqueued);
+        Assert.Equal(ShardId, relayed.SourceShardId);
+        Assert.Equal(10, relayed.CharacterId);
+        Assert.Equal(expected, relayed.NewExpirationDate);
 
         var logged = Assert.Single(eventLog.LoggedEvents);
         Assert.Equal(10, logged.ActorCharacterId);
@@ -433,7 +447,8 @@ public class UseInventoryItemServiceTests
         var (session, _, zone, state, characters, guilds, cash, eventLog) = SetUp();
         SeedInventory(zone, new ItemStack(ProxyShopOneDayItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1));
         var offlineShops = new FakeOfflineShopRepository { ThrowOnExtendRental = true };
-        var service = CreateService(characters, guilds, cash, eventLog, offlineShops);
+        var relay = new FakeProxyShopExpirationRelayQueue();
+        var service = CreateService(characters, guilds, cash, eventLog, offlineShops, relay);
         Assert.True(GameDate.TryAddDays(GameDate.Today(), 1, out var expected));
 
         var response = await service.ResolveAsync(zone, state, 10, AccountId, ContainerMatrix.InventoryPage0, 0, 0,
@@ -447,6 +462,7 @@ public class UseInventoryItemServiceTests
         Assert.Equal(0, response.Value2);
         Assert.Null(characters.LastReplacedContainer);
         Assert.Empty(eventLog.LoggedEvents);
+        Assert.Empty(relay.Enqueued);
     }
 
     [Fact]
@@ -458,7 +474,8 @@ public class UseInventoryItemServiceTests
         var offlineShops = new FakeOfflineShopRepository();
         // The maximum representable calendar date -- projecting one more day forward overflows.
         offlineShops.SeedShop(new OfflineShopRowDto(10, null, 1, 99991231, 0, 0, 0, 0, 0, ""));
-        var service = CreateService(characters, guilds, cash, eventLog, offlineShops);
+        var relay = new FakeProxyShopExpirationRelayQueue();
+        var service = CreateService(characters, guilds, cash, eventLog, offlineShops, relay);
 
         var response = await service.ResolveAsync(zone, state, 10, AccountId, ContainerMatrix.InventoryPage0, 0, 0,
             CancellationToken.None);
@@ -470,6 +487,7 @@ public class UseInventoryItemServiceTests
         Assert.Null(offlineShops.LastExtendRentalNewShopDate);
         Assert.Null(characters.LastReplacedContainer);
         Assert.Empty(eventLog.LoggedEvents);
+        Assert.Empty(relay.Enqueued);
     }
 
     [Fact]

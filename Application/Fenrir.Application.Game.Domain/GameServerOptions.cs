@@ -377,6 +377,57 @@ public sealed class GameServerOptions
     public int SocialCrossShardRelayRetentionSeconds { get; set; } = 30;
 
     /// <summary>
+    ///     How often <c>ProxyShopExpirationRelayHost</c> both flushes this shard's own queued proxy-shop
+    ///     rental-extension rows to <c>runtime.ProxyShopExpirationRelay</c> and polls that same table for
+    ///     rows published by every OTHER live shard, applying matches to this shard's own locally-hosted
+    ///     zone-37 <c>Zone</c> instance (if any) -- the fan-out sibling of
+    ///     <see cref="GuildTribeBroadcastPollIntervalSeconds" />, hardening past a legacy structural
+    ///     limitation rather than reproducing a legacy-cited value (legacy's own single-process
+    ///     <c>ts25zone</c> registry update had no cross-shard concept at all -- see
+    ///     <c>ProxyShopExpirationRelayHost</c>'s own remarks for the full trail). Same default as
+    ///     <see cref="GuildTribeBroadcastPollIntervalSeconds" />: a rental-extension mirror update is not as
+    ///     latency-sensitive as a live human negotiation prompt (<see cref="SocialCrossShardRelayPollIntervalSeconds" />'s
+    ///     own tighter default), since the only thing it races is the periodic proxy-shop expiry sweep, not a
+    ///     player waiting on a reply.
+    /// </summary>
+    public int ProxyShopExpirationRelayPollIntervalSeconds { get; set; } = 2;
+
+    /// <summary>
+    ///     How long a row survives in <c>runtime.ProxyShopExpirationRelay</c> before
+    ///     <c>ProxyShopExpirationRelayHost</c>'s own poll cycle reaps it, regardless of whether every live
+    ///     shard has already consumed it -- same "safe direction to fail toward" posture as
+    ///     <see cref="GuildTribeBroadcastRetentionSeconds" />, and the same default value: comfortably wider
+    ///     than <see cref="ProxyShopExpirationRelayPollIntervalSeconds" /> so a normally-alive shard never
+    ///     races its own poll cadence.
+    /// </summary>
+    public int ProxyShopExpirationRelayRetentionSeconds { get; set; } = 30;
+
+    /// <summary>
+    ///     How often <c>RvrSiegeEventRelayHost</c> both flushes this shard's own queued outbound Zone049
+    ///     siege-zone-slot (sub-codes 1-9) and tribe-symbol/alliance (tSort 38/39/40/42/45/46/47) rows to
+    ///     <c>runtime.RvrSiegeEventRelay</c> and polls that same table for rows published by every OTHER live
+    ///     shard, replaying matches through <c>ZoneCenterBroadcastIngestor.ApplyRelayedEvent</c>/
+    ///     <c>ZoneEventBroadcaster.ApplyRelayedEvent</c> -- the fan-out sibling of
+    ///     <see cref="GuildTribeBroadcastPollIntervalSeconds" />, hardening past the same "Fenrir shards
+    ///     ZoneRegistry disjointly by map" structural gap <see cref="ProxyShopExpirationRelayPollIntervalSeconds" />'s
+    ///     own remarks describe (legacy's single ts25center process had no such gap: it relayed to literally
+    ///     every connected zone process). Same default as <see cref="GuildTribeBroadcastPollIntervalSeconds" />:
+    ///     a siege-slot/tribe-symbol/alliance transition is schedule-cadence traffic, not as latency-sensitive
+    ///     as a live human negotiation prompt (<see cref="SocialCrossShardRelayPollIntervalSeconds" />'s own
+    ///     tighter default).
+    /// </summary>
+    public int RvrSiegeEventRelayPollIntervalSeconds { get; set; } = 2;
+
+    /// <summary>
+    ///     How long a row survives in <c>runtime.RvrSiegeEventRelay</c> before <c>RvrSiegeEventRelayHost</c>'s
+    ///     own poll cycle reaps it, regardless of whether every live shard has already consumed it -- same
+    ///     "safe direction to fail toward" posture as <see cref="GuildTribeBroadcastRetentionSeconds" />, and
+    ///     the same default value: comfortably wider than <see cref="RvrSiegeEventRelayPollIntervalSeconds" />
+    ///     so a normally-alive shard never races its own poll cadence.
+    /// </summary>
+    public int RvrSiegeEventRelayRetentionSeconds { get; set; } = 30;
+
+    /// <summary>
     ///     Map ids this shard hosts that run the Zone195 "Nok-San" solo stone-capture content --
     ///     <see cref="World.ZoneWar.RegularWarAfkTickSystem" />'s own AFK-enforcement gate only; the Nok-San
     ///     capture mechanic itself (candidate lock/hold-countdown/possession transfer,
@@ -415,4 +466,26 @@ public sealed class GameServerOptions
     /// </summary>
     public IReadOnlyDictionary<byte, short> MonsterSymbolAttackNotifyMapIds { get; set; } =
         new Dictionary<byte, short>();
+
+    /// <summary>
+    ///     How often <c>GuildBuffExpiryRelayHost</c> both flushes this shard's own queued outbound
+    ///     guild-buff-reserve-exhaustion pushes (<c>Hosting.Guilds.GuildBuffDecayHost</c>'s own edge-triggered
+    ///     <c>gBuffTime &lt; 1</c> detections) to <c>runtime.GuildBuffExpiryRelay</c> and polls that same table
+    ///     for pushes published by every OTHER live shard, delivering matches to this shard's own
+    ///     locally-hosted players -- the fan-out sibling of <see cref="GuildTribeBroadcastPollIntervalSeconds" />
+    ///     for this one, dedicated, non-opcode-driven push (Server/ts25center/S07_MyGame01.cpp:291-331's own
+    ///     <c>BroadcastZone()</c> cluster-wide send). A NEW, Fenrir-internal operational knob, not a
+    ///     reproduction of a legacy-cited value -- the same-shard half (<c>GuildBuffDecayHost</c>'s own
+    ///     immediate, synchronous delivery to this shard's hosted zones) is unaffected; only the OTHER-shard
+    ///     fan-out lags by up to this many seconds.
+    /// </summary>
+    public int GuildBuffExpiryRelayPollIntervalSeconds { get; set; } = 2;
+
+    /// <summary>
+    ///     How long a row survives in <c>runtime.GuildBuffExpiryRelay</c> before <c>GuildBuffExpiryRelayHost</c>'s
+    ///     own poll cycle reaps it, regardless of whether every live shard has already consumed it -- same
+    ///     "safe direction to fail toward" posture as <see cref="GuildTribeBroadcastRetentionSeconds" />, and
+    ///     the same default value.
+    /// </summary>
+    public int GuildBuffExpiryRelayRetentionSeconds { get; set; } = 30;
 }

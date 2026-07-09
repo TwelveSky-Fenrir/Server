@@ -17,16 +17,7 @@ public static class Extensions
         {
             builder.ConfigureOpenTelemetry();
 
-            builder.AddDefaultHealthChecks();
-
             builder.Services.AddServiceDiscovery();
-
-            builder.Services.ConfigureHttpClientDefaults(http =>
-            {
-                http.AddStandardResilienceHandler();
-
-                http.AddServiceDiscovery();
-            });
 
             return builder;
         }
@@ -43,13 +34,11 @@ public static class Extensions
                 .WithMetrics(metrics =>
                 {
                     // No AddAspNetCoreInstrumentation(): neither server is an ASP.NET Core app, no HTTP pipeline to instrument.
-                    metrics.AddHttpClientInstrumentation()
-                        .AddRuntimeInstrumentation();
+                    metrics.AddRuntimeInstrumentation();
                 })
                 .WithTracing(tracing =>
                 {
-                    tracing.AddSource(builder.Environment.ApplicationName)
-                        .AddHttpClientInstrumentation();
+                    tracing.AddSource(builder.Environment.ApplicationName);
                 });
 
             builder.AddOpenTelemetryExporters();
@@ -62,15 +51,6 @@ public static class Extensions
             var useOtlpExporter = !string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]);
 
             if (useOtlpExporter) builder.Services.AddOpenTelemetry().UseOtlpExporter();
-
-            return builder;
-        }
-
-        /// <summary>Registers the health-check service only, no HTTP endpoint mapping: these are TCP game-socket servers.</summary>
-        public TBuilder AddDefaultHealthChecks()
-        {
-            builder.Services.AddHealthChecks()
-                .AddCheck("self", () => HealthCheckResult.Healthy(), ["live"]);
 
             return builder;
         }

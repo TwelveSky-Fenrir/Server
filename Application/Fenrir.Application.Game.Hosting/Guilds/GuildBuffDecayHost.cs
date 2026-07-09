@@ -1,8 +1,10 @@
+using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Guilds;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Hosting.Guilds;
 
@@ -14,7 +16,19 @@ namespace Fenrir.Application.Game.Hosting.Guilds;
 ///     SQL round trip and must run exactly once process-wide, not once per hosted zone per tick. Same
 ///     "singleton BackgroundService with its own timer" shape as <c>WorldStateWriteBehindHost</c>.
 /// </summary>
-public sealed class GuildBuffDecayHost(IGuildRepository guilds, ILogger<GuildBuffDecayHost> logger) : BackgroundService
+/// <remarks>
+///     Also owns the guild-buff-reserve-exhaustion immediate strip-effect push's own trigger detection
+///     (Server/ts25center/S07_MyGame01.cpp:291-331's edge-triggered <c>gBuffTime &lt; 1</c> branch) -- see
+///     <see cref="Zone.ApplyGuildBuffExpiryCommand" /> and <see cref="GuildBuffExpiryRelayHost" /> for the
+///     same-shard/cross-shard delivery halves this host only detects and dispatches, never delivers directly
+///     itself.
+/// </remarks>
+public sealed class GuildBuffDecayHost(
+    IGuildRepository guilds,
+    ZoneRegistry zones,
+    IGuildBuffExpiryRelayQueue expiryRelay,
+    IOptions<GameServerOptions> options,
+    ILogger<GuildBuffDecayHost> logger) : BackgroundService
 {
     /// <summary>BuffTime's unit is whole minutes, so sub-minute polling would only ever waste a full-table scan.</summary>
     public static readonly TimeSpan Interval = TimeSpan.FromSeconds(30);
@@ -64,7 +78,32 @@ public sealed class GuildBuffDecayHost(IGuildRepository guilds, ILogger<GuildBuf
             {
                 logger.LogWarning(ex, "Guild {GuildId} buff decay persist failed -- will retry next interval",
                     guild.GuildId);
+                continue;
             }
+
+            // Edge-triggered reserve-exhaustion push (Server/ts25center/S07_MyGame01.cpp:316-330's own
+            // gBuffTime < 1 branch) -- the eligibility query above structurally never re-selects a guild whose
+            // reserve is already exactly zero (GuildBuffDecay.Apply's own <= 0 short-circuit), so this fires
+            // exactly once, at the pass the reserve first reaches exhaustion.
+            if (result.BuffTime >= 1)
+                continue;
+
+            PushExpiry(guild.GuildId, result.BuffTime);
         }
+    }
+
+    /// <summary>
+    ///     Same-shard delivery first (synchronous, posted directly onto every zone THIS shard hosts), then
+    ///     cross-shard fan-out via <see cref="IGuildBuffExpiryRelayQueue" /> so every OTHER live shard's own
+    ///     <see cref="GuildBuffExpiryRelayHost" /> delivers to its own locally-hosted matches -- same ordering
+    ///     as every other cluster-wide broadcast producer in this codebase (e.g. <c>GuildAnnouncementService</c>).
+    /// </summary>
+    private void PushExpiry(int guildId, int newBuffTime)
+    {
+        var command = new GuildBuffExpiryZoneCommand(guildId, newBuffTime);
+        foreach (var zone in zones.Zones)
+            zone.PostGuildBuffExpiryCommand(in command);
+
+        expiryRelay.Enqueue(new GuildBuffExpiryRelayEntry(options.Value.ShardId, guildId, newBuffTime));
     }
 }

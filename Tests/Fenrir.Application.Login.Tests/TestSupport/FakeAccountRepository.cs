@@ -32,6 +32,11 @@ internal sealed class FakeAccountRepository : IAccountRepository
         return ValueTask.CompletedTask;
     }
 
+    public ValueTask SetGradeAsync(string loginName, short accountGrade, CancellationToken ct)
+    {
+        throw new NotSupportedException();
+    }
+
     public static FakeAccountRepository WithAccount(AuthenticateAccountDto account)
     {
         return new FakeAccountRepository(account);

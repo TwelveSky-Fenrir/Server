@@ -28,8 +28,10 @@ namespace Fenrir.Application.Game.Services.Gm;
 ///     (audit-log call for item creation -- see this type's own remarks for the inexact field mapping) ;
 ///     Server/Header/Protocol/DEFINE.h:611 (MAX_ITEM_DUPLICATION_NUM = 999, ported as
 ///     <see cref="GroundItemPickupPolicy.MaxStackQuantity" />) ; Server/Header/Protocol/DEFINE.h:520
-///     (GM-drop-source code, ported as <see cref="GroundItemEntity.GmCreateItemDropSort" /> -- see that
-///     constant's own remarks for its unconfirmed-value caveat).
+///     (GM-drop-source code = 13, ported as <see cref="GroundItemEntity.GmCreateItemDropSort" />) ;
+///     Server/ts25zone/S07_MyGame03.cpp:650 (this drop source excluded from the cluster-wide "elite item
+///     drop" inter-zone announcement list -- moot in Fenrir today since no such announcement subsystem is
+///     implemented for any drop source yet, so nothing here can accidentally include it).
 /// </summary>
 /// <remarks>
 ///     Legacy's world item-object pool is a fixed-size array whose exhaustion is a real, observable failure

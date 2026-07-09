@@ -40,4 +40,14 @@ public sealed record AccountRepository(ICaeriusNetDbContext Db) : IAccountReposi
 
         await Db.ExecuteAsync(sp, ct);
     }
+
+    public async ValueTask SetGradeAsync(string loginName, short accountGrade, CancellationToken ct)
+    {
+        var sp = new StoredProcedureParametersBuilder("auth", "usp_Account_SetGrade", 0)
+            .AddParameter("LoginName", loginName, SqlDbType.NVarChar)
+            .AddParameter("AccountGrade", accountGrade, SqlDbType.SmallInt)
+            .Build();
+
+        await Db.ExecuteAsync(sp, ct);
+    }
 }

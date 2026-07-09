@@ -23,6 +23,28 @@ public partial class PlayerRuntimeState
     public string GuildCallName { get; set; } = "";
 
     /// <summary>
+    ///     Live guild-buff on/off gate for this session -- the primary field live combat/stat-formula
+    ///     calculations are meant to read directly on every relevant calculation (multiple distinct legacy
+    ///     formula sites gate their bonus application on this exact field: Server/Header/Protocol/MyFactor.cpp:
+    ///     3151, :3323, :4102, :4443, :4574). Flipped false by <see cref="Zone.ApplyGuildBuffExpiryCommand" />
+    ///     the instant a guild's buff reserve reaches exhaustion (see that method's own remarks) -- Fenrir has
+    ///     no formula site wired to actually READ this yet (a separate, not-yet-implemented gap: applying the
+    ///     guild-buff bonus itself), so this field is currently write-only within this cluster, same
+    ///     "real but currently unreachable" posture as <see cref="VerifyEchoedActionState" />.
+    /// </summary>
+    public bool GuildBuffActive { get; set; }
+
+    /// <summary>
+    ///     Second in-memory mirror of the exact same on/off state as <see cref="GuildBuffActive" /> -- legacy
+    ///     flips two distinct session fields together on every guild-buff expiry
+    ///     (Server/ts25zone/UpperCom/S06_MyUpperCom02.cpp:359-378), not one; kept as a separate property here
+    ///     rather than folded into <see cref="GuildBuffActive" /> so a future consumer of the second legacy
+    ///     field has a faithful, independently-settable Fenrir counterpart to bind to. No current Fenrir
+    ///     consumer reads this one either.
+    /// </summary>
+    public bool GuildBuffActiveMirror { get; set; }
+
+    /// <summary>
     ///     This character's tribe role -- loaded once at world entry, matching <c>ReturnTribeRole</c>'s own
     ///     encoding directly (0 = regular, 1 = master, 2 = sub-master, 3 = elected tribe-council member
     ///     seated via the tribe-vote mechanism; see <c>Server/Header/function.h:92-114</c>).

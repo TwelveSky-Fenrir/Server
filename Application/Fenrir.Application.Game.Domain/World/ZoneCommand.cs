@@ -42,7 +42,18 @@ public enum ZoneCommandKind : byte
     ///     host's own background-timer thread -- same single-writer-preserving posture as
     ///     <see cref="MarkZoneTransferPending" />/<see cref="SetMuted" />.
     /// </summary>
-    CreditRegularWarConclusion
+    CreditRegularWarConclusion,
+
+    /// <summary>
+    ///     Grants the 7 known Valley of the Deceased (Zone 200/297/298/299) boss-win reward ground-item drops --
+    ///     see <see cref="Zone.HandleGrantValleyWarRewardDrop" />'s own remarks for the full behavior and
+    ///     citation. Posted once per winning-tribe character still tracked ANYWHERE on this shard (not only on
+    ///     the war map itself, per the source contract) at boss-win time by
+    ///     <see cref="Fenrir.Application.Game.Domain.World.ZoneWar.ValleyWarSystem" />, from whichever zone's own
+    ///     tick thread evaluated the win -- possibly a DIFFERENT zone than the one that now hosts the recipient,
+    ///     same cross-zone <see cref="Post" /> precedent as <see cref="CreditRegularWarConclusion" />.
+    /// </summary>
+    GrantValleyWarRewardDrop
 }
 
 /// <summary>
@@ -134,6 +145,12 @@ public readonly struct ZoneCommand
     public static ZoneCommand CreditRegularWarConclusion(int characterId)
     {
         return new ZoneCommand { Kind = ZoneCommandKind.CreditRegularWarConclusion, CharacterId = characterId };
+    }
+
+    /// <summary>See <see cref="ZoneCommandKind.GrantValleyWarRewardDrop" />'s own remarks.</summary>
+    public static ZoneCommand GrantValleyWarRewardDrop(int characterId)
+    {
+        return new ZoneCommand { Kind = ZoneCommandKind.GrantValleyWarRewardDrop, CharacterId = characterId };
     }
 }
 

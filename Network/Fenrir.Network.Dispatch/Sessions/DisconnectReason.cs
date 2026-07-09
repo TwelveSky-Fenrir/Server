@@ -100,5 +100,16 @@ public enum DisconnectReason
     ///     <see cref="Faulted" /> (an unrelated protocol/anti-tamper fault), so operators can tell a GM's
     ///     one-off disconnect-only action apart from either.
     /// </summary>
-    GmKicked
+    GmKicked,
+
+    /// <summary>
+    ///     Torn down by the Valley of the Deceased (Zone 200/297/298/299 gate/door/kill-race "Regular War")
+    ///     forced-reset step: every session on the map is disconnected unconditionally once the post-conclusion
+    ///     cooldown elapses, immediately before the whole cycle resets to its idle wait -- see
+    ///     <c>Fenrir.Application.Game.Domain.World.ZoneWar.ValleyWarSystem</c> for the one caller. Distinct from
+    ///     <see cref="TimedZoneExpired" /> (a per-player countdown) since this fires identically for every
+    ///     connected session on the map regardless of that player's own state.
+    /// </summary>
+    /// <remarks>Réf. C++ : Server/ts25zone/S07_MyGame01.cpp:11558-11571.</remarks>
+    ValleyWarForcedReset
 }

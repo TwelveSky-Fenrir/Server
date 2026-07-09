@@ -16,30 +16,48 @@ namespace Fenrir.Application.Game.Services.Gm;
 ///     Citations: Server/ts25zone/S04_MyWork04.cpp:2062-2083 (full case 700 body: privilege gate,
 ///     unconditional result-code assignment, unconditional overwrite of the pet-identifier field to the "no
 ///     pet" sentinel, the equipped-pet-slot/catalog-sort-code checks gating the grant call, the conditional
-///     write of the echoed experience field) ; Server/Header/Protocol/STRUCT.h:1662-1676 (equipment-slot
+///     write of the echoed experience field) ; Server/Header/Protocol/STRUCT.h:1296-1300 (payload shape: two
+///     whole-number fields, PetId/PetExperience) ; Server/Header/Protocol/STRUCT.h:1662-1676 (equipment-slot
 ///     enumeration confirming the pet slot's position, ported as <see cref="PetSlots.EquipmentSlot" />) ;
 ///     Server/Header/Protocol/STRUCT.h:1696 (pet-item catalog sort-code constant used by the outer
 ///     eligibility check -- item catalog Sort 22, the same constant <see cref="PetGrowthCalculator.Compute" />
-///     already gates its own stat-contribution computation on) ; Server/ts25zone/H08_MyGameSystem.h:212 and
-///     Server/ts25zone/GameSystem/GameSystem_07_Pet.cpp:1804-1971 (the actual growth-grant subsystem this
-///     command calls into -- NOT ported by this type; see this type's own remarks for why).
+///     already gates its own stat-contribution computation on) ; Server/ts25zone/H08_MyGameSystem.h:212 (the
+///     grant-routine declaration; its packet-notification parameter defaults to send) ;
+///     Server/ts25zone/GameSystem/GameSystem_07_Pet.cpp:1804-1894 (item-id-to-growth-tier lookup switch),
+///     :1895-1918 (unrecognized-item-id zero-growth default, already-at-cap early return, growth-rate-based
+///     recomputation, clamp to tier maximum), :1920-1971 (grant routine full body: pet re-resolution from the
+///     equipped slot, force-activation-on-inactive side effect, proactive packet, growth-stage-crossing
+///     second broadcast) -- the actual growth-grant subsystem this command calls into, NOT ported by this
+///     type; see this type's own remarks for why -- and :8-15 (per-tier maximum-growth constants).
 /// </summary>
 /// <remarks>
 ///     This type deliberately implements only the OUTER shape of case 700 -- the privilege gate, the
 ///     unconditional accepted result code, and the equipped-pet eligibility check (slot 8 occupied, catalog
 ///     Sort == 22) that decides which sentinel/item-id value to echo back in the PetId field. It does NOT
-///     port the inner growth-grant computation itself (GameSystem_07_Pet.cpp:1804-1918's per-item-id
-///     tier-bucket lookup table, the fixed growth-multiplier-200/640,000,000-fallback formula, the
-///     force-activation-on-inactive side effect, or the growth-stage-threshold rebroadcast) -- the source
-///     behavior contract this type was authored against cites only the tier CAP constants
-///     (40M/80M/160M/320M/80M/160M/320M/640M across eight buckets), not the concrete item-id -&gt; bucket
-///     mapping table itself, and porting a fabricated mapping would silently ship wrong per-pet growth
-///     amounts rather than a wire-format or gating defect. Every request that finds an eligible pet therefore
-///     still reports the accepted result code and echoes the equipped item's real catalog id in PetId (both
-///     confirmed, cited behaviors), but never actually grants any experience and always echoes
+///     port the inner growth-grant computation itself: the per-item-id tier-bucket lookup switch
+///     (GameSystem_07_Pet.cpp:1804-1894), the at-cap-skip/recompute-toward-tier-maximum/clamp logic
+///     (:1895-1918), or the force-activation/proactive-packet/growth-stage-threshold-rebroadcast side effects
+///     of the grant routine itself (:1920-1971). A second, more detailed behavior contract pass (this type's
+///     own citations above) still only points at those line ranges and the four base tier CAP constants
+///     (GameSystem_07_Pet.cpp:8-15, 40M/80M/160M/320M -- the same four values
+///     <see cref="PetGrowthCalculator" />'s own <c>MaxRangeValue</c> array already uses for the *unrelated*
+///     stat-contribution formula) -- it does not transcribe the concrete item-id -&gt; tier-bucket table for
+///     *this* function, nor the exact recompute formula ("drives the counter to at or very near the tier
+///     maximum in one call" is a qualitative description, not a formula). Inferring that table from
+///     <see cref="PetGrowthCalculator" />'s own <c>LifeFamily</c>/<c>ManaFamily</c>/<c>AttackFamily</c>/
+///     <c>DefenseFamily</c> tables would be guessing at one legacy function's behavior from a
+///     similar-looking-but-distinct sibling function, which this project's own engineering rules forbid.
+///     Porting a fabricated mapping or formula would silently ship wrong per-pet growth amounts (and a
+///     fabricated "pet activation" state transition -- Fenrir has no modeled boolean pet-active/inactive
+///     state anywhere yet, only the decayable <see cref="Fenrir.Application.Game.Domain.World.PlayerRuntimeState.PetActivity" />
+///     meter, a different concept) rather than a wire-format or gating defect. Every request that finds an
+///     eligible pet therefore still reports the accepted result code and echoes the equipped item's real
+///     catalog id in PetId (both confirmed, cited behaviors), but never actually grants any experience,
+///     never force-activates a pet, never fires the activation/growth-stage rebroadcasts, and always echoes
 ///     PetExperience = 0 -- flagged here explicitly rather than silently approximated. A dedicated
-///     <c>legacy-behavior-translator</c>/<c>cpp-zone-gameplay-analyst</c> follow-up citing the concrete
-///     per-item-id table is required before this gap can be closed.
+///     <c>legacy-behavior-translator</c>/<c>cpp-zone-gameplay-analyst</c> follow-up transcribing the concrete
+///     per-item-id table, the exact recompute formula, and how "pet active state" should be modeled in
+///     <see cref="PlayerRuntimeState" /> is required before this gap can be closed.
 ///     <para>
 ///         Legacy's own case 700 body writes no game.EventLog row either -- the
 ///         <see cref="IEventLogRepository.LogAsync" /> call below is a Fenrir-authored addition (project

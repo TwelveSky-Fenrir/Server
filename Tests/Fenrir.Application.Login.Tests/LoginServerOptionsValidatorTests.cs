@@ -73,4 +73,33 @@ public sealed class LoginServerOptionsValidatorTests
         Assert.True(result.Failed);
         Assert.Contains(result.Failures!, f => f.Contains("Login:IdleSweepIntervalSeconds"));
     }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void Validate_WithNonPositiveMaxConnectionsPerIp_FailsAndMentionsField(int maxConnectionsPerIp)
+    {
+        var options = Valid();
+        options.MaxConnectionsPerIp = maxConnectionsPerIp;
+
+        var result = new LoginServerOptionsValidator().Validate(null, options);
+
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures!, f => f.Contains("Login:MaxConnectionsPerIp"));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void Validate_WithNonPositiveMaxProtocolViolationsPerIpPerHour_FailsAndMentionsField(
+        int maxProtocolViolationsPerIpPerHour)
+    {
+        var options = Valid();
+        options.MaxProtocolViolationsPerIpPerHour = maxProtocolViolationsPerIpPerHour;
+
+        var result = new LoginServerOptionsValidator().Validate(null, options);
+
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures!, f => f.Contains("Login:MaxProtocolViolationsPerIpPerHour"));
+    }
 }

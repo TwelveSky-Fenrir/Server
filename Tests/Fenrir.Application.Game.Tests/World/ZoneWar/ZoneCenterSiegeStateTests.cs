@@ -181,4 +181,53 @@ public class ZoneCenterSiegeStateTests
 
         Assert.Throws<ArgumentOutOfRangeException>(() => state.GetZone038DtmValue(4));
     }
+
+    [Theory]
+    [InlineData(0, true)]
+    [InlineData(12, true)]
+    [InlineData(-1, false)]
+    [InlineData(13, false)]
+    public void IsValidZone049Slot_MatchesTheThirteenSlotArray(int slot, bool expected)
+    {
+        Assert.Equal(expected, ZoneCenterSiegeState.IsValidZone049Slot(slot));
+    }
+
+    [Fact]
+    public void SetZone049State_WithoutStampTime_WritesStateOnly_LeavesTimeAndOtherSlotsUntouched()
+    {
+        var state = new ZoneCenterSiegeState();
+
+        state.SetZone049State(5, 3, false);
+
+        Assert.Equal(3, state.GetZone049State(5));
+        Assert.Equal(0, state.GetZone049StateTime(5));
+        Assert.Equal(0, state.GetZone049State(4));
+    }
+
+    [Fact]
+    public void SetZone049State_WithStampTime_WritesStateAndANonZeroTimestamp()
+    {
+        var state = new ZoneCenterSiegeState();
+
+        state.SetZone049State(2, 5, true);
+
+        Assert.Equal(5, state.GetZone049State(2));
+        Assert.NotEqual(0, state.GetZone049StateTime(2));
+    }
+
+    [Fact]
+    public void SetZone049State_OutOfRangeSlot_Throws()
+    {
+        var state = new ZoneCenterSiegeState();
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => state.SetZone049State(13, 1, false));
+    }
+
+    [Fact]
+    public void GetZone049State_OutOfRangeSlot_Throws()
+    {
+        var state = new ZoneCenterSiegeState();
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => state.GetZone049State(-1));
+    }
 }

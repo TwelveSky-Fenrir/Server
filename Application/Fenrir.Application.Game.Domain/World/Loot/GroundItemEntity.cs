@@ -65,16 +65,15 @@ public sealed record GroundItemEntity(
     ///     owner-can-reclaim) treatment as any other <see cref="Master" />-stamped drop.
     /// </summary>
     /// <remarks>
-    ///     Réf. C++ : Server/Header/Protocol/DEFINE.h:520 names this specific GM-drop-source code, distinct
-    ///     from <see cref="MonsterKillDropSort" /> (:517-520 broadly) and <see cref="ManualGroundDropSort" />.
-    ///     Its concrete numeric value was NOT independently confirmed against the header for this change --
-    ///     same "inferred by adjacency, not re-derived" posture <see cref="ManualGroundDropSort" /> already
-    ///     documents for itself, extended one step further here (next unused value after 1/2). Re-verify
-    ///     against DEFINE.h:517-520 (the small drop-source-code block that range spans) before relying on this
-    ///     exact value for anything beyond the audit-trail/informational tagging
-    ///     <see cref="Fenrir.Application.Game.Services.Gm.GmCreateItemService" /> uses it for today.
+    ///     Réf. C++ : Server/Header/Protocol/DEFINE.h:520 names this specific GM-drop-source code as literal
+    ///     value 13, distinct from <see cref="MonsterKillDropSort" /> (:517-520 broadly) and
+    ///     <see cref="ManualGroundDropSort" /> -- confirmed via the
+    ///     <c>legacy-behavior-translator</c> contract for the Admin-tier spawn-item command (carried forward
+    ///     from that contract's own input research, not independently re-opened by this project's own C#
+    ///     engineering pass), superseding this constant's earlier "inferred by adjacency, not re-derived"
+    ///     placeholder value of 3.
     /// </remarks>
-    public const int GmCreateItemDropSort = 3;
+    public const int GmCreateItemDropSort = 13;
 
     public bool IsExpired(TimeSpan nowZoneClock)
     {

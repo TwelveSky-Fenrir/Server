@@ -1,5 +1,6 @@
 using System.Collections.Frozen;
 using System.Collections.Immutable;
+using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.GameData;
@@ -11,6 +12,7 @@ using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Dispatch.Zone.Sessions;
 using Fenrir.Network.Serialization.Zone.Packets.Zone;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.Handlers;
 
@@ -91,7 +93,8 @@ public class UseInventoryItemConsumablesServiceTests
         }.ToFrozenDictionary();
 
         return new UseInventoryItemService(characters, new FakeGuildRepository(), new FakeCashRepository(),
-            new FakeOfflineShopRepository(), new FakeEventLogRepository(), ZoneTestKit.EmptyWorldData(itemsById),
+            new FakeOfflineShopRepository(), new FakeEventLogRepository(), new FakeProxyShopExpirationRelayQueue(),
+            Options.Create(new GameServerOptions()), ZoneTestKit.EmptyWorldData(itemsById),
             NullLogger<UseInventoryItemService>.Instance);
     }
 

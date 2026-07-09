@@ -20,11 +20,21 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 ///         returns immediately after the map-id comparison fails, so this never grows more expensive as the
 ///         shard hosts more maps.
 ///     </para>
+///     <para>
+///         <paramref name="broadcaster" /> is <see cref="Lazy{T}" />, not a direct reference, because
+///         <see cref="ZoneEventBroadcaster" /> itself depends on <see cref="World.ZoneRegistry" />, and this
+///         system is one of the <see cref="ISimulationSystem" /> instances <see cref="World.ZoneRegistry" />
+///         resolves at construction time -- a direct reference here would create a same-container constructor
+///         cycle (ZoneRegistry -&gt; ISimulationSystem -&gt; MonsterSymbolAttackWindowNotifySystem -&gt;
+///         ZoneEventBroadcaster -&gt; ZoneRegistry). Deferring the lookup until first notify resolves it after
+///         every singleton, including <see cref="World.ZoneRegistry" /> itself, is already constructed and
+///         cached.
+///     </para>
 /// </remarks>
 public sealed class MonsterSymbolAttackWindowNotifySystem(
     WorldStateService worldState,
     MonsterSymbolAttackWindowTracker tracker,
-    ZoneEventBroadcaster broadcaster,
+    Lazy<ZoneEventBroadcaster> broadcaster,
     IOptions<GameServerOptions> options) : ISimulationSystem
 {
     /// <summary>Server/Header/function.h:1643-1652: 120 legacy ticks (TimeLogic=500ms) per real minute.</summary>
@@ -46,6 +56,6 @@ public sealed class MonsterSymbolAttackWindowNotifySystem(
         var delayLegacyTicks = opts.MonsterSymbolAttackNotifyDelayMinutes * LegacyTicksPerMinute;
 
         if (tracker.ShouldNotifyNow(holder, legacyTicksElapsed, delayLegacyTicks))
-            broadcaster.AnnounceMonsterSymbolAttackWindow();
+            broadcaster.Value.AnnounceMonsterSymbolAttackWindow();
     }
 }

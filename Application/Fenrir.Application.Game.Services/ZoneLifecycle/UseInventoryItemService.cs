@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 using Fenrir.Application.Game.Abstractions.ZoneLifecycle;
+using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Commerce;
 using Fenrir.Application.Game.Domain.Consumables;
 using Fenrir.Application.Game.Domain.Inventory;
@@ -15,6 +16,7 @@ using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Stats;
 using Fenrir.Network.Serialization.Zone.Packets.Zone;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Services.ZoneLifecycle;
 
@@ -24,6 +26,8 @@ public sealed class UseInventoryItemService(
     ICashRepository cash,
     IOfflineShopRepository offlineShops,
     IEventLogRepository eventLog,
+    IProxyShopExpirationRelayQueue proxyShopExpirationRelay,
+    IOptions<GameServerOptions> options,
     WorldDataCache worldData,
     ILogger<UseInventoryItemService> logger) : IUseInventoryItemService
 {
@@ -494,10 +498,17 @@ public sealed class UseInventoryItemService(
     ///     field" side effect therefore has no Fenrir equivalent to perform here. The legacy's other remaining
     ///     side effect (updating a live shared-registry entry in place) DOES have a Fenrir equivalent --
     ///     <see cref="Zone.TryUpdateProxyShopExpiration" /> against the zone hosting the shop's own broadcast
-    ///     entry -- called best-effort, discarding whether it actually found an entry to update (see that
-    ///     method's own remarks for why a miss is expected whenever the acting character isn't in the same
-    ///     zone/shard as their shop). Stack consumption uses <see cref="CashItemStackConsumption" /> -- see
-    ///     that type's own remarks for the unresolved stack-safe-category ambiguity for these four item ids.
+    ///     entry -- called best-effort first for this shard's own same-shard case, discarding whether it
+    ///     actually found an entry to update, then ALWAYS relayed cross-shard via
+    ///     <see cref="IProxyShopExpirationRelayQueue" /> so whichever OTHER shard actually hosts the zone-37
+    ///     broadcast registry (the overwhelmingly common case, since the acting character is rarely standing
+    ///     in zone 37 at the moment they use the item) can apply the same update -- see
+    ///     <c>ProxyShopExpirationRelayHost</c>'s own remarks for why this is a deliberate hardening past a
+    ///     legacy structural limitation (legacy's own in-place update only ever applied on the single process
+    ///     hosting the live registry, with no cross-process resynchronization path at all), not a
+    ///     reproduction of a legacy mechanism. Stack consumption uses <see cref="CashItemStackConsumption" />
+    ///     -- see that type's own remarks for the unresolved stack-safe-category ambiguity for these four
+    ///     item ids.
     /// </summary>
     /// <remarks>
     ///     Réf. C++ : Server/ts25zone/S04_MyWork03.cpp:2632-2675 (the full proxy-shop item branch: mapping,
@@ -512,7 +523,10 @@ public sealed class UseInventoryItemService(
     ///     exception collapses "unreachable" and "reported failure" into the same Result=1 response, matching
     ///     the legacy client's own inability to distinguish them) ; Server/Header/Protocol/DEFINE.h:309,369
     ///     (the four-faction, 500-slot-per-faction live shop registry that <see cref="Zone.TryUpdateProxyShopExpiration" />
-    ///     is the Fenrir-sharded analogue of).
+    ///     is the Fenrir-sharded analogue of) ; Server/Header/Protocol/DEFINE.h:95 (<c>PPSHOP_V2</c>, defined
+    ///     with no surrounding conditional -- the single-hub/zone-37 configuration every real build ships,
+    ///     which is what makes legacy's <c>mProxyInfo != NULL</c> gate equivalent to "only zone 37's own
+    ///     process" and therefore why a cross-shard relay is needed here where legacy had none).
     /// </remarks>
     private async ValueTask<UseInventoryItemResponse> ResolveProxyShopRentalExtensionAsync(Zone zone,
         PlayerRuntimeState state, int characterId, byte page, byte index, ItemStack item,
@@ -567,9 +581,16 @@ public sealed class UseInventoryItemService(
                 "Zone {MapId} inventory inbox full: dropped proxy-shop rental-extension mirror for character {CharacterId} -- SQL is durable, in-memory cache will self-heal on next world entry",
                 zone.MapId, characterId);
 
-        // Best-effort live-registry mirror -- see this method's own <summary> for why a miss here is
-        // expected and not logged as an error.
+        // Best-effort SAME-shard live-registry mirror -- see this method's own <summary> for why a miss here
+        // is expected and not logged as an error.
         zone.TryUpdateProxyShopExpiration(characterId, resolved.NewExpirationDate);
+
+        // Cross-shard leg: always relayed, regardless of whether the same-shard attempt above hit or missed
+        // (a miss is the overwhelmingly common case) -- see this method's own <summary> and
+        // ProxyShopExpirationRelayHost's own remarks for why this hardens past a legacy structural
+        // limitation instead of reproducing it.
+        proxyShopExpirationRelay.Enqueue(
+            new ProxyShopExpirationRelayEntry(options.Value.ShardId, characterId, resolved.NewExpirationDate));
 
         logger.LogInformation(
             "Character {CharacterId} use-inventory-item (proxy-shop rental extension) applied: item {ItemId}, new expiration {NewExpirationDate}",

@@ -46,7 +46,7 @@ public class RegularWarSchedulerHostTests
         var registry = CreateRegistry(1); // map 1 is not one of the 11 configured Regular War maps
         var sink = new RecordingSink();
         var host = new RegularWarSchedulerHost(registry, CreateWorldState(), sink,
-            new UnavailableRegularWarRewardValueProvider());
+            new UnavailableRegularWarRewardValueProvider(), NullLogger<RegularWarSchedulerHost>.Instance);
 
         host.Tick(SimulationClock.LegacyTick * (TicksToActiveWar + 100));
 
@@ -60,7 +60,7 @@ public class RegularWarSchedulerHostTests
         var registry = CreateRegistry(49); // one of the 11 configured maps
         var sink = new RecordingSink();
         var host = new RegularWarSchedulerHost(registry, CreateWorldState(), sink,
-            new UnavailableRegularWarRewardValueProvider());
+            new UnavailableRegularWarRewardValueProvider(), NullLogger<RegularWarSchedulerHost>.Instance);
 
         host.Tick(SimulationClock.LegacyTick * TicksToActiveWar);
 
@@ -81,7 +81,7 @@ public class RegularWarSchedulerHostTests
 
         var sink = new RecordingSink();
         var host = new RegularWarSchedulerHost(registry, CreateWorldState(), sink,
-            new UnavailableRegularWarRewardValueProvider());
+            new UnavailableRegularWarRewardValueProvider(), NullLogger<RegularWarSchedulerHost>.Instance);
 
         // Reach Active (only tribe 0 present the whole time, but elimination is only evaluated once Active
         // starts, so this alone doesn't conclude the war early).

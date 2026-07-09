@@ -87,7 +87,16 @@ public sealed class TribeVoteElectionCalendarHost(
         try
         {
             while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false))
-                await TickAsync(DateTime.UtcNow, stoppingToken).ConfigureAwait(false);
+                try
+                {
+                    await TickAsync(DateTime.UtcNow, stoppingToken).ConfigureAwait(false);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    // A missed tick just delays this cycle's Tribe Vote calendar transition to the next
+                    // legacy tick -- never worth crashing the GameServer.
+                    logger.LogError(ex, "Tribe Vote election calendar tick failed");
+                }
         }
         catch (OperationCanceledException)
         {

@@ -5,6 +5,7 @@ using Fenrir.Network.Dispatch.FloodProtection;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Wire;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Login.Hosting.Extensions;
@@ -51,7 +52,8 @@ public static class HostingServiceCollectionExtensions
                 opts.MaxConnectionsPerIp,
                 opts.MaxProtocolViolationsPerIpPerHour,
                 firewallRules.BlockAsync,
-                registry);
+                registry,
+                logger: sp.GetRequiredService<ILogger<IpFloodGuard>>());
         });
 
         return services;

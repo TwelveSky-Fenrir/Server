@@ -2,6 +2,8 @@ using System.IO.Pipelines;
 using System.Net;
 using System.Net.Sockets;
 using Fenrir.Network.Compression;
+using Fenrir.Network.Transport.Logging;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Network.Transport;
 
@@ -15,15 +17,17 @@ public sealed class SocketConnection : IDuplexPipe, IAsyncDisposable
     // own remarks for why this exists separately from the pipe-level cancellation ClientSession.Abort already
     // performs on Transport.Input/Output.
     private readonly CancellationTokenSource _abortCts = new();
+    private readonly ILogger? _logger;
     private readonly Pipe _rxPipe;
 
     private readonly Socket _socket;
     private readonly Pipe _txPipe;
 
-    public SocketConnection(Socket socket)
+    public SocketConnection(Socket socket, ILogger? logger = null)
     {
         _socket = socket;
         _socket.NoDelay = true; // Nagle OFF: an MMO's tick-driven traffic wants latency over throughput
+        _logger = logger;
 
         RemoteEndPoint = socket.RemoteEndPoint as IPEndPoint;
 
@@ -157,6 +161,17 @@ public sealed class SocketConnection : IDuplexPipe, IAsyncDisposable
         catch (Exception ex)
         {
             failure = ex;
+
+            // Deliberately excludes OperationCanceledException: SocketConnection.Abort() cancels this same
+            // linked token on EVERY connection teardown (see RunIoAsync/Abort's own remarks), including a
+            // perfectly ordinary clean disconnect -- logging that as a fault would produce a Warning on every
+            // single session end, not just the genuinely faulted ones. Anything else reaching here (a
+            // SocketException from a mid-send connection reset, etc.) is a real anomaly worth surfacing --
+            // see TransportLog.SendLoopFaulted's own remarks for why this is the one place this specific
+            // fault can be observed at all (ReceiveLoopAsync's own fault resurfaces one layer up through
+            // SessionLoop; this one, uniquely, does not).
+            if (ex is not OperationCanceledException)
+                _logger?.SendLoopFaulted(ex, RemoteEndPoint);
         }
         finally
         {

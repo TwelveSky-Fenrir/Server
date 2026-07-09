@@ -167,7 +167,8 @@ public static class HostingServiceCollectionExtensions
                 opts.MaxConnectionsPerIp,
                 opts.MaxProtocolViolationsPerIpPerHour,
                 firewallRules.BlockAsync,
-                registry);
+                registry,
+                logger: sp.GetRequiredService<ILogger<IpFloodGuard>>());
         });
 
         return services;

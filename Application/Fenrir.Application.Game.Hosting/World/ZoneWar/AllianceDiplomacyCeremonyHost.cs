@@ -54,7 +54,16 @@ public sealed class AllianceDiplomacyCeremonyHost(
         try
         {
             while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false))
-                Tick();
+                try
+                {
+                    Tick();
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    // A missed tick just delays this cycle's Alliance Diplomacy ceremony advance to the next
+                    // legacy tick -- never worth crashing the GameServer.
+                    logger.LogError(ex, "Alliance Diplomacy ceremony tick failed");
+                }
         }
         catch (OperationCanceledException)
         {

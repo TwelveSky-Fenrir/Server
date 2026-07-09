@@ -42,11 +42,26 @@ var host = builder.Build();
 // Must run before LoginConnectionHost starts accepting connections: MessageDispatcher resolves handlers through this provider.
 PacketHandlerHub.Initialize(host.Services);
 
+var bootLogger = host.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Fenrir.LoginServer.Boot");
+
 // Must run before LoginConnectionHost starts accepting connections: the maintenance-lockdown/server-full quota
 // gates (LoginService.LoginAsync) read LoginCapacityState synchronously on every login attempt, so it must
 // already hold a real admin.ServerQuota.MaxPlayers value by the time the first connection can send one. A
 // failed read here is fatal startup (matches legacy MyGame::Init's own fatal-on-failure treatment), unlike
-// ServerQuotaRefreshHost's later recurring re-reads.
-await host.Services.GetRequiredService<ServerQuotaRefreshHost>().InitializeAsync(CancellationToken.None);
+// ServerQuotaRefreshHost's later recurring re-reads. Wrapped so a boot-time failure (e.g. a SQL error) is
+// logged with which step was in flight before it propagates and exits the process -- mirrors the same
+// try/catch-then-rethrow pattern Fenrir.GameServer's own boot sequence uses, just for this single step.
+var bootStep = "ServerQuotaRefreshHost.InitializeAsync";
+try
+{
+    await host.Services.GetRequiredService<ServerQuotaRefreshHost>().InitializeAsync(CancellationToken.None);
+}
+catch (Exception ex)
+{
+    bootLogger.LogCritical(ex,
+        "Fenrir.LoginServer boot failed during step '{BootStep}' -- process will exit without accepting connections",
+        bootStep);
+    throw;
+}
 
 await host.RunAsync();

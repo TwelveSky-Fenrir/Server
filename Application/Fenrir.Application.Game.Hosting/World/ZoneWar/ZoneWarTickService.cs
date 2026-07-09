@@ -5,6 +5,7 @@ using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Serialization.Zone.Packets.Zone;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Hosting.World.ZoneWar;
 
@@ -55,7 +56,7 @@ public enum ZoneWarKind : byte
 ///         waiting on a caller to report it, since that figure needs no gameplay system to be real.
 ///     </para>
 /// </summary>
-public sealed class ZoneWarTickService(ZoneRegistry zones) : BackgroundService
+public sealed class ZoneWarTickService(ZoneRegistry zones, ILogger<ZoneWarTickService> logger) : BackgroundService
 {
     /// <summary>4 tribes -- every per-tribe status array this wire family carries is this wide.</summary>
     public const int TribeCount = WorldStateService.TribeCount;
@@ -186,7 +187,16 @@ public sealed class ZoneWarTickService(ZoneRegistry zones) : BackgroundService
         try
         {
             while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false))
-                Tick(SimulationClock.LegacyTick);
+                try
+                {
+                    Tick(SimulationClock.LegacyTick);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    // A missed tick just delays this cycle's ZoneWar status broadcast to the next legacy tick --
+                    // never worth crashing the GameServer.
+                    logger.LogError(ex, "ZoneWar tick failed");
+                }
         }
         catch (OperationCanceledException)
         {

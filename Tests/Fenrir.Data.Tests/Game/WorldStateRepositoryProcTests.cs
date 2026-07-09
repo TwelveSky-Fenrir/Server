@@ -81,6 +81,28 @@ public class WorldStateRepositoryProcTests
         Assert.Contains(tribes, t => t is { TribeId: 0, Points: 999, IsClosed: true, HasSymbol: false });
     }
 
+    /// <summary>
+    ///     Reproduces the sharded-boot race that used to throw a PK_WorldState violation: every
+    ///     <c>game-shard-NN</c> process calls <c>EnsureInitializedAsync</c> once at startup with no external
+    ///     serialization between them, so several callers can hit the procedure at the same instant. The
+    ///     sp_getapplock guard added by 039_worldstate_ensureinitialized_concurrency_fix.sql must serialize
+    ///     them instead of letting two concurrent "NOT EXISTS" checks both pass.
+    /// </summary>
+    [Fact]
+    public async Task EnsureInitializedAsync_CalledConcurrently_NeverThrowsAndSeedsExactlyOnce()
+    {
+        var callers = Enumerable.Range(0, 8)
+            .Select(_ => _repository.EnsureInitializedAsync(CancellationToken.None).AsTask());
+
+        await Task.WhenAll(callers); // must not throw PK_WorldState/PK_Tribes/etc.
+
+        var (row, tribes, _) = await _repository.GetAsync(CancellationToken.None);
+
+        Assert.NotNull(row);
+        Assert.Equal(4, tribes.Count);
+        Assert.Equal(new byte[] { 0, 1, 2, 3 }, tribes.Select(t => t.TribeId).OrderBy(id => id));
+    }
+
     [Fact]
     public async Task UpdateAsync_ReplacesEveryScalarField_AndIsReadBackByGetAsync()
     {

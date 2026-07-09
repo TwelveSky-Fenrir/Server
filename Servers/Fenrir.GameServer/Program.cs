@@ -60,55 +60,86 @@ var host = builder.Build();
 // Must run before ZoneConnectionHost starts accepting connections: MessageDispatcher resolves handlers through this provider.
 PacketHandlerHub.Initialize(host.Services);
 
-// Hosted services only start inside host.Run(), so awaiting this here guarantees the world.* reference-data
-// cache is populated before the first connection -- a SQL failure aborts startup instead of serving an empty world.
-await host.Services.GetRequiredService<WorldDataLoader>().InitializeAsync(CancellationToken.None);
+var bootLogger = host.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Fenrir.GameServer.Boot");
 
-// Same rationale again: mirrors legacy MyGame::Init's own one-shot synchronous InitItemMall/InitBloodShop
-// pass -- without this, the first CZ_GET_CASH_ITEM_INFO_SEND/CZ_DEMAND_BLOOD_MARK_SEND of the shard's life
-// would see an empty catalog until CommerceCatalogRefreshHost's first periodic pass caught up.
-await host.Services.GetRequiredService<CommerceCatalogCache>()
-    .RefreshAllAsync(host.Services.GetRequiredService<IWorldDataRepository>(), CancellationToken.None);
+// Everything below is sequential, one-shot boot-time initialization -- unlike a BackgroundService's own tick
+// loop, a failure here must still crash the process (fail fast, never serve on a half-populated cache), but
+// until this wrapper existed, a failure here (e.g. the WorldStateService.InitializeAsync PK-violation-race
+// production incident this was added for) produced ONLY a raw unhandled-exception dump to stderr, with no
+// application-level trace of which step was in flight. bootStep is updated immediately before each await so
+// the single catch below can name the failing step in one LogCritical line before rethrowing -- the process
+// still exits non-zero exactly as before, this only makes the failure diagnosable from logs alone.
+var bootStep = "(unknown)";
+byte shardId;
+IReadOnlyList<short> hostedMaps;
 
-// Same rationale: RvR world state (tribe symbols/points/gate/alliance offers) must be loaded before any
-// zone actor or handler can read/mutate it.
-await host.Services.GetRequiredService<WorldStateService>().InitializeAsync(CancellationToken.None);
+try
+{
+    // Hosted services only start inside host.Run(), so awaiting this here guarantees the world.* reference-data
+    // cache is populated before the first connection -- a SQL failure aborts startup instead of serving an empty world.
+    bootStep = "WorldDataLoader.InitializeAsync";
+    await host.Services.GetRequiredService<WorldDataLoader>().InitializeAsync(CancellationToken.None);
 
-// Same rationale again: without this, the first players in would broadcast an empty guild ranking board
-// until GuildRankingRefreshHost's first periodic pass caught up.
-await host.Services.GetRequiredService<GuildRankingCache>()
-    .RefreshAsync(host.Services.GetRequiredService<IGuildRepository>(), CancellationToken.None);
+    // Same rationale again: mirrors legacy MyGame::Init's own one-shot synchronous InitItemMall/InitBloodShop
+    // pass -- without this, the first CZ_GET_CASH_ITEM_INFO_SEND/CZ_DEMAND_BLOOD_MARK_SEND of the shard's life
+    // would see an empty catalog until CommerceCatalogRefreshHost's first periodic pass caught up.
+    bootStep = "CommerceCatalogCache.RefreshAllAsync";
+    await host.Services.GetRequiredService<CommerceCatalogCache>()
+        .RefreshAllAsync(host.Services.GetRequiredService<IWorldDataRepository>(), CancellationToken.None);
 
-// Same rationale again: a tower's guardian-monster lifecycle must resume from game.TowerState before
-// TowerGuardianSystem's first tick, instead of starting every tower at Dormant every restart.
-await host.Services.GetRequiredService<TowerWarState>()
-    .InitializeAsync(host.Services.GetRequiredService<ITowerRepository>(), CancellationToken.None);
+    // Same rationale: RvR world state (tribe symbols/points/gate/alliance offers) must be loaded before any
+    // zone actor or handler can read/mutate it.
+    bootStep = "WorldStateService.InitializeAsync";
+    await host.Services.GetRequiredService<WorldStateService>().InitializeAsync(CancellationToken.None);
 
-// Same rationale again: the persisted "Yanggok" named-boss respawn deadlines (monsters 564-568) must be in
-// memory before MonsterSpawnScheduler's first tick for any zone, or a freshly booted server would pop them
-// back in immediately regardless of how recently they were killed.
-await host.Services.GetRequiredService<MonsterBossRespawnTracker>()
-    .InitializeAsync(host.Services.GetRequiredService<IMonsterBossRespawnTimerRepository>(), CancellationToken.None);
+    // Same rationale again: without this, the first players in would broadcast an empty guild ranking board
+    // until GuildRankingRefreshHost's first periodic pass caught up.
+    bootStep = "GuildRankingCache.RefreshAsync";
+    await host.Services.GetRequiredService<GuildRankingCache>()
+        .RefreshAsync(host.Services.GetRequiredService<IGuildRepository>(), CancellationToken.None);
 
-// Must run before ZoneTickHost/ZoneConnectionHost start accepting ticks or connections.
-var shardId = host.Services.GetRequiredService<IOptions<GameServerOptions>>().Value.ShardId;
-var hostedMaps = await host.Services.GetRequiredService<IShardMapAssignmentRepository>()
-    .GetHostedMapsAsync(shardId, CancellationToken.None);
+    // Same rationale again: a tower's guardian-monster lifecycle must resume from game.TowerState before
+    // TowerGuardianSystem's first tick, instead of starting every tower at Dormant every restart.
+    bootStep = "TowerWarState.InitializeAsync";
+    await host.Services.GetRequiredService<TowerWarState>()
+        .InitializeAsync(host.Services.GetRequiredService<ITowerRepository>(), CancellationToken.None);
 
-if (hostedMaps.Count == 0)
-    throw new InvalidOperationException(
-        $"No maps assigned to shard {shardId} in admin.ShardMapAssignments -- a GameServer hosting no world is always a configuration mistake.");
+    // Same rationale again: the persisted "Yanggok" named-boss respawn deadlines (monsters 564-568) must be in
+    // memory before MonsterSpawnScheduler's first tick for any zone, or a freshly booted server would pop them
+    // back in immediately regardless of how recently they were killed.
+    bootStep = "MonsterBossRespawnTracker.InitializeAsync";
+    await host.Services.GetRequiredService<MonsterBossRespawnTracker>()
+        .InitializeAsync(host.Services.GetRequiredService<IMonsterBossRespawnTimerRepository>(), CancellationToken.None);
 
-// ADR-0012 rule 1: a shard is a disjoint map partition, never a replica. Must run before ZoneRegistry.Initialize
-// so a colliding shard fails fast at boot instead of silently duplicating a Zone another shard already hosts --
-// "another shard" here means either a currently-live one (cross-checked via runtime.GameServerDirectory) or one
-// merely configured in admin.ShardMapAssignments but not yet live, which matters because this shard's own
-// heartbeat (below, inside host.RunAsync()) has not started yet either: on a whole fleet cold-booting together,
-// no shard would otherwise be visible to any other shard's check at this exact moment.
-await ShardPartitionGuard.EnsureNoOverlapAsync(shardId, hostedMaps,
-    host.Services.GetRequiredService<IGameServerDirectoryRepository>(),
-    host.Services.GetRequiredService<IShardMapAssignmentRepository>(),
-    CancellationToken.None);
+    // Must run before ZoneTickHost/ZoneConnectionHost start accepting ticks or connections.
+    bootStep = "IShardMapAssignmentRepository.GetHostedMapsAsync";
+    shardId = host.Services.GetRequiredService<IOptions<GameServerOptions>>().Value.ShardId;
+    hostedMaps = await host.Services.GetRequiredService<IShardMapAssignmentRepository>()
+        .GetHostedMapsAsync(shardId, CancellationToken.None);
+
+    if (hostedMaps.Count == 0)
+        throw new InvalidOperationException(
+            $"No maps assigned to shard {shardId} in admin.ShardMapAssignments -- a GameServer hosting no world is always a configuration mistake.");
+
+    // ADR-0012 rule 1: a shard is a disjoint map partition, never a replica. Must run before ZoneRegistry.Initialize
+    // so a colliding shard fails fast at boot instead of silently duplicating a Zone another shard already hosts --
+    // "another shard" here means either a currently-live one (cross-checked via runtime.GameServerDirectory) or one
+    // merely configured in admin.ShardMapAssignments but not yet live, which matters because this shard's own
+    // heartbeat (below, inside host.RunAsync()) has not started yet either: on a whole fleet cold-booting together,
+    // no shard would otherwise be visible to any other shard's check at this exact moment.
+    bootStep = "ShardPartitionGuard.EnsureNoOverlapAsync";
+    await ShardPartitionGuard.EnsureNoOverlapAsync(shardId, hostedMaps,
+        host.Services.GetRequiredService<IGameServerDirectoryRepository>(),
+        host.Services.GetRequiredService<IShardMapAssignmentRepository>(),
+        CancellationToken.None);
+}
+catch (Exception ex)
+{
+    bootLogger.LogCritical(ex,
+        "Fenrir.GameServer boot failed during step '{BootStep}' -- process will exit without accepting connections",
+        bootStep);
+    throw;
+}
 
 // Complements the guard above: not "do two shards collide" (impossible to reach this line if so) but
 // "is any live shard actually hosting the map each singleton RvR scheduler is configured to run on".
@@ -129,7 +160,6 @@ var unclaimedDesignatedMaps = await SingletonRvrSchedulerGuard.FindUnclaimedDesi
     host.Services.GetRequiredService<IShardMapAssignmentRepository>(),
     CancellationToken.None);
 
-var bootLogger = host.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Fenrir.GameServer.Boot");
 foreach (var gap in unclaimedDesignatedMaps)
     bootLogger.LogWarning(
         "No live shard currently hosts map {MapId}, the designated map for {SchedulerName} -- that scheduler " +

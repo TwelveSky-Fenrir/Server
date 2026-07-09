@@ -3,6 +3,7 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Hosting.World.ZoneWar;
 
@@ -44,6 +45,7 @@ public sealed class RegularWarSchedulerHost(
     WorldStateService worldState,
     IRegularWarEventSink sink,
     IRegularWarRewardValueProvider rewardValues,
+    ILogger<RegularWarSchedulerHost> logger,
     RegularWarActiveMapTracker? activeMapTracker = null) : BackgroundService
 {
     private readonly SimulationTickAccumulator _accumulator = new();
@@ -72,7 +74,16 @@ public sealed class RegularWarSchedulerHost(
         try
         {
             while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false))
-                Tick(SimulationClock.LegacyTick);
+                try
+                {
+                    Tick(SimulationClock.LegacyTick);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    // A missed tick just delays this cycle's Regular War advance to the next legacy tick --
+                    // never worth crashing the GameServer.
+                    logger.LogError(ex, "Regular War scheduler tick failed");
+                }
         }
         catch (OperationCanceledException)
         {

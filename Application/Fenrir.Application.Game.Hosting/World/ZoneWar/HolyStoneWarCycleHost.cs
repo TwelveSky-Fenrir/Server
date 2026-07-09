@@ -42,7 +42,16 @@ public sealed class HolyStoneWarCycleHost(
         try
         {
             while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false))
-                cycle.Tick(SimulationClock.LegacyTick);
+                try
+                {
+                    cycle.Tick(SimulationClock.LegacyTick);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    // A missed tick just delays this cycle's Holy Stone War advance to the next legacy tick --
+                    // never worth crashing the GameServer.
+                    logger.LogError(ex, "Holy Stone War cycle tick failed");
+                }
         }
         catch (OperationCanceledException)
         {

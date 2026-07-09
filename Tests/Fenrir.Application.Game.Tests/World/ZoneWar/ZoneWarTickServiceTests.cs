@@ -33,7 +33,7 @@ public class ZoneWarTickServiceTests
         registry[1].Tick(TimeSpan.FromMilliseconds(50));
         ZoneTestKit.DrainOutbound(pipe);
 
-        var service = new ZoneWarTickService(registry);
+        var service = new ZoneWarTickService(registry, NullLogger<ZoneWarTickService>.Instance);
 
         service.Tick(SimulationClock.LegacyTick * 20);
 
@@ -57,7 +57,7 @@ public class ZoneWarTickServiceTests
         ZoneTestKit.DrainOutbound(pipeB);
         ZoneTestKit.DrainOutbound(pipeC);
 
-        var service = new ZoneWarTickService(registry);
+        var service = new ZoneWarTickService(registry, NullLogger<ZoneWarTickService>.Instance);
         service.StartWar(ZoneWarKind.Zone049, 30);
         service.ReportStanding(0, 999); // must be ignored -- Zone049 always computes this live
 
@@ -80,7 +80,7 @@ public class ZoneWarTickServiceTests
         registry[1].Tick(TimeSpan.FromMilliseconds(50));
         ZoneTestKit.DrainOutbound(pipe);
 
-        var service = new ZoneWarTickService(registry);
+        var service = new ZoneWarTickService(registry, NullLogger<ZoneWarTickService>.Instance);
         service.StartWar(ZoneWarKind.Zone051, 12);
         service.ReportStanding(3, 1);
 
@@ -103,7 +103,7 @@ public class ZoneWarTickServiceTests
         registry[1].Tick(TimeSpan.FromMilliseconds(50));
         ZoneTestKit.DrainOutbound(pipe);
 
-        var service = new ZoneWarTickService(registry);
+        var service = new ZoneWarTickService(registry, NullLogger<ZoneWarTickService>.Instance);
         service.StartWar(ZoneWarKind.Zone241, 10);
 
         for (var i = 0; i < 9; i++)
@@ -129,7 +129,7 @@ public class ZoneWarTickServiceTests
         registry[1].Tick(TimeSpan.FromMilliseconds(50));
         ZoneTestKit.DrainOutbound(pipe);
 
-        var service = new ZoneWarTickService(registry);
+        var service = new ZoneWarTickService(registry, NullLogger<ZoneWarTickService>.Instance);
         service.StartWar(ZoneWarKind.Zone335, 1);
 
         service.Tick(SimulationClock.LegacyTick); // tick 1: broadcast RemainTime=1, no decrement yet
@@ -154,7 +154,7 @@ public class ZoneWarTickServiceTests
         registry[1].Tick(TimeSpan.FromMilliseconds(50));
         ZoneTestKit.DrainOutbound(pipe);
 
-        var service = new ZoneWarTickService(registry);
+        var service = new ZoneWarTickService(registry, NullLogger<ZoneWarTickService>.Instance);
         service.StartWar(ZoneWarKind.Zone194, 20);
         service.ReportStanding(1, 7);
 
@@ -182,7 +182,7 @@ public class ZoneWarTickServiceTests
         registry[1].Tick(TimeSpan.FromMilliseconds(50));
         ZoneTestKit.DrainOutbound(pipe);
 
-        var service = new ZoneWarTickService(registry);
+        var service = new ZoneWarTickService(registry, NullLogger<ZoneWarTickService>.Instance);
         service.StartWar(ZoneWarKind.Zone297, 42);
         service.ReportExtraStatus(3, 4);
         service.ReportMonsterCount(2, 9);
@@ -215,7 +215,7 @@ public class ZoneWarTickServiceTests
         registry[1].Tick(TimeSpan.FromMilliseconds(50));
         ZoneTestKit.DrainOutbound(pipe);
 
-        var service = new ZoneWarTickService(registry);
+        var service = new ZoneWarTickService(registry, NullLogger<ZoneWarTickService>.Instance);
         service.StartWar(ZoneWarKind.Zone267, 10);
         service.ReportStanding(0, 55);
         service.EndWar();
@@ -232,7 +232,7 @@ public class ZoneWarTickServiceTests
     public void ReportStanding_OutOfRangeTribeId_Throws()
     {
         var registry = CreateRegistry(1);
-        var service = new ZoneWarTickService(registry);
+        var service = new ZoneWarTickService(registry, NullLogger<ZoneWarTickService>.Instance);
 
         Assert.Throws<ArgumentOutOfRangeException>(() => service.ReportStanding(4, 1));
     }

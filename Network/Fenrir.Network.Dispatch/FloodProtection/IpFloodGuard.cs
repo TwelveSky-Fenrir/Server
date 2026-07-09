@@ -1,5 +1,7 @@
 using System.Collections.Concurrent;
+using Fenrir.Network.Dispatch.Logging;
 using Fenrir.Network.Dispatch.Sessions;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Network.Dispatch.FloodProtection;
 
@@ -50,7 +52,8 @@ public sealed class IpFloodGuard(
     int maxProtocolViolationsPerIpPerHour,
     Func<string, CancellationToken, ValueTask> blockIpAsync,
     SessionRegistry sessionRegistry,
-    Func<DateTime>? utcNowProvider = null)
+    Func<DateTime>? utcNowProvider = null,
+    ILogger<IpFloodGuard>? logger = null)
 {
     private readonly ConcurrentDictionary<string, int> _connectionCounts = new();
     private readonly Func<DateTime> _utcNowProvider = utcNowProvider ?? DefaultUtcNowProvider;
@@ -130,17 +133,22 @@ public sealed class IpFloodGuard(
         {
             await blockIpAsync(ipAddress, ct).ConfigureAwait(false);
         }
-        catch (Exception) when (!ct.IsCancellationRequested)
+        catch (Exception ex) when (!ct.IsCancellationRequested)
         {
             // Persisting the block must never fault the accept/dispatch path that triggered it -- matches
             // legacy's own fire-and-forget SetSqlBlockIP (contract Error/failure semantics: no visible retry or
-            // alerting in the cited range either). Network.Dispatch takes no logging-framework dependency by
-            // design (consistent with the rest of this project, e.g. SessionRateLimiter), so this failure is
-            // silently absorbed rather than logged -- the in-memory counters above still gate future traffic
-            // from this IP even if this particular write failed.
+            // alerting in the cited range either). Still worth an Error-level log (see
+            // FloodProtectionLog.IpBlockPersistFailed's own remarks): the in-memory counters above still gate
+            // future traffic from this IP even if this particular write failed, but that gate resets on the
+            // next process restart with no durable record this IP was ever blocked, which an operator needs to
+            // be able to see happened.
+            logger?.IpBlockPersistFailed(ex, ipAddress);
         }
 
-        foreach (var session in sessionRegistry.SnapshotByRemoteAddress(ipAddress))
+        var kicked = sessionRegistry.SnapshotByRemoteAddress(ipAddress);
+        logger?.IpBlocked(ipAddress, kicked.Length);
+
+        foreach (var session in kicked)
             session.Abort(DisconnectReason.IpBlocked);
     }
 

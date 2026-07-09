@@ -550,6 +550,11 @@ Migrations/036_monster_static_data_range_checks.sql
 # fields).
 Migrations/038_items_column_width_and_potiontype_checks.sql
 
+# Concurrency fix for the sharded-boot PK_WorldState race (two game-shard-NN processes calling
+# EnsureInitialized at the same time): serializes callers via sp_getapplock before the existence checks.
+# See the script's own header for the full citation/repro trail.
+Migrations/039_worldstate_ensureinitialized_concurrency_fix.sql
+
 Migrations/Seed/001_dev_account.sql
 
 Migrations/Seed/world/060_levels.sql

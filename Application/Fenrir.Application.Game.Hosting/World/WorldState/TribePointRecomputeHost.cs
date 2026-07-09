@@ -1,5 +1,6 @@
 using Fenrir.Application.Game.Domain.World.WorldState;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Hosting.World.WorldState;
 
@@ -37,7 +38,8 @@ namespace Fenrir.Application.Game.Hosting.World.WorldState;
 /// </remarks>
 public sealed class TribePointRecomputeHost(
     TribePointLevelRecomputeService levelRecompute,
-    FavoredTribeRankBonusLadderService ladder) : BackgroundService
+    FavoredTribeRankBonusLadderService ladder,
+    ILogger<TribePointRecomputeHost> logger) : BackgroundService
 {
     /// <summary>Server/ts25center/S07_MyGame01.cpp:240-244/253-266 -- both mechanisms share this same gate.</summary>
     public const int TickGate = 6;
@@ -89,7 +91,16 @@ public sealed class TribePointRecomputeHost(
         try
         {
             while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false))
-                await TickAsync(stoppingToken).ConfigureAwait(false);
+                try
+                {
+                    await TickAsync(stoppingToken).ConfigureAwait(false);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    // A missed tick just delays this cycle's tribe-point recompute to the next ~1s tick --
+                    // never worth crashing the GameServer.
+                    logger.LogError(ex, "Tribe point recompute tick failed");
+                }
         }
         catch (OperationCanceledException)
         {

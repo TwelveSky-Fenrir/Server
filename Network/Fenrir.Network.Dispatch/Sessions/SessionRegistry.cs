@@ -1,10 +1,11 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Network.Dispatch.Sessions;
 
 // Enforces one connection per account lifecycle (Abort/CompleteAsync) stays with the caller.
-public sealed class SessionRegistry
+public sealed class SessionRegistry(ILogger<SessionRegistry>? logger = null)
 {
     private readonly ConcurrentDictionary<long, long> _accountToSession = new();
 
@@ -121,6 +122,22 @@ public sealed class SessionRegistry
             _accountToSession[accountId] = sessionId;
             _sessionToAccount[sessionId] = accountId;
         }
+
+        // Blind spot this closes: the evicted session's OWN SessionLoop eventually logs its own
+        // "connection loop ended, disconnect reason Evicted" line (Information) once Abort() below unblocks
+        // its read loop, but that line has no idea which account or which NEW session caused it -- and
+        // neither LoginService.LoginAsync nor ZoneHandshakeHandler (this method's only two production callers)
+        // logs anything about the session it just discarded via this method's return value. Logged here,
+        // centrally, the same "structural, not incidental" reasoning ClientSession.LogSessionStateChanged
+        // already applies -- an operator can now correlate "session 42 disconnected: Evicted" with exactly
+        // which account and which new session displaced it, without either caller needing to remember to log
+        // it themselves. Warning, not Information: this is a forced disconnect of another live connection, the
+        // same severity SessionLoop already uses for its own abort-triggering violations, not a routine
+        // lifecycle event.
+        if (evicted is not null)
+            logger?.LogWarning(
+                "Account {AccountId}: evicting session {EvictedSessionId} in favor of session {SessionId}",
+                accountId, evicted.SessionId, sessionId);
 
         // Outside the lock: Abort only cancels pending pipe operations, never re-enters the registry.
         evicted?.Abort(DisconnectReason.Evicted);

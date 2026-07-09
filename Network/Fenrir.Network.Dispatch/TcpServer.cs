@@ -28,7 +28,7 @@ public sealed class TcpServer<TSession>(
     ILogger? logger = null) : IAsyncDisposable
     where TSession : ClientSession
 {
-    private readonly FenrirTcpListener<TSession> _listener = new(endpoint, sessionFactory);
+    private readonly FenrirTcpListener<TSession> _listener = new(endpoint, sessionFactory, logger);
 
     public Task AcceptLoopAsync(
         Func<TSession, SocketConnection, CancellationToken, Task> onAccepted,

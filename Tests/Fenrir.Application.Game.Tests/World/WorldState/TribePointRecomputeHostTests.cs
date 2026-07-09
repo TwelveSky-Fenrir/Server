@@ -23,7 +23,7 @@ public class TribePointRecomputeHostTests
         var ladder = new FavoredTribeRankBonusLadderService(worldState, broadcaster,
             NullLogger<FavoredTribeRankBonusLadderService>.Instance);
 
-        var host = new TribePointRecomputeHost(levelRecompute, ladder);
+        var host = new TribePointRecomputeHost(levelRecompute, ladder, NullLogger<TribePointRecomputeHost>.Instance);
         return (worldState, gateway, host);
     }
 

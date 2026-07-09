@@ -44,7 +44,16 @@ public sealed class TribeSymbolBattleSchedulerHost(
         try
         {
             while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false))
-                scheduler.Tick(SimulationClock.LegacyTick, DateTime.UtcNow);
+                try
+                {
+                    scheduler.Tick(SimulationClock.LegacyTick, DateTime.UtcNow);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    // A missed tick just delays this cycle's Tribe Symbol Battle advance to the next legacy
+                    // tick -- never worth crashing the GameServer.
+                    logger.LogError(ex, "Tribe Symbol Battle scheduler tick failed");
+                }
         }
         catch (OperationCanceledException)
         {

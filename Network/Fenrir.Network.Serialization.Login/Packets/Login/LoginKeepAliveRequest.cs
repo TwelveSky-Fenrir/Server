@@ -11,6 +11,6 @@ namespace Fenrir.Network.Serialization.Login.Packets.Login;
     [
         (byte)LoginSessionState.Authenticated, (byte)LoginSessionState.PinRequired, (byte)LoginSessionState.CharSelect
     ])]
-public readonly partial record struct LoginKeepAliveRequest : IIncomingPacket<LoginKeepAliveRequest>
+public readonly record struct LoginKeepAliveRequest : IIncomingPacket<LoginKeepAliveRequest>
 {
 }

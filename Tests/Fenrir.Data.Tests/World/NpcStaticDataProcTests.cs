@@ -86,7 +86,7 @@ public class NpcStaticDataProcTests
     [InlineData((byte)6)]
     public async Task InsertNpc_TribeOutOfRange_ThrowsCheckConstraintViolation(byte tribe)
     {
-        var ex = await Record.ExceptionAsync(() => InsertNpcAsync(NewNpcId(), tribe: tribe));
+        var ex = await Record.ExceptionAsync(() => InsertNpcAsync(NewNpcId(), tribe));
 
         AssertCheckConstraintViolation(ex);
     }

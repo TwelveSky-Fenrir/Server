@@ -9,7 +9,8 @@ namespace Fenrir.Application.Game.Domain.Gm;
 ///     mode-0 branch still needs to read the character's LIVE <c>Experience</c>/<c>Level2</c> at apply time (the
 ///     "already at cap" skip and "huge-magnitude shortcut" decisions cannot be made ahead of the tick that
 ///     applies them without risking a stale read), which is why this is its own dedicated command/channel
-///     rather than one more nullable field folded into <see cref="Fenrir.Application.Game.Domain.Tribes.TribeProgressZoneCommand" />.
+///     rather than one more nullable field folded into
+///     <see cref="Fenrir.Application.Game.Domain.Tribes.TribeProgressZoneCommand" />.
 /// </summary>
 /// <param name="CharacterId">A no-op if the character already left this zone by the time the tick drains this.</param>
 /// <param name="Mode">
@@ -19,7 +20,10 @@ namespace Fenrir.Application.Game.Domain.Gm;
 ///     value (including the dead/commented-out mode 3) has no effect.
 /// </param>
 /// <param name="Magnitude">GmExpGrantPayload.Exp verbatim -- signed, no wire-level bound.</param>
-/// <param name="Applied">Completed once actually mirrored -- see TribeProgressZoneCommand.Applied for why this matters while EconomyActionLock is held.</param>
+/// <param name="Applied">
+///     Completed once actually mirrored -- see TribeProgressZoneCommand.Applied for why this matters
+///     while EconomyActionLock is held.
+/// </param>
 public readonly record struct GmSelfExperienceGrantZoneCommand(
     int CharacterId,
     int Mode,

@@ -29,7 +29,8 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
     }
 
     /// <summary>
-    ///     Richer companion to <see cref="GetByAccountAsync" /> -- see <see cref="ICharacterRepository.GetAccountRosterAsync" />'s
+    ///     Richer companion to <see cref="GetByAccountAsync" /> -- see
+    ///     <see cref="ICharacterRepository.GetAccountRosterAsync" />'s
     ///     own doc for scope. Capacity 3 (like <see cref="GetByAccountAsync" />) sizes RS0; RS1 (items) has no
     ///     fixed cap since it spans up to 3 characters' full containers.
     /// </summary>

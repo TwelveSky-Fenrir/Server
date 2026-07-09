@@ -100,6 +100,26 @@ public sealed partial class Zone
             { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
     /// <summary>
+    ///     Reusable scratch buffer for one raw
+    ///     <see cref="AoiGrid.Neighbors(List{int},ValueTuple{int,int},float,float,float,int)" />
+    ///     scan at a time, shared by <see cref="ApplyPvmAttack" /> and <see cref="CombatRecipients" /> -- both
+    ///     immediately drain it into a dedup'd recipient set (<see cref="_pvmAttackRecipientScratch" />/
+    ///     <see cref="_combatRecipientScratch" />) before the next scan reuses this buffer, and both run only on
+    ///     this zone's own single tick thread, so no two scans ever overlap.
+    /// </summary>
+    private readonly List<int> _combatNeighborScratch = [];
+
+    /// <summary>
+    ///     Reusable scratch buffer for <see cref="CombatRecipients" />'s attacker+defender combined AOI-neighbor
+    ///     recipient set -- replaces a per-hit <c>new HashSet&lt;int&gt;()</c>. Shared by both of
+    ///     <see cref="CombatRecipients" />'s callers (<c>ApplyCombatCommand</c>'s mCase-2 path here and
+    ///     <c>ApplyDuelAttack</c>'s mCase-1 path in <c>Zone.Duel.cs</c>) since both run on this zone's own single
+    ///     tick thread and always consume the returned reference immediately, before the next call could ever
+    ///     reuse it.
+    /// </summary>
+    private readonly HashSet<int> _combatRecipientScratch = [];
+
+    /// <summary>
     ///     Independent 2-minute same-victim-pair cooldown for the FFA-335 flat CP override (step 5 of the
     ///     source contract) -- deliberately a SEPARATE table from <see cref="_killCooldownTracker" /> (the main
     ///     C05 anti-farm gate) and from <see cref="_regularWarCpOverrideCooldown" />'s own table, matching
@@ -115,6 +135,14 @@ public sealed partial class Zone
     private readonly KillCooldownTracker _killCooldownTracker = killCooldownTracker ?? new KillCooldownTracker();
 
     /// <summary>
+    ///     Reusable scratch buffer for <see cref="ApplyPvmAttack" />'s attacker+monster combined AOI-neighbor
+    ///     recipient set -- replaces a per-attack <c>new HashSet&lt;int&gt;()</c>. Same single-tick-thread reuse
+    ///     posture as every other scratch buffer in this file family; cleared before use, consumed entirely by
+    ///     the immediately-following <see cref="BroadcastAttackResult" /> call.
+    /// </summary>
+    private readonly HashSet<int> _pvmAttackRecipientScratch = [];
+
+    /// <summary>
     ///     Null (production default) builds a private one from <paramref name="worldData" /> instead of the
     ///     process-wide singleton <see cref="ZoneRegistry" /> owns, so pre-existing test call sites that
     ///     construct a <see cref="Zone" /> directly keep compiling unchanged.
@@ -127,33 +155,6 @@ public sealed partial class Zone
     ///     <see cref="_killCooldownTracker" />: a pair's cooldown state in one override never affects the others.
     /// </summary>
     private readonly KillCooldownTracker _regularWarCpOverrideCooldown = new();
-
-    /// <summary>
-    ///     Reusable scratch buffer for one raw <see cref="AoiGrid.Neighbors(List{int},ValueTuple{int,int},float,float,float,int)" />
-    ///     scan at a time, shared by <see cref="ApplyPvmAttack" /> and <see cref="CombatRecipients" /> -- both
-    ///     immediately drain it into a dedup'd recipient set (<see cref="_pvmAttackRecipientScratch" />/
-    ///     <see cref="_combatRecipientScratch" />) before the next scan reuses this buffer, and both run only on
-    ///     this zone's own single tick thread, so no two scans ever overlap.
-    /// </summary>
-    private readonly List<int> _combatNeighborScratch = [];
-
-    /// <summary>
-    ///     Reusable scratch buffer for <see cref="ApplyPvmAttack" />'s attacker+monster combined AOI-neighbor
-    ///     recipient set -- replaces a per-attack <c>new HashSet&lt;int&gt;()</c>. Same single-tick-thread reuse
-    ///     posture as every other scratch buffer in this file family; cleared before use, consumed entirely by
-    ///     the immediately-following <see cref="BroadcastAttackResult" /> call.
-    /// </summary>
-    private readonly HashSet<int> _pvmAttackRecipientScratch = [];
-
-    /// <summary>
-    ///     Reusable scratch buffer for <see cref="CombatRecipients" />'s attacker+defender combined AOI-neighbor
-    ///     recipient set -- replaces a per-hit <c>new HashSet&lt;int&gt;()</c>. Shared by both of
-    ///     <see cref="CombatRecipients" />'s callers (<c>ApplyCombatCommand</c>'s mCase-2 path here and
-    ///     <c>ApplyDuelAttack</c>'s mCase-1 path in <c>Zone.Duel.cs</c>) since both run on this zone's own single
-    ///     tick thread and always consume the returned reference immediately, before the next call could ever
-    ///     reuse it.
-    /// </summary>
-    private readonly HashSet<int> _combatRecipientScratch = [];
 
     public bool PostCombatCommand(in CombatCommand command)
     {

@@ -16,7 +16,6 @@ using Fenrir.Application.Game.Tests.World.WorldState;
 using Fenrir.Data.Abstractions.Runtime;
 using Fenrir.Data.Abstractions.World;
 using Fenrir.Data.WriteBehind;
-using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Dispatch.Zone.Sessions;
 using Microsoft.Extensions.Logging.Abstractions;
 

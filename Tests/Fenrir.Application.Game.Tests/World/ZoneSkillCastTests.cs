@@ -140,7 +140,7 @@ public class ZoneSkillCastTests
         // ManaUse interpolates 0 (grade0) -> 100 (grade1) over MaxUpgradePoint 10; ShieldLifeUp 0 -> 20%.
         var skillsById = new Dictionary<int, SkillDefinition>
         {
-            [82] = HolyShieldSkillGraded(10, grade0: (0, 0, 40), grade1: (100, 20, 40))
+            [82] = HolyShieldSkillGraded(10, (0, 0, 40), (100, 20, 40))
         }.ToFrozenDictionary();
         var worldData = ZoneTestKit.EmptyWorldData(skillsById: skillsById);
         var zone = ZoneTestKit.CreateZone(1, worldData: worldData);

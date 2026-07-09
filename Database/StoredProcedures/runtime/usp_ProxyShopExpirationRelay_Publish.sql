@@ -3,9 +3,9 @@
 -- IProxyShopExpirationRelayQueue's own remarks for that boundary). Single-row INSERT, no dependencies --
 -- natively compiled like this feature's sibling single-row hot-path procs (usp_GuildTribeBroadcastRelay_Publish).
 CREATE PROCEDURE runtime.usp_ProxyShopExpirationRelay_Publish @SourceShardId TINYINT,
-                                                               @CharacterId INT,
-                                                               @NewExpirationDate INT
-    WITH NATIVE_COMPILATION, SCHEMABINDING
+                                                              @CharacterId INT,
+                                                              @NewExpirationDate INT
+    WITH NATIVE_COMPILATION , SCHEMABINDING
 AS
 BEGIN
     ATOMIC

@@ -6,7 +6,6 @@ using Fenrir.Application.Game.Services.BuffsMountsCosmetics;
 using Fenrir.Application.Game.Tests.GameData;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Data.Abstractions.Game;
-using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Dispatch.Zone.Sessions;
 using Fenrir.Network.Framing;
 using Fenrir.Network.Serialization.Zone.Packets.Zone;

@@ -95,14 +95,25 @@ public sealed partial class Zone
     /// </summary>
     private const short HolyShieldCooldownZoneId = 124;
 
-    /// <summary>Legacy's <c>GetSecondFromTick(10)</c> minimum reapplication interval for skill 82's buff.</summary>
-    private static readonly TimeSpan HolyShieldReapplyCooldown = TimeSpan.FromSeconds(10);
-
     /// <summary>
     ///     S010CHARACTER_HP -- <see cref="AvatarStatUpdateResponse.Sort" /> for the HP-changed notification
     ///     <see cref="ApplyRestActionProtectionAndHeal" /> sends (Server/Header/Protocol/STRUCT.h:1525).
     /// </summary>
     private const int CharacterHpStatSort = 10;
+
+    /// <summary>Legacy's <c>GetSecondFromTick(10)</c> minimum reapplication interval for skill 82's buff.</summary>
+    private static readonly TimeSpan HolyShieldReapplyCooldown = TimeSpan.FromSeconds(10);
+
+    /// <summary>
+    ///     Reusable scratch buffer for <see cref="RecomputeStatsAndBroadcastBuffs" />'s buff-state broadcast
+    ///     recipient list -- replaces a per-call, self-filtered <c>AoiGrid.Neighbors(...)</c> iterator with the
+    ///     non-allocating
+    ///     <see cref="AoiGrid.NeighborsExcludingSelf(List{int},ValueTuple{int,int},int,float,float,float,int)" />
+    ///     overload. Same single-tick-thread reuse posture as <see cref="_moveNeighborScratch" />: cleared
+    ///     before use, consumed entirely by the immediately-following send loop before
+    ///     <see cref="RecomputeStatsAndBroadcastBuffs" /> returns.
+    /// </summary>
+    private readonly List<int> _buffStateNeighborScratch = [];
 
     /// <summary>
     ///     Released once per queued row so <c>DeathEventLogFlushHost</c> can flush as soon as one arrives
@@ -185,16 +196,6 @@ public sealed partial class Zone
     ///     call before <see cref="GrantReviveEligibility" /> returns.
     /// </summary>
     private readonly List<int> _reviveNeighborScratch = [];
-
-    /// <summary>
-    ///     Reusable scratch buffer for <see cref="RecomputeStatsAndBroadcastBuffs" />'s buff-state broadcast
-    ///     recipient list -- replaces a per-call, self-filtered <c>AoiGrid.Neighbors(...)</c> iterator with the
-    ///     non-allocating <see cref="AoiGrid.NeighborsExcludingSelf(List{int},ValueTuple{int,int},int,float,float,float,int)" />
-    ///     overload. Same single-tick-thread reuse posture as <see cref="_moveNeighborScratch" />: cleared
-    ///     before use, consumed entirely by the immediately-following send loop before
-    ///     <see cref="RecomputeStatsAndBroadcastBuffs" /> returns.
-    /// </summary>
-    private readonly List<int> _buffStateNeighborScratch = [];
 
     /// <summary>
     ///     Queues a death-related <c>game.EventLog</c> row rather than awaiting

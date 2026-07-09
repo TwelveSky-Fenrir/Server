@@ -2,7 +2,8 @@ namespace Fenrir.Data.Abstractions.Runtime;
 
 /// <summary>
 ///     Implemented by whichever of the six negotiation *.Services registries owns a given
-///     <see cref="SocialCrossShardRelayKind" /> (<c>PartyInviteService</c> for <see cref="SocialCrossShardRelayKind.Party" />,
+///     <see cref="SocialCrossShardRelayKind" /> (<c>PartyInviteService</c> for
+///     <see cref="SocialCrossShardRelayKind.Party" />,
 ///     <c>FriendService</c> for <see cref="SocialCrossShardRelayKind.Friend" />, <c>MentorAskService</c> for
 ///     <see cref="SocialCrossShardRelayKind.Mentor" />, <c>DuelService</c> for
 ///     <see cref="SocialCrossShardRelayKind.Duel" />, <c>TradeInviteService</c> for

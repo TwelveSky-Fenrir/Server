@@ -62,7 +62,9 @@ public class MonsterSymbolAttackWindowNotifySystemTests
     }
 
     private static Lazy<ZoneEventBroadcaster> LazyBroadcaster(ZoneEventBroadcaster broadcaster)
-        => new(() => broadcaster);
+    {
+        return new Lazy<ZoneEventBroadcaster>(() => broadcaster);
+    }
 
     [Fact]
     public void Disabled_NeverBroadcasts_EvenIfHolderAndMapMatch()
@@ -75,7 +77,7 @@ public class MonsterSymbolAttackWindowNotifySystemTests
         var tracker = new MonsterSymbolAttackWindowTracker();
         var broadcaster = new ZoneEventBroadcaster(worldState, registry, NullLogger<ZoneEventBroadcaster>.Instance);
         var system = new MonsterSymbolAttackWindowNotifySystem(worldState, tracker, LazyBroadcaster(broadcaster),
-            Options.Create(BuildGameOptions(enabled: false)));
+            Options.Create(BuildGameOptions(false)));
 
         system.Simulate(zone, LegacyTicksPerMinute * 10);
 

@@ -16,8 +16,10 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>Documented gaps, not silent ones -- three pieces of concrete legacy data are unavailable in the
-///         source behavior contract this ports, so the corresponding side effects are logged, not fabricated:</b>
+///         <b>
+///             Documented gaps, not silent ones -- three pieces of concrete legacy data are unavailable in the
+///             source behavior contract this ports, so the corresponding side effects are logged, not fabricated:
+///         </b>
 ///     </para>
 ///     <list type="bullet">
 ///         <item>
@@ -25,7 +27,8 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 ///             coordinate is given ("an unlimited/untimed monster summon is triggered... unconditionally").
 ///         </item>
 ///         <item>
-///             The kill-race-win boss summon (contract §6b): monster id 756 (<see cref="ValleyWarSchedule.BossMonsterId" />)
+///             The kill-race-win boss summon (contract §6b): monster id 756 (
+///             <see cref="ValleyWarSchedule.BossMonsterId" />)
 ///             is given, but its "fixed coordinate" is not.
 ///         </item>
 ///         <item>
@@ -116,7 +119,8 @@ public sealed class ValleyWarSystem(
         if (result.DoorOpened)
         {
             broadcaster.Value.AnnounceValleyWarDoorOpened();
-            LogMonsterSummonGap(zone, "the general kill-race monster population (no id/count/coordinate data available)");
+            LogMonsterSummonGap(zone,
+                "the general kill-race monster population (no id/count/coordinate data available)");
         }
 
         if (result.KillRaceQuotas is { } quotas)

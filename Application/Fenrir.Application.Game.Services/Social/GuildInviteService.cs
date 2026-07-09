@@ -8,7 +8,6 @@ using Fenrir.Application.Game.Domain.Social.Mentor;
 using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Data.Abstractions.Runtime;
 using Fenrir.Network.Serialization.Zone.Packets.Zone;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -121,6 +120,37 @@ public sealed class GuildInviteService(
         }
     }
 
+    public void Answer(int targetId, int answerCode)
+    {
+        if (!invites.TryAnswer(targetId, answerCode == 0, out var askerId))
+        {
+            logger.LogDebug("Character {TargetId} guild invite answer ignored: no pending invite found", targetId);
+            return;
+        }
+
+        if (zones.TryGetPlayer(askerId, out var asker))
+            asker.Session.Send(new GuildInviteAnswerResponse { Answer = answerCode });
+
+        logger.LogInformation(
+            "Character {TargetId} answered guild invite from character {AskerId}: accepted={Accepted}", targetId,
+            askerId, answerCode == 0);
+    }
+
+    public void Cancel(int askerId)
+    {
+        if (!invites.TryCancel(askerId, out var targetId))
+        {
+            logger.LogDebug("Character {AskerId} guild invite cancel ignored: no pending invite found", askerId);
+            return;
+        }
+
+        if (zones.TryGetPlayer(targetId, out var target))
+            target.Session.Send(new GuildInviteCancelResponse());
+
+        logger.LogInformation("Character {AskerId} cancelled guild invite to character {TargetId}", askerId,
+            targetId);
+    }
+
     /// <summary>
     ///     WS1.4 same-shard-miss, ASK-PUBLISH-ONLY fallback -- see this class's own remarks. The target's
     ///     guild membership (needed for the already-guilded check) is not carried by the cross-shard
@@ -176,37 +206,6 @@ public sealed class GuildInviteService(
             "Character {CharacterId} published a guild invite cross-shard to character {TargetCharacterId} on shard {TargetShardId} (never delivered today -- see GuildInviteService's own remarks)",
             asker.CharacterId, remote.CharacterId, remote.ShardId);
         return GuildInviteAskResultKind.SentCrossShard;
-    }
-
-    public void Answer(int targetId, int answerCode)
-    {
-        if (!invites.TryAnswer(targetId, answerCode == 0, out var askerId))
-        {
-            logger.LogDebug("Character {TargetId} guild invite answer ignored: no pending invite found", targetId);
-            return;
-        }
-
-        if (zones.TryGetPlayer(askerId, out var asker))
-            asker.Session.Send(new GuildInviteAnswerResponse { Answer = answerCode });
-
-        logger.LogInformation(
-            "Character {TargetId} answered guild invite from character {AskerId}: accepted={Accepted}", targetId,
-            askerId, answerCode == 0);
-    }
-
-    public void Cancel(int askerId)
-    {
-        if (!invites.TryCancel(askerId, out var targetId))
-        {
-            logger.LogDebug("Character {AskerId} guild invite cancel ignored: no pending invite found", askerId);
-            return;
-        }
-
-        if (zones.TryGetPlayer(targetId, out var target))
-            target.Session.Send(new GuildInviteCancelResponse());
-
-        logger.LogInformation("Character {AskerId} cancelled guild invite to character {TargetId}", askerId,
-            targetId);
     }
 
     /// <summary>

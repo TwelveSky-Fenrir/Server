@@ -17,7 +17,6 @@ using Fenrir.Network.Framing;
 using Fenrir.Network.Serialization.Login.Packets.Login;
 using Fenrir.Network.Serialization.Login.Wire;
 using Fenrir.Network.Serialization.Shared.Packets.Shared;
-using Fenrir.Network.Serialization.Wire;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -29,6 +28,12 @@ namespace Fenrir.Application.Login.Tests.Handlers;
 public class LoginHandlerTests
 {
     private const int ClientVersion = 90354; // LoginServerOptions.ExpectedClientVersion default
+
+    // Realistic, non-placeholder default adapter name: a real client always declares a non-empty adapter
+    // name/GUID, so the empty-adapter-name gate (cluster: Server/ts25login/S08_MyDB.cpp:421-425) never trips
+    // unless a test deliberately asks for the empty-string edge case it covers below -- same rationale as
+    // DefaultPhysicalAddress above.
+    private const string DefaultAdapterName = "{real-adapter-guid}";
     private static readonly IPEndPoint RemoteEndPoint = new(IPAddress.Parse("203.0.113.50"), 40000);
 
     // Realistic, non-placeholder default device tuple: a real client always has a non-zero-length MAC, so
@@ -578,13 +583,13 @@ public class LoginHandlerTests
 
         var summary = new CharacterSummaryDto(201, 0, "Hero", 2, 1, 3, 4, 12);
         var richCharacter = new CharacterRosterDto(
-            CharacterId: 201, Slot: 0, Name: "Hero", Tribe: 2, PreviousTribe: 1, Gender: 1, HeadType: 3,
-            FaceType: 4, Level: 12, Level2: 3, Halo: 5, RebirthCount: 2, ContributionPoints: 40, SkillPoints: 7,
-            EatLifePotion: 1, EatManaPotion: 2, EatStrPotion: 3, EatDexPotion: 4, EatElePotion: 5,
-            PetGrowth: 10, PetActivity: 50, MapId: 6, PosX: 1f, PosY: 2f, PosZ: 3f, Life: 30, Mana: 21);
-        var equippedWeapon = new CharacterRosterItemDto(201, Container: 2, Slot: 7, ItemId: 9001, Quantity: 1,
-            Enchant: 0, Combine: 0, Refine: 0, Socket: 0, SocketGem1: 0, SocketGem2: 0, SocketGem3: 0,
-            ExpireDate: 0, Serial: 1);
+            201, 0, "Hero", 2, 1, 1, 3,
+            4, 12, 3, 5, 2, 40, 7,
+            1, 2, 3, 4, 5,
+            10, 50, 6, 1f, 2f, 3f, 30, 21);
+        var equippedWeapon = new CharacterRosterItemDto(201, 2, 7, 9001, 1,
+            0, 0, 0, 0, 0, 0, 0,
+            0, 1);
 
         var characters = FakeCharacterRepository.WithSummaries(summary)
             .WithRosterCharacter(richCharacter)
@@ -675,12 +680,6 @@ public class LoginHandlerTests
         return state;
     }
 
-    // Realistic, non-placeholder default adapter name: a real client always declares a non-empty adapter
-    // name/GUID, so the empty-adapter-name gate (cluster: Server/ts25login/S08_MyDB.cpp:421-425) never trips
-    // unless a test deliberately asks for the empty-string edge case it covers below -- same rationale as
-    // DefaultPhysicalAddress above.
-    private const string DefaultAdapterName = "{real-adapter-guid}";
-
     private static LoginRequest ValidLoginRequest(string id = "someuser", string password = "irrelevant",
         byte[]? physicalAddress = null, string adapterName = DefaultAdapterName)
     {
@@ -722,33 +721,33 @@ public class LoginHandlerTests
     private static CharacterRosterDto ToRosterDto(CharacterSummaryDto summary)
     {
         return new CharacterRosterDto(
-            CharacterId: summary.CharacterId,
-            Slot: summary.Slot,
-            Name: summary.Name,
-            Tribe: summary.Tribe,
-            PreviousTribe: 0,
-            Gender: summary.Gender,
-            HeadType: summary.HeadType,
-            FaceType: summary.FaceType,
-            Level: summary.Level,
-            Level2: 0,
-            Halo: 0,
-            RebirthCount: 0,
-            ContributionPoints: 0,
-            SkillPoints: 0,
-            EatLifePotion: 0,
-            EatManaPotion: 0,
-            EatStrPotion: 0,
-            EatDexPotion: 0,
-            EatElePotion: 0,
-            PetGrowth: 0,
-            PetActivity: 0,
-            MapId: 0,
-            PosX: 0f,
-            PosY: 0f,
-            PosZ: 0f,
-            Life: 0,
-            Mana: 0);
+            summary.CharacterId,
+            summary.Slot,
+            summary.Name,
+            summary.Tribe,
+            0,
+            summary.Gender,
+            summary.HeadType,
+            summary.FaceType,
+            summary.Level,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0f,
+            0f,
+            0f,
+            0,
+            0);
     }
 
     /// <summary>

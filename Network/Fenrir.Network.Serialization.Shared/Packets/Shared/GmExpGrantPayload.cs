@@ -21,15 +21,19 @@ namespace Fenrir.Network.Serialization.Shared.Packets.Shared;
 ///     </para>
 /// </summary>
 [FenrirWireType(8)]
-public readonly partial record struct GmExpGrantPayload : IFenrirWireType<GmExpGrantPayload>
+public readonly record struct GmExpGrantPayload : IFenrirWireType<GmExpGrantPayload>
 {
-    /// <summary>0 = general character-level experience; 1 = pet-experience (mislabeled "God 1 - Rebirth 12" in
-    /// the legacy source comment -- see the behavior contract's Side effects for why that label is wrong).
-    /// Any other value is syntactically legal on the wire but produces no effect.</summary>
+    /// <summary>
+    ///     0 = general character-level experience; 1 = pet-experience (mislabeled "God 1 - Rebirth 12" in
+    ///     the legacy source comment -- see the behavior contract's Side effects for why that label is wrong).
+    ///     Any other value is syntactically legal on the wire but produces no effect.
+    /// </summary>
     public required int Type { get; init; }
 
-    /// <summary>Full 32-bit signed range, including negative and overflow-sized values -- no wire-level bound.
-    /// Only an upper-bound clamp exists, and only inside the shared experience-grant routine this command
-    /// calls into (not enforced here).</summary>
+    /// <summary>
+    ///     Full 32-bit signed range, including negative and overflow-sized values -- no wire-level bound.
+    ///     Only an upper-bound clamp exists, and only inside the shared experience-grant routine this command
+    ///     calls into (not enforced here).
+    /// </summary>
     public required int Exp { get; init; }
 }

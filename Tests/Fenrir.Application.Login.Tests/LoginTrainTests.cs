@@ -4,7 +4,6 @@ using Fenrir.Application.Login.Tests.TestSupport;
 using Fenrir.Data.Abstractions.Characters;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Login.Sessions;
-using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Framing;
 using Fenrir.Network.Serialization.Login.Packets.Login;
 
@@ -117,7 +116,7 @@ public class LoginTrainTests
     {
         AvatarRosterEntry[] characters =
         [
-            EntryFor(new CharacterRosterDtoBuilder(1, 0, "Hero", 2, 1, 3, 4, 12).Build(), guildName: "TestGuild"),
+            EntryFor(new CharacterRosterDtoBuilder(1, 0, "Hero", 2, 1, 3, 4, 12).Build(), "TestGuild"),
             EntryFor(new CharacterRosterDtoBuilder(2, 1, "Guildless", 1, 0, 1, 2, 5).Build())
         ];
 
@@ -154,12 +153,12 @@ public class LoginTrainTests
 
         CharacterRosterItemDto[] items =
         [
-            new(character.CharacterId, Container: 2, Slot: 7, ItemId: 9001, Quantity: 1, Enchant: 0, Combine: 0,
-                Refine: 0, Socket: 0, SocketGem1: 0, SocketGem2: 0, SocketGem3: 0, ExpireDate: 0, Serial: 1),
-            new(character.CharacterId, Container: 0, Slot: 5, ItemId: 500, Quantity: 3, Enchant: 0, Combine: 0,
-                Refine: 0, Socket: 0, SocketGem1: 0, SocketGem2: 0, SocketGem3: 0, ExpireDate: 0, Serial: 2),
-            new(character.CharacterId, Container: 3, Slot: 2, ItemId: 700, Quantity: 1, Enchant: 0, Combine: 0,
-                Refine: 0, Socket: 0, SocketGem1: 0, SocketGem2: 0, SocketGem3: 0, ExpireDate: 0, Serial: 3)
+            new(character.CharacterId, 2, 7, 9001, 1, 0, 0,
+                0, 0, 0, 0, 0, 0, 1),
+            new(character.CharacterId, 0, 5, 500, 3, 0, 0,
+                0, 0, 0, 0, 0, 0, 2),
+            new(character.CharacterId, 3, 2, 700, 1, 0, 0,
+                0, 0, 0, 0, 0, 0, 3)
         ];
 
         var entry = new AvatarRosterEntry(character, items, "", new Dictionary<byte, string>(), "", "");
@@ -201,8 +200,8 @@ public class LoginTrainTests
 
         CharacterRosterItemDto[] items =
         [
-            new(character.CharacterId, Container: 2, Slot: 8, ItemId: 4200, Quantity: 1, Enchant: 0, Combine: 0,
-                Refine: 0, Socket: 0, SocketGem1: 0, SocketGem2: 0, SocketGem3: 0, ExpireDate: 0, Serial: 1)
+            new(character.CharacterId, 2, 8, 4200, 1, 0, 0,
+                0, 0, 0, 0, 0, 0, 1)
         ];
 
         var entry = new AvatarRosterEntry(character, items, "", new Dictionary<byte, string>(), "", "");
@@ -282,7 +281,13 @@ public class LoginTrainTests
     ///     instead of repeating all 26 named arguments in every case.
     /// </summary>
     private sealed class CharacterRosterDtoBuilder(
-        int characterId, byte slot, string name, byte tribe, byte gender, byte headType, byte faceType,
+        int characterId,
+        byte slot,
+        string name,
+        byte tribe,
+        byte gender,
+        byte headType,
+        byte faceType,
         short level)
     {
         public byte PreviousTribe { get; init; }

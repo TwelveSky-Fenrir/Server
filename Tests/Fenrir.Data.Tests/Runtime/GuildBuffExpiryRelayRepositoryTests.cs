@@ -44,11 +44,13 @@ public sealed class GuildBuffExpiryRelayRepositoryTests : IDisposable
         _provider.Dispose();
     }
 
-    /// <summary>Advances <paramref name="shardId" />'s own cursor past whatever is already in the table, without
-    /// reaping anything (a large retention), so a subsequent poll only returns rows published after this call.</summary>
+    /// <summary>
+    ///     Advances <paramref name="shardId" />'s own cursor past whatever is already in the table, without
+    ///     reaping anything (a large retention), so a subsequent poll only returns rows published after this call.
+    /// </summary>
     private async Task DrainAsync(byte shardId)
     {
-        await _repository.PollAsync(shardId, retentionSeconds: 999_999, CancellationToken.None);
+        await _repository.PollAsync(shardId, 999_999, CancellationToken.None);
     }
 
     [Fact]
@@ -58,9 +60,9 @@ public sealed class GuildBuffExpiryRelayRepositoryTests : IDisposable
         const byte otherShardId = 2;
         await DrainAsync(otherShardId);
 
-        var entry = new GuildBuffExpiryRelayEntry(sourceShardId, GuildId: 4001, NewBuffTime: 0);
+        var entry = new GuildBuffExpiryRelayEntry(sourceShardId, 4001, 0);
         await _repository.PublishAsync(entry, CancellationToken.None);
-        var rows = await _repository.PollAsync(otherShardId, retentionSeconds: 999_999, CancellationToken.None);
+        var rows = await _repository.PollAsync(otherShardId, 999_999, CancellationToken.None);
 
         var row = Assert.Single(rows);
         Assert.Equal(4001, row.GuildId);
@@ -75,13 +77,13 @@ public sealed class GuildBuffExpiryRelayRepositoryTests : IDisposable
         await DrainAsync(sourceShardId);
 
         await _repository.PublishAsync(
-            new GuildBuffExpiryRelayEntry(sourceShardId, GuildId: 4002, NewBuffTime: -5), CancellationToken.None);
+            new GuildBuffExpiryRelayEntry(sourceShardId, 4002, -5), CancellationToken.None);
 
         // The originating shard already delivered locally at publish time (in-process, never through this
         // repository) -- usp_GuildBuffExpiryRelay_Poll excludes SourceShardId = @ShardId so it is never
         // re-delivered to itself via the cross-shard path.
         var ownShardRows =
-            await _repository.PollAsync(sourceShardId, retentionSeconds: 999_999, CancellationToken.None);
+            await _repository.PollAsync(sourceShardId, 999_999, CancellationToken.None);
         Assert.Empty(ownShardRows);
     }
 
@@ -95,14 +97,14 @@ public sealed class GuildBuffExpiryRelayRepositoryTests : IDisposable
         await DrainAsync(secondOtherShardId);
 
         await _repository.PublishAsync(
-            new GuildBuffExpiryRelayEntry(sourceShardId, GuildId: 4003, NewBuffTime: 0), CancellationToken.None);
+            new GuildBuffExpiryRelayEntry(sourceShardId, 4003, 0), CancellationToken.None);
 
         // Unlike SocialCrossShardRelay's point-to-point addressing, this is a genuine cluster-wide broadcast:
         // every other live shard's own next poll sees the same row, independently.
         var firstRows =
-            await _repository.PollAsync(firstOtherShardId, retentionSeconds: 999_999, CancellationToken.None);
+            await _repository.PollAsync(firstOtherShardId, 999_999, CancellationToken.None);
         var secondRows =
-            await _repository.PollAsync(secondOtherShardId, retentionSeconds: 999_999, CancellationToken.None);
+            await _repository.PollAsync(secondOtherShardId, 999_999, CancellationToken.None);
 
         Assert.Equal(4003, Assert.Single(firstRows).GuildId);
         Assert.Equal(4003, Assert.Single(secondRows).GuildId);
@@ -116,23 +118,23 @@ public sealed class GuildBuffExpiryRelayRepositoryTests : IDisposable
         await DrainAsync(pollingShardId);
 
         await _repository.PublishAsync(
-            new GuildBuffExpiryRelayEntry(sourceShardId, GuildId: 4004, NewBuffTime: 0), CancellationToken.None);
+            new GuildBuffExpiryRelayEntry(sourceShardId, 4004, 0), CancellationToken.None);
 
         var firstPoll =
-            await _repository.PollAsync(pollingShardId, retentionSeconds: 999_999, CancellationToken.None);
+            await _repository.PollAsync(pollingShardId, 999_999, CancellationToken.None);
         Assert.Single(firstPoll);
 
         // Cursor already advanced past the first row -- an immediate re-poll with nothing new published sees
         // nothing, it is never re-delivered.
         var secondPollNoNewRows =
-            await _repository.PollAsync(pollingShardId, retentionSeconds: 999_999, CancellationToken.None);
+            await _repository.PollAsync(pollingShardId, 999_999, CancellationToken.None);
         Assert.Empty(secondPollNoNewRows);
 
         await _repository.PublishAsync(
-            new GuildBuffExpiryRelayEntry(sourceShardId, GuildId: 4005, NewBuffTime: 0), CancellationToken.None);
+            new GuildBuffExpiryRelayEntry(sourceShardId, 4005, 0), CancellationToken.None);
 
         var thirdPoll =
-            await _repository.PollAsync(pollingShardId, retentionSeconds: 999_999, CancellationToken.None);
+            await _repository.PollAsync(pollingShardId, 999_999, CancellationToken.None);
         Assert.Equal(4005, Assert.Single(thirdPoll).GuildId);
     }
 
@@ -146,15 +148,15 @@ public sealed class GuildBuffExpiryRelayRepositoryTests : IDisposable
         await DrainAsync(firstSourceShardId);
 
         await _repository.PublishAsync(
-            new GuildBuffExpiryRelayEntry(firstSourceShardId, GuildId: 4006, NewBuffTime: 0), CancellationToken.None);
+            new GuildBuffExpiryRelayEntry(firstSourceShardId, 4006, 0), CancellationToken.None);
         await _repository.PublishAsync(
-            new GuildBuffExpiryRelayEntry(secondSourceShardId, GuildId: 4007, NewBuffTime: 0), CancellationToken.None);
+            new GuildBuffExpiryRelayEntry(secondSourceShardId, 4007, 0), CancellationToken.None);
 
         // The SELECT happens before the reap DELETE, so this call still returns both rows even though
         // @RetentionSeconds = 0 makes every already-inserted row (regardless of SourceShardId) immediately
         // reap-eligible.
         var firstCallRows =
-            await _repository.PollAsync(pollingShardId, retentionSeconds: 0, CancellationToken.None);
+            await _repository.PollAsync(pollingShardId, 0, CancellationToken.None);
         Assert.Equal(2, firstCallRows.Length);
 
         // Reap is purely time-based, not scoped to the polling shard's own filter -- a later poll from a
@@ -162,7 +164,7 @@ public sealed class GuildBuffExpiryRelayRepositoryTests : IDisposable
         // already caught up by the DrainAsync priming call above, so it isn't retroactively catching up on
         // unrelated backlog either).
         var laterPollFromAnotherShard =
-            await _repository.PollAsync(firstSourceShardId, retentionSeconds: 999_999, CancellationToken.None);
+            await _repository.PollAsync(firstSourceShardId, 999_999, CancellationToken.None);
         Assert.Empty(laterPollFromAnotherShard);
     }
 
@@ -178,7 +180,7 @@ public sealed class GuildBuffExpiryRelayRepositoryTests : IDisposable
         await DrainAsync(shardId);
 
         // With nothing published since that catch-up poll, an immediate re-poll sees nothing.
-        var rows = await _repository.PollAsync(shardId, retentionSeconds: 999_999, CancellationToken.None);
+        var rows = await _repository.PollAsync(shardId, 999_999, CancellationToken.None);
         Assert.Empty(rows);
     }
 }

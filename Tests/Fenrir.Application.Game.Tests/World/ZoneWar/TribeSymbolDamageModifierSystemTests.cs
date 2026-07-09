@@ -40,7 +40,7 @@ public class TribeSymbolDamageModifierSystemTests
         system.Simulate(zone, 1);
 
         Assert.Equal(TribeSymbolCombatModifiers.OwnSymbolLostDamageDownPenalty, modifiers.GetDamageDownPenalty(2));
-        foreach (byte other in (byte[]) [0, 1, 3])
+        foreach (var other in (byte[])[0, 1, 3])
             Assert.Equal(0f, modifiers.GetDamageDownPenalty(other));
     }
 

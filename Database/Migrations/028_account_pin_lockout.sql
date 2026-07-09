@@ -13,8 +13,9 @@
 -- LoginService.AuthenticateConstantTimeAsync) rather than a purely in-memory per-session counter, per that
 -- finding's own recommendation.
 ALTER TABLE auth.AccountPins
-    ADD FailedAttempts INT NOT NULL CONSTRAINT DF_AccountPins_FailedAttempts DEFAULT 0,
-        LockedUntilUtc  DATETIME2(3) NULL;
+    ADD FailedAttempts INT NOT NULL
+            CONSTRAINT DF_AccountPins_FailedAttempts DEFAULT 0,
+        LockedUntilUtc DATETIME2(3) NULL;
 GO
 
 -- New procedure (not a fix-forward of an existing one): records one real mouse-PIN comparison attempt
@@ -29,7 +30,7 @@ GO
 -- comparison exactly once -- never call this for an outcome rejected before a PasswordHasher.Verify ever
 -- ran (an already-locked account, a malformed PIN, a not-yet-configured PIN).
 CREATE PROCEDURE auth.usp_AccountPin_RecordAttempt @AccountId INT,
-                                                    @Success BIT
+                                                   @Success BIT
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -37,11 +38,11 @@ BEGIN
 
     UPDATE auth.AccountPins
     SET FailedAttempts = CASE WHEN @Success = 1 THEN 0 ELSE FailedAttempts + 1 END,
-        LockedUntilUtc  = CASE
-                               WHEN @Success = 1 THEN NULL
-                               WHEN FailedAttempts + 1 >= 10 THEN DATEADD(MINUTE, 15, SYSUTCDATETIME())
-                               WHEN FailedAttempts + 1 >= 5 THEN DATEADD(MINUTE, 1, SYSUTCDATETIME())
-                               ELSE LockedUntilUtc
+        LockedUntilUtc = CASE
+                             WHEN @Success = 1 THEN NULL
+                             WHEN FailedAttempts + 1 >= 10 THEN DATEADD(MINUTE, 15, SYSUTCDATETIME())
+                             WHEN FailedAttempts + 1 >= 5 THEN DATEADD(MINUTE, 1, SYSUTCDATETIME())
+                             ELSE LockedUntilUtc
             END
     WHERE AccountId = @AccountId;
 END;

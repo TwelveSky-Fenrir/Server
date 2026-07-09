@@ -1,5 +1,3 @@
-using Fenrir.Application.Game.Domain.Social;
-
 namespace Fenrir.Application.Game.Domain.Social.Party;
 
 /// <summary>Soft (non-disconnecting) outcomes of a party invite ask -- mirrors ZC_PARTY_ANSWER_RECV's pre-check codes.</summary>

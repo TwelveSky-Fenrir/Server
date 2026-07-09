@@ -37,6 +37,9 @@ public class ZoneMonsterAttackBroadcastAllocationTests
     private static readonly EffectiveStats StrongAttacker =
         new(1000, 1000, 1000, 0, 100, 0, 0, 0, 0, 0, 0);
 
+    private static readonly EffectiveStats ImmortalTarget =
+        new(100_000_000, 1000, 0, 1_000_000, 100, 0, 0, 100_000, 0, 0, 100_000);
+
     // The target's DefensePower deliberately absurd so ApplyPvmAttack's damage floors to 1 every hit -- the
     // monster survives hundreds of repeated hits across the measurement loop without ever dying (a death would
     // additionally run monster-kill loot/despawn machinery, an unrelated allocation source this test isn't
@@ -64,9 +67,6 @@ public class ZoneMonsterAttackBroadcastAllocationTests
             Critical = 0
         };
     }
-
-    private static readonly EffectiveStats ImmortalTarget =
-        new(100_000_000, 1000, 0, 1_000_000, 100, 0, 0, 100_000, 0, 0, 100_000);
 
     private static AttackForProtocol MeleeAgainstMonster(int attackerId, MonsterEntity monster)
     {
@@ -103,7 +103,7 @@ public class ZoneMonsterAttackBroadcastAllocationTests
 
         var (attackerSession, attackerPipe) = ZoneTestKit.CreateSession(1);
         pipes.Add(attackerPipe);
-        zone.Post(ZoneCommand.Enter(1, ZoneTestKit.EnterData(attackerSession, 1, "Attacker", 100f, 0f, 100f)));
+        zone.Post(ZoneCommand.Enter(1, ZoneTestKit.EnterData(attackerSession, 1, "Attacker")));
 
         var monster = MonsterEntity.Create(1, 1u, PvmMonsterTemplate(), 1, 100f, 0f, 100f, 50f);
         zone.SpawnMonster(monster);
@@ -114,7 +114,7 @@ public class ZoneMonsterAttackBroadcastAllocationTests
             var (session, pipe) = ZoneTestKit.CreateSession(characterId);
             pipes.Add(pipe);
             zone.Post(ZoneCommand.Enter(characterId,
-                ZoneTestKit.EnterData(session, 1, $"Bystander{i}", 100f + i * 3f, 0f, 100f)));
+                ZoneTestKit.EnterData(session, 1, $"Bystander{i}", 100f + i * 3f)));
         }
 
         zone.Tick(TimeSpan.FromMilliseconds(50));
@@ -212,7 +212,7 @@ public class ZoneMonsterAttackBroadcastAllocationTests
 
         var (targetSession, targetPipe) = ZoneTestKit.CreateSession(1);
         pipes.Add(targetPipe);
-        zone.Post(ZoneCommand.Enter(1, ZoneTestKit.EnterData(targetSession, 1, "Target", 100f, 0f, 100f)));
+        zone.Post(ZoneCommand.Enter(1, ZoneTestKit.EnterData(targetSession, 1, "Target")));
 
         for (var i = 0; i < bystanderCount; i++)
         {
@@ -220,7 +220,7 @@ public class ZoneMonsterAttackBroadcastAllocationTests
             var (session, pipe) = ZoneTestKit.CreateSession(characterId);
             pipes.Add(pipe);
             zone.Post(ZoneCommand.Enter(characterId,
-                ZoneTestKit.EnterData(session, 1, $"Bystander{i}", 100f + i * 3f, 0f, 100f)));
+                ZoneTestKit.EnterData(session, 1, $"Bystander{i}", 100f + i * 3f)));
         }
 
         zone.Tick(TimeSpan.FromMilliseconds(50));

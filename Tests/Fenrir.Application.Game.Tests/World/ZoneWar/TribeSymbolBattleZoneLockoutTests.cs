@@ -16,7 +16,7 @@ public class TribeSymbolBattleZoneLockoutTests
     [InlineData((short)42)]
     public void BattleActive_GuardedSourceZone_IntoZone38_IsLockedOut(short sourceZoneId)
     {
-        var result = TribeSymbolBattleZoneLockout.IsLockedOut(sourceZoneId, 38, tribeSymbolBattleActive: true);
+        var result = TribeSymbolBattleZoneLockout.IsLockedOut(sourceZoneId, 38, true);
 
         Assert.True(result);
     }
@@ -24,7 +24,7 @@ public class TribeSymbolBattleZoneLockoutTests
     [Fact]
     public void BattleActive_SourceZoneNotOneOfTheThreeGuardedZones_IsNotLockedOut()
     {
-        var result = TribeSymbolBattleZoneLockout.IsLockedOut(2, 38, tribeSymbolBattleActive: true);
+        var result = TribeSymbolBattleZoneLockout.IsLockedOut(2, 38, true);
 
         Assert.False(result);
     }
@@ -32,7 +32,7 @@ public class TribeSymbolBattleZoneLockoutTests
     [Fact]
     public void BattleActive_DestinationNot38_IsNotLockedOut()
     {
-        var result = TribeSymbolBattleZoneLockout.IsLockedOut(40, 50, tribeSymbolBattleActive: true);
+        var result = TribeSymbolBattleZoneLockout.IsLockedOut(40, 50, true);
 
         Assert.False(result);
     }
@@ -43,7 +43,7 @@ public class TribeSymbolBattleZoneLockoutTests
     [InlineData((short)42)]
     public void BattleNotActive_IsNeverLockedOut_EvenWithMatchingSourceAndDestination(short sourceZoneId)
     {
-        var result = TribeSymbolBattleZoneLockout.IsLockedOut(sourceZoneId, 38, tribeSymbolBattleActive: false);
+        var result = TribeSymbolBattleZoneLockout.IsLockedOut(sourceZoneId, 38, false);
 
         Assert.False(result);
     }

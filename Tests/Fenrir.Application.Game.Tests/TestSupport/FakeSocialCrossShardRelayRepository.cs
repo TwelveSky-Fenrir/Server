@@ -13,7 +13,10 @@ internal sealed class FakeSocialCrossShardRelayRepository : ISocialCrossShardRel
 {
     public List<SocialCrossShardRelayEntry> Published { get; } = [];
 
-    /// <summary>Rows <see cref="PollAsync" /> returns on its NEXT call, then clears (single-shot, like a real poll cursor advancing).</summary>
+    /// <summary>
+    ///     Rows <see cref="PollAsync" /> returns on its NEXT call, then clears (single-shot, like a real poll cursor
+    ///     advancing).
+    /// </summary>
     public List<SocialCrossShardRelayDto> NextPoll { get; set; } = [];
 
     /// <summary>When set, <see cref="PublishAsync" /> throws this instead of recording the entry.</summary>

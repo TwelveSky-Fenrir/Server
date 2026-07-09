@@ -1,7 +1,6 @@
 using Fenrir.Application.Game.Abstractions.Gm;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
-using Fenrir.Data.Abstractions.Game;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Dispatch.Zone.Sessions;
 using Fenrir.Network.Serialization.Shared.Packets.Shared;

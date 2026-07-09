@@ -26,7 +26,8 @@ namespace Fenrir.Application.Game.Hosting;
 ///         live state -- asker busy/negotiating gate, same-tribe check against the resolved row's
 ///         denormalized Tribe, map-based inter-tribe carve-out) or an Answer (after a human responds to a
 ///         cross-shard prompt, addressed back to the Ask's own
-///         <see cref="SocialCrossShardRelayEntry.SourceShardId" />/<see cref="SocialCrossShardRelayEntry.SourceCharacterId" />
+///         <see cref="SocialCrossShardRelayEntry.SourceShardId" />/
+///         <see cref="SocialCrossShardRelayEntry.SourceCharacterId" />
 ///         via <see cref="SocialCrossShardRelayEntry.AskRelayId" />).
 ///     </para>
 ///     <para>

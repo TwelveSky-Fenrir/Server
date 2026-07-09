@@ -6,7 +6,7 @@ namespace Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.UseHotkeyItem, ExpectedSize = 17,
     AllowedStates = [(byte)ZoneSessionState.Registering, (byte)ZoneSessionState.InWorld])]
-public readonly partial record struct UseHotkeyItemRequest : IIncomingPacket<UseHotkeyItemRequest>
+public readonly record struct UseHotkeyItemRequest : IIncomingPacket<UseHotkeyItemRequest>
 {
     public required int Page1 { get; init; }
 

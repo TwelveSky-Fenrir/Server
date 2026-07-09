@@ -1,10 +1,10 @@
 using System.Buffers.Binary;
+using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
-using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Tests.TestSupport;
-using Fenrir.Network.Serialization.Zone.Packets.Zone;
 using Fenrir.Network.Framing;
+using Fenrir.Network.Serialization.Zone.Packets.Zone;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.World.ZoneWar;
@@ -86,9 +86,11 @@ public class Zone335FfaEventCycleSystemTests
         Assert.Equal(0, state.GetKillOtherTribeBonus(3));
     }
 
-    /// <summary>Drives the whole cycle Idle -> ... -> WindDown -> Idle with nobody online, asserting every
-    /// client-visible <see cref="ZoneCenterSiegeState.Zone335"/> value the source contract's own 1501-1507
-    /// table specifies is hit in order, and the machine returns to a clean idle state.</summary>
+    /// <summary>
+    ///     Drives the whole cycle Idle -> ... -> WindDown -> Idle with nobody online, asserting every
+    ///     client-visible <see cref="ZoneCenterSiegeState.Zone335" /> value the source contract's own 1501-1507
+    ///     table specifies is hit in order, and the machine returns to a clean idle state.
+    /// </summary>
     [Fact]
     public void FullCycle_WithNoPlayersOnline_VisitsEveryPhaseScalarInOrder_AndReturnsToIdle()
     {
@@ -212,11 +214,13 @@ public class Zone335FfaEventCycleSystemTests
     ///     call) at a time and asserts, at every single one of those successive calls, both that the phase has NOT
     ///     jumped ahead of schedule and that the exact contract-mandated sort-1501 payload (remaining whole
     ///     minutes, counting down 10..1) reaches a connected player -- closing the gap the other tests in this
-    ///     class leave open by only checking <see cref="Zone335FfaEventCycleSystem.Phase" />/<see cref="ZoneCenterSiegeState.Zone335" />,
+    ///     class leave open by only checking <see cref="Zone335FfaEventCycleSystem.Phase" />/
+    ///     <see cref="ZoneCenterSiegeState.Zone335" />,
     ///     never the actual wire broadcast a real client would receive.
     /// </summary>
     [Fact]
-    public void PreStartCountdown_AdvancesOneMinuteAtATime_BroadcastingSort1501WithDecreasingRemainingMinutes_ThenExitsWithNoFurtherBroadcast()
+    public void
+        PreStartCountdown_AdvancesOneMinuteAtATime_BroadcastingSort1501WithDecreasingRemainingMinutes_ThenExitsWithNoFurtherBroadcast()
     {
         var (system, _, trigger, registry) = CreateSystem();
         var zone = registry[FfaMapId];
@@ -259,7 +263,8 @@ public class Zone335FfaEventCycleSystemTests
     ///     broadcasts the 1507 reset to them, in that order.
     /// </summary>
     [Fact]
-    public void FullCycle_WithOnePlayerOnline_BroadcastsEveryContractEventCodeInOrder_ThenForcesThemHomeAndResetsOnFinalWindDown()
+    public void
+        FullCycle_WithOnePlayerOnline_BroadcastsEveryContractEventCodeInOrder_ThenForcesThemHomeAndResetsOnFinalWindDown()
     {
         var (system, state, trigger, registry) = CreateSystem();
         var zone = registry[FfaMapId];
@@ -339,7 +344,7 @@ public class Zone335FfaEventCycleSystemTests
         var (stayingSession, stayingPipe) = ZoneTestKit.CreateSession(1);
         zone.Post(ZoneCommand.Enter(1, ZoneTestKit.EnterData(stayingSession, FfaMapId)));
         var (transferringSession, transferringPipe) = ZoneTestKit.CreateSession(2);
-        zone.Post(ZoneCommand.Enter(2, ZoneTestKit.EnterData(transferringSession, FfaMapId, name: "Mover")));
+        zone.Post(ZoneCommand.Enter(2, ZoneTestKit.EnterData(transferringSession, FfaMapId, "Mover")));
         zone.Tick(TimeSpan.FromMilliseconds(50));
         DrainAll(stayingPipe);
         DrainAll(transferringPipe);
@@ -406,7 +411,6 @@ public class Zone335FfaEventCycleSystemTests
         var offset = 0;
 
         while (offset < bytes.Length)
-        {
             if (bytes[offset] == ZoneEventInfoResponse.Opcode)
             {
                 var payload = bytes.AsSpan(offset + 1, eventFrameSize - 1);
@@ -419,7 +423,6 @@ public class Zone335FfaEventCycleSystemTests
             {
                 offset += countdownFrameSize;
             }
-        }
 
         throw new InvalidOperationException($"No ZoneEventInfoResponse frame with sort {expectedSort} was found.");
     }

@@ -7,7 +7,6 @@ using Fenrir.Application.Game.Domain.Social.Mentor;
 using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Data.Abstractions.Runtime;
 using Fenrir.Network.Serialization.Zone.Packets.Zone;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -46,13 +45,13 @@ public sealed class FriendCrossShardRelayHandler(
     {
         if (!zones.TryGetPlayer(ask.TargetCharacterId, out var target))
         {
-            PublishDecline(ask, reasonCode: 4);
+            PublishDecline(ask, 4);
             return ValueTask.CompletedTask;
         }
 
         if (friends.IsNegotiating(target.CharacterId) || IsExcludedByCommunityWork(target))
         {
-            PublishDecline(ask, reasonCode: 5);
+            PublishDecline(ask, 5);
             return ValueTask.CompletedTask;
         }
 
@@ -63,7 +62,7 @@ public sealed class FriendCrossShardRelayHandler(
             // Lost a narrow race against a same-shard ask that landed on the target in between the
             // IsNegotiating check above and this registration -- same "busy" reply as if it had been caught
             // synchronously.
-            PublishDecline(ask, reasonCode: 5);
+            PublishDecline(ask, 5);
             return ValueTask.CompletedTask;
         }
 

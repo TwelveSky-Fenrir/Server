@@ -51,8 +51,10 @@ public class RvrSiegeEventRelayHostTests
     {
         var registry = CreateRegistry(1);
         var state = new ZoneCenterSiegeState();
-        var ingestor = new ZoneCenterBroadcastIngestor(state, registry, NullLogger<ZoneCenterBroadcastIngestor>.Instance);
-        var broadcaster = new ZoneEventBroadcaster(CreateWorldState(), registry, NullLogger<ZoneEventBroadcaster>.Instance);
+        var ingestor =
+            new ZoneCenterBroadcastIngestor(state, registry, NullLogger<ZoneCenterBroadcastIngestor>.Instance);
+        var broadcaster =
+            new ZoneEventBroadcaster(CreateWorldState(), registry, NullLogger<ZoneEventBroadcaster>.Instance);
         var relay = new FakeRvrSiegeEventRelayRepository();
         var host = CreateHost(relay, ingestor, broadcaster);
 
@@ -70,14 +72,16 @@ public class RvrSiegeEventRelayHostTests
     {
         var registry = CreateRegistry(1);
         var state = new ZoneCenterSiegeState();
-        var ingestor = new ZoneCenterBroadcastIngestor(state, registry, NullLogger<ZoneCenterBroadcastIngestor>.Instance);
-        var broadcaster = new ZoneEventBroadcaster(CreateWorldState(), registry, NullLogger<ZoneEventBroadcaster>.Instance);
+        var ingestor =
+            new ZoneCenterBroadcastIngestor(state, registry, NullLogger<ZoneCenterBroadcastIngestor>.Instance);
+        var broadcaster =
+            new ZoneEventBroadcaster(CreateWorldState(), registry, NullLogger<ZoneEventBroadcaster>.Instance);
         var relay = new FakeRvrSiegeEventRelayRepository();
         var host = CreateHost(relay, ingestor, broadcaster);
 
         var data = new byte[130];
         BinaryPrimitives.WriteInt32LittleEndian(data, 4); // slot 4
-        relay.NextPoll = [new RvrSiegeEventRelayDto(RelayId: 1, Sort: 2, Data: data)]; // sub-code 2 -> state 1
+        relay.NextPoll = [new RvrSiegeEventRelayDto(1, 2, data)]; // sub-code 2 -> state 1
 
         await host.PollOnceAsync(CancellationToken.None);
 
@@ -94,7 +98,8 @@ public class RvrSiegeEventRelayHostTests
         ZoneTestKit.DrainOutbound(pipe);
 
         var state = new ZoneCenterSiegeState();
-        var ingestor = new ZoneCenterBroadcastIngestor(state, registry, NullLogger<ZoneCenterBroadcastIngestor>.Instance);
+        var ingestor =
+            new ZoneCenterBroadcastIngestor(state, registry, NullLogger<ZoneCenterBroadcastIngestor>.Instance);
         var worldState = CreateWorldState();
         var broadcaster = new ZoneEventBroadcaster(worldState, registry, NullLogger<ZoneEventBroadcaster>.Instance);
         var relay = new FakeRvrSiegeEventRelayRepository();
@@ -102,7 +107,7 @@ public class RvrSiegeEventRelayHostTests
 
         var data = new byte[130];
         BinaryPrimitives.WriteInt32LittleEndian(data, 2); // tribe 2 decided Zone038
-        relay.NextPoll = [new RvrSiegeEventRelayDto(RelayId: 1, Sort: 38, Data: data)];
+        relay.NextPoll = [new RvrSiegeEventRelayDto(1, 38, data)];
 
         await host.PollOnceAsync(CancellationToken.None);
 
@@ -118,8 +123,10 @@ public class RvrSiegeEventRelayHostTests
     {
         var registry = CreateRegistry(1);
         var state = new ZoneCenterSiegeState();
-        var ingestor = new ZoneCenterBroadcastIngestor(state, registry, NullLogger<ZoneCenterBroadcastIngestor>.Instance);
-        var broadcaster = new ZoneEventBroadcaster(CreateWorldState(), registry, NullLogger<ZoneEventBroadcaster>.Instance);
+        var ingestor =
+            new ZoneCenterBroadcastIngestor(state, registry, NullLogger<ZoneCenterBroadcastIngestor>.Instance);
+        var broadcaster =
+            new ZoneEventBroadcaster(CreateWorldState(), registry, NullLogger<ZoneEventBroadcaster>.Instance);
         var relay = new FakeRvrSiegeEventRelayRepository { ThrowOnPublish = new InvalidOperationException("boom") };
         var host = CreateHost(relay, ingestor, broadcaster);
 
@@ -134,13 +141,15 @@ public class RvrSiegeEventRelayHostTests
     {
         var registry = CreateRegistry(1);
         var state = new ZoneCenterSiegeState();
-        var ingestor = new ZoneCenterBroadcastIngestor(state, registry, NullLogger<ZoneCenterBroadcastIngestor>.Instance);
-        var broadcaster = new ZoneEventBroadcaster(CreateWorldState(), registry, NullLogger<ZoneEventBroadcaster>.Instance);
+        var ingestor =
+            new ZoneCenterBroadcastIngestor(state, registry, NullLogger<ZoneCenterBroadcastIngestor>.Instance);
+        var broadcaster =
+            new ZoneEventBroadcaster(CreateWorldState(), registry, NullLogger<ZoneEventBroadcaster>.Instance);
         var relay = new FakeRvrSiegeEventRelayRepository();
         var host = CreateHost(relay, ingestor, broadcaster);
 
         // A malformed (too-short) payload makes ApplyRelayedEvent throw -- must not take the whole poll cycle down.
-        relay.NextPoll = [new RvrSiegeEventRelayDto(RelayId: 1, Sort: 2, Data: new byte[4])];
+        relay.NextPoll = [new RvrSiegeEventRelayDto(1, 2, new byte[4])];
 
         var ex = await Record.ExceptionAsync(() => host.PollOnceAsync(CancellationToken.None).AsTask());
         Assert.Null(ex);

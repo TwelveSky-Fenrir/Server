@@ -35,8 +35,10 @@ public class PartyCrossShardRelayHandlerTests
         return (handler, zones, parties, relay);
     }
 
-    /// <summary>Enters a character into map 1 -- the caller's own <see cref="ZoneRegistry" /> must already be
-    /// initialized (once) by <see cref="CreateHandler" />; this never re-initializes it.</summary>
+    /// <summary>
+    ///     Enters a character into map 1 -- the caller's own <see cref="ZoneRegistry" /> must already be
+    ///     initialized (once) by <see cref="CreateHandler" />; this never re-initializes it.
+    /// </summary>
     private static (PlayerRuntimeState State, FakeDuplexPipe Pipe) Enter(ZoneRegistry zones, short mapId,
         int characterId, string name)
     {
@@ -74,7 +76,7 @@ public class PartyCrossShardRelayHandlerTests
         var (handler, zones, parties, relay) = CreateHandler();
         var (invitee, pipe) = Enter(zones, 1, 100, "Invitee");
 
-        await handler.HandleAskAsync(MakeAsk(relayId: 42, targetCharacterId: 100), CancellationToken.None);
+        await handler.HandleAskAsync(MakeAsk(42, 100), CancellationToken.None);
 
         Assert.Empty(relay.Enqueued);
         Assert.True(parties.IsNegotiating(invitee.CharacterId));
@@ -92,7 +94,7 @@ public class PartyCrossShardRelayHandlerTests
         Assert.Equal(PartyInviteOutcome.Sent, parties.TryInvite(501, 1, invitee.Tribe, 100, 1, invitee.Tribe));
         Assert.True(parties.TryAnswer(100, true, out _, out _));
 
-        await handler.HandleAskAsync(MakeAsk(relayId: 43, targetCharacterId: 100), CancellationToken.None);
+        await handler.HandleAskAsync(MakeAsk(43, 100), CancellationToken.None);
 
         var declined = Assert.Single(relay.Enqueued);
         Assert.False(declined.Accepted);

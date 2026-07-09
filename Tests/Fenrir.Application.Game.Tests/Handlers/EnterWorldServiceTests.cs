@@ -30,7 +30,6 @@ using Fenrir.Network.Dispatch.Zone.Sessions;
 using Fenrir.Network.Framing;
 using Fenrir.Network.Serialization.Shared.Packets.Shared;
 using Fenrir.Network.Serialization.Zone.Packets.Zone;
-using Fenrir.Network.Serialization.Wire;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 

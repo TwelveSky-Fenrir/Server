@@ -1,5 +1,3 @@
-using Fenrir.Application.Game.Domain.Social;
-
 namespace Fenrir.Application.Game.Domain.Social.Duel;
 
 /// <summary>Soft outcomes of CZ_DUEL_ASK_SEND -- mirrors ZC_DUEL_ANSWER_RECV's pre-check codes.</summary>

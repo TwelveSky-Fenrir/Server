@@ -3,7 +3,6 @@ using Fenrir.Data.Abstractions.Security;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.FloodProtection;
 using Fenrir.Network.Dispatch.Sessions;
-using Fenrir.Network.Serialization.Wire;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;

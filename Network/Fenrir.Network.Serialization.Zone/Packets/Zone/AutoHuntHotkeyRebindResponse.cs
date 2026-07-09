@@ -6,7 +6,7 @@ namespace Fenrir.Network.Serialization.Zone.Packets.Zone;
 // Server-initiated push (no client request) — auto-hunt bot rebinds hotkey after consuming a pill.
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.AutoHuntHotkeyRebind,
     ExpectedSize = 29)]
-public readonly partial record struct AutoHuntHotkeyRebindResponse : IOutgoingPacket
+public readonly record struct AutoHuntHotkeyRebindResponse : IOutgoingPacket
 {
     public required int Page1 { get; init; }
 

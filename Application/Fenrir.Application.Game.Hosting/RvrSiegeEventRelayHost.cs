@@ -13,7 +13,8 @@ namespace Fenrir.Application.Game.Hosting;
 ///     family (38/39/40/42/45/46/47, owned by <see cref="ZoneEventBroadcaster" />). Both producers already
 ///     mutate this shard's own shared state and broadcast to this shard's own hosted zones synchronously and
 ///     unchanged BEFORE ever calling <see cref="Enqueue" /> -- see either class's own CROSS-SHARD RELAY remarks
-///     for why that same-shard leg alone is no longer enough once <see cref="Fenrir.Application.Game.Domain.World.ZoneRegistry" />
+///     for why that same-shard leg alone is no longer enough once
+///     <see cref="Fenrir.Application.Game.Domain.World.ZoneRegistry" />
 ///     only ever covers a disjoint subset of the game's maps.
 /// </summary>
 /// <remarks>

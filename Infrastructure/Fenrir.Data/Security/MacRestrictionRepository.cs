@@ -21,8 +21,12 @@ public sealed record MacRestrictionRepository(ICaeriusNetDbContext Db) : IMacRes
     /// <summary>
     ///     A MachineGuid match is sufficient on its own, independent of MacAddress, and takes precedence over
     ///     the MAC-wide default row (MachineGuid IS NULL) -- mirrors legacy's ban lookup, which is keyed
-    ///     solely by the client-declared adapter GUID string (<c>SELECT mac_limit FROM macinfo WHERE
-    ///     mac_guid='%s';</c>, Server/ts25login/S08_MyDB.cpp:441) and never predicates on the reported
+    ///     solely by the client-declared adapter GUID string (
+    ///     <c>
+    ///         SELECT mac_limit FROM macinfo WHERE
+    ///         mac_guid='%s';
+    ///     </c>
+    ///     , Server/ts25login/S08_MyDB.cpp:441) and never predicates on the reported
     ///     MAC-address bytes at all. Requiring an exact MacAddress match as a precondition (as this method
     ///     used to) would let a banned device evade the ban simply by reporting a different MAC address while
     ///     keeping the same adapter GUID. The MAC-wide default row (MachineGuid IS NULL) is a Fenrir-only

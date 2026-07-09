@@ -2,7 +2,6 @@ using System.Buffers;
 using System.Net;
 using System.Net.Sockets;
 using Fenrir.Network.Dispatch.Login.Sessions;
-using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Transport;
 
 namespace Fenrir.Network.Tests.Transport;

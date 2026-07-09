@@ -60,7 +60,8 @@ public class GmFfaEventStartServiceTests
     }
 
     [Fact]
-    public async Task HandleAsync_ElevatedTier_IdleFfaState_ArmsTriggerWithRequestedDuration_AcksAccepted_AndLogsAuditRow()
+    public async Task
+        HandleAsync_ElevatedTier_IdleFfaState_ArmsTriggerWithRequestedDuration_AcksAccepted_AndLogsAuditRow()
     {
         var (session, pipe, siegeState, startTrigger, eventLog) = SetUp((short)GmCommandTier.Elevated);
         Assert.Equal(0, siegeState.Zone335); // idle by construction.

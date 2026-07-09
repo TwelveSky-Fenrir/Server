@@ -38,10 +38,10 @@ public class SocialCrossShardRelayHostTests
         var friendHandler = new FakeSocialCrossShardRelayHandler(SocialCrossShardRelayKind.Friend);
         var host = CreateHost(relay, [duelHandler, friendHandler]);
 
-        var dto = new SocialCrossShardRelayDto(RelayId: 55, Kind: (byte)SocialCrossShardRelayKind.Duel,
-            MessageType: (byte)SocialCrossShardRelayMessageType.Ask, Accepted: null, ReasonCode: null,
-            SourceShardId: 7, SourceCharacterId: 200, SourceAvatarName: "Challenger", TargetShardId: ShardId,
-            TargetCharacterId: 100, AskRelayId: null);
+        var dto = new SocialCrossShardRelayDto(55, (byte)SocialCrossShardRelayKind.Duel,
+            (byte)SocialCrossShardRelayMessageType.Ask, null, null,
+            7, 200, "Challenger", ShardId,
+            100, null);
         relay.NextPoll = [dto];
 
         await host.PollOnceAsync(CancellationToken.None);
@@ -60,10 +60,10 @@ public class SocialCrossShardRelayHostTests
         var tradeHandler = new FakeSocialCrossShardRelayHandler(SocialCrossShardRelayKind.Trade);
         var host = CreateHost(relay, [tradeHandler]);
 
-        var dto = new SocialCrossShardRelayDto(RelayId: 9, Kind: (byte)SocialCrossShardRelayKind.Trade,
-            MessageType: (byte)SocialCrossShardRelayMessageType.Answer, Accepted: true, ReasonCode: null,
-            SourceShardId: 7, SourceCharacterId: 200, SourceAvatarName: "Target", TargetShardId: ShardId,
-            TargetCharacterId: 100, AskRelayId: 3);
+        var dto = new SocialCrossShardRelayDto(9, (byte)SocialCrossShardRelayKind.Trade,
+            (byte)SocialCrossShardRelayMessageType.Answer, true, null,
+            7, 200, "Target", ShardId,
+            100, 3);
         relay.NextPoll = [dto];
 
         await host.PollOnceAsync(CancellationToken.None);
@@ -79,10 +79,10 @@ public class SocialCrossShardRelayHostTests
         var relay = new FakeSocialCrossShardRelayRepository();
         var host = CreateHost(relay, []);
 
-        var dto = new SocialCrossShardRelayDto(RelayId: 1, Kind: (byte)SocialCrossShardRelayKind.Mentor,
-            MessageType: (byte)SocialCrossShardRelayMessageType.Ask, Accepted: null, ReasonCode: null,
-            SourceShardId: 7, SourceCharacterId: 200, SourceAvatarName: "Asker", TargetShardId: ShardId,
-            TargetCharacterId: 100, AskRelayId: null);
+        var dto = new SocialCrossShardRelayDto(1, (byte)SocialCrossShardRelayKind.Mentor,
+            (byte)SocialCrossShardRelayMessageType.Ask, null, null,
+            7, 200, "Asker", ShardId,
+            100, null);
         relay.NextPoll = [dto];
 
         await Record.ExceptionAsync(() => host.PollOnceAsync(CancellationToken.None).AsTask());

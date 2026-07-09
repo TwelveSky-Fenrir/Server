@@ -3,7 +3,6 @@ using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Services.Guilds;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Data.Abstractions.Guilds;
-using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Dispatch.Zone.Sessions;
 using Fenrir.Network.Serialization.Shared.Packets.Shared;
 using Fenrir.Network.Serialization.Zone.Packets.Zone;

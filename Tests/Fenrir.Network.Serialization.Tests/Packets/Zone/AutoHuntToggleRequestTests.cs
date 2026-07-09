@@ -1,8 +1,8 @@
 using System.Buffers.Binary;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Serialization.Shared.Packets.Shared;
-using Fenrir.Network.Serialization.Zone.Packets.Zone;
 using Fenrir.Network.Serialization.Tests.TestSupport;
+using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Network.Serialization.Tests.Packets.Zone;
 

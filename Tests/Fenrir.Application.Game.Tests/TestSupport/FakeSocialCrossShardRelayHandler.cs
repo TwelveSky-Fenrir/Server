@@ -10,10 +10,9 @@ namespace Fenrir.Application.Game.Tests.TestSupport;
 /// </summary>
 internal sealed class FakeSocialCrossShardRelayHandler(SocialCrossShardRelayKind kind) : ISocialCrossShardRelayHandler
 {
-    public SocialCrossShardRelayKind Kind { get; } = kind;
-
     public List<SocialCrossShardRelayDto> AsksHandled { get; } = [];
     public List<SocialCrossShardRelayDto> AnswersHandled { get; } = [];
+    public SocialCrossShardRelayKind Kind { get; } = kind;
 
     public ValueTask HandleAskAsync(SocialCrossShardRelayDto ask, CancellationToken ct)
     {

@@ -7,8 +7,6 @@ namespace Fenrir.Application.Login.Tests.TestSupport;
 // container. Single-account: every PIN handler only ever touches its own session's account.
 internal sealed class FakeAccountPinRepository : IAccountPinRepository
 {
-    private AccountPinDto? _stored;
-
     /// <summary>Throws from <see cref="SetAsync" /> to simulate the legacy UpdateMousePassword storage failure.</summary>
     public bool ThrowOnSet { get; set; }
 
@@ -18,11 +16,11 @@ internal sealed class FakeAccountPinRepository : IAccountPinRepository
     public int RecordAttemptCallCount { get; private set; }
 
     /// <summary>Current row state, for assertions that need to inspect FailedAttempts/LockedUntilUtc directly.</summary>
-    public AccountPinDto? Stored => _stored;
+    public AccountPinDto? Stored { get; private set; }
 
     public ValueTask<AccountPinDto?> GetAsync(int accountId, CancellationToken ct)
     {
-        return ValueTask.FromResult(_stored);
+        return ValueTask.FromResult(Stored);
     }
 
     public ValueTask SetAsync(int accountId, byte[] pinHash, byte[] pinSalt, CancellationToken ct)
@@ -35,7 +33,7 @@ internal sealed class FakeAccountPinRepository : IAccountPinRepository
         // does not touch these columns; only CreateMousePinService ever hits this branch with a fresh
         // account, where FailedAttempts is already 0, so no explicit reset needed here beyond the
         // implicit one from constructing a brand-new AccountPinDto).
-        _stored = new AccountPinDto(pinHash, pinSalt);
+        Stored = new AccountPinDto(pinHash, pinSalt);
         return ValueTask.CompletedTask;
     }
 
@@ -46,23 +44,23 @@ internal sealed class FakeAccountPinRepository : IAccountPinRepository
     {
         RecordAttemptCallCount++;
 
-        if (_stored is null)
+        if (Stored is null)
             return ValueTask.CompletedTask;
 
         if (success)
         {
-            _stored = _stored with { FailedAttempts = 0, LockedUntilUtc = null };
+            Stored = Stored with { FailedAttempts = 0, LockedUntilUtc = null };
             return ValueTask.CompletedTask;
         }
 
-        var failedAttempts = _stored.FailedAttempts + 1;
+        var failedAttempts = Stored.FailedAttempts + 1;
         var lockedUntil = failedAttempts switch
         {
             >= 10 => DateTime.UtcNow.AddMinutes(15),
             >= 5 => DateTime.UtcNow.AddMinutes(1),
-            _ => _stored.LockedUntilUtc
+            _ => Stored.LockedUntilUtc
         };
-        _stored = _stored with { FailedAttempts = failedAttempts, LockedUntilUtc = lockedUntil };
+        Stored = Stored with { FailedAttempts = failedAttempts, LockedUntilUtc = lockedUntil };
         return ValueTask.CompletedTask;
     }
 
@@ -74,7 +72,7 @@ internal sealed class FakeAccountPinRepository : IAccountPinRepository
     public static FakeAccountPinRepository WithPin(string pin)
     {
         var (hash, salt) = PasswordHasher.Hash(pin);
-        return new FakeAccountPinRepository { _stored = new AccountPinDto(hash, salt) };
+        return new FakeAccountPinRepository { Stored = new AccountPinDto(hash, salt) };
     }
 
     /// <summary>Seeds a PIN whose account-scoped lockout is already active, for Locked-outcome tests.</summary>
@@ -83,7 +81,7 @@ internal sealed class FakeAccountPinRepository : IAccountPinRepository
         var (hash, salt) = PasswordHasher.Hash(pin);
         return new FakeAccountPinRepository
         {
-            _stored = new AccountPinDto(hash, salt, 5, lockedUntilUtc)
+            Stored = new AccountPinDto(hash, salt, 5, lockedUntilUtc)
         };
     }
 }

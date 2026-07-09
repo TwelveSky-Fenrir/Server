@@ -22,12 +22,14 @@ namespace Fenrir.Network.Serialization.Shared.Packets.Shared;
 ///     decompose this value into base/high-level/rebirth tiers, not by this type itself).
 /// </remarks>
 [FenrirWireType(4)]
-public readonly partial record struct GmLevelSetPayload : IFenrirWireType<GmLevelSetPayload>
+public readonly record struct GmLevelSetPayload : IFenrirWireType<GmLevelSetPayload>
 {
-    /// <summary>Requested total level, spanning three successive tiers combined into one number: base level (up
-    /// to 145), then "high level" (a further 12), then rebirth count (a further 12) -- 169 total capacity. No
-    /// lower bound is enforced by the legacy code (every comparison is "less than or equal", so a zero/negative
-    /// value reaches the base tier's branch unchanged and is applied as-is); a value above 169 is rejected with
-    /// no mutation. Decomposed/validated by the caller, not here.</summary>
+    /// <summary>
+    ///     Requested total level, spanning three successive tiers combined into one number: base level (up
+    ///     to 145), then "high level" (a further 12), then rebirth count (a further 12) -- 169 total capacity. No
+    ///     lower bound is enforced by the legacy code (every comparison is "less than or equal", so a zero/negative
+    ///     value reaches the base tier's branch unchanged and is applied as-is); a value above 169 is rejected with
+    ///     no mutation. Decomposed/validated by the caller, not here.
+    /// </summary>
     public required int Level { get; init; }
 }

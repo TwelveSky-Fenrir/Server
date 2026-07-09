@@ -17,7 +17,7 @@ namespace Fenrir.Network.Serialization.Shared.Packets.Shared;
 ///     cap a quantity here is validated against by the caller, not this type).
 /// </remarks>
 [FenrirWireType(8)]
-public readonly partial record struct GmCreateItemQuantityPayload : IFenrirWireType<GmCreateItemQuantityPayload>
+public readonly record struct GmCreateItemQuantityPayload : IFenrirWireType<GmCreateItemQuantityPayload>
 {
     /// <summary>Catalog item id to create. Valid range [2, 99999]; validated by the caller, not here.</summary>
     public required int ItemId { get; init; }

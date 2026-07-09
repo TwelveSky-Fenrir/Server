@@ -113,7 +113,8 @@ public class GmExpGrantServiceTests
     }
 
     [Fact]
-    public async Task HandleAsync_ElevatedTier_Mode0_PositiveMagnitude_IncreasesExperienceByMagnitude_LogsAuditRow_AndAcksSuccess()
+    public async Task
+        HandleAsync_ElevatedTier_Mode0_PositiveMagnitude_IncreasesExperienceByMagnitude_LogsAuditRow_AndAcksSuccess()
     {
         var (session, pipe, zone, state, eventLog) = SetUp((short)GmCommandTier.Elevated);
         var service = new GmExpGrantService(eventLog, NullLogger<GmExpGrantService>.Instance);
@@ -189,7 +190,8 @@ public class GmExpGrantServiceTests
     ///     itself, so this exact total would have fallen through to the ordinary deposit path instead of no-op'ing.
     /// </summary>
     [Fact]
-    public async Task HandleAsync_ElevatedTier_Mode0_AboveLegacyCeilingButBelowIntMaxValue_StillTreatedAsAlreadyAtMaximum()
+    public async Task
+        HandleAsync_ElevatedTier_Mode0_AboveLegacyCeilingButBelowIntMaxValue_StillTreatedAsAlreadyAtMaximum()
     {
         var (session, pipe, zone, state, eventLog) = SetUp((short)GmCommandTier.Elevated);
         state.Experience = LegacyExperienceCeiling + 1_000; // strictly above MAX_NUMBER_SIZE, still below int.MaxValue.
@@ -238,7 +240,8 @@ public class GmExpGrantServiceTests
     ///     stops it.
     /// </summary>
     [Fact]
-    public async Task HandleAsync_ElevatedTier_Mode0_MagnitudeAtCeiling_WithSecondTierAlreadyStarted_ShortcutClampsToFirstTierCap_NotFullMagnitude()
+    public async Task
+        HandleAsync_ElevatedTier_Mode0_MagnitudeAtCeiling_WithSecondTierAlreadyStarted_ShortcutClampsToFirstTierCap_NotFullMagnitude()
     {
         var levels = new Dictionary<short, LevelRowDto>
         {

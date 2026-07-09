@@ -52,7 +52,8 @@ public interface IGmBasicCommandService
     ///     followed by the shared generic acknowledgment -- two packets for one request. No other failure
     ///     branch exists once the tier gate passes.
     /// </summary>
-    ValueTask HandleVisibilityAsync(int sort, byte[] data, ZoneClientSession zoneSession, PlayerRuntimeState state,
+    public ValueTask HandleVisibilityAsync(int sort, byte[] data, ZoneClientSession zoneSession,
+        PlayerRuntimeState state,
         Zone zone, CancellationToken cancellationToken);
 
     /// <summary>
@@ -60,7 +61,7 @@ public interface IGmBasicCommandService
     ///     GM's own character, no bounds/map-validity/collision check. Shared generic acknowledgment only, no
     ///     dedicated response.
     /// </summary>
-    ValueTask HandleSelfTeleportAsync(byte[] data, ZoneClientSession zoneSession, PlayerRuntimeState state,
+    public ValueTask HandleSelfTeleportAsync(byte[] data, ZoneClientSession zoneSession, PlayerRuntimeState state,
         Zone zone, CancellationToken cancellationToken);
 
     /// <summary>
@@ -70,7 +71,7 @@ public interface IGmBasicCommandService
     ///     loot/experience grant), which also arms that instance's ordinary respawn timer from "now" via the
     ///     same death pipeline every other monster death already uses.
     /// </summary>
-    ValueTask HandleForceKillMonsterAsync(byte[] data, ZoneClientSession zoneSession, Zone zone,
+    public ValueTask HandleForceKillMonsterAsync(byte[] data, ZoneClientSession zoneSession, Zone zone,
         CancellationToken cancellationToken);
 
     /// <summary>
@@ -79,7 +80,8 @@ public interface IGmBasicCommandService
     ///     no acknowledgment of any kind. A successful change mutates Tribe (and PreviousTribe, unless the
     ///     selector is the special value 3) plus clears the 5-slot quest state, writes NO audit-log entry, sends
     ///     NO acknowledgment of any kind, and forcibly disconnects the invoking GM's own session as the normal
-    ///     signal that the command succeeded (<see cref="Fenrir.Network.Dispatch.Sessions.DisconnectReason.GmCommandLogout" />).
+    ///     signal that the command succeeded (<see cref="Fenrir.Network.Dispatch.Sessions.DisconnectReason.GmCommandLogout" />
+    ///     ).
     ///     <para>
     ///         Persistence gap, flagged not silently assumed correct: unlike the sibling op37 (Fourth-tribe
     ///         conversion) command this method's own mutation shape resembles, no existing repository call
@@ -90,7 +92,7 @@ public interface IGmBasicCommandService
     ///         from this method.
     ///     </para>
     /// </summary>
-    ValueTask HandleTribeChangeAsync(byte[] data, ZoneClientSession zoneSession, PlayerRuntimeState state,
+    public ValueTask HandleTribeChangeAsync(byte[] data, ZoneClientSession zoneSession, PlayerRuntimeState state,
         Zone zone, CancellationToken cancellationToken);
 
     /// <summary>
@@ -100,7 +102,7 @@ public interface IGmBasicCommandService
     ///     server-side read/branch consumer anywhere in the zone-server source tree (display/persisted value
     ///     only). Shared generic acknowledgment only.
     /// </summary>
-    ValueTask HandleSelfSpecialStateAsync(int sort, byte[] data, ZoneClientSession zoneSession,
+    public ValueTask HandleSelfSpecialStateAsync(int sort, byte[] data, ZoneClientSession zoneSession,
         PlayerRuntimeState state, Zone zone, CancellationToken cancellationToken);
 
     /// <summary>
@@ -113,7 +115,7 @@ public interface IGmBasicCommandService
     ///     carries the legacy literal tag 1 (<c>B_GM_COMMAND_INFO(1, ...)</c>), NOT the outer switch's tSort
     ///     513 -- see S05_MyTransfer.cpp:1159-1164 and S04_MyWork04.cpp:1319.
     /// </summary>
-    ValueTask HandleFindAsync(byte[] data, ZoneClientSession zoneSession, PlayerRuntimeState state,
+    public ValueTask HandleFindAsync(byte[] data, ZoneClientSession zoneSession, PlayerRuntimeState state,
         CancellationToken cancellationToken);
 
     /// <summary>
@@ -129,7 +131,7 @@ public interface IGmBasicCommandService
     ///     S05_MyTransfer.cpp:1159-1164 and S04_MyWork04.cpp:1348 (shared with <see cref="HandleMoveToTargetAsync" />'s
     ///     own tag below).
     /// </summary>
-    ValueTask HandleCallAsync(byte[] data, ZoneClientSession zoneSession, PlayerRuntimeState state,
+    public ValueTask HandleCallAsync(byte[] data, ZoneClientSession zoneSession, PlayerRuntimeState state,
         CancellationToken cancellationToken);
 
     /// <summary>
@@ -143,7 +145,7 @@ public interface IGmBasicCommandService
     ///     <c>B_GM_COMMAND_INFO(2, ...)</c>), NOT the outer switch's tSort 515 -- see
     ///     S05_MyTransfer.cpp:1159-1164 and S04_MyWork04.cpp:1406.
     /// </summary>
-    ValueTask HandleMoveToTargetAsync(byte[] data, ZoneClientSession zoneSession, PlayerRuntimeState state,
+    public ValueTask HandleMoveToTargetAsync(byte[] data, ZoneClientSession zoneSession, PlayerRuntimeState state,
         Zone zone, CancellationToken cancellationToken);
 
     /// <summary>
@@ -157,7 +159,7 @@ public interface IGmBasicCommandService
     ///     own case body ends in an explicit <c>return</c> before ever reaching the shared closing step
     ///     (S04_MyWork04.cpp:1433-1439/1462-1468).
     /// </summary>
-    ValueTask HandleTargetSpecialStateAsync(int sort, byte[] data, ZoneClientSession zoneSession,
+    public ValueTask HandleTargetSpecialStateAsync(int sort, byte[] data, ZoneClientSession zoneSession,
         PlayerRuntimeState state, CancellationToken cancellationToken);
 
     /// <summary>
@@ -166,7 +168,7 @@ public interface IGmBasicCommandService
     ///     disconnect. No dedicated response to anyone; the invoker receives only the shared generic
     ///     acknowledgment. Target not found: shared generic acknowledgment only, default-failure outcome.
     /// </summary>
-    ValueTask HandleKickAsync(byte[] data, ZoneClientSession zoneSession, PlayerRuntimeState state,
+    public ValueTask HandleKickAsync(byte[] data, ZoneClientSession zoneSession, PlayerRuntimeState state,
         CancellationToken cancellationToken);
 
     /// <summary>
@@ -174,7 +176,8 @@ public interface IGmBasicCommandService
     ///     sends the shared generic acknowledgment carrying the default-failure outcome, regardless of input, no
     ///     mutation of any kind.
     /// </summary>
-    ValueTask HandleTribeBankAsync(byte[] data, ZoneClientSession zoneSession, CancellationToken cancellationToken);
+    public ValueTask HandleTribeBankAsync(byte[] data, ZoneClientSession zoneSession,
+        CancellationToken cancellationToken);
 
     /// <summary>
     ///     LEVEL (521) -- self-only total-level set, decomposed into base level (up to 145) / "high level" (a
@@ -198,7 +201,8 @@ public interface IGmBasicCommandService
     ///         per the contract.
     ///     </para>
     /// </summary>
-    ValueTask HandleLevelSetAsync(byte[] data, ZoneClientSession zoneSession, PlayerRuntimeState state, Zone zone,
+    public ValueTask HandleLevelSetAsync(byte[] data, ZoneClientSession zoneSession, PlayerRuntimeState state,
+        Zone zone,
         CancellationToken cancellationToken);
 
     /// <summary>
@@ -206,5 +210,6 @@ public interface IGmBasicCommandService
     ///     remarks. Always sends the shared generic acknowledgment carrying the default-failure outcome,
     ///     regardless of input, no mutation of any kind.
     /// </summary>
-    ValueTask HandleStatEditAsync(byte[] data, ZoneClientSession zoneSession, CancellationToken cancellationToken);
+    public ValueTask HandleStatEditAsync(byte[] data, ZoneClientSession zoneSession,
+        CancellationToken cancellationToken);
 }

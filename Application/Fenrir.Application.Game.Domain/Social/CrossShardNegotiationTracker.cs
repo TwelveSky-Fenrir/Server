@@ -6,7 +6,9 @@ namespace Fenrir.Application.Game.Domain.Social;
 ///     the moment the Ask is handed to <c>ISocialCrossShardRelayQueue</c> until the matching Answer is
 ///     delivered back (<see cref="CrossShardNegotiationTracker.TryConsumeOutbound" />) or the asker cancels.
 /// </summary>
-public readonly record struct CrossShardOutboundAsk(byte TargetShardId, int TargetCharacterId,
+public readonly record struct CrossShardOutboundAsk(
+    byte TargetShardId,
+    int TargetCharacterId,
     string TargetAvatarName);
 
 /// <summary>
@@ -19,7 +21,10 @@ public readonly record struct CrossShardOutboundAsk(byte TargetShardId, int Targ
 ///     since an asker can only ever have one outstanding ask at a time, same invariant every one of the six
 ///     negotiation registries' own same-shard <c>IsNegotiating</c>/<c>IsBusy</c> gate already enforces).
 /// </summary>
-public readonly record struct CrossShardInboundAsk(long RelayId, byte SourceShardId, int SourceCharacterId,
+public readonly record struct CrossShardInboundAsk(
+    long RelayId,
+    byte SourceShardId,
+    int SourceCharacterId,
     string SourceAvatarName);
 
 /// <summary>
@@ -42,8 +47,8 @@ public readonly record struct CrossShardInboundAsk(long RelayId, byte SourceShar
 /// </summary>
 public sealed class CrossShardNegotiationTracker
 {
-    private readonly Lock _lock = new();
     private readonly Dictionary<int, CrossShardInboundAsk> _inboundByTarget = new();
+    private readonly Lock _lock = new();
     private readonly Dictionary<int, CrossShardOutboundAsk> _outboundByAsker = new();
 
     /// <summary>True if <paramref name="characterId" /> is either side of a still-open cross-shard ask.</summary>

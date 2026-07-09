@@ -12,7 +12,7 @@
 -- Throws 50336 on an unknown character or an adjustment that would take Zone241Time negative. Returns the
 -- post-adjustment value so a caller can mirror it to the client without a second round trip.
 CREATE PROCEDURE game.usp_Character_AdjustZone241Time @CharacterId INT,
-                                                       @Delta INT
+                                                      @Delta INT
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -24,7 +24,7 @@ BEGIN
                       );
 
     UPDATE game.Characters
-    SET Zone241Time = Zone241Time + @Delta,
+    SET Zone241Time  = Zone241Time + @Delta,
         UpdatedAtUtc = SYSUTCDATETIME()
     OUTPUT INSERTED.Zone241Time INTO @Adjusted
     WHERE CharacterId = @CharacterId

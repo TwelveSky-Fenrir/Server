@@ -6,15 +6,15 @@
 -- feature's sibling single-row hot-path procs (usp_GuildTribeBroadcastRelay_Publish,
 -- usp_GameServer_Heartbeat, usp_CharacterShardLocation_Upsert).
 CREATE PROCEDURE runtime.usp_SocialCrossShardRelay_Publish @Kind TINYINT,
-                                                            @MessageType TINYINT,
-                                                            @Accepted BIT NULL,
-                                                            @ReasonCode TINYINT NULL,
-                                                            @SourceShardId TINYINT,
-                                                            @SourceCharacterId INT,
-                                                            @SourceAvatarName NVARCHAR(13),
-                                                            @TargetShardId TINYINT,
-                                                            @TargetCharacterId INT,
-                                                            @AskRelayId BIGINT NULL
+                                                           @MessageType TINYINT,
+                                                           @Accepted BIT NULL,
+                                                           @ReasonCode TINYINT NULL,
+                                                           @SourceShardId TINYINT,
+                                                           @SourceCharacterId INT,
+                                                           @SourceAvatarName NVARCHAR(13),
+                                                           @TargetShardId TINYINT,
+                                                           @TargetCharacterId INT,
+                                                           @AskRelayId BIGINT NULL
     WITH NATIVE_COMPILATION , SCHEMABINDING
 AS
 BEGIN

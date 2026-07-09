@@ -44,7 +44,7 @@ public class GuildInfoBroadcasterAllocationTests
             var (session, pipe) = ZoneTestKit.CreateSession(characterId);
             pipes.Add(pipe);
             zone.Post(ZoneCommand.Enter(characterId,
-                ZoneTestKit.EnterData(session, 1, $"P{characterId}", 100f + i * 3f, 0f, 100f)));
+                ZoneTestKit.EnterData(session, 1, $"P{characterId}", 100f + i * 3f)));
         }
 
         zone.Tick(TimeSpan.FromMilliseconds(50));

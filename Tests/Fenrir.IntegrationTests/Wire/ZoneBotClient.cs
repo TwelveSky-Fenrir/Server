@@ -3,8 +3,8 @@ using System.Collections.Concurrent;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Compression;
 using Fenrir.Network.Serialization.Shared.Packets.Shared;
-using Fenrir.Network.Serialization.Zone.Packets.Zone;
 using Fenrir.Network.Serialization.Wire;
+using Fenrir.Network.Serialization.Zone.Packets.Zone;
 using K4os.Compression.LZ4;
 
 namespace Fenrir.IntegrationTests.Wire;

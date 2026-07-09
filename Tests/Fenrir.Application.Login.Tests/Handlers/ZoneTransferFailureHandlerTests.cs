@@ -1,10 +1,8 @@
 using Fenrir.Application.Login.Handlers.Handlers;
 using Fenrir.Application.Login.Tests.TestSupport;
 using Fenrir.Network.Dispatch.Login.Sessions;
-using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Login.Packets.Login;
 using Fenrir.Network.Serialization.Login.Wire;
-using Fenrir.Network.Serialization.Wire;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Login.Tests.Handlers;

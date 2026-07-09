@@ -1,5 +1,3 @@
-using Fenrir.Application.Game.Domain.Social;
-
 namespace Fenrir.Application.Game.Domain.Social.Trade;
 
 /// <summary>Soft outcomes of CZ_TRADE_ASK_SEND -- mirrors ZC_TRADE_ANSWER_RECV's pre-check codes.</summary>

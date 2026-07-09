@@ -2,7 +2,6 @@ using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Social;
 using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Data.Abstractions.Runtime;
 using Fenrir.Network.Serialization.Zone.Packets.Zone;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -42,7 +41,7 @@ public sealed class PartyCrossShardRelayHandler(
     {
         if (!zones.TryGetPlayer(ask.TargetCharacterId, out var target))
         {
-            PublishDecline(ask, reasonCode: 4);
+            PublishDecline(ask, 4);
             return ValueTask.CompletedTask;
         }
 
@@ -56,7 +55,7 @@ public sealed class PartyCrossShardRelayHandler(
             // code, but that distinction is not reconstructable here without a second local lookup this
             // registry does not expose; busy (5) is the closer of the two same-shard codes for an already
             // occupied target.
-            PublishDecline(ask, reasonCode: 5);
+            PublishDecline(ask, 5);
             return ValueTask.CompletedTask;
         }
 

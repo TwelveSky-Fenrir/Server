@@ -26,11 +26,13 @@ namespace Fenrir.Network.Serialization.Shared.Packets.Shared;
 ///     </para>
 /// </summary>
 [FenrirWireType(4)]
-public readonly partial record struct GmTribeChangePayload : IFenrirWireType<GmTribeChangePayload>
+public readonly record struct GmTribeChangePayload : IFenrirWireType<GmTribeChangePayload>
 {
-    /// <summary>Tribe selector. Valid range [0, 3] -- 3 is a distinct special case (only the current tribe is
-    /// set to 3; the previous-tribe marker is left untouched). A value equal to the character's current tribe,
-    /// or outside [0, 3], is silently dropped with no mutation, no disconnect, and no acknowledgment of any
-    /// kind. Validated by the caller, not here.</summary>
+    /// <summary>
+    ///     Tribe selector. Valid range [0, 3] -- 3 is a distinct special case (only the current tribe is
+    ///     set to 3; the previous-tribe marker is left untouched). A value equal to the character's current tribe,
+    ///     or outside [0, 3], is silently dropped with no mutation, no disconnect, and no acknowledgment of any
+    ///     kind. Validated by the caller, not here.
+    /// </summary>
     public required int Tribe { get; init; }
 }

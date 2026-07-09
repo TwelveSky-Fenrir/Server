@@ -19,6 +19,6 @@ namespace Fenrir.Application.Game.Abstractions.Gm;
 public interface IGmFfaEventStartService
 {
     /// <summary><paramref name="data" /> is the raw, unmodified 130-byte tData blob to echo back verbatim.</summary>
-    ValueTask HandleAsync(GmFfaEventStartPayload packet, byte[] data, ZoneClientSession zoneSession,
+    public ValueTask HandleAsync(GmFfaEventStartPayload packet, byte[] data, ZoneClientSession zoneSession,
         CancellationToken cancellationToken);
 }

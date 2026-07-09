@@ -3,7 +3,6 @@ using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Social;
 using Fenrir.Application.Game.Domain.Social.Duel;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Data.Abstractions.Runtime;
 using Fenrir.Network.Serialization.Zone.Packets.Zone;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -123,71 +122,6 @@ public sealed class DuelService(
         }
     }
 
-    /// <summary>
-    ///     WS1.4 same-shard-miss, ASK-PUBLISH-ONLY fallback -- see this class's own remarks for why no
-    ///     target-side delivery exists yet. The inter-tribe-allowed determination only ever depends on the
-    ///     CHALLENGER's own current map (<see cref="PlayerRuntimeState.MapId" />, same as <see cref="AskAsync" />'s
-    ///     own <c>zone.MapId</c>), so it is still fully evaluable here; the target-already-dueling/target-busy
-    ///     checks are not (no local target state), left for the eventual target-side handler to enforce.
-    /// </summary>
-    private async ValueTask<DuelAskResultKind> AskCrossShardAsync(PlayerRuntimeState challenger,
-        string targetAvatarName, CancellationToken cancellationToken)
-    {
-        var remote = await characterShardLocations.FindByNameAsync(targetAvatarName, cancellationToken)
-            .ConfigureAwait(false);
-
-        if (remote is null)
-        {
-            logger.LogInformation(
-                "Duel ask rejected: challenger {ChallengerId} named target avatar {TargetAvatarName}, not found on any shard",
-                challenger.CharacterId, targetAvatarName);
-            return DuelAskResultKind.TargetNotFound;
-        }
-
-        var interTribeAllowed = challenger.MapId is 37 or 119 or 124;
-        if (!interTribeAllowed && challenger.Tribe != remote.Tribe)
-        {
-            logger.LogInformation(
-                "Duel ask rejected and challenger {ChallengerId}'s session will be terminated: cross-tribe duel with cross-shard target {TargetId} not allowed on map {MapId}",
-                challenger.CharacterId, remote.CharacterId, challenger.MapId);
-            return DuelAskResultKind.TribeMismatch;
-        }
-
-        var outcome = duels.TryAskCrossShard(challenger.CharacterId,
-            new CrossShardOutboundAsk(remote.ShardId, remote.CharacterId, remote.AvatarName));
-
-        switch (outcome)
-        {
-            case DuelAskOutcome.ChallengerAlreadyDueling:
-                logger.LogInformation(
-                    "Duel ask rejected and challenger {ChallengerId}'s session will be terminated: challenger is already actively dueling (desynced state, cross-shard registration)",
-                    challenger.CharacterId);
-                return DuelAskResultKind.ChallengerAlreadyDueling;
-            case DuelAskOutcome.Sent:
-                crossShardRelay.Enqueue(new SocialCrossShardRelayEntry(
-                    SocialCrossShardRelayKind.Duel,
-                    SocialCrossShardRelayMessageType.Ask,
-                    null,
-                    null,
-                    options.Value.ShardId,
-                    challenger.CharacterId,
-                    challenger.Name,
-                    remote.ShardId,
-                    remote.CharacterId,
-                    null));
-
-                logger.LogInformation(
-                    "Duel challenge published cross-shard: challenger {ChallengerId} -> target {TargetCharacterId} on shard {TargetShardId} (never delivered today -- see DuelService's own remarks)",
-                    challenger.CharacterId, remote.CharacterId, remote.ShardId);
-                return DuelAskResultKind.SentCrossShard;
-            default:
-                logger.LogInformation(
-                    "Duel ask rejected: challenger {ChallengerId} is already negotiating another duel (cross-shard registration)",
-                    challenger.CharacterId);
-                return DuelAskResultKind.ChallengerBusy;
-        }
-    }
-
     public void Answer(int targetId, int answerCode)
     {
         if (!duels.TryAnswer(targetId, answerCode == 0, out var challengerId))
@@ -271,6 +205,71 @@ public sealed class DuelService(
             RemainTime = duel.RemainingTicks,
             EatDrugState = eatDrugState
         });
+    }
+
+    /// <summary>
+    ///     WS1.4 same-shard-miss, ASK-PUBLISH-ONLY fallback -- see this class's own remarks for why no
+    ///     target-side delivery exists yet. The inter-tribe-allowed determination only ever depends on the
+    ///     CHALLENGER's own current map (<see cref="PlayerRuntimeState.MapId" />, same as <see cref="AskAsync" />'s
+    ///     own <c>zone.MapId</c>), so it is still fully evaluable here; the target-already-dueling/target-busy
+    ///     checks are not (no local target state), left for the eventual target-side handler to enforce.
+    /// </summary>
+    private async ValueTask<DuelAskResultKind> AskCrossShardAsync(PlayerRuntimeState challenger,
+        string targetAvatarName, CancellationToken cancellationToken)
+    {
+        var remote = await characterShardLocations.FindByNameAsync(targetAvatarName, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (remote is null)
+        {
+            logger.LogInformation(
+                "Duel ask rejected: challenger {ChallengerId} named target avatar {TargetAvatarName}, not found on any shard",
+                challenger.CharacterId, targetAvatarName);
+            return DuelAskResultKind.TargetNotFound;
+        }
+
+        var interTribeAllowed = challenger.MapId is 37 or 119 or 124;
+        if (!interTribeAllowed && challenger.Tribe != remote.Tribe)
+        {
+            logger.LogInformation(
+                "Duel ask rejected and challenger {ChallengerId}'s session will be terminated: cross-tribe duel with cross-shard target {TargetId} not allowed on map {MapId}",
+                challenger.CharacterId, remote.CharacterId, challenger.MapId);
+            return DuelAskResultKind.TribeMismatch;
+        }
+
+        var outcome = duels.TryAskCrossShard(challenger.CharacterId,
+            new CrossShardOutboundAsk(remote.ShardId, remote.CharacterId, remote.AvatarName));
+
+        switch (outcome)
+        {
+            case DuelAskOutcome.ChallengerAlreadyDueling:
+                logger.LogInformation(
+                    "Duel ask rejected and challenger {ChallengerId}'s session will be terminated: challenger is already actively dueling (desynced state, cross-shard registration)",
+                    challenger.CharacterId);
+                return DuelAskResultKind.ChallengerAlreadyDueling;
+            case DuelAskOutcome.Sent:
+                crossShardRelay.Enqueue(new SocialCrossShardRelayEntry(
+                    SocialCrossShardRelayKind.Duel,
+                    SocialCrossShardRelayMessageType.Ask,
+                    null,
+                    null,
+                    options.Value.ShardId,
+                    challenger.CharacterId,
+                    challenger.Name,
+                    remote.ShardId,
+                    remote.CharacterId,
+                    null));
+
+                logger.LogInformation(
+                    "Duel challenge published cross-shard: challenger {ChallengerId} -> target {TargetCharacterId} on shard {TargetShardId} (never delivered today -- see DuelService's own remarks)",
+                    challenger.CharacterId, remote.CharacterId, remote.ShardId);
+                return DuelAskResultKind.SentCrossShard;
+            default:
+                logger.LogInformation(
+                    "Duel ask rejected: challenger {ChallengerId} is already negotiating another duel (cross-shard registration)",
+                    challenger.CharacterId);
+                return DuelAskResultKind.ChallengerBusy;
+        }
     }
 
     private static PlayerRuntimeState? FindPlayerByName(Zone zone, string avatarName)

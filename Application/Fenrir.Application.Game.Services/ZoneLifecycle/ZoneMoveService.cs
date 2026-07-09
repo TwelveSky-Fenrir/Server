@@ -10,7 +10,6 @@ using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Dispatch.Zone.Sessions;
 using Fenrir.Network.Serialization.Shared.Packets.Shared;
 using Fenrir.Network.Serialization.Zone.Packets.Zone;
-using Fenrir.Network.Serialization.Wire;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 

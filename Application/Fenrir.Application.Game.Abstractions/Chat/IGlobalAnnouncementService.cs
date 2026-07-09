@@ -1,4 +1,3 @@
-using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Dispatch.Zone.Sessions;
 
 namespace Fenrir.Application.Game.Abstractions.Chat;

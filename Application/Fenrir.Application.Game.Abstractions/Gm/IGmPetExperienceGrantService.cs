@@ -14,6 +14,6 @@ namespace Fenrir.Application.Game.Abstractions.Gm;
 /// </summary>
 public interface IGmPetExperienceGrantService
 {
-    ValueTask HandleAsync(byte[] data, ZoneClientSession zoneSession, PlayerRuntimeState state,
+    public ValueTask HandleAsync(byte[] data, ZoneClientSession zoneSession, PlayerRuntimeState state,
         CancellationToken cancellationToken);
 }

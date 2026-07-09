@@ -9,7 +9,7 @@ namespace Fenrir.Network.Serialization.Zone.Packets.Zone;
 ///     here.
 /// </summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.GuildAction, ExpectedSize = 1397)]
-public readonly partial record struct GuildActionResponse : IOutgoingPacket
+public readonly record struct GuildActionResponse : IOutgoingPacket
 {
     public required int Result { get; init; }
     public required int Sort { get; init; }

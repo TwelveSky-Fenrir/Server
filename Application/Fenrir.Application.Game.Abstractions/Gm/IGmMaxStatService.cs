@@ -13,6 +13,6 @@ namespace Fenrir.Application.Game.Abstractions.Gm;
 /// </summary>
 public interface IGmMaxStatService
 {
-    ValueTask HandleAsync(ZoneClientSession zoneSession, PlayerRuntimeState state, Zone zone,
+    public ValueTask HandleAsync(ZoneClientSession zoneSession, PlayerRuntimeState state, Zone zone,
         CancellationToken cancellationToken);
 }

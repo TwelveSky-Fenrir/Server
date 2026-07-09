@@ -4,8 +4,8 @@ using Fenrir.Network.Dispatch;
 using Fenrir.Network.Dispatch.FloodProtection;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Dispatch.Zone.Sessions;
-using Fenrir.Network.Serialization.Zone.Packets.Zone;
 using Fenrir.Network.Serialization.Wire;
+using Fenrir.Network.Serialization.Zone.Packets.Zone;
 using Fenrir.Network.Tests.Sessions;
 using Fenrir.Network.Tests.TestSupport;
 using Microsoft.Extensions.Logging;
@@ -24,7 +24,8 @@ public sealed class SessionLoopTests
         var pipe = new FakeDuplexPipe();
         var session = InWorldZoneSession(1, pipe);
         var dispatcher = new RecordingFrameDispatcher();
-        var loopTask = SessionLoop.RunAsync(session, dispatcher, ZoneOpcodeRegistry.Provider, null, null, CancellationToken.None);
+        var loopTask = SessionLoop.RunAsync(session, dispatcher, ZoneOpcodeRegistry.Provider, null, null,
+            CancellationToken.None);
 
         var frame = BuildClientFrame(HeartbeatRequest.Opcode, HeartbeatRequest.PayloadSize);
         await pipe.PeerToSession.WriteAsync(frame);
@@ -47,7 +48,8 @@ public sealed class SessionLoopTests
         var pipe = new FakeDuplexPipe();
         var session = InWorldZoneSession(2, pipe);
         var dispatcher = new RecordingFrameDispatcher();
-        var loopTask = SessionLoop.RunAsync(session, dispatcher, ZoneOpcodeRegistry.Provider, null, null, CancellationToken.None);
+        var loopTask = SessionLoop.RunAsync(session, dispatcher, ZoneOpcodeRegistry.Provider, null, null,
+            CancellationToken.None);
 
         var frame = BuildClientFrame(HeartbeatRequest.Opcode, HeartbeatRequest.PayloadSize, 0x40);
 
@@ -78,7 +80,8 @@ public sealed class SessionLoopTests
         var pipe = new FakeDuplexPipe();
         var session = new ZoneClientSession(3, pipe); // Connected, not TicketConsumed
         var dispatcher = new RecordingFrameDispatcher();
-        var loopTask = SessionLoop.RunAsync(session, dispatcher, ZoneOpcodeRegistry.Provider, null, null, CancellationToken.None);
+        var loopTask = SessionLoop.RunAsync(session, dispatcher, ZoneOpcodeRegistry.Provider, null, null,
+            CancellationToken.None);
 
         // EnterWorld is only allowed once TicketConsumed -> illegal here.
         var frame = BuildClientFrame(EnterWorldRequest.Opcode, EnterWorldRequest.PayloadSize);
@@ -96,7 +99,8 @@ public sealed class SessionLoopTests
         var pipe = new FakeDuplexPipe();
         var session = new ZoneClientSession(4, pipe);
         var dispatcher = new RecordingFrameDispatcher();
-        var loopTask = SessionLoop.RunAsync(session, dispatcher, ZoneOpcodeRegistry.Provider, null, null, CancellationToken.None);
+        var loopTask = SessionLoop.RunAsync(session, dispatcher, ZoneOpcodeRegistry.Provider, null, null,
+            CancellationToken.None);
 
         // Opcode 250 is unregistered -> FrameDecoder's ProtocolViolationException must be swallowed here.
         var header = new byte[WireHeaderSizes.ClientPacketSize];
@@ -126,7 +130,8 @@ public sealed class SessionLoopTests
             return ValueTask.CompletedTask;
         }, registry);
         var dispatcher = new RecordingFrameDispatcher();
-        var loopTask = SessionLoop.RunAsync(session, dispatcher, ZoneOpcodeRegistry.Provider, null, floodGuard, CancellationToken.None);
+        var loopTask = SessionLoop.RunAsync(session, dispatcher, ZoneOpcodeRegistry.Provider, null, floodGuard,
+            CancellationToken.None);
 
         var header = new byte[WireHeaderSizes.ClientPacketSize];
         header[8] = 250;
@@ -155,7 +160,8 @@ public sealed class SessionLoopTests
             return ValueTask.CompletedTask;
         }, registry);
         var dispatcher = new RecordingFrameDispatcher();
-        var loopTask = SessionLoop.RunAsync(session, dispatcher, ZoneOpcodeRegistry.Provider, null, floodGuard, CancellationToken.None);
+        var loopTask = SessionLoop.RunAsync(session, dispatcher, ZoneOpcodeRegistry.Provider, null, floodGuard,
+            CancellationToken.None);
 
         var header = new byte[WireHeaderSizes.ClientPacketSize];
         header[8] = 250;
@@ -183,7 +189,8 @@ public sealed class SessionLoopTests
             return ValueTask.CompletedTask;
         }, registry);
         var dispatcher = new RecordingFrameDispatcher();
-        var loopTask = SessionLoop.RunAsync(session, dispatcher, ZoneOpcodeRegistry.Provider, null, floodGuard, CancellationToken.None);
+        var loopTask = SessionLoop.RunAsync(session, dispatcher, ZoneOpcodeRegistry.Provider, null, floodGuard,
+            CancellationToken.None);
 
         var header = new byte[WireHeaderSizes.ClientPacketSize];
         header[8] = 250;
@@ -224,7 +231,8 @@ public sealed class SessionLoopTests
         var pipe = new FakeDuplexPipe();
         var session = InWorldZoneSession(10, pipe);
         var dispatcher = new ThrowingFrameDispatcher(new InvalidOperationException("boom"));
-        var loopTask = SessionLoop.RunAsync(session, dispatcher, ZoneOpcodeRegistry.Provider, null, null, CancellationToken.None);
+        var loopTask = SessionLoop.RunAsync(session, dispatcher, ZoneOpcodeRegistry.Provider, null, null,
+            CancellationToken.None);
 
         var frame = BuildClientFrame(HeartbeatRequest.Opcode, HeartbeatRequest.PayloadSize);
         await pipe.PeerToSession.WriteAsync(frame);
@@ -240,7 +248,8 @@ public sealed class SessionLoopTests
         var pipe = new FakeDuplexPipe();
         var session = new ZoneClientSession(6, pipe);
         var dispatcher = new RecordingFrameDispatcher();
-        var loopTask = SessionLoop.RunAsync(session, dispatcher, ZoneOpcodeRegistry.Provider, null, null, CancellationToken.None);
+        var loopTask = SessionLoop.RunAsync(session, dispatcher, ZoneOpcodeRegistry.Provider, null, null,
+            CancellationToken.None);
 
         await pipe.PeerToSession.CompleteAsync();
 
@@ -263,7 +272,8 @@ public sealed class SessionLoopTests
         var session = InWorldZoneSession(20, pipe);
         var dispatcher = new RecordingFrameDispatcher();
         var logger = new CapturingLogger(LogLevel.Debug);
-        var loopTask = SessionLoop.RunAsync(session, dispatcher, ZoneOpcodeRegistry.Provider, null, null, CancellationToken.None, logger);
+        var loopTask = SessionLoop.RunAsync(session, dispatcher, ZoneOpcodeRegistry.Provider, null, null,
+            CancellationToken.None, logger);
 
         var frame = BuildClientFrame(HeartbeatRequest.Opcode, HeartbeatRequest.PayloadSize);
         await pipe.PeerToSession.WriteAsync(frame);
@@ -294,7 +304,8 @@ public sealed class SessionLoopTests
         var session = InWorldZoneSession(21, pipe);
         var dispatcher = new RecordingFrameDispatcher();
         var logger = new CapturingLogger(LogLevel.Information);
-        var loopTask = SessionLoop.RunAsync(session, dispatcher, ZoneOpcodeRegistry.Provider, null, null, CancellationToken.None, logger);
+        var loopTask = SessionLoop.RunAsync(session, dispatcher, ZoneOpcodeRegistry.Provider, null, null,
+            CancellationToken.None, logger);
 
         var frame = BuildClientFrame(HeartbeatRequest.Opcode, HeartbeatRequest.PayloadSize);
         await pipe.PeerToSession.WriteAsync(frame);

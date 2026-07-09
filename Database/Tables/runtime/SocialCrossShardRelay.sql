@@ -37,18 +37,18 @@
 -- own ZoneRegistry.
 CREATE TABLE runtime.SocialCrossShardRelay
 (
-    RelayId          BIGINT IDENTITY (1,1) NOT NULL,
-    Kind             TINYINT               NOT NULL, -- 0 Party, 1 Friend, 2 Mentor, 3 Duel, 4 Trade, 5 GuildInvite
-    MessageType      TINYINT               NOT NULL, -- 0 Ask, 1 Answer
-    Accepted         BIT                   NULL,      -- Answer rows only
-    ReasonCode       TINYINT               NULL,      -- Answer rows only (decline reason, Fenrir-internal)
-    SourceShardId    TINYINT               NOT NULL,
-    SourceCharacterId INT                  NOT NULL,
-    SourceAvatarName NVARCHAR(13)          NOT NULL,
-    TargetShardId    TINYINT               NOT NULL,
-    TargetCharacterId INT                  NOT NULL,
-    AskRelayId       BIGINT                NULL,      -- Answer rows only: RelayId of the Ask being answered
-    CreatedAtUtc     DATETIME2(3)          NOT NULL,
+    RelayId           BIGINT IDENTITY (1,1) NOT NULL,
+    Kind              TINYINT               NOT NULL, -- 0 Party, 1 Friend, 2 Mentor, 3 Duel, 4 Trade, 5 GuildInvite
+    MessageType       TINYINT               NOT NULL, -- 0 Ask, 1 Answer
+    Accepted          BIT                   NULL,     -- Answer rows only
+    ReasonCode        TINYINT               NULL,     -- Answer rows only (decline reason, Fenrir-internal)
+    SourceShardId     TINYINT               NOT NULL,
+    SourceCharacterId INT                   NOT NULL,
+    SourceAvatarName  NVARCHAR(13)          NOT NULL,
+    TargetShardId     TINYINT               NOT NULL,
+    TargetCharacterId INT                   NOT NULL,
+    AskRelayId        BIGINT                NULL,     -- Answer rows only: RelayId of the Ask being answered
+    CreatedAtUtc      DATETIME2(3)          NOT NULL,
     CONSTRAINT PK_SocialCrossShardRelay PRIMARY KEY NONCLUSTERED (RelayId),
     INDEX IX_SocialCrossShardRelay_Target NONCLUSTERED (TargetShardId, RelayId)
 )

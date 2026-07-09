@@ -21,25 +21,6 @@ namespace Fenrir.Application.Game.Domain.World;
 public sealed partial class Zone
 {
     /// <summary>
-    ///     Reusable scratch buffer for the tribe-progress command's op-23 stat-potion full-avatar-action
-    ///     rebroadcast recipient list (see the <c>FullActionRebroadcast</c> branch of
-    ///     <see cref="ApplyTribeProgressCommand" />) -- replaces a per-call
-    ///     <c>AoiGrid.Neighbors(...).Where(id =&gt; id != characterId).ToArray()</c> LINQ pipeline (iterator +
-    ///     closure + array) with the non-allocating
-    ///     <see cref="AoiGrid.NeighborsExcludingSelf(List{int},ValueTuple{int,int},int,float,float,float,int)" />
-    ///     overload. Single tick thread, cleared before use, consumed entirely before that command's handling
-    ///     returns.
-    /// </summary>
-    private readonly List<int> _statPotionFullActionNeighborScratch = [];
-
-    /// <summary>
-    ///     Reusable scratch buffer for the tribe-progress command's GM "Basic"-tier CALL (tSort 514) relocation
-    ///     notice (see the <c>NeighborActionBroadcast</c> branch of <see cref="ApplyTribeProgressCommand" />) --
-    ///     same non-allocating reuse posture as <see cref="_statPotionFullActionNeighborScratch" />.
-    /// </summary>
-    private readonly List<int> _gmTeleportNeighborScratch = [];
-
-    /// <summary>
     ///     Bounded capacity for <see cref="_guildInbox" /> -- also the basis for <see cref="GuildInboxDrainCapPerTick" />
     ///     .
     /// </summary>
@@ -111,6 +92,13 @@ public sealed partial class Zone
     private const int TribeInboxDrainCapPerTick = TribeInboxCapacity / 2;
 
     /// <summary>
+    ///     Reusable scratch buffer for the tribe-progress command's GM "Basic"-tier CALL (tSort 514) relocation
+    ///     notice (see the <c>NeighborActionBroadcast</c> branch of <see cref="ApplyTribeProgressCommand" />) --
+    ///     same non-allocating reuse posture as <see cref="_statPotionFullActionNeighborScratch" />.
+    /// </summary>
+    private readonly List<int> _gmTeleportNeighborScratch = [];
+
+    /// <summary>
     ///     Already-durably-persisted guild-membership mirrors, posted by <c>GuildActionHandler</c> onto this
     ///     character's own hosting zone, whether the target is the actor or a different guild member.
     /// </summary>
@@ -157,6 +145,18 @@ public sealed partial class Zone
     private readonly Channel<SkillZoneCommand> _skillInbox = Channel.CreateBounded<SkillZoneCommand>(
         new BoundedChannelOptions(SkillInboxCapacity)
             { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+
+    /// <summary>
+    ///     Reusable scratch buffer for the tribe-progress command's op-23 stat-potion full-avatar-action
+    ///     rebroadcast recipient list (see the <c>FullActionRebroadcast</c> branch of
+    ///     <see cref="ApplyTribeProgressCommand" />) -- replaces a per-call
+    ///     <c>AoiGrid.Neighbors(...).Where(id =&gt; id != characterId).ToArray()</c> LINQ pipeline (iterator +
+    ///     closure + array) with the non-allocating
+    ///     <see cref="AoiGrid.NeighborsExcludingSelf(List{int},ValueTuple{int,int},int,float,float,float,int)" />
+    ///     overload. Single tick thread, cleared before use, consumed entirely before that command's handling
+    ///     returns.
+    /// </summary>
+    private readonly List<int> _statPotionFullActionNeighborScratch = [];
 
     /// <summary>
     ///     Already-decided tribe-progress self-mutations posted by <c>TribeActionHandler</c> for the actor's own hosting

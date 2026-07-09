@@ -49,7 +49,11 @@ public class AccountLoginAvatarRosterAfterStarterKitCreationTests
 {
     private const int AccountId = 7;
     private const int ClientVersion = 90354; // LoginServerOptions.ExpectedClientVersion default
-    private const byte WeaponEquipSlot = 7; // CreateAvatarService.WeaponEquipSlot / AvatarInfoFactory.PetEquipSlot's own sibling constant
+
+    private const byte
+        WeaponEquipSlot =
+            7; // CreateAvatarService.WeaponEquipSlot / AvatarInfoFactory.PetEquipSlot's own sibling constant
+
     private const byte ArmorEquipSlot = 2; // CreateAvatarService.ArmorEquipSlot (torso)
     private const byte EquipmentContainer = 2; // AvatarInfoFactory.ContainerEquipment convention
 
@@ -105,13 +109,13 @@ public class AccountLoginAvatarRosterAfterStarterKitCreationTests
         // ICharacterRepository.GetAccountRosterAsync (usp_Character_GetAccountRoster) would on a real
         // reconnect -- deliberately NOT GetForWorldEntryAsync/GetForWorldEntryBundleAsync, the world-entry
         // path this bug never affected.
-        var summary = new CharacterSummaryDto(characterId, Slot: 0, Name: "Hero", Tribe: 0, Gender: 1,
-            HeadType: 2, FaceType: 1, Level: 1);
+        var summary = new CharacterSummaryDto(characterId, 0, "Hero", 0, 1,
+            2, 1, 1);
         var rosterCharacter = new CharacterRosterDto(
-            CharacterId: characterId, Slot: 0, Name: "Hero", Tribe: 0, PreviousTribe: 0, Gender: 1, HeadType: 2,
-            FaceType: 1, Level: 1, Level2: 0, Halo: 0, RebirthCount: 0, ContributionPoints: 0, SkillPoints: 0,
-            EatLifePotion: 0, EatManaPotion: 0, EatStrPotion: 0, EatDexPotion: 0, EatElePotion: 0, PetGrowth: 0,
-            PetActivity: 0, MapId: 1, PosX: 6f, PosY: 0f, PosZ: -7f, Life: 30, Mana: 21);
+            characterId, 0, "Hero", 0, 0, 1, 2,
+            1, 1, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0,
+            0, 1, 6f, 0f, -7f, 30, 21);
 
         var reloginRepository = FakeCharacterRepository.WithSummaries(summary)
             .WithRosterCharacter(rosterCharacter)
@@ -192,10 +196,10 @@ public class AccountLoginAvatarRosterAfterStarterKitCreationTests
     private static LoginHandler CreateLoginHandler(FakeAccountRepository accounts,
         FakeCharacterRepository characters)
     {
-        var gmAllowlistRepository = new FakeGmAllowlistRepository(false);
+        var gmAllowlistRepository = new FakeGmAllowlistRepository();
         var firewall = new ApplicationFirewall(
-            new FakeBlockedIpRepository(false),
-            new FakeFirewallRuleRepository(false),
+            new FakeBlockedIpRepository(),
+            new FakeFirewallRuleRepository(),
             gmAllowlistRepository);
 
         var capacity = new LoginCapacityState();
@@ -211,8 +215,8 @@ public class AccountLoginAvatarRosterAfterStarterKitCreationTests
                 capacity,
                 firewall,
                 gmAllowlistRepository,
-                new FakeBanRepository(false),
-                new FakeMacRestrictionRepository([]),
+                new FakeBanRepository(),
+                new FakeMacRestrictionRepository(),
                 Options.Create(new LoginServerOptions { ExpectedClientVersion = ClientVersion }),
                 new SessionRegistry(),
                 new FakeAccountSessionRepository(),

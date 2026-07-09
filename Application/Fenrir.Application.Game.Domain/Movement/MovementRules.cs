@@ -14,7 +14,10 @@ namespace Fenrir.Application.Game.Domain.Movement;
 ///         <c>ServerDocs/12_ts25zone/04_MyWork02_PartieA.md:150-156</c>). The ONLY position sanity that ever
 ///         existed in that handler is a DISABLED ("# Defense Hack #", entirely commented out at
 ///         <c>S04_MyWork02.cpp:1738-1768</c>) distance check:
-///         <c>fRange = mUTIL.ReturnLengthXYZ(r-&gt;tAction.aLocation, tUserInfo-&gt;mPRE_LOCATION); if (fRange &gt; 666.0f) { ...snap back to mPRE_LOCATION... }</c>
+///         <c>
+///             fRange = mUTIL.ReturnLengthXYZ(r-&gt;tAction.aLocation, tUserInfo-&gt;mPRE_LOCATION); if (fRange &gt;
+///             666.0f) { ...snap back to mPRE_LOCATION... }
+///         </c>
 ///         -- a 3D straight-line distance between the claimed new position and <c>mPRE_LOCATION</c>, compared
 ///         against a flat <c>666.0f</c> ceiling, with NO division by elapsed time (a distance cap, not a
 ///         units/second speed). <c>ReturnLengthXYZ</c> is the full 3-axis distance

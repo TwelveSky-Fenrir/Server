@@ -121,7 +121,8 @@ public class ZoneEventBroadcasterRelayTests
     }
 
     [Fact]
-    public void ApplyRelayedEvent_Sort38_ReplaysTheWorldStateMutation_BroadcastsLocally_AndForcesTheZone038WinnerGuardResummon()
+    public void
+        ApplyRelayedEvent_Sort38_ReplaysTheWorldStateMutation_BroadcastsLocally_AndForcesTheZone038WinnerGuardResummon()
     {
         var cache = CacheWithGuardTemplate();
         var registry = CreateRegistry(cache, TribeGuardSpawner.Zone038MapId);

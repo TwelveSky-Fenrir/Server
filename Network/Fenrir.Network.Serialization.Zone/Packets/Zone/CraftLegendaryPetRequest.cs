@@ -7,7 +7,7 @@ namespace Fenrir.Network.Serialization.Zone.Packets.Zone;
 // Only Sort==2 is reachable (guarded by an early Quit()); cases 0/1/3 are dead code.
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.CraftLegendaryPet, ExpectedSize = 45,
     AllowedStates = [(byte)ZoneSessionState.Registering, (byte)ZoneSessionState.InWorld])]
-public readonly partial record struct CraftLegendaryPetRequest : IIncomingPacket<CraftLegendaryPetRequest>
+public readonly record struct CraftLegendaryPetRequest : IIncomingPacket<CraftLegendaryPetRequest>
 {
     public required int Sort { get; init; }
 

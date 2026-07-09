@@ -284,7 +284,8 @@ public class GmBasicForceKillMonsterServiceTests
     }
 
     [Fact]
-    public async Task HandleForceKillMonsterAsync_CallerNotBasicTier_AbortsWithNoReply_LogsNothing_AndLeavesMonsterAlive()
+    public async Task
+        HandleForceKillMonsterAsync_CallerNotBasicTier_AbortsWithNoReply_LogsNothing_AndLeavesMonsterAlive()
     {
         var (registry, zone) = GmBasicTestSupport.CreateWorld();
         SpawnMonster(zone, MonsterServerIndex, 500);
@@ -575,7 +576,8 @@ public class GmBasicFindServiceTests
     [Theory]
     [InlineData("NobodyHome")]
     [InlineData("TheGm")] // self-targeting collapses to not-found (SearchAvatar's own default exclusion)
-    public async Task HandleFindAsync_TargetNotFoundOrSelf_ReportsZeroFilledGmData_ButStillAcksSuccess(string targetName)
+    public async Task HandleFindAsync_TargetNotFoundOrSelf_ReportsZeroFilledGmData_ButStillAcksSuccess(
+        string targetName)
     {
         var (registry, zone) = GmBasicTestSupport.CreateWorld();
         var (session, pipe, state) = GmBasicTestSupport.Enter(zone, CallerId, "TheGm", 1);
@@ -670,7 +672,8 @@ public class GmBasicCallServiceTests
     }
 
     [Fact]
-    public async Task HandleCallAsync_TargetFound_TeleportsTargetToCaller_SendsTargetCoordinateResponse_LogsAuditRow_AndAcksCaller()
+    public async Task
+        HandleCallAsync_TargetFound_TeleportsTargetToCaller_SendsTargetCoordinateResponse_LogsAuditRow_AndAcksCaller()
     {
         var (registry, zone) = GmBasicTestSupport.CreateWorld();
         var (caller, callerPipe, callerState) = GmBasicTestSupport.Enter(zone, CallerId, "TheGm", 1);
@@ -695,7 +698,8 @@ public class GmBasicCallServiceTests
 
         // Target isn't its own AOI neighbor, so its own pipe carries exactly this one dedicated frame.
         await PacketAssert.AssertSentAsync(targetPipe,
-            new GmCommandResponse { Sort = GmDataTag, GmData = GmBasicTestSupport.PackedCoordinateGmData(555f, 2f, 777f) });
+            new GmCommandResponse
+                { Sort = GmDataTag, GmData = GmBasicTestSupport.PackedCoordinateGmData(555f, 2f, 777f) });
         // The caller may also be a now-co-located AOI neighbor of the relocated target, so tolerate a
         // preceding BroadcastAvatarAction frame ahead of this ack (NeighborActionBroadcast, see
         // TribeProgressZoneCommand.NeighborActionBroadcast's own remarks).
@@ -746,7 +750,8 @@ public class GmBasicMoveToTargetServiceTests
     [Theory]
     [InlineData("NobodyHome")]
     [InlineData("TheGm")]
-    public async Task HandleMoveToTargetAsync_TargetNotFoundOrSelf_AcksFailure_AndLeavesPositionUnchanged(string targetName)
+    public async Task HandleMoveToTargetAsync_TargetNotFoundOrSelf_AcksFailure_AndLeavesPositionUnchanged(
+        string targetName)
     {
         var (registry, zone) = GmBasicTestSupport.CreateWorld();
         var (session, pipe, state) = GmBasicTestSupport.Enter(zone, CallerId, "TheGm", 1);
@@ -764,7 +769,8 @@ public class GmBasicMoveToTargetServiceTests
     }
 
     [Fact]
-    public async Task HandleMoveToTargetAsync_TargetFound_WarpsCallerToTarget_SendsCoordinateResponseThenAck_NoBroadcast()
+    public async Task
+        HandleMoveToTargetAsync_TargetFound_WarpsCallerToTarget_SendsCoordinateResponseThenAck_NoBroadcast()
     {
         var (registry, zone) = GmBasicTestSupport.CreateWorld();
         var (caller, callerPipe, callerState) = GmBasicTestSupport.Enter(zone, CallerId, "TheGm", 1);
@@ -786,7 +792,8 @@ public class GmBasicMoveToTargetServiceTests
         Assert.Equal(222f, callerState.PosZ);
 
         await GmBasicTestSupport.AssertExactSequenceAsync(callerPipe,
-            new GmCommandResponse { Sort = GmDataTag, GmData = GmBasicTestSupport.PackedCoordinateGmData(111f, 3f, 222f) },
+            new GmCommandResponse
+                { Sort = GmDataTag, GmData = GmBasicTestSupport.PackedCoordinateGmData(111f, 3f, 222f) },
             new GenericActionResponse { Result = 0, Sort = Sort, Data = data, RuneValue = 0 });
         // "no such broadcast is issued for that sibling command" -- unlike CALL's NeighborActionBroadcast.
         PacketAssert.AssertNothingSent(targetPipe);
@@ -1066,8 +1073,8 @@ public class GmBasicLevelSetServiceTests
     {
         var levelsByLevel = new Dictionary<short, LevelRowDto>
         {
-            [BaseLevelRow] = new LevelRowDto(BaseLevelRow, 12345, 54321, 0, 0, 0, 0, 0, 0, 0, 0),
-            [CapLevelRow] = new LevelRowDto(CapLevelRow, 90000, 99999, 0, 0, 0, 0, 0, 0, 0, 0)
+            [BaseLevelRow] = new(BaseLevelRow, 12345, 54321, 0, 0, 0, 0, 0, 0, 0, 0),
+            [CapLevelRow] = new(CapLevelRow, 90000, 99999, 0, 0, 0, 0, 0, 0, 0, 0)
         }.ToFrozenDictionary();
         return ZoneTestKit.EmptyWorldData(levelsByLevel: levelsByLevel);
     }

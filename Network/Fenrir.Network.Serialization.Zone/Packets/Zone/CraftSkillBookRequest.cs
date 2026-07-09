@@ -7,7 +7,7 @@ namespace Fenrir.Network.Serialization.Zone.Packets.Zone;
 // Sort 3 (War God recipe) is live in EU33, not the dead Quit-only branch.
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.CraftSkillBook, ExpectedSize = 45,
     AllowedStates = [(byte)ZoneSessionState.Registering, (byte)ZoneSessionState.InWorld])]
-public readonly partial record struct CraftSkillBookRequest : IIncomingPacket<CraftSkillBookRequest>
+public readonly record struct CraftSkillBookRequest : IIncomingPacket<CraftSkillBookRequest>
 {
     public required int Sort { get; init; }
 

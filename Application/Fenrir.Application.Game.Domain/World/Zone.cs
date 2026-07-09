@@ -14,7 +14,6 @@ using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Data.WriteBehind;
-using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Dispatch.Zone.Sessions;
 using Microsoft.Extensions.Logging;
 
@@ -127,6 +126,17 @@ public sealed partial class Zone(
     private readonly KeyValuePair<string, object?> _mapTag = ZoneTickMetrics.MapTag(mapId);
 
     /// <summary>
+    ///     Reusable scratch buffer backing <see cref="NeighborsOfPosition" />'s result -- <see cref="MonsterAiSystem" />
+    ///     is a single DI singleton shared across every zone this process ticks (see that class's own remarks),
+    ///     so it cannot safely own this buffer itself; only <see cref="Zone" /> is guaranteed confined to a
+    ///     single tick thread. Repopulated fresh on every <see cref="NeighborsOfPosition" /> call and valid only
+    ///     until the next one -- <see cref="Monsters.MonsterAiSystem.TryAcquireTarget" />, the sole caller,
+    ///     fully consumes it in its own immediately-following <c>foreach</c> before returning, so no reentrant
+    ///     use can observe a half-built or already-cleared buffer.
+    /// </summary>
+    private readonly List<int> _monsterAiNeighborScratch = [];
+
+    /// <summary>
     ///     Process-wide party authority (team-stun's exact-5-member gate, <see cref="ApplyStunAttack" />) --
     ///     defaults to a private instance in tests so each test zone starts with a clean, empty party roster.
     /// </summary>
@@ -200,17 +210,6 @@ public sealed partial class Zone(
     {
         return _players.TryGetValue(characterId, out state);
     }
-
-    /// <summary>
-    ///     Reusable scratch buffer backing <see cref="NeighborsOfPosition" />'s result -- <see cref="MonsterAiSystem" />
-    ///     is a single DI singleton shared across every zone this process ticks (see that class's own remarks),
-    ///     so it cannot safely own this buffer itself; only <see cref="Zone" /> is guaranteed confined to a
-    ///     single tick thread. Repopulated fresh on every <see cref="NeighborsOfPosition" /> call and valid only
-    ///     until the next one -- <see cref="Monsters.MonsterAiSystem.TryAcquireTarget" />, the sole caller,
-    ///     fully consumes it in its own immediately-following <c>foreach</c> before returning, so no reentrant
-    ///     use can observe a half-built or already-cleared buffer.
-    /// </summary>
-    private readonly List<int> _monsterAiNeighborScratch = [];
 
     /// <summary>
     ///     Tick-thread-only: <see cref="_grid" /> itself is not thread-safe. Deliberately coarse-only (no

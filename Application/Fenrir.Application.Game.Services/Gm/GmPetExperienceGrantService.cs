@@ -49,7 +49,8 @@ namespace Fenrir.Application.Game.Services.Gm;
 ///     similar-looking-but-distinct sibling function, which this project's own engineering rules forbid.
 ///     Porting a fabricated mapping or formula would silently ship wrong per-pet growth amounts (and a
 ///     fabricated "pet activation" state transition -- Fenrir has no modeled boolean pet-active/inactive
-///     state anywhere yet, only the decayable <see cref="Fenrir.Application.Game.Domain.World.PlayerRuntimeState.PetActivity" />
+///     state anywhere yet, only the decayable
+///     <see cref="Fenrir.Application.Game.Domain.World.PlayerRuntimeState.PetActivity" />
 ///     meter, a different concept) rather than a wire-format or gating defect. Every request that finds an
 ///     eligible pet therefore still reports the accepted result code and echoes the equipped item's real
 ///     catalog id in PetId (both confirmed, cited behaviors), but never actually grants any experience,

@@ -1,5 +1,3 @@
-using Fenrir.Application.Game.Domain.Social;
-
 namespace Fenrir.Application.Game.Domain.Social.Friends;
 
 /// <summary>Soft outcomes of CZ_FRIEND_ASK_SEND -- mirrors ZC_FRIEND_ANSWER_RECV's pre-check codes.</summary>

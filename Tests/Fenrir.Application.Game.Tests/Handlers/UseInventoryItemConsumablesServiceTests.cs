@@ -8,7 +8,6 @@ using Fenrir.Application.Game.Services.ZoneLifecycle;
 using Fenrir.Application.Game.Stats;
 using Fenrir.Application.Game.Tests.GameData;
 using Fenrir.Application.Game.Tests.TestSupport;
-using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Dispatch.Zone.Sessions;
 using Fenrir.Network.Serialization.Zone.Packets.Zone;
 using Microsoft.Extensions.Logging.Abstractions;

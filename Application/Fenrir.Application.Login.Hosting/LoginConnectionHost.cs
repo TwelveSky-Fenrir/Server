@@ -12,7 +12,6 @@ using Fenrir.Network.Dispatch.RateLimiting;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Login.Packets.Login;
 using Fenrir.Network.Serialization.Login.Wire;
-using Fenrir.Network.Serialization.Wire;
 using Fenrir.Network.Transport;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;

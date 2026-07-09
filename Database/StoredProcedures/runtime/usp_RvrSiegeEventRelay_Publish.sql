@@ -3,9 +3,9 @@
 -- remarks for that boundary). Single-row INSERT, no dependencies -- natively compiled like this feature's
 -- sibling single-row hot-path procs (usp_GuildTribeBroadcastRelay_Publish/usp_ProxyShopExpirationRelay_Publish).
 CREATE PROCEDURE runtime.usp_RvrSiegeEventRelay_Publish @SourceShardId TINYINT,
-                                                          @Sort INT,
-                                                          @Data VARBINARY(130)
-    WITH NATIVE_COMPILATION, SCHEMABINDING
+                                                        @Sort INT,
+                                                        @Data VARBINARY(130)
+    WITH NATIVE_COMPILATION , SCHEMABINDING
 AS
 BEGIN
     ATOMIC

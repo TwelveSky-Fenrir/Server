@@ -64,6 +64,7 @@ public sealed class LoginService(
 {
     // Legacy tResult codes actually producible by Fenrir's flows (S04_MyWork02.cpp W_LOGIN_SEND / S08_MyDB Login):
     private const int ResultMaintenance = 1; // MyGame::mMaxPlayerNum == 0 (S04_MyWork02.cpp:149-154)
+
     // MyDB::CheckGMIP/CheckBanIP (S04_MyWork02.cpp:195-215), and -- the one Fenrir's GM-IP-allowlist gate
     // below actually mirrors -- the GM-IP gate inside MyDB::Login itself (S08_MyDB.cpp:339-356), which runs
     // strictly before the password comparison.

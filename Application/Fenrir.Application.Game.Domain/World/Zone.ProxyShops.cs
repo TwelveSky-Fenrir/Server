@@ -12,30 +12,6 @@ namespace Fenrir.Application.Game.Domain.World;
 
 public sealed partial class Zone
 {
-    // CharacterIds force-closed by this tick's expiry check, awaiting their durable ShopState=0 write.
-    // Tick must stay fully synchronous, so the write is deferred to ProxyShopExpiryFlushHost -- same posture
-    // as _pendingMoneyGrants/MonsterLootFlushHost.
-    private readonly ConcurrentQueue<int> _pendingProxyShopCloses = new();
-
-    // Keyed by CharacterId (also this shop's wire ServerIndex -- see ProxyShopBroadcastEntry's remarks).
-    // A ConcurrentDictionary, not tick-owned-only: OpenShopStallService/CloseShopStallService register/remove
-    // whole entries directly from a handler thread (never mutate an existing entry's fields), while only this
-    // zone's own tick ever reads the table or writes LastBroadcastAt -- same split-ownership posture as _monsters.
-    private readonly ConcurrentDictionary<int, ProxyShopBroadcastEntry> _proxyShops = new();
-
-    /// <summary>
-    ///     Reusable scratch buffer for <see cref="BroadcastProxyShopState" />'s recipient list -- replaces a
-    ///     per-call <c>AoiGrid.Neighbors(...).ToArray()</c> LINQ buffer with the non-allocating
-    ///     <see cref="AoiGrid.Neighbors(List{int},ValueTuple{int,int},float,float,float,int)" /> overload, the
-    ///     same shape <see cref="BroadcastMonsterAction" />/<see cref="BroadcastGroundItemAction" /> already use
-    ///     for this exact "keep-alive/despawn broadcast" pattern. <see cref="AoiGrid.HasAnyNeighbor" /> still
-    ///     pre-checks emptiness before paying for this scan. Single tick thread, cleared before use, consumed
-    ///     entirely by the immediately-following send loop before <see cref="BroadcastProxyShopState" /> returns.
-    /// </summary>
-    private readonly List<int> _proxyShopNeighborScratch = [];
-
-    public int ProxyShopCount => _proxyShops.Count;
-
     /// <summary>
     ///     <c>MAX_PROXY_SHOP_NUM</c> -- the global ceiling on simultaneously open proxy/deputy shops.
     ///     Server/Header/Protocol/DEFINE.h:369 defines it as 500; the legacy scan/reject that enforces it
@@ -56,6 +32,30 @@ public sealed partial class Zone
     ///     server-37-only allowlist, see <see cref="ProxyShopZonePolicy" />'s own remarks.
     /// </remarks>
     public const int MaxProxyShopSlots = 500;
+
+    // CharacterIds force-closed by this tick's expiry check, awaiting their durable ShopState=0 write.
+    // Tick must stay fully synchronous, so the write is deferred to ProxyShopExpiryFlushHost -- same posture
+    // as _pendingMoneyGrants/MonsterLootFlushHost.
+    private readonly ConcurrentQueue<int> _pendingProxyShopCloses = new();
+
+    /// <summary>
+    ///     Reusable scratch buffer for <see cref="BroadcastProxyShopState" />'s recipient list -- replaces a
+    ///     per-call <c>AoiGrid.Neighbors(...).ToArray()</c> LINQ buffer with the non-allocating
+    ///     <see cref="AoiGrid.Neighbors(List{int},ValueTuple{int,int},float,float,float,int)" /> overload, the
+    ///     same shape <see cref="BroadcastMonsterAction" />/<see cref="BroadcastGroundItemAction" /> already use
+    ///     for this exact "keep-alive/despawn broadcast" pattern. <see cref="AoiGrid.HasAnyNeighbor" /> still
+    ///     pre-checks emptiness before paying for this scan. Single tick thread, cleared before use, consumed
+    ///     entirely by the immediately-following send loop before <see cref="BroadcastProxyShopState" /> returns.
+    /// </summary>
+    private readonly List<int> _proxyShopNeighborScratch = [];
+
+    // Keyed by CharacterId (also this shop's wire ServerIndex -- see ProxyShopBroadcastEntry's remarks).
+    // A ConcurrentDictionary, not tick-owned-only: OpenShopStallService/CloseShopStallService register/remove
+    // whole entries directly from a handler thread (never mutate an existing entry's fields), while only this
+    // zone's own tick ever reads the table or writes LastBroadcastAt -- same split-ownership posture as _monsters.
+    private readonly ConcurrentDictionary<int, ProxyShopBroadcastEntry> _proxyShops = new();
+
+    public int ProxyShopCount => _proxyShops.Count;
 
     /// <summary>
     ///     Registers (or fully replaces) the periodic-broadcast entry for a newly opened or re-opened proxy

@@ -11,5 +11,5 @@ namespace Fenrir.Network.Abstractions;
 /// </summary>
 public interface IOpcodeFrameSizeProvider
 {
-    bool TryGetFrameSize(byte opcode, out int frameSize);
+    public bool TryGetFrameSize(byte opcode, out int frameSize);
 }

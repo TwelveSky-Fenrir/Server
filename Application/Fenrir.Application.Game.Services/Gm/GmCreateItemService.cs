@@ -1,11 +1,9 @@
-using System.Collections.Immutable;
 using Fenrir.Application.Game.Abstractions.Gm;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.Loot;
 using Fenrir.Application.Game.GameData;
-using Fenrir.Data.Abstractions.Game;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Dispatch.Zone.Sessions;
 using Fenrir.Network.Serialization.Shared.Packets.Shared;
@@ -83,7 +81,10 @@ public sealed class GmCreateItemService(
     IEventLogRepository eventLog,
     ILogger<GmCreateItemService> logger) : IGmCreateItemService
 {
-    /// <summary>Legacy tResult's own default-initialized/rejected value (same convention as GmBlockAvatarService's ResultTargetNotFound).</summary>
+    /// <summary>
+    ///     Legacy tResult's own default-initialized/rejected value (same convention as GmBlockAvatarService's
+    ///     ResultTargetNotFound).
+    /// </summary>
     private const int RejectedResult = 1;
 
     /// <summary>
@@ -160,7 +161,8 @@ public sealed class GmCreateItemService(
             logger.LogInformation(
                 "Character {CharacterId} spawn-item rejected: item {ItemId} out of range or not in the catalog (sort {Sort})",
                 zoneSession.CharacterId, itemId, sort);
-            zoneSession.Send(new GenericActionResponse { Result = RejectedResult, Sort = sort, Data = data, RuneValue = 0 });
+            zoneSession.Send(new GenericActionResponse
+                { Result = RejectedResult, Sort = sort, Data = data, RuneValue = 0 });
             return;
         }
 

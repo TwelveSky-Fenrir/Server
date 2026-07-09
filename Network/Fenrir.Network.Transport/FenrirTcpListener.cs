@@ -11,9 +11,9 @@ namespace Fenrir.Network.Transport;
 public sealed class FenrirTcpListener<TSession> : IAsyncDisposable
 {
     private const int Backlog = 512;
+    private readonly Socket _listenSocket;
 
     private readonly ILogger? _logger;
-    private readonly Socket _listenSocket;
     private readonly Func<long, IDuplexPipe, IPEndPoint?, TSession> _sessionFactory;
     private long _nextSessionId;
 

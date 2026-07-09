@@ -37,8 +37,8 @@ public class MonsterAttackDamageTableTests
     {
         var zone = ZoneTestKit.CreateZone(1);
         var template = WorldDataTestRows.Monster(600) with { Life = life };
-        monster = MonsterEntity.Create(serverIndex, (uint)serverIndex, template, spawnSlotId: 1,
-            homeX: 0, homeY: 0, homeZ: 0, leashRadius: 50);
+        monster = MonsterEntity.Create(serverIndex, (uint)serverIndex, template, 1,
+            0, 0, 0, 50);
         zone.SpawnMonster(monster);
         return zone;
     }
@@ -60,7 +60,7 @@ public class MonsterAttackDamageTableTests
         // A's hits but less than A's true running total (8, between 5 and 10). If accrual were a last-write
         // overwrite instead of a sum, A's tracked value would read back as 5 (its last hit only) and B (8)
         // would incorrectly outrank it -- this discriminates the two implementations.
-        var zone = CreateZoneWithManualMonster(1, life: 1000, out var monster);
+        var zone = CreateZoneWithManualMonster(1, 1000, out var monster);
         EnterCharacter(zone, 10, "A");
         EnterCharacter(zone, 11, "B");
         zone.Tick(SimulationClock.LegacyTick); // drains both Enters
@@ -184,7 +184,7 @@ public class MonsterAttackDamageTableTests
         // deliberately the one held back from the #2-#50 fill loop so it lands the write that forces eviction.
         const int fiftyFirstAttackerId = firstAttackerId + 50;
 
-        var zone = CreateZoneWithManualMonster(1, life: 1_000_000, out var monster);
+        var zone = CreateZoneWithManualMonster(1, 1_000_000, out var monster);
 
         for (var i = 0; i < 51; i++)
             EnterCharacter(zone, firstAttackerId + i, $"Attacker{i}");

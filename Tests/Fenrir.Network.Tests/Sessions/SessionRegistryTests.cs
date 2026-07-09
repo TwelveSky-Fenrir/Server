@@ -214,7 +214,8 @@ public class SessionRegistryTests
         registry.Register(session);
         var idleTimeout = TimeSpan.FromSeconds(60);
 
-        var snapshot = registry.SnapshotIdle(idleTimeout, session.LastActivityUtc + idleTimeout + TimeSpan.FromTicks(1));
+        var snapshot =
+            registry.SnapshotIdle(idleTimeout, session.LastActivityUtc + idleTimeout + TimeSpan.FromTicks(1));
 
         Assert.Contains(session, snapshot);
     }
@@ -227,7 +228,8 @@ public class SessionRegistryTests
         registry.Register(session);
         var idleTimeout = TimeSpan.FromSeconds(60);
 
-        var snapshot = registry.SnapshotIdle(idleTimeout, session.LastActivityUtc + idleTimeout - TimeSpan.FromTicks(1));
+        var snapshot =
+            registry.SnapshotIdle(idleTimeout, session.LastActivityUtc + idleTimeout - TimeSpan.FromTicks(1));
 
         Assert.Empty(snapshot);
     }

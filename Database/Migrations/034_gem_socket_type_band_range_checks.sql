@@ -64,16 +64,18 @@
 ALTER TABLE world.GemSockets
     ADD CONSTRAINT CK_GemSockets_TypeBandRules CHECK (
         Value02 = 0
-        OR Type = 0
-        OR (
+            OR Type = 0
+            OR (
             Type BETWEEN 1 AND 46
-            AND (
+                AND (
                 (Type = 1 AND Value02 BETWEEN 1 AND 33 AND Value03 BETWEEN 0 AND 400 AND Value04 BETWEEN 0 AND 400)
-                OR (Type BETWEEN 2 AND 29 AND Value02 BETWEEN 1 AND 100 AND Value03 BETWEEN 0 AND 1000 AND Value04 BETWEEN 0 AND 1000)
-                OR (Type BETWEEN 30 AND 38) -- dead band in legacy source; deliberately left unconstrained, see header
-                OR (Type BETWEEN 39 AND 42 AND Value02 BETWEEN 1 AND 10 AND Value03 >= 1 AND Value04 = 0)
-                OR (Type BETWEEN 43 AND 46 AND Value02 BETWEEN 1 AND 10 AND Value03 >= 6 AND Value04 = 0)
+                    OR (Type BETWEEN 2 AND 29 AND Value02 BETWEEN 1 AND 100 AND Value03 BETWEEN 0 AND 1000 AND
+                        Value04 BETWEEN 0 AND 1000)
+                    OR
+                (Type BETWEEN 30 AND 38) -- dead band in legacy source; deliberately left unconstrained, see header
+                    OR (Type BETWEEN 39 AND 42 AND Value02 BETWEEN 1 AND 10 AND Value03 >= 1 AND Value04 = 0)
+                    OR (Type BETWEEN 43 AND 46 AND Value02 BETWEEN 1 AND 10 AND Value03 >= 6 AND Value04 = 0)
+                )
             )
-        )
-    );
+        );
 GO

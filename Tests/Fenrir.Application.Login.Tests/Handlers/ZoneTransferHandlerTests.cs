@@ -5,10 +5,8 @@ using Fenrir.Application.Login.Tests.TestSupport;
 using Fenrir.Data.Abstractions.Characters;
 using Fenrir.Data.Abstractions.Runtime;
 using Fenrir.Network.Dispatch.Login.Sessions;
-using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Login.Packets.Login;
 using Fenrir.Network.Serialization.Login.Wire;
-using Fenrir.Network.Serialization.Wire;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 

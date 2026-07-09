@@ -16,7 +16,8 @@ using Microsoft.Extensions.Options;
 namespace Fenrir.Application.Game.Tests.Social;
 
 /// <summary>
-///     WS1.4 <see cref="FriendCrossShardRelayHandler" /> -- target-shard delivery (<see cref="ISocialCrossShardRelayHandler.HandleAskAsync" />)
+///     WS1.4 <see cref="FriendCrossShardRelayHandler" /> -- target-shard delivery (
+///     <see cref="ISocialCrossShardRelayHandler.HandleAskAsync" />)
 ///     and asker-shard completion (<see cref="ISocialCrossShardRelayHandler.HandleAnswerAsync" />) for the
 ///     cross-shard half of CZ_FRIEND_ASK_SEND/CZ_FRIEND_ANSWER_SEND.
 /// </summary>
@@ -39,8 +40,10 @@ public class FriendCrossShardRelayHandlerTests
         return (handler, zones, friends, relay);
     }
 
-    /// <summary>Enters a character into map 1 -- the caller's own <see cref="ZoneRegistry" /> must already be
-    /// initialized (once) by <see cref="CreateHandler" />; this never re-initializes it.</summary>
+    /// <summary>
+    ///     Enters a character into map 1 -- the caller's own <see cref="ZoneRegistry" /> must already be
+    ///     initialized (once) by <see cref="CreateHandler" />; this never re-initializes it.
+    /// </summary>
     private static (PlayerRuntimeState State, FakeDuplexPipe Pipe) Enter(ZoneRegistry zones, short mapId,
         int characterId, string name)
     {
@@ -93,7 +96,7 @@ public class FriendCrossShardRelayHandlerTests
         var (handler, zones, friends, relay) = CreateHandler();
         var (target, pipe) = Enter(zones, 1, 100, "Target");
 
-        await handler.HandleAskAsync(MakeAsk(relayId: 42, targetCharacterId: 100), CancellationToken.None);
+        await handler.HandleAskAsync(MakeAsk(42, 100), CancellationToken.None);
 
         Assert.Empty(relay.Enqueued); // no auto-decline
         Assert.True(friends.IsNegotiating(target.CharacterId));

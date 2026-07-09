@@ -16,6 +16,9 @@ namespace Fenrir.Data.Tests.World;
 [Collection("SqlServer")]
 public class SkillStaticDataProcTests
 {
+    // The 293 seeded SkillIds top out at 293 (Migrations/Seed/world/070_skills.sql); anything from here up is
+    // guaranteed unused by seed data.
+    private static int _nextSkillId = 900_001;
     private readonly string _connectionString;
     private readonly IWorldDataRepository _repository;
 
@@ -58,7 +61,8 @@ public class SkillStaticDataProcTests
             Assert.InRange(skill.DataNumber2D, (short)1, (short)10000);
             Assert.InRange(skill.TribeInfo1, (byte)1, (byte)4);
             Assert.InRange(skill.TribeInfo2, (byte)1, (byte)10);
-            Assert.InRange(skill.LearnSkillPoint, (byte)1, byte.MaxValue); // CHECK ceiling is 1000, unreachable under TINYINT's 255
+            Assert.InRange(skill.LearnSkillPoint, (byte)1,
+                byte.MaxValue); // CHECK ceiling is 1000, unreachable under TINYINT's 255
             // MaxUpgradePoint's floor of 1 is the divide-by-zero guard for SKILLSYSTEM::ReturnSkillValue
             // (Server/ts25zone/GameSystem/GameSystem_03_Skill.cpp:186) -- the highest-severity bound in the
             // migration, asserted explicitly rather than folded into Assert.InRange.
@@ -72,7 +76,8 @@ public class SkillStaticDataProcTests
         foreach (var grade in grades)
         {
             Assert.InRange(grade.ManaUse, (short)0, (short)10000);
-            Assert.InRange(grade.RecoverInfo1, (byte)0, byte.MaxValue); // CHECK ceiling is 10000, unreachable under TINYINT's 255
+            Assert.InRange(grade.RecoverInfo1, (byte)0,
+                byte.MaxValue); // CHECK ceiling is 10000, unreachable under TINYINT's 255
             Assert.InRange(grade.RecoverInfo2, (byte)0, byte.MaxValue);
             Assert.InRange(grade.StunAttack, (byte)0, (byte)100);
             Assert.InRange(grade.StunDefense, (byte)0, (byte)100);
@@ -95,7 +100,7 @@ public class SkillStaticDataProcTests
     [Fact]
     public async Task InsertSkill_TypeOutOfRange_ThrowsCheckConstraintViolation()
     {
-        var ex = await Record.ExceptionAsync(() => InsertSkillAsync(NewSkillId(), type: 5));
+        var ex = await Record.ExceptionAsync(() => InsertSkillAsync(NewSkillId(), 5));
 
         AssertCheckConstraintViolation(ex);
     }
@@ -144,10 +149,6 @@ public class SkillStaticDataProcTests
 
         Assert.Null(ex);
     }
-
-    // The 293 seeded SkillIds top out at 293 (Migrations/Seed/world/070_skills.sql); anything from here up is
-    // guaranteed unused by seed data.
-    private static int _nextSkillId = 900_001;
 
     private static int NewSkillId()
     {

@@ -30,6 +30,11 @@ public sealed class TcpServer<TSession>(
 {
     private readonly FenrirTcpListener<TSession> _listener = new(endpoint, sessionFactory, logger);
 
+    public ValueTask DisposeAsync()
+    {
+        return _listener.DisposeAsync();
+    }
+
     public Task AcceptLoopAsync(
         Func<TSession, SocketConnection, CancellationToken, Task> onAccepted,
         CancellationToken cancellationToken)
@@ -41,10 +46,5 @@ public sealed class TcpServer<TSession>(
     {
         return SessionLoop.RunConnectionAsync(connection, session, dispatcher, registry, rateLimiter, ipFloodGuard,
             cancellationToken, logger);
-    }
-
-    public ValueTask DisposeAsync()
-    {
-        return _listener.DisposeAsync();
     }
 }

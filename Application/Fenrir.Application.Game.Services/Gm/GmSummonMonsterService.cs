@@ -1,7 +1,6 @@
 using Fenrir.Application.Game.Abstractions.Gm;
 using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Data.Abstractions.Game;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Dispatch.Zone.Sessions;
 using Fenrir.Network.Serialization.Shared.Packets.Shared;
@@ -79,6 +78,7 @@ public sealed class GmSummonMonsterService(
             "Character {CharacterId} applied the Elevated-tier summon-monster command (monster {MonsterId}, map {MapId})",
             state.CharacterId, packet.Value, zone.MapId);
 
-        zoneSession.Send(new GenericActionResponse { Result = AcceptedResult, Sort = Sort, Data = data, RuneValue = 0 });
+        zoneSession.Send(new GenericActionResponse
+            { Result = AcceptedResult, Sort = Sort, Data = data, RuneValue = 0 });
     }
 }

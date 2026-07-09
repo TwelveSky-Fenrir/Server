@@ -23,7 +23,10 @@ public sealed partial class Zone
     /// </summary>
     private const int GmExperienceInboxCapacity = 64;
 
-    /// <summary>Per-tick drain cap for <see cref="_gmExperienceInbox" /> -- see <see cref="InboxDrainCapPerTick" />'s own remarks.</summary>
+    /// <summary>
+    ///     Per-tick drain cap for <see cref="_gmExperienceInbox" /> -- see <see cref="InboxDrainCapPerTick" />'s own
+    ///     remarks.
+    /// </summary>
     private const int GmExperienceInboxDrainCapPerTick = GmExperienceInboxCapacity / 2;
 
     /// <summary>

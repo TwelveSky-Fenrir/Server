@@ -10,7 +10,7 @@ namespace Fenrir.Network.Serialization.Zone.Packets.Zone;
 /// </summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.ZoneMove,
     ExpectedSize = 21, AllowedStates = [(byte)ZoneSessionState.Registering, (byte)ZoneSessionState.InWorld])]
-public readonly partial record struct ZoneMoveRequest : IIncomingPacket<ZoneMoveRequest>
+public readonly record struct ZoneMoveRequest : IIncomingPacket<ZoneMoveRequest>
 {
     /// <summary>
     ///     Transfer reason: 2=GM, 3=death, 4=portal, 5=paying NPC, 6=NPC move, 7=return, 8=return item, 9=teleport

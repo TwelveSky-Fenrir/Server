@@ -21,19 +21,13 @@ using Microsoft.Extensions.DependencyInjection;
 var command = args.Length > 0 ? args[0] : null;
 
 if (string.Equals(command, "create", StringComparison.OrdinalIgnoreCase) && args.Length == 3)
-{
     return await RunCreateAsync(args[1], args[2]);
-}
 
 if (string.Equals(command, "grant-gm", StringComparison.OrdinalIgnoreCase) && args.Length == 3)
-{
     return await RunGrantGmAsync(args[1], args[2]);
-}
 
 if (string.Equals(command, "allow-gm-ip", StringComparison.OrdinalIgnoreCase) && args.Length == 2)
-{
     return await RunAllowGmIpAsync(args[1]);
-}
 
 Console.Error.WriteLine("Usage: Fenrir.Tools.AccountProvisioning create <loginName> <password>");
 Console.Error.WriteLine(

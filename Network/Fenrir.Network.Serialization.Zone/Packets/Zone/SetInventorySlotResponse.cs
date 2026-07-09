@@ -5,7 +5,7 @@ namespace Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.SetInventorySlot,
     ExpectedSize = 33)]
-public readonly partial record struct SetInventorySlotResponse : IOutgoingPacket
+public readonly record struct SetInventorySlotResponse : IOutgoingPacket
 {
     public required int Page { get; init; }
 

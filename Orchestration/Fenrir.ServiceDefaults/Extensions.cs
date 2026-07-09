@@ -1,10 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
-using OpenTelemetry.Trace;
 
 namespace Fenrir.ServiceDefaults;
 
@@ -36,10 +34,7 @@ public static class Extensions
                     // No AddAspNetCoreInstrumentation(): neither server is an ASP.NET Core app, no HTTP pipeline to instrument.
                     metrics.AddRuntimeInstrumentation();
                 })
-                .WithTracing(tracing =>
-                {
-                    tracing.AddSource(builder.Environment.ApplicationName);
-                });
+                .WithTracing(tracing => { tracing.AddSource(builder.Environment.ApplicationName); });
 
             builder.AddOpenTelemetryExporters();
 

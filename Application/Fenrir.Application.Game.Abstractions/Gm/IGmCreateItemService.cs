@@ -20,7 +20,11 @@ namespace Fenrir.Application.Game.Abstractions.Gm;
 /// </summary>
 public interface IGmCreateItemService
 {
-    /// <summary><paramref name="sort" /> is 505 or 523; <paramref name="data" /> is the raw, unmodified 130-byte tData blob to decode and echo back.</summary>
-    ValueTask HandleAsync(int sort, byte[] data, ZoneClientSession zoneSession, PlayerRuntimeState state, Zone zone,
+    /// <summary>
+    ///     <paramref name="sort" /> is 505 or 523; <paramref name="data" /> is the raw, unmodified 130-byte tData blob to
+    ///     decode and echo back.
+    /// </summary>
+    public ValueTask HandleAsync(int sort, byte[] data, ZoneClientSession zoneSession, PlayerRuntimeState state,
+        Zone zone,
         CancellationToken cancellationToken);
 }

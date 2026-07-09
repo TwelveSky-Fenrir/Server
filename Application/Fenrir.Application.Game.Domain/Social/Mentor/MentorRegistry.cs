@@ -1,5 +1,3 @@
-using Fenrir.Application.Game.Domain.Social;
-
 namespace Fenrir.Application.Game.Domain.Social.Mentor;
 
 /// <summary>Soft outcomes of CZ_TEACHER_ASK_SEND -- mirrors ZC_TEACHER_ANSWER_RECV's pre-check codes.</summary>

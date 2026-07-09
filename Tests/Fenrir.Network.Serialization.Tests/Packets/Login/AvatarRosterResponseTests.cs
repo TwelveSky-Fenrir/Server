@@ -7,6 +7,14 @@ namespace Fenrir.Network.Serialization.Tests.Packets.Login;
 
 public class LcUserAvatarRecv2Tests
 {
+    // --- Golden-buffer helpers -------------------------------------------------------------------------
+    // Intentionally re-derived from the ServerDocs-cited scopyAvtXor*/GetMyXor mask description rather than
+    // calling into Fenrir.Network.Compression.WireXor, so this test does not validate Write() against the
+    // very code it delegates to.
+
+    private const byte GoldenFirstKey = 0x10;
+    private const byte GoldenSteadyKey = 0xFE;
+
     [Fact]
     public void PayloadSize_MatchesContractConstant()
     {
@@ -189,14 +197,6 @@ public class LcUserAvatarRecv2Tests
 
         Assert.Equal(expected, actual);
     }
-
-    // --- Golden-buffer helpers -------------------------------------------------------------------------
-    // Intentionally re-derived from the ServerDocs-cited scopyAvtXor*/GetMyXor mask description rather than
-    // calling into Fenrir.Network.Compression.WireXor, so this test does not validate Write() against the
-    // very code it delegates to.
-
-    private const byte GoldenFirstKey = 0x10;
-    private const byte GoldenSteadyKey = 0xFE;
 
     private static void WriteGoldenInt(byte[] buffer, int offset, int value)
     {

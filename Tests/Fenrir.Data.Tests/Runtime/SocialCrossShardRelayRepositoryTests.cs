@@ -55,11 +55,11 @@ public sealed class SocialCrossShardRelayRepositoryTests : IDisposable
     public async Task PublishAsync_ThenPollAsync_ReadsBackEveryFieldOfAnAskRow()
     {
         const byte targetShardId = 220;
-        var entry = MakeAsk(sourceShardId: 7, sourceCharacterId: 200, sourceAvatarName: "AskerName",
-            targetShardId: targetShardId, targetCharacterId: 100, kind: SocialCrossShardRelayKind.Duel);
+        var entry = MakeAsk(7, 200, "AskerName",
+            targetShardId, 100, SocialCrossShardRelayKind.Duel);
 
         await _repository.PublishAsync(entry, CancellationToken.None);
-        var rows = await _repository.PollAsync(targetShardId, retentionSeconds: 999_999, CancellationToken.None);
+        var rows = await _repository.PollAsync(targetShardId, 999_999, CancellationToken.None);
 
         var row = Assert.Single(rows);
         Assert.Equal((byte)SocialCrossShardRelayKind.Duel, row.Kind);
@@ -79,19 +79,19 @@ public sealed class SocialCrossShardRelayRepositoryTests : IDisposable
     public async Task PublishAsync_ThenPollAsync_ReadsBackEveryFieldOfAnAnswerRow()
     {
         const byte targetShardId = 221;
-        var ask = MakeAsk(sourceShardId: 7, sourceCharacterId: 200, sourceAvatarName: "Asker",
-            targetShardId: targetShardId, targetCharacterId: 100);
+        var ask = MakeAsk(7, 200, "Asker",
+            targetShardId, 100);
         await _repository.PublishAsync(ask, CancellationToken.None);
         var askRow = Assert.Single(
-            await _repository.PollAsync(targetShardId, retentionSeconds: 999_999, CancellationToken.None));
+            await _repository.PollAsync(targetShardId, 999_999, CancellationToken.None));
 
         // Answer is addressed back the other way: Answer.TargetShardId is the original asker's shard.
-        var answer = MakeAnswer(sourceShardId: targetShardId, sourceCharacterId: 100, sourceAvatarName: "Target",
-            targetShardId: 7, targetCharacterId: 200, accepted: false, reasonCode: 5, askRelayId: askRow.RelayId);
+        var answer = MakeAnswer(targetShardId, 100, "Target",
+            7, 200, false, 5, askRow.RelayId);
         await _repository.PublishAsync(answer, CancellationToken.None);
 
         var answerRow = Assert.Single(
-            await _repository.PollAsync(shardId: 7, retentionSeconds: 999_999, CancellationToken.None));
+            await _repository.PollAsync(7, 999_999, CancellationToken.None));
 
         Assert.Equal((byte)SocialCrossShardRelayMessageType.Answer, answerRow.MessageType);
         Assert.False(answerRow.Accepted);
@@ -110,18 +110,18 @@ public sealed class SocialCrossShardRelayRepositoryTests : IDisposable
         const byte targetShardId = 230;
         const byte unrelatedShardId = 231;
         await _repository.PublishAsync(
-            MakeAsk(sourceShardId: 7, sourceCharacterId: 200, sourceAvatarName: "Asker",
-                targetShardId: targetShardId, targetCharacterId: 100),
+            MakeAsk(7, 200, "Asker",
+                targetShardId, 100),
             CancellationToken.None);
 
         // Unlike GuildTribeBroadcastRelay's fan-out (every OTHER shard sees it), a shard not named as the
         // target never sees this row at all -- not even once.
         var unrelatedShardRows =
-            await _repository.PollAsync(unrelatedShardId, retentionSeconds: 999_999, CancellationToken.None);
+            await _repository.PollAsync(unrelatedShardId, 999_999, CancellationToken.None);
         Assert.Empty(unrelatedShardRows);
 
         var targetShardRows =
-            await _repository.PollAsync(targetShardId, retentionSeconds: 999_999, CancellationToken.None);
+            await _repository.PollAsync(targetShardId, 999_999, CancellationToken.None);
         Assert.Single(targetShardRows);
     }
 
@@ -130,25 +130,25 @@ public sealed class SocialCrossShardRelayRepositoryTests : IDisposable
     {
         const byte targetShardId = 240;
         await _repository.PublishAsync(
-            MakeAsk(sourceShardId: 7, sourceCharacterId: 200, sourceAvatarName: "First",
-                targetShardId: targetShardId, targetCharacterId: 100),
+            MakeAsk(7, 200, "First",
+                targetShardId, 100),
             CancellationToken.None);
 
-        var firstPoll = await _repository.PollAsync(targetShardId, retentionSeconds: 999_999, CancellationToken.None);
+        var firstPoll = await _repository.PollAsync(targetShardId, 999_999, CancellationToken.None);
         Assert.Single(firstPoll);
 
         // Cursor already advanced past the first row -- an immediate re-poll with nothing new published sees
         // nothing, it is never re-delivered.
         var secondPollNoNewRows =
-            await _repository.PollAsync(targetShardId, retentionSeconds: 999_999, CancellationToken.None);
+            await _repository.PollAsync(targetShardId, 999_999, CancellationToken.None);
         Assert.Empty(secondPollNoNewRows);
 
         await _repository.PublishAsync(
-            MakeAsk(sourceShardId: 7, sourceCharacterId: 201, sourceAvatarName: "Second",
-                targetShardId: targetShardId, targetCharacterId: 100),
+            MakeAsk(7, 201, "Second",
+                targetShardId, 100),
             CancellationToken.None);
 
-        var thirdPoll = await _repository.PollAsync(targetShardId, retentionSeconds: 999_999, CancellationToken.None);
+        var thirdPoll = await _repository.PollAsync(targetShardId, 999_999, CancellationToken.None);
         var onlyNewRow = Assert.Single(thirdPoll);
         Assert.Equal("Second", onlyNewRow.SourceAvatarName);
     }
@@ -159,32 +159,32 @@ public sealed class SocialCrossShardRelayRepositoryTests : IDisposable
         const byte pollingShardId = 250;
         const byte otherTargetShardId = 251;
         await _repository.PublishAsync(
-            MakeAsk(sourceShardId: 7, sourceCharacterId: 200, sourceAvatarName: "ForPollingShard",
-                targetShardId: pollingShardId, targetCharacterId: 100),
+            MakeAsk(7, 200, "ForPollingShard",
+                pollingShardId, 100),
             CancellationToken.None);
         await _repository.PublishAsync(
-            MakeAsk(sourceShardId: 7, sourceCharacterId: 201, sourceAvatarName: "ForOtherShard",
-                targetShardId: otherTargetShardId, targetCharacterId: 101),
+            MakeAsk(7, 201, "ForOtherShard",
+                otherTargetShardId, 101),
             CancellationToken.None);
 
         // The SELECT happens before the reap DELETE, so this call still returns its own row even though
         // @RetentionSeconds = 0 makes every already-inserted row (any target shard) immediately reap-eligible.
         var pollingShardRows =
-            await _repository.PollAsync(pollingShardId, retentionSeconds: 0, CancellationToken.None);
+            await _repository.PollAsync(pollingShardId, 0, CancellationToken.None);
         Assert.Single(pollingShardRows);
 
         // The row addressed to otherTargetShardId was reaped as a side effect of the call above, even though
         // that shard never polled with a small retention itself -- reap is purely time-based, not scoped to
         // the polling shard's own TargetShardId filter.
         var otherShardRows =
-            await _repository.PollAsync(otherTargetShardId, retentionSeconds: 999_999, CancellationToken.None);
+            await _repository.PollAsync(otherTargetShardId, 999_999, CancellationToken.None);
         Assert.Empty(otherShardRows);
     }
 
     [Fact]
     public async Task PollAsync_ShardNeverPublishedTo_ReturnsEmpty()
     {
-        var rows = await _repository.PollAsync(shardId: 252, retentionSeconds: 999_999, CancellationToken.None);
+        var rows = await _repository.PollAsync(252, 999_999, CancellationToken.None);
         Assert.Empty(rows);
     }
 }

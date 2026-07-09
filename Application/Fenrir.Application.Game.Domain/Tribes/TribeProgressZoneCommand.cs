@@ -261,6 +261,7 @@ public readonly record struct TribeProgressZoneCommand(
 ///     <paramref name="DropSort" /> defaults to 0 (the pre-existing, generic drop-source code every caller
 ///     before the Admin-tier GM spawn-item command used implicitly) so no existing caller's behavior changes;
 ///     <see cref="Fenrir.Application.Game.Services.Gm.GmCreateItemService" /> is the one caller that supplies
-///     a non-default value (<see cref="Fenrir.Application.Game.Domain.World.Loot.GroundItemEntity.GmCreateItemDropSort" />).
+///     a non-default value (<see cref="Fenrir.Application.Game.Domain.World.Loot.GroundItemEntity.GmCreateItemDropSort" />
+///     ).
 /// </summary>
 public readonly record struct TribeGroundItemDrop(int ItemId, int Quantity, int DropSort = 0);

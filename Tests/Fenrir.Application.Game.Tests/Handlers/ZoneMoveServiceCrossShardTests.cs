@@ -1,10 +1,8 @@
-using System.Collections.Frozen;
 using System.Collections.Immutable;
 using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Guilds;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
-using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Services.ZoneLifecycle;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Data.Abstractions.Runtime;
@@ -34,6 +32,15 @@ public class ZoneMoveServiceCrossShardTests
     private const byte SourceShardId = 1;
     private const byte DestinationShardId = 2;
 
+    // --- Fix (Finding 19): HandleCrossShardAsync now runs TribeGuardCorridorGate against the live destination
+    // shard before minting a ticket -- previously a cross-shard destination bypassed the corridor gate
+    // entirely, even though the same-shard branch already ran it. All tests below use a NON-empty catalog
+    // (unlike every test above, which relies on TribeGuardCorridorCatalog.Empty's documented always-allow) to
+    // actually exercise the gate rather than its no-op default. ---
+
+    private const short CorridorHubZoneId = 100;
+    private const byte CorridorOwnerTribe = 0;
+
     private static (ZoneMoveService Service, ZoneClientSession Session, Zone SourceZone,
         FakeSessionTicketRepository Tickets) CreateService(
             IReadOnlyDictionary<byte, short[]> hostedMapsByShard, params ShardDirectoryEntryDto[] shards)
@@ -57,7 +64,7 @@ public class ZoneMoveServiceCrossShardTests
 
         var (session, _) = ZoneTestKit.CreateSession(1);
         var sessionToken = Guid.NewGuid();
-        session.MarkTicketConsumed(1, CharacterId, sessionToken, accountGrade: 0);
+        session.MarkTicketConsumed(1, CharacterId, sessionToken, 0);
         var sourceZone = zones[SourceMapId];
         session.CurrentZone = sourceZone;
 
@@ -170,15 +177,6 @@ public class ZoneMoveServiceCrossShardTests
         Assert.Single(tickets.CreatedTickets);
     }
 
-    // --- Fix (Finding 19): HandleCrossShardAsync now runs TribeGuardCorridorGate against the live destination
-    // shard before minting a ticket -- previously a cross-shard destination bypassed the corridor gate
-    // entirely, even though the same-shard branch already ran it. All tests below use a NON-empty catalog
-    // (unlike every test above, which relies on TribeGuardCorridorCatalog.Empty's documented always-allow) to
-    // actually exercise the gate rather than its no-op default. ---
-
-    private const short CorridorHubZoneId = 100;
-    private const byte CorridorOwnerTribe = 0;
-
     // Owner tribe 0's own chain: 201 (seg0) -> 202 (seg1) -> 203 (seg2) -> 204 (seg3, home). Deliberately
     // disjoint from SourceMapId/TargetMapId so these tests can freely choose their own origin/destination
     // without colliding with the plain-ticket-mint tests above. Every destination used below stays within
@@ -218,7 +216,7 @@ public class ZoneMoveServiceCrossShardTests
 
         var (session, pipe) = ZoneTestKit.CreateSession(1);
         var sessionToken = Guid.NewGuid();
-        session.MarkTicketConsumed(1, CharacterId, sessionToken, accountGrade: accountGrade);
+        session.MarkTicketConsumed(1, CharacterId, sessionToken, accountGrade);
         var sourceZone = zones[sourceMapId];
         session.CurrentZone = sourceZone;
 
@@ -237,7 +235,7 @@ public class ZoneMoveServiceCrossShardTests
         // invalid single-step advance, soft-rejected since neither zone involved is 37.
         var catalog = CreateCorridorCatalog();
         var (service, session, _, pipe, tickets) = CreateServiceWithCorridor(
-            2, requesterTribe: 1, accountGrade: 0, catalog, new TribeGuardCorridorState(),
+            2, 1, 0, catalog, new TribeGuardCorridorState(),
             new Dictionary<byte, short[]> { [DestinationShardId] = [202] },
             new ShardDirectoryEntryDto(DestinationShardId, "10.0.0.9", 11009, 0, 100, 5f));
 
@@ -249,7 +247,7 @@ public class ZoneMoveServiceCrossShardTests
 
         var sent = ZoneTestKit.DrainOutbound(pipe);
         var expected = new byte[FrameWriter.FrameSizeOf<ZoneMoveResponse>() +
-                                 FrameWriter.FrameSizeOf<ReturnToHomeZoneResponse>()];
+                                FrameWriter.FrameSizeOf<ReturnToHomeZoneResponse>()];
         var moveResponseSize = FrameWriter.WriteFrame(
             new ZoneMoveResponse { Result = 1, Ip = "10.0.0.9", Port = 11009 }, expected);
         FrameWriter.WriteFrame(new ReturnToHomeZoneResponse(), expected.AsSpan(moveResponseSize));
@@ -261,7 +259,7 @@ public class ZoneMoveServiceCrossShardTests
     {
         var catalog = CreateCorridorCatalog(); // segment0 = 201, unrelated to 37
         var (service, session, _, pipe, tickets) = CreateServiceWithCorridor(
-            37, requesterTribe: 1, accountGrade: 0, catalog, new TribeGuardCorridorState(),
+            37, 1, 0, catalog, new TribeGuardCorridorState(),
             new Dictionary<byte, short[]> { [DestinationShardId] = [202] },
             new ShardDirectoryEntryDto(DestinationShardId, "10.0.0.9", 11009, 0, 100, 5f));
 
@@ -276,9 +274,9 @@ public class ZoneMoveServiceCrossShardTests
     [Fact]
     public async Task CorridorHardDisconnect_DestinationIsZone37_AbortsSession_NoTicketMinted()
     {
-        var catalog = CreateCorridorCatalog(segment0OverrideZoneId: 37); // segment0's own zone is (contrived) 37
+        var catalog = CreateCorridorCatalog(37); // segment0's own zone is (contrived) 37
         var (service, session, _, pipe, tickets) = CreateServiceWithCorridor(
-            2, requesterTribe: 1, accountGrade: 0, catalog, new TribeGuardCorridorState(),
+            2, 1, 0, catalog, new TribeGuardCorridorState(),
             new Dictionary<byte, short[]> { [DestinationShardId] = [37] },
             new ShardDirectoryEntryDto(DestinationShardId, "10.0.0.9", 11009, 0, 100, 5f));
 
@@ -297,7 +295,7 @@ public class ZoneMoveServiceCrossShardTests
         // fail adjacency if evaluated, but the owning-tribe bypass short-circuits before that check.
         var catalog = CreateCorridorCatalog();
         var (service, session, _, _, tickets) = CreateServiceWithCorridor(
-            2, requesterTribe: CorridorOwnerTribe, accountGrade: 0, catalog, new TribeGuardCorridorState(),
+            2, CorridorOwnerTribe, 0, catalog, new TribeGuardCorridorState(),
             new Dictionary<byte, short[]> { [DestinationShardId] = [202] },
             new ShardDirectoryEntryDto(DestinationShardId, "10.0.0.9", 11009, 0, 100, 5f));
 
@@ -313,7 +311,7 @@ public class ZoneMoveServiceCrossShardTests
     {
         var catalog = CreateCorridorCatalog();
         var (service, session, _, _, tickets) = CreateServiceWithCorridor(
-            2, requesterTribe: 1, accountGrade: 1, catalog, new TribeGuardCorridorState(),
+            2, 1, 1, catalog, new TribeGuardCorridorState(),
             new Dictionary<byte, short[]> { [DestinationShardId] = [202] },
             new ShardDirectoryEntryDto(DestinationShardId, "10.0.0.9", 11009, 0, 100, 5f));
 
@@ -331,7 +329,7 @@ public class ZoneMoveServiceCrossShardTests
         var state = new TribeGuardCorridorState();
         state.TrySetOpen(CorridorOwnerTribe, 1, true); // segment gating entry into zone 202 (chain[1])
         var (service, session, _, _, tickets) = CreateServiceWithCorridor(
-            201, requesterTribe: 1, accountGrade: 0, catalog, state,
+            201, 1, 0, catalog, state,
             new Dictionary<byte, short[]> { [DestinationShardId] = [202] },
             new ShardDirectoryEntryDto(DestinationShardId, "10.0.0.9", 11009, 0, 100, 5f));
 
@@ -347,7 +345,7 @@ public class ZoneMoveServiceCrossShardTests
     {
         var catalog = CreateCorridorCatalog();
         var (service, session, _, _, tickets) = CreateServiceWithCorridor(
-            201, requesterTribe: 1, accountGrade: 0, catalog, new TribeGuardCorridorState(), // closed by default
+            201, 1, 0, catalog, new TribeGuardCorridorState(), // closed by default
             new Dictionary<byte, short[]> { [DestinationShardId] = [202] },
             new ShardDirectoryEntryDto(DestinationShardId, "10.0.0.9", 11009, 0, 100, 5f));
 

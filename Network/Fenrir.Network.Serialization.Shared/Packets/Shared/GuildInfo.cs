@@ -3,7 +3,7 @@ using Fenrir.Network.Serialization.Wire.Attributes;
 namespace Fenrir.Network.Serialization.Shared.Packets.Shared;
 
 [FenrirWireType(1388)]
-public readonly partial record struct GuildInfo : IFenrirWireType<GuildInfo>
+public readonly record struct GuildInfo : IFenrirWireType<GuildInfo>
 {
     [FixedString(13)] public required string Name { get; init; }
 

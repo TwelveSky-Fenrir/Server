@@ -73,11 +73,11 @@ public sealed class ZoneCenterSiegeState
     private readonly Lock _lock = new();
     private readonly float[] _myoungItemDropBonusRatio = new float[TribeCount];
     private readonly int[] _zone038DtmValue = new int[TribeCount];
+    private readonly int[] _zone049State = new int[Zone049Slots];
+    private readonly int[] _zone049StateTime = new int[Zone049Slots];
     private readonly int[,] _zone175 = new int[Zone175Instances, Zone175Slots];
     private readonly DenOfRebirthChallengeState[] _zone241 = new DenOfRebirthChallengeState[Zone241Instances];
     private readonly int[] _zone267 = new int[TribeCount];
-    private readonly int[] _zone049State = new int[Zone049Slots];
-    private readonly int[] _zone049StateTime = new int[Zone049Slots];
     private int _zone335;
 
     // ---- Free-for-all zone / Zone335 (6 events -- 1 no-op -- cases within 1501-1507, reset 1520;

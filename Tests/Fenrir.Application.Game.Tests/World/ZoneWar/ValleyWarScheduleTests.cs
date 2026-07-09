@@ -61,8 +61,10 @@ public class ValleyWarScheduleTests
         return schedule;
     }
 
-    /// <summary>Tribe 0 wins the kill race (via <see cref="ValleyWarSchedule.ForceZeroTribeQuota" />), then
-    /// waits out the scroll-delete delay, landing exactly at the first tick of <see cref="ValleyWarPhase.BossWindow" />.</summary>
+    /// <summary>
+    ///     Tribe 0 wins the kill race (via <see cref="ValleyWarSchedule.ForceZeroTribeQuota" />), then
+    ///     waits out the scroll-delete delay, landing exactly at the first tick of <see cref="ValleyWarPhase.BossWindow" />.
+    /// </summary>
     private static ValleyWarSchedule AdvanceToBossWindowStart()
     {
         var schedule = AdvanceToKillRaceStart();

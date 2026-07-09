@@ -4,8 +4,6 @@ using Fenrir.Application.Login.Tests.TestSupport;
 using Fenrir.Data.Abstractions.Game;
 using Microsoft.Extensions.Logging.Abstractions;
 
-using Fenrir.Network.Dispatch.Login.Sessions;
-
 namespace Fenrir.Application.Login.Tests.Services;
 
 // op14 CL_CHANGE_MOUSE_PASSWORD_SEND business logic: shares LoginClientSession.PinFailureCount and the

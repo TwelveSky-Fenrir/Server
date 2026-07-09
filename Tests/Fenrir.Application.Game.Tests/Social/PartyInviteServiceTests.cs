@@ -148,7 +148,7 @@ public class PartyInviteServiceTests
         directory.Seed(new CharacterShardLocationDto(2, 9, 77, "RemoteTarget", 2, DateTime.UtcNow));
         var relay = new FakeSocialCrossShardRelayQueue();
         var (service, zones, _) = CreateService(1, directory, relay);
-        var inviter = Enter(zones, 1, 1, "Inviter", tribe: 1);
+        var inviter = Enter(zones, 1, 1, "Inviter", 1);
 
         var result = await service.InviteAsync(zones[1], inviter, "RemoteTarget", CancellationToken.None);
 

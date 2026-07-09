@@ -5,10 +5,12 @@ using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 
-/// <summary>Where <see cref="Zone335FfaEventCycleSystem" /> currently sits, finer-grained than the six values
-/// the shared, cluster-wide <see cref="ZoneCenterSiegeState.Zone335" /> scalar itself distinguishes (three of
-/// these -- <see cref="Idle" />/<see cref="CountdownArmed" />/<see cref="PreStartCountdown" /> -- all keep that
-/// scalar at 0; the client-visible scalar only starts moving at <see cref="GateOpenPending" />'s own exit).</summary>
+/// <summary>
+///     Where <see cref="Zone335FfaEventCycleSystem" /> currently sits, finer-grained than the six values
+///     the shared, cluster-wide <see cref="ZoneCenterSiegeState.Zone335" /> scalar itself distinguishes (three of
+///     these -- <see cref="Idle" />/<see cref="CountdownArmed" />/<see cref="PreStartCountdown" /> -- all keep that
+///     scalar at 0; the client-visible scalar only starts moving at <see cref="GateOpenPending" />'s own exit).
+/// </summary>
 public enum Zone335FfaPhase : byte
 {
     /// <summary>Accumulating toward the 60-in-game-minute automatic rollover, or waiting for a GM start request.</summary>
@@ -125,10 +127,16 @@ public sealed class Zone335FfaEventCycleSystem(
     /// <summary>One further minute before battle-start preparation fires (:10833-10850).</summary>
     public const int BattlePrepWaitMinutes = 1;
 
-    /// <summary>Fixed 15-minute/1800-tick battle timer -- overwrites whatever the GM command's duration parameter set (:10841-10844).</summary>
+    /// <summary>
+    ///     Fixed 15-minute/1800-tick battle timer -- overwrites whatever the GM command's duration parameter set
+    ///     (:10841-10844).
+    /// </summary>
     public const int BattleDurationLegacyTicks = 1800;
 
-    /// <summary>Last-man-standing may not end the battle before this many ticks have elapsed (guards the opening tick's not-yet-populated roster, :10874).</summary>
+    /// <summary>
+    ///     Last-man-standing may not end the battle before this many ticks have elapsed (guards the opening tick's
+    ///     not-yet-populated roster, :10874).
+    /// </summary>
     public const int BattleMinimumElapsedLegacyTicksForLastManStanding = SimulationClock.PlayTimeAccrualLegacyTicks;
 
     /// <summary>Live in-battle countdown broadcast cadence: every 10 ticks/5 s (:10906-10912).</summary>

@@ -75,12 +75,12 @@ public class ZoneCombatBroadcastAllocationTests
         var (attackerSession, attackerPipe) = ZoneTestKit.CreateSession(1);
         pipes.Add(attackerPipe);
         zone.Post(ZoneCommand.Enter(1,
-            ZoneTestKit.EnterData(attackerSession, 1, "Attacker", 100f, 0f, 100f, tribe: 0)));
+            ZoneTestKit.EnterData(attackerSession, 1, "Attacker", tribe: 0)));
 
         var (defenderSession, defenderPipe) = ZoneTestKit.CreateSession(2);
         pipes.Add(defenderPipe);
         zone.Post(ZoneCommand.Enter(2,
-            ZoneTestKit.EnterData(defenderSession, 1, "Defender", 105f, 0f, 100f, tribe: 1)));
+            ZoneTestKit.EnterData(defenderSession, 1, "Defender", 105f)));
 
         for (var i = 0; i < bystanderCount; i++)
         {
@@ -88,7 +88,7 @@ public class ZoneCombatBroadcastAllocationTests
             var (session, pipe) = ZoneTestKit.CreateSession(characterId);
             pipes.Add(pipe);
             zone.Post(ZoneCommand.Enter(characterId,
-                ZoneTestKit.EnterData(session, 1, $"Bystander{i}", 100f + i * 3f, 0f, 100f, tribe: 1)));
+                ZoneTestKit.EnterData(session, 1, $"Bystander{i}", 100f + i * 3f)));
         }
 
         zone.Tick(TimeSpan.FromMilliseconds(50));

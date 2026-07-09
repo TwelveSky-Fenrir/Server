@@ -79,7 +79,8 @@ public sealed class GuildBuffExpiryRelayHost(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(options.Value.GuildBuffExpiryRelayPollIntervalSeconds));
+        using var timer =
+            new PeriodicTimer(TimeSpan.FromSeconds(options.Value.GuildBuffExpiryRelayPollIntervalSeconds));
 
         do
         {

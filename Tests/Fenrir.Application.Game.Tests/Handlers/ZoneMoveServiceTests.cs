@@ -279,7 +279,7 @@ public class ZoneMoveServiceTests
         // still fires first, before that switch is ever reached.
         var (service, session, _) = CreateServiceWithGrade(2, 1, true, 0, [50]);
 
-        await service.HandleAsync(Request(2, 50, sort: 2), session, CancellationToken.None);
+        await service.HandleAsync(Request(2, 50, 2), session, CancellationToken.None);
 
         Assert.Equal(DisconnectReason.StateViolation, session.DisconnectReason);
     }
@@ -291,7 +291,7 @@ public class ZoneMoveServiceTests
         // fires first.
         var (service, session, _) = CreateServiceWithGrade(2, 1, true, 0, [50]);
 
-        await service.HandleAsync(Request(2, 50, sort: 99), session, CancellationToken.None);
+        await service.HandleAsync(Request(2, 50, 99), session, CancellationToken.None);
 
         Assert.Equal(DisconnectReason.StateViolation, session.DisconnectReason);
     }
@@ -305,7 +305,7 @@ public class ZoneMoveServiceTests
         // revive-hack gate down to that check).
         var (service, session, _) = CreateServiceWithGrade(2, 1, true, 0, [38]);
 
-        await service.HandleAsync(Request(2, 38, sort: 99), session, CancellationToken.None);
+        await service.HandleAsync(Request(2, 38, 99), session, CancellationToken.None);
 
         Assert.Equal(DisconnectReason.Faulted, session.DisconnectReason);
     }
@@ -320,7 +320,7 @@ public class ZoneMoveServiceTests
     {
         var (service, session, _) = CreateServiceWithGrade(2, 1, false, 0, [50]);
 
-        await service.HandleAsync(Request(2, 50, sort: 2), session, CancellationToken.None);
+        await service.HandleAsync(Request(2, 50, 2), session, CancellationToken.None);
 
         Assert.Equal(DisconnectReason.Faulted, session.DisconnectReason);
     }
@@ -330,7 +330,7 @@ public class ZoneMoveServiceTests
     {
         var (service, session, sourceZone) = CreateServiceWithGrade(2, 1, false, 1, [50]);
 
-        await service.HandleAsync(Request(2, 50, sort: 2), session, CancellationToken.None);
+        await service.HandleAsync(Request(2, 50, 2), session, CancellationToken.None);
 
         Assert.Null(session.DisconnectReason);
 
@@ -345,7 +345,7 @@ public class ZoneMoveServiceTests
     {
         var (service, session, _) = CreateServiceWithGrade(2, 1, false, 1, [50]);
 
-        await service.HandleAsync(Request(2, 50, sort: 4), session, CancellationToken.None);
+        await service.HandleAsync(Request(2, 50, 4), session, CancellationToken.None);
 
         Assert.Null(session.DisconnectReason);
     }

@@ -1,7 +1,6 @@
 using Fenrir.Application.Game.Abstractions.Gm;
 using Fenrir.Application.Game.Domain.Gm;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Data.Abstractions.Game;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Dispatch.Zone.Sessions;
 using Fenrir.Network.Serialization.Shared.Packets.Shared;
@@ -58,6 +57,7 @@ public sealed class GmExpGrantService(
             "Character {CharacterId} applied the Elevated-tier grant-experience-to-self command (mode {Mode}, magnitude {Magnitude})",
             state.CharacterId, packet.Type, packet.Exp);
 
-        zoneSession.Send(new GenericActionResponse { Result = AcceptedResult, Sort = Sort, Data = data, RuneValue = 0 });
+        zoneSession.Send(new GenericActionResponse
+            { Result = AcceptedResult, Sort = Sort, Data = data, RuneValue = 0 });
     }
 }

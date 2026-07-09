@@ -3,7 +3,8 @@ using Microsoft.Extensions.Logging;
 namespace Fenrir.Network.Dispatch.Logging;
 
 /// <summary>
-///     Operational log entries for the one chokepoint both of <see cref="Fenrir.Network.Dispatch.FloodProtection.IpFloodGuard" />
+///     Operational log entries for the one chokepoint both of
+///     <see cref="Fenrir.Network.Dispatch.FloodProtection.IpFloodGuard" />
 ///     's triggers converge on -- <c>IpFloodGuard.BlockAndKickAsync</c> (see that class's own remarks for
 ///     Trigger A/raw-connection-flood vs Trigger B/protocol-violation-flood). Neither trigger's own call site
 ///     (<c>TryAcquireConnectionAsync</c>, <c>RecordProtocolViolationAsync</c>) logs anything itself; centralizing

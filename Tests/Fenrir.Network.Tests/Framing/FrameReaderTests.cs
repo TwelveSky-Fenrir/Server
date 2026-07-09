@@ -1,18 +1,18 @@
 using System.Buffers;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Framing;
-using Fenrir.Network.Serialization.Zone.Packets.Zone;
 using Fenrir.Network.Serialization.Wire;
+using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Network.Tests.Framing;
 
 public class FrameReaderTests
 {
     private const FenrirServer Server = FenrirServer.Zone;
-    private static readonly IOpcodeFrameSizeProvider Registry = ZoneOpcodeRegistry.Provider;
 
     // Login Incoming tops out at 25, Zone Incoming at 151 -- 250 is registered nowhere.
     private const byte UnregisteredOpcode = 250;
+    private static readonly IOpcodeFrameSizeProvider Registry = ZoneOpcodeRegistry.Provider;
 
     [Fact]
     public void TryReadFrame_SingleCompleteFrame_CzHeartbeatSend_DecodesOpcodeAndPayload()

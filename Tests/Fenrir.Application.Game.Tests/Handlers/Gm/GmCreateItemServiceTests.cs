@@ -158,7 +158,8 @@ public class GmCreateItemServiceTests
 
         Assert.Null(session.DisconnectReason);
         Assert.Equal(1, zone.GroundItemCount);
-        await AssertResponseSentAsync(pipe, new GenericActionResponse { Result = 0, Sort = 505, Data = data, RuneValue = 0 });
+        await AssertResponseSentAsync(pipe,
+            new GenericActionResponse { Result = 0, Sort = 505, Data = data, RuneValue = 0 });
 
         var logged = Assert.Single(eventLog.LoggedEvents);
         Assert.Equal((short)1, logged.EventCode);

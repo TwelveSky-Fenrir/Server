@@ -144,33 +144,6 @@ public sealed class MonsterEntity
 
     public float TargetLocationZ { get; set; }
 
-    /// <summary>
-    ///     Locks <paramref name="characterId" /> as the pursuit target and captures its wire identity and live
-    ///     position as the broadcast target descriptor -- legacy sets <c>aTargetObjectIndex</c>,
-    ///     <c>aTargetObjectUniqueNumber</c>, and (for the moving/attacking transitions) <c>aTargetLocation</c>
-    ///     together (<c>Server/ts25zone/S07_MyGame05.cpp:1104-1105,1166-1171,1373-1374</c>).
-    /// </summary>
-    public void AssignTarget(int characterId, uint uniqueNumber, float x, float y, float z)
-    {
-        TargetCharacterId = characterId;
-        TargetUniqueNumber = uniqueNumber;
-        TargetLocationX = x;
-        TargetLocationY = y;
-        TargetLocationZ = z;
-    }
-
-    /// <summary>
-    ///     Clears the pursuit-target descriptor -- legacy routes an invalid/out-of-range chase target back to the
-    ///     idle state with no target (<c>Server/ts25zone/S07_MyGame05.cpp:1351-1365</c>). Deliberately leaves
-    ///     <see cref="TargetLocationX" />/Y/Z at their last value, matching legacy's retention of the stale
-    ///     <c>aTargetLocation</c> across the transition back to idle.
-    /// </summary>
-    public void ReleaseTarget()
-    {
-        TargetCharacterId = null;
-        TargetUniqueNumber = 0;
-    }
-
     public TimeSpan LastRebroadcastAt { get; set; }
 
     /// <summary>
@@ -231,6 +204,33 @@ public sealed class MonsterEntity
 
     /// <summary>Current HP -- safe to read from any thread (<see cref="Volatile.Read(ref int)" />).</summary>
     public int Life => Volatile.Read(ref _life);
+
+    /// <summary>
+    ///     Locks <paramref name="characterId" /> as the pursuit target and captures its wire identity and live
+    ///     position as the broadcast target descriptor -- legacy sets <c>aTargetObjectIndex</c>,
+    ///     <c>aTargetObjectUniqueNumber</c>, and (for the moving/attacking transitions) <c>aTargetLocation</c>
+    ///     together (<c>Server/ts25zone/S07_MyGame05.cpp:1104-1105,1166-1171,1373-1374</c>).
+    /// </summary>
+    public void AssignTarget(int characterId, uint uniqueNumber, float x, float y, float z)
+    {
+        TargetCharacterId = characterId;
+        TargetUniqueNumber = uniqueNumber;
+        TargetLocationX = x;
+        TargetLocationY = y;
+        TargetLocationZ = z;
+    }
+
+    /// <summary>
+    ///     Clears the pursuit-target descriptor -- legacy routes an invalid/out-of-range chase target back to the
+    ///     idle state with no target (<c>Server/ts25zone/S07_MyGame05.cpp:1351-1365</c>). Deliberately leaves
+    ///     <see cref="TargetLocationX" />/Y/Z at their last value, matching legacy's retention of the stale
+    ///     <c>aTargetLocation</c> across the transition back to idle.
+    /// </summary>
+    public void ReleaseTarget()
+    {
+        TargetCharacterId = null;
+        TargetUniqueNumber = 0;
+    }
 
     /// <summary>Builds a freshly spawned instance, seeded at full life and parked at its own home point.</summary>
     /// <param name="random">

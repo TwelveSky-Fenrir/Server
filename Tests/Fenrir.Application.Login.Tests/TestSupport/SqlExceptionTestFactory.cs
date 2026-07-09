@@ -27,9 +27,9 @@ internal static class SqlExceptionTestFactory
     public static SqlException WithNumber(int number, string message = "Simulated SQL error")
     {
         var sqlClientAssembly = typeof(SqlException).Assembly;
-        var sqlErrorType = sqlClientAssembly.GetType("Microsoft.Data.SqlClient.SqlError", throwOnError: true)!;
+        var sqlErrorType = sqlClientAssembly.GetType("Microsoft.Data.SqlClient.SqlError", true)!;
         var sqlErrorCollectionType =
-            sqlClientAssembly.GetType("Microsoft.Data.SqlClient.SqlErrorCollection", throwOnError: true)!;
+            sqlClientAssembly.GetType("Microsoft.Data.SqlClient.SqlErrorCollection", true)!;
 
         var errorCtor = sqlErrorType.GetConstructor(
             BindingFlags.NonPublic | BindingFlags.Instance,
@@ -37,10 +37,12 @@ internal static class SqlExceptionTestFactory
                 typeof(int), typeof(byte), typeof(byte), typeof(string), typeof(string), typeof(string),
                 typeof(int), typeof(Exception)
             ])!;
-        var sqlError = errorCtor.Invoke([number, (byte)1, (byte)16, "fenrir-test-server", message,
-            "usp_Gift_ClaimIntoVault", 0, null]);
+        var sqlError = errorCtor.Invoke([
+            number, (byte)1, (byte)16, "fenrir-test-server", message,
+            "usp_Gift_ClaimIntoVault", 0, null
+        ]);
 
-        var errors = Activator.CreateInstance(sqlErrorCollectionType, nonPublic: true)!;
+        var errors = Activator.CreateInstance(sqlErrorCollectionType, true)!;
         var addMethod = sqlErrorCollectionType.GetMethod("Add", BindingFlags.NonPublic | BindingFlags.Instance)!;
         addMethod.Invoke(errors, [sqlError]);
 

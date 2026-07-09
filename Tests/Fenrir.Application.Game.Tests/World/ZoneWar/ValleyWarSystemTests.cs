@@ -55,8 +55,10 @@ public class ValleyWarSystemTests
         return (registry[mapId], session, pipe);
     }
 
-    /// <summary>Ticks Idle -> GateCountdown(5 announcements + open) -> GateOpen -> DoorPending, landing exactly
-    /// on the tick the door opens and <see cref="ValleyWarPhase.KillRace" /> begins.</summary>
+    /// <summary>
+    ///     Ticks Idle -> GateCountdown(5 announcements + open) -> GateOpen -> DoorPending, landing exactly
+    ///     on the tick the door opens and <see cref="ValleyWarPhase.KillRace" /> begins.
+    /// </summary>
     private static void AdvanceToKillRaceStart(ValleyWarSystem system, ValleyWarKillRegistry killRegistry,
         Zone valleyZone)
     {
@@ -184,7 +186,8 @@ public class ValleyWarSystemTests
 
         Assert.Equal(ValleyWarPhase.PreReset, killRegistry.GetOrCreate(ValleyMapId).Phase);
         AssertZoneEventInfo(ZoneTestKit.DrainOutbound(witnessPipe), 669);
-        Assert.Null(valleySession.DisconnectReason); // not disconnected yet -- PreReset's own 1-minute wait hasn't elapsed
+        Assert.Null(valleySession
+            .DisconnectReason); // not disconnected yet -- PreReset's own 1-minute wait hasn't elapsed
     }
 
     [Fact]

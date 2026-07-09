@@ -8,7 +8,6 @@ using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Stats;
-using Fenrir.Data.Abstractions.Game;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Dispatch.Zone.Sessions;
 using Fenrir.Network.Serialization.Shared.Packets.Shared;
@@ -112,7 +111,8 @@ public sealed class GmBasicCommandService(
 
         // Dedicated visibility-change notification, self-only, THEN the shared generic acknowledgment --
         // double-acknowledgment shape (S04_MyWork04.cpp:933-958, S05_MyTransfer.cpp:519-541).
-        zoneSession.Send(new AvatarStatUpdateResponse { Sort = VisibilityStatSort, Value = newVisibleState, Value2 = 0 });
+        zoneSession.Send(
+            new AvatarStatUpdateResponse { Sort = VisibilityStatSort, Value = newVisibleState, Value2 = 0 });
         SendAck(zoneSession, sort, data, SuccessResult);
     }
 
@@ -158,7 +158,8 @@ public sealed class GmBasicCommandService(
         {
             // Audit-logged BEFORE the mutation, matching this sub-operation's own citation ordering.
             await eventLog.LogAsync(GmActionEventCodes.MonsterForceKill, EventLogCategory.GmAction,
-                zoneSession.AccountId, zoneSession.CharacterId, null, null, null, null, null, monster.Template.MonsterId,
+                zoneSession.AccountId, zoneSession.CharacterId, null, null, null, null, null,
+                monster.Template.MonsterId,
                 null, 1, $"ServerIndex={index};MonsterName={monster.Template.Name}", cancellationToken);
 
             // Lethal, unattributed damage -- no attacker credit means MonsterSpawnScheduler.ProcessDeath's own
@@ -270,7 +271,8 @@ public sealed class GmBasicCommandService(
 
         var destination = (state.PosX, state.PosY, state.PosZ);
         if (!await targetZone!.PostTribeProgressCommandAndWaitAsync(
-                new TribeProgressZoneCommand(target.CharacterId, TeleportTo: destination, NeighborActionBroadcast: true),
+                new TribeProgressZoneCommand(target.CharacterId, TeleportTo: destination,
+                    NeighborActionBroadcast: true),
                 cancellationToken))
             logger.LogError(
                 "Zone {MapId} tribe-progress inbox full: dropped CALL mirror for target character {CharacterId}",
@@ -388,7 +390,8 @@ public sealed class GmBasicCommandService(
         SendAck(zoneSession, KickSort, data, SuccessResult);
     }
 
-    public ValueTask HandleTribeBankAsync(byte[] data, ZoneClientSession zoneSession, CancellationToken cancellationToken)
+    public ValueTask HandleTribeBankAsync(byte[] data, ZoneClientSession zoneSession,
+        CancellationToken cancellationToken)
     {
         if (!MeetsTierOrAbort(zoneSession, TribeBankSort))
             return ValueTask.CompletedTask;
@@ -424,7 +427,8 @@ public sealed class GmBasicCommandService(
         long newExperience;
         int newExp2;
 
-        var maxBaseExperience = worldData.LevelsByLevel.TryGetValue(BaseLevelCap, out var maxRow) ? maxRow.ExpRangeMax : 0;
+        var maxBaseExperience =
+            worldData.LevelsByLevel.TryGetValue(BaseLevelCap, out var maxRow) ? maxRow.ExpRangeMax : 0;
 
         if (requested <= BaseLevelCap)
         {
@@ -463,10 +467,12 @@ public sealed class GmBasicCommandService(
         // see this method's own contract.
         var equipmentContainer = state.Inventory.GetContainer(ContainerMatrix.Equipment);
         var petItemId = equipmentContainer.TryGetValue(PetSlots.EquipmentSlot, out var petStack) ? petStack.ItemId : 0;
-        var petContribution = PetGrowthCalculator.Compute(petItemId, state.PetGrowth, state.PetActivity, worldData.ItemsById);
+        var petContribution =
+            PetGrowthCalculator.Compute(petItemId, state.PetGrowth, state.PetActivity, worldData.ItemsById);
         var attributes = new CharacterBaseAttributes(state.StatVit, state.StatStr, state.StatInt, state.StatDex,
             newLevel, state.Tribe, state.PreviousTribe, state.Title, state.Halo, newRebirthCount);
-        var stats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData, state.Buffs, petContribution);
+        var stats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData, state.Buffs,
+            petContribution);
 
         var command = new TribeProgressZoneCommand(state.CharacterId, Level: newLevel, Level2: newLevel2,
             RebirthCount: newRebirthCount, Experience: newExperience, Exp2: newExp2,
@@ -481,7 +487,8 @@ public sealed class GmBasicCommandService(
         SendAck(zoneSession, LevelSort, data, SuccessResult);
     }
 
-    public ValueTask HandleStatEditAsync(byte[] data, ZoneClientSession zoneSession, CancellationToken cancellationToken)
+    public ValueTask HandleStatEditAsync(byte[] data, ZoneClientSession zoneSession,
+        CancellationToken cancellationToken)
     {
         if (!MeetsTierOrAbort(zoneSession, StatEditSort))
             return ValueTask.CompletedTask;

@@ -3,7 +3,7 @@ using Fenrir.Network.Serialization.Wire.Attributes;
 namespace Fenrir.Network.Serialization.Shared.Packets.Shared;
 
 [FenrirWireType(824)]
-public readonly partial record struct ProxyShopUserInfo : IFenrirWireType<ProxyShopUserInfo>
+public readonly record struct ProxyShopUserInfo : IFenrirWireType<ProxyShopUserInfo>
 {
     [FixedString(13)] public required string AvatarName { get; init; }
 

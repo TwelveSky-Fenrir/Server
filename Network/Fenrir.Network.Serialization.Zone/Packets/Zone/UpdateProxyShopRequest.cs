@@ -8,7 +8,7 @@ namespace Fenrir.Network.Serialization.Zone.Packets.Zone;
 /// <summary>Pack(1): no padding after AvatarName[13] (unlike <see cref="ProxyShopUserInfo" />).</summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.UpdateProxyShop,
     ExpectedSize = 82, AllowedStates = [(byte)ZoneSessionState.Registering, (byte)ZoneSessionState.InWorld])]
-public readonly partial record struct UpdateProxyShopRequest : IIncomingPacket<UpdateProxyShopRequest>
+public readonly record struct UpdateProxyShopRequest : IIncomingPacket<UpdateProxyShopRequest>
 {
     [FixedString(13)] public required string AvatarName { get; init; }
     public required int SellPage { get; init; }

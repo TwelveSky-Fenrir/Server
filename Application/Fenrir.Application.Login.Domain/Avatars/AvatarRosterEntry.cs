@@ -21,7 +21,10 @@ namespace Fenrir.Application.Login.Domain.Avatars;
 ///     Live friend-list lookup (<c>IFriendRepository.GetByCharacterAsync</c>), keyed by the friend's own
 ///     client-chosen slot index -- sparse by design, unfilled slots stay "".
 /// </param>
-/// <param name="Teacher">Live mentor-bond lookup (<c>IMentorRepository.GetForCharacterAsync</c>), "" if this character has no teacher.</param>
+/// <param name="Teacher">
+///     Live mentor-bond lookup (<c>IMentorRepository.GetForCharacterAsync</c>), "" if this character has
+///     no teacher.
+/// </param>
 /// <param name="Student">Same lookup as <paramref name="Teacher" />, "" if this character has no student.</param>
 public sealed record AvatarRosterEntry(
     CharacterRosterDto Character,

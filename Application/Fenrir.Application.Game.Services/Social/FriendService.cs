@@ -8,7 +8,6 @@ using Fenrir.Application.Game.Domain.Social.Mentor;
 using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Data.Abstractions.Runtime;
 using Fenrir.Network.Serialization.Zone.Packets.Zone;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -127,74 +126,6 @@ public sealed class FriendService(
                     asker.CharacterId);
                 return FriendAskResultKind.AskerBusy;
         }
-    }
-
-    /// <summary>
-    ///     WS1.4 same-shard-miss fallback: resolves <paramref name="targetAvatarName" /> via the cross-shard
-    ///     character-location directory, re-runs the two pre-checks that are still evaluable from local data
-    ///     (already-friend-or-full against <paramref name="asker" />'s own list; same-tribe against the
-    ///     directory row's own denormalized Tribe), then publishes an Ask row via
-    ///     <see cref="ISocialCrossShardRelayQueue" /> and registers the asker-side busy gate
-    ///     (<see cref="FriendRegistry.TryAskCrossShard" />). The remaining target-side pre-check
-    ///     (<c>IsExcludedByCommunityWork</c>, which needs the target's own live state) is re-run on the
-    ///     target's own shard by <see cref="FriendCrossShardRelayHandler.HandleAskAsync" /> once delivered.
-    /// </summary>
-    private async ValueTask<FriendAskResultKind> AskCrossShardAsync(PlayerRuntimeState asker,
-        string targetAvatarName, CancellationToken cancellationToken)
-    {
-        var remote = await characterShardLocations.FindByNameAsync(targetAvatarName, cancellationToken)
-            .ConfigureAwait(false);
-
-        if (remote is null)
-        {
-            logger.LogDebug(
-                "Friend ask rejected: character {AskerId} target {TargetAvatarName} not found on any shard",
-                asker.CharacterId, targetAvatarName);
-            return FriendAskResultKind.TargetNotFound;
-        }
-
-        if (asker.Friends.Count >= MaxFriends || asker.Friends.Values.Contains(remote.CharacterId))
-        {
-            logger.LogDebug(
-                "Friend ask rejected: character {AskerId} already has {FriendCount} friends or is already friends with cross-shard character {TargetCharacterId}",
-                asker.CharacterId, asker.Friends.Count, remote.CharacterId);
-            return FriendAskResultKind.AlreadyFriendOrFull;
-        }
-
-        if (asker.Tribe != remote.Tribe)
-        {
-            logger.LogWarning(
-                "Friend ask rejected: character {AskerId} (tribe {AskerTribe}) targeted cross-shard character {TargetCharacterId} (tribe {TargetTribe}) -- session will be disconnected",
-                asker.CharacterId, asker.Tribe, remote.CharacterId, remote.Tribe);
-            return FriendAskResultKind.TribeMismatch;
-        }
-
-        var outcome = friends.TryAskCrossShard(asker.CharacterId,
-            new CrossShardOutboundAsk(remote.ShardId, remote.CharacterId, remote.AvatarName));
-
-        if (outcome != FriendAskOutcome.Sent)
-        {
-            logger.LogDebug("Friend ask rejected: character {AskerId} is busy (cross-shard registration)",
-                asker.CharacterId);
-            return FriendAskResultKind.AskerBusy;
-        }
-
-        crossShardRelay.Enqueue(new SocialCrossShardRelayEntry(
-            SocialCrossShardRelayKind.Friend,
-            SocialCrossShardRelayMessageType.Ask,
-            null,
-            null,
-            options.Value.ShardId,
-            asker.CharacterId,
-            asker.Name,
-            remote.ShardId,
-            remote.CharacterId,
-            null));
-
-        logger.LogDebug(
-            "Friend ask published cross-shard: character {AskerId} ({AskerName}) -> character {TargetCharacterId} on shard {TargetShardId}",
-            asker.CharacterId, asker.Name, remote.CharacterId, remote.ShardId);
-        return FriendAskResultKind.SentCrossShard;
     }
 
     /// <summary>
@@ -357,6 +288,74 @@ public sealed class FriendService(
         logger.LogInformation("Friend removed: character {CharacterId} removed slot {Index}", state.CharacterId,
             index);
         return FriendRemoveResultKind.Removed;
+    }
+
+    /// <summary>
+    ///     WS1.4 same-shard-miss fallback: resolves <paramref name="targetAvatarName" /> via the cross-shard
+    ///     character-location directory, re-runs the two pre-checks that are still evaluable from local data
+    ///     (already-friend-or-full against <paramref name="asker" />'s own list; same-tribe against the
+    ///     directory row's own denormalized Tribe), then publishes an Ask row via
+    ///     <see cref="ISocialCrossShardRelayQueue" /> and registers the asker-side busy gate
+    ///     (<see cref="FriendRegistry.TryAskCrossShard" />). The remaining target-side pre-check
+    ///     (<c>IsExcludedByCommunityWork</c>, which needs the target's own live state) is re-run on the
+    ///     target's own shard by <see cref="FriendCrossShardRelayHandler.HandleAskAsync" /> once delivered.
+    /// </summary>
+    private async ValueTask<FriendAskResultKind> AskCrossShardAsync(PlayerRuntimeState asker,
+        string targetAvatarName, CancellationToken cancellationToken)
+    {
+        var remote = await characterShardLocations.FindByNameAsync(targetAvatarName, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (remote is null)
+        {
+            logger.LogDebug(
+                "Friend ask rejected: character {AskerId} target {TargetAvatarName} not found on any shard",
+                asker.CharacterId, targetAvatarName);
+            return FriendAskResultKind.TargetNotFound;
+        }
+
+        if (asker.Friends.Count >= MaxFriends || asker.Friends.Values.Contains(remote.CharacterId))
+        {
+            logger.LogDebug(
+                "Friend ask rejected: character {AskerId} already has {FriendCount} friends or is already friends with cross-shard character {TargetCharacterId}",
+                asker.CharacterId, asker.Friends.Count, remote.CharacterId);
+            return FriendAskResultKind.AlreadyFriendOrFull;
+        }
+
+        if (asker.Tribe != remote.Tribe)
+        {
+            logger.LogWarning(
+                "Friend ask rejected: character {AskerId} (tribe {AskerTribe}) targeted cross-shard character {TargetCharacterId} (tribe {TargetTribe}) -- session will be disconnected",
+                asker.CharacterId, asker.Tribe, remote.CharacterId, remote.Tribe);
+            return FriendAskResultKind.TribeMismatch;
+        }
+
+        var outcome = friends.TryAskCrossShard(asker.CharacterId,
+            new CrossShardOutboundAsk(remote.ShardId, remote.CharacterId, remote.AvatarName));
+
+        if (outcome != FriendAskOutcome.Sent)
+        {
+            logger.LogDebug("Friend ask rejected: character {AskerId} is busy (cross-shard registration)",
+                asker.CharacterId);
+            return FriendAskResultKind.AskerBusy;
+        }
+
+        crossShardRelay.Enqueue(new SocialCrossShardRelayEntry(
+            SocialCrossShardRelayKind.Friend,
+            SocialCrossShardRelayMessageType.Ask,
+            null,
+            null,
+            options.Value.ShardId,
+            asker.CharacterId,
+            asker.Name,
+            remote.ShardId,
+            remote.CharacterId,
+            null));
+
+        logger.LogDebug(
+            "Friend ask published cross-shard: character {AskerId} ({AskerName}) -> character {TargetCharacterId} on shard {TargetShardId}",
+            asker.CharacterId, asker.Name, remote.CharacterId, remote.ShardId);
+        return FriendAskResultKind.SentCrossShard;
     }
 
     /// <summary>

@@ -19,9 +19,11 @@ namespace Fenrir.Network.Serialization.Shared.Packets.Shared;
 ///     </para>
 /// </summary>
 [FenrirWireType(4)]
-public readonly partial record struct GmSummonMonsterPayload : IFenrirWireType<GmSummonMonsterPayload>
+public readonly record struct GmSummonMonsterPayload : IFenrirWireType<GmSummonMonsterPayload>
 {
-    /// <summary>Monster template id to summon. Used directly with no validity check of any kind -- not checked
-    /// positive, not checked to correspond to a real template.</summary>
+    /// <summary>
+    ///     Monster template id to summon. Used directly with no validity check of any kind -- not checked
+    ///     positive, not checked to correspond to a real template.
+    /// </summary>
     public required int Value { get; init; }
 }

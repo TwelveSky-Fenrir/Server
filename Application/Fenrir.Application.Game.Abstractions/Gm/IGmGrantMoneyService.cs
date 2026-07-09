@@ -18,6 +18,9 @@ namespace Fenrir.Application.Game.Abstractions.Gm;
 /// </summary>
 public interface IGmGrantMoneyService
 {
-    /// <summary><paramref name="data" /> is the raw, unmodified 130-byte tData blob to echo back verbatim (never read for this sub-command).</summary>
-    ValueTask HandleAsync(byte[] data, ZoneClientSession zoneSession, CancellationToken cancellationToken);
+    /// <summary>
+    ///     <paramref name="data" /> is the raw, unmodified 130-byte tData blob to echo back verbatim (never read for this
+    ///     sub-command).
+    /// </summary>
+    public ValueTask HandleAsync(byte[] data, ZoneClientSession zoneSession, CancellationToken cancellationToken);
 }

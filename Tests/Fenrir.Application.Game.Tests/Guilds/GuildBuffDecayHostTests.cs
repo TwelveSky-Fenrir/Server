@@ -9,7 +9,8 @@ namespace Fenrir.Application.Game.Tests.Guilds;
 
 public class GuildBuffDecayHostTests
 {
-    private static GuildBuffDecayHost CreateHost(IGuildRepository repository, FakeGuildBuffExpiryRelayQueue? relay = null,
+    private static GuildBuffDecayHost CreateHost(IGuildRepository repository,
+        FakeGuildBuffExpiryRelayQueue? relay = null,
         byte shardId = 1)
     {
         var options = ZoneTestKit.Options();

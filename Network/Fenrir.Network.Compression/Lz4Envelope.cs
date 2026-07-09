@@ -21,7 +21,7 @@ public static class Lz4Envelope
         try
         {
             var compressedSpan = compressedRented.AsSpan(0, maxCompressedSize);
-            var compressSize = LZ4Codec.Encode(plainPayload, compressedSpan, LZ4Level.L00_FAST);
+            var compressSize = LZ4Codec.Encode(plainPayload, compressedSpan);
             var isCompress = compressSize > 0;
             var bodySize = isCompress ? compressSize : payloadSize;
 

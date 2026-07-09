@@ -13,6 +13,7 @@
 // action behind an unauthenticated GET (or any verb without a real credential check), and must bind to a
 // scope no broader than the ts25 loopback-only precedent unless there is an explicit, reviewed reason to
 // widen it.
+
 using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Commerce;
 using Fenrir.Application.Game.Domain.Extensions;
@@ -35,7 +36,6 @@ using Fenrir.Data.Abstractions.Guilds;
 using Fenrir.Data.Abstractions.Progression;
 using Fenrir.Data.Abstractions.Runtime;
 using Fenrir.Data.Abstractions.World;
-using Fenrir.Network.Dispatch;
 using Fenrir.Network.Dispatch.RateLimiting;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.ServiceDefaults;
@@ -109,7 +109,8 @@ try
     // back in immediately regardless of how recently they were killed.
     bootStep = "MonsterBossRespawnTracker.InitializeAsync";
     await host.Services.GetRequiredService<MonsterBossRespawnTracker>()
-        .InitializeAsync(host.Services.GetRequiredService<IMonsterBossRespawnTimerRepository>(), CancellationToken.None);
+        .InitializeAsync(host.Services.GetRequiredService<IMonsterBossRespawnTimerRepository>(),
+            CancellationToken.None);
 
     // Must run before ZoneTickHost/ZoneConnectionHost start accepting ticks or connections.
     bootStep = "IShardMapAssignmentRepository.GetHostedMapsAsync";

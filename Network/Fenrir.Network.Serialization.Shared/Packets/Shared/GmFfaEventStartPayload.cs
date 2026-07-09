@@ -20,11 +20,13 @@ namespace Fenrir.Network.Serialization.Shared.Packets.Shared;
 ///     </para>
 /// </summary>
 [FenrirWireType(4)]
-public readonly partial record struct GmFfaEventStartPayload : IFenrirWireType<GmFfaEventStartPayload>
+public readonly record struct GmFfaEventStartPayload : IFenrirWireType<GmFfaEventStartPayload>
 {
-    /// <summary>Requested duration in minutes. Any value (including zero/negative/unbounded-positive) is
-    /// syntactically accepted. Verified finding: this value has zero observable effect on the FFA event's
-    /// actual timing under any circumstance -- it is unconditionally overwritten before ever being read (see
-    /// the behavior contract's Side effects). Do not treat this as a real "set duration" input.</summary>
+    /// <summary>
+    ///     Requested duration in minutes. Any value (including zero/negative/unbounded-positive) is
+    ///     syntactically accepted. Verified finding: this value has zero observable effect on the FFA event's
+    ///     actual timing under any circumstance -- it is unconditionally overwritten before ever being read (see
+    ///     the behavior contract's Side effects). Do not treat this as a real "set duration" input.
+    /// </summary>
     public required int Time { get; init; }
 }

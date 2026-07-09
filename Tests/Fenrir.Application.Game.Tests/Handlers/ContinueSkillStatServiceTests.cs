@@ -2,7 +2,6 @@ using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Services.ZoneLifecycle;
 using Fenrir.Application.Game.Tests.TestSupport;
-using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Dispatch.Zone.Sessions;
 
 namespace Fenrir.Application.Game.Tests.Handlers;

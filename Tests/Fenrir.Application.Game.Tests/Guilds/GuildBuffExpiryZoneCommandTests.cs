@@ -18,7 +18,7 @@ public class GuildBuffExpiryZoneCommandTests
     public void ApplyGuildBuffExpiryCommand_MatchingMember_FlipsBothFields_AndSendsNotification()
     {
         var zone = ZoneTestKit.CreateZone(1);
-        var (_, pipe, state) = Enter(zone, 10, guildId: 5);
+        var (_, pipe, state) = Enter(zone, 10, 5);
         state.GuildBuffActive = true;
         state.GuildBuffActiveMirror = true;
 
@@ -36,7 +36,7 @@ public class GuildBuffExpiryZoneCommandTests
     public void ApplyGuildBuffExpiryCommand_NonMatchingGuild_LeavesFieldsUntouched_NoNotification()
     {
         var zone = ZoneTestKit.CreateZone(1);
-        var (_, pipe, state) = Enter(zone, 10, guildId: 5);
+        var (_, pipe, state) = Enter(zone, 10, 5);
         state.GuildBuffActive = true;
         state.GuildBuffActiveMirror = true;
 
@@ -53,7 +53,7 @@ public class GuildBuffExpiryZoneCommandTests
     public void ApplyGuildBuffExpiryCommand_MidZoneTransfer_StillFlipsFields_ButSendsNoNotification()
     {
         var zone = ZoneTestKit.CreateZone(1);
-        var (_, pipe, state) = Enter(zone, 10, guildId: 5);
+        var (_, pipe, state) = Enter(zone, 10, 5);
         state.GuildBuffActive = true;
         state.GuildBuffActiveMirror = true;
         state.IsMovingZone = true;
@@ -71,8 +71,8 @@ public class GuildBuffExpiryZoneCommandTests
     public void ApplyGuildBuffExpiryCommand_MultipleMatchingMembers_EachIndependentlyNotified()
     {
         var zone = ZoneTestKit.CreateZone(1);
-        var (_, pipeA, stateA) = Enter(zone, 10, guildId: 5);
-        var (_, pipeB, stateB) = Enter(zone, 20, guildId: 5);
+        var (_, pipeA, stateA) = Enter(zone, 10, 5);
+        var (_, pipeB, stateB) = Enter(zone, 20, 5);
         stateA.GuildBuffActive = true;
         stateB.GuildBuffActive = true;
         ZoneTestKit.DrainOutbound(pipeA); // the second Enter's own AOI join broadcast, not under test

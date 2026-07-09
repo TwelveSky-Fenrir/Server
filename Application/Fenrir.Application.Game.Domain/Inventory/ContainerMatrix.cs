@@ -1,7 +1,5 @@
 using System.Collections.Immutable;
 
-using Fenrir.Network.Dispatch.Zone.Sessions;
-
 namespace Fenrir.Application.Game.Domain.Inventory;
 
 /// <summary>

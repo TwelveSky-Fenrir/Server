@@ -5,7 +5,7 @@
 -- is the missing write path; Tools/Fenrir.Tools.AccountProvisioning's "grant-gm" subcommand is the
 -- CLI surface over it. Idempotent by design (a plain overwrite of the current value, not a delta).
 CREATE PROCEDURE auth.usp_Account_SetGrade @LoginName NVARCHAR(64),
-                                            @AccountGrade SMALLINT
+                                           @AccountGrade SMALLINT
 AS
 BEGIN
     SET

@@ -6,7 +6,7 @@ namespace Fenrir.Network.Serialization.Zone.Packets.Zone;
 // 428B payload: WCDEV3 off (no tCompress), MAX_AVATAR_EFFECT_SORT_NUM=35 -> 4+4+35*2*4+35*4.
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.AvatarEffectState,
     ExpectedSize = 429)]
-public readonly partial record struct AvatarEffectStateResponse : IOutgoingPacket
+public readonly record struct AvatarEffectStateResponse : IOutgoingPacket
 {
     public required int ServerIndex { get; init; }
     public required uint UniqueNumber { get; init; }

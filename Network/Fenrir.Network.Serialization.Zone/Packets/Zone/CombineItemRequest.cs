@@ -6,7 +6,7 @@ namespace Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.CombineItem, ExpectedSize = 29,
     AllowedStates = [(byte)ZoneSessionState.Registering, (byte)ZoneSessionState.InWorld])]
-public readonly partial record struct CombineItemRequest : IIncomingPacket<CombineItemRequest>
+public readonly record struct CombineItemRequest : IIncomingPacket<CombineItemRequest>
 {
     public required int Page1 { get; init; }
 

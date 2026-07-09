@@ -6,6 +6,6 @@ namespace Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.TradeStart, ExpectedSize = 9,
     AllowedStates = [(byte)ZoneSessionState.Registering, (byte)ZoneSessionState.InWorld])]
-public readonly partial record struct TradeStartRequest : IIncomingPacket<TradeStartRequest>
+public readonly record struct TradeStartRequest : IIncomingPacket<TradeStartRequest>
 {
 }

@@ -21,6 +21,31 @@ public sealed partial class Zone
     private const float FlinchDamageThresholdRatio = 0.10f;
 
     /// <summary>
+    ///     Dedicated <see cref="MonsterEntity.ServerIndex" /> pool for the Elevated-tier "moncall" GM command
+    ///     (tSort 506) -- same "each ad-hoc/reserved spawn family gets its own non-overlapping base" convention
+    ///     already established by <c>ZoneWar.TribeGuardSpawner.OrdinaryPoolServerIndexBase</c>/
+    ///     <c>Zone038WinnerPoolServerIndexBase</c> (1_000_000/1_001_000) and
+    ///     <c>ZoneWar.TribeSymbolSpawner.SymbolPoolServerIndexBase</c> (1_002_000, size 100) -- well clear of
+    ///     <see cref="Monsters.MonsterSpawnScheduler" />'s own ordinary per-zone slot numbering (1..
+    ///     <c>RegularMonsterTableCapacity</c> = 3400) and of <see cref="SummonPersonalBoss" />'s own
+    ///     character-id-keyed slot reuse. A purely internal Fenrir bookkeeping choice -- legacy's own
+    ///     <c>SummonMonsterForSpecial</c> has no equivalent slot-numbering concept for this GM command to port.
+    /// </summary>
+    private const int GmSummonPoolServerIndexBase = 1_003_000;
+
+    /// <summary>Size of <see cref="GmSummonPoolServerIndexBase" />'s reserved range.</summary>
+    private const int GmSummonPoolSize = 1_000;
+
+    /// <summary>
+    ///     Free-roam leash for a "moncall"-summoned monster -- same value as <see cref="PersonalDungeonBossLeashRadius" />
+    ///     (Zone.DungeonInstance.cs), reused here as a reasonable boss-scale default since "moncall" is most
+    ///     often used to test/battle a boss-tier monster; the source behavior contract for tSort 506 does not
+    ///     itself specify a leash radius (the underlying <c>SummonMonsterForSpecial</c> primitive is not
+    ///     independently modeled in Fenrir with its own leash parameter for this call).
+    /// </summary>
+    private const float GmSummonLeashRadius = 200f;
+
+    /// <summary>
     ///     Enqueued by <see cref="TryDamageMonster" /> (any thread) on a killing blow, drained by
     ///     <see cref="Monsters.MonsterSpawnScheduler" /> on this zone's own next tick (single-writer preserved).
     /// </summary>
@@ -44,30 +69,6 @@ public sealed partial class Zone
     private readonly List<int> _monsterBroadcastNeighborScratch = [];
 
     /// <summary>
-    ///     Reusable scratch buffer for <see cref="ResolveMonsterAttack" />'s raw AOI-neighbor scan, drained into
-    ///     <see cref="_mvpAttackRecipientScratch" /> immediately after -- same non-allocating shape and reuse
-    ///     justification as <see cref="_monsterBroadcastNeighborScratch" />: single tick thread, cleared before
-    ///     use, never read after the immediately-following broadcast returns.
-    /// </summary>
-    private readonly List<int> _mvpAttackNeighborScratch = [];
-
-    /// <summary>
-    ///     Reusable scratch buffer for <see cref="ResolveMonsterAttack" />'s target+neighbors AOI recipient set
-    ///     -- replaces a per-attack <c>new HashSet&lt;int&gt;()</c>. Same single-tick-thread reuse posture as
-    ///     every other scratch buffer in this file family.
-    /// </summary>
-    private readonly HashSet<int> _mvpAttackRecipientScratch = [];
-
-    /// <summary>
-    ///     Reusable scratch buffer for <see cref="SendExistingMonstersTo" />'s <see cref="_monsterGrid" />
-    ///     neighbor scan -- replaces the enumerable-returning, iterator-allocating
-    ///     <see cref="AoiGrid.Neighbors(ValueTuple{int,int},float,float,float,int)" /> overload with the
-    ///     non-allocating buffer overload. Single tick thread, cleared before use, consumed entirely by the
-    ///     immediately-following per-monster send loop before <see cref="SendExistingMonstersTo" /> returns.
-    /// </summary>
-    private readonly List<int> _sendExistingMonstersScratch = [];
-
-    /// <summary>
     ///     Monster-side counterpart to <see cref="_grid" />, keyed by <see cref="MonsterEntity.ServerIndex" />
     ///     instead of character id -- lets <see cref="SendExistingMonstersTo" /> query nearby monsters directly
     ///     instead of scanning every monster this zone holds. Tick-owned only, same posture as <see cref="_grid" />
@@ -85,11 +86,35 @@ public sealed partial class Zone
     private readonly ConcurrentDictionary<int, MonsterEntity> _monsters = new();
 
     /// <summary>
+    ///     Reusable scratch buffer for <see cref="ResolveMonsterAttack" />'s raw AOI-neighbor scan, drained into
+    ///     <see cref="_mvpAttackRecipientScratch" /> immediately after -- same non-allocating shape and reuse
+    ///     justification as <see cref="_monsterBroadcastNeighborScratch" />: single tick thread, cleared before
+    ///     use, never read after the immediately-following broadcast returns.
+    /// </summary>
+    private readonly List<int> _mvpAttackNeighborScratch = [];
+
+    /// <summary>
+    ///     Reusable scratch buffer for <see cref="ResolveMonsterAttack" />'s target+neighbors AOI recipient set
+    ///     -- replaces a per-attack <c>new HashSet&lt;int&gt;()</c>. Same single-tick-thread reuse posture as
+    ///     every other scratch buffer in this file family.
+    /// </summary>
+    private readonly HashSet<int> _mvpAttackRecipientScratch = [];
+
+    /// <summary>
     ///     Server-initiated monster-kill money grants, queued rather than awaited inline because
     ///     <see cref="Tick" /> is fully synchronous and must never block on SQL I/O; drained by
     ///     <see cref="MonsterLootFlushHost" /> from any thread.
     /// </summary>
     private readonly ConcurrentQueue<(int CharacterId, long Amount)> _pendingMoneyGrants = new();
+
+    /// <summary>
+    ///     Reusable scratch buffer for <see cref="SendExistingMonstersTo" />'s <see cref="_monsterGrid" />
+    ///     neighbor scan -- replaces the enumerable-returning, iterator-allocating
+    ///     <see cref="AoiGrid.Neighbors(ValueTuple{int,int},float,float,float,int)" /> overload with the
+    ///     non-allocating buffer overload. Single tick thread, cleared before use, consumed entirely by the
+    ///     immediately-following per-monster send loop before <see cref="SendExistingMonstersTo" /> returns.
+    /// </summary>
+    private readonly List<int> _sendExistingMonstersScratch = [];
 
     private int _monsterUniqueNumberSeed;
 
@@ -551,8 +576,12 @@ public sealed partial class Zone
     ///     tick-owned caller (<see cref="Monsters.MonsterAiSystem" />) fires this at every FSM transition that
     ///     changes the monster's visible action or target, matching legacy's unconditional
     ///     <c>B_MONSTER_ACTION_RECV(..., 1)</c> + <c>Send1</c>/<c>Send2</c>/<c>Send3</c> at each such transition
-    ///     (<c>Server/ts25zone/S07_MyGame05.cpp:1027-1028,1063-1064,1172-1173,1354-1356,1362-1364,1380-1381,
-    ///     1671-1672</c>). This is the piece that was missing: previously monsters only ever reached clients via
+    ///     (
+    ///     <c>
+    ///         Server/ts25zone/S07_MyGame05.cpp:1027-1028,1063-1064,1172-1173,1354-1356,1362-1364,1380-1381,
+    ///         1671-1672
+    ///     </c>
+    ///     ). This is the piece that was missing: previously monsters only ever reached clients via
     ///     the 5 s keep-alive below, so a real client learned about an aggro/attack/return only up to 5 s late
     ///     (and, before the descriptor fix, malformed) -- which desynced and reset the client's monster
     ///     simulation. <c>1</c> tells the client "this is a new action, render it," distinct from the keep-alive's
@@ -634,31 +663,6 @@ public sealed partial class Zone
             ArrayPool<byte>.Shared.Return(rented);
         }
     }
-
-    /// <summary>
-    ///     Dedicated <see cref="MonsterEntity.ServerIndex" /> pool for the Elevated-tier "moncall" GM command
-    ///     (tSort 506) -- same "each ad-hoc/reserved spawn family gets its own non-overlapping base" convention
-    ///     already established by <c>ZoneWar.TribeGuardSpawner.OrdinaryPoolServerIndexBase</c>/
-    ///     <c>Zone038WinnerPoolServerIndexBase</c> (1_000_000/1_001_000) and
-    ///     <c>ZoneWar.TribeSymbolSpawner.SymbolPoolServerIndexBase</c> (1_002_000, size 100) -- well clear of
-    ///     <see cref="Monsters.MonsterSpawnScheduler" />'s own ordinary per-zone slot numbering (1..
-    ///     <c>RegularMonsterTableCapacity</c> = 3400) and of <see cref="SummonPersonalBoss" />'s own
-    ///     character-id-keyed slot reuse. A purely internal Fenrir bookkeeping choice -- legacy's own
-    ///     <c>SummonMonsterForSpecial</c> has no equivalent slot-numbering concept for this GM command to port.
-    /// </summary>
-    private const int GmSummonPoolServerIndexBase = 1_003_000;
-
-    /// <summary>Size of <see cref="GmSummonPoolServerIndexBase" />'s reserved range.</summary>
-    private const int GmSummonPoolSize = 1_000;
-
-    /// <summary>
-    ///     Free-roam leash for a "moncall"-summoned monster -- same value as <see cref="PersonalDungeonBossLeashRadius" />
-    ///     (Zone.DungeonInstance.cs), reused here as a reasonable boss-scale default since "moncall" is most
-    ///     often used to test/battle a boss-tier monster; the source behavior contract for tSort 506 does not
-    ///     itself specify a leash radius (the underlying <c>SummonMonsterForSpecial</c> primitive is not
-    ///     independently modeled in Fenrir with its own leash parameter for this call).
-    /// </summary>
-    private const float GmSummonLeashRadius = 200f;
 
     /// <summary>
     ///     Elevated-tier "moncall" GM command (tSort 506) -- see

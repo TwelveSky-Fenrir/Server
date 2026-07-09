@@ -1,3 +1,6 @@
+using System.Buffers.Binary;
+using System.Text;
+
 namespace Fenrir.Network.Serialization.Wire;
 
 /// <summary>
@@ -16,7 +19,7 @@ public static class LegacyWireCodec
     public static string ReadFixedString(ReadOnlySpan<byte> source)
     {
         var nul = source.IndexOf((byte)0);
-        return System.Text.Encoding.Latin1.GetString(nul < 0 ? source : source[..nul]);
+        return Encoding.Latin1.GetString(nul < 0 ? source : source[..nul]);
     }
 
     public static void WriteFixedString(Span<byte> destination, string value)
@@ -24,7 +27,7 @@ public static class LegacyWireCodec
         destination.Clear();
         var count = Math.Min(value.Length, destination.Length);
         if (count > 0)
-            System.Text.Encoding.Latin1.GetBytes(value.AsSpan(0, count), destination);
+            Encoding.Latin1.GetBytes(value.AsSpan(0, count), destination);
     }
 
     public static string[] ReadFixedStringRows(ReadOnlySpan<byte> source, int rowLength)
@@ -45,28 +48,28 @@ public static class LegacyWireCodec
     {
         var result = new int[source.Length / 4];
         for (var i = 0; i < result.Length; i++)
-            result[i] = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(source.Slice(i * 4, 4));
+            result[i] = BinaryPrimitives.ReadInt32LittleEndian(source.Slice(i * 4, 4));
         return result;
     }
 
     public static void WriteInt32Array(Span<byte> destination, int[] values)
     {
         for (var i = 0; i < values.Length; i++)
-            System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(destination.Slice(i * 4, 4), values[i]);
+            BinaryPrimitives.WriteInt32LittleEndian(destination.Slice(i * 4, 4), values[i]);
     }
 
     public static float[] ReadSingleArray(ReadOnlySpan<byte> source)
     {
         var result = new float[source.Length / 4];
         for (var i = 0; i < result.Length; i++)
-            result[i] = System.Buffers.Binary.BinaryPrimitives.ReadSingleLittleEndian(source.Slice(i * 4, 4));
+            result[i] = BinaryPrimitives.ReadSingleLittleEndian(source.Slice(i * 4, 4));
         return result;
     }
 
     public static void WriteSingleArray(Span<byte> destination, float[] values)
     {
         for (var i = 0; i < values.Length; i++)
-            System.Buffers.Binary.BinaryPrimitives.WriteSingleLittleEndian(destination.Slice(i * 4, 4), values[i]);
+            BinaryPrimitives.WriteSingleLittleEndian(destination.Slice(i * 4, 4), values[i]);
     }
 
     public static byte[] ReadByteArray(ReadOnlySpan<byte> source)

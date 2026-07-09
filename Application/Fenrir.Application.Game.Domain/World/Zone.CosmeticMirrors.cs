@@ -183,6 +183,15 @@ public sealed partial class Zone
     private readonly List<int> _autoBuffNeighborScratch = [];
 
     /// <summary>
+    ///     Op 97/111 (<c>PlaytimeBuff</c>/<c>RankBuff</c>) self-mutation mirror. See
+    ///     <see cref="ApplyAvatarBuffCommand" />'s remarks for what this stub does/doesn't mirror yet.
+    /// </summary>
+    private readonly Channel<AvatarBuffZoneCommand> _avatarBuffInbox =
+        Channel.CreateBounded<AvatarBuffZoneCommand>(
+            new BoundedChannelOptions(AvatarBuffInboxCapacity)
+                { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+
+    /// <summary>
     ///     Reusable scratch buffer for <see cref="BroadcastAvatarStateFlag" />'s recipient list -- replaces a
     ///     per-call, self-filtered <c>AoiGrid.Neighbors(...)</c> iterator with the non-allocating
     ///     <see cref="AoiGrid.NeighborsExcludingSelf(List{int},ValueTuple{int,int},int,float,float,float,int)" />
@@ -192,34 +201,19 @@ public sealed partial class Zone
     /// </summary>
     private readonly List<int> _avatarStateFlagNeighborScratch = [];
 
-    /// <summary>
-    ///     Reusable scratch buffer for <see cref="ApplyCostumeCommand" />'s op-139 full-avatar-action rebroadcast
-    ///     recipient list -- replaces a per-call <c>AoiGrid.Neighbors(...).Where(id =&gt; id != characterId).ToArray()</c>
-    ///     LINQ pipeline (iterator + closure + array) with <see cref="AoiGrid.NeighborsExcludingSelf(List{int},ValueTuple{int,int},int,float,float,float,int)" />.
-    /// </summary>
-    private readonly List<int> _costumeFullActionNeighborScratch = [];
-
-    /// <summary>
-    ///     Reusable scratch buffer for <see cref="ApplyPshopCommand" />'s stall-closed full-avatar-action
-    ///     rebroadcast recipient list -- same LINQ-pipeline-avoidance rationale as
-    ///     <see cref="_costumeFullActionNeighborScratch" />.
-    /// </summary>
-    private readonly List<int> _pshopCloseFullActionNeighborScratch = [];
-
-    /// <summary>
-    ///     Op 97/111 (<c>PlaytimeBuff</c>/<c>RankBuff</c>) self-mutation mirror. See
-    ///     <see cref="ApplyAvatarBuffCommand" />'s remarks for what this stub does/doesn't mirror yet.
-    /// </summary>
-    private readonly Channel<AvatarBuffZoneCommand> _avatarBuffInbox =
-        Channel.CreateBounded<AvatarBuffZoneCommand>(
-            new BoundedChannelOptions(AvatarBuffInboxCapacity)
-                { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
-
     /// <summary>Op 129 <c>DrinkBottle</c> self-mutation mirror. See <see cref="ApplyDrinkBottleCommand" />'s remarks.</summary>
     private readonly Channel<DrinkBottleZoneCommand> _bottleInbox =
         Channel.CreateBounded<DrinkBottleZoneCommand>(
             new BoundedChannelOptions(BottleInboxCapacity)
                 { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+
+    /// <summary>
+    ///     Reusable scratch buffer for <see cref="ApplyCostumeCommand" />'s op-139 full-avatar-action rebroadcast
+    ///     recipient list -- replaces a per-call <c>AoiGrid.Neighbors(...).Where(id =&gt; id != characterId).ToArray()</c>
+    ///     LINQ pipeline (iterator + closure + array) with
+    ///     <see cref="AoiGrid.NeighborsExcludingSelf(List{int},ValueTuple{int,int},int,float,float,float,int)" />.
+    /// </summary>
+    private readonly List<int> _costumeFullActionNeighborScratch = [];
 
     /// <summary>
     ///     Op 90/139 (<c>CostumeState</c>/<c>CostumeVisibility</c>) self-mutation mirror. See
@@ -288,6 +282,13 @@ public sealed partial class Zone
         Channel.CreateBounded<MountZoneCommand>(
             new BoundedChannelOptions(MountInboxCapacity)
                 { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+
+    /// <summary>
+    ///     Reusable scratch buffer for <see cref="ApplyPshopCommand" />'s stall-closed full-avatar-action
+    ///     rebroadcast recipient list -- same LINQ-pipeline-avoidance rationale as
+    ///     <see cref="_costumeFullActionNeighborScratch" />.
+    /// </summary>
+    private readonly List<int> _pshopCloseFullActionNeighborScratch = [];
 
     /// <summary>
     ///     Fire-and-forget, purely cosmetic PShop-stall mirrors posted by <c>BuyShopItemHandler</c> onto the

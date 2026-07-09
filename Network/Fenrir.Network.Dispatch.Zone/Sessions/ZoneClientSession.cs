@@ -2,7 +2,6 @@ using System.IO.Pipelines;
 using System.Net;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
-using Fenrir.Network.Serialization.Wire;
 using Fenrir.Network.Serialization.Zone.Wire;
 using Microsoft.Extensions.Logging;
 

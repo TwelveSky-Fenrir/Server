@@ -102,7 +102,9 @@ public class GmPetExperienceGrantServiceTests
 
         Assert.Null(session.DisconnectReason);
         var expected = (byte[])data.Clone();
-        new GmPetExperienceGrantPayload { PetId = 0, PetExperience = 0 }.Write(expected);
+        // Server/ts25zone/S04_MyWork04.cpp:2071 -- legacy unconditionally initializes r->tPetID = -1 before the
+        // equipped-pet check, so -1 (not 0) is the confirmed "no pet" sentinel on the wire.
+        new GmPetExperienceGrantPayload { PetId = -1, PetExperience = 0 }.Write(expected);
         await PacketAssert.AssertSentAsync(pipe,
             new GenericActionResponse { Result = 0, Sort = 700, Data = expected, RuneValue = 0 });
 

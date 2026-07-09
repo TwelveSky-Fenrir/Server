@@ -1,5 +1,6 @@
 using Fenrir.Application.Game.Abstractions.Gm;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Data.Abstractions.Game;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Dispatch.Zone.Sessions;
 using Fenrir.Network.Serialization.Shared.Packets.Shared;
@@ -11,7 +12,10 @@ namespace Fenrir.Application.Game.Services.Gm;
 /// <summary>
 ///     See <see cref="IGmBlockAvatarService" />'s own remarks for the full behavior contract. Citations:
 ///     Server/ts25zone/S04_MyWork04.cpp:1487-1515 (gate, target lookup, ban dispatch, target disconnect, the
-///     return-vs-break control-flow divergence versus sibling case 518 KICK) ; :2121-2122 (shared
+///     return-vs-break control-flow divergence versus sibling case 518 KICK) ; :1510 (mGAMELOG.GL_632_GM_BLOCK,
+///     defined non-dead at Server/ts25zone/UpperCom/S06_MyUpperCom05.cpp:629, declared
+///     Server/ts25zone/H06_MyUpperCom.h:303 -- a real, non-dead audit-log call written before the ban, the same
+///     pattern as sibling case 518 KICK's own GL_631_GM_KICK call at S04_MyWork04.cpp:1482) ; :2121-2122 (shared
 ///     PROCESS_DATA_SEND/RECV reply step reached only by sub-commands that fall through, which sends this on
 ///     opcode 23 -- legacy has no command-specific reply message for GM-BLOCK) ;
 ///     Server/Header/Protocol/ZONE.h:462-468, :1437-1438 (the opcode-23 ZC_PROCESS_DATA_RECV shape:
@@ -24,6 +28,7 @@ namespace Fenrir.Application.Game.Services.Gm;
 public sealed class GmBlockAvatarService(
     ZoneRegistry zones,
     IBanRepository bans,
+    IEventLogRepository eventLog,
     ILogger<GmBlockAvatarService> logger) : IGmBlockAvatarService
 {
     private const int ResultTargetNotFound = 1; // legacy tResult's own default-initialized value (S04_MyWork04.cpp:305)
@@ -82,6 +87,13 @@ public sealed class GmBlockAvatarService(
 
         await bans.CreateAsync(targetAccountId, target.CharacterId, BanReason.GmManualBlock,
             DateTime.UtcNow.Add(BlockDuration), cancellationToken);
+
+        // Legacy writes its GL_632_GM_BLOCK audit-log call immediately after issuing the ban
+        // (S04_MyWork04.cpp:1510) -- same placement, same GmAction category, as the sibling GL_631_GM_KICK call
+        // GmBasicCommandService.HandleKickAsync makes for case 518.
+        await eventLog.LogAsync(GmActionEventCodes.Block, EventLogCategory.GmAction, zoneSession.AccountId,
+            callerCharacterId, targetAccountId, target.CharacterId, null, null, null, null, null, 1,
+            $"TargetName={target.Name}", cancellationToken);
 
         logger.LogWarning(
             "GM character {GmCharacterId} blocked avatar {TargetCharacterId} ({TargetName})",

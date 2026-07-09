@@ -574,10 +574,12 @@ public sealed class GenericActionHandler(
         // tSort 505/523 -- Admin-tier (GmCommandTier.Admin) "spawn-item" GM command
         // (Server/ts25zone/S04_MyWork04.cpp:1036-1095). No dedicated legacy wire opcode; multiplexed inside
         // this same generic envelope like every other tSort here. IGmCreateItemService owns every send/abort
-        // itself (id-range/catalog-lookup failure sends the shared opcode-23 ack with the rejected code;
-        // every other outcome -- including a downstream creation failure -- sends it with the accepted code,
-        // a confirmed legacy defect this project deliberately preserves), so this branch never calls
-        // Respond() itself.
+        // itself (id-range/catalog-lookup failure sends the shared opcode-23 ack with the rejected code; a
+        // stackable-item (iSort 2/99) downstream quantity-bound failure sends a distinct rejected code
+        // mirroring legacy's own tResult=2; every other outcome -- including the non-stackable per-unit
+        // branch's own downstream creation failure -- sends the accepted code, a confirmed legacy
+        // control-flow defect specific to that branch which this project deliberately preserves), so this
+        // branch never calls Respond() itself.
         if (sort is 505 or 523)
         {
             if (debugEnabled)

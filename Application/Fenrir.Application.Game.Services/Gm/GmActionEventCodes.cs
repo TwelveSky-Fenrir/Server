@@ -78,4 +78,15 @@ internal static class GmActionEventCodes
     ///     row itself.
     /// </summary>
     public const short Chat = 10;
+
+    /// <summary>
+    ///     The Basic-tier (<c>GmCommandTier.Basic</c>) BLOCK command (tSort 519,
+    ///     <see cref="GmBlockAvatarService" />) permanently banning a named target's account and disconnecting
+    ///     their session. Legacy parity: Server/ts25zone/S04_MyWork04.cpp:1510 (mGAMELOG.GL_632_GM_BLOCK, defined
+    ///     non-dead at Server/ts25zone/UpperCom/S06_MyUpperCom05.cpp:629, declared
+    ///     Server/ts25zone/H06_MyUpperCom.h:303) writes a real audit-log call before the ban, the same pattern as
+    ///     <see cref="Kick" /> (S04_MyWork04.cpp:1482, mGAMELOG.GL_631_GM_KICK) -- this is legacy parity, not a
+    ///     Fenrir-authored addition.
+    /// </summary>
+    public const short Block = 11;
 }

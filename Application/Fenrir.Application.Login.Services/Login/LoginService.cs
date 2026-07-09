@@ -17,10 +17,12 @@ namespace Fenrir.Application.Login.Services.Login;
 /// <summary>
 ///     op11 CL_LOGIN_SEND business logic -- IP rate limit (Fenrir-only, no legacy analog), then maintenance
 ///     lockdown, then server-full quota, then the application firewall, then version, then MAC restriction,
-///     then auth, then the GM-IP allowlist gate, then the "Only Admin can login" lockdown, then the device
-///     anti-spoofing gate, run in that order so an under-maintenance/over-capacity/over-budget/blocked/
-///     incompatible/banned-PC attempt never reaches Argon2id/SQL account lookup, and a GM-IP/admin-lockdown/
-///     spoofed-device rejection never reaches PIN/session-claim, unnecessarily.
+///     then the account lookup, then the GM-IP allowlist gate, then auth (password/ban), then the "Only Admin
+///     can login" lockdown, then the empty-adapter-name gate, then the device anti-spoofing gate, run in that
+///     order so an under-maintenance/over-capacity/over-budget/blocked/incompatible/banned-PC attempt never
+///     reaches Argon2id/SQL account lookup, a GM-tier account from a non-allowlisted IP never even reaches the
+///     password comparison (matching legacy, see the GM-IP gate's own remarks below), and an admin-lockdown/
+///     missing-adapter/spoofed-device rejection never reaches PIN/session-claim, unnecessarily.
 /// </summary>
 /// <remarks>
 ///     Réf. C++ (maintenance/quota) : Server/ts25login/S04_MyWork02.cpp:149-154 (maintenance, tResult=1) et
@@ -30,6 +32,14 @@ namespace Fenrir.Application.Login.Services.Login;
 ///     continu (~1s) de cet état, jamais relu en ligne dans ce chemin de requête. Le rate limiter IP ci-dessus
 ///     reste volontairement en premier malgré cet ordre legacy : c'est un ajout Fenrir sans équivalent legacy,
 ///     protégeant contre le flood indépendamment de l'état maintenance/quota.
+///     Réf. C++ (MAC-restriction gate order) : legacy's mac_limit check (Server/ts25login/S08_MyDB.cpp:441-448)
+///     only runs after both the password check (:363-370) and the block/ban check (:372-376) have already
+///     passed inside MyDB::Login, whereas Fenrir checks it before the account lookup entirely -- a deliberate
+///     divergence, not an oversight; see the MAC-restriction check's own remarks below for why.
+///     Réf. C++ (GM-IP allowlist gate order) : Server/ts25login/S08_MyDB.cpp:339-356 (GM-IP check) precedes
+///     :357-370 (CheckValidUserIdx/password) inside MyDB::Login -- see that gate's own remarks below.
+///     Réf. C++ (empty-adapter-name gate) : Server/ts25login/S08_MyDB.cpp:421-425 -- see that gate's own
+///     remarks below.
 ///     Réf. C++ (device anti-spoofing gate) : see <see cref="DeviceSpoofingGuard" />'s own remarks for the full
 ///     citation range (Server/ts25login/S08_MyDB.cpp:497-507 and siblings).
 /// </remarks>
@@ -54,7 +64,10 @@ public sealed class LoginService(
 {
     // Legacy tResult codes actually producible by Fenrir's flows (S04_MyWork02.cpp W_LOGIN_SEND / S08_MyDB Login):
     private const int ResultMaintenance = 1; // MyGame::mMaxPlayerNum == 0 (S04_MyWork02.cpp:149-154)
-    private const int ResultIpBlocked = 2; // MyDB::CheckGMIP/CheckBanIP (S04_MyWork02.cpp:195-215)
+    // MyDB::CheckGMIP/CheckBanIP (S04_MyWork02.cpp:195-215), and -- the one Fenrir's GM-IP-allowlist gate
+    // below actually mirrors -- the GM-IP gate inside MyDB::Login itself (S08_MyDB.cpp:339-356), which runs
+    // strictly before the password comparison.
+    private const int ResultIpBlocked = 2;
     private const int ResultServerFull = 3; // MyGame::mPresentPlayerNum >= mMaxPlayerNum (S04_MyWork02.cpp:155-160)
     private const int ResultVersionMismatch = 4; // tVersion != mServerVersion
 
@@ -94,6 +107,9 @@ public sealed class LoginService(
     private const string MacBannedMessage = "Your PC has been banned.";
     private const string InvalidDevicesMessage = "Invalid devices!";
     private const string OnlyAdminMessage = "Only Admin can login";
+
+    // Legacy unconditional adapter-name/GUID presence gate (Server/ts25login/S08_MyDB.cpp:421-425).
+    private const string AdapterNameEmptyMessage = "IP address not specified. Please update to the latest client.";
 
     /// <summary>
     ///     game.EventLog.EventCode for a successful authentication (Category=Session) -- an app-owned numbering
@@ -152,6 +168,19 @@ public sealed class LoginService(
             return Failure(ResultVersionMismatch, "", false);
         }
 
+        // MAC-restriction ("Your PC has been banned") gate: deliberately checked here, ahead of the account
+        // lookup and password verification entirely. Legacy's mac_limit check runs much later -- only after
+        // both the password check (Server/ts25login/S08_MyDB.cpp:363-370) and the block/ban check (:372-376)
+        // have already passed inside MyDB::Login (mac_limit itself is at :441-448) -- but Fenrir moving it
+        // ahead of auth is an intentional hardening, not an unflagged accident (contrast with the
+        // ApplicationFirewall reordering documented a few lines above, which this follows the same posture
+        // as): it rejects a known-bad device signal before spending any Argon2id/DB work on it, and it closes
+        // a legacy password-correctness oracle -- because legacy's mac_limit check only runs after a correct
+        // password already matched, a banned-MAC attacker who gets back "Your PC has been banned" (rather
+        // than "wrong password") thereby learns their password guess was actually correct, even though the
+        // login itself is still refused. Checking the MAC ban first, before any password comparison ever
+        // runs, means the same rejection message comes back regardless of whether the supplied password is
+        // right or wrong, so that oracle doesn't exist in Fenrir.
         var macAddress =
             MacAddressFormatter.Format(packet.Adapter.PhysicalAddress, packet.Adapter.PhysicalAddressLength);
         if (macAddress.Length > 0 &&
@@ -162,6 +191,30 @@ public sealed class LoginService(
         }
 
         var account = await accounts.AuthenticateAsync(packet.Id, cancellationToken);
+        var remoteIp = remoteEndPoint?.Address.ToString();
+
+        // "# GM Enable Login IP #" gate: legacy evaluates this strictly before the password comparison,
+        // inside MyDB::Login itself (Server/ts25login/S08_MyDB.cpp:339-356 precedes the password check at
+        // :357-370) -- once the account row is located, a GM-tier account (uUserSort > 0) connecting from a
+        // non-allowlisted IP is refused immediately, before the password is ever compared, so a
+        // wrong-password attempt against such an account still returns tResult=2 ("IP blocked"), never
+        // tResult=7 ("wrong password"). Runs here, right after the account lookup and ahead of
+        // AuthenticateConstantTimeAsync, to match that ordering; the discarded Argon2id verify below keeps
+        // this branch's wall-clock cost the same as a real password check, preserving
+        // AuthenticateConstantTimeAsync's timing-attack defense even though the reject can now happen ahead
+        // of it in the pipeline. Fails open when no remote address is known (unit tests / non-TCP transport),
+        // matching ApplicationFirewall.IsAllowedAsync's own documented fail-open rationale for the identical
+        // condition.
+        if (account is not null && account.AccountGrade >= DeviceSpoofingGuard.GmGradeThreshold &&
+            remoteIp is not null && !await gmAllowlist.IsAllowedAsync(remoteIp, cancellationToken))
+        {
+            _ = PasswordHasher.Verify(packet.Password, account.PasswordHash, account.PasswordSalt);
+            logger.LogWarning(
+                "Login rejected: GM-tier account {AccountId} attempted login from non-allowlisted IP {RemoteIp}",
+                account.AccountId, remoteIp);
+            return Failure(ResultIpBlocked, "", true);
+        }
+
         var result = await AuthenticateConstantTimeAsync(account, packet.Password, cancellationToken);
 
         if (result != ResultSuccess)
@@ -172,22 +225,6 @@ public sealed class LoginService(
         }
 
         var accountId = account!.AccountId;
-        var remoteIp = remoteEndPoint?.Address.ToString();
-
-        // "# GM Enable Login IP #" gate (Server/ts25login/S04_MyWork02.cpp:192-201, re-checked a second time
-        // at the DB layer itself at Server/ts25login/S08_MyDB.cpp:339-356): a GM-tier account must additionally
-        // connect from an allow-listed IP, even after its credentials already matched -- runs post-
-        // authentication, gated on the exact same AccountGrade field/threshold as the anti-spoofing gate right
-        // below. Fails open when no remote address is known (unit tests / non-TCP transport), matching
-        // ApplicationFirewall.IsAllowedAsync's own documented fail-open rationale for the identical condition.
-        if (account.AccountGrade >= DeviceSpoofingGuard.GmGradeThreshold && remoteIp is not null &&
-            !await gmAllowlist.IsAllowedAsync(remoteIp, cancellationToken))
-        {
-            logger.LogWarning(
-                "Login rejected: GM-tier account {AccountId} attempted login from non-allowlisted IP {RemoteIp}",
-                accountId, remoteIp);
-            return Failure(ResultIpBlocked, "", true);
-        }
 
         // Legacy "Only Admin can login" operator lockdown (Server/ts25login/S04_MyWork02.cpp:202-208): when
         // enabled, only GM-tier accounts may proceed past this point. Disabled by default (see
@@ -197,6 +234,19 @@ public sealed class LoginService(
             logger.LogWarning(
                 "Login rejected: only-admin lockdown is active and account {AccountId} is not GM-tier", accountId);
             return Failure(ResultCustomMessage, OnlyAdminMessage, true);
+        }
+
+        // Legacy unconditional adapter-name/GUID presence gate (Server/ts25login/S08_MyDB.cpp:421-425):
+        // "if (IsEmptyString(adapter->AdapterName)) { resString = "IP address not specified. Please update to
+        // the latest client."; return 10000; }" -- runs inside MyDB::Login after the password/ban checks have
+        // already passed (:363-370, :372-376), unconditional on uUserSort (applies to GM and non-GM accounts
+        // alike), ahead of the mac_limit gate (:441-448) and the "Protect Spoofed" gate (:497-507). No
+        // equivalent existed anywhere in LoginService/DeviceSpoofingGuard before this.
+        if (string.IsNullOrEmpty(packet.Adapter.AdapterName))
+        {
+            logger.LogWarning("Login rejected: empty adapter name/GUID (login {Id}, account {AccountId})",
+                packet.Id, accountId);
+            return Failure(ResultCustomMessage, AdapterNameEmptyMessage, true);
         }
 
         // "Protect Spoofed" anti-spoofing gate: runs after the account row is located, the password has

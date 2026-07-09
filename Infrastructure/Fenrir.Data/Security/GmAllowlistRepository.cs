@@ -1,7 +1,9 @@
 using System.Collections.Immutable;
+using System.Data;
 using CaeriusNet.Abstractions;
 using CaeriusNet.Builders;
 using CaeriusNet.Commands.Reads;
+using CaeriusNet.Commands.Writes;
 using Fenrir.Data.Abstractions.Security;
 
 namespace Fenrir.Data.Security;
@@ -17,6 +19,15 @@ public sealed record GmAllowlistRepository(ICaeriusNetDbContext Db) : IGmAllowli
                 return true;
 
         return false;
+    }
+
+    public async ValueTask<int> AddAsync(string ipAddress, CancellationToken ct)
+    {
+        var sp = new StoredProcedureParametersBuilder("admin", "usp_GmAllowlist_Add", 1)
+            .AddParameter("IpAddress", ipAddress, SqlDbType.VarChar)
+            .Build();
+
+        return await Db.ExecuteScalarAsync<int>(sp, ct);
     }
 
     /// <summary>Short in-memory cache, same rationale as FirewallRuleRepository's own cache.</summary>

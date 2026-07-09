@@ -19,15 +19,18 @@ namespace Fenrir.Network.Serialization.Shared.Packets.Shared;
 ///     STRUCT.h:1296-1300 (request/response payload shape -- PetId then PetExperience, both confirmed
 ///     write-only from the server's side for this command).
 ///     <para>
-///         The "no pet" sentinel's exact legacy numeric value was not independently confirmed in the source
-///         behavior contract this type was authored against (only the field shape/order was cited, not the
-///         sentinel's concrete value) -- <see cref="Fenrir.Application.Game.Services.Gm.GmPetExperienceGrantService" />
-///         uses 0, matching this codebase's own already-established "0 = no pet equipped" convention
+///         The "no pet" sentinel's exact legacy numeric value is now confirmed as -1:
+///         Server/ts25zone/S04_MyWork04.cpp:2071 (<c>r-&gt;tPetID = -1;</c>, executed unconditionally right
+///         after the tResult=0 assignment, before the equipped-pet-slot check) and :2078
+///         (<c>r-&gt;tPetID = tITEM_INFO-&gt;iIndex;</c>, only reached once an eligible equipped pet is found).
+///         GM_PETEXP.tPetID is a signed int (STRUCT.h:1296-1300), so -1 is representable on the wire and
+///         distinct from 0. <see cref="Fenrir.Application.Game.Services.Gm.GmPetExperienceGrantService" />
+///         uses -1, matching this confirmed value -- deliberately diverging from this codebase's own
+///         otherwise-established "0 = no pet equipped" convention
 ///         (<see cref="Fenrir.Application.Game.Domain.Pets.PetSlots.ResolveEquippedPetItemId" />,
 ///         <see cref="Fenrir.Application.Game.Domain.Pets.PetGrowthCalculator.Compute" />'s own
-///         <c>petItemId == 0</c> guard) rather than an independently re-derived legacy constant -- flag for a
-///         follow-up <c>cpp-zone-gameplay-analyst</c> citation if exact legacy parity for this specific
-///         sentinel value matters later.
+///         <c>petItemId == 0</c> guard) because this specific field is a distinct, independently confirmed
+///         wire sentinel, not a shared internal representation.
 ///     </para>
 /// </remarks>
 [FenrirWireType(8)]

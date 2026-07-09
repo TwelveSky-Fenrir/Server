@@ -10,8 +10,11 @@ namespace Fenrir.Data.Abstractions.Security;
 public interface IMacRestrictionRepository
 {
     /// <summary>
-    ///     Prefers the most specific match (exact MacAddress+MachineGuid override) over the MAC-wide default row
-    ///     (MachineGuid IS NULL) -- mirrors admin.MacRestrictions' two-tier uniqueness design.
+    ///     A MachineGuid match alone is enough to ban, independent of MacAddress -- mirrors legacy's ban lookup,
+    ///     which is keyed solely by the client-declared adapter GUID string (Server/ts25login/S08_MyDB.cpp:441).
+    ///     The MAC-wide default row (MachineGuid IS NULL, admin.MacRestrictions) is a Fenrir-only elaboration
+    ///     with no legacy analog. See <c>MacRestrictionRepository.SelectRestriction</c>'s own remarks for the
+    ///     full precedence rules.
     /// </summary>
     public ValueTask<bool> IsBannedAsync(string macAddress, string? machineGuid, CancellationToken ct);
 }

@@ -109,7 +109,9 @@ public interface IGmBasicCommandService
     ///     this interface's own class remarks for why this is a deliberately simplified, process-local (not
     ///     cluster-wide-via-blocking-upstream-call) lookup, and for the unresolved "what value is sent when no
     ///     character matches" ambiguity this method resolves by writing a zero-filled coordinate/zone-number
-    ///     region rather than a confirmed legacy sentinel.
+    ///     region rather than a confirmed legacy sentinel. The dedicated response's own <c>Sort</c> field
+    ///     carries the legacy literal tag 1 (<c>B_GM_COMMAND_INFO(1, ...)</c>), NOT the outer switch's tSort
+    ///     513 -- see S05_MyTransfer.cpp:1159-1164 and S04_MyWork04.cpp:1319.
     /// </summary>
     ValueTask HandleFindAsync(byte[] data, ZoneClientSession zoneSession, PlayerRuntimeState state,
         CancellationToken cancellationToken);
@@ -122,7 +124,10 @@ public interface IGmBasicCommandService
     ///     coordinate response (<c>GmCommandResponse</c>) plus an AOI-neighbor relocation broadcast on its own
     ///     zone; the invoker receives only the shared generic acknowledgment. Target not found (or is the
     ///     invoker itself): shared generic acknowledgment only, default-failure outcome, nothing sent to anyone
-    ///     else.
+    ///     else. The dedicated response's own <c>Sort</c> field carries the legacy literal tag 2 (
+    ///     <c>B_GM_COMMAND_INFO(2, ...)</c>), NOT the outer switch's tSort 514 -- see
+    ///     S05_MyTransfer.cpp:1159-1164 and S04_MyWork04.cpp:1348 (shared with <see cref="HandleMoveToTargetAsync" />'s
+    ///     own tag below).
     /// </summary>
     ValueTask HandleCallAsync(byte[] data, ZoneClientSession zoneSession, PlayerRuntimeState state,
         CancellationToken cancellationToken);
@@ -134,6 +139,9 @@ public interface IGmBasicCommandService
     ///     dedicated coordinate response (<c>GmCommandResponse</c>) on its own connection, immediately followed
     ///     by the shared generic acknowledgment -- no broadcast is issued for this variant, unlike CALL. Target
     ///     not found (or is the invoker itself): shared generic acknowledgment only, default-failure outcome.
+    ///     The dedicated response's own <c>Sort</c> field carries the same legacy literal tag 2 CALL uses (
+    ///     <c>B_GM_COMMAND_INFO(2, ...)</c>), NOT the outer switch's tSort 515 -- see
+    ///     S05_MyTransfer.cpp:1159-1164 and S04_MyWork04.cpp:1406.
     /// </summary>
     ValueTask HandleMoveToTargetAsync(byte[] data, ZoneClientSession zoneSession, PlayerRuntimeState state,
         Zone zone, CancellationToken cancellationToken);
@@ -141,9 +149,13 @@ public interface IGmBasicCommandService
     /// <summary>
     ///     NCHAT(516, <paramref name="sort" />==516)/YCHAT(517) -- marks a named target's (process-local,
     ///     self-exclusion applies) own "special state" marker to 2/0, audit-logged through one shared log point
-    ///     for both (distinguishable only by the outcome byte, not by which log call fired). Sends NO
-    ///     acknowledgment of any kind on any path (found or not-found alike) -- legacy's own case body returns
-    ///     before ever reaching the shared closing step.
+    ///     for both (distinguishable only by the outcome byte, not by which log call fired). This family is
+    ///     asymmetric, not silent on every path: target not found (or is the invoker itself) falls through to
+    ///     the shared closing step and sends the shared generic acknowledgment carrying the default-failure
+    ///     outcome, matching legacy's own bare <c>break</c> out of the switch for that case
+    ///     (S04_MyWork04.cpp:1429-1432/1458-1461). Target found: sends NO acknowledgment of any kind -- legacy's
+    ///     own case body ends in an explicit <c>return</c> before ever reaching the shared closing step
+    ///     (S04_MyWork04.cpp:1433-1439/1462-1468).
     /// </summary>
     ValueTask HandleTargetSpecialStateAsync(int sort, byte[] data, ZoneClientSession zoneSession,
         PlayerRuntimeState state, CancellationToken cancellationToken);
@@ -173,12 +185,17 @@ public interface IGmBasicCommandService
     ///     maximum (this command always fully heals the invoker). No audit-log entry is written, matching
     ///     legacy. Shared generic acknowledgment only.
     ///     <para>
-    ///         Flagged gap: the "high level"/rebirth tiers' own secondary-experience-component (Exp2)
-    ///         recompute/max-value has no confirmed formula or citation anywhere in this codebase today (no
-    ///         Fenrir-side kill-experience path grants <see cref="PlayerRuntimeState.Level2" /> yet either) --
-    ///         this method conservatively writes 0 rather than fabricate a threshold, flagged here rather than
-    ///         silently assumed correct. Level/Level2/RebirthCount/base Experience/Life/Mana/MaxLife/MaxMana are
-    ///         all confirmed and applied per the contract.
+    ///         The "high level"/rebirth tiers' own secondary-experience-component (Exp2) is recomputed from the
+    ///         same hardcoded 12-entry high-level XP table already ported to
+    ///         <see cref="Fenrir.Application.Game.Domain.Progression.RebirthProgression.HighLevelExpTable" />
+    ///         (legacy <c>LEVELSYSTEM::ReturnHighExpValue</c>'s <c>mRangeForHigh</c>, GameSystem_01_Level.cpp:
+    ///         712-719,319-330): index Level2-1 for the high-level tier, index
+    ///         <see cref="Fenrir.Application.Game.Domain.Progression.RebirthProgression.MaxHighLevel" />-1 for
+    ///         the rebirth tier (Level2 pinned at its own cap there), matching
+    ///         <c>wAvatar.aExp2 = mLEVEL.ReturnHighExpValue(...)</c> at S04_MyWork04.cpp:1566-1580. Tier 1
+    ///         (plain base level, no high-level or rebirth component) always clears Exp2 to 0.
+    ///         Level/Level2/RebirthCount/base Experience/Life/Mana/MaxLife/MaxMana are all confirmed and applied
+    ///         per the contract.
     ///     </para>
     /// </summary>
     ValueTask HandleLevelSetAsync(byte[] data, ZoneClientSession zoneSession, PlayerRuntimeState state, Zone zone,

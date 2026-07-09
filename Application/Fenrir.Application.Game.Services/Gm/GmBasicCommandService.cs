@@ -2,6 +2,7 @@ using System.Buffers.Binary;
 using Fenrir.Application.Game.Abstractions.Gm;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Pets;
+using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.Quests;
 using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World;
@@ -56,6 +57,20 @@ public sealed class GmBasicCommandService(
     private const int TribeBankSort = 520;
     private const int LevelSort = 521;
     private const int StatEditSort = 522;
+
+    /// <summary>
+    ///     Legacy literal tag <c>B_GM_COMMAND_INFO</c> writes verbatim as <see cref="GmCommandResponse" />.Sort
+    ///     for FIND -- NOT the outer switch's tSort (513). See S05_MyTransfer.cpp:1159-1164 and
+    ///     S04_MyWork04.cpp:1319.
+    /// </summary>
+    private const int FindGmDataTag = 1;
+
+    /// <summary>
+    ///     Legacy literal tag <c>B_GM_COMMAND_INFO</c> writes verbatim as <see cref="GmCommandResponse" />.Sort
+    ///     for both CALL and MOVE-to-target -- NOT the outer switch's tSort (514/515). See
+    ///     S05_MyTransfer.cpp:1159-1164 and S04_MyWork04.cpp:1348,1406.
+    /// </summary>
+    private const int CallMoveGmDataTag = 2;
 
     /// <summary>AvatarStatUpdateResponse.Sort for the HIDE/SHOW dedicated notification (STRUCT.h:1518-1524).</summary>
     private const int VisibilityStatSort = 9;
@@ -229,7 +244,7 @@ public sealed class GmBasicCommandService(
             found!.CharacterId != state.CharacterId)
             BinaryPrimitives.WriteInt32LittleEndian(gmData, targetZone!.MapId);
 
-        zoneSession.Send(new GmCommandResponse { Sort = FindSort, GmData = gmData });
+        zoneSession.Send(new GmCommandResponse { Sort = FindGmDataTag, GmData = gmData });
         SendAck(zoneSession, FindSort, data, SuccessResult);
         return ValueTask.CompletedTask;
     }
@@ -268,7 +283,7 @@ public sealed class GmBasicCommandService(
         var gmData = new byte[GmDataSize];
         new GmMoveCoordinatePayload { Location = [destination.Item1, destination.Item2, destination.Item3] }
             .Write(gmData);
-        target.Session.Send(new GmCommandResponse { Sort = CallSort, GmData = gmData });
+        target.Session.Send(new GmCommandResponse { Sort = CallMoveGmDataTag, GmData = gmData });
 
         SendAck(zoneSession, CallSort, data, SuccessResult);
     }
@@ -302,7 +317,7 @@ public sealed class GmBasicCommandService(
         var gmData = new byte[GmDataSize];
         new GmMoveCoordinatePayload { Location = [destination.Item1, destination.Item2, destination.Item3] }
             .Write(gmData);
-        zoneSession.Send(new GmCommandResponse { Sort = MoveToTargetSort, GmData = gmData });
+        zoneSession.Send(new GmCommandResponse { Sort = CallMoveGmDataTag, GmData = gmData });
 
         SendAck(zoneSession, MoveToTargetSort, data, SuccessResult);
     }
@@ -321,8 +336,13 @@ public sealed class GmBasicCommandService(
 
         var found = zones.TryGetPlayerAndZoneByName(payload.TargetName, out var target, out var targetZone);
         if (!found || target!.CharacterId == state.CharacterId)
-            // Silently dropped -- this sub-operation never reaches the shared closing step on any path.
+        {
+            // Not-found falls through to the shared closing step in legacy (a bare `break` inside the
+            // switch, not `return`) -- only the target-FOUND branch below is truly silent. See this
+            // method's own remarks in IGmBasicCommandService.HandleTargetSpecialStateAsync.
+            SendAck(zoneSession, sort, data, FailureResult);
             return;
+        }
 
         var newSpecialState = sort == NchatSort ? NchatSpecialState : YchatSpecialState;
 
@@ -402,11 +422,8 @@ public sealed class GmBasicCommandService(
         short newLevel2;
         int newRebirthCount;
         long newExperience;
+        int newExp2;
 
-        // Flagged gap: the "high level"/rebirth tiers' own Exp2 recompute/max-value has no confirmed formula
-        // anywhere in this codebase -- see IGmBasicCommandService.HandleLevelSetAsync's own remarks. Tier 1's
-        // own "secondary experience component is cleared" IS confirmed (0), so only tiers 2/3 are the gap.
-        const int flaggedUnconfirmedExp2 = 0;
         var maxBaseExperience = worldData.LevelsByLevel.TryGetValue(BaseLevelCap, out var maxRow) ? maxRow.ExpRangeMax : 0;
 
         if (requested <= BaseLevelCap)
@@ -415,6 +432,9 @@ public sealed class GmBasicCommandService(
             newLevel2 = 0;
             newRebirthCount = 0;
             newExperience = worldData.LevelsByLevel.TryGetValue(newLevel, out var row) ? row.ExpRangeMin : 0;
+            // Plain base-level tier carries no high-level/rebirth component -- Exp2 is cleared (confirmed,
+            // S04_MyWork04.cpp:1566-1580's own tier-1 branch never touches aExp2).
+            newExp2 = 0;
         }
         else if (requested <= BaseLevelCap + HighLevelSpan)
         {
@@ -422,6 +442,10 @@ public sealed class GmBasicCommandService(
             newLevel2 = (short)(requested - BaseLevelCap);
             newRebirthCount = 0;
             newExperience = maxBaseExperience;
+            // wAvatar.aExp2 = mLEVEL.ReturnHighExpValue(wAvatar.aLevel2) -- S04_MyWork04.cpp:1566-1580 ;
+            // GameSystem_01_Level.cpp:712-719,319-330 (mRangeForHigh[Level2-1], ported as
+            // RebirthProgression.HighLevelExpTable).
+            newExp2 = RebirthProgression.HighLevelExpTable[newLevel2 - 1];
         }
         else
         {
@@ -429,6 +453,9 @@ public sealed class GmBasicCommandService(
             newLevel2 = HighLevelSpan;
             newRebirthCount = requested - BaseLevelCap - HighLevelSpan;
             newExperience = maxBaseExperience;
+            // wAvatar.aExp2 = mLEVEL.ReturnHighExpValue(MAX_LIMIT_HIGH_LEVEL_NUM) -- Level2 pinned at its own
+            // cap for the rebirth tier, same citations as the high-level branch above.
+            newExp2 = RebirthProgression.HighLevelExpTable[RebirthProgression.MaxHighLevel - 1];
         }
 
         // Recompute derived combat stats from the NEW level/rebirth values and current equipment, then heal to
@@ -442,7 +469,7 @@ public sealed class GmBasicCommandService(
         var stats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData, state.Buffs, petContribution);
 
         var command = new TribeProgressZoneCommand(state.CharacterId, Level: newLevel, Level2: newLevel2,
-            RebirthCount: newRebirthCount, Experience: newExperience, Exp2: flaggedUnconfirmedExp2,
+            RebirthCount: newRebirthCount, Experience: newExperience, Exp2: newExp2,
             UpdatedStats: stats, MaxLife: stats.MaxLife, MaxMana: stats.MaxMana, Life: stats.MaxLife,
             Mana: stats.MaxMana);
 

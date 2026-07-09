@@ -83,5 +83,10 @@ public class ApplicationFirewallTests
         {
             return ValueTask.FromResult(allowed);
         }
+
+        public ValueTask<int> AddAsync(string ipAddress, CancellationToken ct)
+        {
+            return ValueTask.FromResult(1);
+        }
     }
 }

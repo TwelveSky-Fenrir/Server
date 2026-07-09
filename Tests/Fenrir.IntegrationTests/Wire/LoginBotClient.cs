@@ -58,7 +58,12 @@ public sealed class LoginBotClient : IAsyncDisposable
         WireScalars.WriteInt32(payload.AsSpan(288, 4), version);
         new LoginAdapterInfo
         {
-            AdapterName = "",
+            // Non-empty: LoginService now unconditionally rejects an empty adapter name/GUID with
+            // tResult=10000 (Server/ts25login/S08_MyDB.cpp:421-425), regardless of account grade -- unlike
+            // the zero-length PhysicalAddress below, which is fine here only because every account this bot
+            // drives is seeded GM-tier (DeviceSpoofingGuard's "Protect Spoofed" gate exempts GM-tier
+            // accounts, but the adapter-name-empty gate does not).
+            AdapterName = "integration-test-adapter-guid",
             PhysicalAddressLength = 0,
             PhysicalAddress = new byte[8],
             IPAddress = ""

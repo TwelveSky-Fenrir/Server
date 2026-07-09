@@ -80,11 +80,15 @@ public sealed class GmPetExperienceGrantService(
     private const byte NoEligiblePetOutcome = 0;
 
     /// <summary>
-    ///     "No pet" sentinel echoed in the response's PetId field -- see <see cref="GmPetExperienceGrantPayload" />'s
-    ///     own remarks for why 0 (this codebase's own established "no pet equipped" convention) is used here
-    ///     rather than an independently re-derived legacy constant.
+    ///     "No pet" sentinel echoed in the response's PetId field. Confirmed against legacy:
+    ///     Server/ts25zone/S04_MyWork04.cpp:2071 (<c>r-&gt;tPetID = -1;</c>, executed unconditionally right
+    ///     after the tResult=0 assignment, before the equipped-pet-slot check) ; Server/ts25zone/S04_MyWork04.cpp:2078
+    ///     (<c>r-&gt;tPetID = tITEM_INFO-&gt;iIndex;</c>, only reached once an eligible equipped pet is found) ;
+    ///     Server/Header/Protocol/STRUCT.h:1296-1300 (GM_PETEXP.tPetID is a signed int, so -1 is representable
+    ///     on the wire and distinct from 0). See <see cref="GmPetExperienceGrantPayload" />'s own remarks for
+    ///     the prior unconfirmed-value history this citation supersedes.
     /// </summary>
-    private const int NoPetSentinel = 0;
+    private const int NoPetSentinel = -1;
 
     /// <summary>Unconditional once the privilege gate passes -- see this type's own remarks.</summary>
     private const int AcceptedResult = 0;

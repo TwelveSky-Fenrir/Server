@@ -27,17 +27,21 @@ public sealed partial class Zone
     private const int GmExperienceInboxDrainCapPerTick = GmExperienceInboxCapacity / 2;
 
     /// <summary>
-    ///     "The maximum representable value" the source behavior contract's own Inputs/Side-effects sections
-    ///     reference for the GM-EXP command's mode-0 already-at-cap/huge-magnitude-shortcut branches, WITHOUT
-    ///     pinning a concrete legacy numeric constant -- the contract's own translator did not cite one. Read
-    ///     literally as the wire field's own type ceiling (<see cref="Network.Serialization.Shared.Packets.Shared.GmExpGrantPayload.Exp" />
-    ///     is a 4-byte signed int, matching the legacy request struct's own <c>int tExp</c>), NOT an
-    ///     independently re-derived legacy game-balance constant -- flag for a <c>cpp-zone-gameplay-analyst</c>
-    ///     follow-up citation if a different concrete ceiling is ever found. <see cref="long" /> (not
-    ///     <see cref="int" />) because <see cref="PlayerRuntimeState.Experience" /> itself is a
-    ///     <see cref="long" />.
+    ///     Legacy's own experience ceiling, <c>MAX_NUMBER_SIZE</c> -- NOT the wire field's/CLR <see cref="int" />
+    ///     type ceiling. The GM-EXP command's mode-0 already-at-cap check, huge-magnitude-shortcut trigger, and
+    ///     shortcut target are all compared against/derived from this exact constant in legacy
+    ///     (Server/ts25zone/S04_MyWork04.cpp:972,974,977), and the shared crediting routine
+    ///     <c>MyUtil::ProcessForExperience</c> hard-clamps <c>avt-&gt;aExp1</c> to the same constant
+    ///     (Server/ts25zone/S07_MyGame03.cpp:177,190-193). <see cref="long" /> (not <see cref="int" />) because
+    ///     <see cref="PlayerRuntimeState.Experience" /> itself is a <see cref="long" />.
     /// </summary>
-    private const long GmMaxExperience = int.MaxValue;
+    /// <remarks>
+    ///     Réf. C++ : Server/Header/Protocol/DEFINE.h:365 (<c>#define MAX_NUMBER_SIZE 2000000000</c>) ;
+    ///     Server/ts25zone/S04_MyWork04.cpp:972,974,977 (mode-0 entry guard, shortcut trigger, and shortcut
+    ///     target) ; Server/ts25zone/S07_MyGame03.cpp:177,190-193 (<c>ProcessForExperience</c>'s own
+    ///     LONGLONG-guarded hard clamp of <c>avt-&gt;aExp1</c>).
+    /// </remarks>
+    private const long GmMaxExperience = 2_000_000_000;
 
     private readonly Channel<GmSelfExperienceGrantZoneCommand> _gmExperienceInbox =
         Channel.CreateBounded<GmSelfExperienceGrantZoneCommand>(

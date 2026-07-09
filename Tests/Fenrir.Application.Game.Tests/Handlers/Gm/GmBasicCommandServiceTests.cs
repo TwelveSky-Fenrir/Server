@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using System.Collections.Frozen;
+using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.Monsters;
 using Fenrir.Application.Game.GameData;
@@ -529,6 +530,10 @@ public class GmBasicFindServiceTests
     private const int TargetId = 20;
     private const int Sort = 513;
 
+    // Legacy B_GM_COMMAND_INFO(1, ...) literal tag written into GmCommandResponse.Sort for FIND -- NOT the
+    // outer switch's tSort (513). See S05_MyTransfer.cpp:1159-1164 and S04_MyWork04.cpp:1319.
+    private const int GmDataTag = 1;
+
     [Fact]
     public async Task HandleFindAsync_CallerNotBasicTier_AbortsWithNoReply()
     {
@@ -563,7 +568,7 @@ public class GmBasicFindServiceTests
 
         Assert.Null(session.DisconnectReason);
         await GmBasicTestSupport.AssertExactSequenceAsync(pipe,
-            new GmCommandResponse { Sort = Sort, GmData = GmBasicTestSupport.MapIdGmData(2) },
+            new GmCommandResponse { Sort = GmDataTag, GmData = GmBasicTestSupport.MapIdGmData(2) },
             new GenericActionResponse { Result = 0, Sort = Sort, Data = data, RuneValue = 0 });
     }
 
@@ -583,7 +588,30 @@ public class GmBasicFindServiceTests
 
         Assert.Null(session.DisconnectReason);
         await GmBasicTestSupport.AssertExactSequenceAsync(pipe,
-            new GmCommandResponse { Sort = Sort, GmData = GmBasicTestSupport.ZeroGmData() },
+            new GmCommandResponse { Sort = GmDataTag, GmData = GmBasicTestSupport.ZeroGmData() },
+            new GenericActionResponse { Result = 0, Sort = Sort, Data = data, RuneValue = 0 });
+    }
+
+    // Regression: legacy always writes the literal tag 1 into GmCommandResponse.Sort for FIND, never the
+    // outer switch's tSort case number (513) -- S05_MyTransfer.cpp:1159-1164, S04_MyWork04.cpp:1319.
+    [Fact]
+    public async Task HandleFindAsync_GmCommandResponseSort_IsLegacyLiteralTagOne_NotTheTSortCaseNumber()
+    {
+        var registry = ZoneTestKit.CreateRegistry();
+        registry.Initialize([1, 2]);
+        var callerZone = registry[1];
+        var targetZone = registry[2];
+        var (session, pipe, state) = GmBasicTestSupport.Enter(callerZone, CallerId, "TheGm", 1);
+        GmBasicTestSupport.Enter(targetZone, TargetId, "Wanderer");
+        var service = new GmBasicCommandService(registry, ZoneTestKit.EmptyWorldData(), new FakeEventLogRepository(),
+            NullLogger<GmBasicCommandService>.Instance);
+        var data = GmBasicTestSupport.RequestData(d => new GmTargetNamePayload { TargetName = "Wanderer" }.Write(d));
+
+        await GmBasicTestSupport.RunToCompletionAsync(
+            service.HandleFindAsync(data, session, state, CancellationToken.None), callerZone);
+
+        await GmBasicTestSupport.AssertExactSequenceAsync(pipe,
+            new GmCommandResponse { Sort = 1, GmData = GmBasicTestSupport.MapIdGmData(2) },
             new GenericActionResponse { Result = 0, Sort = Sort, Data = data, RuneValue = 0 });
     }
 }
@@ -597,6 +625,11 @@ public class GmBasicCallServiceTests
     private const int TargetId = 20;
     private const int TargetAccountId = 200;
     private const int Sort = 514;
+
+    // Legacy B_GM_COMMAND_INFO(2, ...) literal tag written into GmCommandResponse.Sort for CALL and
+    // MOVE-to-target alike -- NOT the outer switch's tSort (514/515). See S05_MyTransfer.cpp:1159-1164
+    // and S04_MyWork04.cpp:1348.
+    private const int GmDataTag = 2;
 
     [Fact]
     public async Task HandleCallAsync_CallerNotBasicTier_AbortsWithNoReply_LogsNothing()
@@ -662,7 +695,7 @@ public class GmBasicCallServiceTests
 
         // Target isn't its own AOI neighbor, so its own pipe carries exactly this one dedicated frame.
         await PacketAssert.AssertSentAsync(targetPipe,
-            new GmCommandResponse { Sort = Sort, GmData = GmBasicTestSupport.PackedCoordinateGmData(555f, 2f, 777f) });
+            new GmCommandResponse { Sort = GmDataTag, GmData = GmBasicTestSupport.PackedCoordinateGmData(555f, 2f, 777f) });
         // The caller may also be a now-co-located AOI neighbor of the relocated target, so tolerate a
         // preceding BroadcastAvatarAction frame ahead of this ack (NeighborActionBroadcast, see
         // TribeProgressZoneCommand.NeighborActionBroadcast's own remarks).
@@ -688,6 +721,11 @@ public class GmBasicMoveToTargetServiceTests
     private const int CallerId = 10;
     private const int TargetId = 20;
     private const int Sort = 515;
+
+    // Legacy B_GM_COMMAND_INFO(2, ...) literal tag written into GmCommandResponse.Sort for MOVE-to-target --
+    // the same tag CALL uses, NOT the outer switch's tSort (515). See S05_MyTransfer.cpp:1159-1164 and
+    // S04_MyWork04.cpp:1406.
+    private const int GmDataTag = 2;
 
     [Fact]
     public async Task HandleMoveToTargetAsync_CallerNotBasicTier_AbortsWithNoReply()
@@ -748,7 +786,7 @@ public class GmBasicMoveToTargetServiceTests
         Assert.Equal(222f, callerState.PosZ);
 
         await GmBasicTestSupport.AssertExactSequenceAsync(callerPipe,
-            new GmCommandResponse { Sort = Sort, GmData = GmBasicTestSupport.PackedCoordinateGmData(111f, 3f, 222f) },
+            new GmCommandResponse { Sort = GmDataTag, GmData = GmBasicTestSupport.PackedCoordinateGmData(111f, 3f, 222f) },
             new GenericActionResponse { Result = 0, Sort = Sort, Data = data, RuneValue = 0 });
         // "no such broadcast is issued for that sibling command" -- unlike CALL's NeighborActionBroadcast.
         PacketAssert.AssertNothingSent(targetPipe);
@@ -756,8 +794,10 @@ public class GmBasicMoveToTargetServiceTests
 }
 
 // NCHAT(516)/YCHAT(517) -- marks a named target's (process-local, self-exclusion applies) "special state"
-// marker to 2/0, one shared audit-log point for both (S04_MyWork04.cpp:1411-1468). Sends NO acknowledgment
-// of any kind on any path.
+// marker to 2/0, one shared audit-log point for both (S04_MyWork04.cpp:1411-1468). Asymmetric acknowledgment:
+// target-not-found falls through to the shared closing step and acks failure (legacy `break`,
+// S04_MyWork04.cpp:1429-1432/1458-1461), while target-found sends NO acknowledgment of any kind (legacy
+// explicit `return`, S04_MyWork04.cpp:1433-1439/1462-1468).
 public class GmBasicTargetSpecialStateServiceTests
 {
     private const int CallerId = 10;
@@ -784,10 +824,14 @@ public class GmBasicTargetSpecialStateServiceTests
         Assert.Empty(eventLog.LoggedEvents);
     }
 
+    // Regression: legacy's not-found branch falls through to the shared closing code (a bare `break`, not
+    // `return`) and sends a failure GenericActionResponse -- only the target-FOUND branch is truly silent.
+    // S04_MyWork04.cpp:1429-1432 (NCHAT not-found `break`), :1458-1461 (YCHAT not-found `break`),
+    // :2116-2122 (shared closing code any `break` falls into).
     [Theory]
     [InlineData("NobodyHome")]
     [InlineData("TheGm")]
-    public async Task HandleTargetSpecialStateAsync_TargetNotFoundOrSelf_SilentlyDropped_NoLog(string targetName)
+    public async Task HandleTargetSpecialStateAsync_TargetNotFoundOrSelf_AcksFailure_NoLog(string targetName)
     {
         var (registry, zone) = GmBasicTestSupport.CreateWorld();
         var (session, pipe, state) = GmBasicTestSupport.Enter(zone, CallerId, "TheGm", 1);
@@ -800,8 +844,31 @@ public class GmBasicTargetSpecialStateServiceTests
             service.HandleTargetSpecialStateAsync(NchatSort, data, session, state, CancellationToken.None), zone);
 
         Assert.Null(session.DisconnectReason);
-        PacketAssert.AssertNothingSent(pipe);
         Assert.Empty(eventLog.LoggedEvents);
+        await PacketAssert.AssertSentAsync(pipe,
+            new GenericActionResponse { Result = 1, Sort = NchatSort, Data = data, RuneValue = 0 });
+    }
+
+    // Same asymmetry, YCHAT side (shares the exact same not-found handling as NCHAT).
+    [Theory]
+    [InlineData("NobodyHome")]
+    [InlineData("TheGm")]
+    public async Task HandleTargetSpecialStateAsync_Ychat_TargetNotFoundOrSelf_AcksFailure_NoLog(string targetName)
+    {
+        var (registry, zone) = GmBasicTestSupport.CreateWorld();
+        var (session, pipe, state) = GmBasicTestSupport.Enter(zone, CallerId, "TheGm", 1);
+        var eventLog = new FakeEventLogRepository();
+        var service = new GmBasicCommandService(registry, ZoneTestKit.EmptyWorldData(), eventLog,
+            NullLogger<GmBasicCommandService>.Instance);
+        var data = GmBasicTestSupport.RequestData(d => new GmTargetNamePayload { TargetName = targetName }.Write(d));
+
+        await GmBasicTestSupport.RunToCompletionAsync(
+            service.HandleTargetSpecialStateAsync(YchatSort, data, session, state, CancellationToken.None), zone);
+
+        Assert.Null(session.DisconnectReason);
+        Assert.Empty(eventLog.LoggedEvents);
+        await PacketAssert.AssertSentAsync(pipe,
+            new GenericActionResponse { Result = 1, Sort = YchatSort, Data = data, RuneValue = 0 });
     }
 
     [Fact]
@@ -1041,6 +1108,7 @@ public class GmBasicLevelSetServiceTests
         Assert.Equal(0, state.Level2);
         Assert.Equal(0, state.RebirthCount);
         Assert.Equal(12345, state.Experience); // level 50's own ExpRangeMin
+        Assert.Equal(0, state.Exp2); // plain base-level tier carries no high-level/rebirth component
         Assert.Equal(state.MaxLife, state.Life); // "always fully heals the invoker"
         Assert.Equal(state.MaxMana, state.Mana);
         await PacketAssert.AssertSentAsync(pipe,
@@ -1064,6 +1132,9 @@ public class GmBasicLevelSetServiceTests
         Assert.Equal(5, state.Level2);
         Assert.Equal(0, state.RebirthCount);
         Assert.Equal(99999, state.Experience); // maxBaseExperience, level 145's own ExpRangeMax
+        // Regression: wAvatar.aExp2 = mLEVEL.ReturnHighExpValue(wAvatar.aLevel2) -- RebirthProgression.
+        // HighLevelExpTable[Level2-1], NOT the previously-written flagged-gap 0.
+        Assert.Equal(RebirthProgression.HighLevelExpTable[4], state.Exp2);
     }
 
     [Fact]
@@ -1083,6 +1154,10 @@ public class GmBasicLevelSetServiceTests
         Assert.Equal(12, state.Level2);
         Assert.Equal(8, state.RebirthCount);
         Assert.Equal(99999, state.Experience);
+        // Regression: wAvatar.aExp2 = mLEVEL.ReturnHighExpValue(MAX_LIMIT_HIGH_LEVEL_NUM) for the rebirth
+        // tier (Level2 pinned at its own cap) -- RebirthProgression.HighLevelExpTable[MaxHighLevel-1], NOT
+        // the previously-written flagged-gap 0.
+        Assert.Equal(RebirthProgression.HighLevelExpTable[RebirthProgression.MaxHighLevel - 1], state.Exp2);
     }
 
     [Fact]

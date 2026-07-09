@@ -36,8 +36,10 @@ public static class DeviceSpoofingGuard
     /// <summary>
     ///     Grade values at or above this threshold are GM-tier and exempt from this gate. Also reused by
     ///     <c>Fenrir.Application.Login.Services.Login.LoginService</c>'s own GM-IP allowlist gate (the "# GM
-    ///     Enable Login IP #" check, Server/ts25login/S04_MyWork02.cpp:192-201) so both AccountGrade-gated
-    ///     post-authentication checks share the exact same elevation threshold.
+    ///     Enable Login IP #" check -- the primary gate inside <c>MyDB::Login</c> itself,
+    ///     Server/ts25login/S08_MyDB.cpp:339-356, which runs strictly before the password comparison, not the
+    ///     redundant post-<c>Login</c>-success re-check at Server/ts25login/S04_MyWork02.cpp:192-201) so both
+    ///     AccountGrade-gated checks share the exact same elevation threshold.
     /// </summary>
     public const int GmGradeThreshold = 1;
 

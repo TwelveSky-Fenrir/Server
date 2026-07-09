@@ -191,7 +191,7 @@ public class GmCreateItemServiceTests
     }
 
     [Fact]
-    public async Task HandleAsync_Sort523_StackableItem_OutOfRangeQuantity_CreatesNothing_ButStillSendsAccepted()
+    public async Task HandleAsync_Sort523_StackableItem_OutOfRangeQuantity_CreatesNothing_AndSendsRejected()
     {
         var (session, pipe, zone, state, eventLog) = SetUp((short)GmCommandTier.Admin);
         var service = CreateService(eventLog);
@@ -200,8 +200,47 @@ public class GmCreateItemServiceTests
         await RunToCompletionAsync(
             service.HandleAsync(523, data, session, state, zone, CancellationToken.None), zone);
 
-        // Legacy's own confirmed defect: once past the id/catalog gate, the result code is unconditionally
-        // "accepted" even when the downstream quantity bound rejected every actual creation.
+        // Server/ts25zone/S04_MyWork04.cpp:1068-1077 -- the stackable branch's own `tResult=2; break;` exits
+        // the outer switch(tSort) directly (unlike the non-stackable branch's identical-looking break, which
+        // sits inside a for loop and falls through to tResult=0), so this out-of-range quantity genuinely
+        // reports the failure code (2) rather than being masked as accepted.
+        Assert.Null(session.DisconnectReason);
+        await PacketAssert.AssertSentAsync(pipe,
+            new GenericActionResponse { Result = 2, Sort = 523, Data = data, RuneValue = 0 });
+        Assert.Equal(0, zone.GroundItemCount);
+        Assert.Empty(eventLog.LoggedEvents);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Sort523_StackableItem_NegativeQuantity_CreatesNothing_AndSendsRejected()
+    {
+        var (session, pipe, zone, state, eventLog) = SetUp((short)GmCommandTier.Admin);
+        var service = CreateService(eventLog);
+        var data = QuantityPayloadData(StackableItemId, -5); // negative, and nonzero so it's not "unspecified".
+
+        await RunToCompletionAsync(
+            service.HandleAsync(523, data, session, state, zone, CancellationToken.None), zone);
+
+        Assert.Null(session.DisconnectReason);
+        await PacketAssert.AssertSentAsync(pipe,
+            new GenericActionResponse { Result = 2, Sort = 523, Data = data, RuneValue = 0 });
+        Assert.Equal(0, zone.GroundItemCount);
+        Assert.Empty(eventLog.LoggedEvents);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Sort523_UniqueItem_NegativeQuantity_CreatesNothing_ButStillSendsAccepted()
+    {
+        // Non-stackable branch keeps legacy's own control-flow defect: `tResult=2; break;` there sits inside a
+        // for loop (Server/ts25zone/S04_MyWork04.cpp:1078-1093), so it only exits the loop and falls through to
+        // the unconditional tResult=0 overwrite -- unlike the stackable branch above.
+        var (session, pipe, zone, state, eventLog) = SetUp((short)GmCommandTier.Admin);
+        var service = CreateService(eventLog);
+        var data = QuantityPayloadData(UniqueItemId, -3); // negative resolvedCount -> the for loop never runs.
+
+        await RunToCompletionAsync(
+            service.HandleAsync(523, data, session, state, zone, CancellationToken.None), zone);
+
         Assert.Null(session.DisconnectReason);
         await PacketAssert.AssertSentAsync(pipe,
             new GenericActionResponse { Result = 0, Sort = 523, Data = data, RuneValue = 0 });

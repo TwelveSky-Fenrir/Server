@@ -11,10 +11,12 @@ namespace Fenrir.Application.Game.Abstractions.Gm;
 ///     Owns every send/abort itself (rather than returning a Result for the handler to translate), same
 ///     posture as <c>IGmBlockAvatarService</c>, because the wire-level result-code semantics here are
 ///     unusually asymmetric: an unauthorized caller is disconnected outright with no reply, an id-range/
-///     catalog-lookup failure sends the generic rejected code, and every other outcome -- including a
-///     downstream creation failure -- sends the accepted code (a confirmed legacy defect this type
-///     deliberately preserves rather than silently "fixing," per the source behavior contract's own explicit
-///     flag on that point).
+///     catalog-lookup failure sends the generic rejected code, a stackable-item (iSort 2/99) downstream
+///     quantity-bound failure sends a distinct rejected code (legacy's own <c>tResult=2; break;</c> exiting
+///     the outer switch directly for that branch), and every other outcome -- including the non-stackable
+///     per-unit branch's own downstream creation failure -- sends the accepted code (a confirmed legacy
+///     control-flow defect specific to that branch, which this type deliberately preserves rather than
+///     silently "fixing," per the source behavior contract's own explicit flag on that point).
 /// </summary>
 public interface IGmCreateItemService
 {

@@ -14,4 +14,7 @@ namespace Fenrir.Data.Abstractions.Security;
 public interface IGmAllowlistRepository
 {
     public ValueTask<bool> IsAllowedAsync(string ipAddress, CancellationToken ct);
+
+    /// <summary>Throws if <paramref name="ipAddress" /> is already allowlisted (usp_GmAllowlist_Add THROW 50304).</summary>
+    public ValueTask<int> AddAsync(string ipAddress, CancellationToken ct);
 }

@@ -17,8 +17,15 @@ namespace Fenrir.Application.Game.Services.Gm;
 /// <summary>
 ///     See <see cref="IGmCreateItemService" />'s own remarks for the wire-level contract summary. Citations:
 ///     Server/ts25zone/S04_MyWork04.cpp:1036-1095 (case 505/523 body: privilege gate, id-range/catalog
-///     checks, quantity resolution, stackable-vs-unique branches, the final unconditional result-code
-///     overwrite) ; Server/ts25zone/S04_MyWork04.cpp:7 (<c>eLocation</c> macro resolving to the acting user's
+///     checks, quantity resolution, stackable-vs-unique branches) ; Server/ts25zone/S04_MyWork04.cpp:1068-1077
+///     (stackable branch's own <c>tResult=2; break;</c>, which exits the outer <c>switch(tSort)</c> directly
+///     and so preserves the failure code -- see <see cref="StackableQuantityRejectedResult" />) ;
+///     Server/ts25zone/S04_MyWork04.cpp:1078-1093 (non-stackable branch's identical-looking
+///     <c>tResult=2; break;</c>, which instead sits inside a <c>for</c> loop and so only exits that loop,
+///     falling through to the unconditional <c>tResult=0;</c> overwrite at :1093 -- the only branch where the
+///     "always accepted" masking genuinely occurs) ; Server/Header/Protocol/DEFINE.h:73 (<c>USE_MATS_999</c>
+///     unconditionally defined, keeping the iSort==99 stackable case live in every build) ;
+///     Server/ts25zone/S04_MyWork04.cpp:7 (<c>eLocation</c> macro resolving to the acting user's
 ///     own live location -- mirrored here by always spawning at <c>state.Pos*</c>, the GM's own
 ///     <see cref="PlayerRuntimeState" />, never any other target) ; Server/ts25zone/S07_MyGame03.cpp:505-527
 ///     (stackable-item quantity default-to-cap-on-zero and 1-999 bound enforcement) ;
@@ -35,15 +42,16 @@ namespace Fenrir.Application.Game.Services.Gm;
 /// </summary>
 /// <remarks>
 ///     Legacy's world item-object pool is a fixed-size array whose exhaustion is a real, observable failure
-///     mode this command's own privilege-preserving "always report accepted" defect masks from the client.
-///     Fenrir's own <see cref="Zone.SpawnGroundItem" /> (reached here via <see cref="TribeProgressZoneCommand.DropItems" />)
+///     mode that, in the non-stackable per-unit branch only, legacy's own "always report accepted" control-flow
+///     defect masks from the client (see <see cref="AcceptedResult" />/<see cref="StackableQuantityRejectedResult" />'s
+///     own remarks for why the stackable branch does not share that masking). Fenrir's own
+///     <see cref="Zone.SpawnGroundItem" /> (reached here via <see cref="TribeProgressZoneCommand.DropItems" />)
 ///     is backed by an unbounded <see cref="System.Collections.Concurrent.ConcurrentDictionary{TKey,TValue}" />
-///     with no capacity ceiling, so that specific failure mode cannot occur in this implementation -- every
-///     creation this method decides to attempt (after the id-range/catalog and, for a stackable item, the
-///     1-999 quantity-bound checks) unconditionally succeeds. This is a genuine, documented architectural
-///     divergence from legacy, not a bug: the client-visible behavior (result code always accepted once the
-///     id/catalog gate passes) is unaffected either way, since legacy already masks that exact failure mode
-///     from the wire.
+///     with no capacity ceiling, so that specific pool-exhaustion failure mode cannot occur in this
+///     implementation at all -- every creation this method decides to attempt (after the id-range/catalog and,
+///     for a stackable item, the 1-999 quantity-bound checks) unconditionally succeeds once attempted. This is
+///     a genuine, documented architectural divergence from legacy, not a bug: pool exhaustion specifically is
+///     unobservable either way, since Fenrir has no equivalent fixed-size pool to exhaust.
 ///     <para>
 ///         The audit-log call's exact legacy argument list ("refine/combine/improve metadata associated with
 ///         that item id") was not independently re-derived from
@@ -79,11 +87,24 @@ public sealed class GmCreateItemService(
     private const int RejectedResult = 1;
 
     /// <summary>
-    ///     Forced unconditionally once the id-range/catalog gate passes, regardless of whether creation
-    ///     actually happened -- see this type's own remarks and the source contract's "Error/failure
-    ///     semantics" section for why this masking is preserved rather than "fixed."
+    ///     Forced unconditionally once the id-range/catalog gate passes for the non-stackable per-unit branch,
+    ///     regardless of whether creation actually happened there -- see this type's own remarks and the
+    ///     source contract's "Error/failure semantics" section for why that masking is preserved rather than
+    ///     "fixed." Also used for the stackable branch whenever it actually creates at least one object.
     /// </summary>
     private const int AcceptedResult = 0;
+
+    /// <summary>
+    ///     Legacy's own <c>tResult=2</c> for the stackable-item branch (Server/ts25zone/S04_MyWork04.cpp:1068-1077)
+    ///     when the resolved quantity is out of range: that <c>break;</c> sits directly inside the outer
+    ///     <c>switch(tSort)</c> (not inside any loop), so it exits the switch immediately and preserves the
+    ///     failure code on the wire -- unlike the non-stackable branch's identical-looking <c>tResult=2; break;</c>
+    ///     at :1078-1093, which sits inside a <c>for</c> loop and only exits that loop, falling through to the
+    ///     unconditional <c>tResult=0;</c> at :1093. Only the stackable branch (tSort 523, iSort 2/99) reports
+    ///     this failure code; the non-stackable branch keeps reporting <see cref="AcceptedResult" /> even when it
+    ///     creates nothing, matching legacy's own control-flow defect there.
+    /// </summary>
+    private const int StackableQuantityRejectedResult = 2;
 
     private const int MinItemId = 2;
     private const int MaxItemId = 99999;
@@ -143,6 +164,7 @@ public sealed class GmCreateItemService(
             return;
         }
 
+        var isStackable = ContainerMatrix.IsStackableSort(definition.Item.Sort);
         var drops = ResolveDrops(sort, itemId, requestedQuantity, definition.Item.Sort);
 
         if (drops.Count > 0 &&
@@ -162,9 +184,12 @@ public sealed class GmCreateItemService(
             "Character {CharacterId} spawn-item applied: item {ItemId}, {ObjectCount} object(s) created (sort {Sort})",
             state.CharacterId, itemId, drops.Count, sort);
 
-        // Unconditionally accepted from here on -- see this type's own remarks for the legacy-defect rationale,
-        // even when `drops` ended up empty (a stackable-item quantity outside [1,999], nonzero).
-        zoneSession.Send(new GenericActionResponse { Result = AcceptedResult, Sort = sort, Data = data, RuneValue = 0 });
+        // Stackable branch (tSort 523, iSort 2/99) with an out-of-range/negative explicit quantity: legacy's
+        // `tResult=2; break;` exits the outer switch directly, so the failure code survives onto the wire --
+        // see StackableQuantityRejectedResult's own remarks. Every other case (including the non-stackable
+        // per-unit branch creating nothing) keeps reporting AcceptedResult, matching legacy's own masking there.
+        var resultCode = isStackable && drops.Count == 0 ? StackableQuantityRejectedResult : AcceptedResult;
+        zoneSession.Send(new GenericActionResponse { Result = resultCode, Sort = sort, Data = data, RuneValue = 0 });
     }
 
     /// <summary>
@@ -188,7 +213,7 @@ public sealed class GmCreateItemService(
             else if (requestedQuantity is >= 1 and <= GroundItemPickupPolicy.MaxStackQuantity)
                 quantity = requestedQuantity;
             else
-                quantity = 0; // Out-of-range nonzero quantity -- creation fails silently (result stays accepted).
+                quantity = 0; // Out-of-range nonzero quantity -- creation fails and StackableQuantityRejectedResult is reported.
 
             if (quantity > 0)
                 drops.Add(new TribeGroundItemDrop(itemId, quantity, GroundItemEntity.GmCreateItemDropSort));

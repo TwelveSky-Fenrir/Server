@@ -252,9 +252,12 @@ public class LoginHandlerTests
         Assert.Equal(LoginSessionState.VersionOk, session.State);
     }
 
-    // "# GM Enable Login IP #" gate (Server/ts25login/S04_MyWork02.cpp:192-201): a GM-tier account whose
-    // credentials matched must still come from an allow-listed IP, or the whole login is refused with the
-    // same IP-blocked result code (2) a plain banned IP gets.
+    // "# GM Enable Login IP #" gate: the primary check lives inside MyDB::Login itself
+    // (Server/ts25login/S08_MyDB.cpp:339-356), strictly before the password comparison at :357-370 -- so a
+    // GM-tier account connecting from a non-allowlisted IP is refused immediately once its account row is
+    // located, whether or not its credentials would have matched. ReArmVersionOk=true even though this now
+    // trips ahead of the password check: it still happens after the account lookup (unlike the pre-auth
+    // IpIsBlocked/MAC-ban cases above), so the client can retry on this same connection.
     [Fact]
     public async Task HandleAsync_GmAccount_NonAllowlistedIp_SendsIpBlockedResult_AndNeverCompletesLogin()
     {
@@ -267,8 +270,30 @@ public class LoginHandlerTests
 
         await AssertFirstResponseAsync(pipe, LoginTrain.BuildLoginRecv(2, "someuser", 0, LoginTrain.FailurePinMask));
         Assert.Null(session.AccountId);
-        // ReArmVersionOk=true: this trips post-authentication, so the client can retry on this same
-        // connection, unlike the pre-auth IpIsBlocked case above.
+        Assert.Equal(LoginSessionState.VersionOk, session.State);
+    }
+
+    // Regression for the confirmed audit finding: legacy evaluates the GM-IP-allowlist gate strictly before
+    // the password comparison (S08_MyDB.cpp:339-356 precedes :357-370 inside MyDB::Login), so a *wrong*
+    // password against a GM-tier account from a non-allowlisted IP still returns tResult=2 ("IP blocked"),
+    // never tResult=7 ("wrong password") -- proving the gate no longer requires a successful password check
+    // to trip, unlike before this fix. Also proves the password comparison itself never actually ran
+    // (LastRecordedAttempt stays null), even though a same-cost dummy Argon2id verify was performed.
+    [Fact]
+    public async Task
+        HandleAsync_GmAccount_WrongPassword_NonAllowlistedIp_SendsIpBlockedResult_NotWrongPasswordResult()
+    {
+        var (hash, salt) = PasswordHasher.Hash("correct-password");
+        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, false, 1);
+        var accounts = FakeAccountRepository.WithAccount(account);
+        var handler = CreateHandler(out var session, out var pipe, accounts, gmAllowlisted: false);
+
+        await handler.HandleAsync(ValidLoginRequest(password: "totally-wrong-password"), session,
+            CancellationToken.None);
+
+        await AssertFirstResponseAsync(pipe, LoginTrain.BuildLoginRecv(2, "someuser", 0, LoginTrain.FailurePinMask));
+        Assert.Null(session.AccountId);
+        Assert.Null(accounts.LastRecordedAttempt);
         Assert.Equal(LoginSessionState.VersionOk, session.State);
     }
 
@@ -334,6 +359,47 @@ public class LoginHandlerTests
         await handler.HandleAsync(ValidLoginRequest(password: "correct-password"), session, CancellationToken.None);
 
         await AssertFirstResponseAsync(pipe, LoginTrain.BuildLoginRecv(0, "MG7", 1, ""));
+    }
+
+    // Regression for the confirmed audit finding: legacy has an unconditional gate rejecting any login (GM or
+    // non-GM) whose declared adapter name/GUID is empty (Server/ts25login/S08_MyDB.cpp:421-425:
+    // "if (IsEmptyString(adapter->AdapterName)) { resString = "IP address not specified. Please update to the
+    // latest client."; return 10000; }"), which had no equivalent anywhere in LoginService before this fix.
+    [Fact]
+    public async Task HandleAsync_NonGmAccount_EmptyAdapterName_SendsCustomMessageResult()
+    {
+        var (hash, salt) = PasswordHasher.Hash("correct-password");
+        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, false);
+        var accounts = FakeAccountRepository.WithAccount(account);
+        var handler = CreateHandler(out var session, out var pipe, accounts);
+
+        await handler.HandleAsync(ValidLoginRequest(password: "correct-password", adapterName: ""), session,
+            CancellationToken.None);
+
+        await AssertFirstResponseAsync(pipe,
+            LoginTrain.BuildLoginRecv(10000, "someuser", 0, LoginTrain.FailurePinMask,
+                "IP address not specified. Please update to the latest client."));
+        Assert.Null(session.AccountId);
+    }
+
+    // The gate is unconditional on account grade, unlike the mac-limit and "Protect Spoofed" gates right
+    // below it in legacy (both scoped to uUserSort &lt; 1) -- a GM-tier account with an empty adapter name is
+    // refused too, even though it would otherwise be exempt from every other device-related gate.
+    [Fact]
+    public async Task HandleAsync_GmAccount_EmptyAdapterName_SendsCustomMessageResult()
+    {
+        var (hash, salt) = PasswordHasher.Hash("correct-password");
+        var account = new AuthenticateAccountDto(7, hash, salt, 0, null, false, 1);
+        var accounts = FakeAccountRepository.WithAccount(account);
+        var handler = CreateHandler(out var session, out var pipe, accounts, gmAllowlisted: true);
+
+        await handler.HandleAsync(ValidLoginRequest(password: "correct-password", adapterName: ""), session,
+            CancellationToken.None);
+
+        await AssertFirstResponseAsync(pipe,
+            LoginTrain.BuildLoginRecv(10000, "someuser", 0, LoginTrain.FailurePinMask,
+                "IP address not specified. Please update to the latest client."));
+        Assert.Null(session.AccountId);
     }
 
     // "Protect Spoofed" anti-spoofing gate (Server/ts25login/S08_MyDB.cpp:497-507): a non-GM account whose
@@ -609,8 +675,14 @@ public class LoginHandlerTests
         return state;
     }
 
+    // Realistic, non-placeholder default adapter name: a real client always declares a non-empty adapter
+    // name/GUID, so the empty-adapter-name gate (cluster: Server/ts25login/S08_MyDB.cpp:421-425) never trips
+    // unless a test deliberately asks for the empty-string edge case it covers below -- same rationale as
+    // DefaultPhysicalAddress above.
+    private const string DefaultAdapterName = "{real-adapter-guid}";
+
     private static LoginRequest ValidLoginRequest(string id = "someuser", string password = "irrelevant",
-        byte[]? physicalAddress = null, string adapterName = "")
+        byte[]? physicalAddress = null, string adapterName = DefaultAdapterName)
     {
         var mac = physicalAddress ?? DefaultPhysicalAddress;
         return new LoginRequest

@@ -1,6 +1,7 @@
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Services.Gm;
 using Fenrir.Application.Game.Tests.TestSupport;
+using Fenrir.Data.Abstractions.Game;
 using Fenrir.Data.Abstractions.Security;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Dispatch.Zone.Sessions;
@@ -54,7 +55,8 @@ public class GmBlockAvatarServiceTests
         var (registry, zone) = CreateWorld();
         var (caller, callerPipe, _) = Enter(zone, 10, "NotAGm");
         var bans = new FakeBanRepository();
-        var service = new GmBlockAvatarService(registry, bans, NullLogger<GmBlockAvatarService>.Instance);
+        var eventLog = new FakeEventLogRepository();
+        var service = new GmBlockAvatarService(registry, bans, eventLog, NullLogger<GmBlockAvatarService>.Instance);
 
         await service.HandleAsync(new GmBlockAvatarPayload { AvatarName = "AnyoneAtAll" }, caller,
             CancellationToken.None);
@@ -62,6 +64,7 @@ public class GmBlockAvatarServiceTests
         Assert.Equal(DisconnectReason.Faulted, caller.DisconnectReason);
         PacketAssert.AssertNothingSent(callerPipe);
         Assert.Null(bans.LastCreatedBan);
+        Assert.Empty(eventLog.LoggedEvents);
     }
 
     [Fact]
@@ -70,13 +73,15 @@ public class GmBlockAvatarServiceTests
         var (registry, zone) = CreateWorld();
         var (caller, callerPipe, _) = Enter(zone, 10, "TheGm", 1);
         var bans = new FakeBanRepository();
-        var service = new GmBlockAvatarService(registry, bans, NullLogger<GmBlockAvatarService>.Instance);
+        var eventLog = new FakeEventLogRepository();
+        var service = new GmBlockAvatarService(registry, bans, eventLog, NullLogger<GmBlockAvatarService>.Instance);
 
         await service.HandleAsync(new GmBlockAvatarPayload { AvatarName = "NobodyOnline" }, caller,
             CancellationToken.None);
 
         Assert.Null(caller.DisconnectReason);
         Assert.Null(bans.LastCreatedBan);
+        Assert.Empty(eventLog.LoggedEvents);
         await PacketAssert.AssertSentAsync(callerPipe, new GenericActionResponse
         {
             Result = 1, Sort = GmBlockSort, Data = EmptyGenericActionData, RuneValue = 0
@@ -90,12 +95,14 @@ public class GmBlockAvatarServiceTests
         var (registry, zone) = CreateWorld();
         var (caller, callerPipe, _) = Enter(zone, 10, "TheGm", 1);
         var bans = new FakeBanRepository();
-        var service = new GmBlockAvatarService(registry, bans, NullLogger<GmBlockAvatarService>.Instance);
+        var eventLog = new FakeEventLogRepository();
+        var service = new GmBlockAvatarService(registry, bans, eventLog, NullLogger<GmBlockAvatarService>.Instance);
 
         await service.HandleAsync(new GmBlockAvatarPayload { AvatarName = "TheGm" }, caller, CancellationToken.None);
 
         Assert.Null(caller.DisconnectReason);
         Assert.Null(bans.LastCreatedBan);
+        Assert.Empty(eventLog.LoggedEvents);
         await PacketAssert.AssertSentAsync(callerPipe, new GenericActionResponse
         {
             Result = 1, Sort = GmBlockSort, Data = EmptyGenericActionData, RuneValue = 0
@@ -106,12 +113,13 @@ public class GmBlockAvatarServiceTests
     public async Task HandleAsync_GmValidTarget_CreatesTheBan_DisconnectsTheTargetSilently_AndSendsNoAckToTheCaller()
     {
         var (registry, zone) = CreateWorld();
-        var (caller, callerPipe, _) = Enter(zone, 10, "TheGm", 1);
+        var (caller, callerPipe, callerState) = Enter(zone, 10, "TheGm", 1);
         var (target, targetPipe, targetState) = Enter(zone, 20, "Griefer", 0, 200);
         ZoneTestKit.DrainOutbound(
             callerPipe); // target's own Enter-broadcast join packet reaching the GM, not under test
         var bans = new FakeBanRepository();
-        var service = new GmBlockAvatarService(registry, bans, NullLogger<GmBlockAvatarService>.Instance);
+        var eventLog = new FakeEventLogRepository();
+        var service = new GmBlockAvatarService(registry, bans, eventLog, NullLogger<GmBlockAvatarService>.Instance);
 
         await service.HandleAsync(new GmBlockAvatarPayload { AvatarName = "Griefer" }, caller, CancellationToken.None);
 
@@ -125,6 +133,19 @@ public class GmBlockAvatarServiceTests
                     DateTime.UtcNow.AddYears(29)); // "today plus 365*30 days," a concrete future date
 
         Assert.Equal(DisconnectReason.Banned, target.DisconnectReason);
+
+        // Legacy writes a real GL_632_GM_BLOCK audit-log call before the ban (S04_MyWork04.cpp:1510) -- the
+        // same pattern as sibling case 518 KICK's GL_631_GM_KICK, which GmBasicCommandService already
+        // reimplements. Regression coverage for the previously-missing game.EventLog write.
+        var logged = Assert.Single(eventLog.LoggedEvents);
+        Assert.Equal((short)11, logged.EventCode); // GmActionEventCodes.Block (internal, not visible here)
+        Assert.Equal(EventLogCategory.GmAction, logged.Category);
+        Assert.Equal(caller.AccountId, logged.ActorAccountId);
+        Assert.Equal(callerState.CharacterId, logged.ActorCharacterId);
+        Assert.Equal(200, logged.TargetAccountId);
+        Assert.Equal(targetState.CharacterId, logged.TargetCharacterId);
+        Assert.Equal((byte)1, logged.Outcome);
+        Assert.Equal("TargetName=Griefer", logged.Payload);
 
         // Silence is the "it worked" signal on this path -- legacy case 519 `return`s immediately, bypassing
         // the shared epilogue every sibling sub-command (e.g. case 518 KICK) reaches via `break`.

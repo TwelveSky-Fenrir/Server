@@ -73,6 +73,11 @@ public static class FenrirDataServiceCollectionExtensions
         // consumed by GuildTribeBroadcastRelayHost (Fenrir.Application.Game.Hosting), not by *.Services
         // directly (see IGuildTribeBroadcastRelayQueue's own remarks for that boundary).
         builder.Services.AddSingleton<IGuildTribeBroadcastRelayRepository, GuildTribeBroadcastRelayRepository>();
+
+        // WS1.4 cross-shard social-negotiation relay (Party/Friend/Mentor/Duel/Trade/GuildInvite Ask+Answer)
+        // -- point-to-point sibling of the fan-out registration above; consumed by a future
+        // SocialCrossShardRelayHost (Fenrir.Application.Game.Hosting), not by *.Services directly.
+        builder.Services.AddSingleton<ISocialCrossShardRelayRepository, SocialCrossShardRelayRepository>();
         builder.Services.AddSingleton<IShardMapAssignmentRepository, ShardMapAssignmentRepository>();
         builder.Services.AddSingleton<IGameSettingsRepository, GameSettingsRepository>();
         builder.Services.AddSingleton<IServerQuotaRepository, ServerQuotaRepository>();

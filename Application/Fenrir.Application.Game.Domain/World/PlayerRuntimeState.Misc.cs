@@ -11,6 +11,36 @@ public partial class PlayerRuntimeState
     ];
 
     /// <summary>
+    ///     aVisibleState -- 1 = normally visible (the value every character is created/enters world with), 0 =
+    ///     GM-hidden (legacy <c>IsHiding()</c>, <c>Server/ts25zone/H07_MyGame.h:971</c>). Session-scoped only:
+    ///     no <c>game.Characters</c> column exists to load this from at world entry (see
+    ///     <c>EnterWorldService</c>'s own self-spawn-packet remarks), so every zone (re)entry starts a
+    ///     character visible regardless of whatever a GM last set here in a previous session. Mutated only by
+    ///     the GM "Basic"-tier (<see cref="Fenrir.Network.Dispatch.Zone.Sessions.GmCommandTier.Basic" />)
+    ///     HIDE/SHOW self-commands (tSort 501/502) -- see
+    ///     <see cref="Fenrir.Application.Game.Services.Gm.IGmBasicCommandService" />.
+    /// </summary>
+    /// <remarks>Réf. C++ : Server/ts25zone/S04_MyWork04.cpp:933-958.</remarks>
+    public int VisibleState { get; set; } = 1;
+
+    /// <summary>
+    ///     aSpecialState -- grep-verified (this session, mirroring the originating behavior contract's own
+    ///     sweep) to have no read/branch consumer anywhere in the zone-server source tree: written at world
+    ///     entry (always 0), by the GM "Basic"-tier EQUIP/UNEQUIP self-commands (tSort 511/512, values 1/0) and
+    ///     the NCHAT/YCHAT by-name-target commands (tSort 516/517, values 2/0 -- on the TARGET's own record,
+    ///     not the invoking GM's), sent outbound in one packing routine, and persisted to the database -- but
+    ///     never consulted in any conditional. Functions as a display/persisted value only, not a mechanism;
+    ///     session-scoped only here, same "no persisted column yet" posture as <see cref="VisibleState" />. See
+    ///     <see cref="Fenrir.Application.Game.Services.Gm.IGmBasicCommandService" />.
+    /// </summary>
+    /// <remarks>
+    ///     Réf. C++ : Server/ts25zone/S04_MyWork04.cpp:1265-1298 (EQUIP/UNEQUIP), :1411-1468 (NCHAT/YCHAT) ;
+    ///     Server/ts25zone/S04_MyWork02.cpp:1000 (world-entry write) ; Server/ts25zone/S05_MyTransfer.cpp:224
+    ///     (outbound pack site) ; Server/Header/CSQLAvatar.cpp:559 (DB-persistence site).
+    /// </remarks>
+    public int SpecialState { get; set; }
+
+    /// <summary>
     ///     aUseOrnament. Session-scoped only -- not yet loaded from/flushed to game.Characters (no persisted column
     ///     exists yet).
     /// </summary>
@@ -21,6 +51,22 @@ public partial class PlayerRuntimeState
     ///     <see cref="UseOrnament" />: session-scoped only.
     /// </summary>
     public int ProtectForHalo { get; set; }
+
+    /// <summary>
+    ///     <c>mTickCountCPRFC</c> -- same-tick reentry guard on CZ_TRIBE_WORK_SEND tSort 7 (halo enchant, see
+    ///     <see cref="Tribes.TribeHaloEnchantResolver" />). Legacy compares this against the server's own
+    ///     current logic-tick value with strict equality and disconnects on a match; re-expressed here as a
+    ///     sub-<see cref="Simulation.SimulationClock.LegacyTick" /> wall-clock window, matching
+    ///     <see cref="LastEnchantAttemptUtc" />'s own translation of the identical
+    ///     request-thread/Zone-tick-thread split (<c>Tribes.TribeActionService.HaloEnchantAsync</c> runs on
+    ///     the request thread, not the Zone tick thread that owns the only Zone-wide simulated clock in this
+    ///     codebase). Defaulted to <see cref="DateTime.UtcNow" /> at construction time, same posture as
+    ///     <see cref="LastEnchantAttemptUtc" /> -- NOT a literal port of legacy's "initialized to the current
+    ///     tick at avatar registration" (S04_MyWork02.cpp:871), which this default already achieves
+    ///     structurally, since a freshly (re)registered avatar constructs a fresh <see cref="PlayerRuntimeState" />
+    ///     at that same moment.
+    /// </summary>
+    public DateTime LastHaloEnchantAttemptUtc { get; set; } = DateTime.UtcNow;
 
     /// <summary>
     ///     aBonusItemLevel -- which level-up milestone's bonus-item claim is pending. Session-scoped only; always 0 until

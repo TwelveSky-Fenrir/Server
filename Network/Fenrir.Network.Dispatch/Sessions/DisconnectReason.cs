@@ -68,5 +68,37 @@ public enum DisconnectReason
     ///     drops below 1). See <c>Fenrir.Application.Game.Domain.Simulation.HoisundoCountdownSystem</c> for the
     ///     one consumer.
     /// </summary>
-    TimedZoneExpired
+    TimedZoneExpired,
+
+    /// <summary>
+    ///     Torn down by an Admin-tier (<c>GmCommandTier.Admin</c>) GM data-command (opcode 19,
+    ///     CZ_PROCESS_DATA_SEND): the MAX stat-cheat (tSort 509), and the shared privilege-gate-failure path
+    ///     for that command plus its two siblings in the same tier (spawn-item tSort 505/523, grant-pet-
+    ///     experience tSort 700). Legacy calls the exact same full-logout routine
+    ///     (Server/ts25zone/S03_MyUser.cpp:338-410, resolved via the disconnect macro at
+    ///     Server/Header/Protocol/DEFINE.h:651) on both the privilege-gate-failure branch AND the
+    ///     tSort-509-success branch of Server/ts25zone/S04_MyWork04.cpp:1188-1202 -- distinct from
+    ///     <see cref="Faulted" /> so operators can tell a deliberate, successful Admin-tier GM command's own
+    ///     forced disconnect (which, for tSort 509, is what actually makes the stat mutation durable -- see
+    ///     that command's own remarks) apart from an unauthorized-caller rejection or an unrelated fault, the
+    ///     same distinction <see cref="Banned" /> already draws for GM-BLOCK.
+    ///     <para>
+    ///         Also used by the Basic-tier (<c>GmCommandTier.Basic</c>) TRIBE self-command's (tSort 510) own
+    ///         successful-completion forced disconnect (Server/ts25zone/S04_MyWork04.cpp:1203-1264) -- the
+    ///         identical "a deliberate, successful GM command's own forced disconnect IS the completion
+    ///         signal" semantic as tSort 509 above, just at a lower tier; kept as one value rather than a
+    ///         per-tier duplicate, since the metric distinction this value exists for (deliberate-success vs.
+    ///         rejection/fault) does not depend on which tier the command gates at.
+    ///     </para>
+    /// </summary>
+    GmCommandLogout,
+
+    /// <summary>
+    ///     Torn down because the Basic-tier (<c>GmCommandTier.Basic</c>) KICK GM command (CZ_PROCESS_DATA_SEND
+    ///     tSort 518, Server/ts25zone/S04_MyWork04.cpp:1469-1486) just disconnected this session as its
+    ///     TARGET -- distinct from <see cref="Banned" /> (which also creates a durable admin.Bans row) and
+    ///     <see cref="Faulted" /> (an unrelated protocol/anti-tamper fault), so operators can tell a GM's
+    ///     one-off disconnect-only action apart from either.
+    /// </summary>
+    GmKicked
 }

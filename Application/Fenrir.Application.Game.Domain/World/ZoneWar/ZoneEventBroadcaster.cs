@@ -141,6 +141,19 @@ public sealed class ZoneEventBroadcaster(
     }
 
     /// <summary>
+    ///     tSort 401 (<c>bAttackMonsterSymbol</c>, S07_MyGame01.cpp:2622-2651): the current monster-symbol
+    ///     holder has kept the neutral, monster-guarded battle symbol for the configured delay -- a bare
+    ///     notice, no payload beyond the opcode itself, fired at most once per holding period (see
+    ///     <see cref="MonsterSymbolAttackWindowTracker" />'s own remarks). Does not itself mutate
+    ///     <see cref="WorldStateService" />: unlike every other <c>Announce*</c> method above, this is a pure
+    ///     notification with no world-state side effect of its own.
+    /// </summary>
+    public void AnnounceMonsterSymbolAttackWindow()
+    {
+        Broadcast(401);
+    }
+
+    /// <summary>
     ///     tSort 1234: the flag-triggered, high-tribe-biased tribe-point recompute has just been persisted
     ///     successfully -- fan out the 4 freshly computed totals to every connected zone-server link exactly as
     ///     read (already applied to <see cref="WorldStateService" /> and the DB by the caller; this method does

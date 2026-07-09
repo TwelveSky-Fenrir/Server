@@ -13,6 +13,7 @@ using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Dispatch.Zone.Sessions;
 using Fenrir.Network.Framing;
 using Fenrir.Network.Serialization.Zone.Packets.Zone;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -56,7 +57,8 @@ public class TribeActionServiceTests
         return (session, pipe, state);
     }
 
-    private static TribeActionService CreateService(FakeCharacterRepository? characters = null)
+    private static TribeActionService CreateService(FakeCharacterRepository? characters = null,
+        ILogger<TribeActionService>? logger = null)
     {
         var options = ZoneTestKit.Options();
         var registry = new ZoneRegistry(Options.Create(options), new MovementRules(Options.Create(options)),
@@ -69,7 +71,7 @@ public class TribeActionServiceTests
             .ToFrozenDictionary();
 
         return new TribeActionService(registry, new FakeTribeRepository(), characters ?? new FakeCharacterRepository(),
-            ZoneTestKit.EmptyWorldData(levelsByLevel: levels), NullLogger<TribeActionService>.Instance);
+            ZoneTestKit.EmptyWorldData(levelsByLevel: levels), logger ?? NullLogger<TribeActionService>.Instance);
     }
 
     private static TribeActionRequest RebirthRequest()
@@ -87,6 +89,90 @@ public class TribeActionServiceTests
         }
 
         session.Send(new TribeActionResponse { Result = outcome.Result, Sort = packet.Sort, Data = packet.Data });
+    }
+
+    // CZ_TRIBE_WORK_SEND tSort 7 (Halo Enchant) -- HaloEnchantAsync's own same-tick reentry guard
+    // (mTickCountCPRFC, see that method's own remarks). PlayerRuntimeState.LastHaloEnchantAttemptUtc is
+    // stamped unconditionally the instant the guard passes, BEFORE the CP/halo-cap check below it, so a
+    // legitimate first attempt that itself goes on to fail that check still stamps the timestamp -- the two
+    // tests below rely on that ordering to isolate the reentry guard from every other precondition in this
+    // method without ever reaching its own money-debit/zone-command-post tail (avoiding
+    // PostTribeProgressCommandAndWaitAsync's 2s internal wait, since nothing here ticks the zone
+    // concurrently).
+    [Fact]
+    public async Task HaloEnchant_FirstAttempt_PassesTheReentryGuard_ButFailsTheSeparateHaloCapCheck()
+    {
+        var zone = ZoneTestKit.CreateZone(1);
+        var (_, _, state) = Setup(zone, CharacterId, contributionPoints: 1_000);
+        state.Halo = 96; // at the cap -- the check immediately after the guard aborts, without ever
+        // reaching AdjustMoneyAsync/the resolver/the zone-command post.
+        state.LastHaloEnchantAttemptUtc = DateTime.UtcNow - TimeSpan.FromSeconds(1); // clears the guard
+        var logger = new CapturingLogger<TribeActionService>();
+        var service = CreateService(logger: logger);
+
+        var outcome = await service.HaloEnchantAsync(zone, state, CharacterId, CancellationToken.None);
+
+        Assert.True(outcome.Aborted); // aborted, but by the halo-cap check, NOT the reentry guard
+        Assert.DoesNotContain(logger.Entries, e => e.Message.Contains("same-tick repeat request"));
+        Assert.Equal(96, state.Halo);
+        Assert.Equal(1_000, state.ContributionPoints); // untouched -- the abort precedes any CP/money debit
+    }
+
+    [Fact]
+    public async Task HaloEnchant_SecondAttemptWithinSameLegacyTick_IsRejectedByTheReentryGuard()
+    {
+        var zone = ZoneTestKit.CreateZone(1);
+        var (_, _, state) = Setup(zone, CharacterId, contributionPoints: 1_000);
+        state.Halo = 96; // guarantees a fast, synchronous abort on EVERY call that passes the guard, so
+        // neither attempt below ever reaches AdjustMoneyAsync/PostTribeProgressCommandAndWaitAsync -- keeping
+        // the two calls back-to-back in real wall-clock time, which is exactly what this test needs to prove.
+        state.LastHaloEnchantAttemptUtc = DateTime.UtcNow - TimeSpan.FromSeconds(1); // clears the guard for
+        // attempt #1 only
+        var logger = new CapturingLogger<TribeActionService>();
+        var service = CreateService(logger: logger);
+
+        var first = await service.HaloEnchantAsync(zone, state, CharacterId, CancellationToken.None);
+        Assert.True(first.Aborted); // halo-cap abort (see the sibling test above) -- guard already passed once
+        var stampedAfterFirst = state.LastHaloEnchantAttemptUtc;
+
+        // Same-tick retry: real elapsed time between these two awaited calls is a tiny fraction of the 500ms
+        // legacy tick (SimulationClock.LegacyTick) this guard is measured against.
+        var second = await service.HaloEnchantAsync(zone, state, CharacterId, CancellationToken.None);
+
+        Assert.True(second.Aborted);
+        Assert.Contains(logger.Entries,
+            e => e.Level == LogLevel.Warning && e.Message.Contains("same-tick repeat request"));
+        // The rejected retry must never re-stamp the guard's own timestamp (only a guard-PASSING attempt
+        // does that) -- otherwise a fast enough attacker could perpetually push the window forward with
+        // rejected retries alone.
+        Assert.Equal(stampedAfterFirst, state.LastHaloEnchantAttemptUtc);
+        Assert.Equal(96, state.Halo);
+        Assert.Equal(1_000, state.ContributionPoints);
+    }
+
+    /// <summary>
+    ///     Companion acceptance-path check: a genuine (non-same-tick) attempt is never blocked by the reentry
+    ///     guard itself -- CP and money are debited unconditionally once the guard and halo-cap check both
+    ///     pass, regardless of the halo-enchant roll's own random outcome (Success/Downgraded/NeutralFail all
+    ///     debit the same fixed CP/money cost, see <c>TribeActionService.HaloEnchantAsync</c>'s own remarks).
+    /// </summary>
+    [Fact]
+    public async Task HaloEnchant_NonSameTickAttempt_PassesTheGuard_AndDebitsMoneyAndCp()
+    {
+        var zone = ZoneTestKit.CreateZone(1);
+        var characters = new FakeCharacterRepository();
+        var (_, _, state) = Setup(zone, CharacterId, contributionPoints: 1_000);
+        state.Halo = 10; // well below the 96 cap
+        state.LastHaloEnchantAttemptUtc = DateTime.UtcNow - TimeSpan.FromSeconds(1); // clears the guard
+        var service = CreateService(characters);
+
+        var outcome = await service.HaloEnchantAsync(zone, state, CharacterId, CancellationToken.None);
+        zone.Tick(TimeSpan.FromMilliseconds(50)); // drains the posted TribeProgressZoneCommand mirror
+
+        Assert.False(outcome.Aborted);
+        Assert.True(zone.TryGetPlayer(CharacterId, out var after));
+        Assert.Equal(900, after!.ContributionPoints); // 1_000 - HaloEnchantCpCost(100), unconditional on outcome
+        Assert.Equal((CharacterId, -1_000_000L, 0), characters.LastAdjustMoney); // HaloEnchantMoneyCost
     }
 
     [Fact]

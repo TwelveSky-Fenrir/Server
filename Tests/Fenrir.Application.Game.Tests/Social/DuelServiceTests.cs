@@ -1,11 +1,14 @@
 using Fenrir.Application.Game.Abstractions.Social;
+using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Social.Duel;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Services.Social;
 using Fenrir.Application.Game.Tests.TestSupport;
+using Fenrir.Data.Abstractions.Runtime;
 using Fenrir.Network.Framing;
 using Fenrir.Network.Serialization.Zone.Packets.Zone;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.Social;
 
@@ -20,10 +23,17 @@ public class DuelServiceTests
 {
     private static (DuelService Service, ZoneRegistry Zones, DuelRegistry Duels) CreateService(short mapId)
     {
+        return CreateService(mapId, new FakeCharacterShardLocationRepository(), new FakeSocialCrossShardRelayQueue());
+    }
+
+    private static (DuelService Service, ZoneRegistry Zones, DuelRegistry Duels) CreateService(short mapId,
+        ICharacterShardLocationRepository directory, FakeSocialCrossShardRelayQueue relay)
+    {
         var duels = new DuelRegistry();
         var zones = ZoneTestKit.CreateRegistry();
         zones.Initialize([mapId]);
-        return (new DuelService(zones, duels, NullLogger<DuelService>.Instance), zones, duels);
+        return (new DuelService(zones, duels, directory, relay, Options.Create(new GameServerOptions { ShardId = 1 }),
+            NullLogger<DuelService>.Instance), zones, duels);
     }
 
     private static PlayerRuntimeState Enter(ZoneRegistry zones, short mapId, int characterId, string name, byte tribe)
@@ -44,7 +54,7 @@ public class DuelServiceTests
     }
 
     [Fact]
-    public void Ask_ChallengerAlreadyActivelyDueling_ReturnsChallengerAlreadyDueling()
+    public async Task Ask_ChallengerAlreadyActivelyDueling_ReturnsChallengerAlreadyDueling()
     {
         var (service, zones, duels) = CreateService(1);
         var challenger = Enter(zones, 1, 10, "Challenger", 1);
@@ -56,13 +66,13 @@ public class DuelServiceTests
         Assert.True(duels.TryAnswer(20, true, out _));
         Assert.True(duels.TryStart(10, out _));
 
-        var result = service.Ask(zones[1], challenger, "NewTarget", 0);
+        var result = await service.AskAsync(zones[1], challenger, "NewTarget", 0, CancellationToken.None);
 
         Assert.Equal(DuelAskResultKind.ChallengerAlreadyDueling, result);
     }
 
     [Fact]
-    public void Ask_OrdinaryBusyChallenger_StillNegotiating_ReturnsChallengerBusy()
+    public async Task Ask_OrdinaryBusyChallenger_StillNegotiating_ReturnsChallengerBusy()
     {
         var (service, zones, duels) = CreateService(1);
         var challenger = Enter(zones, 1, 10, "Challenger", 1);
@@ -71,7 +81,7 @@ public class DuelServiceTests
 
         Assert.Equal(DuelAskOutcome.Sent, duels.TryAsk(10, 20, false)); // still pending, never answered
 
-        var result = service.Ask(zones[1], challenger, "NewTarget", 0);
+        var result = await service.AskAsync(zones[1], challenger, "NewTarget", 0, CancellationToken.None);
 
         Assert.Equal(DuelAskResultKind.ChallengerBusy, result);
     }
@@ -82,7 +92,7 @@ public class DuelServiceTests
     ///     the busy reply, not "target not found" (Server/ts25zone/S04_MyWork02.cpp:8259-8277).
     /// </summary>
     [Fact]
-    public void Ask_ChallengerBusy_AndTargetNameDoesNotExist_ReturnsChallengerBusy_NotTargetNotFound()
+    public async Task Ask_ChallengerBusy_AndTargetNameDoesNotExist_ReturnsChallengerBusy_NotTargetNotFound()
     {
         var (service, zones, duels) = CreateService(1);
         var challenger = Enter(zones, 1, 10, "Challenger", 1);
@@ -90,14 +100,14 @@ public class DuelServiceTests
 
         Assert.Equal(DuelAskOutcome.Sent, duels.TryAsk(10, 20, false)); // still pending, never answered
 
-        var result = service.Ask(zones[1], challenger, "NoSuchAvatar", 0);
+        var result = await service.AskAsync(zones[1], challenger, "NoSuchAvatar", 0, CancellationToken.None);
 
         Assert.Equal(DuelAskResultKind.ChallengerBusy, result);
     }
 
     /// <summary>Same response-code-order regression as above, for the desynced-Active-duel outcome.</summary>
     [Fact]
-    public void Ask_ChallengerAlreadyActivelyDueling_AndTargetNameDoesNotExist_ReturnsChallengerAlreadyDueling()
+    public async Task Ask_ChallengerAlreadyActivelyDueling_AndTargetNameDoesNotExist_ReturnsChallengerAlreadyDueling()
     {
         var (service, zones, duels) = CreateService(1);
         var challenger = Enter(zones, 1, 10, "Challenger", 1);
@@ -107,9 +117,27 @@ public class DuelServiceTests
         Assert.True(duels.TryAnswer(20, true, out _));
         Assert.True(duels.TryStart(10, out _));
 
-        var result = service.Ask(zones[1], challenger, "NoSuchAvatar", 0);
+        var result = await service.AskAsync(zones[1], challenger, "NoSuchAvatar", 0, CancellationToken.None);
 
         Assert.Equal(DuelAskResultKind.ChallengerAlreadyDueling, result);
+    }
+
+    /// <summary>WS1.4 ASK-PUBLISH-ONLY: a same-shard miss that resolves cross-shard publishes an Ask.</summary>
+    [Fact]
+    public async Task Ask_SameShardMiss_ResolvesCrossShard_PublishesAskAndReturnsSentCrossShard()
+    {
+        var directory = new FakeCharacterShardLocationRepository();
+        directory.Seed(new CharacterShardLocationDto(2, 9, 77, "RemoteTarget", 1, DateTime.UtcNow));
+        var relay = new FakeSocialCrossShardRelayQueue();
+        var (service, zones, duels) = CreateService(1, directory, relay);
+        var challenger = Enter(zones, 1, 10, "Challenger", 1);
+
+        var result = await service.AskAsync(zones[1], challenger, "RemoteTarget", 0, CancellationToken.None);
+
+        Assert.Equal(DuelAskResultKind.SentCrossShard, result);
+        Assert.Single(relay.Enqueued);
+        Assert.Equal(SocialCrossShardRelayKind.Duel, relay.Enqueued[0].Kind);
+        Assert.True(duels.IsNegotiating(10));
     }
 
     [Fact]

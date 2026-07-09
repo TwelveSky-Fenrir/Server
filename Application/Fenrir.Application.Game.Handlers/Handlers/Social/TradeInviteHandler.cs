@@ -13,9 +13,10 @@ namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 ///     which uses <see cref="PlayerRuntimeState.CombinedLevel" /> (aLevel1+aLevel2).
 /// </summary>
 public sealed class TradeInviteHandler(ITradeInviteService tradeInviteService, ILogger<TradeInviteHandler> logger)
-    : IInlinePacketHandler<TradeInviteRequest>
+    : IAsyncPacketHandler<TradeInviteRequest>
 {
-    public void Handle(in TradeInviteRequest packet, IPacketSession session)
+    public async ValueTask HandleAsync(TradeInviteRequest packet, IPacketSession session,
+        CancellationToken cancellationToken)
     {
         var zoneSession = (ZoneClientSession)session;
 
@@ -29,7 +30,8 @@ public sealed class TradeInviteHandler(ITradeInviteService tradeInviteService, I
         if (!zone.TryGetPlayer(askerId, out var asker) || asker is null)
             return;
 
-        var result = tradeInviteService.Invite(zone, asker, packet.AvatarName);
+        var result = await tradeInviteService.InviteAsync(zone, asker, packet.AvatarName, cancellationToken)
+            .ConfigureAwait(false);
 
         switch (result.Kind)
         {
@@ -49,6 +51,10 @@ public sealed class TradeInviteHandler(ITradeInviteService tradeInviteService, I
                 zone.TryGetPlayer(result.TargetCharacterId, out var target);
                 target!.Session.Send(new TradeInviteResponse
                     { AvatarName = result.AskerName!, Level = result.AskerLevel });
+                return;
+            case TradeInviteResultKind.SentCrossShard:
+                // Ask-publish-only today -- see TradeInviteResultKind.SentCrossShard's own remarks; nothing
+                // to send (no target-side delivery exists yet to ever produce a reply).
                 return;
         }
     }

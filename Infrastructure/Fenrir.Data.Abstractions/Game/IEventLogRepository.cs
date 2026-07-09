@@ -13,7 +13,25 @@ public enum EventLogCategory : byte
     ItemCreate = 2,
     ItemDestroy = 3,
     Enchant = 4,
+
+    /// <summary>
+    ///     A GM command's effect on a character, any tier -- EventCode is app-owned within this category per
+    ///     <c>Fenrir.Application.Game.Services.Gm.GmActionEventCodes</c> (that project's own locally-scoped
+    ///     catalog, mirroring <c>Fenrir.Application.Login.Services.AccountSecurity.AccountSecurityEventCodes</c>'
+    ///     convention). Admin-tier (<c>GmCommandTier.Admin</c>) first consumers: <c>GmMaxStatService</c> (tSort
+    ///     509, "MAX" stat-cheat) and <c>GmPetExperienceGrantService</c> (tSort 700, grant-pet-experience) --
+    ///     both a Fenrir-authored audit trail added by project decision, since neither command's own cited
+    ///     legacy body (Server/ts25zone/S04_MyWork04.cpp:1188-1202 / :2062-2083) writes any audit-log call
+    ///     itself. The third Admin-tier command, <c>GmCreateItemService</c> (tSort 505/523, spawn-item), logs
+    ///     to <see cref="ItemCreate" /> instead, since a real legacy audit-log call for that command already
+    ///     exists to map onto (Server/ts25zone/UpperCom/S06_MyUpperCom05.cpp:289-305). Basic-tier
+    ///     (<c>GmCommandTier.Basic</c>) consumers: <c>IGmBasicCommandService</c>'s DIE (tSort 508), CALL
+    ///     (tSort 514), KICK (tSort 518), and the shared NCHAT/YCHAT (tSort 516/517) log point -- these four
+    ///     DO have a real legacy audit-log call each (Server/ts25zone/S04_MyWork04.cpp:1165-1187,1324-1384,
+    ///     1411-1468,1469-1486), unlike the two Admin-tier project-decision consumers above.
+    /// </summary>
     GmAction = 5,
+
     Death = 6,
     Session = 7,
     AccountSecurity = 8,

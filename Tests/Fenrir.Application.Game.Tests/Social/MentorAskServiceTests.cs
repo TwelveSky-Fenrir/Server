@@ -1,4 +1,5 @@
 using Fenrir.Application.Game.Abstractions.Social;
+using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Guilds;
 using Fenrir.Application.Game.Domain.Social.Duel;
 using Fenrir.Application.Game.Domain.Social.Friends;
@@ -8,11 +9,13 @@ using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Services.Social;
 using Fenrir.Application.Game.Tests.TestSupport;
+using Fenrir.Data.Abstractions.Runtime;
+using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.Social;
 
 /// <summary>
-///     Covers <see cref="MentorAskService.Ask" />'s response-code-order: the master's own still-negotiating
+///     Covers <see cref="MentorAskService.AskAsync" />'s response-code-order: the master's own still-negotiating
 ///     busy state must be checked before the target student is resolved by name
 ///     (Server/ts25zone/S04_MyWork02.cpp:9311-9324).
 /// </summary>
@@ -22,12 +25,19 @@ public class MentorAskServiceTests
 
     private static (MentorAskService Service, ZoneRegistry Zones, MentorRegistry Mentors) CreateService(short mapId)
     {
+        return CreateService(mapId, new FakeCharacterShardLocationRepository(), new FakeSocialCrossShardRelayQueue());
+    }
+
+    private static (MentorAskService Service, ZoneRegistry Zones, MentorRegistry Mentors) CreateService(short mapId,
+        ICharacterShardLocationRepository directory, FakeSocialCrossShardRelayQueue relay)
+    {
         var mentors = new MentorRegistry();
         var zones = ZoneTestKit.CreateRegistry();
         zones.Initialize([mapId]);
         return (new MentorAskService(mentors, new DuelRegistry(), new TradeRegistry(), new FriendRegistry(),
-                new PartyRegistry(), new GuildInviteRegistry(), new CapturingLogger<MentorAskService>()), zones,
-            mentors);
+                new PartyRegistry(), new GuildInviteRegistry(), directory, relay,
+                Options.Create(new GameServerOptions { ShardId = 1 }), new CapturingLogger<MentorAskService>()),
+            zones, mentors);
     }
 
     private static PlayerRuntimeState Enter(ZoneRegistry zones, short mapId, int characterId, string name,
@@ -43,7 +53,7 @@ public class MentorAskServiceTests
     }
 
     [Fact]
-    public void Ask_MasterBusy_AndTargetNameDoesNotExist_ReturnsAskerBusy_NotTargetNotFound()
+    public async Task Ask_MasterBusy_AndTargetNameDoesNotExist_ReturnsAskerBusy_NotTargetNotFound()
     {
         var (service, zones, mentors) = CreateService(1);
         var master = Enter(zones, 1, 1, "Master");
@@ -51,32 +61,50 @@ public class MentorAskServiceTests
 
         Assert.Equal(MentorAskOutcome.Sent, mentors.TryAsk(1, 2, false, false)); // still pending, never answered
 
-        var result = service.Ask(zones[1], master, "NoSuchAvatar");
+        var result = await service.AskAsync(zones[1], master, "NoSuchAvatar", CancellationToken.None);
 
         Assert.Equal(MentorAskResultKind.AskerBusy, result.Kind);
     }
 
     [Fact]
-    public void Ask_MasterNotBusy_TargetNameDoesNotExist_ReturnsTargetNotFound()
+    public async Task Ask_MasterNotBusy_TargetNameDoesNotExist_ReturnsTargetNotFound()
     {
         var (service, zones, _) = CreateService(1);
         var master = Enter(zones, 1, 1, "Master");
 
-        var result = service.Ask(zones[1], master, "NoSuchAvatar");
+        var result = await service.AskAsync(zones[1], master, "NoSuchAvatar", CancellationToken.None);
 
         Assert.Equal(MentorAskResultKind.TargetNotFound, result.Kind);
     }
 
     [Fact]
-    public void Ask_MasterLevelTooLow_ReturnsAskerMustDisconnect_BeforeBusyOrTargetChecks()
+    public async Task Ask_MasterLevelTooLow_ReturnsAskerMustDisconnect_BeforeBusyOrTargetChecks()
     {
         var (service, zones, mentors) = CreateService(1);
         var master = Enter(zones, 1, 1, "Master", level: 50);
         Enter(zones, 1, 2, "PendingStudent", level: 1);
         Assert.Equal(MentorAskOutcome.Sent, mentors.TryAsk(1, 2, false, false)); // also busy, must not matter
 
-        var result = service.Ask(zones[1], master, "NoSuchAvatar");
+        var result = await service.AskAsync(zones[1], master, "NoSuchAvatar", CancellationToken.None);
 
         Assert.Equal(MentorAskResultKind.AskerMustDisconnect, result.Kind);
+    }
+
+    /// <summary>WS1.4 ASK-PUBLISH-ONLY: a same-shard miss that resolves cross-shard publishes an Ask.</summary>
+    [Fact]
+    public async Task Ask_SameShardMiss_ResolvesCrossShard_PublishesAskAndReturnsSentCrossShard()
+    {
+        var directory = new FakeCharacterShardLocationRepository();
+        directory.Seed(new CharacterShardLocationDto(2, 9, 77, "RemoteStudent", 1, DateTime.UtcNow));
+        var relay = new FakeSocialCrossShardRelayQueue();
+        var (service, zones, mentors) = CreateService(1, directory, relay);
+        var master = Enter(zones, 1, 1, "Master");
+
+        var result = await service.AskAsync(zones[1], master, "RemoteStudent", CancellationToken.None);
+
+        Assert.Equal(MentorAskResultKind.SentCrossShard, result.Kind);
+        Assert.Single(relay.Enqueued);
+        Assert.Equal(SocialCrossShardRelayKind.Mentor, relay.Enqueued[0].Kind);
+        Assert.True(mentors.IsNegotiating(1));
     }
 }

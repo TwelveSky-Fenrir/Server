@@ -40,8 +40,10 @@ namespace Fenrir.Application.Game.Domain.World;
 ///     (already-SQL-durable inventory/skill/mentor/guild/tribe/quest/mission mirrors),
 ///     <c>Zone.CosmeticMirrors.cs</c> (drink-bottle/hero-ranking/fishing/mount/costume/stellar-core/avatar-buff/
 ///     rune-socket/auto-buff/pshop mirrors), <c>Zone.ProxyShops.cs</c> (the offline/deputy shop periodic
-///     radius rebroadcast + expiry force-close sweep), and <c>Zone.TribeBankTax.cs</c> (the 1%/9% tribe-bank
-///     income tax accumulator and its 10-minute sweep). This file keeps the constructor, the fields/state
+///     radius rebroadcast + expiry force-close sweep), <c>Zone.TribeBankTax.cs</c> (the 1%/9% tribe-bank
+///     income tax accumulator and its 10-minute sweep), and <c>Zone.Gm.cs</c> (the Elevated-tier GM-EXP
+///     command's own read-decide-mutate mirror, the one GM-command concern that cannot be folded into
+///     <c>Zone.EconomyMirrors.cs</c>'s already-decided-field-mirror shape). This file keeps the constructor, the fields/state
 ///     shared across several of those concerns (the AOI grid, the player map, the tick clock, RNG), and the
 ///     tick loop itself.
 /// </remarks>
@@ -197,6 +199,17 @@ public sealed partial class Zone(
     }
 
     /// <summary>
+    ///     Reusable scratch buffer backing <see cref="NeighborsOfPosition" />'s result -- <see cref="MonsterAiSystem" />
+    ///     is a single DI singleton shared across every zone this process ticks (see that class's own remarks),
+    ///     so it cannot safely own this buffer itself; only <see cref="Zone" /> is guaranteed confined to a
+    ///     single tick thread. Repopulated fresh on every <see cref="NeighborsOfPosition" /> call and valid only
+    ///     until the next one -- <see cref="Monsters.MonsterAiSystem.TryAcquireTarget" />, the sole caller,
+    ///     fully consumes it in its own immediately-following <c>foreach</c> before returning, so no reentrant
+    ///     use can observe a half-built or already-cleared buffer.
+    /// </summary>
+    private readonly List<int> _monsterAiNeighborScratch = [];
+
+    /// <summary>
     ///     Tick-thread-only: <see cref="_grid" /> itself is not thread-safe. Deliberately coarse-only (no
     ///     exact-distance filtering) -- <see cref="Monsters.MonsterAiSystem.TryAcquireTarget" /> is this
     ///     method's other caller, and its own detection radius (<c>MonsterRowDto.RadiusInfo2</c>) is an
@@ -206,10 +219,20 @@ public sealed partial class Zone(
     ///     broadcast call site that DOES want the AOI exact-distance pass (legacy's own <c>Broadcast11</c>
     ///     semantics, see <see cref="AoiGrid" />'s remarks) should query <see cref="_grid" /> directly instead
     ///     of going through this helper.
+    ///     <para>
+    ///         Returns the concrete <see cref="_monsterAiNeighborScratch" /> buffer, not <see cref="IEnumerable{T}" />
+    ///         -- returning the interface would force the caller's <c>foreach</c> to box <see cref="List{T}" />'s
+    ///         own value-type enumerator on every detection-throttle tick for every monster in the zone. This
+    ///         also replaces the previous <c>yield return</c> iterator (a fresh compiler-generated enumerator
+    ///         allocated per call) with a reused buffer -- see this field's own remarks for why the buffer lives
+    ///         here rather than on the caller.
+    ///     </para>
     /// </summary>
-    public IEnumerable<int> NeighborsOfPosition(float x, float z)
+    public List<int> NeighborsOfPosition(float x, float z)
     {
-        return _grid.Neighbors(_grid.CellOf(x, z));
+        _monsterAiNeighborScratch.Clear();
+        _grid.Neighbors(_monsterAiNeighborScratch, _grid.CellOf(x, z));
+        return _monsterAiNeighborScratch;
     }
 
     public async Task RunAsync(CancellationToken ct)
@@ -273,6 +296,7 @@ public sealed partial class Zone(
         DrainQuestCommands();
         DrainGuildCommands();
         DrainTribeProgressCommands();
+        DrainGmExperienceCommands();
         DrainPshopCommands();
         DrainMissionCommands();
         DrainDrinkBottleCommands();

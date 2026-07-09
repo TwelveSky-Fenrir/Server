@@ -1,13 +1,17 @@
 using Fenrir.Application.Game.Abstractions.Social;
+using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Guilds;
+using Fenrir.Application.Game.Domain.Social;
 using Fenrir.Application.Game.Domain.Social.Duel;
 using Fenrir.Application.Game.Domain.Social.Friends;
 using Fenrir.Application.Game.Domain.Social.Mentor;
 using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Data.Abstractions.Runtime;
 using Fenrir.Network.Serialization.Zone.Packets.Zone;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Services.Social;
 
@@ -22,6 +26,8 @@ public sealed class FriendService(
     MentorRegistry mentors,
     IFriendRepository repository,
     ICharacterShardLocationRepository characterShardLocations,
+    ISocialCrossShardRelayQueue crossShardRelay,
+    IOptions<GameServerOptions> options,
     ILogger<FriendService> logger)
     : IFriendService
 {
@@ -46,8 +52,17 @@ public sealed class FriendService(
     ///         no contract citation confirms it applies to this opcode pair, so it is left unmodeled rather than
     ///         guessed at.
     ///     </para>
+    ///     <para>
+    ///         WS1.4: on a same-shard <see cref="FindPlayerByName" /> miss, falls back to
+    ///         <see cref="ICharacterShardLocationRepository.FindByNameAsync" /> before reporting
+    ///         <see cref="FriendAskResultKind.TargetNotFound" /> -- see <see cref="FriendAskResultKind.SentCrossShard" />'s
+    ///         own remarks. The already-friend-or-full check reuses <paramref name="asker" />'s own local
+    ///         <see cref="PlayerRuntimeState.Friends" /> list either way (no second query needed); the
+    ///         same-tribe check re-runs against the resolved row's own denormalized Tribe column.
+    ///     </para>
     /// </remarks>
-    public FriendAskResultKind Ask(Zone zone, PlayerRuntimeState asker, string targetAvatarName)
+    public async ValueTask<FriendAskResultKind> AskAsync(Zone zone, PlayerRuntimeState asker, string targetAvatarName,
+        CancellationToken cancellationToken)
     {
         if (zone.MapId == 124)
         {
@@ -65,12 +80,7 @@ public sealed class FriendService(
 
         var target = FindPlayerByName(zone, targetAvatarName);
         if (target is null)
-        {
-            logger.LogDebug(
-                "Friend ask rejected: character {AskerId} target {TargetAvatarName} not found in map {MapId}",
-                asker.CharacterId, targetAvatarName, zone.MapId);
-            return FriendAskResultKind.TargetNotFound;
-        }
+            return await AskCrossShardAsync(asker, targetAvatarName, cancellationToken).ConfigureAwait(false);
 
         if (asker.Friends.Count >= MaxFriends || asker.Friends.Values.Contains(target.CharacterId))
         {
@@ -119,8 +129,109 @@ public sealed class FriendService(
         }
     }
 
+    /// <summary>
+    ///     WS1.4 same-shard-miss fallback: resolves <paramref name="targetAvatarName" /> via the cross-shard
+    ///     character-location directory, re-runs the two pre-checks that are still evaluable from local data
+    ///     (already-friend-or-full against <paramref name="asker" />'s own list; same-tribe against the
+    ///     directory row's own denormalized Tribe), then publishes an Ask row via
+    ///     <see cref="ISocialCrossShardRelayQueue" /> and registers the asker-side busy gate
+    ///     (<see cref="FriendRegistry.TryAskCrossShard" />). The remaining target-side pre-check
+    ///     (<c>IsExcludedByCommunityWork</c>, which needs the target's own live state) is re-run on the
+    ///     target's own shard by <see cref="FriendCrossShardRelayHandler.HandleAskAsync" /> once delivered.
+    /// </summary>
+    private async ValueTask<FriendAskResultKind> AskCrossShardAsync(PlayerRuntimeState asker,
+        string targetAvatarName, CancellationToken cancellationToken)
+    {
+        var remote = await characterShardLocations.FindByNameAsync(targetAvatarName, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (remote is null)
+        {
+            logger.LogDebug(
+                "Friend ask rejected: character {AskerId} target {TargetAvatarName} not found on any shard",
+                asker.CharacterId, targetAvatarName);
+            return FriendAskResultKind.TargetNotFound;
+        }
+
+        if (asker.Friends.Count >= MaxFriends || asker.Friends.Values.Contains(remote.CharacterId))
+        {
+            logger.LogDebug(
+                "Friend ask rejected: character {AskerId} already has {FriendCount} friends or is already friends with cross-shard character {TargetCharacterId}",
+                asker.CharacterId, asker.Friends.Count, remote.CharacterId);
+            return FriendAskResultKind.AlreadyFriendOrFull;
+        }
+
+        if (asker.Tribe != remote.Tribe)
+        {
+            logger.LogWarning(
+                "Friend ask rejected: character {AskerId} (tribe {AskerTribe}) targeted cross-shard character {TargetCharacterId} (tribe {TargetTribe}) -- session will be disconnected",
+                asker.CharacterId, asker.Tribe, remote.CharacterId, remote.Tribe);
+            return FriendAskResultKind.TribeMismatch;
+        }
+
+        var outcome = friends.TryAskCrossShard(asker.CharacterId,
+            new CrossShardOutboundAsk(remote.ShardId, remote.CharacterId, remote.AvatarName));
+
+        if (outcome != FriendAskOutcome.Sent)
+        {
+            logger.LogDebug("Friend ask rejected: character {AskerId} is busy (cross-shard registration)",
+                asker.CharacterId);
+            return FriendAskResultKind.AskerBusy;
+        }
+
+        crossShardRelay.Enqueue(new SocialCrossShardRelayEntry(
+            SocialCrossShardRelayKind.Friend,
+            SocialCrossShardRelayMessageType.Ask,
+            null,
+            null,
+            options.Value.ShardId,
+            asker.CharacterId,
+            asker.Name,
+            remote.ShardId,
+            remote.CharacterId,
+            null));
+
+        logger.LogDebug(
+            "Friend ask published cross-shard: character {AskerId} ({AskerName}) -> character {TargetCharacterId} on shard {TargetShardId}",
+            asker.CharacterId, asker.Name, remote.CharacterId, remote.ShardId);
+        return FriendAskResultKind.SentCrossShard;
+    }
+
+    /// <summary>
+    ///     WS1.4: if <paramref name="targetId" /> has a cross-shard ask delivered in (via
+    ///     <see cref="FriendCrossShardRelayHandler.HandleAskAsync" />), answers it by publishing an Answer row
+    ///     back to the original asker's own shard instead of the same-shard <see cref="FriendRegistry.TryAnswer" />
+    ///     path -- transparent to the caller (<see cref="FriendAskHandler" />/<c>FriendAnswerHandler</c>), which
+    ///     is unaware whether a given pending ask is same-shard or cross-shard.
+    /// </summary>
     public void Answer(int targetId, int answerCode)
     {
+        if (friends.TryConsumeCrossShardInbound(targetId, out var inbound))
+        {
+            var accepted = answerCode == 0;
+            if (accepted)
+                friends.MarkAccepted(targetId, inbound.SourceCharacterId);
+
+            var targetName = zones.TryGetPlayer(targetId, out var targetState) ? targetState.Name : "";
+
+            crossShardRelay.Enqueue(new SocialCrossShardRelayEntry(
+                SocialCrossShardRelayKind.Friend,
+                SocialCrossShardRelayMessageType.Answer,
+                accepted,
+                null,
+                options.Value.ShardId,
+                targetId,
+                targetName,
+                inbound.SourceShardId,
+                inbound.SourceCharacterId,
+                inbound.RelayId));
+
+            logger.LogDebug(
+                "Friend answer (cross-shard): character {TargetId} answered {AnswerCode} to asker {AskerId} on shard {AskerShardId}",
+                targetId, answerCode, inbound.SourceCharacterId, inbound.SourceShardId);
+            return;
+        }
+
         if (!friends.TryAnswer(targetId, answerCode == 0, out var askerId))
         {
             logger.LogDebug("Friend answer ignored: character {TargetId} has no pending ask", targetId);

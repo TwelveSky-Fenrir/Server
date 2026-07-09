@@ -13,9 +13,10 @@ namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 ///     always refuses; no inter-tribe exception here unlike duel/trade/party.
 /// </summary>
 public sealed class FriendAskHandler(IFriendService friendService, ILogger<FriendAskHandler> logger)
-    : IInlinePacketHandler<FriendRequest>
+    : IAsyncPacketHandler<FriendRequest>
 {
-    public void Handle(in FriendRequest packet, IPacketSession session)
+    public async ValueTask HandleAsync(FriendRequest packet, IPacketSession session,
+        CancellationToken cancellationToken)
     {
         var zoneSession = (ZoneClientSession)session;
 
@@ -29,7 +30,10 @@ public sealed class FriendAskHandler(IFriendService friendService, ILogger<Frien
         if (!zone.TryGetPlayer(askerId, out var asker) || asker is null)
             return;
 
-        switch (friendService.Ask(zone, asker, packet.AvatarName))
+        var result = await friendService.AskAsync(zone, asker, packet.AvatarName, cancellationToken)
+            .ConfigureAwait(false);
+
+        switch (result)
         {
             case FriendAskResultKind.MapForbidden:
                 return;
@@ -45,6 +49,11 @@ public sealed class FriendAskHandler(IFriendService friendService, ILogger<Frien
                 return;
             case FriendAskResultKind.TargetBusy:
                 session.Send(new FriendAnswerResponse { Answer = 5 });
+                return;
+            case FriendAskResultKind.SentCrossShard:
+                // Nothing to send yet -- the target (on another shard) is notified asynchronously once
+                // SocialCrossShardRelayHost delivers the Ask; see FriendAskResultKind.SentCrossShard's own
+                // remarks.
                 return;
         }
     }

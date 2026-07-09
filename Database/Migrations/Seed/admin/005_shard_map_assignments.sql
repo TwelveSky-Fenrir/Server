@@ -2,6 +2,6 @@
 -- to live in Servers/Fenrir.GameServer/appsettings.json's Game:Maps before that list moved here.
 INSERT INTO admin.ShardMapAssignments (ShardId, MapId)
 VALUES (1, 1),
-       (2, 6),
-       (2, 11),
-       (2, 140);
+       (1, 6),
+       (1, 11),
+       (1, 140);

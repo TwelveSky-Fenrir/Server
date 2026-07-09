@@ -196,6 +196,38 @@ public class ZoneEventBroadcasterTests
     }
 
     [Fact]
+    public void AnnounceMonsterSymbolAttackWindow_BroadcastsSort401_WithNoPayload_AndNoWorldStateMutation()
+    {
+        var registry = CreateRegistry(1, 2);
+        var (sessionA, pipeA) = ZoneTestKit.CreateSession(1);
+        var (sessionB, pipeB) = ZoneTestKit.CreateSession(2);
+        registry[1].Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(sessionA, 1)));
+        registry[2].Post(ZoneCommand.Enter(20, ZoneTestKit.EnterData(sessionB, 2)));
+        registry[1].Tick(TimeSpan.FromMilliseconds(50));
+        registry[2].Tick(TimeSpan.FromMilliseconds(50));
+        ZoneTestKit.DrainOutbound(pipeA);
+        ZoneTestKit.DrainOutbound(pipeB);
+
+        var worldState = CreateWorldState();
+        var worldBefore = worldState.World;
+        var broadcaster = new ZoneEventBroadcaster(worldState, registry, NullLogger<ZoneEventBroadcaster>.Instance);
+
+        broadcaster.AnnounceMonsterSymbolAttackWindow();
+
+        Assert.Equal(worldBefore, worldState.World); // unlike every other Announce* method, no state mutation
+
+        foreach (var pipe in new[] { pipeA, pipeB })
+        {
+            var frame = ZoneTestKit.DrainOutbound(pipe);
+            Assert.Equal(OneFrame, frame.Length);
+            var payload = frame.AsSpan(1);
+            Assert.Equal(401, BinaryPrimitives.ReadInt32LittleEndian(payload));
+            // No payload beyond the sort itself.
+            Assert.Equal(0, BinaryPrimitives.ReadInt32LittleEndian(payload[4..]));
+        }
+    }
+
+    [Fact]
     public void PlayerWithNoZoneEntry_NeverReceivesAnything()
     {
         var registry = CreateRegistry(1);

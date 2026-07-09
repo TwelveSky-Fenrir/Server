@@ -78,6 +78,27 @@ public sealed partial class Zone
     private const int SkillEffectConfirmActionSort = 1;
 
     /// <summary>
+    ///     Skill number for "Holy Shield" (<see cref="SkillEffectCatalog" /> slot 9) --
+    ///     <see cref="ApplySkillEffectConfirm" />'s own zone-124 reapplication-cooldown gate trigger.
+    /// </summary>
+    private const int HolyShieldSkillId = 82;
+
+    /// <summary>
+    ///     The zone-server process specifically assigned server number 124 at startup -- Fenrir's
+    ///     one-process-per-map model makes <see cref="MapId" /> the direct analogue of legacy's
+    ///     <c>mSERVER_INFO.mServerNumber</c> (<c>Server/ts25zone/H07_MyGame.h:239</c>,
+    ///     <c>Server/ts25zone/S07_MyGame01.cpp:513-521</c>). Declared locally rather than shared from a
+    ///     cross-file catalog constant, matching the established per-site convention elsewhere in this
+    ///     codebase (e.g. <c>Simulation.DuelMaintenanceSystem.ScriptedDuelArenaMapId</c>,
+    ///     <c>ReviveEligibilityZones.BroadcastSuppressionExemptZoneId</c>) -- each zone-124 special case is
+    ///     reproduced as its own explicit, independently citable guard, not a shared symbol.
+    /// </summary>
+    private const short HolyShieldCooldownZoneId = 124;
+
+    /// <summary>Legacy's <c>GetSecondFromTick(10)</c> minimum reapplication interval for skill 82's buff.</summary>
+    private static readonly TimeSpan HolyShieldReapplyCooldown = TimeSpan.FromSeconds(10);
+
+    /// <summary>
     ///     S010CHARACTER_HP -- <see cref="AvatarStatUpdateResponse.Sort" /> for the HP-changed notification
     ///     <see cref="ApplyRestActionProtectionAndHeal" /> sends (Server/Header/Protocol/STRUCT.h:1525).
     /// </summary>
@@ -164,6 +185,16 @@ public sealed partial class Zone
     ///     call before <see cref="GrantReviveEligibility" /> returns.
     /// </summary>
     private readonly List<int> _reviveNeighborScratch = [];
+
+    /// <summary>
+    ///     Reusable scratch buffer for <see cref="RecomputeStatsAndBroadcastBuffs" />'s buff-state broadcast
+    ///     recipient list -- replaces a per-call, self-filtered <c>AoiGrid.Neighbors(...)</c> iterator with the
+    ///     non-allocating <see cref="AoiGrid.NeighborsExcludingSelf(List{int},ValueTuple{int,int},int,float,float,float,int)" />
+    ///     overload. Same single-tick-thread reuse posture as <see cref="_moveNeighborScratch" />: cleared
+    ///     before use, consumed entirely by the immediately-following send loop before
+    ///     <see cref="RecomputeStatsAndBroadcastBuffs" /> returns.
+    /// </summary>
+    private readonly List<int> _buffStateNeighborScratch = [];
 
     /// <summary>
     ///     Queues a death-related <c>game.EventLog</c> row rather than awaiting
@@ -550,8 +581,28 @@ public sealed partial class Zone
             // shard's trade slot.
             ClearTradeOnDisconnect(characterId);
 
+            // Trigger 4 of the Zone-241 personal-dungeon-instance behavior contract: a real client TCP
+            // disconnect must not leak this player's own summoned monster/ground-item ownership to whoever
+            // occupies this zone's forcibly-reused monster slot next. Like ClearTradeOnDisconnect and unlike
+            // BreakPartyOnDisconnect, deliberately NOT gated on IsMovingZone here -- see
+            // ClearDungeonInstanceOnDisconnect's own remarks; its internal Summoning-only guard already makes
+            // this a no-op for the overwhelming majority of disconnects (Idle or BattleInProgress stage).
+            ClearDungeonInstanceOnDisconnect(state);
+
             // Plain leave (disconnect). No despawn/logout opcode exists in the M1 client protocol -- nearby
-            // clients simply stop receiving updates for this entity. A documented gap, not an oversight.
+            // clients simply stop receiving updates for this entity. Confirmed parity with legacy, cite:
+            // MyUser::Exit (Server/ts25zone/S03_MyUser.cpp:338-411) sends no AOI-facing despawn packet on a
+            // ready, non-mid-transfer disconnect -- only the conditional party-break relay and the
+            // ts25playuser unregister, both server-to-server, neither spatial/AOI. CheckAvatarObject
+            // (Server/ts25zone/S07_MyGame04.cpp:6-11) gates the tick loop's per-avatar Update() on
+            // mReadyState, which Exit's Set(UCLOSE,...) clears, so a disconnected avatar's own
+            // SendBroadcast() never fires again; AVATAR_OBJECT::Clear (S07_MyGame04.cpp:60-127) that follows
+            // is pure field-zeroing with no network calls. The AOI broadcast candidate loop itself
+            // (Server/ts25zone/S07_MyGame03.cpp:809-813) also filters out any user with mReadyState false as
+            // its very first check, silently excluding a disconnected user rather than emitting a removal
+            // for them. Contrast ITEM_OBJECT::Update (Server/ts25zone/S07_MyGame06.cpp:32-55), which does
+            // send an explicit state=3 despawn broadcast for ground items -- avatars get no such equivalent
+            // on disconnect, confirming the asymmetry is intentional engine behavior, not an oversight.
             if (characterShardLocations is not null)
                 // Fire-and-forget: this method runs on the zone's own tick thread, which must never block on
                 // inbound or outbound I/O (see this class's own header remarks). A failed/slow remove just
@@ -1259,6 +1310,17 @@ public sealed partial class Zone
     ///         (S07_MyGame04.cpp:1376-1381) -- neither established by the behavior contract this satisfies
     ///         (flagged there as further-tracing items, not guessed at here).
     ///     </para>
+    ///     <para>
+    ///         Skill 82 ("Holy Shield") additionally carries its own <c>mLastHSTick</c> real-time
+    ///         reapplication cooldown, live only on the zone-124 process -- Server/ts25zone/S07_MyGame03.cpp:
+    ///         9388-9397 (<c>mGAME.mCheckZone124TypeServer</c>-gated ten-second check) ; H07_MyGame.h:892
+    ///         (field declaration) ; H07_MyGame.h:239 and S07_MyGame01.cpp:513-521
+    ///         (<c>mCheckZone124TypeServer</c> set true only when this process's own server number is 124) ;
+    ///         H07_MyGame.h:19 (<c>#define ZONE124</c>, unconditional -- live in the shipped build) ;
+    ///         S04_MyWork02.cpp:873 (<c>mLastHSTick</c> zero-initialized at avatar registration). See
+    ///         <see cref="PlayerRuntimeState.LastHolyShieldAppliedUtc" />'s own remarks for the
+    ///         wall-clock-vs-Zone-clock distinction and the field's own zero-equivalent default.
+    ///     </para>
     /// </remarks>
     private void ApplySkillEffectConfirm(PlayerRuntimeState state, ActionInfo action, int previousSkillNumber,
         int previousGradeNum1, int previousGradeNum2)
@@ -1293,6 +1355,20 @@ public sealed partial class Zone
         switch (result.Kind)
         {
             case SkillEffectKind.SelfBuff:
+                // mLastHSTick (S07_MyGame03.cpp:9388-9397): skill 82 ("Holy Shield") only, and only on the
+                // zone-server process assigned server number 124 -- every other zone process reapplies this
+                // buff unconditionally on every cast, no minimum interval. A cooldown hit is a pure no-op
+                // skip (buff slot 9 left unpopulated for this pass); it never blocks any other part of the
+                // cast, unlike every other same-tick/reentry guard in this set.
+                if (action.SkillNumber == HolyShieldSkillId && MapId == HolyShieldCooldownZoneId)
+                {
+                    var now = DateTime.UtcNow;
+                    if (now - state.LastHolyShieldAppliedUtc < HolyShieldReapplyCooldown)
+                        break;
+
+                    state.LastHolyShieldAppliedUtc = now;
+                }
+
                 ApplyBuffWrites(state, result.BuffWrites);
                 break;
             case SkillEffectKind.HealLife:
@@ -1437,11 +1513,11 @@ public sealed partial class Zone
             FrameWriter.WriteFrame(in response, span);
 
             SendBuffStateFrame(state.CharacterId, span);
-            foreach (var neighborId in _grid.Neighbors(state.CurrentCell, state.PosX, state.PosY, state.PosZ))
-            {
-                if (neighborId == state.CharacterId) continue;
+            _buffStateNeighborScratch.Clear();
+            _grid.NeighborsExcludingSelf(_buffStateNeighborScratch, state.CurrentCell, state.CharacterId,
+                state.PosX, state.PosY, state.PosZ);
+            foreach (var neighborId in _buffStateNeighborScratch)
                 SendBuffStateFrame(neighborId, span);
-            }
         }
         finally
         {
@@ -1626,8 +1702,14 @@ public sealed partial class Zone
             UniqueNumber = state.UniqueNumber,
             Data = new ObjectForAvatar
             {
-                VisibleState = 0,
-                SpecialState = 0,
+                // Reflects state's own live values (GM "Basic"-tier HIDE/SHOW/EQUIP/UNEQUIP/NCHAT/YCHAT,
+                // Server/ts25zone/S04_MyWork04.cpp:933-958,1265-1298,1411-1468) instead of a permanent zero
+                // placeholder, same "must reflect state's live values here" rule this method's own remarks
+                // already establish for CostumeState/DuelState/EffectValueForView below -- see
+                // PlayerRuntimeState.VisibleState/SpecialState's own remarks for why every character used to
+                // broadcast as permanently GM-hidden (VisibleState=0) to every neighbor before this fix.
+                VisibleState = state.VisibleState,
+                SpecialState = state.SpecialState,
                 KillOtherTribe = 0,
                 GoodFellow = 0,
                 GuildName = "",

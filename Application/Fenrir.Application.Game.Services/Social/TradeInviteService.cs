@@ -1,12 +1,16 @@
 using Fenrir.Application.Game.Abstractions.Social;
+using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Guilds;
+using Fenrir.Application.Game.Domain.Social;
 using Fenrir.Application.Game.Domain.Social.Duel;
 using Fenrir.Application.Game.Domain.Social.Friends;
 using Fenrir.Application.Game.Domain.Social.Mentor;
 using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Data.Abstractions.Runtime;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Services.Social;
 
@@ -35,6 +39,18 @@ namespace Fenrir.Application.Game.Services.Social;
 ///         rather than guessed at.
 ///     </para>
 /// </remarks>
+/// <remarks>
+///     WS1.4 ASK-PUBLISH-ONLY: <see cref="InviteAsync" />'s cross-shard fallback publishes an Ask row via
+///     <see cref="ISocialCrossShardRelayQueue" /> and registers the asker-side busy gate
+///     (<see cref="TradeRegistry.TryAskCrossShard" />), but no <c>ISocialCrossShardRelayHandler</c> is
+///     registered for <see cref="SocialCrossShardRelayKind.Trade" /> -- see <c>DuelService</c>'s own remarks
+///     for the shared rationale (target-side pre-checks all need live state this shard cannot see; Party and
+///     Friend are the explicitly scoped full reference implementation for this WS1.4 round).
+///     <see cref="TradeRegistry.TryCancel" />/<see cref="TradeRegistry.ClearForDisconnect" /> still consume
+///     the outbound entry, so an asker is never left permanently busy even though the invite itself is never
+///     delivered today. A follow-up closing this gap needs a <c>TradeCrossShardRelayHandler</c> mirroring
+///     <c>FriendCrossShardRelayHandler</c>.
+/// </remarks>
 public sealed class TradeInviteService(
     TradeRegistry trades,
     DuelRegistry duels,
@@ -42,6 +58,9 @@ public sealed class TradeInviteService(
     PartyRegistry parties,
     MentorRegistry mentors,
     GuildInviteRegistry guildInvites,
+    ICharacterShardLocationRepository characterShardLocations,
+    ISocialCrossShardRelayQueue crossShardRelay,
+    IOptions<GameServerOptions> options,
     ILogger<TradeInviteService> logger) : ITradeInviteService
 {
     /// <remarks>
@@ -61,7 +80,8 @@ public sealed class TradeInviteService(
     ///         the tribe/alliance disconnect check, confirmed unaffected by this).
     ///     </para>
     /// </remarks>
-    public TradeInviteResult Invite(Zone zone, PlayerRuntimeState asker, string targetAvatarName)
+    public async ValueTask<TradeInviteResult> InviteAsync(Zone zone, PlayerRuntimeState asker,
+        string targetAvatarName, CancellationToken cancellationToken)
     {
         if (trades.IsBusy(asker.CharacterId) || IsExcludedByCommunityWorkOrStunDeath(asker))
         {
@@ -78,12 +98,7 @@ public sealed class TradeInviteService(
             }
 
         if (target is null)
-        {
-            logger.LogDebug(
-                "Trade invite rejected: character {AskerCharacterId} target {TargetAvatarName} not found in map {MapId}",
-                asker.CharacterId, targetAvatarName, zone.MapId);
-            return new TradeInviteResult(TradeInviteResultKind.TargetNotFound);
-        }
+            return await InviteCrossShardAsync(asker, targetAvatarName, cancellationToken).ConfigureAwait(false);
 
         var interTribeAllowed = zone.MapId is 37 or 119 or 124;
         if (!interTribeAllowed && asker.Tribe != target.Tribe)
@@ -117,6 +132,58 @@ public sealed class TradeInviteService(
                 return new TradeInviteResult(TradeInviteResultKind.Sent, target.CharacterId, target.Name, asker.Name,
                     asker.CombinedLevel);
         }
+    }
+
+    /// <summary>WS1.4 same-shard-miss, ASK-PUBLISH-ONLY fallback -- see this class's own remarks.</summary>
+    private async ValueTask<TradeInviteResult> InviteCrossShardAsync(PlayerRuntimeState asker,
+        string targetAvatarName, CancellationToken cancellationToken)
+    {
+        var remote = await characterShardLocations.FindByNameAsync(targetAvatarName, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (remote is null)
+        {
+            logger.LogDebug(
+                "Trade invite rejected: character {AskerCharacterId} target {TargetAvatarName} not found on any shard",
+                asker.CharacterId, targetAvatarName);
+            return new TradeInviteResult(TradeInviteResultKind.TargetNotFound);
+        }
+
+        var interTribeAllowed = asker.MapId is 37 or 119 or 124;
+        if (!interTribeAllowed && asker.Tribe != remote.Tribe)
+        {
+            logger.LogWarning(
+                "Trade invite rejected: character {AskerCharacterId} (tribe {AskerTribe}) targeted cross-shard cross-tribe character {TargetCharacterId} (tribe {TargetTribe}) -- session will be disconnected",
+                asker.CharacterId, asker.Tribe, remote.CharacterId, remote.Tribe);
+            return new TradeInviteResult(TradeInviteResultKind.MustDisconnect);
+        }
+
+        var outcome = trades.TryAskCrossShard(asker.CharacterId,
+            new CrossShardOutboundAsk(remote.ShardId, remote.CharacterId, remote.AvatarName));
+
+        if (outcome != TradeAskOutcome.Sent)
+        {
+            logger.LogDebug("Trade invite rejected: character {AskerCharacterId} is busy (cross-shard registration)",
+                asker.CharacterId);
+            return new TradeInviteResult(TradeInviteResultKind.AskerBusy);
+        }
+
+        crossShardRelay.Enqueue(new SocialCrossShardRelayEntry(
+            SocialCrossShardRelayKind.Trade,
+            SocialCrossShardRelayMessageType.Ask,
+            null,
+            null,
+            options.Value.ShardId,
+            asker.CharacterId,
+            asker.Name,
+            remote.ShardId,
+            remote.CharacterId,
+            null));
+
+        logger.LogDebug(
+            "Trade invite published cross-shard: character {AskerCharacterId} ({AskerName}) -> character {TargetCharacterId} on shard {TargetShardId} (never delivered today -- see TradeInviteService's own remarks)",
+            asker.CharacterId, asker.Name, remote.CharacterId, remote.ShardId);
+        return new TradeInviteResult(TradeInviteResultKind.SentCrossShard);
     }
 
     /// <summary>

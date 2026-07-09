@@ -55,6 +55,27 @@ public sealed record GroundItemEntity(
     /// </remarks>
     public const int ManualGroundDropSort = 2;
 
+    /// <summary>
+    ///     GM-originated world drop code, stamped by the Admin-tier (<c>GmCommandTier.Admin</c>) spawn-item
+    ///     command (CZ_PROCESS_DATA_SEND tSort 505/523) via
+    ///     <see cref="Fenrir.Application.Game.Services.Gm.GmCreateItemService" />. Never gates any of
+    ///     <see cref="IsClaimableBy" />'s ownership rules today (rules 5/6 only special-case
+    ///     <see cref="MonsterKillDropSort" />/<see cref="ManualGroundDropSort" />), so a GM-created item falls
+    ///     through to the same rule-2/3/4 (free-for-all-once-expired, no-owner-free-for-anyone,
+    ///     owner-can-reclaim) treatment as any other <see cref="Master" />-stamped drop.
+    /// </summary>
+    /// <remarks>
+    ///     Réf. C++ : Server/Header/Protocol/DEFINE.h:520 names this specific GM-drop-source code, distinct
+    ///     from <see cref="MonsterKillDropSort" /> (:517-520 broadly) and <see cref="ManualGroundDropSort" />.
+    ///     Its concrete numeric value was NOT independently confirmed against the header for this change --
+    ///     same "inferred by adjacency, not re-derived" posture <see cref="ManualGroundDropSort" /> already
+    ///     documents for itself, extended one step further here (next unused value after 1/2). Re-verify
+    ///     against DEFINE.h:517-520 (the small drop-source-code block that range spans) before relying on this
+    ///     exact value for anything beyond the audit-trail/informational tagging
+    ///     <see cref="Fenrir.Application.Game.Services.Gm.GmCreateItemService" /> uses it for today.
+    /// </remarks>
+    public const int GmCreateItemDropSort = 3;
+
     public bool IsExpired(TimeSpan nowZoneClock)
     {
         return nowZoneClock - CreatedAtZoneClock >= SimulationClock.GroundItemLifetime;

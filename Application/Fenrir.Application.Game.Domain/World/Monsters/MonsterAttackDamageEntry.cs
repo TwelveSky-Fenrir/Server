@@ -3,8 +3,12 @@ namespace Fenrir.Application.Game.Domain.World.Monsters;
 /// <summary>
 ///     One attacker's tracked hit-history entry against a single <see cref="MonsterEntity" /> -- legacy
 ///     <c>mAttackDamage[]</c> slot (<c>SetAttackInfoWithAvatar</c>, <c>Server/ts25zone/S07_MyGame05.cpp:1675-1720</c>).
-///     Consumed only by <see cref="World.Zone" />'s own kill-credit selection
-///     (<see cref="World.Zone.TryDamageMonster" />) at the moment a monster dies.
+///     Written from two distinct call reasons sharing this same table, matching legacy: a zero-seeded
+///     write-through the instant a monster's own AI acquires a new pursuit target
+///     (<see cref="MonsterEntity.RegisterAcquisition" />), and an accrual on every landed hit
+///     (<see cref="MonsterEntity.RegisterAttackDamage" />) -- so <see cref="CumulativeDamage" /> can be exactly
+///     zero for an entry that was only ever acquired, never hit. Consumed only by <see cref="World.Zone" />'s
+///     own kill-credit selection (<see cref="World.Zone.TryDamageMonster" />) at the moment a monster dies.
 /// </summary>
 /// <remarks>
 ///     <see cref="SessionToken" /> is the attacker's live <see cref="PlayerRuntimeState" /> instance at the

@@ -1,3 +1,5 @@
+using Fenrir.Application.Game.Domain.Social;
+
 namespace Fenrir.Application.Game.Domain.Social.Party;
 
 /// <summary>Soft (non-disconnecting) outcomes of a party invite ask -- mirrors ZC_PARTY_ANSWER_RECV's pre-check codes.</summary>
@@ -141,6 +143,12 @@ public sealed class PartyRegistry
     /// <summary>abs((aLevel1+aLevel2) - (oLevel1+oLevel2)) &gt; 9 (S04_MyWork02.cpp:9608-9614).</summary>
     public const int MaxLevelGap = 9;
 
+    /// <summary>
+    ///     WS1.4: this family's own cross-shard ask/answer half, folded into <see cref="IsNegotiating" /> --
+    ///     see <see cref="CrossShardNegotiationTracker" />'s own remarks.
+    /// </summary>
+    private readonly CrossShardNegotiationTracker _crossShard = new();
+
     /// <summary>Reverse index: any member characterId -> their party's leader characterId.</summary>
     private readonly Dictionary<int, int> _leaderByMember = new();
 
@@ -189,13 +197,43 @@ public sealed class PartyRegistry
     ///     only, deliberately NOT the same as <see cref="IsInParty" /> (already belonging to a party is not one
     ///     of the seven exclusivity flags). Public so sibling negotiation families (e.g. Guild ask, see
     ///     <c>GuildInviteService</c>) can compose a cross-family busy check without duplicating this registry's
-    ///     own state.
+    ///     own state. Also includes a still-open cross-shard ask, either side
+    ///     (<see cref="CrossShardNegotiationTracker.IsPending" />).
     /// </summary>
     public bool IsNegotiating(int characterId)
     {
         lock (_lock)
         {
-            return _pendingByInviter.ContainsKey(characterId) || _pendingByInvitee.ContainsKey(characterId);
+            return _pendingByInviter.ContainsKey(characterId) || _pendingByInvitee.ContainsKey(characterId) ||
+                   _crossShard.IsPending(characterId);
+        }
+    }
+
+    /// <summary>
+    ///     WS1.4 asker-side cross-shard invite registration -- same inviter-busy gate as <see cref="TryInvite" />,
+    ///     but the invitee is not locally resolvable (it lives on <paramref name="ask" />'s own
+    ///     <see cref="CrossShardOutboundAsk.TargetShardId" />), so neither the invitee-already-partied nor the
+    ///     level-gap check can be evaluated here -- the caller (<c>PartyInviteService.InviteAsync</c>) has
+    ///     already re-run the already-partied-and-not-leader check and the same-tribe check (against the
+    ///     resolved row's own denormalized Tribe) ahead of this call; the invitee-already-partied and
+    ///     level-gap checks are deferred to the TARGET's own shard
+    ///     (<c>PartyCrossShardRelayHandler.HandleAskAsync</c>) where live state is available, with the
+    ///     level-gap check specifically left unenforced there too -- see that type's own remarks for why (no
+    ///     cross-shard directory column carries a character's current level).
+    /// </summary>
+    public PartyInviteOutcome TryInviteCrossShard(int inviterId, CrossShardOutboundAsk ask)
+    {
+        lock (_lock)
+        {
+            if (_leaderByMember.TryGetValue(inviterId, out var inviterPartyLeader) && inviterPartyLeader != inviterId)
+                return PartyInviteOutcome.InviterMustDisconnect;
+
+            if (IsNegotiating(inviterId))
+                return PartyInviteOutcome.InviterBusy;
+
+            return _crossShard.TryRegisterOutbound(inviterId, ask)
+                ? PartyInviteOutcome.Sent
+                : PartyInviteOutcome.InviterBusy;
         }
     }
 
@@ -238,11 +276,94 @@ public sealed class PartyRegistry
     {
         lock (_lock)
         {
-            if (!_pendingByInviter.Remove(inviterId, out inviteeId))
+            if (_pendingByInviter.Remove(inviterId, out inviteeId))
+            {
+                _pendingByInvitee.Remove(inviteeId);
+                return true;
+            }
+
+            if (_crossShard.TryConsumeOutbound(inviterId, out var crossShardAsk))
+            {
+                inviteeId = crossShardAsk.TargetCharacterId;
+                return true;
+            }
+
+            return false;
+        }
+    }
+
+    /// <summary>WS1.4 target-side: registers a delivered-in cross-shard invite once local pre-checks pass.</summary>
+    public bool TryRegisterCrossShardInbound(int inviteeId, CrossShardInboundAsk ask)
+    {
+        lock (_lock)
+        {
+            if (_leaderByMember.ContainsKey(inviteeId) || IsNegotiating(inviteeId))
                 return false;
 
-            _pendingByInvitee.Remove(inviteeId);
-            return true;
+            return _crossShard.TryRegisterInbound(inviteeId, ask);
+        }
+    }
+
+    /// <summary>
+    ///     WS1.4 target-side: consumes a delivered-in cross-shard invite when the local invitee answers. False
+    ///     if <paramref name="inviteeId" /> has no cross-shard invite pending -- the caller falls back to
+    ///     <see cref="TryAnswer" /> in that case. Deliberately does NOT perform the join itself (unlike
+    ///     <see cref="TryAnswer" />'s own accept branch) -- see <c>PartyCrossShardRelayHandler</c>'s own
+    ///     remarks for why the join can only happen on the inviter's own shard
+    ///     (<see cref="TryCompleteCrossShardAnswer" />).
+    /// </summary>
+    public bool TryConsumeCrossShardInbound(int inviteeId, out CrossShardInboundAsk ask)
+    {
+        lock (_lock)
+        {
+            return _crossShard.TryConsumeInbound(inviteeId, out ask);
+        }
+    }
+
+    /// <summary>
+    ///     WS1.4: consumes this shard's own held outbound cross-shard invite once the matching Answer is
+    ///     delivered back. False if nothing was pending for <paramref name="inviterId" /> (already cancelled,
+    ///     or a stale/duplicate Answer).
+    /// </summary>
+    public bool TryConsumeCrossShardOutbound(int inviterId, out CrossShardOutboundAsk ask)
+    {
+        lock (_lock)
+        {
+            return _crossShard.TryConsumeOutbound(inviterId, out ask);
+        }
+    }
+
+    /// <summary>
+    ///     WS1.4 inviter-side completion of an accepted cross-shard answer -- the join half of
+    ///     <see cref="TryAnswer" />'s own accept branch, callable directly by
+    ///     <c>PartyCrossShardRelayHandler.HandleAnswerAsync</c> (already holding a consumed
+    ///     <see cref="CrossShardOutboundAsk" />, so there is no pending-invite dictionary entry to remove
+    ///     here -- unlike <see cref="TryAnswer" />, this method is unconditional: the caller only invokes it
+    ///     after confirming acceptance).
+    /// </summary>
+    public PartyJoinOutcome TryCompleteCrossShardAnswer(int inviterId, int inviteeId, out IReadOnlyList<int> members)
+    {
+        lock (_lock)
+        {
+            if (_partiesByLeader.TryGetValue(inviterId, out var existing))
+            {
+                if (!existing.TryAddMember(inviteeId))
+                {
+                    members = [];
+                    return PartyJoinOutcome.PartyWasFull;
+                }
+
+                _leaderByMember[inviteeId] = inviterId;
+                members = existing.Members.ToArray();
+                return PartyJoinOutcome.Joined;
+            }
+
+            var party = new Party(inviterId, inviteeId);
+            _partiesByLeader[inviterId] = party;
+            _leaderByMember[inviterId] = inviterId;
+            _leaderByMember[inviteeId] = inviterId;
+            members = party.Members.ToArray();
+            return PartyJoinOutcome.Created;
         }
     }
 

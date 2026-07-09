@@ -101,6 +101,25 @@ public static class DomainServiceCollectionExtensions
         // DeathGateTickSystem only because that one is deliberately last (see its own comment below).
         services.AddSingleton<ISimulationSystem, DuelMaintenanceSystem>();
 
+        // Regular War (Zone049 active-battle)/Zone195 "Nok-San" AFK enforcement (mAFKTick) -- self-contained
+        // (reads its own PlayerRuntimeState.AfkTick field plus the process-wide RegularWarActiveMapTracker/
+        // GameServerOptions.Zone195MapIds gates, and only ever disconnects via the same deferred-list pattern
+        // as DeathGateTickSystem/HoisundoCountdownSystem), so its position relative to every other system here
+        // doesn't matter.
+        services.AddSingleton<ISimulationSystem, RegularWarAfkTickSystem>();
+
+        // "Monster symbol" (mYaoguaiHSB) timer notify -- self-contained (a cheap disabled-flag/map-id check on
+        // every zone, real work only on the single zone matching the current holder's mapped instance), so its
+        // position relative to every other system here doesn't matter.
+        services.AddSingleton<ISimulationSystem, MonsterSymbolAttackWindowNotifySystem>();
+
+        // AdjustSymbolDamageInfo's damage-down half -- unconditional on every zone every tick, same as legacy
+        // (see that system's own remarks for why this, unlike the multi-instance RvR world-event schedulers,
+        // is a genuine ISimulationSystem rather than a Hosting-driven background service); writes
+        // TribeSymbolCombatModifiers, which no other system in this pipeline reads yet, so its position here
+        // doesn't matter either.
+        services.AddSingleton<ISimulationSystem, TribeSymbolDamageModifierSystem>();
+
         // Registered last: it can end a session outright (the 50-tick mProtect_ReviveHack force-quit safety
         // valve), so every other system's per-tick mutation for a about-to-be-quit player should already have
         // landed before that happens.
@@ -114,6 +133,14 @@ public static class DomainServiceCollectionExtensions
         // override (Zone.Combat.cs's ApplyRegularWarCpOverride). See RegularWarActiveMapTracker's own remarks
         // for why this small Domain class -- not RegularWarSchedulerHost itself -- is the bridge.
         services.AddSingleton<RegularWarActiveMapTracker>();
+
+        // Ephemeral "has the current monster-symbol holder been notified yet" latch consumed by
+        // MonsterSymbolAttackWindowNotifySystem above -- see that class's own remarks.
+        services.AddSingleton<MonsterSymbolAttackWindowTracker>();
+
+        // Per-tribe damage-down combat modifier written by TribeSymbolDamageModifierSystem above -- see that
+        // class's own remarks for why only this half of AdjustSymbolDamageInfo is modeled.
+        services.AddSingleton<TribeSymbolCombatModifiers>();
 
         // Process-wide singletons: a party/duel/trade/friend-ask/mentor-ask negotiation can span multiple Zone actors
         // within THIS process. PartyRegistry specifically has a documented, still-unresolved cross-shard scope gap

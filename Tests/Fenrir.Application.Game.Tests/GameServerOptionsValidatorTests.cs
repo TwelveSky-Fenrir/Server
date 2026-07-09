@@ -27,7 +27,9 @@ public class GameServerOptionsValidatorTests
         bool holyStoneWarEnabled = false,
         short holyStoneMapId = 0,
         bool allianceTribeEnabled = false,
-        short allianceTribeMapId = 0)
+        short allianceTribeMapId = 0,
+        bool monsterSymbolAttackNotifyEnabled = false,
+        int monsterSymbolAttackNotifyDelayMinutes = 0)
     {
         return new GameServerOptions
         {
@@ -50,7 +52,9 @@ public class GameServerOptionsValidatorTests
             HolyStoneWarEnabled = holyStoneWarEnabled,
             HolyStoneMapId = holyStoneMapId,
             AllianceTribeEnabled = allianceTribeEnabled,
-            AllianceTribeMapId = allianceTribeMapId
+            AllianceTribeMapId = allianceTribeMapId,
+            MonsterSymbolAttackNotifyEnabled = monsterSymbolAttackNotifyEnabled,
+            MonsterSymbolAttackNotifyDelayMinutes = monsterSymbolAttackNotifyDelayMinutes
         };
     }
 
@@ -267,6 +271,42 @@ public class GameServerOptionsValidatorTests
     public void Validate_AllianceTribeEnabledWithMapId_Succeeds()
     {
         var result = Validator.Validate(null, Options(allianceTribeEnabled: true, allianceTribeMapId: 37));
+
+        Assert.True(result.Succeeded);
+    }
+
+    [Fact]
+    public void Validate_MonsterSymbolAttackNotifyEnabledWithoutDelayMinutes_Fails()
+    {
+        var result = Validator.Validate(null, Options(monsterSymbolAttackNotifyEnabled: true));
+
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures!, f => f.Contains("Game:MonsterSymbolAttackNotifyDelayMinutes"));
+    }
+
+    [Fact]
+    public void Validate_MonsterSymbolAttackNotifyEnabledWithNegativeDelayMinutes_Fails()
+    {
+        var result = Validator.Validate(null,
+            Options(monsterSymbolAttackNotifyEnabled: true, monsterSymbolAttackNotifyDelayMinutes: -1));
+
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures!, f => f.Contains("Game:MonsterSymbolAttackNotifyDelayMinutes"));
+    }
+
+    [Fact]
+    public void Validate_MonsterSymbolAttackNotifyEnabledWithPositiveDelayMinutes_Succeeds()
+    {
+        var result = Validator.Validate(null,
+            Options(monsterSymbolAttackNotifyEnabled: true, monsterSymbolAttackNotifyDelayMinutes: 30));
+
+        Assert.True(result.Succeeded);
+    }
+
+    [Fact]
+    public void Validate_MonsterSymbolAttackNotifyDisabled_SucceedsRegardlessOfDelayMinutes()
+    {
+        var result = Validator.Validate(null, Options(monsterSymbolAttackNotifyDelayMinutes: 0));
 
         Assert.True(result.Succeeded);
     }

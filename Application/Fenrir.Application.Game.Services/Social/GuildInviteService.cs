@@ -1,4 +1,5 @@
 using Fenrir.Application.Game.Abstractions.Social;
+using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Guilds;
 using Fenrir.Application.Game.Domain.Social;
 using Fenrir.Application.Game.Domain.Social.Duel;
@@ -7,8 +8,10 @@ using Fenrir.Application.Game.Domain.Social.Mentor;
 using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Data.Abstractions.Runtime;
 using Fenrir.Network.Serialization.Zone.Packets.Zone;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Services.Social;
 
@@ -16,8 +19,8 @@ namespace Fenrir.Application.Game.Services.Social;
 /// <remarks>
 ///     Réf. C++ : Server/ts25zone/S04_MyWork02.cpp:9827-9884 (GUILD_ASK_SEND) and
 ///     Server/ts25zone/S07_MyGame04.cpp:185-216 (<c>CheckCommunityWork</c>'s seven-flag exclusivity check).
-///     <see cref="Ask" /> composes that check from this process's own sibling negotiation registries (Duel,
-///     Trade, Friend, Party, Mentor, plus this family's own <see cref="GuildInviteRegistry" />) and the
+///     <see cref="AskAsync" /> composes that check from this process's own sibling negotiation registries
+///     (Duel, Trade, Friend, Party, Mentor, plus this family's own <see cref="GuildInviteRegistry" />) and the
 ///     stun/death action-state gate (<see cref="PlayerRuntimeState.IsStunned" />/<see cref="PlayerRuntimeState.IsDead" />,
 ///     Server/ts25zone/S07_MyGame04.cpp:438-459,1617-1658) -- both applied to the asker before the target is
 ///     even resolved, and again to the target once found, matching the legacy check order. The target's own
@@ -25,6 +28,16 @@ namespace Fenrir.Application.Game.Services.Social;
 ///     state has an equivalent "pending" flag on <see cref="PlayerRuntimeState" /> today (same gap
 ///     <c>RankBuffHandler</c> documents for its own unrelated check) -- left as an open, explicitly-flagged gap
 ///     rather than guessed at.
+///     <para>
+///         WS1.4 ASK-PUBLISH-ONLY: <see cref="AskAsync" />'s cross-shard fallback publishes an Ask row via
+///         <see cref="ISocialCrossShardRelayQueue" /> and registers the asker-side busy gate
+///         (<see cref="GuildInviteRegistry.TryAskCrossShard" />), but no <c>ISocialCrossShardRelayHandler</c>
+///         is registered for <see cref="SocialCrossShardRelayKind.GuildInvite" /> -- see <c>DuelService</c>'s
+///         own remarks for the shared rationale. <see cref="GuildInviteRegistry.TryCancel" /> still consumes
+///         the outbound entry, so an asker is never left permanently busy even though the invite itself is
+///         never delivered today. A follow-up closing this gap needs a <c>GuildInviteCrossShardRelayHandler</c>
+///         mirroring <c>FriendCrossShardRelayHandler</c>.
+///     </para>
 /// </remarks>
 public sealed class GuildInviteService(
     ZoneRegistry zones,
@@ -34,9 +47,13 @@ public sealed class GuildInviteService(
     FriendRegistry friends,
     PartyRegistry parties,
     MentorRegistry mentors,
+    ICharacterShardLocationRepository characterShardLocations,
+    ISocialCrossShardRelayQueue crossShardRelay,
+    IOptions<GameServerOptions> options,
     ILogger<GuildInviteService> logger) : IGuildInviteService
 {
-    public GuildInviteAskResultKind Ask(Zone zone, PlayerRuntimeState asker, string targetAvatarName)
+    public async ValueTask<GuildInviteAskResultKind> AskAsync(Zone zone, PlayerRuntimeState asker,
+        string targetAvatarName, CancellationToken cancellationToken)
     {
         if (asker.GuildId is null || !GuildRoleCodec.IsMasterOrSubMaster(asker.GuildRoleDb))
         {
@@ -56,11 +73,7 @@ public sealed class GuildInviteService(
 
         var target = FindPlayerByName(zone, targetAvatarName);
         if (target is null)
-        {
-            logger.LogDebug("Character {CharacterId} guild invite-ask target {TargetName} not found in zone",
-                asker.CharacterId, targetAvatarName);
-            return GuildInviteAskResultKind.TargetNotFound;
-        }
+            return await AskCrossShardAsync(asker, targetAvatarName, cancellationToken).ConfigureAwait(false);
 
         if (target.GuildId is not null)
         {
@@ -106,6 +119,63 @@ public sealed class GuildInviteService(
             default:
                 return GuildInviteAskResultKind.AskerBusy;
         }
+    }
+
+    /// <summary>
+    ///     WS1.4 same-shard-miss, ASK-PUBLISH-ONLY fallback -- see this class's own remarks. The target's
+    ///     guild membership (needed for the already-guilded check) is not carried by the cross-shard
+    ///     directory, so that check is deferred to the eventual target-side handler; only the same-tribe
+    ///     check (against the directory row's own denormalized Tribe) is re-evaluable here.
+    /// </summary>
+    private async ValueTask<GuildInviteAskResultKind> AskCrossShardAsync(PlayerRuntimeState asker,
+        string targetAvatarName, CancellationToken cancellationToken)
+    {
+        var remote = await characterShardLocations.FindByNameAsync(targetAvatarName, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (remote is null)
+        {
+            logger.LogDebug(
+                "Character {CharacterId} guild invite-ask target {TargetName} not found on any shard",
+                asker.CharacterId, targetAvatarName);
+            return GuildInviteAskResultKind.TargetNotFound;
+        }
+
+        if (asker.Tribe != remote.Tribe)
+        {
+            logger.LogDebug(
+                "Character {CharacterId} guild invite-ask rejected: tribe mismatch with cross-shard target {TargetCharacterId}",
+                asker.CharacterId, remote.CharacterId);
+            return GuildInviteAskResultKind.TribeMismatch;
+        }
+
+        var outcome = invites.TryAskCrossShard(asker.CharacterId,
+            new CrossShardOutboundAsk(remote.ShardId, remote.CharacterId, remote.AvatarName));
+
+        if (outcome != GuildInviteAskOutcome.Sent)
+        {
+            logger.LogDebug(
+                "Character {CharacterId} guild invite-ask rejected: caller already has a pending negotiation (cross-shard registration)",
+                asker.CharacterId);
+            return GuildInviteAskResultKind.AskerBusy;
+        }
+
+        crossShardRelay.Enqueue(new SocialCrossShardRelayEntry(
+            SocialCrossShardRelayKind.GuildInvite,
+            SocialCrossShardRelayMessageType.Ask,
+            null,
+            null,
+            options.Value.ShardId,
+            asker.CharacterId,
+            asker.Name,
+            remote.ShardId,
+            remote.CharacterId,
+            null));
+
+        logger.LogInformation(
+            "Character {CharacterId} published a guild invite cross-shard to character {TargetCharacterId} on shard {TargetShardId} (never delivered today -- see GuildInviteService's own remarks)",
+            asker.CharacterId, remote.CharacterId, remote.ShardId);
+        return GuildInviteAskResultKind.SentCrossShard;
     }
 
     public void Answer(int targetId, int answerCode)

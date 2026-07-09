@@ -11,7 +11,17 @@ public enum FriendAskResultKind
     TribeMismatch,
     AskerBusy,
     TargetBusy,
-    Sent
+    Sent,
+
+    /// <summary>
+    ///     WS1.4: the target was not found on this shard's own <c>ZoneRegistry</c> but WAS resolved on a
+    ///     different live shard via <c>ICharacterShardLocationRepository</c> -- the ask has been handed to
+    ///     <c>ISocialCrossShardRelayQueue</c> for asynchronous cross-shard delivery instead of the immediate
+    ///     local <see cref="Sent" /> notification. The caller (<see cref="FriendAskHandler" />) sends nothing
+    ///     further; any reply (accept/decline/target-unreachable) arrives later via
+    ///     <c>FriendCrossShardRelayHandler.HandleAnswerAsync</c>.
+    /// </summary>
+    SentCrossShard
 }
 
 /// <summary>Outcome of CZ_FRIEND_FIND_SEND, as branched on by <see cref="FriendLocateHandler" />.</summary>
@@ -45,7 +55,12 @@ public enum FriendRemoveResultKind
 /// <summary>Business logic behind the CZ_FRIEND_* opcode family, extracted from the Friend*Handlers.</summary>
 public interface IFriendService
 {
-    public FriendAskResultKind Ask(Zone zone, PlayerRuntimeState asker, string targetAvatarName);
+    /// <summary>
+    ///     Same-shard lookup first (within <paramref name="zone" />), falling back to the cross-shard
+    ///     character-location directory on a miss -- see <see cref="FriendAskResultKind.SentCrossShard" />.
+    /// </summary>
+    public ValueTask<FriendAskResultKind> AskAsync(Zone zone, PlayerRuntimeState asker, string targetAvatarName,
+        CancellationToken cancellationToken);
 
     public void Answer(int targetId, int answerCode);
 

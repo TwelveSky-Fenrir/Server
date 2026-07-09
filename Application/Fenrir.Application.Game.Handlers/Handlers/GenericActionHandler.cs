@@ -20,9 +20,14 @@ namespace Fenrir.Application.Game.Handlers.Handlers;
 ///     inventory&lt;-&gt;equipment), ground pickup, manual drop-to-world, NPC teleport toll, skill learn/upgrade,
 ///     stat-point allocation, NPC shop buy/sell, rune-stone stat crafting, TimeExchange
 ///     (play-time-event-to-teacher-point/pet-experience conversion), the Store/coffre (menu index 2) and
-///     Save/vault (menu index 8, account-scoped bank) item/money transfer families, and GM-BLOCK (tSort 519 --
-///     legacy has no dedicated wire opcode for this command; it rides this same envelope like everything else
-///     here). A tSort the legacy switch recognizes but this handler doesn't implement
+///     Save/vault (menu index 8, account-scoped bank) item/money transfer families, GM-BLOCK (tSort 519), the
+///     Admin-tier spawn-item/MAX-stat-cheat/grant-pet-experience commands (tSort 505/523, 509, 700), the
+///     Elevated-tier grant-experience-to-self/grant-money/zone-wide-FFA-start/summon-monster commands (tSort
+///     503, 504, 333, 506), and the sixteen Basic-tier commands (HIDE/SHOW 501/502, self-teleport-to-coordinate
+///     MOVE 507, DIE 508, TRIBE 510, EQUIP/UNEQUIP 511/512, FIND 513, CALL 514, self-teleport-to-target MOVE
+///     515, NCHAT/YCHAT 516/517, KICK 518, TRIBEBANK 520, LEVEL 521, STR/DEX/VIT/INT-edit 522) -- none of these
+///     GM commands have a dedicated legacy wire opcode; they all ride this same envelope like everything else
+///     here. A tSort the legacy switch recognizes but this handler doesn't implement
 ///     replies with a clean failure; a tSort absent from every legacy family gets
 ///     <see cref="ClientSession.Abort" /> (anti-fuzzing).
 /// </summary>
@@ -38,6 +43,14 @@ public sealed class GenericActionHandler(
     IInventoryToWorldDropService inventoryToWorldDropService,
     IRuneStoneCraftService runeStoneCraftService,
     IGmBlockAvatarService gmBlockAvatarService,
+    IGmCreateItemService gmCreateItemService,
+    IGmMaxStatService gmMaxStatService,
+    IGmPetExperienceGrantService gmPetExperienceGrantService,
+    IGmExpGrantService gmExpGrantService,
+    IGmGrantMoneyService gmGrantMoneyService,
+    IGmFfaEventStartService gmFfaEventStartService,
+    IGmSummonMonsterService gmSummonMonsterService,
+    IGmBasicCommandService gmBasicCommandService,
     ILogger<GenericActionHandler> logger)
     : IAsyncPacketHandler<GenericActionRequest>
 {
@@ -374,6 +387,321 @@ public sealed class GenericActionHandler(
                     "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} dispatched to {Method}",
                     zoneSession.SessionId, characterId, sort, nameof(IGmBlockAvatarService.HandleAsync));
             await gmBlockAvatarService.HandleAsync(gmBlockPayload, zoneSession, cancellationToken);
+            return;
+        }
+
+        // tSort 501/502 -- Basic-tier (GmCommandTier.Basic) HIDE/SHOW self-commands
+        // (Server/ts25zone/S04_MyWork04.cpp:933-958). No payload read. IGmBasicCommandService owns every
+        // send/abort itself (a dedicated AvatarStatUpdateResponse notification, self-only, immediately followed
+        // by the shared opcode-23 ack -- two packets for one request), so this branch never calls Respond().
+        if (sort is 501 or 502)
+        {
+            if (debugEnabled)
+                logger.LogDebug(
+                    "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} dispatched to {Method}",
+                    zoneSession.SessionId, characterId, sort, nameof(IGmBasicCommandService.HandleVisibilityAsync));
+            await gmBasicCommandService.HandleVisibilityAsync(sort, packet.Data, zoneSession, state, zone,
+                cancellationToken);
+            return;
+        }
+
+        // tSort 507 -- Basic-tier self-teleport-to-coordinate MOVE command
+        // (Server/ts25zone/S04_MyWork04.cpp:1146-1164). IGmBasicCommandService owns every send/abort itself.
+        if (sort == 507)
+        {
+            if (debugEnabled)
+                logger.LogDebug(
+                    "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} dispatched to {Method}",
+                    zoneSession.SessionId, characterId, sort, nameof(IGmBasicCommandService.HandleSelfTeleportAsync));
+            await gmBasicCommandService.HandleSelfTeleportAsync(packet.Data, zoneSession, state, zone,
+                cancellationToken);
+            return;
+        }
+
+        // tSort 508 -- Basic-tier DIE command, force-invalidates a live monster instance by raw table index, not
+        // a player (Server/ts25zone/S04_MyWork04.cpp:1165-1187). IGmBasicCommandService owns every send/abort
+        // itself.
+        if (sort == 508)
+        {
+            if (debugEnabled)
+                logger.LogDebug(
+                    "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} dispatched to {Method}",
+                    zoneSession.SessionId, characterId, sort,
+                    nameof(IGmBasicCommandService.HandleForceKillMonsterAsync));
+            await gmBasicCommandService.HandleForceKillMonsterAsync(packet.Data, zoneSession, zone,
+                cancellationToken);
+            return;
+        }
+
+        // tSort 510 -- Basic-tier TRIBE self-command (Server/ts25zone/S04_MyWork04.cpp:1203-1264). Sends NO
+        // acknowledgment of any kind on any path -- a successful change forcibly disconnects the invoking GM
+        // instead (the normal completion signal for this command); IGmBasicCommandService owns every
+        // send/abort/disconnect itself.
+        if (sort == 510)
+        {
+            if (debugEnabled)
+                logger.LogDebug(
+                    "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} dispatched to {Method}",
+                    zoneSession.SessionId, characterId, sort, nameof(IGmBasicCommandService.HandleTribeChangeAsync));
+            await gmBasicCommandService.HandleTribeChangeAsync(packet.Data, zoneSession, state, zone,
+                cancellationToken);
+            return;
+        }
+
+        // tSort 511/512 -- Basic-tier EQUIP/UNEQUIP self-commands, writing an unread "special state" marker, no
+        // item involved (Server/ts25zone/S04_MyWork04.cpp:1265-1298). IGmBasicCommandService owns every
+        // send/abort itself.
+        if (sort is 511 or 512)
+        {
+            if (debugEnabled)
+                logger.LogDebug(
+                    "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} dispatched to {Method}",
+                    zoneSession.SessionId, characterId, sort,
+                    nameof(IGmBasicCommandService.HandleSelfSpecialStateAsync));
+            await gmBasicCommandService.HandleSelfSpecialStateAsync(sort, packet.Data, zoneSession, state, zone,
+                cancellationToken);
+            return;
+        }
+
+        // tSort 513 -- Basic-tier FIND command (Server/ts25zone/S04_MyWork04.cpp:1299-1323). See
+        // IGmBasicCommandService's own remarks for why this is a deliberately simplified, process-local lookup
+        // rather than legacy's genuinely cluster-wide blocking upstream round trip. IGmBasicCommandService owns
+        // every send/abort itself (a dedicated GmCommandResponse immediately followed by the shared opcode-23
+        // ack).
+        if (sort == 513)
+        {
+            if (debugEnabled)
+                logger.LogDebug(
+                    "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} dispatched to {Method}",
+                    zoneSession.SessionId, characterId, sort, nameof(IGmBasicCommandService.HandleFindAsync));
+            await gmBasicCommandService.HandleFindAsync(packet.Data, zoneSession, state, cancellationToken);
+            return;
+        }
+
+        // tSort 514 -- Basic-tier CALL command, summons a named target to the invoker
+        // (Server/ts25zone/S04_MyWork04.cpp:1324-1384). Only the ordinary single-target branch is implemented --
+        // see IGmBasicCommandService's own remarks for the special-server mass-summon branch this project does
+        // not implement. IGmBasicCommandService owns every send/abort itself.
+        if (sort == 514)
+        {
+            if (debugEnabled)
+                logger.LogDebug(
+                    "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} dispatched to {Method}",
+                    zoneSession.SessionId, characterId, sort, nameof(IGmBasicCommandService.HandleCallAsync));
+            await gmBasicCommandService.HandleCallAsync(packet.Data, zoneSession, state, cancellationToken);
+            return;
+        }
+
+        // tSort 515 -- Basic-tier self-teleport-to-target's-position MOVE command, the reverse direction of CALL
+        // (Server/ts25zone/S04_MyWork04.cpp:1385-1410). IGmBasicCommandService owns every send/abort itself.
+        if (sort == 515)
+        {
+            if (debugEnabled)
+                logger.LogDebug(
+                    "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} dispatched to {Method}",
+                    zoneSession.SessionId, characterId, sort, nameof(IGmBasicCommandService.HandleMoveToTargetAsync));
+            await gmBasicCommandService.HandleMoveToTargetAsync(packet.Data, zoneSession, state, zone,
+                cancellationToken);
+            return;
+        }
+
+        // tSort 516/517 -- Basic-tier NCHAT/YCHAT commands, marking a named target's "special state" marker to
+        // 2/0 (Server/ts25zone/S04_MyWork04.cpp:1411-1468). Sends NO acknowledgment of any kind on any path --
+        // IGmBasicCommandService owns every send/abort itself (never calls Respond()).
+        if (sort is 516 or 517)
+        {
+            if (debugEnabled)
+                logger.LogDebug(
+                    "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} dispatched to {Method}",
+                    zoneSession.SessionId, characterId, sort,
+                    nameof(IGmBasicCommandService.HandleTargetSpecialStateAsync));
+            await gmBasicCommandService.HandleTargetSpecialStateAsync(sort, packet.Data, zoneSession, state,
+                cancellationToken);
+            return;
+        }
+
+        // tSort 518 -- Basic-tier KICK command, disconnects a named target's session
+        // (Server/ts25zone/S04_MyWork04.cpp:1469-1486). IGmBasicCommandService owns every send/abort itself.
+        if (sort == 518)
+        {
+            if (debugEnabled)
+                logger.LogDebug(
+                    "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} dispatched to {Method}",
+                    zoneSession.SessionId, characterId, sort, nameof(IGmBasicCommandService.HandleKickAsync));
+            await gmBasicCommandService.HandleKickAsync(packet.Data, zoneSession, state, cancellationToken);
+            return;
+        }
+
+        // tSort 520 -- Basic-tier TRIBEBANK command -- dead code behind a live tier gate
+        // (Server/ts25zone/S04_MyWork04.cpp:1516-1540). Always the default-failure outcome, no mutation.
+        // IGmBasicCommandService owns every send/abort itself.
+        if (sort == 520)
+        {
+            if (debugEnabled)
+                logger.LogDebug(
+                    "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} dispatched to {Method}",
+                    zoneSession.SessionId, characterId, sort, nameof(IGmBasicCommandService.HandleTribeBankAsync));
+            await gmBasicCommandService.HandleTribeBankAsync(packet.Data, zoneSession, cancellationToken);
+            return;
+        }
+
+        // tSort 521 -- Basic-tier LEVEL self-command (Server/ts25zone/S04_MyWork04.cpp:1541-1596).
+        // IGmBasicCommandService owns every send/abort itself.
+        if (sort == 521)
+        {
+            if (debugEnabled)
+                logger.LogDebug(
+                    "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} dispatched to {Method}",
+                    zoneSession.SessionId, characterId, sort, nameof(IGmBasicCommandService.HandleLevelSetAsync));
+            await gmBasicCommandService.HandleLevelSetAsync(packet.Data, zoneSession, state, zone,
+                cancellationToken);
+            return;
+        }
+
+        // tSort 522 -- Basic-tier STR/DEX/VIT/INT stat-edit command -- dead code behind a live tier gate
+        // (Server/ts25zone/S04_MyWork04.cpp:1597-1621). Always the default-failure outcome, no mutation.
+        // IGmBasicCommandService owns every send/abort itself.
+        if (sort == 522)
+        {
+            if (debugEnabled)
+                logger.LogDebug(
+                    "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} dispatched to {Method}",
+                    zoneSession.SessionId, characterId, sort, nameof(IGmBasicCommandService.HandleStatEditAsync));
+            await gmBasicCommandService.HandleStatEditAsync(packet.Data, zoneSession, cancellationToken);
+            return;
+        }
+
+        // tSort 505/523 -- Admin-tier (GmCommandTier.Admin) "spawn-item" GM command
+        // (Server/ts25zone/S04_MyWork04.cpp:1036-1095). No dedicated legacy wire opcode; multiplexed inside
+        // this same generic envelope like every other tSort here. IGmCreateItemService owns every send/abort
+        // itself (id-range/catalog-lookup failure sends the shared opcode-23 ack with the rejected code;
+        // every other outcome -- including a downstream creation failure -- sends it with the accepted code,
+        // a confirmed legacy defect this project deliberately preserves), so this branch never calls
+        // Respond() itself.
+        if (sort is 505 or 523)
+        {
+            if (debugEnabled)
+                logger.LogDebug(
+                    "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} dispatched to {Method}",
+                    zoneSession.SessionId, characterId, sort, nameof(IGmCreateItemService.HandleAsync));
+            await gmCreateItemService.HandleAsync(sort, packet.Data, zoneSession, state, zone, cancellationToken);
+            return;
+        }
+
+        // tSort 509 -- Admin-tier "MAX" stat-cheat GM command (Server/ts25zone/S04_MyWork04.cpp:1188-1202). No
+        // wire payload is ever read, and no response packet is ever composed for this selector on either the
+        // privilege-gate-failure or the success path -- both end in a forced full-logout disconnect instead
+        // (IGmMaxStatService owns that call itself), so this branch bypasses the shared response epilogue
+        // entirely, matching legacy's own early return.
+        if (sort == 509)
+        {
+            if (debugEnabled)
+                logger.LogDebug(
+                    "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} dispatched to {Method}",
+                    zoneSession.SessionId, characterId, sort, nameof(IGmMaxStatService.HandleAsync));
+            await gmMaxStatService.HandleAsync(zoneSession, state, zone, cancellationToken);
+            return;
+        }
+
+        // tSort 700 -- Admin-tier, unlabeled grant-pet-experience GM command
+        // (Server/ts25zone/S04_MyWork04.cpp:2062-2083). No dedicated legacy wire opcode; multiplexed inside
+        // this same generic envelope. IGmPetExperienceGrantService owns its own response composition (result
+        // code is unconditionally accepted once the privilege gate passes), so this branch never calls
+        // Respond() itself either.
+        if (sort == 700)
+        {
+            if (debugEnabled)
+                logger.LogDebug(
+                    "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} dispatched to {Method}",
+                    zoneSession.SessionId, characterId, sort, nameof(IGmPetExperienceGrantService.HandleAsync));
+            await gmPetExperienceGrantService.HandleAsync(packet.Data, zoneSession, state, cancellationToken);
+            return;
+        }
+
+        // tSort 503 -- Elevated-tier (GmCommandTier.Elevated) "[GM]-EXP" (grant experience to self) command
+        // (Server/ts25zone/S04_MyWork04.cpp:959-1005). No dedicated legacy wire opcode; multiplexed inside this
+        // same generic envelope. IGmExpGrantService owns its own response composition (result code is
+        // unconditionally accepted once the tier gate passes), so this branch never calls Respond() itself.
+        if (sort == 503)
+        {
+            if (!GmExpGrantPayload.TryRead(packet.Data, out var gmExpGrantPayload))
+            {
+                logger.LogInformation(
+                    "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} aborted, malformed GmExpGrantPayload payload",
+                    zoneSession.SessionId, characterId, sort);
+                zoneSession.Abort(DisconnectReason.Faulted);
+                return;
+            }
+
+            if (debugEnabled)
+                logger.LogDebug(
+                    "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} dispatched to {Method}",
+                    zoneSession.SessionId, characterId, sort, nameof(IGmExpGrantService.HandleAsync));
+            await gmExpGrantService.HandleAsync(gmExpGrantPayload, packet.Data, zoneSession, state, zone,
+                cancellationToken);
+            return;
+        }
+
+        // tSort 504 -- Elevated-tier "grant money" command (Server/ts25zone/S04_MyWork04.cpp:1006-1035). No
+        // dedicated legacy wire opcode; multiplexed inside this same generic envelope. The 130-byte payload is
+        // never read for this sub-command (the would-be parse is dead/commented-out legacy source) --
+        // IGmGrantMoneyService owns its own response composition, so this branch never calls Respond() itself.
+        if (sort == 504)
+        {
+            if (debugEnabled)
+                logger.LogDebug(
+                    "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} dispatched to {Method}",
+                    zoneSession.SessionId, characterId, sort, nameof(IGmGrantMoneyService.HandleAsync));
+            await gmGrantMoneyService.HandleAsync(packet.Data, zoneSession, cancellationToken);
+            return;
+        }
+
+        // tSort 333 -- Elevated-tier zone-wide FFA-start command (Server/ts25zone/S04_MyWork04.cpp:1097-1131).
+        // No dedicated legacy wire opcode; multiplexed inside this same generic envelope (sitting outside the
+        // 501-528 numeric block the other tier-10 sub-commands occupy -- a source-organization detail with no
+        // behavioral effect). IGmFfaEventStartService owns its own response composition, so this branch never
+        // calls Respond() itself.
+        if (sort == 333)
+        {
+            if (!GmFfaEventStartPayload.TryRead(packet.Data, out var gmFfaEventStartPayload))
+            {
+                logger.LogInformation(
+                    "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} aborted, malformed GmFfaEventStartPayload payload",
+                    zoneSession.SessionId, characterId, sort);
+                zoneSession.Abort(DisconnectReason.Faulted);
+                return;
+            }
+
+            if (debugEnabled)
+                logger.LogDebug(
+                    "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} dispatched to {Method}",
+                    zoneSession.SessionId, characterId, sort, nameof(IGmFfaEventStartService.HandleAsync));
+            await gmFfaEventStartService.HandleAsync(gmFfaEventStartPayload, packet.Data, zoneSession,
+                cancellationToken);
+            return;
+        }
+
+        // tSort 506 -- Elevated-tier "moncall" (summon monster) command
+        // (Server/ts25zone/S04_MyWork04.cpp:1133-1145). No dedicated legacy wire opcode; multiplexed inside
+        // this same generic envelope. IGmSummonMonsterService owns its own response composition (result code
+        // is unconditionally accepted once the tier gate passes), so this branch never calls Respond() itself.
+        if (sort == 506)
+        {
+            if (!GmSummonMonsterPayload.TryRead(packet.Data, out var gmSummonMonsterPayload))
+            {
+                logger.LogInformation(
+                    "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} aborted, malformed GmSummonMonsterPayload payload",
+                    zoneSession.SessionId, characterId, sort);
+                zoneSession.Abort(DisconnectReason.Faulted);
+                return;
+            }
+
+            if (debugEnabled)
+                logger.LogDebug(
+                    "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} dispatched to {Method}",
+                    zoneSession.SessionId, characterId, sort, nameof(IGmSummonMonsterService.HandleAsync));
+            await gmSummonMonsterService.HandleAsync(gmSummonMonsterPayload, packet.Data, zoneSession, state, zone,
+                cancellationToken);
             return;
         }
 

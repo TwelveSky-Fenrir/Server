@@ -1,15 +1,29 @@
 using Fenrir.Application.Game.Abstractions.Social;
+using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Guilds;
+using Fenrir.Application.Game.Domain.Social;
 using Fenrir.Application.Game.Domain.Social.Duel;
 using Fenrir.Application.Game.Domain.Social.Friends;
 using Fenrir.Application.Game.Domain.Social.Mentor;
 using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Data.Abstractions.Runtime;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Services.Social;
 
+/// <remarks>
+///     WS1.4 ASK-PUBLISH-ONLY: <see cref="AskAsync" />'s cross-shard fallback publishes an Ask row via
+///     <see cref="ISocialCrossShardRelayQueue" /> and registers the master-side busy gate
+///     (<see cref="MentorRegistry.TryAskCrossShard" />), but no <c>ISocialCrossShardRelayHandler</c> is
+///     registered for <see cref="SocialCrossShardRelayKind.Mentor" /> -- see <c>DuelService</c>'s own remarks
+///     for the shared rationale. <see cref="MentorRegistry.TryCancel" /> still consumes the outbound entry,
+///     so a master is never left permanently busy even though the ask itself is never delivered today. A
+///     follow-up closing this gap needs a <c>MentorCrossShardRelayHandler</c> mirroring
+///     <c>FriendCrossShardRelayHandler</c>, including the target's own level-gate re-check.
+/// </remarks>
 public sealed class MentorAskService(
     MentorRegistry mentors,
     DuelRegistry duels,
@@ -17,6 +31,9 @@ public sealed class MentorAskService(
     FriendRegistry friends,
     PartyRegistry parties,
     GuildInviteRegistry guildInvites,
+    ICharacterShardLocationRepository characterShardLocations,
+    ISocialCrossShardRelayQueue crossShardRelay,
+    IOptions<GameServerOptions> options,
     ILogger<MentorAskService> logger) : IMentorAskService
 {
     private const int MinimumMasterLevel = 113;
@@ -42,7 +59,8 @@ public sealed class MentorAskService(
     ///         guessed at.
     ///     </para>
     /// </remarks>
-    public MentorAskResult Ask(Zone zone, PlayerRuntimeState master, string targetAvatarName)
+    public async ValueTask<MentorAskResult> AskAsync(Zone zone, PlayerRuntimeState master, string targetAvatarName,
+        CancellationToken cancellationToken)
     {
         if (master.Level < MinimumMasterLevel || master.TeacherCharacterId is not null ||
             master.StudentCharacterId is not null)
@@ -71,12 +89,7 @@ public sealed class MentorAskService(
             }
 
         if (student is null)
-        {
-            logger.LogDebug(
-                "Mentor ask rejected: character {MasterId} target {TargetAvatarName} not found in map {MapId}",
-                master.CharacterId, targetAvatarName, zone.MapId);
-            return new MentorAskResult(MentorAskResultKind.TargetNotFound);
-        }
+            return await AskCrossShardAsync(master, targetAvatarName, cancellationToken).ConfigureAwait(false);
 
         if (student.Tribe != master.Tribe || student.Level >= master.Level)
         {
@@ -120,6 +133,63 @@ public sealed class MentorAskService(
                     master.CharacterId, master.Name, student.CharacterId, student.Name);
                 return new MentorAskResult(MentorAskResultKind.Sent, student.CharacterId, student.Name, master.Name);
         }
+    }
+
+    /// <summary>
+    ///     WS1.4 same-shard-miss, ASK-PUBLISH-ONLY fallback -- see this class's own remarks. The student's
+    ///     level (needed for the level-gate check) is not carried by the cross-shard directory, so that check
+    ///     -- along with already-has-teacher/already-has-student -- is deferred to the eventual target-side
+    ///     handler; only the same-tribe check (against the directory row's own denormalized Tribe) is
+    ///     re-evaluable here.
+    /// </summary>
+    private async ValueTask<MentorAskResult> AskCrossShardAsync(PlayerRuntimeState master, string targetAvatarName,
+        CancellationToken cancellationToken)
+    {
+        var remote = await characterShardLocations.FindByNameAsync(targetAvatarName, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (remote is null)
+        {
+            logger.LogDebug(
+                "Mentor ask rejected: character {MasterId} target {TargetAvatarName} not found on any shard",
+                master.CharacterId, targetAvatarName);
+            return new MentorAskResult(MentorAskResultKind.TargetNotFound);
+        }
+
+        if (remote.Tribe != master.Tribe)
+        {
+            logger.LogWarning(
+                "Mentor ask rejected: character {MasterId} (tribe {MasterTribe}) targeted cross-shard character {TargetCharacterId} (tribe {TargetTribe}) -- session will be disconnected",
+                master.CharacterId, master.Tribe, remote.CharacterId, remote.Tribe);
+            return new MentorAskResult(MentorAskResultKind.TargetMustDisconnect);
+        }
+
+        var outcome = mentors.TryAskCrossShard(master.CharacterId,
+            new CrossShardOutboundAsk(remote.ShardId, remote.CharacterId, remote.AvatarName));
+
+        if (outcome != MentorAskOutcome.Sent)
+        {
+            logger.LogDebug("Mentor ask rejected: character {MasterId} is busy (cross-shard registration)",
+                master.CharacterId);
+            return new MentorAskResult(MentorAskResultKind.AskerBusy);
+        }
+
+        crossShardRelay.Enqueue(new SocialCrossShardRelayEntry(
+            SocialCrossShardRelayKind.Mentor,
+            SocialCrossShardRelayMessageType.Ask,
+            null,
+            null,
+            options.Value.ShardId,
+            master.CharacterId,
+            master.Name,
+            remote.ShardId,
+            remote.CharacterId,
+            null));
+
+        logger.LogDebug(
+            "Mentor ask published cross-shard: character {MasterId} ({MasterName}) -> character {TargetCharacterId} on shard {TargetShardId} (never delivered today -- see MentorAskService's own remarks)",
+            master.CharacterId, master.Name, remote.CharacterId, remote.ShardId);
+        return new MentorAskResult(MentorAskResultKind.SentCrossShard);
     }
 
     /// <summary>

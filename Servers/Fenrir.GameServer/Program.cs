@@ -1,3 +1,18 @@
+// SECURITY GUARDRAIL -- read before adding any HTTP/gRPC surface to this executable.
+// Legacy ts25center bound an unauthenticated cpp-httplib dashboard on 127.0.0.1:2499 with zero
+// authentication anywhere in its routing (no set_pre_routing_handler check) and a side-effecting
+// GET /Shutdown that armed a cluster-wide kill switch (Server/ts25center/S02_MyServer.cpp:56-82,215-253;
+// ServerDocs/10_ts25center/03_HTTP_Dashboard_NonAuth_CRITIQUE.md; ServerDocs/04_SECURITE_ET_DETTE_TECHNIQUE.md
+// finding #2). This is the single worst legacy anti-pattern this project's security audits have found.
+// Fenrir.GameServer is deliberately a Microsoft.NET.Sdk.Worker project with no ASP.NET Core reference at
+// all (Host.CreateApplicationBuilder, never WebApplication -- see Orchestration/Fenrir.ServiceDefaults'
+// own "TCP-socket-only servers" comments), and Tests/Fenrir.IntegrationTests/NoUnauthenticatedHttpSurfaceTests.cs
+// regression-tests that this stays true. The day anyone proposes an HTTP/gRPC admin, metrics, shard-control,
+// or GM surface on this process: it must get its own explicit authentication and authorization from line
+// one, must never be assumed to inherit ClientSession/game-session auth, must never expose a state-mutating
+// action behind an unauthenticated GET (or any verb without a real credential check), and must bind to a
+// scope no broader than the ts25 loopback-only precedent unless there is an explicit, reviewed reason to
+// widen it.
 using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Commerce;
 using Fenrir.Application.Game.Domain.Extensions;
@@ -121,6 +136,28 @@ foreach (var gap in unclaimedDesignatedMaps)
         "is inert cluster-wide until admin.ShardMapAssignments assigns map {MapId} to some shard.",
         gap.MapId, gap.SchedulerName, gap.MapId);
 
-host.Services.GetRequiredService<ZoneRegistry>().Initialize(hostedMaps);
+var zoneRegistry = host.Services.GetRequiredService<ZoneRegistry>();
+zoneRegistry.Initialize(hostedMaps);
+
+// Aggregates the per-zone LogWarning (missing file)/LogError (parse failure) Zone.TryLoadGeometry already
+// emitted once per Zone above, inside ZoneRegistry.Initialize, into one glanceable rollup -- same "collect,
+// then log one summary via the Boot logger" shape as unclaimedDesignatedMaps above. Pure observability: does
+// not change Zone's own degrade-to-speed-only-validation behavior (see GameServerOptionsValidator's remarks
+// for why a missing/unparseable .WM is deliberately not startup-blocking), it only makes "which of this
+// shard's hosted maps are currently running with degraded (speed-only, unconstrained-pathing) anti-cheat"
+// visible at a glance instead of requiring an operator to scroll back through N individual per-zone log lines.
+var mapsMissingGeometry = new List<short>();
+foreach (var zone in zoneRegistry.Zones)
+    if (zone.Geometry is null)
+        mapsMissingGeometry.Add(zone.MapId);
+
+if (mapsMissingGeometry.Count > 0)
+    bootLogger.LogWarning(
+        "{MissingCount} of {HostedCount} hosted map(s) loaded without navmesh (.WM) data: [{MapIds}] -- on these " +
+        "maps, monster pathing (MonsterAiSystem.MoveToward) is unconstrained by terrain/obstacles and " +
+        "player-movement validation (MovementRules.IsPlausible) degrades to its speed-only check, until real " +
+        ".WM assets are deployed for them. See the per-map warning/error already logged above by " +
+        "Zone.TryLoadGeometry for each map's specific cause (missing file vs. parse failure).",
+        mapsMissingGeometry.Count, hostedMaps.Count, string.Join(", ", mapsMissingGeometry));
 
 await host.RunAsync();

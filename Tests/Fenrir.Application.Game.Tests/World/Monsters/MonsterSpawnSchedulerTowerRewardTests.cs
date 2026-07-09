@@ -28,8 +28,8 @@ public class MonsterSpawnSchedulerTowerRewardTests
             SummonTime2 = 100,
             FrameInfo1 = 1,
             FrameInfo3 = 1,
-            RadiusInfo1 = 1000,
-            RadiusInfo2 = 50,
+            RadiusInfo1 = 50,
+            RadiusInfo2 = 1000,
             WalkSpeed = 10,
             RunSpeed = 50
         };

@@ -10,9 +10,9 @@ namespace Fenrir.Application.Game.Domain.World.Monsters;
 ///     <see cref="Life" /> is the one exception: <see cref="TakeDamage" /> is safe to call from any thread (a
 ///     future combat handler's own session thread), touching only the interlocked <c>_life</c>/
 ///     <c>_deathClaimed</c> fields, so it can never tear or corrupt the tick-owned fields.
-///     <see cref="RegisterAttackDamage" />/<see cref="SnapshotAttackDamage" /> share that same
-///     any-thread-safe posture, guarded by their own <see cref="_attackDamageLock" /> instead of an
-///     interlocked primitive since a whole entry (not a single scalar) is mutated per call.
+///     <see cref="RegisterAttackDamage" />/<see cref="RegisterAcquisition" />/<see cref="SnapshotAttackDamage" />
+///     share that same any-thread-safe posture, guarded by their own <see cref="_attackDamageLock" /> instead
+///     of an interlocked primitive since a whole entry (not a single scalar) is mutated per call.
 /// </remarks>
 public sealed class MonsterEntity
 {
@@ -118,15 +118,6 @@ public sealed class MonsterEntity
 
     /// <summary>The currently-locked pursuit target, or null when idle/patrolling/returning.</summary>
     public int? TargetCharacterId { get; set; }
-
-    /// <summary>
-    ///     Bounded FIFO aggro list (legacy cap 50), populated by this monster's own proximity detection.
-    ///     Distinct from the separate <see cref="RegisterAttackDamage" />/<see cref="SnapshotAttackDamage" />
-    ///     per-attacker damage-history table that actually drives kill/loot credit selection
-    ///     (<see cref="Zone.TryDamageMonster" />, <see cref="Zone.SelectMonsterKillCredit" />) -- this list is
-    ///     proximity-driven, not damage-driven, and is read by nothing for attribution purposes.
-    /// </summary>
-    public List<int> AggroCharacterIds { get; } = [];
 
     public TimeSpan LastRebroadcastAt { get; set; }
 
@@ -265,9 +256,14 @@ public sealed class MonsterEntity
 
     /// <summary>
     ///     Accrues one hit's damage onto <paramref name="attackerCharacterId" />'s own tracked entry (legacy
-    ///     <c>SetAttackInfoWithAvatar</c>, <c>Server/ts25zone/S07_MyGame05.cpp:1675-1720</c>), creating it at
-    ///     zero cumulative damage first if this is that identity+session pair's first tracked hit. Safe to
-    ///     call from any thread (see class remarks).
+    ///     <c>SetAttackInfoWithAvatar</c>, <c>Server/ts25zone/S07_MyGame05.cpp:1675-1720</c>, called from the
+    ///     real-damage call site at <c>Server/ts25zone/S07_MyGame02.cpp:2159-2169</c>), creating it at zero
+    ///     cumulative damage first if this is that identity+session pair's first tracked hit. Safe to call
+    ///     from any thread (see class remarks). Routes through the same slot writer as
+    ///     <see cref="RegisterAcquisition" /> (<see cref="WriteAttackDamageSlot" />) -- legacy's
+    ///     <c>SetAttackInfoWithAvatar</c> is the SAME function both a successful acquisition and a landed hit
+    ///     call, just with a different damage argument (zero for acquisition, the real amount here); the two
+    ///     remain separate call reasons/entry points here too, only the underlying 50-slot table is shared.
     /// </summary>
     /// <param name="attackerCharacterId">Identity half of the legacy identity+session slot key.</param>
     /// <param name="sessionToken">
@@ -276,17 +272,67 @@ public sealed class MonsterEntity
     /// </param>
     /// <param name="damage">
     ///     Negative/zero contributes no damage and registers no entry, same convention as
-    ///     <see cref="TakeDamage" />.
+    ///     <see cref="TakeDamage" />. This guard is specific to this real-damage entry point -- it does not
+    ///     gate <see cref="RegisterAcquisition" />'s own deliberate zero-seed write.
     /// </param>
     internal void RegisterAttackDamage(int attackerCharacterId, object sessionToken, int damage)
     {
         if (damage <= 0)
             return;
 
+        WriteAttackDamageSlot(attackerCharacterId, sessionToken, damage);
+    }
+
+    /// <summary>
+    ///     Zero-seeds a tracked slot for a just-acquired pursuit target -- legacy's acquisition write-through
+    ///     into the SAME shared attacker table <see cref="RegisterAttackDamage" /> writes into
+    ///     (<c>SetAttackInfoWithAvatar</c> called with a zero damage argument from the acquisition call sites,
+    ///     <c>Server/ts25zone/S07_MyGame05.cpp:1068</c> (<c>A002</c>) and <c>:1321</c> (<c>A004</c>)). This is
+    ///     what lets kill-credit resolution (<see cref="World.Zone.SelectDamageBasedKillCredit" />)
+    ///     default-credit a target that was acquired but never actually hit for positive damage before the
+    ///     monster died some other way (environment damage, or any death route that never called
+    ///     <see cref="RegisterAttackDamage" />) -- matching legacy's own initial-candidate-accepted-
+    ///     unconditionally scan (<c>SelectAvatarIndexForMaxAttackDamage</c>, <c>S07_MyGame05.cpp:1763-1766</c>),
+    ///     which can land on a zero-damage slot exactly like this one. Safe to call from any thread (see class
+    ///     remarks).
+    ///     <para>
+    ///         Deliberately a separate entry point from <see cref="RegisterAttackDamage" />, and called from a
+    ///         wholly separate algorithm: initial acquisition is a first-found linear scan
+    ///         (<see cref="MonsterAiSystem.TryAcquireTarget" />), kill-credit resolution is a FIFO-capped
+    ///         max-damage lookup (<see cref="World.Zone.SelectDamageBasedKillCredit" />) -- only the underlying
+    ///         50-slot table both write into (and the latter reads from) is shared, exactly as it is in legacy.
+    ///     </para>
+    /// </summary>
+    /// <param name="characterId">Identity half of the legacy identity+session slot key.</param>
+    /// <param name="sessionToken">Session half of the slot key -- see <see cref="RegisterAttackDamage" />.</param>
+    internal void RegisterAcquisition(int characterId, object sessionToken)
+    {
+        WriteAttackDamageSlot(characterId, sessionToken, 0);
+    }
+
+    /// <summary>
+    ///     Shared slot writer both <see cref="RegisterAttackDamage" /> and <see cref="RegisterAcquisition" />
+    ///     route through -- legacy's single <c>SetAttackInfoWithAvatar</c>. Adds <paramref name="damage" /> onto
+    ///     an existing identity+session slot's cumulative total if one is already tracked (a no-op addition
+    ///     when called with zero from a re-acquisition of an already-tracked target -- legacy does not re-zero
+    ///     an existing slot), or creates a fresh slot seeded at <paramref name="damage" /> otherwise (legacy's
+    ///     own zero-seed-then-credit on a brand-new slot collapses to the same observable result as directly
+    ///     seeding at the passed-in value).
+    /// </summary>
+    /// <remarks>
+    ///     FIFO eviction: once full, the oldest identity+session slot -- and its whole accumulated total -- is
+    ///     discarded to make room, never a partial/averaged carry-over (<c>S07_MyGame05.cpp:1706-1715</c>,
+    ///     <c>MAX_MONSTER_OBJECT_ATTACK_NUM == 50</c>). This rule is shared by both call reasons, so a
+    ///     monster's own acquisition churn (repeated chase/give-up/re-acquire cycles) and real hits compete for
+    ///     the same 50 slots under the identical eviction rule -- matching legacy, where both write paths are
+    ///     literally the same function against the same array.
+    /// </remarks>
+    private void WriteAttackDamageSlot(int characterId, object sessionToken, int damage)
+    {
         lock (_attackDamageLock)
         {
             var existing = _attackDamage.Find(e =>
-                e.CharacterId == attackerCharacterId && ReferenceEquals(e.SessionToken, sessionToken));
+                e.CharacterId == characterId && ReferenceEquals(e.SessionToken, sessionToken));
 
             if (existing is not null)
             {
@@ -294,15 +340,12 @@ public sealed class MonsterEntity
                 return;
             }
 
-            // FIFO eviction: once full, the oldest identity+session slot -- and its whole accumulated total
-            // -- is discarded to make room, never a partial/averaged carry-over (S07_MyGame05.cpp:1675-1720,
-            // MAX_MONSTER_OBJECT_ATTACK_NUM == 50).
             if (_attackDamage.Count >= MaxAttackDamageEntries)
                 _attackDamage.RemoveAt(0);
 
             _attackDamage.Add(new MonsterAttackDamageEntry
             {
-                CharacterId = attackerCharacterId,
+                CharacterId = characterId,
                 SessionToken = sessionToken,
                 CumulativeDamage = damage
             });

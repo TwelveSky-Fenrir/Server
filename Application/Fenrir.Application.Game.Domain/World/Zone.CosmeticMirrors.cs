@@ -183,6 +183,30 @@ public sealed partial class Zone
     private readonly List<int> _autoBuffNeighborScratch = [];
 
     /// <summary>
+    ///     Reusable scratch buffer for <see cref="BroadcastAvatarStateFlag" />'s recipient list -- replaces a
+    ///     per-call, self-filtered <c>AoiGrid.Neighbors(...)</c> iterator with the non-allocating
+    ///     <see cref="AoiGrid.NeighborsExcludingSelf(List{int},ValueTuple{int,int},int,float,float,float,int)" />
+    ///     overload. <see cref="BroadcastAvatarStateFlag" /> is shared by every mount/costume/stellar-core/pet
+    ///     state-flag push in this file family, but all run on this zone's own single tick thread, so no two
+    ///     calls ever overlap this buffer.
+    /// </summary>
+    private readonly List<int> _avatarStateFlagNeighborScratch = [];
+
+    /// <summary>
+    ///     Reusable scratch buffer for <see cref="ApplyCostumeCommand" />'s op-139 full-avatar-action rebroadcast
+    ///     recipient list -- replaces a per-call <c>AoiGrid.Neighbors(...).Where(id =&gt; id != characterId).ToArray()</c>
+    ///     LINQ pipeline (iterator + closure + array) with <see cref="AoiGrid.NeighborsExcludingSelf(List{int},ValueTuple{int,int},int,float,float,float,int)" />.
+    /// </summary>
+    private readonly List<int> _costumeFullActionNeighborScratch = [];
+
+    /// <summary>
+    ///     Reusable scratch buffer for <see cref="ApplyPshopCommand" />'s stall-closed full-avatar-action
+    ///     rebroadcast recipient list -- same LINQ-pipeline-avoidance rationale as
+    ///     <see cref="_costumeFullActionNeighborScratch" />.
+    /// </summary>
+    private readonly List<int> _pshopCloseFullActionNeighborScratch = [];
+
+    /// <summary>
     ///     Op 97/111 (<c>PlaytimeBuff</c>/<c>RankBuff</c>) self-mutation mirror. See
     ///     <see cref="ApplyAvatarBuffCommand" />'s remarks for what this stub does/doesn't mirror yet.
     /// </summary>
@@ -854,11 +878,11 @@ public sealed partial class Zone
             FrameWriter.WriteFrame(in response, span);
 
             SendAvatarStateFlagFrame(state.CharacterId, span);
-            foreach (var neighborId in _grid.Neighbors(state.CurrentCell, state.PosX, state.PosY, state.PosZ))
-            {
-                if (neighborId == state.CharacterId) continue;
+            _avatarStateFlagNeighborScratch.Clear();
+            _grid.NeighborsExcludingSelf(_avatarStateFlagNeighborScratch, state.CurrentCell, state.CharacterId,
+                state.PosX, state.PosY, state.PosZ);
+            foreach (var neighborId in _avatarStateFlagNeighborScratch)
                 SendAvatarStateFlagFrame(neighborId, span);
-            }
         }
         finally
         {
@@ -963,9 +987,10 @@ public sealed partial class Zone
         if (!command.FullActionRebroadcast) return;
         var characterId = command.CharacterId;
         SendAvatarAction(state.Session, state);
-        var neighbors = _grid.Neighbors(state.CurrentCell, state.PosX, state.PosY, state.PosZ)
-            .Where(id => id != characterId).ToArray();
-        BroadcastAvatarAction(neighbors, state);
+        _costumeFullActionNeighborScratch.Clear();
+        _grid.NeighborsExcludingSelf(_costumeFullActionNeighborScratch, state.CurrentCell, characterId, state.PosX,
+            state.PosY, state.PosZ);
+        BroadcastAvatarAction(_costumeFullActionNeighborScratch, state);
     }
 
     private void DrainStellarCoreCommands()
@@ -1336,9 +1361,10 @@ public sealed partial class Zone
 
         var characterId = command.CharacterId;
         SendAvatarAction(state.Session, state);
-        var neighbors = _grid.Neighbors(state.CurrentCell, state.PosX, state.PosY, state.PosZ)
-            .Where(id => id != characterId).ToArray();
-        BroadcastAvatarAction(neighbors, state);
+        _pshopCloseFullActionNeighborScratch.Clear();
+        _grid.NeighborsExcludingSelf(_pshopCloseFullActionNeighborScratch, state.CurrentCell, characterId,
+            state.PosX, state.PosY, state.PosZ);
+        BroadcastAvatarAction(_pshopCloseFullActionNeighborScratch, state);
     }
 }
 

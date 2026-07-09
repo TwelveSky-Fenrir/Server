@@ -34,22 +34,24 @@ public class DuelAskHandlerTests
     }
 
     [Fact]
-    public void ChallengerAlreadyDueling_AbortsTheRequesterSSession_NotAnOrdinaryBusyReply()
+    public async Task ChallengerAlreadyDueling_AbortsTheRequesterSSession_NotAnOrdinaryBusyReply()
     {
         var (handler, session, pipe) = CreateHandler(DuelAskResultKind.ChallengerAlreadyDueling);
 
-        handler.Handle(new DuelChallengeRequest { AvatarName = "Target", Sort = 0 }, session);
+        await handler.HandleAsync(new DuelChallengeRequest { AvatarName = "Target", Sort = 0 }, session,
+            CancellationToken.None);
 
         Assert.Equal(DisconnectReason.Faulted, session.DisconnectReason);
         Assert.Empty(ZoneTestKit.DrainOutbound(pipe)); // no ZC_DUEL_ANSWER_RECV -- the session is just torn down
     }
 
     [Fact]
-    public void ChallengerBusy_OrdinaryNegotiatingCase_RepliesInstead_DoesNotDisconnect()
+    public async Task ChallengerBusy_OrdinaryNegotiatingCase_RepliesInstead_DoesNotDisconnect()
     {
         var (handler, session, pipe) = CreateHandler(DuelAskResultKind.ChallengerBusy);
 
-        handler.Handle(new DuelChallengeRequest { AvatarName = "Target", Sort = 0 }, session);
+        await handler.HandleAsync(new DuelChallengeRequest { AvatarName = "Target", Sort = 0 }, session,
+            CancellationToken.None);
 
         Assert.Null(session.DisconnectReason);
         Assert.NotEmpty(ZoneTestKit.DrainOutbound(pipe));
@@ -57,10 +59,10 @@ public class DuelAskHandlerTests
 
     private sealed class StubDuelService(DuelAskResultKind resultKind) : IDuelService
     {
-        public DuelAskResultKind Ask(Zone zone, PlayerRuntimeState challenger,
-            string targetAvatarName, int sort)
+        public ValueTask<DuelAskResultKind> AskAsync(Zone zone, PlayerRuntimeState challenger,
+            string targetAvatarName, int sort, CancellationToken cancellationToken)
         {
-            return resultKind;
+            return ValueTask.FromResult(resultKind);
         }
 
         public void Answer(int targetId, int answerCode)

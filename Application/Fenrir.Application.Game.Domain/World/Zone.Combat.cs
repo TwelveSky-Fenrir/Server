@@ -128,6 +128,33 @@ public sealed partial class Zone
     /// </summary>
     private readonly KillCooldownTracker _regularWarCpOverrideCooldown = new();
 
+    /// <summary>
+    ///     Reusable scratch buffer for one raw <see cref="AoiGrid.Neighbors(List{int},ValueTuple{int,int},float,float,float,int)" />
+    ///     scan at a time, shared by <see cref="ApplyPvmAttack" /> and <see cref="CombatRecipients" /> -- both
+    ///     immediately drain it into a dedup'd recipient set (<see cref="_pvmAttackRecipientScratch" />/
+    ///     <see cref="_combatRecipientScratch" />) before the next scan reuses this buffer, and both run only on
+    ///     this zone's own single tick thread, so no two scans ever overlap.
+    /// </summary>
+    private readonly List<int> _combatNeighborScratch = [];
+
+    /// <summary>
+    ///     Reusable scratch buffer for <see cref="ApplyPvmAttack" />'s attacker+monster combined AOI-neighbor
+    ///     recipient set -- replaces a per-attack <c>new HashSet&lt;int&gt;()</c>. Same single-tick-thread reuse
+    ///     posture as every other scratch buffer in this file family; cleared before use, consumed entirely by
+    ///     the immediately-following <see cref="BroadcastAttackResult" /> call.
+    /// </summary>
+    private readonly HashSet<int> _pvmAttackRecipientScratch = [];
+
+    /// <summary>
+    ///     Reusable scratch buffer for <see cref="CombatRecipients" />'s attacker+defender combined AOI-neighbor
+    ///     recipient set -- replaces a per-hit <c>new HashSet&lt;int&gt;()</c>. Shared by both of
+    ///     <see cref="CombatRecipients" />'s callers (<c>ApplyCombatCommand</c>'s mCase-2 path here and
+    ///     <c>ApplyDuelAttack</c>'s mCase-1 path in <c>Zone.Duel.cs</c>) since both run on this zone's own single
+    ///     tick thread and always consume the returned reference immediately, before the next call could ever
+    ///     reuse it.
+    /// </summary>
+    private readonly HashSet<int> _combatRecipientScratch = [];
+
     public bool PostCombatCommand(in CombatCommand command)
     {
         return _combatInbox.Writer.TryWrite(command);
@@ -730,14 +757,22 @@ public sealed partial class Zone
             }
         };
 
-        var recipients = new HashSet<int> { attackerState.CharacterId };
-        foreach (var id in _grid.Neighbors(attackerState.CurrentCell, attackerState.PosX, attackerState.PosY,
-                     attackerState.PosZ))
-            recipients.Add(id);
-        foreach (var id in _grid.Neighbors(_grid.CellOf(monster.PosX, monster.PosZ), monster.PosX, monster.PosY,
-                     monster.PosZ))
-            recipients.Add(id);
-        BroadcastAttackResult(recipients, response);
+        _pvmAttackRecipientScratch.Clear();
+        _pvmAttackRecipientScratch.Add(attackerState.CharacterId);
+
+        _combatNeighborScratch.Clear();
+        _grid.Neighbors(_combatNeighborScratch, attackerState.CurrentCell, attackerState.PosX, attackerState.PosY,
+            attackerState.PosZ);
+        foreach (var id in _combatNeighborScratch)
+            _pvmAttackRecipientScratch.Add(id);
+
+        _combatNeighborScratch.Clear();
+        _grid.Neighbors(_combatNeighborScratch, _grid.CellOf(monster.PosX, monster.PosZ), monster.PosX,
+            monster.PosY, monster.PosZ);
+        foreach (var id in _combatNeighborScratch)
+            _pvmAttackRecipientScratch.Add(id);
+
+        BroadcastAttackResult(_pvmAttackRecipientScratch, response);
 
         if (!outcome.Hit)
             return;
@@ -865,27 +900,59 @@ public sealed partial class Zone
     /// </summary>
     private HashSet<int> CombatRecipients(PlayerRuntimeState attacker, PlayerRuntimeState defender)
     {
-        var recipients = new HashSet<int> { attacker.CharacterId, defender.CharacterId };
-        foreach (var id in _grid.Neighbors(attacker.CurrentCell, attacker.PosX, attacker.PosY, attacker.PosZ))
-            recipients.Add(id);
-        foreach (var id in _grid.Neighbors(defender.CurrentCell, defender.PosX, defender.PosY, defender.PosZ))
-            recipients.Add(id);
-        return recipients;
+        _combatRecipientScratch.Clear();
+        _combatRecipientScratch.Add(attacker.CharacterId);
+        _combatRecipientScratch.Add(defender.CharacterId);
+
+        _combatNeighborScratch.Clear();
+        _grid.Neighbors(_combatNeighborScratch, attacker.CurrentCell, attacker.PosX, attacker.PosY, attacker.PosZ);
+        foreach (var id in _combatNeighborScratch)
+            _combatRecipientScratch.Add(id);
+
+        _combatNeighborScratch.Clear();
+        _grid.Neighbors(_combatNeighborScratch, defender.CurrentCell, defender.PosX, defender.PosY, defender.PosZ);
+        foreach (var id in _combatNeighborScratch)
+            _combatRecipientScratch.Add(id);
+
+        return _combatRecipientScratch;
     }
 
-    private void BroadcastAttackResult(IEnumerable<int> recipientCharacterIds, in AttackResponse response)
+    /// <summary>
+    ///     Rent-once/write-once/copy-N-times -- same idiom as <see cref="BroadcastTowerStatus" /> and
+    ///     <c>BroadcastAvatarAction</c> (<c>Zone.PlayerLifecycle.cs</c>): the frame is encoded exactly once and
+    ///     copied into each recipient's own transport, instead of every recipient independently re-serializing
+    ///     the identical <see cref="AttackResponse" /> via <c>Session.Send</c>.
+    /// </summary>
+    private void BroadcastAttackResult(IReadOnlyCollection<int> recipientCharacterIds, in AttackResponse response)
     {
-        foreach (var id in recipientCharacterIds)
-            try
-            {
-                if (_players.TryGetValue(id, out var recipient))
-                    recipient.Session.Send(response);
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Zone {MapId} attack-result send to character {RecipientId} failed", MapId,
-                    id);
-            }
+        if (recipientCharacterIds.Count == 0)
+            return;
+
+        var total = FrameWriter.FrameSizeOf<AttackResponse>();
+        var rented = ArrayPool<byte>.Shared.Rent(total);
+
+        try
+        {
+            var span = rented.AsSpan(0, total);
+            FrameWriter.WriteFrame(in response, span);
+
+            foreach (var id in recipientCharacterIds)
+                try
+                {
+                    if (_players.TryGetValue(id, out var recipient) &&
+                        recipient.Session is ClientSession clientSession)
+                        clientSession.SendRaw(span);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Zone {MapId} attack-result send to character {RecipientId} failed", MapId,
+                        id);
+                }
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(rented);
+        }
     }
 
     /// <summary>

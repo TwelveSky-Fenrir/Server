@@ -113,6 +113,17 @@ public static class HostingServiceCollectionExtensions
             sp.GetRequiredService<GuildTribeBroadcastRelayHost>());
         services.AddHostedService(sp => sp.GetRequiredService<GuildTribeBroadcastRelayHost>());
 
+        // WS1.4 cross-shard social-negotiation relay (Party/Friend/Mentor/Duel/Trade/GuildInvite Ask+Answer)
+        // -- point-to-point sibling of GuildTribeBroadcastRelayHost above, same "one instance, three
+        // registrations" pattern. IEnumerable<ISocialCrossShardRelayHandler> resolves empty until each of
+        // the six negotiation *.Services registries registers its own handler in a follow-up change (see
+        // SocialCrossShardRelayHost's own remarks) -- that is safe today, a delivered row for an
+        // unregistered Kind is simply logged and dropped.
+        services.AddSingleton<SocialCrossShardRelayHost>();
+        services.AddSingleton<ISocialCrossShardRelayQueue>(sp =>
+            sp.GetRequiredService<SocialCrossShardRelayHost>());
+        services.AddHostedService(sp => sp.GetRequiredService<SocialCrossShardRelayHost>());
+
         services.AddSingleton(sp =>
         {
             var opts = sp.GetRequiredService<IOptions<GameServerOptions>>().Value;
@@ -180,6 +191,15 @@ public static class HostingServiceCollectionExtensions
         // wired up in this cluster), same posture as ZoneWarTickService before anything calls StartWar.
         services.AddSingleton<ZoneCenterSiegeState>();
         services.AddSingleton<ZoneCenterBroadcastIngestor>();
+
+        // Elevated-tier zone-wide FFA-start GM command (tSort 333) process-local countdown/start-trigger
+        // bookkeeping -- same "plain, not-yet-consumed in-memory singleton" posture as ZoneCenterSiegeState
+        // just above, but deliberately a distinct object from it; see Zone335StartTrigger's own remarks for
+        // why. Consumed by GmFfaEventStartService (Fenrir.Application.Game.Services); no reader is wired up
+        // yet (the FFA-335 autonomous tick, legacy Process_Zone_335_FFA, is a separate, currently unmodeled
+        // system), same "real API, not yet called by anything" posture as ZoneWarTickService before anything
+        // calls StartWar.
+        services.AddSingleton<Zone335StartTrigger>();
 
         // Registered as a factory (opaque to the DI container's constructor-graph cycle check) so that
         // MonsterSpawnScheduler -- an ISimulationSystem that ZoneRegistry itself resolves at construction

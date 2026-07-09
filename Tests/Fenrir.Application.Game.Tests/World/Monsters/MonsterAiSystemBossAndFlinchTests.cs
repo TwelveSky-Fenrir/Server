@@ -83,7 +83,9 @@ public class MonsterAiSystemBossAndFlinchTests
     [Fact]
     public void NonBossMonster_SamePlacement_MustCloseToMeleeRange_NeverEntersRangedAttackWindup()
     {
-        var zone = CreateZone(CacheWithOneRegion(0, 2, 1000));
+        // SpecialType 1 is the legacy "no special designation" value real ordinary monsters use (e.g.
+        // Migrations/Seed/world/090_monsters.sql's MonsterId=1) -- outside the 40-44 Zone175-boss band.
+        var zone = CreateZone(CacheWithOneRegion(1, 2, 1000));
         var (session, _) = ZoneTestKit.CreateSession(1);
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1, "Target", 10, posZ: 0)));
 
@@ -130,7 +132,7 @@ public class MonsterAiSystemBossAndFlinchTests
     [Fact]
     public void Flinch_ReturnsToDecision_AfterFrameInfo2Ticks()
     {
-        var zone = CreateZone(CacheWithOneRegion(0, 0, 0));
+        var zone = CreateZone(CacheWithOneRegion(1, 0, 0));
         zone.Tick(SimulationClock.LegacyTick); // pop + Spawning -> Decision (FrameInfo1=1)
         Assert.True(zone.TryGetMonster(1, out var monster));
         Assert.Equal(MonsterAiState.Decision, monster!.AiState);

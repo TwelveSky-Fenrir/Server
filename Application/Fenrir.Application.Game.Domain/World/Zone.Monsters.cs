@@ -44,6 +44,30 @@ public sealed partial class Zone
     private readonly List<int> _monsterBroadcastNeighborScratch = [];
 
     /// <summary>
+    ///     Reusable scratch buffer for <see cref="ResolveMonsterAttack" />'s raw AOI-neighbor scan, drained into
+    ///     <see cref="_mvpAttackRecipientScratch" /> immediately after -- same non-allocating shape and reuse
+    ///     justification as <see cref="_monsterBroadcastNeighborScratch" />: single tick thread, cleared before
+    ///     use, never read after the immediately-following broadcast returns.
+    /// </summary>
+    private readonly List<int> _mvpAttackNeighborScratch = [];
+
+    /// <summary>
+    ///     Reusable scratch buffer for <see cref="ResolveMonsterAttack" />'s target+neighbors AOI recipient set
+    ///     -- replaces a per-attack <c>new HashSet&lt;int&gt;()</c>. Same single-tick-thread reuse posture as
+    ///     every other scratch buffer in this file family.
+    /// </summary>
+    private readonly HashSet<int> _mvpAttackRecipientScratch = [];
+
+    /// <summary>
+    ///     Reusable scratch buffer for <see cref="SendExistingMonstersTo" />'s <see cref="_monsterGrid" />
+    ///     neighbor scan -- replaces the enumerable-returning, iterator-allocating
+    ///     <see cref="AoiGrid.Neighbors(ValueTuple{int,int},float,float,float,int)" /> overload with the
+    ///     non-allocating buffer overload. Single tick thread, cleared before use, consumed entirely by the
+    ///     immediately-following per-monster send loop before <see cref="SendExistingMonstersTo" /> returns.
+    /// </summary>
+    private readonly List<int> _sendExistingMonstersScratch = [];
+
+    /// <summary>
     ///     Monster-side counterpart to <see cref="_grid" />, keyed by <see cref="MonsterEntity.ServerIndex" />
     ///     instead of character id -- lets <see cref="SendExistingMonstersTo" /> query nearby monsters directly
     ///     instead of scanning every monster this zone holds. Tick-owned only, same posture as <see cref="_grid" />
@@ -248,9 +272,12 @@ public sealed partial class Zone
     /// <summary>
     ///     <c>SelectAvatarIndexForMaxAttackDamage</c> (<c>S07_MyGame05.cpp:1723-1780</c>): the single highest
     ///     cumulative-damage entry among every still-eligible tracked attacker, or null if none qualify. The
-    ///     strictly-greater-than comparison means an exact tie is won by whichever entry was tracked first --
-    ///     <see cref="MonsterEntity.SnapshotAttackDamage" /> preserves oldest-to-newest order, and only a strict
-    ///     improvement ever replaces the current leader.
+    ///     first eligible entry is accepted unconditionally as the initial candidate regardless of its own
+    ///     recorded damage (<c>:1763-1766</c>) -- including an exact zero if that slot originated from
+    ///     <see cref="MonsterEntity.RegisterAcquisition" />'s write-through rather than ever being hit; every
+    ///     subsequent eligible entry only replaces the current candidate on a strictly-greater damage value, so
+    ///     an exact tie is won by whichever entry was tracked first -- <see cref="MonsterEntity.SnapshotAttackDamage" />
+    ///     preserves oldest-to-newest order, and only a strict improvement ever replaces the current leader.
     /// </summary>
     private int? SelectDamageBasedKillCredit(MonsterEntity monster)
     {
@@ -406,10 +433,15 @@ public sealed partial class Zone
             }
         };
 
-        var recipients = new HashSet<int> { target.CharacterId };
-        foreach (var id in _grid.Neighbors(target.CurrentCell, target.PosX, target.PosY, target.PosZ))
-            recipients.Add(id);
-        BroadcastAttackResult(recipients, response);
+        _mvpAttackRecipientScratch.Clear();
+        _mvpAttackRecipientScratch.Add(target.CharacterId);
+
+        _mvpAttackNeighborScratch.Clear();
+        _grid.Neighbors(_mvpAttackNeighborScratch, target.CurrentCell, target.PosX, target.PosY, target.PosZ);
+        foreach (var id in _mvpAttackNeighborScratch)
+            _mvpAttackRecipientScratch.Add(id);
+
+        BroadcastAttackResult(_mvpAttackRecipientScratch, response);
 
         if (!outcome.Hit)
             return;
@@ -491,7 +523,9 @@ public sealed partial class Zone
         if (!_monsterGrid.HasAnyNeighbor(cell))
             return;
 
-        foreach (var serverIndex in _monsterGrid.Neighbors(cell, state.PosX, state.PosY, state.PosZ))
+        _sendExistingMonstersScratch.Clear();
+        _monsterGrid.Neighbors(_sendExistingMonstersScratch, cell, state.PosX, state.PosY, state.PosZ);
+        foreach (var serverIndex in _sendExistingMonstersScratch)
         {
             if (!_monsters.TryGetValue(serverIndex, out var monster))
                 continue; // stale grid entry (despawned/killed earlier this same tick) -- harmless, skip
@@ -566,6 +600,77 @@ public sealed partial class Zone
         {
             ArrayPool<byte>.Shared.Return(rented);
         }
+    }
+
+    /// <summary>
+    ///     Dedicated <see cref="MonsterEntity.ServerIndex" /> pool for the Elevated-tier "moncall" GM command
+    ///     (tSort 506) -- same "each ad-hoc/reserved spawn family gets its own non-overlapping base" convention
+    ///     already established by <c>ZoneWar.TribeGuardSpawner.OrdinaryPoolServerIndexBase</c>/
+    ///     <c>Zone038WinnerPoolServerIndexBase</c> (1_000_000/1_001_000) and
+    ///     <c>ZoneWar.TribeSymbolSpawner.SymbolPoolServerIndexBase</c> (1_002_000, size 100) -- well clear of
+    ///     <see cref="Monsters.MonsterSpawnScheduler" />'s own ordinary per-zone slot numbering (1..
+    ///     <c>RegularMonsterTableCapacity</c> = 3400) and of <see cref="SummonPersonalBoss" />'s own
+    ///     character-id-keyed slot reuse. A purely internal Fenrir bookkeeping choice -- legacy's own
+    ///     <c>SummonMonsterForSpecial</c> has no equivalent slot-numbering concept for this GM command to port.
+    /// </summary>
+    private const int GmSummonPoolServerIndexBase = 1_003_000;
+
+    /// <summary>Size of <see cref="GmSummonPoolServerIndexBase" />'s reserved range.</summary>
+    private const int GmSummonPoolSize = 1_000;
+
+    /// <summary>
+    ///     Free-roam leash for a "moncall"-summoned monster -- same value as <see cref="PersonalDungeonBossLeashRadius" />
+    ///     (Zone.DungeonInstance.cs), reused here as a reasonable boss-scale default since "moncall" is most
+    ///     often used to test/battle a boss-tier monster; the source behavior contract for tSort 506 does not
+    ///     itself specify a leash radius (the underlying <c>SummonMonsterForSpecial</c> primitive is not
+    ///     independently modeled in Fenrir with its own leash parameter for this call).
+    /// </summary>
+    private const float GmSummonLeashRadius = 200f;
+
+    /// <summary>
+    ///     Elevated-tier "moncall" GM command (tSort 506) -- see
+    ///     <see cref="Tribes.TribeProgressZoneCommand.GmSummonMonsterTemplateId" />'s own remarks for the
+    ///     posting side. Silently does nothing if <paramref name="monsterId" /> does not resolve in the world
+    ///     catalog (legacy performs no validation of its own either -- see the source behavior contract's own
+    ///     Edge cases) or if <see cref="GmSummonPoolServerIndexBase" />'s reserved range is exhausted (a
+    ///     Fenrir-side safeguard with no legacy equivalent, since legacy's own bounded world-object-pool
+    ///     exhaustion failure mode is already masked from the wire by this command's own unconditional success
+    ///     result -- same posture <see cref="Fenrir.Application.Game.Services.Gm.GmCreateItemService" />'s own
+    ///     remarks document for its sibling spawn-item command). No duplicate-of-same-template check: legacy's
+    ///     own <c>SummonMonsterForSpecial</c> call passes <c>tCheckExistMonster=FALSE</c> for this command, and
+    ///     Fenrir's own <see cref="_monsters" /> is keyed by slot, not by template id, so there was never a
+    ///     duplicate check here to turn off in the first place. No owner binding: <see cref="MonsterEntity.Create" />'s
+    ///     optional <c>instanceId</c> parameter is left at its "no owner" default, matching legacy's own omitted
+    ///     <c>tUserIndex</c> argument.
+    /// </summary>
+    private void SpawnGmSummonedMonster(int monsterId, PlayerRuntimeState state)
+    {
+        if (!worldData.MonstersById.TryGetValue(monsterId, out var definition))
+            return;
+
+        if (!TryFindFreeGmSummonSlot(out var serverIndex))
+            return;
+
+        var monster = MonsterEntity.Create(serverIndex, NextMonsterUniqueNumber(), definition.Monster, serverIndex,
+            state.PosX, state.PosY, state.PosZ, GmSummonLeashRadius);
+
+        SpawnMonster(monster);
+    }
+
+    private bool TryFindFreeGmSummonSlot(out int serverIndex)
+    {
+        for (var i = 0; i < GmSummonPoolSize; i++)
+        {
+            var candidate = GmSummonPoolServerIndexBase + i;
+            if (!_monsters.ContainsKey(candidate))
+            {
+                serverIndex = candidate;
+                return true;
+            }
+        }
+
+        serverIndex = 0;
+        return false;
     }
 
     private static MonsterReplicationResponse BuildMonsterActionRecv(MonsterEntity monster,

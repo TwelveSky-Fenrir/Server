@@ -114,7 +114,9 @@ public class MonsterSpawnSchedulerTribeSymbolTests
     [Fact]
     public void KillingAnOrdinaryMonster_NeverResolvesAnySymbol()
     {
-        var cache = CacheWithHolyStone(700, 0); // SpecialType 0 -- not a Holy Stone
+        // SpecialType 1 is the legacy "no special designation" value real ordinary monsters use (e.g.
+        // Migrations/Seed/world/090_monsters.sql's MonsterId=1) -- not one of the 11/12/13/28/14 Holy Stone types.
+        var cache = CacheWithHolyStone(700, 1);
         var (worldState, broadcaster) = CreateWorldStateAndBroadcaster();
         var scheduler =
             new MonsterSpawnScheduler(cache, zoneEventBroadcaster: new Lazy<ZoneEventBroadcaster>(broadcaster));

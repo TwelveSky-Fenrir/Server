@@ -1,3 +1,5 @@
+using Fenrir.Application.Game.Domain.Social;
+
 namespace Fenrir.Application.Game.Domain.Social.Trade;
 
 /// <summary>Soft outcomes of CZ_TRADE_ASK_SEND -- mirrors ZC_TRADE_ANSWER_RECV's pre-check codes.</summary>
@@ -54,6 +56,19 @@ public readonly record struct TradeDisconnectResult(TradeDisconnectNotification 
 public sealed class TradeRegistry
 {
     private readonly Dictionary<int, int> _acceptedPairs = new();
+
+    /// <summary>
+    ///     WS1.4: this family's own cross-shard ASK-PUBLISH-ONLY half, folded into <see cref="IsBusy" /> --
+    ///     see <see cref="CrossShardNegotiationTracker" />'s own remarks. Unlike Party/Friend, no
+    ///     <c>ISocialCrossShardRelayHandler</c> is registered for <c>SocialCrossShardRelayKind.Trade</c> yet
+    ///     (see <c>TradeInviteService.InviteAsync</c>'s own remarks for why), so only the OUTBOUND half of
+    ///     this tracker is ever populated -- an inbound cross-shard trade invite can never be delivered here
+    ///     today. <see cref="TryCancel" />/<see cref="ClearForDisconnect" /> still consume an outbound entry
+    ///     so an asker who published a cross-shard invite that will never be answered is not stuck busy
+    ///     forever.
+    /// </summary>
+    private readonly CrossShardNegotiationTracker _crossShard = new();
+
     private readonly Lock _lock = new();
     private readonly Dictionary<int, int> _pendingByAsker = new();
     private readonly Dictionary<int, int> _pendingByTarget = new();
@@ -64,14 +79,30 @@ public sealed class TradeRegistry
     ///     negotiation lifecycle (pending ask, accepted, and an actually-started session), matching legacy's
     ///     single nonzero-throughout trade-process-state field. Public so sibling negotiation families (e.g.
     ///     Guild ask, see <c>GuildInviteService</c>) can compose a cross-family busy check without duplicating
-    ///     this registry's own state.
+    ///     this registry's own state. Also includes a still-open outbound cross-shard invite.
     /// </summary>
     public bool IsBusy(int characterId)
     {
         lock (_lock)
         {
             return _pendingByAsker.ContainsKey(characterId) || _pendingByTarget.ContainsKey(characterId) ||
-                   _acceptedPairs.ContainsKey(characterId) || _sessionByCharacter.ContainsKey(characterId);
+                   _acceptedPairs.ContainsKey(characterId) || _sessionByCharacter.ContainsKey(characterId) ||
+                   _crossShard.IsPending(characterId);
+        }
+    }
+
+    /// <summary>
+    ///     WS1.4 asker-side cross-shard invite registration (ASK-PUBLISH-ONLY -- see <see cref="_crossShard" />'s
+    ///     own remarks). Same busy gate as <see cref="TryAsk" />.
+    /// </summary>
+    public TradeAskOutcome TryAskCrossShard(int askerId, CrossShardOutboundAsk ask)
+    {
+        lock (_lock)
+        {
+            if (IsBusy(askerId))
+                return TradeAskOutcome.AskerBusy;
+
+            return _crossShard.TryRegisterOutbound(askerId, ask) ? TradeAskOutcome.Sent : TradeAskOutcome.AskerBusy;
         }
     }
 
@@ -94,11 +125,19 @@ public sealed class TradeRegistry
     {
         lock (_lock)
         {
-            if (!_pendingByAsker.Remove(askerId, out targetId))
-                return false;
+            if (_pendingByAsker.Remove(askerId, out targetId))
+            {
+                _pendingByTarget.Remove(targetId);
+                return true;
+            }
 
-            _pendingByTarget.Remove(targetId);
-            return true;
+            if (_crossShard.TryConsumeOutbound(askerId, out var crossShardAsk))
+            {
+                targetId = crossShardAsk.TargetCharacterId;
+                return true;
+            }
+
+            return false;
         }
     }
 
@@ -232,6 +271,14 @@ public sealed class TradeRegistry
                 return new TradeDisconnectResult(TradeDisconnectNotification.End, opponentId);
             }
 
+            // WS1.4: a disconnecting character's own outbound cross-shard invite (this registry only ever
+            // holds the OUTBOUND half, see _crossShard's own remarks) is torn down here too, for the same
+            // stuck-forever-busy reason every branch above already exists for -- no target-side handler
+            // exists yet to ever deliver the Answer that would normally consume this entry. No partner to
+            // notify (the partner is remote, and there is no Cancel message shape in this relay -- see
+            // ISocialCrossShardRelayHandler.HandleAnswerAsync's own remarks on tolerating exactly this), so
+            // this is a pure cleanup with no distinct TradeDisconnectResult shape of its own.
+            _crossShard.TryConsumeOutbound(characterId, out _);
             return TradeDisconnectResult.None;
         }
     }

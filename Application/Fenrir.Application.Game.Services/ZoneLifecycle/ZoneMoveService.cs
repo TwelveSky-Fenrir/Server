@@ -42,6 +42,38 @@ public sealed class ZoneMoveService(
             return ValueTask.CompletedTask;
         }
 
+        var targetZoneNumber = (short)packet.ZoneNumber;
+
+        // Resolved up front -- rather than immediately before the corridor gate further down, where this
+        // lookup used to sit -- purely so the mProtect_ReviveHack companion check immediately below has the
+        // live PlayerRuntimeState it needs. A miss here (narrow race: the source zone's own tick already
+        // removed this player between the CurrentZone read above and this lookup) is handled further down,
+        // once the malformed-input/sort/lockout gates that must still fire on their own terms regardless of
+        // the race have had their say -- see that check's own comment below.
+        sourceZone.TryGetPlayer(characterId, out var state);
+
+        // mProtect_ReviveHack companion check (S04_MyWork02.cpp:2017-2064): runs UNCONDITIONALLY FIRST,
+        // before the same-zone no-op short-circuit, the destination-range/present-zone validation, and the
+        // sort-reason checks below -- legacy's own line ordering places this check (2019-2064) strictly
+        // before the no-op check and everything that follows it (2065-2114); TribeSymbolBattleZoneLockout's
+        // own remarks independently corroborate this same relative ordering from the other side. A session
+        // still flagged from an unresolved death is kicked outright on ANY zone-transfer attempt --
+        // including a same-zone no-op request, and including a request this shard would otherwise route
+        // cross-shard (see HandleCrossShardAsync, reached further below only once this gate has already run)
+        // -- unless the destination is zone 38. See ZoneTransferAntiAbuseRules' own remarks for why this
+        // alliance wording deliberately differs from the tick-loop gate's. Skipped only when state is null
+        // (the narrow-race miss above): there is nothing to protect in that case.
+        if (state is not null && state.ReviveHackFlag &&
+            !ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(sourceZone.MapId, targetZoneNumber, state.Tribe,
+                worldState.GetAllyOf))
+        {
+            logger.LogWarning(
+                "Zone-move aborted for character {CharacterId}: revive-hack flag set, transfer {SourceMapId} -> {TargetZoneNumber} not allowed while flagged",
+                characterId, sourceZone.MapId, targetZoneNumber);
+            zoneSession.Abort(DisconnectReason.StateViolation);
+            return ValueTask.CompletedTask;
+        }
+
         // Same zone requested -- silent ignore, matching the legacy's bare return (no response at all).
         if (packet.ZoneNumber == sourceZone.MapId)
         {
@@ -60,11 +92,16 @@ public sealed class ZoneMoveService(
             return ValueTask.CompletedTask;
         }
 
-        // Sort==2 (GM transfer) requires GM rank, which Fenrir has no concept of yet -- always rejected.
-        if (packet.Sort == 2)
+        // Sort==2 (GM transfer) requires operator rank, checked prior to and independent of the core
+        // corridor predicate further below (Server/ts25zone/S04_MyWork02.cpp:2069-2075, gated on
+        // tUserInfo->uUserSort >= 1 -- zoneSession.IsGm is the same uUserSort < 1 threshold
+        // TribeGuardCorridorGate itself bypasses on further down). A non-operator session requesting sort 2
+        // is rejected outright; an operator session falls through and is treated exactly like any other
+        // recognized sort value for the rest of this handler.
+        if (packet.Sort == 2 && !zoneSession.IsGm)
         {
             logger.LogWarning(
-                "Zone-move aborted for character {CharacterId}: GM transfer (sort 2) requested but GM rank is not modeled",
+                "Zone-move aborted for character {CharacterId}: GM transfer (sort 2) requested without operator rank",
                 characterId);
             zoneSession.Abort(DisconnectReason.Faulted);
             return ValueTask.CompletedTask;
@@ -78,8 +115,6 @@ public sealed class ZoneMoveService(
             zoneSession.Abort(DisconnectReason.Faulted);
             return ValueTask.CompletedTask;
         }
-
-        var targetZoneNumber = (short)packet.ZoneNumber;
 
         // Independent, unconditional tribe-symbol-battle zone-transfer lockout (Server/ts25zone/S04_MyWork02.cpp:
         // 2125-2141), evaluated here -- strictly BEFORE the connection-availability/cross-shard resolution just
@@ -102,28 +137,11 @@ public sealed class ZoneMoveService(
             return ValueTask.CompletedTask;
         }
 
-        // Not hosted by THIS shard's static ZoneRegistry -- legacy never distinguishes "local" from "remote"
-        // here (Server/ts25zone/S04_MyWork02.cpp:2017-2186): every zone number is resolved live against the
-        // same cross-process directory (Server/ts25center/S04_MyWork02.cpp:74-109's mZoneConnectionInfo), and
-        // only a target whose own process isn't currently registered gets the port==0/Result=1 failure. Given
-        // Fenrir's current shard/map coverage this "not local" case is the routine one, not the rare one, so
-        // it must be resolved against the live runtime.GameServerDirectory + admin.ShardMapAssignments pair
-        // before concluding the zone is genuinely unavailable -- see HandleCrossShardAsync.
-        if (!zones.TryGet(targetZoneNumber, out var targetZone))
-            return HandleCrossShardAsync(targetZoneNumber, characterId, zoneSession, cancellationToken);
-
-        if (!worldData.ZonesByNumber.TryGetValue(targetZoneNumber, out var targetDefinition))
-        {
-            logger.LogError(
-                "Zone {TargetZoneNumber} is hosted by this shard but absent from WorldDataCache -- refusing transfer for character {CharacterId}",
-                targetZoneNumber, characterId);
-            zoneSession.Send(new ZoneMoveResponse { Result = 1, Ip = "", Port = 0 });
-            return ValueTask.CompletedTask;
-        }
-
-        // Narrow race: the source zone's own tick already removed this player between the CurrentZone read
-        // above and this lookup (disconnect/another handoff) -- nothing to transfer.
-        if (!sourceZone.TryGetPlayer(characterId, out var state) || state is null)
+        // Narrow race resolved: the TryGetPlayer lookup at the top of this method came back empty -- nothing
+        // to transfer. Checked here, after the malformed-input/sort/tribe-symbol-battle gates above (which
+        // must still fire on their own terms even under the race) but before every remaining gate below, all
+        // of which need the live PlayerRuntimeState this race lost.
+        if (state is null)
         {
             logger.LogDebug(
                 "Zone-move ignored for character {CharacterId}: no longer present in source zone {SourceMapId} (narrow race)",
@@ -131,18 +149,25 @@ public sealed class ZoneMoveService(
             return ValueTask.CompletedTask;
         }
 
-        // mProtect_ReviveHack companion check (S04_MyWork02.cpp:2017-2064): a session still flagged from an
-        // unresolved death is kicked outright on any zone-transfer attempt, unless the destination is zone 38
-        // -- see ZoneTransferAntiAbuseRules' own remarks for why this alliance wording deliberately differs
-        // from the tick-loop gate's.
-        if (state.ReviveHackFlag &&
-            !ZoneTransferAntiAbuseRules.AllowsTransferWhileFlagged(sourceZone.MapId, targetZoneNumber, state.Tribe,
-                worldState.GetAllyOf))
+        // Not hosted by THIS shard's static ZoneRegistry -- legacy never distinguishes "local" from "remote"
+        // here (Server/ts25zone/S04_MyWork02.cpp:2017-2186): every zone number is resolved live against the
+        // same cross-process directory (Server/ts25center/S04_MyWork02.cpp:74-109's mZoneConnectionInfo), and
+        // only a target whose own process isn't currently registered gets the port==0/Result=1 failure. Given
+        // Fenrir's current shard/map coverage this "not local" case is the routine one, not the rare one, so
+        // it must be resolved against the live runtime.GameServerDirectory + admin.ShardMapAssignments pair
+        // before concluding the zone is genuinely unavailable -- see HandleCrossShardAsync, which now also
+        // runs the same TribeGuardCorridorGate check the same-shard path runs just below (a cross-shard
+        // destination used to bypass the corridor gate entirely -- see HandleCrossShardAsync's own remarks).
+        if (!zones.TryGet(targetZoneNumber, out var targetZone))
+            return HandleCrossShardAsync(targetZoneNumber, characterId, state.Tribe, sourceZone.MapId, zoneSession,
+                cancellationToken);
+
+        if (!worldData.ZonesByNumber.TryGetValue(targetZoneNumber, out var targetDefinition))
         {
-            logger.LogWarning(
-                "Zone-move aborted for character {CharacterId}: revive-hack flag set, transfer {SourceMapId} -> {TargetZoneNumber} not allowed while flagged",
-                characterId, sourceZone.MapId, targetZoneNumber);
-            zoneSession.Abort(DisconnectReason.StateViolation);
+            logger.LogError(
+                "Zone {TargetZoneNumber} is hosted by this shard but absent from WorldDataCache -- refusing transfer for character {CharacterId}",
+                targetZoneNumber, characterId);
+            zoneSession.Send(new ZoneMoveResponse { Result = 1, Ip = "", Port = 0 });
             return ValueTask.CompletedTask;
         }
 
@@ -294,9 +319,23 @@ public sealed class ZoneMoveService(
     ///     intra-shard handoff above, which ADR-0012 documents as a deliberate Fenrir simplification), so the
     ///     client is expected to disconnect this connection on its own -- the ordinary connection-close path
     ///     already flushes/tidies this player's in-memory state the same way any other disconnect does.
+    ///     <para>
+    ///         Fix: also runs <see cref="TribeGuardCorridorGate" /> once a live destination shard is found, for
+    ///         the identical reason and against the identical <c>MyUtil::WrapCheck</c> switch
+    ///         (Server/ts25zone/S07_MyGame03.cpp:5721-5943) as <see cref="HandleAsync" />'s own same-shard
+    ///         evaluation just above -- legacy resolves every destination zone against the same single
+    ///         connection-info table regardless of which process ultimately hosts it
+    ///         (Server/ts25zone/S04_MyWork02.cpp:2017-2186), so a corridor zone assigned to a different shard
+    ///         must be gated exactly like one this shard hosts itself, not silently exempted by
+    ///         Fenrir's own shard-partitioning being an implementation detail legacy has no concept of. The
+    ///         soft-rejection's paired ip/port uses <paramref name="candidate" />'s own resolved address (the
+    ///         same value the ordinary success reply below sends), mirroring the same-shard branch's own
+    ///         "already-resolved address, not a blank one" posture (Server/ts25zone/S04_MyWork02.cpp:2116-2118,
+    ///         2159-2160).
+    ///     </para>
     /// </remarks>
-    private async ValueTask HandleCrossShardAsync(short targetZoneNumber, int characterId,
-        ZoneClientSession zoneSession, CancellationToken cancellationToken)
+    private async ValueTask HandleCrossShardAsync(short targetZoneNumber, int characterId, byte requesterTribe,
+        short originZoneId, ZoneClientSession zoneSession, CancellationToken cancellationToken)
     {
         var shards = await directory.GetDirectoryAsync(cancellationToken);
         foreach (var candidate in shards)
@@ -310,6 +349,45 @@ public sealed class ZoneMoveService(
             var hostedMaps = await shardMapAssignments.GetHostedMapsAsync(candidate.ShardId, cancellationToken);
             if (!hostedMaps.Contains(targetZoneNumber))
                 continue;
+
+            var corridorOutcome = TribeGuardCorridorGate.Evaluate(
+                corridorCatalog,
+                corridorState,
+                requesterTribe,
+                originZoneId,
+                targetZoneNumber,
+                zoneSession.IsGm,
+                worldState.GetAllyOf);
+
+            if (corridorOutcome == TribeGuardCorridorMoveOutcome.RejectedHardDisconnect)
+            {
+                // Reserved zone 37 involved as either origin or destination -- hard failure, no response at
+                // all (Server/ts25zone/S04_MyWork02.cpp:2152-2156), identical to the same-shard branch.
+                logger.LogWarning(
+                    "Zone-move aborted for character {CharacterId}: tribe-guard corridor hard-disconnect ({SourceMapId} -> {TargetZoneNumber}, cross-shard)",
+                    characterId, originZoneId, targetZoneNumber);
+                zoneSession.Abort(DisconnectReason.StateViolation);
+                return;
+            }
+
+            if (corridorOutcome == TribeGuardCorridorMoveOutcome.RejectedSoft)
+            {
+                // Same B_RETURN_TO_AUTO_ZONE pairing the same-shard branch sends, paired with the destination
+                // shard's own already-resolved address rather than a blank one -- see this method's own
+                // remarks. No ticket is minted and the player is never marked cross-shard-transfer-pending:
+                // the request never actually leaves this shard.
+                logger.LogWarning(
+                    "Zone-move redirected to auto-zone for character {CharacterId}: tribe-guard corridor rejected {SourceMapId} -> {TargetZoneNumber} (cross-shard, destination shard {ShardId})",
+                    characterId, originZoneId, targetZoneNumber, candidate.ShardId);
+                zoneSession.Send(new ZoneMoveResponse
+                {
+                    Result = 1,
+                    Ip = candidate.Host,
+                    Port = candidate.Port
+                });
+                zoneSession.Send(new ReturnToHomeZoneResponse());
+                return;
+            }
 
             // Account id/session token/account grade are already held by this connection since its own
             // handshake (ZoneClientSession.MarkTicketConsumed) -- never re-derived or re-queried here, same

@@ -165,6 +165,23 @@ public sealed class OpenShopStallService(
         PlayerRuntimeState state, int characterId, int accountId, PshopInfo listing,
         List<OfflineShopItemSlotTvp> offlineItems, CancellationToken cancellationToken)
     {
+        // Server/ts25zone/S07_MyGame09.cpp:380-392 -- PROXY_SHOP_SYSTEM::Process's global
+        // MAX_PROXY_SHOP_NUM (500, Server/Header/Protocol/DEFINE.h:369) capacity ceiling, checked before any
+        // item leaves inventory or any persistence is attempted, so a rejection here has zero side effects
+        // (no slot claimed, no container mutated, no DB write). zone.ProxyShopCount is this map's own live
+        // shop-broadcast table (Zone.ProxyShops.cs); see Zone.MaxProxyShopSlots's own remarks for why that
+        // per-shard-instance count is already the faithful global count, not an approximation, given
+        // GameServer's disjoint by-map sharding. Echoes back "listing" (the submitted PshopInfo, no slot
+        // assignment applied) unfilled/unopened, the same shape the persistence-failure branch below already
+        // uses for its own coded rejection.
+        if (zone.ProxyShopCount >= Zone.MaxProxyShopSlots)
+        {
+            logger.LogInformation(
+                "Proxy shop open rejected: character {CharacterId} hit the global {Cap}-slot proxy-shop capacity ceiling",
+                characterId, Zone.MaxProxyShopSlots);
+            return new OpenShopStallResponse { Result = 105, PshopInfo = listing };
+        }
+
         var page0 = state.Inventory.GetContainer(ContainerMatrix.InventoryPage0);
         var page1 = state.Inventory.GetContainer(ContainerMatrix.InventoryPage1);
 

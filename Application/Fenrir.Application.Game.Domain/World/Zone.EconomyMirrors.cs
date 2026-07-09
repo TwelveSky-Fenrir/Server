@@ -21,6 +21,25 @@ namespace Fenrir.Application.Game.Domain.World;
 public sealed partial class Zone
 {
     /// <summary>
+    ///     Reusable scratch buffer for the tribe-progress command's op-23 stat-potion full-avatar-action
+    ///     rebroadcast recipient list (see the <c>FullActionRebroadcast</c> branch of
+    ///     <see cref="ApplyTribeProgressCommand" />) -- replaces a per-call
+    ///     <c>AoiGrid.Neighbors(...).Where(id =&gt; id != characterId).ToArray()</c> LINQ pipeline (iterator +
+    ///     closure + array) with the non-allocating
+    ///     <see cref="AoiGrid.NeighborsExcludingSelf(List{int},ValueTuple{int,int},int,float,float,float,int)" />
+    ///     overload. Single tick thread, cleared before use, consumed entirely before that command's handling
+    ///     returns.
+    /// </summary>
+    private readonly List<int> _statPotionFullActionNeighborScratch = [];
+
+    /// <summary>
+    ///     Reusable scratch buffer for the tribe-progress command's GM "Basic"-tier CALL (tSort 514) relocation
+    ///     notice (see the <c>NeighborActionBroadcast</c> branch of <see cref="ApplyTribeProgressCommand" />) --
+    ///     same non-allocating reuse posture as <see cref="_statPotionFullActionNeighborScratch" />.
+    /// </summary>
+    private readonly List<int> _gmTeleportNeighborScratch = [];
+
+    /// <summary>
     ///     Bounded capacity for <see cref="_guildInbox" /> -- also the basis for <see cref="GuildInboxDrainCapPerTick" />
     ///     .
     /// </summary>
@@ -626,6 +645,20 @@ public sealed partial class Zone
             changed = true;
         }
 
+        // GM "Basic"-tier LEVEL self-command's (tSort 521) own recomputed-stats cache write -- see
+        // TribeProgressZoneCommand.MaxLife's own remarks.
+        if (command.MaxLife is { } maxLife)
+        {
+            state.MaxLife = maxLife;
+            changed = true;
+        }
+
+        if (command.MaxMana is { } maxMana)
+        {
+            state.MaxMana = maxMana;
+            changed = true;
+        }
+
         if (command.UpdatedStats is { } stats)
             state.Stats = stats;
 
@@ -780,6 +813,12 @@ public sealed partial class Zone
         if (command.Tribe is { } newTribe)
             state.Tribe = newTribe;
 
+        // GM "Basic"-tier TRIBE self-command (tSort 510) only -- see TribeProgressZoneCommand.PreviousTribe's
+        // own remarks for the flagged persistence gap this leaves (no existing repository call durably writes
+        // a plain PreviousTribe update outside the unrelated op37/book-conversion mechanics).
+        if (command.PreviousTribe is { } newPreviousTribe)
+            state.PreviousTribe = newPreviousTribe;
+
         if (command.QuestProgress is { } questProgress)
         {
             state.QuestStepPermanent = questProgress.StepPermanent;
@@ -799,12 +838,87 @@ public sealed partial class Zone
         if (command.StoreMoney is { } storeMoney)
             state.StoreMoney = storeMoney;
 
+        if (command.SkillPoints is { } skillPoints)
+        {
+            state.SkillPoints = skillPoints;
+            changed = true;
+        }
+
+        // GM "Basic"-tier HIDE(501)/SHOW(502) self-commands.
+        if (command.VisibleState is { } visibleState)
+        {
+            state.VisibleState = visibleState;
+            changed = true;
+        }
+
+        // GM "Basic"-tier EQUIP(511)/UNEQUIP(512) self-commands, or NCHAT(516)/YCHAT(517) target mirrors
+        // (posted onto the target's own zone).
+        if (command.SpecialState is { } specialState)
+        {
+            state.SpecialState = specialState;
+            changed = true;
+        }
+
+        // GM "Basic"-tier LEVEL self-command (tSort 521) -- see IGmBasicCommandService's own remarks for the
+        // three-tier decomposition this mirrors verbatim (already resolved by the caller).
+        if (command.Level is { } newLevel)
+        {
+            state.Level = newLevel;
+            changed = true;
+        }
+
+        if (command.Level2 is { } newLevel2)
+        {
+            state.Level2 = newLevel2;
+            changed = true;
+        }
+
+        if (command.Experience is { } newExperience)
+        {
+            state.Experience = newExperience;
+            changed = true;
+        }
+
         if (changed)
             state.MarkProgressDirty(dirtyTracker, DirtyFlags.Progression);
 
+        // GM "Basic"-tier self-teleport-to-coordinate (507), CALL's target-warped-to-invoker branch (514), and
+        // MOVE-to-target's invoker-warped-to-target branch (515) -- see TribeProgressZoneCommand.TeleportTo's
+        // own remarks. Own dedicated DirtyFlags.Position mark, same convention as Zone.PlayerLifecycle's
+        // HandleMove for every other position write in this codebase.
+        if (command.TeleportTo is { } teleportTo)
+        {
+            state.PosX = teleportTo.X;
+            state.PosY = teleportTo.Y;
+            state.PosZ = teleportTo.Z;
+
+            var newCell = _grid.CellOf(state.PosX, state.PosZ);
+            _grid.Move(command.CharacterId, state.CurrentCell, newCell, state.PosX, state.PosY, state.PosZ);
+            state.CurrentCell = newCell;
+
+            dirtyTracker.MarkDirty(command.CharacterId, DirtyFlags.Position);
+        }
+
+        // CALL's (514) own AOI-neighbor-only relocation notice -- see
+        // TribeProgressZoneCommand.NeighborActionBroadcast's own remarks. Runs AFTER TeleportTo above so the
+        // neighbor scan and the broadcast packet both reflect the character's already-updated position.
+        if (command.NeighborActionBroadcast)
+        {
+            _gmTeleportNeighborScratch.Clear();
+            _grid.NeighborsExcludingSelf(_gmTeleportNeighborScratch, state.CurrentCell, command.CharacterId,
+                state.PosX, state.PosY, state.PosZ);
+            BroadcastAvatarAction(_gmTeleportNeighborScratch, state);
+        }
+
         if (!command.DropItems.IsDefaultOrEmpty)
             foreach (var drop in command.DropItems)
-                SpawnGroundItem(drop.ItemId, drop.Quantity, state.PosX, state.PosY, state.PosZ, state.Name, "", 0);
+                SpawnGroundItem(drop.ItemId, drop.Quantity, state.PosX, state.PosY, state.PosZ, state.Name, "",
+                    drop.DropSort);
+
+        // Elevated-tier "moncall" GM command (tSort 506) -- see TribeProgressZoneCommand.GmSummonMonsterTemplateId's
+        // own remarks.
+        if (command.GmSummonMonsterTemplateId is { } gmSummonMonsterTemplateId)
+            SpawnGmSummonedMonster(gmSummonMonsterTemplateId, state);
 
         // tSort 11 Max Rebirth's own B_AVATAR_CHANGE_INFO_1(sort 14)+Broadcast11 pairing (S04_MyWork02.cpp:11367),
         // also posted by the Rebirth-Pill item-consumption path (Path A). Value03 (aZone241Time) is read from
@@ -819,9 +933,10 @@ public sealed partial class Zone
         {
             var characterId = command.CharacterId;
             SendAvatarAction(state.Session, state);
-            var neighbors = _grid.Neighbors(state.CurrentCell, state.PosX, state.PosY, state.PosZ)
-                .Where(id => id != characterId).ToArray();
-            BroadcastAvatarAction(neighbors, state);
+            _statPotionFullActionNeighborScratch.Clear();
+            _grid.NeighborsExcludingSelf(_statPotionFullActionNeighborScratch, state.CurrentCell, characterId,
+                state.PosX, state.PosY, state.PosZ);
+            BroadcastAvatarAction(_statPotionFullActionNeighborScratch, state);
         }
     }
 

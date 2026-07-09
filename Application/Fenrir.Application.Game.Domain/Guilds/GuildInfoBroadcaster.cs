@@ -1,4 +1,7 @@
+using System.Buffers;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Network.Dispatch.Sessions;
+using Fenrir.Network.Framing;
 using Fenrir.Network.Serialization.Shared.Packets.Shared;
 using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
@@ -23,9 +26,27 @@ public static class GuildInfoBroadcaster
     {
         var response = new GuildActionResponse { Result = 0, Sort = sort, GuildInfo = info };
 
-        foreach (var zone in zones.Zones)
-        foreach (var member in zone.Players)
-            if (member.GuildId == guildId && member.CharacterId != excludeCharacterId)
-                member.Session.Send(response);
+        // Rent-once/write-once/copy-N-times -- same idiom as Zone's own broadcast helpers (e.g.
+        // BroadcastAvatarAction, Zone.PlayerLifecycle.cs): the frame is encoded exactly once and copied into
+        // every matching guild member's own transport, instead of each member independently re-serializing
+        // the identical GuildActionResponse via Session.Send.
+        var total = FrameWriter.FrameSizeOf<GuildActionResponse>();
+        var rented = ArrayPool<byte>.Shared.Rent(total);
+
+        try
+        {
+            var span = rented.AsSpan(0, total);
+            FrameWriter.WriteFrame(in response, span);
+
+            foreach (var zone in zones.Zones)
+            foreach (var member in zone.Players)
+                if (member.GuildId == guildId && member.CharacterId != excludeCharacterId &&
+                    member.Session is ClientSession clientSession)
+                    clientSession.SendRaw(span);
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(rented);
+        }
     }
 }

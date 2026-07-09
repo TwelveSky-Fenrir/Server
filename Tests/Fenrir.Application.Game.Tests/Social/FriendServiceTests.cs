@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using Fenrir.Application.Game.Abstractions.Social;
+using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Guilds;
 using Fenrir.Application.Game.Domain.Social.Duel;
 using Fenrir.Application.Game.Domain.Social.Friends;
@@ -11,6 +12,7 @@ using Fenrir.Application.Game.Services.Social;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Data.Abstractions.Runtime;
 using Fenrir.Data.Abstractions.Social;
+using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.Social;
 
@@ -46,6 +48,7 @@ public class FriendServiceTests
     {
         return new FriendService(zones, friends, new DuelRegistry(), new TradeRegistry(), new PartyRegistry(),
             new GuildInviteRegistry(), new MentorRegistry(), new ThrowingFriendRepository(), directory,
+            new FakeSocialCrossShardRelayQueue(), Options.Create(new GameServerOptions()),
             new CapturingLogger<FriendService>());
     }
 
@@ -55,7 +58,7 @@ public class FriendServiceTests
     ///     not "target not found" (Server/ts25zone/S04_MyWork02.cpp:8459-8471).
     /// </summary>
     [Fact]
-    public void Ask_AskerBusy_AndTargetNameDoesNotExist_ReturnsAskerBusy_NotTargetNotFound()
+    public async Task Ask_AskerBusy_AndTargetNameDoesNotExist_ReturnsAskerBusy_NotTargetNotFound()
     {
         var friends = new FriendRegistry();
         var zones = ZoneTestKit.CreateRegistry();
@@ -73,9 +76,46 @@ public class FriendServiceTests
 
         var service = CreateService(zones, friends, new FakeCharacterShardLocationRepository());
 
-        var result = service.Ask(zone, asker!, "NoSuchAvatar");
+        var result = await service.AskAsync(zone, asker!, "NoSuchAvatar", CancellationToken.None);
 
         Assert.Equal(FriendAskResultKind.AskerBusy, result);
+    }
+
+    /// <summary>
+    ///     WS1.4: a same-shard miss that DOES resolve on the cross-shard directory publishes an Ask and
+    ///     reports SentCrossShard, not TargetNotFound.
+    /// </summary>
+    [Fact]
+    public async Task Ask_SameShardMiss_ResolvesCrossShard_PublishesAskAndReturnsSentCrossShard()
+    {
+        var friends = new FriendRegistry();
+        var zones = ZoneTestKit.CreateRegistry();
+        zones.Initialize([1]);
+        zones.TryGet(1, out var zone);
+        var (askerSession, _) = ZoneTestKit.CreateSession(1);
+        zone!.Post(ZoneCommand.Enter(1, ZoneTestKit.EnterData(askerSession, 1, "Asker", tribe: 1)));
+        zone.Tick(TimeSpan.FromMilliseconds(50));
+        Assert.True(zone.TryGetPlayer(1, out var asker));
+
+        var directory = new FakeCharacterShardLocationRepository();
+        directory.Seed(new CharacterShardLocationDto(2, 9, 77, "RemoteFriend", 1, DateTime.UtcNow));
+
+        var relay = new FakeSocialCrossShardRelayQueue();
+        var service = new FriendService(zones, friends, new DuelRegistry(), new TradeRegistry(), new PartyRegistry(),
+            new GuildInviteRegistry(), new MentorRegistry(), new ThrowingFriendRepository(), directory, relay,
+            Options.Create(new GameServerOptions { ShardId = 1 }), new CapturingLogger<FriendService>());
+
+        var result = await service.AskAsync(zone, asker!, "RemoteFriend", CancellationToken.None);
+
+        Assert.Equal(FriendAskResultKind.SentCrossShard, result);
+        Assert.Single(relay.Enqueued);
+        var entry = relay.Enqueued[0];
+        Assert.Equal(SocialCrossShardRelayKind.Friend, entry.Kind);
+        Assert.Equal(SocialCrossShardRelayMessageType.Ask, entry.MessageType);
+        Assert.Equal(1, entry.SourceCharacterId);
+        Assert.Equal((byte)9, entry.TargetShardId);
+        Assert.Equal(2, entry.TargetCharacterId);
+        Assert.True(friends.IsNegotiating(1));
     }
 
     [Fact]

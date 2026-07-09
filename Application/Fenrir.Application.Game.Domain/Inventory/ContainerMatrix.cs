@@ -56,10 +56,13 @@ public static class ContainerMatrix
         240, 241, 242, 243, 244, 245, 246, 247,
         254, 255, 256,
 
-        // GM commands -- rank-gated. 519 ([GM]-BLOCK) is implemented outside this type, via
-        // GenericActionHandler's own dedicated tSort 519 branch calling IGmBlockAvatarService (which owns the
-        // ZoneClientSession.IsGm/GmCommandTier gate itself) -- every other value here still falls through
-        // GenericActionHandler's fallback into MoveContainerAsync's generic clean-failure reply, unimplemented.
+        // GM commands -- rank-gated. Each is implemented outside this type, via GenericActionHandler's own
+        // dedicated per-tSort branch calling a dedicated Gm service (which owns the ZoneClientSession's own
+        // GmCommandTier gate itself): 519 ([GM]-BLOCK, Basic tier) -> IGmBlockAvatarService ; 505/523
+        // (spawn-item, Admin tier) -> IGmCreateItemService ; 509 (MAX stat-cheat, Admin tier) ->
+        // IGmMaxStatService ; 700 (grant-pet-experience, Admin tier) -> IGmPetExperienceGrantService. Every
+        // other value here still falls through GenericActionHandler's fallback into MoveContainerAsync's
+        // generic clean-failure reply, unimplemented.
         501, 502, 503, 504, 505, 523, 333, 506, 507, 508, 509, 510,
         511, 512, 513, 514, 515, 516, 517, 518, 519, 520, 521, 522,
         524, 525, 526, 527, 528,
@@ -67,7 +70,7 @@ public static class ContainerMatrix
         // Scripted duel, map 124 only.
         598, 599, 600, 601, 602, 603,
 
-        // Pet XP / GM inventory maintenance.
+        // Pet XP (700, Admin tier -- see above) / GM inventory maintenance (701, unimplemented).
         700, 701
     ];
 

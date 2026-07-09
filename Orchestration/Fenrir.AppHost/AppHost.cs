@@ -36,14 +36,8 @@ builder.AddProject<Fenrir_LoginServer>("login-server")
     .WithEndpoint(name: "login-tcp", scheme: "tcp", port: loginPort, targetPort: loginPort, isProxied: false)
     .WithEnvironment("Login__Port", loginPort.ToString());
 
-// Shard 1 hosts map 1 (tribe 0 spawn); shard 2 hosts maps 6/11/140 (tribes 1/2/4th-faction spawns) --
-// see admin.ShardMapAssignments (Database/Migrations/Seed/admin/005_shard_map_assignments.sql). A
-// character spawning on a map with no running shard silently fails EnterWorldService's zones.TryGet
-// check (Abort, no packet sent), so every assigned map must have its shard running here. Both shard
-// identifiers from that seed table must appear below -- this list is hand-maintained and nothing
-// reconciles it against admin.ShardMapAssignments automatically.
 const int gameBasePort = 1100;
-byte[] shardIds = [1, 2];
+byte[] shardIds = [1];
 
 foreach (var shardId in shardIds)
 {

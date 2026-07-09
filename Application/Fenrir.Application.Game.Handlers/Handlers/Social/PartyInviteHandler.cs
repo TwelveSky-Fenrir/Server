@@ -13,9 +13,10 @@ namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 ///     uses <see cref="PlayerRuntimeState.CombinedLevel" /> (aLevel1+aLevel2) on both sides.
 /// </summary>
 public sealed class PartyInviteHandler(IPartyInviteService partyInviteService, ILogger<PartyInviteHandler> logger)
-    : IInlinePacketHandler<PartyInviteRequest>
+    : IAsyncPacketHandler<PartyInviteRequest>
 {
-    public void Handle(in PartyInviteRequest packet, IPacketSession session)
+    public async ValueTask HandleAsync(PartyInviteRequest packet, IPacketSession session,
+        CancellationToken cancellationToken)
     {
         var zoneSession = (ZoneClientSession)session;
 
@@ -30,7 +31,8 @@ public sealed class PartyInviteHandler(IPartyInviteService partyInviteService, I
         if (!zone.TryGetPlayer(inviterId, out var inviter) || inviter is null)
             return;
 
-        var result = partyInviteService.Invite(zone, inviter, packet.AvatarName);
+        var result = await partyInviteService.InviteAsync(zone, inviter, packet.AvatarName, cancellationToken)
+            .ConfigureAwait(false);
 
         switch (result.Kind)
         {
@@ -52,6 +54,11 @@ public sealed class PartyInviteHandler(IPartyInviteService partyInviteService, I
             case PartyInviteResultKind.Sent:
                 zone.TryGetPlayer(result.TargetCharacterId, out var target);
                 target!.Session.Send(new PartyInviteResponse { AvatarName = result.InviterName! });
+                return;
+            case PartyInviteResultKind.SentCrossShard:
+                // Nothing to send yet -- the target (on another shard) is notified asynchronously once
+                // SocialCrossShardRelayHost delivers the Ask; see PartyInviteResultKind.SentCrossShard's own
+                // remarks.
                 return;
         }
     }

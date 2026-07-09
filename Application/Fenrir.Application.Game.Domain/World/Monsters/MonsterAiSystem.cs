@@ -62,6 +62,25 @@ namespace Fenrir.Application.Game.Domain.World.Monsters;
 ///             has no cataloged Fenrir equivalent state, the latter is correctly never-real legacy behavior
 ///             in the first place.
 ///         </item>
+///         <item>
+///             UPDATE (2026-07, shared-acquisition/damage-table behavior contract): a successful
+///             <see cref="TryAcquireTarget" /> now zero-seeds a slot for the acquired candidate in the SAME
+///             50-capacity attacker table <see cref="MonsterEntity.RegisterAttackDamage" />/kill-credit
+///             resolution use (<see cref="MonsterEntity.RegisterAcquisition" />), matching legacy's single
+///             shared <c>SetAttackInfoWithAvatar</c> array (<c>S07_MyGame05.cpp:1675-1720</c>, written from
+///             both the acquisition call sites at <c>:1068</c>/<c>:1321</c> and the real-damage call site at
+///             <c>S07_MyGame02.cpp:2167</c>) -- previously routed into a separate, acquisition-only FIFO list
+///             that kill-credit never read. The two algorithms stay separate code paths (this first-found
+///             linear scan here vs. <see cref="Zone.SelectDamageBasedKillCredit" />'s FIFO-capped max-damage
+///             lookup); only the underlying table is now shared, as it is in legacy. NOT further ported by
+///             this fix: a third, structurally distinct acquisition-like function,
+///             <c>SelectAvatarIndexForPossibleAttackForZone175TypeBoss</c> (<c>S07_MyGame05.cpp:218-265</c>),
+///             also calls the shared-table writer directly (multi-candidate, no anti-clump/break-on-first-
+///             success, unlike this method) for a boss-specific mechanic this class does not model as its own
+///             code path; and the full category (<c>mSpecialSortNumber</c>) scope of both the acquisition
+///             write-through and the real-damage write gate was not exhaustively re-audited -- both flagged
+///             for <c>cpp-zone-gameplay-analyst</c> re-check rather than assumed complete.
+///         </item>
 ///     </list>
 /// </remarks>
 public sealed class MonsterAiSystem(IRandomSource? random = null) : ISimulationSystem
@@ -380,7 +399,13 @@ public sealed class MonsterAiSystem(IRandomSource? random = null) : ISimulationS
                 continue;
 
             monster.TargetCharacterId = characterId;
-            RecordAggro(monster, characterId);
+
+            // Acquisition write-through (SetAttackInfoWithAvatar called with a zero damage argument from the
+            // acquisition call sites, S07_MyGame05.cpp:1068/:1321): zero-seeds a slot for this candidate in
+            // the SAME shared attacker table RegisterAttackDamage/kill-credit resolution use, not a separate
+            // proximity-only list -- see MonsterEntity.RegisterAcquisition's own remarks for why this is a
+            // distinct call into a shared table rather than a merge of the two algorithms.
+            monster.RegisterAcquisition(characterId, player);
             monster.AiState = MonsterAiState.Chase;
             monster.StateTicks = 0;
             return true;
@@ -414,19 +439,6 @@ public sealed class MonsterAiSystem(IRandomSource? random = null) : ISimulationS
         }
 
         return count;
-    }
-
-    /// <summary>Bounded FIFO, oldest purged first (legacy cap 50).</summary>
-    private static void RecordAggro(MonsterEntity monster, int characterId)
-    {
-        var list = monster.AggroCharacterIds;
-        if (list.Contains(characterId))
-            return;
-
-        if (list.Count >= 50)
-            list.RemoveAt(0);
-
-        list.Add(characterId);
     }
 
     private void RunChase(Zone zone, MonsterEntity monster, float dt)

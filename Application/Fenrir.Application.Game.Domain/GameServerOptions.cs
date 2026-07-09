@@ -347,4 +347,72 @@ public sealed class GameServerOptions
     ///     races its own poll cadence.
     /// </summary>
     public int GuildTribeBroadcastRetentionSeconds { get; set; } = 30;
+
+    /// <summary>
+    ///     How often <c>SocialCrossShardRelayHost</c> both flushes this shard's own queued outbound
+    ///     Party invite/Friend ask/Mentor ask/Duel ask/Trade invite/Guild invite Ask+Answer rows to
+    ///     <c>runtime.SocialCrossShardRelay</c> and polls that same table for rows addressed to THIS shard
+    ///     (<c>TargetShardId = ShardId</c>), delivering matches to whichever registered
+    ///     <c>ISocialCrossShardRelayHandler</c> owns that row's <c>Kind</c> -- the point-to-point sibling of
+    ///     <see cref="GuildTribeBroadcastPollIntervalSeconds" />'s fan-out relay; see
+    ///     <c>ISocialCrossShardRelayRepository</c>'s own remarks for the point-to-point-vs-fan-out
+    ///     distinction. Also a NEW, Fenrir-internal operational knob, not a reproduction of a legacy-cited
+    ///     value (legacy's single-process <c>ts25zone</c> had no cross-shard concept at all): the same-shard
+    ///     half of every one of these six negotiation flows is unaffected and stays synchronous/immediate;
+    ///     only the cross-shard leg lags by up to this many seconds. Tighter default than
+    ///     <see cref="GuildTribeBroadcastPollIntervalSeconds" /> because a negotiation prompt (party/duel/
+    ///     trade invite) is a synchronous, latency-sensitive human interaction in a way a chat broadcast is
+    ///     not.
+    /// </summary>
+    public int SocialCrossShardRelayPollIntervalSeconds { get; set; } = 1;
+
+    /// <summary>
+    ///     How long a row survives in <c>runtime.SocialCrossShardRelay</c> before
+    ///     <c>SocialCrossShardRelayHost</c>'s own poll cycle reaps it, regardless of whether its target shard
+    ///     has already consumed it -- same "safe direction to fail toward" posture as
+    ///     <see cref="GuildTribeBroadcastRetentionSeconds" />, and the same default value: comfortably wider
+    ///     than <see cref="SocialCrossShardRelayPollIntervalSeconds" /> so a normally-alive shard never races
+    ///     its own poll cadence.
+    /// </summary>
+    public int SocialCrossShardRelayRetentionSeconds { get; set; } = 30;
+
+    /// <summary>
+    ///     Map ids this shard hosts that run the Zone195 "Nok-San" solo stone-capture content --
+    ///     <see cref="World.ZoneWar.RegularWarAfkTickSystem" />'s own AFK-enforcement gate only; the Nok-San
+    ///     capture mechanic itself (candidate lock/hold-countdown/possession transfer,
+    ///     Server/ts25zone/S07_MyGame01.cpp:8374-8459+) is a separate, not-yet-implemented feature -- adding a
+    ///     map id here does NOT turn on stone-capture gameplay, it only arms the AFK counter's 10-unit
+    ///     threshold and continuous-enforcement gate for that map. Empty by default, matching every other
+    ///     operator-configured map-id set in this class (fails safe: no AFK enforcement on any map until
+    ///     configured).
+    /// </summary>
+    public ISet<short> Zone195MapIds { get; set; } = new HashSet<short>();
+
+    /// <summary>
+    ///     Legacy per-instance ini flag <c>mYaoguaiHSB</c> (Server/ts25zone/S07_MyGame01.cpp:2622-2651): arms
+    ///     the "monster symbol" (mYaoguaiHSB) attack-window notify -- once the neutral, monster-guarded battle
+    ///     symbol has been held by the same tribe for <see cref="MonsterSymbolAttackNotifyDelayMinutes" />, a
+    ///     single center-broadcast (sort 401, no payload) fires once. False by default: fails safe, no
+    ///     broadcast until an operator opts in.
+    /// </summary>
+    public bool MonsterSymbolAttackNotifyEnabled { get; set; }
+
+    /// <summary>
+    ///     Legacy per-instance ini value <c>mYaoguaiHSBMiniute</c>: real minutes the current monster-symbol
+    ///     holder must keep the symbol before the one-shot sort-401 notify fires. 0 by default (paired with
+    ///     <see cref="MonsterSymbolAttackNotifyEnabled" />'s own false default, so a misconfigured "enabled but
+    ///     0 minutes" state can never silently fire immediately -- see <see cref="GameServerOptionsValidator" />).
+    /// </summary>
+    public int MonsterSymbolAttackNotifyDelayMinutes { get; set; }
+
+    /// <summary>
+    ///     Legacy maps each of the 4 monster-symbol holder tribes to one specific zone server number (0-&gt;4,
+    ///     1-&gt;9, 2-&gt;14, 3-&gt;143, Server/ts25zone/S07_MyGame01.cpp:2622-2651) -- only the zone process
+    ///     matching the CURRENT holder's mapped instance ever proceeds past that gate, every other instance
+    ///     silently skips. Fenrir shards by map, not by numbered server instance, so this is the operator-
+    ///     configured tribeId-&gt;mapId translation of that same table; empty by default (fails safe: no
+    ///     map ever matches, so the notify never fires, until an operator supplies all 4 entries).
+    /// </summary>
+    public IReadOnlyDictionary<byte, short> MonsterSymbolAttackNotifyMapIds { get; set; } =
+        new Dictionary<byte, short>();
 }

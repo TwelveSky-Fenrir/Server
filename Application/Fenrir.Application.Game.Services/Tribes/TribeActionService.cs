@@ -4,6 +4,7 @@ using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Pets;
 using Fenrir.Application.Game.Domain.Progression;
+using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.GameData;
@@ -264,12 +265,33 @@ public sealed class TribeActionService(
     }
 
     /// <summary>
-    ///     tSort 7 -- halo enchant, no role gate at all. Anti-double-click-per-tick is not reproduced (open
-    ///     issue -- no per-zone-tick counter is exposed to this service).
+    ///     tSort 7 -- halo enchant, no role gate at all.
     /// </summary>
+    /// <remarks>
+    ///     Réf. C++ : Server/ts25zone/S04_MyWork02.cpp:11128-11136 (<c>mTickCountCPRFC == mGAME.mTickCount</c>
+    ///     same-tick reentry guard, checked first, and its <c>Quit()</c>) ; :11137-11150 (the CP/money/level
+    ///     checks this guard precedes -- <see cref="PlayerRuntimeState.LastHaloEnchantAttemptUtc" /> is stamped
+    ///     unconditionally the instant the guard passes, before any of those checks run, so a same-tick retry
+    ///     is rejected even if this first attempt later fails one of them) ; Server/ts25zone/H07_MyGame.h:836
+    ///     (field declaration, "#Protect CP RFC Time").
+    /// </remarks>
     public async ValueTask<TribeActionOutcome> HaloEnchantAsync(Zone zone, PlayerRuntimeState state, int characterId,
         CancellationToken ct)
     {
+        // Same-tick reentry guard (mTickCountCPRFC) -- see this method's own <remarks>. A hostile-client
+        // signal (a real client can never submit twice within the same server tick), so it disconnects
+        // outright via TribeActionOutcome.Abort rather than a soft in-band failure -- the same posture the
+        // CP-insufficiency check immediately below also uses.
+        var now = DateTime.UtcNow;
+        if (now - state.LastHaloEnchantAttemptUtc < SimulationClock.LegacyTick)
+        {
+            logger.LogWarning(
+                "Character {CharacterId} halo-enchant rejected: same-tick repeat request", characterId);
+            return TribeActionOutcome.Abort;
+        }
+
+        state.LastHaloEnchantAttemptUtc = now;
+
         if (state.ContributionPoints < HaloEnchantCpCost || state.Halo >= 96)
             return TribeActionOutcome.Abort;
 

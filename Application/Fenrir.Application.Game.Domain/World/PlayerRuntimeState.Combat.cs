@@ -244,6 +244,22 @@ public partial class PlayerRuntimeState
     public TimeSpan? LastSkillCastAtZoneClock { get; set; }
 
     /// <summary>
+    ///     <c>mLastHSTick</c> -- real-time (not simulated-clock) reapplication cooldown for skill 82's
+    ///     ("Holy Shield", <see cref="Skills.SkillEffectCatalog" /> slot 9) timed buff, enforced only on the
+    ///     zone-server process specifically assigned server number 124 at startup
+    ///     (<see cref="World.Zone.MapId" /> == 124 in Fenrir's one-process-per-map model). Compared against a
+    ///     genuine wall-clock read (legacy's own <c>GetTickCount()</c>-style real elapsed milliseconds), NOT
+    ///     <see cref="LastSkillCastAtZoneClock" />'s Zone-simulated clock -- a deliberately different clock
+    ///     source from every other same-tick guard on this type. Initialized to <see cref="DateTime.MinValue" />
+    ///     (not <see cref="DateTime.UtcNow" />), mirroring legacy's own zero-init at avatar registration
+    ///     (S04_MyWork02.cpp:873): the very first skill-82 application on a zone-124 process must always clear
+    ///     the ten-second threshold, unlike <see cref="LastEnchantAttemptUtc" />'s opposite "already now"
+    ///     default. Breaching the cooldown is a pure no-op skip (buff slot 9 left unpopulated for that pass) --
+    ///     no disconnect, no counter escalation, unlike every other guard in this set.
+    /// </summary>
+    public DateTime LastHolyShieldAppliedUtc { get; set; } = DateTime.MinValue;
+
+    /// <summary>
     ///     mCheckStun / aAction.aSort==11 -- true while stunned (ProcessAttack05/<see cref="Combat.StunResolver" />).
     ///     Vetoes every other client-requested action while true
     ///     (<see cref="Zone.HandleMove" />, <c>W_AVATAR_ACTION_SEND</c>'s anti-stun-hack veto,

@@ -342,6 +342,119 @@ public class Zone241PersonalDungeonInstanceTests
         Assert.Equal(1, zone.GroundItemCount);
     }
 
+    [Fact]
+    public void HandleLeave_DuringSummoning_ClearsTaggedMonsterAndGroundItem()
+    {
+        var zone = ZoneTestKit.CreateZone(Zone241MapId, Zone241Options(), worldData: BossWorldData());
+        const int characterId = 11;
+        var (session, _) = ZoneTestKit.CreateSession(1);
+        // No quota granted -- the automatic HandleEnter-triggered attempt refuses outright (QuotaExhausted),
+        // touching no state, leaving a clean baseline to hand-arm the narrow Summoning window below.
+        zone.Post(ZoneCommand.Enter(characterId, EnterData(session, Zone241MapId, 100, 100)));
+        zone.Tick(SimulationClock.LegacyTick);
+
+        Assert.True(zone.TryGetPlayer(characterId, out var state));
+        Assert.Equal(DungeonInstanceLifecycle.Idle, state!.DungeonInstanceLifecycleState);
+
+        // TryEnterZone241PersonalInstance never itself returns control while still in Summoning (it either
+        // completes synchronously to BattleInProgress or reverts to Idle on SummonFailed) -- this hand-arms
+        // the narrow, sub-one-tick window a real disconnect could race, same posture as this file's own
+        // MonsterAiSystem_TaggedBoss...OwnerId test hand-arming DungeonInstanceId directly.
+        state.DungeonInstanceLifecycleState = DungeonInstanceLifecycle.Summoning;
+        state.DungeonInstanceId = characterId;
+
+        var taggedMonster = MonsterEntity.Create(characterId, 1u,
+            WorldDataTestRows.Monster(BossMonsterId) with { Life = 999 }, characterId, 100, 0, 100, 200f,
+            characterId);
+        zone.SpawnMonster(taggedMonster);
+        zone.SpawnGroundItem(8001, 1, 100, 0, 100, "Hero", "", GroundItemEntity.MonsterKillDropSort, characterId);
+
+        Assert.True(zone.TryGetMonster(characterId, out _));
+        Assert.Equal(1, zone.GroundItemCount);
+
+        // Genuine disconnect (handoffTarget null) -- GameConnectionHost.OnAcceptedAsync's own finally block
+        // posts exactly this on every real socket teardown.
+        zone.Post(ZoneCommand.Leave(characterId));
+        zone.Tick(SimulationClock.LegacyTick);
+
+        Assert.False(zone.TryGetPlayer(characterId, out _)); // removed from this zone, same as any other disconnect
+        Assert.False(zone.TryGetMonster(characterId, out _)); // tagged boss removed, not left to rot forever
+        Assert.Equal(0, zone.GroundItemCount); // tagged ground item removed too
+    }
+
+    [Fact]
+    public void HandleLeave_DuringSummoning_DoesNotLeakOwnership_WhenSameCharacterReconnectsAndSummonsAgain()
+    {
+        // DungeonInstanceId is always set to the owning PlayerRuntimeState's own CharacterId (side effect #1,
+        // TryEnterZone241PersonalInstance), so the realistic "next occupant" of a stale instance tag is this
+        // same character's own next session -- a fresh reconnect (new PlayerRuntimeState, new session, same
+        // CharacterId) that later re-enters the dungeon for real.
+        var zone = ZoneTestKit.CreateZone(Zone241MapId, Zone241Options(), worldData: BossWorldData());
+        const int characterId = 13;
+        var (firstSession, _) = ZoneTestKit.CreateSession(1);
+        zone.Post(ZoneCommand.Enter(characterId, EnterData(firstSession, Zone241MapId, 100, 100)));
+        zone.Tick(SimulationClock.LegacyTick);
+
+        Assert.True(zone.TryGetPlayer(characterId, out var firstState));
+        firstState!.DungeonInstanceLifecycleState = DungeonInstanceLifecycle.Summoning;
+        firstState.DungeonInstanceId = characterId;
+
+        var staleMonster = MonsterEntity.Create(characterId, 1u,
+            WorldDataTestRows.Monster(BossMonsterId) with { Life = 999 }, characterId, 100, 0, 100, 200f,
+            characterId);
+        zone.SpawnMonster(staleMonster);
+        zone.SpawnGroundItem(8001, 1, 100, 0, 100, "Hero", "", GroundItemEntity.MonsterKillDropSort, characterId);
+
+        zone.Post(ZoneCommand.Leave(characterId)); // genuine disconnect mid-Summoning
+        zone.Tick(SimulationClock.LegacyTick);
+
+        Assert.Equal(0, zone.GroundItemCount); // nothing left over before the reconnect below
+
+        // Same character reconnects with a fresh session and quota, this time completing entry for real.
+        var (secondSession, _) = ZoneTestKit.CreateSession(2);
+        zone.PersonalDungeonBossCatalog = new FakeBossCatalog(BossMonsterId);
+        zone.Post(ZoneCommand.Enter(characterId, EnterData(secondSession, Zone241MapId, 100, 100, 1)));
+        zone.Tick(SimulationClock.LegacyTick); // HandleEnter's automatic re-arm + summon
+
+        Assert.True(zone.TryGetPlayer(characterId, out var secondState));
+        Assert.Equal(DungeonInstanceLifecycle.BattleInProgress, secondState!.DungeonInstanceLifecycleState);
+        Assert.Equal(characterId, secondState.DungeonInstanceId);
+
+        // Exactly the fresh boss occupies the slot -- no stale leftover doubled up underneath it, and no
+        // orphaned ground item from the earlier aborted session survived into this new instance.
+        Assert.True(zone.TryGetMonster(characterId, out var occupant));
+        Assert.Equal(BossMonsterId, occupant!.Template.MonsterId);
+        Assert.Equal(characterId, occupant.InstanceId);
+        Assert.Equal(0, zone.GroundItemCount);
+    }
+
+    [Fact]
+    public void HandleLeave_OutsideSummoning_DoesNotClearLiveBattleInProgressBoss()
+    {
+        // The disconnect cleanup's shared guard (ClearZone241PersonalDungeonInstance) is a no-op unless the
+        // lifecycle is still exactly Summoning at the moment it runs -- a disconnect during BattleInProgress
+        // (the overwhelming majority case, per ClearDungeonInstanceOnDisconnect's own remarks) must leave the
+        // still-live boss alone.
+        var zone = ZoneTestKit.CreateZone(Zone241MapId, Zone241Options(), worldData: BossWorldData(999_999));
+        zone.PersonalDungeonBossCatalog = new FakeBossCatalog(BossMonsterId);
+
+        var (session, _) = ZoneTestKit.CreateSession(1);
+        const int characterId = 17;
+        zone.Post(ZoneCommand.Enter(characterId, EnterData(session, Zone241MapId, 100, 100, 1)));
+        zone.Tick(SimulationClock.LegacyTick); // enter + arm + summon -> BattleInProgress
+
+        Assert.True(zone.TryGetPlayer(characterId, out var state));
+        Assert.Equal(DungeonInstanceLifecycle.BattleInProgress, state!.DungeonInstanceLifecycleState);
+        Assert.True(zone.TryGetMonster(characterId, out _));
+
+        zone.Post(ZoneCommand.Leave(characterId)); // genuine disconnect while the boss fight is still live
+        zone.Tick(SimulationClock.LegacyTick);
+
+        Assert.False(zone.TryGetPlayer(characterId, out _)); // player state itself is still removed as normal
+        Assert.True(zone.TryGetMonster(characterId, out var survivingBoss)); // but the boss is untouched
+        Assert.Equal(BossMonsterId, survivingBoss!.Template.MonsterId);
+    }
+
     private sealed class FakeBossCatalog(int monsterId) : IPersonalDungeonBossCatalog
     {
         public bool TryGetBossMonsterId(int rebirthTier, out int resolvedMonsterId)

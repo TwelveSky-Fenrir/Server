@@ -69,6 +69,9 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
 
     public (int CharacterId, long DeltaMoney, long DeltaStoreMoney)? LastAdjustStoreMoney { get; private set; }
 
+    /// <summary>Last call ever made to <see cref="AdjustMoneyAsync" /> -- (CharacterId, DeltaMoney, DeltaBigMoney).</summary>
+    public (int CharacterId, long DeltaMoney, int DeltaBigMoney)? LastAdjustMoney { get; private set; }
+
     public bool ThrowOnAdjustZone241Time { get; set; }
 
     public (int CharacterId, int Delta)? LastAdjustZone241Time { get; private set; }
@@ -158,7 +161,11 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
 
     public ValueTask AdjustMoneyAsync(int characterId, long deltaMoney, int deltaBigMoney, CancellationToken ct)
     {
-        throw new NotImplementedException();
+        if (ThrowOnAdjustMoney)
+            throw new InvalidOperationException("Simulated SQL failure");
+
+        LastAdjustMoney = (characterId, deltaMoney, deltaBigMoney);
+        return ValueTask.CompletedTask;
     }
 
     public ValueTask AdjustStoreMoneyAsync(int characterId, long deltaMoney, long deltaStoreMoney,

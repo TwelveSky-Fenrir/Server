@@ -10,9 +10,10 @@ namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
 /// <summary>CZ_DUEL_ASK_SEND (opcode 43) -- map 124 (scripted-duel server) always refuses immediately.</summary>
 public sealed class DuelAskHandler(IDuelService duelService, ILogger<DuelAskHandler>? logger = null)
-    : IInlinePacketHandler<DuelChallengeRequest>
+    : IAsyncPacketHandler<DuelChallengeRequest>
 {
-    public void Handle(in DuelChallengeRequest packet, IPacketSession session)
+    public async ValueTask HandleAsync(DuelChallengeRequest packet, IPacketSession session,
+        CancellationToken cancellationToken)
     {
         var zoneSession = (ZoneClientSession)session;
 
@@ -28,7 +29,10 @@ public sealed class DuelAskHandler(IDuelService duelService, ILogger<DuelAskHand
         if (!zone.TryGetPlayer(challengerId, out var challenger) || challenger is null)
             return;
 
-        switch (duelService.Ask(zone, challenger, packet.AvatarName, packet.Sort))
+        var result = await duelService.AskAsync(zone, challenger, packet.AvatarName, packet.Sort, cancellationToken)
+            .ConfigureAwait(false);
+
+        switch (result)
         {
             case DuelAskResultKind.MapForbidden:
                 session.Send(new DuelAnswerResponse { Answer = 3 });
@@ -49,6 +53,10 @@ public sealed class DuelAskHandler(IDuelService duelService, ILogger<DuelAskHand
                 return;
             case DuelAskResultKind.TargetBusy:
                 session.Send(new DuelAnswerResponse { Answer = 5 });
+                return;
+            case DuelAskResultKind.SentCrossShard:
+                // Ask-publish-only today -- see DuelAskResultKind.SentCrossShard's own remarks; nothing to
+                // send (no target-side delivery exists yet to ever produce a reply).
                 return;
         }
     }

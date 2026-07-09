@@ -54,6 +54,12 @@ public sealed class GameServerOptionsValidator : IValidateOptions<GameServerOpti
         if (options.GuildTribeBroadcastRetentionSeconds <= 0)
             errors.Add(
                 $"Game:GuildTribeBroadcastRetentionSeconds must be positive (was {options.GuildTribeBroadcastRetentionSeconds}).");
+        if (options.SocialCrossShardRelayPollIntervalSeconds <= 0)
+            errors.Add(
+                $"Game:SocialCrossShardRelayPollIntervalSeconds must be positive (was {options.SocialCrossShardRelayPollIntervalSeconds}).");
+        if (options.SocialCrossShardRelayRetentionSeconds <= 0)
+            errors.Add(
+                $"Game:SocialCrossShardRelayRetentionSeconds must be positive (was {options.SocialCrossShardRelayRetentionSeconds}).");
 
         // Each singleton RvR scheduler is armed by "does this shard host the designated map", not ShardId --
         // an operator who flips the *Enabled flag on must also name which map arms it, or the scheduler is
@@ -68,6 +74,9 @@ public sealed class GameServerOptionsValidator : IValidateOptions<GameServerOpti
         if (options.AllianceTribeEnabled && options.AllianceTribeMapId == 0)
             errors.Add(
                 "Game:AllianceTribeMapId must be configured (nonzero) when Game:AllianceTribeEnabled is true.");
+        if (options.MonsterSymbolAttackNotifyEnabled && options.MonsterSymbolAttackNotifyDelayMinutes <= 0)
+            errors.Add(
+                "Game:MonsterSymbolAttackNotifyDelayMinutes must be positive when Game:MonsterSymbolAttackNotifyEnabled is true.");
 
         return errors.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(errors);
     }

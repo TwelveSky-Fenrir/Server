@@ -28,9 +28,10 @@ namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 /// </remarks>
 public sealed class GuildInviteHandler(
     IGuildInviteService guildInviteService,
-    ILogger<GuildInviteHandler>? logger = null) : IInlinePacketHandler<GuildInviteRequest>
+    ILogger<GuildInviteHandler>? logger = null) : IAsyncPacketHandler<GuildInviteRequest>
 {
-    public void Handle(in GuildInviteRequest packet, IPacketSession session)
+    public async ValueTask HandleAsync(GuildInviteRequest packet, IPacketSession session,
+        CancellationToken cancellationToken)
     {
         var zoneSession = (ZoneClientSession)session;
 
@@ -45,7 +46,10 @@ public sealed class GuildInviteHandler(
         if (!zone.TryGetPlayer(askerId, out var asker) || asker is null)
             return;
 
-        switch (guildInviteService.Ask(zone, asker, packet.AvatarName))
+        var result = await guildInviteService.AskAsync(zone, asker, packet.AvatarName, cancellationToken)
+            .ConfigureAwait(false);
+
+        switch (result)
         {
             case GuildInviteAskResultKind.NotAuthorized:
             case GuildInviteAskResultKind.TargetAlreadyGuilded:
@@ -60,6 +64,10 @@ public sealed class GuildInviteHandler(
                 return;
             case GuildInviteAskResultKind.TargetBusy:
                 session.Send(new GuildInviteAnswerResponse { Answer = 5 });
+                return;
+            case GuildInviteAskResultKind.SentCrossShard:
+                // Ask-publish-only today -- see GuildInviteAskResultKind.SentCrossShard's own remarks;
+                // nothing to send (no target-side delivery exists yet to ever produce a reply).
                 return;
         }
     }

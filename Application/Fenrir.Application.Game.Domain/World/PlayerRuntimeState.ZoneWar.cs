@@ -17,4 +17,14 @@ public partial class PlayerRuntimeState
     ///     reset).
     /// </remarks>
     public int AntiCampingProximityCounter { get; set; }
+
+    /// <summary>
+    ///     Legacy <c>mAFKTick</c> (<c>USE_REGULAR_WAR_AFK_TICK</c>) -- <see cref="ZoneWar.RegularWarAfkTickSystem" />'s
+    ///     per-avatar accumulator, counting legacy ticks continuously spent on a map currently enforcing this
+    ///     mechanic (a Zone049 Regular War instance mid-active-battle, or any Zone195 Nok-San instance at all).
+    ///     Reset to zero whenever this avatar's own zone stops enforcing the mechanic -- see
+    ///     <see cref="ZoneWar.RegularWarAfkTickSystem" />'s own remarks for why this reset-on-clear rule is a
+    ///     documented engineering choice, not an independently confirmed legacy fact.
+    /// </summary>
+    public int AfkTick { get; set; }
 }

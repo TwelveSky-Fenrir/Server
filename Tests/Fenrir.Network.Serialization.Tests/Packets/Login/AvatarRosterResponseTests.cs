@@ -97,6 +97,163 @@ public class LcUserAvatarRecv2Tests
         Assert.True(packet.Costume.SequenceEqual(ReadXoredIntArray(buffer, 4538, 10)));
     }
 
+    // Golden-byte regression test: builds the entire 4578-byte expected payload from scratch (plaintext
+    // field values placed at their contract-documented offsets, then masked by a re-implementation of the
+    // XOR rules written independently of Fenrir.Network.Compression.WireXor) and asserts one full-buffer
+    // equality against Write()'s actual output. RoundTrip_PreservesAllFields_ThroughPerFieldAvatarXor only
+    // proves decode(encode(x)) == x per field via the very same WireXor primitives Write() itself calls, so
+    // it cannot catch two adjacent fields swapping offsets, a field bleeding into its neighbor's byte
+    // range, or the unmasked "spare" bytes (last two bytes of every IntArray/Char field) drifting — this
+    // test compares every one of the 4578 bytes against an independently-computed reference sequence.
+    [Fact]
+    public void Write_ProducesExactGoldenByteSequence_ForEveryAvatarInfoField()
+    {
+        var inventory = Enumerable.Range(1, 768).ToArray();
+        var equip = Enumerable.Range(2000, 52).ToArray();
+        var logoutInfo = Enumerable.Range(3000, 6).ToArray();
+        var storeItem = Enumerable.Range(4000, 224).ToArray();
+        var petBag = Enumerable.Range(5000, 20).ToArray();
+        var friend = Enumerable.Range(0, 10).Select(i => $"Friend{i}").ToArray();
+        var costume = Enumerable.Range(6000, 10).ToArray();
+
+        var packet = new AvatarRosterResponse
+        {
+            VisibleState = 1,
+            SpecialState = 2,
+            CostumeIndex = 3,
+            Tribe = 4,
+            PreviousTribe = 5,
+            EatLifePotion = 6,
+            Gender = 7,
+            HeadType = 8,
+            FaceType = 9,
+            EatStrPotion = 10,
+            Level1 = 11,
+            Inventory = inventory,
+            Level2 = 12,
+            EatManaPotion = 13,
+            Halo = 14,
+            RebirthNum = 15,
+            KillOtherTribe = 16,
+            SkillPoint = 17,
+            Equip = equip,
+            EatDexPotion = 18,
+            Name = "PlayerOne",
+            EatElePotion = 19,
+            LogoutInfo = logoutInfo,
+            GuildName = "GuildX",
+            StoreItem = storeItem,
+            PetBag = petBag,
+            Friend = friend,
+            Teacher = "TeacherA",
+            Student = "StudentB",
+            Costume = costume
+        };
+
+        var actual = new byte[AvatarRosterResponse.PayloadSize];
+        var written = packet.Write(actual);
+        Assert.Equal(AvatarRosterResponse.PayloadSize, written);
+
+        var expected = new byte[AvatarRosterResponse.PayloadSize];
+
+        WriteGoldenInt(expected, 0, packet.VisibleState);
+        WriteGoldenInt(expected, 4, packet.SpecialState);
+        WriteGoldenInt(expected, 8, packet.CostumeIndex);
+        WriteGoldenInt(expected, 12, packet.Tribe);
+        WriteGoldenInt(expected, 16, packet.PreviousTribe);
+        WriteGoldenInt(expected, 20, packet.EatLifePotion);
+        WriteGoldenInt(expected, 24, packet.Gender);
+        WriteGoldenInt(expected, 28, packet.HeadType);
+        WriteGoldenInt(expected, 32, packet.FaceType);
+        WriteGoldenInt(expected, 36, packet.EatStrPotion);
+        WriteGoldenInt(expected, 40, packet.Level1);
+        WriteGoldenIntArray(expected, 44, packet.Inventory);
+        WriteGoldenInt(expected, 3116, packet.Level2);
+        WriteGoldenInt(expected, 3120, packet.EatManaPotion);
+        WriteGoldenInt(expected, 3124, packet.Halo);
+        WriteGoldenInt(expected, 3128, packet.RebirthNum);
+        WriteGoldenInt(expected, 3132, packet.KillOtherTribe);
+        WriteGoldenInt(expected, 3136, packet.SkillPoint);
+        WriteGoldenIntArray(expected, 3140, packet.Equip);
+        WriteGoldenInt(expected, 3348, packet.EatDexPotion);
+        WriteGoldenChar(expected, 3352, 13, packet.Name);
+        WriteGoldenInt(expected, 3365, packet.EatElePotion);
+        WriteGoldenIntArray(expected, 3369, packet.LogoutInfo);
+        WriteGoldenChar(expected, 3393, 13, packet.GuildName);
+        WriteGoldenIntArray(expected, 3406, packet.StoreItem);
+        WriteGoldenIntArray(expected, 4302, packet.PetBag);
+        WriteGoldenChar2Rows(expected, 4382, 13, packet.Friend);
+        WriteGoldenChar(expected, 4512, 13, packet.Teacher);
+        WriteGoldenChar(expected, 4525, 13, packet.Student);
+        WriteGoldenIntArray(expected, 4538, packet.Costume);
+
+        Assert.Equal(expected, actual);
+    }
+
+    // --- Golden-buffer helpers -------------------------------------------------------------------------
+    // Intentionally re-derived from the ServerDocs-cited scopyAvtXor*/GetMyXor mask description rather than
+    // calling into Fenrir.Network.Compression.WireXor, so this test does not validate Write() against the
+    // very code it delegates to.
+
+    private const byte GoldenFirstKey = 0x10;
+    private const byte GoldenSteadyKey = 0xFE;
+
+    private static void WriteGoldenInt(byte[] buffer, int offset, int value)
+    {
+        Span<byte> plain = stackalloc byte[4];
+        BinaryPrimitives.WriteInt32LittleEndian(plain, value);
+
+        plain[0] ^= GoldenFirstKey;
+        for (var i = 1; i < 4; i++)
+            plain[i] ^= GoldenSteadyKey;
+
+        plain.CopyTo(buffer.AsSpan(offset, 4));
+    }
+
+    private static void WriteGoldenIntArray(byte[] buffer, int offset, int[] values)
+    {
+        var length = values.Length * 4;
+        var plain = new byte[length];
+        for (var i = 0; i < values.Length; i++)
+            BinaryPrimitives.WriteInt32LittleEndian(plain.AsSpan(i * 4, 4), values[i]);
+
+        if (length > 0)
+        {
+            plain[0] ^= GoldenFirstKey;
+            for (var i = 1; i < length - 2; i++)
+                plain[i] ^= GoldenSteadyKey;
+            // plain[length - 2] and plain[length - 1] (the trailing two bytes of the final int) are left
+            // exactly as written above: scopyAvtXorIntArr's mask loop never reaches them.
+        }
+
+        plain.CopyTo(buffer.AsSpan(offset, length));
+    }
+
+    private static void WriteGoldenChar(byte[] buffer, int offset, int length, string value)
+    {
+        var plain = new byte[length];
+        var count = Math.Min(value.Length, length);
+        if (count > 0)
+            Encoding.Latin1.GetBytes(value, 0, count, plain, 0);
+
+        if (length > 0)
+        {
+            plain[0] ^= GoldenFirstKey;
+            for (var i = 1; i < length - 2; i++)
+                plain[i] ^= GoldenSteadyKey;
+            // plain[length - 2] stays raw/unmasked (same tail rule as WriteGoldenIntArray)...
+            plain[length - 1] = 0; // ...but scopyAvtXorChar additionally forces the final byte to 0.
+        }
+
+        plain.CopyTo(buffer.AsSpan(offset, length));
+    }
+
+    private static void WriteGoldenChar2Rows(byte[] buffer, int offset, int rowLength, string[] values)
+    {
+        for (var i = 0; i < values.Length; i++)
+            WriteGoldenChar(buffer, offset + i * rowLength, rowLength, values[i]);
+    }
+
     private static int ReadXoredInt(byte[] buffer, int offset)
     {
         var bytes = buffer.AsSpan(offset, 4).ToArray();

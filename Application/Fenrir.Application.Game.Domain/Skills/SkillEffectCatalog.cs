@@ -10,7 +10,9 @@ namespace Fenrir.Application.Game.Domain.Skills;
 ///     value/duration -- ported verbatim from MyUtil::ProcessForCreateBuff (S07_MyGame03.cpp:9315-9631).
 /// </summary>
 /// <remarks>
-///     Not reproduced: skill 82's zone-124 cooldown and the dead MG5ORIGIN_ECAPE block.
+///     Skill 82's zone-124 real-time reapplication cooldown (<c>mLastHSTick</c>) is reproduced at the call
+///     site, not in this catalog -- see <see cref="World.PlayerRuntimeState.LastHolyShieldAppliedUtc" /> and
+///     <c>World.Zone.ApplySkillEffectConfirm</c>. Not reproduced: the dead MG5ORIGIN_ECAPE block.
 ///     <para>
 ///         <c>mSupportSkillTimeUpRatio</c> (behavior contract "buff-application-stacking-decay"): every
 ///         <c>AddSelfBuff</c>-registered entry below is one of the 14 genuine self-buff duration-write sites

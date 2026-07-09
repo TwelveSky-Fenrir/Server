@@ -1,3 +1,5 @@
+using Fenrir.Application.Game.Domain.Social;
+
 namespace Fenrir.Application.Game.Domain.Social.Duel;
 
 /// <summary>Soft outcomes of CZ_DUEL_ASK_SEND -- mirrors ZC_DUEL_ANSWER_RECV's pre-check codes.</summary>
@@ -85,6 +87,17 @@ public sealed class DuelRegistry
     /// <summary>characterId -> the active duel it's part of (both sides point at the same ActiveDuel instance).</summary>
     private readonly Dictionary<int, ActiveDuel> _activeByCharacter = new();
 
+    /// <summary>
+    ///     WS1.4: this family's own cross-shard ASK-PUBLISH-ONLY half, folded into <see cref="IsNegotiating" />
+    ///     -- see <see cref="CrossShardNegotiationTracker" />'s own remarks. Unlike Party/Friend, no
+    ///     <c>ISocialCrossShardRelayHandler</c> is registered for <c>SocialCrossShardRelayKind.Duel</c> yet
+    ///     (see <c>DuelService.AskAsync</c>'s own remarks for why), so only the OUTBOUND half of this tracker
+    ///     is ever populated for this registry -- an inbound cross-shard challenge can never be delivered
+    ///     here today. <see cref="TryCancel" /> still consumes an outbound entry so a challenger who published
+    ///     a cross-shard ask that will never be answered is not stuck busy forever.
+    /// </summary>
+    private readonly CrossShardNegotiationTracker _crossShard = new();
+
     private readonly Lock _lock = new();
 
     /// <summary>
@@ -110,7 +123,26 @@ public sealed class DuelRegistry
         lock (_lock)
         {
             return _pendingByChallenger.ContainsKey(characterId) || _pendingByTarget.ContainsKey(characterId) ||
-                   _acceptedPairs.ContainsKey(characterId);
+                   _acceptedPairs.ContainsKey(characterId) || _crossShard.IsPending(characterId);
+        }
+    }
+
+    /// <summary>
+    ///     WS1.4 challenger-side cross-shard ask registration (ASK-PUBLISH-ONLY -- see
+    ///     <see cref="_crossShard" />'s own remarks). Same active-duel/negotiating gate as <see cref="TryAsk" />.
+    /// </summary>
+    public DuelAskOutcome TryAskCrossShard(int challengerId, CrossShardOutboundAsk ask)
+    {
+        lock (_lock)
+        {
+            if (IsActivelyDueling(challengerId))
+                return DuelAskOutcome.ChallengerAlreadyDueling;
+            if (IsNegotiating(challengerId))
+                return DuelAskOutcome.ChallengerBusy;
+
+            return _crossShard.TryRegisterOutbound(challengerId, ask)
+                ? DuelAskOutcome.Sent
+                : DuelAskOutcome.ChallengerBusy;
         }
     }
 
@@ -145,12 +177,20 @@ public sealed class DuelRegistry
     {
         lock (_lock)
         {
-            if (!_pendingByChallenger.Remove(challengerId, out targetId))
-                return false;
+            if (_pendingByChallenger.Remove(challengerId, out targetId))
+            {
+                _pendingByTarget.Remove(targetId);
+                _noPotionsByChallenger.Remove(challengerId);
+                return true;
+            }
 
-            _pendingByTarget.Remove(targetId);
-            _noPotionsByChallenger.Remove(challengerId);
-            return true;
+            if (_crossShard.TryConsumeOutbound(challengerId, out var crossShardAsk))
+            {
+                targetId = crossShardAsk.TargetCharacterId;
+                return true;
+            }
+
+            return false;
         }
     }
 
@@ -279,6 +319,14 @@ public sealed class DuelRegistry
             _noPotionsByChallenger.Remove(characterId);
 
             _activeByCharacter.Remove(characterId);
+
+            // WS1.4: a re-entering character's own outbound cross-shard challenge (this registry only ever
+            // holds the OUTBOUND half, see _crossShard's own remarks) is torn down here too, for the same
+            // reason every same-shard pending-ask dictionary above already is -- otherwise a character who
+            // disconnected mid cross-shard negotiation would come back permanently "busy" with no way to
+            // self-clear (no target-side handler exists yet to ever deliver the Answer that would normally
+            // consume this entry).
+            _crossShard.TryConsumeOutbound(characterId, out _);
         }
     }
 }

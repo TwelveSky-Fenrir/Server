@@ -10,9 +10,10 @@ namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
 /// <summary>CZ_TEACHER_ASK_SEND (opcode 59) -- sender becomes master (MG5ORIGIN branch, active in this build).</summary>
 public sealed class MentorAskHandler(IMentorAskService mentorAskService, ILogger<MentorAskHandler> logger)
-    : IInlinePacketHandler<MentorRequest>
+    : IAsyncPacketHandler<MentorRequest>
 {
-    public void Handle(in MentorRequest packet, IPacketSession session)
+    public async ValueTask HandleAsync(MentorRequest packet, IPacketSession session,
+        CancellationToken cancellationToken)
     {
         var zoneSession = (ZoneClientSession)session;
 
@@ -26,7 +27,8 @@ public sealed class MentorAskHandler(IMentorAskService mentorAskService, ILogger
         if (!zone.TryGetPlayer(masterId, out var master) || master is null)
             return;
 
-        var result = mentorAskService.Ask(zone, master, packet.AvatarName);
+        var result = await mentorAskService.AskAsync(zone, master, packet.AvatarName, cancellationToken)
+            .ConfigureAwait(false);
 
         switch (result.Kind)
         {
@@ -52,6 +54,10 @@ public sealed class MentorAskHandler(IMentorAskService mentorAskService, ILogger
             case MentorAskResultKind.Sent:
                 zone.TryGetPlayer(result.TargetCharacterId, out var student);
                 student!.Session.Send(new MentorResponse { AvatarName = result.AskerName! });
+                return;
+            case MentorAskResultKind.SentCrossShard:
+                // Ask-publish-only today -- see MentorAskResultKind.SentCrossShard's own remarks; nothing to
+                // send (no target-side delivery exists yet to ever produce a reply).
                 return;
         }
     }

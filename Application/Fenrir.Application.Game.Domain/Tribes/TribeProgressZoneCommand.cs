@@ -18,6 +18,13 @@ namespace Fenrir.Application.Game.Domain.Tribes;
 /// </param>
 /// <param name="Life">tSort 1 forces this to 1, matching the legacy's own aLifeValue=1.</param>
 /// <param name="Mana">tSort 1 forces this to 0, matching the legacy's own aManaValue=0.</param>
+/// <param name="MaxLife">
+///     The GM "Basic"-tier LEVEL self-command's (tSort 521) own recomputed-stats cache write, mirroring
+///     <see cref="Fenrir.Application.Game.Domain.World.Zone" />'s own <c>ApplyCharacterExperienceGain</c>
+///     level-up cascade (<see cref="PlayerRuntimeState.MaxLife" /> set alongside, not derived from,
+///     <see cref="UpdatedStats" />). Paired 1:1 with <see cref="Life" /> for that one caller.
+/// </param>
+/// <param name="MaxMana">Companion to <see cref="MaxLife" /> -- see <see cref="PlayerRuntimeState.MaxMana" />.</param>
 /// <param name="UpdatedStats">Freshly recomputed whenever a stat-affecting field above changed; null otherwise.</param>
 /// <param name="DropItems">
 ///     Ground-item drop(s) to spawn at the character's current position when applied. Fenrir's ground-item
@@ -123,6 +130,65 @@ namespace Fenrir.Application.Game.Domain.Tribes;
 ///     <see cref="PlayerRuntimeState.MarkProgressDirty" /> -- see
 ///     <see cref="Fenrir.Application.Game.Domain.World.Zone" />'s own <c>ApplyTribeProgressCommand</c> remarks.
 /// </param>
+/// <param name="SkillPoints">
+///     The Admin-tier (<c>GmCommandTier.Admin</c>) MAX stat-cheat (CZ_PROCESS_DATA_SEND tSort 509) forces
+///     this to a fixed 3000 -- see <see cref="Fenrir.Application.Game.Services.Gm.GmMaxStatService" />. No
+///     other caller sets this field today; the ordinary learn-skill/upgrade-skill SkillPoints debit instead
+///     goes through the separate, slot-paired <see cref="Fenrir.Application.Game.Domain.Skills.SkillZoneCommand" />
+///     channel, which this field does not replace.
+/// </param>
+/// <param name="GmSummonMonsterTemplateId">
+///     The Elevated-tier (<c>GmCommandTier.Elevated</c>) "moncall" GM command (CZ_PROCESS_DATA_SEND tSort 506)
+///     -- the requested monster template id, spawned at the invoking GM's own current position
+///     (<see cref="Fenrir.Application.Game.Services.Gm.GmSummonMonsterService" />). Silently a no-op if the id
+///     does not resolve in <see cref="Fenrir.Application.Game.GameData.WorldDataCache.MonstersById" /> or if
+///     Fenrir's own GM-summon slot pool is exhausted (<see cref="Fenrir.Application.Game.Domain.World.Zone" />'s
+///     own <c>SpawnGmSummonedMonster</c> remarks) -- matching legacy's own "not validated, whatever the spawn
+///     primitive does with an invalid id is not surfaced back to the GM" behavior.
+/// </param>
+/// <param name="VisibleState">
+///     The GM "Basic"-tier HIDE(tSort 501, value 0)/SHOW(tSort 502, value 1) self-commands -- see
+///     <see cref="PlayerRuntimeState.VisibleState" />.
+/// </param>
+/// <param name="SpecialState">
+///     The GM "Basic"-tier EQUIP(tSort 511, value 1)/UNEQUIP(tSort 512, value 0) self-commands, and the
+///     NCHAT(tSort 516, value 2)/YCHAT(tSort 517, value 0) by-name-target commands (posted onto the TARGET's
+///     own zone, not the invoking GM's) -- see <see cref="PlayerRuntimeState.SpecialState" />.
+/// </param>
+/// <param name="PreviousTribe">
+///     The GM "Basic"-tier TRIBE self-command (tSort 510) when the requested selector is not the special
+///     value 3 -- mirrors the selector onto <see cref="PlayerRuntimeState.PreviousTribe" /> alongside
+///     <see cref="Tribe" />. Unlike <see cref="Tribe" />/<see cref="QuestProgress" />, this is NOT already
+///     synchronously persisted by any existing repository call (see
+///     <see cref="Fenrir.Application.Game.Services.Gm.IGmBasicCommandService" />'s own remarks for the
+///     flagged persistence gap this leaves) -- still deliberately excluded from the generic
+///     <c>changed</c>/<see cref="DirtyFlags.Progression" /> bucket below anyway, matching <see cref="Tribe" />'s
+///     own posture, since Tribe/PreviousTribe are not columns the Progression write-behind flush covers
+///     regardless.
+/// </param>
+/// <param name="TeleportTo">
+///     Unconditional absolute position overwrite (no bounds/map-validity/collision check) plus the matching
+///     <see cref="AoiGrid" /> cell refresh -- the GM "Basic"-tier self-teleport-to-coordinate (tSort 507),
+///     CALL's target-warped-to-invoker branch (tSort 514), and MOVE-to-target's invoker-warped-to-target
+///     branch (tSort 515) all funnel through this one field. Always marks <see cref="DirtyFlags.Position" />
+///     (never folded into the generic <c>changed</c>/<see cref="DirtyFlags.Progression" /> bucket below),
+///     matching <see cref="Fenrir.Application.Game.Domain.World.Zone.PlayerLifecycle" />'s own
+///     <c>HandleMove</c> convention for every other position write in this codebase.
+/// </param>
+/// <param name="NeighborActionBroadcast">
+///     CALL's (tSort 514) own "general action/notification broadcast... so nearby players observe the
+///     target's sudden relocation" side effect -- an AOI-neighbor-only <c>BroadcastAvatarAction</c> (no
+///     self-send, unlike <see cref="FullActionRebroadcast" />) issued around the character's position AFTER
+///     <see cref="TeleportTo" /> (if also set) has already been applied. MOVE-to-target's (tSort 515) own
+///     contract explicitly states no such broadcast is issued for that sibling command, so this is never set
+///     alongside a caller-side <see cref="TeleportTo" /> for that one.
+/// </param>
+/// <param name="Level">
+///     The GM "Basic"-tier LEVEL self-command (tSort 521) -- see
+///     <see cref="Fenrir.Application.Game.Services.Gm.IGmBasicCommandService" />.
+/// </param>
+/// <param name="Level2">Companion to <see cref="Level" /> -- see <see cref="PlayerRuntimeState.Level2" />.</param>
+/// <param name="Experience">Companion to <see cref="Level" /> -- see <see cref="PlayerRuntimeState.Experience" />.</param>
 /// <param name="Applied">
 ///     Completed once actually mirrored -- see InventoryZoneCommand.Applied for why this matters while
 ///     EconomyActionLock is held.
@@ -144,6 +210,8 @@ public readonly record struct TribeProgressZoneCommand(
     int? StatPoints = null,
     int? Life = null,
     int? Mana = null,
+    int? MaxLife = null,
+    int? MaxMana = null,
     EffectiveStats? UpdatedStats = null,
     ImmutableArray<TribeGroundItemDrop> DropItems = default,
     int? TribeNotifyScrollCount = null,
@@ -176,7 +244,23 @@ public readonly record struct TribeProgressZoneCommand(
     QuestProgress? QuestProgress = null,
     int? TribeFourReturnAllowance = null,
     long? StoreMoney = null,
+    int? SkillPoints = null,
+    int? GmSummonMonsterTemplateId = null,
+    int? VisibleState = null,
+    int? SpecialState = null,
+    byte? PreviousTribe = null,
+    (float X, float Y, float Z)? TeleportTo = null,
+    bool NeighborActionBroadcast = false,
+    short? Level = null,
+    short? Level2 = null,
+    long? Experience = null,
     TaskCompletionSource? Applied = null);
 
-/// <summary>One ground-item drop request -- see TribeProgressZoneCommand.DropItems.</summary>
-public readonly record struct TribeGroundItemDrop(int ItemId, int Quantity);
+/// <summary>
+///     One ground-item drop request -- see TribeProgressZoneCommand.DropItems.
+///     <paramref name="DropSort" /> defaults to 0 (the pre-existing, generic drop-source code every caller
+///     before the Admin-tier GM spawn-item command used implicitly) so no existing caller's behavior changes;
+///     <see cref="Fenrir.Application.Game.Services.Gm.GmCreateItemService" /> is the one caller that supplies
+///     a non-default value (<see cref="Fenrir.Application.Game.Domain.World.Loot.GroundItemEntity.GmCreateItemDropSort" />).
+/// </summary>
+public readonly record struct TribeGroundItemDrop(int ItemId, int Quantity, int DropSort = 0);

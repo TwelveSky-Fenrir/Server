@@ -14,7 +14,9 @@ public enum DungeonInstanceEntryOutcome
 
     /// <summary>
     ///     No boss could be resolved/summoned for this avatar's rebirth tier -- the just-armed instance was torn
-    ///     down (the one live cleanup call site) and entry refused.
+    ///     down (via <see cref="Zone.TearDownFailedEntry" />, one of two calls into the shared cleanup routine
+    ///     whose guard is actually live at the moment of the call -- see <see cref="Zone.ClearDungeonInstanceOnDisconnect" />
+    ///     for the other) and entry refused.
     /// </summary>
     SummonFailed,
 
@@ -37,8 +39,10 @@ public enum DungeonInstanceEntryOutcome
 ///     Server/ts25zone/H07_MyGame.h:24-41,889 (struct shape, one-per-avatar) ;
 ///     Server/ts25zone/S04_MyWork02.cpp:1142-1194 (zone-enter re-arm + summon) ;
 ///     Server/ts25zone/S07_MyGame03.cpp:5946-5960,6240-6330 (the 325-330 server-number gate, quota check, forced
-///     monster-slot reuse, the one live cleanup call site) ; Server/ts25zone/S07_MyGame01.cpp:11763-12013
-///     (the tick-driven state machine, states 0-8).
+///     monster-slot reuse) ; Server/ts25zone/S07_MyGame01.cpp:11763-12013
+///     (the tick-driven state machine, states 0-8) ; Server/ts25zone/S03_MyUser.cpp:404,511-517 (the
+///     disconnect-triggered cleanup call site -- see <see cref="Zone.ClearDungeonInstanceOnDisconnect" />'s own
+///     remarks).
 ///     <para>
 ///         <b>Trigger 1</b> (connection-slot alloc/free resets the instance struct) needs no code here: every
 ///         <see cref="PlayerRuntimeState" /> is a fresh object built by <see cref="Zone.HandleEnter" /> and
@@ -157,7 +161,11 @@ public sealed partial class Zone
         SpawnMonster(boss);
     }
 
-    /// <summary>The one live cleanup call site: the synchronous summon-failure path, guard still true (see class remarks).</summary>
+    /// <summary>
+    ///     One of two call sites where <see cref="ClearZone241PersonalDungeonInstance" />'s own Summoning-stage
+    ///     guard is actually live at the moment of the call (the other is <see cref="ClearDungeonInstanceOnDisconnect" />):
+    ///     the synchronous summon-failure path.
+    /// </summary>
     private void TearDownFailedEntry(PlayerRuntimeState state)
     {
         ClearZone241PersonalDungeonInstance(state);
@@ -169,15 +177,47 @@ public sealed partial class Zone
     }
 
     /// <summary>
+    ///     Trigger 4 -- the disconnect-triggered cleanup call site, previously missing entirely from this
+    ///     codebase: called from <see cref="HandleLeave" />'s genuine-disconnect branch (never the in-process
+    ///     zone-handoff branch -- see that method's own remarks for why the two are distinguished there) for
+    ///     every real socket teardown on a Zone-241-type zone, regardless of the disconnecting player's own
+    ///     instance stage. <see cref="ClearZone241PersonalDungeonInstance" />'s own Summoning-only guard is what
+    ///     makes this a no-op outside the narrow, sub-one-tick Summoning window -- there is no additional stage
+    ///     check here, matching legacy's own call site gating on nothing but real-disconnect status and the
+    ///     zone-241 server flag.
+    /// </summary>
+    /// <remarks>
+    ///     Réf. C++ : Server/ts25zone/S03_MyUser.cpp:511-515 (the disconnect-triggered <c>ClearAll</c> call,
+    ///     gated on real-disconnect status and <c>mCheckZone241TypeServer</c>) ; Server/ts25zone/S03_MyUser.cpp:
+    ///     516-517 (the immediately-following, redundant low-level id/stage reset -- NOT reproduced here beyond
+    ///     the conservative Idle terminus already used by <see cref="TearDownFailedEntry" />; whether the
+    ///     legacy transient state value 1 differs behaviorally from a plain idle baseline was flagged as an
+    ///     open question by the contract this was implemented from and was not independently resolved here) ;
+    ///     Server/ts25zone/S03_MyUser.cpp:38-53 (<c>DUNGEON_INSTANCE::ClearAll</c> body).
+    /// </remarks>
+    private void ClearDungeonInstanceOnDisconnect(PlayerRuntimeState state)
+    {
+        if (!IsZone241TypeZone)
+            return;
+
+        ClearZone241PersonalDungeonInstance(state);
+
+        state.DungeonInstanceId = null;
+        state.DungeonInstanceLifecycleState = DungeonInstanceLifecycle.Idle;
+    }
+
+    /// <summary>
     ///     <c>ClearMonster</c>/<c>ClearItem</c>'s shared guard (Server/ts25zone/S03_MyUser.cpp:73,104): a no-op
     ///     unless <paramref name="state" />'s own lifecycle is still exactly <see cref="DungeonInstanceLifecycle.Summoning" />
-    ///     at the moment this runs -- true only at <see cref="TearDownFailedEntry" />'s call site; every other
-    ///     caller (Success/Failure/DisconnectPending transitions) has already moved state past Summoning by the
-    ///     time it would call this, so the scan below never actually frees anything there, faithfully
-    ///     reproducing legacy's own dead-in-practice cleanup (see the behavior contract's own Edge Cases).
-    ///     <see cref="IPersonalDungeonBossCatalog" />'s sibling <c>INSTANCE_STL</c> membership list is dead code
-    ///     in legacy too (never defined), so this scans every live monster/item instead of a tracked list --
-    ///     the faithful equivalent, not a Fenrir shortcut.
+    ///     at the moment this runs. Live at exactly two call sites: <see cref="TearDownFailedEntry" />'s
+    ///     synchronous summon-failure path, and <see cref="ClearDungeonInstanceOnDisconnect" />'s narrow,
+    ///     sub-one-tick disconnect-during-Summoning window. Every other caller
+    ///     (<see cref="AdvanceZone241PersonalDungeonInstances" />'s Success transition) has already moved state
+    ///     past Summoning by the time it would call this, so the scan below never actually frees anything there,
+    ///     faithfully reproducing legacy's own dead-in-practice cleanup at that one specific call site (see the
+    ///     behavior contract's own Edge Cases). <see cref="IPersonalDungeonBossCatalog" />'s sibling
+    ///     <c>INSTANCE_STL</c> membership list is dead code in legacy too (never defined), so this scans every
+    ///     live monster/item instead of a tracked list -- the faithful equivalent, not a Fenrir shortcut.
     /// </summary>
     private void ClearZone241PersonalDungeonInstance(PlayerRuntimeState state)
     {

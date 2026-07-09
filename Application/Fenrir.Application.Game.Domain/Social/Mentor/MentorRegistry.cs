@@ -1,3 +1,5 @@
+using Fenrir.Application.Game.Domain.Social;
+
 namespace Fenrir.Application.Game.Domain.Social.Mentor;
 
 /// <summary>Soft outcomes of CZ_TEACHER_ASK_SEND -- mirrors ZC_TEACHER_ANSWER_RECV's pre-check codes.</summary>
@@ -23,6 +25,17 @@ public sealed class MentorRegistry
     /// <summary>master characterId -> accepted student characterId, awaiting CZ_TEACHER_START_SEND.</summary>
     private readonly Dictionary<int, int> _acceptedByMaster = new();
 
+    /// <summary>
+    ///     WS1.4: this family's own cross-shard ASK-PUBLISH-ONLY half, folded into <see cref="IsNegotiating" />
+    ///     -- see <see cref="CrossShardNegotiationTracker" />'s own remarks. Unlike Party/Friend, no
+    ///     <c>ISocialCrossShardRelayHandler</c> is registered for <c>SocialCrossShardRelayKind.Mentor</c> yet
+    ///     (see <c>MentorAskService.AskAsync</c>'s own remarks for why), so only the OUTBOUND half of this
+    ///     tracker is ever populated -- an inbound cross-shard mentor ask can never be delivered here today.
+    ///     <see cref="TryCancel" /> still consumes an outbound entry so a master who published a cross-shard
+    ///     ask that will never be answered is not stuck busy forever.
+    /// </summary>
+    private readonly CrossShardNegotiationTracker _crossShard = new();
+
     private readonly Lock _lock = new();
     private readonly Dictionary<int, int> _pendingByMaster = new();
     private readonly Dictionary<int, int> _pendingByStudent = new();
@@ -30,14 +43,33 @@ public sealed class MentorRegistry
     /// <summary>
     ///     Mentor-family half of the legacy <c>CheckCommunityWork</c> exclusivity check. Public so sibling
     ///     negotiation families (e.g. Guild ask, see <c>GuildInviteService</c>) can compose a cross-family busy
-    ///     check without duplicating this registry's own state.
+    ///     check without duplicating this registry's own state. Also includes a still-open outbound
+    ///     cross-shard ask.
     /// </summary>
     public bool IsNegotiating(int characterId)
     {
         lock (_lock)
         {
             return _pendingByMaster.ContainsKey(characterId) || _pendingByStudent.ContainsKey(characterId) ||
-                   _acceptedByMaster.ContainsKey(characterId) || _acceptedByMaster.ContainsValue(characterId);
+                   _acceptedByMaster.ContainsKey(characterId) || _acceptedByMaster.ContainsValue(characterId) ||
+                   _crossShard.IsPending(characterId);
+        }
+    }
+
+    /// <summary>
+    ///     WS1.4 master-side cross-shard ask registration (ASK-PUBLISH-ONLY -- see <see cref="_crossShard" />'s
+    ///     own remarks). Same negotiating gate as <see cref="TryAsk" />; the target-already-has-teacher/student
+    ///     checks are not evaluable here (no local target state), so they are omitted -- caller-side risk
+    ///     accepted the same way the level-gap check is for Party's own cross-shard path.
+    /// </summary>
+    public MentorAskOutcome TryAskCrossShard(int masterId, CrossShardOutboundAsk ask)
+    {
+        lock (_lock)
+        {
+            if (IsNegotiating(masterId))
+                return MentorAskOutcome.AskerBusy;
+
+            return _crossShard.TryRegisterOutbound(masterId, ask) ? MentorAskOutcome.Sent : MentorAskOutcome.AskerBusy;
         }
     }
 
@@ -65,11 +97,19 @@ public sealed class MentorRegistry
     {
         lock (_lock)
         {
-            if (!_pendingByMaster.Remove(masterId, out studentId))
-                return false;
+            if (_pendingByMaster.Remove(masterId, out studentId))
+            {
+                _pendingByStudent.Remove(studentId);
+                return true;
+            }
 
-            _pendingByStudent.Remove(studentId);
-            return true;
+            if (_crossShard.TryConsumeOutbound(masterId, out var crossShardAsk))
+            {
+                studentId = crossShardAsk.TargetCharacterId;
+                return true;
+            }
+
+            return false;
         }
     }
 

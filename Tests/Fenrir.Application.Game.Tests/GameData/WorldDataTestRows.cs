@@ -25,23 +25,30 @@ internal static class WorldDataTestRows
 
     internal static MonsterRowDto Monster(int monsterId)
     {
+        // Most fields use the smallest legacy-valid value (1) rather than 0: ValidateMonsters (backed by
+        // Monster_CheckValidElement, Server/Header/S15_MyShare.cpp:1519-1830) rejects 0 for Type/SpecialType/
+        // DamageType/DataSortNumber/Size1-3/SizeCategory/CheckCollision/ItemLevel/AttackType/SummonTime1-2/
+        // FrameInfo1-6/BulletInfo1-2. Fields whose legacy-valid range does include 0 (Size4, TotalHitNum/
+        // TotalSkillHitNum, MartialItemLevel/MartialRealLevel, GeneralExperience/PatExperience, RadiusInfo1-2,
+        // WalkSpeed/RunSpeed/DeathSpeed, AttackPower and the other combat stats, Critical, HitFrame1-3,
+        // SkillHitFrame1-3) are left at 0.
         return new MonsterRowDto(
             monsterId, $"Monster{monsterId}", null, null,
-            0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0,
+            1, 1, 1, 1,
+            1, 1, 1, 0, 1, 1,
+            0, 0, 1, 0,
             1, 0, 0, 0, 100,
-            0, 0, 0, 0, 0, 0,
+            1, 0, 0, 0, 0, 0,
             0, 0, 0, 0,
             // FollowInfo1/2 (anti-clump pursuer-cap bounds, S10_MySummon.cpp:795) default to a small non-zero
             // range rather than 0 -- MonsterEntity.Create rolls MonsterEntity.PursuerCapacity from these, and a
             // 0 cap would make MonsterAiSystem's anti-clump filter refuse every candidate for every test that
             // doesn't override these fields.
             0, 0, 0, 5, 5,
-            0, 0,
+            1, 1,
+            1, 1, 1, 1, 1, 1,
             0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0,
-            0, 0);
+            1, 1);
     }
 
     internal static SkillRowDto Skill(int skillId)

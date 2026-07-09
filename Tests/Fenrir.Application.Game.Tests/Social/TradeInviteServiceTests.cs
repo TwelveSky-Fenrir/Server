@@ -1,4 +1,5 @@
 using Fenrir.Application.Game.Abstractions.Social;
+using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Guilds;
 using Fenrir.Application.Game.Domain.Social.Duel;
 using Fenrir.Application.Game.Domain.Social.Friends;
@@ -8,12 +9,14 @@ using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Services.Social;
 using Fenrir.Application.Game.Tests.TestSupport;
+using Fenrir.Data.Abstractions.Runtime;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.Social;
 
 /// <summary>
-///     Covers <see cref="TradeInviteService.Invite" />'s response-code-order: the asker's own busy state
+///     Covers <see cref="TradeInviteService.InviteAsync" />'s response-code-order: the asker's own busy state
 ///     must be checked before the target avatar is resolved by name
 ///     (Server/ts25zone/S04_MyWork02.cpp:8259-8277,8459-8471,9088-9101,9311-9324 pre-check family).
 /// </summary>
@@ -21,14 +24,17 @@ public class TradeInviteServiceTests
 {
     private static (TradeInviteService Service, ZoneRegistry Zones, TradeRegistry Trades) CreateService(short mapId,
         DuelRegistry? duels = null, FriendRegistry? friends = null, PartyRegistry? parties = null,
-        MentorRegistry? mentors = null, GuildInviteRegistry? guildInvites = null)
+        MentorRegistry? mentors = null, GuildInviteRegistry? guildInvites = null,
+        ICharacterShardLocationRepository? directory = null, FakeSocialCrossShardRelayQueue? relay = null)
     {
         var trades = new TradeRegistry();
         var zones = ZoneTestKit.CreateRegistry();
         zones.Initialize([mapId]);
         return (new TradeInviteService(trades, duels ?? new DuelRegistry(), friends ?? new FriendRegistry(),
             parties ?? new PartyRegistry(), mentors ?? new MentorRegistry(),
-            guildInvites ?? new GuildInviteRegistry(), NullLogger<TradeInviteService>.Instance), zones, trades);
+            guildInvites ?? new GuildInviteRegistry(), directory ?? new FakeCharacterShardLocationRepository(),
+            relay ?? new FakeSocialCrossShardRelayQueue(), Options.Create(new GameServerOptions { ShardId = 1 }),
+            NullLogger<TradeInviteService>.Instance), zones, trades);
     }
 
     private static PlayerRuntimeState Enter(ZoneRegistry zones, short mapId, int characterId, string name,
@@ -43,7 +49,7 @@ public class TradeInviteServiceTests
     }
 
     [Fact]
-    public void Invite_AskerBusy_AndTargetNameDoesNotExist_ReturnsAskerBusy_NotTargetNotFound()
+    public async Task Invite_AskerBusy_AndTargetNameDoesNotExist_ReturnsAskerBusy_NotTargetNotFound()
     {
         var (service, zones, trades) = CreateService(1);
         var asker = Enter(zones, 1, 1, "Asker");
@@ -51,18 +57,18 @@ public class TradeInviteServiceTests
 
         Assert.Equal(TradeAskOutcome.Sent, trades.TryAsk(1, 2)); // still pending, never answered
 
-        var result = service.Invite(zones[1], asker, "NoSuchAvatar");
+        var result = await service.InviteAsync(zones[1], asker, "NoSuchAvatar", CancellationToken.None);
 
         Assert.Equal(TradeInviteResultKind.AskerBusy, result.Kind);
     }
 
     [Fact]
-    public void Invite_AskerNotBusy_TargetNameDoesNotExist_ReturnsTargetNotFound()
+    public async Task Invite_AskerNotBusy_TargetNameDoesNotExist_ReturnsTargetNotFound()
     {
         var (service, zones, _) = CreateService(1);
         var asker = Enter(zones, 1, 1, "Asker");
 
-        var result = service.Invite(zones[1], asker, "NoSuchAvatar");
+        var result = await service.InviteAsync(zones[1], asker, "NoSuchAvatar", CancellationToken.None);
 
         Assert.Equal(TradeInviteResultKind.TargetNotFound, result.Kind);
     }
@@ -72,7 +78,7 @@ public class TradeInviteServiceTests
     ///     <see cref="PlayerRuntimeState.CombinedLevel" /> (aLevel1+aLevel2), sent verbatim with no offset.
     /// </summary>
     [Fact]
-    public void Invite_Success_SendsAskersCombinedLevel_NotOrdinaryLevelAlone()
+    public async Task Invite_Success_SendsAskersCombinedLevel_NotOrdinaryLevelAlone()
     {
         var (service, zones, _) = CreateService(1);
         var asker = Enter(zones, 1, 1, "Asker");
@@ -80,9 +86,27 @@ public class TradeInviteServiceTests
         asker.Level2 = 7;
         Enter(zones, 1, 2, "Target");
 
-        var result = service.Invite(zones[1], asker, "Target");
+        var result = await service.InviteAsync(zones[1], asker, "Target", CancellationToken.None);
 
         Assert.Equal(TradeInviteResultKind.Sent, result.Kind);
         Assert.Equal(37, result.AskerLevel);
+    }
+
+    /// <summary>WS1.4 ASK-PUBLISH-ONLY: a same-shard miss that resolves cross-shard publishes an Ask.</summary>
+    [Fact]
+    public async Task Invite_SameShardMiss_ResolvesCrossShard_PublishesAskAndReturnsSentCrossShard()
+    {
+        var directory = new FakeCharacterShardLocationRepository();
+        directory.Seed(new CharacterShardLocationDto(2, 9, 77, "RemoteTarget", 1, DateTime.UtcNow));
+        var relay = new FakeSocialCrossShardRelayQueue();
+        var (service, zones, trades) = CreateService(1, directory: directory, relay: relay);
+        var asker = Enter(zones, 1, 1, "Asker");
+
+        var result = await service.InviteAsync(zones[1], asker, "RemoteTarget", CancellationToken.None);
+
+        Assert.Equal(TradeInviteResultKind.SentCrossShard, result.Kind);
+        Assert.Single(relay.Enqueued);
+        Assert.Equal(SocialCrossShardRelayKind.Trade, relay.Enqueued[0].Kind);
+        Assert.True(trades.IsBusy(1));
     }
 }

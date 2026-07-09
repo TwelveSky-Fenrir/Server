@@ -83,7 +83,7 @@ public class MonsterAiSystemTests
     [Fact]
     public void Monster_WithNoNearbyPlayer_StaysIdleAtHome()
     {
-        var zone = CreateZone(CacheWithOneRegion(1, 1, 50, 5,
+        var zone = CreateZone(CacheWithOneRegion(1, 1, 5, 50,
             10, 10, 0));
 
         for (var i = 0; i < 5; i++)

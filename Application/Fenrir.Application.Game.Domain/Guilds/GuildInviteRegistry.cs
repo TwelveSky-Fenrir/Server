@@ -1,3 +1,5 @@
+using Fenrir.Application.Game.Domain.Social;
+
 namespace Fenrir.Application.Game.Domain.Guilds;
 
 /// <summary>Soft outcomes of CZ_GUILD_ASK_SEND -- mirrors ZC_GUILD_ANSWER_RECV's pre-check codes.</summary>
@@ -17,6 +19,17 @@ public sealed class GuildInviteRegistry
     /// <summary>askerId -&gt; the target it may now finalize the join for (legacy state 3).</summary>
     private readonly Dictionary<int, int> _acceptedFor = new();
 
+    /// <summary>
+    ///     WS1.4: this family's own cross-shard ASK-PUBLISH-ONLY half, folded into <see cref="IsNegotiating" />
+    ///     -- see <see cref="CrossShardNegotiationTracker" />'s own remarks. Unlike Party/Friend, no
+    ///     <c>ISocialCrossShardRelayHandler</c> is registered for <c>SocialCrossShardRelayKind.GuildInvite</c>
+    ///     yet (see <c>GuildInviteService.AskAsync</c>'s own remarks for why), so only the OUTBOUND half of
+    ///     this tracker is ever populated -- an inbound cross-shard guild invite can never be delivered here
+    ///     today. <see cref="TryCancel" /> still consumes an outbound entry so an asker who published a
+    ///     cross-shard invite that will never be answered is not stuck busy forever.
+    /// </summary>
+    private readonly CrossShardNegotiationTracker _crossShard = new();
+
     private readonly Lock _lock = new();
     private readonly Dictionary<int, int> _pendingByAsker = new();
     private readonly Dictionary<int, int> _pendingByTarget = new();
@@ -26,11 +39,33 @@ public sealed class GuildInviteRegistry
     ///     direction). Public so sibling negotiation families (e.g. Trade ask, see <c>TradeInviteService</c>)
     ///     can compose a cross-family busy check without duplicating this registry's own state -- the same
     ///     reason <see cref="Fenrir.Application.Game.Domain.Social.Duel.DuelRegistry.IsNegotiating" />/
-    ///     <see cref="Fenrir.Application.Game.Domain.Social.Trade.TradeRegistry.IsBusy" /> are public.
+    ///     <see cref="Fenrir.Application.Game.Domain.Social.Trade.TradeRegistry.IsBusy" /> are public. Also
+    ///     includes a still-open outbound cross-shard invite.
     /// </summary>
     public bool IsNegotiating(int characterId)
     {
-        return _pendingByAsker.ContainsKey(characterId) || _pendingByTarget.ContainsKey(characterId);
+        return _pendingByAsker.ContainsKey(characterId) || _pendingByTarget.ContainsKey(characterId) ||
+               _crossShard.IsPending(characterId);
+    }
+
+    /// <summary>
+    ///     WS1.4 asker-side cross-shard invite registration (ASK-PUBLISH-ONLY -- see <see cref="_crossShard" />'s
+    ///     own remarks). Same busy gate as <see cref="TryAsk" />. Unlike <see cref="TryAsk" />, this method
+    ///     takes its own lock (mirroring the sibling registries' own <c>TryAskCrossShard</c> methods) since,
+    ///     unlike <see cref="IsNegotiating" /> above, it is not already called from within a lock by any
+    ///     existing caller.
+    /// </summary>
+    public GuildInviteAskOutcome TryAskCrossShard(int askerId, CrossShardOutboundAsk ask)
+    {
+        lock (_lock)
+        {
+            if (IsNegotiating(askerId))
+                return GuildInviteAskOutcome.AskerBusy;
+
+            return _crossShard.TryRegisterOutbound(askerId, ask)
+                ? GuildInviteAskOutcome.Sent
+                : GuildInviteAskOutcome.AskerBusy;
+        }
     }
 
     /// <summary>Caller has already verified the asker's own role/guild membership and the tribe match.</summary>
@@ -54,11 +89,19 @@ public sealed class GuildInviteRegistry
     {
         lock (_lock)
         {
-            if (!_pendingByAsker.Remove(askerId, out targetId))
-                return false;
+            if (_pendingByAsker.Remove(askerId, out targetId))
+            {
+                _pendingByTarget.Remove(targetId);
+                return true;
+            }
 
-            _pendingByTarget.Remove(targetId);
-            return true;
+            if (_crossShard.TryConsumeOutbound(askerId, out var crossShardAsk))
+            {
+                targetId = crossShardAsk.TargetCharacterId;
+                return true;
+            }
+
+            return false;
         }
     }
 

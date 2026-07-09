@@ -26,6 +26,7 @@ using Fenrir.Application.Game.Services.Quests;
 using Fenrir.Application.Game.Services.Social;
 using Fenrir.Application.Game.Services.Tribes;
 using Fenrir.Application.Game.Services.ZoneLifecycle;
+using Fenrir.Data.Abstractions.Runtime;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -153,6 +154,15 @@ public static class ServicesServiceCollectionExtensions
         services.AddSingleton<ITradeInviteService, TradeInviteService>();
         services.AddSingleton<ITradeLockService, TradeLockService>();
         services.AddSingleton<ITradeStartService, TradeStartService>();
+
+        // WS1.4: the cross-shard social-negotiation relay's own target-shard-delivery/asker-shard-completion
+        // handlers -- Party and Friend are the full reference implementation (see each type's own remarks);
+        // Mentor/Duel/Trade/GuildInvite deliberately have none registered yet (ask-publish-only for now, see
+        // MentorAskService/DuelService/TradeInviteService/GuildInviteService's own remarks). Consumed as
+        // IEnumerable<ISocialCrossShardRelayHandler> by Fenrir.Application.Game.Hosting's own
+        // SocialCrossShardRelayHost.
+        services.AddSingleton<ISocialCrossShardRelayHandler, FriendCrossShardRelayHandler>();
+        services.AddSingleton<ISocialCrossShardRelayHandler, PartyCrossShardRelayHandler>();
     }
 
     private static void AddItemModificationServices(IServiceCollection services)
@@ -211,6 +221,23 @@ public static class ServicesServiceCollectionExtensions
     private static void AddGmServices(IServiceCollection services)
     {
         services.AddSingleton<IGmBlockAvatarService, GmBlockAvatarService>();
+        services.AddSingleton<IGmCreateItemService, GmCreateItemService>();
+        services.AddSingleton<IGmMaxStatService, GmMaxStatService>();
+        services.AddSingleton<IGmPetExperienceGrantService, GmPetExperienceGrantService>();
+
+        // Elevated tier (GmCommandTier.Elevated): grant-experience-to-self (tSort 503), grant-money (tSort 504,
+        // legacy dead code -- see IGmGrantMoneyService's own remarks), zone-wide FFA-start (tSort 333),
+        // summon-monster/"moncall" (tSort 506).
+        services.AddSingleton<IGmExpGrantService, GmExpGrantService>();
+        services.AddSingleton<IGmGrantMoneyService, GmGrantMoneyService>();
+        services.AddSingleton<IGmFfaEventStartService, GmFfaEventStartService>();
+        services.AddSingleton<IGmSummonMonsterService, GmSummonMonsterService>();
+
+        // Basic tier (GmCommandTier.Basic): HIDE/SHOW (501/502), self-teleport-to-coordinate MOVE (507), DIE
+        // (508), TRIBE (510), EQUIP/UNEQUIP (511/512), FIND (513), CALL (514), self-teleport-to-target MOVE
+        // (515), NCHAT/YCHAT (516/517), KICK (518), TRIBEBANK (520, dead code), LEVEL (521), STR/DEX/VIT/INT-edit
+        // (522, dead code) -- see IGmBasicCommandService's own remarks.
+        services.AddSingleton<IGmBasicCommandService, GmBasicCommandService>();
     }
 
     /// <summary>

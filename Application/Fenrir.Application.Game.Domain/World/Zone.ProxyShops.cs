@@ -23,7 +23,39 @@ public sealed partial class Zone
     // zone's own tick ever reads the table or writes LastBroadcastAt -- same split-ownership posture as _monsters.
     private readonly ConcurrentDictionary<int, ProxyShopBroadcastEntry> _proxyShops = new();
 
+    /// <summary>
+    ///     Reusable scratch buffer for <see cref="BroadcastProxyShopState" />'s recipient list -- replaces a
+    ///     per-call <c>AoiGrid.Neighbors(...).ToArray()</c> LINQ buffer with the non-allocating
+    ///     <see cref="AoiGrid.Neighbors(List{int},ValueTuple{int,int},float,float,float,int)" /> overload, the
+    ///     same shape <see cref="BroadcastMonsterAction" />/<see cref="BroadcastGroundItemAction" /> already use
+    ///     for this exact "keep-alive/despawn broadcast" pattern. <see cref="AoiGrid.HasAnyNeighbor" /> still
+    ///     pre-checks emptiness before paying for this scan. Single tick thread, cleared before use, consumed
+    ///     entirely by the immediately-following send loop before <see cref="BroadcastProxyShopState" /> returns.
+    /// </summary>
+    private readonly List<int> _proxyShopNeighborScratch = [];
+
     public int ProxyShopCount => _proxyShops.Count;
+
+    /// <summary>
+    ///     <c>MAX_PROXY_SHOP_NUM</c> -- the global ceiling on simultaneously open proxy/deputy shops.
+    ///     Server/Header/Protocol/DEFINE.h:369 defines it as 500; the legacy scan/reject that enforces it
+    ///     lives in <c>PROXY_SHOP_SYSTEM::Process</c> (Server/ts25zone/S07_MyGame09.cpp:380-392), a single
+    ///     500-slot table owned by exactly one dedicated zone-server process (server/zone number 37 under the
+    ///     always-active <c>PPSHOP_V2</c> build variant -- Server/ts25zone/S07_MyGame09.cpp:9-84,
+    ///     Server/Header/mapcheck.h:130-148), not four independent per-tribe-capital pools despite the
+    ///     4-row/"zone 1,6,11,140" shape suggested by the underlying shared-memory struct
+    ///     (Server/Header/Protocol/STRUCT.h:1762-1783).
+    /// </summary>
+    /// <remarks>
+    ///     Fenrir enforces this against <see cref="_proxyShops" />'s own count (see <see cref="ProxyShopCount" />)
+    ///     rather than a separate 500-element table, which is a faithful global count and not merely a
+    ///     per-shard approximation: <c>GameServer</c> shards <see cref="Zone" /> instances disjointly by map,
+    ///     and every proxy-shop handler already gates to <see cref="ProxyShopZonePolicy.ZoneNumber" /> (zone
+    ///     37) alone, so exactly one shard process ever owns a <see cref="Zone" /> instance for that map at a
+    ///     time -- the same "exactly one process ever iterates this table" invariant legacy got from its
+    ///     server-37-only allowlist, see <see cref="ProxyShopZonePolicy" />'s own remarks.
+    /// </remarks>
+    public const int MaxProxyShopSlots = 500;
 
     /// <summary>
     ///     Registers (or fully replaces) the periodic-broadcast entry for a newly opened or re-opened proxy
@@ -168,7 +200,8 @@ public sealed partial class Zone
         if (!_grid.HasAnyNeighbor(cell))
             return;
 
-        var recipients = _grid.Neighbors(cell, entry.PosX, entry.PosY, entry.PosZ).ToArray();
+        _proxyShopNeighborScratch.Clear();
+        _grid.Neighbors(_proxyShopNeighborScratch, cell, entry.PosX, entry.PosY, entry.PosZ);
         var packet = new ProxyShopStallStateResponse
         {
             ServerIndex = entry.CharacterId,
@@ -190,7 +223,7 @@ public sealed partial class Zone
             var span = rented.AsSpan(0, total);
             FrameWriter.WriteFrame(in packet, span);
 
-            foreach (var id in recipients)
+            foreach (var id in _proxyShopNeighborScratch)
                 try
                 {
                     if (_players.TryGetValue(id, out var recipient) &&

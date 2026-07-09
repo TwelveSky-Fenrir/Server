@@ -124,13 +124,14 @@ internal static class ZoneTestKit
         FrozenDictionary<int, ItemDefinition>? itemsById = null,
         FrozenDictionary<int, SkillDefinition>? skillsById = null,
         FrozenDictionary<short, LevelRowDto>? levelsByLevel = null,
-        FrozenDictionary<short, ZoneDefinition>? zonesByNumber = null)
+        FrozenDictionary<short, ZoneDefinition>? zonesByNumber = null,
+        FrozenDictionary<int, MonsterDefinition>? monstersById = null)
     {
         return new WorldDataCache
         {
             ItemsById = itemsById ?? EmptyFrozen<int, ItemDefinition>(),
             SkillsById = skillsById ?? EmptyFrozen<int, SkillDefinition>(),
-            MonstersById = EmptyFrozen<int, MonsterDefinition>(),
+            MonstersById = monstersById ?? EmptyFrozen<int, MonsterDefinition>(),
             NpcsById = EmptyFrozen<int, NpcDefinition>(),
             QuestsById = EmptyFrozen<int, QuestDefinition>(),
             LevelsByLevel = levelsByLevel ?? EmptyFrozen<short, LevelRowDto>(),

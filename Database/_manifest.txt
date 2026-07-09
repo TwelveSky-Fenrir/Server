@@ -14,6 +14,12 @@ Tables/runtime/AccountSessions.sql
 Tables/runtime/GuildTribeBroadcastRelay.sql
 Tables/runtime/GuildTribeBroadcastCursor.sql
 
+# WS1.4: lightweight cross-shard social-negotiation relay (Party/Friend/Mentor/Duel/Trade/GuildInvite
+# Ask+Answer) -- point-to-point sibling of the GuildTribeBroadcastRelay/Cursor pair above (TargetShardId=
+# @ShardId filter instead of fan-out), see SocialCrossShardRelay.sql's own header for the full design.
+Tables/runtime/SocialCrossShardRelay.sql
+Tables/runtime/SocialCrossShardRelayCursor.sql
+
 Tables/world/Levels.sql
 Tables/world/Skills.sql
 Tables/world/SkillDescriptions.sql
@@ -188,6 +194,15 @@ StoredProcedures/runtime/usp_AccountSession_GetActiveCount.sql
 # (runtime.GuildTribeBroadcastRelay/runtime.GuildTribeBroadcastCursor) -- see GuildTribeBroadcastRelayHost.
 StoredProcedures/runtime/usp_GuildTribeBroadcastRelay_Publish.sql
 StoredProcedures/runtime/usp_GuildTribeBroadcastRelay_Poll.sql
+
+# WS1.4: lightweight cross-shard social-negotiation relay (runtime.SocialCrossShardRelay/
+# runtime.SocialCrossShardRelayCursor) for the six character-to-character negotiation flows -- Party invite,
+# Friend ask, Mentor ask, Duel ask, Trade invite, Guild invite. Point-to-point (TargetShardId=@ShardId),
+# unlike the fan-out GuildTribeBroadcastRelay pair above -- see usp_SocialCrossShardRelay_Poll.sql's own
+# header for the full citation/design trail. Consumed by a future SocialCrossShardRelayHost
+# (Fenrir.Application.Game.Hosting, not part of this DB-layer change).
+StoredProcedures/runtime/usp_SocialCrossShardRelay_Publish.sql
+StoredProcedures/runtime/usp_SocialCrossShardRelay_Poll.sql
 
 StoredProcedures/world/usp_Level_GetAll.sql
 StoredProcedures/world/usp_Skill_GetAll.sql
@@ -426,6 +441,63 @@ Migrations/028_account_pin_lockout.sql
 # new FailedAttempts/LockedUntilUtc columns so VerifyMousePinService/ChangeMousePinService can check the
 # account-scoped lockout before ever touching PasswordHasher.Verify.
 Migrations/029_account_pin_lockout_get.sql
+
+# Level static-data schema/validation gap: storage-level CHECK constraint mirroring the legacy 0-100
+# RangeInfo3 bound (Server/Header/S15_MyShare.cpp:843-846) that world.Levels' TINYINT column type alone
+# doesn't enforce. Companion to WorldDataCacheBuilder.ValidateLevels' boot-time check of the same bound plus
+# four other gaps closed in the same change -- see the script's own header for the full citation trail.
+Migrations/030_levels_rangeinfo3_check_constraint.sql
+
+# Quest static-data load-time field validation (legacy Load_Quest / Quest_CheckValidElement audit): adds
+# the two CHECK constraints (world.Quests.Step 1-1000, world.QuestRewards.Amount 0-100,000,000) the
+# contract's Edge cases section confirms are unreplicated "concrete gap"s -- every other legacy
+# Quest_CheckValidElement bound is already covered by existing CHECKs/FKs or is deliberately unchecked in
+# both legacy and SQL alike. See the script's own header for the full citation trail.
+Migrations/031_quest_step_and_reward_amount_range_checks.sql
+
+# Skill static-data load-time field validation (legacy SKILLSYSTEM::Init / MyShm::Load_Skill /
+# Skill_CheckValidElement audit): adds the 9 world.Skills + 25 world.SkillGrades CHECK constraints the
+# contract confirms were entirely missing (neither table had ever had a range CHECK on any of these
+# columns). MaxUpgradePoint's floor of 1 is the highest-severity one -- it is the sole guard against a
+# divide-by-zero in the skill-value interpolation formula's unguarded division. See the script's own header
+# for the full citation trail and the note on why affected TINYINT columns are not retyped in this script.
+Migrations/032_skill_static_data_range_checks.sql
+
+# Npc static-data load-time field validation (legacy MyShm::Load_Npc / Npc_CheckValidElement audit): adds
+# the world.Npcs (Tribe/Type/DataSortNumber2D/DataSortNumber3D/Size1-3), world.NpcMenuOptions (OptionId
+# exactly 1 or 2) and world.NpcGambleCosts (Value 0-100,000,000) CHECK constraints the contract confirms
+# were entirely missing -- its own explicit "core finding". Name-length, NpcId-slot-identity and
+# ItemId/SkillId FK bounds are deliberately left out per the contract's own scoping -- see the script's own
+# header for the full citation trail and rationale.
+Migrations/033_npc_static_data_range_checks.sql
+
+# Gem socket static-data load-time field validation (legacy SOCKET_INFO / Load_GSocket /
+# GSocket_CheckValidElement audit): adds the world.GemSockets CK_GemSockets_TypeBandRules CHECK constraint
+# covering the zero-bypass rules (Value02 = 0, Type = 0), the Type 1-46 range gate, and the four live
+# Type-band rules (Type=1, 2-29, 39-42, 43-46). The dead Value01 range check and the dead Type 30-38 band
+# are deliberately NOT reproduced -- both are confirmed inert in the legacy source, so this constraint
+# matches legacy's actual (not intended) runtime behavior. Total-row-count-2891 and GemSocketId-slot-identity
+# are deliberately left out per the same precedent Migrations/031 (QuestId) and Migrations/033 (NpcId)
+# already established. See the script's own header for the full citation trail and rationale.
+Migrations/034_gem_socket_type_band_range_checks.sql
+
+# Monster static-data load-time field validation (legacy Load_Monster / Monster_CheckValidElement audit):
+# adds the value-range and cross-field-ordering CHECK constraints world.Monsters, world.MonsterAnimationFrames,
+# and the five world.MonsterDrop* child tables never had (only structural slot/category-index bounds existed
+# on the drop tables; the two parent tables had none at all). See the script's own header for the full
+# citation trail and the deliberately-out-of-scope items (MonsterId slot-position parity, the Thunder Giant
+# AttackType load-time patch).
+Migrations/036_monster_static_data_range_checks.sql
+
+# Item static-data load-time field validation (legacy Item_CheckValidElement audit): widens
+# CheckDateItem/DataNumber3D/AddDataNumber3D from TINYINT (max 255) to SMALLINT so they can represent their
+# full legacy-valid ranges (365 and 10000 respectively), adds CHECK constraints on those 3 now-widened
+# columns, and adds a compound CHECK reproducing PotionType2's conditional narrowing to 1-3 whenever
+# PotionType1 = 9. See the script's own header for the full citation trail and for what is deliberately
+# left to a companion boot-time loader validation instead (every ordinary single-field legacy bound not
+# individually flagged as a storage-level gap, e.g. Type/Sort/EquipInfo/the eleven Check* flags/stat
+# fields).
+Migrations/038_items_column_width_and_potiontype_checks.sql
 
 Migrations/Seed/001_dev_account.sql
 

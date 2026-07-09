@@ -31,6 +31,22 @@ public sealed partial class Zone
             new BoundedChannelOptions(ChatInboxCapacity)
                 { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
+    /// <summary>
+    ///     Reusable scratch buffer for <see cref="ApplyChatCommand" />'s Local-chat raw AOI-neighbor scan --
+    ///     feeds <see cref="_localChatRecipientScratch" />'s tribe/alliance filter below. Same non-allocating
+    ///     shape and reuse justification as <see cref="Zone.PlayerLifecycle" />'s <c>_moveNeighborScratch</c>:
+    ///     single tick thread, cleared before use, consumed entirely before <see cref="ApplyChatCommand" />
+    ///     returns.
+    /// </summary>
+    private readonly List<int> _localChatNeighborScratch = [];
+
+    /// <summary>
+    ///     Reusable scratch buffer for <see cref="ApplyChatCommand" />'s Local-chat recipient list -- replaces a
+    ///     per-message <c>new List&lt;int&gt;()</c> filtered from <see cref="_localChatNeighborScratch" /> by
+    ///     tribe/alliance. Same reuse posture as every other scratch buffer in this file family.
+    /// </summary>
+    private readonly List<int> _localChatRecipientScratch = [];
+
     public bool PostChatCommand(in ChatZoneCommand command)
     {
         return _chatInbox.Writer.TryWrite(command);
@@ -83,12 +99,15 @@ public sealed partial class Zone
             {
                 var response = new LocalChatResponse
                     { AvatarName = sender.Name, Content = command.Content, Link = command.Link };
-                var recipientIds = new List<int>();
-                foreach (var id in _grid.Neighbors(sender.CurrentCell, sender.PosX, sender.PosY, sender.PosZ))
+                _localChatNeighborScratch.Clear();
+                _grid.Neighbors(_localChatNeighborScratch, sender.CurrentCell, sender.PosX, sender.PosY,
+                    sender.PosZ);
+                _localChatRecipientScratch.Clear();
+                foreach (var id in _localChatNeighborScratch)
                     if (_players.TryGetValue(id, out var recipient) &&
                         IsAlliedOrSameTribe(sender.Tribe, recipient.Tribe))
-                        recipientIds.Add(id);
-                BroadcastChatFrame(in response, recipientIds);
+                        _localChatRecipientScratch.Add(id);
+                BroadcastChatFrame(in response, _localChatRecipientScratch);
                 break;
             }
             case ChatBroadcastKind.Shout:

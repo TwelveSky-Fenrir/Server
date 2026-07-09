@@ -16,7 +16,7 @@ public static class LegacyWireCodec
     public static string ReadFixedString(ReadOnlySpan<byte> source)
     {
         var nul = source.IndexOf((byte)0);
-        return System.Text.Encoding.Latin1.GetString(nul < 0 ? source : source.Slice(0, nul));
+        return System.Text.Encoding.Latin1.GetString(nul < 0 ? source : source[..nul]);
     }
 
     public static void WriteFixedString(Span<byte> destination, string value)

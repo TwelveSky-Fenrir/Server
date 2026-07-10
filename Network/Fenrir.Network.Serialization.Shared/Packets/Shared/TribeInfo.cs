@@ -3,7 +3,7 @@ using Fenrir.Network.Serialization.Wire.Attributes;
 namespace Fenrir.Network.Serialization.Shared.Packets.Shared;
 
 [FenrirWireType(2456)]
-public readonly record struct TribeInfo : IFenrirWireType<TribeInfo>
+public readonly partial record struct TribeInfo : IFenrirWireType<TribeInfo>
 {
     // Flattened row-major char[4][10][13]: 40 rows of 13 bytes.
     [FixedArray(40)] [FixedString(13)] public required string[] TribeVoteName { get; init; }

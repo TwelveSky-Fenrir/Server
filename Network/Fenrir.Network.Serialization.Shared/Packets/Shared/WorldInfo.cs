@@ -3,7 +3,7 @@ using Fenrir.Network.Serialization.Wire.Attributes;
 namespace Fenrir.Network.Serialization.Shared.Packets.Shared;
 
 [FenrirWireType(1384)]
-public readonly record struct WorldInfo : IFenrirWireType<WorldInfo>
+public readonly partial record struct WorldInfo : IFenrirWireType<WorldInfo>
 {
     public required int Zone038WinTribe { get; init; }
     public required int Zone038WinTribeTime { get; init; }

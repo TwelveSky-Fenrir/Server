@@ -4,7 +4,7 @@ using Fenrir.Network.Serialization.Wire.Attributes;
 namespace Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.Mentor, ExpectedSize = 14)]
-public readonly record struct MentorResponse : IOutgoingPacket
+public readonly partial record struct MentorResponse : IOutgoingPacket
 {
     [FixedString(13)] public required string AvatarName { get; init; }
 }

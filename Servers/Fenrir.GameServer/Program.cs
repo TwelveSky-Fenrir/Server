@@ -14,6 +14,7 @@
 // scope no broader than the ts25 loopback-only precedent unless there is an explicit, reviewed reason to
 // widen it.
 
+using Fenrir.Network.Dispatch;
 using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Commerce;
 using Fenrir.Application.Game.Domain.Extensions;

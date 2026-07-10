@@ -20,7 +20,7 @@ namespace Fenrir.Network.Serialization.Shared.Packets.Shared;
 ///     </para>
 /// </summary>
 [FenrirWireType(4)]
-public readonly record struct GmFfaEventStartPayload : IFenrirWireType<GmFfaEventStartPayload>
+public readonly partial record struct GmFfaEventStartPayload : IFenrirWireType<GmFfaEventStartPayload>
 {
     /// <summary>
     ///     Requested duration in minutes. Any value (including zero/negative/unbounded-positive) is

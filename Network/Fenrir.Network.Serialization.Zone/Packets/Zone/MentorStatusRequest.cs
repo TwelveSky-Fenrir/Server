@@ -6,6 +6,6 @@ namespace Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.MentorStatus, ExpectedSize = 9,
     AllowedStates = [(byte)ZoneSessionState.Registering, (byte)ZoneSessionState.InWorld])]
-public readonly record struct MentorStatusRequest : IIncomingPacket<MentorStatusRequest>
+public readonly partial record struct MentorStatusRequest : IIncomingPacket<MentorStatusRequest>
 {
 }

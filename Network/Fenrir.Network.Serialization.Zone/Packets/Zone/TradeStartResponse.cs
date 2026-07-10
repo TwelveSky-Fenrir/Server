@@ -8,7 +8,7 @@ namespace Fenrir.Network.Serialization.Zone.Packets.Zone;
 ///     (USE_SOCKET_GEM undef).
 /// </summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.TradeStart, ExpectedSize = 233)]
-public readonly record struct TradeStartResponse : IOutgoingPacket
+public readonly partial record struct TradeStartResponse : IOutgoingPacket
 {
     public required int TradeMoney { get; init; }
     [FixedArray(32)] public required int[] Trade { get; init; }

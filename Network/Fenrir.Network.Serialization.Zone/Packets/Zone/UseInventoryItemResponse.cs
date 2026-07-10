@@ -9,7 +9,7 @@ namespace Fenrir.Network.Serialization.Zone.Packets.Zone;
 /// </summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.UseInventoryItem,
     ExpectedSize = 21)]
-public readonly record struct UseInventoryItemResponse : IOutgoingPacket
+public readonly partial record struct UseInventoryItemResponse : IOutgoingPacket
 {
     public required int Result { get; init; }
 

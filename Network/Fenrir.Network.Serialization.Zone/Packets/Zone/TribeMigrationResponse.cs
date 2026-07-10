@@ -30,7 +30,7 @@ namespace Fenrir.Network.Serialization.Zone.Packets.Zone;
 /// </remarks>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.TribeMigration,
     ExpectedSize = 5)]
-public readonly record struct TribeMigrationResponse : IOutgoingPacket
+public readonly partial record struct TribeMigrationResponse : IOutgoingPacket
 {
     public required int Result { get; init; }
 }

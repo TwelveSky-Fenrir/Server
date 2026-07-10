@@ -5,7 +5,7 @@ namespace Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 /// <summary>Real reward is CP, not an item; every field but Result is zero (the multi-item path is dead code in EU33).</summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.HeroRewardClaim, ExpectedSize = 57)]
-public readonly record struct HeroRewardClaimResponse : IOutgoingPacket
+public readonly partial record struct HeroRewardClaimResponse : IOutgoingPacket
 {
     public required int Result { get; init; }
     public required int Page { get; init; }

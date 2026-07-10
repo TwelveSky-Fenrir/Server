@@ -4,7 +4,7 @@ namespace Fenrir.Network.Serialization.Shared.Packets.Shared;
 
 // 17 bytes, no padding before the trailing int despite lying outside a byte boundary.
 [FenrirWireType(17)]
-public readonly record struct GuildWorkAgmPayload : IFenrirWireType<GuildWorkAgmPayload>
+public readonly partial record struct GuildWorkAgmPayload : IFenrirWireType<GuildWorkAgmPayload>
 {
     [FixedString(13)] public required string AvatarName { get; init; }
 

@@ -13,7 +13,7 @@ namespace Fenrir.Network.Serialization.Zone.Packets.Zone;
 /// </summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.TribeBank, ExpectedSize = 17,
     AllowedStates = [(byte)ZoneSessionState.Registering, (byte)ZoneSessionState.InWorld])]
-public readonly record struct TribeBankRequest : IIncomingPacket<TribeBankRequest>
+public readonly partial record struct TribeBankRequest : IIncomingPacket<TribeBankRequest>
 {
     public required int Sort { get; init; }
     public required int Value { get; init; }

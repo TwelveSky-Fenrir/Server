@@ -18,10 +18,17 @@ public sealed class GameServerOptions
     public byte ShardId { get; set; } = 1;
 
     /// <summary>
-    ///     Dev-only NTFS junction onto the legacy DATA tree (not committed -- multi-hundred-MB external asset). Resolved
-    ///     against cwd, not <c>AppContext.BaseDirectory</c>. In particular, <c>{GameDataDirectory}/WORLD/Z{mapId:D3}.WM</c>
-    ///     backs each zone's collision/navmesh geometry (<see cref="World.Zone.Geometry" />) -- see
-    ///     <see cref="GameServerOptionsValidator" />'s remarks for why its presence is not validated at startup.
+    ///     Path to an operator-provisioned, gitignored external asset tree. May be ABSOLUTE (recommended -- resolved
+    ///     as-is regardless of cwd, since <c>Path.Combine</c> drops earlier segments when a later one is rooted) or
+    ///     cwd-relative. Only <c>{GameDataDirectory}/WORLD/Z{mapId:D3}.WM</c> is read from here -- each zone's
+    ///     collision/navmesh geometry (<see cref="World.Zone.Geometry" />). Monster SPAWN data is NOT read from here:
+    ///     it comes from <c>world.MonsterSpawnRegions</c> (DB, imported from the legacy <c>*.WREGION.csv</c>; the sibling
+    ///     binary <c>.WREGION</c> files are legacy dead code -- the shipped build compiles the CSV reader,
+    ///     <c>S10_MySummon.cpp:420</c>). See <see cref="GameServerOptionsValidator" /> for why a missing .WM is a
+    ///     non-fatal boot warning (Program.cs rolls up which hosted maps lack navmesh) rather than a startup block.
+    ///     PENDING (plan A1/A2): dungeon/instance maps share a canonical mesh via the legacy <c>mSameSummon</c>/<c>LoadWM</c>
+    ///     physical-&gt;canonical zone remap (<c>S09_MyWorld.cpp:96-368</c>, plus the <c>_FIX</c> prefix for zones
+    ///     39/144/145/313/74), not yet applied in <see cref="World.Zone" />'s geometry load path.
     /// </summary>
     public string GameDataDirectory { get; set; } = "GameData";
 

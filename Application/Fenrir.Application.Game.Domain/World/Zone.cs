@@ -537,14 +537,19 @@ public sealed partial class Zone(
     }
 
     /// <summary>
-    ///     Resolves <c>{GameDataDirectory}/WORLD/Z{mapId:D3}.WM</c> against the process's current working
-    ///     directory, matching the legacy <c>ServerInfo.ini</c>'s <c>DataDir=./DATA/</c> convention.
+    ///     Resolves <c>{GameDataDirectory}/WORLD/Z{canonicalMapId:D3}.WM</c> against the process's current working
+    ///     directory (or, when <see cref="GameServerOptions.GameDataDirectory" /> is absolute, as-is), matching the
+    ///     legacy <c>ServerInfo.ini</c>'s <c>DataDir=./DATA/</c> convention. The map id is first remapped to its
+    ///     canonical geometry id (<see cref="ZoneCanonicalGeometryMap" />), reproducing legacy
+    ///     <c>WORLD_FOR_GXD::LoadWM</c>'s dungeon/instance/war-arena mesh sharing (e.g. map 336 loads <c>Z310.WM</c>),
+    ///     so those maps resolve the mesh they actually ship with instead of a non-existent per-map file.
     /// </summary>
     private static ZoneGeometry? TryLoadGeometry(short mapId, GameServerOptions gameServerOptions,
         ILogger<Zone> zoneLogger)
     {
+        var canonicalMapId = ZoneCanonicalGeometryMap.ResolveCanonicalMapId(mapId);
         var wmPath = Path.Combine(Directory.GetCurrentDirectory(), gameServerOptions.GameDataDirectory, "WORLD",
-            $"Z{mapId:D3}.WM");
+            $"Z{canonicalMapId:D3}.WM");
 
         if (!File.Exists(wmPath))
         {

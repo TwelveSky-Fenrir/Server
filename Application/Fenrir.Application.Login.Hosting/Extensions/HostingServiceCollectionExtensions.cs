@@ -1,3 +1,4 @@
+using Fenrir.Network.Serialization.Wire;
 using Fenrir.Application.Login.Domain;
 using Fenrir.Data.Abstractions.Security;
 using Fenrir.Network.Abstractions;

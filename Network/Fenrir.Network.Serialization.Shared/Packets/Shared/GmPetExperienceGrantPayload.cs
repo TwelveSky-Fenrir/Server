@@ -34,7 +34,7 @@ namespace Fenrir.Network.Serialization.Shared.Packets.Shared;
 ///     </para>
 /// </remarks>
 [FenrirWireType(8)]
-public readonly record struct GmPetExperienceGrantPayload : IFenrirWireType<GmPetExperienceGrantPayload>
+public readonly partial record struct GmPetExperienceGrantPayload : IFenrirWireType<GmPetExperienceGrantPayload>
 {
     /// <summary>
     ///     Echoed back: the "no pet" sentinel if no eligible pet was equipped, or the equipped item's own

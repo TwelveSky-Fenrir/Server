@@ -5,7 +5,7 @@ namespace Fenrir.Network.Serialization.Login.Packets.Login;
 
 [FenrirPacket(FenrirServer.Login, FenrirDirection.Outgoing, Opcodes.Login.Outgoing.CreateMousePin,
     ExpectedSize = 10)]
-public readonly record struct CreateMousePinResponse : IOutgoingPacket
+public readonly partial record struct CreateMousePinResponse : IOutgoingPacket
 {
     // 0 = created; failure Quit()s instead of replying (failure code is dead in the legacy source).
     public required int Result { get; init; }

@@ -5,7 +5,7 @@ namespace Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 // Twin of ZC 108 minus the 8th int - 29 bytes; don't reuse ZC 108's 33-byte layout.
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.StellarCoreState, ExpectedSize = 29)]
-public readonly record struct StellarCoreStateResponse : IOutgoingPacket
+public readonly partial record struct StellarCoreStateResponse : IOutgoingPacket
 {
     /// <summary>0=ok, 1=invalid slot, 2=inventory full.</summary>
     public required int Result { get; init; }

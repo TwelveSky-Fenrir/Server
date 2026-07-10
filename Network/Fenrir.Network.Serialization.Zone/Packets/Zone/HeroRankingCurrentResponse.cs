@@ -6,7 +6,7 @@ namespace Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.HeroRankingCurrent,
     ExpectedSize = 685)]
-public readonly record struct HeroRankingCurrentResponse : IOutgoingPacket
+public readonly partial record struct HeroRankingCurrentResponse : IOutgoingPacket
 {
     public required int Result { get; init; }
     public required HeroRank HeroInfo { get; init; }

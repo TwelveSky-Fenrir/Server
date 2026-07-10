@@ -7,7 +7,7 @@ namespace Fenrir.Network.Serialization.Zone.Packets.Zone;
 // Sort: 1=select slot(Value 0..9), 2=no-op, 3=equip, 4=remove, 5=return to inventory; unknown Sort -> Quit().
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Incoming, Opcodes.Zone.Incoming.CostumeState, ExpectedSize = 17,
     AllowedStates = [(byte)ZoneSessionState.Registering, (byte)ZoneSessionState.InWorld])]
-public readonly record struct CostumeStateRequest : IIncomingPacket<CostumeStateRequest>
+public readonly partial record struct CostumeStateRequest : IIncomingPacket<CostumeStateRequest>
 {
     public required int Sort { get; init; }
     public required int Value { get; init; }

@@ -9,7 +9,7 @@ namespace Fenrir.Network.Serialization.Zone.Packets.Zone;
 /// </summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.TribePopulation,
     ExpectedSize = 9)]
-public readonly record struct TribePopulationResponse : IOutgoingPacket
+public readonly partial record struct TribePopulationResponse : IOutgoingPacket
 {
     public required int ZoneNumber { get; init; }
     public required int ConnectedUser { get; init; }

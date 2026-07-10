@@ -21,7 +21,7 @@ namespace Fenrir.Network.Serialization.Shared.Packets.Shared;
 ///     decode the request).
 /// </remarks>
 [FenrirWireType(4)]
-public readonly record struct GmCreateItemPayload : IFenrirWireType<GmCreateItemPayload>
+public readonly partial record struct GmCreateItemPayload : IFenrirWireType<GmCreateItemPayload>
 {
     /// <summary>Catalog item id to create. Valid range [2, 99999]; validated by the caller, not here.</summary>
     public required int ItemId { get; init; }

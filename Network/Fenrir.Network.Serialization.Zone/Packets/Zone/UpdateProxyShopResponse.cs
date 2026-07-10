@@ -7,7 +7,7 @@ namespace Fenrir.Network.Serialization.Zone.Packets.Zone;
 /// <summary>Value1 packs 6 item values + 3 sockets (9 ints), in that order.</summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.UpdateProxyShop,
     ExpectedSize = 877)]
-public readonly record struct UpdateProxyShopResponse : IOutgoingPacket
+public readonly partial record struct UpdateProxyShopResponse : IOutgoingPacket
 {
     public required int Result { get; init; }
     public required ProxyShopUserInfo ProxyUser { get; init; }

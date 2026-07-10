@@ -23,7 +23,7 @@ namespace Fenrir.Network.Serialization.Shared.Packets.Shared;
 ///     </para>
 /// </summary>
 [FenrirWireType(13)]
-public readonly record struct GmBlockAvatarPayload : IFenrirWireType<GmBlockAvatarPayload>
+public readonly partial record struct GmBlockAvatarPayload : IFenrirWireType<GmBlockAvatarPayload>
 {
     [FixedString(13)] public required string AvatarName { get; init; }
 }

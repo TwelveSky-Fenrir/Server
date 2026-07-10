@@ -21,7 +21,7 @@ namespace Fenrir.Network.Serialization.Shared.Packets.Shared;
 ///     </para>
 /// </summary>
 [FenrirWireType(8)]
-public readonly record struct GmExpGrantPayload : IFenrirWireType<GmExpGrantPayload>
+public readonly partial record struct GmExpGrantPayload : IFenrirWireType<GmExpGrantPayload>
 {
     /// <summary>
     ///     0 = general character-level experience; 1 = pet-experience (mislabeled "God 1 - Rebirth 12" in

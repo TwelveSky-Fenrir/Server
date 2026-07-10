@@ -5,7 +5,7 @@ namespace Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 /// <summary>Same layout is reused elsewhere with different semantics; here TribeRole genuinely is a role.</summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.TribeAnnouncement, ExpectedSize = 79)]
-public readonly record struct TribeAnnouncementResponse : IOutgoingPacket
+public readonly partial record struct TribeAnnouncementResponse : IOutgoingPacket
 {
     /// <summary>
     ///     Sender's real role: 1 = tribe master, 2 = vice-master, 3 = elected tribe-council member seated

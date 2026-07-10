@@ -22,7 +22,7 @@ namespace Fenrir.Network.Serialization.Shared.Packets.Shared;
 ///     decompose this value into base/high-level/rebirth tiers, not by this type itself).
 /// </remarks>
 [FenrirWireType(4)]
-public readonly record struct GmLevelSetPayload : IFenrirWireType<GmLevelSetPayload>
+public readonly partial record struct GmLevelSetPayload : IFenrirWireType<GmLevelSetPayload>
 {
     /// <summary>
     ///     Requested total level, spanning three successive tiers combined into one number: base level (up

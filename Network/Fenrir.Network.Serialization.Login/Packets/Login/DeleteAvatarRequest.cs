@@ -15,7 +15,7 @@ namespace Fenrir.Network.Serialization.Login.Packets.Login;
 /// </remarks>
 [FenrirPacket(FenrirServer.Login, FenrirDirection.Incoming, Opcodes.Login.Incoming.DeleteAvatar, ExpectedSize = 21,
     AllowedStates = [(byte)LoginSessionState.Authenticated, (byte)LoginSessionState.CharSelect])]
-public readonly record struct DeleteAvatarRequest : IIncomingPacket<DeleteAvatarRequest>
+public readonly partial record struct DeleteAvatarRequest : IIncomingPacket<DeleteAvatarRequest>
 {
     public required int AvatarPost { get; init; }
     public required int Unknow1 { get; init; }

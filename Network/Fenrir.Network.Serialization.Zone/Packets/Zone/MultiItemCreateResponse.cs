@@ -6,7 +6,7 @@ namespace Fenrir.Network.Serialization.Zone.Packets.Zone;
 /// <summary>Page/Index/Xy fields are bit-packed (4 slots per int); this contract carries the raw packed ints as-is.</summary>
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.MultiItemCreate,
     ExpectedSize = 73)]
-public readonly record struct MultiItemCreateResponse : IOutgoingPacket
+public readonly partial record struct MultiItemCreateResponse : IOutgoingPacket
 {
     public required int Num { get; init; }
 

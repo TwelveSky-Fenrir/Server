@@ -26,7 +26,7 @@ namespace Fenrir.Network.Serialization.Shared.Packets.Shared;
 ///     </para>
 /// </summary>
 [FenrirWireType(4)]
-public readonly record struct GmTribeChangePayload : IFenrirWireType<GmTribeChangePayload>
+public readonly partial record struct GmTribeChangePayload : IFenrirWireType<GmTribeChangePayload>
 {
     /// <summary>
     ///     Tribe selector. Valid range [0, 3] -- 3 is a distinct special case (only the current tribe is

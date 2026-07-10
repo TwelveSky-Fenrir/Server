@@ -1,3 +1,4 @@
+using Fenrir.Network.Dispatch;
 using Fenrir.Application.Game.Handlers.Handlers.Dispatching;
 using Fenrir.Network.Abstractions;
 using Microsoft.Extensions.DependencyInjection;

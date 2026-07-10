@@ -29,7 +29,7 @@ namespace Fenrir.Network.Serialization.Shared.Packets.Shared;
 ///     </para>
 /// </summary>
 [FenrirWireType(4)]
-public readonly record struct GmMonsterInstanceIndexPayload : IFenrirWireType<GmMonsterInstanceIndexPayload>
+public readonly partial record struct GmMonsterInstanceIndexPayload : IFenrirWireType<GmMonsterInstanceIndexPayload>
 {
     /// <summary>
     ///     Index into the live monster-instance table. Valid range [0, 3000); an out-of-range or

@@ -1,3 +1,4 @@
+using Fenrir.Network.Serialization.Wire;
 using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World;

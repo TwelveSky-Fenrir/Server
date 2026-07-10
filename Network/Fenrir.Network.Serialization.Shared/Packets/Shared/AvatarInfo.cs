@@ -3,7 +3,7 @@ using Fenrir.Network.Serialization.Wire.Attributes;
 namespace Fenrir.Network.Serialization.Shared.Packets.Shared;
 
 [FenrirWireType(11168)]
-public readonly record struct AvatarInfo : IFenrirWireType<AvatarInfo>
+public readonly partial record struct AvatarInfo : IFenrirWireType<AvatarInfo>
 {
     public required int VisibleState { get; init; }
     public required int SpecialState { get; init; }

@@ -259,6 +259,14 @@ public sealed partial class Zone
         // CombatResolver.ResolveEnemyTribeAttack runs against attackerSnapshot below.
         ApplySenderLocation(attackerState, command.AttackInfo);
 
+        // ProcessAttack02 RvR "close the fight" gate (S07_MyGame02.cpp:1783-1817): on the eleven Zone049-type
+        // RvR maps, once the map's RvR state value has reached phase 4 (PostWarCleanup) or beyond, the entire
+        // cross-tribe attack is aborted before the damage routine runs -- a silent no-op, same as every other
+        // rejection path here. On every other map the gate is skipped (IsFightClosed returns false for a
+        // non-RvR map). The four dead Zone051/053/194/267 else-if arms are not modeled -- see the B15 contract.
+        if (regularWarActiveMapTracker?.IsFightClosed(MapId) == true)
+            return;
+
         if (!_players.TryGetValue(command.AttackInfo.ServerIndex2, out var defenderState))
             return;
 
@@ -334,6 +342,27 @@ public sealed partial class Zone
         if (outcome.ChargeConsumed)
             attackerState.Buffs.Buff[8 * 2] = 0; // charge buff slot 8, value half -- single-use
 
+        // B15 cross-avatar depth terms (destroyer roll + reflect pre-main, then Holy-Shield absorption) -- see
+        // Zone.Combat.DamagePipeline.cs. A reflect fires the attacker's own return damage (possibly lethal),
+        // leaves the defender untouched this hit, and aborts the rest of the resolution; otherwise the shield
+        // absorbs from the pre-element main damage and the view/real values are re-derived.
+        var viewDamage = outcome.ViewDamage;
+        var realDamage = outcome.DamageApplied;
+        var reflectFired = false;
+        if (outcome.Hit)
+        {
+            if (TryApplyReflectAndDestroyer(attackerState, defenderState, outcome, CrossAvatarAttackKind.EnemyTribe))
+            {
+                reflectFired = true;
+                viewDamage = 0;
+                realDamage = 0;
+            }
+            else
+            {
+                (viewDamage, realDamage) = ApplyHolyShieldAbsorption(defenderState, outcome);
+            }
+        }
+
         // "1 + attacker's weapon ItemId" on a hit (client picks the swing animation/effect from this), 0 on a miss.
         var attackerWeaponItemId = attackerState.Inventory.GetSlot(ContainerMatrix.Equipment, 7)?.ItemId ?? 0;
         var response = new AttackResponse
@@ -342,21 +371,23 @@ public sealed partial class Zone
             {
                 AttackResultValue = outcome.Hit ? 1 + attackerWeaponItemId : 0,
                 AttackCriticalExist = outcome.Critical ? 1 : 0,
-                AttackElementDamage = outcome.ElementDamage,
+                // A reflected hit deals nothing to the defender (the return damage lands on the attacker
+                // instead, broadcast via ApplyDeath's own death pose when lethal).
+                AttackElementDamage = reflectFired ? 0 : outcome.ElementDamage,
                 // View = full (pre-life-cap) hit size the client displays; Real = the life-capped amount
                 // actually applied -- diverge only on a killing/overkill blow (S07_MyGame02.cpp:1361-1366).
-                AttackViewDamageValue = outcome.ViewDamage,
-                AttackRealDamageValue = outcome.DamageApplied
+                AttackViewDamageValue = viewDamage,
+                AttackRealDamageValue = realDamage
             }
         };
 
         var recipients = CombatRecipients(attackerState, defenderState);
         BroadcastAttackResult(recipients, response);
 
-        if (!outcome.Hit)
+        if (!outcome.Hit || reflectFired)
             return;
 
-        defenderState.Life -= outcome.DamageApplied;
+        defenderState.Life -= realDamage;
         defenderState.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
 
         if (defenderState.Life <= 0)

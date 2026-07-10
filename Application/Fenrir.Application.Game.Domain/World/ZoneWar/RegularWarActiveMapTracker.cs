@@ -53,4 +53,28 @@ public sealed class RegularWarActiveMapTracker
                _phaseByMapId.TryGetValue(mapId, out var phase) &&
                phase == RegularWarPhase.Active;
     }
+
+    /// <summary>
+    ///     True only when <paramref name="mapId" /> runs the Regular War schedule (one of the eleven Zone049-type
+    ///     RvR maps, <see cref="RegularWarMapCatalog" />) AND its last-reported phase has reached
+    ///     <see cref="RegularWarPhase.PostWarCleanup" /> or beyond -- <c>ProcessAttack02</c>'s "close the fight"
+    ///     gate (<c>Server/ts25zone/S07_MyGame02.cpp:1783-1817</c>), which aborts an entire cross-tribe attack
+    ///     once the map's RvR state value is &gt;= 4. <see cref="RegularWarPhase" />'s byte values ARE the legacy
+    ///     0-5 per-war-slot state (Idle=0..ForcedReset=5), so <see cref="RegularWarPhase.PostWarCleanup" /> == 4
+    ///     is exactly the "state &gt;= 4" threshold. A map this process has never reported a phase for is treated
+    ///     as "not closed."
+    /// </summary>
+    /// <remarks>
+    ///     The four else-if arms the legacy gate also carries (Zone051/053/194/267) compile but their
+    ///     server-type flags are permanently false, so only this Zone049 arm is ever taken -- see the B15
+    ///     damage-pipeline behavior contract. The specific eleven qualifying server numbers rest on
+    ///     <c>S07_MyGame01.cpp:647-698</c> and are the same fixed set <see cref="RegularWarMapCatalog" /> already
+    ///     encodes.
+    /// </remarks>
+    public bool IsFightClosed(short mapId)
+    {
+        return RegularWarMapCatalog.TryGet(mapId, out _) &&
+               _phaseByMapId.TryGetValue(mapId, out var phase) &&
+               phase >= RegularWarPhase.PostWarCleanup;
+    }
 }

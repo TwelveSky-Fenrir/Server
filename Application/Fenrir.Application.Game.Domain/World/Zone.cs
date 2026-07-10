@@ -35,7 +35,9 @@ namespace Fenrir.Application.Game.Domain.World;
 ///     This class is split across several partial files by concern, all in this same folder:
 ///     <c>Zone.Monsters.cs</c> (monster spawn/damage/death + monster-kill money grants),
 ///     <c>Zone.GroundItems.cs</c> (ground-item spawn/claim/expiry), <c>Zone.Combat.cs</c> (attack resolution +
-///     kill hooks), <c>Zone.Chat.cs</c> (local/shout/tribe chat), <c>Zone.PlayerLifecycle.cs</c>
+///     kill hooks), <c>Zone.Combat.DamagePipeline.cs</c> (the B15 cross-avatar depth terms -- destroyer roll,
+///     reflect, Holy-Shield absorption -- shared by <c>Zone.Combat.cs</c>'s mCase-2 and <c>Zone.Duel.cs</c>'s
+///     mCase-1 paths), <c>Zone.Chat.cs</c> (local/shout/tribe chat), <c>Zone.PlayerLifecycle.cs</c>
 ///     (enter/leave/move/death/revive/skill-cast + avatar-action broadcast), <c>Zone.EconomyMirrors.cs</c>
 ///     (already-SQL-durable inventory/skill/mentor/guild/tribe/quest/mission mirrors),
 ///     <c>Zone.CosmeticMirrors.cs</c> (drink-bottle/hero-ranking/fishing/mount/costume/stellar-core/avatar-buff/

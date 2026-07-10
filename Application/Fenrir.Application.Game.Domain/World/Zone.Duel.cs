@@ -94,6 +94,26 @@ public sealed partial class Zone
             attackerState.Buffs.Buff[8 * 2] =
                 0; // charge buff slot 8, value half -- single-use, same convention as mCase 2
 
+        // B15 cross-avatar depth terms -- shared verbatim with mCase 2 (Zone.Combat.DamagePipeline.cs), differing
+        // only in the reflect-kill crediting (a duel reflect-kill routes to ApplyDeath with DeathCause.Duel and
+        // no reward pipeline, matching every other duel kill).
+        var viewDamage = outcome.ViewDamage;
+        var realDamage = outcome.DamageApplied;
+        var reflectFired = false;
+        if (outcome.Hit)
+        {
+            if (TryApplyReflectAndDestroyer(attackerState, defenderState, outcome, CrossAvatarAttackKind.Duel))
+            {
+                reflectFired = true;
+                viewDamage = 0;
+                realDamage = 0;
+            }
+            else
+            {
+                (viewDamage, realDamage) = ApplyHolyShieldAbsorption(defenderState, outcome);
+            }
+        }
+
         // "1 + attacker's weapon ItemId" on a hit (client picks the swing animation/effect from this), 0 on a miss.
         var attackerWeaponItemId = attackerState.Inventory.GetSlot(ContainerMatrix.Equipment, 7)?.ItemId ?? 0;
         var response = new AttackResponse
@@ -102,21 +122,21 @@ public sealed partial class Zone
             {
                 AttackResultValue = outcome.Hit ? 1 + attackerWeaponItemId : 0,
                 AttackCriticalExist = outcome.Critical ? 1 : 0,
-                AttackElementDamage = outcome.ElementDamage,
+                AttackElementDamage = reflectFired ? 0 : outcome.ElementDamage,
                 // View = full (pre-life-cap) hit size the client displays; Real = the life-capped amount
                 // actually applied -- duel shares AttackPlayer's split (S07_MyGame02.cpp:1361-1366).
-                AttackViewDamageValue = outcome.ViewDamage,
-                AttackRealDamageValue = outcome.DamageApplied
+                AttackViewDamageValue = viewDamage,
+                AttackRealDamageValue = realDamage
             }
         };
 
         var recipients = CombatRecipients(attackerState, defenderState);
         BroadcastAttackResult(recipients, response);
 
-        if (!outcome.Hit)
+        if (!outcome.Hit || reflectFired)
             return;
 
-        defenderState.Life -= outcome.DamageApplied;
+        defenderState.Life -= realDamage;
         defenderState.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
 
         if (defenderState.Life <= 0)

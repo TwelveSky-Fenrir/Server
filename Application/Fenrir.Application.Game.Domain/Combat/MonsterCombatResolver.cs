@@ -27,6 +27,13 @@ public static class MonsterCombatResolver
     /// </summary>
     public static readonly TimeSpan OwnerNameLockExemptionCooldown = TimeSpan.FromMinutes(1);
 
+    /// <summary>
+    ///     Catapult flat attack-power bonus (<c>Server/ts25zone/S07_MyGame02.cpp:3273-3287</c>, live under
+    ///     <c>__REBIRTH__</c>): a monster of one of the four "catapult" special-types adds this to its own attack
+    ///     power BEFORE the defender's defense is subtracted, in the monster-attacks-avatar damage path.
+    /// </summary>
+    public const int CatapultAttackPowerBonus = 15000;
+
     /// <param name="request">
     ///     <c>AttackActionValue1</c> (attack-mode selector, 1=melee/2=skill -- any other value is an
     ///     unconditional silent reject) and, only when it selects the skill branch,
@@ -187,7 +194,20 @@ public static class MonsterCombatResolver
                 return AttackOutcome.Miss();
         }
 
-        var damage = monster.Template.AttackPower - defender.Stats.DefensePower;
+        // Catapult flat +15000 (E.1, S07_MyGame02.cpp:3273-3287, __REBIRTH__, live): added to the monster's
+        // attack power BEFORE the defender's defense is subtracted. GAP: the contract grounds the +15000
+        // magnitude and the "before defense subtraction" ordering, but NOT the four catapult mSpecialType
+        // values that gate it -- so this reads the nearest existing accessor, the car-thrower/catapult
+        // archetype selector (MonsterSpecialSort.CarThrower). That selector's own (Type, SpecialType) -> sort 6
+        // derivation is itself still ungrounded (MonsterSpecialSort's remarks), so no production spawn resolves
+        // to CarThrower yet and this bonus is inert in production today -- it becomes live for free once the
+        // derivation is grounded. TODO(legacy): reopen the four catapult mSpecialType values and gate on them
+        // directly if they do not all map to the CarThrower archetype.
+        var monsterAttackPower = monster.Template.AttackPower;
+        if (monster.SpecialSort == MonsterSpecialSort.CarThrower)
+            monsterAttackPower += CatapultAttackPowerBonus;
+
+        var damage = monsterAttackPower - defender.Stats.DefensePower;
         if (damage < 1) damage = 1;
 
         damage = CombatMath.ApplyVariance(damage, rng);

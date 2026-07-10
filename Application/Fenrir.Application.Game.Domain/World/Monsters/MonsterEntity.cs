@@ -30,6 +30,15 @@ public sealed class MonsterEntity
     public required uint UniqueNumber { get; init; }
     public required MonsterRowDto Template { get; init; }
 
+    /// <summary>
+    ///     Legacy <c>mSpecialSortNumber</c> (<see cref="MonsterSpecialSort" />) -- the per-monster archetype
+    ///     selector, derived once at spawn from <see cref="MonsterRowDto.Type" />/<see cref="MonsterRowDto.SpecialType" />
+    ///     via <see cref="MonsterSpecialSort.Derive" /> and read-only thereafter. Drives which idle/decision
+    ///     recipe <see cref="MonsterAiSystem" /> dispatches (its <c>A002</c> byte switch). Seeded by
+    ///     <see cref="Create" />.
+    /// </summary>
+    public byte SpecialSort { get; init; }
+
     /// <summary>Back-reference so a death event can tell <see cref="MonsterSpawnScheduler" /> which slot to respawn.</summary>
     public required int SpawnSlotId { get; init; }
 
@@ -183,6 +192,16 @@ public sealed class MonsterEntity
     public int DetectionThrottleTicks { get; set; }
 
     /// <summary>
+    ///     Legacy ticks accumulated since the last <c>SelectAvatarIndexForShortRange</c> mid-chase re-target
+    ///     throttle-check attempt (legacy's own 1000 ms detection stamp for that function,
+    ///     <c>S07_MyGame05.cpp:518-594</c>) -- reset to 0 whenever <see cref="MonsterAiSystem" /> runs a
+    ///     short-range re-target scan, same "restarts on every attempt" posture as
+    ///     <see cref="DetectionThrottleTicks" />. Only meaningful while <see cref="AiState" /> is
+    ///     <see cref="MonsterAiState.Chase" />.
+    /// </summary>
+    public int ShortRangeRetargetThrottleTicks { get; set; }
+
+    /// <summary>
     ///     Legacy ticks accumulated toward the 60-second in-place re-detection grace period (legacy
     ///     <c>mCheckFirstLocationTime</c>, <c>S07_MyGame05.cpp:1012-1031</c>) -- advances only across ticks
     ///     spent in <see cref="MonsterAiState.Decision" /> that fail to (re)acquire a target; unconditionally
@@ -265,9 +284,15 @@ public sealed class MonsterEntity
     ///     <see cref="SystemRandomSource" /> so every production spawn call site gets a real roll without
     ///     having to thread a random source through; tests that need a deterministic capacity can pass one.
     /// </param>
+    /// <param name="specialSort">
+    ///     Overrides the archetype selector when supplied; otherwise derived from the template via
+    ///     <see cref="MonsterSpecialSort.Derive" />. Every production spawn path leaves this null (real
+    ///     derivation); it exists so a test can exercise a recipe whose live <c>(Type, SpecialType) -&gt; sort</c>
+    ///     discriminator is not yet available from the behavior contract (see <see cref="MonsterSpecialSort" />).
+    /// </param>
     public static MonsterEntity Create(int serverIndex, uint uniqueNumber, MonsterRowDto template, int spawnSlotId,
         float homeX, float homeY, float homeZ, float leashRadius, int? instanceId = null,
-        IRandomSource? random = null)
+        IRandomSource? random = null, byte? specialSort = null)
     {
         var rng = random ?? SystemRandomSource.Instance;
 
@@ -300,7 +325,8 @@ public sealed class MonsterEntity
             TargetLocationY = homeY,
             TargetLocationZ = homeZ,
             InstanceId = instanceId,
-            PursuerCapacity = pursuerCapacity
+            PursuerCapacity = pursuerCapacity,
+            SpecialSort = specialSort ?? MonsterSpecialSort.Derive(template.Type, template.SpecialType)
         };
         entity._life = template.Life;
         return entity;

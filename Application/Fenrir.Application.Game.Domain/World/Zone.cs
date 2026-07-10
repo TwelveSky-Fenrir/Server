@@ -139,6 +139,16 @@ public sealed partial class Zone(
     private readonly List<int> _monsterAiNeighborScratch = [];
 
     /// <summary>
+    ///     Reusable scratch buffer backing <see cref="BorrowBossAggroScratch" /> -- the per-acquisition-tick
+    ///     aggro candidate list a Zone175-type boss's multi-candidate acquisition
+    ///     (<see cref="Monsters.MonsterAiSystem" />) fills and then consumes within one decision pass. Same
+    ///     single-tick-thread confinement rationale as <see cref="_monsterAiNeighborScratch" />: the shared
+    ///     <see cref="Monsters.MonsterAiSystem" /> singleton cannot own it, only <see cref="Zone" /> is
+    ///     guaranteed one tick thread. Cleared on every borrow, valid only until the next borrow.
+    /// </summary>
+    private readonly List<Monsters.MonsterAggroCandidate> _monsterBossAggroScratch = [];
+
+    /// <summary>
     ///     Process-wide party authority (team-stun's exact-5-member gate, <see cref="ApplyStunAttack" />) --
     ///     defaults to a private instance in tests so each test zone starts with a clean, empty party roster.
     /// </summary>
@@ -273,6 +283,20 @@ public sealed partial class Zone(
         _monsterAiNeighborScratch.Clear();
         _grid.Neighbors(_monsterAiNeighborScratch, _grid.CellOf(x, z));
         return _monsterAiNeighborScratch;
+    }
+
+    /// <summary>
+    ///     Tick-thread-only. Hands the caller the cleared, reusable <see cref="_monsterBossAggroScratch" />
+    ///     buffer for a Zone175-type boss's multi-candidate acquisition (<see cref="Monsters.MonsterAiSystem" />)
+    ///     to fill and then read within the same decision pass -- a non-allocating counterpart to
+    ///     <see cref="NeighborsOfPosition" /> for a candidate list that carries per-entry distance/position, not
+    ///     just an id. Distinct buffer from <see cref="_monsterAiNeighborScratch" /> so the acquisition loop can
+    ///     iterate the neighbor-id list and populate this one at the same time without aliasing.
+    /// </summary>
+    public List<Monsters.MonsterAggroCandidate> BorrowBossAggroScratch()
+    {
+        _monsterBossAggroScratch.Clear();
+        return _monsterBossAggroScratch;
     }
 
     public async Task RunAsync(CancellationToken ct)

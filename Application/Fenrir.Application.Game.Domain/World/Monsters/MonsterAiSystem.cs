@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
 using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Simulation;
@@ -11,8 +12,17 @@ namespace Fenrir.Application.Game.Domain.World.Monsters;
 ///     simplified FSM covering spawn-wait, proximity aggro detection, pursuit that gives up once the target
 ///     escapes the monster's own detection radius (routing back to idle re-detection, not straight home -- see
 ///     <see cref="RunDecision" />), a windup-timed attack state (melee, and a Zone175-boss ranged variant), a
-///     hit-stagger state, and forced return-to-spawn. One instance per <see cref="Zone" />.
+///     hit-stagger state, and forced return-to-spawn. One instance per <see cref="Zone" /> -- actually a single
+///     cross-zone DI singleton (see the <see cref="_random" /> remarks), so every per-monster mutable AI counter
+///     lives on <see cref="MonsterEntity" />, never on this system.
 /// </summary>
+/// <remarks>
+///     Split across two files by concern: this file holds the FSM core (the per-tick <see cref="Update" />
+///     dispatch, spawn-wait, idle/decision dispatch, chase, movement/pathfinding, and the shared candidate
+///     gauntlet). <c>MonsterAiSystem.Recipes.cs</c> holds the <c>mSpecialSortNumber</c> archetype recipes
+///     (<see cref="MonsterSpecialSort" />): the car-thrower/ranged annulus recipe and the Zone175-type boss
+///     multi-candidate acquisition + far/near decision (behavior contract <c>A3-ai-recipes</c>).
+/// </remarks>
 /// <remarks>
 ///     Deliberately not ported:
 ///     <list type="bullet">
@@ -34,12 +44,25 @@ namespace Fenrir.Application.Game.Domain.World.Monsters;
 ///             <see cref="Combat.MonsterCombatResolver.ResolveMvpAttack" />).
 ///         </item>
 ///         <item>
-///             Guard/tower/tribe-symbol-guard special AI recipes (legacy <c>mSpecialSortNumber</c> 1-6: tower
-///             attacks, guard-attack target selection, throw-car idle AI) -- not modeled; those hang off a
-///             per-slot "recipe" field this schema does not catalog. Only the SpecialType-gated Zone175-boss
-///             ranged branch (<see cref="MonsterAiState.RangedAttackWindup" />) and the universal death/attack-
-///             stone state (<see cref="MonsterAiState.Dead" />, tribe-symbol resolution) are covered -- see
-///             <see cref="RunChase" /> and <see cref="MonsterSpawnScheduler.ProcessDeath" /> respectively.
+///             UPDATE (2026-07, A3 ai-recipes behavior contract): the <c>mSpecialSortNumber</c> archetype
+///             recipes are now modeled off a real per-monster selector (<see cref="MonsterEntity.SpecialSort" />,
+///             derived once at spawn via <see cref="MonsterSpecialSort" />) dispatched by a byte switch in
+///             <see cref="RunDecision" />. Implemented: the standard mob (<see cref="MonsterSpecialSort.Standard" />),
+///             the car-thrower/ranged annulus recipe (<see cref="MonsterSpecialSort.CarThrower" />), and the
+///             Zone175-type boss multi-candidate acquisition + far/near decision (both in
+///             <c>MonsterAiSystem.Recipes.cs</c>). The RvR recipes that act only on objects workstream A4
+///             spawns -- tribe-symbol stone (2), alliance stone (4), tribe guard (5), tower (10) -- are
+///             dispatched but a safe no-op with a <c>TODO(A4)</c> marker (they cannot run until A4 creates
+///             those objects). Recipe 3 is a genuine inert no-op. NOT yet grounded (flagged for a
+///             <c>legacy-behavior-translator</c> follow-up, see <see cref="MonsterSpecialSort" />): the concrete
+///             <c>ReturnSpecialSortNumber</c> <c>(Type, SpecialType) -&gt; sort</c> discriminator table (only
+///             standard-default + tribe-symbol are grounded), the guard/thrower monster-type/special-type -&gt;
+///             tribe maps (the contract's tribe/allied-tribe exclusion, so the thrower recipe currently applies
+///             no such exclusion), the short-range re-target's body-size height filter (which <c>Size*</c> field
+///             it reads is unknown), and any <c>BulletInfo1/2</c> server-side projectile hit-test (the contract
+///             states the ranged attack is client-echoed, not server-resolved -- so <see cref="MonsterAiState.RangedAttackWindup" />
+///             stays pure-timed and only the melee <see cref="MonsterAiState.AttackWindup" /> resolves damage
+///             through <see cref="Zone.ResolveMonsterAttack" />).
 ///         </item>
 ///         <item>
 ///             UPDATE: <see cref="MonsterAiState.Flinch" />'s entry condition (a big single hit interrupting
@@ -75,18 +98,19 @@ namespace Fenrir.Application.Game.Domain.World.Monsters;
 ///             <c>S07_MyGame02.cpp:2167</c>) -- previously routed into a separate, acquisition-only FIFO list
 ///             that kill-credit never read. The two algorithms stay separate code paths (this first-found
 ///             linear scan here vs. <see cref="Zone.SelectDamageBasedKillCredit" />'s FIFO-capped max-damage
-///             lookup); only the underlying table is now shared, as it is in legacy. NOT further ported by
-///             this fix: a third, structurally distinct acquisition-like function,
+///             lookup); only the underlying table is now shared, as it is in legacy. UPDATE (2026-07, A3
+///             ai-recipes): a third, structurally distinct acquisition-like function,
 ///             <c>SelectAvatarIndexForPossibleAttackForZone175TypeBoss</c> (<c>S07_MyGame05.cpp:218-265</c>),
-///             also calls the shared-table writer directly (multi-candidate, no anti-clump/break-on-first-
-///             success, unlike this method) for a boss-specific mechanic this class does not model as its own
-///             code path; and the full category (<c>mSpecialSortNumber</c>) scope of both the acquisition
+///             IS now modeled as its own code path (<c>MonsterAiSystem.Recipes.cs</c>'s
+///             <c>RunZone175BossDecision</c>): multi-candidate, no anti-clump, no break-on-first-success,
+///             writing every 50%-accepted in-range candidate through the same shared-table writer. The full
+///             category (<c>mSpecialSortNumber</c>) scope of both the acquisition
 ///             write-through and the real-damage write gate was not exhaustively re-audited -- both flagged
 ///             for <c>cpp-zone-gameplay-analyst</c> re-check rather than assumed complete.
 ///         </item>
 ///     </list>
 /// </remarks>
-public sealed class MonsterAiSystem(IRandomSource? random = null) : ISimulationSystem
+public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISimulationSystem
 {
     /// <summary>One legacy tick's worth of movement time, matching the report's own "vitesse × dTime" with dTime ≈ 0.5 s.</summary>
     private const float TickSeconds = SimulationClock.LegacyTickMilliseconds / 1000f;
@@ -270,14 +294,66 @@ public sealed class MonsterAiSystem(IRandomSource? random = null) : ISimulationS
     }
 
     /// <summary>
-    ///     A002 idle/decision dispatcher (<c>S07_MyGame05.cpp:1003-1057</c>): every idle tick first re-attempts
-    ///     the same wide-radius proximity scan used for original aggro -- including the very first idle tick
-    ///     after this monster just gave up a chase target (<see cref="RunChase" />'s two give-up branches both
-    ///     land here, not in <see cref="MonsterAiState.ReturnToSpawn" />). Only once 60 continuous idle ticks
-    ///     pass with zero re-engagement does the monster even consider heading home; until then it falls into
-    ///     a 40-second random-wander cadence instead, still loitering wherever it currently is.
+    ///     A002 idle/decision dispatcher (<c>S07_MyGame05.cpp:815-999</c>): the update router first hands a
+    ///     Zone175-type boss (<see cref="MonsterRowDto.SpecialType" /> 40-44) to its own dedicated boss variant
+    ///     regardless of archetype; every other monster then dispatches on its <c>mSpecialSortNumber</c>
+    ///     archetype selector (<see cref="MonsterEntity.SpecialSort" />, <see cref="MonsterSpecialSort" />) via a
+    ///     byte switch. See <c>MonsterAiSystem.Recipes.cs</c> for the boss and car-thrower recipes; the RvR
+    ///     object recipes (tribe-symbol/alliance/guard/tower) are deferred to workstream A4's spawn objects.
     /// </summary>
     private void RunDecision(Zone zone, MonsterEntity monster, int legacyTicksElapsed,
+        IEnumerable<MonsterEntity> allMonsters)
+    {
+        // Update-router boss dispatch (S07_MyGame05.cpp:59-92): a Zone175-type boss in the idle/decision sort
+        // runs the dedicated boss variant, ahead of and independent of mSpecialSortNumber.
+        if (IsZone175TypeBoss(monster.Template.SpecialType))
+        {
+            RunZone175BossDecision(zone, monster, legacyTicksElapsed);
+            return;
+        }
+
+        // mSpecialSortNumber archetype recipe dispatch (A002 switch, S07_MyGame05.cpp:838). The default (any
+        // value with no case, including the inert value 3) takes no action this tick -- see the contract's
+        // "switch's default is also inert."
+        switch (monster.SpecialSort)
+        {
+            case MonsterSpecialSort.Standard:
+                RunStandardDecision(zone, monster, legacyTicksElapsed, allMonsters);
+                break;
+
+            case MonsterSpecialSort.CarThrower:
+                RunThrowerDecision(zone, monster);
+                break;
+
+            case MonsterSpecialSort.TribeSymbolStone:
+            case MonsterSpecialSort.AllianceStone:
+            case MonsterSpecialSort.TribeGuard:
+            case MonsterSpecialSort.Tower:
+                // TODO(A4): these RvR recipes act only on objects workstream A4 spawns (tribe-symbol/alliance
+                // stones, tribe guards, towers), each gated on a first-attack flag / one-hour or 30-second
+                // hub-action window / territory-ownership state that has no Fenrir spawn source yet. Dispatched
+                // here so the switch is exhaustive and the recipe activates the moment A4 supplies the objects
+                // (and MonsterSpecialSort.Derive gets the reopened discriminator table) -- a safe no-op until
+                // then, never a standard-aggro fall-through.
+                break;
+
+            case MonsterSpecialSort.Inert:
+            default:
+                // Recipe 3 / any unmapped value: fully inert -- no detection, no aggro, no action.
+                break;
+        }
+    }
+
+    /// <summary>
+    ///     Standard-mob idle/decision recipe (<see cref="MonsterSpecialSort.Standard" />,
+    ///     <c>S07_MyGame05.cpp:1003-1057</c>): every idle tick first re-attempts the same wide-radius proximity
+    ///     scan used for original aggro -- including the very first idle tick after this monster just gave up a
+    ///     chase target (<see cref="RunChase" />'s give-up branches all land here, not in
+    ///     <see cref="MonsterAiState.ReturnToSpawn" />). Only once 60 continuous idle ticks pass with zero
+    ///     re-engagement does the monster even consider heading home; until then it falls into a 40-second
+    ///     random-wander cadence instead, still loitering wherever it currently is.
+    /// </summary>
+    private void RunStandardDecision(Zone zone, MonsterEntity monster, int legacyTicksElapsed,
         IEnumerable<MonsterEntity> allMonsters)
     {
         if (TryAcquireTarget(zone, monster, legacyTicksElapsed, allMonsters))
@@ -408,12 +484,9 @@ public sealed class MonsterAiSystem(IRandomSource? random = null) : ISimulationS
 
         foreach (var characterId in zone.NeighborsOfPosition(monster.PosX, monster.PosZ))
         {
-            // Ready-state, then IsMovingZone(), then (unmodeled) hiding, then death -- legacy's own ordering
-            // (S07_MyGame05.cpp:136-152). Only observably reachable for a CROSS-shard transfer; a same-shard
-            // handoff already removes the candidate from this zone's own player map before this loop could
-            // ever see it -- see PlayerRuntimeState.IsMovingZone's own remarks.
-            if (!zone.TryGetPlayer(characterId, out var player) || player is null || player.IsMovingZone ||
-                player.IsDead)
+            // Shared candidate gauntlet -- ready-state, then IsMovingZone(), then (unmodeled) hiding, then
+            // death, in legacy's own ordering (S07_MyGame05.cpp:136-152). See IsCandidateValid.
+            if (!zone.TryGetPlayer(characterId, out var player) || !IsCandidateValid(player))
                 continue;
 
             // Zone-241 "LOD" personal-instance aggro-eligibility filter (Server/ts25zone/S07_MyGame05.cpp:169-177,565):
@@ -488,25 +561,114 @@ public sealed class MonsterAiSystem(IRandomSource? random = null) : ISimulationS
         return count;
     }
 
+    /// <summary>
+    ///     The shared candidate gauntlet every selection function and <c>AdjustValidAttackTarget</c> apply, in
+    ///     legacy's own short-circuit order (<c>S07_MyGame05.cpp:136-152,387-391</c>): a player is a valid
+    ///     target only if it is present/ready (resolved in <see cref="Zone" />'s own player map -- Fenrir's map
+    ///     only ever holds a fully-entered, non-transferring player, collapsing legacy's separate ready check),
+    ///     is NOT mid-cross-shard-transfer (<see cref="PlayerRuntimeState.IsMovingZone" />), is NOT hiding (see
+    ///     <see cref="IsHiding" />), and is NOT dead. The legacy action-sort-0/33 exclusion (<c>:156-159</c>) has
+    ///     no cataloged Fenrir equivalent state and is not applied.
+    /// </summary>
+    private static bool IsCandidateValid([NotNullWhen(true)] PlayerRuntimeState? player)
+    {
+        return player is not null && !player.IsMovingZone && !IsHiding(player) && !player.IsDead;
+    }
+
+    /// <summary>
+    ///     Legacy <c>IsHiding()</c> stealth predicate (part of the candidate gauntlet,
+    ///     <c>S07_MyGame05.cpp:136-152</c>). <see cref="PlayerRuntimeState" /> has no stealth/hide state -- it is
+    ///     a separate, unimplemented gameplay feature -- so this is a named, always-<c>false</c> predicate
+    ///     rather than a fabricated stealth check: no candidate is ever excluded on this ground today. Documented
+    ///     as its own method (not inlined as a literal <c>false</c>) so the gauntlet reads as the full legacy
+    ///     ordering and the gap is greppable when stealth is added.
+    /// </summary>
+    private static bool IsHiding(PlayerRuntimeState player)
+    {
+        _ = player;
+        return false;
+    }
+
+    /// <summary>
+    ///     Short-range mid-chase re-target scan (<c>SelectAvatarIndexForShortRange</c>,
+    ///     <c>S07_MyGame05.cpp:518-594</c>): throttled to the same ~1 s window as wide-detect, gated to attack
+    ///     type {1,3,6}, using the short/melee radius (<see cref="MonsterRowDto.RadiusInfo1" />) with a squared
+    ///     HORIZONTAL distance test. Returns a valid candidate strictly closer than the current target if one is
+    ///     found (re-committing the target descriptor + anti-clump), otherwise the unchanged
+    ///     <paramref name="current" />. The body-size height rejection filter (<c>:581-584</c>) is NOT applied --
+    ///     the contract does not establish which <see cref="MonsterRowDto" /> size field is "body-size height"
+    ///     (flagged for a <c>legacy-behavior-translator</c> follow-up). Never itself transitions state; the
+    ///     caller's own attack/close logic acts on whichever target this returns.
+    /// </summary>
+    private PlayerRuntimeState TryShortRangeRetarget(Zone zone, MonsterEntity monster, PlayerRuntimeState current)
+    {
+        if (monster.Template.AttackType is not (1 or 3 or 6))
+            return current;
+
+        monster.ShortRangeRetargetThrottleTicks++;
+        if (monster.ShortRangeRetargetThrottleTicks < SimulationClock.MonsterDetectionThrottleLegacyTicks)
+            return current;
+
+        monster.ShortRangeRetargetThrottleTicks = 0;
+
+        var shortRadius = monster.Template.RadiusInfo1;
+        if (shortRadius <= 0)
+            return current; // radius-at-least-1 gate (:518-594) -- no short-range scan for a non-positive melee radius
+
+        var shortRadiusSq = (float)shortRadius * shortRadius;
+        var currentDistSq = DistanceSquared(monster.PosX, monster.PosZ, current.PosX, current.PosZ);
+
+        foreach (var characterId in zone.NeighborsOfPosition(monster.PosX, monster.PosZ))
+        {
+            if (characterId == current.CharacterId)
+                continue; // never "re-target" to the one already locked
+
+            if (!zone.TryGetPlayer(characterId, out var candidate) || !IsCandidateValid(candidate))
+                continue;
+
+            if (monster.InstanceId is { } requiredInstanceId && candidate.DungeonInstanceId != requiredInstanceId)
+                continue; // instance-id filter (short-range function, :562-570)
+
+            var candidateDistSq = DistanceSquared(monster.PosX, monster.PosZ, candidate.PosX, candidate.PosZ);
+            if (candidateDistSq > shortRadiusSq || candidateDistSq >= currentDistSq)
+                continue; // must be inside the short radius AND strictly closer than the current target
+
+            monster.AssignTarget(characterId, candidate.UniqueNumber, candidate.PosX, candidate.PosY,
+                candidate.PosZ);
+            monster.RegisterAcquisition(characterId, candidate);
+            return candidate;
+        }
+
+        return current;
+    }
+
     private void RunChase(Zone zone, MonsterEntity monster, float dt)
     {
+        // AdjustValidAttackTarget prune (S07_MyGame05.cpp:387-391, per-A005-tick target re-validation): a
+        // locked target that is disconnected / mid-cross-shard-transfer (IsMovingZone) / (unmodeled) hiding /
+        // dead routes to the idle/decision state, NOT straight to return-to-spawn (S07_MyGame05.cpp:1351-1358).
+        // The very next idle tick immediately re-attempts the same wide-radius proximity scan used for original
+        // aggro (RunDecision -> TryAcquireTarget) at the monster's CURRENT position, and only gives up and heads
+        // home after a continuous 60-second grace period with zero re-engagement -- see RunStandardDecision.
         if (monster.TargetCharacterId is not { } targetId || !zone.TryGetPlayer(targetId, out var target) ||
-            target is null || target.IsDead)
+            !IsCandidateValid(target))
         {
-            // A005: an invalid/disconnected/unique-number-mismatched/dead chased target routes to the
-            // idle/decision state, NOT straight to return-to-spawn (S07_MyGame05.cpp:1351-1358). The very
-            // next idle tick immediately re-attempts the same wide-radius proximity scan used for original
-            // aggro (RunDecision -> TryAcquireTarget) at the monster's CURRENT position, and only gives up and
-            // heads home after a continuous 60-second grace period with zero re-engagement -- see RunDecision.
             monster.ReleaseTarget();
             monster.AiState = MonsterAiState.Decision;
             monster.StateTicks = 0;
 
-            // Legacy A005 broadcasts the drop-to-idle (aSort 1) on an invalid/dead target via
+            // Legacy A005 broadcasts the drop-to-idle (aSort 1) on an invalid target via
             // B_MONSTER_ACTION_RECV(...,1)+Send1 (S07_MyGame05.cpp:1351-1356).
             zone.BroadcastMonsterActionChange(monster);
             return;
         }
+
+        // Short-range mid-chase re-target (SelectAvatarIndexForShortRange, S07_MyGame05.cpp:518-594): a chasing
+        // monster may switch to a valid candidate that has come strictly closer than its current target, within
+        // the short/melee radius (RadiusInfo1). Throttled like the wide-detect scan. NOT reproduced: the
+        // body-size height rejection filter (:581-584) -- which MonsterRowDto.Size* field is "body-size height"
+        // is not established by the A3 contract, so no vertical filter is applied here (flagged for follow-up).
+        target = TryShortRangeRetarget(zone, monster, target);
 
         var distanceToTargetSq = DistanceSquared(monster.PosX, monster.PosZ, target.PosX, target.PosZ);
 
@@ -551,12 +713,13 @@ public sealed class MonsterAiSystem(IRandomSource? random = null) : ISimulationS
             return;
         }
 
-        // Zone175-type boss (A002/A005_FOR_ZONE_175_TYPE_BOSS, S07_MyGame05.cpp:1176-1298): can also loose a
-        // ranged attack from its full detection radius instead of always closing to melee range first. Legacy
-        // rolls a 1/3 chance each tick between this and continuing to close in, over a multi-candidate
-        // distance-banded target list; simplified here to "always take the ranged opening once in range",
-        // since Fenrir's single-locked-target Chase has no equivalent candidate list to roll over. The
-        // give-up guard above already guarantees distanceToTargetSq <= detectionRadiusSq by this point.
+        // Zone175-type boss CHASE continuation (A005_FOR_ZONE_175_TYPE_BOSS, S07_MyGame05.cpp:1176-1298): once
+        // a boss is already closing on its single locked target, it can loose a ranged opening from its full
+        // detection radius instead of always reaching melee range first. The richer multi-candidate 1/3-far vs
+        // 2/3-near DECISION (the acquisition-tick branch) lives in MonsterAiSystem.Recipes.cs's
+        // RunZone175BossDecision; this Chase-state branch is the simpler "already engaged, take the ranged
+        // opening once in range" continuation. The give-up guard above already guarantees
+        // distanceToTargetSq <= detectionRadiusSq by this point.
         if (IsZone175TypeBoss(monster.Template.SpecialType) && distanceToTargetSq <= detectionRadiusSq)
         {
             monster.AiState = MonsterAiState.RangedAttackWindup;

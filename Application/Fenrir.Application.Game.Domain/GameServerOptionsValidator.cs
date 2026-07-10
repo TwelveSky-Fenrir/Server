@@ -31,6 +31,10 @@ public sealed class GameServerOptionsValidator : IValidateOptions<GameServerOpti
         if (options.AoiCellSize <= 0) errors.Add($"Game:AoiCellSize must be positive (was {options.AoiCellSize}).");
         if (options.MaxPlausibleMoveDistance <= 0)
             errors.Add($"Game:MaxPlausibleMoveDistance must be positive (was {options.MaxPlausibleMoveDistance}).");
+        // Non-negative rather than positive: 0 deliberately disables A* monster pathfinding (see the option).
+        if (options.MonsterPathfindingBudgetPerTick < 0)
+            errors.Add(
+                $"Game:MonsterPathfindingBudgetPerTick must not be negative (was {options.MonsterPathfindingBudgetPerTick}).");
         if (options.HeartbeatIntervalSeconds <= 0)
             errors.Add($"Game:HeartbeatIntervalSeconds must be positive (was {options.HeartbeatIntervalSeconds}).");
         if (options.HeroRankingRolloverCheckIntervalMinutes <= 0)

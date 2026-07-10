@@ -39,7 +39,8 @@ internal static class ZoneTestKit
         WorldStateService? worldState = null, PartyRegistry? partyRegistry = null,
         DuelRegistry? duelRegistry = null, ICharacterShardLocationRepository? characterShardLocations = null,
         TribeBankTaxAccumulator? tribeBankTax = null,
-        RegularWarActiveMapTracker? regularWarActiveMapTracker = null)
+        RegularWarActiveMapTracker? regularWarActiveMapTracker = null,
+        Domain.World.Geometry.ZoneGeometry? geometry = null)
     {
         var opts = options ?? Options();
         return new Zone(mapId, opts, new MovementRules(Microsoft.Extensions.Options.Options.Create(opts)),
@@ -47,7 +48,7 @@ internal static class ZoneTestKit
             worldData ?? EmptyWorldData(), randomSource, killCooldownTracker: killCooldownTracker,
             towerWar: towerWar, worldState: worldState, partyRegistry: partyRegistry, duelRegistry: duelRegistry,
             characterShardLocations: characterShardLocations, tribeBankTax: tribeBankTax,
-            regularWarActiveMapTracker: regularWarActiveMapTracker);
+            regularWarActiveMapTracker: regularWarActiveMapTracker, geometry: geometry);
     }
 
     public static (ZoneClientSession Session, FakeDuplexPipe Pipe) CreateSession(long sessionId)

@@ -102,6 +102,20 @@ public sealed class GameServerOptions
     /// </summary>
     public float MaxPlausibleMoveDistance { get; set; } = 666f;
 
+    /// <summary>
+    ///     Maximum number of full A* + funnel monster path computations
+    ///     (<see cref="World.Pathfinding.MonsterPathfinder" />) one zone performs per simulation pass, before
+    ///     monsters still needing a fresh route reuse their cached waypoints or fall back to a straight-line step
+    ///     for that tick. A Fenrir-side cost ceiling with no legacy analogue (legacy's step-and-reject
+    ///     <c>mWORLD.Path</c> never did graph search): 24 keeps the worst-case per-tick pathfinding cost bounded
+    ///     on a busy zone while still letting a healthy batch of newly-aggroing/re-planning monsters route around
+    ///     obstacles promptly -- a monster over budget this tick keeps last frame's motion and re-plans a tick
+    ///     later, so routing is deferred under load, never starved. Path <em>following</em> (walking cached
+    ///     waypoints) costs no budget; only a recompute does. 0 disables A* pathfinding (every constrained move
+    ///     degrades to the straight-line-with-walkability-refusal fallback).
+    /// </summary>
+    public int MonsterPathfindingBudgetPerTick { get; set; } = 24;
+
     /// <summary>How often this shard refreshes its <c>runtime.GameServerDirectory</c> heartbeat row.</summary>
     public int HeartbeatIntervalSeconds { get; set; } = 5;
 

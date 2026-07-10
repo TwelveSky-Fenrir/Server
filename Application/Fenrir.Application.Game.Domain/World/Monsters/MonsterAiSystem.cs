@@ -1,5 +1,8 @@
+using System.Numerics;
 using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Simulation;
+using Fenrir.Application.Game.Domain.World.Geometry;
+using Fenrir.Application.Game.Domain.World.Pathfinding;
 
 namespace Fenrir.Application.Game.Domain.World.Monsters;
 
@@ -91,6 +94,17 @@ public sealed class MonsterAiSystem(IRandomSource? random = null) : ISimulationS
     /// <summary>Close enough to "arrived" that jitter/overshoot never leaves a monster oscillating around its destination.</summary>
     private const float ArrivalEpsilon = 1f;
 
+    /// <summary>
+    ///     How far the movement goal (a chased avatar's live position, or a wander point) must relocate from the
+    ///     goal a cached navmesh route was computed for before that route is re-planned. A Fenrir-chosen
+    ///     heuristic with no legacy analogue (legacy had no A* route to invalidate): large enough that a chased
+    ///     target's small per-tick drift does not burn the per-tick pathfinding budget on a near-identical route
+    ///     every tick, small enough that pursuit never trails the target by a visibly stale margin. Well under a
+    ///     minimum wander step (<see cref="WanderMinDisplacement" />) so a fresh wander destination always
+    ///     triggers a plan.
+    /// </summary>
+    private const float PathReplanGoalMoveThreshold = 40f;
+
     /// <summary>Minimum idle-wander destination radius (S07_MyGame05.cpp:1048): <c>50 + rand()%51</c>, i.e. [50,100].</summary>
     private const float WanderMinRadius = 50f;
 
@@ -127,6 +141,12 @@ public sealed class MonsterAiSystem(IRandomSource? random = null) : ISimulationS
     public void Simulate(Zone zone, int legacyTicksElapsed)
     {
         var dt = TickSeconds * legacyTicksElapsed;
+
+        // One monster-pathfinding budget window per simulation pass (see GameServerOptions.
+        // MonsterPathfindingBudgetPerTick / MonsterPathfinder): monsters past the budget this pass reuse their
+        // cached waypoints or step straight-line rather than blocking. No-op on a zone with no geometry (or one
+        // whose pathfinder has not been lazily built yet).
+        zone.ResetPathBudget();
 
         // Captured once per call and threaded down to the anti-clump pursuer count instead of re-reading
         // zone.MonstersSnapshot per candidate: the property itself already allocates a snapshot, so re-fetching
@@ -323,10 +343,10 @@ public sealed class MonsterAiSystem(IRandomSource? random = null) : ISimulationS
     ///     Random wander destination (S07_MyGame05.cpp:1039-1053): a normalized random 2D direction scaled by a
     ///     radius uniformly drawn from [50,100], measured from the monster's CURRENT position -- not home.
     ///     Legacy resolves the raw random point through <c>mWORLD.Path</c> (navmesh-aware, can slide the
-    ///     result short of an obstacle) before measuring displacement; Fenrir has no equivalent path-resolution
-    ///     step, so an unwalkable raw destination is simply treated as unreachable (same posture as
-    ///     <see cref="MoveToward" />'s own "no pathfinding around obstacles" simplification elsewhere in this
-    ///     class) rather than sliding to a partial point.
+    ///     result short of an obstacle) before measuring displacement; Fenrir instead discards an unwalkable raw
+    ///     destination here (treated as unreachable), then lets <see cref="MoveToward" />'s A* + funnel router
+    ///     find an obstacle-avoiding route to any accepted (walkable) wander point -- so the wander <em>walk</em>
+    ///     is now navmesh-aware even though the destination <em>roll</em> is still a discard-if-blocked check.
     /// </summary>
     private bool TryComputeWanderDestination(Zone zone, MonsterEntity monster, out float destX, out float destZ)
     {
@@ -558,47 +578,218 @@ public sealed class MonsterAiSystem(IRandomSource? random = null) : ISimulationS
     }
 
     /// <summary>
-    ///     Straight-line step of <c>speed * dt</c> toward (targetX, targetZ). Validated against
-    ///     <see cref="Zone.Geometry" /> when loaded; when no <c>.WM</c> is loaded, the step is applied
-    ///     unconditionally, same posture as <see cref="Movement.MovementRules" /> for players.
+    ///     Advances the monster one movement step toward (targetX, targetZ). When no <c>.WM</c> geometry is
+    ///     loaded the step is an unconstrained straight line (same posture as <see cref="Movement.MovementRules" />
+    ///     for players -- unchanged from before this class gained pathfinding). When geometry is present the
+    ///     monster follows an A* + funnel navmesh route (<see cref="MonsterPathfinder" />) cached on the entity,
+    ///     routing <em>around</em> obstacles instead of stalling at a blocked step; the route is recomputed
+    ///     (budget permitting) only when the goal has relocated, the cached path is exhausted, or the next
+    ///     straight segment is blocked. A monster denied a recompute this tick keeps following its cached path,
+    ///     or -- with no cached path -- steps straight-line-with-walkability-refusal (never teleporting through a
+    ///     wall), the same conservative fallback used when no route can be found at all.
     /// </summary>
     private static void MoveToward(Zone zone, MonsterEntity monster, float targetX, float targetZ, float speed,
         float dt)
     {
-        var dx = targetX - monster.PosX;
-        var dz = targetZ - monster.PosZ;
+        if (zone.Geometry is not { } geometry)
+        {
+            // No navmesh: unconstrained straight-line move, exactly as before (no walkability, no ground snap).
+            StepToward(monster, targetX, targetZ, speed, dt, null, false);
+            return;
+        }
+
+        if (zone.Pathfinder is { } pathfinder)
+        {
+            MoveAlongPath(pathfinder, geometry, monster, targetX, targetZ, speed, dt);
+            return;
+        }
+
+        // Geometry present but pathfinding disabled (budget option 0): straight-line-with-walkability-refusal,
+        // the pre-pathfinding fallback (refuse a blocked step rather than route around it).
+        StepToward(monster, targetX, targetZ, speed, dt, geometry, true);
+    }
+
+    /// <summary>
+    ///     Follows (or recomputes) the monster's cached navmesh route toward (targetX, targetZ). A recompute is
+    ///     attempted only when needed -- goal relocated past <see cref="SimulationClock" />-independent
+    ///     <see cref="PathReplanGoalMoveThreshold" />, cached path exhausted, or the next segment blocked -- and
+    ///     only if the per-tick pathfinding budget permits; following an existing route costs no budget.
+    /// </summary>
+    private static void MoveAlongPath(MonsterPathfinder pathfinder, ZoneGeometry geometry, MonsterEntity monster,
+        float targetX, float targetZ, float speed, float dt)
+    {
+        var exhausted = monster.WaypointCursor >= monster.PathWaypoints.Count;
+        var needReplan = exhausted
+                         || PathGoalMoved(monster, targetX, targetZ)
+                         || NextStepBlocked(monster, geometry, speed, dt);
+
+        if (needReplan)
+        {
+            if (pathfinder.TryConsumeBudget())
+            {
+                var from = new Vector3(monster.PosX, monster.PosY, monster.PosZ);
+                var to = new Vector3(targetX, monster.PosY, targetZ);
+                if (pathfinder.TryFindPath(from, to, monster.PathWaypoints))
+                {
+                    monster.WaypointCursor = 0;
+                    monster.PathGoalX = targetX;
+                    monster.PathGoalZ = targetZ;
+                }
+                else
+                {
+                    // Off-mesh endpoint / disconnected goal: don't teleport through walls -- straight-line step
+                    // that refuses a blocked cell, same conservative posture as the pre-pathfinding behavior.
+                    monster.ClearPath();
+                    StepToward(monster, targetX, targetZ, speed, dt, geometry, true);
+                    return;
+                }
+            }
+            else if (exhausted)
+            {
+                // Over budget this tick with no usable cached path: straight-line fallback keeps last frame's
+                // motion going and never blocks; a real route is computed on a later tick once budget frees up.
+                StepToward(monster, targetX, targetZ, speed, dt, geometry, true);
+                return;
+            }
+
+            // Over budget but a cached (possibly slightly stale) path is still available: keep following it.
+        }
+
+        FollowWaypoints(monster, geometry, speed, dt);
+    }
+
+    /// <summary>
+    ///     Walks the monster along its cached waypoint list by up to <c>speed * dt</c> this tick, advancing the
+    ///     cursor as waypoints are reached (and spending any leftover step distance toward the next one, so a
+    ///     fast monster is not throttled to one sparse funnel corner per tick). Each committed position snaps to
+    ///     ground height; funnel waypoints are on-mesh by construction, so no walkability refusal is needed here.
+    /// </summary>
+    private static void FollowWaypoints(MonsterEntity monster, ZoneGeometry geometry, float speed, float dt)
+    {
+        var remainingStep = speed * dt;
+        if (remainingStep <= 0f)
+            return;
+
+        while (monster.WaypointCursor < monster.PathWaypoints.Count)
+        {
+            var waypoint = monster.PathWaypoints[monster.WaypointCursor];
+            var dx = waypoint.X - monster.PosX;
+            var dz = waypoint.Y - monster.PosZ; // Vector2.Y carries world Z
+            var distance = MathF.Sqrt(dx * dx + dz * dz);
+
+            if (distance <= ArrivalEpsilon)
+            {
+                monster.WaypointCursor++;
+                continue;
+            }
+
+            monster.Heading = MathF.Atan2(dx, dz);
+
+            if (remainingStep >= distance)
+            {
+                CommitPosition(monster, geometry, waypoint.X, waypoint.Y);
+                remainingStep -= distance;
+                monster.WaypointCursor++;
+                continue;
+            }
+
+            var newX = monster.PosX + dx / distance * remainingStep;
+            var newZ = monster.PosZ + dz / distance * remainingStep;
+            CommitPosition(monster, geometry, newX, newZ);
+            return;
+        }
+    }
+
+    /// <summary>
+    ///     Single straight-line step of <c>speed * dt</c> toward (destX, destZ). With no geometry, moves
+    ///     unconditionally (no ground snap). With geometry and <paramref name="refuseBlockedStep" />, refuses a
+    ///     step whose landing cell is off the navmesh (never teleports through a wall) and snaps to ground
+    ///     otherwise. Returns true when the step reached the destination exactly.
+    /// </summary>
+    private static bool StepToward(MonsterEntity monster, float destX, float destZ, float speed, float dt,
+        ZoneGeometry? geometry, bool refuseBlockedStep)
+    {
+        var dx = destX - monster.PosX;
+        var dz = destZ - monster.PosZ;
         var distance = MathF.Sqrt(dx * dx + dz * dz);
         if (distance <= 0.0001f)
-            return;
+            return true;
 
         var step = speed * dt;
         if (step <= 0f)
-            return;
+            return false;
 
         float newX, newZ;
+        bool arrived;
         if (step >= distance)
         {
-            newX = targetX;
-            newZ = targetZ;
+            newX = destX;
+            newZ = destZ;
+            arrived = true;
         }
         else
         {
             newX = monster.PosX + dx / distance * step;
             newZ = monster.PosZ + dz / distance * step;
+            arrived = false;
         }
 
-        if (zone.Geometry is { } geometry)
+        if (geometry is { } g)
         {
-            if (!geometry.IsWalkable(newX, newZ))
-                return; // no pathfinding around obstacles in this pass -- simply refuse the blocked step
+            if (refuseBlockedStep && !g.IsWalkable(newX, newZ))
+                return false; // blocked -- refuse the step (no pathfinding fallback), keep current position
 
-            if (geometry.TryGetGroundHeight(newX, newZ, out var groundY))
+            if (g.TryGetGroundHeight(newX, newZ, out var groundY))
                 monster.PosY = groundY;
         }
 
         monster.PosX = newX;
         monster.PosZ = newZ;
         monster.Heading = MathF.Atan2(dx, dz);
+        return arrived;
+    }
+
+    private static void CommitPosition(MonsterEntity monster, ZoneGeometry geometry, float x, float z)
+    {
+        monster.PosX = x;
+        monster.PosZ = z;
+        if (geometry.TryGetGroundHeight(x, z, out var groundY))
+            monster.PosY = groundY;
+    }
+
+    /// <summary>True once the goal has relocated far enough from the cached route's goal to warrant a re-plan.</summary>
+    private static bool PathGoalMoved(MonsterEntity monster, float targetX, float targetZ)
+    {
+        var dx = targetX - monster.PathGoalX;
+        var dz = targetZ - monster.PathGoalZ;
+        return dx * dx + dz * dz > PathReplanGoalMoveThreshold * PathReplanGoalMoveThreshold;
+    }
+
+    /// <summary>
+    ///     True if the immediate step toward the current cached waypoint would land off the navmesh -- a signal
+    ///     to re-plan. False when there is no current waypoint (exhaustion already forces a re-plan). Funnel
+    ///     waypoints are on-mesh, so for a fresh route this is effectively always false; it only fires when a
+    ///     sub-threshold goal drift has left the tail of a stale route clipping an obstacle.
+    /// </summary>
+    private static bool NextStepBlocked(MonsterEntity monster, ZoneGeometry geometry, float speed, float dt)
+    {
+        if (monster.WaypointCursor >= monster.PathWaypoints.Count)
+            return false;
+
+        var waypoint = monster.PathWaypoints[monster.WaypointCursor];
+        var dx = waypoint.X - monster.PosX;
+        var dz = waypoint.Y - monster.PosZ;
+        var distance = MathF.Sqrt(dx * dx + dz * dz);
+        if (distance <= ArrivalEpsilon)
+            return false;
+
+        var step = MathF.Min(speed * dt, distance);
+        if (step <= 0f)
+            return false;
+
+        var newX = monster.PosX + dx / distance * step;
+        var newZ = monster.PosZ + dz / distance * step;
+        return !geometry.IsWalkable(newX, newZ);
     }
 
     private static float DistanceSquared(float x1, float z1, float x2, float z2)

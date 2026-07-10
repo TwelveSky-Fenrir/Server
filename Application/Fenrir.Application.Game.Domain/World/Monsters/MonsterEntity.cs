@@ -1,3 +1,4 @@
+using System.Numerics;
 using Fenrir.Application.Game.Domain.Combat;
 
 namespace Fenrir.Application.Game.Domain.World.Monsters;
@@ -145,6 +146,32 @@ public sealed class MonsterEntity
     public float TargetLocationZ { get; set; }
 
     public TimeSpan LastRebroadcastAt { get; set; }
+
+    /// <summary>
+    ///     Cached A* + funnel navmesh route this monster is currently following (XZ turning points, ending at the
+    ///     goal), reused across ticks and refilled in place by <see cref="Pathfinding.MonsterPathfinder.TryFindPath" />
+    ///     -- no per-tick allocation. Only meaningful on a zone with loaded geometry; empty otherwise. Advanced
+    ///     via <see cref="WaypointCursor" />; the goal it was computed for is <see cref="PathGoalX" />/
+    ///     <see cref="PathGoalZ" />. Tick-owned only (single-writer invariant), like every other mutable field
+    ///     here. See <see cref="MonsterAiSystem.MoveToward" /> for the follow/recompute policy.
+    /// </summary>
+    public List<Vector2> PathWaypoints { get; } = [];
+
+    /// <summary>Index of the next unreached waypoint in <see cref="PathWaypoints" />; at or past <c>Count</c> means the route is exhausted.</summary>
+    public int WaypointCursor { get; set; }
+
+    /// <summary>Goal X the cached <see cref="PathWaypoints" /> route was computed for -- see <see cref="PathWaypoints" />.</summary>
+    public float PathGoalX { get; set; }
+
+    /// <summary>Goal Z the cached <see cref="PathWaypoints" /> route was computed for -- see <see cref="PathWaypoints" />.</summary>
+    public float PathGoalZ { get; set; }
+
+    /// <summary>Discards the cached navmesh route (e.g. when it can no longer be reached), forcing a fresh plan.</summary>
+    public void ClearPath()
+    {
+        PathWaypoints.Clear();
+        WaypointCursor = 0;
+    }
 
     /// <summary>
     ///     Legacy ticks accumulated since the last <c>SelectAvatarIndexForPossibleAttack</c> throttle-check

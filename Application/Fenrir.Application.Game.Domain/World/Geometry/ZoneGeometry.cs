@@ -1,4 +1,5 @@
 using System.Numerics;
+using Fenrir.Application.Game.Domain.World.Pathfinding;
 
 namespace Fenrir.Application.Game.Domain.World.Geometry;
 
@@ -9,8 +10,19 @@ namespace Fenrir.Application.Game.Domain.World.Geometry;
 /// </summary>
 public sealed class ZoneGeometry(WorldTriangle[] triangles, QuadtreeNode[] quadtree)
 {
+    /// <summary>
+    ///     The triangle-connectivity graph used by A* + funnel monster pathfinding (<see cref="MonsterPathfinder" />),
+    ///     built lazily and once: a zone with geometry but no aggressive, actually-pathing monster never pays the
+    ///     O(triangles) build cost. Thread-safe to first-touch (<see cref="Lazy{T}" />'s default publication mode),
+    ///     though in practice only a zone's own tick thread reads it.
+    /// </summary>
+    private readonly Lazy<TriangleAdjacencyGraph> _navmesh = new(() => TriangleAdjacencyGraph.Build(triangles));
+
     public IReadOnlyList<WorldTriangle> Triangles => triangles;
     public IReadOnlyList<QuadtreeNode> Quadtree => quadtree;
+
+    /// <summary>See <see cref="_navmesh" />.</summary>
+    public TriangleAdjacencyGraph Navmesh => _navmesh.Value;
 
     /// <summary>
     ///     Ground height at (x, z) via quadtree descent (legacy <c>GetYCoord</c>). Among candidates under
@@ -67,6 +79,38 @@ public sealed class ZoneGeometry(WorldTriangle[] triangles, QuadtreeNode[] quadt
         foreach (var triangleIndex in quadtree[nodeIndex].TriangleIndex)
             if (IsPointInsideTriangleXz(triangles[triangleIndex], x, z))
                 return true;
+
+        return false;
+    }
+
+    /// <summary>
+    ///     Index of a walkable floor triangle (<see cref="WorldTriangle.PlaneInfo" /><c>.Y &gt; 0</c>) whose XZ
+    ///     footprint contains (x, z), via the same quadtree descent + XZ point-in-triangle test as
+    ///     <see cref="IsWalkable" /> -- the on-mesh entry point A* pathfinding snaps a start/goal position to
+    ///     (see <see cref="MonsterPathfinder" />). Returns the first matching walkable triangle in the resolved
+    ///     leaf; on a multi-level footprint (e.g. a bridge over a floor, coincident in XZ) that first match may be
+    ///     either surface, which is acceptable for grounding a monster's route -- callers needing a specific
+    ///     surface use <see cref="TryGetGroundHeight" />'s height resolution instead. Excludes vertical
+    ///     wall/ceiling triangles, matching the walkable set the adjacency graph is built from.
+    /// </summary>
+    public bool TryFindContainingWalkableTriangle(float x, float z, out int triangleIndex)
+    {
+        triangleIndex = -1;
+        if (quadtree.Length == 0 || !TryDescend(x, z, out var nodeIndex))
+            return false;
+
+        foreach (var candidate in quadtree[nodeIndex].TriangleIndex)
+        {
+            var triangle = triangles[candidate];
+            if (triangle.PlaneInfo.Y <= 0f)
+                continue;
+
+            if (IsPointInsideTriangleXz(triangle, x, z))
+            {
+                triangleIndex = candidate;
+                return true;
+            }
+        }
 
         return false;
     }

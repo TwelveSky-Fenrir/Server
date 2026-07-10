@@ -10,6 +10,7 @@ using Fenrir.Application.Game.Domain.Social.Duel;
 using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Domain.World.Geometry;
+using Fenrir.Application.Game.Domain.World.Pathfinding;
 using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.GameData;
@@ -69,7 +70,8 @@ public sealed partial class Zone(
     ICharacterShardLocationRepository? characterShardLocations = null,
     TribeBankTaxAccumulator? tribeBankTax = null,
     RegularWarActiveMapTracker? regularWarActiveMapTracker = null,
-    ZoneRegistry? zoneRegistry = null) : IZoneActor
+    ZoneRegistry? zoneRegistry = null,
+    ZoneGeometry? geometry = null) : IZoneActor
 {
     /// <summary>Bounded capacity for <see cref="_inbox" /> -- also the basis for <see cref="InboxDrainCapPerTick" />.</summary>
     private const int InboxCapacity = 8192;
@@ -194,8 +196,44 @@ public sealed partial class Zone(
     ///     movement validation. Null (logged, not a startup crash) when the <c>.WM</c> file is absent -- the
     ///     legacy game-data tree is an external asset not committed to the repo, so its absence must not block
     ///     the zone from ticking; validation degrades to speed-only in that case.
+    ///     <para>
+    ///         The <c>geometry</c> constructor parameter is a test seam: when supplied it replaces the file load,
+    ///         letting a test drive terrain-aware movement/pathfinding over a hand-built mesh without an on-disk
+    ///         <c>.WM</c>. Null in every production call site (<see cref="ZoneRegistry.Initialize" />), which
+    ///         always loads from disk.
+    ///     </para>
     /// </summary>
-    public ZoneGeometry? Geometry { get; } = TryLoadGeometry(mapId, options, logger);
+    public ZoneGeometry? Geometry { get; } = geometry ?? TryLoadGeometry(mapId, options, logger);
+
+    /// <summary>
+    ///     Lazily-built A* + funnel navmesh router for monster movement (<see cref="Monsters.MonsterAiSystem" />),
+    ///     tick-thread-only. Null when <see cref="Geometry" /> is absent (movement degrades to unconstrained
+    ///     straight-line). Created on the first monster path request rather than at construction so a zone with
+    ///     geometry but no aggressive, actually-pathing monster never pays the triangle-adjacency build cost --
+    ///     see <see cref="Pathfinder" />.
+    /// </summary>
+    private MonsterPathfinder? _pathfinder;
+
+    /// <summary>
+    ///     Tick-thread-only accessor that lazily creates <see cref="_pathfinder" /> on first use. Returns null
+    ///     (no pathfinding, straight-line fallback) when this zone has no loaded <see cref="Geometry" />.
+    /// </summary>
+    public MonsterPathfinder? Pathfinder =>
+        Geometry is null
+            ? null
+            : _pathfinder ??= new MonsterPathfinder(Geometry, options.MonsterPathfindingBudgetPerTick);
+
+    /// <summary>
+    ///     Resets this tick's monster-pathfinding budget -- called once per <see cref="Monsters.MonsterAiSystem" />
+    ///     pass before its monster loop. Deliberately resets only an <em>already-built</em> pathfinder: it must
+    ///     not force <see cref="Pathfinder" />'s lazy build (and the adjacency-graph cost behind it) on a zone
+    ///     whose monsters have never actually pathed. The first real path request starts with a full budget from
+    ///     the pathfinder's own constructor, so skipping the reset before that point is correct.
+    /// </summary>
+    public void ResetPathBudget()
+    {
+        _pathfinder?.ResetBudget();
+    }
 
     /// <summary>
     ///     Enqueues a command for the next tick. Never blocks: a full inbox drops the write rather than stall

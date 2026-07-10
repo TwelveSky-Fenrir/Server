@@ -11,6 +11,7 @@ using Fenrir.Application.Game.Domain.Social.Mentor;
 using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Application.Game.Domain.World.Loot;
 using Fenrir.Application.Game.Domain.World.Monsters;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Data.WriteBehind;
@@ -42,6 +43,11 @@ public static class DomainServiceCollectionExtensions
 
         services.AddSingleton<QuestCatalog>();
         services.AddSingleton<KillCooldownTracker>(); // C05 anti-farm gate, shared by every Zone via ZoneRegistry
+
+        // C4 boss/event drop item-id data (BossEventDropResolver's DATA half) -- an immutable Domain-owned static
+        // asset built once, injected into MonsterSpawnScheduler above. Registered as the single Default instance so
+        // production and any DI-constructed test share the exact same materialized lists.
+        services.AddSingleton(BossDropCatalog.Default);
 
         // Registration order IS simulation order within a zone's tick: buffs must expire before meditation regen
         // reads a (possibly just-cleared) sit-skill, and before auto-hunt decides which configured buff is still

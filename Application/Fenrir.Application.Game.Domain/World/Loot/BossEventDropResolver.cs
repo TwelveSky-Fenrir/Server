@@ -22,8 +22,9 @@ namespace Fenrir.Application.Game.Domain.World.Loot;
 /// <param name="SkipGenericTiers">
 ///     When true, the matched identifier's legacy block unconditionally <c>return</c>s before ever reaching
 ///     <c>DROP_MONEY</c> -- <see cref="MonsterDropRoller.Roll" /> must not run at all for this kill (identifiers
-///     287, 564-568, 1407). When false, the legacy block falls through and the generic tiers still run in addition
-///     to whatever this outcome already carries (every other identifier).
+///     287, 564-568, 1407, and -- now that its pool is populated and always resolves a positive id -- 746/9001).
+///     When false, the legacy block falls through and the generic tiers still run in addition to whatever this
+///     outcome already carries (731, 1404, 576, 756, 1408).
 /// </param>
 /// <param name="AnnounceEliteBossDefeat">Identifier 1407 only -- see <see cref="Zone.AnnounceEliteBossDefeated" />.</param>
 public readonly record struct BossDropOutcome(
@@ -48,24 +49,26 @@ public readonly record struct BossDropOutcome(
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>Known gap, intentional:</b> the source behavior contract this class was built from gave exact item
-///         catalog ids for only three drops -- identifier 731's item 536, identifier 576's public 20x item 1048
-///         (Labyrinth Key), and identifier 746's 30%-chance rare item 93500 -- every other guaranteed/random list
-///         below (1404's 9 items, 287's 13-item pool, 576's own 6-item personal list, 756's 3 items, each of
-///         564-568's own distinct 6/7-item list, 1407's 8 items, 1408's four pools, and the 746/9001 shared 6-entry
-///         pool) was only described by name/shape, never by id, in that contract. Per this repo's "no legacy parity
-///         from memory" rule, none of those ids are guessed here -- every such list below is intentionally left
-///         empty, with the exact <c>Server/ts25zone/S07_MyGame05.cpp</c> line range still needed cited alongside it,
-///         ready for a follow-up <c>legacy-behavior-translator</c> contract to fill in. Every other part of this
-///         class (control flow, early-return/fallthrough semantics, CP/War Point/Blood Point amounts, roll
-///         thresholds, the public-vs-owned drop distinction, the shared server-process-wide kill tally for
-///         identifier 287) is fully modeled from that contract.
+///         This class owns the control flow -- early-return/fallthrough semantics, CP/War Point/Blood Point
+///         amounts, roll thresholds, the public-vs-owned drop distinction, the shared server-process-wide kill
+///         tally for identifier 287. The item-id DATA each block drops lives in <see cref="BossDropCatalog" />
+///         (guaranteed lists and index-picked pools) and <see cref="BossDropHelperResolver" /> (the per-kill
+///         random animal/elixir pickers); every id in both is grounded in the C4 boss-drop behavior contract's
+///         own drop blocks (<c>Server/ts25zone/S07_MyGame05.cpp:2333-2662</c>, with the animal/elixir tables at
+///         <c>S07_MyGame03.cpp:7308-7359</c>), cited per-list at each member there.
 ///     </para>
 ///     <para>
 ///         Identifier 9001 does not correspond to any monster this scheduler's per-region spawn pool can produce
 ///         today (not present in the seeded <c>world.Monsters</c> catalog as an ordinary spawn) -- it shares
 ///         identifier 746's ("Virgin Ghost") drop block in the legacy source, so <see cref="Resolve" /> still
 ///         recognizes it for whenever an event-summon path that can produce it exists.
+///     </para>
+///     <para>
+///         <b>Not modeled (pre-existing, out of C4's data-fill scope):</b> the legacy loot-tribe filter the
+///         746/9001 shared-pool drop and the 746 rare bonus pass (both equal to the killer's tribe) -- Fenrir's
+///         <see cref="DroppedItem" /> carries no tribe filter and every drop here is attributed to the killer
+///         through the same owner-name path as any other drop; see the contract's own "emitter/argument
+///         semantics not fully re-read" edge case.
 ///     </para>
 /// </remarks>
 public static class BossEventDropResolver
@@ -133,38 +136,6 @@ public static class BossEventDropResolver
     private const int SharedRandomPoolWarPoints = 3;
     private const int SharedRandomPoolBloodPoints = 6;
 
-    // ---- Guaranteed/random item lists -- every one of these is an intentionally empty placeholder for a
-    // ---- follow-up contract, see this class's own remarks. Do NOT fill these with a guessed id.
-    private static readonly IReadOnlyList<DroppedItem> NineItemEventList = []; // :2339-2352
-
-    private static readonly IReadOnlyList<DroppedItem>
-        HolyUnicornPersonalList = []; // :2396-2420 (own 6-item list; the public Labyrinth Key drop IS modeled)
-
-    private static readonly IReadOnlyList<DroppedItem> ThreeItemEventList = []; // :2423-2428
-    private static readonly IReadOnlyList<DroppedItem> EliteBossGuaranteedList = []; // :2509-2529
-    private static readonly int[] DemonLordItemPool = []; // :2356-2394, 13-item pool
-
-    private static readonly int[]
-        FifteenMinuteBossLowTierPool = []; // :2532-2583, roll < 25, "random animal (tier 10)" helper
-
-    private static readonly int[]
-        FifteenMinuteBossLowMidTierPool = []; // roll [25,100), 2 fixed ids + "random animal (tier 5)" helper
-
-    private static readonly int[] FifteenMinuteBossMidTierPool = []; // roll [100,400), 9-item fixed pool
-    private static readonly int[] FifteenMinuteBossHighTierPool = []; // roll >= 400, 3-item fixed pool
-
-    private static readonly int[]
-        SharedRandomPool = []; // :2586-2662, 2 fixed ids + "random elixir" helper + 2 more fixed ids
-
-    private static readonly IReadOnlyList<DroppedItem>[] CustomTimedBossLists =
-    [
-        [], // 564
-        [], // 565
-        [], // 566
-        [], // 567
-        [] // 568
-    ];
-
     /// <summary>
     ///     Resolves the boss/event tier for one kill. Runs unconditionally for the fixed fifteen (well, ten)
     ///     identifiers below -- no cooldown, zone, or inventory-space gate exists in the cited source range beyond
@@ -178,8 +149,9 @@ public static class BossEventDropResolver
     ///     <see cref="MonsterSpawnScheduler" />'s own field for where that shared state actually lives).
     ///     Ignored for every other identifier.
     /// </param>
+    /// <param name="catalog">The item-id lists each block drops -- <see cref="BossDropCatalog.Default" /> in production.</param>
     public static BossDropOutcome Resolve(int monsterId, int demonLordKillTally, Random random,
-        WorldDataCache worldData)
+        WorldDataCache worldData, BossDropCatalog catalog)
     {
         return monsterId switch
         {
@@ -187,83 +159,112 @@ public static class BossEventDropResolver
 
             NineItemEventBossMonsterId => BossDropOutcome.None with
             {
-                Items = NineItemEventList, ContributionPointsGranted = NineItemEventContributionPoints
+                Items = catalog.NineItemEventList, ContributionPointsGranted = NineItemEventContributionPoints
             },
 
-            DemonLordMonsterId => ResolveDemonLord(demonLordKillTally, random),
+            DemonLordMonsterId => ResolveDemonLord(demonLordKillTally, random, catalog),
 
             HolyUnicornMonsterId => BossDropOutcome.None with
             {
-                Items = HolyUnicornPersonalList,
+                Items = catalog.HolyUnicornPersonalList,
                 PublicItems = [new DroppedItem(LabyrinthKeyItemId, LabyrinthKeyPublicQuantity)]
             },
 
-            ThreeItemEventBossMonsterId => BossDropOutcome.None with { Items = ThreeItemEventList },
+            ThreeItemEventBossMonsterId => BossDropOutcome.None with { Items = catalog.ThreeItemEventList },
 
-            >= CustomTimedBossFirstMonsterId and <= CustomTimedBossLastMonsterId => BossDropOutcome.None with
-            {
-                Items = CustomTimedBossLists[monsterId - CustomTimedBossFirstMonsterId], SkipGenericTiers = true
-            },
+            >= CustomTimedBossFirstMonsterId and <= CustomTimedBossLastMonsterId =>
+                ResolveCustomTimedBoss(monsterId, catalog),
 
             EliteBossMonsterId => BossDropOutcome.None with
             {
-                Items = EliteBossGuaranteedList, SkipGenericTiers = true, AnnounceEliteBossDefeat = true
+                Items = catalog.EliteBossGuaranteedList, SkipGenericTiers = true, AnnounceEliteBossDefeat = true
             },
 
-            FifteenMinuteBossMonsterId => ResolveFifteenMinuteBoss(random),
+            FifteenMinuteBossMonsterId => ResolveFifteenMinuteBoss(random, catalog),
 
-            VirginGhostMonsterId or SharedRandomPoolMonsterId => ResolveSharedRandomPool(monsterId, random, worldData),
+            VirginGhostMonsterId or SharedRandomPoolMonsterId =>
+                ResolveSharedRandomPool(monsterId, random, worldData, catalog),
 
             _ => BossDropOutcome.None
         };
     }
 
     /// <summary>
+    ///     Identifiers 564-568 (:2431-2506): each drops its own distinct guaranteed list in order, then always
+    ///     aborts before the generic tiers. The <c>TryGetValue</c> miss branch is defensive only -- every id in
+    ///     the range has a seeded list.
+    /// </summary>
+    private static BossDropOutcome ResolveCustomTimedBoss(int monsterId, BossDropCatalog catalog)
+    {
+        return catalog.CustomTimedBossLists.TryGetValue(monsterId, out var list)
+            ? BossDropOutcome.None with { Items = list, SkipGenericTiers = true }
+            : BossDropOutcome.None with { SkipGenericTiers = true };
+    }
+
+    /// <summary>
     ///     Every kill of this identifier exits before the generic tiers regardless of whether an item actually drops
     ///     -- only the 10th (mod) kill (server-process-wide, see <see cref="Resolve" />'s own param remarks) resolves
-    ///     one item from the (currently unresolved, see class remarks) 13-item pool.
+    ///     one item uniformly from the thirteen-entry pool.
     /// </summary>
-    private static BossDropOutcome ResolveDemonLord(int demonLordKillTally, Random random)
+    private static BossDropOutcome ResolveDemonLord(int demonLordKillTally, Random random, BossDropCatalog catalog)
     {
-        if (demonLordKillTally <= 0 || demonLordKillTally % DemonLordKillCycle != 0 || DemonLordItemPool.Length == 0)
+        var pool = catalog.DemonLordItemPool;
+        if (demonLordKillTally <= 0 || demonLordKillTally % DemonLordKillCycle != 0 || pool.Length == 0)
             return BossDropOutcome.None with { SkipGenericTiers = true };
 
-        var item = DemonLordItemPool[random.Next(DemonLordItemPool.Length)];
+        var item = pool[random.Next(pool.Length)];
         return BossDropOutcome.None with { Items = [new DroppedItem(item, 1)], SkipGenericTiers = true };
     }
 
     /// <summary>
-    ///     No early exit for this identifier either way -- the roll/tier-boundary logic is fully modeled; only the
-    ///     four pools' contents (and therefore any actual resolved item) are an open gap, see class remarks.
+    ///     No early exit for this identifier either way (1408 falls through to the generic table in addition to
+    ///     its own drop): the standard-generator weighted tier roll picks a pool, then one item is picked uniformly
+    ///     from it. The two lowest tiers' pools are built per kill from a helper-drawn animal
+    ///     (<see cref="BossDropHelperResolver" />); the two upper tiers are wholly fixed (<see cref="BossDropCatalog" />).
     /// </summary>
-    private static BossDropOutcome ResolveFifteenMinuteBoss(Random random)
+    private static BossDropOutcome ResolveFifteenMinuteBoss(Random random, BossDropCatalog catalog)
     {
         var roll = random.Next(0, FifteenMinuteBossRollCeiling);
 
-        var pool = roll switch
+        int resolvedItemId;
+        if (roll < FifteenMinuteBossTierBoundaryLow)
         {
-            < FifteenMinuteBossTierBoundaryLow => FifteenMinuteBossLowTierPool,
-            < FifteenMinuteBossTierBoundaryMid => FifteenMinuteBossLowMidTierPool,
-            < FifteenMinuteBossTierBoundaryHigh => FifteenMinuteBossMidTierPool,
-            _ => FifteenMinuteBossHighTierPool
-        };
+            // Low tier (2.5%): a single random tier-2 animal.
+            Span<int> pool = [BossDropHelperResolver.ResolveRandomTier2Animal(random)];
+            resolvedItemId = pool[random.Next(pool.Length)];
+        }
+        else if (roll < FifteenMinuteBossTierBoundaryMid)
+        {
+            // Low-mid tier (7.5%): two fixed ids plus a random tier-1 animal, in that order.
+            var fixedIds = catalog.FifteenMinuteBossLowMidFixedIds;
+            Span<int> pool = [fixedIds[0], fixedIds[1], BossDropHelperResolver.ResolveRandomTier1Animal(random)];
+            resolvedItemId = pool[random.Next(pool.Length)];
+        }
+        else
+        {
+            var pool = roll < FifteenMinuteBossTierBoundaryHigh
+                ? catalog.FifteenMinuteBossMidTierPool
+                : catalog.FifteenMinuteBossHighTierPool;
+            resolvedItemId = pool[random.Next(pool.Length)];
+        }
 
-        if (pool.Length == 0)
+        if (resolvedItemId == 0)
             return BossDropOutcome.None;
 
-        var resolvedItemId = pool[random.Next(pool.Length)];
         var quantity = resolvedItemId == FifteenMinuteBossDoubleStackItemId ? 2 : 1;
         return BossDropOutcome.None with { Items = [new DroppedItem(resolvedItemId, quantity)] };
     }
 
     /// <summary>
-    ///     Identifiers 746 ("Virgin Ghost") and 9001 share this one block. The routine only ever exits early when
-    ///     the shared pool resolves a non-zero item -- since that pool is currently unresolved (class remarks), this
-    ///     always takes the documented "resolved item is zero" fallthrough, i.e.
-    ///     <see cref="BossDropOutcome.SkipGenericTiers" />
-    ///     stays false and the generic tiers still run, same as legacy would for an actual zero roll.
+    ///     Identifiers 746 ("Virgin Ghost") and 9001 share this one block. Draw order matches the contract's own
+    ///     block order: build the shared six-entry pool (its fourth slot a per-kill random elixir), then -- 746
+    ///     only -- the 30%-chance rare bonus, then the uniform shared-pool pick. Because every pool entry is a
+    ///     positive id the pick always resolves non-zero, so this identifier's legacy "abort before the generic
+    ///     table" fires on every kill (<see cref="BossDropOutcome.SkipGenericTiers" /> = true) -- unlike the empty-
+    ///     pool placeholder this replaced, which always fell through.
     /// </summary>
-    private static BossDropOutcome ResolveSharedRandomPool(int monsterId, Random random, WorldDataCache worldData)
+    private static BossDropOutcome ResolveSharedRandomPool(int monsterId, Random random, WorldDataCache worldData,
+        BossDropCatalog catalog)
     {
         var isVirginGhost = monsterId == VirginGhostMonsterId;
 
@@ -271,20 +272,32 @@ public static class BossEventDropResolver
         var warPoints = isVirginGhost ? VirginGhostWarPoints : SharedRandomPoolWarPoints;
         var bloodPoints = isVirginGhost ? VirginGhostBloodPoints : SharedRandomPoolBloodPoints;
 
+        // Six-entry pool with the per-kill random elixir spliced into its documented slot (index 3): the three
+        // fixed ids before it, the elixir, then the two fixed ids after it. Stack-allocated -- no per-kill heap.
+        var fixedIds = catalog.SharedRandomPoolFixedIds;
+        Span<int> pool =
+        [
+            fixedIds[0], fixedIds[1], fixedIds[2],
+            BossDropHelperResolver.ResolveRandomElixir(random),
+            fixedIds[3], fixedIds[4]
+        ];
+
         List<DroppedItem>? items = null;
 
-        if (SharedRandomPool.Length > 0)
-        {
-            var resolved = SharedRandomPool[random.Next(SharedRandomPool.Length)];
-            if (resolved != 0)
-                (items ??= []).Add(new DroppedItem(resolved, 1));
-        }
-
-        // The only drop call in this whole tier that validates catalog existence before dropping (Edge cases).
+        // 746 only: the 30%-chance rare bonus, guarded by the one catalog-existence check in this whole tier (Edge
+        // cases). Rolled BEFORE the shared-pool pick, matching the contract's block order.
         if (isVirginGhost && worldData.ItemsById.ContainsKey(VirginGhostRareItemId) &&
             LootRandomSource.RandomNumber(random) <= VirginGhostRareItemDropChance)
             (items ??= []).Add(new DroppedItem(VirginGhostRareItemId, 1));
 
-        return new BossDropOutcome(items ?? [], [], contributionPoints, warPoints, bloodPoints, false, false);
+        // Both: pick one item uniformly from the shared pool and drop it, then abort. resolved is always non-zero
+        // (every pool entry is positive), so the abort effectively always fires -- see this method's remarks.
+        var resolved = pool[random.Next(pool.Length)];
+        var abortGenericTiers = resolved != 0;
+        if (abortGenericTiers)
+            (items ??= []).Add(new DroppedItem(resolved, 1));
+
+        return new BossDropOutcome(items ?? [], [], contributionPoints, warPoints, bloodPoints, abortGenericTiers,
+            false);
     }
 }

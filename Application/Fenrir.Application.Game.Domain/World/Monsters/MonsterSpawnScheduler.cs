@@ -89,9 +89,17 @@ public sealed class MonsterSpawnScheduler(
     Lazy<ZoneEventBroadcaster>? zoneEventBroadcaster = null,
     MonsterBossRespawnTracker? bossRespawnTracker = null,
     TowerWarState? towerWar = null,
-    ValleyWarKillRegistry? valleyWarKillRegistry = null)
+    ValleyWarKillRegistry? valleyWarKillRegistry = null,
+    BossDropCatalog? bossDropCatalog = null)
     : ISimulationSystem
 {
+    /// <summary>
+    ///     The boss/event drop item-id data (<see cref="BossEventDropResolver" />'s DATA half). Defaults to the
+    ///     process-wide <see cref="BossDropCatalog.Default" /> when DI/tests don't supply one -- it is an immutable
+    ///     static asset, so a shared single instance across every zone is correct.
+    /// </summary>
+    private readonly BossDropCatalog _bossDropCatalog = bossDropCatalog ?? BossDropCatalog.Default;
+
     /// <summary>
     ///     Legacy's <c>END_NORMAL_MONSTER_OBJECT_NUM</c> (<c>Server/ts25zone/S01_MainApplication.cpp:38-57</c>,
     ///     per <c>ServerDocs/12_ts25zone/21_MyWorld_MySummon_Navmesh_Spawn.md</c> &#167;3.3): the running total of
@@ -379,7 +387,7 @@ public sealed class MonsterSpawnScheduler(
             ? Interlocked.Increment(ref _demonLordKillTally)
             : 0;
         var bossOutcome = BossEventDropResolver.Resolve(monster.Template.MonsterId, demonLordKillTally, state.Random,
-            worldData);
+            worldData, _bossDropCatalog);
 
         ApplyBossDropSideEffects(zone, killer, bossOutcome);
 

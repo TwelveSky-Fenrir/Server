@@ -51,8 +51,6 @@ public sealed class DuelAskHandler(IDuelService duelService, ILogger<DuelAskHand
             case DuelAskResultKind.TargetBusy:
                 session.Send(new DuelAnswerResponse { Answer = 5 });
                 return;
-            case DuelAskResultKind.SentCrossShard:
-                return;
         }
     }
 }

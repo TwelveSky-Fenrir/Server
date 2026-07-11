@@ -6,10 +6,6 @@ using Fenrir.Data.Abstractions.Characters;
 
 namespace Fenrir.Data.Characters;
 
-// The three BigMoney ("1B") transfer/conversion primitives (CZ_PROCESS_DATA_SEND tSort
-// 241/242/244/245/246/247) -- see IBigMoneyRepository for the per-method contract. Dedicated, off
-// ICharacterRepository/IAccountVaultRepository's hot magnet files (same posture as RuneRepository/
-// WarPointRepository).
 public sealed record BigMoneyRepository(ICaeriusNetDbContext Db) : IBigMoneyRepository
 {
     public async ValueTask AdjustBigMoneyStoreAsync(int characterId, int deltaBigMoney, int deltaBigStoreMoney,

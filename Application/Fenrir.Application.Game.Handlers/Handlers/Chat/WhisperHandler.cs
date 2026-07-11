@@ -48,7 +48,7 @@ public sealed class WhisperHandler(IWhisperService whisperService, ILogger<Whisp
                     Result = 1,
                     ZoneNumber = 0,
                     AvatarName = packet.AvatarName,
-                    Content = "",
+                    Content = packet.Content,
                     AuthType = 0,
                     Link = EmptyLink
                 });
@@ -83,15 +83,26 @@ public sealed class WhisperHandler(IWhisperService whisperService, ILogger<Whisp
                     Link = packet.Link
                 });
 
-                target.Session.Send(new WhisperResponse
+                if (!target.IsMovingZone)
                 {
-                    Result = 3,
-                    ZoneNumber = 0,
-                    AvatarName = sender.Name,
-                    Content = packet.Content,
-                    AuthType = zoneSession.IsGm ? 1 : 0,
-                    Link = packet.Link
-                });
+                    target.Session.Send(new WhisperResponse
+                    {
+                        Result = 3,
+                        ZoneNumber = 0,
+                        AvatarName = sender.Name,
+                        Content = packet.Content,
+                        AuthType = zoneSession.IsGm ? 1 : 0,
+                        Link = packet.Link
+                    });
+                }
+                else
+                {
+                    logger.LogDebug(
+                        "Whisper from {SenderName} to {TargetName} resolved locally but target is mid " +
+                        "zone-transfer; delivery suppressed",
+                        sender.Name, target.Name);
+                }
+
                 return;
         }
     }

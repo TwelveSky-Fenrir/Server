@@ -103,7 +103,7 @@ public class ZoneFormationPartyBuffGateTests
         foreach (var allyId in allyIds)
         {
             Assert.Equal(PartyInviteOutcome.Sent, partyRegistry.TryInvite(casterId, 1, 0, allyId, 1, 0));
-            Assert.True(partyRegistry.TryAnswer(allyId, true, out _, out _));
+            Assert.True(partyRegistry.TryAnswer(allyId, true, false, out _, out _, out _));
         }
 
         Assert.Equal(PartyRegistry.MaxMembers, partyRegistry.GetMembers(casterId).Count);

@@ -99,6 +99,32 @@ public sealed class GuildInviteService(
 
     public void Answer(int targetId, int answerCode)
     {
+        if (invites.TryConsumeCrossShardInbound(targetId, out var inbound))
+        {
+            var crossShardAccepted = answerCode == 0;
+            if (crossShardAccepted)
+                invites.MarkAccepted(inbound.SourceCharacterId, targetId);
+
+            var targetName = zones.TryGetPlayer(targetId, out var targetState) ? targetState.Name : "";
+
+            crossShardRelay.Enqueue(new SocialCrossShardRelayEntry(
+                SocialCrossShardRelayKind.GuildInvite,
+                SocialCrossShardRelayMessageType.Answer,
+                crossShardAccepted,
+                null,
+                options.Value.ShardId,
+                targetId,
+                targetName,
+                inbound.SourceShardId,
+                inbound.SourceCharacterId,
+                inbound.RelayId));
+
+            logger.LogInformation(
+                "Character {TargetId} answered cross-shard guild invite from asker {AskerId} on shard {AskerShardId}: accepted={Accepted}",
+                targetId, inbound.SourceCharacterId, inbound.SourceShardId, crossShardAccepted);
+            return;
+        }
+
         if (!invites.TryAnswer(targetId, answerCode == 0, out var askerId))
         {
             logger.LogDebug("Character {TargetId} guild invite answer ignored: no pending invite found", targetId);
@@ -142,6 +168,14 @@ public sealed class GuildInviteService(
             return GuildInviteAskResultKind.TargetNotFound;
         }
 
+        if (remote.ShardId == options.Value.ShardId)
+        {
+            logger.LogWarning(
+                "Character {CharacterId} guild invite-ask target {TargetName}: directory reports shard {ShardId} (same as asker's own shard) but the live shard-wide registry has no such player -- treating as a stale directory row, not publishing cross-shard",
+                asker.CharacterId, targetAvatarName, remote.ShardId);
+            return GuildInviteAskResultKind.TargetNotFound;
+        }
+
         if (asker.Tribe != remote.Tribe)
         {
             logger.LogDebug(
@@ -174,7 +208,7 @@ public sealed class GuildInviteService(
             null));
 
         logger.LogInformation(
-            "Character {CharacterId} published a guild invite cross-shard to character {TargetCharacterId} on shard {TargetShardId} (never delivered today -- see GuildInviteService's own remarks)",
+            "Character {CharacterId} published a guild invite cross-shard to character {TargetCharacterId} on shard {TargetShardId}",
             asker.CharacterId, remote.CharacterId, remote.ShardId);
         return GuildInviteAskResultKind.SentCrossShard;
     }

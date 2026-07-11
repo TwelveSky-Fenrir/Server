@@ -414,7 +414,7 @@ public sealed class GmBasicCommandService(
         var attributes = new CharacterBaseAttributes(state.StatVit, state.StatStr, state.StatInt, state.StatDex,
             newLevel, state.Tribe, state.PreviousTribe, state.Title, state.Halo, newRebirthCount, newLevel2);
         var stats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData, state.Buffs,
-            petContribution);
+            petContribution, runtimeState: state);
 
         var command = new TribeProgressZoneCommand(state.CharacterId, Level: newLevel, Level2: newLevel2,
             RebirthCount: newRebirthCount, Experience: newExperience, Exp2: newExp2,

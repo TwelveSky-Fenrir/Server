@@ -2,15 +2,10 @@ namespace Fenrir.Application.Game.Domain.Social.Party;
 
 public enum PartyInviteOutcome
 {
-
         Sent,
-
         InviterBusy,
-
         TargetBusy,
-
         TargetAlreadyPartied,
-
         InviterMustDisconnect
 }
 
@@ -74,10 +69,9 @@ public sealed class Party
 
 public sealed class PartyRegistry
 {
+    public const int MaxMembers = 5;
 
-        public const int MaxMembers = 5;
-
-        public const int MaxLevelGap = 9;
+    public const int MaxLevelGap = 9;
 
         private readonly CrossShardNegotiationTracker _crossShard = new();
 
@@ -200,10 +194,7 @@ public sealed class PartyRegistry
         lock (_lock)
         {
             if (_pendingByInviter.Remove(inviterId, out inviteeId))
-            {
-                _pendingByInvitee.Remove(inviteeId);
                 return true;
-            }
 
             if (_crossShard.TryConsumeOutbound(inviterId, out var crossShardAsk))
             {
@@ -212,6 +203,16 @@ public sealed class PartyRegistry
             }
 
             return false;
+        }
+    }
+
+        public bool ClearInviteeAfterCancel(int inviteeId, int inviterId)
+    {
+        lock (_lock)
+        {
+            return _pendingByInvitee.TryGetValue(inviteeId, out var recordedInviterId) &&
+                   recordedInviterId == inviterId &&
+                   _pendingByInvitee.Remove(inviteeId);
         }
     }
 
@@ -268,19 +269,39 @@ public sealed class PartyRegistry
         }
     }
 
-        public bool TryAnswer(int inviteeId, bool accepted, out int inviterId, out PartyJoinOutcome joinOutcome)
+            public bool TryAnswer(int inviteeId, bool accepted, bool inviterBusyByZoneTransfer, out int inviterId,
+        out PartyJoinOutcome joinOutcome, out bool guardBlocked)
     {
         joinOutcome = default;
+        guardBlocked = false;
 
         lock (_lock)
         {
-            if (!_pendingByInvitee.Remove(inviteeId, out inviterId))
+            if (!_pendingByInvitee.TryGetValue(inviteeId, out inviterId))
                 return false;
 
-            _pendingByInviter.Remove(inviterId);
-
             if (!accepted)
+            {
+                _pendingByInvitee.Remove(inviteeId);
+
+                if (inviterBusyByZoneTransfer)
+                {
+                    guardBlocked = true;
+                    return false;
+                }
+
+                _pendingByInviter.Remove(inviterId);
                 return true;
+            }
+
+            if (inviterBusyByZoneTransfer)
+            {
+                guardBlocked = true;
+                return false;
+            }
+
+            _pendingByInvitee.Remove(inviteeId);
+            _pendingByInviter.Remove(inviterId);
 
             if (_partiesByLeader.TryGetValue(inviterId, out var existing))
             {

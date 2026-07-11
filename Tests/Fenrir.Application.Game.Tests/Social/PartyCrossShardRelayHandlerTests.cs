@@ -80,7 +80,7 @@ public class PartyCrossShardRelayHandlerTests
 
         Enter(zones, 1, 501, "Leader");
         Assert.Equal(PartyInviteOutcome.Sent, parties.TryInvite(501, 1, invitee.Tribe, 100, 1, invitee.Tribe));
-        Assert.True(parties.TryAnswer(100, true, out _, out _));
+        Assert.True(parties.TryAnswer(100, true, false, out _, out _, out _));
 
         await handler.HandleAskAsync(MakeAsk(43, 100), CancellationToken.None);
 

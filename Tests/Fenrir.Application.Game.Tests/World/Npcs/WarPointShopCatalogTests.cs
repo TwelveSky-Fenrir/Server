@@ -29,10 +29,10 @@ public class WarPointShopCatalogTests
     public void WarPointNpcIds_ContainsExactlyTheFourCodes()
     {
         Assert.Equal(4, WarPointShopCatalog.WarPointNpcIds.Count);
-        Assert.Contains(52, WarPointShopCatalog.WarPointNpcIds);
-        Assert.Contains(102, WarPointShopCatalog.WarPointNpcIds);
-        Assert.Contains(202, WarPointShopCatalog.WarPointNpcIds);
-        Assert.Contains(302, WarPointShopCatalog.WarPointNpcIds);
+        Assert.Contains(52, (IEnumerable<int>)WarPointShopCatalog.WarPointNpcIds);
+        Assert.Contains(102, (IEnumerable<int>)WarPointShopCatalog.WarPointNpcIds);
+        Assert.Contains(202, (IEnumerable<int>)WarPointShopCatalog.WarPointNpcIds);
+        Assert.Contains(302, (IEnumerable<int>)WarPointShopCatalog.WarPointNpcIds);
     }
 
     [Fact]

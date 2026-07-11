@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using Fenrir.Application.Game.Abstractions.Social;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Social.Trade;
+using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Serialization.Zone.Packets.Zone;
 using Microsoft.Extensions.Logging;
@@ -85,6 +86,15 @@ public sealed class TradeLockService(
 
         await PostMirrorAndWaitAsync(zoneA, playerA.CharacterId, planA, cancellationToken);
         await PostMirrorAndWaitAsync(zoneB, playerB.CharacterId, planB, cancellationToken);
+
+        if (bigMoneyDeltaA != 0)
+            await zoneA.PostTribeProgressCommandAndWaitAsync(
+                new TribeProgressZoneCommand(playerA.CharacterId, BigMoneyDelta: bigMoneyDeltaA),
+                cancellationToken);
+        if (bigMoneyDeltaB != 0)
+            await zoneB.PostTribeProgressCommandAndWaitAsync(
+                new TribeProgressZoneCommand(playerB.CharacterId, BigMoneyDelta: bigMoneyDeltaB),
+                cancellationToken);
 
         trades.TryEnd(characterId, out _);
 

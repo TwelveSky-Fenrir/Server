@@ -26,7 +26,9 @@ public enum ZoneCommandKind : byte
 
         ApplyRegularWarReward,
 
-        SummonRegularWarBoss
+        SummonRegularWarBoss,
+
+        BroadcastDuelStart
 }
 
 public readonly struct ZoneCommand
@@ -49,6 +51,10 @@ public readonly struct ZoneCommand
         public byte WinningTribe { get; init; }
 
         public RegularWarRewardGrant RegularWarReward { get; init; }
+
+        public int DuelOpponentCharacterId { get; init; }
+
+        public int DuelUniqueNumber { get; init; }
 
     public static ZoneCommand Enter(int characterId, PlayerEnterData data)
     {
@@ -119,6 +125,16 @@ public readonly struct ZoneCommand
     {
         return new ZoneCommand { Kind = ZoneCommandKind.SummonRegularWarBoss, CharacterId = 0 };
     }
+
+        public static ZoneCommand BroadcastDuelStart(int requesterCharacterId, int opponentCharacterId,
+        int duelUniqueNumber)
+    {
+        return new ZoneCommand
+        {
+            Kind = ZoneCommandKind.BroadcastDuelStart, CharacterId = requesterCharacterId,
+            DuelOpponentCharacterId = opponentCharacterId, DuelUniqueNumber = duelUniqueNumber
+        };
+    }
 }
 
 public sealed record PlayerEnterData(
@@ -163,6 +179,8 @@ public sealed record PlayerEnterData(
     int PetGrowth = 0,
     byte PetActivity = 0,
     string GuildCallName = "",
+    int GuildBuffType = 0,
+    bool GuildBuffActive = false,
     int StatVit = 0,
     int StatStr = 0,
     int StatInt = 0,
@@ -198,6 +216,7 @@ public sealed record PlayerEnterData(
     int PetExpX2Time = 0,
     int Zone241Time = 0,
     long StoreMoney = 0,
+    int BigMoney = 0,
     int InventoryDate = 0,
     int StoreDate = 0,
     int PetBagDate = 0,

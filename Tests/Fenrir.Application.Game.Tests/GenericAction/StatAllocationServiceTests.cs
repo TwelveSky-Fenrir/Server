@@ -2,6 +2,7 @@ using System.Collections.Frozen;
 using Fenrir.Application.Game.Abstractions.GenericAction;
 using Fenrir.Application.Game.Domain.Quests;
 using Fenrir.Application.Game.Domain.Social.Party;
+using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Services.GenericAction;
@@ -42,8 +43,8 @@ public class StatAllocationServiceTests
     private static GenericActionService CreateService(WorldDataCache worldData)
     {
         return new GenericActionService(new FakeCharacterRepository(), worldData, new QuestCatalog(worldData),
-            new PartyRegistry(), new FakeEventLogRepository(), new FakeAccountVaultRepository(),
-            NullLogger<GenericActionService>.Instance);
+            new PartyRegistry(), new FakeEventLogRepository(), new FakeAccountVaultRepository(), new TradeRegistry(),
+            ZoneTestKit.CreateRegistry(), NullLogger<GenericActionService>.Instance);
     }
 
     [Fact]

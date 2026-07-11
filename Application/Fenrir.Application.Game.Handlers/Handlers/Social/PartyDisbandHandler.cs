@@ -1,15 +1,20 @@
 using Fenrir.Application.Game.Abstractions.Social;
+using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Data.Abstractions.Runtime;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Zone.Sessions;
 using Fenrir.Network.Serialization.Zone.Packets.Zone;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
 public sealed class PartyDisbandHandler(
     ZoneRegistry zones,
     IPartyDisbandService partyDisbandService,
+    IPartyResyncRelayQueue partyResyncRelay,
+    IOptions<GameServerOptions> options,
     ILogger<PartyDisbandHandler> logger) : IInlinePacketHandler<PartyDisbandRequest>
 {
     public void Handle(in PartyDisbandRequest packet, IPacketSession session)
@@ -25,9 +30,11 @@ public sealed class PartyDisbandHandler(
         if (result.Members.Count == 0)
             return;
 
+        var shardId = options.Value.ShardId;
+
         var notice = new PartyDisbandResponse { Sort = 1, AvatarName = "" };
         foreach (var memberId in result.Members)
-            if (zones.TryGetPlayer(memberId, out var member))
-                member.Session.Send(notice);
+            PartyBroadcast.SendOrRelayNotice(zones, partyResyncRelay, shardId, memberId, notice,
+                PartyResyncRelaySort.DisbandNotice, "");
     }
 }

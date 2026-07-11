@@ -93,7 +93,7 @@ public class MountBox635RewardTableTests
     [Fact]
     public void BoxItemId_IsNotInBulkOpenWhitelist_SoAnyRequestedOpenCountIsIgnored()
     {
-        Assert.DoesNotContain(MountBox635RewardTable.BoxItemId, LootBoxCatalog.BulkOpenWhitelist);
+        Assert.DoesNotContain(MountBox635RewardTable.BoxItemId, (IEnumerable<int>)LootBoxCatalog.BulkOpenWhitelist);
     }
 
     private static ItemStack Box(int id, int quantity)

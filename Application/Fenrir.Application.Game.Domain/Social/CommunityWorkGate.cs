@@ -16,6 +16,7 @@ public static class CommunityWorkGate
     {
         return player.PshopOpen
                || duels.IsNegotiating(player.CharacterId)
+               || duels.IsActivelyDueling(player.CharacterId)
                || trades.IsBusy(player.CharacterId)
                || friends.IsNegotiating(player.CharacterId)
                || parties.IsNegotiating(player.CharacterId)

@@ -1,15 +1,23 @@
+using System.Buffers;
 using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Social.Duel;
 using Fenrir.Data.WriteBehind;
+using Fenrir.Network.Dispatch.Sessions;
+using Fenrir.Network.Framing;
 using Fenrir.Network.Serialization.Zone.Packets.Zone;
+using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Domain.World;
 
 public sealed partial class Zone
 {
 
+                private const int DuelStateChangedSort = 7;
+
         private readonly List<int> _duelEndNeighborScratch = [];
+
+        private readonly List<int> _duelStartNeighborScratch = [];
 
         private readonly Zone124MassDuelState _zone124MassDuel = new();
 
@@ -103,5 +111,67 @@ public sealed partial class Zone
         _grid.NeighborsExcludingSelf(_duelEndNeighborScratch, state.CurrentCell, state.CharacterId, state.PosX,
             state.PosY, state.PosZ);
         BroadcastAvatarAction(_duelEndNeighborScratch, state);
+    }
+
+                private void HandleBroadcastDuelStart(int requesterCharacterId, int opponentCharacterId,
+        int duelUniqueNumber)
+    {
+        if (!_players.TryGetValue(requesterCharacterId, out var requester))
+            return;
+
+        BroadcastDuelStateChanged(requester, requesterCharacterId, requester.UniqueNumber,
+            duelUniqueNumber, roleMarker: 1);
+
+        if (_players.TryGetValue(opponentCharacterId, out var opponent) && !opponent.IsMovingZone)
+            BroadcastDuelStateChanged(requester, opponentCharacterId, opponent.UniqueNumber,
+                duelUniqueNumber, roleMarker: 2);
+    }
+
+        private void BroadcastDuelStateChanged(PlayerRuntimeState anchor, int subjectCharacterId,
+        uint subjectUniqueNumber, int duelUniqueNumber, int roleMarker)
+    {
+        var response = new AvatarStateFlagResponse
+        {
+            ServerIndex = subjectCharacterId,
+            UniqueNumber = subjectUniqueNumber,
+            Sort = DuelStateChangedSort,
+            Value01 = 1,
+            Value02 = duelUniqueNumber,
+            Value03 = roleMarker
+        };
+
+        var total = FrameWriter.FrameSizeOf<AvatarStateFlagResponse>();
+        var rented = ArrayPool<byte>.Shared.Rent(total);
+
+        try
+        {
+            var span = rented.AsSpan(0, total);
+            FrameWriter.WriteFrame(in response, span);
+
+            _duelStartNeighborScratch.Clear();
+            _grid.NeighborsExcludingSelf(_duelStartNeighborScratch, anchor.CurrentCell, anchor.CharacterId,
+                anchor.PosX, anchor.PosY, anchor.PosZ);
+            foreach (var neighborId in _duelStartNeighborScratch)
+                SendDuelStateChangedFrame(neighborId, span);
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(rented);
+        }
+    }
+
+        private void SendDuelStateChangedFrame(int recipientId, ReadOnlySpan<byte> frame)
+    {
+        try
+        {
+            if (_players.TryGetValue(recipientId, out var recipient) &&
+                recipient.Session is ClientSession clientSession)
+                clientSession.SendRaw(frame);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Zone {MapId} duel-state-changed broadcast to character {RecipientId} failed",
+                MapId, recipientId);
+        }
     }
 }

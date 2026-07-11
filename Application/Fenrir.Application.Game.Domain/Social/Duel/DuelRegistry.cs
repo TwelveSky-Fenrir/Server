@@ -72,7 +72,7 @@ public sealed class DuelRegistry
         }
     }
 
-    private bool IsActivelyDueling(int characterId)
+    public bool IsActivelyDueling(int characterId)
     {
         return _activeByCharacter.ContainsKey(characterId);
     }

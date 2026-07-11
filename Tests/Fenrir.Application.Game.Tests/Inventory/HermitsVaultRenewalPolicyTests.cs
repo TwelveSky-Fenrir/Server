@@ -12,7 +12,7 @@ public class HermitsVaultRenewalPolicyTests
 
         Assert.Equal(expected.Length, HermitsVaultRenewalPolicy.QualifyingItemIds.Count);
         foreach (var id in expected)
-            Assert.Contains(id, HermitsVaultRenewalPolicy.QualifyingItemIds);
+            Assert.Contains(id, (IEnumerable<int>)HermitsVaultRenewalPolicy.QualifyingItemIds);
     }
 
     [Fact]

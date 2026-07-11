@@ -25,7 +25,7 @@ public class TradeInviteServiceTests
         var trades = new TradeRegistry();
         var zones = ZoneTestKit.CreateRegistry();
         zones.Initialize([mapId]);
-        return (new TradeInviteService(trades, duels ?? new DuelRegistry(), friends ?? new FriendRegistry(),
+        return (new TradeInviteService(zones, trades, duels ?? new DuelRegistry(), friends ?? new FriendRegistry(),
             parties ?? new PartyRegistry(), mentors ?? new MentorRegistry(),
             guildInvites ?? new GuildInviteRegistry(), directory ?? new FakeCharacterShardLocationRepository(),
             relay ?? new FakeSocialCrossShardRelayQueue(), Options.Create(new GameServerOptions { ShardId = 1 }),

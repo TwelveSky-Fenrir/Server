@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using Fenrir.Application.Game.Abstractions.GenericAction;
+using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Services.Inventory;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Data.Abstractions.Game;
@@ -22,7 +23,8 @@ public class BigMoneyTransferServiceTests
     {
         var repo = new FakeBigMoneyRepository();
         var eventLog = new FakeEventLogRepository();
-        var service = new BigMoneyTransferService(repo, eventLog, NullLogger<BigMoneyTransferService>.Instance);
+        var service = new BigMoneyTransferService(repo, eventLog, new TradeRegistry(), ZoneTestKit.CreateRegistry(),
+            NullLogger<BigMoneyTransferService>.Instance);
 
         var outcome = await service.TransferStoreAsync(241, EncodeQuantity1(5), 10, CancellationToken.None);
 
@@ -46,7 +48,8 @@ public class BigMoneyTransferServiceTests
     {
         var repo = new FakeBigMoneyRepository();
         var eventLog = new FakeEventLogRepository();
-        var service = new BigMoneyTransferService(repo, eventLog, NullLogger<BigMoneyTransferService>.Instance);
+        var service = new BigMoneyTransferService(repo, eventLog, new TradeRegistry(), ZoneTestKit.CreateRegistry(),
+            NullLogger<BigMoneyTransferService>.Instance);
 
         var outcome = await service.TransferStoreAsync(244, EncodeQuantity1(3), 10, CancellationToken.None);
 
@@ -67,7 +70,8 @@ public class BigMoneyTransferServiceTests
     {
         var repo = new FakeBigMoneyRepository();
         var eventLog = new FakeEventLogRepository();
-        var service = new BigMoneyTransferService(repo, eventLog, NullLogger<BigMoneyTransferService>.Instance);
+        var service = new BigMoneyTransferService(repo, eventLog, new TradeRegistry(), ZoneTestKit.CreateRegistry(),
+            NullLogger<BigMoneyTransferService>.Instance);
 
         var outcome = await service.TransferStoreAsync(241, EncodeQuantity1(0), 10, CancellationToken.None);
 
@@ -81,7 +85,8 @@ public class BigMoneyTransferServiceTests
     {
         var repo = new FakeBigMoneyRepository { ThrowOnAdjust = true };
         var eventLog = new FakeEventLogRepository();
-        var service = new BigMoneyTransferService(repo, eventLog, NullLogger<BigMoneyTransferService>.Instance);
+        var service = new BigMoneyTransferService(repo, eventLog, new TradeRegistry(), ZoneTestKit.CreateRegistry(),
+            NullLogger<BigMoneyTransferService>.Instance);
 
         var outcome = await service.TransferStoreAsync(241, EncodeQuantity1(5), 10, CancellationToken.None);
 
@@ -94,7 +99,8 @@ public class BigMoneyTransferServiceTests
     {
         var repo = new FakeBigMoneyRepository();
         var eventLog = new FakeEventLogRepository();
-        var service = new BigMoneyTransferService(repo, eventLog, NullLogger<BigMoneyTransferService>.Instance);
+        var service = new BigMoneyTransferService(repo, eventLog, new TradeRegistry(), ZoneTestKit.CreateRegistry(),
+            NullLogger<BigMoneyTransferService>.Instance);
 
         var outcome = await service.TransferSaveAsync(242, EncodeQuantity1(7), 99, 10, CancellationToken.None);
 
@@ -119,7 +125,8 @@ public class BigMoneyTransferServiceTests
     {
         var repo = new FakeBigMoneyRepository();
         var eventLog = new FakeEventLogRepository();
-        var service = new BigMoneyTransferService(repo, eventLog, NullLogger<BigMoneyTransferService>.Instance);
+        var service = new BigMoneyTransferService(repo, eventLog, new TradeRegistry(), ZoneTestKit.CreateRegistry(),
+            NullLogger<BigMoneyTransferService>.Instance);
 
         var outcome = await service.TransferSaveAsync(245, EncodeQuantity1(2), 99, 10, CancellationToken.None);
 

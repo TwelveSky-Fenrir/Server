@@ -292,6 +292,30 @@ public sealed class GenericActionHandler(
             return;
         }
 
+        if (sort is 218 or 219 or 220)
+        {
+            if (debugEnabled)
+                logger.LogDebug(
+                    "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} dispatched to {Method}",
+                    zoneSession.SessionId, characterId, sort, nameof(IGenericActionService.TransferTradeItemAsync));
+            var result = await genericActionService.TransferTradeItemAsync(sort, packet.Data, state, characterId,
+                cancellationToken);
+            Respond(session, zoneSession, sort, packet.Data, result);
+            return;
+        }
+
+        if (sort is 221 or 222)
+        {
+            if (debugEnabled)
+                logger.LogDebug(
+                    "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} dispatched to {Method}",
+                    zoneSession.SessionId, characterId, sort, nameof(IGenericActionService.TransferTradeMoneyAsync));
+            var result = await genericActionService.TransferTradeMoneyAsync(sort, packet.Data, state, characterId,
+                cancellationToken);
+            Respond(session, zoneSession, sort, packet.Data, result);
+            return;
+        }
+
         if (sort is 211 or 253 or 214 or 216)
         {
             if (!DefaultPData.TryRead(packet.Data, out var hotkeyMove))
@@ -352,18 +376,22 @@ public sealed class GenericActionHandler(
             return;
         }
 
-        if (sort is 241 or 244 or 242 or 245)
+        if (sort is 241 or 244 or 242 or 245 or 240 or 243)
         {
             if (debugEnabled)
                 logger.LogDebug(
                     "Session {SessionId} character {CharacterId}: GenericAction Sort {Sort} dispatched to BigMoney family",
                     zoneSession.SessionId, characterId, sort);
 
-            var bigMoneyResult = sort is 241 or 244
-                ? await bigMoneyTransferService.TransferStoreAsync(sort, packet.Data, characterId,
-                    cancellationToken)
-                : await bigMoneyTransferService.TransferSaveAsync(sort, packet.Data, zoneSession.AccountId!.Value,
-                    characterId, cancellationToken);
+            var bigMoneyResult = sort switch
+            {
+                241 or 244 => await bigMoneyTransferService.TransferStoreAsync(sort, packet.Data, characterId,
+                    cancellationToken),
+                242 or 245 => await bigMoneyTransferService.TransferSaveAsync(sort, packet.Data,
+                    zoneSession.AccountId!.Value, characterId, cancellationToken),
+                _ => await bigMoneyTransferService.TransferTradeAsync(sort, packet.Data, zone, state,
+                    zoneSession.AccountId!.Value, characterId, cancellationToken)
+            };
             Respond(session, zoneSession, sort, packet.Data, bigMoneyResult);
             return;
         }

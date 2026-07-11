@@ -744,7 +744,7 @@ public sealed partial class Zone
                 target.StatDex, target.Level, target.Tribe, target.PreviousTribe, target.Title, target.Halo,
                 target.RebirthCount, target.Level2);
             var stats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData, target.Buffs,
-                petContribution);
+                petContribution, runtimeState: target);
 
             target.Stats = stats;
             target.MaxLife = stats.MaxLife;

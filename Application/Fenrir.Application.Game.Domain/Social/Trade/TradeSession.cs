@@ -15,6 +15,21 @@ public sealed class TradeOfferSide
     public long Money { get; set; }
     public int BigMoney { get; set; }
     public int MenuState { get; set; }
+
+        public long GetOriginStagedQuantity(byte container, byte slot, int excludingTradeSlotIndex)
+    {
+        long total = 0;
+        for (var i = 0; i < TradeLimits.SlotCount; i++)
+        {
+            if (i == excludingTradeSlotIndex)
+                continue;
+
+            if (Slots[i] is { } entry && entry.Container == container && entry.Slot == slot)
+                total += entry.Stack.Quantity;
+        }
+
+        return total;
+    }
 }
 
 public sealed class TradeSession

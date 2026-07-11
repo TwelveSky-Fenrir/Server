@@ -175,6 +175,8 @@ public static class ServicesServiceCollectionExtensions
 
         services.AddSingleton<ISocialCrossShardRelayHandler, FriendCrossShardRelayHandler>();
         services.AddSingleton<ISocialCrossShardRelayHandler, PartyCrossShardRelayHandler>();
+        services.AddSingleton<ISocialCrossShardRelayHandler, GuildCrossShardRelayHandler>();
+        services.AddSingleton<ISocialCrossShardRelayHandler, TradeCrossShardRelayHandler>();
 
         services.AddSingleton<IPartyResyncRelayHandler, PartyResyncRelayHandler>();
     }

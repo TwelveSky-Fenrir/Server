@@ -11,9 +11,7 @@ public enum DuelAskResultKind
     TargetBusy,
     Sent,
 
-        ChallengerAlreadyDueling,
-
-        SentCrossShard
+        ChallengerAlreadyDueling
 }
 
 public interface IDuelService

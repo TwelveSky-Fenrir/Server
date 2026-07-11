@@ -180,6 +180,12 @@ public sealed class EnterWorldService(
             var heroRankPoints = heroRankPointsTask.Result ?? 0;
             var (runeSystem, runeSystemStat) = BuildRuneArrays(runeRowsTask.Result);
 
+            var guildSummary = guildMembership is { } membership
+                ? await guilds.GetByIdAsync(membership.GuildId, cancellationToken)
+                : null;
+            var guildBuffType = guildSummary?.BuffType ?? 0;
+            var guildBuffActive = guildSummary is { } summary && summary.BuffTime > 0 && summary.BuffState != 0;
+
             var guildRoleWire = guildMembership is { } gm ? GuildRoleCodec.DbRoleToWire(gm.Role) : 0;
             var friendNameBySlot = friendRows.ToDictionary(f => f.Slot, f => f.FriendName);
             var friendIdBySlot = friendRows.ToDictionary(f => f.Slot, f => f.FriendCharacterId);
@@ -318,6 +324,8 @@ public sealed class EnterWorldService(
                 GuildId: guildMembership?.GuildId,
                 GuildName: socialSnapshot.GuildName,
                 GuildRoleDb: guildMembership?.Role ?? 0,
+                GuildBuffType: guildBuffType,
+                GuildBuffActive: guildBuffActive,
                 TribeRole: tribeRole,
                 FriendsBySlot: friendIdBySlot,
                 Skills: bundle.Skills,
@@ -363,6 +371,7 @@ public sealed class EnterWorldService(
                 PremiumExpireUtc: character.PremiumExpireUtc,
                 PreviousTribe: character.PreviousTribe,
                 StoreMoney: character.StoreMoney,
+                BigMoney: character.BigMoney,
                 InventoryDate: VaultDateNormalization.NormalizeIfExpired(character.InventoryDate, GameDate.Today()),
                 StoreDate: character.StoreDate,
                 PetBagDate: character.PetBagDate,

@@ -343,10 +343,6 @@ public sealed class TribeActionService(
             state.Level2);
         var equipmentContainer = state.Inventory.GetContainer(ContainerMatrix.Equipment);
 
-        // The ornament flag this call is itself toggling is only durably written to state.UseOrnament once the
-        // TribeProgressZoneCommand posted below is drained by this zone's own tick -- runtimeState still
-        // carries the PRE-toggle value at this exact instant. Override ZoneContext.OrnamentInUse with the new
-        // value directly so this recompute (not a later, unrelated one) is the first to reflect it.
         var zoneOverride = new ZoneContext(state.MapId, OrnamentInUse: on, RankBuffType: state.RankBuffType,
             TribeRole: state.TribeRole, GuildBuffActive: state.GuildBuffActive, GuildId: state.GuildId ?? 0);
 
@@ -388,7 +384,7 @@ public sealed class TribeActionService(
             state.Level2);
         var equipmentContainer = state.Inventory.GetContainer(ContainerMatrix.Equipment);
         var updatedStats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData,
-            pet: ComputePetContribution(state, equipmentContainer));
+            pet: ComputePetContribution(state, equipmentContainer), runtimeState: state);
 
         int newZone241Time;
         try

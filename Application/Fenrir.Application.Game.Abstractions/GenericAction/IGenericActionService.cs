@@ -63,4 +63,10 @@ public interface IGenericActionService
 
         public ValueTask<GenericActionResult> TransferBankMoneyAsync(int sort, byte[] data, int accountId,
         int characterId, CancellationToken cancellationToken);
+
+        public ValueTask<GenericActionResult> TransferTradeItemAsync(int sort, byte[] data, PlayerRuntimeState state,
+        int characterId, CancellationToken cancellationToken);
+
+        public ValueTask<GenericActionResult> TransferTradeMoneyAsync(int sort, byte[] data, PlayerRuntimeState state,
+        int characterId, CancellationToken cancellationToken);
 }

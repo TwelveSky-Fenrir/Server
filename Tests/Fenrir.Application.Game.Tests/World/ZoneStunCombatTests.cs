@@ -275,7 +275,7 @@ public class ZoneStunCombatTests
         zone.Tick(SimulationClock.LegacyTick);
 
         Assert.Equal(PartyInviteOutcome.Sent, partyRegistry.TryInvite(attacker.CharacterId, 1, 0, 30, 1, 0));
-        Assert.True(partyRegistry.TryAnswer(30, true, out _, out _));
+        Assert.True(partyRegistry.TryAnswer(30, true, false, out _, out _, out _));
 
         zone.PostCombatCommand(new CombatCommand
         {
@@ -314,7 +314,7 @@ public class ZoneStunCombatTests
             Assert.True(zone.TryGetPlayer(memberId, out var member));
             members.Add(member!);
             Assert.Equal(PartyInviteOutcome.Sent, partyRegistry.TryInvite(attacker.CharacterId, 1, 0, memberId, 1, 0));
-            Assert.True(partyRegistry.TryAnswer(memberId, true, out _, out _));
+            Assert.True(partyRegistry.TryAnswer(memberId, true, false, out _, out _, out _));
         }
 
         Assert.Equal(5, partyRegistry.GetMembers(attacker.CharacterId).Count);
@@ -369,7 +369,7 @@ public class ZoneStunCombatTests
             Assert.True(zone.TryGetPlayer(memberId, out var member));
             members.Add(member!);
             Assert.Equal(PartyInviteOutcome.Sent, partyRegistry.TryInvite(attacker.CharacterId, 1, 0, memberId, 1, 0));
-            Assert.True(partyRegistry.TryAnswer(memberId, true, out _, out _));
+            Assert.True(partyRegistry.TryAnswer(memberId, true, false, out _, out _, out _));
         }
 
         Assert.Equal(5, partyRegistry.GetMembers(attacker.CharacterId).Count);
@@ -423,7 +423,7 @@ public class ZoneStunCombatTests
             Assert.True(zone.TryGetPlayer(memberId, out var member));
             member!.Buffs.Buff[CriticalBuffSlot * 2 + 1] = 10;
             Assert.Equal(PartyInviteOutcome.Sent, partyRegistry.TryInvite(attacker.CharacterId, 1, 0, memberId, 1, 0));
-            Assert.True(partyRegistry.TryAnswer(memberId, true, out _, out _));
+            Assert.True(partyRegistry.TryAnswer(memberId, true, false, out _, out _, out _));
         }
 
         attacker.Buffs.Buff[CriticalBuffSlot * 2 + 1] = 10;

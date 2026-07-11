@@ -7,9 +7,15 @@ public enum PartyResyncRelaySort : byte
 
         Request = 108,
 
-        PartyInfo = 108,
+        PartyInfoReply = 110,
 
-        PartyBreak = 109
+        PartyBreak = 109,
+
+        LeaveNotice = 106,
+
+        KickNotice = 107,
+
+        DisbandNotice = 111
 }
 
 public sealed record PartyResyncRelayEntry(

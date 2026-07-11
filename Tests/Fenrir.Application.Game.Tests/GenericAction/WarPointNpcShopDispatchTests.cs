@@ -5,6 +5,7 @@ using Fenrir.Application.Game.Abstractions.WarPoint;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Quests;
 using Fenrir.Application.Game.Domain.Social.Party;
+using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.Npcs;
 using Fenrir.Application.Game.GameData;
@@ -116,7 +117,8 @@ public class WarPointNpcShopDispatchTests
         FakeEventLogRepository eventLog, IWarPointShopService? warPointShop)
     {
         return new GenericActionService(characters, worldData, new QuestCatalog(worldData), new PartyRegistry(),
-            eventLog, new FakeAccountVaultRepository(), NullLogger<GenericActionService>.Instance, warPointShop);
+            eventLog, new FakeAccountVaultRepository(), new TradeRegistry(), ZoneTestKit.CreateRegistry(),
+            NullLogger<GenericActionService>.Instance, warPointShop);
     }
 
     private static WarPointShopService CreateWarPointShop(WorldDataCache worldData, FakeWarPointRepository warPoints,

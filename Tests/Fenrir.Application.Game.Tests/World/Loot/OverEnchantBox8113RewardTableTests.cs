@@ -38,7 +38,7 @@ public class OverEnchantBox8113RewardTableTests
     [Fact]
     public void BoxItemId_IsAlreadyInBulkOpenWhitelist()
     {
-        Assert.Contains(OverEnchantBox8113RewardTable.BoxItemId, LootBoxCatalog.BulkOpenWhitelist);
+        Assert.Contains(OverEnchantBox8113RewardTable.BoxItemId, (IEnumerable<int>)LootBoxCatalog.BulkOpenWhitelist);
     }
 
     [Theory]

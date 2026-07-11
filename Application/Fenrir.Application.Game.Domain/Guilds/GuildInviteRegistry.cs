@@ -118,4 +118,39 @@ public sealed class GuildInviteRegistry
             return _acceptedFor.Remove(askerId, out targetId);
         }
     }
+
+        public bool TryRegisterCrossShardInbound(int targetId, CrossShardInboundAsk ask)
+    {
+        lock (_lock)
+        {
+            if (IsNegotiating(targetId))
+                return false;
+
+            return _crossShard.TryRegisterInbound(targetId, ask);
+        }
+    }
+
+        public bool TryConsumeCrossShardInbound(int targetId, out CrossShardInboundAsk ask)
+    {
+        lock (_lock)
+        {
+            return _crossShard.TryConsumeInbound(targetId, out ask);
+        }
+    }
+
+        public bool TryConsumeCrossShardOutbound(int askerId, out CrossShardOutboundAsk ask)
+    {
+        lock (_lock)
+        {
+            return _crossShard.TryConsumeOutbound(askerId, out ask);
+        }
+    }
+
+        public void MarkAccepted(int askerId, int targetId)
+    {
+        lock (_lock)
+        {
+            _acceptedFor[askerId] = targetId;
+        }
+    }
 }

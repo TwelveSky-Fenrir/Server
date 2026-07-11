@@ -1,10 +1,18 @@
 using Fenrir.Application.Game.Abstractions.Social;
+using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Social.Trade;
+using Fenrir.Application.Game.Domain.World;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Services.Social;
 
-public sealed class TradeAnswerService(TradeRegistry trades, ILogger<TradeAnswerService> logger) : ITradeAnswerService
+public sealed class TradeAnswerService(
+    TradeRegistry trades,
+    ZoneRegistry zones,
+    ISocialCrossShardRelayQueue crossShardRelay,
+    IOptions<GameServerOptions> options,
+    ILogger<TradeAnswerService> logger) : ITradeAnswerService
 {
     public TradeAnswerResult Answer(int targetId, int answer)
     {
@@ -12,6 +20,29 @@ public sealed class TradeAnswerService(TradeRegistry trades, ILogger<TradeAnswer
         {
             logger.LogDebug("Trade answer rejected: character {TargetId} sent malformed answer code {Answer}",
                 targetId, answer);
+            return new TradeAnswerResult(false, 0);
+        }
+
+        if (trades.TryConsumeCrossShardInbound(targetId, out var inbound))
+        {
+            var accepted = answer == 0;
+            var targetName = zones.TryGetPlayer(targetId, out var targetState) ? targetState.Name : "";
+
+            crossShardRelay.Enqueue(new SocialCrossShardRelayEntry(
+                SocialCrossShardRelayKind.Trade,
+                SocialCrossShardRelayMessageType.Answer,
+                accepted,
+                null,
+                options.Value.ShardId,
+                targetId,
+                targetName,
+                inbound.SourceShardId,
+                inbound.SourceCharacterId,
+                inbound.RelayId));
+
+            logger.LogDebug(
+                "Trade answer (cross-shard): character {TargetId} answered {Answer} to asker {AskerId} on shard {AskerShardId}",
+                targetId, answer, inbound.SourceCharacterId, inbound.SourceShardId);
             return new TradeAnswerResult(false, 0);
         }
 

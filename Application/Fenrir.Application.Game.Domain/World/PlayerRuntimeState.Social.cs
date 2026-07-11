@@ -17,6 +17,8 @@ public partial class PlayerRuntimeState
 
         public bool GuildBuffActiveMirror { get; set; }
 
+        public int GuildBuffType { get; set; }
+
         public byte TribeRole { get; set; }
 
         public ConcurrentDictionary<byte, int> Friends { get; } = new();

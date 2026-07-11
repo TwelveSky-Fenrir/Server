@@ -17,6 +17,7 @@ public sealed class TradeEndService(TradeRegistry trades, ILogger<TradeEndServic
         logger.LogDebug(
             "Trade abandoned (nothing committed): character {CharacterId} ended session with character {PlayerAId}/{PlayerBId}",
             characterId, trade.PlayerAId, trade.PlayerBId);
-        return new TradeEndResult(true, trade.PlayerAId, trade.PlayerBId);
+        return new TradeEndResult(true, trade.PlayerAId, trade.PlayerBId, trade.SideA.BigMoney,
+            trade.SideB.BigMoney);
     }
 }

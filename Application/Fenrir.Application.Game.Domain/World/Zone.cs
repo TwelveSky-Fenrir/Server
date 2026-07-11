@@ -16,6 +16,7 @@ using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Data.Abstractions.Game;
+using Fenrir.Data.Abstractions.Runtime;
 using Fenrir.Data.WriteBehind;
 using Fenrir.Network.Dispatch.Zone.Sessions;
 using Microsoft.Extensions.Logging;
@@ -46,7 +47,8 @@ public sealed partial class Zone(
     ZoneGeometry? geometry = null,
     IEventLogQueue? eventLogQueue = null,
     IFourGuildKillPointQueue? fourGuildKillPointQueue = null,
-    TribeSymbolCombatModifiers? tribeSymbolCombatModifiers = null) : IZoneActor
+    TribeSymbolCombatModifiers? tribeSymbolCombatModifiers = null,
+    IPartyResyncRelayQueue? partyResyncRelayQueue = null) : IZoneActor
 {
 
         private const int InboxCapacity = 8192;
@@ -72,6 +74,8 @@ public sealed partial class Zone(
         private readonly List<MonsterAggroCandidate> _monsterBossAggroScratch = [];
 
         private readonly PartyRegistry _partyRegistry = partyRegistry ?? new PartyRegistry();
+
+        private readonly IPartyResyncRelayQueue? _partyResyncRelayQueue = partyResyncRelayQueue;
 
     private readonly ConcurrentDictionary<int, PlayerRuntimeState> _players = new();
 
@@ -187,6 +191,7 @@ public sealed partial class Zone(
         DrainRuneSocketCommands();
         DrainAutoBuffCommands();
         DrainGuildBuffExpiryCommands();
+        DrainGuildBuffActivationCommands();
         var t1 = Stopwatch.GetTimestamp();
         var legacyTicksElapsed = _accumulator.Advance(elapsed);
         Simulate(legacyTicksElapsed);
@@ -332,6 +337,10 @@ public sealed partial class Zone(
                         break;
                     case ZoneCommandKind.SummonRegularWarBoss:
                         HandleSummonRegularWarBoss();
+                        break;
+                    case ZoneCommandKind.BroadcastDuelStart:
+                        HandleBroadcastDuelStart(command.CharacterId, command.DuelOpponentCharacterId,
+                            command.DuelUniqueNumber);
                         break;
                 }
             }

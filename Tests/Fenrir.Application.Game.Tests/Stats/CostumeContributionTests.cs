@@ -30,7 +30,7 @@ public class CostumeContributionTests
     public void ValidCostume_IncludesEnumeratedIds(int costumeId)
     {
         Assert.True(StatCalculator.IsValidCostume(costumeId));
-        Assert.Contains(costumeId, StatCalculator.ValidCostumeIds);
+        Assert.Contains(costumeId, (IEnumerable<int>)StatCalculator.ValidCostumeIds);
     }
 
     [Theory]
@@ -48,7 +48,7 @@ public class CostumeContributionTests
     public void ValidCostume_ExcludesCommentedOutAndGapIds(int costumeId)
     {
         Assert.False(StatCalculator.IsValidCostume(costumeId));
-        Assert.DoesNotContain(costumeId, StatCalculator.ValidCostumeIds);
+        Assert.DoesNotContain(costumeId, (IEnumerable<int>)StatCalculator.ValidCostumeIds);
     }
 
 

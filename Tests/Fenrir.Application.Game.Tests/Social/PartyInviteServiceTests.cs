@@ -7,9 +7,12 @@ using Fenrir.Application.Game.Domain.Social.Mentor;
 using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Services.Social;
 using Fenrir.Application.Game.Tests.TestSupport;
+using Fenrir.Application.Game.Tests.World.WorldState;
 using Fenrir.Data.Abstractions.Runtime;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Tests.Social;
@@ -27,8 +30,9 @@ public class PartyInviteServiceTests
         var parties = new PartyRegistry();
         var zones = ZoneTestKit.CreateRegistry();
         zones.Initialize([mapId]);
-        return (new PartyInviteService(parties, new DuelRegistry(), new TradeRegistry(), new FriendRegistry(),
-                new MentorRegistry(), new GuildInviteRegistry(), directory, relay,
+        var worldState = new WorldStateService(new FakeWorldStateRepository(), NullLogger<WorldStateService>.Instance);
+        return (new PartyInviteService(zones, parties, new DuelRegistry(), new TradeRegistry(), new FriendRegistry(),
+                new MentorRegistry(), new GuildInviteRegistry(), worldState, directory, relay,
                 Options.Create(new GameServerOptions { ShardId = 1 }), new CapturingLogger<PartyInviteService>()),
             zones, parties);
     }
@@ -53,7 +57,7 @@ public class PartyInviteServiceTests
         var inviter = Enter(zones, 1, 2, "Member");
 
         Assert.Equal(PartyInviteOutcome.Sent, parties.TryInvite(1, 10, 1, 2, 10, 1));
-        Assert.True(parties.TryAnswer(2, true, out _, out _));
+        Assert.True(parties.TryAnswer(2, true, false, out _, out _, out _));
 
         var result = await service.InviteAsync(zones[1], inviter, "NoSuchAvatar", CancellationToken.None);
 

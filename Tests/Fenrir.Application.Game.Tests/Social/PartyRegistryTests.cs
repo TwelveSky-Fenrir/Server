@@ -12,7 +12,7 @@ public class PartyRegistryTests
         var outcome = registry.TryInvite(1, 10, 0, 2, 10, 0);
         Assert.Equal(PartyInviteOutcome.Sent, outcome);
 
-        var accepted = registry.TryAnswer(2, true, out var inviterId, out var joinOutcome);
+        var accepted = registry.TryAnswer(2, true, false, out var inviterId, out var joinOutcome, out _);
 
         Assert.True(accepted);
         Assert.Equal(1, inviterId);
@@ -47,7 +47,7 @@ public class PartyRegistryTests
     {
         var registry = new PartyRegistry();
         registry.TryInvite(1, 10, 0, 2, 10, 0);
-        registry.TryAnswer(2, true, out _, out _);
+        registry.TryAnswer(2, true, false, out _, out _, out _);
 
         var outcome = registry.TryInvite(3, 10, 0, 2, 10, 0);
 
@@ -69,7 +69,7 @@ public class PartyRegistryTests
     {
         var registry = new PartyRegistry();
         registry.TryInvite(1, 10, 0, 2, 10, 0);
-        registry.TryAnswer(2, true, out _, out _);
+        registry.TryAnswer(2, true, false, out _, out _, out _);
 
         var outcome = registry.TryInvite(3, 10, 1, 2, 10, 0);
 
@@ -81,12 +81,12 @@ public class PartyRegistryTests
     {
         var registry = new PartyRegistry();
         registry.TryInvite(1, 10, 0, 2, 10, 0);
-        registry.TryAnswer(2, true, out _, out _);
+        registry.TryAnswer(2, true, false, out _, out _, out _);
 
         for (var member = 3; member <= 6; member++)
         {
             registry.TryInvite(1, 10, 0, member, 10, 0);
-            registry.TryAnswer(member, true, out _, out var joinOutcome);
+            registry.TryAnswer(member, true, false, out _, out var joinOutcome, out _);
 
             if (member <= 5)
                 Assert.Equal(PartyJoinOutcome.Joined, joinOutcome);
@@ -103,7 +103,7 @@ public class PartyRegistryTests
     {
         var registry = new PartyRegistry();
         registry.TryInvite(1, 10, 0, 2, 10, 0);
-        registry.TryAnswer(2, true, out _, out _);
+        registry.TryAnswer(2, true, false, out _, out _, out _);
 
         var left = registry.TryLeave(1, out _, out _);
 
@@ -116,7 +116,7 @@ public class PartyRegistryTests
     {
         var registry = new PartyRegistry();
         registry.TryInvite(1, 10, 0, 2, 10, 0);
-        registry.TryAnswer(2, true, out _, out _);
+        registry.TryAnswer(2, true, false, out _, out _, out _);
 
         var left = registry.TryLeave(2, out var membersBefore, out var disbanded);
 
@@ -132,7 +132,7 @@ public class PartyRegistryTests
     {
         var registry = new PartyRegistry();
         registry.TryInvite(1, 10, 0, 2, 10, 0);
-        registry.TryAnswer(2, true, out _, out _);
+        registry.TryAnswer(2, true, false, out _, out _, out _);
 
         var kicked = registry.TryKick(2, 1, out _, out _);
 
@@ -144,9 +144,9 @@ public class PartyRegistryTests
     {
         var registry = new PartyRegistry();
         registry.TryInvite(1, 10, 0, 2, 10, 0);
-        registry.TryAnswer(2, true, out _, out _);
+        registry.TryAnswer(2, true, false, out _, out _, out _);
         registry.TryInvite(1, 10, 0, 3, 10, 0);
-        registry.TryAnswer(3, true, out _, out _);
+        registry.TryAnswer(3, true, false, out _, out _, out _);
 
         var members = registry.Disband(1);
 
@@ -170,7 +170,7 @@ public class PartyRegistryTests
         var registry = new PartyRegistry();
         registry.TryInvite(1, 10, 0, 2, 10, 0);
 
-        var answered = registry.TryAnswer(2, false, out var inviterId, out _);
+        var answered = registry.TryAnswer(2, false, false, out var inviterId, out _, out _);
 
         Assert.True(answered);
         Assert.Equal(1, inviterId);

@@ -21,7 +21,7 @@ public class PartyResyncRelayHandlerTests
         var zones = ZoneTestKit.CreateRegistry();
         zones.Initialize([1]);
         var relay = new FakePartyResyncRelayQueue();
-        var handler = new PartyResyncRelayHandler(zones, parties, relay,
+        var handler = new PartyResyncRelayHandler(zones, parties, new Lazy<IPartyResyncRelayQueue>(() => relay),
             Options.Create(new GameServerOptions { ShardId = OwnShardId }),
             NullLogger<PartyResyncRelayHandler>.Instance);
         return (handler, zones, parties, relay);
@@ -52,13 +52,13 @@ public class PartyResyncRelayHandlerTests
         Enter(zones, 1, 502, "Follower");
         Assert.Equal(PartyInviteOutcome.Sent,
             parties.TryInvite(leader.CharacterId, 1, leader.Tribe, 502, 1, leader.Tribe));
-        Assert.True(parties.TryAnswer(502, true, out _, out _));
+        Assert.True(parties.TryAnswer(502, true, false, out _, out _, out _));
 
         var request = MakeRequest("Leader");
         await handler.HandleAsync(request, CancellationToken.None);
 
         var republished = Assert.Single(relay.Enqueued);
-        Assert.Equal((byte)PartyResyncRelaySort.PartyInfo, republished.Sort);
+        Assert.Equal((byte)PartyResyncRelaySort.PartyInfoReply, republished.Sort);
         Assert.Equal(OwnShardId, republished.SourceShardId);
         Assert.Equal(999, republished.SourceCharacterId);
         Assert.Equal("Leader", republished.PartyName);
@@ -94,7 +94,7 @@ public class PartyResyncRelayHandlerTests
         var follower = Enter(zones, 1, 502, "Follower");
         Assert.Equal(PartyInviteOutcome.Sent,
             parties.TryInvite(leader.CharacterId, 1, leader.Tribe, follower.CharacterId, 1, leader.Tribe));
-        Assert.True(parties.TryAnswer(follower.CharacterId, true, out _, out _));
+        Assert.True(parties.TryAnswer(follower.CharacterId, true, false, out _, out _, out _));
 
         await handler.HandleAsync(MakeRequest("Follower"), CancellationToken.None);
 
@@ -108,7 +108,7 @@ public class PartyResyncRelayHandlerTests
         var leader = Enter(zones, 1, 501, "Leader");
         Enter(zones, 1, 502, "Follower");
         parties.TryInvite(leader.CharacterId, 1, leader.Tribe, 502, 1, leader.Tribe);
-        parties.TryAnswer(502, true, out _, out _);
+        parties.TryAnswer(502, true, false, out _, out _, out _);
 
         var breakRow = new PartyResyncRelayDto(1, (byte)PartyResyncRelaySort.PartyBreak, OtherShardId, 999,
             "Leader", "ReconnectingMember");

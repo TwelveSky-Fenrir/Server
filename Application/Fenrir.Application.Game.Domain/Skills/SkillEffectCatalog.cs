@@ -76,17 +76,8 @@ public static class SkillEffectCatalog
 
 public enum SkillEffectKind
 {
-    /// <summary>
-    ///     No registered buff/heal effect exists for the cast skill id (e.g. starter skills 1/20/39,
-    ///     2/3/21/22/40/41, 4/5/23/24/42/43 -- see <see cref="SkillCastResolver.TryCast" />'s own remarks).
-    ///     Réf. C++ : Server/ts25zone/S07_MyGame04.cpp:1509-1564 (buff-dispatch switch has no case, and no
-    ///     default branch, for any of these ids -- control falls straight through to the function's own
-    ///     return with no write and no broadcast) and Server/ts25zone/S07_MyGame03.cpp:9315-9631
-    ///     (<c>ProcessForCreateBuff</c>'s own switch, same absence). The op15 mana charge still applies for
-    ///     this kind -- legacy's mana debit is unconditional on invested grade points alone, independent of
-    ///     whether the skill id has any recognized effect (S04_MyWork02.cpp:1640-1650,1680-1683).
-    /// </summary>
-    None,
+
+        None,
 
     SelfBuff,
     HealLife,

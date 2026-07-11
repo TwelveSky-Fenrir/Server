@@ -388,6 +388,10 @@ public sealed class GuildActionService(
         var info = await BuildGuildInfoAsync(guildId, ct);
         GuildInfoBroadcaster.BroadcastGuildInfo(zones, guildId, 14, info, state.CharacterId);
 
+        var activation = new GuildBuffActivationZoneCommand(guildId, payload.GuildBuffType, true);
+        foreach (var memberZone in zones.Zones)
+            memberZone.PostGuildBuffActivationCommand(in activation);
+
         logger.LogInformation("Character {CharacterId} set guild {GuildId}'s buff type to {BuffType}",
             state.CharacterId, guildId, payload.GuildBuffType);
 

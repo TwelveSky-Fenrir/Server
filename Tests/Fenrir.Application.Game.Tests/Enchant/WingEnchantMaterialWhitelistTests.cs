@@ -15,13 +15,13 @@ public class WingEnchantMaterialWhitelistTests
     [InlineData(8106)]
     public void ClassWhitelist_ContainsEveryLiveGate1Id(int itemId)
     {
-        Assert.Contains(itemId, WingEnchantMaterialWhitelist.ClassWhitelist);
+        Assert.Contains(itemId, (IEnumerable<int>)WingEnchantMaterialWhitelist.ClassWhitelist);
     }
 
     [Fact]
     public void ClassWhitelist_ExcludesDeadOnlineForDsId()
     {
-        Assert.DoesNotContain(99409, WingEnchantMaterialWhitelist.ClassWhitelist);
+        Assert.DoesNotContain(99409, (IEnumerable<int>)WingEnchantMaterialWhitelist.ClassWhitelist);
     }
 
     [Theory]
@@ -29,8 +29,8 @@ public class WingEnchantMaterialWhitelistTests
     [InlineData(2392)]
     public void Gate2MissingDisconnects_ContainsOnlyTheTwoConfirmedInconsistentIds(int itemId)
     {
-        Assert.Contains(itemId, WingEnchantMaterialWhitelist.Gate2MissingDisconnects);
-        Assert.Contains(itemId, WingEnchantMaterialWhitelist.ClassWhitelist);
+        Assert.Contains(itemId, (IEnumerable<int>)WingEnchantMaterialWhitelist.Gate2MissingDisconnects);
+        Assert.Contains(itemId, (IEnumerable<int>)WingEnchantMaterialWhitelist.ClassWhitelist);
     }
 
     [Fact]
@@ -45,23 +45,23 @@ public class WingEnchantMaterialWhitelistTests
     [InlineData(2397)]
     public void WhitelistedAmountNotCited_ContainsTheThreeUnamountedIds(int itemId)
     {
-        Assert.Contains(itemId, WingEnchantMaterialWhitelist.WhitelistedAmountNotCited);
+        Assert.Contains(itemId, (IEnumerable<int>)WingEnchantMaterialWhitelist.WhitelistedAmountNotCited);
     }
 
         [Fact]
     public void WhitelistedAmountNotCited_ExcludesSiblingWithNowKnownValue()
     {
         Assert.DoesNotContain(WingEnchantMaterialWhitelist.SiblingWithSharedEnchantValueItemId,
-            WingEnchantMaterialWhitelist.WhitelistedAmountNotCited);
+            (IEnumerable<int>)WingEnchantMaterialWhitelist.WhitelistedAmountNotCited);
     }
 
     [Fact]
     public void WhitelistedAmountNotCited_ExcludesFullySpecifiedMaterials()
     {
         Assert.DoesNotContain(WingEnchantMaterialWhitelist.GuaranteedSuccessScrollItemId,
-            WingEnchantMaterialWhitelist.WhitelistedAmountNotCited);
+            (IEnumerable<int>)WingEnchantMaterialWhitelist.WhitelistedAmountNotCited);
         Assert.DoesNotContain(WingEnchantMaterialWhitelist.ProtectedMaterialItemId,
-            WingEnchantMaterialWhitelist.WhitelistedAmountNotCited);
+            (IEnumerable<int>)WingEnchantMaterialWhitelist.WhitelistedAmountNotCited);
     }
 
     [Fact]
@@ -86,7 +86,7 @@ public class WingEnchantMaterialWhitelistTests
         Assert.Equal(1, WingEnchantMaterialWhitelist.ProtectedMaterialEnchantValue);
         Assert.Equal(695, WingEnchantMaterialWhitelist.SiblingWithSharedEnchantValueItemId);
         Assert.Contains(WingEnchantMaterialWhitelist.SiblingWithSharedEnchantValueItemId,
-            WingEnchantMaterialWhitelist.ClassWhitelist);
+            (IEnumerable<int>)WingEnchantMaterialWhitelist.ClassWhitelist);
     }
 
         [Fact]

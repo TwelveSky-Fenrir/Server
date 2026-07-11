@@ -3,25 +3,6 @@ using Fenrir.Application.Game.GameData;
 
 namespace Fenrir.Application.Game.Domain.Skills;
 
-/// <remarks>
-///     <see cref="TryCast" />'s mana-charge step is deliberately independent of whether
-///     <see cref="SkillEffectCatalog" /> has a registered effect for the cast skill id. Legacy's own op15
-///     mana debit (Server/ts25zone/S04_MyWork02.cpp:1640-1650,1680-1683) is computed purely from the
-///     caster's invested grade points against the skill's own "ManaUse" grade-table factor, and is charged
-///     unconditionally -- it never inspects whether a later, separate confirm-step dispatch
-///     (Server/ts25zone/S07_MyGame04.cpp:1509-1564) recognizes the skill id at all. A prior revision of this
-///     resolver collapsed a catalog miss straight to <see cref="FailureReason.NotCastable" /> before ever
-///     computing the mana cost, which silently made every uncatalogued skill id (starter skills 1/20/39,
-///     the six FastRunSpeed ids 2/3/21/22/40/41, and the six stun ids 4/5/23/24/42/43) free to spam-cast for
-///     zero mana in Fenrir -- a real, if narrow, economy divergence from legacy for the six FastRunSpeed and
-///     six stun ids specifically (their ManaUse grade rows are genuinely non-zero;
-///     Database/Migrations/Seed/world/072_skill_grades.sql:15-18,53-56,91-94 and :19-22,57-58,95-96 -- the
-///     starter ids 1/20/39 are unaffected either way since their own ManaUse rows are 0 at both grades).
-///     <see cref="SkillEffectKind.None" /> is the outcome for this case: mana is still charged (subject to
-///     the ordinary insufficient-mana check below), but no buff/heal effect is produced -- the caller's op16
-///     confirm-step switch (no case, no default, for <see cref="SkillEffectKind.None" />) is a no-op for it,
-///     matching legacy's own silent fallthrough exactly.
-/// </remarks>
 public static class SkillCastResolver
 {
     public enum FailureReason
@@ -29,12 +10,7 @@ public static class SkillCastResolver
         None,
         UnknownSkill,
 
-        /// <summary>
-        ///     No longer produced by <see cref="TryCast" /> -- a catalog miss now succeeds with
-        ///     <see cref="SkillEffectKind.None" /> instead (see this class's own remarks). Retained on the
-        ///     enum for source/binary compatibility with any external pattern match against this value.
-        /// </summary>
-        NotCastable,
+                NotCastable,
         InsufficientMana,
         WrongWeaponClass
     }

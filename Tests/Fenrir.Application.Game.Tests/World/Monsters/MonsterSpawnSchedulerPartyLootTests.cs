@@ -50,7 +50,7 @@ public class MonsterSpawnSchedulerPartyLootTests
     {
         var parties = new PartyRegistry();
         Assert.Equal(PartyInviteOutcome.Sent, parties.TryInvite(10, 1, 0, 11, 1, 0));
-        Assert.True(parties.TryAnswer(11, true, out _, out _));
+        Assert.True(parties.TryAnswer(11, true, false, out _, out _, out _));
         Assert.Equal(new[] { 10, 11 }, parties.GetMembers(10));
 
         var zone = CreateZoneWithGuaranteedDrop(parties);

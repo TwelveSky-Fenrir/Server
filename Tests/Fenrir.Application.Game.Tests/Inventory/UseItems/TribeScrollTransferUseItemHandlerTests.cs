@@ -302,7 +302,7 @@ public class TribeScrollTransferUseItemHandlerTests
         var (zone, _, state, tribeConversion, parties, handler) = SetUp();
         Assert.Equal(PartyInviteOutcome.Sent,
             parties.TryInvite(999, EligibleLevel, 0, CharacterId, EligibleLevel, 0));
-        Assert.True(parties.TryAnswer(CharacterId, true, out _, out _));
+        Assert.True(parties.TryAnswer(CharacterId, true, false, out _, out _, out _));
         Assert.True(parties.IsInParty(CharacterId));
 
         var response = await handler.HandleAsync(Context(zone, state, ContainerMatrix.InventoryPage0, 0, 1),

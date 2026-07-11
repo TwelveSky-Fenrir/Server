@@ -41,6 +41,69 @@ public sealed class FriendService(
             return FriendAskResultKind.MapForbidden;
         }
 
+        if (asker.Friends.Count >= MaxFriends)
+        {
+            logger.LogDebug(
+                "Friend ask rejected: character {AskerId} already has {FriendCount} friends",
+                asker.CharacterId, asker.Friends.Count);
+            return FriendAskResultKind.AlreadyFriendOrFull;
+        }
+
+        var target = FindPlayerByName(zone, targetAvatarName);
+        if (target is not null)
+        {
+            if (asker.Friends.Values.Contains(target.CharacterId))
+            {
+                logger.LogDebug(
+                    "Friend ask rejected: character {AskerId} is already friends with {TargetCharacterId}",
+                    asker.CharacterId, target.CharacterId);
+                return FriendAskResultKind.AlreadyFriendOrFull;
+            }
+
+            if (CommunityWorkGate.IsBusy(asker, duels, trades, friends, parties, mentors, guildInvites))
+            {
+                logger.LogDebug("Friend ask rejected: character {AskerId} already has a pending negotiation",
+                    asker.CharacterId);
+                return FriendAskResultKind.AskerBusy;
+            }
+
+            if (asker.Tribe != target.Tribe)
+            {
+                logger.LogWarning(
+                    "Friend ask rejected: character {AskerId} (tribe {AskerTribe}) targeted character {TargetCharacterId} (tribe {TargetTribe}) -- session will be disconnected",
+                    asker.CharacterId, asker.Tribe, target.CharacterId, target.Tribe);
+                return FriendAskResultKind.TribeMismatch;
+            }
+
+            if (CommunityWorkGate.IsBusy(target, duels, trades, friends, parties, mentors, guildInvites))
+            {
+                logger.LogDebug("Friend ask rejected: target character {TargetCharacterId} is busy",
+                    target.CharacterId);
+                return FriendAskResultKind.TargetBusy;
+            }
+
+            switch (friends.TryAsk(asker.CharacterId, target.CharacterId))
+            {
+                case FriendAskOutcome.AskerBusy:
+                    logger.LogDebug("Friend ask rejected: character {AskerId} is busy", asker.CharacterId);
+                    return FriendAskResultKind.AskerBusy;
+                case FriendAskOutcome.TargetBusy:
+                    logger.LogDebug("Friend ask rejected: target character {TargetCharacterId} is busy",
+                        target.CharacterId);
+                    return FriendAskResultKind.TargetBusy;
+                case FriendAskOutcome.Sent:
+                    target.Session.Send(new FriendResponse { AvatarName = asker.Name });
+                    logger.LogDebug(
+                        "Friend ask sent: character {AskerId} ({AskerName}) -> character {TargetCharacterId} ({TargetName})",
+                        asker.CharacterId, asker.Name, target.CharacterId, target.Name);
+                    return FriendAskResultKind.Sent;
+                default:
+                    logger.LogDebug("Friend ask rejected: character {AskerId} is busy (unmatched outcome)",
+                        asker.CharacterId);
+                    return FriendAskResultKind.AskerBusy;
+            }
+        }
+
         if (CommunityWorkGate.IsBusy(asker, duels, trades, friends, parties, mentors, guildInvites))
         {
             logger.LogDebug("Friend ask rejected: character {AskerId} already has a pending negotiation",
@@ -48,53 +111,7 @@ public sealed class FriendService(
             return FriendAskResultKind.AskerBusy;
         }
 
-        var target = FindPlayerByName(zone, targetAvatarName);
-        if (target is null)
-            return await AskCrossShardAsync(asker, targetAvatarName, cancellationToken).ConfigureAwait(false);
-
-        if (asker.Friends.Count >= MaxFriends || asker.Friends.Values.Contains(target.CharacterId))
-        {
-            logger.LogDebug(
-                "Friend ask rejected: character {AskerId} already has {FriendCount} friends or is already friends with {TargetCharacterId}",
-                asker.CharacterId, asker.Friends.Count, target.CharacterId);
-            return FriendAskResultKind.AlreadyFriendOrFull;
-        }
-
-        if (asker.Tribe != target.Tribe)
-        {
-            logger.LogWarning(
-                "Friend ask rejected: character {AskerId} (tribe {AskerTribe}) targeted character {TargetCharacterId} (tribe {TargetTribe}) -- session will be disconnected",
-                asker.CharacterId, asker.Tribe, target.CharacterId, target.Tribe);
-            return FriendAskResultKind.TribeMismatch;
-        }
-
-        if (CommunityWorkGate.IsBusy(target, duels, trades, friends, parties, mentors, guildInvites))
-        {
-            logger.LogDebug("Friend ask rejected: target character {TargetCharacterId} is busy",
-                target.CharacterId);
-            return FriendAskResultKind.TargetBusy;
-        }
-
-        switch (friends.TryAsk(asker.CharacterId, target.CharacterId))
-        {
-            case FriendAskOutcome.AskerBusy:
-                logger.LogDebug("Friend ask rejected: character {AskerId} is busy", asker.CharacterId);
-                return FriendAskResultKind.AskerBusy;
-            case FriendAskOutcome.TargetBusy:
-                logger.LogDebug("Friend ask rejected: target character {TargetCharacterId} is busy",
-                    target.CharacterId);
-                return FriendAskResultKind.TargetBusy;
-            case FriendAskOutcome.Sent:
-                target.Session.Send(new FriendResponse { AvatarName = asker.Name });
-                logger.LogDebug(
-                    "Friend ask sent: character {AskerId} ({AskerName}) -> character {TargetCharacterId} ({TargetName})",
-                    asker.CharacterId, asker.Name, target.CharacterId, target.Name);
-                return FriendAskResultKind.Sent;
-            default:
-                logger.LogDebug("Friend ask rejected: character {AskerId} is busy (unmatched outcome)",
-                    asker.CharacterId);
-                return FriendAskResultKind.AskerBusy;
-        }
+        return await AskCrossShardAsync(asker, targetAvatarName, cancellationToken).ConfigureAwait(false);
     }
 
         public void Answer(int targetId, int answerCode)
@@ -260,11 +277,11 @@ public sealed class FriendService(
             return FriendAskResultKind.TargetNotFound;
         }
 
-        if (asker.Friends.Count >= MaxFriends || asker.Friends.Values.Contains(remote.CharacterId))
+        if (asker.Friends.Values.Contains(remote.CharacterId))
         {
             logger.LogDebug(
-                "Friend ask rejected: character {AskerId} already has {FriendCount} friends or is already friends with cross-shard character {TargetCharacterId}",
-                asker.CharacterId, asker.Friends.Count, remote.CharacterId);
+                "Friend ask rejected: character {AskerId} is already friends with cross-shard character {TargetCharacterId}",
+                asker.CharacterId, remote.CharacterId);
             return FriendAskResultKind.AlreadyFriendOrFull;
         }
 

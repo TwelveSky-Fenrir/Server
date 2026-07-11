@@ -14,6 +14,7 @@ using Microsoft.Extensions.Options;
 namespace Fenrir.Application.Game.Services.Social;
 
 public sealed class TradeInviteService(
+    ZoneRegistry zones,
     TradeRegistry trades,
     DuelRegistry duels,
     FriendRegistry friends,
@@ -36,15 +37,7 @@ public sealed class TradeInviteService(
             return new TradeInviteResult(TradeInviteResultKind.AskerBusy);
         }
 
-        PlayerRuntimeState? target = null;
-        foreach (var candidate in zone.Players)
-            if (string.Equals(candidate.Name, targetAvatarName, StringComparison.OrdinalIgnoreCase))
-            {
-                target = candidate;
-                break;
-            }
-
-        if (target is null)
+        if (!zones.TryGetPlayerByName(targetAvatarName, out var target))
             return await InviteCrossShardAsync(asker, targetAvatarName, cancellationToken).ConfigureAwait(false);
 
         var interTribeAllowed = zone.MapId is 37 or 119 or 124;
@@ -93,6 +86,14 @@ public sealed class TradeInviteService(
             logger.LogDebug(
                 "Trade invite rejected: character {AskerCharacterId} target {TargetAvatarName} not found on any shard",
                 asker.CharacterId, targetAvatarName);
+            return new TradeInviteResult(TradeInviteResultKind.TargetNotFound);
+        }
+
+        if (remote.ShardId == options.Value.ShardId)
+        {
+            logger.LogWarning(
+                "Trade invite for character {AskerCharacterId} target {TargetAvatarName}: directory reports shard {ShardId} (same as asker's own shard) but the live shard-wide registry has no such player -- treating as a stale directory row, not publishing cross-shard",
+                asker.CharacterId, targetAvatarName, remote.ShardId);
             return new TradeInviteResult(TradeInviteResultKind.TargetNotFound);
         }
 

@@ -48,9 +48,25 @@ public sealed class PartyAnswerService(
             return new PartyAnswerResult(PartyAnswerResultKind.Answered, 0, accepted);
         }
 
-        if (!parties.TryAnswer(inviteeId, accepted, out var inviterId, out var joinOutcome))
+        if (!parties.TryPeekPending(inviteeId, out var pendingInviterId, out var isInviter) || isInviter)
         {
             logger.LogDebug("Party answer ignored: character {InviteeId} has no pending invite", inviteeId);
+            return new PartyAnswerResult(PartyAnswerResultKind.NotFound);
+        }
+
+        var inviterBusyByZoneTransfer =
+            !zones.TryGetPlayer(pendingInviterId, out var pendingInviter) || pendingInviter.IsMovingZone;
+
+        if (!parties.TryAnswer(inviteeId, accepted, inviterBusyByZoneTransfer, out var inviterId,
+                out var joinOutcome, out var guardBlocked))
+        {
+            if (guardBlocked)
+                logger.LogDebug(
+                    "Party answer: character {InviteeId} answered but counterpart (inviter) {InviterId} is unreachable or mid zone-transfer -- no notice sent, negotiation state left as-is",
+                    inviteeId, inviterId);
+            else
+                logger.LogDebug("Party answer ignored: character {InviteeId} has no pending invite", inviteeId);
+
             return new PartyAnswerResult(PartyAnswerResultKind.NotFound);
         }
 

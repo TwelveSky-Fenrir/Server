@@ -17,7 +17,8 @@ public enum TradeDisconnectNotification
         End
 }
 
-public readonly record struct TradeDisconnectResult(TradeDisconnectNotification Notification, int PartnerId)
+public readonly record struct TradeDisconnectResult(TradeDisconnectNotification Notification, int PartnerId,
+    int SelfBigMoneyRestore = 0, int PartnerBigMoneyRestore = 0)
 {
     public static readonly TradeDisconnectResult None = new(TradeDisconnectNotification.None, 0);
 }
@@ -228,7 +229,8 @@ public sealed class TradeRegistry
             {
                 var opponentId = session.OpponentOf(characterId);
                 _sessionByCharacter.Remove(opponentId);
-                return new TradeDisconnectResult(TradeDisconnectNotification.End, opponentId);
+                return new TradeDisconnectResult(TradeDisconnectNotification.End, opponentId,
+                    session.SideOf(characterId).BigMoney, session.SideOf(opponentId).BigMoney);
             }
 
             _crossShard.TryConsumeOutbound(characterId, out _);

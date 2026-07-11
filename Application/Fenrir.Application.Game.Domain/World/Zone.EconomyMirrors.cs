@@ -692,6 +692,9 @@ public sealed partial class Zone
         if (command.StoreMoney is { } storeMoney)
             state.StoreMoney = storeMoney;
 
+        if (command.BigMoneyDelta is { } bigMoneyDelta)
+            state.BigMoney += bigMoneyDelta;
+
         if (command.SkillPoints is { } skillPoints)
         {
             state.SkillPoints = skillPoints;

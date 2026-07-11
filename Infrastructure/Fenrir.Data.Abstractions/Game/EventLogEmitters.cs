@@ -26,6 +26,10 @@ public static class EventLogEmitters
 
         public const short TradeMoneyStagedToInventoryEventCode = 6;
 
+        public const short TradeBigMoneyStagedToWindowEventCode = 7;
+
+        public const short TradeBigMoneyStagedToInventoryEventCode = 8;
+
 
         public const short PetInventoryToPetEventCode = 1;
 
@@ -90,6 +94,18 @@ public static class EventLogEmitters
         var eventCode = toTradeWindow ? TradeMoneyStagedToWindowEventCode : TradeMoneyStagedToInventoryEventCode;
         return eventLog.LogAsync(eventCode, EventLogCategory.Trade, accountId, characterId, null, null, null,
             amount, null, null, null, SuccessOutcome, null, ct);
+    }
+
+        public static ValueTask LogTradeBigMoneyStagedAsync(this IEventLogRepository eventLog, int accountId,
+        int characterId, bool toTradeWindow, long amount, long onHandBefore, long onHandAfter,
+        long tradeOfferBefore, long tradeOfferAfter, CancellationToken ct)
+    {
+        var eventCode = toTradeWindow
+            ? TradeBigMoneyStagedToWindowEventCode
+            : TradeBigMoneyStagedToInventoryEventCode;
+        return eventLog.LogAsync(eventCode, EventLogCategory.Trade, accountId, characterId, null, null, null,
+            null, amount, null, null, SuccessOutcome,
+            $"OnHand={onHandBefore}->{onHandAfter};Offer={tradeOfferBefore}->{tradeOfferAfter}", ct);
     }
 
     public static ValueTask LogPetInventoryTransferAsync(this IEventLogRepository eventLog, int accountId,

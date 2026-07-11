@@ -64,10 +64,10 @@ public class OrnamentContributionTests
     {
         Assert.Equal(4, StatCalculator.OrnamentDecorationSlots.Count);
         foreach (var expected in (int[])[9, 10, 11, 12])
-            Assert.Contains(expected, StatCalculator.OrnamentDecorationSlots);
+            Assert.Contains(expected, (IEnumerable<int>)StatCalculator.OrnamentDecorationSlots);
 
-        Assert.DoesNotContain(0, StatCalculator.OrnamentDecorationSlots);
-        Assert.DoesNotContain(8, StatCalculator.OrnamentDecorationSlots);
+        Assert.DoesNotContain(0, (IEnumerable<int>)StatCalculator.OrnamentDecorationSlots);
+        Assert.DoesNotContain(8, (IEnumerable<int>)StatCalculator.OrnamentDecorationSlots);
     }
 
     [Theory]

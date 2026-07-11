@@ -4,6 +4,7 @@ using Fenrir.Application.Game.Abstractions.GenericAction;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Quests;
 using Fenrir.Application.Game.Domain.Social.Party;
+using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.Npcs;
 using Fenrir.Application.Game.GameData;
@@ -115,7 +116,8 @@ public class NpcShopTradeServiceTests
         FakeEventLogRepository eventLog)
     {
         return new GenericActionService(characters, worldData, new QuestCatalog(worldData), new PartyRegistry(),
-            eventLog, new FakeAccountVaultRepository(), NullLogger<GenericActionService>.Instance);
+            eventLog, new FakeAccountVaultRepository(), new TradeRegistry(), ZoneTestKit.CreateRegistry(),
+            NullLogger<GenericActionService>.Instance);
     }
 
     private static DefaultPData SellMove(int quantity = 0)

@@ -499,12 +499,6 @@ public sealed class UseInventoryItemService(
 
         var newRawCounter = ResolvedStatPotionRawCounter(state, kind, newSubValue);
 
-        // The just-consumed potion's own counter is what this recompute exists to reflect, but state.Eat*Potion
-        // is only mutated later, once the TribeProgressZoneCommand posted below is drained by this zone's own
-        // tick -- so the live runtimeState still carries the PRE-consumption counter at this exact instant.
-        // Build the post-consumption ConsumableContext explicitly and hand it in as an override rather than
-        // relying on runtimeState alone, so this same recompute (not a later, unrelated one) is the first to
-        // reflect the newly granted bonus.
         var baseConsumable = new ConsumableContext(state.EatLifePotion, state.EatManaPotion, state.EatStrPotion,
             state.EatDexPotion, state.EatElePotion);
         var consumableOverride = kind switch

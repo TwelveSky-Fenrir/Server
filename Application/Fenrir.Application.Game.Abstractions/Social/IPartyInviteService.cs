@@ -10,8 +10,7 @@ public enum PartyInviteResultKind
     TargetBusy,
     TargetAlreadyPartied,
     Sent,
-
-        SentCrossShard
+    SentCrossShard
 }
 
 public readonly record struct PartyInviteResult(
@@ -22,7 +21,6 @@ public readonly record struct PartyInviteResult(
 
 public interface IPartyInviteService
 {
-
-        public ValueTask<PartyInviteResult> InviteAsync(Zone zone, PlayerRuntimeState inviter, string targetAvatarName,
+    public ValueTask<PartyInviteResult> InviteAsync(Zone zone, PlayerRuntimeState inviter, string targetAvatarName,
         CancellationToken cancellationToken);
 }

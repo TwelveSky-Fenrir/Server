@@ -41,12 +41,6 @@ public static class EquipmentService
     {
         var equipped = BuildEquippedSlots(equipmentContainer, worldData.ItemsById);
         var (cosmetic, zone, consumable, mount) = AssembleStatContexts(runtimeState, worldData);
-        // consumableOverride/zoneOverride exist for the handful of call sites where this very same action is
-        // ALSO the one mutating one of these context categories (e.g. a stat-potion's own lifetime counter, an
-        // ornament on/off toggle) but the mutation is only durably applied later, once the posted ZoneCommand
-        // is drained by this zone's own tick -- runtimeState still reflects the PRE-mutation value at the
-        // instant this recompute runs. Passing the already-known new value here lets the caller's own action
-        // become visible in this same recompute, instead of only appearing on some later, unrelated one.
         if (consumableOverride is { } overrideConsumable)
             consumable = overrideConsumable;
         if (zoneOverride is { } overrideZone)

@@ -13,9 +13,11 @@ using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.Domain.Social.Duel;
 using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.Social.Trade;
+using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Stats;
 using Fenrir.Data.Abstractions.Game;
+using Fenrir.Data.Abstractions.Runtime;
 using Fenrir.Data.WriteBehind;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
@@ -161,6 +163,8 @@ public sealed partial class Zone
             GuildName = data.GuildName,
             GuildRoleDb = data.GuildRoleDb,
             GuildCallName = data.GuildCallName,
+            GuildBuffType = data.GuildBuffType,
+            GuildBuffActive = data.GuildBuffActive,
             TribeRole = data.TribeRole,
             PreviousTribe = data.PreviousTribe,
             ZoneEntryAtZoneClock = _clock,
@@ -177,6 +181,7 @@ public sealed partial class Zone
             PremiumExpireUtc = data.PremiumExpireUtc,
             BuffX2Time = data.BuffX2Time,
             StoreMoney = data.StoreMoney,
+            BigMoney = data.BigMoney,
             InventoryDate = data.InventoryDate,
             StoreDate = data.StoreDate,
             PetBagDate = data.PetBagDate,
@@ -294,6 +299,17 @@ public sealed partial class Zone
 
         if (IsZone241TypeZone)
             TryEnterZone241PersonalInstance(characterId);
+
+        TryPublishPartyResyncRequest(characterId, state.Name);
+    }
+
+        private void TryPublishPartyResyncRequest(int characterId, string avatarName)
+    {
+        if (_partyResyncRelayQueue is null || _partyRegistry.IsInParty(characterId))
+            return;
+
+        _partyResyncRelayQueue.Enqueue(new PartyResyncRelayEntry(
+            (byte)PartyResyncRelaySort.Request, options.ShardId, characterId, avatarName, avatarName));
     }
 
     private void HandleLeave(int characterId, Zone? handoffTarget, (float X, float Y, float Z)? handoffPosition = null)
@@ -399,9 +415,26 @@ public sealed partial class Zone
                 return;
 
             case TradeDisconnectNotification.End:
+                RestoreStagedBigMoney(characterId, result.SelfBigMoneyRestore);
+                RestoreStagedBigMoney(result.PartnerId, result.PartnerBigMoneyRestore);
                 SendToCharacter(result.PartnerId, new TradeEndResponse { Result = 1 });
                 return;
         }
+    }
+
+        private void RestoreStagedBigMoney(int characterId, int amount)
+    {
+        if (amount == 0)
+            return;
+
+        if (_players.TryGetValue(characterId, out var state))
+        {
+            state.BigMoney += amount;
+            return;
+        }
+
+        if (_zoneRegistry is not null && _zoneRegistry.TryGetPlayerAndZone(characterId, out _, out var otherZone))
+            otherZone.PostTribeProgressCommand(new TribeProgressZoneCommand(characterId, BigMoneyDelta: amount));
     }
 
         private PartyRosterResponse BuildPartyRoster(int sort, IReadOnlyList<int> memberIds)
@@ -752,7 +785,7 @@ public sealed partial class Zone
         }
 
         var serverBonusGrade = SkillGradeAuthority.GetBonusSkillValue(action.SkillNumber, equipSlotItems, 0,
-            skillDef, 0, state.GuildBuffActive);
+            skillDef, state.GuildBuffType, state.GuildBuffActive);
         var serverMaxGrade = SkillGradeAuthority.GetMaxSkillGradeNum(action.SkillNumber, state.LearnedSkills);
 
         var isRealSkillCast = action.SkillNumber != 0 &&
@@ -978,7 +1011,7 @@ public sealed partial class Zone
             worldData.ItemsById);
 
         state.Stats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData, state.Buffs,
-            petContribution);
+            petContribution, runtimeState: state);
 
         var response = new AvatarEffectStateResponse
         {

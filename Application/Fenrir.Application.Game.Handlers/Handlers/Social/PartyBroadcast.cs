@@ -1,4 +1,6 @@
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Data.Abstractions.Runtime;
+using Fenrir.Network.Abstractions;
 using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Application.Game.Handlers.Handlers.Social;
@@ -22,5 +24,18 @@ internal static class PartyBroadcast
             AvatarName04 = names[3],
             AvatarName05 = names[4]
         };
+    }
+
+        public static void SendOrRelayNotice<TPacket>(ZoneRegistry zones, IPartyResyncRelayQueue relay,
+        byte shardId, int memberId, in TPacket localPacket, PartyResyncRelaySort remoteSort, string actorAvatarName)
+        where TPacket : struct, IOutgoingPacket
+    {
+        if (zones.TryGetPlayer(memberId, out var member))
+        {
+            member.Session.Send(localPacket);
+            return;
+        }
+
+        relay.Enqueue(new PartyResyncRelayEntry((byte)remoteSort, shardId, memberId, "", actorAvatarName));
     }
 }

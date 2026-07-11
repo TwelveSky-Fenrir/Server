@@ -54,7 +54,8 @@ public static class FenrirDataServiceCollectionExtensions
 
         builder.Services.AddSingleton<IPetBagRepository, PetBagRepository>();
 
-        builder.Services.AddSingleton<IBigMoneyRepository, BigMoneyRepository>();
+        builder.Services
+            .AddSingleton<Fenrir.Data.Abstractions.Inventory.IBigMoneyRepository, Inventory.BigMoneyRepository>();
 
         builder.Services.AddSingleton<IRuneRepository, RuneRepository>();
 

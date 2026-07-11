@@ -33,10 +33,6 @@ public class SkillCastResolverTests
     [Fact]
     public void SkillNotInEffectCatalog_StillChargesManaButProducesNoEffect()
     {
-        // Legacy's op15 mana debit is unconditional on invested grade points alone (S04_MyWork02.cpp:1640-
-        // 1650,1680-1683) -- it never inspects whether the confirm-step dispatch recognizes the skill id
-        // (S07_MyGame04.cpp:1509-1564 has no case/default for an uncatalogued id). A catalog miss must
-        // therefore still succeed and charge mana, just with SkillEffectKind.None (no buff/heal produced).
         var skill = BuildSkill(999, 10, (10, 10), (0, 0), (0, 0));
         var result = SkillCastResolver.TryCast(skill, 5, 100, 1000, null, 1);
         Assert.True(result.Success);
@@ -50,8 +46,6 @@ public class SkillCastResolverTests
     [Fact]
     public void SkillNotInEffectCatalog_InsufficientMana_StillFails()
     {
-        // The insufficient-mana gate is unaffected by the catalog-miss case above -- it must still block
-        // the cast (and the mana debit) exactly as it would for any catalogued skill.
         var skill = BuildSkill(999, 10, (50, 50), (0, 0), (0, 0));
         var result = SkillCastResolver.TryCast(skill, 5, 10, 1000, null, 1);
         Assert.False(result.Success);

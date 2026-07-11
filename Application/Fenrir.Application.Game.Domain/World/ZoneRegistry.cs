@@ -13,6 +13,7 @@ using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Data.Abstractions.Game;
+using Fenrir.Data.Abstractions.Runtime;
 using Fenrir.Data.WriteBehind;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -26,6 +27,7 @@ public sealed class ZoneRegistry
     private readonly DuelRegistry? _duelRegistry;
     private readonly IEventLogQueue? _eventLogQueue;
     private readonly IFourGuildKillPointQueue? _fourGuildKillPointQueue;
+    private readonly IPartyResyncRelayQueue? _partyResyncRelayQueue;
     private readonly HeroRankPointAccumulator? _heroRankPointAccumulator;
     private readonly KillCooldownTracker _killCooldownTracker;
     private readonly MovementRules _movementRules;
@@ -53,7 +55,8 @@ public sealed class ZoneRegistry
         TradeRegistry? tradeRegistry = null,
         IEventLogQueue? eventLogQueue = null,
         IFourGuildKillPointQueue? fourGuildKillPointQueue = null,
-        TribeSymbolCombatModifiers? tribeSymbolCombatModifiers = null)
+        TribeSymbolCombatModifiers? tribeSymbolCombatModifiers = null,
+        IPartyResyncRelayQueue? partyResyncRelayQueue = null)
     {
         _options = options.Value;
         _movementRules = movementRules;
@@ -87,6 +90,8 @@ public sealed class ZoneRegistry
         _fourGuildKillPointQueue = fourGuildKillPointQueue;
 
         _tribeSymbolCombatModifiers = tribeSymbolCombatModifiers;
+
+        _partyResyncRelayQueue = partyResyncRelayQueue;
     }
 
         public ImmutableArray<Zone> Zones => _zones.Values;
@@ -120,7 +125,8 @@ public sealed class ZoneRegistry
                     zoneRegistry: this,
                     eventLogQueue: _eventLogQueue,
                     fourGuildKillPointQueue: _fourGuildKillPointQueue,
-                    tribeSymbolCombatModifiers: _tribeSymbolCombatModifiers);
+                    tribeSymbolCombatModifiers: _tribeSymbolCombatModifiers,
+                    partyResyncRelayQueue: _partyResyncRelayQueue);
 
                 zone.PersonalDungeonBossCatalog = Zone241RebirthTierBossCatalog.Instance;
 

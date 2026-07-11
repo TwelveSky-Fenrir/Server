@@ -29,8 +29,7 @@ public sealed class PartyInviteService(
     ILogger<PartyInviteService> logger)
     : IPartyInviteService
 {
-
-        public async ValueTask<PartyInviteResult> InviteAsync(Zone zone, PlayerRuntimeState inviter,
+    public async ValueTask<PartyInviteResult> InviteAsync(Zone zone, PlayerRuntimeState inviter,
         string targetAvatarName, CancellationToken cancellationToken)
     {
         if (parties.IsInParty(inviter.CharacterId) && !parties.IsLeader(inviter.CharacterId))
@@ -54,7 +53,7 @@ public sealed class PartyInviteService(
 
         var targetBusyExternally =
             CommunityWorkGate.IsBusy(target, duels, trades, friends, parties, mentors, guildInvites) ||
-            target.IsStunned || target.IsDead;
+            target.IsStunned || target.IsDead || target.IsMovingZone;
 
         var allyOfInviterTribe = worldState.GetAllyOf(inviter.Tribe);
 

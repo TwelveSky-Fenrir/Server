@@ -11,11 +11,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Fenrir.Data.Tests.Characters;
 
-// game.usp_Character_AdjustBigMoneyStore / usp_AccountVault_TransferBigMoneyWithCharacter /
-// usp_Character_AdjustBigMoneyConversion against real SQL Server 2025 -- the three BigMoney ("1B")
-// transfer/conversion primitives backing CZ_PROCESS_DATA_SEND tSort 241/242/244/245/246/247 (the
-// C8-bank-store contract's big-money family). Each test creates its own account/character so tests never
-// depend on execution order.
 [Collection("SqlServer")]
 public class BigMoneyRepositoryTests
 {
@@ -48,7 +43,6 @@ public class BigMoneyRepositoryTests
 
         await ExecAsync($"UPDATE game.Characters SET BigMoney = 3 WHERE CharacterId = {characterId};");
 
-        // tSort 241 -- inventory -> store: move 2 units.
         await _bigMoney.AdjustBigMoneyStoreAsync(characterId, -2, 2, CancellationToken.None);
 
         var afterDeposit = await _characters.GetWorldEntryBundleAsync(characterId, CancellationToken.None);
@@ -56,7 +50,6 @@ public class BigMoneyRepositoryTests
         Assert.Equal(1, afterDeposit.Character.BigMoney);
         Assert.Equal(2, afterDeposit.Character.BigStoreMoney);
 
-        // tSort 244 -- store -> inventory: move the 2 units back.
         await _bigMoney.AdjustBigMoneyStoreAsync(characterId, 2, -2, CancellationToken.None);
 
         var afterWithdraw = await _characters.GetWorldEntryBundleAsync(characterId, CancellationToken.None);
@@ -74,7 +67,6 @@ public class BigMoneyRepositoryTests
         await ExecAsync(
             $"UPDATE game.Characters SET BigMoney = 1, BigStoreMoney = 999 WHERE CharacterId = {characterId};");
 
-        // Moving 1 more unit into BigStoreMoney would land it at 1000, over MAX_NUMBER_SIZE2 (999).
         var ex = await Record.ExceptionAsync(() =>
             _bigMoney.AdjustBigMoneyStoreAsync(characterId, -1, 1, CancellationToken.None).AsTask());
 
@@ -97,8 +89,6 @@ public class BigMoneyRepositoryTests
 
         await ExecAsync($"UPDATE game.Characters SET BigMoney = 5 WHERE CharacterId = {characterId};");
 
-        // No game.AccountVault row exists for this account yet -- tSort 242 (inventory -> bank) must
-        // auto-create it, mirroring usp_AccountVault_TransferMoneyWithCharacter's own posture.
         await _bigMoney.AdjustBigMoneyBankAsync(characterId, -3, accountId, 3, CancellationToken.None);
 
         var afterDeposit = await _characters.GetWorldEntryBundleAsync(characterId, CancellationToken.None);
@@ -109,7 +99,6 @@ public class BigMoneyRepositoryTests
         Assert.NotNull(balanceAfterDeposit);
         Assert.Equal(3L, balanceAfterDeposit.Money2);
 
-        // tSort 245 -- bank -> inventory: move the 3 units back.
         await _bigMoney.AdjustBigMoneyBankAsync(characterId, 3, accountId, -3, CancellationToken.None);
 
         var afterWithdraw = await _characters.GetWorldEntryBundleAsync(characterId, CancellationToken.None);
@@ -141,8 +130,6 @@ public class BigMoneyRepositoryTests
         Assert.NotNull(afterRejected);
         Assert.Equal(1, afterRejected.Character.BigMoney);
 
-        // The Characters-side guard fails first (inside the same transaction as the auto-create), so the
-        // vault row must never observe a credit -- verify it stays at its untouched default of 0.
         var (balance, _) = await _accountVault.GetAsync(accountId, CancellationToken.None);
         if (balance is not null)
             Assert.Equal(0L, balance.Money2);
@@ -167,8 +154,6 @@ public class BigMoneyRepositoryTests
         if (sqlException is not null)
             Assert.Equal(50351, sqlException.Number);
 
-        // XACT_ABORT + THROW rolls back the whole transaction, including the Characters-side debit that
-        // already committed inside this same batch -- verify it was rolled back, not left half-applied.
         var afterRejected = await _characters.GetWorldEntryBundleAsync(characterId, CancellationToken.None);
         Assert.NotNull(afterRejected);
         Assert.Equal(5, afterRejected.Character.BigMoney);
@@ -182,8 +167,6 @@ public class BigMoneyRepositoryTests
 
         await ExecAsync($"UPDATE game.Characters SET Money = 1000000000 WHERE CharacterId = {characterId};");
 
-        // tSort 246 shape (BigMoneyUnitConversionPolicy.ResolveMoneyToBigMoney): full requested amount
-        // debited from Money, exactly +1 credited to BigMoney.
         await _bigMoney.AdjustBigMoneyConversionAsync(characterId, -1_000_000_000L, 1, CancellationToken.None);
 
         var afterConvertUp = await _characters.GetWorldEntryBundleAsync(characterId, CancellationToken.None);
@@ -191,7 +174,6 @@ public class BigMoneyRepositoryTests
         Assert.Equal(0L, afterConvertUp.Character.Money);
         Assert.Equal(1, afterConvertUp.Character.BigMoney);
 
-        // tSort 247 shape (ResolveBigMoneyToMoney): exactly -1 BigMoney, exactly +1,000,000,000 Money.
         await _bigMoney.AdjustBigMoneyConversionAsync(characterId, 1_000_000_000L, -1, CancellationToken.None);
 
         var afterConvertDown = await _characters.GetWorldEntryBundleAsync(characterId, CancellationToken.None);
@@ -209,7 +191,6 @@ public class BigMoneyRepositoryTests
         await ExecAsync(
             $"UPDATE game.Characters SET Money = 1000000000, BigMoney = 999 WHERE CharacterId = {characterId};");
 
-        // Converting up again would push BigMoney to 1000, over MAX_NUMBER_SIZE2 (999).
         var ex = await Record.ExceptionAsync(() =>
             _bigMoney.AdjustBigMoneyConversionAsync(characterId, -1_000_000_000L, 1, CancellationToken.None)
                 .AsTask());

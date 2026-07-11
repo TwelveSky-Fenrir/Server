@@ -1,4 +1,5 @@
 using Fenrir.Application.Game.Abstractions.Social;
+using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Zone.Sessions;
@@ -23,11 +24,23 @@ public sealed class TradeEndHandler(
         if (!result.Handled)
             return;
 
+        RestoreStagedBigMoney(result.PlayerAId, result.PlayerABigMoneyRestore);
+        RestoreStagedBigMoney(result.PlayerBId, result.PlayerBBigMoneyRestore);
+
         var response = new TradeEndResponse { Result = 1 };
 
         if (zones.TryGetPlayer(result.PlayerAId, out var playerA))
             playerA.Session.Send(response);
         if (zones.TryGetPlayer(result.PlayerBId, out var playerB))
             playerB.Session.Send(response);
+    }
+
+    private void RestoreStagedBigMoney(int characterId, int amount)
+    {
+        if (amount == 0)
+            return;
+
+        if (zones.TryGetPlayerAndZone(characterId, out _, out var zone))
+            zone.PostTribeProgressCommand(new TribeProgressZoneCommand(characterId, BigMoneyDelta: amount));
     }
 }

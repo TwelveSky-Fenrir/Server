@@ -1,5 +1,4 @@
 using Fenrir.Application.Game.Abstractions.Social;
-using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Guilds;
 using Fenrir.Application.Game.Domain.Social;
 using Fenrir.Application.Game.Domain.Social.Duel;
@@ -10,7 +9,6 @@ using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Serialization.Zone.Packets.Zone;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace Fenrir.Application.Game.Services.Social;
 
@@ -22,13 +20,10 @@ public sealed class DuelService(
     PartyRegistry parties,
     MentorRegistry mentors,
     GuildInviteRegistry guildInvites,
-    ICharacterShardLocationRepository characterShardLocations,
-    ISocialCrossShardRelayQueue crossShardRelay,
-    IOptions<GameServerOptions> options,
     ILogger<DuelService> logger) : IDuelService
 {
 
-        public async ValueTask<DuelAskResultKind> AskAsync(Zone zone, PlayerRuntimeState challenger,
+        public ValueTask<DuelAskResultKind> AskAsync(Zone zone, PlayerRuntimeState challenger,
         string targetAvatarName, int sort, CancellationToken cancellationToken)
     {
         if (zone.MapId == 124)
@@ -36,7 +31,7 @@ public sealed class DuelService(
             logger.LogInformation(
                 "Duel ask rejected: challenger {ChallengerId} is on map {MapId}, which forbids duels",
                 challenger.CharacterId, zone.MapId);
-            return DuelAskResultKind.MapForbidden;
+            return ValueTask.FromResult(DuelAskResultKind.MapForbidden);
         }
 
         if (duels.TryGetActiveDuel(challenger.CharacterId, out _))
@@ -44,7 +39,7 @@ public sealed class DuelService(
             logger.LogInformation(
                 "Duel ask rejected and challenger {ChallengerId}'s session will be terminated: challenger is already actively dueling (desynced state)",
                 challenger.CharacterId);
-            return DuelAskResultKind.ChallengerAlreadyDueling;
+            return ValueTask.FromResult(DuelAskResultKind.ChallengerAlreadyDueling);
         }
 
         if (CommunityWorkGate.IsBusy(challenger, duels, trades, friends, parties, mentors, guildInvites))
@@ -52,12 +47,16 @@ public sealed class DuelService(
             logger.LogInformation(
                 "Duel ask rejected: challenger {ChallengerId} is already negotiating another duel",
                 challenger.CharacterId);
-            return DuelAskResultKind.ChallengerBusy;
+            return ValueTask.FromResult(DuelAskResultKind.ChallengerBusy);
         }
 
-        var target = FindPlayerByName(zone, targetAvatarName);
-        if (target is null)
-            return await AskCrossShardAsync(challenger, targetAvatarName, cancellationToken).ConfigureAwait(false);
+        if (!zones.TryGetPlayerByName(targetAvatarName, out var target))
+        {
+            logger.LogInformation(
+                "Duel ask rejected: challenger {ChallengerId} named target avatar {TargetAvatarName}, not found on this shard",
+                challenger.CharacterId, targetAvatarName);
+            return ValueTask.FromResult(DuelAskResultKind.TargetNotFound);
+        }
 
         var interTribeAllowed = zone.MapId is 37 or 119 or 124;
         if (!interTribeAllowed && challenger.Tribe != target.Tribe)
@@ -65,14 +64,14 @@ public sealed class DuelService(
             logger.LogInformation(
                 "Duel ask rejected and challenger {ChallengerId}'s session will be terminated: cross-tribe duel with target {TargetId} not allowed on map {MapId}",
                 challenger.CharacterId, target.CharacterId, zone.MapId);
-            return DuelAskResultKind.TribeMismatch;
+            return ValueTask.FromResult(DuelAskResultKind.TribeMismatch);
         }
 
         if (CommunityWorkGate.IsBusy(target, duels, trades, friends, parties, mentors, guildInvites))
         {
             logger.LogInformation("Duel ask rejected: target {TargetId} is busy (community-work gate)",
                 target.CharacterId);
-            return DuelAskResultKind.TargetBusy;
+            return ValueTask.FromResult(DuelAskResultKind.TargetBusy);
         }
 
         switch (duels.TryAsk(challenger.CharacterId, target.CharacterId, sort == 1))
@@ -81,28 +80,28 @@ public sealed class DuelService(
                 logger.LogInformation(
                     "Duel ask rejected and challenger {ChallengerId}'s session will be terminated: challenger is already actively dueling (desynced state, caught at registration)",
                     challenger.CharacterId);
-                return DuelAskResultKind.ChallengerAlreadyDueling;
+                return ValueTask.FromResult(DuelAskResultKind.ChallengerAlreadyDueling);
             case DuelAskOutcome.ChallengerBusy:
                 logger.LogInformation(
                     "Duel ask rejected: challenger {ChallengerId} is already negotiating another duel (caught at registration)",
                     challenger.CharacterId);
-                return DuelAskResultKind.ChallengerBusy;
+                return ValueTask.FromResult(DuelAskResultKind.ChallengerBusy);
             case DuelAskOutcome.TargetBusy:
                 logger.LogInformation(
                     "Duel ask rejected: target {TargetId} is busy (negotiating or actively dueling)",
                     target.CharacterId);
-                return DuelAskResultKind.TargetBusy;
+                return ValueTask.FromResult(DuelAskResultKind.TargetBusy);
             case DuelAskOutcome.Sent:
                 logger.LogInformation(
                     "Duel challenge sent: challenger {ChallengerId} -> target {TargetId} (sort {Sort}, noPotions {NoPotions})",
                     challenger.CharacterId, target.CharacterId, sort, sort == 1);
                 target.Session.Send(new DuelChallengeResponse { AvatarName = challenger.Name, Sort = sort });
-                return DuelAskResultKind.Sent;
+                return ValueTask.FromResult(DuelAskResultKind.Sent);
             default:
                 logger.LogWarning(
                     "Duel ask for challenger {ChallengerId} hit an unexpected DuelRegistry.TryAsk outcome -- treating as ChallengerBusy",
                     challenger.CharacterId);
-                return DuelAskResultKind.ChallengerBusy;
+                return ValueTask.FromResult(DuelAskResultKind.ChallengerBusy);
         }
     }
 
@@ -157,7 +156,8 @@ public sealed class DuelService(
             return;
         }
 
-        if (!zones.TryGetPlayer(duel.PlayerA, out var playerA) || !zones.TryGetPlayer(duel.PlayerB, out var playerB))
+        if (!zones.TryGetPlayerAndZone(duel.PlayerA, out var playerA, out var requesterZone) ||
+            !zones.TryGetPlayer(duel.PlayerB, out var playerB))
         {
             logger.LogWarning(
                 "Duel {UniqueNumber} start aborted: a participant was not found in any zone on this shard (playerA {PlayerA}, playerB {PlayerB})",
@@ -184,72 +184,7 @@ public sealed class DuelService(
             RemainTime = duel.RemainingTicks,
             EatDrugState = eatDrugState
         });
-    }
 
-        private async ValueTask<DuelAskResultKind> AskCrossShardAsync(PlayerRuntimeState challenger,
-        string targetAvatarName, CancellationToken cancellationToken)
-    {
-        var remote = await characterShardLocations.FindByNameAsync(targetAvatarName, cancellationToken)
-            .ConfigureAwait(false);
-
-        if (remote is null)
-        {
-            logger.LogInformation(
-                "Duel ask rejected: challenger {ChallengerId} named target avatar {TargetAvatarName}, not found on any shard",
-                challenger.CharacterId, targetAvatarName);
-            return DuelAskResultKind.TargetNotFound;
-        }
-
-        var interTribeAllowed = challenger.MapId is 37 or 119 or 124;
-        if (!interTribeAllowed && challenger.Tribe != remote.Tribe)
-        {
-            logger.LogInformation(
-                "Duel ask rejected and challenger {ChallengerId}'s session will be terminated: cross-tribe duel with cross-shard target {TargetId} not allowed on map {MapId}",
-                challenger.CharacterId, remote.CharacterId, challenger.MapId);
-            return DuelAskResultKind.TribeMismatch;
-        }
-
-        var outcome = duels.TryAskCrossShard(challenger.CharacterId,
-            new CrossShardOutboundAsk(remote.ShardId, remote.CharacterId, remote.AvatarName));
-
-        switch (outcome)
-        {
-            case DuelAskOutcome.ChallengerAlreadyDueling:
-                logger.LogInformation(
-                    "Duel ask rejected and challenger {ChallengerId}'s session will be terminated: challenger is already actively dueling (desynced state, cross-shard registration)",
-                    challenger.CharacterId);
-                return DuelAskResultKind.ChallengerAlreadyDueling;
-            case DuelAskOutcome.Sent:
-                crossShardRelay.Enqueue(new SocialCrossShardRelayEntry(
-                    SocialCrossShardRelayKind.Duel,
-                    SocialCrossShardRelayMessageType.Ask,
-                    null,
-                    null,
-                    options.Value.ShardId,
-                    challenger.CharacterId,
-                    challenger.Name,
-                    remote.ShardId,
-                    remote.CharacterId,
-                    null));
-
-                logger.LogInformation(
-                    "Duel challenge published cross-shard: challenger {ChallengerId} -> target {TargetCharacterId} on shard {TargetShardId} (never delivered today -- see DuelService's own remarks)",
-                    challenger.CharacterId, remote.CharacterId, remote.ShardId);
-                return DuelAskResultKind.SentCrossShard;
-            default:
-                logger.LogInformation(
-                    "Duel ask rejected: challenger {ChallengerId} is already negotiating another duel (cross-shard registration)",
-                    challenger.CharacterId);
-                return DuelAskResultKind.ChallengerBusy;
-        }
-    }
-
-    private static PlayerRuntimeState? FindPlayerByName(Zone zone, string avatarName)
-    {
-        foreach (var candidate in zone.Players)
-            if (string.Equals(candidate.Name, avatarName, StringComparison.OrdinalIgnoreCase))
-                return candidate;
-
-        return null;
+        requesterZone.Post(ZoneCommand.BroadcastDuelStart(duel.PlayerA, duel.PlayerB, duel.UniqueNumber));
     }
 }

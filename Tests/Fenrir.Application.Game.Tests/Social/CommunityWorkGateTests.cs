@@ -124,6 +124,36 @@ public class CommunityWorkGateTests
     }
 
     [Fact]
+    public void IsBusy_ActivelyDueling_ReturnsTrue()
+    {
+        var player = MakePlayer(PlayerId);
+        var (duels, trades, friends, parties, mentors, guildInvites) = MakeRegistries();
+
+        Assert.Equal(DuelAskOutcome.Sent, duels.TryAsk(PlayerId, OtherId, false));
+        Assert.True(duels.TryAnswer(OtherId, true, out var challengerId));
+        Assert.Equal(PlayerId, challengerId);
+        Assert.True(duels.TryStart(PlayerId, out _));
+
+        Assert.False(duels.IsNegotiating(PlayerId));
+        Assert.True(duels.IsActivelyDueling(PlayerId));
+
+        Assert.True(CommunityWorkGate.IsBusy(player, duels, trades, friends, parties, mentors, guildInvites));
+    }
+
+    [Fact]
+    public void IsBusy_TargetSideActivelyDueling_AlsoReturnsTrueForTarget()
+    {
+        var target = MakePlayer(OtherId);
+        var (duels, trades, friends, parties, mentors, guildInvites) = MakeRegistries();
+
+        Assert.Equal(DuelAskOutcome.Sent, duels.TryAsk(PlayerId, OtherId, false));
+        Assert.True(duels.TryAnswer(OtherId, true, out _));
+        Assert.True(duels.TryStart(PlayerId, out _));
+
+        Assert.True(CommunityWorkGate.IsBusy(target, duels, trades, friends, parties, mentors, guildInvites));
+    }
+
+    [Fact]
     public void IsBusy_TargetSideNegotiating_AlsoReturnsTrueForTarget()
     {
         var target = MakePlayer(OtherId);

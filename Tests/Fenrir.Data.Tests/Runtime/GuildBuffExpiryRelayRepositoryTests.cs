@@ -29,7 +29,7 @@ public sealed class GuildBuffExpiryRelayRepositoryTests : IDisposable
         _provider.Dispose();
     }
 
-        private async Task DrainAsync(byte shardId)
+    private async Task DrainAsync(byte shardId)
     {
         await _repository.PollAsync(shardId, 999_999, CancellationToken.None);
     }

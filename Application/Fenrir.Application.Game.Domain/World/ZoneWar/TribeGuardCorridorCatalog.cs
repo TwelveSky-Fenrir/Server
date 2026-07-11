@@ -6,8 +6,7 @@ public readonly record struct TribeGuardCorridorChain(ImmutableArray<short> Zone
 
 public sealed class TribeGuardCorridorCatalog
 {
-
-        public const int SegmentsPerTribe = 4;
+    public const int SegmentsPerTribe = 4;
 
     public static readonly TribeGuardCorridorCatalog Empty = new(
         0,
@@ -50,9 +49,9 @@ public sealed class TribeGuardCorridorCatalog
         _segmentsOwnedByZone = ownedByZone.ToImmutableDictionary(kv => kv.Key, kv => kv.Value.ToImmutableArray());
     }
 
-        public short HubZoneId { get; }
+    public short HubZoneId { get; }
 
-        public bool TryGetSegmentForDestinationZone(short zoneId, out byte tribeId, out byte segmentIndex)
+    public bool TryGetSegmentForDestinationZone(short zoneId, out byte tribeId, out byte segmentIndex)
     {
         if (_segmentByDestinationZone.TryGetValue(zoneId, out var segment))
         {
@@ -65,7 +64,7 @@ public sealed class TribeGuardCorridorCatalog
         return false;
     }
 
-        public int? GetOriginSegmentIndex(byte tribeId, short zoneId)
+    public int? GetOriginSegmentIndex(byte tribeId, short zoneId)
     {
         if (zoneId == HubZoneId)
             return -1;
@@ -77,12 +76,12 @@ public sealed class TribeGuardCorridorCatalog
         return index < 0 ? null : index;
     }
 
-        public IReadOnlyList<(byte TribeId, byte SegmentIndex)> GetSegmentsOwnedByZone(short zoneId)
+    public IReadOnlyList<(byte TribeId, byte SegmentIndex)> GetSegmentsOwnedByZone(short zoneId)
     {
         return _segmentsOwnedByZone.TryGetValue(zoneId, out var owned) ? owned : [];
     }
 
-        public bool TryGetGuardPostSlots(byte tribeId, byte segmentIndex, out ImmutableArray<int> slots)
+    public bool TryGetGuardPostSlots(byte tribeId, byte segmentIndex, out ImmutableArray<int> slots)
     {
         return _guardPostSlotsBySegment.TryGetValue((tribeId, segmentIndex), out slots);
     }

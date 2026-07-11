@@ -2,33 +2,31 @@ namespace Fenrir.Application.Game.Domain.Social.Party;
 
 public enum PartyInviteOutcome
 {
-        Sent,
-        InviterBusy,
-        TargetBusy,
-        TargetAlreadyPartied,
-        InviterMustDisconnect
+    Sent,
+    InviterBusy,
+    TargetBusy,
+    TargetAlreadyPartied,
+    InviterMustDisconnect
 }
 
 public enum PartyJoinOutcome
 {
+    Created,
 
-        Created,
+    Joined,
 
-        Joined,
-
-        PartyWasFull
+    PartyWasFull
 }
 
 public enum PartyDisconnectKind
 {
+    NotInParty,
 
-        NotInParty,
+    LeaderDisbanded,
 
-        LeaderDisbanded,
+    MemberLeft,
 
-        MemberLeft,
-
-        MemberLeftAndDisbanded
+    MemberLeftAndDisbanded
 }
 
 public readonly record struct PartyDisconnectResult(
@@ -61,7 +59,7 @@ public sealed class Party
         return true;
     }
 
-        public bool TryRemoveMember(int characterId)
+    public bool TryRemoveMember(int characterId)
     {
         return _members.Remove(characterId);
     }
@@ -73,17 +71,17 @@ public sealed class PartyRegistry
 
     public const int MaxLevelGap = 9;
 
-        private readonly CrossShardNegotiationTracker _crossShard = new();
+    private readonly CrossShardNegotiationTracker _crossShard = new();
 
-        private readonly Dictionary<int, int> _leaderByMember = new();
+    private readonly Dictionary<int, int> _leaderByMember = new();
 
     private readonly Lock _lock = new();
 
-        private readonly Dictionary<int, Party> _partiesByLeader = new();
+    private readonly Dictionary<int, Party> _partiesByLeader = new();
 
-        private readonly Dictionary<int, int> _pendingByInvitee = new();
+    private readonly Dictionary<int, int> _pendingByInvitee = new();
 
-        private readonly Dictionary<int, int> _pendingByInviter = new();
+    private readonly Dictionary<int, int> _pendingByInviter = new();
 
     public bool IsInParty(int characterId)
     {
@@ -101,7 +99,7 @@ public sealed class PartyRegistry
         }
     }
 
-        public IReadOnlyList<int> GetMembers(int characterId)
+    public IReadOnlyList<int> GetMembers(int characterId)
     {
         lock (_lock)
         {
@@ -113,7 +111,7 @@ public sealed class PartyRegistry
         }
     }
 
-        public bool IsNegotiating(int characterId)
+    public bool IsNegotiating(int characterId)
     {
         lock (_lock)
         {
@@ -122,7 +120,7 @@ public sealed class PartyRegistry
         }
     }
 
-        public bool TryPeekPending(int characterId, out int counterpartId, out bool isInviter)
+    public bool TryPeekPending(int characterId, out int counterpartId, out bool isInviter)
     {
         lock (_lock)
         {
@@ -143,7 +141,7 @@ public sealed class PartyRegistry
         }
     }
 
-        public PartyInviteOutcome TryInviteCrossShard(int inviterId, CrossShardOutboundAsk ask)
+    public PartyInviteOutcome TryInviteCrossShard(int inviterId, CrossShardOutboundAsk ask)
     {
         lock (_lock)
         {
@@ -159,7 +157,7 @@ public sealed class PartyRegistry
         }
     }
 
-        public PartyInviteOutcome TryInvite(int inviterId, int inviterCumulativeLevel, byte inviterTribe,
+    public PartyInviteOutcome TryInvite(int inviterId, int inviterCumulativeLevel, byte inviterTribe,
         int inviteeId, int inviteeCumulativeLevel, byte inviteeTribe, byte? allyOfInviterTribe = null,
         bool inviteeBusyExternally = false)
     {
@@ -206,7 +204,7 @@ public sealed class PartyRegistry
         }
     }
 
-        public bool ClearInviteeAfterCancel(int inviteeId, int inviterId)
+    public bool ClearInviteeAfterCancel(int inviteeId, int inviterId)
     {
         lock (_lock)
         {
@@ -216,7 +214,7 @@ public sealed class PartyRegistry
         }
     }
 
-        public bool TryRegisterCrossShardInbound(int inviteeId, CrossShardInboundAsk ask)
+    public bool TryRegisterCrossShardInbound(int inviteeId, CrossShardInboundAsk ask)
     {
         lock (_lock)
         {
@@ -227,7 +225,7 @@ public sealed class PartyRegistry
         }
     }
 
-        public bool TryConsumeCrossShardInbound(int inviteeId, out CrossShardInboundAsk ask)
+    public bool TryConsumeCrossShardInbound(int inviteeId, out CrossShardInboundAsk ask)
     {
         lock (_lock)
         {
@@ -235,7 +233,7 @@ public sealed class PartyRegistry
         }
     }
 
-        public bool TryConsumeCrossShardOutbound(int inviterId, out CrossShardOutboundAsk ask)
+    public bool TryConsumeCrossShardOutbound(int inviterId, out CrossShardOutboundAsk ask)
     {
         lock (_lock)
         {
@@ -243,7 +241,7 @@ public sealed class PartyRegistry
         }
     }
 
-        public PartyJoinOutcome TryCompleteCrossShardAnswer(int inviterId, int inviteeId, out IReadOnlyList<int> members)
+    public PartyJoinOutcome TryCompleteCrossShardAnswer(int inviterId, int inviteeId, out IReadOnlyList<int> members)
     {
         lock (_lock)
         {
@@ -269,7 +267,7 @@ public sealed class PartyRegistry
         }
     }
 
-            public bool TryAnswer(int inviteeId, bool accepted, bool inviterBusyByZoneTransfer, out int inviterId,
+    public bool TryAnswer(int inviteeId, bool accepted, bool inviterBusyByZoneTransfer, out int inviterId,
         out PartyJoinOutcome joinOutcome, out bool guardBlocked)
     {
         joinOutcome = default;
@@ -325,12 +323,12 @@ public sealed class PartyRegistry
         }
     }
 
-        public bool TryLeave(int characterId, out IReadOnlyList<int> membersBeforeLeave, out bool disbanded)
+    public bool TryLeave(int characterId, out IReadOnlyList<int> membersBeforeLeave, out bool disbanded)
     {
         return TryRemove(characterId, characterId, false, out membersBeforeLeave, out disbanded);
     }
 
-        public bool TryKick(int leaderId, int targetId, out IReadOnlyList<int> membersBeforeKick, out bool disbanded)
+    public bool TryKick(int leaderId, int targetId, out IReadOnlyList<int> membersBeforeKick, out bool disbanded)
     {
         return TryRemove(leaderId, targetId, true, out membersBeforeKick, out disbanded);
     }
@@ -370,7 +368,7 @@ public sealed class PartyRegistry
         }
     }
 
-        public IReadOnlyList<int> Disband(int leaderId)
+    public IReadOnlyList<int> Disband(int leaderId)
     {
         lock (_lock)
         {
@@ -383,7 +381,7 @@ public sealed class PartyRegistry
         }
     }
 
-        public PartyDisconnectResult LeaveForDisconnect(int characterId)
+    public PartyDisconnectResult LeaveForDisconnect(int characterId)
     {
         lock (_lock)
         {
@@ -418,7 +416,7 @@ public sealed class PartyRegistry
         }
     }
 
-        private void DisbandLocked(Party party)
+    private void DisbandLocked(Party party)
     {
         foreach (var memberId in party.Members)
             _leaderByMember.Remove(memberId);

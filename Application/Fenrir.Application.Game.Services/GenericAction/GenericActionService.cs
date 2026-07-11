@@ -33,27 +33,26 @@ public sealed class GenericActionService(
     IWarPointShopService? warPointShop = null)
     : IGenericActionService
 {
-
-        private const short TimeExchangeEventCode = 1;
+    private const short TimeExchangeEventCode = 1;
 
     private const byte TimeExchangeOutcome = 1;
 
-        private const short NpcShopSellEventCode = 1;
+    private const short NpcShopSellEventCode = 1;
 
-        private const short NpcShopBuyEventCode = 2;
+    private const short NpcShopBuyEventCode = 2;
 
     private const byte NpcShopTradeOutcome = 1;
 
-        private const short VaultTransferDepositEventCode = 1;
+    private const short VaultTransferDepositEventCode = 1;
 
     private const short VaultTransferWithdrawEventCode = 2;
     private const byte VaultTransferOutcome = 1;
 
-        private const int TeacherPointsPerPlayTimeMinute = 694;
+    private const int TeacherPointsPerPlayTimeMinute = 694;
 
-        private const int PetExperiencePerPlayTimeMinute = 400;
+    private const int PetExperiencePerPlayTimeMinute = 400;
 
-        private const int IdleActionSort = 1;
+    private const int IdleActionSort = 1;
 
     public async ValueTask<GenericActionResult> MoveContainerAsync(int sort, byte[] data, Zone zone,
         PlayerRuntimeState state, int characterId, CancellationToken cancellationToken)
@@ -158,7 +157,7 @@ public sealed class GenericActionService(
                 worldData.ItemsById);
 
             updatedStats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData, state.Buffs,
-                pet: petContribution, runtimeState: state);
+                petContribution, state);
         }
 
         if (toContainer == fromContainer)
@@ -304,7 +303,7 @@ public sealed class GenericActionService(
         return new GenericActionResult(GenericActionStatus.Succeeded, notifyQuestProgress);
     }
 
-        public async ValueTask<GenericActionResult> PayTeleportTollAsync(byte[] data, int characterId,
+    public async ValueTask<GenericActionResult> PayTeleportTollAsync(byte[] data, int characterId,
         CancellationToken cancellationToken)
     {
         if (!TeleportTollData.TryRead(data, out var toll))
@@ -340,7 +339,7 @@ public sealed class GenericActionService(
         return GenericActionResult.Succeeded;
     }
 
-        public async ValueTask<GenericActionResult> LearnSkillAsync(int sort, byte[] data, Zone zone,
+    public async ValueTask<GenericActionResult> LearnSkillAsync(int sort, byte[] data, Zone zone,
         PlayerRuntimeState state, int characterId, CancellationToken cancellationToken)
     {
         if (!NpcSkillLearnData.TryRead(data, out var request))
@@ -393,7 +392,7 @@ public sealed class GenericActionService(
         return GenericActionResult.Succeeded;
     }
 
-        public async ValueTask<GenericActionResult> UpgradeSkillAsync(byte[] data, Zone zone, PlayerRuntimeState state,
+    public async ValueTask<GenericActionResult> UpgradeSkillAsync(byte[] data, Zone zone, PlayerRuntimeState state,
         int characterId, CancellationToken cancellationToken)
     {
         if (!SkillUpgradeData.TryRead(data, out var request))
@@ -438,7 +437,7 @@ public sealed class GenericActionService(
         return GenericActionResult.Succeeded;
     }
 
-        public async ValueTask<GenericActionResult> SellToNpcShopAsync(Zone zone, PlayerRuntimeState state,
+    public async ValueTask<GenericActionResult> SellToNpcShopAsync(Zone zone, PlayerRuntimeState state,
         int accountId, int characterId, DefaultPData move, CancellationToken cancellationToken)
     {
         if (!NpcShopPolicy.TownZoneNumbers.Contains(zone.MapId) ||
@@ -518,7 +517,7 @@ public sealed class GenericActionService(
         return GenericActionResult.Succeeded;
     }
 
-        public async ValueTask<GenericActionResult> BuyFromNpcShopAsync(Zone zone, PlayerRuntimeState state,
+    public async ValueTask<GenericActionResult> BuyFromNpcShopAsync(Zone zone, PlayerRuntimeState state,
         int accountId, int characterId, DefaultPData move, CancellationToken cancellationToken)
     {
         if (!NpcShopPolicy.TownZoneNumbers.Contains(zone.MapId) ||
@@ -635,7 +634,7 @@ public sealed class GenericActionService(
         return GenericActionResult.Succeeded;
     }
 
-        public async ValueTask<GenericActionResult> TransferStoreItemAsync(int sort, byte[] data, Zone zone,
+    public async ValueTask<GenericActionResult> TransferStoreItemAsync(int sort, byte[] data, Zone zone,
         PlayerRuntimeState state, int accountId, int characterId, CancellationToken cancellationToken)
     {
         if (!DefaultPData.TryRead(data, out var move))
@@ -781,7 +780,7 @@ public sealed class GenericActionService(
         return GenericActionResult.Succeeded;
     }
 
-        public async ValueTask<GenericActionResult> TransferStoreMoneyAsync(int sort, byte[] data, Zone zone,
+    public async ValueTask<GenericActionResult> TransferStoreMoneyAsync(int sort, byte[] data, Zone zone,
         PlayerRuntimeState state, int accountId, int characterId, CancellationToken cancellationToken)
     {
         if (!DefaultPData.TryRead(data, out var move))
@@ -834,7 +833,7 @@ public sealed class GenericActionService(
         return GenericActionResult.Succeeded;
     }
 
-        public async ValueTask<GenericActionResult> TransferBankItemAsync(int sort, byte[] data, Zone zone,
+    public async ValueTask<GenericActionResult> TransferBankItemAsync(int sort, byte[] data, Zone zone,
         PlayerRuntimeState state, int accountId, int characterId, CancellationToken cancellationToken)
     {
         if (!DefaultPData.TryRead(data, out var move))
@@ -986,7 +985,7 @@ public sealed class GenericActionService(
         }
     }
 
-        public async ValueTask<GenericActionResult> TransferBankMoneyAsync(int sort, byte[] data, int accountId,
+    public async ValueTask<GenericActionResult> TransferBankMoneyAsync(int sort, byte[] data, int accountId,
         int characterId, CancellationToken cancellationToken)
     {
         if (!DefaultPData.TryRead(data, out var move))
@@ -1033,7 +1032,7 @@ public sealed class GenericActionService(
         return GenericActionResult.Succeeded;
     }
 
-            public ValueTask<GenericActionResult> TransferTradeItemAsync(int sort, byte[] data, PlayerRuntimeState state,
+    public ValueTask<GenericActionResult> TransferTradeItemAsync(int sort, byte[] data, PlayerRuntimeState state,
         int characterId, CancellationToken cancellationToken)
     {
         if (!DefaultPData.TryRead(data, out var move))
@@ -1085,131 +1084,7 @@ public sealed class GenericActionService(
         return ValueTask.FromResult(GenericActionResult.Succeeded);
     }
 
-    private bool TryTradeDeposit(DefaultPData move, PlayerRuntimeState state, TradeOfferSide side,
-        bool secondInventoryPageAccessible)
-    {
-        if (!TradeItemPlacementResolver.IsValidInventoryPage(move.Page1) ||
-            !TradeItemPlacementResolver.IsValidInventorySlot(move.Index1) ||
-            !TradeItemPlacementResolver.IsValidTradeSlot(move.Index2))
-            return false;
-
-        if (move.Page1 == ContainerMatrix.InventoryPage1 && !secondInventoryPageAccessible)
-            return false;
-
-        var originContainer = (byte)move.Page1;
-        var originSlot = (byte)move.Index1;
-        var destinationEntry = side.Slots[move.Index2];
-
-        if (destinationEntry is { } occupant &&
-            (occupant.Container != originContainer || occupant.Slot != originSlot))
-            return false;
-
-        var liveStack = state.Inventory.GetSlot(originContainer, originSlot);
-        var stagedElsewhere = side.GetOriginStagedQuantity(originContainer, originSlot, move.Index2);
-        var effectiveSource = ReduceByAlreadyStaged(liveStack, stagedElsewhere);
-
-        ItemDefinition? itemDefinition = effectiveSource is { } es &&
-                                          worldData.ItemsById.TryGetValue(es.ItemId, out var def)
-            ? def
-            : null;
-
-        var resolved = TradeItemPlacementResolver.ResolveDeposit(effectiveSource, move.Quantity1,
-            destinationEntry?.Stack, itemDefinition, false);
-
-        if (!resolved.Succeeded)
-            return false;
-
-        side.Slots[move.Index2] = resolved.NewDestination is { } newDestination
-            ? (originContainer, originSlot, newDestination)
-            : null;
-
-        return true;
-    }
-
-    private bool TryTradeWithdraw(DefaultPData move, PlayerRuntimeState state, TradeOfferSide side,
-        bool secondInventoryPageAccessible)
-    {
-        if (!TradeItemPlacementResolver.IsValidTradeSlot(move.Index1) ||
-            !TradeItemPlacementResolver.IsValidInventoryPage(move.Page2) ||
-            !TradeItemPlacementResolver.IsValidInventorySlot(move.Index2) ||
-            !TradeItemPlacementResolver.IsValidGridCoordinate(move.XPost2) ||
-            !TradeItemPlacementResolver.IsValidGridCoordinate(move.YPost2))
-            return false;
-
-        var destinationContainer = (byte)move.Page2;
-        if (destinationContainer == ContainerMatrix.InventoryPage1 && !secondInventoryPageAccessible)
-            return false;
-
-        var sourceEntry = side.Slots[move.Index1];
-        var sourceStack = sourceEntry?.Stack;
-        var destinationSlot = (byte)move.Index2;
-        var destinationStack = state.Inventory.GetSlot(destinationContainer, destinationSlot);
-
-        ItemDefinition? itemDefinition = sourceStack is { } ss && worldData.ItemsById.TryGetValue(ss.ItemId, out var def)
-            ? def
-            : null;
-
-        var resolved = TradeItemPlacementResolver.ResolveWithdrawal(sourceStack, move.Quantity1, destinationStack,
-            itemDefinition, false);
-
-        if (!resolved.Succeeded)
-            return false;
-
-        side.Slots[move.Index1] = resolved.NewSource is { } remainder
-            ? (sourceEntry!.Value.Container, sourceEntry.Value.Slot, remainder)
-            : null;
-
-        return true;
-    }
-
-    private bool TryTradeRearrange(DefaultPData move, TradeOfferSide side)
-    {
-        if (!TradeItemPlacementResolver.IsValidTradeSlot(move.Index1) ||
-            !TradeItemPlacementResolver.IsValidTradeSlot(move.Index2))
-            return false;
-
-        if (move.Index1 == move.Index2)
-            return true;
-
-        var sourceEntry = side.Slots[move.Index1];
-        var destinationEntry = side.Slots[move.Index2];
-
-        if (sourceEntry is { } origin && destinationEntry is { } occupant &&
-            (occupant.Container != origin.Container || occupant.Slot != origin.Slot))
-            return false;
-
-        var sourceStack = sourceEntry?.Stack;
-        ItemDefinition? itemDefinition = sourceStack is { } ss && worldData.ItemsById.TryGetValue(ss.ItemId, out var def)
-            ? def
-            : null;
-
-        var resolved = TradeItemPlacementResolver.ResolveRearrange(sourceStack, move.Quantity1,
-            destinationEntry?.Stack, itemDefinition, false);
-
-        if (!resolved.Succeeded)
-            return false;
-
-        var sourceOrigin = sourceEntry!.Value;
-        side.Slots[move.Index1] = resolved.NewSource is { } remainder
-            ? (sourceOrigin.Container, sourceOrigin.Slot, remainder)
-            : null;
-        side.Slots[move.Index2] = resolved.NewDestination is { } newDestination
-            ? (sourceOrigin.Container, sourceOrigin.Slot, newDestination)
-            : null;
-
-        return true;
-    }
-
-    private static ItemStack? ReduceByAlreadyStaged(ItemStack? liveStack, long alreadyStagedQuantity)
-    {
-        if (liveStack is not { } stack)
-            return null;
-
-        var remaining = stack.Quantity - alreadyStagedQuantity;
-        return remaining <= 0 ? null : stack with { Quantity = (int)remaining };
-    }
-
-            public ValueTask<GenericActionResult> TransferTradeMoneyAsync(int sort, byte[] data, PlayerRuntimeState state,
+    public ValueTask<GenericActionResult> TransferTradeMoneyAsync(int sort, byte[] data, PlayerRuntimeState state,
         int characterId, CancellationToken cancellationToken)
     {
         if (!DefaultPData.TryRead(data, out var move))
@@ -1257,7 +1132,7 @@ public sealed class GenericActionService(
         return ValueTask.FromResult(GenericActionResult.Succeeded);
     }
 
-        public async ValueTask<GenericActionResult> AllocateStatPointAsync(int statSort, int addValue, Zone zone,
+    public async ValueTask<GenericActionResult> AllocateStatPointAsync(int statSort, int addValue, Zone zone,
         PlayerRuntimeState state, int characterId, CancellationToken cancellationToken)
     {
         var resolved = StatAllocationResolver.Resolve(statSort, addValue, state.StatPoints);
@@ -1286,7 +1161,7 @@ public sealed class GenericActionService(
             worldData.ItemsById);
 
         var updatedStats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData, state.Buffs,
-            petContribution, runtimeState: state);
+            petContribution, state);
 
         if (!await zone.PostTribeProgressCommandAndWaitAsync(new TribeProgressZoneCommand(characterId,
                 StatVit: newVit, StatStr: newStr, StatInt: newInt, StatDex: newDex,
@@ -1302,7 +1177,7 @@ public sealed class GenericActionService(
         return GenericActionResult.Succeeded;
     }
 
-        public async ValueTask<GenericActionResult> TimeExchangeAsync(Zone zone, PlayerRuntimeState state,
+    public async ValueTask<GenericActionResult> TimeExchangeAsync(Zone zone, PlayerRuntimeState state,
         int accountId, int characterId, CancellationToken cancellationToken)
     {
         var accruedMinutes = state.PlayTimeEvent;
@@ -1359,7 +1234,131 @@ public sealed class GenericActionService(
         return new GenericActionResult(GenericActionStatus.Succeeded, GrantedPetExperienceGrowth: grantedPetGrowth);
     }
 
-        private static ItemStack? GetSlotOrNull(PlayerRuntimeState state, byte container, int slot)
+    private bool TryTradeDeposit(DefaultPData move, PlayerRuntimeState state, TradeOfferSide side,
+        bool secondInventoryPageAccessible)
+    {
+        if (!TradeItemPlacementResolver.IsValidInventoryPage(move.Page1) ||
+            !TradeItemPlacementResolver.IsValidInventorySlot(move.Index1) ||
+            !TradeItemPlacementResolver.IsValidTradeSlot(move.Index2))
+            return false;
+
+        if (move.Page1 == ContainerMatrix.InventoryPage1 && !secondInventoryPageAccessible)
+            return false;
+
+        var originContainer = (byte)move.Page1;
+        var originSlot = (byte)move.Index1;
+        var destinationEntry = side.Slots[move.Index2];
+
+        if (destinationEntry is { } occupant &&
+            (occupant.Container != originContainer || occupant.Slot != originSlot))
+            return false;
+
+        var liveStack = state.Inventory.GetSlot(originContainer, originSlot);
+        var stagedElsewhere = side.GetOriginStagedQuantity(originContainer, originSlot, move.Index2);
+        var effectiveSource = ReduceByAlreadyStaged(liveStack, stagedElsewhere);
+
+        var itemDefinition = effectiveSource is { } es &&
+                             worldData.ItemsById.TryGetValue(es.ItemId, out var def)
+            ? def
+            : null;
+
+        var resolved = TradeItemPlacementResolver.ResolveDeposit(effectiveSource, move.Quantity1,
+            destinationEntry?.Stack, itemDefinition, false);
+
+        if (!resolved.Succeeded)
+            return false;
+
+        side.Slots[move.Index2] = resolved.NewDestination is { } newDestination
+            ? (originContainer, originSlot, newDestination)
+            : null;
+
+        return true;
+    }
+
+    private bool TryTradeWithdraw(DefaultPData move, PlayerRuntimeState state, TradeOfferSide side,
+        bool secondInventoryPageAccessible)
+    {
+        if (!TradeItemPlacementResolver.IsValidTradeSlot(move.Index1) ||
+            !TradeItemPlacementResolver.IsValidInventoryPage(move.Page2) ||
+            !TradeItemPlacementResolver.IsValidInventorySlot(move.Index2) ||
+            !TradeItemPlacementResolver.IsValidGridCoordinate(move.XPost2) ||
+            !TradeItemPlacementResolver.IsValidGridCoordinate(move.YPost2))
+            return false;
+
+        var destinationContainer = (byte)move.Page2;
+        if (destinationContainer == ContainerMatrix.InventoryPage1 && !secondInventoryPageAccessible)
+            return false;
+
+        var sourceEntry = side.Slots[move.Index1];
+        var sourceStack = sourceEntry?.Stack;
+        var destinationSlot = (byte)move.Index2;
+        var destinationStack = state.Inventory.GetSlot(destinationContainer, destinationSlot);
+
+        var itemDefinition = sourceStack is { } ss && worldData.ItemsById.TryGetValue(ss.ItemId, out var def)
+            ? def
+            : null;
+
+        var resolved = TradeItemPlacementResolver.ResolveWithdrawal(sourceStack, move.Quantity1, destinationStack,
+            itemDefinition, false);
+
+        if (!resolved.Succeeded)
+            return false;
+
+        side.Slots[move.Index1] = resolved.NewSource is { } remainder
+            ? (sourceEntry!.Value.Container, sourceEntry.Value.Slot, remainder)
+            : null;
+
+        return true;
+    }
+
+    private bool TryTradeRearrange(DefaultPData move, TradeOfferSide side)
+    {
+        if (!TradeItemPlacementResolver.IsValidTradeSlot(move.Index1) ||
+            !TradeItemPlacementResolver.IsValidTradeSlot(move.Index2))
+            return false;
+
+        if (move.Index1 == move.Index2)
+            return true;
+
+        var sourceEntry = side.Slots[move.Index1];
+        var destinationEntry = side.Slots[move.Index2];
+
+        if (sourceEntry is { } origin && destinationEntry is { } occupant &&
+            (occupant.Container != origin.Container || occupant.Slot != origin.Slot))
+            return false;
+
+        var sourceStack = sourceEntry?.Stack;
+        var itemDefinition = sourceStack is { } ss && worldData.ItemsById.TryGetValue(ss.ItemId, out var def)
+            ? def
+            : null;
+
+        var resolved = TradeItemPlacementResolver.ResolveRearrange(sourceStack, move.Quantity1,
+            destinationEntry?.Stack, itemDefinition, false);
+
+        if (!resolved.Succeeded)
+            return false;
+
+        var sourceOrigin = sourceEntry!.Value;
+        side.Slots[move.Index1] = resolved.NewSource is { } remainder
+            ? (sourceOrigin.Container, sourceOrigin.Slot, remainder)
+            : null;
+        side.Slots[move.Index2] = resolved.NewDestination is { } newDestination
+            ? (sourceOrigin.Container, sourceOrigin.Slot, newDestination)
+            : null;
+
+        return true;
+    }
+
+    private static ItemStack? ReduceByAlreadyStaged(ItemStack? liveStack, long alreadyStagedQuantity)
+    {
+        if (liveStack is not { } stack)
+            return null;
+
+        var remaining = stack.Quantity - alreadyStagedQuantity;
+        return remaining <= 0 ? null : stack with { Quantity = (int)remaining };
+    }
+
+    private static ItemStack? GetSlotOrNull(PlayerRuntimeState state, byte container, int slot)
     {
         return ContainerMatrix.IsValidSlot(container, slot) ? state.Inventory.GetSlot(container, (byte)slot) : null;
     }
@@ -1394,7 +1393,7 @@ public sealed class GenericActionService(
         return newValue is { } value ? current.SetItem(slot, value) : current.Remove(slot);
     }
 
-        private (ItemStack? Source, bool IsStackable, bool SupportsSocket) ResolveTransferSource(ItemStack? candidate)
+    private (ItemStack? Source, bool IsStackable, bool SupportsSocket) ResolveTransferSource(ItemStack? candidate)
     {
         if (candidate is not { } stack || !worldData.ItemsById.TryGetValue(stack.ItemId, out var definition))
             return (null, false, false);

@@ -9,5 +9,5 @@ public interface IAccountRepository
 
     public ValueTask RecordLoginAttemptAsync(int accountId, bool success, CancellationToken ct);
 
-        public ValueTask SetGradeAsync(string loginName, short accountGrade, CancellationToken ct);
+    public ValueTask SetGradeAsync(string loginName, short accountGrade, CancellationToken ct);
 }

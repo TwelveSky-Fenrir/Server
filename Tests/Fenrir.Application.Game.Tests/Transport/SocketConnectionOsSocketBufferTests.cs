@@ -22,7 +22,7 @@ public sealed class SocketConnectionOsSocketBufferTests
 
             var defaultReceive = server.ReceiveBufferSize;
 
-            await using var connection = new SocketConnection(server, null, applyOsSocketBuffers: true);
+            await using var connection = new SocketConnection(server, null, true);
 
             Assert.True(server.SendBufferSize >= ExpectedSendBufferSize,
                 $"SO_SNDBUF should be >= {ExpectedSendBufferSize}, was {server.SendBufferSize}");
@@ -50,7 +50,7 @@ public sealed class SocketConnectionOsSocketBufferTests
             var defaultSend = server.SendBufferSize;
             var defaultReceive = server.ReceiveBufferSize;
 
-            await using var connection = new SocketConnection(server, null, applyOsSocketBuffers: false);
+            await using var connection = new SocketConnection(server);
 
             Assert.Equal(defaultSend, server.SendBufferSize);
             Assert.Equal(defaultReceive, server.ReceiveBufferSize);

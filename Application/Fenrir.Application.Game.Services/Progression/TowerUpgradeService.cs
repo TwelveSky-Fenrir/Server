@@ -16,11 +16,11 @@ public sealed class TowerUpgradeService(
     private const int HerbItemId = 666;
     private const int BarItemId = 1073;
 
-        private const int TowerConstructItemId = 665;
+    private const int TowerConstructItemId = 665;
 
-        private const int TowerHealItemId = 667;
+    private const int TowerHealItemId = 667;
 
-        private const float HealRangeSquared = 200f * 200f;
+    private const float HealRangeSquared = 200f * 200f;
 
     public async ValueTask<TowerUpgradeResult> UpgradeAsync(int characterId, Zone zone, PlayerRuntimeState state,
         TowerUpgradeRequest packet, CancellationToken cancellationToken)
@@ -94,7 +94,7 @@ public sealed class TowerUpgradeService(
         return new TowerUpgradeResult(TowerUpgradeOutcome.Success, packedPage, packedIndex);
     }
 
-        public async ValueTask<UseInventoryItemResponse> ConstructAsync(int characterId, Zone zone,
+    public async ValueTask<UseInventoryItemResponse> ConstructAsync(int characterId, Zone zone,
         PlayerRuntimeState state, byte page, byte index, ItemStack item, int constructType,
         CancellationToken cancellationToken)
     {
@@ -154,7 +154,7 @@ public sealed class TowerUpgradeService(
         return new UseInventoryItemResponse { Result = 0, Page = page, Index = index, Value = 0, Value2 = 0 };
     }
 
-        public async ValueTask<UseInventoryItemResponse> HealAsync(int characterId, Zone zone, PlayerRuntimeState state,
+    public async ValueTask<UseInventoryItemResponse> HealAsync(int characterId, Zone zone, PlayerRuntimeState state,
         byte page, byte index, ItemStack item, CancellationToken cancellationToken)
     {
         var towerIndex = TowerZoneIndexTable.GetTowerIndex(zone.MapId);

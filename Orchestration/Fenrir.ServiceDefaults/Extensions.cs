@@ -28,10 +28,7 @@ public static class Extensions
             });
 
             builder.Services.AddOpenTelemetry()
-                .WithMetrics(metrics =>
-                {
-                    metrics.AddRuntimeInstrumentation();
-                })
+                .WithMetrics(metrics => { metrics.AddRuntimeInstrumentation(); })
                 .WithTracing(tracing => { tracing.AddSource(builder.Environment.ApplicationName); });
 
             builder.AddOpenTelemetryExporters();

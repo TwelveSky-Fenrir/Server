@@ -3,9 +3,6 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using Aspire.Hosting.Testing;
-using Fenrir.Application.Game.Hosting;
-using Fenrir.Application.Login.Hosting;
-using Fenrir.Data.Abstractions.Security;
 using Fenrir.Data.Security;
 using Microsoft.Data.SqlClient;
 
@@ -42,11 +39,11 @@ public sealed class FenrirEnvironmentFixture : IAsyncLifetime
     public int LoginPort { get; private set; }
     public int GamePort { get; private set; }
 
-        public int GamePort2 { get; private set; }
+    public int GamePort2 { get; private set; }
 
     public int TestAccountId { get; private set; }
 
-        public int TestAccountId2 { get; private set; }
+    public int TestAccountId2 { get; private set; }
 
     public async Task InitializeAsync()
     {
@@ -111,22 +108,22 @@ public sealed class FenrirEnvironmentFixture : IAsyncLifetime
         return connection;
     }
 
-        public string LoginServerLogSnapshot()
+    public string LoginServerLogSnapshot()
     {
         return Snapshot(_loginLog, _loginLogLock);
     }
 
-        public string GameServerLogSnapshot()
+    public string GameServerLogSnapshot()
     {
         return Snapshot(_gameLog, _gameLogLock);
     }
 
-        public string GameServer2LogSnapshot()
+    public string GameServer2LogSnapshot()
     {
         return Snapshot(_gameLog2, _gameLogLock2);
     }
 
-        private async Task<(int AccountId, int AccountId2)> StartDatabaseWithRetryAsync()
+    private async Task<(int AccountId, int AccountId2)> StartDatabaseWithRetryAsync()
     {
         const int maxAttempts = 3;
 
@@ -167,7 +164,7 @@ public sealed class FenrirEnvironmentFixture : IAsyncLifetime
         }
     }
 
-        private async Task ApplyManifestAsync()
+    private async Task ApplyManifestAsync()
     {
         var databaseDir = Path.Combine(AppContext.BaseDirectory, "Database");
         var manifestPath = Path.Combine(databaseDir, "_manifest.txt");
@@ -215,7 +212,7 @@ public sealed class FenrirEnvironmentFixture : IAsyncLifetime
             yield return batch.ToString().Trim();
     }
 
-        private async Task SeedSecondShardMapAsync()
+    private async Task SeedSecondShardMapAsync()
     {
         await using var connection = new SqlConnection(ConnectionString);
         await connection.OpenAsync();
@@ -226,7 +223,7 @@ public sealed class FenrirEnvironmentFixture : IAsyncLifetime
         await command.ExecuteNonQueryAsync();
     }
 
-        private async Task SeedGmAllowlistAsync()
+    private async Task SeedGmAllowlistAsync()
     {
         await using var connection = new SqlConnection(ConnectionString);
         await connection.OpenAsync();
@@ -236,7 +233,7 @@ public sealed class FenrirEnvironmentFixture : IAsyncLifetime
         await command.ExecuteNonQueryAsync();
     }
 
-        private async Task<int> SeedTestAccountAsync(string loginName, string password)
+    private async Task<int> SeedTestAccountAsync(string loginName, string password)
     {
         var (hash, salt) = PasswordHasher.Hash(password);
 
@@ -253,7 +250,7 @@ public sealed class FenrirEnvironmentFixture : IAsyncLifetime
         return accountId;
     }
 
-        private static string OriginalBuildOutputDllPath(string serverProjectName)
+    private static string OriginalBuildOutputDllPath(string serverProjectName)
     {
         var tfmDir = new DirectoryInfo(AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar));
         var repoRoot = tfmDir.Parent!.Parent!.Parent!.Parent!.Parent!.FullName;

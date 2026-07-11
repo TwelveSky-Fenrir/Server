@@ -85,7 +85,7 @@ public class MentorAskServiceTests
         Assert.Equal(MentorAskResultKind.AskerMustDisconnect, result.Kind);
     }
 
-        [Fact]
+    [Fact]
     public async Task Ask_SameShardMiss_ResolvesCrossShard_PublishesAskAndReturnsSentCrossShard()
     {
         var directory = new FakeCharacterShardLocationRepository();

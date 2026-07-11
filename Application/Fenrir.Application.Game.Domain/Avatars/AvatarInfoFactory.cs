@@ -9,8 +9,7 @@ namespace Fenrir.Application.Game.Domain.Avatars;
 
 public static class AvatarInfoFactory
 {
-
-        private const int MaxGeneralExperience = 2_000_000_000;
+    private const int MaxGeneralExperience = 2_000_000_000;
 
     private const int InventoryPageCount = 2;
     private const int InventorySlotsPerPage = 64;
@@ -27,7 +26,7 @@ public static class AvatarInfoFactory
     private const int HotkeyKeysPerPage = 14;
     private const int HotkeyWireIntsPerSlot = 3;
 
-        public static AvatarInfo CreateForCharacter(CharacterWorldSnapshotDto character,
+    public static AvatarInfo CreateForCharacter(CharacterWorldSnapshotDto character,
         IReadOnlyList<CharacterItemSlotDto> items, AvatarSocialSnapshot? social = null,
         IReadOnlyList<CharacterSkillDto>? skills = null, IReadOnlyList<CharacterHotkeyDto>? hotkeys = null)
     {
@@ -106,7 +105,7 @@ public static class AvatarInfoFactory
         };
     }
 
-        public static AvatarInfo CreateForRuntimeState(PlayerRuntimeState state, short mapId, float posX, float posY,
+    public static AvatarInfo CreateForRuntimeState(PlayerRuntimeState state, short mapId, float posX, float posY,
         float posZ)
     {
         return AvatarInfoTemplates.Zeroed with
@@ -160,7 +159,7 @@ public static class AvatarInfoFactory
         };
     }
 
-        private static int[] BuildSingleMountSlotArray(int value, int slotIndex)
+    private static int[] BuildSingleMountSlotArray(int value, int slotIndex)
     {
         var slots = new int[10];
 
@@ -170,7 +169,7 @@ public static class AvatarInfoFactory
         return slots;
     }
 
-        private static int[] BuildEquipArrayFromRows(IReadOnlyList<CharacterItemSlotDto> items, int petGrowth,
+    private static int[] BuildEquipArrayFromRows(IReadOnlyList<CharacterItemSlotDto> items, int petGrowth,
         byte petActivity)
     {
         var equip = new int[52];
@@ -198,7 +197,7 @@ public static class AvatarInfoFactory
         return equip;
     }
 
-        private static int[] BuildEquipArrayFromContainer(IReadOnlyDictionary<byte, ItemStack> equipmentContainer,
+    private static int[] BuildEquipArrayFromContainer(IReadOnlyDictionary<byte, ItemStack> equipmentContainer,
         int petGrowth, byte petActivity)
     {
         var equip = new int[52];
@@ -226,12 +225,12 @@ public static class AvatarInfoFactory
         return equip;
     }
 
-        private static int PackUpgradeBytes(byte enchant, byte combine, byte refine, byte socket)
+    private static int PackUpgradeBytes(byte enchant, byte combine, byte refine, byte socket)
     {
         return enchant | (combine << 8) | (refine << 16) | (socket << 24);
     }
 
-        private static int[] BuildInventoryArrayFromRows(IReadOnlyList<CharacterItemSlotDto> items)
+    private static int[] BuildInventoryArrayFromRows(IReadOnlyList<CharacterItemSlotDto> items)
     {
         var inventory = new int[InventoryPageCount * InventorySlotsPerPage * InventoryWireIntsPerSlot];
 
@@ -256,7 +255,7 @@ public static class AvatarInfoFactory
         return inventory;
     }
 
-        private static int[] BuildInventoryArrayFromContainers(IReadOnlyDictionary<byte, ItemStack> page0,
+    private static int[] BuildInventoryArrayFromContainers(IReadOnlyDictionary<byte, ItemStack> page0,
         IReadOnlyDictionary<byte, ItemStack> page1)
     {
         var inventory = new int[InventoryPageCount * InventorySlotsPerPage * InventoryWireIntsPerSlot];
@@ -281,7 +280,7 @@ public static class AvatarInfoFactory
         }
     }
 
-        private static int[] BuildStoreItemArrayFromRows(IReadOnlyList<CharacterItemSlotDto> items)
+    private static int[] BuildStoreItemArrayFromRows(IReadOnlyList<CharacterItemSlotDto> items)
     {
         var store = new int[StorePageCount * StoreSlotsPerPage * StoreWireIntsPerSlot];
 
@@ -306,7 +305,7 @@ public static class AvatarInfoFactory
         return store;
     }
 
-        private static int[] BuildStoreItemArrayFromContainers(IReadOnlyDictionary<byte, ItemStack> page0,
+    private static int[] BuildStoreItemArrayFromContainers(IReadOnlyDictionary<byte, ItemStack> page0,
         IReadOnlyDictionary<byte, ItemStack> page1)
     {
         var store = new int[StorePageCount * StoreSlotsPerPage * StoreWireIntsPerSlot];
@@ -331,7 +330,7 @@ public static class AvatarInfoFactory
         }
     }
 
-        private static int[] BuildSkillArrayFromRows(IReadOnlyList<CharacterSkillDto> skills)
+    private static int[] BuildSkillArrayFromRows(IReadOnlyList<CharacterSkillDto> skills)
     {
         var skill = new int[SkillSlotCount * SkillWireIntsPerSlot];
 
@@ -348,7 +347,7 @@ public static class AvatarInfoFactory
         return skill;
     }
 
-        private static int[] BuildSkillArrayFromLearnedSkills(IReadOnlyDictionary<byte, LearnedSkill> learnedSkills)
+    private static int[] BuildSkillArrayFromLearnedSkills(IReadOnlyDictionary<byte, LearnedSkill> learnedSkills)
     {
         var skill = new int[SkillSlotCount * SkillWireIntsPerSlot];
 
@@ -365,7 +364,7 @@ public static class AvatarInfoFactory
         return skill;
     }
 
-        private static int[] BuildHotKeyArrayFromRows(IReadOnlyList<CharacterHotkeyDto> hotkeys)
+    private static int[] BuildHotKeyArrayFromRows(IReadOnlyList<CharacterHotkeyDto> hotkeys)
     {
         var hotkey = new int[HotkeyPageCount * HotkeyKeysPerPage * HotkeyWireIntsPerSlot];
 
@@ -395,7 +394,7 @@ public sealed record AvatarSocialSnapshot(
     public static readonly AvatarSocialSnapshot Empty =
         new(new Dictionary<byte, string>(), "", "", "", 0);
 
-        public string[] BuildFriendArray()
+    public string[] BuildFriendArray()
     {
         var friends = new string[10];
         Array.Fill(friends, "");

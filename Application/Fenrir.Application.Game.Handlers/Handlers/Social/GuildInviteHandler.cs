@@ -1,5 +1,4 @@
 using Fenrir.Application.Game.Abstractions.Social;
-using Fenrir.Application.Game.Domain.Social;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;

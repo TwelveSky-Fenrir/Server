@@ -1,4 +1,3 @@
-using System.Linq;
 using Fenrir.Application.Game.Stats;
 using Fenrir.Application.Game.Stats.Context;
 
@@ -6,7 +5,6 @@ namespace Fenrir.Application.Game.Tests.Stats;
 
 public class MountGradeContributionTests
 {
-
     [Theory]
     [InlineData(1301)]
     [InlineData(8301)]
@@ -215,7 +213,7 @@ public class MountGradeContributionTests
     [Fact]
     public void DecodeMountPowerDigits_ActivityPositive_AssignsEachDigitToItsFixedStat()
     {
-        var digits = StatCalculator.DecodeMountPowerDigits(12_345_678, activity: 1);
+        var digits = StatCalculator.DecodeMountPowerDigits(12_345_678, 1);
 
         Assert.Equal(1, digits.Attack);
         Assert.Equal(2, digits.Defense);
@@ -240,7 +238,7 @@ public class MountGradeContributionTests
     [Fact]
     public void DecodeMountPowerDigits_NinthDigitAndAbove_NeverExamined()
     {
-        var digits = StatCalculator.DecodeMountPowerDigits(123_456_789, activity: 1);
+        var digits = StatCalculator.DecodeMountPowerDigits(123_456_789, 1);
 
         Assert.Equal(2, digits.Attack);
         Assert.Equal(3, digits.Defense);
@@ -255,13 +253,13 @@ public class MountGradeContributionTests
     [Fact]
     public void DecodeMountPowerDigits_ZeroPower_EveryDigitIsZeroEvenWithActivity()
     {
-        Assert.Equal(default, StatCalculator.DecodeMountPowerDigits(0, activity: 1));
+        Assert.Equal(default, StatCalculator.DecodeMountPowerDigits(0, 1));
     }
 
     [Fact]
     public void ComputeMountFlatBonuses_ComposesDecodeWithEachPerStatMultiple()
     {
-        var bonuses = StatCalculator.ComputeMountFlatBonuses(12_345_678, activity: 1);
+        var bonuses = StatCalculator.ComputeMountFlatBonuses(12_345_678, 1);
 
         Assert.Equal(300, bonuses.MaxLife);
         Assert.Equal(800, bonuses.MaxMana);
@@ -276,7 +274,7 @@ public class MountGradeContributionTests
     [Fact]
     public void ComputeMountFlatBonuses_ActivityNotPositive_EveryBonusIsZero()
     {
-        var bonuses = StatCalculator.ComputeMountFlatBonuses(12_345_678, activity: 0);
+        var bonuses = StatCalculator.ComputeMountFlatBonuses(12_345_678, 0);
 
         Assert.Equal(default, bonuses);
     }
@@ -284,38 +282,38 @@ public class MountGradeContributionTests
     [Fact]
     public void ComputeMountFlatBonuses_TierOneUnaffectedByActivityGate_CallerMustApplySeparately()
     {
-        var bonuses = StatCalculator.ComputeMountFlatBonuses(12_345_678, activity: 0);
+        var bonuses = StatCalculator.ComputeMountFlatBonuses(12_345_678, 0);
 
         Assert.Equal(default, bonuses);
-        Assert.Equal(220, StatCalculator.ApplyMountGradeMultiplierFourTier(200, column: 10));
+        Assert.Equal(220, StatCalculator.ApplyMountGradeMultiplierFourTier(200, 10));
     }
 
 
     [Fact]
     public void MountAbsorbPrimaryBonus_MountSetAndAbsorbActive_ReturnsAbsorbValue()
     {
-        var mount = new MountContext(AnimalNumber: 1234, AbsorbActive: true, AbsorbValue: 500);
+        var mount = new MountContext(1234, AbsorbActive: true, AbsorbValue: 500);
         Assert.Equal(500, StatCalculator.MountAbsorbPrimaryBonus(mount));
     }
 
     [Fact]
     public void MountAbsorbPrimaryBonus_AbsorbInactive_ReturnsZero()
     {
-        var mount = new MountContext(AnimalNumber: 1234, AbsorbActive: false, AbsorbValue: 500);
+        var mount = new MountContext(1234, AbsorbActive: false, AbsorbValue: 500);
         Assert.Equal(0, StatCalculator.MountAbsorbPrimaryBonus(mount));
     }
 
     [Fact]
     public void MountAbsorbPrimaryBonus_NoMountSet_ReturnsZero()
     {
-        var mount = new MountContext(AnimalNumber: 0, AbsorbActive: true, AbsorbValue: 500);
+        var mount = new MountContext(0, AbsorbActive: true, AbsorbValue: 500);
         Assert.Equal(0, StatCalculator.MountAbsorbPrimaryBonus(mount));
     }
 
     [Fact]
     public void MountAbsorbPrimaryBonus_ZeroAbsorbValue_ReturnsZero()
     {
-        var mount = new MountContext(AnimalNumber: 1234, AbsorbActive: true, AbsorbValue: 0);
+        var mount = new MountContext(1234, AbsorbActive: true, AbsorbValue: 0);
         Assert.Equal(0, StatCalculator.MountAbsorbPrimaryBonus(mount));
     }
 

@@ -16,7 +16,7 @@ public sealed record WorldStateRepository(ICaeriusNetDbContext Db) : IWorldState
         await Db.ExecuteAsync(sp, ct);
     }
 
-        public async ValueTask<(WorldStateRowDto? Row, ReadOnlyCollection<WorldStateTribeDto> Tribes,
+    public async ValueTask<(WorldStateRowDto? Row, ReadOnlyCollection<WorldStateTribeDto> Tribes,
             ReadOnlyCollection<WorldStateAllianceOfferDto> AllianceOffers)>
         GetAsync(CancellationToken ct)
     {

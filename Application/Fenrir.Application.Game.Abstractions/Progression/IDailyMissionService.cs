@@ -4,10 +4,9 @@ namespace Fenrir.Application.Game.Abstractions.Progression;
 
 public enum DailyMissionClaimOutcome
 {
+    Aborted,
 
-        Aborted,
-
-        InventoryFull,
+    InventoryFull,
 
     Success
 }

@@ -28,17 +28,16 @@ public sealed class HolyStoneTerritoryEvictionSweep(
     IHolyStoneForcedReturnGateway forcedReturn,
     ILogger<HolyStoneTerritoryEvictionSweep> logger)
 {
+    public static readonly TimeSpan IdleInterval = TimeSpan.FromMinutes(1);
 
-        public static readonly TimeSpan IdleInterval = TimeSpan.FromMinutes(1);
-
-        public static readonly TimeSpan GraceInterval = TimeSpan.FromSeconds(3);
+    public static readonly TimeSpan GraceInterval = TimeSpan.FromSeconds(3);
 
     private readonly IReadOnlyCollection<short> _territoryMapIds = territoryMapIds;
     private TimeSpan _accumulated;
 
     public HolyStoneTerritoryEvictionPhase Phase { get; private set; } = HolyStoneTerritoryEvictionPhase.Idle;
 
-        public void Tick(TimeSpan elapsed)
+    public void Tick(TimeSpan elapsed)
     {
         _accumulated += elapsed;
 
@@ -93,8 +92,7 @@ public sealed class HolyStoneTerritoryEvictionSweep(
 
 public enum HolyStoneTerritoryEvictionPhase : byte
 {
+    Idle,
 
-        Idle,
-
-        Grace
+    Grace
 }

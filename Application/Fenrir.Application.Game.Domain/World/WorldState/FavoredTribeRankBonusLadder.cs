@@ -5,9 +5,9 @@ public static class FavoredTribeRankBonusLadder
     public const int Baseline = 1000;
     public const int FavoredTribeBonus = 4000;
 
-        private static readonly int[] DistanceBonus = [0, 100, 200, 300];
+    private static readonly int[] DistanceBonus = [0, 100, 200, 300];
 
-        public static int[] ComputeTotals(byte favoredTribeId)
+    public static int[] ComputeTotals(byte favoredTribeId)
     {
         if (favoredTribeId >= WorldStateService.TribeCount)
             throw new ArgumentOutOfRangeException(nameof(favoredTribeId), favoredTribeId,

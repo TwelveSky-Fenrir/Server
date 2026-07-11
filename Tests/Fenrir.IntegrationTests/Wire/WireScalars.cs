@@ -25,7 +25,7 @@ internal static class WireScalars
         return BinaryPrimitives.ReadUInt32LittleEndian(source);
     }
 
-        public static void WriteFixedString(Span<byte> destination, string value)
+    public static void WriteFixedString(Span<byte> destination, string value)
     {
         destination.Clear();
         var count = Math.Min(value.Length, destination.Length);

@@ -7,9 +7,8 @@ public readonly record struct TradeLockAttempt(bool Locked, TradeSession? Trade)
 
 public interface ITradeLockService
 {
+    public TradeLockAttempt TryLock(int characterId);
 
-        public TradeLockAttempt TryLock(int characterId);
-
-        public ValueTask CommitAsync(TradeSession trade, PlayerRuntimeState playerA, Zone zoneA, PlayerRuntimeState playerB,
+    public ValueTask CommitAsync(TradeSession trade, PlayerRuntimeState playerA, Zone zoneA, PlayerRuntimeState playerB,
         Zone zoneB, int characterId, CancellationToken cancellationToken);
 }

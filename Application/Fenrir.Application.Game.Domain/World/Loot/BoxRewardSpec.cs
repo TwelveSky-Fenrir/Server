@@ -21,19 +21,19 @@ public sealed record BoxRewardSpec
         RentalDays = rentalDays;
     }
 
-        public int BoxId { get; }
+    public int BoxId { get; }
 
-        public BoxRewardKind Kind { get; }
+    public BoxRewardKind Kind { get; }
 
-        public ImmutableArray<int> UniformIds { get; }
+    public ImmutableArray<int> UniformIds { get; }
 
-        public ImmutableArray<LootBoxRewardResolver.WeightedReward> WeightedRewards { get; }
+    public ImmutableArray<LootBoxRewardResolver.WeightedReward> WeightedRewards { get; }
 
-        public ImmutableArray<LootBoxRewardResolver.RewardBand> RareBands { get; }
+    public ImmutableArray<LootBoxRewardResolver.RewardBand> RareBands { get; }
 
-        public ImmutableArray<LootBoxRewardResolver.RewardPool> Pools { get; }
+    public ImmutableArray<LootBoxRewardResolver.RewardPool> Pools { get; }
 
-        public int RentalDays { get; }
+    public int RentalDays { get; }
 
     public static BoxRewardSpec Uniform(int boxId, ImmutableArray<int> ids, int rentalDays = 0)
     {
@@ -54,7 +54,7 @@ public sealed record BoxRewardSpec
             rentalDays);
     }
 
-        public int RollRewardId(Random random)
+    public int RollRewardId(Random random)
     {
         return Kind switch
         {
@@ -68,10 +68,9 @@ public sealed record BoxRewardSpec
 
 public enum BoxRewardKind
 {
+    Uniform,
 
-        Uniform,
+    Weighted,
 
-        Weighted,
-
-        RareBandThenPools
+    RareBandThenPools
 }

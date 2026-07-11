@@ -39,7 +39,7 @@ public class SetDetectorTests
         return new EquippedItemSlot(slotIndex, Item(itemId + slotIndex, sort), 0, 0, 0, 0);
     }
 
-        private static EquippedItemSlot[] SixGear(byte sort)
+    private static EquippedItemSlot[] SixGear(byte sort)
     {
         var list = new List<EquippedItemSlot>();
         foreach (var slot in SixGearSlots) list.Add(Equip(slot, sort));
@@ -89,7 +89,7 @@ public class SetDetectorTests
         EquippedItemSlot[] gear =
         [
             Equip(Amulet, 1), Equip(Armor, 1), Equip(Gloves, 1),
-            Equip(Ring, 1), Equip(Boots, 1), Equip(Weapon, 0)
+            Equip(Ring, 1), Equip(Boots, 1), Equip(Weapon)
         ];
         Assert.Equal(0, StatCalculator.DetectLegacySetNumber(gear));
     }
@@ -172,7 +172,8 @@ public class SetDetectorTests
         ];
 
         Assert.Equal(0, StatCalculator.DetectLegacySetNumber(gear));
-        Assert.Equal(103, SetBonusTables.ResolveEffectiveSetNumber(0, gear, StatCalculator.DetectLegacySetNumber(gear)));
+        Assert.Equal(103,
+            SetBonusTables.ResolveEffectiveSetNumber(0, gear, StatCalculator.DetectLegacySetNumber(gear)));
     }
 
     private static EquippedItemSlot NxtEquip(int slotIndex, int itemId)

@@ -6,7 +6,7 @@ internal sealed class FakePartyResyncRelayQueue : IPartyResyncRelayQueue
 {
     public List<PartyResyncRelayEntry> Enqueued { get; } = [];
 
-        public bool RejectNext { get; set; }
+    public bool RejectNext { get; set; }
 
     public bool Enqueue(PartyResyncRelayEntry entry)
     {

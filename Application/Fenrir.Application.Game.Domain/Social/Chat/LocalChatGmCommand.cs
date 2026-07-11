@@ -4,18 +4,17 @@ namespace Fenrir.Application.Game.Domain.Social.Chat;
 
 public enum LocalChatGmCommandKind
 {
+    Where,
 
-        Where,
+    YgDrop,
 
-        YgDrop,
+    Lab,
 
-        Lab,
+    Boss,
 
-        Boss,
+    Kill200,
 
-        Kill200,
-
-        ClearInventory
+    ClearInventory
 }
 
 public readonly record struct LocalChatGmCommand
@@ -23,5 +22,5 @@ public readonly record struct LocalChatGmCommand
     public required LocalChatGmCommandKind Kind { get; init; }
     public required GmCommandTier RequiredTier { get; init; }
 
-        public string? Argument { get; init; }
+    public string? Argument { get; init; }
 }

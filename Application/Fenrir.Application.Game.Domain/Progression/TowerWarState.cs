@@ -5,43 +5,42 @@ namespace Fenrir.Application.Game.Domain.Progression;
 
 public enum TowerSiegePhase : byte
 {
+    Dormant,
 
-        Dormant,
+    Building,
 
-        Building,
+    Active,
 
-        Active,
-
-        Sieged
+    Sieged
 }
 
 public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
 {
     public const int TowerCount = 12;
 
-        public const int MaxTowersPerKind = 3;
+    public const int MaxTowersPerKind = 3;
 
-        public static readonly TimeSpan SiegeCollapseCooldown = TimeSpan.FromMinutes(5);
+    public static readonly TimeSpan SiegeCollapseCooldown = TimeSpan.FromMinutes(5);
 
-        public static readonly TimeSpan CreateCooldown = TimeSpan.FromMinutes(5);
+    public static readonly TimeSpan CreateCooldown = TimeSpan.FromMinutes(5);
 
-        public static readonly TimeSpan AttackStateIdleReset = TimeSpan.FromSeconds(30);
+    public static readonly TimeSpan AttackStateIdleReset = TimeSpan.FromSeconds(30);
 
-        public static readonly TimeSpan EngagementAutoClear = TimeSpan.FromMinutes(10);
+    public static readonly TimeSpan EngagementAutoClear = TimeSpan.FromMinutes(10);
 
-        private readonly int[] _constructKind = new int[TowerCount];
+    private readonly int[] _constructKind = new int[TowerCount];
 
     private readonly byte?[] _controllingTribe = new byte?[TowerCount];
 
-        private readonly DateTime?[] _createCooldownStartedAtUtc = new DateTime?[TowerCount];
+    private readonly DateTime?[] _createCooldownStartedAtUtc = new DateTime?[TowerCount];
 
     private readonly bool[] _dirty = new bool[TowerCount];
 
     private readonly DateTime?[] _firstAttackAtUtc = new DateTime?[TowerCount];
 
-        private readonly bool[] _firstAttackRecorded = new bool[TowerCount];
+    private readonly bool[] _firstAttackRecorded = new bool[TowerCount];
 
-        private readonly bool[] _guardianHealPending = new bool[TowerCount];
+    private readonly bool[] _guardianHealPending = new bool[TowerCount];
 
     private readonly DateTime?[] _lastAttackAtUtc = new DateTime?[TowerCount];
     private readonly Lock _lock = new();
@@ -50,9 +49,9 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
     private readonly byte?[] _pendingTribe = new byte?[TowerCount];
     private readonly DateTime?[] _siegeStartedAtUtc = new DateTime?[TowerCount];
 
-        private readonly TowerTribeRewardBonus[] _tribeBonus = new TowerTribeRewardBonus[TowerRewardBonusTable.TribeCount];
+    private readonly TowerTribeRewardBonus[] _tribeBonus = new TowerTribeRewardBonus[TowerRewardBonusTable.TribeCount];
 
-        private readonly bool[] _underAttack = new bool[TowerCount];
+    private readonly bool[] _underAttack = new bool[TowerCount];
 
     private readonly bool[] _valid = new bool[TowerCount];
 
@@ -88,7 +87,7 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
         }
     }
 
-        public TowerStatusResponse BuildStatusSnapshot()
+    public TowerStatusResponse BuildStatusSnapshot()
     {
         var state1 = new int[TowerCount];
         var state2 = new int[TowerCount];
@@ -105,7 +104,7 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
         return new TowerStatusResponse { State1Tower = state1, State2Tower = state2 };
     }
 
-        public int GetPendingPackedStateForBuilding(int towerIndex)
+    public int GetPendingPackedStateForBuilding(int towerIndex)
     {
         lock (_lock)
         {
@@ -113,17 +112,17 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
         }
     }
 
-        public static int DecodeLevel(int packedState)
+    public static int DecodeLevel(int packedState)
     {
         return packedState < 1 ? 0 : packedState / 100;
     }
 
-        public static int DecodeType(int packedState)
+    public static int DecodeType(int packedState)
     {
         return packedState < 1 ? 0 : packedState % 100;
     }
 
-        public void RecomputeTribeBonuses()
+    public void RecomputeTribeBonuses()
     {
         lock (_lock)
         {
@@ -132,7 +131,7 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
         }
     }
 
-        public TowerTribeRewardBonus GetTribeBonus(byte tribe)
+    public TowerTribeRewardBonus GetTribeBonus(byte tribe)
     {
         lock (_lock)
         {
@@ -140,12 +139,12 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
         }
     }
 
-        public static int GuardianServerIndex(int towerIndex)
+    public static int GuardianServerIndex(int towerIndex)
     {
         return -(towerIndex + 1);
     }
 
-        public bool IsUnderAttack(int towerIndex)
+    public bool IsUnderAttack(int towerIndex)
     {
         lock (_lock)
         {
@@ -153,7 +152,7 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
         }
     }
 
-        public DateTime? GetFirstAttackAtUtc(int towerIndex)
+    public DateTime? GetFirstAttackAtUtc(int towerIndex)
     {
         lock (_lock)
         {
@@ -161,7 +160,7 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
         }
     }
 
-        public DateTime? GetLastAttackAtUtc(int towerIndex)
+    public DateTime? GetLastAttackAtUtc(int towerIndex)
     {
         lock (_lock)
         {
@@ -169,7 +168,7 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
         }
     }
 
-        public bool RecordGuardianHit(int towerIndex, DateTime utcNow)
+    public bool RecordGuardianHit(int towerIndex, DateTime utcNow)
     {
         lock (_lock)
         {
@@ -185,7 +184,7 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
         }
     }
 
-        public void SetTowerState(int towerIndex, int packedState, bool valid)
+    public void SetTowerState(int towerIndex, int packedState, bool valid)
     {
         lock (_lock)
         {
@@ -194,7 +193,7 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
         }
     }
 
-        public void BeginUpgrade(int towerIndex, int newPackedState, byte controllingTribeId)
+    public void BeginUpgrade(int towerIndex, int newPackedState, byte controllingTribeId)
     {
         lock (_lock)
         {
@@ -204,7 +203,7 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
         }
     }
 
-        public void CompleteUpgrade(int towerIndex)
+    public void CompleteUpgrade(int towerIndex)
     {
         lock (_lock)
         {
@@ -227,7 +226,7 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
         }
     }
 
-        public void BeginSiege(int towerIndex, DateTime utcNow)
+    public void BeginSiege(int towerIndex, DateTime utcNow)
     {
         lock (_lock)
         {
@@ -239,7 +238,7 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
         }
     }
 
-        public bool IsDueForDestruction(int towerIndex, DateTime utcNow)
+    public bool IsDueForDestruction(int towerIndex, DateTime utcNow)
     {
         lock (_lock)
         {
@@ -247,7 +246,7 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
         }
     }
 
-        public void CompleteDestruction(int towerIndex)
+    public void CompleteDestruction(int towerIndex)
     {
         lock (_lock)
         {
@@ -266,7 +265,7 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
     }
 
 
-        public bool BeginConstruction(int towerIndex, int constructKind, byte controllingTribeId)
+    public bool BeginConstruction(int towerIndex, int constructKind, byte controllingTribeId)
     {
         lock (_lock)
         {
@@ -283,7 +282,7 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
         }
     }
 
-        public void CancelConstruction(int towerIndex)
+    public void CancelConstruction(int towerIndex)
     {
         lock (_lock)
         {
@@ -295,7 +294,7 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
         }
     }
 
-        public int GetPendingConstructKind(int towerIndex)
+    public int GetPendingConstructKind(int towerIndex)
     {
         lock (_lock)
         {
@@ -303,7 +302,7 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
         }
     }
 
-        public void CompleteConstructionSpawn(int towerIndex, DateTime utcNow)
+    public void CompleteConstructionSpawn(int towerIndex, DateTime utcNow)
     {
         lock (_lock)
         {
@@ -326,7 +325,7 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
         }
     }
 
-        public bool IsCreateCooldownElapsed(int towerIndex, DateTime utcNow)
+    public bool IsCreateCooldownElapsed(int towerIndex, DateTime utcNow)
     {
         lock (_lock)
         {
@@ -334,7 +333,7 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
         }
     }
 
-        public void CompleteConstructionCooldown(int towerIndex)
+    public void CompleteConstructionCooldown(int towerIndex)
     {
         lock (_lock)
         {
@@ -346,7 +345,7 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
         }
     }
 
-        public int CountTowersOfKind(int kind)
+    public int CountTowersOfKind(int kind)
     {
         lock (_lock)
         {
@@ -359,7 +358,7 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
         }
     }
 
-        public bool IsKindPresentInTribeGroup(int towerIndex, int kind)
+    public bool IsKindPresentInTribeGroup(int towerIndex, int kind)
     {
         lock (_lock)
         {
@@ -377,7 +376,7 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
         }
     }
 
-        public bool TryResetIdleAttackState(int towerIndex, DateTime utcNow)
+    public bool TryResetIdleAttackState(int towerIndex, DateTime utcNow)
     {
         lock (_lock)
         {
@@ -392,7 +391,7 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
         }
     }
 
-        public bool TryClearStaleEngagement(int towerIndex, DateTime utcNow)
+    public bool TryClearStaleEngagement(int towerIndex, DateTime utcNow)
     {
         lock (_lock)
         {
@@ -408,7 +407,7 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
         }
     }
 
-        public void RequestGuardianHeal(int towerIndex)
+    public void RequestGuardianHeal(int towerIndex)
     {
         lock (_lock)
         {
@@ -416,7 +415,7 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
         }
     }
 
-        public bool IsGuardianHealPending(int towerIndex)
+    public bool IsGuardianHealPending(int towerIndex)
     {
         lock (_lock)
         {
@@ -424,7 +423,7 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
         }
     }
 
-        public bool TryConsumeGuardianHeal(int towerIndex)
+    public bool TryConsumeGuardianHeal(int towerIndex)
     {
         lock (_lock)
         {
@@ -436,7 +435,7 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
         }
     }
 
-        public async Task InitializeAsync(ITowerRepository towers, CancellationToken ct)
+    public async Task InitializeAsync(ITowerRepository towers, CancellationToken ct)
     {
         await towers.EnsureInitializedAsync(ct).ConfigureAwait(false);
         var rows = await towers.GetAllAsync(ct).ConfigureAwait(false);
@@ -459,7 +458,7 @@ public sealed class TowerWarState(ILogger<TowerWarState>? logger = null)
         }
     }
 
-        public async Task FlushDirtyAsync(ITowerRepository towers, CancellationToken ct)
+    public async Task FlushDirtyAsync(ITowerRepository towers, CancellationToken ct)
     {
         for (var i = 0; i < TowerCount; i++)
         {

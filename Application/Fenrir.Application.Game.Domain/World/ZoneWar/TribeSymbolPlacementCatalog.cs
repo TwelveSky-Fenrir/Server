@@ -4,10 +4,9 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 
 public static class TribeSymbolPlacementCatalog
 {
+    public static readonly TribeSymbolCatalog Default = Build();
 
-        public static readonly TribeSymbolCatalog Default = Build();
-
-        public static TribeSymbolCatalog Build()
+    public static TribeSymbolCatalog Build()
     {
         var builder = ImmutableDictionary.CreateBuilder<byte, ImmutableDictionary<byte, TribeSymbolPlacement>>();
 

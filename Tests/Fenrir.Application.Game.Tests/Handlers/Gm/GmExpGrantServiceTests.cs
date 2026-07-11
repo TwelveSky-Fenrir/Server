@@ -65,7 +65,7 @@ public class GmExpGrantServiceTests
         return data;
     }
 
-        private static async Task AssertResponseSentAsync(FakeDuplexPipe pipe, GenericActionResponse expected)
+    private static async Task AssertResponseSentAsync(FakeDuplexPipe pipe, GenericActionResponse expected)
     {
         var actual = await PacketAssert.ReadSentBytesAsync(pipe);
         var frame = new byte[FrameWriter.FrameSizeOf<GenericActionResponse>()];
@@ -159,7 +159,7 @@ public class GmExpGrantServiceTests
         Assert.Equal((byte)1, logged.Outcome);
     }
 
-        [Fact]
+    [Fact]
     public async Task
         HandleAsync_ElevatedTier_Mode0_AboveLegacyCeilingButBelowIntMaxValue_StillTreatedAsAlreadyAtMaximum()
     {
@@ -197,7 +197,7 @@ public class GmExpGrantServiceTests
         Assert.Equal($"Mode=0;Magnitude={LegacyExperienceCeiling}", logged.Payload);
     }
 
-        [Fact]
+    [Fact]
     public async Task
         HandleAsync_ElevatedTier_Mode0_MagnitudeAtCeiling_WithSecondTierAlreadyStarted_ShortcutClampsToFirstTierCap_NotFullMagnitude()
     {
@@ -222,7 +222,7 @@ public class GmExpGrantServiceTests
         Assert.Equal((byte)1, logged.Outcome);
     }
 
-        [Fact]
+    [Fact]
     public async Task HandleAsync_ElevatedTier_Mode0_OrdinaryDeposit_ClampsToLegacyCeiling_NotIntMaxValue()
     {
         var (session, pipe, zone, state, eventLog) = SetUp((short)GmCommandTier.Elevated);

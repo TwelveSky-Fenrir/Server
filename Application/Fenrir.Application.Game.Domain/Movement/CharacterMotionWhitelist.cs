@@ -86,7 +86,7 @@ public static class CharacterMotionWhitelist
         [255] = new(AllTypes, 3, true, 0, 0)
     }.ToFrozenDictionary();
 
-        public static bool TryEvaluate(int sort, int type, out CharacterMotionEvaluation evaluation)
+    public static bool TryEvaluate(int sort, int type, out CharacterMotionEvaluation evaluation)
     {
         if (type is >= 0 and <= 7 && Rules.TryGetValue(sort, out var rule) && (rule.TypeMask & (1 << type)) != 0)
         {

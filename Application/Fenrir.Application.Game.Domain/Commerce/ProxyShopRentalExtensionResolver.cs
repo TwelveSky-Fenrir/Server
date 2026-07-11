@@ -6,15 +6,14 @@ public static class ProxyShopRentalExtensionResolver
 {
     public enum Outcome
     {
+        NotRecognized,
 
-                NotRecognized,
-
-                InvalidDate,
+        InvalidDate,
 
         Success
     }
 
-        public static int? ExtensionDaysFor(int itemId)
+    public static int? ExtensionDaysFor(int itemId)
     {
         return itemId switch
         {
@@ -24,7 +23,7 @@ public static class ProxyShopRentalExtensionResolver
         };
     }
 
-        public static ExtensionResult Resolve(int itemId, int today, int currentExpirationDate)
+    public static ExtensionResult Resolve(int itemId, int today, int currentExpirationDate)
     {
         if (ExtensionDaysFor(itemId) is not { } extensionDays)
             return new ExtensionResult(Outcome.NotRecognized, GameDate.Invalid);

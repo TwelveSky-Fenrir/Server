@@ -22,7 +22,7 @@ CREATE TABLE world.MonsterAnimationFrames
     BulletInfo2    SMALLINT NOT NULL,
     CONSTRAINT PK_MonsterAnimationFrames PRIMARY KEY CLUSTERED (MonsterId),
     CONSTRAINT FK_MonsterAnimationFrames_Monster FOREIGN KEY (MonsterId) REFERENCES world.Monsters (MonsterId),
-    CONSTRAINT CK_MonsterAnimationFrames_FrameInfo CHECK ( -- Server/Header/S15_MyShare.cpp:1589-1596
+    CONSTRAINT CK_MonsterAnimationFrames_FrameInfo CHECK (     -- Server/Header/S15_MyShare.cpp:1589-1596
         FrameInfo1 BETWEEN 1 AND 10000 AND
         FrameInfo2 BETWEEN 1 AND 10000 AND
         FrameInfo3 BETWEEN 1 AND 10000 AND
@@ -30,7 +30,7 @@ CREATE TABLE world.MonsterAnimationFrames
         FrameInfo5 BETWEEN 1 AND 10000 AND
         FrameInfo6 BETWEEN 1 AND 10000
         ),
-    CONSTRAINT CK_MonsterAnimationFrames_HitFrame CHECK ( -- :1602-1609
+    CONSTRAINT CK_MonsterAnimationFrames_HitFrame CHECK (      -- :1602-1609
         HitFrame1 BETWEEN 0 AND 10000 AND
         HitFrame2 BETWEEN 0 AND 10000 AND
         HitFrame3 BETWEEN 0 AND 10000
@@ -40,7 +40,7 @@ CREATE TABLE world.MonsterAnimationFrames
         SkillHitFrame2 BETWEEN 0 AND 10000 AND
         SkillHitFrame3 BETWEEN 0 AND 10000
         ),
-    CONSTRAINT CK_MonsterAnimationFrames_BulletInfo CHECK ( -- :1623-1632
+    CONSTRAINT CK_MonsterAnimationFrames_BulletInfo CHECK (    -- :1623-1632
         BulletInfo1 BETWEEN 1 AND 10000 AND
         BulletInfo2 BETWEEN 1 AND 10000
         )

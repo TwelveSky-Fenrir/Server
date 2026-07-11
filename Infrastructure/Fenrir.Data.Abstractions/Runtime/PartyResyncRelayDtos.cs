@@ -4,18 +4,17 @@ namespace Fenrir.Data.Abstractions.Runtime;
 
 public enum PartyResyncRelaySort : byte
 {
+    Request = 108,
 
-        Request = 108,
+    PartyInfoReply = 110,
 
-        PartyInfoReply = 110,
+    PartyBreak = 109,
 
-        PartyBreak = 109,
+    LeaveNotice = 106,
 
-        LeaveNotice = 106,
+    KickNotice = 107,
 
-        KickNotice = 107,
-
-        DisbandNotice = 111
+    DisbandNotice = 111
 }
 
 public sealed record PartyResyncRelayEntry(

@@ -100,7 +100,7 @@ public class OverEnchantBox8113RewardTableTests
         return id => map.TryGetValue(id, out var sort) ? sort : null;
     }
 
-        private sealed class ScriptedRandom(params int[] values) : Random
+    private sealed class ScriptedRandom(params int[] values) : Random
     {
         private int _index;
 

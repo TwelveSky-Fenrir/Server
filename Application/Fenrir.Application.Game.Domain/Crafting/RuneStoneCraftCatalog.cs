@@ -2,14 +2,13 @@ namespace Fenrir.Application.Game.Domain.Crafting;
 
 public static class RuneStoneCraftCatalog
 {
+    public const int AddStatItemId = 92296;
 
-        public const int AddStatItemId = 92296;
+    public const int RerollAllStatsItemId = 92297;
 
-        public const int RerollAllStatsItemId = 92297;
+    public const int RerollOneStatItemId = 92298;
 
-        public const int RerollOneStatItemId = 92298;
-
-        public const int StatSlotSelectorStrength = 100;
+    public const int StatSlotSelectorStrength = 100;
 
     public const int StatSlotSelectorDexterity = 200;
     public const int StatSlotSelectorVitality = 300;
@@ -20,14 +19,14 @@ public static class RuneStoneCraftCatalog
     private const int RuneCoreId3 = 93516;
     private const int RuneCoreId4 = 93517;
 
-        public const int NoSpecificSlot = -1;
+    public const int NoSpecificSlot = -1;
 
     public const int ResultCodeSuccess = 0;
     public const int ResultCodeAllStatsAlreadyFilled = 10;
     public const int ResultCodeNotAllStatsFilled = 11;
     public const int ResultCodeSelectedStatSuccess = 12;
 
-        public const int ResultCodeInvalidSelectorDeadCode = 13;
+    public const int ResultCodeInvalidSelectorDeadCode = 13;
 
     public const int ResultCodeSelectedStatEmpty = 14;
 
@@ -47,7 +46,7 @@ public static class RuneStoneCraftCatalog
             or StatSlotSelectorIntelligence;
     }
 
-        public static string GetLogActionLabel(int sourceItemId)
+    public static string GetLogActionLabel(int sourceItemId)
     {
         return sourceItemId switch
         {

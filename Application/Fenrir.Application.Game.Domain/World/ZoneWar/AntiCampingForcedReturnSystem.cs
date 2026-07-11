@@ -5,10 +5,9 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 
 public sealed class AntiCampingForcedReturnSystem(AntiCampingGuardPointCatalog catalog) : ISimulationSystem
 {
+    public const float ProximityRadius = 40.0f;
 
-        public const float ProximityRadius = 40.0f;
-
-        public const int ForcedReturnThreshold = 20;
+    public const int ForcedReturnThreshold = 20;
 
     public void Simulate(Zone zone, int legacyTicksElapsed)
     {
@@ -38,7 +37,7 @@ public sealed class AntiCampingForcedReturnSystem(AntiCampingGuardPointCatalog c
             player.Session.Send(new ReturnToHomeZoneResponse());
     }
 
-        private static bool EvaluatePoint(PlayerRuntimeState player, AntiCampingGuardPoint point, int legacyTicksElapsed)
+    private static bool EvaluatePoint(PlayerRuntimeState player, AntiCampingGuardPoint point, int legacyTicksElapsed)
     {
         if (!IsWithinRadius(player, point))
         {

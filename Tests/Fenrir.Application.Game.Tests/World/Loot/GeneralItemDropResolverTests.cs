@@ -11,6 +11,10 @@ public class GeneralItemDropResolverTests
     private const int Armor = 9;
     private const int Sword = 13;
 
+
+    private const int Cape = 8;
+    private const int SkillBook = 5;
+
     private static WorldDataCache CacheWith(params ItemRowDto[] items)
     {
         var rows = WorldDataTestRows.MinimalRows() with { Items = items };
@@ -108,10 +112,6 @@ public class GeneralItemDropResolverTests
         Assert.Null(result);
     }
 
-
-    private const int Cape = 8;
-    private const int SkillBook = 5;
-
     [Fact]
     public void Resolve_IncludeCapeDefaultTrue_CapeSlotIsReachable()
     {
@@ -132,7 +132,7 @@ public class GeneralItemDropResolverTests
         var random = new ScriptedRandom(0, 1, 2, 3, 4, 5, 6, 7);
 
         var result = GeneralItemDropResolver.Resolve(cache, random, 0, Common, 10, 10,
-            includeCape: false, includeSkillBook: false);
+            false, false);
 
         Assert.Null(result);
     }
@@ -145,7 +145,7 @@ public class GeneralItemDropResolverTests
         var random = new ScriptedRandom(0, 1, 2, 3, 4, 5, 6, 7, 8);
 
         var result = GeneralItemDropResolver.Resolve(cache, random, 0, Common, 10, 10,
-            includeCape: true, includeSkillBook: false);
+            true, false);
 
         Assert.Null(result);
     }
@@ -158,7 +158,7 @@ public class GeneralItemDropResolverTests
         var random = new ScriptedRandom(1);
 
         var result = GeneralItemDropResolver.Resolve(cache, random, 0, Common, 10, 10,
-            includeCape: false, includeSkillBook: false);
+            false, false);
 
         Assert.Equal(9009, result);
     }

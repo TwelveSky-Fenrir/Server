@@ -2,8 +2,7 @@ namespace Fenrir.Application.Game.Domain.Tribes;
 
 public static class TribeScrollTransferGate
 {
-
-        public const short MinLevel = 145;
+    public const short MinLevel = 145;
 
     public static TribeScrollTransferOutcome Evaluate(TribeScrollTransferEligibilityContext ctx)
     {
@@ -47,7 +46,7 @@ public static class TribeScrollTransferGate
         return TribeScrollTransferOutcome.Success;
     }
 
-        public static bool IsValidTown(byte tribe, short mapId)
+    public static bool IsValidTown(byte tribe, short mapId)
     {
         return tribe switch
         {

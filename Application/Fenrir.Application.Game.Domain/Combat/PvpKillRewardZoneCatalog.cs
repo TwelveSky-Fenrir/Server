@@ -12,18 +12,17 @@ public readonly record struct PvpKillZoneRewardProfile(
 
 public static class PvpKillRewardZoneCatalog
 {
+    public const short FfaMapNumber = 335;
 
-        public const short FfaMapNumber = 335;
+    public const int FfaHeroPointAmount = 2;
 
-        public const int FfaHeroPointAmount = 2;
+    public const int HeroPointMinimumCombinedLevel = 0;
 
-        public const int HeroPointMinimumCombinedLevel = 0;
+    private static readonly short[] UnconditionalFullRewardZoneIds = [194, 267, 268, 269];
 
-        private static readonly short[] UnconditionalFullRewardZoneIds = [194, 267, 268, 269];
+    private static readonly short[] CityZoneIds = [1, 6, 11, 140];
 
-        private static readonly short[] CityZoneIds = [1, 6, 11, 140];
-
-        public static PvpKillZoneRewardProfile Resolve(short zoneId, bool isStunTrigger)
+    public static PvpKillZoneRewardProfile Resolve(short zoneId, bool isStunTrigger)
     {
         if (zoneId == FfaMapNumber)
             return new PvpKillZoneRewardProfile(

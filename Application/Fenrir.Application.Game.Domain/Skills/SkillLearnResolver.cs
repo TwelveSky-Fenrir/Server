@@ -25,11 +25,11 @@ public static class SkillLearnResolver
         AlreadyMaxed
     }
 
-        public const int MaxSlots = 40;
+    public const int MaxSlots = 40;
 
-        public const byte SkillTree1 = 1;
+    public const byte SkillTree1 = 1;
 
-        public const byte SkillTree2 = 2;
+    public const byte SkillTree2 = 2;
 
     public static LearnResult ResolveLearn(
         ImmutableArray<NpcSkillOfferRowDto> npcSkillOffers,
@@ -86,7 +86,7 @@ public static class SkillLearnResolver
         return new UpgradeResult(true, UpgradeFailure.None, learned.Grade + 1);
     }
 
-        internal static bool TryFindFreeSlotForType(byte skillType, IReadOnlyDictionary<byte, LearnedSkill> learnedSkills,
+    internal static bool TryFindFreeSlotForType(byte skillType, IReadOnlyDictionary<byte, LearnedSkill> learnedSkills,
         out byte slot)
     {
         switch (skillType)

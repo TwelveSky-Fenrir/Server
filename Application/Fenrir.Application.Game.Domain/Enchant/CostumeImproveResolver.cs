@@ -7,34 +7,33 @@ public static class CostumeImproveResolver
 {
     public enum CostumeEnchantOutcome
     {
+        Rejected,
 
-                Rejected,
+        Success,
 
-                Success,
-
-                NoChange
+        NoChange
     }
 
     public enum CostumeSwapOutcome
     {
         Rejected,
 
-                Swapped
+        Swapped
     }
 
-        public const int MaxCostumeImprove = 96;
+    public const int MaxCostumeImprove = 96;
 
-        public const int OrdinaryMaterial = 8102;
+    public const int OrdinaryMaterial = 8102;
 
-        public const int GuaranteedSuccessMaterial = 724;
+    public const int GuaranteedSuccessMaterial = 724;
 
-        public const int EnchantMoneyCost = 5_000_000;
+    public const int EnchantMoneyCost = 5_000_000;
 
-        public const int EnchantContributionPointCost = 25;
+    public const int EnchantContributionPointCost = 25;
 
-        public const int SwapMoneyCost = 2_000_000_000;
+    public const int SwapMoneyCost = 2_000_000_000;
 
-        public static CostumeEnchantResult ResolveEnchant(int currentImprove, int materialItemId, IRandomSource random)
+    public static CostumeEnchantResult ResolveEnchant(int currentImprove, int materialItemId, IRandomSource random)
     {
         if (currentImprove >= MaxCostumeImprove)
             return CostumeEnchantResult.Rejected;
@@ -63,12 +62,12 @@ public static class CostumeImproveResolver
             EnchantMoneyCost, EnchantContributionPointCost, newImprove == MaxCostumeImprove);
     }
 
-        public static CostumeSwapResult ResolveSwap(int improveA, int improveB)
+    public static CostumeSwapResult ResolveSwap(int improveA, int improveB)
     {
         return new CostumeSwapResult(CostumeSwapOutcome.Swapped, SwapMoneyCost, improveB, improveA);
     }
 
-        public readonly record struct CostumeEnchantResult(
+    public readonly record struct CostumeEnchantResult(
         CostumeEnchantOutcome Outcome,
         int NewImprove,
         int MoneyCost,

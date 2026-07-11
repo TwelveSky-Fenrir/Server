@@ -12,16 +12,15 @@ namespace Fenrir.Application.Game.Domain.World;
 
 public sealed partial class Zone
 {
+    private const int DuelStateChangedSort = 7;
 
-                private const int DuelStateChangedSort = 7;
+    private readonly List<int> _duelEndNeighborScratch = [];
 
-        private readonly List<int> _duelEndNeighborScratch = [];
+    private readonly List<int> _duelStartNeighborScratch = [];
 
-        private readonly List<int> _duelStartNeighborScratch = [];
+    private readonly Zone124MassDuelState _zone124MassDuel = new();
 
-        private readonly Zone124MassDuelState _zone124MassDuel = new();
-
-        private void ApplyDuelAttack(in CombatCommand command)
+    private void ApplyDuelAttack(in CombatCommand command)
     {
         if (!_players.TryGetValue(command.AttackerCharacterId, out var attackerState))
             return;
@@ -102,7 +101,7 @@ public sealed partial class Zone
             ApplyDeath(defenderState.CharacterId, DeathCause.Duel);
     }
 
-        public void EndActiveDuel(PlayerRuntimeState state, DuelEndReason reason)
+    public void EndActiveDuel(PlayerRuntimeState state, DuelEndReason reason)
     {
         state.CanUseConsumables = true;
         state.Session.Send(new DuelEndResponse { Result = (int)reason });
@@ -113,21 +112,21 @@ public sealed partial class Zone
         BroadcastAvatarAction(_duelEndNeighborScratch, state);
     }
 
-                private void HandleBroadcastDuelStart(int requesterCharacterId, int opponentCharacterId,
+    private void HandleBroadcastDuelStart(int requesterCharacterId, int opponentCharacterId,
         int duelUniqueNumber)
     {
         if (!_players.TryGetValue(requesterCharacterId, out var requester))
             return;
 
         BroadcastDuelStateChanged(requester, requesterCharacterId, requester.UniqueNumber,
-            duelUniqueNumber, roleMarker: 1);
+            duelUniqueNumber, 1);
 
         if (_players.TryGetValue(opponentCharacterId, out var opponent) && !opponent.IsMovingZone)
             BroadcastDuelStateChanged(requester, opponentCharacterId, opponent.UniqueNumber,
-                duelUniqueNumber, roleMarker: 2);
+                duelUniqueNumber, 2);
     }
 
-        private void BroadcastDuelStateChanged(PlayerRuntimeState anchor, int subjectCharacterId,
+    private void BroadcastDuelStateChanged(PlayerRuntimeState anchor, int subjectCharacterId,
         uint subjectUniqueNumber, int duelUniqueNumber, int roleMarker)
     {
         var response = new AvatarStateFlagResponse
@@ -160,7 +159,7 @@ public sealed partial class Zone
         }
     }
 
-        private void SendDuelStateChangedFrame(int recipientId, ReadOnlySpan<byte> frame)
+    private void SendDuelStateChangedFrame(int recipientId, ReadOnlySpan<byte> frame)
     {
         try
         {

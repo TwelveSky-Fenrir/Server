@@ -293,7 +293,7 @@ internal static class FieldScanner
             SymbolEqualityComparer.Default.Equals(candidate.TypeArguments[0], candidateType));
     }
 
-        private static int ResolveNestedSize(INamedTypeSymbol nestedType, Compilation compilation,
+    private static int ResolveNestedSize(INamedTypeSymbol nestedType, Compilation compilation,
         HashSet<INamedTypeSymbol> visiting)
     {
         var wireTypeAttribute = nestedType.GetAttributes().Find(WellKnownNames.FenrirWireTypeAttribute);

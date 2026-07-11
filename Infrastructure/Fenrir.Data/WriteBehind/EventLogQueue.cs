@@ -44,7 +44,7 @@ public sealed class EventLogQueue : IEventLogQueue, IAsyncDisposable
         });
     }
 
-        public async ValueTask DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         if (Interlocked.Exchange(ref _disposed, 1) != 0)
             return;
@@ -58,7 +58,7 @@ public sealed class EventLogQueue : IEventLogQueue, IAsyncDisposable
         _shutdownCts.Dispose();
     }
 
-        public bool Enqueue(EventLogEntryTvp entry)
+    public bool Enqueue(EventLogEntryTvp entry)
     {
         if (_channel.Writer.TryWrite(entry))
             return true;
@@ -67,7 +67,7 @@ public sealed class EventLogQueue : IEventLogQueue, IAsyncDisposable
         return false;
     }
 
-        public async Task RunAsync(CancellationToken ct)
+    public async Task RunAsync(CancellationToken ct)
     {
         if (Interlocked.Exchange(ref _runStarted, 1) != 0)
             throw new InvalidOperationException(
@@ -105,7 +105,6 @@ public sealed class EventLogQueue : IEventLogQueue, IAsyncDisposable
 
                 if (batch.Count > 0)
                     await FlushBatchAsync(batch, loopCt).ConfigureAwait(false);
-
             }
         }
         finally
@@ -114,7 +113,7 @@ public sealed class EventLogQueue : IEventLogQueue, IAsyncDisposable
         }
     }
 
-        private async ValueTask FlushBatchAsync(IReadOnlyList<EventLogEntryTvp> batch, CancellationToken loopCt)
+    private async ValueTask FlushBatchAsync(IReadOnlyList<EventLogEntryTvp> batch, CancellationToken loopCt)
     {
         try
         {

@@ -108,7 +108,7 @@ public class ZoneMonsterAoiGridTests
         Assert.Equal(cellAfterSpawn, monster.CurrentCell);
     }
 
-        [Fact]
+    [Fact]
     public void MonsterDeath_RemovesTheStaleGridEntry_SoARespawnAtADifferentCellIsNotAlsoVisibleFromTheOldOne()
     {
         var scheduler = new MonsterSpawnScheduler(ZoneTestKit.EmptyWorldData());

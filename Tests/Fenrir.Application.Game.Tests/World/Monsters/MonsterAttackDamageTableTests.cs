@@ -10,8 +10,7 @@ namespace Fenrir.Application.Game.Tests.World.Monsters;
 
 public class MonsterAttackDamageTableTests
 {
-
-        private static Zone CreateZoneWithManualMonster(int serverIndex, int life, out MonsterEntity monster)
+    private static Zone CreateZoneWithManualMonster(int serverIndex, int life, out MonsterEntity monster)
     {
         var zone = ZoneTestKit.CreateZone(1);
         var template = WorldDataTestRows.Monster(600) with { Life = life };
@@ -21,7 +20,7 @@ public class MonsterAttackDamageTableTests
         return zone;
     }
 
-        private static void EnterCharacter(Zone zone, int characterId, string name)
+    private static void EnterCharacter(Zone zone, int characterId, string name)
     {
         var (session, _) = ZoneTestKit.CreateSession(characterId);
         zone.Post(ZoneCommand.Enter(characterId, ZoneTestKit.EnterData(session, 1, name)));
@@ -143,7 +142,7 @@ public class MonsterAttackDamageTableTests
         Assert.Equal(fiftyFirstAttackerId, deadMonster!.KillerCharacterId);
     }
 
-        private sealed class ZeroScatterRandom : Random
+    private sealed class ZeroScatterRandom : Random
     {
         public override double NextDouble()
         {

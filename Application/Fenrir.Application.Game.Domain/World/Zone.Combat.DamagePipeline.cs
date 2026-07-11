@@ -5,10 +5,9 @@ namespace Fenrir.Application.Game.Domain.World;
 
 public sealed partial class Zone
 {
+    private const short ReflectDisabledZoneId = 124;
 
-        private const short ReflectDisabledZoneId = 124;
-
-        private bool TryApplyReflectAndDestroyer(PlayerRuntimeState attackerState, PlayerRuntimeState defenderState,
+    private bool TryApplyReflectAndDestroyer(PlayerRuntimeState attackerState, PlayerRuntimeState defenderState,
         in AttackOutcome outcome, CrossAvatarAttackKind kind)
     {
         var preElementMainDamage = outcome.ViewDamage - outcome.ElementDamage;
@@ -50,7 +49,7 @@ public sealed partial class Zone
         return true;
     }
 
-        private (int View, int Real) ApplyHolyShieldAbsorption(PlayerRuntimeState defenderState, in AttackOutcome outcome)
+    private (int View, int Real) ApplyHolyShieldAbsorption(PlayerRuntimeState defenderState, in AttackOutcome outcome)
     {
         var preElementMainDamage = outcome.ViewDamage - outcome.ElementDamage;
         var absorbed = HolyShieldResolver.Absorb(defenderState.Buffs.Buff, preElementMainDamage);
@@ -69,7 +68,7 @@ public sealed partial class Zone
             BroadcastHolyShieldChange(defenderState);
     }
 
-        private void BroadcastHolyShieldChange(PlayerRuntimeState state)
+    private void BroadcastHolyShieldChange(PlayerRuntimeState state)
     {
         var changed = state.BuffChangeScratch;
         Array.Clear(changed);
@@ -80,7 +79,7 @@ public sealed partial class Zone
         RecomputeStatsAndBroadcastBuffs(state, changed);
     }
 
-        private enum CrossAvatarAttackKind
+    private enum CrossAvatarAttackKind
     {
         EnemyTribe,
         Duel

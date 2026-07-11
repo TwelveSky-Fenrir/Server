@@ -8,12 +8,11 @@ public sealed class FavoredTribeRankBonusLadderService(
     ZoneEventBroadcaster broadcaster,
     ILogger<FavoredTribeRankBonusLadderService> logger)
 {
+    public const short PendingFlagValue = 1;
 
-        public const short PendingFlagValue = 1;
+    public const short ConsumedFlagValue = 2;
 
-        public const short ConsumedFlagValue = 2;
-
-        public async Task TickIfPendingAsync(CancellationToken ct)
+    public async Task TickIfPendingAsync(CancellationToken ct)
     {
         if (!await worldState.TryConsumeUpdateTribePointFlagAsync(PendingFlagValue, ConsumedFlagValue, ct)
                 .ConfigureAwait(false))

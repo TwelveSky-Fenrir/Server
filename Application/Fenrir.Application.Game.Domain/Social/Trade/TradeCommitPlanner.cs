@@ -5,8 +5,7 @@ namespace Fenrir.Application.Game.Domain.Social.Trade;
 
 public static class TradeCommitPlanner
 {
-
-        public static Plan BuildFinalContainers(
+    public static Plan BuildFinalContainers(
         ImmutableDictionary<byte, ItemStack> currentPage0,
         ImmutableDictionary<byte, ItemStack> currentPage1,
         IReadOnlyList<(byte Container, byte Slot, ItemStack Stack)?> ownOfferedSlots,

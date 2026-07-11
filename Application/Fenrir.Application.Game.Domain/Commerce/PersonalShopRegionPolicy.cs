@@ -14,7 +14,7 @@ public static class PersonalShopRegionPolicy
         new(37, 1f, 0f, -1478f, null)
     ];
 
-        public static bool IsWithinPermittedRegion(short mapId, byte tribe, float x, float y, float z)
+    public static bool IsWithinPermittedRegion(short mapId, byte tribe, float x, float y, float z)
     {
         foreach (var region in Regions)
         {

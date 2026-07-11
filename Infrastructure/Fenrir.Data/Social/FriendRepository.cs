@@ -10,8 +10,7 @@ namespace Fenrir.Data.Social;
 
 public sealed record FriendRepository(ICaeriusNetDbContext Db) : IFriendRepository
 {
-
-        public async ValueTask<ReadOnlyCollection<CharacterFriendDto>> GetByCharacterAsync(int characterId,
+    public async ValueTask<ReadOnlyCollection<CharacterFriendDto>> GetByCharacterAsync(int characterId,
         CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_CharacterFriend_GetByCharacter", 10)
@@ -21,7 +20,7 @@ public sealed record FriendRepository(ICaeriusNetDbContext Db) : IFriendReposito
         return await Db.QueryAsReadOnlyCollectionAsync<CharacterFriendDto>(sp, ct);
     }
 
-        public async ValueTask AddAsync(int characterId, byte slot, int friendCharacterId, CancellationToken ct)
+    public async ValueTask AddAsync(int characterId, byte slot, int friendCharacterId, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_CharacterFriend_Add", 0)
             .AddParameter("CharacterId", characterId, SqlDbType.Int)
@@ -32,7 +31,7 @@ public sealed record FriendRepository(ICaeriusNetDbContext Db) : IFriendReposito
         await Db.ExecuteAsync(sp, ct);
     }
 
-        public async ValueTask RemoveAsync(int characterId, byte slot, CancellationToken ct)
+    public async ValueTask RemoveAsync(int characterId, byte slot, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_CharacterFriend_Remove", 0)
             .AddParameter("CharacterId", characterId, SqlDbType.Int)

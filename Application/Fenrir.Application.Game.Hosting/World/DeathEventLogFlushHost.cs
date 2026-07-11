@@ -34,7 +34,7 @@ public sealed class DeathEventLogFlushHost(
         }
     }
 
-        public async Task FlushAllZonesAsync(CancellationToken stoppingToken)
+    public async Task FlushAllZonesAsync(CancellationToken stoppingToken)
     {
         foreach (var zone in zones.Zones)
         {

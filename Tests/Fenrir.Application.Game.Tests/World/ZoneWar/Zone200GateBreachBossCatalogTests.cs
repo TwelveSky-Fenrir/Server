@@ -42,7 +42,8 @@ public class Zone200GateBreachBossCatalogTests
     [Fact]
     public void BattleWinBonusFixedItemIds_HasSevenOfEightKnownItems_EighthSlotDeliberatelyOmitted()
     {
-        Assert.Equal([1072, 1103, 1449, 1422, 1145, 2249, 602], Zone200GateBreachBossCatalog.BattleWinBonusFixedItemIds);
+        Assert.Equal([1072, 1103, 1449, 1422, 1145, 2249, 602],
+            Zone200GateBreachBossCatalog.BattleWinBonusFixedItemIds);
     }
 
     [Fact]

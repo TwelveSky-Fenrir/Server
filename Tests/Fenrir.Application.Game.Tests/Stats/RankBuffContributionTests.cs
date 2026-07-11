@@ -161,7 +161,7 @@ public class RankBuffContributionTests
     public void SuppressedZone335_AlsoSuppressesTheHpTier_WhichFfaOverrideDoesNotTouch()
     {
         Assert.Equal(0, StatCalculator.RankBuffMaxLifeBonus(Zone(6, 335)));
-        Assert.Equal(1000, StatCalculator.RankBuffMaxLifeBonus(Zone(6, NeutralZone)));
+        Assert.Equal(1000, StatCalculator.RankBuffMaxLifeBonus(Zone(6)));
     }
 
     [Fact]

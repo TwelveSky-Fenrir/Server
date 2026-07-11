@@ -13,12 +13,11 @@ public sealed class PalaceRankUpgradeUseItemHandler(
     IEventLogRepository eventLog,
     ILogger<PalaceRankUpgradeUseItemHandler> logger) : IUseItemHandler
 {
+    public const int ItemId = 2193;
 
-        public const int ItemId = 2193;
+    private const int RankCeiling = 96;
 
-        private const int RankCeiling = 96;
-
-        private const short PalaceRankGrantEventCode = 5;
+    private const short PalaceRankGrantEventCode = 5;
 
     private const byte SuccessOutcome = 1;
 

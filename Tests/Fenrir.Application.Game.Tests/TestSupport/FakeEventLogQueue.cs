@@ -6,7 +6,7 @@ internal sealed class FakeEventLogQueue : IEventLogQueue
 {
     public List<EventLogEntryTvp> Enqueued { get; } = [];
 
-        public bool RejectNext { get; set; }
+    public bool RejectNext { get; set; }
 
     public bool Enqueue(EventLogEntryTvp entry)
     {

@@ -34,12 +34,12 @@ public sealed class SessionRegistry(ILogger<SessionRegistry>? logger = null)
         return false;
     }
 
-        public ImmutableArray<long> SnapshotAssociatedAccountIds()
+    public ImmutableArray<long> SnapshotAssociatedAccountIds()
     {
         return [.._accountToSession.Keys];
     }
 
-        public ImmutableArray<ClientSession> SnapshotByRemoteAddress(string ipAddress)
+    public ImmutableArray<ClientSession> SnapshotByRemoteAddress(string ipAddress)
     {
         var builder = ImmutableArray.CreateBuilder<ClientSession>();
 
@@ -50,7 +50,7 @@ public sealed class SessionRegistry(ILogger<SessionRegistry>? logger = null)
         return builder.ToImmutable();
     }
 
-        public ImmutableArray<ClientSession> SnapshotIdle(TimeSpan idleTimeout, DateTimeOffset nowUtc)
+    public ImmutableArray<ClientSession> SnapshotIdle(TimeSpan idleTimeout, DateTimeOffset nowUtc)
     {
         var builder = ImmutableArray.CreateBuilder<ClientSession>();
 

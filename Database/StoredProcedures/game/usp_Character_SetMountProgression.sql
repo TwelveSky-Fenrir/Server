@@ -8,12 +8,12 @@
 -- calling this. All five mount columns are written together so the whole mount snapshot commits atomically,
 -- matching the legacy "persisted through the normal save path as one avatar record" shape. Not a per-tick
 -- write -- invoked only on the discrete progression events above, the same posture as usp_Character_SetPetGrowth.
-CREATE PROCEDURE game.usp_Character_SetMountProgression @CharacterId     INT,
-                                                        @MountItemId     INT,
+CREATE PROCEDURE game.usp_Character_SetMountProgression @CharacterId INT,
+                                                        @MountItemId INT,
                                                         @MountExpActivity INT,
-                                                        @MountPower      INT,
-                                                        @MountSlotIndex  INT,
-                                                        @MountTime       INT
+                                                        @MountPower INT,
+                                                        @MountSlotIndex INT,
+                                                        @MountTime INT
 AS
 BEGIN
     SET

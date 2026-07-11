@@ -67,7 +67,7 @@ public static partial class StatCalculator
 
     private static readonly FrozenSet<int> LegendaryPieceIds = FrozenSet<int>.Empty;
 
-        public static int DetectLegacySetNumber(IReadOnlyList<EquippedItemSlot> equipment)
+    public static int DetectLegacySetNumber(IReadOnlyList<EquippedItemSlot> equipment)
     {
         var bySlot = BuildSlotLookup(equipment);
 
@@ -92,7 +92,7 @@ public static partial class StatCalculator
         return MixedCountFallback(bySlot);
     }
 
-        private static int DetectRareSetNumber(EquippedItemSlot?[] bySlot, int idOffset, int resultBase)
+    private static int DetectRareSetNumber(EquippedItemSlot?[] bySlot, int idOffset, int resultBase)
     {
         if (AllSlotIdsMatch(bySlot, RingAmuletSlots, Set01Ids, idOffset)) return resultBase + 1;
         if (AllSlotIdsMatch(bySlot, WeaponArmorSlots, Set02Ids, idOffset)) return resultBase + 2;
@@ -105,7 +105,7 @@ public static partial class StatCalculator
         return 0;
     }
 
-        private static bool AllSlotIdsMatch(EquippedItemSlot?[] bySlot, ReadOnlySpan<int> slotIndices,
+    private static bool AllSlotIdsMatch(EquippedItemSlot?[] bySlot, ReadOnlySpan<int> slotIndices,
         FrozenSet<int> ids, int idOffset = 0)
     {
         if (ids.Count == 0) return false;
@@ -118,7 +118,7 @@ public static partial class StatCalculator
         return true;
     }
 
-        private static bool HasGodRingOrAmulet(EquippedItemSlot?[] bySlot)
+    private static bool HasGodRingOrAmulet(EquippedItemSlot?[] bySlot)
     {
         if (GodRingAmuletIds.Count == 0) return false;
         if (bySlot[4] is { } ring && GodRingAmuletIds.Contains(ring.Item.ItemId)) return true;
@@ -126,7 +126,7 @@ public static partial class StatCalculator
         return false;
     }
 
-        private static int MixedCountFallback(EquippedItemSlot?[] bySlot)
+    private static int MixedCountFallback(EquippedItemSlot?[] bySlot)
     {
         var legendaryPieceCount = 0;
         var sortCount = 0;

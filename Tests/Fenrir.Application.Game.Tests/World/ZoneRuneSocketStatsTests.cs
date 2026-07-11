@@ -18,7 +18,7 @@ public class ZoneRuneSocketStatsTests
         return state!;
     }
 
-        private static EffectiveStats RecomputeExpected(PlayerRuntimeState state)
+    private static EffectiveStats RecomputeExpected(PlayerRuntimeState state)
     {
         var attributes = new CharacterBaseAttributes(state.StatVit, state.StatStr, state.StatInt, state.StatDex,
             state.Level, state.Tribe, state.PreviousTribe, state.Title, state.Halo, state.RebirthCount,
@@ -32,7 +32,7 @@ public class ZoneRuneSocketStatsTests
             worldData.ItemsById);
 
         return EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData, state.Buffs,
-            petContribution, runtimeState: state);
+            petContribution, state);
     }
 
     [Fact]

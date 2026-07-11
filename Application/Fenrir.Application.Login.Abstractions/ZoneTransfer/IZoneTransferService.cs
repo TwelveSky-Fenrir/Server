@@ -11,7 +11,6 @@ public readonly record struct ZoneTransferResult(ZoneTransferOutcome Outcome, st
 
 public interface IZoneTransferService
 {
-
-        public ValueTask<ZoneTransferResult> RequestZoneTransferAsync(int accountId, byte avatarPost, Guid sessionToken,
+    public ValueTask<ZoneTransferResult> RequestZoneTransferAsync(int accountId, byte avatarPost, Guid sessionToken,
         short accountGrade, CancellationToken cancellationToken);
 }

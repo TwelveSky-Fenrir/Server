@@ -12,7 +12,7 @@ public static class SkillBookCraftResolver
 
     private static readonly Result Rejected = new(Outcome.Rejected, 0);
 
-        public static Result ResolveFragments(int sort, int material1, int material2, int material3, int material4)
+    public static Result ResolveFragments(int sort, int material1, int material2, int material3, int material4)
     {
         if (sort < 0 || sort >= SkillBookCraftCatalog.Recipes.Length)
             return Rejected;
@@ -25,7 +25,7 @@ public static class SkillBookCraftResolver
         return new Result(Outcome.Success, recipe.ResultItemId);
     }
 
-        public static Result ResolveWarGod(int material1, int material2, int material3, int material4,
+    public static Result ResolveWarGod(int material1, int material2, int material3, int material4,
         byte previousTribe, IRandomSource random)
     {
         if (material1 != SkillBookCraftCatalog.WarGodMaterial1ItemId ||

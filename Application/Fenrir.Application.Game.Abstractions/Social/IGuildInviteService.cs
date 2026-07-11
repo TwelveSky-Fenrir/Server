@@ -12,13 +12,12 @@ public enum GuildInviteAskResultKind
     TargetBusy,
     Sent,
 
-        SentCrossShard
+    SentCrossShard
 }
 
 public interface IGuildInviteService
 {
-
-        public ValueTask<GuildInviteAskResultKind> AskAsync(PlayerRuntimeState asker, string targetAvatarName,
+    public ValueTask<GuildInviteAskResultKind> AskAsync(PlayerRuntimeState asker, string targetAvatarName,
         CancellationToken cancellationToken);
 
     public void Answer(int targetId, int answerCode);

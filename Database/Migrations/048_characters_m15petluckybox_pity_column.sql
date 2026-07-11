@@ -12,7 +12,7 @@
 -- (Tables/game/Characters.sql) per the DbMigrator SHA-256 journal rule. Idempotent so a re-run no-ops. Same
 -- pattern as Migrations/041 (WarPoint) and Migrations/047 (PetBagDate).
 IF COL_LENGTH('game.Characters', 'M15PetLuckyBoxPity') IS NULL
-    ALTER TABLE game.Characters
-        ADD M15PetLuckyBoxPity INT NOT NULL
-            CONSTRAINT DF_Characters_M15PetLuckyBoxPity DEFAULT 0
-            CONSTRAINT CK_Characters_M15PetLuckyBoxPity CHECK (M15PetLuckyBoxPity BETWEEN 0 AND 200);
+ALTER TABLE game.Characters
+    ADD M15PetLuckyBoxPity INT NOT NULL
+        CONSTRAINT DF_Characters_M15PetLuckyBoxPity DEFAULT 0
+        CONSTRAINT CK_Characters_M15PetLuckyBoxPity CHECK (M15PetLuckyBoxPity BETWEEN 0 AND 200);

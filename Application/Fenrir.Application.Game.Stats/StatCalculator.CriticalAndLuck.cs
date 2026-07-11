@@ -4,7 +4,6 @@ namespace Fenrir.Application.Game.Stats;
 
 public static partial class StatCalculator
 {
-
     private static int ComputeCritical(int setNumber, EquippedItemSlot?[] bySlot,
         CosmeticContext cosmetic = default, MountContext mount = default)
     {

@@ -18,10 +18,9 @@ public sealed class SkyUpgradeItemService(
     ILogger<SkyUpgradeItemService> logger)
     : ISkyUpgradeItemService
 {
+    private const short SkyUpgradeItemEventCode = 93;
 
-        private const short SkyUpgradeItemEventCode = 93;
-
-        private const byte SuccessOutcome = 0;
+    private const byte SuccessOutcome = 0;
 
     private const byte FailedOutcome = 1;
 

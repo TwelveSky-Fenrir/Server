@@ -19,8 +19,8 @@
 -- :3701-3734 (ProcessFor1BStoreMoneyToInventoryMoney, tSort 244) ; Server/Header/Protocol/DEFINE.h:365-367
 -- (MAX_NUMBER_SIZE2 = 999, the BigMoney-family cap).
 CREATE PROCEDURE game.usp_Character_AdjustBigMoneyStore @CharacterId INT,
-                                                         @DeltaBigMoney INT,
-                                                         @DeltaBigStoreMoney INT
+                                                        @DeltaBigMoney INT,
+                                                        @DeltaBigStoreMoney INT
 AS
 BEGIN
     SET

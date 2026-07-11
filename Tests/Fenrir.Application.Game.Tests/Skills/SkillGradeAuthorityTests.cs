@@ -10,7 +10,6 @@ namespace Fenrir.Application.Game.Tests.Skills;
 
 public class SkillGradeAuthorityTests
 {
-
     [Fact]
     public void GetMaxSkillGradeNum_LearnedSkillPresent_ReturnsStoredGrade()
     {
@@ -138,7 +137,7 @@ public class SkillGradeAuthorityTests
     }
 
 
-        private static int Pack(int isByte, int iuByte = 0, int imByte = 0, int izByte = 0)
+    private static int Pack(int isByte, int iuByte = 0, int imByte = 0, int izByte = 0)
     {
         return (isByte & 0xFF) | ((iuByte & 0xFF) << 8) | ((imByte & 0xFF) << 16) | ((izByte & 0xFF) << 24);
     }
@@ -161,7 +160,7 @@ public class SkillGradeAuthorityTests
         int expectedStatType)
     {
         var packed = Pack(0, expectedStatType * 10 + 4);
-        var petItem = ItemWith(8500, sort: 28);
+        var petItem = ItemWith(8500, 28);
 
         var result = SkillGradeAuthority.GetBonusSkillValue(skillId, EquipWithPet(petItem), packed, null, 0, false);
 
@@ -174,7 +173,7 @@ public class SkillGradeAuthorityTests
     public void GetBonusSkillValue_Term4_SkillNotOneOfTheSixMapped_ContributesZero()
     {
         var packed = Pack(0, 14);
-        var petItem = ItemWith(8500, sort: 28);
+        var petItem = ItemWith(8500, 28);
 
         var result = SkillGradeAuthority.GetBonusSkillValue(999, EquipWithPet(petItem), packed, null, 0, false);
 
@@ -185,7 +184,7 @@ public class SkillGradeAuthorityTests
     public void GetBonusSkillValue_Term4_ExcludedAmuletItemId_ContributesZero()
     {
         var packed = Pack(0, 14);
-        var petItem = ItemWith(2253, sort: 28);
+        var petItem = ItemWith(2253, 28);
 
         var result = SkillGradeAuthority.GetBonusSkillValue(103, EquipWithPet(petItem), packed, null, 0, false);
 
@@ -199,7 +198,7 @@ public class SkillGradeAuthorityTests
     public void GetBonusSkillValue_Term5_GrowthPetIuCode_AddsFixedGrade(int iuCode, int expectedGrade)
     {
         var packed = Pack(0, iuCode);
-        var petItem = ItemWith(9100, sort: 22);
+        var petItem = ItemWith(9100, 22);
 
         var result = SkillGradeAuthority.GetBonusSkillValue(1234, EquipWithPet(petItem), packed, null, 0, false);
 
@@ -210,7 +209,7 @@ public class SkillGradeAuthorityTests
     public void GetBonusSkillValue_Term5_AmuletSort_NeverContributes_EvenWithMatchingIuCode()
     {
         var packed = Pack(0, 11);
-        var petItem = ItemWith(9100, sort: 28);
+        var petItem = ItemWith(9100, 28);
 
         var result = SkillGradeAuthority.GetBonusSkillValue(1234, EquipWithPet(petItem), packed, null, 0, false);
 
@@ -220,7 +219,7 @@ public class SkillGradeAuthorityTests
     [Fact]
     public void GetBonusSkillValue_Terms4And5_BothZero_WhenPetPackedValueIsZero()
     {
-        var petItem = ItemWith(9100, sort: 22);
+        var petItem = ItemWith(9100, 22);
 
         var result = SkillGradeAuthority.GetBonusSkillValue(103, EquipWithPet(petItem), 0, null, 0, false);
 
@@ -319,10 +318,10 @@ public class SkillGradeAuthorityTests
     [Fact]
     public void GetBonusSkillValue_Term6_AllFourConditionsHold_AddsFlatOne()
     {
-        var buffCategorySkill = SkillDefinitionWithType(82, type: 2);
+        var buffCategorySkill = SkillDefinitionWithType(82, 2);
 
         var result = SkillGradeAuthority.GetBonusSkillValue(82, [], 0, buffCategorySkill,
-            guildBuffType: 3, guildBuffActive: true);
+            3, true);
 
         Assert.Equal(1, result);
     }
@@ -330,7 +329,7 @@ public class SkillGradeAuthorityTests
     [Fact]
     public void GetBonusSkillValue_Term6_SkillDefinitionNull_ContributesZero()
     {
-        var result = SkillGradeAuthority.GetBonusSkillValue(82, [], 0, null, guildBuffType: 3, guildBuffActive: true);
+        var result = SkillGradeAuthority.GetBonusSkillValue(82, [], 0, null, 3, true);
 
         Assert.Equal(0, result);
     }
@@ -338,10 +337,10 @@ public class SkillGradeAuthorityTests
     [Fact]
     public void GetBonusSkillValue_Term6_SkillTypeNotTwo_ContributesZero()
     {
-        var notBuffCategorySkill = SkillDefinitionWithType(82, type: 1);
+        var notBuffCategorySkill = SkillDefinitionWithType(82, 1);
 
         var result = SkillGradeAuthority.GetBonusSkillValue(82, [], 0, notBuffCategorySkill,
-            guildBuffType: 3, guildBuffActive: true);
+            3, true);
 
         Assert.Equal(0, result);
     }
@@ -349,7 +348,7 @@ public class SkillGradeAuthorityTests
     [Fact]
     public void GetBonusSkillValue_Term6_GuildBuffInactiveOrWrongType_ContributesZero()
     {
-        var buffCategorySkill = SkillDefinitionWithType(82, type: 2);
+        var buffCategorySkill = SkillDefinitionWithType(82, 2);
 
         Assert.Equal(0, SkillGradeAuthority.GetBonusSkillValue(82, [], 0, buffCategorySkill, 3, false));
         Assert.Equal(0, SkillGradeAuthority.GetBonusSkillValue(82, [], 0, buffCategorySkill, 1, true));
@@ -361,10 +360,10 @@ public class SkillGradeAuthorityTests
         var capeItem = ItemWith(SkillGradeAuthority.GodOfWarriorCapeItemId);
         var slots = new ItemDefinition?[SkillGradeAuthority.EquipSlotCount];
         slots[SkillGradeAuthority.CapeSlotIndex] = capeItem;
-        var buffCategorySkill = SkillDefinitionWithType(82, type: 2);
+        var buffCategorySkill = SkillDefinitionWithType(82, 2);
 
         var result = SkillGradeAuthority.GetBonusSkillValue(82, slots, 0, buffCategorySkill,
-            guildBuffType: 3, guildBuffActive: true);
+            3, true);
 
         Assert.Equal(3, result);
     }

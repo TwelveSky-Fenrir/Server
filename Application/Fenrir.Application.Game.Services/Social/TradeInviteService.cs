@@ -26,8 +26,7 @@ public sealed class TradeInviteService(
     IOptions<GameServerOptions> options,
     ILogger<TradeInviteService> logger) : ITradeInviteService
 {
-
-        public async ValueTask<TradeInviteResult> InviteAsync(Zone zone, PlayerRuntimeState asker,
+    public async ValueTask<TradeInviteResult> InviteAsync(Zone zone, PlayerRuntimeState asker,
         string targetAvatarName, CancellationToken cancellationToken)
     {
         if (CommunityWorkGate.IsBusy(asker, duels, trades, friends, parties, mentors, guildInvites) ||
@@ -75,7 +74,7 @@ public sealed class TradeInviteService(
         }
     }
 
-        private async ValueTask<TradeInviteResult> InviteCrossShardAsync(PlayerRuntimeState asker,
+    private async ValueTask<TradeInviteResult> InviteCrossShardAsync(PlayerRuntimeState asker,
         string targetAvatarName, CancellationToken cancellationToken)
     {
         var remote = await characterShardLocations.FindByNameAsync(targetAvatarName, cancellationToken)

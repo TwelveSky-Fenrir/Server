@@ -11,8 +11,8 @@ public class CombinedLevelStatFeedTests
     private static CharacterBaseAttributes Attributes(short level, short level2 = 0)
     {
         return new CharacterBaseAttributes(
-            Vitality: 0, Strength: 0, Intelligence: 0, Dexterity: 0,
-            Level: level, Tribe: 0, PreviousTribe: 0, Title: 0, Halo: 0, RebirthCount: 0, Level2: level2);
+            0, 0, 0, 0,
+            level, 0, 0, 0, 0, 0, level2);
     }
 
     private static FrozenDictionary<short, LevelRowDto> Levels(params LevelRowDto[] rows)
@@ -39,7 +39,7 @@ public class CombinedLevelStatFeedTests
     public void ComputeBaseStats_Level2NonZero_UsesCombinedLevelForLevelFactorLookup_NotBaseLevelAlone()
     {
         var attributes = Attributes(100, 10);
-        var levels = Levels(LevelRow(100, life: 50), LevelRow(110, life: 999));
+        var levels = Levels(LevelRow(100, 50), LevelRow(110, 999));
 
         var stats = StatCalculator.ComputeBaseStats(attributes, NoEquipment, levels);
 
@@ -61,7 +61,7 @@ public class CombinedLevelStatFeedTests
     public void ComputeBaseStats_CombinedLevelInHighBand_StillClampsToLevelOneFortyFive()
     {
         var attributes = Attributes(145, 12);
-        var levels = Levels(LevelRow(145, life: 777));
+        var levels = Levels(LevelRow(145, 777));
 
         var stats = StatCalculator.ComputeBaseStats(attributes, NoEquipment, levels);
 
@@ -72,7 +72,7 @@ public class CombinedLevelStatFeedTests
     public void ComputeBaseStats_Level2Zero_ReproducesBaseLevelOnlyLookup()
     {
         var attributes = Attributes(50);
-        var levels = Levels(LevelRow(50, life: 4242));
+        var levels = Levels(LevelRow(50, 4242));
 
         var stats = StatCalculator.ComputeBaseStats(attributes, NoEquipment, levels);
 

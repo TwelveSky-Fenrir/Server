@@ -11,10 +11,9 @@ namespace Fenrir.Data.Characters;
 
 public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRepository
 {
+    public const byte NoContainer = 255;
 
-        public const byte NoContainer = 255;
-
-        public async ValueTask<ReadOnlyCollection<CharacterSummaryDto>> GetByAccountAsync(int accountId,
+    public async ValueTask<ReadOnlyCollection<CharacterSummaryDto>> GetByAccountAsync(int accountId,
         CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_GetByAccount", 3)
@@ -24,7 +23,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         return await Db.QueryAsReadOnlyCollectionAsync<CharacterSummaryDto>(sp, ct);
     }
 
-        public async ValueTask<CharacterAccountRosterBundle> GetAccountRosterAsync(int accountId, CancellationToken ct)
+    public async ValueTask<CharacterAccountRosterBundle> GetAccountRosterAsync(int accountId, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_GetAccountRoster", 3)
             .AddParameter("AccountId", accountId, SqlDbType.Int)
@@ -36,7 +35,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         return new CharacterAccountRosterBundle(characters, items);
     }
 
-        public async ValueTask<int> CreateAsync(
+    public async ValueTask<int> CreateAsync(
         int accountId,
         byte slot,
         string name,
@@ -75,7 +74,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         return await Db.ExecuteScalarAsync<int>(sp, ct);
     }
 
-        public async ValueTask<int> CreateWithStarterKitAsync(
+    public async ValueTask<int> CreateWithStarterKitAsync(
         int accountId,
         byte slot,
         string name,
@@ -136,7 +135,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         return await Db.ExecuteScalarAsync<int>(builder.Build(), ct);
     }
 
-        public async ValueTask DeleteAsync(int accountId, byte slot, CancellationToken ct)
+    public async ValueTask DeleteAsync(int accountId, byte slot, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_Delete", 0)
             .AddParameter("AccountId", accountId, SqlDbType.Int)
@@ -146,7 +145,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(sp, ct);
     }
 
-        public async ValueTask<CharacterWorldEntryDto?> GetForWorldEntryAsync(int characterId, CancellationToken ct)
+    public async ValueTask<CharacterWorldEntryDto?> GetForWorldEntryAsync(int characterId, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_GetForWorldEntry", 1)
             .AddParameter("CharacterId", characterId, SqlDbType.Int)
@@ -155,7 +154,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         return await Db.FirstQueryAsync<CharacterWorldEntryDto>(sp, ct);
     }
 
-        public async ValueTask PersistPositionsAsync(IReadOnlyList<CharacterPositionTvp> rows, CancellationToken ct)
+    public async ValueTask PersistPositionsAsync(IReadOnlyList<CharacterPositionTvp> rows, CancellationToken ct)
     {
         if (rows.Count == 0)
             return;
@@ -167,7 +166,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(sp, ct);
     }
 
-        public async ValueTask ClampVitalsFloorAsync(int characterId, long flushSequence, int life, int mana,
+    public async ValueTask ClampVitalsFloorAsync(int characterId, long flushSequence, int life, int mana,
         CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_ClampVitalsFloor", 0)
@@ -180,7 +179,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(sp, ct);
     }
 
-        public async ValueTask<CharacterWorldEntryBundle?> GetWorldEntryBundleAsync(int characterId, CancellationToken ct)
+    public async ValueTask<CharacterWorldEntryBundle?> GetWorldEntryBundleAsync(int characterId, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_GetForWorldEntry", 64)
             .AddParameter("CharacterId", characterId, SqlDbType.Int)
@@ -195,7 +194,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
             : new CharacterWorldEntryBundle(characters[0], items, skills, hotkeys, buffs);
     }
 
-        public async ValueTask ReplaceContainerAsync(int characterId, byte container,
+    public async ValueTask ReplaceContainerAsync(int characterId, byte container,
         IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct)
     {
         var builder = new StoredProcedureParametersBuilder("game", "usp_CharacterItems_ReplaceContainer", 0)
@@ -208,7 +207,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(builder.Build(), ct);
     }
 
-        public async ValueTask ReplaceTwoContainersAsync(int characterId, byte containerA,
+    public async ValueTask ReplaceTwoContainersAsync(int characterId, byte containerA,
         IReadOnlyList<CharacterItemSlotTvp> itemsA, byte containerB, IReadOnlyList<CharacterItemSlotTvp> itemsB,
         CancellationToken ct)
     {
@@ -227,7 +226,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(builder.Build(), ct);
     }
 
-        public async ValueTask PersistProgressAsync(IReadOnlyList<CharacterProgressTvp> rows, CancellationToken ct)
+    public async ValueTask PersistProgressAsync(IReadOnlyList<CharacterProgressTvp> rows, CancellationToken ct)
     {
         if (rows.Count == 0)
             return;
@@ -239,7 +238,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(sp, ct);
     }
 
-        public async ValueTask AdjustMoneyAsync(int characterId, long deltaMoney, int deltaBigMoney, CancellationToken ct)
+    public async ValueTask AdjustMoneyAsync(int characterId, long deltaMoney, int deltaBigMoney, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_AdjustMoney", 0)
             .AddParameter("CharacterId", characterId, SqlDbType.Int)
@@ -250,7 +249,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(sp, ct);
     }
 
-        public async ValueTask AdjustStoreMoneyAsync(int characterId, long deltaMoney, long deltaStoreMoney,
+    public async ValueTask AdjustStoreMoneyAsync(int characterId, long deltaMoney, long deltaStoreMoney,
         CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_AdjustStoreMoney", 0)
@@ -262,7 +261,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(sp, ct);
     }
 
-        public async ValueTask AdjustMoneyAndReplaceContainerAsync(int characterId, long deltaMoney, int deltaBigMoney,
+    public async ValueTask AdjustMoneyAndReplaceContainerAsync(int characterId, long deltaMoney, int deltaBigMoney,
         byte container, IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct)
     {
         var builder = new StoredProcedureParametersBuilder("game", "usp_Character_AdjustMoneyAndReplaceContainer", 0)
@@ -277,7 +276,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(builder.Build(), ct);
     }
 
-        public async ValueTask AdjustMoneyAndReplaceTwoContainersAsync(int characterId, long deltaMoney,
+    public async ValueTask AdjustMoneyAndReplaceTwoContainersAsync(int characterId, long deltaMoney,
         int deltaBigMoney, byte containerA, IReadOnlyList<CharacterItemSlotTvp> itemsA, byte containerB,
         IReadOnlyList<CharacterItemSlotTvp> itemsB, CancellationToken ct)
     {
@@ -299,7 +298,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(builder.Build(), ct);
     }
 
-        public async ValueTask UpsertSkillSlotAsync(int characterId, byte slotIndex, int skillId, int grade,
+    public async ValueTask UpsertSkillSlotAsync(int characterId, byte slotIndex, int skillId, int grade,
         CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_CharacterSkills_UpsertSlot", 0)
@@ -312,7 +311,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(sp, ct);
     }
 
-        public async ValueTask UpsertHotkeySlotAsync(int characterId, byte page, byte keyIndex, int sort, int value1,
+    public async ValueTask UpsertHotkeySlotAsync(int characterId, byte page, byte keyIndex, int sort, int value1,
         int value2, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_CharacterHotkeys_UpsertSlot", 0)
@@ -327,7 +326,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(sp, ct);
     }
 
-        public async ValueTask ExecuteTradeAsync(
+    public async ValueTask ExecuteTradeAsync(
         int characterA, IReadOnlyList<CharacterItemSlotTvp> itemsA0, IReadOnlyList<CharacterItemSlotTvp> itemsA1,
         long deltaMoneyA, int deltaBigMoneyA,
         int characterB, IReadOnlyList<CharacterItemSlotTvp> itemsB0, IReadOnlyList<CharacterItemSlotTvp> itemsB1,
@@ -365,7 +364,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(builder.Build(), ct);
     }
 
-        public async ValueTask ApplyQuestTransitionAsync(int characterId, int stepPermanent, int activeQuestId,
+    public async ValueTask ApplyQuestTransitionAsync(int characterId, int stepPermanent, int activeQuestId,
         int qSort, int targetPhase, int killCounter, long deltaMoney,
         byte? container1, IReadOnlyList<CharacterItemSlotTvp> items1,
         byte? container2, IReadOnlyList<CharacterItemSlotTvp> items2,
@@ -392,7 +391,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(builder.Build(), ct);
     }
 
-        public async ValueTask ApplyDailyMissionClaimAsync(int characterId, int joinWar, int killOtherTribe,
+    public async ValueTask ApplyDailyMissionClaimAsync(int characterId, int joinWar, int killOtherTribe,
         int killMonster, int playTime, byte? container, IReadOnlyList<CharacterItemSlotTvp> items,
         CancellationToken ct)
     {
@@ -410,7 +409,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(builder.Build(), ct);
     }
 
-        public async ValueTask SetAutoPotionThresholdAsync(int characterId, byte autoLifeRatio, byte autoManaRatio,
+    public async ValueTask SetAutoPotionThresholdAsync(int characterId, byte autoLifeRatio, byte autoManaRatio,
         CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_SetAutoPotionThreshold", 0)
@@ -422,7 +421,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(sp, ct);
     }
 
-        public async ValueTask SetAutoHuntAsync(int characterId, bool enabled, byte[] config, CancellationToken ct)
+    public async ValueTask SetAutoHuntAsync(int characterId, bool enabled, byte[] config, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_SetAutoHunt", 0)
             .AddParameter("CharacterId", characterId, SqlDbType.Int)
@@ -433,7 +432,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(sp, ct);
     }
 
-        public async ValueTask SetPetGrowthAsync(int characterId, int petGrowth, byte petActivity, CancellationToken ct)
+    public async ValueTask SetPetGrowthAsync(int characterId, int petGrowth, byte petActivity, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_SetPetGrowth", 0)
             .AddParameter("CharacterId", characterId, SqlDbType.Int)
@@ -444,7 +443,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(sp, ct);
     }
 
-        public async ValueTask<int?> GetIdByNameAsync(string name, CancellationToken ct)
+    public async ValueTask<int?> GetIdByNameAsync(string name, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_GetIdByName", 1)
             .AddParameter("Name", name, SqlDbType.NVarChar)
@@ -454,7 +453,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         return row?.CharacterId;
     }
 
-        public async ValueTask<int?> GetItemIdAtSlotAsync(int characterId, byte container, byte slot, CancellationToken ct)
+    public async ValueTask<int?> GetItemIdAtSlotAsync(int characterId, byte container, byte slot, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_CharacterItem_GetIdAtSlot", 1)
             .AddParameter("CharacterId", characterId, SqlDbType.Int)
@@ -466,7 +465,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         return row?.ItemId;
     }
 
-        public async ValueTask<RewardClaimStateDto?> GetRewardClaimStateAsync(int characterId, int todayDate,
+    public async ValueTask<RewardClaimStateDto?> GetRewardClaimStateAsync(int characterId, int todayDate,
         CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_GetRewardClaimState", 1)
@@ -477,7 +476,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         return await Db.FirstQueryAsync<RewardClaimStateDto>(sp, ct);
     }
 
-        public async ValueTask ClaimDailyRewardAsync(int characterId, int todayDate, byte container,
+    public async ValueTask ClaimDailyRewardAsync(int characterId, int todayDate, byte container,
         IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct)
     {
         var builder = new StoredProcedureParametersBuilder("game", "usp_Character_ClaimDailyReward", 0)
@@ -491,7 +490,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(builder.Build(), ct);
     }
 
-        public async ValueTask<int> SpendBloodCoinAndReplaceContainerAsync(int characterId, int deltaBloodCoin,
+    public async ValueTask<int> SpendBloodCoinAndReplaceContainerAsync(int characterId, int deltaBloodCoin,
         byte container, IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct)
     {
         var builder = new StoredProcedureParametersBuilder("game", "usp_Character_SpendBloodCoinAndReplaceContainer", 1)
@@ -505,7 +504,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         return await Db.ExecuteScalarAsync<int>(builder.Build(), ct);
     }
 
-        public async ValueTask ExecutePshopPurchaseAsync(int sellerCharacterId, byte sellerContainer,
+    public async ValueTask ExecutePshopPurchaseAsync(int sellerCharacterId, byte sellerContainer,
         IReadOnlyList<CharacterItemSlotTvp> sellerItems, int buyerCharacterId, byte buyerContainer,
         IReadOnlyList<CharacterItemSlotTvp> buyerItems, int price, CancellationToken ct)
     {
@@ -525,7 +524,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(builder.Build(), ct);
     }
 
-        public async ValueTask<int> GrantTribeTransferPermitAsync(int characterId, int delta, CancellationToken ct)
+    public async ValueTask<int> GrantTribeTransferPermitAsync(int characterId, int delta, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_GrantTribeTransferPermit", 1)
             .AddParameter("CharacterId", characterId, SqlDbType.Int)
@@ -535,7 +534,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         return await Db.ExecuteScalarAsync<int>(sp, ct);
     }
 
-        public async ValueTask<int> AdjustDeathProtectionAsync(int characterId, int delta, CancellationToken ct)
+    public async ValueTask<int> AdjustDeathProtectionAsync(int characterId, int delta, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_AdjustDeathProtection", 1)
             .AddParameter("CharacterId", characterId, SqlDbType.Int)
@@ -545,7 +544,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         return await Db.ExecuteScalarAsync<int>(sp, ct);
     }
 
-        public async ValueTask<int> AdjustZone241TimeAsync(int characterId, int delta, CancellationToken ct)
+    public async ValueTask<int> AdjustZone241TimeAsync(int characterId, int delta, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_AdjustZone241Time", 1)
             .AddParameter("CharacterId", characterId, SqlDbType.Int)
@@ -555,7 +554,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         return await Db.ExecuteScalarAsync<int>(sp, ct);
     }
 
-        public async ValueTask ApplyTribeConversionAsync(int characterId, int itemId, byte container,
+    public async ValueTask ApplyTribeConversionAsync(int characterId, int itemId, byte container,
         IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct)
     {
         var builder = new StoredProcedureParametersBuilder("game", "usp_Character_ApplyTribeConversion", 0)
@@ -569,7 +568,7 @@ public sealed record CharacterRepository(ICaeriusNetDbContext Db) : ICharacterRe
         await Db.ExecuteAsync(builder.Build(), ct);
     }
 
-        public async ValueTask ApplyTribeFourConversionAsync(int characterId, byte newTribe, int stepPermanent,
+    public async ValueTask ApplyTribeFourConversionAsync(int characterId, byte newTribe, int stepPermanent,
         int activeQuestId, int qSort, int targetPhase, int killCounter, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Character_ApplyTribeFourConversion", 0)

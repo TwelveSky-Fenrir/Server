@@ -18,7 +18,7 @@ public static class PasswordHasher
         return (HashWithSalt(password, salt), salt);
     }
 
-        public static bool Verify(string password, byte[] hash, byte[] salt)
+    public static bool Verify(string password, byte[] hash, byte[] salt)
     {
         return CryptographicOperations.FixedTimeEquals(HashWithSalt(password, salt), hash);
     }

@@ -6,10 +6,10 @@ namespace Fenrir.Application.Game.Tests.Simulation;
 
 public class MountExpiryCountdownSystemTests
 {
+    private const short PlainZone = 100;
+
     private static readonly TimeSpan OneMinute =
         SimulationClock.ToTimeSpan(SimulationClock.PlayTimeAccrualLegacyTicks);
-
-    private const short PlainZone = 100;
 
     private static (Zone Zone, PlayerRuntimeState State) EnterPlayer()
     {

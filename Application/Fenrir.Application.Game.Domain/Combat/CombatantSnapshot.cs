@@ -11,14 +11,9 @@ public readonly record struct CombatantSnapshot(
     float PosX,
     float PosY,
     float PosZ,
-
-        TimeSpan? ZoneEntryAtZoneClock,
+    TimeSpan? ZoneEntryAtZoneClock,
     EffectiveStats Stats,
-
-        int ChargeBuffPercent,
-
-        short Level = 0,
-
-        bool IsMovingZone = false,
-
-        string Name = "");
+    int ChargeBuffPercent,
+    short Level = 0,
+    bool IsMovingZone = false,
+    string Name = "");

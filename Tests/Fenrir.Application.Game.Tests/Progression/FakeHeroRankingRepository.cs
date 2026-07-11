@@ -39,7 +39,7 @@ internal sealed class FakeHeroRankingRepository : IHeroRankingRepository
         return ValueTask.FromResult(newTotal);
     }
 
-        public ValueTask<int?> GetPointsAsync(int characterId, byte periodKind, CancellationToken ct)
+    public ValueTask<int?> GetPointsAsync(int characterId, byte periodKind, CancellationToken ct)
     {
         var key = (characterId, periodKind);
         return ValueTask.FromResult<int?>(Points.TryGetValue(key, out var points) ? points : null);

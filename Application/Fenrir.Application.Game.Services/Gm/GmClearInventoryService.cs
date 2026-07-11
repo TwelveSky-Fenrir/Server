@@ -17,7 +17,7 @@ public sealed class GmClearInventoryService(
 {
     private const int Sort = 701;
 
-        private const int AcceptedResult = 0;
+    private const int AcceptedResult = 0;
 
     private static readonly ImmutableDictionary<byte, ItemStack> EmptyContainer =
         ImmutableDictionary<byte, ItemStack>.Empty;

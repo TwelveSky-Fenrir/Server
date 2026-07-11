@@ -2,8 +2,7 @@ namespace Fenrir.Application.Game.Domain.Simulation;
 
 public static class Zone175MissionCore
 {
-
-        public static void Advance(Zone175MissionState state, in Zone175InstanceConfig config,
+    public static void Advance(Zone175MissionState state, in Zone175InstanceConfig config,
         IZone175MissionEffects effects, DateTimeOffset nowUtc, int legacyTicksElapsed)
     {
         if (legacyTicksElapsed <= 0)
@@ -31,7 +30,7 @@ public static class Zone175MissionCore
         }
     }
 
-        public static bool IsOpenMoment(DateTimeOffset nowUtc)
+    public static bool IsOpenMoment(DateTimeOffset nowUtc)
     {
         return nowUtc.DayOfWeek == DayOfWeek.Sunday && nowUtc.Hour == 21 && nowUtc.Minute == 0;
     }
@@ -73,7 +72,7 @@ public static class Zone175MissionCore
             BeginWave(state, in config, effects, 1);
     }
 
-        private static void BeginWave(Zone175MissionState state, in Zone175InstanceConfig config,
+    private static void BeginWave(Zone175MissionState state, in Zone175InstanceConfig config,
         IZone175MissionEffects effects, int wave)
     {
         _ = config;

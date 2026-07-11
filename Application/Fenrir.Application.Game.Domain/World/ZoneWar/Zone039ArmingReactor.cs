@@ -7,7 +7,7 @@ public sealed class Zone039ArmingReactor(IZone039MonsterSummonResetGateway gatew
 {
     private readonly ConcurrentDictionary<short, Zone039ArmingState> _stateByZone = new();
 
-        public void Apply(ZoneRegistry zones)
+    public void Apply(ZoneRegistry zones)
     {
         foreach (var zone in zones.Zones)
         {
@@ -23,7 +23,7 @@ public sealed class Zone039ArmingReactor(IZone039MonsterSummonResetGateway gatew
         }
     }
 
-        public Zone039ArmingState? TryGetState(short mapId)
+    public Zone039ArmingState? TryGetState(short mapId)
     {
         return _stateByZone.TryGetValue(mapId, out var state) ? state : null;
     }
@@ -37,8 +37,7 @@ public sealed class Zone039ArmingState
 
 public interface IZone039MonsterSummonResetGateway
 {
-
-        public void ResetGeneralSpawnTable(Zone zone);
+    public void ResetGeneralSpawnTable(Zone zone);
 }
 
 public sealed class LoggingOnlyZone039MonsterSummonResetGateway(

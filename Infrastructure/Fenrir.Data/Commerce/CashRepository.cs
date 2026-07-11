@@ -18,7 +18,7 @@ public sealed record CashRepository(ICaeriusNetDbContext Db) : ICashRepository
         return await Db.ExecuteScalarAsync<int>(sp, ct);
     }
 
-        public async ValueTask<int> DebitAndGrantItemAsync(int accountId, int amount, byte reason, int productId,
+    public async ValueTask<int> DebitAndGrantItemAsync(int accountId, int amount, byte reason, int productId,
         int characterId, byte container, IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct)
     {
         var builder = new StoredProcedureParametersBuilder("game", "usp_Cash_DebitAndGrantItem", 1)
@@ -34,7 +34,7 @@ public sealed record CashRepository(ICaeriusNetDbContext Db) : ICashRepository
         return await Db.ExecuteScalarAsync<int>(builder.Build(), ct);
     }
 
-        public async ValueTask CreditAsync(int accountId, int amount, byte reason, int? productId, CancellationToken ct)
+    public async ValueTask CreditAsync(int accountId, int amount, byte reason, int? productId, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Cash_Credit", 0)
             .AddParameter("AccountId", accountId, SqlDbType.Int)

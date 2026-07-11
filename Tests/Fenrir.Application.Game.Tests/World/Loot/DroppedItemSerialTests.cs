@@ -4,6 +4,9 @@ namespace Fenrir.Application.Game.Tests.World.Loot;
 
 public class DroppedItemSerialTests
 {
+    private const int CpGiftCard5ItemId = 691;
+    private const int Level2Cap = 12;
+
     [Fact]
     public void DroppedItem_DefaultsSerialToZero()
     {
@@ -33,16 +36,12 @@ public class DroppedItemSerialTests
         Assert.NotEqual(withoutSerial, withSerial);
     }
 
-
-    private const int CpGiftCard5ItemId = 691;
-    private const int Level2Cap = 12;
-
     [Fact]
     public void ResolveCpGiftCard_OnZone126TypeShard_DropsWhereOrdinaryShardWouldNot()
     {
         var onZone126 = MonsterDropTailResolver.ResolveCpGiftCard(
-            generalDropEligible: true, monsterId: 500, isZone241TypeShard: false, killerLevel2: Level2Cap,
-            isZone126TypeShard: true, random: new ScriptedRandom(7, 4, 0));
+            true, 500, false, Level2Cap,
+            true, new ScriptedRandom(7, 4, 0));
 
         Assert.Single(onZone126);
         Assert.Equal(CpGiftCard5ItemId, onZone126[0].ItemId);
@@ -52,13 +51,13 @@ public class DroppedItemSerialTests
     public void ResolveCpGiftCard_OnOrdinaryShard_SameRollYieldsNoDrop()
     {
         var onOrdinary = MonsterDropTailResolver.ResolveCpGiftCard(
-            generalDropEligible: true, monsterId: 500, isZone241TypeShard: false, killerLevel2: Level2Cap,
-            isZone126TypeShard: false, random: new ScriptedRandom(7, 4, 0));
+            true, 500, false, Level2Cap,
+            false, new ScriptedRandom(7, 4, 0));
 
         Assert.Empty(onOrdinary);
     }
 
-        private sealed class ScriptedRandom(params int[] sequence) : Random
+    private sealed class ScriptedRandom(params int[] sequence) : Random
     {
         private int _index;
 

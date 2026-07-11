@@ -9,16 +9,15 @@ public enum FriendAskOutcome
 
 public sealed class FriendRegistry
 {
+    private readonly Dictionary<int, int> _acceptedFor = new();
 
-        private readonly Dictionary<int, int> _acceptedFor = new();
-
-        private readonly CrossShardNegotiationTracker _crossShard = new();
+    private readonly CrossShardNegotiationTracker _crossShard = new();
 
     private readonly Lock _lock = new();
     private readonly Dictionary<int, int> _pendingByAsker = new();
     private readonly Dictionary<int, int> _pendingByTarget = new();
 
-        public bool IsNegotiating(int characterId)
+    public bool IsNegotiating(int characterId)
     {
         lock (_lock)
         {
@@ -28,7 +27,7 @@ public sealed class FriendRegistry
         }
     }
 
-        public bool TryPeekPending(int characterId, out int counterpartId, out bool isAsker)
+    public bool TryPeekPending(int characterId, out int counterpartId, out bool isAsker)
     {
         lock (_lock)
         {
@@ -64,7 +63,7 @@ public sealed class FriendRegistry
         }
     }
 
-        public FriendAskOutcome TryAskCrossShard(int askerId, CrossShardOutboundAsk ask)
+    public FriendAskOutcome TryAskCrossShard(int askerId, CrossShardOutboundAsk ask)
     {
         lock (_lock)
         {
@@ -95,7 +94,7 @@ public sealed class FriendRegistry
         }
     }
 
-        public bool TryRegisterCrossShardInbound(int targetId, CrossShardInboundAsk ask)
+    public bool TryRegisterCrossShardInbound(int targetId, CrossShardInboundAsk ask)
     {
         lock (_lock)
         {
@@ -106,7 +105,7 @@ public sealed class FriendRegistry
         }
     }
 
-        public bool TryConsumeCrossShardInbound(int targetId, out CrossShardInboundAsk ask)
+    public bool TryConsumeCrossShardInbound(int targetId, out CrossShardInboundAsk ask)
     {
         lock (_lock)
         {
@@ -114,7 +113,7 @@ public sealed class FriendRegistry
         }
     }
 
-        public bool TryConsumeCrossShardOutbound(int askerId, out CrossShardOutboundAsk ask)
+    public bool TryConsumeCrossShardOutbound(int askerId, out CrossShardOutboundAsk ask)
     {
         lock (_lock)
         {
@@ -122,7 +121,7 @@ public sealed class FriendRegistry
         }
     }
 
-        public void MarkAccepted(int characterId, int otherCharacterId)
+    public void MarkAccepted(int characterId, int otherCharacterId)
     {
         lock (_lock)
         {
@@ -149,7 +148,7 @@ public sealed class FriendRegistry
         }
     }
 
-        public bool TryConsumeAccepted(int characterId, out int otherId)
+    public bool TryConsumeAccepted(int characterId, out int otherId)
     {
         lock (_lock)
         {

@@ -7,8 +7,7 @@ namespace Fenrir.Application.Game.Domain.Commerce;
 
 public sealed class CommerceCatalogCache
 {
-
-        public const int InitialVersion = 0;
+    public const int InitialVersion = 0;
 
     private readonly Lock _lock = new();
 
@@ -49,7 +48,7 @@ public sealed class CommerceCatalogCache
         }
     }
 
-        public int CashCatalogCrc
+    public int CashCatalogCrc
     {
         get
         {
@@ -60,7 +59,7 @@ public sealed class CommerceCatalogCache
         }
     }
 
-        public bool CashShopSellEnabled
+    public bool CashShopSellEnabled
     {
         get
         {
@@ -93,13 +92,13 @@ public sealed class CommerceCatalogCache
         }
     }
 
-        public async Task RefreshAllAsync(IWorldDataRepository repository, CancellationToken ct)
+    public async Task RefreshAllAsync(IWorldDataRepository repository, CancellationToken ct)
     {
         await RefreshCashCatalogAsync(repository, ct).ConfigureAwait(false);
         await RefreshBloodCatalogAsync(repository, ct).ConfigureAwait(false);
     }
 
-        public async Task RefreshCashCatalogAsync(IWorldDataRepository repository, CancellationToken ct)
+    public async Task RefreshCashCatalogAsync(IWorldDataRepository repository, CancellationToken ct)
     {
         ReadOnlyCollection<ItemMallProductRowDto> rows;
         try
@@ -152,7 +151,7 @@ public sealed class CommerceCatalogCache
         }
     }
 
-        public async Task RefreshBloodCatalogAsync(IWorldDataRepository repository, CancellationToken ct)
+    public async Task RefreshBloodCatalogAsync(IWorldDataRepository repository, CancellationToken ct)
     {
         ReadOnlyCollection<BloodExchangeCatalogRowDto> rows;
         try

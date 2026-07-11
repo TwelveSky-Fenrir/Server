@@ -33,7 +33,7 @@ public class PvpKillCreditGuardTests
     public void EitherPartyNotReady_NoCredit(bool killerReady, bool victimReady)
     {
         Assert.Equal(KillCreditDenial.NotReady,
-            PvpKillCreditGuard.Evaluate(Request(killerReady: killerReady, victimReady: victimReady)));
+            PvpKillCreditGuard.Evaluate(Request(killerReady, victimReady)));
     }
 
     [Fact]

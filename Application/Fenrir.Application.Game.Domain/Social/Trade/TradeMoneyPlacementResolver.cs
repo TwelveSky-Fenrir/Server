@@ -6,16 +6,16 @@ public static class TradeMoneyPlacementResolver
     {
         Success,
 
-                QuantityOutOfRange,
+        QuantityOutOfRange,
 
-                InsufficientSourceBalance,
+        InsufficientSourceBalance,
 
-                DestinationOverflow
+        DestinationOverflow
     }
 
-        public const long MoneyCeiling = 2_000_000_000;
+    public const long MoneyCeiling = 2_000_000_000;
 
-        public static MoneyPlacementResult ResolveToTradeOffer(long onHandMoney, long tradeOfferMoney, long amount)
+    public static MoneyPlacementResult ResolveToTradeOffer(long onHandMoney, long tradeOfferMoney, long amount)
     {
         if (amount < 1)
             return new MoneyPlacementResult(MoneyPlacementOutcome.QuantityOutOfRange, onHandMoney, tradeOfferMoney);
@@ -31,7 +31,7 @@ public static class TradeMoneyPlacementResolver
         return new MoneyPlacementResult(MoneyPlacementOutcome.Success, onHandMoney - amount, newTradeOfferMoney);
     }
 
-        public static MoneyPlacementResult ResolveFromTradeOffer(long tradeOfferMoney, long onHandMoney, long amount)
+    public static MoneyPlacementResult ResolveFromTradeOffer(long tradeOfferMoney, long onHandMoney, long amount)
     {
         if (amount < 1)
             return new MoneyPlacementResult(MoneyPlacementOutcome.QuantityOutOfRange, onHandMoney, tradeOfferMoney);
@@ -47,7 +47,7 @@ public static class TradeMoneyPlacementResolver
         return new MoneyPlacementResult(MoneyPlacementOutcome.Success, newOnHandMoney, tradeOfferMoney - amount);
     }
 
-        public readonly record struct MoneyPlacementResult(
+    public readonly record struct MoneyPlacementResult(
         MoneyPlacementOutcome Outcome,
         long NewOnHandMoney,
         long NewTradeOfferMoney)

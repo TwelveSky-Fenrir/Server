@@ -9,8 +9,7 @@ namespace Fenrir.Data.Admin;
 
 public sealed record MuteRepository(ICaeriusNetDbContext Db) : IMuteRepository
 {
-
-        public async ValueTask<bool> IsActiveForCharacterAsync(int characterId, CancellationToken ct)
+    public async ValueTask<bool> IsActiveForCharacterAsync(int characterId, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("admin", "usp_Mute_GetActiveForCharacter", 1)
             .AddParameter("CharacterId", characterId, SqlDbType.Int)
@@ -20,7 +19,7 @@ public sealed record MuteRepository(ICaeriusNetDbContext Db) : IMuteRepository
         return rows.Count > 0;
     }
 
-        public async ValueTask<ImmutableArray<int>> GetActiveCharacterIdsAsync(IReadOnlyCollection<int> characterIds,
+    public async ValueTask<ImmutableArray<int>> GetActiveCharacterIdsAsync(IReadOnlyCollection<int> characterIds,
         CancellationToken ct)
     {
         if (characterIds.Count == 0)

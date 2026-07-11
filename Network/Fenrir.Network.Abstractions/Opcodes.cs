@@ -156,7 +156,6 @@ public static class Opcodes
             public const byte ClaimDailyReward = 155;
             public const byte PetActionUpdate = 156;
             public const byte RuneSocket = 157;
-
         }
 
         public static class Outgoing
@@ -297,7 +296,6 @@ public static class Opcodes
             public const byte ClaimDailyReward = 196;
             public const byte RuneSocket = 199;
             public const byte ZoneWar335Countdown = 200;
-
         }
     }
 }

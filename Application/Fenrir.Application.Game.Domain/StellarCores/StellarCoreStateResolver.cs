@@ -6,22 +6,21 @@ public static class StellarCoreStateResolver
 {
     public enum ResultKind
     {
-
-                NoReply,
+        NoReply,
 
         Select,
         Equip,
         Remove,
 
-                ReturnToInventoryMismatch,
+        ReturnToInventoryMismatch,
 
-                Disconnect,
+        Disconnect,
         ReturnToInventorySuccess
     }
 
-        public const int SlotCount = 10;
+    public const int SlotCount = 10;
 
-        public const int WornMax = 19;
+    public const int WornMax = 19;
 
     public static Result Resolve(int sort, int value, in Context ctx)
     {

@@ -74,30 +74,30 @@ public class DoublePetExpTimerGateTests
     [Fact]
     public void ComputeNextTimerValue_BelowTwoHundredPercent_DrainsByOne()
     {
-        Assert.Equal(9, DoublePetExpTimerGate.ComputeNextTimerValue(541, Tier0Max, currentTimerValue: 10));
+        Assert.Equal(9, DoublePetExpTimerGate.ComputeNextTimerValue(541, Tier0Max, 10));
     }
 
     [Fact]
     public void ComputeNextTimerValue_AtTwoHundredPercent_LeavesTimerUntouched()
     {
-        Assert.Equal(10, DoublePetExpTimerGate.ComputeNextTimerValue(541, Tier0Max * 2, currentTimerValue: 10));
+        Assert.Equal(10, DoublePetExpTimerGate.ComputeNextTimerValue(541, Tier0Max * 2, 10));
     }
 
     [Fact]
     public void ComputeNextTimerValue_NoPetEquipped_StillDrainsByOne()
     {
-        Assert.Equal(9, DoublePetExpTimerGate.ComputeNextTimerValue(0, 0, currentTimerValue: 10));
+        Assert.Equal(9, DoublePetExpTimerGate.ComputeNextTimerValue(0, 0, 10));
     }
 
     [Fact]
     public void ComputeNextTimerValue_TimerAlreadyZero_IsANoOp()
     {
-        Assert.Equal(0, DoublePetExpTimerGate.ComputeNextTimerValue(541, Tier0Max, currentTimerValue: 0));
+        Assert.Equal(0, DoublePetExpTimerGate.ComputeNextTimerValue(541, Tier0Max, 0));
     }
 
     [Fact]
     public void ComputeNextTimerValue_TimerNegative_IsANoOp()
     {
-        Assert.Equal(-5, DoublePetExpTimerGate.ComputeNextTimerValue(541, Tier0Max, currentTimerValue: -5));
+        Assert.Equal(-5, DoublePetExpTimerGate.ComputeNextTimerValue(541, Tier0Max, -5));
     }
 }

@@ -20,9 +20,9 @@ public sealed class SearchShopListingsService(
     private const int SortAll = 0;
     private const int MaxResults = 1000;
 
-        private const byte ExcludedRawSort = 3;
+    private const byte ExcludedRawSort = 3;
 
-        private static readonly Dictionary<byte, int> SortToCategory = new()
+    private static readonly Dictionary<byte, int> SortToCategory = new()
     {
         [5] = 1,
         [7] = 2,
@@ -116,7 +116,7 @@ public sealed class SearchShopListingsService(
         return results;
     }
 
-        private static bool IsMatch(int sort1, int sort2, ItemDefinition itemDefinition)
+    private static bool IsMatch(int sort1, int sort2, ItemDefinition itemDefinition)
     {
         if (itemDefinition.Item.Sort == ExcludedRawSort)
             return false;
@@ -130,7 +130,7 @@ public sealed class SearchShopListingsService(
         return sort1 == TypeAll && sort2 == SortAll;
     }
 
-        private static bool Matches(int sort1, int sort2, int category, byte itemType)
+    private static bool Matches(int sort1, int sort2, int category, byte itemType)
     {
         if (sort1 == TypeAll && (sort2 == SortAll || sort2 == category))
             return true;

@@ -4,8 +4,7 @@ namespace Fenrir.Application.Game.Domain.Skills;
 
 public static class SkillCatalog
 {
-
-        public static float ReturnSkillValue(SkillDefinition skill, int gradePoints, SkillValueKind kind)
+    public static float ReturnSkillValue(SkillDefinition skill, int gradePoints, SkillValueKind kind)
     {
         if (gradePoints < 1)
             return 0f;

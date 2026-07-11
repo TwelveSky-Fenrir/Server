@@ -6,7 +6,6 @@ namespace Fenrir.Application.Game.Tests.GameData;
 
 public class WorldDataCacheBuilderSkillNpcValidationTests
 {
-
     [Fact]
     public void Build_Accepts_ValidSkillAndNpcRowsWithChildren()
     {

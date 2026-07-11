@@ -42,7 +42,8 @@ BEGIN
         XACT_ABORT ON;
 
     DECLARE
-        @Ceiling INT = 2000000000; -- MAX_NUMBER_SIZE (Server/Header/Protocol/DEFINE.h:365).
+        @Ceiling INT = 2000000000;
+    -- MAX_NUMBER_SIZE (Server/Header/Protocol/DEFINE.h:365).
 
     -- Positive incoming amounts only, clamped to the ceiling defensively (the zone-local accumulator already
     -- guarantees <= @Ceiling, but a value above it must never be stored). A zero/negative tribe contributes
@@ -87,9 +88,9 @@ BEGIN
                   FROM Nums
                   WHERE SlotIndex < 49),
          Grid AS (SELECT i.TribeId,
-                         i.Amount                                                AS Incoming,
+                         i.Amount                                                   AS Incoming,
                          n.SlotIndex,
-                         COALESCE(tb.Amount, 0)                                  AS SlotAmount,
+                         COALESCE(tb.Amount, 0)                                     AS SlotAmount,
                          CAST(CASE WHEN tb.Amount IS NULL THEN 0 ELSE 1 END AS BIT) AS RowExists
                   FROM @Incoming i
                            CROSS JOIN Nums n
@@ -101,7 +102,7 @@ BEGIN
          -- too full, which is exactly when the clamp fallback below is meant to run.
          Absorbers AS (SELECT TribeId,
                               SlotIndex,
-                              CAST(CAST(SlotAmount AS BIGINT) + Incoming AS INT) AS NewAmount,
+                              CAST(CAST(SlotAmount AS BIGINT) + Incoming AS INT)          AS NewAmount,
                               RowExists,
                               ROW_NUMBER() OVER (PARTITION BY TribeId ORDER BY SlotIndex) AS rn
                        FROM Grid
@@ -111,12 +112,13 @@ BEGIN
          -- every slot has a materialized row, so RowExists is always 1 here.
          Clampers AS (SELECT TribeId,
                              SlotIndex,
-                             @Ceiling AS NewAmount,
+                             @Ceiling                                                    AS NewAmount,
                              RowExists,
                              ROW_NUMBER() OVER (PARTITION BY TribeId ORDER BY SlotIndex) AS rn
                       FROM Grid
                       WHERE SlotAmount < @Ceiling)
-    INSERT INTO @Targets (TribeId, SlotIndex, NewAmount, RowExists)
+    INSERT
+    INTO @Targets (TribeId, SlotIndex, NewAmount, RowExists)
     SELECT a.TribeId, a.SlotIndex, a.NewAmount, a.RowExists
     FROM Absorbers a
     WHERE a.rn = 1

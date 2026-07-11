@@ -8,8 +8,7 @@ public sealed class ApplicationFirewall(
     IFirewallRuleRepository firewallRules,
     IGmAllowlistRepository gmAllowlist)
 {
-
-        public async ValueTask<bool> IsAllowedAsync(IPEndPoint? remoteEndPoint, CancellationToken ct)
+    public async ValueTask<bool> IsAllowedAsync(IPEndPoint? remoteEndPoint, CancellationToken ct)
     {
         if (remoteEndPoint is null)
             return true;

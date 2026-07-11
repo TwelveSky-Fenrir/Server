@@ -4,7 +4,6 @@ namespace Fenrir.Application.Game.Tests.Inventory;
 
 public class BigMoneyUnitConversionPolicyTests
 {
-
     [Fact]
     public void ResolveMoneyToBigMoney_QuantityBelowOneBillion_IsQuantityBelowMinimum()
     {

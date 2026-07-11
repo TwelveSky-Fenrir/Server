@@ -1,20 +1,18 @@
-using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Network.Dispatch.Zone.Sessions;
 
 namespace Fenrir.Application.Game.Abstractions.ZoneLifecycle;
 
 public enum ZoneHandshakeOutcome
 {
-
-        Rejected,
+    Rejected,
 
     Accepted,
 
-        SessionSuperseded,
+    SessionSuperseded,
 
-        ProtocolViolation,
+    ProtocolViolation,
 
-        QuotaFull
+    QuotaFull
 }
 
 public readonly record struct ZoneHandshakeResult(
@@ -26,7 +24,6 @@ public readonly record struct ZoneHandshakeResult(
 
 public interface IZoneHandshakeService
 {
-
-        public ValueTask<ZoneHandshakeResult> ConsumeTicketAsync(string obfuscatedId, int declaredTribe,
+    public ValueTask<ZoneHandshakeResult> ConsumeTicketAsync(string obfuscatedId, int declaredTribe,
         ZoneClientSession session, CancellationToken cancellationToken);
 }

@@ -65,7 +65,7 @@ public sealed class RenameAvatarService(
         }
     }
 
-        private async ValueTask<RenameAvatarOutcome?> CheckRelationshipRefusalsAsync(CharacterSummaryDto character,
+    private async ValueTask<RenameAvatarOutcome?> CheckRelationshipRefusalsAsync(CharacterSummaryDto character,
         CancellationToken ct)
     {
         var tribeRole = await tribes.GetRoleForCharacterAsync(character.CharacterId, ct);

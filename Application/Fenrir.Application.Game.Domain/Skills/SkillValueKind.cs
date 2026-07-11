@@ -4,9 +4,9 @@ public enum SkillValueKind
 {
     ManaUse = 1,
 
-        RecoverInfo1 = 2,
+    RecoverInfo1 = 2,
 
-        RecoverInfo2 = 3,
+    RecoverInfo2 = 3,
 
     StunAttack = 4,
     StunDefense = 5,
@@ -15,7 +15,7 @@ public enum SkillValueKind
     ElementAttackPowerRatio = 8,
     AttackInfo3 = 9,
 
-        RunTime = 10,
+    RunTime = 10,
 
     ChargingDamageUp = 11,
     AttackPowerUp = 12,
@@ -27,7 +27,7 @@ public enum SkillValueKind
     AttackSpeedUp = 18,
     RunSpeedUp = 19,
 
-        ShieldLifeUp = 20,
+    ShieldLifeUp = 20,
 
     LuckUp = 21,
     CriticalUp = 22,

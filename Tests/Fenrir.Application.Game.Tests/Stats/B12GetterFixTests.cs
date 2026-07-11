@@ -199,7 +199,7 @@ public class B12GetterFixTests
         var attributes = Attributes();
         var levels = Levels(LevelRow(1));
 
-        var stats = StatCalculator.ComputeBaseStats(attributes, NoEquipment, levels, legacySetNumber: 20);
+        var stats = StatCalculator.ComputeBaseStats(attributes, NoEquipment, levels, 20);
 
         Assert.Equal(35000, stats.MaxLife);
     }
@@ -210,7 +210,7 @@ public class B12GetterFixTests
         var attributes = Attributes();
         var levels = Levels(LevelRow(1));
 
-        var stats = StatCalculator.ComputeBaseStats(attributes, NoEquipment, levels, legacySetNumber: 5);
+        var stats = StatCalculator.ComputeBaseStats(attributes, NoEquipment, levels, 5);
 
         Assert.Equal(15000, stats.MaxLife);
     }

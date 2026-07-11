@@ -63,7 +63,8 @@ public class SiegeZoneLiteralEventCatalogIngestionTests
     }
 
     [Theory]
-    [InlineData(SiegeZoneLiteralEventCatalog.Zone241ChallengeStartedEventCode, DenOfRebirthChallengeState.ChallengeStarted)]
+    [InlineData(SiegeZoneLiteralEventCatalog.Zone241ChallengeStartedEventCode,
+        DenOfRebirthChallengeState.ChallengeStarted)]
     [InlineData(SiegeZoneLiteralEventCatalog.Zone241FailureEventCodeA, DenOfRebirthChallengeState.Ended)]
     [InlineData(SiegeZoneLiteralEventCatalog.Zone241FailureEventCodeB, DenOfRebirthChallengeState.Ended)]
     [InlineData(SiegeZoneLiteralEventCatalog.Zone241SuccessEventCode, DenOfRebirthChallengeState.Ended)]
@@ -97,7 +98,8 @@ public class SiegeZoneLiteralEventCatalogIngestionTests
         ZoneTestKit.DrainOutbound(pipe);
 
         var state = new ZoneCenterSiegeState();
-        var ingestor = new ZoneCenterBroadcastIngestor(state, registry, NullLogger<ZoneCenterBroadcastIngestor>.Instance);
+        var ingestor =
+            new ZoneCenterBroadcastIngestor(state, registry, NullLogger<ZoneCenterBroadcastIngestor>.Instance);
 
         ingestor.Ingest(namedEventCode, Payload(0, 0));
 
@@ -128,7 +130,8 @@ public class SiegeZoneLiteralEventCatalogIngestionTests
         ZoneTestKit.DrainOutbound(pipe);
 
         var state = new ZoneCenterSiegeState();
-        var ingestor = new ZoneCenterBroadcastIngestor(state, registry, NullLogger<ZoneCenterBroadcastIngestor>.Instance);
+        var ingestor =
+            new ZoneCenterBroadcastIngestor(state, registry, NullLogger<ZoneCenterBroadcastIngestor>.Instance);
 
         var gapCode = Assert.Single(SiegeZoneLiteralEventCatalog.KnownGapEventCodes);
         ingestor.Ingest(gapCode, Payload(0, 0));

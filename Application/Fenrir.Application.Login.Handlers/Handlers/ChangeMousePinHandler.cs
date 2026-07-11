@@ -14,7 +14,7 @@ public sealed class ChangeMousePinHandler(
 {
     private const int MaxPinFailures = 3;
 
-        private const string ZeroPin = "0000";
+    private const string ZeroPin = "0000";
 
     public async ValueTask HandleAsync(ChangeMousePinRequest packet, IPacketSession session,
         CancellationToken cancellationToken)

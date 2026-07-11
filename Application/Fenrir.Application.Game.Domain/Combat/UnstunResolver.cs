@@ -11,15 +11,15 @@ public enum UnstunRejectReason
     TargetDead,
     TargetShopOpen,
 
-        TargetNotStunned,
+    TargetNotStunned,
 
-        TargetMovingZone,
+    TargetMovingZone,
 
-        NotAuthorized,
+    NotAuthorized,
 
-        AntiCheatEchoMismatch,
+    AntiCheatEchoMismatch,
 
-        UnrecognizedSkill
+    UnrecognizedSkill
 }
 
 public readonly record struct UnstunAttemptOutcome(bool Rejected, UnstunRejectReason RejectReason, bool Success)
@@ -47,12 +47,11 @@ public readonly record struct UnstunAttemptRequest(
 
 public static class UnstunResolver
 {
-
-        public const int GuaranteedCureGradePoints = 20;
+    public const int GuaranteedCureGradePoints = 20;
 
     private const int SuccessRollRange = 100;
 
-        public static readonly ImmutableArray<int> StunResistSkillIds = [5, 24, 43];
+    public static readonly ImmutableArray<int> StunResistSkillIds = [5, 24, 43];
 
     public static UnstunAttemptOutcome Resolve(UnstunAttemptRequest request, IRandomSource rng)
     {

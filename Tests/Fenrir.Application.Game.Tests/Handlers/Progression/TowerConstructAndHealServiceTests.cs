@@ -157,7 +157,7 @@ public class TowerConstructAndHealServiceTests
     [Fact]
     public async Task Construct_InAnotherTribesTowerZone_Rejected()
     {
-        var (_, _, zone, state, _, towerWar, service) = SetUp(tribe: 1);
+        var (_, _, zone, state, _, towerWar, service) = SetUp(1);
         SeedItem(zone, ConstructItemId);
 
         var result = await RunAsync(
@@ -173,7 +173,7 @@ public class TowerConstructAndHealServiceTests
     {
         var (_, _, zone, state, _, _, service) = SetUp();
         SeedItem(zone, ConstructItemId);
-        SpawnGuardian(zone, damaged: false);
+        SpawnGuardian(zone, false);
 
         var result = await RunAsync(
             service.ConstructAsync(10, zone, state, Page, Slot, Item(ConstructItemId), 1, CancellationToken.None),
@@ -236,7 +236,7 @@ public class TowerConstructAndHealServiceTests
     {
         var (session, _, zone, state, characters, towerWar, service) = SetUp();
         SeedItem(zone, HealItemId);
-        SpawnGuardian(zone, damaged: true);
+        SpawnGuardian(zone, true);
         PlaceAtGuardian(state);
 
         var result = await RunAsync(
@@ -269,7 +269,7 @@ public class TowerConstructAndHealServiceTests
     {
         var (_, _, zone, state, _, towerWar, service) = SetUp();
         SeedItem(zone, HealItemId);
-        SpawnGuardian(zone, damaged: true);
+        SpawnGuardian(zone, true);
 
         var result = await RunAsync(
             service.HealAsync(10, zone, state, Page, Slot, Item(HealItemId), CancellationToken.None), zone);
@@ -283,7 +283,7 @@ public class TowerConstructAndHealServiceTests
     {
         var (_, _, zone, state, _, towerWar, service) = SetUp();
         SeedItem(zone, HealItemId);
-        SpawnGuardian(zone, damaged: false);
+        SpawnGuardian(zone, false);
         PlaceAtGuardian(state);
 
         var result = await RunAsync(
@@ -308,9 +308,9 @@ public class TowerConstructAndHealServiceTests
     [Fact]
     public async Task Heal_InAnotherTribesTowerZone_Rejected()
     {
-        var (_, _, zone, state, _, towerWar, service) = SetUp(tribe: 1);
+        var (_, _, zone, state, _, towerWar, service) = SetUp(1);
         SeedItem(zone, HealItemId);
-        SpawnGuardian(zone, damaged: true);
+        SpawnGuardian(zone, true);
         PlaceAtGuardian(state);
 
         var result = await RunAsync(

@@ -93,7 +93,7 @@ public static class CombineResolver
         return table[combine];
     }
 
-        private static bool MatchesEliteTier(short eqLevel, short matLevel, byte matMartialLevel)
+    private static bool MatchesEliteTier(short eqLevel, short matLevel, byte matMartialLevel)
     {
         return eqLevel switch
         {

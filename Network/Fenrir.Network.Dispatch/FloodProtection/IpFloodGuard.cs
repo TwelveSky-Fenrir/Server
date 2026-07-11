@@ -22,7 +22,7 @@ public sealed class IpFloodGuard(
         return DateTime.UtcNow;
     }
 
-        public async ValueTask<bool> TryAcquireConnectionAsync(string ipAddress, CancellationToken ct)
+    public async ValueTask<bool> TryAcquireConnectionAsync(string ipAddress, CancellationToken ct)
     {
         var count = _connectionCounts.AddOrUpdate(ipAddress, 1, static (_, existing) => existing + 1);
 
@@ -33,14 +33,14 @@ public sealed class IpFloodGuard(
         return false;
     }
 
-        public void ReleaseConnection(string ipAddress)
+    public void ReleaseConnection(string ipAddress)
     {
         _connectionCounts.AddOrUpdate(ipAddress, 0, static (_, existing) => Math.Max(0, existing - 1));
 
         _connectionCounts.TryRemove(new KeyValuePair<string, int>(ipAddress, 0));
     }
 
-        public async ValueTask RecordProtocolViolationAsync(string ipAddress, CancellationToken ct)
+    public async ValueTask RecordProtocolViolationAsync(string ipAddress, CancellationToken ct)
     {
         var currentHour = _utcNowProvider().Ticks / TimeSpan.TicksPerHour;
 

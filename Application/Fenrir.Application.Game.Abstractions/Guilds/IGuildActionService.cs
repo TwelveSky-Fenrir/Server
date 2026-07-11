@@ -16,42 +16,41 @@ public readonly record struct GuildActionResult(bool Abort, int Sort, int Result
 
 public interface IGuildActionService
 {
-
-        public ValueTask<GuildActionResult> CreateGuildAsync(GuildActionRequest packet, Zone zone, PlayerRuntimeState state,
+    public ValueTask<GuildActionResult> CreateGuildAsync(GuildActionRequest packet, Zone zone, PlayerRuntimeState state,
         int characterId, CancellationToken ct);
 
-        public ValueTask<GuildActionResult> GetGuildInfoAsync(PlayerRuntimeState state, CancellationToken ct);
+    public ValueTask<GuildActionResult> GetGuildInfoAsync(PlayerRuntimeState state, CancellationToken ct);
 
-        public ValueTask<GuildActionResult> FinalizeInviteAsync(PlayerRuntimeState state, int characterId,
+    public ValueTask<GuildActionResult> FinalizeInviteAsync(PlayerRuntimeState state, int characterId,
         CancellationToken ct);
 
-        public ValueTask<GuildActionResult> ExitGuildAsync(Zone zone, PlayerRuntimeState state, int characterId,
+    public ValueTask<GuildActionResult> ExitGuildAsync(Zone zone, PlayerRuntimeState state, int characterId,
         CancellationToken ct);
 
-        public ValueTask<GuildActionResult> UpdateGuildNoticeAsync(GuildActionRequest packet, PlayerRuntimeState state,
+    public ValueTask<GuildActionResult> UpdateGuildNoticeAsync(GuildActionRequest packet, PlayerRuntimeState state,
         CancellationToken ct);
 
-        public ValueTask<GuildActionResult> DisbandGuildAsync(Zone zone, PlayerRuntimeState state, int characterId,
+    public ValueTask<GuildActionResult> DisbandGuildAsync(Zone zone, PlayerRuntimeState state, int characterId,
         CancellationToken ct);
 
-        public ValueTask<GuildActionResult> UpgradeGuildAsync(PlayerRuntimeState state, int characterId,
+    public ValueTask<GuildActionResult> UpgradeGuildAsync(PlayerRuntimeState state, int characterId,
         CancellationToken ct);
 
-        public ValueTask<GuildActionResult> KickMemberAsync(GuildActionRequest packet, PlayerRuntimeState state,
+    public ValueTask<GuildActionResult> KickMemberAsync(GuildActionRequest packet, PlayerRuntimeState state,
         CancellationToken ct);
 
-        public ValueTask<GuildActionResult> SetAgmRoleAsync(GuildActionRequest packet, PlayerRuntimeState state,
+    public ValueTask<GuildActionResult> SetAgmRoleAsync(GuildActionRequest packet, PlayerRuntimeState state,
         CancellationToken ct);
 
-        public ValueTask<GuildActionResult> SetMemberTitleAsync(GuildActionRequest packet, PlayerRuntimeState state,
+    public ValueTask<GuildActionResult> SetMemberTitleAsync(GuildActionRequest packet, PlayerRuntimeState state,
         CancellationToken ct);
 
-        public ValueTask<GuildActionResult> SetGuildBuffAsync(GuildActionRequest packet, PlayerRuntimeState state,
+    public ValueTask<GuildActionResult> SetGuildBuffAsync(GuildActionRequest packet, PlayerRuntimeState state,
         CancellationToken ct);
 
-        public ValueTask<GuildActionResult> TransferLeadershipAsync(GuildActionRequest packet, Zone zone,
+    public ValueTask<GuildActionResult> TransferLeadershipAsync(GuildActionRequest packet, Zone zone,
         PlayerRuntimeState state, int characterId, CancellationToken ct);
 
-        public ValueTask<GuildActionResult> SetGuildLogoAsync(GuildActionRequest packet, PlayerRuntimeState state,
+    public ValueTask<GuildActionResult> SetGuildLogoAsync(GuildActionRequest packet, PlayerRuntimeState state,
         CancellationToken ct);
 }

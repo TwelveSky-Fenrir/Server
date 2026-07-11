@@ -18,12 +18,11 @@ public sealed class InventoryToWorldDropService(
     ILogger<InventoryToWorldDropService> logger)
     : IInventoryToWorldDropService
 {
-
-        private const short ManualDropItemEventCode = 1;
+    private const short ManualDropItemEventCode = 1;
 
     private const byte SuccessOutcome = 1;
 
-        private const byte NonDroppableFlagValue = 1;
+    private const byte NonDroppableFlagValue = 1;
 
     public async ValueTask<InventoryToWorldDropResult> DropToWorldAsync(Zone zone, PlayerRuntimeState state,
         int characterId, int accountId, DefaultPData move, bool premiumPageAccessAllowed,

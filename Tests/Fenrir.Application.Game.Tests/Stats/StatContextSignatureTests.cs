@@ -17,19 +17,16 @@ public class StatContextSignatureTests
 
     private static CosmeticContext PopulatedCosmetic()
     {
-        return new CosmeticContext(
-            default,
-            default,
-            CostumeState: 1);
+        return new CosmeticContext(CostumeState: 1);
     }
 
     private static ZoneContext PopulatedZone()
     {
         return new ZoneContext(
-            ZoneNumber: 241,
-            OrnamentInUse: true,
-            OrnamentGoldTimeRemaining: 100,
-            OrnamentSilverTimeRemaining: 50,
+            241,
+            true,
+            100,
+            50,
             RageGauge: 999,
             GuildBuffActive: true,
             GuildId: 42);
@@ -54,8 +51,8 @@ public class StatContextSignatureTests
     private static CharacterBaseAttributes RichAttributes()
     {
         return new CharacterBaseAttributes(
-            Vitality: 120, Strength: 90, Intelligence: 75, Dexterity: 60,
-            Level: 100, Tribe: 0, PreviousTribe: 0, Title: 305, Halo: 40, RebirthCount: 8);
+            120, 90, 75, 60,
+            100, 0, 0, 305, 40, 8);
     }
 
     private static FrozenDictionary<short, LevelRowDto> RichLevels()
@@ -116,12 +113,12 @@ public class StatContextSignatureTests
         var levels = RichLevels();
         var pet = new PetStatContribution(50, 40, 30, 20);
 
-        var baseline = StatCalculator.ComputeBaseStats(attributes, equipment, levels, legacySetNumber: 5, pet: pet);
+        var baseline = StatCalculator.ComputeBaseStats(attributes, equipment, levels, 5, pet);
 
         var withContexts = StatCalculator.ComputeBaseStats(
-            attributes, equipment, levels, legacySetNumber: 5, pet: pet,
-            cosmetic: PopulatedCosmetic(), zone: PopulatedZone(),
-            consumable: PopulatedConsumable(), mount: PopulatedMount());
+            attributes, equipment, levels, 5, pet,
+            PopulatedCosmetic(), PopulatedZone(),
+            PopulatedConsumable(), PopulatedMount());
 
         Assert.Equal(baseline, withContexts);
     }
@@ -136,12 +133,12 @@ public class StatContextSignatureTests
         var pet = new PetStatContribution(50, 40, 30, 20);
 
         var baseline = StatCalculator.ComputeEffectiveStats(attributes, equipment, levels, buffs,
-            legacySetNumber: 5, pet: pet);
+            5, pet);
 
         var withContexts = StatCalculator.ComputeEffectiveStats(
-            attributes, equipment, levels, buffs, legacySetNumber: 5, pet: pet,
-            cosmetic: PopulatedCosmetic(), zone: PopulatedZone(),
-            consumable: PopulatedConsumable(), mount: PopulatedMount());
+            attributes, equipment, levels, buffs, 5, pet,
+            PopulatedCosmetic(), PopulatedZone(),
+            PopulatedConsumable(), PopulatedMount());
 
         Assert.Equal(baseline, withContexts);
     }

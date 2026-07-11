@@ -131,7 +131,7 @@ public class SkillCastResolverTests
         Assert.Equal(200, result.HealAmount);
     }
 
-        [Fact]
+    [Fact]
     public void Skill82HolyShield_AppliesSupportSkillTimeUpRatioToDurationOnly()
     {
         var skill = BuildSkill(82, 10, (10, 10), (5, 5), default, shieldLifeUp: (10, 20));
@@ -142,7 +142,7 @@ public class SkillCastResolverTests
         Assert.Equal(20, write.DurationTicks);
     }
 
-        [Fact]
+    [Fact]
     public void Skill79FormationShieldLifeUp_NeverAppliesSupportSkillTimeUpRatio()
     {
         var skill = BuildSkill(79, 10, (10, 10), (5, 5), default, shieldLifeUp: (10, 20));

@@ -9,8 +9,7 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 
 public sealed class TribeGuardOptions
 {
-
-        public bool FourthTribeGuardPostsEnabled { get; init; } = true;
+    public bool FourthTribeGuardPostsEnabled { get; init; } = true;
 }
 
 internal sealed class GuardSlotRuntimeState
@@ -34,17 +33,16 @@ public sealed class TribeGuardSpawner(
     WorldStateService? worldState = null,
     TribeGuardOptions? options = null) : ISimulationSystem
 {
+    public const short Zone038MapId = 38;
 
-        public const short Zone038MapId = 38;
+    private const int FullEvaluationCadenceLegacyTicks = 20;
 
-        private const int FullEvaluationCadenceLegacyTicks = 20;
-
-        private const float GuardLeashRadius = 15f;
+    private const float GuardLeashRadius = 15f;
 
     private const int OrdinaryPoolServerIndexBase = 1_000_000;
     private const int Zone038WinnerPoolServerIndexBase = 1_001_000;
 
-        public static readonly IReadOnlySet<short> OrdinaryEligibleMapIds =
+    public static readonly IReadOnlySet<short> OrdinaryEligibleMapIds =
         new HashSet<short>([38, 2, 3, 4, 7, 8, 9, 12, 13, 14, 141, 142, 143]);
 
     private readonly TribeGuardOptions _options = options ?? new TribeGuardOptions();
@@ -78,13 +76,13 @@ public sealed class TribeGuardSpawner(
         EvaluateZone038WinnerPool(zone, state, forceZone038Winner);
     }
 
-        public void ForceOrdinaryResummon(Zone zone)
+    public void ForceOrdinaryResummon(Zone zone)
     {
         var state = _stateByZone.GetOrAdd(zone.MapId, static _ => new GuardZoneState());
         Interlocked.Exchange(ref state.ForceOrdinaryPending, 1);
     }
 
-        public void ForceZone038WinnerResummon(Zone zone)
+    public void ForceZone038WinnerResummon(Zone zone)
     {
         var state = _stateByZone.GetOrAdd(zone.MapId, static _ => new GuardZoneState());
         Interlocked.Exchange(ref state.ForceZone038WinnerPending, 1);
@@ -134,7 +132,7 @@ public sealed class TribeGuardSpawner(
         }
     }
 
-        private void EvaluatePost(Zone zone, GuardZoneState state, GuardPostDefinition post, int poolServerIndexBase,
+    private void EvaluatePost(Zone zone, GuardZoneState state, GuardPostDefinition post, int poolServerIndexBase,
         bool forceFirstPass)
     {
         if (!TryFindTemplate(post.MonsterMainType, post.MonsterSpecialType, out var template))

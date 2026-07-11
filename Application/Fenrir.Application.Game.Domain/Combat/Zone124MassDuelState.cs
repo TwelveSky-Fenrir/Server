@@ -2,26 +2,24 @@ namespace Fenrir.Application.Game.Domain.Combat;
 
 public enum Zone124DuelWinner : byte
 {
+    Draw,
 
-        Draw,
+    Team1,
 
-        Team1,
-
-        Team2
+    Team2
 }
 
 public enum Zone124CountdownAction : byte
 {
+    Idle,
 
-        Idle,
+    Decremented,
 
-        Decremented,
+    DecrementedBroadcastTime,
 
-        DecrementedBroadcastTime,
+    TornDownEmptyTeam,
 
-        TornDownEmptyTeam,
-
-        Concluded
+    Concluded
 }
 
 public readonly record struct Zone124CountdownStep(
@@ -31,20 +29,19 @@ public readonly record struct Zone124CountdownStep(
 
 public sealed class Zone124MassDuelState
 {
+    public const int StartUnits = 60;
 
-        public const int StartUnits = 60;
+    public const int TimeBroadcastCadenceUnits = 5;
 
-        public const int TimeBroadcastCadenceUnits = 5;
+    public bool Active { get; private set; }
 
-        public bool Active { get; private set; }
+    public int RemainingUnits { get; private set; }
 
-        public int RemainingUnits { get; private set; }
+    public int Team1Count { get; private set; }
 
-        public int Team1Count { get; private set; }
+    public int Team2Count { get; private set; }
 
-        public int Team2Count { get; private set; }
-
-        public void Start(int team1Count, int team2Count)
+    public void Start(int team1Count, int team2Count)
     {
         Active = true;
         RemainingUnits = StartUnits;
@@ -52,7 +49,7 @@ public sealed class Zone124MassDuelState
         Team2Count = team2Count;
     }
 
-        public void Reset()
+    public void Reset()
     {
         Active = false;
         RemainingUnits = 0;
@@ -60,13 +57,13 @@ public sealed class Zone124MassDuelState
         Team2Count = 0;
     }
 
-        public void SetTeamCounts(int team1Count, int team2Count)
+    public void SetTeamCounts(int team1Count, int team2Count)
     {
         Team1Count = team1Count;
         Team2Count = team2Count;
     }
 
-        public Zone124CountdownStep Advance()
+    public Zone124CountdownStep Advance()
     {
         if (!Active)
             return new Zone124CountdownStep(Zone124CountdownAction.Idle, 0, Zone124DuelWinner.Draw);
@@ -92,7 +89,7 @@ public sealed class Zone124MassDuelState
             Zone124DuelWinner.Draw);
     }
 
-        public Zone124DuelWinner DecideWinner()
+    public Zone124DuelWinner DecideWinner()
     {
         if (Team1Count == Team2Count)
             return Zone124DuelWinner.Draw;

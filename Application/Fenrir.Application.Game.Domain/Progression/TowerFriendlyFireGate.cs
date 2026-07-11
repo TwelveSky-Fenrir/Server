@@ -2,8 +2,7 @@ namespace Fenrir.Application.Game.Domain.Progression;
 
 public static class TowerFriendlyFireGate
 {
-
-        public static bool CanAttackGuardian(byte attackerTribe, byte? owningTribe, bool towerActivelyBuilt,
+    public static bool CanAttackGuardian(byte attackerTribe, byte? owningTribe, bool towerActivelyBuilt,
         byte? allyOfOwningTribe)
     {
         if (owningTribe is not { } owner)

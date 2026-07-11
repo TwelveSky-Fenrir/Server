@@ -4,8 +4,7 @@ namespace Fenrir.Application.Game.Domain.Combat;
 
 public readonly record struct KillFeedRankedEntry(int CharacterId, string Name, byte Tribe, int Kills)
 {
-
-        public KillFeedTopEntry ToTopEntry()
+    public KillFeedTopEntry ToTopEntry()
     {
         return new KillFeedTopEntry(Name, Tribe, Kills);
     }
@@ -13,14 +12,13 @@ public readonly record struct KillFeedRankedEntry(int CharacterId, string Name, 
 
 public sealed class KillFeedLeaderboard
 {
-
-        public const int Capacity = 1000;
+    public const int Capacity = 1000;
 
     private readonly List<KillFeedRankedEntry> _entries = new(Capacity);
 
-        public int Count => _entries.Count;
+    public int Count => _entries.Count;
 
-        public bool RecordKill(int characterId, string name, byte tribe, int killTotal)
+    public bool RecordKill(int characterId, string name, byte tribe, int killTotal)
     {
         var index = _entries.FindIndex(e => e.CharacterId == characterId);
         if (index < 0)
@@ -37,13 +35,13 @@ public sealed class KillFeedLeaderboard
         return true;
     }
 
-        public ImmutableArray<KillFeedRankedEntry> GetTopThree()
+    public ImmutableArray<KillFeedRankedEntry> GetTopThree()
     {
         var count = Math.Min(3, _entries.Count);
         return count == 0 ? [] : [.. _entries.Take(count)];
     }
 
-        public void Clear()
+    public void Clear()
     {
         _entries.Clear();
     }

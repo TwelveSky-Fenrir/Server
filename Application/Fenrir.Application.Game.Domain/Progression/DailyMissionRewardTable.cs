@@ -2,10 +2,9 @@ namespace Fenrir.Application.Game.Domain.Progression;
 
 public static class DailyMissionRewardTable
 {
+    private static readonly int[] TierTwoMounts = [1304, 1305, 1306, 1314, 1318, 1321, 1324, 1327];
 
-        private static readonly int[] TierTwoMounts = [1304, 1305, 1306, 1314, 1318, 1321, 1324, 1327];
-
-        public static int Roll(Func<double> random)
+    public static int Roll(Func<double> random)
     {
         Span<int> pool = stackalloc int[8];
         pool[0] = 1072;

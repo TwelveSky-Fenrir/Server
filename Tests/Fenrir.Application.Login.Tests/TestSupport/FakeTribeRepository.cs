@@ -7,7 +7,7 @@ internal sealed class FakeTribeRepository : ITribeRepository
 {
     public List<TribeSummaryDto> Standings { get; init; } = [];
 
-        public Dictionary<int, byte> RolesByCharacterId { get; init; } = new();
+    public Dictionary<int, byte> RolesByCharacterId { get; init; } = new();
 
     public ValueTask<ReadOnlyCollection<TribeSummaryDto>> GetAllAsync(CancellationToken ct)
     {
@@ -54,7 +54,7 @@ internal sealed class FakeTribeRepository : ITribeRepository
         throw new NotSupportedException();
     }
 
-        public static FakeTribeRepository Empty()
+    public static FakeTribeRepository Empty()
     {
         return new FakeTribeRepository();
     }
@@ -67,7 +67,7 @@ internal sealed class FakeTribeRepository : ITribeRepository
         };
     }
 
-        public static FakeTribeRepository WithRole(int characterId, byte role)
+    public static FakeTribeRepository WithRole(int characterId, byte role)
     {
         return new FakeTribeRepository { RolesByCharacterId = { [characterId] = role } };
     }

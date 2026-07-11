@@ -12,8 +12,7 @@ namespace Fenrir.Application.Game.Tests.World.Monsters;
 
 public class MonsterStandardAggroEngagementTests
 {
-
-        private static (Zone Zone, MonsterEntity Monster) CreateStandardZone(short meleeRadius, short leashRadius,
+    private static (Zone Zone, MonsterEntity Monster) CreateStandardZone(short meleeRadius, short leashRadius,
         short runSpeed, IRandomSource ai, ZoneGeometry? geometry = null, bool startInSpawning = false)
     {
         var template = WorldDataTestRows.Monster(600) with
@@ -46,7 +45,7 @@ public class MonsterStandardAggroEngagementTests
             ZoneTestKit.EnterData(session, 1, $"P{characterId}", posX, 0f, posZ)));
     }
 
-        private static ZoneGeometry FlatGeometry()
+    private static ZoneGeometry FlatGeometry()
     {
         const float groundY = 10f;
         var plane = new Vector4(0f, 1f, 0f, groundY);
@@ -62,7 +61,7 @@ public class MonsterStandardAggroEngagementTests
         return new ZoneGeometry(triangles, [root]);
     }
 
-        private static ZoneGeometry TwoIslandGeometry()
+    private static ZoneGeometry TwoIslandGeometry()
     {
         const float groundY = 10f;
         var plane = new Vector4(0f, 1f, 0f, groundY);
@@ -86,9 +85,9 @@ public class MonsterStandardAggroEngagementTests
     [Fact]
     public void TrackedAttackerTableAlreadyNonEmpty_SkipsTheProximityScanEntirely_AndEngagesImmediately()
     {
-        var (zone, monster) = CreateStandardZone(meleeRadius: 1000, leashRadius: 1000, runSpeed: 100,
-            ai: new ScriptedRandomSource(0), startInSpawning: true);
-        EnterPlayerAt(zone, 10, posX: 5, posZ: 0);
+        var (zone, monster) = CreateStandardZone(1000, 1000, 100,
+            new ScriptedRandomSource(0), startInSpawning: true);
+        EnterPlayerAt(zone, 10, 5, 0);
         zone.Tick(SimulationClock.LegacyTick);
 
         Assert.True(zone.TryDamageMonster(monster.ServerIndex, 5, 10, out var died, out _));
@@ -106,8 +105,8 @@ public class MonsterStandardAggroEngagementTests
     [Fact]
     public void EmptyTableAndFailedScan_NeverReachesEngagementStep_StaysIdle()
     {
-        var (zone, _) = CreateStandardZone(meleeRadius: 10, leashRadius: 50, runSpeed: 100,
-            ai: new ScriptedRandomSource(0));
+        var (zone, _) = CreateStandardZone(10, 50, 100,
+            new ScriptedRandomSource(0));
 
         for (var i = 0; i < 5; i++)
             zone.Tick(SimulationClock.LegacyTick);
@@ -120,9 +119,9 @@ public class MonsterStandardAggroEngagementTests
     [Fact]
     public void AllTrackedAttackersInvalidated_EmptyAfterPrune_NoTransitionAtAll()
     {
-        var (zone, monster) = CreateStandardZone(meleeRadius: 1000, leashRadius: 1000, runSpeed: 100,
-            ai: new ScriptedRandomSource(0));
-        EnterPlayerAt(zone, 10, posX: 5, posZ: 0);
+        var (zone, monster) = CreateStandardZone(1000, 1000, 100,
+            new ScriptedRandomSource(0));
+        EnterPlayerAt(zone, 10, 5, 0);
         zone.Tick(SimulationClock.LegacyTick);
 
         Assert.True(zone.TryDamageMonster(monster.ServerIndex, 5, 10, out var died, out _));
@@ -140,9 +139,9 @@ public class MonsterStandardAggroEngagementTests
     [Fact]
     public void BeyondMeleeRangeSurvivor_NonPositiveChaseSpeed_NoTransitionAtAll()
     {
-        var (zone, _) = CreateStandardZone(meleeRadius: 5, leashRadius: 1000, runSpeed: 0,
-            ai: new ScriptedRandomSource(0));
-        EnterPlayerAt(zone, 10, posX: 100, posZ: 0);
+        var (zone, _) = CreateStandardZone(5, 1000, 0,
+            new ScriptedRandomSource(0));
+        EnterPlayerAt(zone, 10, 100, 0);
         zone.Tick(SimulationClock.LegacyTick);
         zone.Tick(SimulationClock.LegacyTick);
 
@@ -155,11 +154,11 @@ public class MonsterStandardAggroEngagementTests
     [Fact]
     public void BeyondMeleeRangeSurvivor_ReachableApproachPoint_ChasesTowardAnArcOffsetPoint()
     {
-        var (zone, _) = CreateStandardZone(meleeRadius: 10, leashRadius: 1000, runSpeed: 100,
-            ai: new ScriptedRandomSource(0, 0,
+        var (zone, _) = CreateStandardZone(10, 1000, 100,
+            new ScriptedRandomSource(0, 0,
                 5, 1),
-            geometry: FlatGeometry());
-        EnterPlayerAt(zone, 10, posX: 100, posZ: 0);
+            FlatGeometry());
+        EnterPlayerAt(zone, 10, 100, 0);
         zone.Tick(SimulationClock.LegacyTick);
         zone.Tick(SimulationClock.LegacyTick);
 
@@ -168,7 +167,7 @@ public class MonsterStandardAggroEngagementTests
         Assert.Equal(10, live.TargetCharacterId);
 
         var approachDistance = MathF.Sqrt(live.TargetLocationX * live.TargetLocationX +
-                                           live.TargetLocationZ * live.TargetLocationZ);
+                                          live.TargetLocationZ * live.TargetLocationZ);
         Assert.True(MathF.Abs(approachDistance - 100f) < 0.01f,
             $"approach point should sit exactly 100 units from the monster, was {approachDistance}");
 
@@ -179,9 +178,9 @@ public class MonsterStandardAggroEngagementTests
     [Fact]
     public void BeyondMeleeRangeSurvivor_UnreachableApproachPoint_TransitionsToReturnToSpawn()
     {
-        var (zone, _) = CreateStandardZone(meleeRadius: 5, leashRadius: 2000, runSpeed: 100,
-            ai: new ScriptedRandomSource(0), geometry: TwoIslandGeometry());
-        EnterPlayerAt(zone, 10, posX: 100, posZ: 100);
+        var (zone, _) = CreateStandardZone(5, 2000, 100,
+            new ScriptedRandomSource(0), TwoIslandGeometry());
+        EnterPlayerAt(zone, 10, 100, 100);
         zone.Tick(SimulationClock.LegacyTick);
         zone.Tick(SimulationClock.LegacyTick);
 

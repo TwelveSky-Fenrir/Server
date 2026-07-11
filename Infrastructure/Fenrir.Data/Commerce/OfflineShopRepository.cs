@@ -11,8 +11,7 @@ namespace Fenrir.Data.Commerce;
 
 public sealed record OfflineShopRepository(ICaeriusNetDbContext Db) : IOfflineShopRepository
 {
-
-        public async ValueTask<(OfflineShopRowDto? Shop, IReadOnlyList<OfflineShopItemRowDto> Items)> GetByCharacterAsync(
+    public async ValueTask<(OfflineShopRowDto? Shop, IReadOnlyList<OfflineShopItemRowDto> Items)> GetByCharacterAsync(
         int characterId, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_OfflineShop_GetByCharacter", 32)
@@ -24,13 +23,13 @@ public sealed record OfflineShopRepository(ICaeriusNetDbContext Db) : IOfflineSh
         return (shops.Count > 0 ? shops[0] : null, items);
     }
 
-        public async ValueTask<ReadOnlyCollection<OfflineShopOpenListingRowDto>> GetAllOpenAsync(CancellationToken ct)
+    public async ValueTask<ReadOnlyCollection<OfflineShopOpenListingRowDto>> GetAllOpenAsync(CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_OfflineShop_GetAllOpen", 64).Build();
         return await Db.QueryAsReadOnlyCollectionAsync<OfflineShopOpenListingRowDto>(sp, ct);
     }
 
-        public async ValueTask OpenAndReplaceContainersAsync(
+    public async ValueTask OpenAndReplaceContainersAsync(
         int characterId, short? zoneNumber, int shopDate, string shopName, int locationX, int locationY, int locationZ,
         IReadOnlyList<OfflineShopItemSlotTvp> items,
         IReadOnlyList<CharacterItemSlotTvp> inventoryPage0, IReadOnlyList<CharacterItemSlotTvp> inventoryPage1,
@@ -52,7 +51,7 @@ public sealed record OfflineShopRepository(ICaeriusNetDbContext Db) : IOfflineSh
         await Db.ExecuteAsync(builder.Build(), ct);
     }
 
-        public async ValueTask SetStateAsync(int characterId, byte shopState, CancellationToken ct)
+    public async ValueTask SetStateAsync(int characterId, byte shopState, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_OfflineShop_SetState", 0)
             .AddParameter("CharacterId", characterId, SqlDbType.Int)
@@ -62,7 +61,7 @@ public sealed record OfflineShopRepository(ICaeriusNetDbContext Db) : IOfflineSh
         await Db.ExecuteAsync(sp, ct);
     }
 
-        public async ValueTask RetrieveItemAndReplaceContainerAsync(int characterId, short slotIndex, int expectedItemId,
+    public async ValueTask RetrieveItemAndReplaceContainerAsync(int characterId, short slotIndex, int expectedItemId,
         int expectedQuantity, int expectedValue, byte container, IReadOnlyList<CharacterItemSlotTvp> items,
         CancellationToken ct)
     {
@@ -79,7 +78,7 @@ public sealed record OfflineShopRepository(ICaeriusNetDbContext Db) : IOfflineSh
         await Db.ExecuteAsync(builder.Build(), ct);
     }
 
-        public async ValueTask ExecutePurchaseAsync(int sellerCharacterId, short slotIndex, int expectedItemId,
+    public async ValueTask ExecutePurchaseAsync(int sellerCharacterId, short slotIndex, int expectedItemId,
         int expectedQuantity, int expectedValue, int price, int buyerCharacterId, byte buyerContainer,
         IReadOnlyList<CharacterItemSlotTvp> buyerItems, CancellationToken ct)
     {
@@ -98,7 +97,7 @@ public sealed record OfflineShopRepository(ICaeriusNetDbContext Db) : IOfflineSh
         await Db.ExecuteAsync(builder.Build(), ct);
     }
 
-        public async ValueTask WithdrawMoneyAsync(int characterId, int expectedMoney, int expectedBigMoney,
+    public async ValueTask WithdrawMoneyAsync(int characterId, int expectedMoney, int expectedBigMoney,
         int todayDate, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_OfflineShop_WithdrawMoney", 0)
@@ -130,7 +129,7 @@ public sealed record OfflineShopRepository(ICaeriusNetDbContext Db) : IOfflineSh
         await Db.ExecuteAsync(sp, ct);
     }
 
-        public async ValueTask ExtendRentalAsync(int characterId, int newShopDate, CancellationToken ct)
+    public async ValueTask ExtendRentalAsync(int characterId, int newShopDate, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_OfflineShop_ExtendRental", 0)
             .AddParameter("CharacterId", characterId, SqlDbType.Int)

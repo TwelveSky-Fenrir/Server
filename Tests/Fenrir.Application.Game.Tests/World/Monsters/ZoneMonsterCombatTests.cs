@@ -124,7 +124,7 @@ public class ZoneMonsterCombatTests
         Assert.True(damaged!.Life < startingLife);
     }
 
-        [Fact]
+    [Fact]
     public void PvmAttack_KillingBlow_BroadcastCarriesUncappedViewDamage_ButCappedRealDamage()
     {
         var zone = CreateZoneWithSpawnedMonster(CacheWithOneRegion(monsterLife: 10), 10, out var attackerPipe);
@@ -169,7 +169,7 @@ public class ZoneMonsterCombatTests
         Assert.Equal(0, zone.MonsterCount);
     }
 
-        private sealed class ScriptedAlwaysHitRandomSource : IRandomSource
+    private sealed class ScriptedAlwaysHitRandomSource : IRandomSource
     {
         public int NextInt32(int exclusiveUpperBound)
         {

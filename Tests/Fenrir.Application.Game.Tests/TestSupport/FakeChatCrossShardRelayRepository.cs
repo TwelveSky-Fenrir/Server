@@ -7,9 +7,9 @@ internal sealed class FakeChatCrossShardRelayRepository : IChatCrossShardRelayRe
 {
     public List<ChatCrossShardWhisperEntry> Published { get; } = [];
 
-        public List<ChatCrossShardWhisperDto> NextPoll { get; set; } = [];
+    public List<ChatCrossShardWhisperDto> NextPoll { get; set; } = [];
 
-        public Exception? ThrowOnPublish { get; set; }
+    public Exception? ThrowOnPublish { get; set; }
 
     public ValueTask PublishAsync(ChatCrossShardWhisperEntry entry, CancellationToken ct)
     {

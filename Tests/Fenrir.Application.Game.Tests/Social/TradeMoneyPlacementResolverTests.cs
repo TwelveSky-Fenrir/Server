@@ -4,7 +4,6 @@ namespace Fenrir.Application.Game.Tests.Social;
 
 public class TradeMoneyPlacementResolverTests
 {
-
     [Fact]
     public void ResolveToTradeOffer_AmountBelowOne_IsQuantityOutOfRange()
     {

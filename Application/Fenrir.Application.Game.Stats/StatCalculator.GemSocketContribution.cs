@@ -26,19 +26,18 @@ public readonly record struct GemSocketSlot(byte GemType, byte GemValue);
 
 public static partial class StatCalculator
 {
+    public const int MaxSocketsPerItem = 5;
 
-        public const int MaxSocketsPerItem = 5;
 
+    private static readonly FrozenSet<byte> AttributeAttackValues = new byte[] { 1, 6, 11 }.ToFrozenSet();
 
-        private static readonly FrozenSet<byte> AttributeAttackValues = new byte[] { 1, 6, 11 }.ToFrozenSet();
+    private static readonly FrozenSet<byte> AttributeDefenseValues = new byte[] { 2, 7, 12 }.ToFrozenSet();
 
-        private static readonly FrozenSet<byte> AttributeDefenseValues = new byte[] { 2, 7, 12 }.ToFrozenSet();
+    private static readonly FrozenSet<byte> AttributeLifeManaValues = new byte[] { 3, 8, 13 }.ToFrozenSet();
 
-        private static readonly FrozenSet<byte> AttributeLifeManaValues = new byte[] { 3, 8, 13 }.ToFrozenSet();
+    private static readonly FrozenSet<byte> AttributeHitDodgeValues = new byte[] { 5, 10, 15 }.ToFrozenSet();
 
-        private static readonly FrozenSet<byte> AttributeHitDodgeValues = new byte[] { 5, 10, 15 }.ToFrozenSet();
-
-        private static readonly FrozenSet<byte> AttributeElementValues = new byte[] { 4, 9, 14 }.ToFrozenSet();
+    private static readonly FrozenSet<byte> AttributeElementValues = new byte[] { 4, 9, 14 }.ToFrozenSet();
 
 
     private static readonly FrozenSet<byte> AttackPrimaryTypes = new byte[] { 2, 3, 4, 5, 6, 7, 8 }.ToFrozenSet();
@@ -63,12 +62,12 @@ public static partial class StatCalculator
     private static readonly FrozenSet<byte> ElementDefenseSecondaryTypes =
         new byte[] { 8, 14, 19, 23, 26, 28, 29 }.ToFrozenSet();
 
-        public static bool IsGemSocketStatLiveInProduction(GemSocketStatKind statKind)
+    public static bool IsGemSocketStatLiveInProduction(GemSocketStatKind statKind)
     {
         return statKind == GemSocketStatKind.AttackPower;
     }
 
-        public static GemSocketColumn ResolveGemSocketColumn(GemSocketStatKind statKind, byte gemType, byte gemValue)
+    public static GemSocketColumn ResolveGemSocketColumn(GemSocketStatKind statKind, byte gemType, byte gemValue)
     {
         return statKind switch
         {
@@ -153,12 +152,12 @@ public static partial class StatCalculator
         return GemSocketColumn.None;
     }
 
-        public static int GemSocketTypeValueKey(byte gemType, byte gemValue)
+    public static int GemSocketTypeValueKey(byte gemType, byte gemValue)
     {
         return (gemType << 8) | gemValue;
     }
 
-        public static int ResolveGemSocketValue(GemSocketStatKind statKind, byte gemType, byte gemValue,
+    public static int ResolveGemSocketValue(GemSocketStatKind statKind, byte gemType, byte gemValue,
         FrozenDictionary<int, GemSocketRowDto> effectTable)
     {
         var column = ResolveGemSocketColumn(statKind, gemType, gemValue);
@@ -172,7 +171,7 @@ public static partial class StatCalculator
         return column == GemSocketColumn.Primary ? row.Value03 : row.Value04;
     }
 
-        public static int DecodeSocketGemV2(int packed1, int packed2, int packed3, Span<GemSocketSlot> destination)
+    public static int DecodeSocketGemV2(int packed1, int packed2, int packed3, Span<GemSocketSlot> destination)
     {
         Span<byte> bytes = stackalloc byte[12];
         BinaryPrimitives.WriteInt32LittleEndian(bytes[..4], packed1);
@@ -186,7 +185,7 @@ public static partial class StatCalculator
         return count;
     }
 
-        public static int SumGemSocketContribution(GemSocketStatKind statKind, int packed1, int packed2, int packed3,
+    public static int SumGemSocketContribution(GemSocketStatKind statKind, int packed1, int packed2, int packed3,
         FrozenDictionary<int, GemSocketRowDto> effectTable)
     {
         Span<GemSocketSlot> slots = stackalloc GemSocketSlot[MaxSocketsPerItem];

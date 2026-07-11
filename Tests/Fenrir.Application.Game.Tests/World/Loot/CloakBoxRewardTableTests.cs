@@ -145,7 +145,7 @@ public class CloakBoxRewardTableTests
         Assert.Equal(509, id);
     }
 
-        private sealed class ScriptedRandom(params int[] values) : Random
+    private sealed class ScriptedRandom(params int[] values) : Random
     {
         private int _index;
 

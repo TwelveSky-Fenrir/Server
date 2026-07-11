@@ -52,7 +52,7 @@ public class ValleyWarScheduleTests
         return schedule;
     }
 
-        private static ValleyWarSchedule AdvanceToBossWindowStart()
+    private static ValleyWarSchedule AdvanceToBossWindowStart()
     {
         var schedule = AdvanceToKillRaceStart();
         schedule.ForceZeroTribeQuota(0);

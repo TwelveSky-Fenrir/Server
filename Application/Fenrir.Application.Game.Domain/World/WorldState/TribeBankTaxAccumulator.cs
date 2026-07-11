@@ -6,7 +6,7 @@ public readonly record struct TribeBankTaxSweepPayload(long Tribe0, long Tribe1,
 
     public bool IsEmpty => Tribe0 == 0 && Tribe1 == 0 && Tribe2 == 0 && Tribe3 == 0;
 
-        public long this[byte tribeId] => tribeId switch
+    public long this[byte tribeId] => tribeId switch
     {
         0 => Tribe0,
         1 => Tribe1,
@@ -19,22 +19,21 @@ public readonly record struct TribeBankTaxSweepPayload(long Tribe0, long Tribe1,
 
 public sealed class TribeBankTaxAccumulator(Func<byte, byte>? resolveBeneficiaryTribe = null)
 {
+    public const int TribeCount = 4;
 
-        public const int TribeCount = 4;
+    public const long ZoneLocalCeiling = 2_000_000_000L;
 
-        public const long ZoneLocalCeiling = 2_000_000_000L;
+    public const double NpcServiceTaxRate = 0.01;
 
-        public const double NpcServiceTaxRate = 0.01;
+    public const double MonsterKillCurrencyTaxRate = 0.09;
 
-        public const double MonsterKillCurrencyTaxRate = 0.09;
-
-        public static readonly TimeSpan SweepInterval = TimeSpan.FromMinutes(10);
+    public static readonly TimeSpan SweepInterval = TimeSpan.FromMinutes(10);
 
     private readonly Lock _lock = new();
     private readonly long[] _totals = new long[TribeCount];
     private TimeSpan _lastSweepAt = TimeSpan.Zero;
 
-        public long GetTotal(byte tribeId)
+    public long GetTotal(byte tribeId)
     {
         ValidateTribeId(tribeId);
         lock (_lock)
@@ -43,12 +42,12 @@ public sealed class TribeBankTaxAccumulator(Func<byte, byte>? resolveBeneficiary
         }
     }
 
-        public void CreditNpcServiceTax(byte payingTribe, int cost)
+    public void CreditNpcServiceTax(byte payingTribe, int cost)
     {
         Credit(payingTribe, cost, NpcServiceTaxRate);
     }
 
-        public void CreditMonsterKillCurrencyTax(byte killerTribe, long postReductionAmount)
+    public void CreditMonsterKillCurrencyTax(byte killerTribe, long postReductionAmount)
     {
         Credit(killerTribe, postReductionAmount, MonsterKillCurrencyTaxRate);
     }
@@ -75,7 +74,7 @@ public sealed class TribeBankTaxAccumulator(Func<byte, byte>? resolveBeneficiary
         }
     }
 
-        public bool TrySweep(TimeSpan zoneUptimeNow, out TribeBankTaxSweepPayload payload)
+    public bool TrySweep(TimeSpan zoneUptimeNow, out TribeBankTaxSweepPayload payload)
     {
         lock (_lock)
         {

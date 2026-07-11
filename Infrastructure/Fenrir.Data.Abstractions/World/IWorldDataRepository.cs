@@ -66,7 +66,7 @@ public interface IWorldDataRepository
 
     public ValueTask<ReadOnlyCollection<RewardBundleItemRowDto>> GetRewardBundleItemsAsync(CancellationToken ct);
 
-        public ValueTask<(
+    public ValueTask<(
             ReadOnlyCollection<TribeSkillEquivalenceRowDto> SkillEquivalences,
             ReadOnlyCollection<TribeItemEquivalenceRowDto> ItemEquivalences,
             ReadOnlyCollection<TribeCostumeEquivalenceRowDto> CostumeEquivalences)>

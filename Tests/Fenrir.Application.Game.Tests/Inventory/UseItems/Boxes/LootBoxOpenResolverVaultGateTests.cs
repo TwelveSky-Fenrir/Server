@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using Fenrir.Application.Game.Domain.Consumables;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Domain.Inventory.UseItems.Boxes;
 using Fenrir.Application.Game.Domain.World.Loot;
@@ -65,13 +64,13 @@ public class LootBoxOpenResolverVaultGateTests
         var page1 = ImmutableDictionary<byte, ItemStack>.Empty;
 
         var plan = LootBoxOpenResolver.OpenBulk(MountBox, 0, 0, Box(601, 3), page0, page1, Sorts((635, 4)),
-            new ScriptedRandom(49, 49, 49), Today, requestedCount: 3, secondPageAccessible: false);
+            new ScriptedRandom(49, 49, 49), Today, 3, secondPageAccessible: false);
 
         Assert.Equal(0, plan.OpenedCount);
         Assert.True(plan.ProjectedPage1.IsEmpty);
     }
 
-        private sealed class ScriptedRandom(params int[] values) : Random
+    private sealed class ScriptedRandom(params int[] values) : Random
     {
         private int _index;
 

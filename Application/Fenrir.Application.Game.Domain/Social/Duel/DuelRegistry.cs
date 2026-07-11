@@ -6,7 +6,7 @@ public enum DuelAskOutcome
     ChallengerBusy,
     TargetBusy,
 
-        ChallengerAlreadyDueling
+    ChallengerAlreadyDueling
 }
 
 public enum DuelEndReason
@@ -19,8 +19,7 @@ public enum DuelEndReason
 
 public sealed record ActiveDuel(int UniqueNumber, int PlayerA, int PlayerB, bool NoPotions)
 {
-
-        public int RemainingTicks { get; set; } = DuelRegistry.DurationTicks;
+    public int RemainingTicks { get; set; } = DuelRegistry.DurationTicks;
 
     public int OpponentOf(int characterId)
     {
@@ -30,25 +29,24 @@ public sealed record ActiveDuel(int UniqueNumber, int PlayerA, int PlayerB, bool
 
 public sealed class DuelRegistry
 {
+    public const int DurationTicks = 180;
 
-        public const int DurationTicks = 180;
+    private readonly Dictionary<int, int> _acceptedPairs = new();
 
-        private readonly Dictionary<int, int> _acceptedPairs = new();
+    private readonly Dictionary<int, ActiveDuel> _activeByCharacter = new();
 
-        private readonly Dictionary<int, ActiveDuel> _activeByCharacter = new();
-
-        private readonly CrossShardNegotiationTracker _crossShard = new();
+    private readonly CrossShardNegotiationTracker _crossShard = new();
 
     private readonly Lock _lock = new();
 
-        private readonly Dictionary<int, bool> _noPotionsByChallenger = new();
+    private readonly Dictionary<int, bool> _noPotionsByChallenger = new();
 
     private readonly Dictionary<int, int> _pendingByChallenger = new();
     private readonly Dictionary<int, int> _pendingByTarget = new();
 
     private int _nextUniqueNumber;
 
-        public bool IsNegotiating(int characterId)
+    public bool IsNegotiating(int characterId)
     {
         lock (_lock)
         {
@@ -57,7 +55,7 @@ public sealed class DuelRegistry
         }
     }
 
-        public DuelAskOutcome TryAskCrossShard(int challengerId, CrossShardOutboundAsk ask)
+    public DuelAskOutcome TryAskCrossShard(int challengerId, CrossShardOutboundAsk ask)
     {
         lock (_lock)
         {
@@ -139,7 +137,7 @@ public sealed class DuelRegistry
         }
     }
 
-        public bool TryStart(int callerId, out ActiveDuel duel)
+    public bool TryStart(int callerId, out ActiveDuel duel)
     {
         lock (_lock)
         {
@@ -168,7 +166,7 @@ public sealed class DuelRegistry
         }
     }
 
-        public bool TryEndActiveDuel(int characterId, out int opponentId)
+    public bool TryEndActiveDuel(int characterId, out int opponentId)
     {
         lock (_lock)
         {
@@ -183,7 +181,7 @@ public sealed class DuelRegistry
         }
     }
 
-        public void ForceClearOnZoneEntry(int characterId)
+    public void ForceClearOnZoneEntry(int characterId)
     {
         lock (_lock)
         {

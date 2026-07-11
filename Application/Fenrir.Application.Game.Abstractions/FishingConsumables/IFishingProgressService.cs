@@ -4,8 +4,7 @@ namespace Fenrir.Application.Game.Abstractions.FishingConsumables;
 
 public interface IFishingProgressService
 {
-
-        public FishingProgressResult? PollBite(Zone zone, PlayerRuntimeState state, int characterId);
+    public FishingProgressResult? PollBite(Zone zone, PlayerRuntimeState state, int characterId);
 
     public FishingProgressResult Recast(Zone zone, PlayerRuntimeState state, int characterId);
 

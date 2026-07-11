@@ -1,6 +1,5 @@
 using Fenrir.Application.Game.Abstractions.Commerce;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Application.Game.Domain.World.Npcs;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Dispatch.Zone.Sessions;
@@ -83,7 +82,7 @@ public sealed class BuyShopItemHandler(IBuyShopItemService service, ILogger<BuyS
         }
     }
 
-        private async ValueTask HandleProxyPurchaseAsync(BuyShopItemRequest packet, ZoneClientSession zoneSession,
+    private async ValueTask HandleProxyPurchaseAsync(BuyShopItemRequest packet, ZoneClientSession zoneSession,
         Zone zone, PlayerRuntimeState buyer, BuyShopItemSellerResult lookup, int accountId,
         CancellationToken cancellationToken)
     {

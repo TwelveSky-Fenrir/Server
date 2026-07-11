@@ -8,9 +8,9 @@ public static class CpTicketResolver
     {
         Success,
 
-                InsufficientQuantity,
+        InsufficientQuantity,
 
-                WouldExceedCeiling
+        WouldExceedCeiling
     }
 
     private static readonly FrozenDictionary<int, int> PerUnitAmounts = new Dictionary<int, int>
@@ -30,14 +30,14 @@ public static class CpTicketResolver
         [8434] = 5000
     }.ToFrozenDictionary();
 
-        public static IEnumerable<int> HandledItemIds => PerUnitAmounts.Keys;
+    public static IEnumerable<int> HandledItemIds => PerUnitAmounts.Keys;
 
     public static bool TryGetPerUnitAmount(int itemId, out int perUnitAmount)
     {
         return PerUnitAmounts.TryGetValue(itemId, out perUnitAmount);
     }
 
-        public static Result Resolve(int itemId, int requestedValue, int stackQuantity, int currentContributionPoints)
+    public static Result Resolve(int itemId, int requestedValue, int stackQuantity, int currentContributionPoints)
     {
         if (stackQuantity < 1 || !PerUnitAmounts.TryGetValue(itemId, out var perUnitAmount))
             return new Result(Outcome.InsufficientQuantity, 0, 0, currentContributionPoints);

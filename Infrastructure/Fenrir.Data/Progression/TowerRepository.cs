@@ -10,14 +10,13 @@ namespace Fenrir.Data.Progression;
 
 public sealed record TowerRepository(ICaeriusNetDbContext Db) : ITowerRepository
 {
-
-        public async ValueTask EnsureInitializedAsync(CancellationToken ct)
+    public async ValueTask EnsureInitializedAsync(CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_TowerState_EnsureInitialized", 0).Build();
         await Db.ExecuteAsync(sp, ct);
     }
 
-        public async ValueTask<ReadOnlyCollection<TowerStateRowDto>> GetAllAsync(CancellationToken ct)
+    public async ValueTask<ReadOnlyCollection<TowerStateRowDto>> GetAllAsync(CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_TowerState_GetAll", 12).Build();
         return await Db.QueryAsReadOnlyCollectionAsync<TowerStateRowDto>(sp, ct);

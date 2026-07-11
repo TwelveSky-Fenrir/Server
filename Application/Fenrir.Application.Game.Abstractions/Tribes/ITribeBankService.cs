@@ -10,10 +10,9 @@ public readonly record struct TribeBankResult(bool Success, int Sort, int[]? Tri
 
 public interface ITribeBankService
 {
-
-        public ValueTask<TribeBankResult> ViewAsync(ZoneClientSession zoneSession, PlayerRuntimeState state,
+    public ValueTask<TribeBankResult> ViewAsync(ZoneClientSession zoneSession, PlayerRuntimeState state,
         CancellationToken ct);
 
-        public ValueTask<TribeBankResult> DepositAsync(int slotValue, PlayerRuntimeState state, int characterId,
+    public ValueTask<TribeBankResult> DepositAsync(int slotValue, PlayerRuntimeState state, int characterId,
         CancellationToken ct);
 }

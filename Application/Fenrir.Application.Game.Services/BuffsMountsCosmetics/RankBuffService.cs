@@ -7,10 +7,9 @@ namespace Fenrir.Application.Game.Services.BuffsMountsCosmetics;
 
 public sealed class RankBuffService(WorldStateService worldState) : IRankBuffService
 {
+    private const int DefaultStoneCount = 1;
 
-        private const int DefaultStoneCount = 1;
-
-        public RankBuffResult Apply(Zone zone, PlayerRuntimeState state, int characterId, int sort)
+    public RankBuffResult Apply(Zone zone, PlayerRuntimeState state, int characterId, int sort)
     {
         var resolved = RankBuffResolver.Resolve(sort, DefaultStoneCount, state.IsMovingZone,
             worldState.World.TribeSymbolBattle);

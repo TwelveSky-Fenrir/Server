@@ -6,21 +6,20 @@ public static class CostumeStateResolver
 {
     public enum ResultKind
     {
+        NoReply,
 
-                NoReply,
-
-                Disconnect,
+        Disconnect,
         Select,
         Equip,
         Remove,
 
-                ReturnToInventoryMismatch,
+        ReturnToInventoryMismatch,
         ReturnToInventorySuccess
     }
 
-        public const int SlotCount = 10;
+    public const int SlotCount = 10;
 
-        public const int WornMax = 19;
+    public const int WornMax = 19;
 
     public static Result Resolve(int sort, int value, in Context ctx)
     {

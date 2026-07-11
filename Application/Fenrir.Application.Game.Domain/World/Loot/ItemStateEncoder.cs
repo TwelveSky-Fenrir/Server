@@ -2,53 +2,52 @@ namespace Fenrir.Application.Game.Domain.World.Loot;
 
 public static class ItemStateEncoder
 {
-
-        public static int ChangeEnchant(int packed, int delta)
+    public static int ChangeEnchant(int packed, int delta)
     {
         return SetByte(packed, 0, GetByte(packed, 0) + delta);
     }
 
-        public static int ChangeCombine(int packed, int delta)
+    public static int ChangeCombine(int packed, int delta)
     {
         return SetByte(packed, 1, GetByte(packed, 1) + delta);
     }
 
-        public static int ChangeRefine(int packed, int delta)
+    public static int ChangeRefine(int packed, int delta)
     {
         return SetByte(packed, 2, GetByte(packed, 2) + delta);
     }
 
-        public static int ResetEnchant(int packed)
+    public static int ResetEnchant(int packed)
     {
         return SetByte(packed, 0, 0);
     }
 
-        public static int ResetCombine(int packed)
+    public static int ResetCombine(int packed)
     {
         return SetByte(packed, 1, 0);
     }
 
-        public static int ResetRefine(int packed)
+    public static int ResetRefine(int packed)
     {
         return SetByte(packed, 2, 0);
     }
 
-        public static int SetRefine(int packed, int value)
+    public static int SetRefine(int packed, int value)
     {
         return SetByte(packed, 2, value);
     }
 
-        public static int SetSocket(int packed, int value)
+    public static int SetSocket(int packed, int value)
     {
         return SetByte(packed, 3, value);
     }
 
-        public static int ResetSocket(int packed)
+    public static int ResetSocket(int packed)
     {
         return SetByte(packed, 3, 0);
     }
 
-        public static int SetAll(int enchant, int combine, int refine, int socket = 0)
+    public static int SetAll(int enchant, int combine, int refine, int socket = 0)
     {
         return ItemValueCodec.Encode((byte)enchant, (byte)combine, (byte)refine, (byte)socket);
     }

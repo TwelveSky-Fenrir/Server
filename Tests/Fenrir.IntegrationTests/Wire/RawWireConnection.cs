@@ -29,7 +29,7 @@ public sealed class RawWireConnection : IAsyncDisposable
         return connection;
     }
 
-        public void SeedOutboundStreamKey(int randomNumber)
+    public void SeedOutboundStreamKey(int randomNumber)
     {
         _outboundStreamKey = unchecked((byte)randomNumber);
     }

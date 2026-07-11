@@ -11,8 +11,7 @@ public sealed class TowerGuardianSystem(
     WorldDataCache worldData,
     Lazy<ZoneEventBroadcaster>? zoneEventBroadcaster = null) : ISimulationSystem
 {
-
-        private const float GuardianLeashRadius = 300f;
+    private const float GuardianLeashRadius = 300f;
 
     public void Simulate(Zone zone, int legacyTicksElapsed)
     {
@@ -49,7 +48,7 @@ public sealed class TowerGuardianSystem(
         }
     }
 
-        private void TrySpawnGuardian(Zone zone, int towerIndex, int guardianIndex)
+    private void TrySpawnGuardian(Zone zone, int towerIndex, int guardianIndex)
     {
         var pendingPacked = towerWar.GetPendingPackedStateForBuilding(towerIndex);
         var level = TowerWarState.DecodeLevel(pendingPacked);

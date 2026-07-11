@@ -26,7 +26,7 @@ public static class GeneralItemDropResolver
 
     private const int MaxAttempts = 10;
 
-        public static int? Resolve(WorldDataCache worldData, Random random, byte killerTribe, int itemType,
+    public static int? Resolve(WorldDataCache worldData, Random random, byte killerTribe, int itemType,
         int levelLow, int levelHigh, bool includeCape = true, bool includeSkillBook = true)
     {
         var weapon1 = killerTribe switch
@@ -92,7 +92,7 @@ public static class GeneralItemDropResolver
         return null;
     }
 
-        private static ItemRowDto? ReturnOne(WorldDataCache worldData, Random random, int level, int type, int sort)
+    private static ItemRowDto? ReturnOne(WorldDataCache worldData, Random random, int level, int type, int sort)
     {
         List<ItemRowDto>? matches = null;
         foreach (var definition in worldData.ItemsById.Values)

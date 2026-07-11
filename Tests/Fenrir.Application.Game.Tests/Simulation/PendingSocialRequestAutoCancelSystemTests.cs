@@ -45,7 +45,7 @@ public class PendingSocialRequestAutoCancelSystemTests
     private static void Enter(Zone zone, int characterId, string name)
     {
         var (session, _) = ZoneTestKit.CreateSession(characterId);
-        zone.Post(ZoneCommand.Enter(characterId, ZoneTestKit.EnterData(session, zone.MapId, name: name)));
+        zone.Post(ZoneCommand.Enter(characterId, ZoneTestKit.EnterData(session, zone.MapId, name)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
     }
 

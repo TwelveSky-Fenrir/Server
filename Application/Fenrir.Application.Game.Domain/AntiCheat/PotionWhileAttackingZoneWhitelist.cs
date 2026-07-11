@@ -10,9 +10,9 @@ public static class PotionWhileAttackingZoneWhitelist
         99, 100, 125, 140, 141, 142, 143, 195, 196, 197, 198, 199, 201, 270, 271, 272, 273, 274, 295, 296
     }.ToFrozenSet();
 
-        public static int Count => ListedZones.Count;
+    public static int Count => ListedZones.Count;
 
-        public static bool IsListed(int zoneId)
+    public static bool IsListed(int zoneId)
     {
         return ListedZones.Contains(zoneId);
     }

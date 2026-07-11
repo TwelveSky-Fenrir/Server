@@ -30,7 +30,7 @@ public sealed record GmAllowlistRepository(ICaeriusNetDbContext Db) : IGmAllowli
         return await Db.ExecuteScalarAsync<int>(sp, ct);
     }
 
-        private ValueTask<ImmutableArray<GmAllowlistRowDto>> GetAllAsync(CancellationToken ct)
+    private ValueTask<ImmutableArray<GmAllowlistRowDto>> GetAllAsync(CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("admin", "usp_GmAllowlist_GetAll", 8)
             .AddInMemoryCache("admin:gm-allowlist", TimeSpan.FromSeconds(2))

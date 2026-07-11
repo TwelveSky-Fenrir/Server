@@ -2,26 +2,24 @@ namespace Fenrir.Application.Game.Domain.World;
 
 public enum ReviveZoneKind
 {
+    FactionTerritory,
 
-        FactionTerritory,
+    AlwaysBlocked,
 
-        AlwaysBlocked,
-
-        Unconditional
+    Unconditional
 }
 
 public static class ReviveEligibilityZones
 {
+    public const short AlwaysBlockedZoneId = 200;
 
-        public const short AlwaysBlockedZoneId = 200;
+    public const short UnconditionalZoneIdA = 322;
 
-        public const short UnconditionalZoneIdA = 322;
+    public const short UnconditionalZoneIdB = 323;
 
-        public const short UnconditionalZoneIdB = 323;
+    public const short BroadcastSuppressionExemptZoneId = 124;
 
-        public const short BroadcastSuppressionExemptZoneId = 124;
-
-        public static (ReviveZoneKind Kind, byte OwningFaction) Classify(short mapId)
+    public static (ReviveZoneKind Kind, byte OwningFaction) Classify(short mapId)
     {
         return mapId switch
         {
@@ -37,10 +35,9 @@ public static class ReviveEligibilityZones
 
 public static class ReviveEligibilityRules
 {
+    public const int DeathSubCounterBaseline = 0;
 
-        public const int DeathSubCounterBaseline = 0;
-
-        public static bool IsEligible(short mapId, byte avatarTribe, byte? avatarAlliedTribe)
+    public static bool IsEligible(short mapId, byte avatarTribe, byte? avatarAlliedTribe)
     {
         var (kind, owningFaction) = ReviveEligibilityZones.Classify(mapId);
 
@@ -56,10 +53,9 @@ public static class ReviveEligibilityRules
 
 public static class ZoneTransferAntiAbuseRules
 {
+    public const short ExemptDestinationZoneId = 38;
 
-        public const short ExemptDestinationZoneId = 38;
-
-        public static bool AllowsTransferWhileFlagged(short currentMapId, short destinationMapId, byte avatarTribe,
+    public static bool AllowsTransferWhileFlagged(short currentMapId, short destinationMapId, byte avatarTribe,
         Func<byte, byte?> currentZoneOwningFactionAlly)
     {
         if (destinationMapId == ExemptDestinationZoneId)

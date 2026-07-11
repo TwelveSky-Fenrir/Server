@@ -2,12 +2,11 @@ namespace Fenrir.Application.Game.Domain.World.Loot;
 
 public enum GroundItemClaimOutcome
 {
+    NotFound,
 
-        NotFound,
+    NotOwned,
 
-        NotOwned,
-
-        TooFar,
+    TooFar,
 
     Success
 }

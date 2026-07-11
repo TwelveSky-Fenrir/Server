@@ -21,8 +21,7 @@ public readonly record struct InventoryToWorldDropResult(
 
 public interface IInventoryToWorldDropService
 {
-
-        public ValueTask<InventoryToWorldDropResult> DropToWorldAsync(Zone zone, PlayerRuntimeState state,
+    public ValueTask<InventoryToWorldDropResult> DropToWorldAsync(Zone zone, PlayerRuntimeState state,
         int characterId, int accountId, DefaultPData move, bool premiumPageAccessAllowed,
         CancellationToken cancellationToken);
 }

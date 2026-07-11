@@ -5,7 +5,6 @@ namespace Fenrir.Application.Game.Tests.Mounts;
 
 public class MountAttributeRollerTests
 {
-
     [Fact]
     public void Convert_PicksTheDrawnDigit_WhenNotMaxed()
     {

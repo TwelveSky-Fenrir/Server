@@ -7,7 +7,7 @@ public static class CashItemStackConsumption
         return false;
     }
 
-        public static int RemainingQuantity(int itemId, int currentQuantity)
+    public static int RemainingQuantity(int itemId, int currentQuantity)
     {
         return IsStackSafe(itemId) ? Math.Max(0, currentQuantity - 1) : 0;
     }

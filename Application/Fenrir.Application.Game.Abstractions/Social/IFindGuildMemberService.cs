@@ -6,7 +6,6 @@ public readonly record struct FindGuildMemberResult(bool HasGuild, int ZoneNumbe
 
 public interface IFindGuildMemberService
 {
-
-        public ValueTask<FindGuildMemberResult> FindZoneAsync(PlayerRuntimeState asker, string avatarName,
+    public ValueTask<FindGuildMemberResult> FindZoneAsync(PlayerRuntimeState asker, string avatarName,
         CancellationToken cancellationToken);
 }

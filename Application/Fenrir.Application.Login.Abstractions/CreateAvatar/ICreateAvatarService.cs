@@ -8,11 +8,11 @@ public enum CreateAvatarOutcome
     Success,
     Failure,
 
-        DominantTribeBlocked,
+    DominantTribeBlocked,
 
-        FourthFactionDisabled,
+    FourthFactionDisabled,
 
-        SlotOccupied
+    SlotOccupied
 }
 
 public readonly record struct CreateAvatarResult(CreateAvatarOutcome Outcome, AvatarInfo AvatarInfo);

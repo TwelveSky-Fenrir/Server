@@ -28,7 +28,7 @@ public sealed class LoginBotClient : IAsyncDisposable
         return bot;
     }
 
-        private async Task ReadGreetingAsync(CancellationToken ct)
+    private async Task ReadGreetingAsync(CancellationToken ct)
     {
         var frame = await _connection.ReadExactAsync(1 + LoginGreetingResponse.PayloadSize, ct);
         WireXor.ApplyPacketXor(frame);
@@ -41,7 +41,7 @@ public sealed class LoginBotClient : IAsyncDisposable
         _connection.SeedOutboundStreamKey(randomNumber);
     }
 
-        public async Task<LoginResult> LoginAsync(string id, string password, int version, CancellationToken ct)
+    public async Task<LoginResult> LoginAsync(string id, string password, int version, CancellationToken ct)
     {
         var payload = new byte[LoginRequest.PayloadSize];
         WireScalars.WriteFixedString(payload.AsSpan(0, 255), id);
@@ -74,7 +74,7 @@ public sealed class LoginBotClient : IAsyncDisposable
         return new LoginResult(result, secondLoginSort);
     }
 
-        public async Task<int> CreateMousePinAsync(string pin, CancellationToken ct)
+    public async Task<int> CreateMousePinAsync(string pin, CancellationToken ct)
     {
         var payload = new byte[CreateMousePinRequest.PayloadSize];
         WireScalars.WriteFixedString(payload.AsSpan(0, 5), pin);
@@ -87,7 +87,7 @@ public sealed class LoginBotClient : IAsyncDisposable
         return WireScalars.ReadInt32(frame.AsSpan(1, 4));
     }
 
-        public async Task<int> CreateAvatarAsync(int avatarPost, int tribe, int gender, int head, int face,
+    public async Task<int> CreateAvatarAsync(int avatarPost, int tribe, int gender, int head, int face,
         string avatarName, CancellationToken ct, int weapon = 5, int previousTribe = 0)
     {
         var payload = new byte[CreateAvatarRequest.PayloadSize];
@@ -108,7 +108,7 @@ public sealed class LoginBotClient : IAsyncDisposable
         return WireScalars.ReadInt32(frame.AsSpan(1, 4));
     }
 
-        public async Task<ZoneTransferResult> ZoneTransferAsync(int avatarPost, CancellationToken ct)
+    public async Task<ZoneTransferResult> ZoneTransferAsync(int avatarPost, CancellationToken ct)
     {
         var payload = new byte[ZoneTransferRequest.PayloadSize];
         WireScalars.WriteInt32(payload.AsSpan(0, 4), avatarPost);
@@ -126,7 +126,7 @@ public sealed class LoginBotClient : IAsyncDisposable
         return new ZoneTransferResult(result, ip, port, zone);
     }
 
-        private async Task SendAsync(byte opcode, byte[] payload, CancellationToken ct)
+    private async Task SendAsync(byte opcode, byte[] payload, CancellationToken ct)
     {
         var frame = new byte[WireHeaderSizes.ClientPacketSize + payload.Length];
         frame[8] = opcode;

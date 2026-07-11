@@ -2,12 +2,11 @@ namespace Fenrir.Application.Game.Domain.World.WorldState;
 
 public static class TribeFormationAbilityEligibility
 {
+    public const int PointFloor = 100;
 
-        public const int PointFloor = 100;
+    public const int SharePercentThreshold = 20;
 
-        public const int SharePercentThreshold = 20;
-
-        public static bool AllTribesAboveFloor(IReadOnlyList<TribeRvrState> tribes)
+    public static bool AllTribesAboveFloor(IReadOnlyList<TribeRvrState> tribes)
     {
         foreach (var tribe in tribes)
             if (tribe.Points <= PointFloor)
@@ -16,7 +15,7 @@ public static class TribeFormationAbilityEligibility
         return true;
     }
 
-        public static byte FindLowestPointTribe(IReadOnlyList<TribeRvrState> tribes)
+    public static byte FindLowestPointTribe(IReadOnlyList<TribeRvrState> tribes)
     {
         var lowest = tribes[0];
         for (var i = 1; i < tribes.Count; i++)
@@ -26,7 +25,7 @@ public static class TribeFormationAbilityEligibility
         return lowest.TribeId;
     }
 
-        public static int CombinedPoints(IReadOnlyList<TribeRvrState> tribes)
+    public static int CombinedPoints(IReadOnlyList<TribeRvrState> tribes)
     {
         var total = 0;
         foreach (var tribe in tribes)
@@ -35,7 +34,7 @@ public static class TribeFormationAbilityEligibility
         return total;
     }
 
-        public static bool IsUnderShareThreshold(int ownPoints, int combinedPoints)
+    public static bool IsUnderShareThreshold(int ownPoints, int combinedPoints)
     {
         var sharePercent = ownPoints * 100 / combinedPoints;
         return sharePercent < SharePercentThreshold;

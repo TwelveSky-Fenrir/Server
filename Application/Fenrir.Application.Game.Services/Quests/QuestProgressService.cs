@@ -18,8 +18,7 @@ public sealed class QuestProgressService(
     ILogger<QuestProgressService> logger)
     : IQuestProgressService
 {
-
-        private const short QuestRewardEventCode = 1;
+    private const short QuestRewardEventCode = 1;
 
     public async ValueTask<QuestActionResult> AcceptAsync(QuestProgressRequest packet, PlayerRuntimeState state,
         Zone zone, int characterId, CancellationToken ct)
@@ -240,7 +239,7 @@ public sealed class QuestProgressService(
         return new QuestActionResult(true);
     }
 
-        private async ValueTask PersistAndMirrorAsync(Zone zone, int characterId, QuestProgress newProgress,
+    private async ValueTask PersistAndMirrorAsync(Zone zone, int characterId, QuestProgress newProgress,
         long deltaMoney, int experienceDelta, int contributionPointsDelta, int teacherPointDelta,
         ContainerEdits edits, CancellationToken ct)
     {
@@ -264,7 +263,7 @@ public sealed class QuestProgressService(
             state.QuestTargetPhase, state.QuestKillCounter);
     }
 
-        private bool IsNearQuestAnchorNpc(Zone zone, PlayerRuntimeState state, int anchorStep, bool useEndNpc)
+    private bool IsNearQuestAnchorNpc(Zone zone, PlayerRuntimeState state, int anchorStep, bool useEndNpc)
     {
         var quest = questCatalog.TryGet(state.Tribe, anchorStep);
         if (quest is null)
@@ -281,7 +280,7 @@ public sealed class QuestProgressService(
             state.PosZ) != NpcProximity.Far;
     }
 
-        private static bool TryValidateDepositSlot(int page, int index, int xPost, int yPost, ContainerEdits edits,
+    private static bool TryValidateDepositSlot(int page, int index, int xPost, int yPost, ContainerEdits edits,
         out byte container, out byte slot)
     {
         container = 0;
@@ -305,7 +304,7 @@ public sealed class QuestProgressService(
         return list;
     }
 
-        private sealed class ContainerEdits(PlayerRuntimeState state)
+    private sealed class ContainerEdits(PlayerRuntimeState state)
     {
         private static readonly byte[] InventoryContainers =
             [ContainerMatrix.InventoryPage0, ContainerMatrix.InventoryPage1];
@@ -322,7 +321,7 @@ public sealed class QuestProgressService(
             _edits[container] = Get(container).SetItem(slot, stack);
         }
 
-                public void DeleteFirstMatch(int itemId)
+        public void DeleteFirstMatch(int itemId)
         {
             foreach (var container in InventoryContainers)
             {
@@ -336,7 +335,7 @@ public sealed class QuestProgressService(
             }
         }
 
-                public bool TryReplaceFirstMatch(int itemId, Func<ItemStack, ItemStack> transform)
+        public bool TryReplaceFirstMatch(int itemId, Func<ItemStack, ItemStack> transform)
         {
             foreach (var container in InventoryContainers)
             {
@@ -363,7 +362,7 @@ public sealed class QuestProgressService(
             return builder.ToImmutable();
         }
 
-                public (byte? Container1, List<CharacterItemSlotTvp> Items1, byte? Container2, List<CharacterItemSlotTvp> Items2
+        public (byte? Container1, List<CharacterItemSlotTvp> Items1, byte? Container2, List<CharacterItemSlotTvp> Items2
             )
             ToTvpPairs()
         {

@@ -7,13 +7,13 @@ public static class MonsterDropTailResolver
     private const int CpGiftCard15ItemId = 693;
     private const int CpGiftCard20ItemId = 694;
 
-        private const int CpGiftBaseRateZone126 = 50;
+    private const int CpGiftBaseRateZone126 = 50;
 
-        private const int CpGiftBaseRateDefault = 25;
+    private const int CpGiftBaseRateDefault = 25;
 
-        private const int MaxHighLevel = 12;
+    private const int MaxHighLevel = 12;
 
-        private const int Zone241ForcedEligibleMonsterIdLow = 725;
+    private const int Zone241ForcedEligibleMonsterIdLow = 725;
 
     private const int Zone241ForcedEligibleMonsterIdHigh = 730;
 
@@ -21,7 +21,7 @@ public static class MonsterDropTailResolver
     private const int RebirthChestLowTierItemId = 1378;
     private const int RebirthChestMidTierItemId = 1379;
 
-        public static IReadOnlyList<DroppedItem> ResolveCpGiftCard(bool generalDropEligible, int monsterId,
+    public static IReadOnlyList<DroppedItem> ResolveCpGiftCard(bool generalDropEligible, int monsterId,
         bool isZone241TypeShard, int killerLevel2, bool isZone126TypeShard, Random random)
     {
         var forcedEligible = isZone241TypeShard &&
@@ -50,7 +50,7 @@ public static class MonsterDropTailResolver
         return [new DroppedItem(itemId, 1)];
     }
 
-        public static IReadOnlyList<DroppedItem> ResolveRebirthItem(int monsterId, Random random)
+    public static IReadOnlyList<DroppedItem> ResolveRebirthItem(int monsterId, Random random)
     {
         if (!IsLodBossMonster(monsterId))
             return [];

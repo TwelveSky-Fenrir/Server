@@ -4,24 +4,23 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 
 public enum ValleyWarPhase : byte
 {
+    Idle = 0,
 
-        Idle = 0,
+    GateCountdown = 1,
 
-        GateCountdown = 1,
+    GateOpen = 2,
 
-        GateOpen = 2,
+    DoorPending = 3,
 
-        DoorPending = 3,
+    KillRace = 4,
 
-        KillRace = 4,
+    ScrollPending = 5,
 
-        ScrollPending = 5,
+    BossWindow = 6,
 
-        BossWindow = 6,
+    PostWinCooldown = 7,
 
-        PostWinCooldown = 7,
-
-        PreReset = 8
+    PreReset = 8
 }
 
 public readonly record struct ValleyWarEnvironmentSnapshot(bool EligiblePlayerPresent, bool BossSlotOccupied = false)
@@ -52,36 +51,35 @@ public readonly record struct ValleyWarTickResult(
 
 public sealed class ValleyWarSchedule
 {
+    public const int TribeCount = 4;
 
-        public const int TribeCount = 4;
+    public const int IdleWaitTicks = 43200;
 
-        public const int IdleWaitTicks = 43200;
+    public const int GateCountdownStartValue = 5;
 
-        public const int GateCountdownStartValue = 5;
+    public const int GateCountdownIntervalTicks = 120;
 
-        public const int GateCountdownIntervalTicks = 120;
+    public const int GateOpenTicks = 120;
 
-        public const int GateOpenTicks = 120;
+    public const int DoorPendingTicks = 20;
 
-        public const int DoorPendingTicks = 20;
+    public const int LegacyTicksPerRealSecond = 2;
 
-        public const int LegacyTicksPerRealSecond = 2;
+    public const int DoorCountdownStartValue = 10;
 
-        public const int DoorCountdownStartValue = 10;
+    public const int KillRaceDurationTicks = 3600;
 
-        public const int KillRaceDurationTicks = 3600;
+    public const int BossWindowDurationTicks = 3600;
 
-        public const int BossWindowDurationTicks = 3600;
+    public const int KillQuotaPerTribeStart = 170;
 
-        public const int KillQuotaPerTribeStart = 170;
+    public const int ScrollDeleteDelayTicks = 6;
 
-        public const int ScrollDeleteDelayTicks = 6;
+    public const int PostWinCooldownTicks = 120;
 
-        public const int PostWinCooldownTicks = 120;
+    public const int PreResetTicks = 120;
 
-        public const int PreResetTicks = 120;
-
-        public const int BossMonsterId = 756;
+    public const int BossMonsterId = 756;
 
     private readonly int[] _killRaceQuota = new int[TribeCount];
 
@@ -102,9 +100,9 @@ public sealed class ValleyWarSchedule
 
     public ValleyWarPhase Phase { get; private set; } = ValleyWarPhase.Idle;
 
-        public byte? WinningTribe { get; private set; }
+    public byte? WinningTribe { get; private set; }
 
-        public ValleyWarTickResult Tick(ValleyWarEnvironmentSnapshot snapshot)
+    public ValleyWarTickResult Tick(ValleyWarEnvironmentSnapshot snapshot)
     {
         var previousPhase = Phase;
 
@@ -187,7 +185,7 @@ public sealed class ValleyWarSchedule
             allSessionsShouldDisconnect);
     }
 
-        public void RegisterMonsterKill(byte tribeId)
+    public void RegisterMonsterKill(byte tribeId)
     {
         if (Phase != ValleyWarPhase.KillRace || tribeId >= TribeCount)
             return;
@@ -196,7 +194,7 @@ public sealed class ValleyWarSchedule
             _killRaceQuota[tribeId]--;
     }
 
-        public void ForceZeroTribeQuota(byte tribeId)
+    public void ForceZeroTribeQuota(byte tribeId)
     {
         if (Phase != ValleyWarPhase.KillRace || tribeId >= TribeCount)
             return;

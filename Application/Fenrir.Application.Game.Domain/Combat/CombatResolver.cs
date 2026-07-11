@@ -9,19 +9,19 @@ public static class CombatResolver
 {
     public const float MaxAttackDistance = 185.0f;
 
-        public const int MinimumDamageAgainstAvatar = 5;
+    public const int MinimumDamageAgainstAvatar = 5;
 
-        public const int ProtectTickLegacyTicks = 20;
+    public const int ProtectTickLegacyTicks = 20;
 
-        private const int SkillNumberExcludedFromCritical = 78;
+    private const int SkillNumberExcludedFromCritical = 78;
 
-        private const int NoActionYetSort = 0;
+    private const int NoActionYetSort = 0;
 
-        private const int DeathPoseSort = 12;
+    private const int DeathPoseSort = 12;
 
     public static readonly TimeSpan ProtectDuration = SimulationClock.ToTimeSpan(ProtectTickLegacyTicks);
 
-        public static AttackOutcome ResolveEnemyTribeAttack(
+    public static AttackOutcome ResolveEnemyTribeAttack(
         CombatantSnapshot attacker,
         CombatantSnapshot defender,
         AttackForProtocol request,
@@ -58,7 +58,7 @@ public static class CombatResolver
             defenderFormationCode);
     }
 
-        public static AttackOutcome ResolveDuelAttack(
+    public static AttackOutcome ResolveDuelAttack(
         CombatantSnapshot attacker,
         CombatantSnapshot defender,
         AttackForProtocol request,
@@ -87,7 +87,7 @@ public static class CombatResolver
             zone124OverrideActive: zone124OverrideActive);
     }
 
-        private static AttackOutcome ResolveDamage(
+    private static AttackOutcome ResolveDamage(
         CombatantSnapshot attacker,
         CombatantSnapshot defender,
         AttackForProtocol request,
@@ -178,7 +178,7 @@ public static class CombatResolver
             chargeConsumed);
     }
 
-        private static bool CanRollCritical(AttackForProtocol request, SkillDefinition? attackSkill)
+    private static bool CanRollCritical(AttackForProtocol request, SkillDefinition? attackSkill)
     {
         if (request.AttackActionValue1 == 1)
             return true;

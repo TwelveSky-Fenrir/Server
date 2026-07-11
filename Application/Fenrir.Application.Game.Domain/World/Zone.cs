@@ -16,7 +16,6 @@ using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Data.Abstractions.Game;
-using Fenrir.Data.Abstractions.Runtime;
 using Fenrir.Data.WriteBehind;
 using Fenrir.Network.Dispatch.Zone.Sessions;
 using Microsoft.Extensions.Logging;
@@ -50,18 +49,17 @@ public sealed partial class Zone(
     TribeSymbolCombatModifiers? tribeSymbolCombatModifiers = null,
     IPartyResyncRelayQueue? partyResyncRelayQueue = null) : IZoneActor
 {
+    private const int InboxCapacity = 8192;
 
-        private const int InboxCapacity = 8192;
-
-        private const int InboxDrainCapPerTick = InboxCapacity / 2;
+    private const int InboxDrainCapPerTick = InboxCapacity / 2;
 
     private readonly SimulationTickAccumulator _accumulator = new();
 
-        private readonly DuelRegistry _duelRegistry = duelRegistry ?? new DuelRegistry();
+    private readonly DuelRegistry _duelRegistry = duelRegistry ?? new DuelRegistry();
 
     private readonly AoiGrid _grid = new(options.AoiCellSize);
 
-        private readonly HeroRankPointAccumulator _heroRankPointAccumulator =
+    private readonly HeroRankPointAccumulator _heroRankPointAccumulator =
         heroRankPointAccumulator ?? new HeroRankPointAccumulator();
 
     private readonly Channel<ZoneCommand> _inbox = Channel.CreateBounded<ZoneCommand>(
@@ -69,45 +67,45 @@ public sealed partial class Zone(
 
     private readonly KeyValuePair<string, object?> _mapTag = ZoneTickMetrics.MapTag(mapId);
 
-        private readonly List<int> _monsterAiNeighborScratch = [];
+    private readonly List<int> _monsterAiNeighborScratch = [];
 
-        private readonly List<MonsterAggroCandidate> _monsterBossAggroScratch = [];
+    private readonly List<MonsterAggroCandidate> _monsterBossAggroScratch = [];
 
-        private readonly PartyRegistry _partyRegistry = partyRegistry ?? new PartyRegistry();
+    private readonly PartyRegistry _partyRegistry = partyRegistry ?? new PartyRegistry();
 
-        private readonly IPartyResyncRelayQueue? _partyResyncRelayQueue = partyResyncRelayQueue;
+    private readonly IPartyResyncRelayQueue? _partyResyncRelayQueue = partyResyncRelayQueue;
 
     private readonly ConcurrentDictionary<int, PlayerRuntimeState> _players = new();
 
-        private readonly IRandomSource _random = randomSource ?? SystemRandomSource.Instance;
+    private readonly IRandomSource _random = randomSource ?? SystemRandomSource.Instance;
 
-        private readonly TradeRegistry _tradeRegistry = tradeRegistry ?? new TradeRegistry();
+    private readonly TradeRegistry _tradeRegistry = tradeRegistry ?? new TradeRegistry();
 
-        private readonly ZoneRegistry? _zoneRegistry = zoneRegistry;
+    private readonly ZoneRegistry? _zoneRegistry = zoneRegistry;
 
-        private TimeSpan _clock;
+    private TimeSpan _clock;
 
-        private MonsterPathfinder? _pathfinder;
+    private MonsterPathfinder? _pathfinder;
 
-        public short MapId { get; } = mapId;
+    public short MapId { get; } = mapId;
 
     public int PlayerCount => _players.Count;
 
-        public IEnumerable<PlayerRuntimeState> Players => _players.Values;
+    public IEnumerable<PlayerRuntimeState> Players => _players.Values;
 
-        public ZoneGeometry? Geometry { get; } = geometry ?? TryLoadGeometry(mapId, options, logger);
+    public ZoneGeometry? Geometry { get; } = geometry ?? TryLoadGeometry(mapId, options, logger);
 
-        public MonsterPathfinder? Pathfinder =>
+    public MonsterPathfinder? Pathfinder =>
         Geometry is null
             ? null
             : _pathfinder ??= new MonsterPathfinder(Geometry, options.MonsterPathfindingBudgetPerTick);
 
-        public void ResetPathBudget()
+    public void ResetPathBudget()
     {
         _pathfinder?.ResetBudget();
     }
 
-        public bool Post(in ZoneCommand command)
+    public bool Post(in ZoneCommand command)
     {
         return _inbox.Writer.TryWrite(command);
     }
@@ -117,14 +115,14 @@ public sealed partial class Zone(
         return _players.TryGetValue(characterId, out state);
     }
 
-        public List<int> NeighborsOfPosition(float x, float z)
+    public List<int> NeighborsOfPosition(float x, float z)
     {
         _monsterAiNeighborScratch.Clear();
         _grid.Neighbors(_monsterAiNeighborScratch, _grid.CellOf(x, z));
         return _monsterAiNeighborScratch;
     }
 
-        public List<MonsterAggroCandidate> BorrowBossAggroScratch()
+    public List<MonsterAggroCandidate> BorrowBossAggroScratch()
     {
         _monsterBossAggroScratch.Clear();
         return _monsterBossAggroScratch;
@@ -159,7 +157,7 @@ public sealed partial class Zone(
         }
     }
 
-        public void Tick(TimeSpan elapsed)
+    public void Tick(TimeSpan elapsed)
     {
         _clock += elapsed;
 
@@ -355,7 +353,7 @@ public sealed partial class Zone(
             LogDrainCapEngaged(_inbox.Reader, "inbox", InboxDrainCapPerTick);
     }
 
-        private void LogDrainCapEngaged<T>(ChannelReader<T> reader, string channelName, int cap)
+    private void LogDrainCapEngaged<T>(ChannelReader<T> reader, string channelName, int cap)
     {
         var remaining = reader.CanCount ? reader.Count : -1;
         logger.LogWarning(
@@ -363,7 +361,7 @@ public sealed partial class Zone(
             MapId, channelName, cap, remaining);
     }
 
-        private void Simulate(int legacyTicksElapsed)
+    private void Simulate(int legacyTicksElapsed)
     {
         if (legacyTicksElapsed <= 0)
             return;
@@ -380,7 +378,7 @@ public sealed partial class Zone(
             }
     }
 
-        private static ZoneGeometry? TryLoadGeometry(short mapId, GameServerOptions gameServerOptions,
+    private static ZoneGeometry? TryLoadGeometry(short mapId, GameServerOptions gameServerOptions,
         ILogger<Zone> zoneLogger)
     {
         var canonicalMapId = ZoneCanonicalGeometryMap.ResolveCanonicalMapId(mapId);

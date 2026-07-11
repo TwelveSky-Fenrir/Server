@@ -11,10 +11,9 @@ public sealed class DungeonKeyUseItemHandler(
     IEventLogRepository eventLog,
     ILogger<DungeonKeyUseItemHandler> logger) : IUseItemHandler
 {
+    public const int ItemId = DungeonAccessTicketResolver.DungeonKeyItemId;
 
-        public const int ItemId = DungeonAccessTicketResolver.DungeonKeyItemId;
-
-        private const short DungeonKeyGrantEventCode = 31;
+    private const short DungeonKeyGrantEventCode = 31;
 
     private const byte SuccessOutcome = 1;
 

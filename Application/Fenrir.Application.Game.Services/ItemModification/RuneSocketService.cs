@@ -15,10 +15,9 @@ public sealed class RuneSocketService(
     ILogger<RuneSocketService> logger)
     : IRuneSocketService
 {
+    private const short RuneInsertEventCode = 157;
 
-        private const short RuneInsertEventCode = 157;
-
-        private const short RuneRemoveEventCode = 158;
+    private const short RuneRemoveEventCode = 158;
 
     public async ValueTask<RuneInsertResult> InsertAsync(RuneSocketRequest packet, Zone zone,
         PlayerRuntimeState state, int characterId, CancellationToken cancellationToken)

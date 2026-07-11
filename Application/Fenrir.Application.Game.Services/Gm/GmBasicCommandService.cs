@@ -22,8 +22,7 @@ public sealed class GmBasicCommandService(
     IEventLogRepository eventLog,
     ILogger<GmBasicCommandService> logger) : IGmBasicCommandService
 {
-
-        private const int FailureResult = 1;
+    private const int FailureResult = 1;
 
     private const int SuccessResult = 0;
 
@@ -43,11 +42,11 @@ public sealed class GmBasicCommandService(
     private const int LevelSort = 521;
     private const int StatEditSort = 522;
 
-        private const int FindGmDataTag = 1;
+    private const int FindGmDataTag = 1;
 
-        private const int CallMoveGmDataTag = 2;
+    private const int CallMoveGmDataTag = 2;
 
-        private const int VisibilityStatSort = 9;
+    private const int VisibilityStatSort = 9;
 
     private const int HiddenVisibleState = 0;
     private const int ShownVisibleState = 1;
@@ -57,9 +56,9 @@ public sealed class GmBasicCommandService(
     private const int EquipSpecialState = 1;
     private const int UnequipSpecialState = 0;
 
-        private const int Tribe4SpecialValue = 3;
+    private const int Tribe4SpecialValue = 3;
 
-        private const int MonsterInstanceCapacity = 3000;
+    private const int MonsterInstanceCapacity = 3000;
 
     private const int GmDataSize = 100;
 
@@ -313,7 +312,6 @@ public sealed class GmBasicCommandService(
             logger.LogError(
                 "Zone {MapId} tribe-progress inbox full: dropped NCHAT/YCHAT mirror for target character {CharacterId} (sort {Sort})",
                 targetZone.MapId, target.CharacterId, sort);
-
     }
 
     public async ValueTask HandleKickAsync(byte[] data, ZoneClientSession zoneSession, PlayerRuntimeState state,
@@ -414,7 +412,7 @@ public sealed class GmBasicCommandService(
         var attributes = new CharacterBaseAttributes(state.StatVit, state.StatStr, state.StatInt, state.StatDex,
             newLevel, state.Tribe, state.PreviousTribe, state.Title, state.Halo, newRebirthCount, newLevel2);
         var stats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData, state.Buffs,
-            petContribution, runtimeState: state);
+            petContribution, state);
 
         var command = new TribeProgressZoneCommand(state.CharacterId, Level: newLevel, Level2: newLevel2,
             RebirthCount: newRebirthCount, Experience: newExperience, Exp2: newExp2,

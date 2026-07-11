@@ -108,10 +108,10 @@ public class ScrollOfSeekersUseItemHandlerTests
     {
         var (zone, state, characters, handler) = SetUp();
         state.ScrollOfSeekersTime = 0;
-        var item = Scroll(1124, quantity: 5);
+        var item = Scroll(1124, 5);
 
         var response = await RunToCompletionAsync(
-            handler.HandleAsync(Context(zone, state, 1124, item, value: 3), CancellationToken.None), zone);
+            handler.HandleAsync(Context(zone, state, 1124, item, 3), CancellationToken.None), zone);
 
         Assert.Equal(0, response.Result);
         Assert.True(zone.TryGetPlayer(CharacterId, out var after));

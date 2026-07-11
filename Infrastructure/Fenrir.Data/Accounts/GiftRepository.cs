@@ -20,7 +20,7 @@ public sealed record GiftRepository(ICaeriusNetDbContext Db) : IGiftRepository
         return await Db.QueryAsReadOnlyCollectionAsync<PendingGiftDto>(sp, ct);
     }
 
-        public async ValueTask<short> ClaimIntoVaultAsync(int giftId, int accountId, CancellationToken ct)
+    public async ValueTask<short> ClaimIntoVaultAsync(int giftId, int accountId, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Gift_ClaimIntoVault", 1)
             .AddParameter("GiftId", giftId, SqlDbType.Int)
@@ -31,7 +31,7 @@ public sealed record GiftRepository(ICaeriusNetDbContext Db) : IGiftRepository
         return result!.SlotIndex;
     }
 
-        public async ValueTask<int> EnqueueAsync(int accountId, int? productId, int quantity, int value,
+    public async ValueTask<int> EnqueueAsync(int accountId, int? productId, int quantity, int value,
         CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Gift_Enqueue", 1)

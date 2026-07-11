@@ -13,7 +13,7 @@ public sealed class DailyResetBroadcaster(ZoneRegistry zones, ILogger<DailyReset
 
     private readonly DailyResetBroadcastScheduler _scheduler = new();
 
-        public void Tick(DateTime utcNow)
+    public void Tick(DateTime utcNow)
     {
         if (_scheduler.TryConsumeDueFire(utcNow))
             Broadcast();
@@ -31,7 +31,7 @@ public sealed class DailyResetBroadcaster(ZoneRegistry zones, ILogger<DailyReset
             ScheduledZoneCenterEventCodes.DailyResetEventCode);
     }
 
-        private void BroadcastToEveryZone<TPacket>(in TPacket response) where TPacket : struct, IOutgoingPacket
+    private void BroadcastToEveryZone<TPacket>(in TPacket response) where TPacket : struct, IOutgoingPacket
     {
         var total = FrameWriter.FrameSizeOf<TPacket>();
         var rented = ArrayPool<byte>.Shared.Rent(total);

@@ -14,8 +14,7 @@ public sealed class RuneStoneCraftService(
     ILogger<RuneStoneCraftService> logger)
     : IRuneStoneCraftService
 {
-
-        private const short EventCode = 3000;
+    private const short EventCode = 3000;
 
     public async ValueTask<RuneStoneCraftResult> CraftAsync(
         int sourcePage, int sourceSlot,

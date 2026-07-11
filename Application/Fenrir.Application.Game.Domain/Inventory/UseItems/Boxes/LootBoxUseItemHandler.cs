@@ -15,14 +15,34 @@ public sealed class LootBoxUseItemHandler(
     IEventLogRepository eventLog,
     ILogger<LootBoxUseItemHandler> logger) : IUseItemHandler
 {
+    private const short BoxOpenBeforeEventCode = 5;
 
-        private const short BoxOpenBeforeEventCode = 5;
-
-        private const short BoxOpenRewardEventCode = 6;
+    private const short BoxOpenRewardEventCode = 6;
 
     private const byte SuccessOutcome = 1;
 
-        public static ImmutableArray<int> HandledItemIds { get; } = LootBoxCatalog.Default.RegisteredBoxIds
+    private static readonly BoxRewardSpec CostumeChestPlaceholderSpec = BoxRewardSpec.Uniform(
+        CostumeChest76543RewardTable.BoxItemId, ImmutableArray<int>.Empty, CostumeChest76543RewardTable.RentalDays);
+
+    private static readonly BoxRewardSpec SkyWarlordChestPlaceholderSpec =
+        BoxRewardSpec.Uniform(WarlordChestRewardTable.SkyChestBoxItemId, ImmutableArray<int>.Empty);
+
+    private static readonly BoxRewardSpec EarthWarlordChestPlaceholderSpec =
+        BoxRewardSpec.Uniform(WarlordChestRewardTable.EarthChestBoxItemId, ImmutableArray<int>.Empty);
+
+    private static readonly BoxRewardSpec HeavenlyJadeChestPlaceholderSpec =
+        BoxRewardSpec.Uniform(HeavenlyJadeChest1236RewardTable.BoxId, ImmutableArray<int>.Empty);
+
+    private static readonly BoxRewardSpec WingLuckyBoxPlaceholderSpec =
+        BoxRewardSpec.Uniform(WingLuckyBox8005RewardTable.BoxId, ImmutableArray<int>.Empty);
+
+    private static readonly BoxRewardSpec LoyKrathongBoxPlaceholderSpec =
+        BoxRewardSpec.Uniform(LoyKrathongBox8108RewardTable.BoxId, ImmutableArray<int>.Empty);
+
+    private static readonly BoxRewardSpec ChestBox720PlaceholderSpec =
+        BoxRewardSpec.Uniform(ChestBox720RewardTable.BoxId, ImmutableArray<int>.Empty);
+
+    public static ImmutableArray<int> HandledItemIds { get; } = LootBoxCatalog.Default.RegisteredBoxIds
         .Add(CostumeChest76543RewardTable.BoxItemId)
         .Add(WarlordChestRewardTable.SkyChestBoxItemId)
         .Add(WarlordChestRewardTable.EarthChestBoxItemId)
@@ -30,27 +50,6 @@ public sealed class LootBoxUseItemHandler(
         .Add(WingLuckyBox8005RewardTable.BoxId)
         .Add(LoyKrathongBox8108RewardTable.BoxId)
         .Add(ChestBox720RewardTable.BoxId);
-
-        private static readonly BoxRewardSpec CostumeChestPlaceholderSpec = BoxRewardSpec.Uniform(
-        CostumeChest76543RewardTable.BoxItemId, ImmutableArray<int>.Empty, CostumeChest76543RewardTable.RentalDays);
-
-        private static readonly BoxRewardSpec SkyWarlordChestPlaceholderSpec =
-        BoxRewardSpec.Uniform(WarlordChestRewardTable.SkyChestBoxItemId, ImmutableArray<int>.Empty);
-
-        private static readonly BoxRewardSpec EarthWarlordChestPlaceholderSpec =
-        BoxRewardSpec.Uniform(WarlordChestRewardTable.EarthChestBoxItemId, ImmutableArray<int>.Empty);
-
-        private static readonly BoxRewardSpec HeavenlyJadeChestPlaceholderSpec =
-        BoxRewardSpec.Uniform(HeavenlyJadeChest1236RewardTable.BoxId, ImmutableArray<int>.Empty);
-
-        private static readonly BoxRewardSpec WingLuckyBoxPlaceholderSpec =
-        BoxRewardSpec.Uniform(WingLuckyBox8005RewardTable.BoxId, ImmutableArray<int>.Empty);
-
-        private static readonly BoxRewardSpec LoyKrathongBoxPlaceholderSpec =
-        BoxRewardSpec.Uniform(LoyKrathongBox8108RewardTable.BoxId, ImmutableArray<int>.Empty);
-
-        private static readonly BoxRewardSpec ChestBox720PlaceholderSpec =
-        BoxRewardSpec.Uniform(ChestBox720RewardTable.BoxId, ImmutableArray<int>.Empty);
 
     public async ValueTask<UseInventoryItemResponse> HandleAsync(UseItemContext context,
         CancellationToken cancellationToken)
@@ -71,7 +70,7 @@ public sealed class LootBoxUseItemHandler(
             : await OpenSingleAsync(context, spec, cancellationToken);
     }
 
-        private static BoxRewardSpec? ResolveSpec(int boxId)
+    private static BoxRewardSpec? ResolveSpec(int boxId)
     {
         if (LootBoxCatalog.Default.TryGetSpec(boxId) is { } spec)
             return spec;
@@ -177,7 +176,7 @@ public sealed class LootBoxUseItemHandler(
         return UseItemResponses.Success(context.Page, context.Index);
     }
 
-        private async ValueTask PersistAndMirrorAsync(UseItemContext context,
+    private async ValueTask PersistAndMirrorAsync(UseItemContext context,
         ImmutableDictionary<byte, ItemStack> originalPage0, ImmutableDictionary<byte, ItemStack> originalPage1,
         ImmutableDictionary<byte, ItemStack> projectedPage0, ImmutableDictionary<byte, ItemStack> projectedPage1,
         CancellationToken cancellationToken)
@@ -211,7 +210,7 @@ public sealed class LootBoxUseItemHandler(
                 context.Zone.MapId, context.CharacterId);
     }
 
-        private async ValueTask AttemptNoticeAsync(UseItemContext context, int rewardItemId, int rewardQuantity,
+    private async ValueTask AttemptNoticeAsync(UseItemContext context, int rewardItemId, int rewardQuantity,
         CancellationToken cancellationToken)
     {
         var rewardType = worldData.ItemsById.TryGetValue(rewardItemId, out var def) ? def.Item.Type : (byte)0;
@@ -232,19 +231,17 @@ public sealed class LootBoxUseItemHandler(
         return worldData.ItemsById.TryGetValue(rewardItemId, out var def) ? def.Item.Sort : null;
     }
 
-        private static Func<int>? ResolveRewardIdOverride(UseItemContext context)
+    private static Func<int>? ResolveRewardIdOverride(UseItemContext context)
     {
         var boxId = context.Item.ItemId;
 
         if (boxId == CloakBoxRewardTable.BoxId)
-        {
             return () =>
             {
                 var result = CloakBoxRewardTable.Roll(context.State.CloakLuckyBoxPity, Random.Shared);
                 context.State.CloakLuckyBoxPity = result.NewPityCounter;
                 return result.RewardItemId;
             };
-        }
 
         if (boxId == CostumeChest76543RewardTable.BoxItemId)
         {
@@ -272,34 +269,28 @@ public sealed class LootBoxUseItemHandler(
         }
 
         if (boxId == M15PetLuckyBox8111RewardTable.BoxId)
-        {
             return () =>
             {
                 var result = M15PetLuckyBox8111RewardTable.Roll(context.State.M15PetLuckyBoxPity, Random.Shared);
                 context.State.M15PetLuckyBoxPity = result.NewPityCounter;
                 return result.RewardItemId;
             };
-        }
 
         if (boxId == CloakVariantBox8114RewardTable.BoxId)
-        {
             return () =>
             {
                 var result = CloakVariantBox8114RewardTable.Roll(context.State.CloakVariantBoxPity, Random.Shared);
                 context.State.CloakVariantBoxPity = result.NewPityCounter;
                 return result.RewardItemId;
             };
-        }
 
         if (boxId == MountVariantBox8115RewardTable.BoxId)
-        {
             return () =>
             {
                 var result = MountVariantBox8115RewardTable.Roll(context.State.MountVariantBoxPity, Random.Shared);
                 context.State.MountVariantBoxPity = result.NewPityCounter;
                 return result.RewardItemId;
             };
-        }
 
         if (boxId == HeavenlyJadeChest1236RewardTable.BoxId)
         {
@@ -344,7 +335,7 @@ public sealed class LootBoxUseItemHandler(
         return null;
     }
 
-        private async ValueTask MirrorM15PetLuckyBoxPityAsync(UseItemContext context, CancellationToken cancellationToken)
+    private async ValueTask MirrorM15PetLuckyBoxPityAsync(UseItemContext context, CancellationToken cancellationToken)
     {
         if (context.Item.ItemId != M15PetLuckyBox8111RewardTable.BoxId)
             return;

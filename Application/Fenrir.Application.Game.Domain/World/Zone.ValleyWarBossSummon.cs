@@ -1,4 +1,3 @@
-using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World.Monsters;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 
@@ -6,14 +5,13 @@ namespace Fenrir.Application.Game.Domain.World;
 
 public sealed partial class Zone
 {
+    private const int ValleyWarBossPoolServerIndexBase = 1_005_000;
 
-        private const int ValleyWarBossPoolServerIndexBase = 1_005_000;
+    private const int ValleyWarBossPoolSize = 10;
 
-        private const int ValleyWarBossPoolSize = 10;
+    private const float ValleyWarBossLeashRadius = 200f;
 
-        private const float ValleyWarBossLeashRadius = 200f;
-
-        internal void HandleSummonValleyWarBoss()
+    internal void HandleSummonValleyWarBoss()
     {
         if (!worldData.MonstersById.TryGetValue(Zone200GateBreachBossCatalog.BossMonsterId, out var definition))
             return;

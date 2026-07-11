@@ -29,12 +29,12 @@ public sealed record GameServerDirectoryRepository(ICaeriusNetDbContext Db, ICae
         return Db.ExecuteAsync(parameters, ct);
     }
 
-        public ValueTask<ImmutableArray<ShardDirectoryEntryDto>> GetDirectoryAsync(CancellationToken ct)
+    public ValueTask<ImmutableArray<ShardDirectoryEntryDto>> GetDirectoryAsync(CancellationToken ct)
     {
         return GetDirectoryAsync(GameServerDirectoryDefaults.StalenessCutoffSeconds, ct);
     }
 
-        public ValueTask<ImmutableArray<ShardDirectoryEntryDto>> GetDirectoryAsync(int stalenessCutoffSeconds,
+    public ValueTask<ImmutableArray<ShardDirectoryEntryDto>> GetDirectoryAsync(int stalenessCutoffSeconds,
         CancellationToken ct)
     {
         var parameters =
@@ -46,7 +46,7 @@ public sealed record GameServerDirectoryRepository(ICaeriusNetDbContext Db, ICae
         return Db.QueryAsImmutableArrayAsync<ShardDirectoryEntryDto>(parameters, ct);
     }
 
-        public async ValueTask MarkUnreachableAsync(byte shardId, CancellationToken ct)
+    public async ValueTask MarkUnreachableAsync(byte shardId, CancellationToken ct)
     {
         var parameters =
             new StoredProcedureParametersBuilder("runtime", "usp_GameServer_MarkUnreachable", 0,

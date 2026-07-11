@@ -107,7 +107,7 @@ public class EquipmentServiceGemSocketWiringTests
         var (p1, p2, p3) = Pack(1, (2, 50));
         var effectTable = new Dictionary<int, GemSocketRowDto>
         {
-            [StatCalculator.GemSocketTypeValueKey(2, 50)] = new GemSocketRowDto(1, 2, 0, 50, 77, 0)
+            [StatCalculator.GemSocketTypeValueKey(2, 50)] = new(1, 2, 0, 50, 77, 0)
         }.ToFrozenDictionary();
         var worldData = WorldData(itemsById, effectTable);
         var attributes = NoBonusAttributes();

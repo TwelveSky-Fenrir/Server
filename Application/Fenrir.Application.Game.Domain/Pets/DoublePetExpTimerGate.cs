@@ -22,19 +22,19 @@ public static class DoublePetExpTimerGate
         [8216] = 3
     }.ToFrozenDictionary();
 
-        public static float ResolveGrowthPercent(int petItemId, int growth)
+    public static float ResolveGrowthPercent(int petItemId, int growth)
     {
         return CategoryByItemId.TryGetValue(petItemId, out var categoryIndex)
             ? StatCalculator.PetGrowPercent(growth, PetGrowthCaps.Values[categoryIndex])
             : 0f;
     }
 
-        public static bool IsAtFreezeThreshold(int petItemId, int growth)
+    public static bool IsAtFreezeThreshold(int petItemId, int growth)
     {
         return ResolveGrowthPercent(petItemId, growth) >= 200f;
     }
 
-        public static int ComputeNextTimerValue(int petItemId, int growth, int currentTimerValue)
+    public static int ComputeNextTimerValue(int petItemId, int growth, int currentTimerValue)
     {
         if (currentTimerValue <= 0)
             return currentTimerValue;

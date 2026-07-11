@@ -6,7 +6,7 @@ public enum TribeVoteAction
 {
     Accept,
 
-        RejectNoAbort,
+    RejectNoAbort,
 
     Abort
 }

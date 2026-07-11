@@ -6,13 +6,12 @@ namespace Fenrir.Application.Game.Domain.Simulation;
 
 public sealed class TimedBuffCountdownSystem : ISimulationSystem
 {
+    private const int MaxMountExp = 100000;
 
-        private const int MaxMountExp = 100000;
-
-        private static readonly FrozenSet<short> GroupAExcludedMaps =
+    private static readonly FrozenSet<short> GroupAExcludedMaps =
         new short[] { 1, 6, 11, 140, 38, 37, 119, 124, 49, 51, 53, 194, 195, 267 }.ToFrozenSet();
 
-        private static readonly FrozenSet<short> GroupBIncludedMaps =
+    private static readonly FrozenSet<short> GroupBIncludedMaps =
         new short[] { 38, 2, 3, 4, 7, 8, 9, 12, 13, 14, 141, 142, 143, 49, 51, 53, 194, 195, 267 }.ToFrozenSet();
 
     public void Simulate(Zone zone, int legacyTicksElapsed)
@@ -107,7 +106,7 @@ public sealed class TimedBuffCountdownSystem : ISimulationSystem
         }
     }
 
-        private static bool TickPaidZoneTimer(PlayerRuntimeState state, int subCode, int current, int minutesElapsed,
+    private static bool TickPaidZoneTimer(PlayerRuntimeState state, int subCode, int current, int minutesElapsed,
         out int newValue)
     {
         if (current > 0)
@@ -121,7 +120,7 @@ public sealed class TimedBuffCountdownSystem : ISimulationSystem
         return true;
     }
 
-        private static int TickTimer(PlayerRuntimeState state, int subCode, int current, int minutesElapsed)
+    private static int TickTimer(PlayerRuntimeState state, int subCode, int current, int minutesElapsed)
     {
         if (current <= 0)
             return current;
@@ -140,7 +139,7 @@ public sealed class TimedBuffCountdownSystem : ISimulationSystem
         return state.MountAccumulatedExp[slot] < MaxMountExp;
     }
 
-        private static bool IsPremiumActive(PlayerRuntimeState state, long nowUnixSeconds)
+    private static bool IsPremiumActive(PlayerRuntimeState state, long nowUnixSeconds)
     {
         return state.PremiumExpireUtc >= nowUnixSeconds;
     }

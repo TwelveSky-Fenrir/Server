@@ -4,12 +4,11 @@ namespace Fenrir.Application.Game.Abstractions.Progression;
 
 public enum HeroRewardClaimOutcome
 {
+    NotRanked,
 
-        NotRanked,
+    AlreadyClaimed,
 
-        AlreadyClaimed,
-
-        Claimed
+    Claimed
 }
 
 public readonly record struct HeroRewardClaimResult(HeroRewardClaimOutcome Outcome);

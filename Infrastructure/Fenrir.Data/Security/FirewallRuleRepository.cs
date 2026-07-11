@@ -24,7 +24,7 @@ public sealed record FirewallRuleRepository(ICaeriusNetDbContext Db) : IFirewall
         return false;
     }
 
-        public async ValueTask BlockAsync(string ipAddress, CancellationToken ct)
+    public async ValueTask BlockAsync(string ipAddress, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("admin", "usp_FirewallRule_Upsert", 2)
             .AddParameter("IpAddress", ipAddress, SqlDbType.VarChar)
@@ -34,13 +34,13 @@ public sealed record FirewallRuleRepository(ICaeriusNetDbContext Db) : IFirewall
         await Db.ExecuteAsync(sp, ct).ConfigureAwait(false);
     }
 
-        public async ValueTask ReconcileAllowlistAsync(CancellationToken ct)
+    public async ValueTask ReconcileAllowlistAsync(CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("admin", "usp_FirewallRule_ReconcileAllowlist").Build();
         await Db.ExecuteAsync(sp, ct).ConfigureAwait(false);
     }
 
-        private ValueTask<ImmutableArray<FirewallRuleRowDto>> GetAllAsync(CancellationToken ct)
+    private ValueTask<ImmutableArray<FirewallRuleRowDto>> GetAllAsync(CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("admin", "usp_FirewallRule_GetAll")
             .AddInMemoryCache("admin:firewall-rules", TimeSpan.FromSeconds(2))

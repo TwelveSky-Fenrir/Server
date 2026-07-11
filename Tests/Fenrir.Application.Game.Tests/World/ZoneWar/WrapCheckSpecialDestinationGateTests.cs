@@ -33,7 +33,7 @@ public class WrapCheckSpecialDestinationGateTests
     [Fact]
     public void GmOrAdminRank_BypassesEveryGroup()
     {
-        var outcome = Evaluate(1, 9999, WinZone038Destination, isGm: true, zone38Winner: 0);
+        var outcome = Evaluate(1, 9999, WinZone038Destination, true, zone38Winner: 0);
 
         Assert.Equal(TribeGuardCorridorMoveOutcome.Allowed, outcome);
     }
@@ -41,7 +41,7 @@ public class WrapCheckSpecialDestinationGateTests
     [Fact]
     public void WinZone038Group_MoverIsTheCurrentHolder_IsAllowed()
     {
-        var outcome = Evaluate(requesterTribe: 2, origin: 1, destination: WinZone038Destination, zone38Winner: 2);
+        var outcome = Evaluate(2, 1, WinZone038Destination, zone38Winner: 2);
 
         Assert.Equal(TribeGuardCorridorMoveOutcome.Allowed, outcome);
     }
@@ -49,8 +49,8 @@ public class WrapCheckSpecialDestinationGateTests
     [Fact]
     public void WinZone038Group_MoverIsTheHoldersDeclaredAlly_IsAllowed()
     {
-        var outcome = Evaluate(requesterTribe: 3, origin: 1, destination: WinZone038Destination, zone38Winner: 2,
-            resolveAlly: holder => holder == 2 ? (byte)3 : null);
+        var outcome = Evaluate(3, 1, WinZone038Destination, zone38Winner: 2,
+            resolveAlly: holder => holder == 2 ? 3 : null);
 
         Assert.Equal(TribeGuardCorridorMoveOutcome.Allowed, outcome);
     }
@@ -66,7 +66,7 @@ public class WrapCheckSpecialDestinationGateTests
             return null;
         }
 
-        Evaluate(requesterTribe: 3, origin: 1, destination: WinZone038Destination, zone38Winner: 2,
+        Evaluate(3, 1, WinZone038Destination, zone38Winner: 2,
             resolveAlly: ResolveAlly);
 
         Assert.Equal((byte)2, queriedWith);
@@ -75,7 +75,7 @@ public class WrapCheckSpecialDestinationGateTests
     [Fact]
     public void WinZone038Group_MoverIsNeitherHolderNorAlly_IsRejectedSoft()
     {
-        var outcome = Evaluate(requesterTribe: 1, origin: 5, destination: WinZone038Destination, zone38Winner: 2);
+        var outcome = Evaluate(1, 5, WinZone038Destination, zone38Winner: 2);
 
         Assert.Equal(TribeGuardCorridorMoveOutcome.RejectedSoft, outcome);
     }
@@ -83,7 +83,7 @@ public class WrapCheckSpecialDestinationGateTests
     [Fact]
     public void WinZone038Group_NobodyHasEverCapturedIt_NeverMatchesAnyTribe()
     {
-        var outcome = Evaluate(requesterTribe: 0, origin: 5, destination: WinZone038Destination, zone38Winner: null);
+        var outcome = Evaluate(0, 5, WinZone038Destination, zone38Winner: null);
 
         Assert.Equal(TribeGuardCorridorMoveOutcome.RejectedSoft, outcome);
     }
@@ -91,7 +91,7 @@ public class WrapCheckSpecialDestinationGateTests
     [Fact]
     public void RebirthGatedGroup_ExactMatch_IsAllowed()
     {
-        var outcome = Evaluate(requesterTribe: 0, origin: 5, destination: RebirthGatedDestination, rebirth: 1);
+        var outcome = Evaluate(0, 5, RebirthGatedDestination, rebirth: 1);
 
         Assert.Equal(TribeGuardCorridorMoveOutcome.Allowed, outcome);
     }
@@ -102,7 +102,7 @@ public class WrapCheckSpecialDestinationGateTests
     [InlineData(12)]
     public void RebirthGatedGroup_AnyOtherRebirthCount_IsRejectedSoft(int rebirth)
     {
-        var outcome = Evaluate(requesterTribe: 0, origin: 5, destination: RebirthGatedDestination, rebirth: rebirth);
+        var outcome = Evaluate(0, 5, RebirthGatedDestination, rebirth: rebirth);
 
         Assert.Equal(TribeGuardCorridorMoveOutcome.RejectedSoft, outcome);
     }
@@ -110,7 +110,7 @@ public class WrapCheckSpecialDestinationGateTests
     [Fact]
     public void InstancedGroup_RebirthAtLeastOne_IsAllowed()
     {
-        var outcome = Evaluate(requesterTribe: 0, origin: 5, destination: InstancedDestination, rebirth: 1);
+        var outcome = Evaluate(0, 5, InstancedDestination, rebirth: 1);
 
         Assert.Equal(TribeGuardCorridorMoveOutcome.Allowed, outcome);
     }
@@ -118,7 +118,7 @@ public class WrapCheckSpecialDestinationGateTests
     [Fact]
     public void InstancedGroup_NeverRebirthed_IsRejectedSoft()
     {
-        var outcome = Evaluate(requesterTribe: 0, origin: 5, destination: InstancedDestination, rebirth: 0);
+        var outcome = Evaluate(0, 5, InstancedDestination, rebirth: 0);
 
         Assert.Equal(TribeGuardCorridorMoveOutcome.RejectedSoft, outcome);
     }
@@ -129,7 +129,7 @@ public class WrapCheckSpecialDestinationGateTests
     [InlineData(InstancedDestination)]
     public void EveryGroupsRejection_InvolvingZone37AsOrigin_IsAHardDisconnect(short destination)
     {
-        var outcome = Evaluate(requesterTribe: 1, origin: 37, destination: destination, rebirth: 0,
+        var outcome = Evaluate(1, 37, destination, rebirth: 0,
             zone38Winner: 2);
 
         Assert.Equal(TribeGuardCorridorMoveOutcome.RejectedHardDisconnect, outcome);
@@ -138,7 +138,7 @@ public class WrapCheckSpecialDestinationGateTests
     [Fact]
     public void NotASpecialDestination_FallsThroughToTheCorridorGatesOwnDefaultAllow()
     {
-        var outcome = Evaluate(requesterTribe: 1, origin: 1, destination: 9999);
+        var outcome = Evaluate(1, 1, 9999);
 
         Assert.Equal(TribeGuardCorridorMoveOutcome.Allowed, outcome);
     }
@@ -148,7 +148,7 @@ public class WrapCheckSpecialDestinationGateTests
     {
         var catalog = TribeGuardCorridorCatalogFactory.BuildLive();
 
-        var outcome = Evaluate(requesterTribe: 1, origin: 2, destination: 1, corridorCatalog: catalog);
+        var outcome = Evaluate(1, 2, 1, corridorCatalog: catalog);
 
         Assert.Equal(TribeGuardCorridorMoveOutcome.RejectedSoft, outcome);
     }

@@ -2,8 +2,7 @@ namespace Fenrir.Application.Game.Domain.World;
 
 public static class PartyBuffMarkerDispatchRules
 {
-
-        public static bool ShouldAdvancePartyBuffMarker(bool isResumeAction, int actionSort)
+    public static bool ShouldAdvancePartyBuffMarker(bool isResumeAction, int actionSort)
     {
         if (!isResumeAction)
             return actionSort is FormationSkillCatalog.PartyBuffArmActionSort
@@ -12,7 +11,7 @@ public static class PartyBuffMarkerDispatchRules
         return actionSort == FormationSkillCatalog.PartyBuffArmActionSort;
     }
 
-        public static bool ShouldResetPartyBuffMarkerOnConfirmSuccess(int skillNumber)
+    public static bool ShouldResetPartyBuffMarkerOnConfirmSuccess(int skillNumber)
     {
         return FormationSkillCatalog.IsPartyBuffSkill(skillNumber);
     }

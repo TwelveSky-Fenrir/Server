@@ -1,5 +1,3 @@
-using Fenrir.Application.Game.Domain.Pets;
-
 namespace Fenrir.Application.Game.Domain.Inventory;
 
 public static class PetBagItemTransferPolicy
@@ -8,35 +6,35 @@ public static class PetBagItemTransferPolicy
     {
         Success,
 
-                NoOp,
+        NoOp,
 
         SourceOutOfRange,
         DestinationOutOfRange,
 
-                DestinationCoordinateOutOfRange,
+        DestinationCoordinateOutOfRange,
 
-                PetNotEquipped,
+        PetNotEquipped,
 
-                PetBagUpperHalfExpired,
+        PetBagUpperHalfExpired,
 
-                SecondInventoryPageExpired,
+        SecondInventoryPageExpired,
 
-                SourceEmpty,
+        SourceEmpty,
 
-                SourceNotAtRest,
+        SourceNotAtRest,
 
-                SourceItemNotPetEligible,
+        SourceItemNotPetEligible,
 
-                DestinationOccupied
+        DestinationOccupied
     }
 
-        public const int BagSlotCount = 20;
+    public const int BagSlotCount = 20;
 
     public const int MaxBagSlotInclusive = BagSlotCount - 1;
 
-        public const int UpperHalfStartSlot = 10;
+    public const int UpperHalfStartSlot = 10;
 
-        public const byte PetBagEligibleSort = 3;
+    public const byte PetBagEligibleSort = 3;
 
     public static bool IsValidBagSlot(int slot)
     {
@@ -48,7 +46,7 @@ public static class PetBagItemTransferPolicy
         return bagSlot >= UpperHalfStartSlot;
     }
 
-        public static DepositResult ResolveDepositFromInventory(
+    public static DepositResult ResolveDepositFromInventory(
         byte inventoryContainer, int inventorySlot, int petBagSlot,
         ItemStack? source, int? destinationBagItemId, byte sourceItemSort,
         bool petEquipped, bool bagUpperHalfEntitlementActive, bool secondInventoryPageEntitlementActive)
@@ -83,7 +81,7 @@ public static class PetBagItemTransferPolicy
         return new DepositResult(TransferOutcome.Success, null, src.ItemId, true);
     }
 
-        public static WithdrawResult ResolveWithdrawToInventory(
+    public static WithdrawResult ResolveWithdrawToInventory(
         int sourceBagSlot, int? sourceBagItemId,
         byte destinationInventoryContainer, int destinationInventorySlot, int destinationX, int destinationY,
         ItemStack? destination, int newSerialNumber,
@@ -117,7 +115,7 @@ public static class PetBagItemTransferPolicy
         return new WithdrawResult(TransferOutcome.Success, null, newSlot, true);
     }
 
-        public static RearrangeResult ResolveRearrangeWithinPetBag(
+    public static RearrangeResult ResolveRearrangeWithinPetBag(
         int sourceBagSlot, int destinationBagSlot,
         int? sourceBagItemId, int? destinationBagItemId, byte sourceItemSort,
         bool petEquipped, bool bagUpperHalfEntitlementActive)
@@ -165,7 +163,7 @@ public static class PetBagItemTransferPolicy
         return new RearrangeResult(outcome, null, null);
     }
 
-        public readonly record struct DepositResult(
+    public readonly record struct DepositResult(
         TransferOutcome Outcome,
         ItemStack? NewGeneralInventorySlot,
         int NewPetBagItemId,
@@ -174,7 +172,7 @@ public static class PetBagItemTransferPolicy
         public bool Succeeded => Outcome is TransferOutcome.Success;
     }
 
-        public readonly record struct WithdrawResult(
+    public readonly record struct WithdrawResult(
         TransferOutcome Outcome,
         int? NewSourcePetBagItemId,
         ItemStack? NewGeneralInventorySlot,
@@ -183,7 +181,7 @@ public static class PetBagItemTransferPolicy
         public bool Succeeded => Outcome is TransferOutcome.Success;
     }
 
-        public readonly record struct RearrangeResult(
+    public readonly record struct RearrangeResult(
         TransferOutcome Outcome,
         int? NewSourcePetBagItemId,
         int? NewDestinationPetBagItemId)

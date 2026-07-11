@@ -19,20 +19,18 @@ public readonly record struct RegularWarRewardGrant(
     int LeaderboardCpAmount,
     bool RequestItemDrop)
 {
-
-        public bool GrantParticipationCounter => true;
+    public bool GrantParticipationCounter => true;
 }
 
 public static class RegularWarRewardCalculator
 {
+    public const int WinningHeroRankPoints = 10;
 
-        public const int WinningHeroRankPoints = 10;
-
-        public const int LosingOrDrawHeroRankPoints = 3;
+    public const int LosingOrDrawHeroRankPoints = 3;
 
     private static readonly ImmutableArray<int> LeaderboardCpByRank = [100, 50, 25];
 
-        public static ImmutableArray<RegularWarRewardGrant> Compute(
+    public static ImmutableArray<RegularWarRewardGrant> Compute(
         RegularWarOutcome outcome,
         byte? winningTribe,
         byte? allyOfWinningTribe,

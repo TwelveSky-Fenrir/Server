@@ -83,7 +83,7 @@ public class TribeActionServiceTests
         return new TribeActionRequest { Sort = 11, Data = new byte[100] };
     }
 
-        private static void Respond(ZoneClientSession session, TribeActionRequest packet, TribeActionOutcome outcome)
+    private static void Respond(ZoneClientSession session, TribeActionRequest packet, TribeActionOutcome outcome)
     {
         if (outcome.Aborted)
         {
@@ -136,7 +136,7 @@ public class TribeActionServiceTests
         Assert.Equal(1_000, state.ContributionPoints);
     }
 
-        [Fact]
+    [Fact]
     public async Task HaloEnchant_NonSameTickAttempt_PassesTheGuard_AndDebitsMoneyAndCp()
     {
         var zone = ZoneTestKit.CreateZone(1);

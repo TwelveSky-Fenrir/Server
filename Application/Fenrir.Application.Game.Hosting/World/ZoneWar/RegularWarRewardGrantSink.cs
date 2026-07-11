@@ -12,7 +12,7 @@ public sealed class RegularWarRewardGrantSink(ZoneRegistry zones, ILogger<Regula
     {
     }
 
-        public void OnSmallestTribeFlagged(short mapId, byte tribeId)
+    public void OnSmallestTribeFlagged(short mapId, byte tribeId)
     {
     }
 
@@ -20,25 +20,21 @@ public sealed class RegularWarRewardGrantSink(ZoneRegistry zones, ILogger<Regula
     {
     }
 
-        public void OnWarConcluded(short mapId, RegularWarOutcome outcome, byte? winningTribe,
+    public void OnWarConcluded(short mapId, RegularWarOutcome outcome, byte? winningTribe,
         ImmutableArray<RegularWarRewardGrant> rewards, bool bossMonstersShouldSpawn)
     {
         if (!rewards.IsDefaultOrEmpty)
         {
             if (!zones.TryGet(mapId, out var rewardZone))
-            {
                 logger.LogWarning(
                     "RegularWar {MapId}: {Count} reward grant(s) computed but this shard no longer hosts the map -- dropped",
                     mapId, rewards.Length);
-            }
             else
-            {
                 foreach (var grant in rewards)
                     if (!rewardZone.Post(ZoneCommand.ApplyRegularWarReward(grant)))
                         logger.LogWarning(
                             "RegularWar {MapId}: reward grant for character {CharacterId} dropped -- zone inbox full",
                             mapId, grant.CharacterId);
-            }
         }
 
         if (!bossMonstersShouldSpawn)

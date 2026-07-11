@@ -20,7 +20,7 @@ public sealed class TradeStartService(TradeRegistry trades, ILogger<TradeStartSe
         return new TradeStartResult(true, trade);
     }
 
-        public void AbortStart(int callerId)
+    public void AbortStart(int callerId)
     {
         if (trades.TryAbortStartForCaller(callerId))
             logger.LogDebug(

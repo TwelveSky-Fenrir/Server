@@ -8,7 +8,7 @@ public class Zone124MassDuelStateTests
     public void Start_SeedsCountdownAndHeadcounts_AndRaisesActive()
     {
         var state = new Zone124MassDuelState();
-        state.Start(team1Count: 4, team2Count: 3);
+        state.Start(4, 3);
 
         Assert.True(state.Active);
         Assert.Equal(Zone124MassDuelState.StartUnits, state.RemainingUnits);
@@ -149,7 +149,7 @@ public class Zone124MassDuelStateTests
         Assert.Equal(Zone124DuelWinner.Team2, state.DecideWinner());
     }
 
-        private static void DriveDownTo(Zone124MassDuelState state, int target)
+    private static void DriveDownTo(Zone124MassDuelState state, int target)
     {
         while (state.RemainingUnits > target)
             state.Advance();

@@ -7,10 +7,9 @@ namespace Fenrir.Application.Game.Domain.World;
 
 public sealed partial class Zone
 {
+    private const DisconnectReason Zone175TerminalDisconnectReason = DisconnectReason.LabyrinthMissionEnded;
 
-        private const DisconnectReason Zone175TerminalDisconnectReason = DisconnectReason.LabyrinthMissionEnded;
-
-        public bool HasAnyZone175QualifyingPlayer()
+    public bool HasAnyZone175QualifyingPlayer()
     {
         foreach (var (_, state) in _players)
             if (Zone175EligibilityRules.IsPresent(state))
@@ -19,7 +18,7 @@ public sealed partial class Zone
         return false;
     }
 
-        public int CountLivingZone175WaveBosses(byte specialType)
+    public int CountLivingZone175WaveBosses(byte specialType)
     {
         var count = 0;
         foreach (var (_, monster) in _monsters)
@@ -29,7 +28,7 @@ public sealed partial class Zone
         return count;
     }
 
-        public void RemoveZone175MissionMonsters()
+    public void RemoveZone175MissionMonsters()
     {
         foreach (var (index, monster) in _monsters)
             if (Zone175RewardTables.IsWaveBossSpecialType(monster.Template.SpecialType) &&
@@ -37,7 +36,7 @@ public sealed partial class Zone
                 RemoveMonsterFromGrid(monster);
     }
 
-        public void GrantZone175WaveReward(int stage, float experienceRatio)
+    public void GrantZone175WaveReward(int stage, float experienceRatio)
     {
         var money = Math.Min(Zone175RewardTables.MoneyForStage(stage), StoreMoneyPolicy.MaxMoney);
         var contributionPoints = Zone175RewardTables.ContributionPointsForStage(stage);
@@ -71,7 +70,7 @@ public sealed partial class Zone
         }
     }
 
-        public void ForceDisconnectAllForZone175()
+    public void ForceDisconnectAllForZone175()
     {
         List<ClientSession>? toKick = null;
         foreach (var (_, state) in _players)

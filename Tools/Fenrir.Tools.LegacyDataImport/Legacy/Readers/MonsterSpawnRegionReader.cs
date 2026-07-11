@@ -17,7 +17,7 @@ internal static class MonsterSpawnRegionReader
         return ReadAllRaw(summonDirectory, out _, out _);
     }
 
-        public static IReadOnlyList<MonsterSpawnRegionRecord> ReadAllRaw(string summonDirectory, out int fileCount,
+    public static IReadOnlyList<MonsterSpawnRegionRecord> ReadAllRaw(string summonDirectory, out int fileCount,
         out int skippedLineCount)
     {
         var files = Directory.EnumerateFiles(summonDirectory, SearchPattern, SearchOption.AllDirectories)
@@ -73,18 +73,18 @@ internal static class MonsterSpawnRegionReader
         return records;
     }
 
-        public static IReadOnlyList<MonsterSpawnRegionRecord> ReadAll(string summonDirectory)
+    public static IReadOnlyList<MonsterSpawnRegionRecord> ReadAll(string summonDirectory)
     {
         return ReadAllRaw(summonDirectory);
     }
 
-        public static IReadOnlyList<MonsterSpawnRegionRecord> ReadAll(string summonDirectory, out int fileCount,
+    public static IReadOnlyList<MonsterSpawnRegionRecord> ReadAll(string summonDirectory, out int fileCount,
         out int skippedLineCount)
     {
         return ReadAllRaw(summonDirectory, out fileCount, out skippedLineCount);
     }
 
-        private static bool TryParseLine(string line, out int[] values)
+    private static bool TryParseLine(string line, out int[] values)
     {
         values = [];
         var fields = line.Split('|');

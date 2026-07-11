@@ -12,17 +12,17 @@ public sealed class ProxyShopBroadcastEntry(
 {
     public int CharacterId { get; } = characterId;
 
-        public int UniqueNumber { get; } = uniqueNumber;
+    public int UniqueNumber { get; } = uniqueNumber;
 
-        public string OwnerName { get; } = ownerName;
+    public string OwnerName { get; } = ownerName;
 
-        public string ShopName { get; } = shopName;
+    public string ShopName { get; } = shopName;
 
     public float PosX { get; } = posX;
     public float PosY { get; } = posY;
     public float PosZ { get; } = posZ;
 
-        public int ShopDate { get; set; } = shopDate;
+    public int ShopDate { get; set; } = shopDate;
 
-        public TimeSpan LastBroadcastAt { get; set; }
+    public TimeSpan LastBroadcastAt { get; set; }
 }

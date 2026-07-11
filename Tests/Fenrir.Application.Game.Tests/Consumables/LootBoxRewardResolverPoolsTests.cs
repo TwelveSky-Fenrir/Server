@@ -42,7 +42,8 @@ public class LootBoxRewardResolverPoolsTests
     public void RollPools_Empty_Throws()
     {
         Assert.Throws<ArgumentException>(() =>
-            LootBoxRewardResolver.RollPools(new ScriptedRandom(0), ImmutableArray<LootBoxRewardResolver.RewardPool>.Empty));
+            LootBoxRewardResolver.RollPools(new ScriptedRandom(0),
+                ImmutableArray<LootBoxRewardResolver.RewardPool>.Empty));
     }
 
     [Fact]
@@ -82,14 +83,15 @@ public class LootBoxRewardResolverPoolsTests
         Assert.Equal(expectNewCounter, result.NewCounter);
     }
 
-        private sealed class ScriptedRandom(params int[] values) : Random
+    private sealed class ScriptedRandom(params int[] values) : Random
     {
         private int _index;
 
         public override int Next(int minValue, int maxValue)
         {
             if (_index >= values.Length)
-                throw new InvalidOperationException("ScriptedRandom exhausted: the code drew more values than scripted.");
+                throw new InvalidOperationException(
+                    "ScriptedRandom exhausted: the code drew more values than scripted.");
 
             return values[_index++];
         }

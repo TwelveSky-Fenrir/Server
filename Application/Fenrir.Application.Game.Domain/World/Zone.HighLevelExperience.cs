@@ -9,12 +9,11 @@ namespace Fenrir.Application.Game.Domain.World;
 
 public sealed partial class Zone
 {
+    private const int RebirthTierLevelUpAvatarChangeInfoSort = 11;
 
-        private const int RebirthTierLevelUpAvatarChangeInfoSort = 11;
+    private const int Zone101TimeStatSort = 18;
 
-        private const int Zone101TimeStatSort = 18;
-
-        public void ApplyHighLevelExperienceGain(PlayerRuntimeState target, int gain,
+    public void ApplyHighLevelExperienceGain(PlayerRuntimeState target, int gain,
         bool antiCheatExperienceFlagged = false)
     {
         var input = HighLevelExperienceInputFactory.Build(target, gain, antiCheatExperienceFlagged,
@@ -43,7 +42,7 @@ public sealed partial class Zone
         }
     }
 
-        private void ApplyRebirthTierLevelUp(PlayerRuntimeState target, HighLevelExperienceOutcome outcome)
+    private void ApplyRebirthTierLevelUp(PlayerRuntimeState target, HighLevelExperienceOutcome outcome)
     {
         var equipmentContainer = target.Inventory.GetContainer(ContainerMatrix.Equipment);
         var petItemId = equipmentContainer.TryGetValue(PetSlots.EquipmentSlot, out var petStack)
@@ -55,7 +54,7 @@ public sealed partial class Zone
             target.StatDex, target.Level, target.Tribe, target.PreviousTribe, target.Title, target.Halo,
             target.RebirthCount, target.Level2);
         var stats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData, target.Buffs,
-            petContribution, runtimeState: target);
+            petContribution, target);
 
         target.Stats = stats;
         target.MaxLife = stats.MaxLife;

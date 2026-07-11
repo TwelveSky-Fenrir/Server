@@ -4,8 +4,7 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 
 public static class WeakestTribeByPoints
 {
-
-        public static byte Resolve(IReadOnlyList<int> tribePoints)
+    public static byte Resolve(IReadOnlyList<int> tribePoints)
     {
         ArgumentNullException.ThrowIfNull(tribePoints);
         if (tribePoints.Count != WorldStateService.TribeCount)
@@ -20,7 +19,7 @@ public static class WeakestTribeByPoints
         return weakest;
     }
 
-        public static byte Resolve(WorldStateService worldState)
+    public static byte Resolve(WorldStateService worldState)
     {
         ArgumentNullException.ThrowIfNull(worldState);
 

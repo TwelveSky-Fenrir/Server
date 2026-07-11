@@ -4,12 +4,11 @@ namespace Fenrir.Application.Game.Domain.Commerce;
 
 public static class CostumeSearchWhitelist
 {
+    public const int CostumeCategory = 4;
 
-        public const int CostumeCategory = 4;
+    public static readonly FrozenSet<int> ItemIds = BuildWhitelist();
 
-        public static readonly FrozenSet<int> ItemIds = BuildWhitelist();
-
-        public static bool Contains(int itemId)
+    public static bool Contains(int itemId)
     {
         return ItemIds.Contains(itemId);
     }

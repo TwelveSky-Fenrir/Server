@@ -12,8 +12,7 @@ namespace Fenrir.Application.Game.Handlers.Handlers.Commerce;
 public sealed class OpenShopStallHandler(IOpenShopStallService service, ILogger<OpenShopStallHandler> logger)
     : IAsyncPacketHandler<OpenShopStallRequest>
 {
-
-        public const short PshopZoneNumber = ProxyShopZonePolicy.ZoneNumber;
+    public const short PshopZoneNumber = ProxyShopZonePolicy.ZoneNumber;
 
     public async ValueTask HandleAsync(OpenShopStallRequest packet, IPacketSession session,
         CancellationToken cancellationToken)

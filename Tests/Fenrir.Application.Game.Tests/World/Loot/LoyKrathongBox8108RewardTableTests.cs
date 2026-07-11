@@ -125,7 +125,7 @@ public class LoyKrathongBox8108RewardTableTests
         Assert.Equal([90793, 90792, 90794], LoyKrathongBox8108RewardTable.EpicIdsByPreviousTribe[2].ToArray());
     }
 
-        [Fact]
+    [Fact]
     public void Roll_NeverAcceptsAnyClientSuppliedValue_SignatureHasNoSuchParameter()
     {
         var method = typeof(LoyKrathongBox8108RewardTable).GetMethod(nameof(LoyKrathongBox8108RewardTable.Roll));
@@ -137,12 +137,12 @@ public class LoyKrathongBox8108RewardTableTests
         Assert.Equal(typeof(Random), parameters[1].ParameterType);
     }
 
-        [Fact]
+    [Fact]
     public void Roll_AcrossManyRealRandomDraws_EveryRewardIsAlwaysWithinTheKnownTable()
     {
         var random = new Random(20260711);
 
-        foreach (byte tribe in new byte[] { 0, 1, 2 })
+        foreach (var tribe in new byte[] { 0, 1, 2 })
             for (var i = 0; i < 5_000; i++)
             {
                 var result = LoyKrathongBox8108RewardTable.Roll(tribe, random);
@@ -152,7 +152,7 @@ public class LoyKrathongBox8108RewardTableTests
             }
     }
 
-        private sealed class ScriptedRandom(params int[] values) : Random
+    private sealed class ScriptedRandom(params int[] values) : Random
     {
         private int _index;
 

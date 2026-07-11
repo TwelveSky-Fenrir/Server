@@ -190,7 +190,7 @@ public class WarPointShopServiceTests
         var (zone, state) = SetUp(worldData);
         var warPoints = new FakeWarPointRepository();
         var eventLog = new FakeEventLogRepository();
-        var service = CreateService(worldData, Catalog(contributionPointPrice: 100), warPoints, eventLog);
+        var service = CreateService(worldData, Catalog(100), warPoints, eventLog);
 
         var result = await RunToCompletionAsync(
             service.TryBuyAsync(zone, state, AccountId, CharacterId, WpNpc, WpItemId, 1, DestinationPage,

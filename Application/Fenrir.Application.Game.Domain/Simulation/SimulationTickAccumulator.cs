@@ -4,7 +4,7 @@ public sealed class SimulationTickAccumulator
 {
     private TimeSpan _accumulated;
 
-        public int Advance(TimeSpan elapsed)
+    public int Advance(TimeSpan elapsed)
     {
         if (elapsed <= TimeSpan.Zero)
             return 0;

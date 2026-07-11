@@ -6,19 +6,18 @@ namespace Fenrir.Application.Game.Domain.World;
 
 public static class ZoneTransfer
 {
-
-        private static readonly byte[] AllContainers =
+    private static readonly byte[] AllContainers =
     [
         ContainerMatrix.InventoryPage0, ContainerMatrix.InventoryPage1, ContainerMatrix.Equipment,
         ContainerMatrix.StorePage0, ContainerMatrix.StorePage1
     ];
 
-        public static bool Request(Zone source, Zone target, int characterId)
+    public static bool Request(Zone source, Zone target, int characterId)
     {
         return source.Post(ZoneCommand.Leave(characterId, target));
     }
 
-        public static PlayerEnterData CreateEnterData(PlayerRuntimeState state, short targetMapId,
+    public static PlayerEnterData CreateEnterData(PlayerRuntimeState state, short targetMapId,
         (float X, float Y, float Z)? position = null)
     {
         var (posX, posY, posZ) = position ?? (state.PosX, state.PosY, state.PosZ);
@@ -129,10 +128,9 @@ public static class ZoneTransfer
 
 public static class ZoneTransferBuffRules
 {
+    public const short BuffClearDestinationZoneId = 124;
 
-        public const short BuffClearDestinationZoneId = 124;
-
-        public static BuffInfo Resolve(BuffInfo liveBuffs, short targetMapId)
+    public static BuffInfo Resolve(BuffInfo liveBuffs, short targetMapId)
     {
         return targetMapId == BuffClearDestinationZoneId
             ? new BuffInfo { Buff = new int[70] }

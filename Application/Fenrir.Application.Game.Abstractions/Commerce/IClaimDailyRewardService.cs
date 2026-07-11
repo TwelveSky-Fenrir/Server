@@ -5,7 +5,6 @@ namespace Fenrir.Application.Game.Abstractions.Commerce;
 
 public interface IClaimDailyRewardService
 {
-
-        public ValueTask<ClaimDailyRewardResponse?> ResolveAndApplyAsync(ClaimDailyRewardRequest packet, Zone zone,
+    public ValueTask<ClaimDailyRewardResponse?> ResolveAndApplyAsync(ClaimDailyRewardRequest packet, Zone zone,
         PlayerRuntimeState state, int characterId, CancellationToken cancellationToken);
 }

@@ -69,7 +69,7 @@ internal sealed class FakeWorldStateRepository : IWorldStateRepository
         throw new NotSupportedException();
     }
 
-        public static FakeWorldStateRepository Empty()
+    public static FakeWorldStateRepository Empty()
     {
         return new FakeWorldStateRepository();
     }

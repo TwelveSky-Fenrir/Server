@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
 using Fenrir.Application.Game.Domain.Quests;
-using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Stats;
 
 namespace Fenrir.Application.Game.Domain.Tribes;
@@ -71,8 +70,7 @@ public readonly record struct TribeProgressZoneCommand(
     short? Level2 = null,
     long? Experience = null,
     int? M15PetLuckyBoxPity = null,
-
-                int? BigMoneyDelta = null,
+    int? BigMoneyDelta = null,
     TaskCompletionSource? Applied = null);
 
 public readonly record struct TribeGroundItemDrop(int ItemId, int Quantity, int DropSort = 0);

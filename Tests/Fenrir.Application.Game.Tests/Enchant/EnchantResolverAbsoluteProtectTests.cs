@@ -28,7 +28,7 @@ public class EnchantResolverAbsoluteProtectTests
     public void FailAbove41_AbsoluteTicketAvailable_LeavesEnchantCompletelyUntouched()
     {
         var result = EnchantResolver.Resolve(Equip(1), Target(45), Material(1023), 0, 0,
-            0, new ScriptedRandomSource(99), protectForDestroy2Charges: 1);
+            0, new ScriptedRandomSource(99), 1);
 
         Assert.Equal(EnchantResolver.EnchantOutcome.Protected, result.Outcome);
         Assert.Equal(45, result.NewEnchant);
@@ -40,7 +40,7 @@ public class EnchantResolverAbsoluteProtectTests
     public void FailAbove41_BothProtectResourcesAvailable_AbsoluteTicketTakesPriority()
     {
         var result = EnchantResolver.Resolve(Equip(1), Target(45), Material(1023), 0, 1,
-            0, new ScriptedRandomSource(99), protectForDestroy2Charges: 1);
+            0, new ScriptedRandomSource(99), 1);
 
         Assert.Equal(EnchantResolver.EnchantOutcome.Protected, result.Outcome);
         Assert.Equal(45, result.NewEnchant);
@@ -52,7 +52,7 @@ public class EnchantResolverAbsoluteProtectTests
     public void FailAbove41_OnlyOrdinaryProtectAvailable_FallsBackAndDecrementsByOne()
     {
         var result = EnchantResolver.Resolve(Equip(1), Target(45), Material(1023), 0, 1,
-            0, new ScriptedRandomSource(99), protectForDestroy2Charges: 0);
+            0, new ScriptedRandomSource(99), 0);
 
         Assert.Equal(EnchantResolver.EnchantOutcome.Protected, result.Outcome);
         Assert.Equal(44, result.NewEnchant);
@@ -64,7 +64,7 @@ public class EnchantResolverAbsoluteProtectTests
     public void FailAtExactly41_AbsoluteTicketNeverConsulted_UnconditionalResetToForty()
     {
         var result = EnchantResolver.Resolve(Equip(1), Target(41), Material(1023), 0, 0,
-            0, new ScriptedRandomSource(20), protectForDestroy2Charges: 1);
+            0, new ScriptedRandomSource(20), 1);
 
         Assert.Equal(EnchantResolver.EnchantOutcome.ResetToForty, result.Outcome);
         Assert.Equal(40, result.NewEnchant);
@@ -75,7 +75,7 @@ public class EnchantResolverAbsoluteProtectTests
     public void FailAbove41_NoProtectResourceAvailable_ResetsToForty()
     {
         var result = EnchantResolver.Resolve(Equip(1), Target(45), Material(1023), 0, 0,
-            0, new ScriptedRandomSource(99), protectForDestroy2Charges: 0);
+            0, new ScriptedRandomSource(99), 0);
 
         Assert.Equal(EnchantResolver.EnchantOutcome.ResetToForty, result.Outcome);
         Assert.Equal(40, result.NewEnchant);

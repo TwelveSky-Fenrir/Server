@@ -22,7 +22,7 @@ public sealed class RegularWarSchedulerHost(
 
     private readonly Dictionary<short, RegularWarSchedule> _schedules = new();
 
-        public void Tick(TimeSpan elapsed)
+    public void Tick(TimeSpan elapsed)
     {
         var wholeTicks = _accumulator.Advance(elapsed);
         for (var i = 0; i < wholeTicks; i++)
@@ -105,7 +105,7 @@ public sealed class RegularWarSchedulerHost(
         sink.OnWarConcluded(mapConfig.MapId, outcome, winningTribe, rewards, bossMonstersShouldSpawn);
     }
 
-        private static void CreditDailyMissionAndWaterfallQuest(Zone zone)
+    private static void CreditDailyMissionAndWaterfallQuest(Zone zone)
     {
         foreach (var player in zone.Players)
         {

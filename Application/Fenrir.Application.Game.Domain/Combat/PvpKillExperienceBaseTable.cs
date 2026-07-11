@@ -2,18 +2,17 @@ namespace Fenrir.Application.Game.Domain.Combat;
 
 public static class PvpKillExperienceBaseTable
 {
+    public const int MinCombinedLevel = 1;
 
-        public const int MinCombinedLevel = 1;
+    public const int MaxCombinedLevel = 157;
 
-        public const int MaxCombinedLevel = 157;
+    public const int LowTierBase = 110;
 
-        public const int LowTierBase = 110;
+    public const int HighTier1Base = 330;
 
-        public const int HighTier1Base = 330;
+    public const int HighTier2Base = 360;
 
-        public const int HighTier2Base = 360;
-
-        public const int HighTier3Base = 390;
+    public const int HighTier3Base = 390;
 
     private static readonly int[] BaseByCombinedLevelIndex = BuildTable();
 
@@ -36,7 +35,7 @@ public static class PvpKillExperienceBaseTable
         return table;
     }
 
-        public static int Lookup(int victimCombinedLevel)
+    public static int Lookup(int victimCombinedLevel)
     {
         if (victimCombinedLevel is < MinCombinedLevel or > MaxCombinedLevel)
             return 0;

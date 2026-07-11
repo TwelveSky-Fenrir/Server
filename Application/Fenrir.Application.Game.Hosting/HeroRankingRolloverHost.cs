@@ -36,7 +36,7 @@ public sealed class HeroRankingRolloverHost(
         } while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false));
     }
 
-        private void NotifyConnectedSessions()
+    private void NotifyConnectedSessions()
     {
         foreach (var zone in zones.Zones)
             zone.PostHeroRankingRolloverReset();

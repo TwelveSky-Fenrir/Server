@@ -31,8 +31,7 @@ public sealed class LoginConnectionHost(
     IpFloodGuard ipFloodGuard,
     ILogger<LoginConnectionHost> logger) : BackgroundService
 {
-
-        private const short LoginSessionEndedEventCode = 2;
+    private const short LoginSessionEndedEventCode = 2;
 
     private readonly ConcurrentDictionary<Task, byte> _inFlightConnections = new();
 
@@ -62,7 +61,7 @@ public sealed class LoginConnectionHost(
         }
     }
 
-        public override async Task StopAsync(CancellationToken cancellationToken)
+    public override async Task StopAsync(CancellationToken cancellationToken)
     {
         await base.StopAsync(cancellationToken).ConfigureAwait(false);
 
@@ -86,7 +85,7 @@ public sealed class LoginConnectionHost(
         }
     }
 
-        private Task TrackInFlightAsync(LoginClientSession loginSession, SocketConnection connection, CancellationToken ct)
+    private Task TrackInFlightAsync(LoginClientSession loginSession, SocketConnection connection, CancellationToken ct)
     {
         var task = OnAcceptedAsync(loginSession, connection, ct);
 
@@ -155,7 +154,7 @@ public sealed class LoginConnectionHost(
         }
     }
 
-        private async ValueTask TearDownAccountSessionAsync(int accountId, Guid? sessionToken)
+    private async ValueTask TearDownAccountSessionAsync(int accountId, Guid? sessionToken)
     {
         try
         {
@@ -176,7 +175,7 @@ public sealed class LoginConnectionHost(
         }
     }
 
-        private async ValueTask LogLoginSessionEndedAsync(int accountId, LoginSessionState finalState)
+    private async ValueTask LogLoginSessionEndedAsync(int accountId, LoginSessionState finalState)
     {
         try
         {
@@ -191,7 +190,7 @@ public sealed class LoginConnectionHost(
         }
     }
 
-        private void Greet(LoginClientSession session, SocketConnection connection)
+    private void Greet(LoginClientSession session, SocketConnection connection)
     {
         var randomNumber = RandomNumberGenerator.GetInt32(int.MinValue, int.MaxValue);
 
@@ -207,7 +206,7 @@ public sealed class LoginConnectionHost(
                 session.SessionId, packet.MaxPlayerNum, packet.PresentPlayerNum);
     }
 
-        public LoginGreetingResponse BuildGreetingPacket(int randomNumber)
+    public LoginGreetingResponse BuildGreetingPacket(int randomNumber)
     {
         return new LoginGreetingResponse
         {

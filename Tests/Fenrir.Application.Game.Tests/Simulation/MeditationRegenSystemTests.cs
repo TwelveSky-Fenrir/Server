@@ -14,12 +14,11 @@ namespace Fenrir.Application.Game.Tests.Simulation;
 
 public class MeditationRegenSystemTests
 {
+    private const int CharacterHpStatSort = 10;
 
-        private const int CharacterHpStatSort = 10;
+    private const int CharacterMpStatSort = 11;
 
-        private const int CharacterMpStatSort = 11;
-
-        private static byte[] ExpectedFrames(params ReadOnlySpan<AvatarStatUpdateResponse> packets)
+    private static byte[] ExpectedFrames(params ReadOnlySpan<AvatarStatUpdateResponse> packets)
     {
         var frameSize = FrameWriter.FrameSizeOf<AvatarStatUpdateResponse>();
         var buffer = new byte[frameSize * packets.Length];

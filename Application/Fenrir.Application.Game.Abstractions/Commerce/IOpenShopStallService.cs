@@ -7,14 +7,13 @@ namespace Fenrir.Application.Game.Abstractions.Commerce;
 
 public enum OpenShopStallPrepareOutcome
 {
+    Abort,
 
-        Abort,
+    LiveOpened,
 
-        LiveOpened,
+    ProxyReady,
 
-        ProxyReady,
-
-        Blocked
+    Blocked
 }
 
 public readonly record struct OpenShopStallPrepareResult(
@@ -25,11 +24,10 @@ public readonly record struct OpenShopStallPrepareResult(
 
 public interface IOpenShopStallService
 {
-
-        public ValueTask<OpenShopStallPrepareResult> PrepareAsync(OpenShopStallRequest packet, PlayerRuntimeState state,
+    public ValueTask<OpenShopStallPrepareResult> PrepareAsync(OpenShopStallRequest packet, PlayerRuntimeState state,
         CancellationToken cancellationToken);
 
-        public ValueTask<OpenShopStallResponse> OpenProxyShopAsync(OpenShopStallRequest packet, Zone zone,
+    public ValueTask<OpenShopStallResponse> OpenProxyShopAsync(OpenShopStallRequest packet, Zone zone,
         PlayerRuntimeState state, int characterId, int accountId, PshopInfo listing,
         List<OfflineShopItemSlotTvp> offlineItems, CancellationToken cancellationToken);
 }

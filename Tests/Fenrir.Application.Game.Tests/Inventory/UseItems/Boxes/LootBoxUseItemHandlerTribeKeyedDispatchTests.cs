@@ -19,6 +19,24 @@ public class LootBoxUseItemHandlerTribeKeyedDispatchTests
     private const int CharacterId = 10;
     private const byte RewardSort = 4;
 
+
+    private static readonly int[] HeavenlyJadeChestFullPoolForTribeZero =
+        [2307, 1321, 1324, 1007, 1008, 126, 601, 602, 2249, 506, 508, 509, 578, 579, 1045];
+
+
+    private static readonly int[] WingLuckyBoxFullPoolForTribeZero =
+    [
+        213, 216, 2477, 201, 2397, 694, 693, 692, 696, 698, 506, 507, 508, 509, 578, 579, 1166, 1118, 1103, 1222, 1145,
+        1237
+    ];
+
+
+    private static readonly int[] LoyKrathongBoxFullPoolForTribeZero =
+    [
+        1407, 1403, 1404, 90787, 90786, 90788, 826, 619,
+        1103, 1237, 1166, 578, 579, 1017, 1018, 1092, 1093, 698, 696, 695
+    ];
+
     private static async Task<UseInventoryItemResponse> RunToCompletionAsync(
         ValueTask<UseInventoryItemResponse> pending, Zone zone)
     {
@@ -292,10 +310,6 @@ public class LootBoxUseItemHandlerTribeKeyedDispatchTests
             stack => pool.Contains(stack.ItemId));
     }
 
-
-    private static readonly int[] HeavenlyJadeChestFullPoolForTribeZero =
-        [2307, 1321, 1324, 1007, 1008, 126, 601, 602, 2249, 506, 508, 509, 578, 579, 1045];
-
     [Fact]
     public async Task HeavenlyJadeChest1236_RecognizedTribe_GrantsSomeMemberOfTheFullKnownPool_AndConsumesBox()
     {
@@ -316,10 +330,6 @@ public class LootBoxUseItemHandlerTribeKeyedDispatchTests
         Assert.Contains(granted.ItemId, HeavenlyJadeChestFullPoolForTribeZero);
     }
 
-
-    private static readonly int[] WingLuckyBoxFullPoolForTribeZero =
-        [213, 216, 2477, 201, 2397, 694, 693, 692, 696, 698, 506, 507, 508, 509, 578, 579, 1166, 1118, 1103, 1222, 1145, 1237];
-
     [Fact]
     public async Task WingLuckyBox8005_RecognizedTribe_GrantsSomeMemberOfTheFullKnownPool_AndConsumesBox()
     {
@@ -339,13 +349,6 @@ public class LootBoxUseItemHandlerTribeKeyedDispatchTests
         var granted = after.Inventory.GetContainer(ContainerMatrix.InventoryPage0).Values.Single();
         Assert.Contains(granted.ItemId, WingLuckyBoxFullPoolForTribeZero);
     }
-
-
-    private static readonly int[] LoyKrathongBoxFullPoolForTribeZero =
-    [
-        1407, 1403, 1404, 90787, 90786, 90788, 826, 619,
-        1103, 1237, 1166, 578, 579, 1017, 1018, 1092, 1093, 698, 696, 695
-    ];
 
     [Fact]
     public async Task LoyKrathongBox8108_SingleOpen_RecognizedTribe_GrantsSomeMemberOfTheFullKnownPool()
@@ -368,7 +371,8 @@ public class LootBoxUseItemHandlerTribeKeyedDispatchTests
     }
 
     [Fact]
-    public async Task LoyKrathongBox8108_SECURITY_ClientSuppliedExtremeValue_NeverInfluencesGrantedReward_OnlyClampsBulkCount()
+    public async Task
+        LoyKrathongBox8108_SECURITY_ClientSuppliedExtremeValue_NeverInfluencesGrantedReward_OnlyClampsBulkCount()
     {
         var (zone, state, characters) = SetUp();
         state.PreviousTribe = 0;

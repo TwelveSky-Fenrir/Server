@@ -15,28 +15,27 @@ public enum AccountSessionClaimOutcome : byte
     ConflictGameKicked = 2,
     ConflictTearingDown = 3,
 
-        ReclaimedDeadShard = 4
+    ReclaimedDeadShard = 4
 }
 
 public interface IAccountSessionRepository
 {
-
-        public ValueTask<AccountSessionClaimDto> ClaimOrSignalKickAsync(int accountId, Guid newSessionToken,
+    public ValueTask<AccountSessionClaimDto> ClaimOrSignalKickAsync(int accountId, Guid newSessionToken,
         CancellationToken ct);
 
-        public ValueTask<bool> TransitionToGameAsync(int accountId, Guid expectedSessionToken, byte shardId,
+    public ValueTask<bool> TransitionToGameAsync(int accountId, Guid expectedSessionToken, byte shardId,
         CancellationToken ct);
 
-        public ValueTask MarkTearingDownAsync(int accountId, AccountSessionServerKind serverKind, byte? shardId,
+    public ValueTask MarkTearingDownAsync(int accountId, AccountSessionServerKind serverKind, byte? shardId,
         Guid sessionToken, CancellationToken ct);
 
-        public ValueTask ClearIfOwnerAsync(int accountId, AccountSessionServerKind serverKind, byte? shardId,
+    public ValueTask ClearIfOwnerAsync(int accountId, AccountSessionServerKind serverKind, byte? shardId,
         Guid sessionToken, CancellationToken ct);
 
-        public ValueTask<ImmutableArray<KickedAccountDto>> RefreshAndGetKickedAsync(AccountSessionServerKind serverKind,
+    public ValueTask<ImmutableArray<KickedAccountDto>> RefreshAndGetKickedAsync(AccountSessionServerKind serverKind,
         byte? shardId, IReadOnlyCollection<int> accountIds, CancellationToken ct);
 
-        public ValueTask<ImmutableArray<ReapedAccountSessionDto>> ReapStaleAsync(CancellationToken ct);
+    public ValueTask<ImmutableArray<ReapedAccountSessionDto>> ReapStaleAsync(CancellationToken ct);
 
-        public ValueTask<int> GetActiveSessionCountAsync(CancellationToken ct);
+    public ValueTask<int> GetActiveSessionCountAsync(CancellationToken ct);
 }

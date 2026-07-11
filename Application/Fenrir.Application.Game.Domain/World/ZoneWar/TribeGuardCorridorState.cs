@@ -8,7 +8,7 @@ public sealed class TribeGuardCorridorState
 
     private readonly bool[,] _open = new bool[TribeCount, SegmentCount];
 
-        public bool IsOpen(byte tribeId, byte segmentIndex)
+    public bool IsOpen(byte tribeId, byte segmentIndex)
     {
         ValidateTribeId(tribeId);
         ValidateSegmentIndex(segmentIndex);
@@ -19,7 +19,7 @@ public sealed class TribeGuardCorridorState
         }
     }
 
-        public bool TrySetOpen(byte tribeId, byte segmentIndex, bool isOpen)
+    public bool TrySetOpen(byte tribeId, byte segmentIndex, bool isOpen)
     {
         ValidateTribeId(tribeId);
         ValidateSegmentIndex(segmentIndex);

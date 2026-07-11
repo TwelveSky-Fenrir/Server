@@ -6,7 +6,7 @@ public enum DeathCause
     PlayerKill,
     MonsterKill,
 
-        StunLock,
+    StunLock,
 
-        Duel
+    Duel
 }

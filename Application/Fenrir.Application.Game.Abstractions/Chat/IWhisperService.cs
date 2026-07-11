@@ -4,21 +4,19 @@ namespace Fenrir.Application.Game.Abstractions.Chat;
 
 public interface IWhisperService
 {
-
-        public ValueTask<WhisperResolution> ResolveAsync(PlayerRuntimeState sender, string targetAvatarName,
+    public ValueTask<WhisperResolution> ResolveAsync(PlayerRuntimeState sender, string targetAvatarName,
         string content, int senderAuthType, CancellationToken cancellationToken);
 }
 
 public enum WhisperOutcome
 {
+    SelfWhisper,
 
-        SelfWhisper,
+    TargetNotFound,
 
-        TargetNotFound,
+    Delivered,
 
-        Delivered,
-
-        QueuedCrossShard
+    QueuedCrossShard
 }
 
 public readonly record struct WhisperResolution(

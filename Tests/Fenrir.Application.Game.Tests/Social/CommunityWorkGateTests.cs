@@ -51,7 +51,7 @@ public class CommunityWorkGateTests
     [Fact]
     public void IsBusy_PersonalShopOpen_ReturnsTrue()
     {
-        var player = MakePlayer(PlayerId, pshopOpen: true);
+        var player = MakePlayer(PlayerId, true);
         var (duels, trades, friends, parties, mentors, guildInvites) = MakeRegistries();
 
         Assert.True(CommunityWorkGate.IsBusy(player, duels, trades, friends, parties, mentors, guildInvites));

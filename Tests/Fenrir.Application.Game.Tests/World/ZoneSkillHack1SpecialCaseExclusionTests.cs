@@ -39,7 +39,7 @@ public class ZoneSkillHack1SpecialCaseExclusionTests
         return (zone, session, state!, eventLog);
     }
 
-        [Fact]
+    [Fact]
     public void NonExemptSkill_ClaimedGradeFarAboveServerMax_TripsSkillHack1_Disconnects()
     {
         var (zone, session, state, eventLog) = SetUp();
@@ -75,7 +75,7 @@ public class ZoneSkillHack1SpecialCaseExclusionTests
         Assert.Empty(eventLog.Enqueued);
     }
 
-        [Fact]
+    [Fact]
     public void SkillNumberZero_NeverTripsSkillHack1_RegardlessOfClaimedGrade()
     {
         var (zone, session, state, eventLog) = SetUp();
@@ -89,7 +89,7 @@ public class ZoneSkillHack1SpecialCaseExclusionTests
         Assert.Empty(eventLog.Enqueued);
     }
 
-        [Fact]
+    [Fact]
     public void BottleExemption_UnderTheExactZoneWiringFormula_IsExempt_ForPrimaryHandlerOnly()
     {
         const int bottleSkillNumber = FormationSkillCatalog.BottleSkillNumber;
@@ -100,23 +100,25 @@ public class ZoneSkillHack1SpecialCaseExclusionTests
         var learnedSkills = ImmutableDictionary<byte, LearnedSkill>.Empty;
 
         var isRealSkillCastPrimary = bottleSkillNumber != 0 &&
-            !FormationSkillCatalog.IsExemptFromGradeBoundCheck(bottleSkillNumber, bottleActionSort,
-                isPrimaryHandler: true);
+                                     !FormationSkillCatalog.IsExemptFromGradeBoundCheck(bottleSkillNumber,
+                                         bottleActionSort,
+                                         true);
         var isRealSkillCastSecondary = bottleSkillNumber != 0 &&
-            !FormationSkillCatalog.IsExemptFromGradeBoundCheck(bottleSkillNumber, bottleActionSort,
-                isPrimaryHandler: false);
+                                       !FormationSkillCatalog.IsExemptFromGradeBoundCheck(bottleSkillNumber,
+                                           bottleActionSort,
+                                           false);
 
         Assert.False(isRealSkillCastPrimary);
         Assert.True(isRealSkillCastSecondary);
 
         var primaryOffense = SkillCastGuard.Evaluate(new SkillCastGuardContext(
-            SkillCategoryCode: 2, IsAutoState: false, ClaimedSkillNumber: bottleSkillNumber,
-            ClaimedInvestedGrade: 999, ClaimedBonusGrade: 0, ServerBonusGrade: 0, ServerMaxGrade: -1,
-            IsRealSkillCast: isRealSkillCastPrimary, Hotkeys: hotkeys, LearnedSkills: learnedSkills));
+            2, false, bottleSkillNumber,
+            999, 0, 0, -1,
+            isRealSkillCastPrimary, hotkeys, learnedSkills));
         var secondaryOffense = SkillCastGuard.Evaluate(new SkillCastGuardContext(
-            SkillCategoryCode: 2, IsAutoState: false, ClaimedSkillNumber: bottleSkillNumber,
-            ClaimedInvestedGrade: 999, ClaimedBonusGrade: 0, ServerBonusGrade: 0, ServerMaxGrade: -1,
-            IsRealSkillCast: isRealSkillCastSecondary, Hotkeys: hotkeys, LearnedSkills: learnedSkills));
+            2, false, bottleSkillNumber,
+            999, 0, 0, -1,
+            isRealSkillCastSecondary, hotkeys, learnedSkills));
 
         Assert.Equal(SkillCastOffense.None, primaryOffense);
         Assert.Equal(SkillCastOffense.SkillHack1, secondaryOffense);

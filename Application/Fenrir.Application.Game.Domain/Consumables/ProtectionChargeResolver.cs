@@ -6,14 +6,14 @@ public static class ProtectionChargeResolver
     {
         Success,
 
-                WouldExceedCeiling,
+        WouldExceedCeiling,
 
-                HaloRankTooHigh
+        HaloRankTooHigh
     }
 
-        public const int HaloRankGateThreshold = 96;
+    public const int HaloRankGateThreshold = 96;
 
-        public static ChargeResult ResolveCharmCharge(int currentCounter, int perUnitAmount, int bulkUnitCount)
+    public static ChargeResult ResolveCharmCharge(int currentCounter, int perUnitAmount, int bulkUnitCount)
     {
         var totalAmount = (long)perUnitAmount * bulkUnitCount;
         var added = BankedCounterMath.AddWideSafe(currentCounter, totalAmount);
@@ -23,7 +23,7 @@ public static class ProtectionChargeResolver
             : new ChargeResult(ChargeOutcome.WouldExceedCeiling, currentCounter, 0);
     }
 
-        public static ChargeResult ResolveCpProtCharmCharge(int currentCounter, int perUnitAmount, int bulkUnitCount,
+    public static ChargeResult ResolveCpProtCharmCharge(int currentCounter, int perUnitAmount, int bulkUnitCount,
         int haloRank)
     {
         return haloRank >= HaloRankGateThreshold
@@ -31,7 +31,7 @@ public static class ProtectionChargeResolver
             : ResolveCharmCharge(currentCounter, perUnitAmount, bulkUnitCount);
     }
 
-        public static ChargeResult ResolveScrollCharge(int currentCounter, int fixedAmount)
+    public static ChargeResult ResolveScrollCharge(int currentCounter, int fixedAmount)
     {
         var added = BankedCounterMath.AddNarrow(currentCounter, fixedAmount);
 

@@ -5,6 +5,5 @@ namespace Fenrir.Network.Serialization.Shared.Packets.Shared;
 [FenrirWireType(4)]
 public readonly partial record struct GmFfaEventStartPayload : IFenrirWireType<GmFfaEventStartPayload>
 {
-
-        public required int Time { get; init; }
+    public required int Time { get; init; }
 }

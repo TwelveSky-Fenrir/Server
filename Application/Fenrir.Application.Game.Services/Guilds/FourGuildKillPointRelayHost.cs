@@ -6,8 +6,7 @@ namespace Fenrir.Application.Game.Services.Guilds;
 
 public sealed class FourGuildKillPointRelayHost : BackgroundService, IFourGuildKillPointQueue
 {
-
-        public const int Capacity = 1024;
+    public const int Capacity = 1024;
 
     private readonly Channel<int> _channel;
     private readonly ILogger<FourGuildKillPointRelayHost> _logger;
@@ -27,7 +26,7 @@ public sealed class FourGuildKillPointRelayHost : BackgroundService, IFourGuildK
         });
     }
 
-        public bool Enqueue(int guildId)
+    public bool Enqueue(int guildId)
     {
         if (_channel.Writer.TryWrite(guildId))
             return true;
@@ -38,7 +37,7 @@ public sealed class FourGuildKillPointRelayHost : BackgroundService, IFourGuildK
         return false;
     }
 
-        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         try
         {

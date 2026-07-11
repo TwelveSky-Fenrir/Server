@@ -8,9 +8,9 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
 {
     private readonly Dictionary<(int CharacterId, byte Container, byte Slot), int> _itemIdBySlot = new();
 
-        private readonly List<CharacterRosterItemDto> _rosterItems = [];
+    private readonly List<CharacterRosterItemDto> _rosterItems = [];
 
-        private readonly Dictionary<int, CharacterRosterDto> _rosterOverridesByCharacterId = new();
+    private readonly Dictionary<int, CharacterRosterDto> _rosterOverridesByCharacterId = new();
 
     private readonly List<CharacterSummaryDto> _summaries;
     private readonly Dictionary<int, CharacterWorldEntryDto> _worldEntriesByCharacterId;
@@ -24,17 +24,17 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
         _worldEntriesByCharacterId = worldEntries.ToDictionary(w => w.CharacterId);
     }
 
-        public Exception? CreateWithStarterKitException { get; set; }
+    public Exception? CreateWithStarterKitException { get; set; }
 
-        public Exception? DeleteException { get; set; }
+    public Exception? DeleteException { get; set; }
 
-        public CreateWithStarterKitCall? LastCreateWithStarterKit { get; private set; }
+    public CreateWithStarterKitCall? LastCreateWithStarterKit { get; private set; }
 
-        public List<(int CharacterId, byte Container, byte Slot)> QueriedItemSlots { get; } = [];
+    public List<(int CharacterId, byte Container, byte Slot)> QueriedItemSlots { get; } = [];
 
-        public List<(int AccountId, byte Slot)> DeleteCalls { get; } = [];
+    public List<(int AccountId, byte Slot)> DeleteCalls { get; } = [];
 
-        public ClampVitalsFloorCall? LastClampVitalsFloor { get; private set; }
+    public ClampVitalsFloorCall? LastClampVitalsFloor { get; private set; }
 
     public ValueTask<int?> GetItemIdAtSlotAsync(int characterId, byte container, byte slot, CancellationToken ct)
     {
@@ -280,7 +280,7 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
         throw new NotSupportedException();
     }
 
-        private static CharacterRosterDto ToRosterDto(CharacterSummaryDto summary)
+    private static CharacterRosterDto ToRosterDto(CharacterSummaryDto summary)
     {
         return new CharacterRosterDto(
             summary.CharacterId,
@@ -312,19 +312,19 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
             0);
     }
 
-        public FakeCharacterRepository WithRosterCharacter(CharacterRosterDto rosterCharacter)
+    public FakeCharacterRepository WithRosterCharacter(CharacterRosterDto rosterCharacter)
     {
         _rosterOverridesByCharacterId[rosterCharacter.CharacterId] = rosterCharacter;
         return this;
     }
 
-        public FakeCharacterRepository WithRosterItem(CharacterRosterItemDto item)
+    public FakeCharacterRepository WithRosterItem(CharacterRosterItemDto item)
     {
         _rosterItems.Add(item);
         return this;
     }
 
-        public FakeCharacterRepository WithItemAtSlot(int characterId, byte container, byte slot, int itemId)
+    public FakeCharacterRepository WithItemAtSlot(int characterId, byte container, byte slot, int itemId)
     {
         _itemIdBySlot[(characterId, container, slot)] = itemId;
         return this;
@@ -335,12 +335,12 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
         return new FakeCharacterRepository([summary], [worldEntry]);
     }
 
-        public static FakeCharacterRepository WithNone()
+    public static FakeCharacterRepository WithNone()
     {
         return new FakeCharacterRepository([], []);
     }
 
-        public static FakeCharacterRepository WithSummaries(params CharacterSummaryDto[] summaries)
+    public static FakeCharacterRepository WithSummaries(params CharacterSummaryDto[] summaries)
     {
         return new FakeCharacterRepository(summaries, []);
     }

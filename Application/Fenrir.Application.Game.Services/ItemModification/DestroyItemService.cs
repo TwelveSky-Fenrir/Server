@@ -17,10 +17,9 @@ public sealed class DestroyItemService(
     ILogger<DestroyItemService> logger)
     : IDestroyItemService
 {
+    private const short DestroyItemEventCode = 1;
 
-        private const short DestroyItemEventCode = 1;
-
-        private const byte SuccessOutcome = 1;
+    private const byte SuccessOutcome = 1;
 
     public async ValueTask<DestroyItemResult> DestroyAsync(DestroyItemRequest packet, Zone zone,
         PlayerRuntimeState state, int characterId, int accountId, CancellationToken cancellationToken)

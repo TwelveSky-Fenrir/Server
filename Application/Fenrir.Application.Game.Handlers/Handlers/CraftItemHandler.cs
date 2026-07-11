@@ -218,7 +218,7 @@ public sealed class CraftItemHandler(ICraftItemService craftItemService, ILogger
         }
     }
 
-        private static int MaterialResultCode(ItemStack? remainingMaterial)
+    private static int MaterialResultCode(ItemStack? remainingMaterial)
     {
         return remainingMaterial is null ? 1001 : 10001;
     }
@@ -228,17 +228,17 @@ public sealed class CraftItemHandler(ICraftItemService craftItemService, ILogger
         return remainingMaterial is { } m ? [m.ItemId, 0, 0, m.Quantity, 0, m.Serial] : [0, 0, 0, 0, 0, 0];
     }
 
-        private static CraftItemResponse StandardResponse(CraftFamilyResult result)
+    private static CraftItemResponse StandardResponse(CraftFamilyResult result)
     {
         return new CraftItemResponse { Result = WireResult(1001, result.ResultItemId), Value = ResponseValue(result) };
     }
 
-        private static CraftItemResponse WingP1Response(CraftFamilyResult result)
+    private static CraftItemResponse WingP1Response(CraftFamilyResult result)
     {
         return new CraftItemResponse { Result = WireResult(1002, result.ResultItemId), Value = ResponseValue(result) };
     }
 
-        private static CraftItemResponse WingP3Response(CraftFamilyResult result)
+    private static CraftItemResponse WingP3Response(CraftFamilyResult result)
     {
         return new CraftItemResponse { Result = WireResult(1003, result.ResultItemId), Value = ResponseValue(result) };
     }
@@ -253,7 +253,7 @@ public sealed class CraftItemHandler(ICraftItemService craftItemService, ILogger
         return [result.ResultItemId, 0, 0, result.ResultQuantity, 0, result.Serial];
     }
 
-        private static void SendGrantedItem(IPacketSession session, CraftFamilyResult result)
+    private static void SendGrantedItem(IPacketSession session, CraftFamilyResult result)
     {
         if (result.GrantedItem is not { } granted)
             return;

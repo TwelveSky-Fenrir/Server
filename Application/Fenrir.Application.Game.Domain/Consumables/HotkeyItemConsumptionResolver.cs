@@ -7,50 +7,47 @@ namespace Fenrir.Application.Game.Domain.Consumables;
 
 public static class HotkeyItemConsumptionResolver
 {
-
-        public enum EffectKind
+    public enum EffectKind
     {
-
-                None,
+        None,
 
         Life,
         Mana,
         LifeAndMana,
 
-                Buff
+        Buff
     }
 
     public enum Outcome
     {
+        Disconnect,
 
-                Disconnect,
+        RejectedClean,
 
-                RejectedClean,
-
-                Success
+        Success
     }
 
-        private const int DarkAttackBuffSlot = 15;
+    private const int DarkAttackBuffSlot = 15;
 
-        private const int HitRateBuffSlot = 17;
+    private const int HitRateBuffSlot = 17;
 
-        private const int DodgeRateBuffSlot = 18;
+    private const int DodgeRateBuffSlot = 18;
 
-        private const int DarkAttackBuffPercent = 3;
+    private const int DarkAttackBuffPercent = 3;
 
-        private const int HitOrDodgeBuffPercent = 25;
+    private const int HitOrDodgeBuffPercent = 25;
 
-        public const int MaxPotionSortNum = 16;
+    public const int MaxPotionSortNum = 16;
 
-        public const byte ConsumableItemCategory = 2;
+    public const byte ConsumableItemCategory = 2;
 
-        private static readonly int AssassinScrollDurationTicks =
+    private static readonly int AssassinScrollDurationTicks =
         SimulationClock.ToWholeLegacyTicks(TimeSpan.FromSeconds(40));
 
-        private static readonly int SixtySecondBuffDurationTicks =
+    private static readonly int SixtySecondBuffDurationTicks =
         SimulationClock.ToWholeLegacyTicks(TimeSpan.FromSeconds(60));
 
-        public static Result Resolve(
+    public static Result Resolve(
         int page, int index, HotkeySlot slot,
         bool isStunned, bool isDead, bool canUseConsumables,
         bool itemResolved, byte itemCategory, int potionType1, int potionType2,
@@ -132,7 +129,7 @@ public static class HotkeyItemConsumptionResolver
             ImmutableArray<SkillCastResolver.BuffWrite>.Empty);
     }
 
-        private static Result SucceedWithBuff(HotkeySlot slot, int buffSlot, int value, int durationTicks)
+    private static Result SucceedWithBuff(HotkeySlot slot, int buffSlot, int value, int durationTicks)
     {
         var remaining = slot.Value2 - 1;
         var newSlot = remaining > 0 ? slot with { Value2 = remaining } : HotkeySlot.Empty;
@@ -140,14 +137,14 @@ public static class HotkeyItemConsumptionResolver
         return new Result(Outcome.Success, newSlot, EffectKind.Buff, 0, 0, write);
     }
 
-        private static int ComputeClampedGain(bool isPercent, int potionType2, int effectiveMax, int current)
+    private static int ComputeClampedGain(bool isPercent, int potionType2, int effectiveMax, int current)
     {
         var raw = isPercent ? effectiveMax * potionType2 / 100 : potionType2;
         var headroom = effectiveMax - current;
         return Math.Clamp(raw, 0, headroom);
     }
 
-        public readonly record struct Result(
+    public readonly record struct Result(
         Outcome Outcome,
         HotkeySlot NewSlot,
         EffectKind Effect,

@@ -42,7 +42,7 @@ public class CpTicketResolverTests
     [Fact]
     public void Resolve_PlainClick_UsesExactlyOneUnit()
     {
-        var result = CpTicketResolver.Resolve(691, requestedValue: 0, stackQuantity: 10, currentContributionPoints: 0);
+        var result = CpTicketResolver.Resolve(691, 0, 10, 0);
 
         Assert.True(result.Succeeded);
         Assert.Equal(1, result.UnitsConsumed);
@@ -53,7 +53,7 @@ public class CpTicketResolverTests
     [Fact]
     public void Resolve_BulkRequest_ClampedToOnHandStock()
     {
-        var result = CpTicketResolver.Resolve(691, requestedValue: 999, stackQuantity: 4, currentContributionPoints: 100);
+        var result = CpTicketResolver.Resolve(691, 999, 4, 100);
 
         Assert.True(result.Succeeded);
         Assert.Equal(4, result.UnitsConsumed);
@@ -64,8 +64,8 @@ public class CpTicketResolverTests
     [Fact]
     public void Resolve_BulkRequest_ClampedToDuplicationCeiling()
     {
-        var result = CpTicketResolver.Resolve(1499, requestedValue: 5000, stackQuantity: 5000,
-            currentContributionPoints: 0);
+        var result = CpTicketResolver.Resolve(1499, 5000, 5000,
+            0);
 
         Assert.True(result.Succeeded);
         Assert.Equal(BulkUseCoercion.MaxStackQuantity, result.UnitsConsumed);
@@ -75,7 +75,7 @@ public class CpTicketResolverTests
     [Fact]
     public void Resolve_RequestedValueBelowOne_FlooredToOneUnit()
     {
-        var result = CpTicketResolver.Resolve(692, requestedValue: 0, stackQuantity: 10, currentContributionPoints: 0);
+        var result = CpTicketResolver.Resolve(692, 0, 10, 0);
 
         Assert.True(result.Succeeded);
         Assert.Equal(1, result.UnitsConsumed);
@@ -85,8 +85,8 @@ public class CpTicketResolverTests
     [Fact]
     public void Resolve_UnrecognizedItemId_ReportsInsufficientQuantity()
     {
-        var result = CpTicketResolver.Resolve(999999, requestedValue: 1, stackQuantity: 10,
-            currentContributionPoints: 100);
+        var result = CpTicketResolver.Resolve(999999, 1, 10,
+            100);
 
         Assert.Equal(CpTicketResolver.Outcome.InsufficientQuantity, result.Outcome);
         Assert.Equal(100, result.NewContributionPoints);
@@ -95,7 +95,7 @@ public class CpTicketResolverTests
     [Fact]
     public void Resolve_ZeroStackQuantity_ReportsInsufficientQuantity()
     {
-        var result = CpTicketResolver.Resolve(691, requestedValue: 1, stackQuantity: 0, currentContributionPoints: 100);
+        var result = CpTicketResolver.Resolve(691, 1, 0, 100);
 
         Assert.Equal(CpTicketResolver.Outcome.InsufficientQuantity, result.Outcome);
         Assert.Equal(100, result.NewContributionPoints);
@@ -104,8 +104,8 @@ public class CpTicketResolverTests
     [Fact]
     public void Resolve_WouldExceedCeiling_Rejects_ContributionPointsUntouched()
     {
-        var result = CpTicketResolver.Resolve(1499, requestedValue: 1, stackQuantity: 1,
-            currentContributionPoints: BankedCounterMath.GlobalCeiling);
+        var result = CpTicketResolver.Resolve(1499, 1, 1,
+            BankedCounterMath.GlobalCeiling);
 
         Assert.Equal(CpTicketResolver.Outcome.WouldExceedCeiling, result.Outcome);
         Assert.Equal(BankedCounterMath.GlobalCeiling, result.NewContributionPoints);

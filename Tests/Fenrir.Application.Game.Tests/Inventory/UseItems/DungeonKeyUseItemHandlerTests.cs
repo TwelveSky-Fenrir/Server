@@ -69,7 +69,8 @@ public class DungeonKeyUseItemHandlerTests
         state.DungeonKeyTime = 5;
         var item = Ticket();
 
-        var response = await RunToCompletionAsync(handler.HandleAsync(Context(zone, state, item), CancellationToken.None), zone);
+        var response =
+            await RunToCompletionAsync(handler.HandleAsync(Context(zone, state, item), CancellationToken.None), zone);
 
         Assert.Equal(0, response.Result);
         Assert.Equal(6, response.Value);
@@ -97,7 +98,7 @@ public class DungeonKeyUseItemHandlerTests
     public async Task ZeroStackQuantity_FailsCleanly()
     {
         var (zone, state, characters, handler) = SetUp();
-        var item = Ticket(quantity: 0);
+        var item = Ticket(0);
 
         var response = await handler.HandleAsync(Context(zone, state, item), CancellationToken.None);
 

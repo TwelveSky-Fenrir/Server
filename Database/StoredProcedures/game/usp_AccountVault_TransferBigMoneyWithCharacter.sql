@@ -4,10 +4,10 @@
 -- AccountVault row on first use, same posture as usp_AccountVault_TransferMoneyWithCharacter.
 -- Réf. C++ : Server/ts25zone/S04_MyWork05.cpp:3736-3769 (ProcessForInventoryMoneyTo1BSaveMoney) ; :3771-3804
 -- (ProcessFor1BSaveMoneyToInventoryMoney) ; Server/Header/Protocol/DEFINE.h:367 (MAX_NUMBER_SIZE2 = 999).
-CREATE PROCEDURE game.usp_AccountVault_TransferBigMoneyWithCharacter @CharacterId            INT,
+CREATE PROCEDURE game.usp_AccountVault_TransferBigMoneyWithCharacter @CharacterId INT,
                                                                      @DeltaCharacterBigMoney INT,
-                                                                     @AccountId              INT,
-                                                                     @DeltaVaultBigMoney     INT
+                                                                     @AccountId INT,
+                                                                     @DeltaVaultBigMoney INT
 AS
 BEGIN
     SET NOCOUNT ON;

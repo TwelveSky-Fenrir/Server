@@ -10,8 +10,7 @@ public sealed record AlliancePostSite(
 
 public static class AlliancePostOccupantScanner
 {
-
-        public static (AllianceCeremonyCandidate? PostOne, AllianceCeremonyCandidate? PostTwo) Scan(Zone zone,
+    public static (AllianceCeremonyCandidate? PostOne, AllianceCeremonyCandidate? PostTwo) Scan(Zone zone,
         AlliancePostSite site)
     {
         var postOne = FindQualifyingLeader(zone, site.Post0X, site.Post0Z, site.Radius);

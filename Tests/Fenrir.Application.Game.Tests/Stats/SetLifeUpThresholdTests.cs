@@ -19,7 +19,7 @@ public class SetLifeUpThresholdTests
         return dict.ToFrozenDictionary();
     }
 
-        private static ItemRowDto QualifyingItem(int itemId)
+    private static ItemRowDto QualifyingItem(int itemId)
     {
         return new ItemRowDto(itemId, $"Item{itemId}", null, null, null,
             0, 2, 0, 0, 0,
@@ -35,7 +35,7 @@ public class SetLifeUpThresholdTests
             0, 0, 0, 0, 0);
     }
 
-        private static ItemRowDto NonQualifyingItem(int itemId)
+    private static ItemRowDto NonQualifyingItem(int itemId)
     {
         return new ItemRowDto(itemId, $"Item{itemId}", null, null, null,
             0, 2, 0, 0, 0,
@@ -56,7 +56,7 @@ public class SetLifeUpThresholdTests
         return new EquippedItemSlot(slotIndex, item, 0, combine, 0, 0);
     }
 
-        private static EquippedItemSlot[] SixQualifyingSlotsAtCombine(byte combine)
+    private static EquippedItemSlot[] SixQualifyingSlotsAtCombine(byte combine)
     {
         return SixSlots.Select(slot => Equip(slot, QualifyingItem(90000 + slot), combine)).ToArray();
     }
@@ -87,7 +87,7 @@ public class SetLifeUpThresholdTests
         Assert.Equal(0, stats.MaxLife);
     }
 
-        [Fact]
+    [Fact]
     public void ComputeBaseStats_FiveOfSixSlotsQualify_GrantsNothingNotAPartialBonus()
     {
         var equipment = SixSlots
@@ -101,7 +101,7 @@ public class SetLifeUpThresholdTests
         Assert.Equal(0, stats.MaxLife);
     }
 
-        [Fact]
+    [Fact]
     public void ComputeBaseStats_FourOfSixSlotsQualify_GrantsNothingDespiteMatchingTheDeadBranchsThreshold()
     {
         var equipment = SixSlots
@@ -115,7 +115,7 @@ public class SetLifeUpThresholdTests
         Assert.Equal(0, stats.MaxLife);
     }
 
-        [Fact]
+    [Fact]
     public void ComputeBaseStats_AllSixQualifyButOnlyFiveReachStricterValue_GrantsOnlyTheLowerTerm()
     {
         var equipment = SixSlots

@@ -6,14 +6,13 @@ namespace Fenrir.Network.Serialization.Zone.Packets.Zone;
 [FenrirPacket(FenrirServer.Zone, FenrirDirection.Outgoing, Opcodes.Zone.Outgoing.FishingLine, ExpectedSize = 21)]
 public readonly partial record struct FishingLineResponse : IOutgoingPacket
 {
-
-        public required int ServerIndex { get; init; }
+    public required int ServerIndex { get; init; }
 
     public required uint UniqueNumber { get; init; }
 
-        public required int Result { get; init; }
+    public required int Result { get; init; }
 
-        public required int FishingState { get; init; }
+    public required int FishingState { get; init; }
 
-        public required int FishingStep { get; init; }
+    public required int FishingStep { get; init; }
 }

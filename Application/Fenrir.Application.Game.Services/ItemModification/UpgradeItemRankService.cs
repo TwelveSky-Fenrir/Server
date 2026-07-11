@@ -19,10 +19,9 @@ public sealed class UpgradeItemRankService(
     ILogger<UpgradeItemRankService> logger)
     : IUpgradeItemRankService
 {
+    private const short UpgradeItemRankEventCode = 27;
 
-        private const short UpgradeItemRankEventCode = 27;
-
-        private const byte SuccessOutcome = 0;
+    private const byte SuccessOutcome = 0;
 
     private const byte FailedOutcome = 1;
 

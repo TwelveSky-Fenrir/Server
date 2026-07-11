@@ -27,7 +27,7 @@ internal sealed class FakeGuildRepository : IGuildRepository
         private set;
     }
 
-        public (int GuildId, int CharacterId)? LastDisband { get; private set; }
+    public (int GuildId, int CharacterId)? LastDisband { get; private set; }
 
     public (int GuildId, int BuffType, int BuffState, int BuffTime, long BuffTimeForDiff)? LastSetBuff
     {
@@ -35,7 +35,7 @@ internal sealed class FakeGuildRepository : IGuildRepository
         private set;
     }
 
-        public CharacterGuildMembershipDto? MembershipToReturn { get; set; }
+    public CharacterGuildMembershipDto? MembershipToReturn { get; set; }
 
     public ValueTask<GuildSummaryDto?> GetByIdAsync(int guildId, CancellationToken ct)
     {

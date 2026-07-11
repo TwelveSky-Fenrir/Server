@@ -4,15 +4,15 @@ public enum ForcedNeutralTribeResetOutcome
 {
     Success,
 
-        LevelTooLow,
+    LevelTooLow,
 
-        AlreadyNeutral,
+    AlreadyNeutral,
 
-        HoldsTribeRole,
+    HoldsTribeRole,
 
-        HasGuildOrMentorLink,
+    HasGuildOrMentorLink,
 
-        HasRegisteredFriends,
+    HasRegisteredFriends,
 
-        NeutralHomeZoneOffline
+    NeutralHomeZoneOffline
 }

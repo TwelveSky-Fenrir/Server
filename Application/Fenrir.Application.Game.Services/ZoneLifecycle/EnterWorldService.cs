@@ -426,7 +426,7 @@ public sealed class EnterWorldService(
         }
     }
 
-        private static bool IsTribeAndPreviousTribeConsistent(byte tribe, byte previousTribe)
+    private static bool IsTribeAndPreviousTribeConsistent(byte tribe, byte previousTribe)
     {
         return tribe switch
         {
@@ -448,7 +448,7 @@ public sealed class EnterWorldService(
         return builder.ToImmutable();
     }
 
-        private static BuffInfo BuildBuffInfo(IReadOnlyList<CharacterBuffDto> buffs)
+    private static BuffInfo BuildBuffInfo(IReadOnlyList<CharacterBuffDto> buffs)
     {
         var buff = new int[70];
 
@@ -464,7 +464,7 @@ public sealed class EnterWorldService(
         return WorldStateTemplates.ZeroedBuffInfo with { Buff = buff };
     }
 
-        private static int[] BuildEffectValueForView(IReadOnlyList<CharacterBuffDto> buffs)
+    private static int[] BuildEffectValueForView(IReadOnlyList<CharacterBuffDto> buffs)
     {
         var effectValueForView = new int[35];
 
@@ -475,7 +475,7 @@ public sealed class EnterWorldService(
         return effectValueForView;
     }
 
-        private static (ImmutableArray<int> RuneSystem, ImmutableArray<int> RuneSystemStat) BuildRuneArrays(
+    private static (ImmutableArray<int> RuneSystem, ImmutableArray<int> RuneSystemStat) BuildRuneArrays(
         IReadOnlyCollection<CharacterRuneSocketDto> rows)
     {
         var runeSystem = new int[RuneStatDecoder.SocketCount];

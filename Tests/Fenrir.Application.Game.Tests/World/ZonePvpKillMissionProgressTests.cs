@@ -37,7 +37,7 @@ public class ZonePvpKillMissionProgressTests
         };
     }
 
-        private static Zone SetUpZone(int attackerId, params int[] defenderIds)
+    private static Zone SetUpZone(int attackerId, params int[] defenderIds)
     {
         var worldState = ZoneTestKit.CreateWorldState();
         var zone = ZoneTestKit.CreateZone(49, randomSource: new ScriptedRandomSource(0, 0), worldState: worldState,

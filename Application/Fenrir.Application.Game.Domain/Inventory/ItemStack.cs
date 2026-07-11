@@ -33,13 +33,13 @@ public readonly record struct ItemStack(
             SocketGem1, SocketGem2, SocketGem3, ExpireDate, Serial);
     }
 
-        public AccountVaultItemSlotTvp ToVaultTvp(short slotIndex)
+    public AccountVaultItemSlotTvp ToVaultTvp(short slotIndex)
     {
         return new AccountVaultItemSlotTvp(slotIndex, ItemId, Quantity,
             ItemValueCodec.Encode(Enchant, Combine, Refine, Socket), Serial, null);
     }
 
-        public static ItemStack FromVaultRow(AccountVaultItemSlotDto row)
+    public static ItemStack FromVaultRow(AccountVaultItemSlotDto row)
     {
         var (enchant, combine, refine, socket) = ItemValueCodec.Decode(row.Value);
         return new ItemStack(row.ItemId ?? 0, row.Quantity, enchant, combine, refine, socket, 0, 0, 0, 0,

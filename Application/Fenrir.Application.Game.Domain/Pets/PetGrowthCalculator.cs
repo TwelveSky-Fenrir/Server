@@ -6,10 +6,9 @@ namespace Fenrir.Application.Game.Domain.Pets;
 
 public static class PetGrowthCalculator
 {
+    private static readonly int[] MaxRangeValue = [40_000_000, 80_000_000, 160_000_000, 320_000_000];
 
-        private static readonly int[] MaxRangeValue = [40_000_000, 80_000_000, 160_000_000, 320_000_000];
-
-        private static readonly FrozenDictionary<int, int> LifeFamily = BuildFamily(
+    private static readonly FrozenDictionary<int, int> LifeFamily = BuildFamily(
         [1004],
         [544, 1007, 1009, 1011],
         [545, 549, 562, 1012, 1014, 1015, 17053, 86820],
@@ -17,7 +16,7 @@ public static class PetGrowthCalculator
 
     private static readonly FrozenSet<int> LifePremium = new HashSet<int> { 1310, 17055 }.ToFrozenSet();
 
-        private static readonly FrozenDictionary<int, int> ManaFamily = BuildFamily(
+    private static readonly FrozenDictionary<int, int> ManaFamily = BuildFamily(
         [1005],
         [1008, 1010, 1011],
         [1013, 1014, 1015],
@@ -25,7 +24,7 @@ public static class PetGrowthCalculator
 
     private static readonly FrozenSet<int> ManaPremium = LifePremium;
 
-        private static readonly FrozenDictionary<int, int> AttackFamily = BuildFamily(
+    private static readonly FrozenDictionary<int, int> AttackFamily = BuildFamily(
         [541, 560, 1002],
         [543, 544, 548, 561, 1006, 1007, 1008, 1452, 17052, 86819],
         [545, 549, 562, 1012, 1013, 1014, 17053, 86820],
@@ -34,7 +33,7 @@ public static class PetGrowthCalculator
     private static readonly FrozenSet<int> AttackPremium = new HashSet<int> { 1312, 17057, 2133, 2144, 2160 }
         .ToFrozenSet();
 
-        private static readonly FrozenDictionary<int, int> DefenseFamily = BuildFamily(
+    private static readonly FrozenDictionary<int, int> DefenseFamily = BuildFamily(
         [542, 547, 1003, 2140],
         [543, 548, 561, 1006, 1009, 1010, 1452, 17052, 86819],
         [545, 549, 562, 1012, 1013, 1015, 17053, 86820],
@@ -42,7 +41,7 @@ public static class PetGrowthCalculator
 
     private static readonly FrozenSet<int> DefensePremium = new HashSet<int> { 1311, 17056 }.ToFrozenSet();
 
-        public static PetStatContribution Compute(int petItemId, int growth, int activity,
+    public static PetStatContribution Compute(int petItemId, int growth, int activity,
         FrozenDictionary<int, ItemDefinition> itemsById)
     {
         if (petItemId == 0 || growth < 1)

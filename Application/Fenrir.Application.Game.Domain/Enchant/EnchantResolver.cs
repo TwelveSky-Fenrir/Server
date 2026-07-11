@@ -8,34 +8,33 @@ public static class EnchantResolver
 {
     public enum EnchantOutcome
     {
+        Rejected,
 
-                Rejected,
+        Unsealed,
 
-                Unsealed,
+        Success,
 
-                Success,
+        Failed,
 
-                Failed,
+        Destroyed,
 
-                Destroyed,
+        Protected,
 
-                Protected,
+        ResetToForty,
 
-                ResetToForty,
-
-                NoChange
+        NoChange
     }
 
     public const int RegimeBoundary = 40;
 
     public const int MaxImprove = 50;
 
-        public const int SafeImproveValue = 20;
+    public const int SafeImproveValue = 20;
 
     private const byte RareItemType = 3;
     private const byte EliteItemType = 4;
 
-        private const byte WingSort = 6;
+    private const byte WingSort = 6;
 
     public static EnchantResult Resolve(
         ItemDefinition targetItemDefinition,
@@ -130,7 +129,7 @@ public static class EnchantResolver
             ConsumesImproveCharge: consumesImproveCharge);
     }
 
-        private static EnchantResult ResolveWingProtectedMaterial(byte currentImprove, int luck,
+    private static EnchantResult ResolveWingProtectedMaterial(byte currentImprove, int luck,
         int improveItemValueCharges, IRandomSource random)
     {
         var newImprove = currentImprove + WingEnchantMaterialWhitelist.ProtectedMaterialEnchantValue;
@@ -143,7 +142,8 @@ public static class EnchantResolver
             return new EnchantResult(EnchantOutcome.Success, newImprove, WingEnchantMaterialWhitelist.WingEnchantCpCost,
                 false, ConsumesImproveCharge: consumesImproveCharge);
 
-        return new EnchantResult(EnchantOutcome.NoChange, currentImprove, WingEnchantMaterialWhitelist.WingEnchantCpCost,
+        return new EnchantResult(EnchantOutcome.NoChange, currentImprove,
+            WingEnchantMaterialWhitelist.WingEnchantCpCost,
             false, ConsumesImproveCharge: consumesImproveCharge);
     }
 
@@ -194,7 +194,7 @@ public static class EnchantResolver
             ConsumesImproveCharge: consumesImproveCharge);
     }
 
-        private static int TierProbability(int newImprove)
+    private static int TierProbability(int newImprove)
     {
         return newImprove switch
         {

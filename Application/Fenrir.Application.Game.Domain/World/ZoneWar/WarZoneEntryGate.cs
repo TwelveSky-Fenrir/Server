@@ -2,16 +2,14 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 
 public enum WarZoneEntryOutcome
 {
+    Allowed,
 
-        Allowed,
-
-        RejectedOutOfRange
+    RejectedOutOfRange
 }
 
 public static class WarZoneEntryGate
 {
-
-        public static WarZoneEntryOutcome Evaluate(short zoneNumber, int combinedLevel, int rebirthCount)
+    public static WarZoneEntryOutcome Evaluate(short zoneNumber, int combinedLevel, int rebirthCount)
     {
         if (!WarZoneEntryCatalog.TryGetRule(zoneNumber, out var rule))
             return WarZoneEntryOutcome.Allowed;

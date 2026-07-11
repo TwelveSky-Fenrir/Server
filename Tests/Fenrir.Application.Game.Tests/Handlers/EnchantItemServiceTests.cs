@@ -19,9 +19,9 @@ public class EnchantItemServiceTests
 {
     private const int TargetItemId = 2000;
 
-        private const int GuaranteedSuccessMaterialId = 633;
+    private const int GuaranteedSuccessMaterialId = 633;
 
-        private const int PaidMaterialId = 1019;
+    private const int PaidMaterialId = 1019;
 
     private static async Task<EnchantItemResult> RunToCompletionAsync(ValueTask<EnchantItemResult> pending, Zone zone)
     {
@@ -122,7 +122,7 @@ public class EnchantItemServiceTests
         Assert.Empty(eventLog.Enqueued);
     }
 
-        [Fact]
+    [Fact]
     public async Task WingTarget_DeductsContributionPoints_NotMoney()
     {
         var itemsById = new Dictionary<int, ItemDefinition>
@@ -198,7 +198,7 @@ public class EnchantItemServiceTests
         Assert.Empty(eventLog.Enqueued);
     }
 
-        [Fact]
+    [Fact]
     public async Task ImproveItemValueCharge_Present_ConsumedAndMirroredOnSuccess()
     {
         var (_, _, zone, state, repo, eventLog) = SetUp();
@@ -216,7 +216,7 @@ public class EnchantItemServiceTests
         Assert.Equal(2, state.ImproveItemValue);
     }
 
-        [Fact]
+    [Fact]
     public async Task ImproveItemValueCharge_Absent_NotTouched()
     {
         var (_, _, zone, state, repo, eventLog) = SetUp();
@@ -233,7 +233,7 @@ public class EnchantItemServiceTests
         Assert.Equal(0, state.ImproveItemValue);
     }
 
-        [Fact]
+    [Fact]
     public async Task NoChangeMaterialFailedRoll_NonWingTarget_ReportsResultCodeEight_EnchantUnchanged()
     {
         const int noChangeMaterialId = 8101;

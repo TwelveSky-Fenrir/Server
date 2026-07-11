@@ -102,7 +102,7 @@ public class EliteDungeonTicketUseItemHandlerTests
     public async Task ZeroStackQuantity_FailsCleanly()
     {
         var (zone, state, characters, handler) = SetUp();
-        var item = Ticket(1047, quantity: 0);
+        var item = Ticket(1047, 0);
 
         var response = await handler.HandleAsync(Context(zone, state, 1047, item), CancellationToken.None);
 

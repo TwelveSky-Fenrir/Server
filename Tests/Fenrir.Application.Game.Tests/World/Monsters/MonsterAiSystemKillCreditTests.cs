@@ -48,7 +48,7 @@ public class MonsterAiSystemKillCreditTests
         return ZoneTestKit.CreateZone(1, options, simulationSystems: [scheduler, ai], worldData: cache);
     }
 
-        private static MonsterEntity AcquireTarget(Zone zone, int expectedTargetId)
+    private static MonsterEntity AcquireTarget(Zone zone, int expectedTargetId)
     {
         for (var i = 0; i < 10; i++)
         {
@@ -117,7 +117,7 @@ public class MonsterAiSystemKillCreditTests
         Assert.Equal(11, deadMonster!.KillerCharacterId);
     }
 
-        private sealed class ZeroScatterRandom : Random
+    private sealed class ZeroScatterRandom : Random
     {
         public override double NextDouble()
         {

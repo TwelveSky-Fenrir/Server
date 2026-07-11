@@ -6,8 +6,7 @@ namespace Fenrir.Application.Game.Tests.TestSupport;
 
 internal static class PacketAssert
 {
-
-        public static async Task<byte[]> ReadSentBytesAsync(FakeDuplexPipe pipe)
+    public static async Task<byte[]> ReadSentBytesAsync(FakeDuplexPipe pipe)
     {
         var result = await pipe.SessionToPeer.ReadAsync();
         var bytes = result.Buffer.ToArray();
@@ -15,7 +14,7 @@ internal static class PacketAssert
         return bytes;
     }
 
-        public static async Task AssertSentAsync<TPacket>(FakeDuplexPipe pipe, TPacket expected)
+    public static async Task AssertSentAsync<TPacket>(FakeDuplexPipe pipe, TPacket expected)
         where TPacket : struct, IOutgoingPacket
     {
         var actual = await ReadSentBytesAsync(pipe);
@@ -24,7 +23,7 @@ internal static class PacketAssert
         Assert.Equal(buffer, actual);
     }
 
-        public static void AssertNothingSent(FakeDuplexPipe pipe)
+    public static void AssertNothingSent(FakeDuplexPipe pipe)
     {
         Assert.False(pipe.SessionToPeer.TryRead(out _));
     }

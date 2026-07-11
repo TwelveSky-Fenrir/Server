@@ -6,16 +6,15 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 
 public enum TribeVotePhase : byte
 {
+    Closed = 0,
 
-        Closed = 0,
+    Candidacy = 1,
 
-        Candidacy = 1,
+    Voting = 2,
 
-        Voting = 2,
+    VotingClosed = 3,
 
-        VotingClosed = 3,
-
-        ResultsAnnounced = 4
+    ResultsAnnounced = 4
 }
 
 public enum TribeVoteCandidacyOutcome
@@ -35,7 +34,7 @@ public enum TribeVoteCastOutcome
     LevelTooLow,
     SlotEmpty,
 
-        AlreadyVotedThisWindow
+    AlreadyVotedThisWindow
 }
 
 public sealed class TribeVoteElection(
@@ -44,15 +43,14 @@ public sealed class TribeVoteElection(
     ZoneRegistry zones,
     ILogger<TribeVoteElection> logger)
 {
+    public const int MinimumEligibilityLevel = 163;
 
-        public const int MinimumEligibilityLevel = 163;
-
-        public const int MinimumContributionPoints = 1000;
+    public const int MinimumContributionPoints = 1000;
 
     private readonly Lock _lock = new();
     private readonly HashSet<int> _votedThisWindow = [];
 
-        private Guid _cycleId;
+    private Guid _cycleId;
 
     private TribeVotePhase _phase = TribeVotePhase.Closed;
 
@@ -67,7 +65,7 @@ public sealed class TribeVoteElection(
         }
     }
 
-        public async ValueTask OpenCandidacyWindowAsync(CancellationToken ct)
+    public async ValueTask OpenCandidacyWindowAsync(CancellationToken ct)
     {
         _cycleId = Guid.NewGuid();
         using var scope = logger.BeginScope("TribeVoteCycle {TribeVoteCycleId}", _cycleId);
@@ -86,7 +84,7 @@ public sealed class TribeVoteElection(
             _cycleId, WorldStateService.TribeCount);
     }
 
-        public void OpenVotingWindow()
+    public void OpenVotingWindow()
     {
         using var scope = logger.BeginScope("TribeVoteCycle {TribeVoteCycleId}", _cycleId);
 
@@ -99,7 +97,7 @@ public sealed class TribeVoteElection(
         logger.LogInformation("Tribe vote cycle {TribeVoteCycleId} opened voting", _cycleId);
     }
 
-        public void CloseWindow()
+    public void CloseWindow()
     {
         using var scope = logger.BeginScope("TribeVoteCycle {TribeVoteCycleId}", _cycleId);
 
@@ -111,7 +109,7 @@ public sealed class TribeVoteElection(
         logger.LogInformation("Tribe vote cycle {TribeVoteCycleId} closed", _cycleId);
     }
 
-        public async ValueTask<TribeVoteCandidacyOutcome> TryRegisterCandidacyAsync(PlayerRuntimeState player,
+    public async ValueTask<TribeVoteCandidacyOutcome> TryRegisterCandidacyAsync(PlayerRuntimeState player,
         byte slotIndex, CancellationToken ct)
     {
         if (Phase != TribeVotePhase.Candidacy)
@@ -139,7 +137,7 @@ public sealed class TribeVoteElection(
         return TribeVoteCandidacyOutcome.Registered;
     }
 
-        public async ValueTask<TribeVoteCastOutcome> TryCastVoteAsync(PlayerRuntimeState player, byte slotIndex,
+    public async ValueTask<TribeVoteCastOutcome> TryCastVoteAsync(PlayerRuntimeState player, byte slotIndex,
         CancellationToken ct)
     {
         if (Phase != TribeVotePhase.Voting)
@@ -177,7 +175,7 @@ public sealed class TribeVoteElection(
         return TribeVoteCastOutcome.Cast;
     }
 
-        public async ValueTask<int?> TallyForceLeaderAsync(byte tribeId, CancellationToken ct)
+    public async ValueTask<int?> TallyForceLeaderAsync(byte tribeId, CancellationToken ct)
     {
         using var scope = logger.BeginScope("TribeVoteCycle {TribeVoteCycleId} Tribe {TribeId}", _cycleId, tribeId);
 
@@ -204,7 +202,7 @@ public sealed class TribeVoteElection(
         return winner?.CandidateCharacterId;
     }
 
-        public void CloseVotingWindow()
+    public void CloseVotingWindow()
     {
         using var scope = logger.BeginScope("TribeVoteCycle {TribeVoteCycleId}", _cycleId);
 
@@ -216,7 +214,7 @@ public sealed class TribeVoteElection(
         logger.LogInformation("Tribe vote cycle {TribeVoteCycleId} closed voting, awaiting results", _cycleId);
     }
 
-        public async ValueTask AnnounceResultsAsync(CancellationToken ct)
+    public async ValueTask AnnounceResultsAsync(CancellationToken ct)
     {
         using var scope = logger.BeginScope("TribeVoteCycle {TribeVoteCycleId}", _cycleId);
 
@@ -236,7 +234,7 @@ public sealed class TribeVoteElection(
             _cycleId, WorldStateService.TribeCount);
     }
 
-        public async ValueTask ResetToIdleAsync(CancellationToken ct)
+    public async ValueTask ResetToIdleAsync(CancellationToken ct)
     {
         using var scope = logger.BeginScope("TribeVoteCycle {TribeVoteCycleId}", _cycleId);
 
@@ -265,7 +263,7 @@ public sealed class TribeVoteElection(
         }
     }
 
-        private static int CombinedEligibilityLevel(PlayerRuntimeState player)
+    private static int CombinedEligibilityLevel(PlayerRuntimeState player)
     {
         return player.Level + player.Level2 + player.RebirthCount;
     }

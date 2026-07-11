@@ -9,7 +9,7 @@ public class KillFeedLeaderboardTests
     {
         var board = new KillFeedLeaderboard();
 
-        Assert.True(board.RecordKill(1, "Alice", tribe: 0, killTotal: 1));
+        Assert.True(board.RecordKill(1, "Alice", 0, 1));
 
         var top3 = board.GetTopThree();
         Assert.Single(top3);

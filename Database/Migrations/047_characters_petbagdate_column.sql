@@ -19,6 +19,6 @@
 -- Standalone additive migration -- never edit the already-applied game.Characters creation script
 -- (Tables/game/Characters.sql) per the DbMigrator SHA-256 journal rule. Idempotent so a re-run no-ops.
 IF COL_LENGTH('game.Characters', 'PetBagDate') IS NULL
-    ALTER TABLE game.Characters
-        ADD PetBagDate INT NOT NULL
-            CONSTRAINT DF_Characters_PetBagDate DEFAULT 0;
+ALTER TABLE game.Characters
+    ADD PetBagDate INT NOT NULL
+        CONSTRAINT DF_Characters_PetBagDate DEFAULT 0;

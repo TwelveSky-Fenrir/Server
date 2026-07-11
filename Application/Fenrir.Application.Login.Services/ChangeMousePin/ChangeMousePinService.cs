@@ -57,7 +57,7 @@ public sealed class ChangeMousePinService(
         return new ChangeMousePinResult(ChangeMousePinOutcome.Success);
     }
 
-        public async ValueTask LogFailedAttemptAsync(int accountId, int failureCount, bool lockedOut,
+    public async ValueTask LogFailedAttemptAsync(int accountId, int failureCount, bool lockedOut,
         CancellationToken cancellationToken)
     {
         var eventCode = lockedOut

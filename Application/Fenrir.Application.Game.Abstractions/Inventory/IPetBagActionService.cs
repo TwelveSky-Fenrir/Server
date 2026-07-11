@@ -6,15 +6,14 @@ namespace Fenrir.Application.Game.Abstractions.Inventory;
 
 public interface IPetBagActionService
 {
-
-        public ValueTask<GenericActionResult> DepositAsync(Zone zone, PlayerRuntimeState state, int characterId,
+    public ValueTask<GenericActionResult> DepositAsync(Zone zone, PlayerRuntimeState state, int characterId,
         DefaultPData move, bool petBagUpperHalfEntitlementActive, bool secondInventoryPageEntitlementActive,
         CancellationToken cancellationToken);
 
-        public ValueTask<GenericActionResult> WithdrawAsync(Zone zone, PlayerRuntimeState state, int characterId,
+    public ValueTask<GenericActionResult> WithdrawAsync(Zone zone, PlayerRuntimeState state, int characterId,
         DefaultPData move, bool petBagUpperHalfEntitlementActive, bool secondInventoryPageEntitlementActive,
         CancellationToken cancellationToken);
 
-        public ValueTask<GenericActionResult> RearrangeAsync(Zone zone, PlayerRuntimeState state, int characterId,
+    public ValueTask<GenericActionResult> RearrangeAsync(Zone zone, PlayerRuntimeState state, int characterId,
         DefaultPData move, bool petBagUpperHalfEntitlementActive, CancellationToken cancellationToken);
 }

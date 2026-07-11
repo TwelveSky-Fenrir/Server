@@ -4,16 +4,15 @@ namespace Fenrir.Network.Dispatch.RateLimiting;
 
 public static class OpcodeRateLimiterPolicy
 {
+    private static readonly (int Capacity, double TokensPerSecond) Auth = (3, 1d / 5d);
 
-        private static readonly (int Capacity, double TokensPerSecond) Auth = (3, 1d / 5d);
+    private static readonly (int Capacity, double TokensPerSecond) Movement = (10, 30d);
 
-        private static readonly (int Capacity, double TokensPerSecond) Movement = (10, 30d);
+    private static readonly (int Capacity, double TokensPerSecond) Heartbeat = (2, 1d / 5d);
 
-        private static readonly (int Capacity, double TokensPerSecond) Heartbeat = (2, 1d / 5d);
+    private static readonly (int Capacity, double TokensPerSecond) Attack = (8, 4d);
 
-        private static readonly (int Capacity, double TokensPerSecond) Attack = (8, 4d);
-
-        private static readonly (int Capacity, double TokensPerSecond) Default = (5, 5d);
+    private static readonly (int Capacity, double TokensPerSecond) Default = (5, 5d);
 
     static OpcodeRateLimiterPolicy()
     {

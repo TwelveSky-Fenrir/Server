@@ -11,14 +11,13 @@ public enum DenOfRebirthChallengeState : byte
 
 public sealed class ZoneCenterSiegeState
 {
+    public const int Zone175Instances = 4;
 
-        public const int Zone175Instances = 4;
+    public const int Zone175Slots = 8;
 
-        public const int Zone175Slots = 8;
+    public const int Zone049Slots = 13;
 
-        public const int Zone049Slots = 13;
-
-        public const int Zone241Instances = 20;
+    public const int Zone241Instances = 20;
 
     private static readonly int TribeCount = WorldStateService.TribeCount;
     private readonly float[] _experienceBonusRatio = new float[TribeCount];
@@ -86,7 +85,7 @@ public sealed class ZoneCenterSiegeState
         }
     }
 
-        public void SetZone049State(int slot, int state, bool stampTime)
+    public void SetZone049State(int slot, int state, bool stampTime)
     {
         ValidateZone049Slot(slot);
         lock (_lock)
@@ -107,7 +106,7 @@ public sealed class ZoneCenterSiegeState
         }
     }
 
-        public void SetZone175(int instance, int slot, int stateCode)
+    public void SetZone175(int instance, int slot, int stateCode)
     {
         ValidateZone175Cell(instance, slot);
         lock (_lock)
@@ -116,7 +115,7 @@ public sealed class ZoneCenterSiegeState
         }
     }
 
-        public void ResetZone175(int instance, int slot)
+    public void ResetZone175(int instance, int slot)
     {
         ValidateZone175Cell(instance, slot);
         lock (_lock)
@@ -186,7 +185,7 @@ public sealed class ZoneCenterSiegeState
         SetZone335(0);
     }
 
-        public void ResetTribeBonusFields()
+    public void ResetTribeBonusFields()
     {
         lock (_lock)
         {
@@ -280,7 +279,7 @@ public sealed class ZoneCenterSiegeState
         }
     }
 
-        public void SetKillOtherTribeBonus(byte tribeId, int value)
+    public void SetKillOtherTribeBonus(byte tribeId, int value)
     {
         ValidateTribeId(tribeId);
         lock (_lock)
@@ -316,7 +315,7 @@ public sealed class ZoneCenterSiegeState
             throw new ArgumentOutOfRangeException(nameof(slot), slot, $"Zone049 slot must be 0-{Zone049Slots - 1}.");
     }
 
-        private static int NowAsLegacyHhMm()
+    private static int NowAsLegacyHhMm()
     {
         var now = DateTime.UtcNow;
         return now.Hour * 100 + now.Minute;

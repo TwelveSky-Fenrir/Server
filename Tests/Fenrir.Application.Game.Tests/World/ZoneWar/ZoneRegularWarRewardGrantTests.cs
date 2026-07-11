@@ -43,7 +43,7 @@ public class ZoneRegularWarRewardGrantTests
     {
         var zone = ZoneTestKit.CreateZone(49);
 
-        zone.Post(ZoneCommand.ApplyRegularWarReward(Grant(characterId: 999, money: 1000)));
+        zone.Post(ZoneCommand.ApplyRegularWarReward(Grant(999, money: 1000)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.False(zone.TryGetPlayer(999, out _));

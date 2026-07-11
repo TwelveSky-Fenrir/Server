@@ -11,8 +11,7 @@ public sealed class EliteDungeonTicketUseItemHandler(
     IEventLogRepository eventLog,
     ILogger<EliteDungeonTicketUseItemHandler> logger) : IUseItemHandler
 {
-
-        private const short EliteDungeonTicketGrantEventCode = 30;
+    private const short EliteDungeonTicketGrantEventCode = 30;
 
     private const byte SuccessOutcome = 1;
 

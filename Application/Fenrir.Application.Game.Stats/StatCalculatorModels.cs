@@ -24,8 +24,7 @@ public readonly record struct CharacterBaseAttributes(
     int RebirthCount,
     short Level2 = 0)
 {
-
-        public short CombinedLevel => (short)(Level + Level2);
+    public short CombinedLevel => (short)(Level + Level2);
 }
 
 public readonly record struct PetStatContribution(

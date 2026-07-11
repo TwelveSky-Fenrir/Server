@@ -11,8 +11,7 @@ namespace Fenrir.Application.Game.Tests.Movement;
 
 public class MovementRulesTests
 {
-
-        private static ZoneGeometry FlatSquareGeometry()
+    private static ZoneGeometry FlatSquareGeometry()
     {
         var planeInfo = new Vector4(0f, 1f, 0f, 10f);
 

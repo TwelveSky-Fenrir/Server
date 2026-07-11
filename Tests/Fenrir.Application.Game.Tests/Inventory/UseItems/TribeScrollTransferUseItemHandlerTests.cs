@@ -67,7 +67,7 @@ public class TribeScrollTransferUseItemHandlerTests
     private static (Zone Zone, ZoneClientSession Session, PlayerRuntimeState State,
         FakeTribeConversionRepository TribeConversion, PartyRegistry Parties,
         TribeScrollTransferUseItemHandler Handler) SetUp(bool homeZoneOnline = true,
-        short configuredHomeMapId = HomeZoneMapId, short zoneMapId = 1)
+            short configuredHomeMapId = HomeZoneMapId, short zoneMapId = 1)
     {
         var parties = new PartyRegistry();
         var zone = ZoneTestKit.CreateZone(zoneMapId, partyRegistry: parties,
@@ -221,7 +221,7 @@ public class TribeScrollTransferUseItemHandlerTests
     [Fact]
     public async Task HomeZoneNotHostedByAnyLiveShard_FailsCleanly()
     {
-        var (zone, _, state, tribeConversion, _, handler) = SetUp(homeZoneOnline: false);
+        var (zone, _, state, tribeConversion, _, handler) = SetUp(false);
 
         var response = await handler.HandleAsync(Context(zone, state, ContainerMatrix.InventoryPage0, 0, 1),
             CancellationToken.None);
@@ -331,7 +331,7 @@ public class TribeScrollTransferUseItemHandlerTests
         var (zone, _, state, tribeConversion, _, handler) = SetUp();
         state.Inventory.ReplaceContainer(ContainerMatrix.Equipment,
             ImmutableDictionary<byte, ItemStack>.Empty
-                .SetItem((byte)SkillGradeAuthority.CapeSlotIndex, new ItemStack(9999, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1)));
+                .SetItem(SkillGradeAuthority.CapeSlotIndex, new ItemStack(9999, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1)));
 
         var response = await handler.HandleAsync(Context(zone, state, ContainerMatrix.InventoryPage0, 0, 1),
             CancellationToken.None);

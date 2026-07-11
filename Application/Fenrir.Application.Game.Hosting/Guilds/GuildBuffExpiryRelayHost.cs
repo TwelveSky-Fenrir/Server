@@ -26,7 +26,7 @@ public sealed class GuildBuffExpiryRelayHost(
             FullMode = BoundedChannelFullMode.Wait
         });
 
-        public bool Enqueue(GuildBuffExpiryRelayEntry entry)
+    public bool Enqueue(GuildBuffExpiryRelayEntry entry)
     {
         if (_outbox.Writer.TryWrite(entry))
             return true;
@@ -56,7 +56,7 @@ public sealed class GuildBuffExpiryRelayHost(
         } while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false));
     }
 
-        public async ValueTask PollOnceAsync(CancellationToken ct)
+    public async ValueTask PollOnceAsync(CancellationToken ct)
     {
         await FlushOutboundAsync(ct).ConfigureAwait(false);
         await DeliverInboundAsync(ct).ConfigureAwait(false);

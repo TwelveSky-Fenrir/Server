@@ -58,7 +58,7 @@ public class ZoneTowerGuardianCombatTests
         return (zone, towerWar);
     }
 
-        private static WorldStateService CreateInitializedWorldState()
+    private static WorldStateService CreateInitializedWorldState()
     {
         var service = new WorldStateService(new FakeWorldStateRepository(), NullLogger<WorldStateService>.Instance);
         service.InitializeAsync(CancellationToken.None).GetAwaiter().GetResult();
@@ -234,7 +234,7 @@ public class ZoneTowerGuardianCombatTests
         Assert.Equal(firstAttackAt, towerWar.GetFirstAttackAtUtc(TowerIndex));
     }
 
-        private sealed class ScriptedAlwaysHitRandomSource : IRandomSource
+    private sealed class ScriptedAlwaysHitRandomSource : IRandomSource
     {
         public int NextInt32(int exclusiveUpperBound)
         {

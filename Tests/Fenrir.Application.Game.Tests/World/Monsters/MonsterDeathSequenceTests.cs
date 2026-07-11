@@ -7,7 +7,6 @@ using Fenrir.Application.Game.Stats;
 using Fenrir.Application.Game.Tests.GameData;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Network.Serialization.Shared.Packets.Shared;
-using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Application.Game.Tests.World.Monsters;
 
@@ -170,7 +169,7 @@ public class MonsterDeathSequenceTests
     }
 
 
-        [Fact]
+    [Fact]
     public void ApplyPvmAttack_KillingBlow_AppliesKnockbackAndFacing_UsingTheAttackersOwnSenderLocation()
     {
         var monsterTemplate = WorldDataTestRows.Monster(901) with
@@ -193,7 +192,10 @@ public class MonsterDeathSequenceTests
             LocationZ = 100,
             Radius = 0
         };
-        var rows = WorldDataTestRows.MinimalRows() with { Monsters = [monsterTemplate], MonsterSpawnRegions = [region] };
+        var rows = WorldDataTestRows.MinimalRows() with
+        {
+            Monsters = [monsterTemplate], MonsterSpawnRegions = [region]
+        };
         var cache = WorldDataCacheBuilder.Build(rows).Cache;
 
         var scheduler = new MonsterSpawnScheduler(cache);
@@ -221,7 +223,7 @@ public class MonsterDeathSequenceTests
             {
                 Case = 3,
                 ServerIndex1 = 10,
-                UniqueNumber1 = unchecked((uint)10),
+                UniqueNumber1 = unchecked(10),
                 ServerIndex2 = monster.ServerIndex,
                 UniqueNumber2 = monster.UniqueNumber,
                 SenderLocation = [killerX, 0, killerZ],
@@ -253,7 +255,7 @@ public class MonsterDeathSequenceTests
         Assert.Equal(expectedHeading, monster.Heading, 4);
     }
 
-        private sealed class CountingRandomSource(int scriptedValue) : IRandomSource
+    private sealed class CountingRandomSource(int scriptedValue) : IRandomSource
     {
         public int DrawCount { get; private set; }
 

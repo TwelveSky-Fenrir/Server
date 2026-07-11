@@ -1,5 +1,4 @@
 using Fenrir.Application.Game.Abstractions.ZoneLifecycle;
-using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Zone.Sessions;

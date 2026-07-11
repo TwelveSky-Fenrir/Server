@@ -10,7 +10,7 @@ CREATE TABLE world.MonsterDropMoney
     CONSTRAINT CK_MonsterDropMoney_AmountRange CHECK (MinAmount <= MaxAmount),
     -- Value-range bounds mirror legacy's load-time field validation (Monster_CheckValidElement,
     -- Server/Header/S15_MyShare.cpp:1768-1787).
-    CONSTRAINT CK_MonsterDropMoney_DropRate CHECK (DropRate BETWEEN 0 AND 1000000), -- :1768-1772
+    CONSTRAINT CK_MonsterDropMoney_DropRate CHECK (DropRate BETWEEN 0 AND 1000000),     -- :1768-1772
     CONSTRAINT CK_MonsterDropMoney_MinAmount CHECK (MinAmount BETWEEN 0 AND 100000000), -- :1773-1777
-    CONSTRAINT CK_MonsterDropMoney_MaxAmount CHECK (MaxAmount BETWEEN 0 AND 100000000) -- :1778-1787
+    CONSTRAINT CK_MonsterDropMoney_MaxAmount CHECK (MaxAmount BETWEEN 0 AND 100000000)  -- :1778-1787
 );

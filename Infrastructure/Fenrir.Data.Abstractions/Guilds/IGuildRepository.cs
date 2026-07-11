@@ -8,11 +8,11 @@ public interface IGuildRepository
 
     public ValueTask<GuildSummaryDto?> GetByIdAsync(int guildId, CancellationToken ct);
 
-        public ValueTask<ReadOnlyCollection<GuildSummaryDto>> GetAllAsync(CancellationToken ct);
+    public ValueTask<ReadOnlyCollection<GuildSummaryDto>> GetAllAsync(CancellationToken ct);
 
-        public ValueTask<ReadOnlyCollection<GuildRankingRowDto>> GetTopByPointsAsync(int count, CancellationToken ct);
+    public ValueTask<ReadOnlyCollection<GuildRankingRowDto>> GetTopByPointsAsync(int count, CancellationToken ct);
 
-        public ValueTask AdjustPointsAsync(int guildId, int delta, CancellationToken ct);
+    public ValueTask AdjustPointsAsync(int guildId, int delta, CancellationToken ct);
 
     public ValueTask<ReadOnlyCollection<GuildRosterRowDto>> GetRosterAsync(int guildId, CancellationToken ct);
 
@@ -20,10 +20,10 @@ public interface IGuildRepository
 
     public ValueTask<int> CreateAsync(string name, int masterCharacterId, CancellationToken ct);
 
-        public ValueTask<int> CreateAndDebitMoneyAsync(string name, int masterCharacterId, long deltaMoney,
+    public ValueTask<int> CreateAndDebitMoneyAsync(string name, int masterCharacterId, long deltaMoney,
         int deltaBigMoney, CancellationToken ct);
 
-        public ValueTask DisbandAsync(int guildId, int characterId, CancellationToken ct);
+    public ValueTask DisbandAsync(int guildId, int characterId, CancellationToken ct);
 
     public ValueTask AddMemberAsync(int guildId, int characterId, CancellationToken ct);
 
@@ -39,7 +39,7 @@ public interface IGuildRepository
 
     public ValueTask SetGradeAsync(int guildId, int grade, CancellationToken ct);
 
-        public ValueTask UpgradeAndDebitMoneyAsync(int guildId, int grade, int characterId, long deltaMoney,
+    public ValueTask UpgradeAndDebitMoneyAsync(int guildId, int grade, int characterId, long deltaMoney,
         int deltaBigMoney, CancellationToken ct);
 
     public ValueTask SetBuffAsync(int guildId, int buffType, int buffState, int buffTime, long buffTimeForDiff,

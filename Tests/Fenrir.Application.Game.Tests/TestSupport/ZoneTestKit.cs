@@ -9,11 +9,13 @@ using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.Social.Duel;
 using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.World;
+using Fenrir.Application.Game.Domain.World.Geometry;
 using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Tests.World.WorldState;
 using Fenrir.Data.Abstractions.Game;
+using Fenrir.Data.Abstractions.Guilds;
 using Fenrir.Data.Abstractions.Runtime;
 using Fenrir.Data.Abstractions.World;
 using Fenrir.Data.WriteBehind;
@@ -37,9 +39,9 @@ internal static class ZoneTestKit
         DuelRegistry? duelRegistry = null, ICharacterShardLocationRepository? characterShardLocations = null,
         TribeBankTaxAccumulator? tribeBankTax = null,
         RegularWarActiveMapTracker? regularWarActiveMapTracker = null,
-        Domain.World.Geometry.ZoneGeometry? geometry = null,
+        ZoneGeometry? geometry = null,
         IEventLogQueue? eventLogQueue = null,
-        Fenrir.Data.Abstractions.Guilds.IFourGuildKillPointQueue? fourGuildKillPointQueue = null,
+        IFourGuildKillPointQueue? fourGuildKillPointQueue = null,
         TribeSymbolCombatModifiers? tribeSymbolCombatModifiers = null)
     {
         var opts = options ?? Options();
@@ -59,7 +61,7 @@ internal static class ZoneTestKit
         return (new ZoneClientSession(sessionId, pipe), pipe);
     }
 
-        public static WorldStateService CreateWorldState(FakeWorldStateRepository? repository = null)
+    public static WorldStateService CreateWorldState(FakeWorldStateRepository? repository = null)
     {
         var service = new WorldStateService(repository ?? new FakeWorldStateRepository(),
             NullLogger<WorldStateService>.Instance);
@@ -67,7 +69,7 @@ internal static class ZoneTestKit
         return service;
     }
 
-        public static ZoneRegistry CreateRegistry(GameServerOptions? options = null, WorldDataCache? worldData = null)
+    public static ZoneRegistry CreateRegistry(GameServerOptions? options = null, WorldDataCache? worldData = null)
     {
         var opts = options ?? Options();
         var optionsWrapper = Microsoft.Extensions.Options.Options.Create(opts);
@@ -100,7 +102,7 @@ internal static class ZoneTestKit
             SourceIp: sourceIp);
     }
 
-        public static byte[] DrainOutbound(FakeDuplexPipe pipe)
+    public static byte[] DrainOutbound(FakeDuplexPipe pipe)
     {
         if (!pipe.SessionToPeer.TryRead(out var result))
             return [];
@@ -110,7 +112,7 @@ internal static class ZoneTestKit
         return bytes;
     }
 
-        public static WorldDataCache EmptyWorldData(
+    public static WorldDataCache EmptyWorldData(
         FrozenDictionary<int, ItemDefinition>? itemsById = null,
         FrozenDictionary<int, SkillDefinition>? skillsById = null,
         FrozenDictionary<short, LevelRowDto>? levelsByLevel = null,

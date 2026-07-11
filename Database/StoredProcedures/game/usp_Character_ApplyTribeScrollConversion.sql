@@ -127,7 +127,8 @@ BEGIN
                         ON tgt.GroupIndex = src.GroupIndex AND tgt.TribeId = @ToTribe
     WHERE ci.CharacterId = @CharacterId
       AND ci.Container = 2
-      AND ci.Slot <> 8; -- FEQUIP_TYPE.EPET (pet slot), excluded exactly like the book path
+      AND ci.Slot <> 8;
+    -- FEQUIP_TYPE.EPET (pet slot), excluded exactly like the book path
 
     -- Step 2: learned skills, best-effort (silent pass-through on no match -- TChangeTribe never fails here).
     UPDATE cs

@@ -4,7 +4,8 @@ namespace Fenrir.Application.Game.Tests.Hotkeys;
 
 public class BotHotKeyResupplyPolicyTests
 {
-    private static readonly BotHotKeyResupplyPolicy.BoundCategories NothingBound = new(false, false, false, false, false);
+    private static readonly BotHotKeyResupplyPolicy.BoundCategories NothingBound = new(false, false, false, false,
+        false);
 
     private static readonly BotHotKeyResupplyPolicy.HotkeyAddress[] TwoEmptySlots =
     [
@@ -37,7 +38,7 @@ public class BotHotKeyResupplyPolicyTests
     {
         var moves = BotHotKeyResupplyPolicy.Resolve(
             NothingBound,
-            [Candidate(5, BotHotKeyResupplyPolicy.ResupplyCategory.Hp, itemId: 1364, qty: 9)],
+            [Candidate(5, BotHotKeyResupplyPolicy.ResupplyCategory.Hp, 1364, 9)],
             TwoEmptySlots,
             false, false, false, false);
 
@@ -93,8 +94,8 @@ public class BotHotKeyResupplyPolicyTests
     {
         var moves = BotHotKeyResupplyPolicy.Resolve(NothingBound,
             [
-                Candidate(1, BotHotKeyResupplyPolicy.ResupplyCategory.Hp, itemId: 10),
-                Candidate(2, BotHotKeyResupplyPolicy.ResupplyCategory.Mp, itemId: 20)
+                Candidate(1, BotHotKeyResupplyPolicy.ResupplyCategory.Hp, 10),
+                Candidate(2, BotHotKeyResupplyPolicy.ResupplyCategory.Mp, 20)
             ],
             TwoEmptySlots, false, false, false, false);
 
@@ -119,7 +120,7 @@ public class BotHotKeyResupplyPolicyTests
     public void NoMatchingSourceForOneCategory_OtherCategoriesStillRefill()
     {
         var moves = BotHotKeyResupplyPolicy.Resolve(NothingBound,
-            [Candidate(2, BotHotKeyResupplyPolicy.ResupplyCategory.Mp, itemId: 20)],
+            [Candidate(2, BotHotKeyResupplyPolicy.ResupplyCategory.Mp, 20)],
             TwoEmptySlots, false, false, false, false);
 
         var move = Assert.Single(moves);
@@ -130,15 +131,15 @@ public class BotHotKeyResupplyPolicyTests
     [Fact]
     public void PetPrey_RequiresFlagAndEquippedPet()
     {
-        var candidates = new[] { Candidate(4, BotHotKeyResupplyPolicy.ResupplyCategory.PetPrey, itemId: 40) };
+        var candidates = new[] { Candidate(4, BotHotKeyResupplyPolicy.ResupplyCategory.PetPrey, 40) };
 
         Assert.Empty(BotHotKeyResupplyPolicy.Resolve(NothingBound, candidates, TwoEmptySlots,
-            animalPreyCmd: false, petEquipped: true, false, false));
+            false, true, false, false));
         Assert.Empty(BotHotKeyResupplyPolicy.Resolve(NothingBound, candidates, TwoEmptySlots,
-            animalPreyCmd: true, petEquipped: false, false, false));
+            true, false, false, false));
 
         var moves = BotHotKeyResupplyPolicy.Resolve(NothingBound, candidates, TwoEmptySlots,
-            animalPreyCmd: true, petEquipped: true, false, false);
+            true, true, false, false);
         Assert.Equal(40, Assert.Single(moves).ItemId);
     }
 
@@ -149,7 +150,7 @@ public class BotHotKeyResupplyPolicyTests
 
         var moves = BotHotKeyResupplyPolicy.Resolve(bound,
             [Candidate(4, BotHotKeyResupplyPolicy.ResupplyCategory.PetPrey)], TwoEmptySlots,
-            animalPreyCmd: true, petEquipped: true, false, false);
+            true, true, false, false);
 
         Assert.Empty(moves);
     }
@@ -157,15 +158,15 @@ public class BotHotKeyResupplyPolicyTests
     [Fact]
     public void PetFood_RequiresFlagAndPresentAnimal()
     {
-        var candidates = new[] { Candidate(6, BotHotKeyResupplyPolicy.ResupplyCategory.PetFood, itemId: 60) };
+        var candidates = new[] { Candidate(6, BotHotKeyResupplyPolicy.ResupplyCategory.PetFood, 60) };
 
         Assert.Empty(BotHotKeyResupplyPolicy.Resolve(NothingBound, candidates, TwoEmptySlots,
-            false, false, animalFoodCmd: false, animalPresent: true));
+            false, false, false, true));
         Assert.Empty(BotHotKeyResupplyPolicy.Resolve(NothingBound, candidates, TwoEmptySlots,
-            false, false, animalFoodCmd: true, animalPresent: false));
+            false, false, true, false));
 
         var moves = BotHotKeyResupplyPolicy.Resolve(NothingBound, candidates, TwoEmptySlots,
-            false, false, animalFoodCmd: true, animalPresent: true);
+            false, false, true, true);
         Assert.Equal(60, Assert.Single(moves).ItemId);
     }
 
@@ -175,14 +176,14 @@ public class BotHotKeyResupplyPolicyTests
         BotHotKeyResupplyPolicy.HotkeyAddress[] fourEmpty = [new(0, 0), new(0, 1), new(0, 2), new(0, 3)];
         var candidates = new[]
         {
-            Candidate(0, BotHotKeyResupplyPolicy.ResupplyCategory.Hp, itemId: 10),
-            Candidate(1, BotHotKeyResupplyPolicy.ResupplyCategory.Mp, itemId: 20),
-            Candidate(2, BotHotKeyResupplyPolicy.ResupplyCategory.PetPrey, itemId: 30),
-            Candidate(3, BotHotKeyResupplyPolicy.ResupplyCategory.PetFood, itemId: 40)
+            Candidate(0, BotHotKeyResupplyPolicy.ResupplyCategory.Hp, 10),
+            Candidate(1, BotHotKeyResupplyPolicy.ResupplyCategory.Mp, 20),
+            Candidate(2, BotHotKeyResupplyPolicy.ResupplyCategory.PetPrey, 30),
+            Candidate(3, BotHotKeyResupplyPolicy.ResupplyCategory.PetFood, 40)
         };
 
         var moves = BotHotKeyResupplyPolicy.Resolve(NothingBound, candidates, fourEmpty,
-            animalPreyCmd: true, petEquipped: true, animalFoodCmd: true, animalPresent: true);
+            true, true, true, true);
 
         Assert.Equal(4, moves.Length);
         Assert.Equal(10, moves[0].ItemId);

@@ -14,32 +14,31 @@ namespace Fenrir.Application.Game.Domain.World;
 
 public sealed partial class Zone
 {
+    private const float FlinchDamageThresholdRatio = 0.10f;
 
-        private const float FlinchDamageThresholdRatio = 0.10f;
+    private const int GmSummonPoolServerIndexBase = 1_003_000;
 
-        private const int GmSummonPoolServerIndexBase = 1_003_000;
+    private const int GmSummonPoolSize = 1_000;
 
-        private const int GmSummonPoolSize = 1_000;
+    private const float GmSummonLeashRadius = 200f;
 
-        private const float GmSummonLeashRadius = 200f;
+    private readonly ConcurrentQueue<DeadMonsterEvent> _deadMonsters = new();
 
-        private readonly ConcurrentQueue<DeadMonsterEvent> _deadMonsters = new();
+    private readonly SemaphoreSlim _moneyGrantSignal = new(0, int.MaxValue);
 
-        private readonly SemaphoreSlim _moneyGrantSignal = new(0, int.MaxValue);
+    private readonly List<int> _monsterBroadcastNeighborScratch = [];
 
-        private readonly List<int> _monsterBroadcastNeighborScratch = [];
-
-        private readonly AoiGrid _monsterGrid = new(options.AoiCellSize);
+    private readonly AoiGrid _monsterGrid = new(options.AoiCellSize);
 
     private readonly ConcurrentDictionary<int, MonsterEntity> _monsters = new();
 
-        private readonly List<int> _mvpAttackNeighborScratch = [];
+    private readonly List<int> _mvpAttackNeighborScratch = [];
 
-        private readonly HashSet<int> _mvpAttackRecipientScratch = [];
+    private readonly HashSet<int> _mvpAttackRecipientScratch = [];
 
-        private readonly ConcurrentQueue<(int CharacterId, long Amount)> _pendingMoneyGrants = new();
+    private readonly ConcurrentQueue<(int CharacterId, long Amount)> _pendingMoneyGrants = new();
 
-        private readonly List<int> _sendExistingMonstersScratch = [];
+    private readonly List<int> _sendExistingMonstersScratch = [];
 
     private int _monsterUniqueNumberSeed;
 
@@ -57,7 +56,7 @@ public sealed partial class Zone
         return unchecked((uint)Interlocked.Increment(ref _monsterUniqueNumberSeed));
     }
 
-        public void SpawnMonster(MonsterEntity monster)
+    public void SpawnMonster(MonsterEntity monster)
     {
         monster.LastRebroadcastAt = _clock - SimulationClock.RebroadcastStaggerOffset(monster.ServerIndex,
             SimulationClock.MonsterRebroadcastInterval);
@@ -70,18 +69,18 @@ public sealed partial class Zone
         BroadcastMonsterAction(monster, 1);
     }
 
-        public void DespawnMonsterSilently(int serverIndex)
+    public void DespawnMonsterSilently(int serverIndex)
     {
         if (_monsters.TryRemove(serverIndex, out var monster))
             RemoveMonsterFromGrid(monster);
     }
 
-        public void RemoveMonsterFromGrid(MonsterEntity monster)
+    public void RemoveMonsterFromGrid(MonsterEntity monster)
     {
         _monsterGrid.Remove(monster.ServerIndex, monster.CurrentCell);
     }
 
-        public void SyncMonsterCell(MonsterEntity monster)
+    public void SyncMonsterCell(MonsterEntity monster)
     {
         var newCell = _grid.CellOf(monster.PosX, monster.PosZ);
         _monsterGrid.Move(monster.ServerIndex, monster.CurrentCell, newCell, monster.PosX, monster.PosY,
@@ -89,12 +88,12 @@ public sealed partial class Zone
         monster.CurrentCell = newCell;
     }
 
-        private static bool IsKillingBlowOverrideMonster(int monsterId)
+    private static bool IsKillingBlowOverrideMonster(int monsterId)
     {
         return monsterId is 746 or 777 or 1407 or 1408 or 1404;
     }
 
-        public bool TryDamageMonster(int serverIndex, int amount, int? attackerCharacterId, out bool died,
+    public bool TryDamageMonster(int serverIndex, int amount, int? attackerCharacterId, out bool died,
         out int remainingLife)
     {
         if (!_monsters.TryGetValue(serverIndex, out var monster))
@@ -118,7 +117,7 @@ public sealed partial class Zone
         return true;
     }
 
-        private int? SelectMonsterKillCredit(MonsterEntity monster, int? killingBlowAttackerId)
+    private int? SelectMonsterKillCredit(MonsterEntity monster, int? killingBlowAttackerId)
     {
         if (killingBlowAttackerId is { } blowAttacker && IsKillingBlowOverrideMonster(monster.Template.MonsterId))
             return blowAttacker;
@@ -129,7 +128,7 @@ public sealed partial class Zone
         return SelectDamageBasedKillCredit(monster);
     }
 
-        private int? SelectDamageBasedKillCredit(MonsterEntity monster)
+    private int? SelectDamageBasedKillCredit(MonsterEntity monster)
     {
         int? bestCharacterId = null;
         long? bestDamage = null;
@@ -161,13 +160,13 @@ public sealed partial class Zone
         return _deadMonsters.TryDequeue(out deadMonster);
     }
 
-        public void BroadcastMonsterDeath(MonsterEntity monster)
+    public void BroadcastMonsterDeath(MonsterEntity monster)
     {
         monster.AiState = MonsterAiState.Dead;
         BroadcastMonsterAction(monster, 0);
     }
 
-        private void TryApplyPvmFlinch(MonsterEntity monster, int damageDealt)
+    private void TryApplyPvmFlinch(MonsterEntity monster, int damageDealt)
     {
         if (monster.Template.DamageType == 1)
             return;
@@ -186,14 +185,14 @@ public sealed partial class Zone
         BroadcastMonsterAction(monster, 1);
     }
 
-        public void AnnounceEliteBossDefeated(byte killerTribe, string killerName)
+    public void AnnounceEliteBossDefeated(byte killerTribe, string killerName)
     {
         logger.LogInformation(
             "Elite Boss defeated (Center broadcast 2003): killerTribe={KillerTribe} killerName={KillerName} zone={MapId}",
             killerTribe, killerName, MapId);
     }
 
-        public void ResolveMonsterAttack(MonsterEntity monster, int targetCharacterId)
+    public void ResolveMonsterAttack(MonsterEntity monster, int targetCharacterId)
     {
         if (!_players.TryGetValue(targetCharacterId, out var target) || target is null)
             return;
@@ -251,12 +250,12 @@ public sealed partial class Zone
         _moneyGrantSignal.Release();
     }
 
-        public Task WaitForMoneyGrantAsync(CancellationToken ct)
+    public Task WaitForMoneyGrantAsync(CancellationToken ct)
     {
         return _moneyGrantSignal.WaitAsync(ct);
     }
 
-        public IReadOnlyList<(int CharacterId, long Amount)> DrainPendingMoneyGrants()
+    public IReadOnlyList<(int CharacterId, long Amount)> DrainPendingMoneyGrants()
     {
         if (_pendingMoneyGrants.IsEmpty)
             return [];
@@ -268,7 +267,7 @@ public sealed partial class Zone
         return (IReadOnlyList<(int CharacterId, long Amount)>?)grants ?? [];
     }
 
-        private void SendExistingMonstersTo(PlayerRuntimeState state)
+    private void SendExistingMonstersTo(PlayerRuntimeState state)
     {
         var cell = state.CurrentCell;
         if (!_monsterGrid.HasAnyNeighbor(cell))
@@ -288,12 +287,12 @@ public sealed partial class Zone
         }
     }
 
-        public void BroadcastMonsterActionChange(MonsterEntity monster)
+    public void BroadcastMonsterActionChange(MonsterEntity monster)
     {
         BroadcastMonsterAction(monster, 1);
     }
 
-        private void RebroadcastMonsters()
+    private void RebroadcastMonsters()
     {
         foreach (var monster in _monsters.Values)
         {
@@ -305,7 +304,7 @@ public sealed partial class Zone
         }
     }
 
-        private void BroadcastMonsterAction(MonsterEntity monster, int checkChangeActionState)
+    private void BroadcastMonsterAction(MonsterEntity monster, int checkChangeActionState)
     {
         var scale = MonsterBroadcastScale.ForMonster(monster.Template.Type, monster.Template.SpecialType);
         var cell = _grid.CellOf(monster.PosX, monster.PosZ);
@@ -344,7 +343,7 @@ public sealed partial class Zone
         }
     }
 
-        private void SpawnGmSummonedMonster(int monsterId, PlayerRuntimeState state)
+    private void SpawnGmSummonedMonster(int monsterId, PlayerRuntimeState state)
     {
         if (!worldData.MonstersById.TryGetValue(monsterId, out var definition))
             return;
@@ -374,7 +373,7 @@ public sealed partial class Zone
         return false;
     }
 
-        private static MonsterReplicationResponse BuildMonsterActionRecv(MonsterEntity monster,
+    private static MonsterReplicationResponse BuildMonsterActionRecv(MonsterEntity monster,
         int checkChangeActionState)
     {
         var targetIndex = monster.TargetCharacterId ?? -1;

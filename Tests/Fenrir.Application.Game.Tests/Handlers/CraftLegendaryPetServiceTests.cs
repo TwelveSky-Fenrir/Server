@@ -21,7 +21,7 @@ public class CraftLegendaryPetServiceTests
     private const int CharacterId = 10;
     private const int Material1ItemId = 5000;
 
-        private const int WrongSortItemId = 5001;
+    private const int WrongSortItemId = 5001;
 
     private static readonly IReadOnlySet<int> AllPossibleResultItemIds = new HashSet<int>(
         LegendaryPetCraftCatalog.LegendaryPool1

@@ -13,8 +13,7 @@ public sealed class ForcedNeutralTribeResetUseItemHandler(
     GameServerOptions options,
     ILogger<ForcedNeutralTribeResetUseItemHandler> logger) : IUseItemHandler
 {
-
-        public const int ItemId = 8100;
+    public const int ItemId = 8100;
 
     public async ValueTask<UseInventoryItemResponse> HandleAsync(UseItemContext context,
         CancellationToken cancellationToken)
@@ -62,7 +61,7 @@ public sealed class ForcedNeutralTribeResetUseItemHandler(
         return UseItemResponses.Success(context.Page, context.Index);
     }
 
-        private async ValueTask<bool> IsNeutralHomeZoneOnlineAsync(CancellationToken cancellationToken)
+    private async ValueTask<bool> IsNeutralHomeZoneOnlineAsync(CancellationToken cancellationToken)
     {
         var mapId = options.ForcedNeutralResetHomeMapId;
         if (mapId <= 0)

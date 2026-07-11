@@ -7,21 +7,20 @@ public static class BoxRewardPlacementResolver
 {
     public enum Outcome
     {
+        Merged,
 
-                Merged,
+        PlacedInEmptySlot,
 
-                PlacedInEmptySlot,
-
-                InventoryFull
+        InventoryFull
     }
 
-        public const int MaxStackQuantity = 999;
+    public const int MaxStackQuantity = 999;
 
-        public const byte PetSort = 22;
+    public const byte PetSort = 22;
 
-        public const int MaxPetActivity = 100;
+    public const int MaxPetActivity = 100;
 
-        public static QuantityResult ResolveQuantity(byte rewardSort, int rolledQuantity)
+    public static QuantityResult ResolveQuantity(byte rewardSort, int rolledQuantity)
     {
         if (ContainerMatrix.IsStackableSort(rewardSort))
             return new QuantityResult(Math.Clamp(rolledQuantity, 1, MaxStackQuantity), true);
@@ -32,7 +31,7 @@ public static class BoxRewardPlacementResolver
         return new QuantityResult(0, false);
     }
 
-        public static Result Resolve(ResolvedReward reward, byte boxContainer, byte boxSlot,
+    public static Result Resolve(ResolvedReward reward, byte boxContainer, byte boxSlot,
         ImmutableDictionary<byte, ItemStack> page0, ImmutableDictionary<byte, ItemStack> page1,
         bool secondPageAccessible = true)
     {
@@ -102,9 +101,9 @@ public static class BoxRewardPlacementResolver
             reward.Socket, 0, 0, 0, reward.ExpireDate, serial);
     }
 
-        public readonly record struct QuantityResult(int Quantity, bool IsStackable);
+    public readonly record struct QuantityResult(int Quantity, bool IsStackable);
 
-        public readonly record struct ResolvedReward(
+    public readonly record struct ResolvedReward(
         int ItemId,
         int Quantity,
         bool IsStackable,
@@ -115,7 +114,7 @@ public static class BoxRewardPlacementResolver
         int ExpireDate,
         int Serial = 0);
 
-        public readonly record struct Result(Outcome Outcome, byte Container, byte Slot, ItemStack? NewStack)
+    public readonly record struct Result(Outcome Outcome, byte Container, byte Slot, ItemStack? NewStack)
     {
         public bool Succeeded => Outcome is Outcome.Merged or Outcome.PlacedInEmptySlot;
     }

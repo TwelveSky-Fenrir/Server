@@ -7,8 +7,7 @@ public readonly record struct TribeSymbolPlacement(short MapId, float X, float Y
 public sealed class TribeSymbolCatalog(
     ImmutableDictionary<byte, ImmutableDictionary<byte, TribeSymbolPlacement>> placementsBySymbol)
 {
-
-        public const byte NeutralUnclaimedOwnerState = 255;
+    public const byte NeutralUnclaimedOwnerState = 255;
 
     public static readonly TribeSymbolCatalog Empty =
         new(ImmutableDictionary<byte, ImmutableDictionary<byte, TribeSymbolPlacement>>.Empty);

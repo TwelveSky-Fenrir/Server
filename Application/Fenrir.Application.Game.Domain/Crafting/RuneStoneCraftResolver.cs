@@ -5,12 +5,11 @@ namespace Fenrir.Application.Game.Domain.Crafting;
 
 public enum RuneStoneCraftOutcome
 {
+    Disconnect,
 
-        Disconnect,
+    Refused,
 
-        Refused,
-
-        Applied
+    Applied
 }
 
 public readonly record struct RuneStoneCraftRequest(
@@ -76,7 +75,7 @@ public static class RuneStoneCraftResolver
         };
     }
 
-        public static ItemStack? ConsumeOneUnit(ItemStack source)
+    public static ItemStack? ConsumeOneUnit(ItemStack source)
     {
         var remaining = source.Quantity - 1;
         return remaining >= 1 ? source with { Quantity = remaining } : null;
@@ -112,7 +111,7 @@ public static class RuneStoneCraftResolver
         return Applied(RuneStoneStatCodec.Encode(strRoll, dexRoll, vitRoll, intRoll));
     }
 
-        private static RuneStoneCraftResult ResolveRerollOne(int statSlotSelector, sbyte str, sbyte dex, sbyte vit,
+    private static RuneStoneCraftResult ResolveRerollOne(int statSlotSelector, sbyte str, sbyte dex, sbyte vit,
         sbyte intel, sbyte strRoll, sbyte dexRoll, sbyte vitRoll, sbyte intRoll)
     {
         return statSlotSelector switch

@@ -10,8 +10,7 @@ namespace Fenrir.Application.Game.Tests.Inventory;
 
 public class BigMoneyTransferServiceTests
 {
-
-        private static byte[] EncodeQuantity1(int quantity1)
+    private static byte[] EncodeQuantity1(int quantity1)
     {
         var bytes = new byte[28];
         BinaryPrimitives.WriteInt32LittleEndian(bytes.AsSpan(8, 4), quantity1);

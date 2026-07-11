@@ -1,6 +1,3 @@
-using Fenrir.Application.Game.Domain.Social.Party;
-using Fenrir.Application.Game.Domain.Social.Trade;
-using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.Loot;
 using Fenrir.Application.Game.GameData;
 
@@ -32,14 +29,14 @@ public static class InventoryToWorldDropPolicy
         Success
     }
 
-        public const int GroundItemCapacity = 4000;
+    public const int GroundItemCapacity = 4000;
 
 
-        public const long MaxNumberSentinel = 2_000_000_000L;
+    public const long MaxNumberSentinel = 2_000_000_000L;
 
-        public const float MonsterMoneyGroundReductionRatio = 0.15f;
+    public const float MonsterMoneyGroundReductionRatio = 0.15f;
 
-        public static Result Resolve(
+    public static Result Resolve(
         int sourcePage,
         int sourceSlot,
         int requestedQuantity,
@@ -114,7 +111,7 @@ public static class InventoryToWorldDropPolicy
         return new Result(outcome, null, null);
     }
 
-        public static GroundDropReshape ReshapeGroundDrop(byte itemSort, int dropSort, int incomingQuantity,
+    public static GroundDropReshape ReshapeGroundDrop(byte itemSort, int dropSort, int incomingQuantity,
         int incomingValue, float ownerTowerSilverRatio = 0f)
     {
         switch (itemSort)
@@ -180,18 +177,17 @@ public static class InventoryToWorldDropPolicy
 
     public readonly record struct Result(Outcome Outcome, ItemStack? NewSource, GroundItemSpawnPlan? Spawn)
     {
-
-                public bool IsMalformed => Outcome is Outcome.SourceOutOfRange or Outcome.PremiumPageExpired
+        public bool IsMalformed => Outcome is Outcome.SourceOutOfRange or Outcome.PremiumPageExpired
             or Outcome.UnknownItem or Outcome.NonDroppableItem or Outcome.QuantityOutOfRange
             or Outcome.InsufficientQuantity;
 
-                public bool IsSoftFailure => Outcome is Outcome.UnsupportedItemType or Outcome.InvalidPackedValue
+        public bool IsSoftFailure => Outcome is Outcome.UnsupportedItemType or Outcome.InvalidPackedValue
             or Outcome.GroundItemTableFull;
 
         public bool Succeeded => Outcome == Outcome.Success;
     }
 
-        public readonly record struct GroundDropReshape(
+    public readonly record struct GroundDropReshape(
         GroundDropReshapeOutcome Outcome,
         int Quantity,
         int Value,
@@ -225,16 +221,15 @@ public enum GroundDropOrigin
 
 public readonly record struct EliteDropNotice(int Type, byte Tribe, int Value, string AvatarName)
 {
+    public const int TypeTreasureChest = 55;
 
-        public const int TypeTreasureChest = 55;
+    public const int TypeTreasureChest175 = 56;
 
-        public const int TypeTreasureChest175 = 56;
+    public const int TypeMonster = 0;
 
-        public const int TypeMonster = 0;
+    public const int TypeCpExchange = 1;
 
-        public const int TypeCpExchange = 1;
-
-        public const int TypePvp = 2;
+    public const int TypePvp = 2;
 }
 
 public static class EliteDropNoticeResolver

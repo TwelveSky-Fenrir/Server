@@ -6,14 +6,13 @@ namespace Fenrir.Application.Game.Domain.World.Loot;
 
 public static class WarlordChestRewardTable
 {
+    public const int SkyChestBoxItemId = 1378;
 
-        public const int SkyChestBoxItemId = 1378;
+    public const int EarthChestBoxItemId = 1379;
 
-        public const int EarthChestBoxItemId = 1379;
+    public const short MinimumLevel2 = 12;
 
-        public const short MinimumLevel2 = 12;
-
-        public static readonly FrozenDictionary<byte, ImmutableArray<int>> RarePoolsByPreviousTribe =
+    public static readonly FrozenDictionary<byte, ImmutableArray<int>> RarePoolsByPreviousTribe =
         new Dictionary<byte, ImmutableArray<int>>
         {
             [0] = [87013, 87014, 87015, 87016, 87017, 87018, 87019, 87020, 87008],
@@ -21,7 +20,7 @@ public static class WarlordChestRewardTable
             [2] = [87055, 87056, 87057, 87058, 87059, 87060, 87061, 87062, 87050]
         }.ToFrozenDictionary();
 
-        public static readonly FrozenDictionary<byte, ImmutableArray<int>> ElitePoolsByPreviousTribe =
+    public static readonly FrozenDictionary<byte, ImmutableArray<int>> ElitePoolsByPreviousTribe =
         new Dictionary<byte, ImmutableArray<int>>
         {
             [0] =
@@ -41,12 +40,12 @@ public static class WarlordChestRewardTable
             ]
         }.ToFrozenDictionary();
 
-        public static bool MeetsLevelGate(short level2)
+    public static bool MeetsLevelGate(short level2)
     {
         return level2 >= MinimumLevel2;
     }
 
-        public static bool TryRollReward(int boxItemId, byte previousTribe, Random random, out int rewardItemId)
+    public static bool TryRollReward(int boxItemId, byte previousTribe, Random random, out int rewardItemId)
     {
         var pools = boxItemId switch
         {

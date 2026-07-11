@@ -5,8 +5,7 @@ namespace Fenrir.Network.Transport.Logging;
 
 internal static partial class TransportLog
 {
-
-        [LoggerMessage(
+    [LoggerMessage(
         EventId = 4201,
         EventName = "AcceptPortScanSwallowed",
         Level = LogLevel.Debug,
@@ -15,7 +14,7 @@ internal static partial class TransportLog
     public static partial void AcceptPortScanSwallowed(this ILogger logger, Exception exception,
         EndPoint? localEndPoint);
 
-        [LoggerMessage(
+    [LoggerMessage(
         EventId = 4202,
         EventName = "ConnectionConstructionFailed",
         Level = LogLevel.Warning,
@@ -24,7 +23,7 @@ internal static partial class TransportLog
     public static partial void ConnectionConstructionFailed(this ILogger logger, Exception exception,
         EndPoint? localEndPoint);
 
-        [LoggerMessage(
+    [LoggerMessage(
         EventId = 4203,
         EventName = "SendLoopFaulted",
         Level = LogLevel.Warning,

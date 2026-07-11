@@ -6,23 +6,23 @@ public static class StoreItemTransferPolicy
     {
         Success,
 
-                NoOp,
+        NoOp,
 
         SourceOutOfRange,
         DestinationOutOfRange,
 
-                DestinationCoordinateOutOfRange,
+        DestinationCoordinateOutOfRange,
 
-                SecondPageExpired,
+        SecondPageExpired,
 
-                SourceEmpty,
+        SourceEmpty,
 
-                InvalidQuantity,
+        InvalidQuantity,
 
-                DestinationConflict
+        DestinationConflict
     }
 
-        public static bool TryResolveStoreContainer(int rawPage, out byte container)
+    public static bool TryResolveStoreContainer(int rawPage, out byte container)
     {
         switch (rawPage)
         {
@@ -38,7 +38,7 @@ public static class StoreItemTransferPolicy
         }
     }
 
-        public static bool TryResolveInventoryContainer(int rawPage, out byte container)
+    public static bool TryResolveInventoryContainer(int rawPage, out byte container)
     {
         switch (rawPage)
         {
@@ -54,7 +54,7 @@ public static class StoreItemTransferPolicy
         }
     }
 
-        public static TransferResult ResolveDepositFromInventory(
+    public static TransferResult ResolveDepositFromInventory(
         byte inventoryContainer, int inventorySlot, int requestedQuantity,
         byte storeContainer, int storeSlot,
         ItemStack? source, ItemStack? destination,
@@ -79,7 +79,7 @@ public static class StoreItemTransferPolicy
         return ResolveOneWayTransfer(requestedQuantity, src, destination, sourceIsStackable, sourceSupportsSocket);
     }
 
-        public static TransferResult ResolveWithdrawToInventory(
+    public static TransferResult ResolveWithdrawToInventory(
         byte storeContainer, int storeSlot, int requestedQuantity,
         byte inventoryContainer, int inventorySlot, int destinationXPost, int destinationYPost,
         ItemStack? source, ItemStack? destination,
@@ -107,7 +107,7 @@ public static class StoreItemTransferPolicy
         return ResolveOneWayTransfer(requestedQuantity, src, destination, sourceIsStackable, sourceSupportsSocket);
     }
 
-        public static TransferResult ResolveRearrangeWithinStore(
+    public static TransferResult ResolveRearrangeWithinStore(
         byte fromContainer, int fromSlot, int requestedQuantity,
         byte toContainer, int toSlot,
         ItemStack? source, ItemStack? destination,
@@ -170,7 +170,7 @@ public static class StoreItemTransferPolicy
         return new TransferResult(TransferOutcome.Success, newSource, newDestination, false);
     }
 
-        private static TransferResult ResolveOneWayTransfer(
+    private static TransferResult ResolveOneWayTransfer(
         int requestedQuantity, ItemStack source, ItemStack? destination,
         bool sourceIsStackable, bool sourceSupportsSocket)
     {
@@ -236,7 +236,7 @@ public static class StoreItemTransferPolicy
         return new TransferResult(outcome, null, null, false);
     }
 
-        public readonly record struct TransferResult(
+    public readonly record struct TransferResult(
         TransferOutcome Outcome,
         ItemStack? NewSource,
         ItemStack? NewDestination,

@@ -8,9 +8,9 @@
 -- Réf. C++ : Server/ts25zone/S04_MyWork05.cpp:3666-3699 (ProcessForInventoryMoneyTo1BStoreMoney) ; :3701-3734
 -- (ProcessFor1BStoreMoneyToInventoryMoney) ; Server/Header/Protocol/DEFINE.h:367 (MAX_NUMBER_SIZE2 = 999, the
 -- BigMoney-family cap both pools share).
-CREATE PROCEDURE game.usp_Character_AdjustBigStoreMoney @CharacterId        INT,
-                                                         @DeltaBigMoney      INT,
-                                                         @DeltaBigStoreMoney INT
+CREATE PROCEDURE game.usp_Character_AdjustBigStoreMoney @CharacterId INT,
+                                                        @DeltaBigMoney INT,
+                                                        @DeltaBigStoreMoney INT
 AS
 BEGIN
     SET NOCOUNT ON;

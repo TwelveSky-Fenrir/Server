@@ -12,7 +12,7 @@ public enum FriendAskResultKind
     TargetBusy,
     Sent,
 
-        SentCrossShard
+    SentCrossShard
 }
 
 public enum FriendLocateResultKind
@@ -42,15 +42,14 @@ public enum FriendRemoveResultKind
 
 public interface IFriendService
 {
-
-        public ValueTask<FriendAskResultKind> AskAsync(Zone zone, PlayerRuntimeState asker, string targetAvatarName,
+    public ValueTask<FriendAskResultKind> AskAsync(Zone zone, PlayerRuntimeState asker, string targetAvatarName,
         CancellationToken cancellationToken);
 
     public void Answer(int targetId, int answerCode);
 
     public void Cancel(int askerId);
 
-        public ValueTask<FriendLocateResult> LocateAsync(PlayerRuntimeState asker, int index,
+    public ValueTask<FriendLocateResult> LocateAsync(PlayerRuntimeState asker, int index,
         CancellationToken cancellationToken);
 
     public ValueTask<FriendAddResult>

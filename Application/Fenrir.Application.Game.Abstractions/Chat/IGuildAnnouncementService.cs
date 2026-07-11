@@ -4,6 +4,5 @@ namespace Fenrir.Application.Game.Abstractions.Chat;
 
 public interface IGuildAnnouncementService
 {
-
-        public bool TrySendAnnouncement(PlayerRuntimeState sender, string content);
+    public bool TrySendAnnouncement(PlayerRuntimeState sender, string content);
 }

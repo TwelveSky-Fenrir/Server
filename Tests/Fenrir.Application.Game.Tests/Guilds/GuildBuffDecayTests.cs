@@ -43,7 +43,8 @@ public class GuildBuffDecayTests
     }
 
     [Fact]
-    public void Apply_ActiveWithReserveRemaining_RecomputesWholeMinutesRemaining_AgainstTheFixedBaseline_NeverAdvancingIt()
+    public void
+        Apply_ActiveWithReserveRemaining_RecomputesWholeMinutesRemaining_AgainstTheFixedBaseline_NeverAdvancingIt()
     {
         var guild = Guild(1, 60, Now.AddMinutes(53).AddSeconds(40).Ticks);
 

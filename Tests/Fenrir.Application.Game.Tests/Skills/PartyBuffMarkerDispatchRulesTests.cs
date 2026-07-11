@@ -4,32 +4,31 @@ namespace Fenrir.Application.Game.Tests.Skills;
 
 public class PartyBuffMarkerDispatchRulesTests
 {
-
     [Fact]
     public void ShouldAdvance_Op15_Cast_True()
     {
-        Assert.True(PartyBuffMarkerDispatchRules.ShouldAdvancePartyBuffMarker(isResumeAction: false,
+        Assert.True(PartyBuffMarkerDispatchRules.ShouldAdvancePartyBuffMarker(false,
             FormationSkillCatalog.PartyBuffArmActionSort));
     }
 
     [Fact]
     public void ShouldAdvance_Op15_Done_True()
     {
-        Assert.True(PartyBuffMarkerDispatchRules.ShouldAdvancePartyBuffMarker(isResumeAction: false,
+        Assert.True(PartyBuffMarkerDispatchRules.ShouldAdvancePartyBuffMarker(false,
             FormationSkillCatalog.PartyBuffConfirmActionSort));
     }
 
     [Fact]
     public void ShouldAdvance_Op16_Cast_True()
     {
-        Assert.True(PartyBuffMarkerDispatchRules.ShouldAdvancePartyBuffMarker(isResumeAction: true,
+        Assert.True(PartyBuffMarkerDispatchRules.ShouldAdvancePartyBuffMarker(true,
             FormationSkillCatalog.PartyBuffArmActionSort));
     }
 
     [Fact]
     public void ShouldAdvance_Op16_Done_False()
     {
-        Assert.False(PartyBuffMarkerDispatchRules.ShouldAdvancePartyBuffMarker(isResumeAction: true,
+        Assert.False(PartyBuffMarkerDispatchRules.ShouldAdvancePartyBuffMarker(true,
             FormationSkillCatalog.PartyBuffConfirmActionSort));
     }
 
@@ -70,12 +69,12 @@ public class PartyBuffMarkerDispatchRulesTests
     {
         var marker = PartyBuffAction.None;
 
-        Assert.True(PartyBuffMarkerDispatchRules.ShouldAdvancePartyBuffMarker(isResumeAction: false,
+        Assert.True(PartyBuffMarkerDispatchRules.ShouldAdvancePartyBuffMarker(false,
             FormationSkillCatalog.PartyBuffArmActionSort));
         marker = FormationSkillCatalog.NextPartyBuffMarker(marker, 76, FormationSkillCatalog.PartyBuffArmActionSort);
         Assert.Equal(PartyBuffAction.Cast, marker);
 
-        Assert.True(PartyBuffMarkerDispatchRules.ShouldAdvancePartyBuffMarker(isResumeAction: false,
+        Assert.True(PartyBuffMarkerDispatchRules.ShouldAdvancePartyBuffMarker(false,
             FormationSkillCatalog.PartyBuffConfirmActionSort));
         marker = FormationSkillCatalog.NextPartyBuffMarker(marker, 76,
             FormationSkillCatalog.PartyBuffConfirmActionSort);
@@ -91,12 +90,12 @@ public class PartyBuffMarkerDispatchRulesTests
     {
         var marker = PartyBuffAction.None;
 
-        Assert.True(PartyBuffMarkerDispatchRules.ShouldAdvancePartyBuffMarker(isResumeAction: true,
+        Assert.True(PartyBuffMarkerDispatchRules.ShouldAdvancePartyBuffMarker(true,
             FormationSkillCatalog.PartyBuffArmActionSort));
         marker = FormationSkillCatalog.NextPartyBuffMarker(marker, 77, FormationSkillCatalog.PartyBuffArmActionSort);
         Assert.Equal(PartyBuffAction.Cast, marker);
 
-        Assert.False(PartyBuffMarkerDispatchRules.ShouldAdvancePartyBuffMarker(isResumeAction: true,
+        Assert.False(PartyBuffMarkerDispatchRules.ShouldAdvancePartyBuffMarker(true,
             FormationSkillCatalog.PartyBuffConfirmActionSort));
         Assert.Equal(PartyBuffAction.Cast, marker);
     }

@@ -13,7 +13,7 @@ public static class ContainerMatrix
         SourceEmpty,
         InsufficientQuantity,
 
-                DestinationOccupied
+        DestinationOccupied
     }
 
     public const byte InventoryPage0 = 0;
@@ -22,7 +22,7 @@ public static class ContainerMatrix
     public const byte StorePage0 = 3;
     public const byte StorePage1 = 4;
 
-        private static readonly HashSet<int> KnownSorts =
+    private static readonly HashSet<int> KnownSorts =
     [
         201, 202, 203, 204, 205, 206, 207, 233, 235, 236, 237, 239,
 
@@ -41,7 +41,7 @@ public static class ContainerMatrix
         700, 701
     ];
 
-        private static readonly HashSet<int> ImplementedContainerMoveSorts = [208, 210, 213];
+    private static readonly HashSet<int> ImplementedContainerMoveSorts = [208, 210, 213];
 
     public static bool IsKnownSort(int sort)
     {
@@ -53,7 +53,7 @@ public static class ContainerMatrix
         return ImplementedContainerMoveSorts.Contains(sort);
     }
 
-        public static bool IsStackableSort(byte itemSort)
+    public static bool IsStackableSort(byte itemSort)
     {
         return itemSort is 2 or 99;
     }
@@ -84,7 +84,7 @@ public static class ContainerMatrix
         return slot >= 0 && TryGetMaxSlot(container, out var max) && slot <= max;
     }
 
-        public static bool TryResolveContainers(int sort, int page1, int page2, out byte fromContainer,
+    public static bool TryResolveContainers(int sort, int page1, int page2, out byte fromContainer,
         out byte toContainer)
     {
         switch (sort)
@@ -116,7 +116,7 @@ public static class ContainerMatrix
         return page is InventoryPage0 or InventoryPage1;
     }
 
-        public static MoveOutcomeResult ResolveMove(
+    public static MoveOutcomeResult ResolveMove(
         byte fromContainer, int fromSlot, int requestedQuantity,
         byte toContainer, int toSlot,
         ItemStack? source, ItemStack? destination,
@@ -157,7 +157,7 @@ public static class ContainerMatrix
         return new MoveOutcomeResult(MoveOutcome.Success, newSourceAfterMerge, merged);
     }
 
-        public static ProjectedContainers ApplyMove(
+    public static ProjectedContainers ApplyMove(
         MoveOutcomeResult move,
         byte fromContainer, int fromSlot, ImmutableDictionary<byte, ItemStack> fromCurrent,
         byte toContainer, int toSlot, ImmutableDictionary<byte, ItemStack> toCurrent)
@@ -180,7 +180,7 @@ public static class ContainerMatrix
         return newValue is { } value ? current.SetItem(slot, value) : current.Remove(slot);
     }
 
-        public readonly record struct MoveOutcomeResult(
+    public readonly record struct MoveOutcomeResult(
         MoveOutcome Outcome,
         ItemStack? NewSource,
         ItemStack? NewDestination)
@@ -188,7 +188,7 @@ public static class ContainerMatrix
         public bool Succeeded => Outcome is MoveOutcome.Success or MoveOutcome.NoOp;
     }
 
-        public readonly record struct ProjectedContainers(
+    public readonly record struct ProjectedContainers(
         ImmutableDictionary<byte, ItemStack> From,
         ImmutableDictionary<byte, ItemStack> To);
 }

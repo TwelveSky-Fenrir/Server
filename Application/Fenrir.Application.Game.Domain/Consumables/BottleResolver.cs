@@ -12,10 +12,9 @@ public static class BottleResolver
 
     public enum DrinkOutcome
     {
+        Silent,
 
-                Silent,
-
-                Rejected,
+        Rejected,
 
         Success
     }
@@ -24,7 +23,7 @@ public static class BottleResolver
     public const int RefillCount = 30;
     public const int DrunkDurationTicks = 120;
 
-        public static AcquireResult ResolveAcquire(ImmutableArray<(int ItemId, int Count)> slots, int itemId)
+    public static AcquireResult ResolveAcquire(ImmutableArray<(int ItemId, int Count)> slots, int itemId)
     {
         var existingIndex = -1;
         for (var i = 0; i < slots.Length; i++)
@@ -51,7 +50,7 @@ public static class BottleResolver
             : new AcquireResult(AcquireOutcome.Success, emptyIndex, RefillCount);
     }
 
-        public static DrinkResult ResolveDrink(ImmutableArray<(int ItemId, int Count)> slots, int sort, int index)
+    public static DrinkResult ResolveDrink(ImmutableArray<(int ItemId, int Count)> slots, int sort, int index)
     {
         if (sort != 0 || index < 0 || index >= slots.Length)
             return new DrinkResult(DrinkOutcome.Rejected, 0);

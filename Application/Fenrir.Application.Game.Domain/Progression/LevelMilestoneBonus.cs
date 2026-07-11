@@ -14,20 +14,20 @@ public static class LevelMilestoneBonus
     public const int LvM32 = 144;
     public const int LvM33 = 145;
 
-        public static readonly FrozenSet<int> ArmableMilestoneLevels =
+    public static readonly FrozenSet<int> ArmableMilestoneLevels =
         new[] { 45, 65, 85, 105, LvM2, LvM8, LvM14, LvM20, LvM26, LvM32, LvM33 }.ToFrozenSet();
 
-        public static readonly FrozenSet<int> DeferredMilestoneLevels = FrozenSet<int>.Empty;
+    public static readonly FrozenSet<int> DeferredMilestoneLevels = FrozenSet<int>.Empty;
 
     private static readonly int[] ArmableMilestoneLevelsAscending =
         [45, 65, 85, 105, LvM2, LvM8, LvM14, LvM20, LvM26, LvM32, LvM33];
 
-        public static bool IsArmableMilestone(int level)
+    public static bool IsArmableMilestone(int level)
     {
         return ArmableMilestoneLevels.Contains(level);
     }
 
-        public static int ResolveHighestMilestoneCrossed(int previousLevel, int newLevel)
+    public static int ResolveHighestMilestoneCrossed(int previousLevel, int newLevel)
     {
         var highest = 0;
         foreach (var milestone in ArmableMilestoneLevelsAscending)
@@ -37,7 +37,7 @@ public static class LevelMilestoneBonus
         return highest;
     }
 
-        public static bool TryResolveClaimDrops(int bonusItemLevel, byte previousTribe,
+    public static bool TryResolveClaimDrops(int bonusItemLevel, byte previousTribe,
         out ImmutableArray<TribeGroundItemDrop> drops)
     {
         switch (bonusItemLevel)

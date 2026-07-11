@@ -4,12 +4,11 @@ namespace Fenrir.Application.Game.Domain.Social.Chat;
 
 public enum ChatBroadcastKind : byte
 {
+    Local,
 
-        Local,
+    Shout,
 
-        Shout,
-
-        Tribe
+    Tribe
 }
 
 public readonly struct ChatZoneCommand

@@ -82,17 +82,17 @@ public static class HotkeyActionResolver
         DestinationOverCap
     }
 
-        public const int PageCount = 3;
+    public const int PageCount = 3;
 
-        public const int SlotsPerPage = 14;
+    public const int SlotsPerPage = 14;
 
-        public const int MinEmoticonCode = 1;
+    public const int MinEmoticonCode = 1;
 
     public const int MaxEmoticonCode = 9;
 
-        public const int MinSkillGrade = 1;
+    public const int MinSkillGrade = 1;
 
-        public const int MaxItemQuantity = 999;
+    public const int MaxItemQuantity = 999;
 
     public const int MinItemQuantity = 1;
 
@@ -106,7 +106,7 @@ public static class HotkeyActionResolver
         return index is >= 0 and < SlotsPerPage;
     }
 
-        public static BindSkillResult ResolveBindSkill(
+    public static BindSkillResult ResolveBindSkill(
         HotkeySlot destination, int destinationPage, int destinationIndex,
         int skillSlotIndex, int requestedGrade,
         IReadOnlyDictionary<byte, LearnedSkill> learnedSkills)
@@ -133,7 +133,7 @@ public static class HotkeyActionResolver
         return new BindSkillResult(true, BindSkillFailure.None, newDestination);
     }
 
-        public static BindEmoticonResult ResolveBindEmoticon(
+    public static BindEmoticonResult ResolveBindEmoticon(
         HotkeySlot destination, int destinationPage, int destinationIndex, int emoticonCode)
     {
         if (!IsValidPage(destinationPage))
@@ -152,7 +152,7 @@ public static class HotkeyActionResolver
         return new BindEmoticonResult(true, BindEmoticonFailure.None, newDestination);
     }
 
-        public static UnbindResult ResolveUnbind(HotkeySlot slot, int page, int index)
+    public static UnbindResult ResolveUnbind(HotkeySlot slot, int page, int index)
     {
         if (!IsValidPage(page))
             return UnbindResult.Fail(UnbindFailure.InvalidPage);
@@ -169,7 +169,7 @@ public static class HotkeyActionResolver
         return UnbindResult.Succeeded;
     }
 
-        public static BindItemResult ResolveBindItem(
+    public static BindItemResult ResolveBindItem(
         HotkeySlot destination, int destinationPage, int destinationIndex,
         ItemStack? sourceItem, int sourcePage, int sourceIndex, int requestedQuantity,
         bool sourceItemIsStackable, bool sourceItemIsExcludedPotionSubtype)
@@ -222,7 +222,7 @@ public static class HotkeyActionResolver
         return new BindItemResult(true, BindItemFailure.None, newDestination, remainingSourceQuantity);
     }
 
-        public static WithdrawItemResult ResolveWithdrawItem(
+    public static WithdrawItemResult ResolveWithdrawItem(
         HotkeySlot source, int sourcePage, int sourceIndex, int requestedQuantity,
         ItemStack? destinationItem, int destinationPage, int destinationIndex,
         int destinationX, int destinationY)
@@ -279,7 +279,7 @@ public static class HotkeyActionResolver
             newDestinationQuantity);
     }
 
-        public static RearrangeResult ResolveRearrange(
+    public static RearrangeResult ResolveRearrange(
         HotkeySlot source, int sourcePage, int sourceIndex,
         HotkeySlot destination, int destinationPage, int destinationIndex,
         int requestedQuantity)
@@ -357,7 +357,7 @@ public static class HotkeyActionResolver
         }
     }
 
-        public readonly record struct UnbindResult(bool Success, UnbindFailure Failure)
+    public readonly record struct UnbindResult(bool Success, UnbindFailure Failure)
     {
         public static readonly UnbindResult Succeeded = new(true, UnbindFailure.None);
 
@@ -367,7 +367,7 @@ public static class HotkeyActionResolver
         }
     }
 
-        public readonly record struct BindItemResult(
+    public readonly record struct BindItemResult(
         bool Success,
         BindItemFailure Failure,
         HotkeySlot NewDestination,
@@ -379,7 +379,7 @@ public static class HotkeyActionResolver
         }
     }
 
-        public readonly record struct WithdrawItemResult(
+    public readonly record struct WithdrawItemResult(
         bool Success,
         WithdrawItemFailure Failure,
         HotkeySlot NewSource,

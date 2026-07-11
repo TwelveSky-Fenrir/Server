@@ -6,17 +6,14 @@ public static class CostumeStellarCoreGrantResolver
 {
     public enum Outcome
     {
+        AlreadyWorn,
 
-                AlreadyWorn,
+        NoFreeSlot,
 
-                NoFreeSlot,
-
-                Success
+        Success
     }
 
-    public readonly record struct Result(Outcome Outcome, int SlotIndex = -1);
-
-        public static Result Resolve(ImmutableArray<int> wardrobe, int itemId)
+    public static Result Resolve(ImmutableArray<int> wardrobe, int itemId)
     {
         if (wardrobe.IsDefaultOrEmpty)
             return new Result(Outcome.NoFreeSlot);
@@ -31,4 +28,6 @@ public static class CostumeStellarCoreGrantResolver
 
         return new Result(Outcome.NoFreeSlot);
     }
+
+    public readonly record struct Result(Outcome Outcome, int SlotIndex = -1);
 }

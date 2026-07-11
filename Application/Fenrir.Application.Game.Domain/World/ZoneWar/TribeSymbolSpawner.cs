@@ -18,16 +18,15 @@ public sealed class TribeSymbolSpawner(
     TribeSymbolCatalog catalog,
     WorldStateService? worldState = null) : ISimulationSystem
 {
+    private const int FullEvaluationCadenceLegacyTicks = 20;
 
-        private const int FullEvaluationCadenceLegacyTicks = 20;
-
-        private const float SymbolLeashRadius = 15f;
+    private const float SymbolLeashRadius = 15f;
 
     private const int SymbolPoolServerIndexBase = 1_002_000;
     private const int SymbolPoolSize = 100;
     private const byte NeutralSymbolIndex = 4;
 
-        private static readonly byte[] SpecialTypeBySymbolIndex = [11, 12, 13, 28, 14];
+    private static readonly byte[] SpecialTypeBySymbolIndex = [11, 12, 13, 28, 14];
 
     private readonly ConcurrentDictionary<short, SymbolZoneState> _stateByZone = new();
 
@@ -49,7 +48,7 @@ public sealed class TribeSymbolSpawner(
         EvaluateNow(zone);
     }
 
-        public void EvaluateNow(Zone zone)
+    public void EvaluateNow(Zone zone)
     {
         for (byte symbolIndex = 0; symbolIndex < SpecialTypeBySymbolIndex.Length; symbolIndex++)
             EvaluateSymbol(zone, symbolIndex, SpecialTypeBySymbolIndex[symbolIndex]);
@@ -104,7 +103,7 @@ public sealed class TribeSymbolSpawner(
         zone.SpawnMonster(entity);
     }
 
-        private byte? ResolveOwnerState(byte symbolIndex)
+    private byte? ResolveOwnerState(byte symbolIndex)
     {
         if (worldState is null)
             return null;

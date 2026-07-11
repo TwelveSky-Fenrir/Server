@@ -76,7 +76,7 @@ public class EnchantResolverWingProtectedMaterialTests
     [Fact]
     public void NonWingTarget_IsRejected_MaterialIsWingExclusive()
     {
-        var result = EnchantResolver.Resolve(Equip(1, sort: 7), Target(0), Material(ProtectedMaterialId), 0, 0,
+        var result = EnchantResolver.Resolve(Equip(1, 7), Target(0), Material(ProtectedMaterialId), 0, 0,
             0, new ScriptedRandomSource(0));
 
         Assert.Equal(EnchantResolver.EnchantOutcome.Rejected, result.Outcome);

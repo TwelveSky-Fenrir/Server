@@ -521,7 +521,7 @@ public class WorldStateServiceTests
         Assert.Equal(threads * callsPerThread, service.GetTribe(0).Points);
     }
 
-        private sealed class RaceOnGetAsyncRepository : IWorldStateRepository
+    private sealed class RaceOnGetAsyncRepository : IWorldStateRepository
     {
         private readonly FakeWorldStateRepository _inner = new();
 

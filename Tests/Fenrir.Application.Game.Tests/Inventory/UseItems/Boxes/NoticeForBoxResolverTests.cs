@@ -7,7 +7,7 @@ public class NoticeForBoxResolverTests
     [Fact]
     public void OrdinaryBox_NeverBroadcasts_WhileTheRewardWhitelistIsEmpty()
     {
-        var decision = NoticeForBoxResolver.Decide(601, 92286, rewardItemType: 4);
+        var decision = NoticeForBoxResolver.Decide(601, 92286, 4);
 
         Assert.False(decision.ShouldBroadcast);
         Assert.False(decision.WriteEliteGainAudit);
@@ -16,7 +16,7 @@ public class NoticeForBoxResolverTests
     [Fact]
     public void EliteOnlyBox_WithEliteTypedReward_FlagsGainAudit_ButStillDoesNotBroadcastWithoutWhitelist()
     {
-        var decision = NoticeForBoxResolver.Decide(1035, 1500, rewardItemType: NoticeForBoxResolver.EliteItemTypeThreshold);
+        var decision = NoticeForBoxResolver.Decide(1035, 1500, NoticeForBoxResolver.EliteItemTypeThreshold);
 
         Assert.True(decision.WriteEliteGainAudit);
         Assert.False(decision.ShouldBroadcast);
@@ -26,7 +26,7 @@ public class NoticeForBoxResolverTests
     public void EliteOnlyBox_WithNonEliteReward_DoesNotFlagGainAudit()
     {
         var decision = NoticeForBoxResolver.Decide(1036, 1500,
-            rewardItemType: (byte)(NoticeForBoxResolver.EliteItemTypeThreshold - 1));
+            NoticeForBoxResolver.EliteItemTypeThreshold - 1);
 
         Assert.False(decision.WriteEliteGainAudit);
         Assert.False(decision.ShouldBroadcast);

@@ -5,7 +5,6 @@ namespace Fenrir.Application.Game.Abstractions.Commerce;
 
 public interface IGetProxyShopService
 {
-
-        public ValueTask<GetProxyShopResponse> GetAsync(GetProxyShopRequest packet, Zone zone, int characterId,
+    public ValueTask<GetProxyShopResponse> GetAsync(GetProxyShopRequest packet, Zone zone, int characterId,
         CancellationToken cancellationToken);
 }

@@ -9,14 +9,13 @@ public readonly record struct AlliancePossibleInfo(bool CooldownActive, int Expi
 
 public sealed class AllianceProposalCenterState
 {
-
-        public const int SlotCount = 2;
+    public const int SlotCount = 2;
 
     private static readonly int TribeCount = WorldStateService.TribeCount;
 
     private readonly byte?[,] _allianceState = new byte?[SlotCount, 2];
-    private readonly AlliancePossibleInfo[] _possibleAllianceInfo = new AlliancePossibleInfo[TribeCount];
     private readonly Lock _lock = new();
+    private readonly AlliancePossibleInfo[] _possibleAllianceInfo = new AlliancePossibleInfo[TribeCount];
 
     public static bool IsValidSlot(int slot)
     {
@@ -28,7 +27,7 @@ public sealed class AllianceProposalCenterState
         return tribeId >= 0 && tribeId < TribeCount;
     }
 
-        public (byte? CellA, byte? CellB) GetSlot(int slot)
+    public (byte? CellA, byte? CellB) GetSlot(int slot)
     {
         ValidateSlot(slot);
         lock (_lock)
@@ -37,7 +36,7 @@ public sealed class AllianceProposalCenterState
         }
     }
 
-        public void SetSlot(int slot, byte? cellA, byte? cellB)
+    public void SetSlot(int slot, byte? cellA, byte? cellB)
     {
         ValidateSlot(slot);
         lock (_lock)
@@ -47,12 +46,12 @@ public sealed class AllianceProposalCenterState
         }
     }
 
-        public void ClearSlot(int slot)
+    public void ClearSlot(int slot)
     {
         SetSlot(slot, null, null);
     }
 
-        public bool SlotIsEmpty(int slot)
+    public bool SlotIsEmpty(int slot)
     {
         ValidateSlot(slot);
         lock (_lock)
@@ -61,7 +60,7 @@ public sealed class AllianceProposalCenterState
         }
     }
 
-        public bool SlotMatchesPairEitherOrder(int slot, byte tribeA, byte tribeB)
+    public bool SlotMatchesPairEitherOrder(int slot, byte tribeA, byte tribeB)
     {
         ValidateSlot(slot);
         lock (_lock)
@@ -70,7 +69,7 @@ public sealed class AllianceProposalCenterState
         }
     }
 
-        public AlliancePossibleInfo GetPossibleAllianceInfo(byte tribeId)
+    public AlliancePossibleInfo GetPossibleAllianceInfo(byte tribeId)
     {
         ValidateTribeId(tribeId);
         lock (_lock)
@@ -79,7 +78,7 @@ public sealed class AllianceProposalCenterState
         }
     }
 
-        public void SetPossibleAllianceCooldown(byte tribeId, int expiryDateYyyyMmDd)
+    public void SetPossibleAllianceCooldown(byte tribeId, int expiryDateYyyyMmDd)
     {
         ValidateTribeId(tribeId);
         lock (_lock)
@@ -88,7 +87,7 @@ public sealed class AllianceProposalCenterState
         }
     }
 
-        public void ClearPossibleAllianceCooldown(byte tribeId)
+    public void ClearPossibleAllianceCooldown(byte tribeId)
     {
         ValidateTribeId(tribeId);
         lock (_lock)
@@ -97,7 +96,7 @@ public sealed class AllianceProposalCenterState
         }
     }
 
-        public void ApplyFinalize(byte tribeA, byte tribeB)
+    public void ApplyFinalize(byte tribeA, byte tribeB)
     {
         ValidateTribeId(tribeA);
         ValidateTribeId(tribeB);
@@ -111,7 +110,7 @@ public sealed class AllianceProposalCenterState
         }
     }
 
-        public void ApplyBreak(byte tribeA, byte tribeB, int expiryDateA, int expiryDateB)
+    public void ApplyBreak(byte tribeA, byte tribeB, int expiryDateA, int expiryDateB)
     {
         ValidateTribeId(tribeA);
         ValidateTribeId(tribeB);
@@ -125,12 +124,12 @@ public sealed class AllianceProposalCenterState
         }
     }
 
-        private bool SlotIsEmptyCore(int slot)
+    private bool SlotIsEmptyCore(int slot)
     {
         return _allianceState[slot, 0] is null && _allianceState[slot, 1] is null;
     }
 
-        private bool SlotMatchesPairEitherOrderCore(int slot, byte tribeA, byte tribeB)
+    private bool SlotMatchesPairEitherOrderCore(int slot, byte tribeA, byte tribeB)
     {
         var cellA = _allianceState[slot, 0];
         var cellB = _allianceState[slot, 1];
@@ -140,7 +139,8 @@ public sealed class AllianceProposalCenterState
     private static void ValidateSlot(int slot)
     {
         if (!IsValidSlot(slot))
-            throw new ArgumentOutOfRangeException(nameof(slot), slot, $"Alliance proposal slot must be 0-{SlotCount - 1}.");
+            throw new ArgumentOutOfRangeException(nameof(slot), slot,
+                $"Alliance proposal slot must be 0-{SlotCount - 1}.");
     }
 
     private static void ValidateTribeId(byte tribeId)

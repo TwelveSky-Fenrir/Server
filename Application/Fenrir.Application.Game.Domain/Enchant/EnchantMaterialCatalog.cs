@@ -10,7 +10,7 @@ public static class EnchantMaterialCatalog
         RareOrElite
     }
 
-        public const int UnsealItemId = 1422;
+    public const int UnsealItemId = 1422;
 
     public static readonly IReadOnlyDictionary<int, StandardMaterial> StandardMaterials =
         new Dictionary<int, StandardMaterial>
@@ -30,7 +30,7 @@ public static class EnchantMaterialCatalog
             [825] = new(825, 50, 0, true, true, TypeRequirement.RareOrElite, null, true)
         };
 
-        public static readonly IReadOnlyDictionary<int, AdvancedMaterial> AdvancedMaterials =
+    public static readonly IReadOnlyDictionary<int, AdvancedMaterial> AdvancedMaterials =
         new Dictionary<int, AdvancedMaterial>
         {
             [1023] = new(1023, 1, 90000, false),
@@ -41,7 +41,7 @@ public static class EnchantMaterialCatalog
             [825] = new(825, 10, 0, true)
         };
 
-        public readonly record struct StandardMaterial(
+    public readonly record struct StandardMaterial(
         int ItemId,
         int Value,
         int MoneyCost,

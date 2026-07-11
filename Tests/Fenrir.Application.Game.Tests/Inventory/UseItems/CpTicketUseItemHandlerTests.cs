@@ -72,9 +72,11 @@ public class CpTicketUseItemHandlerTests
     {
         var (zone, state, characters, eventLog, handler) = SetUp();
         state.ContributionPoints = 100;
-        var item = Ticket(691, quantity: 10);
+        var item = Ticket(691, 10);
 
-        var response = await RunToCompletionAsync(handler.HandleAsync(Context(zone, state, 691, item), CancellationToken.None), zone);
+        var response =
+            await RunToCompletionAsync(handler.HandleAsync(Context(zone, state, 691, item), CancellationToken.None),
+                zone);
 
         Assert.Equal(0, response.Result);
         Assert.Equal(105, response.Value);
@@ -92,10 +94,10 @@ public class CpTicketUseItemHandlerTests
     {
         var (zone, state, characters, _, handler) = SetUp();
         state.ContributionPoints = 0;
-        var item = Ticket(1499, quantity: 3);
+        var item = Ticket(1499, 3);
 
         var response = await RunToCompletionAsync(
-            handler.HandleAsync(Context(zone, state, 1499, item, value: 999), CancellationToken.None), zone);
+            handler.HandleAsync(Context(zone, state, 1499, item, 999), CancellationToken.None), zone);
 
         Assert.Equal(0, response.Result);
         Assert.Equal(15000, response.Value);
@@ -111,7 +113,7 @@ public class CpTicketUseItemHandlerTests
     {
         var (zone, state, characters, _, handler) = SetUp();
         state.ContributionPoints = BankedCounterMath.GlobalCeiling;
-        var item = Ticket(691, quantity: 1);
+        var item = Ticket(691, 1);
 
         var response = await handler.HandleAsync(Context(zone, state, 691, item), CancellationToken.None);
 
@@ -125,7 +127,7 @@ public class CpTicketUseItemHandlerTests
     {
         var (zone, state, characters, _, handler) = SetUp();
         state.ContributionPoints = 100;
-        var item = Ticket(691, quantity: 0);
+        var item = Ticket(691, 0);
 
         var response = await handler.HandleAsync(Context(zone, state, 691, item), CancellationToken.None);
 

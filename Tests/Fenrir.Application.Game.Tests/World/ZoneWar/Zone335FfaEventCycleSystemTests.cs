@@ -86,7 +86,7 @@ public class Zone335FfaEventCycleSystemTests
         Assert.Equal(0, state.GetKillOtherTribeBonus(3));
     }
 
-        [Fact]
+    [Fact]
     public void FullCycle_WithNoPlayersOnline_VisitsEveryPhaseScalarInOrder_AndReturnsToIdle()
     {
         var (system, state, trigger, registry) = CreateSystem();
@@ -191,7 +191,7 @@ public class Zone335FfaEventCycleSystemTests
         Assert.Empty(DrainAll(otherPipe));
     }
 
-        [Fact]
+    [Fact]
     public void
         PreStartCountdown_AdvancesOneMinuteAtATime_BroadcastingSort1501WithDecreasingRemainingMinutes_ThenExitsWithNoFurtherBroadcast()
     {
@@ -227,7 +227,7 @@ public class Zone335FfaEventCycleSystemTests
         Assert.Empty(DrainAll(pipe));
     }
 
-        [Fact]
+    [Fact]
     public void
         FullCycle_WithOnePlayerOnline_BroadcastsEveryContractEventCodeInOrder_ThenForcesThemHomeAndResetsOnFinalWindDown()
     {
@@ -284,7 +284,7 @@ public class Zone335FfaEventCycleSystemTests
         Assert.Equal(1507, resetSort);
     }
 
-        [Fact]
+    [Fact]
     public void FinalReset_SkipsForcedReturnForAPlayerAlreadyMovingZone_ButStillBroadcastsTheClusterWideResetToThem()
     {
         var (system, state, trigger, registry) = CreateSystem();
@@ -342,7 +342,7 @@ public class Zone335FfaEventCycleSystemTests
         Assert.Equal(0, BinaryPrimitives.ReadInt32LittleEndian(payload[4..]));
     }
 
-        private static ReadOnlySpan<byte> ExtractEventPayload(byte[] bytes, int expectedSort)
+    private static ReadOnlySpan<byte> ExtractEventPayload(byte[] bytes, int expectedSort)
     {
         var eventFrameSize = FrameWriter.FrameSizeOf<ZoneEventInfoResponse>();
         var countdownFrameSize = FrameWriter.FrameSizeOf<ZoneWar335CountdownResponse>();
@@ -371,7 +371,7 @@ public class Zone335FfaEventCycleSystemTests
             system.Simulate(zone, SimulationClock.PlayTimeAccrualLegacyTicks);
     }
 
-        private static byte[] DrainAll(FakeDuplexPipe pipe)
+    private static byte[] DrainAll(FakeDuplexPipe pipe)
     {
         var all = new List<byte>();
         for (var i = 0; i < 64; i++)

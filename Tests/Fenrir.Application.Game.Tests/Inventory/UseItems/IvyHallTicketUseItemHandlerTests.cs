@@ -101,7 +101,7 @@ public class IvyHallTicketUseItemHandlerTests
     public async Task ZeroStackQuantity_FailsCleanly()
     {
         var (zone, state, characters, handler) = SetUp();
-        var item = Ticket(553, quantity: 0);
+        var item = Ticket(553, 0);
 
         var response = await handler.HandleAsync(Context(zone, state, 553, item), CancellationToken.None);
 

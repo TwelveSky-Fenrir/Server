@@ -119,7 +119,7 @@ public class ZoneAttackTests
         Assert.True(defender.IsDead);
     }
 
-        [Fact]
+    [Fact]
     public void KillingBlow_BroadcastCarriesUncappedViewDamage_ButCappedRealDamage()
     {
         var zone = TwoPlayerZone(out var attackerPipe, out _);
@@ -156,7 +156,7 @@ public class ZoneAttackTests
         Assert.Equal(lifeBefore, defender.Life);
     }
 
-        [Theory]
+    [Theory]
     [InlineData((short)324)]
     [InlineData((short)335)]
     public void SameTribe_OnOpenPvpMap_DamageIsApplied(short mapId)
@@ -174,7 +174,7 @@ public class ZoneAttackTests
         Assert.True(defender.Life < lifeBefore);
     }
 
-        [Fact]
+    [Fact]
     public void PvpDisabledZone_EnemyTribeAttackIsRejected()
     {
         Assert.False(ZonePvpZoneCatalog.AllowsEnemyTribeAttack(39));
@@ -189,7 +189,7 @@ public class ZoneAttackTests
         Assert.Equal(lifeBefore, defender.Life);
     }
 
-        [Fact]
+    [Fact]
     public void PvpEnabledZone_EnemyTribeAttackIsAllowed()
     {
         Assert.True(ZonePvpZoneCatalog.AllowsEnemyTribeAttack(146));
@@ -204,7 +204,7 @@ public class ZoneAttackTests
         Assert.True(defender.Life < lifeBefore);
     }
 
-        [Fact]
+    [Fact]
     public void NewbieProtectionZone_HighLevelAttacker_CannotDamageLowLevelDefender()
     {
         Assert.True(ZonePvpZoneCatalog.IsNewbieProtectionZone(2));
@@ -222,7 +222,7 @@ public class ZoneAttackTests
         Assert.Equal(lifeBefore, defender.Life);
     }
 
-        [Fact]
+    [Fact]
     public void CapitalPlazaZone_HighLevelAttacker_CanStillDamageLowLevelDefender()
     {
         Assert.False(ZonePvpZoneCatalog.IsNewbieProtectionZone(1));
@@ -270,7 +270,7 @@ public class ZoneAttackTests
         zone.Tick(TimeSpan.FromMilliseconds(50));
     }
 
-        [Fact]
+    [Fact]
     public void RestActionAfterLongSession_RearmsZoneEntryProtectWindow_BlockingTheNextAttack()
     {
         var zone = TwoPlayerZone(out _, out _);
@@ -296,7 +296,7 @@ public class ZoneAttackTests
         Assert.True(defender.Life < lifeAfterRest);
     }
 
-        [Fact]
+    [Fact]
     public void SkillAttackManaCharge_UsesInvestedGradeOnly_NotCombinedItemBonusGrade()
     {
         var row = new SkillRowDto(200, "Test Attack Skill", 0, 0, 0, 0, 0, 1, 10, 1, 0);

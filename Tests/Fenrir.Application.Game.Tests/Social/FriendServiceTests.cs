@@ -48,7 +48,7 @@ public class FriendServiceTests
             new CapturingLogger<FriendService>());
     }
 
-        [Fact]
+    [Fact]
     public async Task Ask_AskerBusy_AndTargetNameDoesNotExist_ReturnsAskerBusy_NotTargetNotFound()
     {
         var friends = new FriendRegistry();
@@ -72,7 +72,7 @@ public class FriendServiceTests
         Assert.Equal(FriendAskResultKind.AskerBusy, result);
     }
 
-        [Fact]
+    [Fact]
     public async Task Ask_SameShardMiss_ResolvesCrossShard_PublishesAskAndReturnsSentCrossShard()
     {
         var friends = new FriendRegistry();

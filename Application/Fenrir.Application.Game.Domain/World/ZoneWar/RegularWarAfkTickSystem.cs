@@ -11,14 +11,13 @@ public sealed class RegularWarAfkTickSystem(
     IOptions<GameServerOptions> options,
     ILogger<RegularWarAfkTickSystem> logger) : ISimulationSystem
 {
+    public const int Zone195FullUnits = 10;
 
-        public const int Zone195FullUnits = 10;
+    public const int WarActiveFullUnits = 5;
 
-        public const int WarActiveFullUnits = 5;
+    public const int UnitLegacyTicks = 60;
 
-        public const int UnitLegacyTicks = 60;
-
-        public const int DisconnectGraceLegacyTicksPastFull = 2;
+    public const int DisconnectGraceLegacyTicksPastFull = 2;
 
     public void Simulate(Zone zone, int legacyTicksElapsed)
     {

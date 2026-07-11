@@ -5,28 +5,26 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 
 public enum RegularWarPhase : byte
 {
+    Idle = 0,
 
-        Idle = 0,
+    OpenGate = 1,
 
-        OpenGate = 1,
+    PreWar = 2,
 
-        PreWar = 2,
+    Active = 3,
 
-        Active = 3,
+    PostWarCleanup = 4,
 
-        PostWarCleanup = 4,
-
-        ForcedReset = 5
+    ForcedReset = 5
 }
 
 public enum RegularWarOutcome : byte
 {
+    Draw,
 
-        Draw,
+    TribeWin,
 
-        TribeWin,
-
-        AbortedEmptyMap
+    AbortedEmptyMap
 }
 
 public readonly record struct RegularWarEnvironmentSnapshot(
@@ -48,38 +46,36 @@ public readonly record struct RegularWarTickResult(
     bool BossMonstersShouldSpawn = false,
     bool AllSessionsShouldDisconnect = false)
 {
-
-        public bool EnteredActiveWar => PreviousPhase == RegularWarPhase.PreWar && Phase == RegularWarPhase.Active;
+    public bool EnteredActiveWar => PreviousPhase == RegularWarPhase.PreWar && Phase == RegularWarPhase.Active;
 }
 
 public sealed class RegularWarSchedule(RegularWarMapConfig config)
 {
+    public const int TribeCount = WorldStateService.TribeCount;
 
-        public const int TribeCount = WorldStateService.TribeCount;
+    public const int CooldownTicks = 3600;
 
-        public const int CooldownTicks = 3600;
-
-        public const int CountdownAnnounceIntervalTicks = 120;
+    public const int CountdownAnnounceIntervalTicks = 120;
 
     public const int CountdownAnnounceStartValue = 10;
 
-        public const int FinalWaitTicks = 120;
+    public const int FinalWaitTicks = 120;
 
-        public const int OpenGateTicks = 360;
+    public const int OpenGateTicks = 360;
 
-        public const int PreWarTicks = 120;
+    public const int PreWarTicks = 120;
 
-        public const int ActiveWarDurationTicks = 1800;
+    public const int ActiveWarDurationTicks = 1800;
 
-        public const int ActiveEvaluationCadenceTicks = 10;
+    public const int ActiveEvaluationCadenceTicks = 10;
 
-        public const int PostWarCleanupTicks = 180;
+    public const int PostWarCleanupTicks = 180;
 
-        public const int BossPollMaxTicks = 1800;
+    public const int BossPollMaxTicks = 1800;
 
-        public const int BossConfirmedAbsenceTicks = 180;
+    public const int BossConfirmedAbsenceTicks = 180;
 
-        public const int ForcedResetDisconnectAtTicks = 12;
+    public const int ForcedResetDisconnectAtTicks = 12;
 
     public const int ForcedResetHeartbeatTicks = 120;
     private readonly Dictionary<int, int> _killCountByCharacter = new();
@@ -101,13 +97,13 @@ public sealed class RegularWarSchedule(RegularWarMapConfig config)
 
     public RegularWarPhase Phase { get; private set; } = RegularWarPhase.Idle;
 
-        public int RemainingActiveWarTicks { get; private set; }
+    public int RemainingActiveWarTicks { get; private set; }
 
-        public int WarCycleNumber { get; private set; } = 1;
+    public int WarCycleNumber { get; private set; } = 1;
 
-        public byte? WinningTribe { get; private set; }
+    public byte? WinningTribe { get; private set; }
 
-        public RegularWarTickResult Tick(RegularWarEnvironmentSnapshot snapshot)
+    public RegularWarTickResult Tick(RegularWarEnvironmentSnapshot snapshot)
     {
         var previousPhase = Phase;
         int? countdownAnnounceValue = null;
@@ -157,7 +153,7 @@ public sealed class RegularWarSchedule(RegularWarMapConfig config)
             allSessionsShouldDisconnect);
     }
 
-        public void RegisterKill(byte killerTribe, int killerCharacterId)
+    public void RegisterKill(byte killerTribe, int killerCharacterId)
     {
         if (Phase != RegularWarPhase.Active)
             return;
@@ -176,7 +172,7 @@ public sealed class RegularWarSchedule(RegularWarMapConfig config)
         return tribeId < TribeCount ? _tribeKillTally[tribeId] : 0;
     }
 
-        public ImmutableArray<int> GetTopKillers(int count = 3)
+    public ImmutableArray<int> GetTopKillers(int count = 3)
     {
         if (_killOrderSeen.Count == 0)
             return [];
@@ -337,7 +333,7 @@ public sealed class RegularWarSchedule(RegularWarMapConfig config)
         _forcedResetTicksElapsed = 0;
     }
 
-        private RegularWarOutcome DetermineTimeoutOutcome()
+    private RegularWarOutcome DetermineTimeoutOutcome()
     {
         var max = 0;
         for (byte t = 0; t < TribeCount; t++)
@@ -367,7 +363,7 @@ public sealed class RegularWarSchedule(RegularWarMapConfig config)
         return RegularWarOutcome.TribeWin;
     }
 
-        private RegularWarOutcome? DetermineEliminationOutcome(ImmutableArray<int> presentCountByTribe)
+    private RegularWarOutcome? DetermineEliminationOutcome(ImmutableArray<int> presentCountByTribe)
     {
         var presentTribes = 0;
         byte soleTribe = 0;
@@ -392,7 +388,7 @@ public sealed class RegularWarSchedule(RegularWarMapConfig config)
         }
     }
 
-        private static byte ComputeSmallestPresentTribe(ImmutableArray<int> presentCountByTribe)
+    private static byte ComputeSmallestPresentTribe(ImmutableArray<int> presentCountByTribe)
     {
         byte smallestTribe = 0;
         var smallestCount = int.MaxValue;

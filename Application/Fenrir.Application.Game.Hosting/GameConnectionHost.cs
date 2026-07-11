@@ -34,8 +34,7 @@ public sealed class GameConnectionHost(
     TribeQuotaRegistry tribeQuota,
     ILogger<GameConnectionHost> logger) : BackgroundService
 {
-
-        private const short LogoutEventCode = 4;
+    private const short LogoutEventCode = 4;
 
     private readonly ConcurrentDictionary<Task, byte> _inFlightConnections = new();
 
@@ -66,7 +65,7 @@ public sealed class GameConnectionHost(
         }
     }
 
-        public override async Task StopAsync(CancellationToken cancellationToken)
+    public override async Task StopAsync(CancellationToken cancellationToken)
     {
         await base.StopAsync(cancellationToken).ConfigureAwait(false);
 
@@ -90,7 +89,7 @@ public sealed class GameConnectionHost(
         }
     }
 
-        private Task TrackInFlightAsync(ZoneClientSession zoneSession, SocketConnection connection, CancellationToken ct)
+    private Task TrackInFlightAsync(ZoneClientSession zoneSession, SocketConnection connection, CancellationToken ct)
     {
         var task = OnAcceptedAsync(zoneSession, connection, ct);
 
@@ -167,7 +166,7 @@ public sealed class GameConnectionHost(
         }
     }
 
-        private async ValueTask FlushFinalCharacterStateAsync(int characterId)
+    private async ValueTask FlushFinalCharacterStateAsync(int characterId)
     {
         try
         {
@@ -181,7 +180,7 @@ public sealed class GameConnectionHost(
         }
     }
 
-        private async ValueTask TearDownAccountSessionAsync(int accountId, Guid? sessionToken)
+    private async ValueTask TearDownAccountSessionAsync(int accountId, Guid? sessionToken)
     {
         try
         {
@@ -202,7 +201,7 @@ public sealed class GameConnectionHost(
         }
     }
 
-        private async ValueTask LogLogoutAsync(int? accountId, int characterId, short mapId)
+    private async ValueTask LogLogoutAsync(int? accountId, int characterId, short mapId)
     {
         try
         {
@@ -216,7 +215,7 @@ public sealed class GameConnectionHost(
         }
     }
 
-        private static void Greet(ZoneClientSession session, SocketConnection connection)
+    private static void Greet(ZoneClientSession session, SocketConnection connection)
     {
         var randomNumber = RandomNumberGenerator.GetInt32(int.MinValue, int.MaxValue);
 

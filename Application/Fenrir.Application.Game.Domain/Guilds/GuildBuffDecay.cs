@@ -15,5 +15,5 @@ public static class GuildBuffDecay
             : new Result(true, guild.BuffType, guild.BuffState, floored, guild.BuffTimeForDiff);
     }
 
-        public readonly record struct Result(bool Changed, int BuffType, int BuffState, int BuffTime, long BuffTimeForDiff);
+    public readonly record struct Result(bool Changed, int BuffType, int BuffState, int BuffTime, long BuffTimeForDiff);
 }

@@ -26,7 +26,7 @@ internal static class GmBasicTestSupport
     public const int GenericActionDataLength = 130;
     public const int GmDataSize = 100;
 
-        public static async Task RunToCompletionAsync(ValueTask pending, Zone zone)
+    public static async Task RunToCompletionAsync(ValueTask pending, Zone zone)
     {
         var task = pending.AsTask();
         var guard = 0;
@@ -65,7 +65,7 @@ internal static class GmBasicTestSupport
         return (session, pipe, state!);
     }
 
-        public static byte[] RequestData(Action<byte[]>? write = null)
+    public static byte[] RequestData(Action<byte[]>? write = null)
     {
         var data = new byte[GenericActionDataLength];
         write?.Invoke(data);
@@ -91,7 +91,7 @@ internal static class GmBasicTestSupport
         return new byte[GmDataSize];
     }
 
-        public static async Task AssertTailFrameAsync<TPacket>(FakeDuplexPipe pipe, TPacket expected)
+    public static async Task AssertTailFrameAsync<TPacket>(FakeDuplexPipe pipe, TPacket expected)
         where TPacket : struct, IOutgoingPacket
     {
         var actual = await PacketAssert.ReadSentBytesAsync(pipe);
@@ -102,7 +102,7 @@ internal static class GmBasicTestSupport
         Assert.Equal(frame, actual[^frame.Length..]);
     }
 
-        public static async Task AssertExactSequenceAsync<T1, T2>(FakeDuplexPipe pipe, T1 first, T2 second)
+    public static async Task AssertExactSequenceAsync<T1, T2>(FakeDuplexPipe pipe, T1 first, T2 second)
         where T1 : struct, IOutgoingPacket
         where T2 : struct, IOutgoingPacket
     {

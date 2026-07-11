@@ -11,15 +11,15 @@ public static class RefineResolver
         Failed
     }
 
-        public const int MaxRefine = 25;
+    public const int MaxRefine = 25;
 
-        public static int RefineRate(int currentRefine, int addedLevel)
+    public static int RefineRate(int currentRefine, int addedLevel)
     {
         var rate = 72 - 2 * (currentRefine + addedLevel);
         return Math.Clamp(rate, 0, 100);
     }
 
-        public static RefineResult Resolve(int currentRefine, int addedLevel, IRandomSource random)
+    public static RefineResult Resolve(int currentRefine, int addedLevel, IRandomSource random)
     {
         if (addedLevel <= 0 || currentRefine < 0 || currentRefine >= MaxRefine)
             return new RefineResult(RefineOutcome.Rejected, currentRefine, 0);

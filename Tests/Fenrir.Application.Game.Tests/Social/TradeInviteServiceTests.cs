@@ -68,7 +68,7 @@ public class TradeInviteServiceTests
         Assert.Equal(TradeInviteResultKind.TargetNotFound, result.Kind);
     }
 
-        [Fact]
+    [Fact]
     public async Task Invite_Success_SendsAskersCombinedLevel_NotOrdinaryLevelAlone()
     {
         var (service, zones, _) = CreateService(1);
@@ -83,7 +83,7 @@ public class TradeInviteServiceTests
         Assert.Equal(37, result.AskerLevel);
     }
 
-        [Fact]
+    [Fact]
     public async Task Invite_SameShardMiss_ResolvesCrossShard_PublishesAskAndReturnsSentCrossShard()
     {
         var directory = new FakeCharacterShardLocationRepository();

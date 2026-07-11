@@ -1,5 +1,4 @@
 using Fenrir.Application.Game.Abstractions.BuffsMountsCosmetics;
-using Fenrir.Application.Game.Domain.Costumes;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;

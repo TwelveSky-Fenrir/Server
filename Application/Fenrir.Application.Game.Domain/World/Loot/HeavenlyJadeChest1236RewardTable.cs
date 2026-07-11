@@ -6,28 +6,27 @@ namespace Fenrir.Application.Game.Domain.World.Loot;
 
 public static class HeavenlyJadeChest1236RewardTable
 {
+    public const int BoxId = 1236;
 
-        public const int BoxId = 1236;
+    public const int ZeroBranchAlternateId = 1321;
 
-        public static readonly FrozenDictionary<byte, int> CatHairBandIdByPreviousTribe =
+    public const int ZeroBranchFallbackId = 1324;
+
+    public const int SevenHundredBranchId = 1045;
+
+    public static readonly FrozenDictionary<byte, int> CatHairBandIdByPreviousTribe =
         new Dictionary<byte, int> { [0] = 2307, [1] = 2308, [2] = 2309 }.ToFrozenDictionary();
 
-        public const int ZeroBranchAlternateId = 1321;
+    public static readonly ImmutableArray<int> OneToThirtyPair = [1007, 1008];
 
-        public const int ZeroBranchFallbackId = 1324;
-
-        public static readonly ImmutableArray<int> OneToThirtyPair = [1007, 1008];
-
-        public static readonly FrozenDictionary<byte, int> TribeFixedIdByPreviousTribe =
+    public static readonly FrozenDictionary<byte, int> TribeFixedIdByPreviousTribe =
         new Dictionary<byte, int> { [0] = 126, [1] = 129, [2] = 132 }.ToFrozenDictionary();
 
-        public static readonly ImmutableArray<int> FiftyOneToHundredTriple = [601, 602, 2249];
+    public static readonly ImmutableArray<int> FiftyOneToHundredTriple = [601, 602, 2249];
 
-        public static readonly ImmutableArray<int> ElixirNoMPPoolIds = [506, 508, 509, 578, 579];
+    public static readonly ImmutableArray<int> ElixirNoMPPoolIds = [506, 508, 509, 578, 579];
 
-        public const int SevenHundredBranchId = 1045;
-
-        public static RollResult Roll(byte previousTribe, Random random)
+    public static RollResult Roll(byte previousTribe, Random random)
     {
         var outer = random.Next(0, 1000);
 
@@ -67,7 +66,7 @@ public static class HeavenlyJadeChest1236RewardTable
         return new RollResult(true, SevenHundredBranchId);
     }
 
-        public readonly record struct RollResult(bool Success, int RewardItemId)
+    public readonly record struct RollResult(bool Success, int RewardItemId)
     {
         public static RollResult Failure { get; } = new(false, 0);
     }

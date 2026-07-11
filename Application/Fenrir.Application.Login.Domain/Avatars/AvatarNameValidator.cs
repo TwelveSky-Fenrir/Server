@@ -2,8 +2,7 @@ namespace Fenrir.Application.Login.Domain.Avatars;
 
 public static class AvatarNameValidator
 {
-
-        public static bool HasOnlyWhitelistedCharacters(string name)
+    public static bool HasOnlyWhitelistedCharacters(string name)
     {
         if (name.Length == 0)
             return false;

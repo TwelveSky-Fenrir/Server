@@ -1,18 +1,16 @@
 using System.Collections.Concurrent;
-using Fenrir.Application.Game.Domain.World;
 
 namespace Fenrir.Application.Game.Domain.Combat;
 
 public sealed class KillCooldownTracker
 {
+    public const int MissionKillOtherTribeCap = 10;
 
-        public const int MissionKillOtherTribeCap = 10;
-
-        public static readonly TimeSpan DefaultCooldown = TimeSpan.FromMinutes(10);
+    public static readonly TimeSpan DefaultCooldown = TimeSpan.FromMinutes(10);
 
     private readonly ConcurrentDictionary<(int AttackerId, int DefenderId), DateTime> _lastRewardedKillUtc = new();
 
-        public bool TryRegisterKill(int attackerId, int defenderId, DateTime utcNow, TimeSpan? cooldown = null)
+    public bool TryRegisterKill(int attackerId, int defenderId, DateTime utcNow, TimeSpan? cooldown = null)
     {
         var window = cooldown ?? DefaultCooldown;
         var key = (attackerId, defenderId);

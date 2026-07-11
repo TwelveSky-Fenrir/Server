@@ -160,10 +160,8 @@ public class WarPointShopCatalogTests
                      WarPointShopCatalog.NobleDragonNpcId, WarPointShopCatalog.RoyalSerpentNpcId,
                      WarPointShopCatalog.GrandTigerNpcId
                  })
-        {
             if (otherNpcId != owningNpcId)
                 Assert.False(entry.DisplaysAtNpc(otherNpcId));
-        }
     }
 
     [Fact]

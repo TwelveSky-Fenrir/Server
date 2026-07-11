@@ -18,12 +18,11 @@ public sealed class AutoHuntTickSystem(
     DirtyTracker<int> dirtyTracker,
     IOptions<GameServerOptions> options) : ISimulationSystem
 {
+    private const byte WeaponSlot = 7;
 
-        private const byte WeaponSlot = 7;
+    private const int NoManaRelocateThreshold = 1000;
 
-        private const int NoManaRelocateThreshold = 1000;
-
-        private static readonly FrozenDictionary<int, ImmutableArray<int>> AutoCastGateSlots =
+    private static readonly FrozenDictionary<int, ImmutableArray<int>> AutoCastGateSlots =
         new Dictionary<int, ImmutableArray<int>>
         {
             [7] = [4], [26] = [4], [45] = [4],
@@ -59,7 +58,6 @@ public sealed class AutoHuntTickSystem(
             return;
 
         TryAutoCastBuff(zone, state, config);
-
     }
 
     private void TryAutoCastBuff(Zone zone, PlayerRuntimeState state, AutoHunt config)
@@ -105,11 +103,10 @@ public sealed class AutoHuntTickSystem(
                 EscalateNoMana(state);
                 return;
             }
-
         }
     }
 
-        private static bool AdvanceBudgetAndRelocateIfExhausted(PlayerRuntimeState state, int legacyTicksElapsed)
+    private static bool AdvanceBudgetAndRelocateIfExhausted(PlayerRuntimeState state, int legacyTicksElapsed)
     {
         var result = AutoHuntBudgetPolicy.Advance(state.AutoHuntPaidDayBudget, state.AutoHuntPaidMinuteBudget,
             state.AutoHuntBudgetMinuteAccrualTicks, legacyTicksElapsed, GameDate.Today());
@@ -125,7 +122,7 @@ public sealed class AutoHuntTickSystem(
         return true;
     }
 
-        private static void EscalateNoMana(PlayerRuntimeState state)
+    private static void EscalateNoMana(PlayerRuntimeState state)
     {
         state.NoManaCount++;
         if (state.NoManaCount == NoManaRelocateThreshold)
@@ -134,7 +131,7 @@ public sealed class AutoHuntTickSystem(
             client.Abort(DisconnectReason.StateViolation);
     }
 
-        private bool IsSuppressedByZoneServerType(Zone zone)
+    private bool IsSuppressedByZoneServerType(Zone zone)
     {
         if (RegularWarMapCatalog.TryGet(zone.MapId, out _))
             return true;
@@ -154,7 +151,7 @@ public sealed class AutoHuntTickSystem(
         return false;
     }
 
-        private static int GetMaxLearnedGrade(int skillId, IReadOnlyDictionary<byte, LearnedSkill> learnedSkills)
+    private static int GetMaxLearnedGrade(int skillId, IReadOnlyDictionary<byte, LearnedSkill> learnedSkills)
     {
         foreach (var learned in learnedSkills.Values)
             if (learned.SkillId == skillId)

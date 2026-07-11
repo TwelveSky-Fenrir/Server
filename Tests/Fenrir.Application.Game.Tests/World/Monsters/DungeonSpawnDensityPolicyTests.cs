@@ -11,7 +11,7 @@ public class DungeonSpawnDensityPolicyTests
     public void ResolveConfiguredSpawnCount_DungeonZone_CountInBand_MonsterBelow500_BumpsTo20(int configuredCount)
     {
         var result = DungeonSpawnDensityPolicy.ResolveConfiguredSpawnCount(
-            isDungeonZone: true, configuredCount, resolvedMonsterId: 100);
+            true, configuredCount, 100);
 
         Assert.Equal(DungeonSpawnDensityPolicy.BumpedSpawnCount, result);
     }
@@ -23,7 +23,7 @@ public class DungeonSpawnDensityPolicyTests
     public void ResolveConfiguredSpawnCount_DungeonZone_CountBelowBand_LeavesUnchanged(int configuredCount)
     {
         var result = DungeonSpawnDensityPolicy.ResolveConfiguredSpawnCount(
-            isDungeonZone: true, configuredCount, resolvedMonsterId: 100);
+            true, configuredCount, 100);
 
         Assert.Equal(configuredCount, result);
     }
@@ -35,7 +35,7 @@ public class DungeonSpawnDensityPolicyTests
     public void ResolveConfiguredSpawnCount_DungeonZone_CountAtOrAboveBand_LeavesUnchanged(int configuredCount)
     {
         var result = DungeonSpawnDensityPolicy.ResolveConfiguredSpawnCount(
-            isDungeonZone: true, configuredCount, resolvedMonsterId: 100);
+            true, configuredCount, 100);
 
         Assert.Equal(configuredCount, result);
     }
@@ -44,7 +44,7 @@ public class DungeonSpawnDensityPolicyTests
     public void ResolveConfiguredSpawnCount_DungeonZone_CountInBand_MonsterAt500_LeavesUnchanged()
     {
         var result = DungeonSpawnDensityPolicy.ResolveConfiguredSpawnCount(
-            isDungeonZone: true, configuredCount: 10, resolvedMonsterId: 500);
+            true, 10, 500);
 
         Assert.Equal(10, result);
     }
@@ -53,7 +53,7 @@ public class DungeonSpawnDensityPolicyTests
     public void ResolveConfiguredSpawnCount_DungeonZone_CountInBand_MonsterAt499_BumpsTo20()
     {
         var result = DungeonSpawnDensityPolicy.ResolveConfiguredSpawnCount(
-            isDungeonZone: true, configuredCount: 10, resolvedMonsterId: 499);
+            true, 10, 499);
 
         Assert.Equal(DungeonSpawnDensityPolicy.BumpedSpawnCount, result);
     }
@@ -62,7 +62,7 @@ public class DungeonSpawnDensityPolicyTests
     public void ResolveConfiguredSpawnCount_DungeonZone_CountInBand_MonsterWellAbove500_LeavesUnchanged()
     {
         var result = DungeonSpawnDensityPolicy.ResolveConfiguredSpawnCount(
-            isDungeonZone: true, configuredCount: 10, resolvedMonsterId: 12345);
+            true, 10, 12345);
 
         Assert.Equal(10, result);
     }
@@ -73,7 +73,7 @@ public class DungeonSpawnDensityPolicyTests
     public void ResolveConfiguredSpawnCount_NonDungeonZone_NeverBumps(int configuredCount)
     {
         var result = DungeonSpawnDensityPolicy.ResolveConfiguredSpawnCount(
-            isDungeonZone: false, configuredCount, resolvedMonsterId: 1);
+            false, configuredCount, 1);
 
         Assert.Equal(configuredCount, result);
     }
@@ -81,7 +81,7 @@ public class DungeonSpawnDensityPolicyTests
     [Fact]
     public void ResolveTableCapacity_DungeonZone_DoublesBaseCapacity()
     {
-        var result = DungeonSpawnDensityPolicy.ResolveTableCapacity(isDungeonZone: true, baseCapacity: 3400);
+        var result = DungeonSpawnDensityPolicy.ResolveTableCapacity(true, 3400);
 
         Assert.Equal(6800, result);
     }
@@ -89,7 +89,7 @@ public class DungeonSpawnDensityPolicyTests
     [Fact]
     public void ResolveTableCapacity_NonDungeonZone_LeavesBaseCapacityUnchanged()
     {
-        var result = DungeonSpawnDensityPolicy.ResolveTableCapacity(isDungeonZone: false, baseCapacity: 3400);
+        var result = DungeonSpawnDensityPolicy.ResolveTableCapacity(false, 3400);
 
         Assert.Equal(3400, result);
     }

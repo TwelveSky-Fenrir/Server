@@ -5,7 +5,7 @@ public static class WireXor
     private const byte FirstKey = 0x10;
     private const byte SteadyKey = 0xFE;
 
-        public static void ApplyPacketXor(Span<byte> buffer)
+    public static void ApplyPacketXor(Span<byte> buffer)
     {
         if (buffer.Length <= 1)
             return;
@@ -15,7 +15,7 @@ public static class WireXor
             buffer[i] ^= SteadyKey;
     }
 
-        public static void ApplyUidXor(Span<byte> fixedField)
+    public static void ApplyUidXor(Span<byte> fixedField)
     {
         var length = fixedField.IndexOf((byte)0);
         if (length < 0)
@@ -24,14 +24,14 @@ public static class WireXor
         ApplyPacketXor(fixedField[..length]);
     }
 
-        public static void XorInt(Span<byte> four)
+    public static void XorInt(Span<byte> four)
     {
         four[0] ^= FirstKey;
         for (var i = 1; i < four.Length; i++)
             four[i] ^= SteadyKey;
     }
 
-        public static void XorIntArray(Span<byte> buffer)
+    public static void XorIntArray(Span<byte> buffer)
     {
         if (buffer.Length == 0)
             return;
@@ -41,7 +41,7 @@ public static class WireXor
             buffer[i] ^= SteadyKey;
     }
 
-        public static void XorChar(Span<byte> buffer)
+    public static void XorChar(Span<byte> buffer)
     {
         if (buffer.Length == 0)
             return;
@@ -50,13 +50,13 @@ public static class WireXor
         buffer[^1] = 0;
     }
 
-        public static void XorChar2Rows(Span<byte> buffer, int rowLength)
+    public static void XorChar2Rows(Span<byte> buffer, int rowLength)
     {
         for (var offset = 0; offset < buffer.Length; offset += rowLength)
             XorChar(buffer.Slice(offset, rowLength));
     }
 
-        public static void ApplyStreamXor(Span<byte> buffer, byte key)
+    public static void ApplyStreamXor(Span<byte> buffer, byte key)
     {
         if (key == 0)
             return;

@@ -9,5 +9,5 @@ public readonly record struct QuestProgress(
 {
     public static readonly QuestProgress None = default;
 
-        public bool IsIdle => ActiveFlag == 0 && QSort == 0 && TargetPhase == 0 && KillCounter == 0;
+    public bool IsIdle => ActiveFlag == 0 && QSort == 0 && TargetPhase == 0 && KillCounter == 0;
 }

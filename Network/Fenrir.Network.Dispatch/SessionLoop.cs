@@ -13,8 +13,7 @@ namespace Fenrir.Network.Dispatch;
 
 public static class SessionLoop
 {
-
-        public static async Task RunConnectionAsync(
+    public static async Task RunConnectionAsync(
         SocketConnection connection,
         ClientSession session,
         IFrameDispatcher dispatcher,

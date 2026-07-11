@@ -10,22 +10,22 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
     private readonly Dictionary<(byte From, byte To), AllianceOfferState> _allianceOffers = new();
     private readonly Lock _lock = new();
 
-        private readonly int[] _pendingTribePointDeltas = new int[TribeCount];
+    private readonly int[] _pendingTribePointDeltas = new int[TribeCount];
 
-        private readonly byte[] _tribeFormationAbility = new byte[TribeCount];
-
-        private readonly byte[] _tribeSymbolOwner = new byte[TribeCount];
+    private readonly byte[] _tribeFormationAbility = new byte[TribeCount];
 
     private readonly TribeRvrState[] _tribes = new TribeRvrState[TribeCount];
+
+    private readonly byte[] _tribeSymbolOwner = new byte[TribeCount];
 
     private bool _dirty;
     private bool _initialized;
 
-        private int _scalarVersion;
+    private int _scalarVersion;
 
     private WorldRvrState _world;
 
-        public bool IsDirty
+    public bool IsDirty
     {
         get
         {
@@ -36,7 +36,7 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
         }
     }
 
-        public WorldRvrState World
+    public WorldRvrState World
     {
         get
         {
@@ -48,7 +48,7 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
         }
     }
 
-        public async Task InitializeAsync(CancellationToken ct)
+    public async Task InitializeAsync(CancellationToken ct)
     {
         if (_initialized)
             throw new InvalidOperationException("WorldStateService.InitializeAsync must only be called once, at boot.");
@@ -97,7 +97,7 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
         }
     }
 
-        public byte GetTribeFormationAbility(byte tribeId)
+    public byte GetTribeFormationAbility(byte tribeId)
     {
         EnsureInitialized();
         ValidateTribeId(tribeId);
@@ -107,7 +107,7 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
         }
     }
 
-        public byte GetTribeSymbolOwner(byte slotTribeId)
+    public byte GetTribeSymbolOwner(byte slotTribeId)
     {
         EnsureInitialized();
         ValidateTribeId(slotTribeId);
@@ -144,7 +144,7 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
         }
     }
 
-        public byte? GetAllyOf(byte tribeId)
+    public byte? GetAllyOf(byte tribeId)
     {
         EnsureInitialized();
         ValidateTribeId(tribeId);
@@ -165,7 +165,7 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
     }
 
 
-        public void SetZone038Winner(byte tribeId)
+    public void SetZone038Winner(byte tribeId)
     {
         ValidateTribeId(tribeId);
         lock (_lock)
@@ -176,7 +176,7 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
         }
     }
 
-        public void SetTribeFormationAbility(byte tribeId, byte formationCode)
+    public void SetTribeFormationAbility(byte tribeId, byte formationCode)
     {
         ValidateTribeId(tribeId);
         lock (_lock)
@@ -185,7 +185,7 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
         }
     }
 
-        public void StartTribeSymbolBattle()
+    public void StartTribeSymbolBattle()
     {
         var now = DateTime.UtcNow;
         lock (_lock)
@@ -204,7 +204,7 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
         logger.LogInformation("WorldState: tribe symbol battle window opened at {SymbolBattleStarted:O}", now);
     }
 
-        public void EndTribeSymbolBattle()
+    public void EndTribeSymbolBattle()
     {
         lock (_lock)
         {
@@ -217,7 +217,7 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
         logger.LogInformation("WorldState: tribe symbol battle window closed");
     }
 
-        public void ResolveTribeSymbol(byte slotTribeId, byte winnerTribeId)
+    public void ResolveTribeSymbol(byte slotTribeId, byte winnerTribeId)
     {
         ValidateTribeId(slotTribeId);
         ValidateTribeId(winnerTribeId);
@@ -240,7 +240,7 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
             slotTribeId, winnerTribeId, winnerTribeId == slotTribeId);
     }
 
-        public void ResolveMonsterSymbol(byte winnerTribeId)
+    public void ResolveMonsterSymbol(byte winnerTribeId)
     {
         ValidateTribeId(winnerTribeId);
         lock (_lock)
@@ -253,7 +253,7 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
         logger.LogInformation("WorldState: neutral monster symbol resolved -- winner={WinnerTribeId}", winnerTribeId);
     }
 
-        public void SetTribePoints(byte tribeId, int points)
+    public void SetTribePoints(byte tribeId, int points)
     {
         ValidateTribeId(tribeId);
         lock (_lock)
@@ -265,7 +265,7 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
         }
     }
 
-        public int AddTribePoints(byte tribeId, int delta)
+    public int AddTribePoints(byte tribeId, int delta)
     {
         ValidateTribeId(tribeId);
         lock (_lock)
@@ -278,7 +278,7 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
         }
     }
 
-        public void SetTribeClosed(byte tribeId, bool isClosed)
+    public void SetTribeClosed(byte tribeId, bool isClosed)
     {
         ValidateTribeId(tribeId);
         lock (_lock)
@@ -302,7 +302,7 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
         }
     }
 
-        public void SetUpdateTribePointFlag(short value)
+    public void SetUpdateTribePointFlag(short value)
     {
         lock (_lock)
         {
@@ -312,7 +312,7 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
         }
     }
 
-        public async ValueTask<bool> TryConsumeUpdateTribePointFlagAsync(short expectedPendingValue, short consumedValue,
+    public async ValueTask<bool> TryConsumeUpdateTribePointFlagAsync(short expectedPendingValue, short consumedValue,
         CancellationToken ct)
     {
         WorldRvrState snapshot;
@@ -349,7 +349,7 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
         return true;
     }
 
-        public async ValueTask<bool> TryOverwriteTribePointTotalsAsync(IReadOnlyList<int> totals, CancellationToken ct)
+    public async ValueTask<bool> TryOverwriteTribePointTotalsAsync(IReadOnlyList<int> totals, CancellationToken ct)
     {
         if (totals.Count != TribeCount)
             throw new ArgumentException($"Expected exactly {TribeCount} totals.", nameof(totals));
@@ -383,7 +383,7 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
         return allSucceeded;
     }
 
-        public void SetAllianceOffer(byte fromTribeId, byte toTribeId, bool isAccepted)
+    public void SetAllianceOffer(byte fromTribeId, byte toTribeId, bool isAccepted)
     {
         ValidateTribeId(fromTribeId);
         ValidateTribeId(toTribeId);
@@ -399,7 +399,7 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
         }
     }
 
-        public void DissolveAlliance(byte tribeA, byte tribeB)
+    public void DissolveAlliance(byte tribeA, byte tribeB)
     {
         ValidateTribeId(tribeA);
         ValidateTribeId(tribeB);
@@ -424,13 +424,13 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
         }
     }
 
-        public ValueTask<ReadOnlyCollection<TribeVoteDto>> GetTribeVotesAsync(byte tribeId, CancellationToken ct)
+    public ValueTask<ReadOnlyCollection<TribeVoteDto>> GetTribeVotesAsync(byte tribeId, CancellationToken ct)
     {
         ValidateTribeId(tribeId);
         return repository.GetTribeVotesAsync(tribeId, ct);
     }
 
-        public ValueTask RegisterTribeVoteCandidateAsync(byte tribeId, byte slotIndex, int candidateCharacterId,
+    public ValueTask RegisterTribeVoteCandidateAsync(byte tribeId, byte slotIndex, int candidateCharacterId,
         short candidateLevel, int killOtherTribeCount, CancellationToken ct)
     {
         ValidateTribeId(tribeId);
@@ -438,19 +438,19 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
             killOtherTribeCount, ct);
     }
 
-        public ValueTask CastTribeVoteAsync(byte tribeId, byte slotIndex, int points, CancellationToken ct)
+    public ValueTask CastTribeVoteAsync(byte tribeId, byte slotIndex, int points, CancellationToken ct)
     {
         ValidateTribeId(tribeId);
         return repository.AddTribeVotePointsAsync(tribeId, slotIndex, points, ct);
     }
 
-        public ValueTask ResetTribeVotesAsync(byte tribeId, CancellationToken ct)
+    public ValueTask ResetTribeVotesAsync(byte tribeId, CancellationToken ct)
     {
         ValidateTribeId(tribeId);
         return repository.ClearTribeVotesAsync(tribeId, ct);
     }
 
-        public async ValueTask FlushIfDirtyAsync(CancellationToken ct)
+    public async ValueTask FlushIfDirtyAsync(CancellationToken ct)
     {
         WorldRvrState world;
         TribeRvrState[] tribes;
@@ -524,7 +524,7 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
         }
     }
 
-        public async ValueTask ReconcileAsync(CancellationToken ct)
+    public async ValueTask ReconcileAsync(CancellationToken ct)
     {
         if (!_initialized)
             return;
@@ -612,7 +612,7 @@ public sealed class WorldStateService(IWorldStateRepository repository, ILogger<
             throw new ArgumentOutOfRangeException(nameof(tribeId), tribeId, $"TribeId must be 0-{TribeCount - 1}.");
     }
 
-        private static int NowAsLegacyHhMm()
+    private static int NowAsLegacyHhMm()
     {
         var now = DateTime.UtcNow;
         return now.Hour * 100 + now.Minute;

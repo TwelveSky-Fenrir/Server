@@ -8,12 +8,12 @@ public static partial class StatCalculator
 {
     private static readonly LevelRowDto ZeroLevelRow = new(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
-        public static int ApplyPetDoubleRule(int statValue, int petStatValue)
+    public static int ApplyPetDoubleRule(int statValue, int petStatValue)
     {
         return statValue >= petStatValue ? statValue + petStatValue : statValue * 2;
     }
 
-        public static EffectiveStats ComputeBaseStats(
+    public static EffectiveStats ComputeBaseStats(
         CharacterBaseAttributes attributes,
         IReadOnlyList<EquippedItemSlot> equipment,
         FrozenDictionary<short, LevelRowDto> levels,
@@ -51,7 +51,7 @@ public static partial class StatCalculator
             ComputeElementDefensePower(setNumber, bySlot, cosmetic, consumable, mount, zone));
     }
 
-        public static EffectiveStats ComputeEffectiveStats(
+    public static EffectiveStats ComputeEffectiveStats(
         CharacterBaseAttributes attributes,
         IReadOnlyList<EquippedItemSlot> equipment,
         FrozenDictionary<short, LevelRowDto> levels,
@@ -159,7 +159,7 @@ public static partial class StatCalculator
         return bySlot;
     }
 
-        private static LevelRowDto GetLevelRow(FrozenDictionary<short, LevelRowDto> levels, short level)
+    private static LevelRowDto GetLevelRow(FrozenDictionary<short, LevelRowDto> levels, short level)
     {
         if (level is < 1 or > 157) return ZeroLevelRow;
         var clamped = level > 145 ? (short)145 : level;
@@ -171,7 +171,7 @@ public static partial class StatCalculator
         return buffPercent is not { } pct || pct == 0 ? value : (int)(value * (pct + 100) * 0.01f);
     }
 
-        private static int? GetBuffPercent(BuffInfo? buffs, int slotIndex)
+    private static int? GetBuffPercent(BuffInfo? buffs, int slotIndex)
     {
         if (buffs is not { } b) return null;
         var idx = slotIndex * 2;

@@ -138,7 +138,7 @@ public class LootBoxOpenResolverTests
 
         var plan = LootBoxOpenResolver.OpenBulk(MountBox, 0, 0, Box(601, 5), page0,
             ImmutableDictionary<byte, ItemStack>.Empty, Sorts((635, 4)), new ScriptedRandom(49, 49, 49), Today,
-            requestedCount: 3);
+            3);
 
         Assert.Equal(3, plan.OpenedCount);
         Assert.Equal(2, plan.BoxRemainingQuantity);
@@ -155,7 +155,7 @@ public class LootBoxOpenResolverTests
 
         var plan = LootBoxOpenResolver.OpenBulk(MountBox, 0, 0, Box(601, 4), page0,
             ImmutableDictionary<byte, ItemStack>.Empty, Sorts((635, 4)), new ScriptedRandom(49, 49, 49, 49), Today,
-            requestedCount: 100);
+            100);
 
         Assert.Equal(4, plan.OpenedCount);
         Assert.Equal(0, plan.BoxRemainingQuantity);
@@ -174,7 +174,7 @@ public class LootBoxOpenResolverTests
             page1Builder[slot] = Filler;
 
         var plan = LootBoxOpenResolver.OpenBulk(MountBox, 0, 0, Box(601, 5), page0Builder.ToImmutable(),
-            page1Builder.ToImmutable(), Sorts((635, 4)), new ScriptedRandom(49, 49, 49), Today, requestedCount: 5);
+            page1Builder.ToImmutable(), Sorts((635, 4)), new ScriptedRandom(49, 49, 49), Today, 5);
 
         Assert.Equal(2, plan.OpenedCount);
         Assert.Equal(3, plan.BoxRemainingQuantity);
@@ -188,14 +188,15 @@ public class LootBoxOpenResolverTests
         return builder.ToImmutable();
     }
 
-        private sealed class ScriptedRandom(params int[] values) : Random
+    private sealed class ScriptedRandom(params int[] values) : Random
     {
         private int _index;
 
         public override int Next(int minValue, int maxValue)
         {
             if (_index >= values.Length)
-                throw new InvalidOperationException("ScriptedRandom exhausted: the code drew more values than scripted.");
+                throw new InvalidOperationException(
+                    "ScriptedRandom exhausted: the code drew more values than scripted.");
 
             return values[_index++];
         }

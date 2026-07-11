@@ -10,14 +10,12 @@ public sealed record Zone195NokSanSite(
     float PostZ = Zone195NokSanState.DefaultPostZ,
     float CaptureRadius = Zone195NokSanState.DefaultCaptureRadius)
 {
-
-        public bool IsRewardWindowShard => StoneSlotIndex == 0;
+    public bool IsRewardWindowShard => StoneSlotIndex == 0;
 }
 
 public sealed class Zone195NokSanSiteCatalog
 {
-
-        public static readonly Zone195NokSanSiteCatalog Empty = new([]);
+    public static readonly Zone195NokSanSiteCatalog Empty = new([]);
 
     private readonly FrozenDictionary<short, Zone195NokSanSite> _byMapId;
 

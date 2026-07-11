@@ -5,16 +5,15 @@ namespace Fenrir.Application.Game.Domain.World.Loot;
 
 public static class PetBoxRewardTable
 {
+    public const int BoxId = 602;
 
-        public const int BoxId = 602;
-
-        public static readonly ImmutableArray<LootBoxRewardResolver.RewardBand> RareBands =
+    public static readonly ImmutableArray<LootBoxRewardResolver.RewardBand> RareBands =
     [
         new(40, 1012),
         new(40, 1016)
     ];
 
-        public static readonly ImmutableArray<LootBoxRewardResolver.RewardPool> Pools =
+    public static readonly ImmutableArray<LootBoxRewardResolver.RewardPool> Pools =
     [
         new(20, [1178]),
         new(60, [1002, 1003, 1004, 1005]),
@@ -23,5 +22,5 @@ public static class PetBoxRewardTable
         new(199, [1103, 1118, 1145, 1166, 1222, 1237])
     ];
 
-        public static readonly BoxRewardSpec Spec = BoxRewardSpec.RareBandThenPools(BoxId, RareBands, Pools);
+    public static readonly BoxRewardSpec Spec = BoxRewardSpec.RareBandThenPools(BoxId, RareBands, Pools);
 }

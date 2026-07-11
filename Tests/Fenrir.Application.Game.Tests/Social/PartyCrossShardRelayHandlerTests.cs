@@ -28,7 +28,7 @@ public class PartyCrossShardRelayHandlerTests
         return (handler, zones, parties, relay);
     }
 
-        private static (PlayerRuntimeState State, FakeDuplexPipe Pipe) Enter(ZoneRegistry zones, short mapId,
+    private static (PlayerRuntimeState State, FakeDuplexPipe Pipe) Enter(ZoneRegistry zones, short mapId,
         int characterId, string name)
     {
         zones.TryGet(mapId, out var zone);
@@ -65,7 +65,7 @@ public class PartyCrossShardRelayHandlerTests
         var (handler, zones, parties, relay) = CreateHandler();
         var (invitee, pipe) = Enter(zones, 1, 100, "Invitee");
 
-        await handler.HandleAskAsync(MakeAsk(42, 100), CancellationToken.None);
+        await handler.HandleAskAsync(MakeAsk(42), CancellationToken.None);
 
         Assert.Empty(relay.Enqueued);
         Assert.True(parties.IsNegotiating(invitee.CharacterId));
@@ -82,7 +82,7 @@ public class PartyCrossShardRelayHandlerTests
         Assert.Equal(PartyInviteOutcome.Sent, parties.TryInvite(501, 1, invitee.Tribe, 100, 1, invitee.Tribe));
         Assert.True(parties.TryAnswer(100, true, false, out _, out _, out _));
 
-        await handler.HandleAskAsync(MakeAsk(43, 100), CancellationToken.None);
+        await handler.HandleAskAsync(MakeAsk(43), CancellationToken.None);
 
         var declined = Assert.Single(relay.Enqueued);
         Assert.False(declined.Accepted);

@@ -7,24 +7,23 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 
 public enum Zone335FfaPhase : byte
 {
+    Idle,
 
-        Idle,
+    CountdownArmed,
 
-        CountdownArmed,
+    PreStartCountdown,
 
-        PreStartCountdown,
+    GateOpenPending,
 
-        GateOpenPending,
+    EntranceOpen,
 
-        EntranceOpen,
+    BattlePrep,
 
-        BattlePrep,
+    Battle,
 
-        Battle,
+    PostBattleCleanupPending,
 
-        PostBattleCleanupPending,
-
-        WindDown
+    WindDown
 }
 
 public sealed class Zone335FfaEventCycleSystem(
@@ -33,26 +32,25 @@ public sealed class Zone335FfaEventCycleSystem(
     Lazy<ZoneEventBroadcaster> broadcaster,
     ILogger<Zone335FfaEventCycleSystem> logger) : ISimulationSystem
 {
+    public const int IdleAutoStartLegacyTicks = 60 * SimulationClock.PlayTimeAccrualLegacyTicks;
 
-        public const int IdleAutoStartLegacyTicks = 60 * SimulationClock.PlayTimeAccrualLegacyTicks;
+    public const int PreStartCountdownMinutes = 10;
 
-        public const int PreStartCountdownMinutes = 10;
+    public const int GateOpenWaitMinutes = 1;
 
-        public const int GateOpenWaitMinutes = 1;
+    public const int EntranceOpenWindowMinutes = 2;
 
-        public const int EntranceOpenWindowMinutes = 2;
+    public const int BattlePrepWaitMinutes = 1;
 
-        public const int BattlePrepWaitMinutes = 1;
+    public const int BattleDurationLegacyTicks = 1800;
 
-        public const int BattleDurationLegacyTicks = 1800;
+    public const int BattleMinimumElapsedLegacyTicksForLastManStanding = SimulationClock.PlayTimeAccrualLegacyTicks;
 
-        public const int BattleMinimumElapsedLegacyTicksForLastManStanding = SimulationClock.PlayTimeAccrualLegacyTicks;
+    public const int LiveCountdownBroadcastCadenceLegacyTicks = 10;
 
-        public const int LiveCountdownBroadcastCadenceLegacyTicks = 10;
+    public const int PostBattleCleanupWaitMinutes = 1;
 
-        public const int PostBattleCleanupWaitMinutes = 1;
-
-        public const int WindDownWaitMinutes = 1;
+    public const int WindDownWaitMinutes = 1;
 
     private readonly MinuteCountdown _minuteCountdown = new();
 
@@ -279,7 +277,7 @@ public sealed class Zone335FfaEventCycleSystem(
         _minuteCountdown.Reset();
     }
 
-        private static void BroadcastLiveCountdown(Zone zone, int remainingLegacyTicks)
+    private static void BroadcastLiveCountdown(Zone zone, int remainingLegacyTicks)
     {
         var response = new ZoneWar335CountdownResponse { RemainTime = remainingLegacyTicks };
         foreach (var player in zone.Players)

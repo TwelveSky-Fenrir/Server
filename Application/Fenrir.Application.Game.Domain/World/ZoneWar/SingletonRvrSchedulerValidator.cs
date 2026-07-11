@@ -2,8 +2,7 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 
 public static class SingletonRvrSchedulerValidator
 {
-
-        public static IReadOnlyList<UnclaimedDesignatedMap> FindUnclaimed(
+    public static IReadOnlyList<UnclaimedDesignatedMap> FindUnclaimed(
         IReadOnlyList<DesignatedMapClaim> designatedMaps, IReadOnlyCollection<short> liveClaimedMapIds)
     {
         var claimed = liveClaimedMapIds as ISet<short> ?? liveClaimedMapIds.ToHashSet();
@@ -14,7 +13,7 @@ public static class SingletonRvrSchedulerValidator
             .ToArray();
     }
 
-        public readonly record struct DesignatedMapClaim(string SchedulerName, short MapId);
+    public readonly record struct DesignatedMapClaim(string SchedulerName, short MapId);
 
-        public readonly record struct UnclaimedDesignatedMap(string SchedulerName, short MapId);
+    public readonly record struct UnclaimedDesignatedMap(string SchedulerName, short MapId);
 }

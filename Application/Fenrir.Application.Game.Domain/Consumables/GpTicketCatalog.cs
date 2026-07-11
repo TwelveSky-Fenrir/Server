@@ -5,7 +5,7 @@ public static class GpTicketCatalog
     public const int Ticket500ItemId = 723;
     public const int Ticket100ItemId = 725;
 
-        public static int? ResolveCreditAmount(int itemId)
+    public static int? ResolveCreditAmount(int itemId)
     {
         return itemId switch
         {

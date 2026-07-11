@@ -98,7 +98,7 @@ public class MonsterBossSpawnSystemTests
     [Fact]
     public void UnresolvableBossId_SpawnsNothing_AndNeverThrows()
     {
-        var cache = CacheWithBossMonster(500);
+        var cache = CacheWithBossMonster();
         var candidate = new MonsterBossSummonCandidate(999, 100f, 5f, 200f, 10f, 1);
         var system = new MonsterBossSpawnSystem(cache, CatalogFor(1, candidate));
         var zone = ZoneTestKit.CreateZone(1, simulationSystems: [system], worldData: cache);

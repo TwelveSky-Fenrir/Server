@@ -14,7 +14,7 @@ public sealed class ServerQuotaRefreshHost(
 {
     public static readonly TimeSpan Interval = TimeSpan.FromSeconds(1);
 
-        public async ValueTask InitializeAsync(CancellationToken ct)
+    public async ValueTask InitializeAsync(CancellationToken ct)
     {
         var maxPlayers = await quota.GetMaxPlayersAsync(ct).ConfigureAwait(false);
         state.SetMaxPlayers(maxPlayers);
@@ -30,7 +30,7 @@ public sealed class ServerQuotaRefreshHost(
         } while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false));
     }
 
-        public async ValueTask RefreshOnceAsync(CancellationToken ct)
+    public async ValueTask RefreshOnceAsync(CancellationToken ct)
     {
         try
         {

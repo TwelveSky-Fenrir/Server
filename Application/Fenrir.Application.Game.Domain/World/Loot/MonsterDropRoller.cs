@@ -14,20 +14,19 @@ public sealed class MonsterDropRoller(
     float rareDropRatio = MonsterDropRoller.DefaultRareDropRatio,
     float userDropRatio = MonsterDropRoller.DefaultUserDropRatio)
 {
+    public const float DefaultItemDropRatio = 20.0f;
 
-        public const float DefaultItemDropRatio = 20.0f;
+    public const float DefaultRareDropRatio = 20.0f;
 
-        public const float DefaultRareDropRatio = 20.0f;
+    public const float DefaultUserDropRatio = 1.0f;
 
-        public const float DefaultUserDropRatio = 1.0f;
-
-        private const int UnconditionalItem864Id = 864;
+    private const int UnconditionalItem864Id = 864;
 
     private const int UnconditionalItem864Threshold = 1000;
 
-        private const float PremiumDropRatioBonus = 1.0f;
+    private const float PremiumDropRatioBonus = 1.0f;
 
-        public static bool IsEligible(MonsterRowDto monster, short killerLevel)
+    public static bool IsEligible(MonsterRowDto monster, short killerLevel)
     {
         if (monster.MartialItemLevel >= 1)
             return false;
@@ -35,7 +34,7 @@ public sealed class MonsterDropRoller(
         return killerLevel - monster.ItemLevel <= 9;
     }
 
-        public MonsterDropResult Roll(MonsterDefinition monster, short killerLevel, byte killerTribe, int killerLuck,
+    public MonsterDropResult Roll(MonsterDefinition monster, short killerLevel, byte killerTribe, int killerLuck,
         QuestProgress killerQuest, Func<int, bool> killerHasItem, bool killerPremiumActive = false)
     {
         var eligible = IsEligible(monster.Monster, killerLevel);
@@ -66,7 +65,7 @@ public sealed class MonsterDropRoller(
         return new MonsterDropResult(money, items);
     }
 
-        private long? RollMoney(MonsterDropMoneyRowDto? dropMoney, int killerLuck, float effectiveItemDropRatio)
+    private long? RollMoney(MonsterDropMoneyRowDto? dropMoney, int killerLuck, float effectiveItemDropRatio)
     {
         if (dropMoney is not { DropRate: > 0 })
             return null;
@@ -83,7 +82,7 @@ public sealed class MonsterDropRoller(
         return size > 0 ? size : null;
     }
 
-        private void RollPotions(IReadOnlyList<MonsterDropPotionRowDto> potions, int killerLuck,
+    private void RollPotions(IReadOnlyList<MonsterDropPotionRowDto> potions, int killerLuck,
         float effectiveItemDropRatio, List<DroppedItem> items)
     {
         foreach (var potion in potions)
@@ -96,7 +95,7 @@ public sealed class MonsterDropRoller(
         }
     }
 
-        private void RollGeneralItems(MonsterRowDto monster, IReadOnlyList<MonsterDropCategoryRateRowDto> rates,
+    private void RollGeneralItems(MonsterRowDto monster, IReadOnlyList<MonsterDropCategoryRateRowDto> rates,
         byte killerTribe, int killerLuck, float effectiveUserDropRatio, float effectiveItemDropRatio,
         float effectiveRareDropRatio, List<DroppedItem> items)
     {
@@ -146,7 +145,7 @@ public sealed class MonsterDropRoller(
         }
     }
 
-        private void RollQuestItem(MonsterDropQuestItemRowDto? dropQuestItem, QuestProgress killerQuest,
+    private void RollQuestItem(MonsterDropQuestItemRowDto? dropQuestItem, QuestProgress killerQuest,
         Func<int, bool> killerHasItem, List<DroppedItem> items)
     {
         if (dropQuestItem is not { DropRate: > 0 })
@@ -163,7 +162,7 @@ public sealed class MonsterDropRoller(
             items.Add(new DroppedItem(dropQuestItem.QuestItemId, 1));
     }
 
-        private void RollExtraItems(IReadOnlyList<MonsterDropExtraItemRowDto> extraItems, List<DroppedItem> items)
+    private void RollExtraItems(IReadOnlyList<MonsterDropExtraItemRowDto> extraItems, List<DroppedItem> items)
     {
         foreach (var extra in extraItems)
         {
@@ -183,7 +182,7 @@ public sealed class MonsterDropRoller(
         }
     }
 
-        private static bool IsLnw33ExtraDropBlacklisted(int itemId)
+    private static bool IsLnw33ExtraDropBlacklisted(int itemId)
     {
         return itemId is 1072 or 1073 or 1074 or 695 or 864 or 1048;
     }

@@ -111,7 +111,7 @@ public class HotkeyItemConsumptionResolverTests
         Assert.Equal(0, result.ManaGain);
     }
 
-        [Fact]
+    [Fact]
     public void FlatLifeGain_PotionType1_ReportsNoBuffWrites()
     {
         var slot = new HotkeySlot(HotkeyBindingKind.Item, 2, 1);
@@ -125,7 +125,7 @@ public class HotkeyItemConsumptionResolverTests
         Assert.Empty(result.BuffWrites);
     }
 
-        [Theory]
+    [Theory]
     [InlineData(6)]
     [InlineData(16)]
     public void StillUnwiredPotionTypes_AreCleanlyRejected_NotTreatedAsABuff(int potionType1)

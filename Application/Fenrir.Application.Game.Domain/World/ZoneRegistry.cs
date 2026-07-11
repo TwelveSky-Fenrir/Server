@@ -13,7 +13,6 @@ using Fenrir.Application.Game.Domain.World.WorldState;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Data.Abstractions.Game;
-using Fenrir.Data.Abstractions.Runtime;
 using Fenrir.Data.WriteBehind;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -27,20 +26,20 @@ public sealed class ZoneRegistry
     private readonly DuelRegistry? _duelRegistry;
     private readonly IEventLogQueue? _eventLogQueue;
     private readonly IFourGuildKillPointQueue? _fourGuildKillPointQueue;
-    private readonly IPartyResyncRelayQueue? _partyResyncRelayQueue;
     private readonly HeroRankPointAccumulator? _heroRankPointAccumulator;
     private readonly KillCooldownTracker _killCooldownTracker;
     private readonly MovementRules _movementRules;
     private readonly GameServerOptions _options;
     private readonly PartyRegistry? _partyRegistry;
+    private readonly IPartyResyncRelayQueue? _partyResyncRelayQueue;
     private readonly QuestCatalog _questCatalog;
     private readonly RegularWarActiveMapTracker? _regularWarActiveMapTracker;
     private readonly ImmutableArray<ISimulationSystem> _systems;
     private readonly TowerWarState? _towerWar;
     private readonly TradeRegistry? _tradeRegistry;
+    private readonly TribeSymbolCombatModifiers? _tribeSymbolCombatModifiers;
     private readonly WorldDataCache _worldData;
     private readonly WorldStateService? _worldState;
-    private readonly TribeSymbolCombatModifiers? _tribeSymbolCombatModifiers;
     private readonly ILogger<Zone> _zoneLogger;
     private FrozenDictionary<short, Zone> _zones = FrozenDictionary<short, Zone>.Empty;
 
@@ -94,11 +93,11 @@ public sealed class ZoneRegistry
         _partyResyncRelayQueue = partyResyncRelayQueue;
     }
 
-        public ImmutableArray<Zone> Zones => _zones.Values;
+    public ImmutableArray<Zone> Zones => _zones.Values;
 
-        public Zone this[short mapId] => _zones[mapId];
+    public Zone this[short mapId] => _zones[mapId];
 
-        public int TotalPlayerCount
+    public int TotalPlayerCount
     {
         get
         {
@@ -109,7 +108,7 @@ public sealed class ZoneRegistry
         }
     }
 
-        public void Initialize(IReadOnlyCollection<short> maps)
+    public void Initialize(IReadOnlyCollection<short> maps)
     {
         _zones = maps.ToFrozenDictionary(
             mapId => mapId,
@@ -139,7 +138,7 @@ public sealed class ZoneRegistry
         return _zones.TryGetValue(mapId, out zone);
     }
 
-        public bool TryGetPlayer(int characterId, [NotNullWhen(true)] out PlayerRuntimeState? state)
+    public bool TryGetPlayer(int characterId, [NotNullWhen(true)] out PlayerRuntimeState? state)
     {
         foreach (var zone in _zones.Values)
             if (zone.TryGetPlayer(characterId, out state) && state is not null)
@@ -149,7 +148,7 @@ public sealed class ZoneRegistry
         return false;
     }
 
-        public bool TryGetPlayerAndZone(int characterId, [NotNullWhen(true)] out PlayerRuntimeState? state,
+    public bool TryGetPlayerAndZone(int characterId, [NotNullWhen(true)] out PlayerRuntimeState? state,
         [NotNullWhen(true)] out Zone? zone)
     {
         foreach (var candidate in _zones.Values)
@@ -164,7 +163,7 @@ public sealed class ZoneRegistry
         return false;
     }
 
-        public bool TryGetPlayerByName(string name, [NotNullWhen(true)] out PlayerRuntimeState? state)
+    public bool TryGetPlayerByName(string name, [NotNullWhen(true)] out PlayerRuntimeState? state)
     {
         foreach (var zone in _zones.Values)
         foreach (var candidate in zone.Players)
@@ -178,7 +177,7 @@ public sealed class ZoneRegistry
         return false;
     }
 
-        public bool TryGetPlayerAndZoneByName(string name, [NotNullWhen(true)] out PlayerRuntimeState? state,
+    public bool TryGetPlayerAndZoneByName(string name, [NotNullWhen(true)] out PlayerRuntimeState? state,
         [NotNullWhen(true)] out Zone? zone)
     {
         foreach (var candidate in _zones.Values)

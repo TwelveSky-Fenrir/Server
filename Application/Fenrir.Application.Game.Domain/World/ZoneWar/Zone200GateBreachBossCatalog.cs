@@ -4,24 +4,23 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 
 public static class Zone200GateBreachBossCatalog
 {
+    public const int BossMonsterId = 756;
 
-        public static readonly ImmutableArray<short> EligibleServerNumbers = [200, 297, 298, 299];
+    public const int KillQuotaPerTribe = 170;
 
-        public const int BossMonsterId = 756;
+    public const int GateBreachToKillRaceClockTicks = 3600;
 
-        public const int KillQuotaPerTribe = 170;
+    public const float SummonX = 16f;
 
-        public const int GateBreachToKillRaceClockTicks = 3600;
+    public const float SummonY = 264f;
 
-        public const float SummonX = 16f;
+    public const float SummonZ = 7650f;
 
-        public const float SummonY = 264f;
+    public const bool ExistenceCheckActive = true;
 
-        public const float SummonZ = 7650f;
+    public const int PostSummonBossDeathPollTimeoutTicks = 3600;
 
-        public const bool ExistenceCheckActive = true;
+    public static readonly ImmutableArray<short> EligibleServerNumbers = [200, 297, 298, 299];
 
-        public const int PostSummonBossDeathPollTimeoutTicks = 3600;
-
-        public static readonly ImmutableArray<int> BattleWinBonusFixedItemIds = [1072, 1103, 1449, 1422, 1145, 2249, 602];
+    public static readonly ImmutableArray<int> BattleWinBonusFixedItemIds = [1072, 1103, 1449, 1422, 1145, 2249, 602];
 }

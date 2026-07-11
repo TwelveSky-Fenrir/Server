@@ -9,7 +9,6 @@ namespace Fenrir.Application.Game.Tests.World.Loot;
 
 public class LuckyTicketRewardResolverTests
 {
-
     [Theory]
     [InlineData(1035, 1, 300)]
     [InlineData(1036, 2, 400)]
@@ -122,8 +121,8 @@ public class LuckyTicketRewardResolverTests
     {
         var worldData = ZoneTestKit.EmptyWorldData();
 
-        var found = LuckyTicketRewardResolver.TryDraw(worldData, new Random(1), 17124, previousTribe: 0, level1: 50,
-            level2: 0, eliteTierEnabled: false, out var rewardItemId);
+        var found = LuckyTicketRewardResolver.TryDraw(worldData, new Random(1), 17124, 0, 50,
+            0, false, out var rewardItemId);
 
         Assert.False(found);
         Assert.Equal(0, rewardItemId);
@@ -134,8 +133,8 @@ public class LuckyTicketRewardResolverTests
     {
         var worldData = ZoneTestKit.EmptyWorldData();
 
-        var found = LuckyTicketRewardResolver.TryDraw(worldData, new Random(7), 1035, previousTribe: 0, level1: 50,
-            level2: 0, eliteTierEnabled: false, out var rewardItemId);
+        var found = LuckyTicketRewardResolver.TryDraw(worldData, new Random(7), 1035, 0, 50,
+            0, false, out var rewardItemId);
 
         Assert.False(found);
         Assert.Equal(0, rewardItemId);
@@ -158,8 +157,8 @@ public class LuckyTicketRewardResolverTests
 
         var worldData = ZoneTestKit.EmptyWorldData(itemsById.ToFrozenDictionary());
 
-        var found = LuckyTicketRewardResolver.TryDraw(worldData, Random.Shared, 1035, previousTribe: 0, level1: 1,
-            level2: 5, eliteTierEnabled: false, out var rewardItemId);
+        var found = LuckyTicketRewardResolver.TryDraw(worldData, Random.Shared, 1035, 0, 1,
+            5, false, out var rewardItemId);
 
         Assert.True(found);
         Assert.Contains(rewardItemId, expectedIds);
@@ -171,17 +170,17 @@ public class LuckyTicketRewardResolverTests
         var random = new ScriptedRandom(0, 8, 5);
         var worldData = ZoneTestKit.EmptyWorldData(new Dictionary<int, ItemDefinition>
         {
-            [55000] = new(EligibleItem(55000, 50, LuckyTicketRewardResolver.Rare, sort: 8), [])
+            [55000] = new(EligibleItem(55000, 50, LuckyTicketRewardResolver.Rare, 8), [])
         }.ToFrozenDictionary());
 
-        var found = LuckyTicketRewardResolver.TryDraw(worldData, random, 1037, previousTribe: 0, level1: 50,
-            level2: 0, eliteTierEnabled: false, out var rewardItemId);
+        var found = LuckyTicketRewardResolver.TryDraw(worldData, random, 1037, 0, 50,
+            0, false, out var rewardItemId);
 
         Assert.True(found);
         Assert.Equal(55000, rewardItemId);
     }
 
-        private sealed class ScriptedRandom(params int[] sequence) : Random
+    private sealed class ScriptedRandom(params int[] sequence) : Random
     {
         private int _index;
 

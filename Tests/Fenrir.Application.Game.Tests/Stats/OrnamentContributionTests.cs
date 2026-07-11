@@ -7,7 +7,6 @@ namespace Fenrir.Application.Game.Tests.Stats;
 
 public class OrnamentContributionTests
 {
-
     private static ItemRowDto Item(int itemId)
     {
         return new ItemRowDto(
@@ -245,8 +244,8 @@ public class OrnamentContributionTests
     public void Ornament_ThroughComputeBaseStats_YieldsCitedGoldDeltas()
     {
         var attributes = new CharacterBaseAttributes(
-            Vitality: 100, Strength: 100, Intelligence: 50, Dexterity: 50,
-            Level: 1, Tribe: 0, PreviousTribe: 0, Title: 0, Halo: 0, RebirthCount: 0);
+            100, 100, 50, 50,
+            1, 0, 0, 0, 0, 0);
         var levels = new Dictionary<short, LevelRowDto>
         {
             [1] = new(1, 0, 100, 0, 0, 0, 0, 0, 0, 50, 100)
@@ -257,7 +256,7 @@ public class OrnamentContributionTests
             Slot(9, 1009), Slot(10, 1010), Slot(11, 1011), Slot(12, 1012)
         ];
 
-        var armedGold = new ZoneContext(ZoneNumber: 1, OrnamentInUse: true, OrnamentGoldTimeRemaining: 100);
+        var armedGold = new ZoneContext(1, true, 100);
 
         var baseline = StatCalculator.ComputeBaseStats(attributes, decoEquipment, levels);
         var withArmedOrnament = StatCalculator.ComputeBaseStats(attributes, decoEquipment, levels, zone: armedGold);

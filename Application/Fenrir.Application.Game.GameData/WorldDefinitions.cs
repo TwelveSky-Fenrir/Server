@@ -39,8 +39,7 @@ public sealed record ZoneDefinition(
     ImmutableArray<ZoneNpcSpawnRowDto> NpcSpawns,
     ImmutableArray<MonsterSpawnRegionRowDto> MonsterSpawnRegions)
 {
-
-        public ZoneSpawnPointRowDto? FindSpawnPointFrom(short fromZoneNumber)
+    public ZoneSpawnPointRowDto? FindSpawnPointFrom(short fromZoneNumber)
     {
         foreach (var spawnPoint in SpawnPoints)
             if (spawnPoint.FromZoneNumber == fromZoneNumber)

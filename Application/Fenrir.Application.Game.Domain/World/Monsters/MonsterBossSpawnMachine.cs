@@ -4,48 +4,45 @@ namespace Fenrir.Application.Game.Domain.World.Monsters;
 
 public interface IMonsterBossSpawnSink
 {
+    public bool TryResolveCandidate(int monsterId);
 
-        public bool TryResolveCandidate(int monsterId);
+    public bool IsSlotFree(int serverIndex);
 
-        public bool IsSlotFree(int serverIndex);
-
-        public void SpawnBoss(int serverIndex, in MonsterBossSummonCandidate candidate);
+    public void SpawnBoss(int serverIndex, in MonsterBossSummonCandidate candidate);
 }
 
 public sealed class MonsterBossSpawnZoneState
 {
+    public required ImmutableArray<MonsterBossSummonCandidate> Candidates { get; init; }
 
-        public required ImmutableArray<MonsterBossSummonCandidate> Candidates { get; init; }
+    public required int SlotBase { get; init; }
 
-        public required int SlotBase { get; init; }
+    public required Random Random { get; init; }
 
-        public required Random Random { get; init; }
+    public required IMonsterBossSpawnSink Sink { get; init; }
 
-        public required IMonsterBossSpawnSink Sink { get; init; }
+    public MonsterBossSummonState State { get; set; } = MonsterBossSummonState.Reload;
 
-        public MonsterBossSummonState State { get; set; } = MonsterBossSummonState.Reload;
+    public long ElapsedLegacyTicks { get; set; }
 
-        public long ElapsedLegacyTicks { get; set; }
+    public int TicksSinceLastInvocation { get; set; }
 
-        public int TicksSinceLastInvocation { get; set; }
-
-        public long AnchorTick { get; set; }
+    public long AnchorTick { get; set; }
 }
 
 public static class MonsterBossSpawnMachine
 {
+    public const int InvocationIntervalLegacyTicks = 20;
 
-        public const int InvocationIntervalLegacyTicks = 20;
+    public const long WaitDurationLegacyTicks = 21_600;
 
-        public const long WaitDurationLegacyTicks = 21_600;
+    public const int MaxSpawnsPerReload = 5;
 
-        public const int MaxSpawnsPerReload = 5;
+    public const int BossSlotWindowSize = 20;
 
-        public const int BossSlotWindowSize = 20;
+    public const int DefaultBossSlotBase = 3800;
 
-        public const int DefaultBossSlotBase = 3800;
-
-        public static void Advance(MonsterBossSpawnZoneState state, int legacyTicksElapsed)
+    public static void Advance(MonsterBossSpawnZoneState state, int legacyTicksElapsed)
     {
         if (legacyTicksElapsed < 0)
             legacyTicksElapsed = 0;

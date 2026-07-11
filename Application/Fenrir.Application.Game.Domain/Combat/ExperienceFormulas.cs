@@ -2,16 +2,15 @@ namespace Fenrir.Application.Game.Domain.Combat;
 
 public static class ExperienceFormulas
 {
+    public const int RebirthDivisorLevelThreshold = 113;
 
-        public const int RebirthDivisorLevelThreshold = 113;
-
-        public const int MaxLimitLevel = 145;
+    public const int MaxLimitLevel = 145;
 
     public const int CpLossAtLevelCap = 10;
 
     public const int MinimumLevelForDeathExperienceLoss = 10;
 
-        public static int ReturnFixedLevel(int level)
+    public static int ReturnFixedLevel(int level)
     {
         if (level < 100)
             return level;
@@ -34,7 +33,7 @@ public static class ExperienceFormulas
         };
     }
 
-        public static int ComputeMonsterKillExperience(int killerFixedLevel, int monsterRealLevel,
+    public static int ComputeMonsterKillExperience(int killerFixedLevel, int monsterRealLevel,
         int monsterGeneralExperience)
     {
         if (monsterGeneralExperience < 1)
@@ -61,7 +60,7 @@ public static class ExperienceFormulas
         return (int)gain;
     }
 
-        public static int ApplyRebirthDivisor(int rawGain, int characterLevel)
+    public static int ApplyRebirthDivisor(int rawGain, int characterLevel)
     {
         if (rawGain <= 0)
             return 0;
@@ -69,14 +68,14 @@ public static class ExperienceFormulas
         return characterLevel < RebirthDivisorLevelThreshold ? rawGain / 3 : rawGain / 5;
     }
 
-        public static long ComputeDeathExperienceLoss(long currentExperience, int levelFactor1)
+    public static long ComputeDeathExperienceLoss(long currentExperience, int levelFactor1)
     {
         var loss = (long)((currentExperience - levelFactor1) * 0.05f);
         if (loss < 1) return 0;
         return loss > currentExperience ? currentExperience : loss;
     }
 
-        public static int ComputePartyBonusExperience(int presentPartySize, int monsterGeneralExperience)
+    public static int ComputePartyBonusExperience(int presentPartySize, int monsterGeneralExperience)
     {
         if (monsterGeneralExperience < 1)
             return 0;

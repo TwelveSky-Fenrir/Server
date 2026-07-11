@@ -6,8 +6,7 @@ namespace Fenrir.Application.Login.Tests.TestSupport;
 internal sealed class FakeGameServerDirectoryRepository(params ShardDirectoryEntryDto[] shards)
     : IGameServerDirectoryRepository
 {
-
-        public List<byte> MarkedUnreachableShardIds { get; } = [];
+    public List<byte> MarkedUnreachableShardIds { get; } = [];
 
     public ValueTask<ImmutableArray<ShardDirectoryEntryDto>> GetDirectoryAsync(CancellationToken ct)
     {

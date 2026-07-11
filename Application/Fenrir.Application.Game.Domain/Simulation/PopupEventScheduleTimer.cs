@@ -11,11 +11,11 @@ public sealed class PopupEventScheduleTimer(PopupEventState state, ILogger<Popup
     private static readonly int[] InvasionOpenHours = [12, 21];
     private static readonly int[] InvasionCloseHours = [14, 23];
 
-        private static readonly (int Minute, int Remaining)[] CountdownSchedule = [(49, 10), (54, 5), (58, 1)];
+    private static readonly (int Minute, int Remaining)[] CountdownSchedule = [(49, 10), (54, 5), (58, 1)];
 
     private int _lastMinuteOfDay = -1;
 
-        public void Tick(DateTime utcNow)
+    public void Tick(DateTime utcNow)
     {
         var minuteOfDay = utcNow.Hour * 60 + utcNow.Minute;
         if (minuteOfDay == _lastMinuteOfDay)

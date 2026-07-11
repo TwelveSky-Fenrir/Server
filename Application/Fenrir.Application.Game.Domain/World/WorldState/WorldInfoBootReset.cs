@@ -6,20 +6,19 @@ namespace Fenrir.Application.Game.Domain.World.WorldState;
 
 public static class WorldInfoBootReset
 {
+    private const int PossibleAllianceValuesPerTribe = 2;
 
-        private const int PossibleAllianceValuesPerTribe = 2;
-
-        private const int AllianceSlotCount = 2;
+    private const int AllianceSlotCount = 2;
 
     private const int TribeIdsPerAllianceSlot = 2;
 
     private static readonly int TribeCount = WorldStateService.TribeCount;
 
-        private static readonly int PopupTypeCount = Enum.GetValues<PopupEventType>().Length;
+    private static readonly int PopupTypeCount = Enum.GetValues<PopupEventType>().Length;
 
-        public static readonly WorldInfo ZeroedTemplate = Apply(WorldStateTemplates.ZeroedWorldInfo);
+    public static readonly WorldInfo ZeroedTemplate = Apply(WorldStateTemplates.ZeroedWorldInfo);
 
-        public static WorldInfo Apply(WorldInfo template, int? allianceEmptySlotSentinel = null)
+    public static WorldInfo Apply(WorldInfo template, int? allianceEmptySlotSentinel = null)
     {
         var result = template with
         {

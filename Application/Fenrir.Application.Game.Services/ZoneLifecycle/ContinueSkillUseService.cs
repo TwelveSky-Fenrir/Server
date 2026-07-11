@@ -7,8 +7,7 @@ namespace Fenrir.Application.Game.Services.ZoneLifecycle;
 
 public sealed class ContinueSkillUseService : IContinueSkillUseService
 {
-
-        public AutoBuffActivationResolver.Result Activate(Zone zone, int characterId, PlayerRuntimeState state, int sort)
+    public AutoBuffActivationResolver.Result Activate(Zone zone, int characterId, PlayerRuntimeState state, int sort)
     {
         var context = new AutoBuffActivationResolver.Context(state.AutoBuffTime, state.ActionSort, state.Mana);
         var result = AutoBuffActivationResolver.Resolve(sort, in context, GameDate.Today());

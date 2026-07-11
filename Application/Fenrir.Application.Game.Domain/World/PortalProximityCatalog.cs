@@ -16,7 +16,7 @@ public sealed class PortalProximityCatalog
         _portalsByZone = portalsByZone;
     }
 
-        public bool TryGetPortals(short zoneId, out ImmutableArray<PortalRegistration> portals)
+    public bool TryGetPortals(short zoneId, out ImmutableArray<PortalRegistration> portals)
     {
         return _portalsByZone.TryGetValue(zoneId, out portals);
     }

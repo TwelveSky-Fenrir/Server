@@ -25,7 +25,7 @@ public static class FrameWriter
         return total;
     }
 
-        public static byte[] WriteCompressedFrame<TPacket>(in TPacket packet) where TPacket : struct, IOutgoingPacket
+    public static byte[] WriteCompressedFrame<TPacket>(in TPacket packet) where TPacket : struct, IOutgoingPacket
     {
         var payloadSize = TPacket.PayloadSize;
         var rented = ArrayPool<byte>.Shared.Rent(payloadSize);

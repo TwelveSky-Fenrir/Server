@@ -2,8 +2,7 @@ namespace Fenrir.Application.Game.Domain.AntiCheat;
 
 public static class TribeConsistencyValidator
 {
-
-        public static bool IsConsistent(int tribe, int previousTribe)
+    public static bool IsConsistent(int tribe, int previousTribe)
     {
         return tribe switch
         {

@@ -115,7 +115,7 @@ public class HeavenlyJadeChest1236RewardTableTests
         Assert.Equal(1045, result.RewardItemId);
     }
 
-        private sealed class ScriptedRandom(params int[] values) : Random
+    private sealed class ScriptedRandom(params int[] values) : Random
     {
         private int _index;
 

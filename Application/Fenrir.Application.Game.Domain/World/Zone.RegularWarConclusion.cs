@@ -5,12 +5,11 @@ namespace Fenrir.Application.Game.Domain.World;
 
 public sealed partial class Zone
 {
+    private const int MissionJoinWarCap = 1;
 
-        private const int MissionJoinWarCap = 1;
+    private const int QuestWaterfallWarConclusionCreditSort = 9;
 
-        private const int QuestWaterfallWarConclusionCreditSort = 9;
-
-        private void HandleRegularWarConclusionCredit(int characterId)
+    private void HandleRegularWarConclusionCredit(int characterId)
     {
         if (!_players.TryGetValue(characterId, out var state))
             return;

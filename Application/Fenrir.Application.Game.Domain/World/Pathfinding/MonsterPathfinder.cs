@@ -5,8 +5,7 @@ namespace Fenrir.Application.Game.Domain.World.Pathfinding;
 
 public sealed class MonsterPathfinder
 {
-
-        private const int BoundaryBisectionIterations = 16;
+    private const int BoundaryBisectionIterations = 16;
 
     private readonly List<Vector2> _apexScratch = [];
     private readonly int[] _cameFrom;
@@ -23,7 +22,7 @@ public sealed class MonsterPathfinder
     private readonly List<Vector2> _portalRight = [];
     private readonly int[] _scoreGeneration;
 
-        private readonly List<Vector2> _tetherRouteScratch = [];
+    private readonly List<Vector2> _tetherRouteScratch = [];
 
     private int _budgetRemaining;
     private int _generation;
@@ -42,12 +41,12 @@ public sealed class MonsterPathfinder
         _closedGeneration = new int[triangleCount];
     }
 
-        public void ResetBudget()
+    public void ResetBudget()
     {
         _budgetRemaining = _perTickBudget;
     }
 
-        public bool TryConsumeBudget()
+    public bool TryConsumeBudget()
     {
         if (_budgetRemaining <= 0)
             return false;
@@ -56,7 +55,7 @@ public sealed class MonsterPathfinder
         return true;
     }
 
-        public bool TryFindPath(Vector3 from, Vector3 to, List<Vector2> waypointsOut)
+    public bool TryFindPath(Vector3 from, Vector3 to, List<Vector2> waypointsOut)
     {
         waypointsOut.Clear();
 
@@ -80,7 +79,7 @@ public sealed class MonsterPathfinder
         return true;
     }
 
-        public bool TryFindPathClamped(Vector3 from, Vector3 to, List<Vector2> waypointsOut)
+    public bool TryFindPathClamped(Vector3 from, Vector3 to, List<Vector2> waypointsOut)
     {
         if (!_geometry.TryFindContainingWalkableTriangle(from.X, from.Z, out _))
         {
@@ -95,7 +94,7 @@ public sealed class MonsterPathfinder
         return TryFindPath(from, clamped, waypointsOut);
     }
 
-        private Vector3 ClampToMeshBoundary(Vector3 from, Vector3 to)
+    private Vector3 ClampToMeshBoundary(Vector3 from, Vector3 to)
     {
         var lowWalkableFraction = 0f;
         var highBlockedFraction = 1f;
@@ -117,7 +116,7 @@ public sealed class MonsterPathfinder
         return new Vector3(clampedX, from.Y, clampedZ);
     }
 
-        public bool TryFindPursuitPath(Vector3 from, Vector3 to, Vector2 tetherAnchor, float tetherRadius,
+    public bool TryFindPursuitPath(Vector3 from, Vector3 to, Vector2 tetherAnchor, float tetherRadius,
         List<Vector2> waypointsOut)
     {
         waypointsOut.Clear();
@@ -135,7 +134,7 @@ public sealed class MonsterPathfinder
         return true;
     }
 
-        private void ClipToTether(Vector2 from, Vector2 anchor, float tetherRadiusSq, List<Vector2> waypointsOut)
+    private void ClipToTether(Vector2 from, Vector2 anchor, float tetherRadiusSq, List<Vector2> waypointsOut)
     {
         var segmentStart = from;
         foreach (var point in _tetherRouteScratch)
@@ -151,7 +150,7 @@ public sealed class MonsterPathfinder
         }
     }
 
-        private static Vector2 ClipSegmentToCircle(Vector2 segmentStart, Vector2 segmentEnd, Vector2 anchor,
+    private static Vector2 ClipSegmentToCircle(Vector2 segmentStart, Vector2 segmentEnd, Vector2 anchor,
         float radiusSq)
     {
         var direction = segmentEnd - segmentStart;
@@ -172,7 +171,7 @@ public sealed class MonsterPathfinder
         return segmentStart + direction * t;
     }
 
-        private bool RunAStar(int startTriangle, int goalTriangle, Vector2 goalXz)
+    private bool RunAStar(int startTriangle, int goalTriangle, Vector2 goalXz)
     {
         var generation = ++_generation;
         _open.Clear();
@@ -225,7 +224,7 @@ public sealed class MonsterPathfinder
         _pathTriangles.Reverse();
     }
 
-        private void Funnel(Vector2 from, Vector2 to, List<Vector2> waypointsOut)
+    private void Funnel(Vector2 from, Vector2 to, List<Vector2> waypointsOut)
     {
         BuildPortals(from, to);
 
@@ -329,7 +328,7 @@ public sealed class MonsterPathfinder
         _portalRight.Add(to);
     }
 
-        private static float TriArea2(Vector2 a, Vector2 b, Vector2 c)
+    private static float TriArea2(Vector2 a, Vector2 b, Vector2 c)
     {
         return (b.X - a.X) * (c.Y - a.Y) - (c.X - a.X) * (b.Y - a.Y);
     }

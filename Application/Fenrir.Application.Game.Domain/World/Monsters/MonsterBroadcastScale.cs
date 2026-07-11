@@ -2,8 +2,7 @@ namespace Fenrir.Application.Game.Domain.World.Monsters;
 
 public static class MonsterBroadcastScale
 {
-
-        public static int ForMonster(byte monsterType, byte monsterSpecialType)
+    public static int ForMonster(byte monsterType, byte monsterSpecialType)
     {
         if (monsterType == 1)
             return monsterSpecialType switch

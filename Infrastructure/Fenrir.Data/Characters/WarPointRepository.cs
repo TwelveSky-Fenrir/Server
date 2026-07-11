@@ -8,8 +8,7 @@ namespace Fenrir.Data.Characters;
 
 public sealed record WarPointRepository(ICaeriusNetDbContext Db) : IWarPointRepository
 {
-
-        private const int InsufficientSentinel = -1;
+    private const int InsufficientSentinel = -1;
 
     public async ValueTask<WarPointPurchaseResult> BuyWarPointItemAsync(int characterId, int warPointCost,
         byte container, IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct)

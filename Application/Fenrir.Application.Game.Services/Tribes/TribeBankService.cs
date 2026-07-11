@@ -24,7 +24,7 @@ public sealed class TribeBankService(ITribeRepository tribes, ILogger<TribeBankS
         return new TribeBankResult(true, 1, BuildBankArray(slots), 0);
     }
 
-        public async ValueTask<TribeBankResult> DepositAsync(int slotValue, PlayerRuntimeState state, int characterId,
+    public async ValueTask<TribeBankResult> DepositAsync(int slotValue, PlayerRuntimeState state, int characterId,
         CancellationToken ct)
     {
         if (slotValue < 0 || slotValue >= SlotCount || state.TribeRole != 1)

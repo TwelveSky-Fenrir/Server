@@ -7,16 +7,15 @@ namespace Fenrir.Application.Game.Domain.Simulation;
 
 public sealed class PopupEventRewardSystem(PopupEventState state) : ISimulationSystem
 {
+    private const int CombinedLevelGapCap = 13;
 
-        private const int CombinedLevelGapCap = 13;
+    private const int WarPointRewardAmount = 1;
 
-        private const int WarPointRewardAmount = 1;
+    private readonly ConditionalWeakTable<PlayerRuntimeState, PopupCounters> _counters = new();
 
-        private readonly ConditionalWeakTable<PlayerRuntimeState, PopupCounters> _counters = new();
+    private readonly ConcurrentDictionary<short, ConcurrentQueue<PopupRewardDue>> _rewardDue = new();
 
-        private readonly ConcurrentDictionary<short, ConcurrentQueue<PopupRewardDue>> _rewardDue = new();
-
-        public void Simulate(Zone zone, int legacyTicksElapsed)
+    public void Simulate(Zone zone, int legacyTicksElapsed)
     {
         if (!_rewardDue.TryGetValue(zone.MapId, out var queue))
             return;
@@ -25,7 +24,7 @@ public sealed class PopupEventRewardSystem(PopupEventState state) : ISimulationS
             DeliverReward(zone, due);
     }
 
-        public void NotifyPvpKill(Zone zone, PlayerRuntimeState killer, PlayerRuntimeState victim)
+    public void NotifyPvpKill(Zone zone, PlayerRuntimeState killer, PlayerRuntimeState victim)
     {
         if (killer.CharacterId == victim.CharacterId)
             return;
@@ -67,7 +66,7 @@ public sealed class PopupEventRewardSystem(PopupEventState state) : ISimulationS
         }
     }
 
-        public void NotifyMonsterKill(Zone zone, PlayerRuntimeState killer, bool dropEligible)
+    public void NotifyMonsterKill(Zone zone, PlayerRuntimeState killer, bool dropEligible)
     {
         if (!dropEligible)
             return;
@@ -94,24 +93,22 @@ public sealed class PopupEventRewardSystem(PopupEventState state) : ISimulationS
         queue.Enqueue(new PopupRewardDue(type, characterId));
     }
 
-        private void DeliverReward(Zone zone, PopupRewardDue due)
+    private void DeliverReward(Zone zone, PopupRewardDue due)
     {
         if (!zone.TryGetPlayer(due.CharacterId, out _))
             return;
 
         zone.GrantWarPoints(due.CharacterId, WarPointRewardAmount);
-
     }
 
-        private sealed class PopupCounters
+    private sealed class PopupCounters
     {
+        public int Avt;
 
-                public int Avt;
+        public int Monster;
 
-                public int Monster;
-
-                public int War;
+        public int War;
     }
 
-        private readonly record struct PopupRewardDue(PopupEventType Type, int CharacterId);
+    private readonly record struct PopupRewardDue(PopupEventType Type, int CharacterId);
 }

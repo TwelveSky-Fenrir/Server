@@ -14,10 +14,9 @@ public sealed class LuckyTicketUseItemHandler(
     UseItemInventoryWriter inventoryWriter,
     ILogger<LuckyTicketUseItemHandler> logger) : IUseItemHandler
 {
+    private static readonly BoxRewardSpec PlaceholderSpec = BoxRewardSpec.Uniform(0, ImmutableArray<int>.Empty);
 
-        public static IEnumerable<int> HandledItemIds { get; } = [1035, 1036, 1037];
-
-        private static readonly BoxRewardSpec PlaceholderSpec = BoxRewardSpec.Uniform(0, ImmutableArray<int>.Empty);
+    public static IEnumerable<int> HandledItemIds { get; } = [1035, 1036, 1037];
 
     public async ValueTask<UseInventoryItemResponse> HandleAsync(UseItemContext context,
         CancellationToken cancellationToken)
@@ -63,7 +62,7 @@ public sealed class LuckyTicketUseItemHandler(
         return UseItemResponses.Success(context.Page, context.Index);
     }
 
-        private int DrawReward(int ticketItemId, PlayerRuntimeState state)
+    private int DrawReward(int ticketItemId, PlayerRuntimeState state)
     {
         return LuckyTicketRewardResolver.TryDraw(worldData, Random.Shared, ticketItemId, state.PreviousTribe,
             state.Level, state.Level2, LuckyTicketRewardResolver.ShippedProductionEliteTierEnabled,

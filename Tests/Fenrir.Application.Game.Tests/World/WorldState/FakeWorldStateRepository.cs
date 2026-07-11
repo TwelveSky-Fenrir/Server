@@ -37,7 +37,7 @@ internal sealed class FakeWorldStateRepository : IWorldStateRepository
     public (byte? Zone038WinTribe, int? Zone038WinTribeTime, bool TribeSymbolBattle, byte? MonsterSymbol,
         int? MonsterSymbolEndTime, byte? HighTribe, short UpdateTribePoint)? LastWorldUpdate { get; private set; }
 
-        public HashSet<byte> ThrowOnUpdateTribeForIds { get; } = [];
+    public HashSet<byte> ThrowOnUpdateTribeForIds { get; } = [];
 
     public List<(byte TribeId, byte SlotIndex, int CandidateCharacterId, short CandidateLevel, int
         KillOtherTribeCount)> RegisterCalls { get; } = [];

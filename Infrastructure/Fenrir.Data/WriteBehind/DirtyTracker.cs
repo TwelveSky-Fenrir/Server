@@ -8,9 +8,9 @@ public sealed class DirtyTracker<TKey> where TKey : notnull
 
     private int _count;
 
-        public int Count => Volatile.Read(ref _count);
+    public int Count => Volatile.Read(ref _count);
 
-        public void MarkDirty(TKey key, DirtyFlags flags)
+    public void MarkDirty(TKey key, DirtyFlags flags)
     {
         while (true)
         {
@@ -26,11 +26,10 @@ public sealed class DirtyTracker<TKey> where TKey : notnull
             if (!_entries.TryAdd(key, flags)) continue;
             Interlocked.Increment(ref _count);
             return;
-
         }
     }
 
-        public IReadOnlyDictionary<TKey, DirtyFlags> DrainAll()
+    public IReadOnlyDictionary<TKey, DirtyFlags> DrainAll()
     {
         var drained = new Dictionary<TKey, DirtyFlags>(Math.Max(0, Count));
 

@@ -28,7 +28,7 @@ public sealed class GuildTribeBroadcastRelayHost(
                 FullMode = BoundedChannelFullMode.Wait
             });
 
-        public bool Enqueue(GuildTribeBroadcastRelayEntry entry)
+    public bool Enqueue(GuildTribeBroadcastRelayEntry entry)
     {
         if (_outbox.Writer.TryWrite(entry))
             return true;
@@ -58,7 +58,7 @@ public sealed class GuildTribeBroadcastRelayHost(
         } while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false));
     }
 
-        public async ValueTask PollOnceAsync(CancellationToken ct)
+    public async ValueTask PollOnceAsync(CancellationToken ct)
     {
         await FlushOutboundAsync(ct).ConfigureAwait(false);
         await DeliverInboundAsync(ct).ConfigureAwait(false);

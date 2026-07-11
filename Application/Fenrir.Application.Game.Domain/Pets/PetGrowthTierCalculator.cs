@@ -14,7 +14,7 @@ public static class PetGrowthTierCalculator
         [17055] = 3, [17056] = 3, [17057] = 3
     }.ToFrozenDictionary();
 
-        public static int ComputeTier(int petItemId, int growth)
+    public static int ComputeTier(int petItemId, int growth)
     {
         if (growth < 1)
             return 0;
@@ -36,7 +36,7 @@ public static class PetGrowthTierCalculator
         };
     }
 
-        public static bool HasTierIncreased(int petItemId, int growthBeforeCredit, int growthAfterCredit)
+    public static bool HasTierIncreased(int petItemId, int growthBeforeCredit, int growthAfterCredit)
     {
         return ComputeTier(petItemId, growthAfterCredit) > ComputeTier(petItemId, growthBeforeCredit);
     }

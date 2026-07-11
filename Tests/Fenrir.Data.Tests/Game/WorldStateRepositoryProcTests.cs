@@ -32,7 +32,7 @@ public class WorldStateRepositoryProcTests
         _characters = new CharacterRepository(db);
     }
 
-        private async Task<int> CreateCharacterAsync()
+    private async Task<int> CreateCharacterAsync()
     {
         var accountId = await _accounts.CreateAsync($"tribevotetest-{Guid.NewGuid():N}",
             RandomNumberGenerator.GetBytes(32), RandomNumberGenerator.GetBytes(16), CancellationToken.None);
@@ -66,7 +66,7 @@ public class WorldStateRepositoryProcTests
         Assert.Contains(tribes, t => t is { TribeId: 0, Points: 999, IsClosed: true, HasSymbol: false });
     }
 
-        [Fact]
+    [Fact]
     public async Task EnsureInitializedAsync_CalledConcurrently_NeverThrowsAndSeedsExactlyOnce()
     {
         var callers = Enumerable.Range(0, 8)

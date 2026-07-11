@@ -232,7 +232,7 @@ public class EnterWorldServiceTests
         const short MapId = 13;
         const int PersistedPetBagDate = 20991231;
 
-        var bundle = HappyPathBundle(MapId, 1, 1, 0f, 0f, 0f, [], petBagDate: PersistedPetBagDate);
+        var bundle = HappyPathBundle(MapId, 1, 1, 0f, 0f, 0f, [], PersistedPetBagDate);
         var characters = new FakeCharacterRepository { WorldEntryBundleToReturn = bundle };
         var worldData = ZoneTestKit.EmptyWorldData();
         var zones = ZoneTestKit.CreateRegistry(worldData: worldData);
@@ -474,7 +474,7 @@ public class EnterWorldServiceTests
         Assert.Null(session.DisconnectReason);
     }
 
-        private static async Task<byte[]> ReadExactlyAsync(FakeDuplexPipe pipe, int totalLength)
+    private static async Task<byte[]> ReadExactlyAsync(FakeDuplexPipe pipe, int totalLength)
     {
         var collected = new byte[totalLength];
         var offset = 0;
@@ -519,7 +519,7 @@ public class EnterWorldServiceTests
             new ReadOnlyCollection<CharacterBuffDto>([..buffs]));
     }
 
-        private static BuffInfo ExpectedBuffInfo(IReadOnlyList<CharacterBuffDto> buffs)
+    private static BuffInfo ExpectedBuffInfo(IReadOnlyList<CharacterBuffDto> buffs)
     {
         var buff = new int[70];
         foreach (var row in buffs)
@@ -531,7 +531,7 @@ public class EnterWorldServiceTests
         return WorldStateTemplates.ZeroedBuffInfo with { Buff = buff };
     }
 
-        private static int[] ExpectedEffectValueForView(IReadOnlyList<CharacterBuffDto> buffs)
+    private static int[] ExpectedEffectValueForView(IReadOnlyList<CharacterBuffDto> buffs)
     {
         var view = new int[35];
         foreach (var row in buffs)
@@ -582,7 +582,7 @@ public class EnterWorldServiceTests
             NullLogger<EnterWorldService>.Instance);
     }
 
-        private static (EnterWorldService Service, ZoneClientSession Session) CreateWorkingService(
+    private static (EnterWorldService Service, ZoneClientSession Session) CreateWorkingService(
         CharacterWorldEntryBundle bundle)
     {
         var characters = new FakeCharacterRepository { WorldEntryBundleToReturn = bundle };
@@ -619,7 +619,7 @@ public class EnterWorldServiceTests
         return (service, session);
     }
 
-        private static string EncodeObfuscatedAccountId(int accountId)
+    private static string EncodeObfuscatedAccountId(int accountId)
     {
         var bytes = Encoding.Latin1.GetBytes("MG" + accountId);
         WireXor.ApplyUidXor(bytes);
@@ -937,7 +937,7 @@ public class EnterWorldServiceTests
         }
     }
 
-        private sealed class RoleOnlyTribeRepository(byte role) : ITribeRepository
+    private sealed class RoleOnlyTribeRepository(byte role) : ITribeRepository
     {
         public ValueTask<byte> GetRoleForCharacterAsync(int characterId, CancellationToken ct)
         {

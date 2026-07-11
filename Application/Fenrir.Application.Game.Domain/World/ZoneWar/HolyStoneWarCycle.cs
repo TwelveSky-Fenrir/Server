@@ -7,14 +7,13 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 
 public enum HolyStoneWarPhase : byte
 {
+    Cooldown,
 
-        Cooldown,
+    OpeningCountdown,
 
-        OpeningCountdown,
+    Contest,
 
-        Contest,
-
-        ChallengePending
+    ChallengePending
 }
 
 public sealed record HolyStoneWarSite(
@@ -35,23 +34,22 @@ public sealed class HolyStoneWarCycle(
     bool testMode = false,
     ZoneCenterBroadcastIngestor? siegeIngestor = null)
 {
+    public const int OpeningCountdownMinutes = 10;
 
-        public const int OpeningCountdownMinutes = 10;
+    public const int ChallengeCountdownMinutes = 5;
 
-        public const int ChallengeCountdownMinutes = 5;
+    public static readonly TimeSpan NormalCooldown = TimeSpan.FromHours(3);
 
-        public static readonly TimeSpan NormalCooldown = TimeSpan.FromHours(3);
-
-        public static readonly TimeSpan TestModeCooldown = TimeSpan.FromHours(1);
+    public static readonly TimeSpan TestModeCooldown = TimeSpan.FromHours(1);
 
     private readonly MinuteCountdown _minuteCountdown = new();
     private readonly IRandomSource _random = random ?? SystemRandomSource.Instance;
 
-        public HolyStoneWarPhase Phase { get; private set; } = HolyStoneWarPhase.Cooldown;
+    public HolyStoneWarPhase Phase { get; private set; } = HolyStoneWarPhase.Cooldown;
 
     public TimeSpan CooldownRemaining { get; private set; } = testMode ? TestModeCooldown : NormalCooldown;
 
-        public int? PendingCandidateCharacterId { get; private set; }
+    public int? PendingCandidateCharacterId { get; private set; }
 
     public void Tick(TimeSpan elapsed)
     {
@@ -206,7 +204,7 @@ public sealed class HolyStoneWarCycle(
         logger.LogInformation("HolyStoneWar: cycle reset -- cooldown armed for {Cooldown}", CooldownRemaining);
     }
 
-        private void GrantTribeWideParticipationRewards(Zone zone, PlayerRuntimeState capturer)
+    private void GrantTribeWideParticipationRewards(Zone zone, PlayerRuntimeState capturer)
     {
         var participationRadiusSq = site.ParticipationRadius * site.ParticipationRadius;
 
@@ -227,7 +225,7 @@ public sealed class HolyStoneWarCycle(
         }
     }
 
-        private void AdvanceQuestProgressServerWide(byte winningTribeId)
+    private void AdvanceQuestProgressServerWide(byte winningTribeId)
     {
         foreach (var otherZone in zones.Zones)
         foreach (var player in otherZone.Players)
@@ -241,7 +239,7 @@ public sealed class HolyStoneWarCycle(
         }
     }
 
-        private static void PostZone038OccupationCredits(Zone zone, byte winningTribe)
+    private static void PostZone038OccupationCredits(Zone zone, byte winningTribe)
     {
         foreach (var player in zone.Players)
         {
@@ -252,7 +250,7 @@ public sealed class HolyStoneWarCycle(
         }
     }
 
-        private void EmitDtmValue(byte tribeId, int value)
+    private void EmitDtmValue(byte tribeId, int value)
     {
         if (siegeIngestor is null)
             return;

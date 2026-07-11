@@ -2,8 +2,7 @@ namespace Fenrir.Application.Game.Domain.World;
 
 public static class ShardMapPartitionValidator
 {
-
-        public static IReadOnlyList<ShardMapConflict> FindConflicts(IReadOnlyList<ShardMapClaim> claims)
+    public static IReadOnlyList<ShardMapConflict> FindConflicts(IReadOnlyList<ShardMapClaim> claims)
     {
         var claimedBy = new Dictionary<short, byte>();
         var overlapsByPair = new Dictionary<(byte Lower, byte Higher), List<short>>();
@@ -36,7 +35,7 @@ public static class ShardMapPartitionValidator
             .ToArray();
     }
 
-        public readonly record struct ShardMapClaim(byte ShardId, IReadOnlyCollection<short> MapIds);
+    public readonly record struct ShardMapClaim(byte ShardId, IReadOnlyCollection<short> MapIds);
 
-        public readonly record struct ShardMapConflict(byte ShardIdA, byte ShardIdB, IReadOnlyList<short> MapIds);
+    public readonly record struct ShardMapConflict(byte ShardIdA, byte ShardIdB, IReadOnlyList<short> MapIds);
 }

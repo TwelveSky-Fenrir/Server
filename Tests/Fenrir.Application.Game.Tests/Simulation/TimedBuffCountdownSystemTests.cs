@@ -6,12 +6,12 @@ namespace Fenrir.Application.Game.Tests.Simulation;
 
 public class TimedBuffCountdownSystemTests
 {
-    private static readonly TimeSpan OneMinute =
-        SimulationClock.ToTimeSpan(SimulationClock.PlayTimeAccrualLegacyTicks);
-
     private const short PlainZone = 100;
 
     private const short WarZone38 = 38;
+
+    private static readonly TimeSpan OneMinute =
+        SimulationClock.ToTimeSpan(SimulationClock.PlayTimeAccrualLegacyTicks);
 
     private static (Zone Zone, PlayerRuntimeState State) EnterPlayer(short mapId)
     {

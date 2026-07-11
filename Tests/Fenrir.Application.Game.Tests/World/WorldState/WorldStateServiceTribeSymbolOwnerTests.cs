@@ -1,5 +1,4 @@
 using Fenrir.Application.Game.Domain.World.WorldState;
-using Fenrir.Application.Game.Tests.TestSupport;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fenrir.Application.Game.Tests.World.WorldState;
@@ -27,7 +26,7 @@ public class WorldStateServiceTribeSymbolOwnerTests
     {
         var service = CreateInitialized();
 
-        service.ResolveTribeSymbol(slotTribeId: 0, winnerTribeId: 2);
+        service.ResolveTribeSymbol(0, 2);
 
         Assert.Equal((byte)2, service.GetTribeSymbolOwner(0));
         Assert.False(service.GetTribe(0).HasSymbol);
@@ -50,7 +49,7 @@ public class WorldStateServiceTribeSymbolOwnerTests
     {
         var service = CreateInitialized();
 
-        service.ResolveTribeSymbol(slotTribeId: 1, winnerTribeId: 3);
+        service.ResolveTribeSymbol(1, 3);
 
         Assert.Equal((byte)3, service.GetTribeSymbolOwner(1));
         Assert.Equal((byte)0, service.GetTribeSymbolOwner(0));

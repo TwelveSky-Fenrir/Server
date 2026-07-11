@@ -18,7 +18,7 @@ public sealed class LoginIpRateLimiter
     private readonly ConcurrentDictionary<string, Entry> _buckets = new();
     private long _callCounter;
 
-        public bool TryConsume(IPEndPoint? remoteEndPoint)
+    public bool TryConsume(IPEndPoint? remoteEndPoint)
     {
         if (remoteEndPoint is null)
             return true;
@@ -33,7 +33,7 @@ public sealed class LoginIpRateLimiter
         return entry.Bucket.TryConsume();
     }
 
-        private void PurgeStaleEntries()
+    private void PurgeStaleEntries()
     {
         var now = Stopwatch.GetTimestamp();
 

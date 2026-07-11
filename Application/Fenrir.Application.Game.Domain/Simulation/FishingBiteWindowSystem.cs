@@ -5,10 +5,9 @@ namespace Fenrir.Application.Game.Domain.Simulation;
 
 public sealed class FishingBiteWindowSystem : ISimulationSystem
 {
+    public const short FishingZoneNumber = 52;
 
-        public const short FishingZoneNumber = 52;
-
-        private const int BiteWindowArmedResultSort = 3;
+    private const int BiteWindowArmedResultSort = 3;
 
     private static readonly TimeSpan BiteWindowDelay = TimeSpan.FromMinutes(1);
 

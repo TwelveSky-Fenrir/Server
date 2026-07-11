@@ -26,7 +26,7 @@ public sealed class ProxyShopExpiryFlushHost(
         }
     }
 
-        public async Task FlushOnceAsync(CancellationToken ct)
+    public async Task FlushOnceAsync(CancellationToken ct)
     {
         foreach (var zone in zones.Zones)
         {

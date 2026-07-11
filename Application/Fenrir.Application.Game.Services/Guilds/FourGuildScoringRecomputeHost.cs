@@ -7,10 +7,9 @@ public sealed class FourGuildScoringRecomputeHost(
     FourGuildScoringService scoring,
     ILogger<FourGuildScoringRecomputeHost> logger) : BackgroundService
 {
+    public static readonly TimeSpan RecomputeInterval = TimeSpan.FromSeconds(10);
 
-        public static readonly TimeSpan RecomputeInterval = TimeSpan.FromSeconds(10);
-
-        public async Task RunOnceAsync(CancellationToken ct)
+    public async Task RunOnceAsync(CancellationToken ct)
     {
         try
         {

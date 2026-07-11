@@ -91,7 +91,7 @@ public class CloakVariantBox8114RewardTableTests
         Assert.Equal(1, result.NewPityCounter);
     }
 
-        private sealed class ScriptedRandom(params int[] values) : Random
+    private sealed class ScriptedRandom(params int[] values) : Random
     {
         private int _index;
 

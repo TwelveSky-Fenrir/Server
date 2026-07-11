@@ -8,22 +8,22 @@ public static class AutoHuntConfigValidator
     {
         None,
 
-                MalformedShape,
+        MalformedShape,
 
-                NegativeSkillId,
+        NegativeSkillId,
 
-                NegativeGrade,
+        NegativeGrade,
 
-                NegativeSelectorOrCount,
+        NegativeSelectorOrCount,
 
-                FlagOutOfDomain
+        FlagOutOfDomain
     }
 
-        private const int BuffStoreLength = 16;
+    private const int BuffStoreLength = 16;
 
-        private const int AttackTypeLength = 4;
+    private const int AttackTypeLength = 4;
 
-        public static Result Validate(in AutoHunt config)
+    public static Result Validate(in AutoHunt config)
     {
         var buffStore = config.BuffStore;
         var attackType = config.AttackType;

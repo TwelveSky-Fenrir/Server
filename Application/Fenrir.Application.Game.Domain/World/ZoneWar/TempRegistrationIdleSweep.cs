@@ -7,7 +7,7 @@ public sealed class TempRegistrationIdleSweep(TribeQuotaRegistry registry, ILogg
 {
     public static readonly TimeSpan IdleTimeout = TimeSpan.FromMinutes(3);
 
-        public void Sweep(DateTimeOffset nowUtc)
+    public void Sweep(DateTimeOffset nowUtc)
     {
         foreach (var entry in registry.SnapshotIdle(IdleTimeout, nowUtc))
         {

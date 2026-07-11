@@ -198,7 +198,7 @@ public class BossEventDropResolverTests
         Assert.False(outcome.SkipGenericTiers);
     }
 
-        private sealed class SequenceRandom(params int[] raw) : Random
+    private sealed class SequenceRandom(params int[] raw) : Random
     {
         private int _index;
 
@@ -219,7 +219,7 @@ public class BossEventDropResolverTests
 
         private static int Mod(int value, int modulus)
         {
-            return ((value % modulus) + modulus) % modulus;
+            return (value % modulus + modulus) % modulus;
         }
     }
 }

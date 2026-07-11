@@ -5,10 +5,9 @@ namespace Fenrir.Application.Game.Domain.World;
 
 public sealed class SessionLivenessSweep(SessionRegistry registry, ILogger<SessionLivenessSweep> logger)
 {
+    public static readonly TimeSpan IdleTimeout = TimeSpan.FromMinutes(3);
 
-        public static readonly TimeSpan IdleTimeout = TimeSpan.FromMinutes(3);
-
-        public void Sweep(DateTimeOffset nowUtc)
+    public void Sweep(DateTimeOffset nowUtc)
     {
         foreach (var session in registry.SnapshotIdle(IdleTimeout, nowUtc))
         {

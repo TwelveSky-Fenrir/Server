@@ -4,13 +4,12 @@ namespace Fenrir.Application.Game.Domain.AntiCheat;
 
 public static class SessionSourceIp
 {
-
-        public static string? Normalize(IPEndPoint? endPoint)
+    public static string? Normalize(IPEndPoint? endPoint)
     {
         return Normalize(endPoint?.Address);
     }
 
-        public static string? Normalize(IPAddress? address)
+    public static string? Normalize(IPAddress? address)
     {
         if (address is null)
             return null;
@@ -21,7 +20,7 @@ public static class SessionSourceIp
         return address.ToString();
     }
 
-        public static bool AreSameHost(string? left, string? right)
+    public static bool AreSameHost(string? left, string? right)
     {
         return !string.IsNullOrEmpty(left) && string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
     }

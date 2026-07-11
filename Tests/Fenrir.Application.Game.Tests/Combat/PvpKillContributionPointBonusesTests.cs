@@ -23,7 +23,7 @@ public class PvpKillContributionPointBonusesTests
     public void Server160Bonus_FiresWhenAttackerTribeMatchesAddedCpTribe()
     {
         var bonus = PvpKillContributionPointBonuses.ComputeConditionalBonuses(
-            160, attackerTribe: 2, addedCpTribe: 2, attackerBaseLevel: 1, symbolBattleActive: false);
+            160, 2, 2, 1, false);
 
         Assert.Equal(PvpKillContributionPointBonuses.Server160AddedTribeBonus, bonus);
     }
@@ -32,7 +32,7 @@ public class PvpKillContributionPointBonusesTests
     public void Server160Bonus_WithheldWhenNoAddedCpTribeDesignated()
     {
         var bonus = PvpKillContributionPointBonuses.ComputeConditionalBonuses(
-            160, attackerTribe: 0, addedCpTribe: -1, attackerBaseLevel: 1, symbolBattleActive: false);
+            160, 0, -1, 1, false);
 
         Assert.Equal(0, bonus);
     }
@@ -41,7 +41,7 @@ public class PvpKillContributionPointBonusesTests
     public void Server160Bonus_WithheldWhenTribeDoesNotMatch()
     {
         var bonus = PvpKillContributionPointBonuses.ComputeConditionalBonuses(
-            160, attackerTribe: 1, addedCpTribe: 2, attackerBaseLevel: 1, symbolBattleActive: false);
+            160, 1, 2, 1, false);
 
         Assert.Equal(0, bonus);
     }
@@ -50,9 +50,9 @@ public class PvpKillContributionPointBonusesTests
     public void SymbolBattleBonus_FiresOnServer38AtBaseLevel135WithBattleActive()
     {
         var bonus = PvpKillContributionPointBonuses.ComputeConditionalBonuses(
-            38, attackerTribe: 0, addedCpTribe: -1,
-            attackerBaseLevel: PvpKillContributionPointBonuses.SymbolBattleMinimumBaseLevel,
-            symbolBattleActive: true);
+            38, 0, -1,
+            PvpKillContributionPointBonuses.SymbolBattleMinimumBaseLevel,
+            true);
 
         Assert.Equal(PvpKillContributionPointBonuses.SymbolBattleBaseLevelBonus, bonus);
     }
@@ -61,7 +61,7 @@ public class PvpKillContributionPointBonusesTests
     public void SymbolBattleBonus_WithheldBelowBaseLevel135()
     {
         var bonus = PvpKillContributionPointBonuses.ComputeConditionalBonuses(
-            38, attackerTribe: 0, addedCpTribe: -1, attackerBaseLevel: 134, symbolBattleActive: true);
+            38, 0, -1, 134, true);
 
         Assert.Equal(0, bonus);
     }
@@ -70,7 +70,7 @@ public class PvpKillContributionPointBonusesTests
     public void SymbolBattleBonus_WithheldWhenBattleInactive()
     {
         var bonus = PvpKillContributionPointBonuses.ComputeConditionalBonuses(
-            38, attackerTribe: 0, addedCpTribe: -1, attackerBaseLevel: 140, symbolBattleActive: false);
+            38, 0, -1, 140, false);
 
         Assert.Equal(0, bonus);
     }
@@ -83,8 +83,8 @@ public class PvpKillContributionPointBonusesTests
     public void MinorityCapitalBonus_FiresWhenTribeIsNotTheServerHomeTribe(short mapId)
     {
         var bonus = PvpKillContributionPointBonuses.ComputeConditionalBonuses(
-            mapId, attackerTribe: 0, addedCpTribe: -1, attackerBaseLevel: 1, symbolBattleActive: false,
-            serverHomeTribe: 1);
+            mapId, 0, -1, 1, false,
+            1);
 
         Assert.Equal(PvpKillContributionPointBonuses.MinorityCapitalBonus, bonus);
     }
@@ -93,8 +93,8 @@ public class PvpKillContributionPointBonusesTests
     public void MinorityCapitalBonus_WithheldForTheServerHomeTribe()
     {
         var bonus = PvpKillContributionPointBonuses.ComputeConditionalBonuses(
-            1, attackerTribe: 1, addedCpTribe: -1, attackerBaseLevel: 1, symbolBattleActive: false,
-            serverHomeTribe: 1);
+            1, 1, -1, 1, false,
+            1);
 
         Assert.Equal(0, bonus);
     }
@@ -103,7 +103,7 @@ public class PvpKillContributionPointBonusesTests
     public void MinorityCapitalBonus_WithheldWhenHomeTribeMappingUnknown()
     {
         var bonus = PvpKillContributionPointBonuses.ComputeConditionalBonuses(
-            1, attackerTribe: 0, addedCpTribe: -1, attackerBaseLevel: 1, symbolBattleActive: false);
+            1, 0, -1, 1, false);
 
         Assert.Equal(0, bonus);
     }
@@ -112,8 +112,8 @@ public class PvpKillContributionPointBonusesTests
     public void UnlistedServer_GrantsNoConditionalBonus()
     {
         var bonus = PvpKillContributionPointBonuses.ComputeConditionalBonuses(
-            999, attackerTribe: 0, addedCpTribe: 0, attackerBaseLevel: 200, symbolBattleActive: true,
-            serverHomeTribe: 3);
+            999, 0, 0, 200, true,
+            3);
 
         Assert.Equal(0, bonus);
     }

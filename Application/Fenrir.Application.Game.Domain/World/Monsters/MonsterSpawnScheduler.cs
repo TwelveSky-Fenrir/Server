@@ -39,16 +39,15 @@ public sealed class MonsterSpawnScheduler(
     BossDropCatalog? bossDropCatalog = null)
     : ISimulationSystem
 {
+    private const int RegularMonsterTableCapacity = 3400;
 
-        private const int RegularMonsterTableCapacity = 3400;
+    private readonly BossDropCatalog _bossDropCatalog = bossDropCatalog ?? BossDropCatalog.Default;
 
-        private readonly BossDropCatalog _bossDropCatalog = bossDropCatalog ?? BossDropCatalog.Default;
-
-        private readonly Func<Random> _randomFactory = randomFactory ?? (static () => new Random());
+    private readonly Func<Random> _randomFactory = randomFactory ?? (static () => new Random());
 
     private readonly ConcurrentDictionary<short, MonsterZoneSpawnState> _stateByZone = new();
 
-        private int _demonLordKillTally;
+    private int _demonLordKillTally;
 
     public void Simulate(Zone zone, int legacyTicksElapsed)
     {
@@ -110,7 +109,6 @@ public sealed class MonsterSpawnScheduler(
         var capacity = DungeonSpawnDensityPolicy.ResolveTableCapacity(isDungeonZone, RegularMonsterTableCapacity);
         if (totalRequested <= capacity)
             foreach (var (region, monster, slotCount) in resolved)
-            {
                 for (var i = 0; i < slotCount; i++)
                 {
                     var slot = new MonsterSpawnSlot
@@ -126,7 +124,6 @@ public sealed class MonsterSpawnScheduler(
 
                     slots.Add(slot);
                 }
-            }
 
         var random = _randomFactory();
         return new MonsterZoneSpawnState
@@ -137,7 +134,7 @@ public sealed class MonsterSpawnScheduler(
         };
     }
 
-        private void Spawn(Zone zone, MonsterSpawnSlot slot)
+    private void Spawn(Zone zone, MonsterSpawnSlot slot)
     {
         var state = _stateByZone[zone.MapId];
         var region = slot.Region;
@@ -184,7 +181,7 @@ public sealed class MonsterSpawnScheduler(
         }
     }
 
-        private static int RollRespawnTicks(MonsterRowDto monster, Random random)
+    private static int RollRespawnTicks(MonsterRowDto monster, Random random)
     {
         if (monster.MonsterId == 746)
             return SimulationClock.ToWholeLegacyTicks(TimeSpan.FromSeconds(240));
@@ -195,12 +192,12 @@ public sealed class MonsterSpawnScheduler(
         return SimulationClock.ToWholeLegacyTicks(TimeSpan.FromSeconds(Math.Max(0, seconds)));
     }
 
-        private static bool IsPersistedBossMonster(int monsterId)
+    private static bool IsPersistedBossMonster(int monsterId)
     {
         return monsterId is >= 564 and <= 568;
     }
 
-        private void ProcessDeath(Zone zone, MonsterZoneSpawnState state, DeadMonsterEvent death)
+    private void ProcessDeath(Zone zone, MonsterZoneSpawnState state, DeadMonsterEvent death)
     {
         var monster = death.Monster;
         if (!worldData.MonstersById.TryGetValue(monster.Template.MonsterId, out var monsterDefinition))
@@ -291,7 +288,7 @@ public sealed class MonsterSpawnScheduler(
                 killer.Name, partyName, dropSort, monster.InstanceId);
     }
 
-        private static void ApplyBossDropSideEffects(Zone zone, PlayerRuntimeState killer, BossDropOutcome outcome)
+    private static void ApplyBossDropSideEffects(Zone zone, PlayerRuntimeState killer, BossDropOutcome outcome)
     {
         if (outcome.ContributionPointsGranted != 0)
             zone.GrantContributionPoints(killer.CharacterId, outcome.ContributionPointsGranted);
@@ -306,7 +303,7 @@ public sealed class MonsterSpawnScheduler(
             zone.AnnounceEliteBossDefeated(killer.Tribe, killer.Name);
     }
 
-        private static (string PartyName, int DropSort) ResolvePartyDrop(Zone zone, PlayerRuntimeState killer,
+    private static (string PartyName, int DropSort) ResolvePartyDrop(Zone zone, PlayerRuntimeState killer,
         IReadOnlyList<int>? partyMemberIds)
     {
         if (partyMemberIds is not { Count: > 0 } members)
@@ -321,7 +318,7 @@ public sealed class MonsterSpawnScheduler(
             : (killer.Name, 1);
     }
 
-        private void ApplyTowerCpForPvmMilestone(Zone zone, PlayerRuntimeState killer, int monsterRealLevel)
+    private void ApplyTowerCpForPvmMilestone(Zone zone, PlayerRuntimeState killer, int monsterRealLevel)
     {
         var registration = TowerCpForPvmMilestone.RegisterKill(killer.TowerCpMilestoneCounter, killer.Level,
             killer.Level2, monsterRealLevel);
@@ -334,7 +331,7 @@ public sealed class MonsterSpawnScheduler(
         zone.GrantContributionPoints(killer.CharacterId, TowerCpForPvmMilestone.ComputeReward(towerBonus));
     }
 
-        private static byte? TribeSymbolIndexOf(byte specialType)
+    private static byte? TribeSymbolIndexOf(byte specialType)
     {
         return specialType switch
         {

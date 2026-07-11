@@ -17,13 +17,13 @@ public sealed class LoginClientSession(
 {
     public LoginSessionState State { get; private set; } = LoginSessionState.Connected;
 
-        public int? AccountId { get; private set; }
+    public int? AccountId { get; private set; }
 
-        public short AccountGrade { get; private set; }
+    public short AccountGrade { get; private set; }
 
-        public int PinFailureCount { get; private set; }
+    public int PinFailureCount { get; private set; }
 
-        public Guid? AccountSessionToken { get; private set; }
+    public Guid? AccountSessionToken { get; private set; }
 
     public override bool IsOpcodeAllowed(byte opcode)
     {
@@ -46,12 +46,12 @@ public sealed class LoginClientSession(
         LogSessionStateChanged(previous, State);
     }
 
-        public void MarkAccountSessionToken(Guid token)
+    public void MarkAccountSessionToken(Guid token)
     {
         AccountSessionToken = token;
     }
 
-        public void MarkPinRequired()
+    public void MarkPinRequired()
     {
         var previous = State;
         PinFailureCount = 0;
@@ -59,7 +59,7 @@ public sealed class LoginClientSession(
         LogSessionStateChanged(previous, State);
     }
 
-        public int RegisterPinFailure()
+    public int RegisterPinFailure()
     {
         return ++PinFailureCount;
     }

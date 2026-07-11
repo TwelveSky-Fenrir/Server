@@ -18,7 +18,7 @@ public sealed record MacRestrictionRepository(ICaeriusNetDbContext Db) : IMacRes
         return match is not null && match.AccountLimit <= 0;
     }
 
-        internal static MacRestrictionRowDto? SelectRestriction(ImmutableArray<MacRestrictionRowDto> rows,
+    internal static MacRestrictionRowDto? SelectRestriction(ImmutableArray<MacRestrictionRowDto> rows,
         string macAddress, string? machineGuid)
     {
         MacRestrictionRowDto? macWideDefault = null;
@@ -35,7 +35,7 @@ public sealed record MacRestrictionRepository(ICaeriusNetDbContext Db) : IMacRes
         return macWideDefault;
     }
 
-        private ValueTask<ImmutableArray<MacRestrictionRowDto>> GetAllAsync(CancellationToken ct)
+    private ValueTask<ImmutableArray<MacRestrictionRowDto>> GetAllAsync(CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("admin", "usp_MacRestriction_GetAll")
             .AddInMemoryCache("admin:mac-restrictions", TimeSpan.FromSeconds(2))

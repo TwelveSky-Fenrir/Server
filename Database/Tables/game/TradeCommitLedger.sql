@@ -20,11 +20,11 @@
 -- path depends on old rows -- only the presence/absence of the current commit's token matters.
 CREATE TABLE game.TradeCommitLedger
 (
-    LedgerId      BIGINT           NOT NULL IDENTITY (1, 1),
-    TradeToken    UNIQUEIDENTIFIER NOT NULL,
-    CharacterA    INT              NOT NULL,
-    CharacterB    INT              NOT NULL,
-    CommittedAtUtc DATETIME2 (3)   NOT NULL
+    LedgerId       BIGINT           NOT NULL IDENTITY (1, 1),
+    TradeToken     UNIQUEIDENTIFIER NOT NULL,
+    CharacterA     INT              NOT NULL,
+    CharacterB     INT              NOT NULL,
+    CommittedAtUtc DATETIME2(3)     NOT NULL
         CONSTRAINT DF_TradeCommitLedger_CommittedAtUtc DEFAULT SYSUTCDATETIME(),
     -- Clustered on the monotonic identity for append-friendly insert locality (a GUID clustered key would
     -- fragment on every insert); the dedupe uniqueness lives on the nonclustered index below.

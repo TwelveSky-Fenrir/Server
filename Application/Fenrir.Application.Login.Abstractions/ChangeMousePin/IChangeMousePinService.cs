@@ -8,7 +8,7 @@ public enum ChangeMousePinOutcome
     StorageFailure,
     Success,
 
-        Locked
+    Locked
 }
 
 public readonly record struct ChangeMousePinResult(ChangeMousePinOutcome Outcome);
@@ -18,6 +18,6 @@ public interface IChangeMousePinService
     public ValueTask<ChangeMousePinResult> ChangeMousePinAsync(int accountId, string currentPin, string newPin,
         CancellationToken cancellationToken);
 
-        public ValueTask LogFailedAttemptAsync(int accountId, int failureCount, bool lockedOut,
+    public ValueTask LogFailedAttemptAsync(int accountId, int failureCount, bool lockedOut,
         CancellationToken cancellationToken);
 }

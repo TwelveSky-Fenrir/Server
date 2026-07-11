@@ -4,7 +4,6 @@ namespace Fenrir.Application.Game.Stats;
 
 public static partial class StatCalculator
 {
-
     private static int ComputeElementAttackPower(LevelRowDto levelRow, int setNumber, EquippedItemSlot?[] bySlot,
         CosmeticContext cosmetic = default, ConsumableContext consumable = default, MountContext mount = default,
         ZoneContext zone = default)

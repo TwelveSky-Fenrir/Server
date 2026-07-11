@@ -5,6 +5,5 @@ namespace Fenrir.Network.Serialization.Shared.Packets.Shared;
 [FenrirWireType(4)]
 public readonly partial record struct GmLevelSetPayload : IFenrirWireType<GmLevelSetPayload>
 {
-
-        public required int Level { get; init; }
+    public required int Level { get; init; }
 }

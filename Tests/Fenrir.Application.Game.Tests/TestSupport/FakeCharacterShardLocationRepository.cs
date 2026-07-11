@@ -52,7 +52,7 @@ internal sealed class FakeCharacterShardLocationRepository : ICharacterShardLoca
             : null);
     }
 
-        public void Seed(CharacterShardLocationDto row)
+    public void Seed(CharacterShardLocationDto row)
     {
         _byCharacterId[row.CharacterId] = row;
     }

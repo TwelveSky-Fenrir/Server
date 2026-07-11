@@ -34,8 +34,8 @@ public class TradeLockServiceCommitTests
         var zone = ZoneTestKit.CreateZone(1);
         var (sessionA, pipeA) = ZoneTestKit.CreateSession(1);
         var (sessionB, pipeB) = ZoneTestKit.CreateSession(2);
-        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(sessionA, 1, name: "Alice")));
-        zone.Post(ZoneCommand.Enter(20, ZoneTestKit.EnterData(sessionB, 1, name: "Bob")));
+        zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(sessionA, 1, "Alice")));
+        zone.Post(ZoneCommand.Enter(20, ZoneTestKit.EnterData(sessionB, 1, "Bob")));
         zone.Tick(TimeSpan.FromMilliseconds(50));
         ZoneTestKit.DrainOutbound(pipeA);
         ZoneTestKit.DrainOutbound(pipeB);
@@ -72,7 +72,8 @@ public class TradeLockServiceCommitTests
 
         var trades = new TradeRegistry();
         var session = StartSession(trades, 10, 20);
-        session.SideA.Slots[0] = (ContainerMatrix.InventoryPage0, 0, new ItemStack(1026, 1, 0, 0, 0, 0, 0, 0, 0, 0, 555));
+        session.SideA.Slots[0] =
+            (ContainerMatrix.InventoryPage0, 0, new ItemStack(1026, 1, 0, 0, 0, 0, 0, 0, 0, 0, 555));
         session.SideA.Money = 500;
 
         var repo = new FakeTradeCommitRepository();
@@ -142,7 +143,8 @@ public class TradeLockServiceCommitTests
         var trades = new TradeRegistry();
         var session = StartSession(trades, 10, 20);
 
-        var repo = new FakeTradeCommitRepository { ThrowOnNextExecute = new InvalidOperationException("simulated SQL failure") };
+        var repo = new FakeTradeCommitRepository
+            { ThrowOnNextExecute = new InvalidOperationException("simulated SQL failure") };
         var service = new TradeLockService(trades, repo, NullLogger<TradeLockService>.Instance);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>

@@ -103,7 +103,7 @@ public sealed class PositionWriteBehindHostTests
         await host.StopAsync(CancellationToken.None);
     }
 
-        [Fact]
+    [Fact]
     public async Task
         FlushCharacterNowAsync_CharacterLiveInRegistry_PersistsProgressAndPositionWithoutTheBackgroundLoop()
     {
@@ -132,7 +132,7 @@ public sealed class PositionWriteBehindHostTests
         Assert.Equal(originalFlushSequence + 1, positionRow.FlushSequence);
     }
 
-        [Fact]
+    [Fact]
     public async Task FlushCharacterNowAsync_CharacterNotInAnyZonesRegistry_IsANoOp()
     {
         var (registry, dirtyTracker) = CreateRegistryWithOnePlayer(1, 40, out _);

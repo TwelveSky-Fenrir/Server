@@ -1,4 +1,3 @@
-using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Domain.World.WorldState;
@@ -11,30 +10,28 @@ namespace Fenrir.Application.Game.Hosting.World.ZoneWar;
 
 public enum ZoneWarKind : byte
 {
+    Zone049 = 0,
 
-        Zone049 = 0,
+    Zone051 = 1,
 
-        Zone051 = 1,
+    Zone194 = 2,
 
-        Zone194 = 2,
+    Zone241 = 3,
 
-        Zone241 = 3,
+    Zone267 = 4,
 
-        Zone267 = 4,
+    Zone297 = 5,
 
-        Zone297 = 5,
-
-        Zone335 = 6
+    Zone335 = 6
 }
 
 public sealed class ZoneWarTickService(ZoneRegistry zones, ILogger<ZoneWarTickService> logger) : BackgroundService
 {
+    public const int TribeCount = WorldStateService.TribeCount;
 
-        public const int TribeCount = WorldStateService.TribeCount;
+    private const int BroadcastCadenceLegacyTicks = 10;
 
-        private const int BroadcastCadenceLegacyTicks = 10;
-
-        private const int LegacyTicksPerRemainTimeUnit = 2;
+    private const int LegacyTicksPerRemainTimeUnit = 2;
 
     private readonly SimulationTickAccumulator _accumulator = new();
     private readonly Lock _lock = new();
@@ -80,7 +77,7 @@ public sealed class ZoneWarTickService(ZoneRegistry zones, ILogger<ZoneWarTickSe
         }
     }
 
-        public void StartWar(ZoneWarKind kind, int remainTimeSeconds)
+    public void StartWar(ZoneWarKind kind, int remainTimeSeconds)
     {
         lock (_lock)
         {
@@ -94,7 +91,7 @@ public sealed class ZoneWarTickService(ZoneRegistry zones, ILogger<ZoneWarTickSe
         }
     }
 
-        public void EndWar()
+    public void EndWar()
     {
         lock (_lock)
         {
@@ -102,7 +99,7 @@ public sealed class ZoneWarTickService(ZoneRegistry zones, ILogger<ZoneWarTickSe
         }
     }
 
-        public void ReportStanding(byte tribeId, int value)
+    public void ReportStanding(byte tribeId, int value)
     {
         ValidateTribeId(tribeId);
         lock (_lock)
@@ -111,7 +108,7 @@ public sealed class ZoneWarTickService(ZoneRegistry zones, ILogger<ZoneWarTickSe
         }
     }
 
-        public void ReportMonsterCount(byte tribeId, int value)
+    public void ReportMonsterCount(byte tribeId, int value)
     {
         ValidateTribeId(tribeId);
         lock (_lock)
@@ -120,7 +117,7 @@ public sealed class ZoneWarTickService(ZoneRegistry zones, ILogger<ZoneWarTickSe
         }
     }
 
-        public void ReportExtraStatus(int value1, int value2)
+    public void ReportExtraStatus(int value1, int value2)
     {
         lock (_lock)
         {
@@ -129,7 +126,7 @@ public sealed class ZoneWarTickService(ZoneRegistry zones, ILogger<ZoneWarTickSe
         }
     }
 
-        public void Tick(TimeSpan elapsed)
+    public void Tick(TimeSpan elapsed)
     {
         var wholeTicks = _accumulator.Advance(elapsed);
         for (var i = 0; i < wholeTicks; i++)

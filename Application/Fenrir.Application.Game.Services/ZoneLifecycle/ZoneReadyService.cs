@@ -6,10 +6,9 @@ namespace Fenrir.Application.Game.Services.ZoneLifecycle;
 
 public sealed class ZoneReadyService(ILogger<ZoneReadyService>? logger = null) : IZoneReadyService
 {
+    private const int AutoHuntHackStrikeLimit = 3;
 
-        private const int AutoHuntHackStrikeLimit = 3;
-
-        private static readonly TimeSpan HeartbeatStaleWindow = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan HeartbeatStaleWindow = TimeSpan.FromSeconds(10);
 
     public ZoneReadyOutcome Validate(PlayerRuntimeState state, int tribe, int autoState)
     {

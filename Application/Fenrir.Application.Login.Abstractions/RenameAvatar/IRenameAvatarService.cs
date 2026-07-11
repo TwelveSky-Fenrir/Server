@@ -4,30 +4,29 @@ public enum RenameAvatarOutcome
 {
     Success,
 
-        NameTaken,
+    NameTaken,
 
-        ItemMismatch,
+    ItemMismatch,
 
-        TribeRoleRefusal,
+    TribeRoleRefusal,
 
-        GuildMembershipRefusal,
+    GuildMembershipRefusal,
 
-        FriendListRefusal,
+    FriendListRefusal,
 
-        TeacherBondRefusal,
+    TeacherBondRefusal,
 
-        StudentBondRefusal,
+    StudentBondRefusal,
 
-        SlotMissing,
+    SlotMissing,
 
-        SqlError
+    SqlError
 }
 
 public readonly record struct RenameAvatarResult(RenameAvatarOutcome Outcome);
 
 public interface IRenameAvatarService
 {
-
-        public ValueTask<RenameAvatarResult> RenameAvatarAsync(int accountId, byte avatarPost, string changeAvatarName,
+    public ValueTask<RenameAvatarResult> RenameAvatarAsync(int accountId, byte avatarPost, string changeAvatarName,
         byte itemContainer, byte itemSlot, CancellationToken cancellationToken);
 }

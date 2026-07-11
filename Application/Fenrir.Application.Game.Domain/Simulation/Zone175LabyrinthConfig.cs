@@ -10,8 +10,7 @@ public readonly record struct Zone175InstanceConfig(
 
 public sealed class Zone175LabyrinthConfig
 {
-
-        public static readonly Zone175LabyrinthConfig Disabled = new(FrozenDictionary<short, Zone175InstanceConfig>.Empty);
+    public static readonly Zone175LabyrinthConfig Disabled = new(FrozenDictionary<short, Zone175InstanceConfig>.Empty);
 
     private readonly FrozenDictionary<short, Zone175InstanceConfig> _byMapId;
 
@@ -20,9 +19,9 @@ public sealed class Zone175LabyrinthConfig
         _byMapId = byMapId as FrozenDictionary<short, Zone175InstanceConfig> ?? byMapId.ToFrozenDictionary();
     }
 
-        public int Count => _byMapId.Count;
+    public int Count => _byMapId.Count;
 
-        public bool TryGet(short mapId, out Zone175InstanceConfig config)
+    public bool TryGet(short mapId, out Zone175InstanceConfig config)
     {
         return _byMapId.TryGetValue(mapId, out config);
     }

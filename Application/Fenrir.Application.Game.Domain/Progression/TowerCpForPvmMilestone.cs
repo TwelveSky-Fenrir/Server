@@ -6,9 +6,9 @@ public static class TowerCpForPvmMilestone
 {
     public const int KillsRequired = 1000;
 
-        public const int BaseKillCp = 1;
+    public const int BaseKillCp = 1;
 
-        public static KillRegistration RegisterKill(int counterBeforeThisKill, int attackerLevel1, int attackerLevel2,
+    public static KillRegistration RegisterKill(int counterBeforeThisKill, int attackerLevel1, int attackerLevel2,
         int monsterRealLevel)
     {
         var fixedLevel = ExperienceFormulas.ReturnFixedLevel(attackerLevel1 + attackerLevel2);
@@ -21,7 +21,7 @@ public static class TowerCpForPvmMilestone
             : new KillRegistration(next, false);
     }
 
-        public static int ComputeReward(int cpForPvmTowerBonus)
+    public static int ComputeReward(int cpForPvmTowerBonus)
     {
         return BaseKillCp + Math.Max(0, cpForPvmTowerBonus);
     }

@@ -8,8 +8,7 @@ namespace Fenrir.Network.Serialization.Zone.Packets.Zone;
     ExpectedSize = 21, AllowedStates = [(byte)ZoneSessionState.Registering, (byte)ZoneSessionState.InWorld])]
 public readonly partial record struct ZoneMoveRequest : IIncomingPacket<ZoneMoveRequest>
 {
-
-        public required int Sort { get; init; }
+    public required int Sort { get; init; }
 
     public required int ZoneNumber { get; init; }
     public required int PresentZoneNumber { get; init; }

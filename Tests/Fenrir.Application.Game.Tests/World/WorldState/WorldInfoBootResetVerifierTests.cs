@@ -49,7 +49,7 @@ public class WorldInfoBootResetVerifierTests
     public void Verify_NokSanStoneAlreadyCaptured_LogsOwnerAndStonesHeldViolations()
     {
         var nokSan = new Zone195NokSanState();
-        nokSan.CommitCapture(0, capturingTribe: 1);
+        nokSan.CommitCapture(0, 1);
         var logger = new CapturingLogger<WorldInfoBootResetVerifier>();
         var verifier = CreateVerifier(logger, nokSan: nokSan);
 

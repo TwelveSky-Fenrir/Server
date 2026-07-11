@@ -20,7 +20,7 @@ public class OneShotKillClassifierTests
     public void ReflectKill_IsAlwaysCritical_RegardlessOfSkillIndex(int killingSkillIndex)
     {
         Assert.Equal(KillCpType.CriticalHit,
-            OneShotKillClassifier.Classify(killingSkillIndex, isReflectKill: true));
+            OneShotKillClassifier.Classify(killingSkillIndex, true));
     }
 
     [Theory]
@@ -32,7 +32,7 @@ public class OneShotKillClassifierTests
     public void NonReflectKill_IsNormal_WhileOneShotSetIsEmpty(int killingSkillIndex)
     {
         Assert.Equal(KillCpType.NormalHit,
-            OneShotKillClassifier.Classify(killingSkillIndex, isReflectKill: false));
+            OneShotKillClassifier.Classify(killingSkillIndex, false));
     }
 
     [Theory]
@@ -47,7 +47,7 @@ public class OneShotKillClassifierTests
     [Fact]
     public void Classify_NeverReturnsStun()
     {
-        Assert.NotEqual(KillCpType.Stun, OneShotKillClassifier.Classify(42, isReflectKill: false));
-        Assert.NotEqual(KillCpType.Stun, OneShotKillClassifier.Classify(42, isReflectKill: true));
+        Assert.NotEqual(KillCpType.Stun, OneShotKillClassifier.Classify(42, false));
+        Assert.NotEqual(KillCpType.Stun, OneShotKillClassifier.Classify(42, true));
     }
 }

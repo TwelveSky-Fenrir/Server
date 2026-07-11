@@ -58,7 +58,7 @@ public class KillFeedEndOfBattleRewardCalculatorTests
     [Fact]
     public void FewerThanThreeEntries_OnlyRewardsThoseTracked()
     {
-        ImmutableArray<KillFeedRankedEntry> oneEntry = [new KillFeedRankedEntry(7, "Solo", 0, 4)];
+        ImmutableArray<KillFeedRankedEntry> oneEntry = [new(7, "Solo", 0, 4)];
 
         var rewards = KillFeedEndOfBattleRewardCalculator.ComputeRankRewards(oneEntry, true, false);
 

@@ -7,10 +7,10 @@ public sealed class WorldDataLoader(IWorldDataRepository repository, ILogger<Wor
 {
     private WorldDataCache? _cache;
 
-        public WorldDataCache Cache => _cache ?? throw new InvalidOperationException(
+    public WorldDataCache Cache => _cache ?? throw new InvalidOperationException(
         "WorldDataCache is not loaded yet -- call WorldDataLoader.InitializeAsync before accepting connections.");
 
-        public async Task InitializeAsync(CancellationToken ct)
+    public async Task InitializeAsync(CancellationToken ct)
     {
         if (_cache is not null)
             throw new InvalidOperationException("WorldDataLoader.InitializeAsync must only be called once, at boot.");

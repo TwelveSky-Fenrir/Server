@@ -55,7 +55,7 @@ public class GmPetExperienceGrantServiceTests
             NullLogger<GmPetExperienceGrantService>.Instance);
     }
 
-        private static void EquipPetSlot(Zone zone, int characterId, int itemId)
+    private static void EquipPetSlot(Zone zone, int characterId, int itemId)
     {
         var containers = ImmutableArray.Create(new InventoryContainerSnapshot(ContainerMatrix.Equipment,
             ImmutableDictionary<byte, ItemStack>.Empty.SetItem(PetSlots.EquipmentSlot,

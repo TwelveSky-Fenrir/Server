@@ -13,7 +13,7 @@ public static class TowerUpgradeResolver
 
     public const int TowerCount = TowerWarState.TowerCount;
 
-        public static Result Validate(byte tribeRole, int requestZoneNumber, int actualZoneNumber, byte tribe,
+    public static Result Validate(byte tribeRole, int requestZoneNumber, int actualZoneNumber, byte tribe,
         int requestedType, int requestedNextLevelRaw, int currentPackedState, bool towerValid)
     {
         if (tribeRole is not (1 or 2) || !towerValid || requestZoneNumber != actualZoneNumber)
@@ -57,7 +57,7 @@ public static class TowerUpgradeResolver
             : new Result(Outcome.Success, towerIndex, requestedNextLevel * 100 + requestedType);
     }
 
-        public static bool TryFindMaterial(ImmutableDictionary<byte, ItemStack> page0,
+    public static bool TryFindMaterial(ImmutableDictionary<byte, ItemStack> page0,
         ImmutableDictionary<byte, ItemStack> page1, int itemId, out byte page, out byte slot)
     {
         for (var i = 0; i <= 63; i++)

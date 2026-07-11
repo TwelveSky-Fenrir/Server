@@ -320,7 +320,7 @@ public class EnchantResolverTests
         Assert.Equal(50, result.NewEnchant);
     }
 
-        [Fact]
+    [Fact]
     public void ImproveCharge_Present_ConsumedOnRolledSuccess()
     {
         var target = Equip(1);
@@ -331,7 +331,7 @@ public class EnchantResolverTests
         Assert.True(result.ConsumesImproveCharge);
     }
 
-        [Fact]
+    [Fact]
     public void ImproveCharge_Present_ConsumedOnRolledFailure()
     {
         var target = Equip(1);
@@ -352,7 +352,7 @@ public class EnchantResolverTests
         Assert.False(result.ConsumesImproveCharge);
     }
 
-        [Fact]
+    [Fact]
     public void ImproveCharge_Present_NotConsumedOnNoRollUnseal()
     {
         var target = Equip(1, type: 3);
@@ -363,7 +363,7 @@ public class EnchantResolverTests
         Assert.False(result.ConsumesImproveCharge);
     }
 
-        [Fact]
+    [Fact]
     public void ImproveCharge_Present_ConsumedInAdvancedRegime()
     {
         var target = Equip(1, type: 3);

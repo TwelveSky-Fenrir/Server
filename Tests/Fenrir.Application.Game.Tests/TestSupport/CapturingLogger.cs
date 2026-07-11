@@ -24,7 +24,7 @@ internal sealed class CapturingLogger<T> : ILogger<T>
         Entries.Add((logLevel, formatter(state, exception)));
     }
 
-        public static IReadOnlyList<KeyValuePair<string, object>> PropertiesOf(object scope)
+    public static IReadOnlyList<KeyValuePair<string, object>> PropertiesOf(object scope)
     {
         return (IReadOnlyList<KeyValuePair<string, object>>)scope;
     }

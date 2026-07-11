@@ -7,10 +7,10 @@ public interface IGameServerDirectoryRepository
     public ValueTask HeartbeatAsync(byte shardId, string host, int port, int ccu, int capacity, float tickP99Ms,
         CancellationToken ct);
 
-        public ValueTask<ImmutableArray<ShardDirectoryEntryDto>> GetDirectoryAsync(CancellationToken ct);
+    public ValueTask<ImmutableArray<ShardDirectoryEntryDto>> GetDirectoryAsync(CancellationToken ct);
 
-        public ValueTask<ImmutableArray<ShardDirectoryEntryDto>> GetDirectoryAsync(int stalenessCutoffSeconds,
+    public ValueTask<ImmutableArray<ShardDirectoryEntryDto>> GetDirectoryAsync(int stalenessCutoffSeconds,
         CancellationToken ct);
 
-        public ValueTask MarkUnreachableAsync(byte shardId, CancellationToken ct);
+    public ValueTask MarkUnreachableAsync(byte shardId, CancellationToken ct);
 }

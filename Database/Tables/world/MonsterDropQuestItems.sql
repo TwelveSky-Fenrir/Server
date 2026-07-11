@@ -11,6 +11,6 @@ CREATE TABLE world.MonsterDropQuestItems
     -- Value-range bounds mirror legacy's load-time field validation (Monster_CheckValidElement,
     -- Server/Header/S15_MyShare.cpp:1809-1818). This table had never had any CHECK constraint at all
     -- (single-row-per-monster shape, no SlotIndex to bound).
-    CONSTRAINT CK_MonsterDropQuestItems_DropRate CHECK (DropRate BETWEEN 0 AND 1000000), -- :1809-1813
+    CONSTRAINT CK_MonsterDropQuestItems_DropRate CHECK (DropRate BETWEEN 0 AND 1000000),    -- :1809-1813
     CONSTRAINT CK_MonsterDropQuestItems_QuestItemId CHECK (QuestItemId BETWEEN 0 AND 99999) -- :1814-1818
 );

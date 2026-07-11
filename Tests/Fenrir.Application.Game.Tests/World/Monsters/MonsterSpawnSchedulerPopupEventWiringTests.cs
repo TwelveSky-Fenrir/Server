@@ -9,8 +9,7 @@ namespace Fenrir.Application.Game.Tests.World.Monsters;
 
 public class MonsterSpawnSchedulerPopupEventWiringTests
 {
-
-        private const short MonsterPopupMap = 145;
+    private const short MonsterPopupMap = 145;
 
     private static WorldDataCache CacheWithOneRegion(short martialItemLevel = 0)
     {
@@ -51,7 +50,7 @@ public class MonsterSpawnSchedulerPopupEventWiringTests
         return (zone, killer!);
     }
 
-        private static void KillAndRespawn(Zone zone)
+    private static void KillAndRespawn(Zone zone)
     {
         zone.TryDamageMonster(1, 10_000, 10, out var died, out _);
         Assert.True(died);
@@ -75,7 +74,7 @@ public class MonsterSpawnSchedulerPopupEventWiringTests
     [Fact]
     public void DropIneligibleKills_NeverAdvanceThePopupCounter()
     {
-        var (zone, killer) = SetUp(CacheWithOneRegion(martialItemLevel: 1));
+        var (zone, killer) = SetUp(CacheWithOneRegion(1));
 
         for (var i = 0; i < 400; i++)
             KillAndRespawn(zone);

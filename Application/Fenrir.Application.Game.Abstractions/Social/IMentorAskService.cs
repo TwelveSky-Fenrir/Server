@@ -13,7 +13,7 @@ public enum MentorAskResultKind
     TargetAlreadyHasStudent,
     Sent,
 
-        SentCrossShard
+    SentCrossShard
 }
 
 public readonly record struct MentorAskResult(
@@ -24,7 +24,6 @@ public readonly record struct MentorAskResult(
 
 public interface IMentorAskService
 {
-
-        public ValueTask<MentorAskResult> AskAsync(Zone zone, PlayerRuntimeState master, string targetAvatarName,
+    public ValueTask<MentorAskResult> AskAsync(Zone zone, PlayerRuntimeState master, string targetAvatarName,
         CancellationToken cancellationToken);
 }

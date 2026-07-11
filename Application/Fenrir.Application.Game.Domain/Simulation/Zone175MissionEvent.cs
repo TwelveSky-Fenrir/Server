@@ -2,26 +2,25 @@ namespace Fenrir.Application.Game.Domain.Simulation;
 
 public enum Zone175MissionEvent : byte
 {
+    MissionOpen,
 
-        MissionOpen,
+    PreOpenCountdown,
 
-        PreOpenCountdown,
+    WaveGateOpen,
 
-        WaveGateOpen,
+    WaveBossSummon,
 
-        WaveBossSummon,
+    WaveCleared,
 
-        WaveCleared,
+    EmptyAbort,
 
-        EmptyAbort,
+    WaveTimeout,
 
-        WaveTimeout,
+    DepthGateStop,
 
-        DepthGateStop,
+    MissionEnd,
 
-        MissionEnd,
+    TerminalEnter,
 
-        TerminalEnter,
-
-        TerminalKickReset
+    TerminalKickReset
 }

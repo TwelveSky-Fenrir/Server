@@ -5,12 +5,11 @@ namespace Fenrir.Application.Game.Abstractions.GenericAction;
 
 public enum GenericActionStatus
 {
+    Aborted,
 
-        Aborted,
+    Failed,
 
-        Failed,
-
-        Succeeded
+    Succeeded
 }
 
 public readonly record struct GenericActionResult(
@@ -28,7 +27,7 @@ public interface IGenericActionService
     public ValueTask<GenericActionResult> MoveContainerAsync(int sort, byte[] data, Zone zone, PlayerRuntimeState state,
         int characterId, CancellationToken cancellationToken);
 
-        public ValueTask<GenericActionResult> PickupGroundItemAsync(byte[] data, Zone zone, PlayerRuntimeState state,
+    public ValueTask<GenericActionResult> PickupGroundItemAsync(byte[] data, Zone zone, PlayerRuntimeState state,
         int accountId, int characterId, CancellationToken cancellationToken);
 
     public ValueTask<GenericActionResult> PayTeleportTollAsync(byte[] data, int characterId,
@@ -40,33 +39,33 @@ public interface IGenericActionService
     public ValueTask<GenericActionResult> UpgradeSkillAsync(byte[] data, Zone zone, PlayerRuntimeState state,
         int characterId, CancellationToken cancellationToken);
 
-        public ValueTask<GenericActionResult> SellToNpcShopAsync(Zone zone, PlayerRuntimeState state, int accountId,
+    public ValueTask<GenericActionResult> SellToNpcShopAsync(Zone zone, PlayerRuntimeState state, int accountId,
         int characterId, DefaultPData move, CancellationToken cancellationToken);
 
-        public ValueTask<GenericActionResult> BuyFromNpcShopAsync(Zone zone, PlayerRuntimeState state, int accountId,
+    public ValueTask<GenericActionResult> BuyFromNpcShopAsync(Zone zone, PlayerRuntimeState state, int accountId,
         int characterId, DefaultPData move, CancellationToken cancellationToken);
 
-        public ValueTask<GenericActionResult> AllocateStatPointAsync(int statSort, int addValue, Zone zone,
+    public ValueTask<GenericActionResult> AllocateStatPointAsync(int statSort, int addValue, Zone zone,
         PlayerRuntimeState state, int characterId, CancellationToken cancellationToken);
 
-        public ValueTask<GenericActionResult> TimeExchangeAsync(Zone zone, PlayerRuntimeState state, int accountId,
+    public ValueTask<GenericActionResult> TimeExchangeAsync(Zone zone, PlayerRuntimeState state, int accountId,
         int characterId, CancellationToken cancellationToken);
 
-        public ValueTask<GenericActionResult> TransferStoreItemAsync(int sort, byte[] data, Zone zone,
+    public ValueTask<GenericActionResult> TransferStoreItemAsync(int sort, byte[] data, Zone zone,
         PlayerRuntimeState state, int accountId, int characterId, CancellationToken cancellationToken);
 
-        public ValueTask<GenericActionResult> TransferStoreMoneyAsync(int sort, byte[] data, Zone zone,
+    public ValueTask<GenericActionResult> TransferStoreMoneyAsync(int sort, byte[] data, Zone zone,
         PlayerRuntimeState state, int accountId, int characterId, CancellationToken cancellationToken);
 
-        public ValueTask<GenericActionResult> TransferBankItemAsync(int sort, byte[] data, Zone zone,
+    public ValueTask<GenericActionResult> TransferBankItemAsync(int sort, byte[] data, Zone zone,
         PlayerRuntimeState state, int accountId, int characterId, CancellationToken cancellationToken);
 
-        public ValueTask<GenericActionResult> TransferBankMoneyAsync(int sort, byte[] data, int accountId,
+    public ValueTask<GenericActionResult> TransferBankMoneyAsync(int sort, byte[] data, int accountId,
         int characterId, CancellationToken cancellationToken);
 
-        public ValueTask<GenericActionResult> TransferTradeItemAsync(int sort, byte[] data, PlayerRuntimeState state,
+    public ValueTask<GenericActionResult> TransferTradeItemAsync(int sort, byte[] data, PlayerRuntimeState state,
         int characterId, CancellationToken cancellationToken);
 
-        public ValueTask<GenericActionResult> TransferTradeMoneyAsync(int sort, byte[] data, PlayerRuntimeState state,
+    public ValueTask<GenericActionResult> TransferTradeMoneyAsync(int sort, byte[] data, PlayerRuntimeState state,
         int characterId, CancellationToken cancellationToken);
 }

@@ -6,8 +6,7 @@ namespace Fenrir.Application.Game.Domain.Simulation;
 
 public sealed class DuelMaintenanceSystem(DuelRegistry duels) : ISimulationSystem
 {
-
-        private const short ScriptedDuelArenaMapId = 124;
+    private const short ScriptedDuelArenaMapId = 124;
 
     public void Simulate(Zone zone, int legacyTicksElapsed)
     {

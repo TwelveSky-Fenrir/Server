@@ -39,12 +39,12 @@ public sealed class LoginService(
     private const int ResultServerFull = 3;
     private const int ResultVersionMismatch = 4;
 
-        private const int ResultSessionRegistrationFailed = 5;
+    private const int ResultSessionRegistrationFailed = 5;
 
     private const int ResultUnknownAccount = 6;
     private const int ResultWrongPassword = 7;
 
-        private const int ResultAlreadyConnected = 8;
+    private const int ResultAlreadyConnected = 8;
 
     private const int ResultBlocked = 9;
 
@@ -58,9 +58,9 @@ public sealed class LoginService(
 
     private const string AdapterNameEmptyMessage = "IP address not specified. Please update to the latest client.";
 
-        private const short LoginSucceededEventCode = 1;
+    private const short LoginSucceededEventCode = 1;
 
-        private static readonly (byte[] Hash, byte[] Salt) DummyCredential =
+    private static readonly (byte[] Hash, byte[] Salt) DummyCredential =
         PasswordHasher.Hash("dummy-unused-reference-password");
 
     public async ValueTask<LoginResult> LoginAsync(long sessionId, IPEndPoint? remoteEndPoint, LoginRequest packet,
@@ -211,7 +211,7 @@ public sealed class LoginService(
             rosterEntries, newToken, account.AccountGrade);
     }
 
-        private async ValueTask<ImmutableArray<AvatarRosterEntry>> ResolveRosterEntriesAsync(
+    private async ValueTask<ImmutableArray<AvatarRosterEntry>> ResolveRosterEntriesAsync(
         CharacterAccountRosterBundle roster, CancellationToken ct)
     {
         if (roster.Characters.Count == 0)
@@ -248,7 +248,7 @@ public sealed class LoginService(
         return entries.ToImmutable();
     }
 
-        private async ValueTask<int> AuthenticateConstantTimeAsync(AuthenticateAccountDto? account, string password,
+    private async ValueTask<int> AuthenticateConstantTimeAsync(AuthenticateAccountDto? account, string password,
         CancellationToken ct)
     {
         if (account is null)

@@ -2,6 +2,5 @@ namespace Fenrir.Application.Game.Domain.World;
 
 public partial class PlayerRuntimeState
 {
-
-        public PartyBuffAction PartyBuffAct { get; set; } = PartyBuffAction.None;
+    public PartyBuffAction PartyBuffAct { get; set; } = PartyBuffAction.None;
 }

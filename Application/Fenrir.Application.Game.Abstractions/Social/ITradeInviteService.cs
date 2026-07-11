@@ -10,7 +10,7 @@ public enum TradeInviteResultKind
     TargetBusy,
     Sent,
 
-        SentCrossShard
+    SentCrossShard
 }
 
 public readonly record struct TradeInviteResult(
@@ -22,7 +22,6 @@ public readonly record struct TradeInviteResult(
 
 public interface ITradeInviteService
 {
-
-        public ValueTask<TradeInviteResult> InviteAsync(Zone zone, PlayerRuntimeState asker, string targetAvatarName,
+    public ValueTask<TradeInviteResult> InviteAsync(Zone zone, PlayerRuntimeState asker, string targetAvatarName,
         CancellationToken cancellationToken);
 }

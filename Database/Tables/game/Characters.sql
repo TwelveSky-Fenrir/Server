@@ -14,7 +14,7 @@ CREATE TABLE game.Characters
     CharacterId              INT IDENTITY (1,1) NOT NULL,
     AccountId                INT                NOT NULL,
     Slot                     TINYINT            NOT NULL,
-    Name                     NVARCHAR(13)       NOT NULL,                                        -- MAX_AVATAR_NAME_LENGTH=13, a real wire truncation limit
+    Name                     NVARCHAR(13)       NOT NULL,                                         -- MAX_AVATAR_NAME_LENGTH=13, a real wire truncation limit
     Tribe                    TINYINT            NOT NULL,
     Gender                   TINYINT            NOT NULL,
     HeadType                 TINYINT            NOT NULL,
@@ -22,23 +22,23 @@ CREATE TABLE game.Characters
     Level                    SMALLINT           NOT NULL
         CONSTRAINT DF_Characters_Level DEFAULT 1,
     Level2                   SMALLINT           NOT NULL
-        CONSTRAINT DF_Characters_Level2 DEFAULT 1,                                               -- aLevel2, the post-Level-145 "high level" rebirth ladder (1-12, MAX_LIMIT_HIGH_LEVEL_NUM)
+        CONSTRAINT DF_Characters_Level2 DEFAULT 1,                                                -- aLevel2, the post-Level-145 "high level" rebirth ladder (1-12, MAX_LIMIT_HIGH_LEVEL_NUM)
     Exp2                     INT                NOT NULL
         CONSTRAINT DF_Characters_Exp2 DEFAULT 0
-        CONSTRAINT CK_Characters_Exp2 CHECK (Exp2 >= 0),                                         -- aExp2, Level2's own XP counter; reset to 0 on every successful Max Rebirth
+        CONSTRAINT CK_Characters_Exp2 CHECK (Exp2 >= 0),                                          -- aExp2, Level2's own XP counter; reset to 0 on every successful Max Rebirth
     MapId                    SMALLINT           NOT NULL,
     PosX                     REAL               NOT NULL,
     PosY                     REAL               NOT NULL,
     PosZ                     REAL               NOT NULL,
     Heading                  REAL               NOT NULL
-        CONSTRAINT DF_Characters_Heading DEFAULT 0,                                              -- ACTION_INFO.aFront
+        CONSTRAINT DF_Characters_Heading DEFAULT 0,                                               -- ACTION_INFO.aFront
     Life                     INT                NOT NULL,
     MaxLife                  INT                NOT NULL,
     Mana                     INT                NOT NULL,
     MaxMana                  INT                NOT NULL,
     Experience               BIGINT             NOT NULL
         CONSTRAINT DF_Characters_Experience DEFAULT 0
-        CONSTRAINT CK_Characters_Experience CHECK (Experience >= 0),                             -- aExp1 (NOT "aExp1+aExp2 combined" -- Server/BuildEU33/DB/nxtserver.sql:41-43 and Server/ts25zone/UpperCom/S06_MyUpperCom05.cpp:229-240 both persist aExp1/aExp2 as two fully independent values, never summed; see Exp2 below)
+        CONSTRAINT CK_Characters_Experience CHECK (Experience >= 0),                              -- aExp1 (NOT "aExp1+aExp2 combined" -- Server/BuildEU33/DB/nxtserver.sql:41-43 and Server/ts25zone/UpperCom/S06_MyUpperCom05.cpp:229-240 both persist aExp1/aExp2 as two fully independent values, never summed; see Exp2 below)
     StatVit                  INT                NOT NULL
         CONSTRAINT DF_Characters_StatVit DEFAULT 0,
     StatStr                  INT                NOT NULL
@@ -65,16 +65,16 @@ CREATE TABLE game.Characters
         CONSTRAINT CK_Characters_BigStoreMoney CHECK (BigStoreMoney >= 0),
     RebirthCount             INT                NOT NULL
         CONSTRAINT DF_Characters_RebirthCount DEFAULT 0
-        CONSTRAINT CK_Characters_RebirthCount CHECK (RebirthCount BETWEEN 0 AND 12),             -- aRebirthNum; MAX_REBIRTH_LIMIT=12 (G1-G12) IS live in ReleaseEU33 via the Rebirth-Pill item path (WUSE_ITEM_632 unconditionally #define'd) -- see Application/Fenrir.Application.Game.Domain/Progression/RebirthProgression.cs. Path B (TribeActionService.RebirthAsync, CZ_TRIBE_WORK_SEND tSort 11) is separately app-capped at generation 6; only Path A (UseInventoryItemService's Rebirth-Pill branch) reaches 7-12. CHECK bound is defense-in-depth: both trigger paths already app-cap before writing (RebirthProgression.MaxRebirthGeneration), but this closes the gap for a future writer that doesn't re-validate.
+        CONSTRAINT CK_Characters_RebirthCount CHECK (RebirthCount BETWEEN 0 AND 12),              -- aRebirthNum; MAX_REBIRTH_LIMIT=12 (G1-G12) IS live in ReleaseEU33 via the Rebirth-Pill item path (WUSE_ITEM_632 unconditionally #define'd) -- see Application/Fenrir.Application.Game.Domain/Progression/RebirthProgression.cs. Path B (TribeActionService.RebirthAsync, CZ_TRIBE_WORK_SEND tSort 11) is separately app-capped at generation 6; only Path A (UseInventoryItemService's Rebirth-Pill branch) reaches 7-12. CHECK bound is defense-in-depth: both trigger paths already app-cap before writing (RebirthProgression.MaxRebirthGeneration), but this closes the gap for a future writer that doesn't re-validate.
     Title                    INT                NOT NULL
         CONSTRAINT DF_Characters_Title DEFAULT 0,
     Halo                     INT                NOT NULL
         CONSTRAINT DF_Characters_Halo DEFAULT 0,
     ContributionPoints       INT                NOT NULL
-        CONSTRAINT DF_Characters_ContributionPoints DEFAULT 0,                                   -- aKillOtherTribe (CP)
+        CONSTRAINT DF_Characters_ContributionPoints DEFAULT 0,                                    -- aKillOtherTribe (CP)
     TeacherPoint             INT                NOT NULL
         CONSTRAINT DF_Characters_TeacherPoint DEFAULT 0
-        CONSTRAINT CK_Characters_TeacherPoint CHECK (TeacherPoint >= 0),                         -- quest reward type 5
+        CONSTRAINT CK_Characters_TeacherPoint CHECK (TeacherPoint >= 0),                          -- quest reward type 5
     EatLifePotion            INT                NOT NULL
         CONSTRAINT DF_Characters_EatLifePotion DEFAULT 0
         CONSTRAINT CK_Characters_EatLifePotion CHECK (EatLifePotion BETWEEN 0 AND 400),
@@ -97,15 +97,15 @@ CREATE TABLE game.Characters
         CONSTRAINT DF_Characters_ProtectForDestroy DEFAULT 0
         CONSTRAINT CK_Characters_ProtectForDestroy CHECK (ProtectForDestroy >= 0),
     DoubleExpTime1           INT                NOT NULL
-        CONSTRAINT DF_Characters_DoubleExpTime1 DEFAULT 0,                                       -- aDoubleExpTime1: raw per-tick decrementing counter (NOT a YYYYMMDD date), 0 = no boost; welcome grant is the bare literal 300 (Server/ts25login/S04_MyWork02.cpp:886-887), decremented once per firing (Server/ts25zone/S07_MyGame04.cpp:955-969)
+        CONSTRAINT DF_Characters_DoubleExpTime1 DEFAULT 0,                                        -- aDoubleExpTime1: raw per-tick decrementing counter (NOT a YYYYMMDD date), 0 = no boost; welcome grant is the bare literal 300 (Server/ts25login/S04_MyWork02.cpp:886-887), decremented once per firing (Server/ts25zone/S07_MyGame04.cpp:955-969)
     DoubleExpTime2           INT                NOT NULL
-        CONSTRAINT DF_Characters_DoubleExpTime2 DEFAULT 0,                                       -- aDoubleExpTime2, same decrementing-counter shape as DoubleExpTime1
+        CONSTRAINT DF_Characters_DoubleExpTime2 DEFAULT 0,                                        -- aDoubleExpTime2, same decrementing-counter shape as DoubleExpTime1
     AutoBuffTime             INT                NOT NULL
-        CONSTRAINT DF_Characters_AutoBuffTime DEFAULT 0,                                         -- aAutoBuffTime/aContinueSkillDay, YYYYMMDD (PlayerRuntimeState.AutoBuffTime encoding), 0 = no boost
+        CONSTRAINT DF_Characters_AutoBuffTime DEFAULT 0,                                          -- aAutoBuffTime/aContinueSkillDay, YYYYMMDD (PlayerRuntimeState.AutoBuffTime encoding), 0 = no boost
     DropItemTime             INT                NOT NULL
         CONSTRAINT DF_Characters_DropItemTime DEFAULT 0,
     InventoryDate            INT                NOT NULL
-        CONSTRAINT DF_Characters_InventoryDate DEFAULT 0,                                        -- bonus inventory page rental
+        CONSTRAINT DF_Characters_InventoryDate DEFAULT 0,                                         -- bonus inventory page rental
     StoreDate                INT                NOT NULL
         CONSTRAINT DF_Characters_StoreDate DEFAULT 0,
     BloodCoin                INT                NOT NULL
@@ -123,7 +123,7 @@ CREATE TABLE game.Characters
         CONSTRAINT CK_Characters_JoinWar CHECK (JoinWar >= 0),
     MissionKillOtherTribe    INT                NOT NULL
         CONSTRAINT DF_Characters_MissionKillOtherTribe DEFAULT 0
-        CONSTRAINT CK_Characters_MissionKillOtherTribe CHECK (MissionKillOtherTribe >= 0),       -- aMissionDate.aKillOtherTribe, distinct from ContributionPoints
+        CONSTRAINT CK_Characters_MissionKillOtherTribe CHECK (MissionKillOtherTribe >= 0),        -- aMissionDate.aKillOtherTribe, distinct from ContributionPoints
     MissionKillMonster       INT                NOT NULL
         CONSTRAINT DF_Characters_MissionKillMonster DEFAULT 0
         CONSTRAINT CK_Characters_MissionKillMonster CHECK (MissionKillMonster >= 0),
@@ -148,38 +148,38 @@ CREATE TABLE game.Characters
         CONSTRAINT CK_Characters_PetActivity CHECK (PetActivity BETWEEN 0 AND 100),
     TribeTransferPermitCount INT                NOT NULL
         CONSTRAINT DF_Characters_TribeTransferPermitCount DEFAULT 0
-        CONSTRAINT CK_Characters_TribeTransferPermitCount CHECK (TribeTransferPermitCount >= 0), -- banked Faction Transfer Scroll (world.Items 8153/8154) uses; no spend path exists yet, same posture as BloodCoin's absent grant path
+        CONSTRAINT CK_Characters_TribeTransferPermitCount CHECK (TribeTransferPermitCount >= 0),  -- banked Faction Transfer Scroll (world.Items 8153/8154) uses; no spend path exists yet, same posture as BloodCoin's absent grant path
     PremiumExpireUtc         BIGINT             NOT NULL
-        CONSTRAINT DF_Characters_PremiumExpireUtc DEFAULT 0,                                     -- aPremium, Unix epoch seconds (0 = none); distinct scale from the YYYYMMDD ints above
+        CONSTRAINT DF_Characters_PremiumExpireUtc DEFAULT 0,                                      -- aPremium, Unix epoch seconds (0 = none); distinct scale from the YYYYMMDD ints above
     PreviousTribe            TINYINT            NOT NULL
         CONSTRAINT DF_Characters_PreviousTribe DEFAULT 0
-        CONSTRAINT CK_Characters_PreviousTribe CHECK (PreviousTribe BETWEEN 0 AND 2),            -- the Noble Dragon/Royal Serpent/Grand Tiger starter-kit template (0-2, never 3) that selected this character's equipment/skills/hotkeys -- genuinely independent from Tribe (0-3), checked for self-consistency at every zone entry (Server/ts25zone/S04_MyWork02.cpp:880-901)
+        CONSTRAINT CK_Characters_PreviousTribe CHECK (PreviousTribe BETWEEN 0 AND 2),             -- the Noble Dragon/Royal Serpent/Grand Tiger starter-kit template (0-2, never 3) that selected this character's equipment/skills/hotkeys -- genuinely independent from Tribe (0-3), checked for self-consistency at every zone entry (Server/ts25zone/S04_MyWork02.cpp:880-901)
     MountItemId              INT                NOT NULL
-        CONSTRAINT DF_Characters_MountItemId DEFAULT 0,                                          -- 0 = no mount; ANIMAL_NUM_TIGER1 (1301) granted at creation
+        CONSTRAINT DF_Characters_MountItemId DEFAULT 0,                                           -- 0 = no mount; ANIMAL_NUM_TIGER1 (1301) granted at creation
     MountExpActivity         INT                NOT NULL
-        CONSTRAINT DF_Characters_MountExpActivity DEFAULT 0,                                     -- aAnimalExpActivity[0]
+        CONSTRAINT DF_Characters_MountExpActivity DEFAULT 0,                                      -- aAnimalExpActivity[0]
     MountPower               INT                NOT NULL
-        CONSTRAINT DF_Characters_MountPower DEFAULT 0,                                           -- aAnimalPower[0]
+        CONSTRAINT DF_Characters_MountPower DEFAULT 0,                                            -- aAnimalPower[0]
     MountSlotIndex           INT                NOT NULL
-        CONSTRAINT DF_Characters_MountSlotIndex DEFAULT -1,                                      -- aAnimalIndex; -1 = none active
+        CONSTRAINT DF_Characters_MountSlotIndex DEFAULT -1,                                       -- aAnimalIndex; -1 = none active
     MountTime                INT                NOT NULL
-        CONSTRAINT DF_Characters_MountTime DEFAULT 0,                                            -- aAnimalTime
+        CONSTRAINT DF_Characters_MountTime DEFAULT 0,                                             -- aAnimalTime
     AutoTime2                INT                NOT NULL
         CONSTRAINT DF_Characters_AutoTime2 DEFAULT 0
-        CONSTRAINT CK_Characters_AutoTime2 CHECK (AutoTime2 >= 0),                               -- aAutoTime2: per-real-minute-decrementing free auto-hunt allowance (Server/ts25zone/S07_MyGame04.cpp:787-823); 1440 (24h) granted at creation (Server/ts25login/S04_MyWork02.cpp:888)
+        CONSTRAINT CK_Characters_AutoTime2 CHECK (AutoTime2 >= 0),                                -- aAutoTime2: per-real-minute-decrementing free auto-hunt allowance (Server/ts25zone/S07_MyGame04.cpp:787-823); 1440 (24h) granted at creation (Server/ts25login/S04_MyWork02.cpp:888)
     Zone241Time              INT                NOT NULL
         CONSTRAINT DF_Characters_Zone241Time DEFAULT 0
-        CONSTRAINT CK_Characters_Zone241Time CHECK (Zone241Time >= 0),                           -- aZone241Time (Server/Header/Protocol/STRUCT.h:751-757's persisted avatar snapshot field, always wired as literal 0 today). First durable consumer: Rebirth-advancement Path B ("Max Rebirth", CZ_TRIBE_WORK_SEND tSort 11) unconditionally += 10 on precondition pass (Server/ts25zone/S04_MyWork02.cpp:11342-11390); see usp_Character_AdjustZone241Time for the write-path primitive.
+        CONSTRAINT CK_Characters_Zone241Time CHECK (Zone241Time >= 0),                            -- aZone241Time (Server/Header/Protocol/STRUCT.h:751-757's persisted avatar snapshot field, always wired as literal 0 today). First durable consumer: Rebirth-advancement Path B ("Max Rebirth", CZ_TRIBE_WORK_SEND tSort 11) unconditionally += 10 on precondition pass (Server/ts25zone/S04_MyWork02.cpp:11342-11390); see usp_Character_AdjustZone241Time for the write-path primitive.
     WarPoint                 INT                NOT NULL
         CONSTRAINT DF_Characters_WarPoint DEFAULT 0
-        CONSTRAINT CK_Characters_WarPoint CHECK (WarPoint >= 0),                                 -- aWarPoint (USE_WAR_POINT_SYSTEM, Server/Header/Protocol/STRUCT.h:554): spendable War-Point balance, deliberately kept OUT of usp_Character_PersistProgressBatch (same posture as Money/BloodCoin) -- it only moves through the dedicated atomic usp_Character_BuyWarPointItem so a last-write-wins flush can never clobber it.
+        CONSTRAINT CK_Characters_WarPoint CHECK (WarPoint >= 0),                                  -- aWarPoint (USE_WAR_POINT_SYSTEM, Server/Header/Protocol/STRUCT.h:554): spendable War-Point balance, deliberately kept OUT of usp_Character_PersistProgressBatch (same posture as Money/BloodCoin) -- it only moves through the dedicated atomic usp_Character_BuyWarPointItem so a last-write-wins flush can never clobber it.
     PetBagDate               INT                NOT NULL
-        CONSTRAINT DF_Characters_PetBagDate DEFAULT 0,                                           -- aPetBagDate (Server/Header/Protocol/STRUCT.h:520-521): pet-bag upper-half (slots 10-19) rental-entitlement expiry date, same shape as InventoryDate/StoreDate above. DEFAULT 0 matches legacy's own confirmed baseline (ServerDocs/11_ts25login/01_Flux_Authentification_Redirection.md:381-383: creation never sets aPetBagDate) -- unlike InventoryDate/StoreDate, usp_Character_CreateWithStarterKit does NOT grant this at creation; no citation establishes what, if anything, ever grants it a non-zero value.
+        CONSTRAINT DF_Characters_PetBagDate DEFAULT 0,                                            -- aPetBagDate (Server/Header/Protocol/STRUCT.h:520-521): pet-bag upper-half (slots 10-19) rental-entitlement expiry date, same shape as InventoryDate/StoreDate above. DEFAULT 0 matches legacy's own confirmed baseline (ServerDocs/11_ts25login/01_Flux_Authentification_Redirection.md:381-383: creation never sets aPetBagDate) -- unlike InventoryDate/StoreDate, usp_Character_CreateWithStarterKit does NOT grant this at creation; no citation establishes what, if anything, ever grants it a non-zero value.
     M15PetLuckyBoxPity       INT                NOT NULL
         CONSTRAINT DF_Characters_M15PetLuckyBoxPity DEFAULT 0
         CONSTRAINT CK_Characters_M15PetLuckyBoxPity CHECK (M15PetLuckyBoxPity BETWEEN 0 AND 200), -- M15 Pet Lucky Box (world.Items 8111) pity counter (legacy gBox8111, Server/Header/Protocol/STRUCT.h:568-571); ceiling 200 matches M15PetLuckyBox8111RewardTable.PityCeiling (Server/ts25zone/S04_MyWork03.cpp:1615-1621,7729-7735).
     FlushSequence            BIGINT             NOT NULL
-        CONSTRAINT DF_Characters_FlushSequence DEFAULT 0,                                        -- idempotent write-behind
+        CONSTRAINT DF_Characters_FlushSequence DEFAULT 0,                                         -- idempotent write-behind
     CreatedAtUtc             DATETIME2(3)       NOT NULL
         CONSTRAINT DF_Characters_CreatedAtUtc DEFAULT SYSUTCDATETIME(),
     UpdatedAtUtc             DATETIME2(3)       NOT NULL

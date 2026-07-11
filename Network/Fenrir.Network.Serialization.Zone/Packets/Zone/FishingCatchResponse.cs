@@ -7,13 +7,12 @@ namespace Fenrir.Network.Serialization.Zone.Packets.Zone;
     ExpectedSize = 21)]
 public readonly partial record struct FishingCatchResponse : IOutgoingPacket
 {
+    public required int Result { get; init; }
 
-        public required int Result { get; init; }
-
-        public required int ItemIndex { get; init; }
+    public required int ItemIndex { get; init; }
 
     public required int Page { get; init; }
     public required int Index { get; init; }
 
-        public required int XY { get; init; }
+    public required int XY { get; init; }
 }

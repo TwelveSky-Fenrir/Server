@@ -6,12 +6,11 @@ namespace Fenrir.Application.Game.Domain.Pets;
 
 public static class PetSlotAmuletBonusTable
 {
+    public const byte RequiredSortCode = 28;
 
-        public const byte RequiredSortCode = 28;
+    public static readonly ImmutableHashSet<int> QualifyingItemIds = BuildQualifyingIds();
 
-        public static readonly ImmutableHashSet<int> QualifyingItemIds = BuildQualifyingIds();
-
-        private static readonly FrozenDictionary<int, (float Life, float Mana)> ConfirmedBonuses =
+    private static readonly FrozenDictionary<int, (float Life, float Mana)> ConfirmedBonuses =
         new Dictionary<int, (float Life, float Mana)>
         {
             [76000] = (3000f, 3000f),
@@ -25,7 +24,7 @@ public static class PetSlotAmuletBonusTable
             [8290] = (550f, 500f)
         }.ToFrozenDictionary();
 
-        public static (float Life, float Mana) GetBaseBonus(int itemId, FrozenDictionary<int, ItemDefinition> itemsById)
+    public static (float Life, float Mana) GetBaseBonus(int itemId, FrozenDictionary<int, ItemDefinition> itemsById)
     {
         if (!itemsById.TryGetValue(itemId, out var definition) || definition.Item.Sort != RequiredSortCode)
             return (0f, 0f);

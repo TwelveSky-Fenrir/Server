@@ -69,7 +69,7 @@ public class ZonePvpKillPopupEventWiringTests
         return (zone, popupSystem);
     }
 
-        private static void KillDefender(Zone zone)
+    private static void KillDefender(Zone zone)
     {
         Assert.True(zone.TryGetPlayer(2, out var defender));
         defender!.IsDead = false;

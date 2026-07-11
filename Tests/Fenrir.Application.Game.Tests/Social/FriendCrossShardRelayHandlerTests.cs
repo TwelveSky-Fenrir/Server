@@ -34,7 +34,7 @@ public class FriendCrossShardRelayHandlerTests
         return (handler, zones, friends, relay);
     }
 
-        private static (PlayerRuntimeState State, FakeDuplexPipe Pipe) Enter(ZoneRegistry zones, short mapId,
+    private static (PlayerRuntimeState State, FakeDuplexPipe Pipe) Enter(ZoneRegistry zones, short mapId,
         int characterId, string name)
     {
         zones.TryGet(mapId, out var zone);
@@ -86,7 +86,7 @@ public class FriendCrossShardRelayHandlerTests
         var (handler, zones, friends, relay) = CreateHandler();
         var (target, pipe) = Enter(zones, 1, 100, "Target");
 
-        await handler.HandleAskAsync(MakeAsk(42, 100), CancellationToken.None);
+        await handler.HandleAskAsync(MakeAsk(42), CancellationToken.None);
 
         Assert.Empty(relay.Enqueued);
         Assert.True(friends.IsNegotiating(target.CharacterId));

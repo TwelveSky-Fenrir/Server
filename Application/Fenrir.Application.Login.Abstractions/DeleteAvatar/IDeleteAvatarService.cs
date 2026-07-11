@@ -4,20 +4,19 @@ public enum DeleteAvatarOutcome
 {
     Success,
 
-        TribeRoleRefusal,
+    TribeRoleRefusal,
 
-        GuildMembershipRefusal,
+    GuildMembershipRefusal,
 
-        ProxyShopRefusal,
+    ProxyShopRefusal,
 
-        SqlError
+    SqlError
 }
 
 public readonly record struct DeleteAvatarResult(DeleteAvatarOutcome Outcome);
 
 public interface IDeleteAvatarService
 {
-
-        public ValueTask<DeleteAvatarResult> DeleteAvatarAsync(int accountId, byte avatarPost,
+    public ValueTask<DeleteAvatarResult> DeleteAvatarAsync(int accountId, byte avatarPost,
         CancellationToken cancellationToken);
 }

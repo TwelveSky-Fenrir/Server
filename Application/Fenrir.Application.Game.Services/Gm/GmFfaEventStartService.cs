@@ -19,7 +19,7 @@ public sealed class GmFfaEventStartService(
     private const int AcceptedResult = 0;
     private const int RejectedResult = 1;
 
-        private const int IdlePhase = 0;
+    private const int IdlePhase = 0;
 
     private static readonly TimeSpan DefaultCountdown = TimeSpan.FromMinutes(10);
 

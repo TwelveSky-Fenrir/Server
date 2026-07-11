@@ -118,7 +118,7 @@ public class TribeRoleContributionTests
     {
         var loaded = new ZoneContext(
             NeutralZone,
-            OrnamentInUse: true,
+            true,
             RankBuffType: 7,
             TribeRole: RoleMaster,
             GuildBuffActive: true,

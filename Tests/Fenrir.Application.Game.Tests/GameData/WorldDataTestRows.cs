@@ -47,7 +47,7 @@ internal static class WorldDataTestRows
             0, 0, 0, 0);
     }
 
-        internal static SkillRowDto ValidSkill(int skillId)
+    internal static SkillRowDto ValidSkill(int skillId)
     {
         return new SkillRowDto(
             skillId, $"Skill{skillId}",
@@ -72,7 +72,7 @@ internal static class WorldDataTestRows
             0, 0, 0, 0, 0);
     }
 
-        internal static NpcRowDto ValidNpc(int npcId)
+    internal static NpcRowDto ValidNpc(int npcId)
     {
         return new NpcRowDto(npcId, $"Npc{npcId}", 1, 1,
             1, 1, 1, 1, 1);
@@ -122,7 +122,7 @@ internal static class WorldDataTestRows
             0, monsterId, 0, 1, 0, 0, 0, 10);
     }
 
-        internal static WorldDataRows MinimalRows()
+    internal static WorldDataRows MinimalRows()
     {
         return new WorldDataRows
         {

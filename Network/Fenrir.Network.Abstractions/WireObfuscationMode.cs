@@ -2,10 +2,9 @@ namespace Fenrir.Network.Abstractions;
 
 public enum WireObfuscationMode : byte
 {
+    None,
 
-        None,
+    XorPacketGlobal,
 
-        XorPacketGlobal,
-
-        XorFieldAvatar
+    XorFieldAvatar
 }

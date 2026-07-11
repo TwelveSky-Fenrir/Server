@@ -10,8 +10,7 @@ namespace Fenrir.Application.Game.Tests.World;
 
 public class ZonePvpTowerCpBonusTests
 {
-
-        private static readonly int BaseKillCp = PvpKillContributionPointCalculator.ComputeBaseAmount(false, false,
+    private static readonly int BaseKillCp = PvpKillContributionPointCalculator.ComputeBaseAmount(false, false,
         basePerKillAmount: PvpKillContributionPointBonuses.ComputeGameWideAddValue(3));
 
     private static readonly EffectiveStats StrongAttacker =
@@ -42,7 +41,7 @@ public class ZonePvpTowerCpBonusTests
         };
     }
 
-        private static (Zone Zone, TowerWarState TowerWar) SetUpZone(int attackerId, params int[] defenderIds)
+    private static (Zone Zone, TowerWarState TowerWar) SetUpZone(int attackerId, params int[] defenderIds)
     {
         var towerWar = new TowerWarState();
         var worldState = ZoneTestKit.CreateWorldState();

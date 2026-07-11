@@ -56,7 +56,7 @@ public static class PetCraftResolver
         return Success(resultItemId, 0, 0);
     }
 
-        public static Result ResolveRecipe3(ItemStack material1, ItemStack material2, ItemStack material3,
+    public static Result ResolveRecipe3(ItemStack material1, ItemStack material2, ItemStack material3,
         ItemStack catalyst)
     {
         if (material1.ItemId != PetCraftRecipeCatalog.Recipe3Material1ItemId ||

@@ -1,5 +1,4 @@
 using Fenrir.Application.Game.Abstractions.FishingConsumables;
-using Fenrir.Application.Game.Domain.Consumables;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Zone.Sessions;

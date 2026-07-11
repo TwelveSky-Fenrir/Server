@@ -239,7 +239,7 @@ public sealed class ZoneMoveService(
         return ValueTask.CompletedTask;
     }
 
-        private async ValueTask HandleCrossShardAsync(short targetZoneNumber, int characterId, byte requesterTribe,
+    private async ValueTask HandleCrossShardAsync(short targetZoneNumber, int characterId, byte requesterTribe,
         short originZoneId, int requesterRebirthCount, ZoneClientSession zoneSession,
         CancellationToken cancellationToken)
     {

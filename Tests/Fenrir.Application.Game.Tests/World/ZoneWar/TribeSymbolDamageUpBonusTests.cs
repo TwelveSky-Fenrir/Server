@@ -100,7 +100,7 @@ public class TribeSymbolDamageUpBonusTests
     public void AllySlotControlCountsTowardTheOwnersBonus_ButNotTheAllysOwnUnrelatedGate()
     {
         var (worldState, modifiers, system) = SetUp();
-        worldState.SetAllianceOffer(0, 1, isAccepted: true);
+        worldState.SetAllianceOffer(0, 1, true);
         worldState.ResolveTribeSymbol(2, 1);
         var zone = ZoneTestKit.CreateZone(MapId);
 
@@ -162,7 +162,7 @@ public class TribeSymbolDamageUpBonusTests
     public void SmallTribeFallback_AllyPointsCombineForBothEligibilityAndComparison()
     {
         var (worldState, modifiers, system) = SetUp();
-        worldState.SetAllianceOffer(0, 1, isAccepted: true);
+        worldState.SetAllianceOffer(0, 1, true);
         worldState.AddTribePoints(0, 10);
         worldState.AddTribePoints(2, 50);
         worldState.AddTribePoints(3, 50);

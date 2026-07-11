@@ -11,7 +11,7 @@ public static partial class StatCalculator
     private static readonly int[] TitleTableE = [3, 8, 15, 25, 37, 52, 70, 90, 112, 137, 167, 205, 243, 281];
 
 
-        private static readonly HashSet<int> CustomDecoStatItemExplicitIds =
+    private static readonly HashSet<int> CustomDecoStatItemExplicitIds =
     [
         594, 595, 596,
         1385, 1389, 1393,
@@ -170,7 +170,7 @@ public static partial class StatCalculator
         return itemId is >= 101 and <= 151 || CustomDecoStatItemExplicitIds.Contains(itemId);
     }
 
-        private static int CustomDecoVitBonus(EquippedItemSlot?[] bySlot)
+    private static int CustomDecoVitBonus(EquippedItemSlot?[] bySlot)
     {
         var bonus = 0;
         for (var slotIndex = 9; slotIndex <= 12; slotIndex++)

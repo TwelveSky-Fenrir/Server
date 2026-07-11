@@ -20,7 +20,7 @@ public class AutoHuntToggleServiceValidationTests
         };
     }
 
-        private static AutoHunt ValidBlobWithAttackSkill()
+    private static AutoHunt ValidBlobWithAttackSkill()
     {
         return ValidBlob() with { AttackType = [15, 6, 0, 0] };
     }
@@ -80,7 +80,7 @@ public class AutoHuntToggleServiceValidationTests
     [Fact]
     public async Task ValidBlobEnableOnBlockedZone_IsRejectedByTheEnableGate()
     {
-        var (service, zone, state) = SetUp(38, equipWeapon: true);
+        var (service, zone, state) = SetUp(38, true);
         var request = new AutoHuntToggleRequest { Sort = 1, AutoHunt = ValidBlobWithAttackSkill() };
 
         var result = await service.ToggleAsync(10, zone, state, request, CancellationToken.None);

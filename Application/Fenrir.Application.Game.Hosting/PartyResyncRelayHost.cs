@@ -27,7 +27,7 @@ public sealed class PartyResyncRelayHost(
                 FullMode = BoundedChannelFullMode.Wait
             });
 
-        public bool Enqueue(PartyResyncRelayEntry entry)
+    public bool Enqueue(PartyResyncRelayEntry entry)
     {
         if (_outbox.Writer.TryWrite(entry))
             return true;
@@ -58,7 +58,7 @@ public sealed class PartyResyncRelayHost(
         } while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false));
     }
 
-        public async ValueTask PollOnceAsync(CancellationToken ct)
+    public async ValueTask PollOnceAsync(CancellationToken ct)
     {
         await FlushOutboundAsync(ct).ConfigureAwait(false);
         await DeliverInboundAsync(ct).ConfigureAwait(false);

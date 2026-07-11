@@ -99,7 +99,7 @@ public class CostumeStellarCoreUseItemHandlerTests
     public async Task CostumeGrant_FirstFreeSlot_GrantsItem_CopiesDateAndExpireDate_ConsumesSourceItem()
     {
         var (session, zone, state, characters, eventLog, handler) = SetUp();
-        var item = Item(ValidCostumeItemId, enchant: 5, combine: 1, refine: 2, socket: 0, expireDate: 12345);
+        var item = Item(ValidCostumeItemId, 5, 1, 2, 0, 12345);
 
         var response =
             await RunToCompletionAsync(handler.HandleAsync(Context(zone, state, item), CancellationToken.None), zone);

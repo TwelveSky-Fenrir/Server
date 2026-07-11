@@ -13,12 +13,11 @@ namespace Fenrir.Application.Game.Domain.World;
 
 public sealed partial class Zone
 {
+    private readonly ConcurrentQueue<GroundItemEntity> _claimedGroundItemDespawns = new();
 
-        private readonly ConcurrentQueue<GroundItemEntity> _claimedGroundItemDespawns = new();
+    private readonly List<int> _groundItemBroadcastNeighborScratch = [];
 
-        private readonly List<int> _groundItemBroadcastNeighborScratch = [];
-
-        private readonly Dictionary<int, TimeSpan> _groundItemLastRebroadcast = new();
+    private readonly Dictionary<int, TimeSpan> _groundItemLastRebroadcast = new();
 
     private readonly ConcurrentDictionary<int, GroundItemEntity> _groundItems = new();
 
@@ -28,7 +27,7 @@ public sealed partial class Zone
 
     public int GroundItemCount => _groundItems.Count;
 
-        public void SpawnGroundItem(int itemId, int quantity, float posX, float posY, float posZ, string master,
+    public void SpawnGroundItem(int itemId, int quantity, float posX, float posY, float posZ, string master,
         string partyName, int dropSort, int? instanceId = null)
     {
         var index = Interlocked.Increment(ref _groundItemServerIndexSeed);
@@ -50,7 +49,7 @@ public sealed partial class Zone
         return name.Length <= 13 ? name : name[..13];
     }
 
-        public GroundItemClaimOutcome TryClaimGroundItem(int serverIndex, uint expectedUniqueNumber, string claimantName,
+    public GroundItemClaimOutcome TryClaimGroundItem(int serverIndex, uint expectedUniqueNumber, string claimantName,
         string? claimantPartyName, float claimantX, float claimantY, float claimantZ, out GroundItemEntity? item,
         int? claimantInstanceId = null)
     {
@@ -95,7 +94,7 @@ public sealed partial class Zone
         return GroundItemClaimOutcome.Success;
     }
 
-        private void RebroadcastGroundItems()
+    private void RebroadcastGroundItems()
     {
         foreach (var (index, item) in _groundItems)
         {
@@ -108,7 +107,7 @@ public sealed partial class Zone
         }
     }
 
-        private void ExpireGroundItems()
+    private void ExpireGroundItems()
     {
         List<(int Index, GroundItemEntity Item)>? expired = null;
         foreach (var (index, item) in _groundItems)
@@ -135,7 +134,7 @@ public sealed partial class Zone
         }
     }
 
-        private void BroadcastGroundItemAction(GroundItemEntity item, int checkChangeActionState)
+    private void BroadcastGroundItemAction(GroundItemEntity item, int checkChangeActionState)
     {
         var cell = _grid.CellOf(item.PosX, item.PosZ);
         if (!_grid.HasAnyNeighbor(cell))

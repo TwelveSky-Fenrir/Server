@@ -254,7 +254,7 @@ public static class ServicesServiceCollectionExtensions
         services.AddSingleton<IGmClearInventoryService, GmClearInventoryService>();
     }
 
-        private static void AddInventoryServices(IServiceCollection services)
+    private static void AddInventoryServices(IServiceCollection services)
     {
         services.AddSingleton<IInventoryToWorldDropService, InventoryToWorldDropService>();
 

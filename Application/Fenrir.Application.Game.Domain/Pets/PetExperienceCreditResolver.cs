@@ -5,10 +5,9 @@ namespace Fenrir.Application.Game.Domain.Pets;
 
 public static class PetExperienceCreditResolver
 {
+    private const byte PetItemCategory = 22;
 
-        private const byte PetItemCategory = 22;
-
-        public static PetExperienceCreditResult Resolve(
+    public static PetExperienceCreditResult Resolve(
         int petItemId,
         int currentGrowth,
         int currentActivity,

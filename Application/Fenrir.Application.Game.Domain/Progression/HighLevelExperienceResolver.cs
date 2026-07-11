@@ -4,14 +4,13 @@ namespace Fenrir.Application.Game.Domain.Progression;
 
 public enum HighLevelExperienceOutcomeKind : byte
 {
+    None = 0,
 
-        None = 0,
+    MainPoolFill = 1,
 
-        MainPoolFill = 1,
+    RebirthTierLevelUp = 2,
 
-        RebirthTierLevelUp = 2,
-
-        RebirthTierAccrual = 3
+    RebirthTierAccrual = 3
 }
 
 public readonly record struct HighLevelExperienceInput(
@@ -25,20 +24,19 @@ public readonly record struct HighLevelExperienceInput(
 
 public readonly record struct HighLevelExperienceOutcome
 {
+    public required HighLevelExperienceOutcomeKind Kind { get; init; }
 
-        public required HighLevelExperienceOutcomeKind Kind { get; init; }
+    public long NewMainExperience { get; init; }
 
-        public long NewMainExperience { get; init; }
+    public short NewLevel2 { get; init; }
 
-        public short NewLevel2 { get; init; }
+    public int NewExp2 { get; init; }
 
-        public int NewExp2 { get; init; }
+    public int SkillPointsGranted { get; init; }
 
-        public int SkillPointsGranted { get; init; }
+    public int StatPointsGranted { get; init; }
 
-        public int StatPointsGranted { get; init; }
-
-        public int Zone101TimeBonus { get; init; }
+    public int Zone101TimeBonus { get; init; }
 
     public static HighLevelExperienceOutcome None => new() { Kind = HighLevelExperienceOutcomeKind.None };
 
@@ -77,21 +75,20 @@ public readonly record struct HighLevelExperienceOutcome
 
 public static class HighLevelExperienceResolver
 {
+    public const long MaxMainExperience = 2_000_000_000L;
 
-        public const long MaxMainExperience = 2_000_000_000L;
+    public const int RebirthTierExperienceCeiling = 1_481_117_817;
 
-        public const int RebirthTierExperienceCeiling = 1_481_117_817;
+    public const int RebirthTierLevelUpSkillPoints = 100;
 
-        public const int RebirthTierLevelUpSkillPoints = 100;
+    public const int Zone101TimeGrantOnFirstRebirthTier = 10_000;
 
-        public const int Zone101TimeGrantOnFirstRebirthTier = 10_000;
-
-        public static bool AppliesAt(short level)
+    public static bool AppliesAt(short level)
     {
         return level >= LevelProgressionCalculator.MaxLevel;
     }
 
-        public static HighLevelExperienceOutcome Resolve(in HighLevelExperienceInput input)
+    public static HighLevelExperienceOutcome Resolve(in HighLevelExperienceInput input)
     {
         if (input.Level < LevelProgressionCalculator.MaxLevel)
             return HighLevelExperienceOutcome.None;
@@ -137,7 +134,7 @@ public static class HighLevelExperienceResolver
         return HighLevelExperienceOutcome.Accrual(newExp2, statPoints);
     }
 
-        public static int RebirthTierThreshold(short level2)
+    public static int RebirthTierThreshold(short level2)
     {
         if (level2 <= 0)
             return 0;

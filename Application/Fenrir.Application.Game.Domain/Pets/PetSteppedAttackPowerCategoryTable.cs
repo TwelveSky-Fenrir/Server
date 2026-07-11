@@ -20,7 +20,7 @@ public static class PetSteppedAttackPowerCategoryTable
         [8216] = 3
     }.ToFrozenDictionary();
 
-        public static bool TryResolveTierMax(int petItemId, out int tierMax)
+    public static bool TryResolveTierMax(int petItemId, out int tierMax)
     {
         if (CategoryByItemId.TryGetValue(petItemId, out var categoryIndex))
         {

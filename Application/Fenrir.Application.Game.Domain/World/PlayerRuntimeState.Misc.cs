@@ -10,37 +10,37 @@ public partial class PlayerRuntimeState
         (0, 0), (0, 0), (0, 0), (0, 0), (0, 0), (0, 0), (0, 0), (0, 0), (0, 0), (0, 0)
     ];
 
-        public int VisibleState { get; set; } = 1;
+    public int VisibleState { get; set; } = 1;
 
-        public int SpecialState { get; set; }
+    public int SpecialState { get; set; }
 
-        public bool UseOrnament { get; set; }
+    public bool UseOrnament { get; set; }
 
-        public int ProtectForHalo { get; set; }
+    public int ProtectForHalo { get; set; }
 
-        public DateTime LastHaloEnchantAttemptUtc { get; set; } = DateTime.UtcNow;
+    public DateTime LastHaloEnchantAttemptUtc { get; set; } = DateTime.UtcNow;
 
-        public int BonusItemLevel { get; set; }
+    public int BonusItemLevel { get; set; }
 
-        public bool BonusItemValue { get; set; }
+    public bool BonusItemValue { get; set; }
 
-        public int TribeNotifyScrollCount { get; set; }
+    public int TribeNotifyScrollCount { get; set; }
 
-        public byte PreviousTribe { get; set; }
+    public byte PreviousTribe { get; set; }
 
-        public int TribeFourReturnAllowance { get; set; }
+    public int TribeFourReturnAllowance { get; set; }
 
-        public ImmutableArray<(int ItemId, int Count)> BottleSlots { get; set; } = DefaultBottleSlots;
+    public ImmutableArray<(int ItemId, int Count)> BottleSlots { get; set; } = DefaultBottleSlots;
 
-        public bool PshopOpen { get; set; }
+    public bool PshopOpen { get; set; }
 
-        public PshopInfo? PshopListing { get; set; }
+    public PshopInfo? PshopListing { get; set; }
 
-        public int FishingState { get; set; }
+    public int FishingState { get; set; }
 
-        public int FishingStep { get; set; }
+    public int FishingStep { get; set; }
 
-        public DateTime? FishingCastAtUtc { get; set; }
+    public DateTime? FishingCastAtUtc { get; set; }
 
-        public bool CatchingFish { get; set; }
+    public bool CatchingFish { get; set; }
 }

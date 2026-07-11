@@ -4,10 +4,10 @@ public sealed class TribeConversionCatalogLoader
 {
     private TribeConversionResolver? _resolver;
 
-        public TribeConversionResolver Resolver => _resolver ?? throw new InvalidOperationException(
+    public TribeConversionResolver Resolver => _resolver ?? throw new InvalidOperationException(
         "TribeConversionResolver is not loaded yet -- call TribeConversionCatalogLoader.InitializeAsync before accepting connections.");
 
-        public async Task InitializeAsync(IWorldDataRepository repository, CancellationToken ct)
+    public async Task InitializeAsync(IWorldDataRepository repository, CancellationToken ct)
     {
         if (_resolver is not null)
             throw new InvalidOperationException(

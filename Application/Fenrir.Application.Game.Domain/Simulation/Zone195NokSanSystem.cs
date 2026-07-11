@@ -14,30 +14,29 @@ public sealed class Zone195NokSanSystem(
     ILogger<Zone195NokSanSystem> logger,
     Func<DateTime>? utcNow = null) : ISimulationSystem
 {
+    public const int CaptureRemainingStart = 5;
 
-        public const int CaptureRemainingStart = 5;
+    public const int SettleLegacyTicks = 12;
 
-        public const int SettleLegacyTicks = 12;
+    public const int CountdownIntervalLegacyTicks = 120;
 
-        public const int CountdownIntervalLegacyTicks = 120;
+    public const int DisqualifyingActionSort = 33;
 
-        public const int DisqualifyingActionSort = 33;
+    public const int CapturerContributionPoints = 50;
 
-        public const int CapturerContributionPoints = 50;
+    public const int CapturerHeroPoints = 50;
 
-        public const int CapturerHeroPoints = 50;
+    public const int AllyContributionPoints = 10;
 
-        public const int AllyContributionPoints = 10;
+    public const int AllyHeroPoints = 10;
 
-        public const int AllyHeroPoints = 10;
+    public const float AllyRewardRadius = 1000f;
 
-        public const float AllyRewardRadius = 1000f;
+    public const int HeroRankPointMinimumCombinedLevel = 113;
 
-        public const int HeroRankPointMinimumCombinedLevel = 113;
+    public const int RewardWindowStartHour = 20;
 
-        public const int RewardWindowStartHour = 20;
-
-        public const int RewardWindowEndHour = 21;
+    public const int RewardWindowEndHour = 21;
 
     private readonly ConcurrentDictionary<short, Zone195CaptureMachine> _machines = new();
     private readonly Func<DateTime> _utcNow = utcNow ?? DefaultNowUtc;
@@ -68,7 +67,7 @@ public sealed class Zone195NokSanSystem(
         }
     }
 
-        private void ScanForChallenger(Zone zone, Zone195NokSanSite site, Zone195CaptureMachine machine)
+    private void ScanForChallenger(Zone zone, Zone195NokSanSite site, Zone195CaptureMachine machine)
     {
         var holderTribe = stoneState.GetOwningTribe(site.StoneSlotIndex);
         var captureRadiusSq = site.CaptureRadius * site.CaptureRadius;
@@ -90,7 +89,6 @@ public sealed class Zone195NokSanSystem(
             broadcaster.Value.AnnounceChallengerAppeared(player.Tribe, player.Name);
             return;
         }
-
     }
 
     private void AdvanceSettle(Zone zone, Zone195NokSanSite site, Zone195CaptureMachine machine, int legacyTicksElapsed)
@@ -120,7 +118,7 @@ public sealed class Zone195NokSanSystem(
         ProcessCountdownIntervals(zone, site, machine);
     }
 
-        private void ProcessCountdownIntervals(Zone zone, Zone195NokSanSite site, Zone195CaptureMachine machine)
+    private void ProcessCountdownIntervals(Zone zone, Zone195NokSanSite site, Zone195CaptureMachine machine)
     {
         while (machine.PhaseAccumulatorTicks >= CountdownIntervalLegacyTicks)
         {
@@ -138,7 +136,7 @@ public sealed class Zone195NokSanSystem(
         }
     }
 
-        private void CommitCapture(Zone zone, Zone195NokSanSite site, Zone195CaptureMachine machine)
+    private void CommitCapture(Zone zone, Zone195NokSanSite site, Zone195CaptureMachine machine)
     {
         machine.Phase = Zone195CapturePhase.Commit;
         var winningTribe = machine.CapturerTribe;
@@ -154,7 +152,7 @@ public sealed class Zone195NokSanSystem(
         machine.ResetToIdle();
     }
 
-        private bool RevalidateCapturer(Zone zone, Zone195NokSanSite site, Zone195CaptureMachine machine)
+    private bool RevalidateCapturer(Zone zone, Zone195NokSanSite site, Zone195CaptureMachine machine)
     {
         var captureRadiusSq = site.CaptureRadius * site.CaptureRadius;
 
@@ -169,7 +167,7 @@ public sealed class Zone195NokSanSystem(
         return false;
     }
 
-        private void GrantTimeBonusRewards(Zone zone, Zone195NokSanSite site, int capturerId, byte winningTribe)
+    private void GrantTimeBonusRewards(Zone zone, Zone195NokSanSite site, int capturerId, byte winningTribe)
     {
         if (zone.TryGetPlayer(capturerId, out var capturer) && capturer is not null)
             GrantReward(zone, capturer, CapturerContributionPoints, CapturerHeroPoints);
@@ -193,7 +191,7 @@ public sealed class Zone195NokSanSystem(
         }
     }
 
-        private void GrantReward(Zone zone, PlayerRuntimeState player, int contributionPoints, int heroPoints)
+    private void GrantReward(Zone zone, PlayerRuntimeState player, int contributionPoints, int heroPoints)
     {
         zone.GrantContributionPoints(player.CharacterId, contributionPoints);
 

@@ -5,12 +5,11 @@ namespace Fenrir.Application.Game.Domain.Combat;
 
 public static class KillFeedBroadcastEncoder
 {
+    public const int PayloadSize = 130;
 
-        public const int PayloadSize = 130;
+    public const int NameFieldSize = 13;
 
-        public const int NameFieldSize = 13;
-
-        private const int RankedEntrySize = NameFieldSize + 1 + 4;
+    private const int RankedEntrySize = NameFieldSize + 1 + 4;
 
     private const int KillerNameOffset = 0;
     private const int KillerTribeOffset = KillerNameOffset + NameFieldSize;

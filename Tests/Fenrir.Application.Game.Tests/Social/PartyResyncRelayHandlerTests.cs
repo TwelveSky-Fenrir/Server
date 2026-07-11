@@ -27,7 +27,7 @@ public class PartyResyncRelayHandlerTests
         return (handler, zones, parties, relay);
     }
 
-        private static PlayerRuntimeState Enter(ZoneRegistry zones, short mapId, int characterId, string name)
+    private static PlayerRuntimeState Enter(ZoneRegistry zones, short mapId, int characterId, string name)
     {
         zones.TryGet(mapId, out var zone);
         var (session, _) = ZoneTestKit.CreateSession(characterId);

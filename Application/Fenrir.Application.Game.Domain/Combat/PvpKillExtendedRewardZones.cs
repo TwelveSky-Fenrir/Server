@@ -8,21 +8,19 @@ public readonly record struct PvpKillRewardZoneRuntimeState(
     bool Map38DropEnabled = false,
     bool Map38DailyMissionEnabled = false)
 {
-
-        public static readonly PvpKillRewardZoneRuntimeState Inactive = default;
+    public static readonly PvpKillRewardZoneRuntimeState Inactive = default;
 }
 
 public static class PvpKillExtendedRewardZones
 {
+    public const short DtmZoneId = 38;
 
-        public const short DtmZoneId = 38;
-
-        private static readonly FrozenSet<short> SymbolBattleZoneIds = new short[]
+    private static readonly FrozenSet<short> SymbolBattleZoneIds = new short[]
     {
         2, 3, 4, 7, 8, 9, 12, 13, 14, 141, 142, 143
     }.ToFrozenSet();
 
-        private static readonly FrozenSet<short> RegularWarDropZoneIds = new short[]
+    private static readonly FrozenSet<short> RegularWarDropZoneIds = new short[]
     {
         49, 146, 149, 154, 157, 160, 120, 121, 122,
         51, 147, 150, 155, 158, 161,
@@ -30,11 +28,11 @@ public static class PvpKillExtendedRewardZones
         295, 296
     }.ToFrozenSet();
 
-        private static readonly FrozenSet<short> Map195EventZoneIds = new short[] { 195, 196 }.ToFrozenSet();
+    private static readonly FrozenSet<short> Map195EventZoneIds = new short[] { 195, 196 }.ToFrozenSet();
 
     private static readonly PvpKillZoneRewardProfile FullReward = new(true, true, true, true, 0);
 
-        public static PvpKillZoneRewardProfile? TryResolve(short zoneId, bool isStunTrigger,
+    public static PvpKillZoneRewardProfile? TryResolve(short zoneId, bool isStunTrigger,
         PvpKillRewardZoneRuntimeState runtime)
     {
         if (SymbolBattleZoneIds.Contains(zoneId))

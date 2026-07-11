@@ -48,7 +48,7 @@ public class WingEnchantMaterialWhitelistTests
         Assert.Contains(itemId, (IEnumerable<int>)WingEnchantMaterialWhitelist.WhitelistedAmountNotCited);
     }
 
-        [Fact]
+    [Fact]
     public void WhitelistedAmountNotCited_ExcludesSiblingWithNowKnownValue()
     {
         Assert.DoesNotContain(WingEnchantMaterialWhitelist.SiblingWithSharedEnchantValueItemId,
@@ -80,7 +80,7 @@ public class WingEnchantMaterialWhitelistTests
         Assert.NotEqual(8, WingEnchantMaterialWhitelist.ProtectedMaterialFailureResultCode);
     }
 
-        [Fact]
+    [Fact]
     public void ProtectedMaterialEnchantValue_IsOne_SharedWithSibling695()
     {
         Assert.Equal(1, WingEnchantMaterialWhitelist.ProtectedMaterialEnchantValue);
@@ -89,7 +89,7 @@ public class WingEnchantMaterialWhitelistTests
             (IEnumerable<int>)WingEnchantMaterialWhitelist.ClassWhitelist);
     }
 
-        [Fact]
+    [Fact]
     public void WingEnchantCpCost_IsFiftyFlatContributionPoints()
     {
         Assert.Equal(50, WingEnchantMaterialWhitelist.WingEnchantCpCost);

@@ -13,10 +13,9 @@ public sealed class TowerLifecycleSystem(
     Lazy<ZoneEventBroadcaster>? zoneEventBroadcaster = null,
     ILogger<TowerLifecycleSystem>? logger = null) : ISimulationSystem
 {
+    private const int Level1LevelCode = 2;
 
-        private const int Level1LevelCode = 2;
-
-        private const float GuardianLeashRadius = 300f;
+    private const float GuardianLeashRadius = 300f;
 
     public void Simulate(Zone zone, int legacyTicksElapsed)
     {
@@ -34,7 +33,7 @@ public sealed class TowerLifecycleSystem(
         ApplyPendingGuardianHeal(zone, towerIndex);
     }
 
-        private void ApplyPendingGuardianHeal(Zone zone, int towerIndex)
+    private void ApplyPendingGuardianHeal(Zone zone, int towerIndex)
     {
         if (!towerWar.TryConsumeGuardianHeal(towerIndex))
             return;
@@ -60,7 +59,7 @@ public sealed class TowerLifecycleSystem(
             towerWar.CompleteConstructionCooldown(towerIndex);
     }
 
-        private void TrySpawnConstructionGuardian(Zone zone, int towerIndex, int constructKind, DateTime now)
+    private void TrySpawnConstructionGuardian(Zone zone, int towerIndex, int constructKind, DateTime now)
     {
         var monsterId = TowerGuardianCatalog.ResolveMonsterId(Level1LevelCode, constructKind);
         if (monsterId == 0 || !worldData.MonstersById.TryGetValue(monsterId, out var definition))

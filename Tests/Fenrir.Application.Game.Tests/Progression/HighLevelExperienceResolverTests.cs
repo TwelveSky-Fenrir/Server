@@ -49,7 +49,7 @@ public class HighLevelExperienceResolverTests
     [Fact]
     public void Resolve_BelowGeneralCap_IsNone()
     {
-        var outcome = HighLevelExperienceResolver.Resolve(At(144, 500, level2: 0, exp2: 0, gain: 1000));
+        var outcome = HighLevelExperienceResolver.Resolve(At(144, 500, 0, 0, 1000));
 
         Assert.Equal(HighLevelExperienceOutcomeKind.None, outcome.Kind);
     }
@@ -59,7 +59,7 @@ public class HighLevelExperienceResolverTests
     public void Resolve_StageA_FillsPoolAndGrantsStatPointsPerPercent()
     {
         var outcome = HighLevelExperienceResolver.Resolve(
-            At(145, mainExp: 1_000_000_000, level2: 0, exp2: 0, gain: 900_000_000));
+            At(145, 1_000_000_000, 0, 0, 900_000_000));
 
         Assert.Equal(HighLevelExperienceOutcomeKind.MainPoolFill, outcome.Kind);
         Assert.Equal(1_900_000_000L, outcome.NewMainExperience);
@@ -70,7 +70,7 @@ public class HighLevelExperienceResolverTests
     public void Resolve_StageA_ClampsPoolAtCeiling()
     {
         var outcome = HighLevelExperienceResolver.Resolve(
-            At(145, mainExp: 1_900_000_000, level2: 0, exp2: 0, gain: 500_000_000));
+            At(145, 1_900_000_000, 0, 0, 500_000_000));
 
         Assert.Equal(HighLevelExperienceOutcomeKind.MainPoolFill, outcome.Kind);
         Assert.Equal(HighLevelExperienceResolver.MaxMainExperience, outcome.NewMainExperience);
@@ -81,7 +81,7 @@ public class HighLevelExperienceResolverTests
     public void Resolve_StageA_AntiCheatFlag_IsIgnored()
     {
         var outcome = HighLevelExperienceResolver.Resolve(
-            At(145, mainExp: 1_000_000_000, level2: 0, exp2: 0, gain: 100_000_000, antiCheat: true));
+            At(145, 1_000_000_000, 0, 0, 100_000_000, true));
 
         Assert.Equal(HighLevelExperienceOutcomeKind.MainPoolFill, outcome.Kind);
         Assert.Equal(1_100_000_000L, outcome.NewMainExperience);
@@ -92,7 +92,7 @@ public class HighLevelExperienceResolverTests
     public void Resolve_StageB_Level0_LevelsUpImmediatelyWithZone101Bonus()
     {
         var outcome = HighLevelExperienceResolver.Resolve(
-            At(145, mainExp: HighLevelExperienceResolver.MaxMainExperience, level2: 0, exp2: 0, gain: 5000));
+            At(145, HighLevelExperienceResolver.MaxMainExperience, 0, 0, 5000));
 
         Assert.Equal(HighLevelExperienceOutcomeKind.RebirthTierLevelUp, outcome.Kind);
         Assert.Equal(1, outcome.NewLevel2);
@@ -106,7 +106,7 @@ public class HighLevelExperienceResolverTests
     {
         var threshold1 = RebirthProgression.HighLevelExpTable[0];
         var outcome = HighLevelExperienceResolver.Resolve(
-            At(145, mainExp: HighLevelExperienceResolver.MaxMainExperience, level2: 1, exp2: threshold1, gain: 50));
+            At(145, HighLevelExperienceResolver.MaxMainExperience, 1, threshold1, 50));
 
         Assert.Equal(HighLevelExperienceOutcomeKind.RebirthTierLevelUp, outcome.Kind);
         Assert.Equal(2, outcome.NewLevel2);
@@ -121,7 +121,7 @@ public class HighLevelExperienceResolverTests
         var threshold1 = RebirthProgression.HighLevelExpTable[0];
         var gain = 100_000_000;
         var outcome = HighLevelExperienceResolver.Resolve(
-            At(145, mainExp: HighLevelExperienceResolver.MaxMainExperience, level2: 1, exp2: 0, gain: gain));
+            At(145, HighLevelExperienceResolver.MaxMainExperience, 1, 0, gain));
 
         Assert.Equal(HighLevelExperienceOutcomeKind.RebirthTierAccrual, outcome.Kind);
         Assert.Equal(gain, outcome.NewExp2);
@@ -133,8 +133,8 @@ public class HighLevelExperienceResolverTests
     {
         var threshold1 = RebirthProgression.HighLevelExpTable[0];
         var outcome = HighLevelExperienceResolver.Resolve(
-            At(145, mainExp: HighLevelExperienceResolver.MaxMainExperience, level2: 1, exp2: 0,
-                gain: threshold1 + 500_000));
+            At(145, HighLevelExperienceResolver.MaxMainExperience, 1, 0,
+                threshold1 + 500_000));
 
         Assert.Equal(HighLevelExperienceOutcomeKind.RebirthTierAccrual, outcome.Kind);
         Assert.Equal(threshold1, outcome.NewExp2);
@@ -146,8 +146,8 @@ public class HighLevelExperienceResolverTests
     {
         var threshold1 = RebirthProgression.HighLevelExpTable[0];
         var outcome = HighLevelExperienceResolver.Resolve(
-            At(145, mainExp: HighLevelExperienceResolver.MaxMainExperience, level2: 1, exp2: threshold1,
-                gain: 1_000_000));
+            At(145, HighLevelExperienceResolver.MaxMainExperience, 1, threshold1,
+                1_000_000));
 
         Assert.Equal(HighLevelExperienceOutcomeKind.RebirthTierLevelUp, outcome.Kind);
         Assert.Equal(2, outcome.NewLevel2);
@@ -158,8 +158,8 @@ public class HighLevelExperienceResolverTests
     public void Resolve_StageB_Level12_AtCeiling_IsNone()
     {
         var outcome = HighLevelExperienceResolver.Resolve(
-            At(145, mainExp: HighLevelExperienceResolver.MaxMainExperience, level2: 12,
-                exp2: HighLevelExperienceResolver.RebirthTierExperienceCeiling, gain: 1_000_000));
+            At(145, HighLevelExperienceResolver.MaxMainExperience, 12,
+                HighLevelExperienceResolver.RebirthTierExperienceCeiling, 1_000_000));
 
         Assert.Equal(HighLevelExperienceOutcomeKind.None, outcome.Kind);
     }
@@ -169,8 +169,8 @@ public class HighLevelExperienceResolverTests
     {
         var ceiling = HighLevelExperienceResolver.RebirthTierExperienceCeiling;
         var outcome = HighLevelExperienceResolver.Resolve(
-            At(145, mainExp: HighLevelExperienceResolver.MaxMainExperience, level2: 12, exp2: 1_000_000_000,
-                gain: 100_000_000));
+            At(145, HighLevelExperienceResolver.MaxMainExperience, 12, 1_000_000_000,
+                100_000_000));
 
         Assert.Equal(HighLevelExperienceOutcomeKind.RebirthTierAccrual, outcome.Kind);
         Assert.Equal(1_100_000_000, outcome.NewExp2);
@@ -184,8 +184,8 @@ public class HighLevelExperienceResolverTests
     {
         var ceiling = HighLevelExperienceResolver.RebirthTierExperienceCeiling;
         var outcome = HighLevelExperienceResolver.Resolve(
-            At(145, mainExp: HighLevelExperienceResolver.MaxMainExperience, level2: 12, exp2: ceiling - 1000,
-                gain: 500_000_000));
+            At(145, HighLevelExperienceResolver.MaxMainExperience, 12, ceiling - 1000,
+                500_000_000));
 
         Assert.Equal(HighLevelExperienceOutcomeKind.RebirthTierAccrual, outcome.Kind);
         Assert.Equal(ceiling, outcome.NewExp2);
@@ -196,8 +196,8 @@ public class HighLevelExperienceResolverTests
     public void Resolve_StageB_AntiCheatFlag_IsSilentNoOp()
     {
         var outcome = HighLevelExperienceResolver.Resolve(
-            At(145, mainExp: HighLevelExperienceResolver.MaxMainExperience, level2: 3, exp2: 100,
-                gain: 5_000_000, antiCheat: true));
+            At(145, HighLevelExperienceResolver.MaxMainExperience, 3, 100,
+                5_000_000, true));
 
         Assert.Equal(HighLevelExperienceOutcomeKind.None, outcome.Kind);
     }
@@ -208,7 +208,7 @@ public class HighLevelExperienceResolverTests
     public void Resolve_StageB_BelowOneGain_IsSilentNoOp(int gain)
     {
         var outcome = HighLevelExperienceResolver.Resolve(
-            At(145, mainExp: HighLevelExperienceResolver.MaxMainExperience, level2: 3, exp2: 100, gain: gain));
+            At(145, HighLevelExperienceResolver.MaxMainExperience, 3, 100, gain));
 
         Assert.Equal(HighLevelExperienceOutcomeKind.None, outcome.Kind);
     }

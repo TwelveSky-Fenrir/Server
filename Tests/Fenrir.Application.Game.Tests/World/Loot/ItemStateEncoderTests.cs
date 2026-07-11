@@ -4,7 +4,6 @@ namespace Fenrir.Application.Game.Tests.World.Loot;
 
 public class ItemStateEncoderTests
 {
-
     [Fact]
     public void ChangeEnchant_AddsDeltaOntoExistingByte_PreservesTheOtherThree()
     {
@@ -131,20 +130,20 @@ public class ItemStateEncoderTests
     [Fact]
     public void SetAll_MatchesItemValueCodecEncode_ForTheSameFourValues()
     {
-        Assert.Equal(ItemValueCodec.Encode(45, 6, 0, 0), ItemStateEncoder.SetAll(45, 6, 0, 0));
+        Assert.Equal(ItemValueCodec.Encode(45, 6, 0, 0), ItemStateEncoder.SetAll(45, 6, 0));
     }
 
-        [Fact]
+    [Fact]
     public void SetAll_ReproducesLegacyStarterEquipStampLiterals_SpecificationOnly()
     {
-        var equipSlotPacked = ItemStateEncoder.SetAll(45, 6, 0, 0);
+        var equipSlotPacked = ItemStateEncoder.SetAll(45, 6, 0);
         var (equipEnchant, equipCombine, equipRefine, equipSocket) = ItemValueCodec.Decode(equipSlotPacked);
         Assert.Equal(45, equipEnchant);
         Assert.Equal(6, equipCombine);
         Assert.Equal(0, equipRefine);
         Assert.Equal(0, equipSocket);
 
-        var wingSlotPacked = ItemStateEncoder.SetAll(40, 0, 0, 0);
+        var wingSlotPacked = ItemStateEncoder.SetAll(40, 0, 0);
         var (wingEnchant, wingCombine, wingRefine, wingSocket) = ItemValueCodec.Decode(wingSlotPacked);
         Assert.Equal(40, wingEnchant);
         Assert.Equal(0, wingCombine);

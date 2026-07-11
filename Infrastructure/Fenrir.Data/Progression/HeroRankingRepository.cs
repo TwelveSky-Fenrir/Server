@@ -10,8 +10,7 @@ namespace Fenrir.Data.Progression;
 
 public sealed record HeroRankingRepository(ICaeriusNetDbContext Db) : IHeroRankingRepository
 {
-
-        public async ValueTask<ReadOnlyCollection<HeroRankingRowDto>> GetByPeriodAsync(byte periodKind,
+    public async ValueTask<ReadOnlyCollection<HeroRankingRowDto>> GetByPeriodAsync(byte periodKind,
         CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_HeroRanking_GetByPeriod", 40)
@@ -21,7 +20,7 @@ public sealed record HeroRankingRepository(ICaeriusNetDbContext Db) : IHeroRanki
         return await Db.QueryAsReadOnlyCollectionAsync<HeroRankingRowDto>(sp, ct);
     }
 
-        public async ValueTask MarkRewardClaimedAsync(int characterId, byte periodKind, int points, byte? tribeId,
+    public async ValueTask MarkRewardClaimedAsync(int characterId, byte periodKind, int points, byte? tribeId,
         int? level, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_HeroRanking_Upsert", 0)
@@ -36,13 +35,13 @@ public sealed record HeroRankingRepository(ICaeriusNetDbContext Db) : IHeroRanki
         await Db.ExecuteAsync(sp, ct);
     }
 
-        public async ValueTask<bool> RolloverIfDueAsync(CancellationToken ct)
+    public async ValueTask<bool> RolloverIfDueAsync(CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_HeroRanking_Rollover", 1).Build();
         return await Db.ExecuteScalarAsync<bool>(sp, ct);
     }
 
-        public async ValueTask<int> AddPointsAsync(int characterId, byte periodKind, int delta, byte? tribeId,
+    public async ValueTask<int> AddPointsAsync(int characterId, byte periodKind, int delta, byte? tribeId,
         int? level, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_HeroRanking_AddPoints", 0)
@@ -56,7 +55,7 @@ public sealed record HeroRankingRepository(ICaeriusNetDbContext Db) : IHeroRanki
         return await Db.ExecuteScalarAsync<int>(sp, ct);
     }
 
-        public async ValueTask<int?> GetPointsAsync(int characterId, byte periodKind, CancellationToken ct)
+    public async ValueTask<int?> GetPointsAsync(int characterId, byte periodKind, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_HeroRanking_GetPoints", 1)
             .AddParameter("CharacterId", characterId, SqlDbType.Int)

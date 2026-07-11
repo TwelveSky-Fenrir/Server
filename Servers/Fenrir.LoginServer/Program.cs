@@ -1,4 +1,3 @@
-
 using Fenrir.Application.Login.Domain;
 using Fenrir.Application.Login.Domain.Extensions;
 using Fenrir.Application.Login.Handlers.Extensions;

@@ -1,4 +1,3 @@
-using Fenrir.Application.Game.Domain.World.Monsters;
 using Fenrir.Application.Game.GameData;
 
 namespace Fenrir.Application.Game.Domain.World.Loot;
@@ -17,15 +16,14 @@ public readonly record struct BossDropOutcome(
 
 public static class BossEventDropResolver
 {
-
-        public const int SantaMonsterId = 731;
+    public const int SantaMonsterId = 731;
 
     private const int SantaGiftItemId = 536;
 
     public const int NineItemEventBossMonsterId = 1404;
     private const int NineItemEventContributionPoints = 50;
 
-        public const int DemonLordMonsterId = 287;
+    public const int DemonLordMonsterId = 287;
 
     private const int DemonLordKillCycle = 10;
 
@@ -35,7 +33,7 @@ public static class BossEventDropResolver
 
     public const int ThreeItemEventBossMonsterId = 756;
 
-        public const int CustomTimedBossFirstMonsterId = 564;
+    public const int CustomTimedBossFirstMonsterId = 564;
 
     public const int CustomTimedBossLastMonsterId = 568;
 
@@ -48,14 +46,14 @@ public static class BossEventDropResolver
     private const int FifteenMinuteBossTierBoundaryMid = 100;
     private const int FifteenMinuteBossTierBoundaryHigh = 400;
 
-        private const int FifteenMinuteBossDoubleStackItemId = 1449;
+    private const int FifteenMinuteBossDoubleStackItemId = 1449;
 
     public const int VirginGhostMonsterId = 746;
     public const int SharedRandomPoolMonsterId = 9001;
 
     private const int VirginGhostRareItemId = 93500;
 
-        private const int VirginGhostRareItemDropChance = 300_000;
+    private const int VirginGhostRareItemDropChance = 300_000;
 
     private const int VirginGhostWarPoints = 2;
     private const int VirginGhostBloodPoints = 2;
@@ -63,7 +61,7 @@ public static class BossEventDropResolver
     private const int SharedRandomPoolWarPoints = 3;
     private const int SharedRandomPoolBloodPoints = 6;
 
-        public static BossDropOutcome Resolve(int monsterId, int demonLordKillTally, Random random,
+    public static BossDropOutcome Resolve(int monsterId, int demonLordKillTally, Random random,
         WorldDataCache worldData, BossDropCatalog catalog)
     {
         return monsterId switch
@@ -102,14 +100,14 @@ public static class BossEventDropResolver
         };
     }
 
-        private static BossDropOutcome ResolveCustomTimedBoss(int monsterId, BossDropCatalog catalog)
+    private static BossDropOutcome ResolveCustomTimedBoss(int monsterId, BossDropCatalog catalog)
     {
         return catalog.CustomTimedBossLists.TryGetValue(monsterId, out var list)
             ? BossDropOutcome.None with { Items = list, SkipGenericTiers = true }
             : BossDropOutcome.None with { SkipGenericTiers = true };
     }
 
-        private static BossDropOutcome ResolveDemonLord(int demonLordKillTally, Random random, BossDropCatalog catalog)
+    private static BossDropOutcome ResolveDemonLord(int demonLordKillTally, Random random, BossDropCatalog catalog)
     {
         var pool = catalog.DemonLordItemPool;
         if (demonLordKillTally <= 0 || demonLordKillTally % DemonLordKillCycle != 0 || pool.Length == 0)
@@ -119,7 +117,7 @@ public static class BossEventDropResolver
         return BossDropOutcome.None with { Items = [new DroppedItem(item, 1)], SkipGenericTiers = true };
     }
 
-        private static BossDropOutcome ResolveFifteenMinuteBoss(Random random, BossDropCatalog catalog)
+    private static BossDropOutcome ResolveFifteenMinuteBoss(Random random, BossDropCatalog catalog)
     {
         var roll = random.Next(0, FifteenMinuteBossRollCeiling);
 
@@ -150,7 +148,7 @@ public static class BossEventDropResolver
         return BossDropOutcome.None with { Items = [new DroppedItem(resolvedItemId, quantity)] };
     }
 
-        private static BossDropOutcome ResolveSharedRandomPool(int monsterId, Random random, WorldDataCache worldData,
+    private static BossDropOutcome ResolveSharedRandomPool(int monsterId, Random random, WorldDataCache worldData,
         BossDropCatalog catalog)
     {
         var isVirginGhost = monsterId == VirginGhostMonsterId;

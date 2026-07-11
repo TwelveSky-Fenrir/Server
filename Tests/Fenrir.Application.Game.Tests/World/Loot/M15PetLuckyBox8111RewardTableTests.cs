@@ -104,7 +104,7 @@ public class M15PetLuckyBox8111RewardTableTests
         Assert.Equal(6, result.NewPityCounter);
     }
 
-        private sealed class ScriptedRandom(params int[] values) : Random
+    private sealed class ScriptedRandom(params int[] values) : Random
     {
         private int _index;
 

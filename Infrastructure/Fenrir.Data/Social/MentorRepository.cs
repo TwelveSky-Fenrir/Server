@@ -9,8 +9,7 @@ namespace Fenrir.Data.Social;
 
 public sealed record MentorRepository(ICaeriusNetDbContext Db) : IMentorRepository
 {
-
-        public async ValueTask<CharacterMentorDto?> GetForCharacterAsync(int characterId, CancellationToken ct)
+    public async ValueTask<CharacterMentorDto?> GetForCharacterAsync(int characterId, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_CharacterMentor_GetForCharacter", 1)
             .AddParameter("CharacterId", characterId, SqlDbType.Int)
@@ -19,7 +18,7 @@ public sealed record MentorRepository(ICaeriusNetDbContext Db) : IMentorReposito
         return await Db.FirstQueryAsync<CharacterMentorDto>(sp, ct);
     }
 
-        public async ValueTask BondAsync(int masterCharacterId, int studentCharacterId, CancellationToken ct)
+    public async ValueTask BondAsync(int masterCharacterId, int studentCharacterId, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_CharacterMentor_Bond", 0)
             .AddParameter("MasterCharacterId", masterCharacterId, SqlDbType.Int)
@@ -29,7 +28,7 @@ public sealed record MentorRepository(ICaeriusNetDbContext Db) : IMentorReposito
         await Db.ExecuteAsync(sp, ct);
     }
 
-        public async ValueTask ClearForCharacterAsync(int characterId, CancellationToken ct)
+    public async ValueTask ClearForCharacterAsync(int characterId, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_CharacterMentor_ClearForCharacter", 0)
             .AddParameter("CharacterId", characterId, SqlDbType.Int)

@@ -4,7 +4,6 @@ using Fenrir.Data.Accounts;
 using Fenrir.Data.Security;
 using Microsoft.Extensions.DependencyInjection;
 
-
 var command = args.Length > 0 ? args[0] : null;
 
 if (string.Equals(command, "create", StringComparison.OrdinalIgnoreCase) && args.Length == 3)

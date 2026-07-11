@@ -6,8 +6,7 @@ namespace Fenrir.Application.Game.Services.Commerce;
 public sealed class GetCashBalanceService(ICashRepository cash, ILogger<GetCashBalanceService> logger)
     : IGetCashBalanceService
 {
-
-        public async ValueTask<int> GetBalanceAsync(int accountId, CancellationToken cancellationToken)
+    public async ValueTask<int> GetBalanceAsync(int accountId, CancellationToken cancellationToken)
     {
         try
         {

@@ -37,7 +37,7 @@ public class ZoneCombatBroadcastAllocationTests
         };
     }
 
-        private static (Zone Zone, List<FakeDuplexPipe> Pipes) BuildZone(int bystanderCount)
+    private static (Zone Zone, List<FakeDuplexPipe> Pipes) BuildZone(int bystanderCount)
     {
         var zone = ZoneTestKit.CreateZone(1, randomSource: new ScriptedRandomSource(0, 0));
         var pipes = new List<FakeDuplexPipe>();
@@ -79,7 +79,7 @@ public class ZoneCombatBroadcastAllocationTests
         return (zone, pipes);
     }
 
-        private static long MeasureAllocatedBytes(Zone zone, IReadOnlyList<FakeDuplexPipe> pipes, int iterations)
+    private static long MeasureAllocatedBytes(Zone zone, IReadOnlyList<FakeDuplexPipe> pipes, int iterations)
     {
         zone.PostCombatCommand(new CombatCommand { AttackerCharacterId = 1, AttackInfo = MeleeRequest() });
         zone.Tick(TimeSpan.FromMilliseconds(50));

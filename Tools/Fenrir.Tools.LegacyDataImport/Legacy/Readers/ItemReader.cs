@@ -13,7 +13,7 @@ internal static class ItemReader
     private const int Ielite = 4;
     private static readonly int[] ElitesExchangeLockSorts = [13, 14, 15, 9, 12, 10, 11, 7];
 
-        private static bool IsNoDropForcedOne(int index)
+    private static bool IsNoDropForcedOne(int index)
     {
         return index is 706 or 708 or 709 or 710 or 711
             or >= 865 and <= 885
@@ -25,12 +25,12 @@ internal static class ItemReader
             or >= 17001 and <= 17133;
     }
 
-        private static bool IsNoDropForcedTwo(int index)
+    private static bool IsNoDropForcedTwo(int index)
     {
         return index is 611 or 612;
     }
 
-        public static IReadOnlyList<ItemRecord> ReadAllRaw(string dataDirectory)
+    public static IReadOnlyList<ItemRecord> ReadAllRaw(string dataDirectory)
     {
         var recordBytes = ImgUnpacker.UnpackRecordArray(
             Path.Combine(dataDirectory, FileName), XorKey, RecordArrayOffset, RecordCount, RecordSize);
@@ -42,7 +42,7 @@ internal static class ItemReader
         return items;
     }
 
-        public static IReadOnlyList<ItemRecord> ReadAll(string dataDirectory)
+    public static IReadOnlyList<ItemRecord> ReadAll(string dataDirectory)
     {
         return ReadAllRaw(dataDirectory).Select(ApplyRuntimePatches).ToList();
     }

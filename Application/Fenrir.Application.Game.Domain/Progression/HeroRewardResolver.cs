@@ -11,9 +11,9 @@ public static class HeroRewardResolver
 
     public const int SlotsPerTribe = HeroRankBuilder.SlotsPerTribe;
 
-        public static readonly int[] PointsByRank = [1000, 900, 800, 700, 600, 500, 400, 300, 200, 100];
+    public static readonly int[] PointsByRank = [1000, 900, 800, 700, 600, 500, 400, 300, 200, 100];
 
-        public static Result Resolve(IReadOnlyList<HeroRankingRowDto> previousPeriodRowsOrderedByPointsDescending,
+    public static Result Resolve(IReadOnlyList<HeroRankingRowDto> previousPeriodRowsOrderedByPointsDescending,
         byte tribe, int characterId)
     {
         var rank = 0;
@@ -28,7 +28,9 @@ public static class HeroRewardResolver
             if (row.CharacterId == characterId)
             {
                 var acceptState = HeroRankAcceptStateRules.FromClaimedFlag(row.RewardClaimed);
-                var outcome = HeroRankAcceptStateRules.IsClaimable(acceptState) ? Outcome.Claim : Outcome.AlreadyClaimed;
+                var outcome = HeroRankAcceptStateRules.IsClaimable(acceptState)
+                    ? Outcome.Claim
+                    : Outcome.AlreadyClaimed;
                 return new Result(outcome, rank, row);
             }
 

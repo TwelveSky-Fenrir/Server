@@ -4,6 +4,5 @@ namespace Fenrir.Application.Game.Abstractions.Chat;
 
 public interface IPartyChatService
 {
-
-        public bool TrySendChat(PlayerRuntimeState sender, string content);
+    public bool TrySendChat(PlayerRuntimeState sender, string content);
 }

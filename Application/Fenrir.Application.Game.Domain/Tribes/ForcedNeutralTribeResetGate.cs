@@ -2,10 +2,9 @@ namespace Fenrir.Application.Game.Domain.Tribes;
 
 public static class ForcedNeutralTribeResetGate
 {
+    public const short MinLevel = 113;
 
-        public const short MinLevel = 113;
-
-        public const byte NeutralTribe = TribeMigrationGate.TribeFour;
+    public const byte NeutralTribe = TribeMigrationGate.TribeFour;
 
     public static ForcedNeutralTribeResetOutcome Evaluate(ForcedNeutralTribeResetEligibilityContext ctx)
     {

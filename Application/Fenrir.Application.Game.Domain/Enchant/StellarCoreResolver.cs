@@ -7,15 +7,14 @@ public static class StellarCoreResolver
 {
     public enum StellarCoreOutcome
     {
+        Rejected,
 
-                Rejected,
-
-                Merged
+        Merged
     }
 
-        public const int MaxStellarCoreItemIdExclusive = 93513;
+    public const int MaxStellarCoreItemIdExclusive = 93513;
 
-        public const int BaseMergeCost = 50_000_000;
+    public const int BaseMergeCost = 50_000_000;
 
     public static StellarCoreResult Resolve(
         ItemDefinition targetDefinition,
@@ -38,7 +37,7 @@ public static class StellarCoreResolver
         return currentItemId + 1;
     }
 
-        public readonly record struct StellarCoreResult(
+    public readonly record struct StellarCoreResult(
         StellarCoreOutcome Outcome,
         int Cost,
         int NewTargetItemId)

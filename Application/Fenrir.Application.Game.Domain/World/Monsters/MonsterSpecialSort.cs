@@ -2,22 +2,21 @@ namespace Fenrir.Application.Game.Domain.World.Monsters;
 
 public static class MonsterSpecialSort
 {
+    public const byte Standard = 1;
 
-        public const byte Standard = 1;
+    public const byte TribeSymbolStone = 2;
 
-        public const byte TribeSymbolStone = 2;
+    public const byte Inert = 3;
 
-        public const byte Inert = 3;
+    public const byte AllianceStone = 4;
 
-        public const byte AllianceStone = 4;
+    public const byte TribeGuard = 5;
 
-        public const byte TribeGuard = 5;
+    public const byte CarThrower = 6;
 
-        public const byte CarThrower = 6;
+    public const byte Tower = 10;
 
-        public const byte Tower = 10;
-
-        public static byte Derive(byte type, byte specialType)
+    public static byte Derive(byte type, byte specialType)
     {
         if (type is 6 or 7 or 8 or 9)
             return TribeGuard;

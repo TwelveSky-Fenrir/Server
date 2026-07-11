@@ -163,7 +163,7 @@ public class Zone195NokSanSystemTests
     {
         var registry = ZoneTestKit.CreateRegistry();
         registry.Initialize([PlainMapId]);
-        var (zone, _, _) = EnterPlayer(registry, PlainMapId, 1, 1, posX: 500, posZ: 500);
+        var (zone, _, _) = EnterPlayer(registry, PlainMapId, 1, 1, 500, 500);
 
         var broadcaster = new RecordingBroadcaster();
         var system = CreateSystem(broadcaster, new Zone195NokSanState(),
@@ -247,7 +247,7 @@ public class Zone195NokSanSystemTests
         var registry = ZoneTestKit.CreateRegistry();
         registry.Initialize([RewardMapId]);
         var (zone, _, _) = EnterPlayer(registry, RewardMapId, 1, 1);
-        EnterPlayer(registry, RewardMapId, 2, 1, posX: 150, posZ: 150);
+        EnterPlayer(registry, RewardMapId, 2, 1, 150, 150);
 
         var capturer = PlayerState(zone, 1);
         var ally = PlayerState(zone, 2);

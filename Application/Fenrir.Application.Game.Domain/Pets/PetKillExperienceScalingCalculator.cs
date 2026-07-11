@@ -2,10 +2,9 @@ namespace Fenrir.Application.Game.Domain.Pets;
 
 public static class PetKillExperienceScalingCalculator
 {
+    public const int GlobalRatio = 20;
 
-        public const int GlobalRatio = 20;
-
-        public static int ComputeScaledAmount(
+    public static int ComputeScaledAmount(
         int baseAmount,
         float personalAddOnRatio,
         bool doubleExpTimerActive,

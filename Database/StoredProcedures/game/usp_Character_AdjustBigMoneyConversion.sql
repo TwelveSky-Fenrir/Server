@@ -21,8 +21,8 @@
 -- (CheckOverMaximum vs. CheckOverBigMoneyMaximum) ; Server/Header/Protocol/DEFINE.h:365-367 (MAX_NUMBER_SIZE =
 -- 2,000,000,000 ; MAX_NUMBER_SIZE1 = 1,000,000,000 ; MAX_NUMBER_SIZE2 = 999).
 CREATE PROCEDURE game.usp_Character_AdjustBigMoneyConversion @CharacterId INT,
-                                                              @DeltaMoney BIGINT,
-                                                              @DeltaBigMoney INT
+                                                             @DeltaMoney BIGINT,
+                                                             @DeltaBigMoney INT
 AS
 BEGIN
     SET

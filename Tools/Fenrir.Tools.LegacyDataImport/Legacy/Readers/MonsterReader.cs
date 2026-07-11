@@ -10,9 +10,9 @@ internal static class MonsterReader
     private const int RecordCount = 10000;
     private const int RecordSize = 940;
 
-        private const int ThunderGiantSlot = 80;
+    private const int ThunderGiantSlot = 80;
 
-        public static IReadOnlyList<MonsterRecord> ReadAllRaw(string dataDirectory)
+    public static IReadOnlyList<MonsterRecord> ReadAllRaw(string dataDirectory)
     {
         var recordBytes = ImgUnpacker.UnpackRecordArray(
             Path.Combine(dataDirectory, FileName), XorKey, RecordArrayOffset, RecordCount, RecordSize);
@@ -24,7 +24,7 @@ internal static class MonsterReader
         return monsters;
     }
 
-        public static IReadOnlyList<MonsterRecord> ReadAll(string dataDirectory)
+    public static IReadOnlyList<MonsterRecord> ReadAll(string dataDirectory)
     {
         return ApplyRuntimePatches(ReadAllRaw(dataDirectory));
     }

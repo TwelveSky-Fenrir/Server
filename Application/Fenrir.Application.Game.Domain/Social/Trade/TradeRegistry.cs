@@ -9,16 +9,18 @@ public enum TradeAskOutcome
 
 public enum TradeDisconnectNotification
 {
+    None,
 
-        None,
+    Cancel,
 
-        Cancel,
-
-        End
+    End
 }
 
-public readonly record struct TradeDisconnectResult(TradeDisconnectNotification Notification, int PartnerId,
-    int SelfBigMoneyRestore = 0, int PartnerBigMoneyRestore = 0)
+public readonly record struct TradeDisconnectResult(
+    TradeDisconnectNotification Notification,
+    int PartnerId,
+    int SelfBigMoneyRestore = 0,
+    int PartnerBigMoneyRestore = 0)
 {
     public static readonly TradeDisconnectResult None = new(TradeDisconnectNotification.None, 0);
 }
@@ -27,14 +29,14 @@ public sealed class TradeRegistry
 {
     private readonly Dictionary<int, int> _acceptedPairs = new();
 
-        private readonly CrossShardNegotiationTracker _crossShard = new();
+    private readonly CrossShardNegotiationTracker _crossShard = new();
 
     private readonly Lock _lock = new();
     private readonly Dictionary<int, int> _pendingByAsker = new();
     private readonly Dictionary<int, int> _pendingByTarget = new();
     private readonly Dictionary<int, TradeSession> _sessionByCharacter = new();
 
-        public bool IsBusy(int characterId)
+    public bool IsBusy(int characterId)
     {
         lock (_lock)
         {
@@ -44,7 +46,7 @@ public sealed class TradeRegistry
         }
     }
 
-        public bool TryPeekPending(int characterId, out int counterpartId, out bool isAsker)
+    public bool TryPeekPending(int characterId, out int counterpartId, out bool isAsker)
     {
         lock (_lock)
         {
@@ -65,7 +67,7 @@ public sealed class TradeRegistry
         }
     }
 
-        public TradeAskOutcome TryAskCrossShard(int askerId, CrossShardOutboundAsk ask)
+    public TradeAskOutcome TryAskCrossShard(int askerId, CrossShardOutboundAsk ask)
     {
         lock (_lock)
         {
@@ -111,7 +113,7 @@ public sealed class TradeRegistry
         }
     }
 
-        public bool TryRegisterCrossShardInbound(int targetId, CrossShardInboundAsk ask)
+    public bool TryRegisterCrossShardInbound(int targetId, CrossShardInboundAsk ask)
     {
         lock (_lock)
         {
@@ -122,7 +124,7 @@ public sealed class TradeRegistry
         }
     }
 
-        public bool TryConsumeCrossShardInbound(int targetId, out CrossShardInboundAsk ask)
+    public bool TryConsumeCrossShardInbound(int targetId, out CrossShardInboundAsk ask)
     {
         lock (_lock)
         {
@@ -130,7 +132,7 @@ public sealed class TradeRegistry
         }
     }
 
-        public bool TryConsumeCrossShardOutbound(int askerId, out CrossShardOutboundAsk ask)
+    public bool TryConsumeCrossShardOutbound(int askerId, out CrossShardOutboundAsk ask)
     {
         lock (_lock)
         {
@@ -157,7 +159,7 @@ public sealed class TradeRegistry
         }
     }
 
-        public bool TryStart(int callerId, out TradeSession session)
+    public bool TryStart(int callerId, out TradeSession session)
     {
         lock (_lock)
         {
@@ -183,7 +185,7 @@ public sealed class TradeRegistry
         }
     }
 
-        public bool TryEnd(int characterId, out TradeSession? session)
+    public bool TryEnd(int characterId, out TradeSession? session)
     {
         lock (_lock)
         {
@@ -195,7 +197,7 @@ public sealed class TradeRegistry
         }
     }
 
-        public bool TryAbortStartForCaller(int callerId)
+    public bool TryAbortStartForCaller(int callerId)
     {
         lock (_lock)
         {
@@ -203,7 +205,7 @@ public sealed class TradeRegistry
         }
     }
 
-        public TradeDisconnectResult ClearForDisconnect(int characterId)
+    public TradeDisconnectResult ClearForDisconnect(int characterId)
     {
         lock (_lock)
         {

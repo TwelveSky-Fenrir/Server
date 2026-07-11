@@ -28,6 +28,7 @@ public class RegularWarBossSummonCatalogTests
     public void SkipExistenceCheck_IsTrue_UnlikeBoss756()
     {
         Assert.True(RegularWarBossSummonCatalog.SkipExistenceCheck);
-        Assert.NotEqual(RegularWarBossSummonCatalog.SkipExistenceCheck, Zone200GateBreachBossCatalog.ExistenceCheckActive);
+        Assert.NotEqual(RegularWarBossSummonCatalog.SkipExistenceCheck,
+            Zone200GateBreachBossCatalog.ExistenceCheckActive);
     }
 }

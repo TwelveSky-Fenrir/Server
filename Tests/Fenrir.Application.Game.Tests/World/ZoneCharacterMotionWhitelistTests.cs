@@ -59,7 +59,7 @@ public class ZoneCharacterMotionWhitelistTests
         Assert.Equal(0, state.ActionSort);
     }
 
-        [Fact]
+    [Fact]
     public void Sort31_DeadMobileOnlySibling_DisconnectsSession()
     {
         var zone = ZoneTestKit.CreateZone(1);

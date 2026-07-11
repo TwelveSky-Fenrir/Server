@@ -55,7 +55,7 @@ public class MonsterAiSystemPathfindingTests
             geometry: geometry);
     }
 
-        private static ZoneGeometry FlatGeometry()
+    private static ZoneGeometry FlatGeometry()
     {
         var plane = new Vector4(0f, 1f, 0f, GroundY);
         var triangles = new[]
@@ -70,7 +70,7 @@ public class MonsterAiSystemPathfindingTests
         return new ZoneGeometry(triangles, [root]);
     }
 
-        private static ZoneGeometry GapGeometry()
+    private static ZoneGeometry GapGeometry()
     {
         (int Col, int Row)[] cells =
         [
@@ -193,7 +193,7 @@ public class MonsterAiSystemPathfindingTests
         Assert.True(snapped, "over-budget straight-line fallback never snapped to ground");
     }
 
-        private sealed class ZeroScatterRandom : Random
+    private sealed class ZeroScatterRandom : Random
     {
         public override double NextDouble()
         {

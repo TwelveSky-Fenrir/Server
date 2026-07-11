@@ -2,10 +2,9 @@ namespace Fenrir.Application.Game.Domain.Mounts;
 
 public static class MountKillExperienceCalculator
 {
+    public const int PlaceholderBaseExperiencePerKill = 10;
 
-        public const int PlaceholderBaseExperiencePerKill = 10;
-
-        public static int ComputeGain(
+    public static int ComputeGain(
         bool isMounted, int mountActivity, int mountExperience,
         bool hasDoubleExp, bool hasSessionExpUp,
         int baseAmount = PlaceholderBaseExperiencePerKill)

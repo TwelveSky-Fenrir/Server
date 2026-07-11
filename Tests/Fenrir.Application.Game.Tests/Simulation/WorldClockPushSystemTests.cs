@@ -136,7 +136,7 @@ public sealed class WorldClockPushSystemTests
         Assert.Equal(WorldClockPushSystem.ThrottleStateJustSent, state.WorldClockPushThrottleState);
     }
 
-        private sealed class MutableTimeProvider(DateTimeOffset now) : TimeProvider
+    private sealed class MutableTimeProvider(DateTimeOffset now) : TimeProvider
     {
         public DateTimeOffset Now { get; set; } = now;
 

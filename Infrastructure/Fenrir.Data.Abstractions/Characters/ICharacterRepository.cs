@@ -7,7 +7,7 @@ public interface ICharacterRepository
 {
     public ValueTask<ReadOnlyCollection<CharacterSummaryDto>> GetByAccountAsync(int accountId, CancellationToken ct);
 
-        public ValueTask<CharacterAccountRosterBundle> GetAccountRosterAsync(int accountId, CancellationToken ct);
+    public ValueTask<CharacterAccountRosterBundle> GetAccountRosterAsync(int accountId, CancellationToken ct);
 
     public ValueTask<int> CreateAsync(
         int accountId,
@@ -27,7 +27,7 @@ public interface ICharacterRepository
         int maxMana,
         CancellationToken ct);
 
-        public ValueTask<int> CreateWithStarterKitAsync(
+    public ValueTask<int> CreateWithStarterKitAsync(
         int accountId,
         byte slot,
         string name,
@@ -58,7 +58,7 @@ public interface ICharacterRepository
 
     public ValueTask PersistPositionsAsync(IReadOnlyList<CharacterPositionTvp> rows, CancellationToken ct);
 
-        public ValueTask ClampVitalsFloorAsync(int characterId, long flushSequence, int life, int mana,
+    public ValueTask ClampVitalsFloorAsync(int characterId, long flushSequence, int life, int mana,
         CancellationToken ct);
 
     public ValueTask<CharacterWorldEntryBundle?> GetWorldEntryBundleAsync(int characterId, CancellationToken ct);
@@ -74,7 +74,7 @@ public interface ICharacterRepository
 
     public ValueTask AdjustMoneyAsync(int characterId, long deltaMoney, int deltaBigMoney, CancellationToken ct);
 
-        public ValueTask AdjustStoreMoneyAsync(int characterId, long deltaMoney, long deltaStoreMoney,
+    public ValueTask AdjustStoreMoneyAsync(int characterId, long deltaMoney, long deltaStoreMoney,
         CancellationToken ct);
 
     public ValueTask AdjustMoneyAndReplaceContainerAsync(int characterId, long deltaMoney, int deltaBigMoney,
@@ -87,10 +87,10 @@ public interface ICharacterRepository
     public ValueTask UpsertSkillSlotAsync(int characterId, byte slotIndex, int skillId, int grade,
         CancellationToken ct);
 
-        public ValueTask UpsertHotkeySlotAsync(int characterId, byte page, byte keyIndex, int sort, int value1,
+    public ValueTask UpsertHotkeySlotAsync(int characterId, byte page, byte keyIndex, int sort, int value1,
         int value2, CancellationToken ct);
 
-        public ValueTask ExecuteTradeAsync(
+    public ValueTask ExecuteTradeAsync(
         int characterA, IReadOnlyList<CharacterItemSlotTvp> itemsA0, IReadOnlyList<CharacterItemSlotTvp> itemsA1,
         long deltaMoneyA, int deltaBigMoneyA,
         int characterB, IReadOnlyList<CharacterItemSlotTvp> itemsB0, IReadOnlyList<CharacterItemSlotTvp> itemsB1,
@@ -120,7 +120,7 @@ public interface ICharacterRepository
 
     public ValueTask<int?> GetIdByNameAsync(string name, CancellationToken ct);
 
-        public ValueTask<int?> GetItemIdAtSlotAsync(int characterId, byte container, byte slot, CancellationToken ct);
+    public ValueTask<int?> GetItemIdAtSlotAsync(int characterId, byte container, byte slot, CancellationToken ct);
 
     public ValueTask<RewardClaimStateDto?> GetRewardClaimStateAsync(int characterId, int todayDate,
         CancellationToken ct);
@@ -135,15 +135,15 @@ public interface ICharacterRepository
         IReadOnlyList<CharacterItemSlotTvp> sellerItems, int buyerCharacterId, byte buyerContainer,
         IReadOnlyList<CharacterItemSlotTvp> buyerItems, int price, CancellationToken ct);
 
-        public ValueTask<int> GrantTribeTransferPermitAsync(int characterId, int delta, CancellationToken ct);
+    public ValueTask<int> GrantTribeTransferPermitAsync(int characterId, int delta, CancellationToken ct);
 
-        public ValueTask<int> AdjustDeathProtectionAsync(int characterId, int delta, CancellationToken ct);
+    public ValueTask<int> AdjustDeathProtectionAsync(int characterId, int delta, CancellationToken ct);
 
-        public ValueTask<int> AdjustZone241TimeAsync(int characterId, int delta, CancellationToken ct);
+    public ValueTask<int> AdjustZone241TimeAsync(int characterId, int delta, CancellationToken ct);
 
-        public ValueTask ApplyTribeConversionAsync(int characterId, int itemId, byte container,
+    public ValueTask ApplyTribeConversionAsync(int characterId, int itemId, byte container,
         IReadOnlyList<CharacterItemSlotTvp> items, CancellationToken ct);
 
-        public ValueTask ApplyTribeFourConversionAsync(int characterId, byte newTribe, int stepPermanent,
+    public ValueTask ApplyTribeFourConversionAsync(int characterId, byte newTribe, int stepPermanent,
         int activeQuestId, int qSort, int targetPhase, int killCounter, CancellationToken ct);
 }

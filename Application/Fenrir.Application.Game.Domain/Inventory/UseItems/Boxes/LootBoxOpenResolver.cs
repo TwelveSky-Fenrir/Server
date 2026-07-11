@@ -9,15 +9,14 @@ public static class LootBoxOpenResolver
 {
     public enum Outcome
     {
+        Success,
 
-                Success,
+        InventoryFull,
 
-                InventoryFull,
-
-                RewardNotFound
+        RewardNotFound
     }
 
-        public static SingleOpenPlan OpenSingle(BoxRewardSpec spec, byte boxContainer, byte boxSlot, ItemStack boxStack,
+    public static SingleOpenPlan OpenSingle(BoxRewardSpec spec, byte boxContainer, byte boxSlot, ItemStack boxStack,
         ImmutableDictionary<byte, ItemStack> page0, ImmutableDictionary<byte, ItemStack> page1,
         Func<int, byte?> resolveRewardSort, Random random, int today, Func<int>? rewardIdOverride = null,
         bool secondPageAccessible = true, Func<int, int>? resolveRewardSerial = null)
@@ -53,7 +52,7 @@ public static class LootBoxOpenResolver
             placement.Container, placement.Slot, placement.NewStack!.Value, boxRemaining, newPage0, newPage1);
     }
 
-        public static BulkOpenPlan OpenBulk(BoxRewardSpec spec, byte boxContainer, byte boxSlot, ItemStack boxStack,
+    public static BulkOpenPlan OpenBulk(BoxRewardSpec spec, byte boxContainer, byte boxSlot, ItemStack boxStack,
         ImmutableDictionary<byte, ItemStack> page0, ImmutableDictionary<byte, ItemStack> page1,
         Func<int, byte?> resolveRewardSort, Random random, int today, int requestedCount,
         Func<int>? rewardIdOverride = null, bool secondPageAccessible = true)
@@ -106,7 +105,7 @@ public static class LootBoxOpenResolver
         return value is { } stack ? page.SetItem(slot, stack) : page.Remove(slot);
     }
 
-        public readonly record struct SingleOpenPlan(
+    public readonly record struct SingleOpenPlan(
         Outcome Outcome,
         int RewardItemId,
         int RewardQuantity,
@@ -128,7 +127,7 @@ public static class LootBoxOpenResolver
         }
     }
 
-        public readonly record struct BulkOpenPlan(
+    public readonly record struct BulkOpenPlan(
         int OpenedCount,
         int BoxRemainingQuantity,
         ImmutableDictionary<byte, ItemStack> ProjectedPage0,
@@ -142,7 +141,7 @@ public static class LootBoxOpenResolver
         }
     }
 
-        public readonly record struct OpenedReward(
+    public readonly record struct OpenedReward(
         int RewardItemId,
         int RewardQuantity,
         BoxRewardPlacementResolver.Outcome PlacementOutcome,

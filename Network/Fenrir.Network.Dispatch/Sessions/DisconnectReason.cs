@@ -12,23 +12,23 @@ public enum DisconnectReason
     Evicted,
     Faulted,
 
-        IpBlocked,
+    IpBlocked,
 
-        Banned,
+    Banned,
 
-        IdleTimeout,
+    IdleTimeout,
 
-        ProcessingFault,
+    ProcessingFault,
 
-        TimedZoneExpired,
+    TimedZoneExpired,
 
-        GmCommandLogout,
+    GmCommandLogout,
 
-        GmKicked,
+    GmKicked,
 
-        ValleyWarForcedReset,
+    ValleyWarForcedReset,
 
-        WardrobeFull,
+    WardrobeFull,
 
-        LabyrinthMissionEnded
+    LabyrinthMissionEnded
 }

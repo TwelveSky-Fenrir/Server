@@ -56,7 +56,7 @@ public class TowerRewardBonusFormulasTests
         Assert.Equal(0f, TowerRewardBonusFormulas.XpBonusRatio(builtLevel));
     }
 
-        [Fact]
+    [Fact]
     public void LevelFourCpTower_YieldsBothPvmAndPvpBonusesSimultaneously()
     {
         Assert.Equal(2, TowerRewardBonusFormulas.CpForPvmBonus(4));
@@ -124,7 +124,7 @@ public class TowerRewardBonusTableTests
         Assert.Equal(0, bonuses[3].CpForPvpBonus);
     }
 
-        [Fact]
+    [Fact]
     public void TwoSameTypeTowersInOneTribesGroup_HighestSlotLocalIndexWins()
     {
         var towers = EmptyTowers();

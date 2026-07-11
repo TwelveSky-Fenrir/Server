@@ -8,30 +8,30 @@ public static class EquipSwapResolver
     {
         Success,
 
-                NotIdle,
+        NotIdle,
 
-                NotEquippable,
+        NotEquippable,
 
-                InvalidTargetSlot
+        InvalidTargetSlot
     }
 
-        private const int IdleActionSort = 1;
+    private const int IdleActionSort = 1;
 
-        private const int ItemSortClassificationPlaceholder = 0;
+    private const int ItemSortClassificationPlaceholder = 0;
 
-        private const int EquipCategoryLow = 6;
+    private const int EquipCategoryLow = 6;
 
     private const int EquipCategoryHigh = 33;
 
-        private static readonly ImmutableArray<byte> EquipPartTagBySlot = [2, 3, 4, 5, 6, 7, 0, 9, 10, 11, 12, 13, 14];
+    private static readonly ImmutableArray<byte> EquipPartTagBySlot = [2, 3, 4, 5, 6, 7, 0, 9, 10, 11, 12, 13, 14];
 
-        public static bool ClaimsItem(ItemRowDto item)
+    public static bool ClaimsItem(ItemRowDto item)
     {
         return item.Sort is >= EquipCategoryLow and <= EquipCategoryHigh &&
                TryDeriveEquipSlot(item.EquipInfo2, out _);
     }
 
-        public static bool TryDeriveEquipSlot(byte equipPartTag, out byte slot)
+    public static bool TryDeriveEquipSlot(byte equipPartTag, out byte slot)
     {
         if (equipPartTag != 0)
             for (byte i = 0; i < EquipPartTagBySlot.Length; i++)
@@ -72,7 +72,7 @@ public static class EquipSwapResolver
         return new Result(Outcome.Success, targetSlot, inventoryItem, previouslyEquipped);
     }
 
-        public readonly record struct Result(
+    public readonly record struct Result(
         Outcome Outcome,
         byte TargetEquipSlot,
         ItemStack NewEquipStack,

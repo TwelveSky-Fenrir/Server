@@ -6,29 +6,28 @@ public static class MountStateResolver
 {
     public enum ResultKind
     {
+        NoReply,
 
-                NoReply,
-
-                Disconnect,
+        Disconnect,
         Select,
         Deselect,
         Mount,
         Dismount,
 
-                DeleteMount,
+        DeleteMount,
 
-                DeleteAttribute
+        DeleteAttribute
     }
 
-        public const int SlotCount = 10;
+    public const int SlotCount = 10;
 
-        public const int MountedMax = 19;
+    public const int MountedMax = 19;
 
-        public const int MaxMountExp = 100_000;
+    public const int MaxMountExp = 100_000;
 
-        public const int MaxRolledAttributeTotal = 25;
+    public const int MaxRolledAttributeTotal = 25;
 
-        public const int StatSlotCount = 8;
+    public const int StatSlotCount = 8;
 
     public static Result Resolve(int sort, int value, in Context ctx)
     {
@@ -74,17 +73,17 @@ public static class MountStateResolver
         }
     }
 
-        public static int AttributeIndex(int garageSlot, int statSlotIndex)
+    public static int AttributeIndex(int garageSlot, int statSlotIndex)
     {
         return garageSlot * StatSlotCount + statSlotIndex;
     }
 
-        private static int GarageSlotOf(int animalIndex)
+    private static int GarageSlotOf(int animalIndex)
     {
         return animalIndex >= SlotCount ? animalIndex - SlotCount : animalIndex;
     }
 
-        private static Result ResolveDeleteMount(int value, in Context ctx)
+    private static Result ResolveDeleteMount(int value, in Context ctx)
     {
         if (ctx.AnimalIndex < 0 || ctx.AnimalIndex >= SlotCount)
             return new Result(ResultKind.Disconnect);
@@ -99,7 +98,7 @@ public static class MountStateResolver
         return new Result(ResultKind.Disconnect);
     }
 
-        private static Result ResolveConvertAttribute(in Context ctx)
+    private static Result ResolveConvertAttribute(in Context ctx)
     {
         if (ctx.AnimalIndex < 0 || ctx.AnimalIndex > MountedMax)
             return new Result(ResultKind.Disconnect);
@@ -115,7 +114,7 @@ public static class MountStateResolver
         return new Result(ResultKind.Disconnect);
     }
 
-        private static Result ResolveDeleteAttribute(int value, in Context ctx)
+    private static Result ResolveDeleteAttribute(int value, in Context ctx)
     {
         if (ctx.AnimalIndex < 0 || ctx.AnimalIndex > MountedMax)
             return new Result(ResultKind.Disconnect);
@@ -130,7 +129,7 @@ public static class MountStateResolver
         return new Result(ResultKind.DeleteAttribute, GarageSlot: slot, StatSlotIndex: value - 1);
     }
 
-        private static Result ResolveTransferAttribute(int value, in Context ctx)
+    private static Result ResolveTransferAttribute(int value, in Context ctx)
     {
         if (ctx.AnimalIndex < 0 || ctx.AnimalIndex > MountedMax)
             return new Result(ResultKind.NoReply);
@@ -144,14 +143,14 @@ public static class MountStateResolver
         return new Result(ResultKind.Disconnect);
     }
 
-        public readonly record struct Result(
+    public readonly record struct Result(
         ResultKind Kind,
         int NewAnimalIndex = 0,
         int NewAnimalNumber = 0,
         int GarageSlot = -1,
         int StatSlotIndex = -1);
 
-        public readonly record struct Context(
+    public readonly record struct Context(
         int AnimalIndex,
         int AnimalTime,
         int ActionSort,

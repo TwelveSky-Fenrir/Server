@@ -64,14 +64,14 @@ public static class SetBonusTables
         [77019, 77020, 77021, 77022, 77023]
     ];
 
-        public static SetCoefficients GetCoefficients(int setNumber, int slotIndex, bool isLegendaryItem)
+    public static SetCoefficients GetCoefficients(int setNumber, int slotIndex, bool isLegendaryItem)
     {
         return setNumber == 30
             ? GetSet30Coefficients(slotIndex, isLegendaryItem)
             : CoefficientsBySetNumber.GetValueOrDefault(setNumber);
     }
 
-        private static SetCoefficients GetSet30Coefficients(int slotIndex, bool isLegendaryItem)
+    private static SetCoefficients GetSet30Coefficients(int slotIndex, bool isLegendaryItem)
     {
         var factor = slotIndex switch
         {
@@ -83,25 +83,25 @@ public static class SetBonusTables
         return new SetCoefficients(factor, factor, factor, factor, factor, factor, 0f, 0f, 0.05f);
     }
 
-        public static int LinearByCombine(byte combine, int perUnit)
+    public static int LinearByCombine(byte combine, int perUnit)
     {
         var clamped = Math.Min((int)combine, 12);
         return clamped * perUnit;
     }
 
-        public static int CapeDefenseByCombine(byte combine)
+    public static int CapeDefenseByCombine(byte combine)
     {
         var clamped = Math.Min((int)combine, 12);
         return CapeDefenseByCombineTable[clamped];
     }
 
-        public static int WeaponIuSet3AttackPowerBonus(byte enchant)
+    public static int WeaponIuSet3AttackPowerBonus(byte enchant)
     {
         var clamped = Math.Min((int)enchant, 12);
         return WeaponIuSet3Table[clamped];
     }
 
-        public static int CapeIuBonus(EquippedItemSlot? capeSlot, int sort, float perUnit)
+    public static int CapeIuBonus(EquippedItemSlot? capeSlot, int sort, float perUnit)
     {
         if (capeSlot is not { } cape) return 0;
         if (cape.Item.Sort != 29) return 0;
@@ -112,7 +112,7 @@ public static class SetBonusTables
         return tens != sort ? 0 : (int)((units + 1) * perUnit);
     }
 
-        public static int DetectNxtSetNumber(byte previousTribe, IReadOnlyList<EquippedItemSlot> equipment)
+    public static int DetectNxtSetNumber(byte previousTribe, IReadOnlyList<EquippedItemSlot> equipment)
     {
         if (previousTribe > 2) return 0;
 
@@ -142,14 +142,14 @@ public static class SetBonusTables
         };
     }
 
-        public static int ResolveEffectiveSetNumber(byte previousTribe, IReadOnlyList<EquippedItemSlot> equipment,
+    public static int ResolveEffectiveSetNumber(byte previousTribe, IReadOnlyList<EquippedItemSlot> equipment,
         int legacySetNumber)
     {
         var nxt = DetectNxtSetNumber(previousTribe, equipment);
         return nxt != 0 ? nxt : legacySetNumber;
     }
 
-        public static int GetFlatLifeBonus(int setNumber)
+    public static int GetFlatLifeBonus(int setNumber)
     {
         var nxtOrSet20 = setNumber switch
         {
@@ -167,7 +167,7 @@ public static class SetBonusTables
         return nxtOrSet20 + pieceBonus + anySetBonus;
     }
 
-        public static int GetFlatManaBonus(int setNumber)
+    public static int GetFlatManaBonus(int setNumber)
     {
         var nxt = setNumber switch { 101 => 1000, 102 => 2000, 103 => 3000, _ => 0 };
         return nxt + (setNumber == 12 ? 1000 : 0) + (setNumber == 17 ? 1100 : 0);
@@ -199,7 +199,7 @@ public static class SetBonusTables
         return setNumber == 19 ? 500 : 0;
     }
 
-        public static int GetWrapperCriticalBonus(int setNumber)
+    public static int GetWrapperCriticalBonus(int setNumber)
     {
         return setNumber switch
         {

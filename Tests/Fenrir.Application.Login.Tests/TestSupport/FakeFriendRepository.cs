@@ -7,7 +7,7 @@ internal sealed class FakeFriendRepository : IFriendRepository
 {
     private readonly Dictionary<int, List<CharacterFriendDto>> _friendsByCharacterId = new();
 
-        public List<int> QueriedCharacterIds { get; } = [];
+    public List<int> QueriedCharacterIds { get; } = [];
 
     public ValueTask<ReadOnlyCollection<CharacterFriendDto>> GetByCharacterAsync(int characterId,
         CancellationToken ct)
@@ -27,7 +27,7 @@ internal sealed class FakeFriendRepository : IFriendRepository
         throw new NotSupportedException();
     }
 
-        public static FakeFriendRepository Empty()
+    public static FakeFriendRepository Empty()
     {
         return new FakeFriendRepository();
     }

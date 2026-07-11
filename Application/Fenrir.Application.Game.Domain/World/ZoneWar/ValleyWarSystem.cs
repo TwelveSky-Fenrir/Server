@@ -12,10 +12,9 @@ public sealed class ValleyWarSystem(
     Lazy<ZoneRegistry> zoneRegistry,
     ILogger<ValleyWarSystem> logger) : ISimulationSystem
 {
+    private const int DoorContextTag = 0;
 
-        private const int DoorContextTag = 0;
-
-        private const int RaceOrBossContextTag = 1;
+    private const int RaceOrBossContextTag = 1;
 
     public void Simulate(Zone zone, int legacyTicksElapsed)
     {
@@ -107,7 +106,7 @@ public sealed class ValleyWarSystem(
             DisconnectEveryone(zone);
     }
 
-        private static void SendZoneLocalCountdown(Zone zone, int contextTag, int value)
+    private static void SendZoneLocalCountdown(Zone zone, int contextTag, int value)
     {
         var packet = new ZoneWar297StatusResponse { Value00 = contextTag, Value01 = contextTag, Value02 = value };
         foreach (var player in zone.Players)
@@ -115,7 +114,7 @@ public sealed class ValleyWarSystem(
                 player.Session.Send(packet);
     }
 
-        private static void SendZoneLocalQuotas(Zone zone, ImmutableArray<int> quotas)
+    private static void SendZoneLocalQuotas(Zone zone, ImmutableArray<int> quotas)
     {
         var packet = new ZoneWar297MonsterCountResponse { MonsterNum = [.. quotas] };
         foreach (var player in zone.Players)
@@ -142,7 +141,7 @@ public sealed class ValleyWarSystem(
         }
     }
 
-        private static void DisconnectEveryone(Zone zone)
+    private static void DisconnectEveryone(Zone zone)
     {
         List<PlayerRuntimeState>? toDisconnect = null;
         foreach (var player in zone.Players)

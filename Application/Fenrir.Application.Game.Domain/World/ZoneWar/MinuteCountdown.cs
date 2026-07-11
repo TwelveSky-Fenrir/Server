@@ -4,7 +4,7 @@ public sealed class MinuteCountdown
 {
     private TimeSpan _accumulated;
 
-        public int MinutesElapsed { get; private set; }
+    public int MinutesElapsed { get; private set; }
 
     public void Reset()
     {
@@ -12,7 +12,7 @@ public sealed class MinuteCountdown
         MinutesElapsed = 0;
     }
 
-        public int Advance(TimeSpan elapsed)
+    public int Advance(TimeSpan elapsed)
     {
         _accumulated += elapsed;
         var wholeMinutes = 0;

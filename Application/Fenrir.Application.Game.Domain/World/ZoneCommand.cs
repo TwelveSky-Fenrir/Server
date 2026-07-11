@@ -14,21 +14,21 @@ public enum ZoneCommandKind : byte
     Move,
     PetAction,
 
-        MarkZoneTransferPending,
+    MarkZoneTransferPending,
 
-        SetMuted,
+    SetMuted,
 
-        CreditRegularWarConclusion,
+    CreditRegularWarConclusion,
 
-        GrantValleyWarRewardDrop,
+    GrantValleyWarRewardDrop,
 
-        CreditZone038Occupation,
+    CreditZone038Occupation,
 
-        ApplyRegularWarReward,
+    ApplyRegularWarReward,
 
-        SummonRegularWarBoss,
+    SummonRegularWarBoss,
 
-        BroadcastDuelStart
+    BroadcastDuelStart
 }
 
 public readonly struct ZoneCommand
@@ -36,25 +36,25 @@ public readonly struct ZoneCommand
     public required ZoneCommandKind Kind { get; init; }
     public required int CharacterId { get; init; }
 
-        public ActionInfo Action { get; init; }
+    public ActionInfo Action { get; init; }
 
-        public bool IsResumeAction { get; init; }
+    public bool IsResumeAction { get; init; }
 
-        public PlayerEnterData? EnterData { get; init; }
+    public PlayerEnterData? EnterData { get; init; }
 
-        public Zone? HandoffTarget { get; init; }
+    public Zone? HandoffTarget { get; init; }
 
-        public (float X, float Y, float Z)? HandoffPosition { get; init; }
+    public (float X, float Y, float Z)? HandoffPosition { get; init; }
 
-        public bool Muted { get; init; }
+    public bool Muted { get; init; }
 
-        public byte WinningTribe { get; init; }
+    public byte WinningTribe { get; init; }
 
-        public RegularWarRewardGrant RegularWarReward { get; init; }
+    public RegularWarRewardGrant RegularWarReward { get; init; }
 
-        public int DuelOpponentCharacterId { get; init; }
+    public int DuelOpponentCharacterId { get; init; }
 
-        public int DuelUniqueNumber { get; init; }
+    public int DuelUniqueNumber { get; init; }
 
     public static ZoneCommand Enter(int characterId, PlayerEnterData data)
     {
@@ -80,32 +80,32 @@ public readonly struct ZoneCommand
         };
     }
 
-        public static ZoneCommand PetAction(int characterId, in ActionInfo action)
+    public static ZoneCommand PetAction(int characterId, in ActionInfo action)
     {
         return new ZoneCommand { Kind = ZoneCommandKind.PetAction, CharacterId = characterId, Action = action };
     }
 
-        public static ZoneCommand MarkZoneTransferPending(int characterId)
+    public static ZoneCommand MarkZoneTransferPending(int characterId)
     {
         return new ZoneCommand { Kind = ZoneCommandKind.MarkZoneTransferPending, CharacterId = characterId };
     }
 
-        public static ZoneCommand SetMuted(int characterId, bool muted)
+    public static ZoneCommand SetMuted(int characterId, bool muted)
     {
         return new ZoneCommand { Kind = ZoneCommandKind.SetMuted, CharacterId = characterId, Muted = muted };
     }
 
-        public static ZoneCommand CreditRegularWarConclusion(int characterId)
+    public static ZoneCommand CreditRegularWarConclusion(int characterId)
     {
         return new ZoneCommand { Kind = ZoneCommandKind.CreditRegularWarConclusion, CharacterId = characterId };
     }
 
-        public static ZoneCommand GrantValleyWarRewardDrop(int characterId)
+    public static ZoneCommand GrantValleyWarRewardDrop(int characterId)
     {
         return new ZoneCommand { Kind = ZoneCommandKind.GrantValleyWarRewardDrop, CharacterId = characterId };
     }
 
-        public static ZoneCommand CreditZone038Occupation(int characterId, byte winningTribe)
+    public static ZoneCommand CreditZone038Occupation(int characterId, byte winningTribe)
     {
         return new ZoneCommand
         {
@@ -113,7 +113,7 @@ public readonly struct ZoneCommand
         };
     }
 
-        public static ZoneCommand ApplyRegularWarReward(RegularWarRewardGrant grant)
+    public static ZoneCommand ApplyRegularWarReward(RegularWarRewardGrant grant)
     {
         return new ZoneCommand
         {
@@ -121,12 +121,12 @@ public readonly struct ZoneCommand
         };
     }
 
-        public static ZoneCommand SummonRegularWarBoss()
+    public static ZoneCommand SummonRegularWarBoss()
     {
         return new ZoneCommand { Kind = ZoneCommandKind.SummonRegularWarBoss, CharacterId = 0 };
     }
 
-        public static ZoneCommand BroadcastDuelStart(int requesterCharacterId, int opponentCharacterId,
+    public static ZoneCommand BroadcastDuelStart(int requesterCharacterId, int opponentCharacterId,
         int duelUniqueNumber)
     {
         return new ZoneCommand

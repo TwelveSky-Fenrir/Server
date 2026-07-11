@@ -18,10 +18,9 @@ public sealed class DowngradeItemRankService(
     ILogger<DowngradeItemRankService> logger)
     : IDowngradeItemRankService
 {
+    private const short DowngradeItemRankEventCode = 28;
 
-        private const short DowngradeItemRankEventCode = 28;
-
-        private const byte SuccessOutcome = 0;
+    private const byte SuccessOutcome = 0;
 
     private const byte FailedOutcome = 1;
 

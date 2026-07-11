@@ -18,6 +18,7 @@ BEGIN
     SET
         XACT_ABORT ON;
 
-    DELETE FROM admin.FirewallRules
+    DELETE
+    FROM admin.FirewallRules
     WHERE RuleType IN (0, 2, 4, 5);
 END;

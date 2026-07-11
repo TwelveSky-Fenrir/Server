@@ -52,7 +52,7 @@ public sealed class AllianceDiplomacyCeremonyHost(
         }
     }
 
-        public void Tick()
+    public void Tick()
     {
         if (!zoneRegistry.TryGet(_site.MapId, out var zone) || zone is null)
             return;

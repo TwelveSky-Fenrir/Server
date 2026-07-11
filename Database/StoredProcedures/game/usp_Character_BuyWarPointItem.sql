@@ -8,9 +8,9 @@
 -- field mirrored through the tribe-progress channel (same split the ordinary NPC-buy path uses), and every live
 -- catalogue row charges 0 CP anyway (WarPointSystem.h:79-140).
 CREATE PROCEDURE game.usp_Character_BuyWarPointItem @CharacterId INT,
-                                                     @WarPointCost INT,
-                                                     @Container TINYINT,
-                                                     @Items game.tvp_CharacterItemSlot READONLY
+                                                    @WarPointCost INT,
+                                                    @Container TINYINT,
+                                                    @Items game.tvp_CharacterItemSlot READONLY
 AS
 BEGIN
     SET NOCOUNT ON;

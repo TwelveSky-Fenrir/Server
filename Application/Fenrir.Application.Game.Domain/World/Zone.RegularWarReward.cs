@@ -5,20 +5,19 @@ namespace Fenrir.Application.Game.Domain.World;
 
 public sealed partial class Zone
 {
-
-        private const int RegularWarRewardItemWhiteFeather = 695;
+    private const int RegularWarRewardItemWhiteFeather = 695;
 
     private const int RegularWarRewardItemCostumeStone30Percent = 8102;
 
-        private const int RegularWarExperienceChangeSort = 1;
+    private const int RegularWarExperienceChangeSort = 1;
 
-        private const int RegularWarContributionPointChangeSort = 3;
+    private const int RegularWarContributionPointChangeSort = 3;
 
-        private const int RegularWarMoneyChangeSort = 23;
+    private const int RegularWarMoneyChangeSort = 23;
 
-        private const int RegularWarHeroRankMinimumCombinedLevel = 113;
+    private const int RegularWarHeroRankMinimumCombinedLevel = 113;
 
-        private void HandleApplyRegularWarReward(in RegularWarRewardGrant grant)
+    private void HandleApplyRegularWarReward(in RegularWarRewardGrant grant)
     {
         if (!_players.TryGetValue(grant.CharacterId, out var state))
             return;

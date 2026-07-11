@@ -75,7 +75,8 @@ public class TreasureChestDropTableTests
     [Fact]
     public void Roll_UsesPlainUniformDraw_DeterministicForAFixedSeed()
     {
-        var expected = TreasureChestDropTable.Resolve(new Random(12345).Next(TreasureChestDropTable.RollExclusiveUpperBound));
+        var expected =
+            TreasureChestDropTable.Resolve(new Random(12345).Next(TreasureChestDropTable.RollExclusiveUpperBound));
         var actual = TreasureChestDropTable.Roll(new Random(12345));
 
         Assert.Equal(expected, actual);

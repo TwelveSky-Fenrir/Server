@@ -8,53 +8,52 @@ public enum EventLogCategory : byte
     ItemDestroy = 3,
     Enchant = 4,
 
-        GmAction = 5,
+    GmAction = 5,
 
     Death = 6,
     Session = 7,
     AccountSecurity = 8,
 
-        CashItemUse = 9,
+    CashItemUse = 9,
 
-        ItemDrop = 10,
+    ItemDrop = 10,
 
-        GuildMoney = 11,
+    GuildMoney = 11,
 
-        PlayTimeExchange = 12,
+    PlayTimeExchange = 12,
 
-        ItemUse = 13,
+    ItemUse = 13,
 
-        ProxyShop = 14,
+    ProxyShop = 14,
 
-        CosmeticDelete = 15,
+    CosmeticDelete = 15,
 
-        NpcShopTrade = 16,
+    NpcShopTrade = 16,
 
-        StoreSlotItem = 17,
+    StoreSlotItem = 17,
 
-        SaveSlotItem = 18,
+    SaveSlotItem = 18,
 
-        StoreSlotMoney = 19,
+    StoreSlotMoney = 19,
 
-        SaveSlotMoney = 20,
+    SaveSlotMoney = 20,
 
-        MountAttribute = 21,
+    MountAttribute = 21,
 
-        CashShopPurchase = 22,
+    CashShopPurchase = 22,
 
-        ItemPickup = 23,
+    ItemPickup = 23,
 
-        PetInventoryTransfer = 24,
+    PetInventoryTransfer = 24,
 
-        BigMoneyConversion = 25,
+    BigMoneyConversion = 25,
 
-        AntiCheat = 26
+    AntiCheat = 26
 }
 
 public interface IEventLogRepository
 {
-
-        public ValueTask LogAsync(
+    public ValueTask LogAsync(
         short eventCode,
         EventLogCategory category,
         int? actorAccountId,
@@ -70,5 +69,5 @@ public interface IEventLogRepository
         string? payload,
         CancellationToken ct);
 
-        public ValueTask BatchLogAsync(IReadOnlyList<EventLogEntryTvp> rows, CancellationToken ct);
+    public ValueTask BatchLogAsync(IReadOnlyList<EventLogEntryTvp> rows, CancellationToken ct);
 }

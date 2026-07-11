@@ -10,10 +10,9 @@ public readonly record struct MonsterBossSummonCandidate(
 
 public enum MonsterBossSummonState : byte
 {
+    Reload = 1,
 
-        Reload = 1,
+    Check = 2,
 
-        Check = 2,
-
-        Wait = 3
+    Wait = 3
 }

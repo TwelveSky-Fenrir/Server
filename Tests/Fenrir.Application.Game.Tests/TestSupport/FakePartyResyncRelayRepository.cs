@@ -7,9 +7,9 @@ internal sealed class FakePartyResyncRelayRepository : IPartyResyncRelayReposito
 {
     public List<PartyResyncRelayEntry> Published { get; } = [];
 
-        public List<PartyResyncRelayDto> NextPoll { get; set; } = [];
+    public List<PartyResyncRelayDto> NextPoll { get; set; } = [];
 
-        public Exception? ThrowOnPublish { get; set; }
+    public Exception? ThrowOnPublish { get; set; }
 
     public ValueTask PublishAsync(PartyResyncRelayEntry entry, CancellationToken ct)
     {

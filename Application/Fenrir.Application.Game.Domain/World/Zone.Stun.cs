@@ -7,22 +7,21 @@ namespace Fenrir.Application.Game.Domain.World;
 
 public sealed partial class Zone
 {
+    private const int StunActionSort = 11;
 
-        private const int StunActionSort = 11;
+    private const int IdleActionSort = 1;
 
-        private const int IdleActionSort = 1;
+    private const int StunDefenseBuffSlot = 13;
 
-        private const int StunDefenseBuffSlot = 13;
+    private const int CriticalBuffSlot = 10;
 
-        private const int CriticalBuffSlot = 10;
+    private const int TeamStunLockDeathThreshold = 10;
 
-        private const int TeamStunLockDeathThreshold = 10;
+    private readonly List<int> _idleNeighborScratch = [];
 
-        private readonly List<int> _idleNeighborScratch = [];
+    private readonly List<int> _stunNeighborScratch = [];
 
-        private readonly List<int> _stunNeighborScratch = [];
-
-        private void ApplyStunAttack(in CombatCommand command)
+    private void ApplyStunAttack(in CombatCommand command)
     {
         if (!_players.TryGetValue(command.AttackerCharacterId, out var attackerState))
             return;
@@ -74,7 +73,7 @@ public sealed partial class Zone
             ApplyTeamStunSubMechanic(attackerState, defenderState);
     }
 
-        private void ApplyUnstunAttack(in CombatCommand command)
+    private void ApplyUnstunAttack(in CombatCommand command)
     {
         if (!_players.TryGetValue(command.AttackerCharacterId, out var curerState))
             return;
@@ -112,7 +111,7 @@ public sealed partial class Zone
         ClearStun(targetState);
     }
 
-        public void ClearStun(PlayerRuntimeState state)
+    public void ClearStun(PlayerRuntimeState state)
     {
         if (!state.IsStunned)
             return;
@@ -126,7 +125,7 @@ public sealed partial class Zone
         BroadcastIdleActionState(state);
     }
 
-        private void ApplyTeamStunSubMechanic(PlayerRuntimeState attackerState, PlayerRuntimeState defenderState)
+    private void ApplyTeamStunSubMechanic(PlayerRuntimeState attackerState, PlayerRuntimeState defenderState)
     {
         var members = _partyRegistry.GetMembers(attackerState.CharacterId);
         if (members.Count != PartyRegistry.MaxMembers)
@@ -166,7 +165,7 @@ public sealed partial class Zone
                duel.OpponentOf(attackerId) == defenderId;
     }
 
-        private static int FindFirstLearnedSkill(PlayerRuntimeState state,
+    private static int FindFirstLearnedSkill(PlayerRuntimeState state,
         ImmutableArray<int> candidateIds, out int grade)
     {
         foreach (var slot in state.LearnedSkills.Keys.Order())

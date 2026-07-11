@@ -16,12 +16,11 @@ public sealed class TitleRemoveScrollUseItemHandler(
     IEventLogRepository eventLog,
     ILogger<TitleRemoveScrollUseItemHandler> logger) : IUseItemHandler
 {
-
-        public static readonly ImmutableArray<int> HandledItemIds = [1200, 8419, 1494];
-
-        private const short TitleRemoveRefundEventCode = 4;
+    private const short TitleRemoveRefundEventCode = 4;
 
     private const byte SuccessOutcome = 1;
+
+    public static readonly ImmutableArray<int> HandledItemIds = [1200, 8419, 1494];
 
     public async ValueTask<UseInventoryItemResponse> HandleAsync(UseItemContext context,
         CancellationToken cancellationToken)

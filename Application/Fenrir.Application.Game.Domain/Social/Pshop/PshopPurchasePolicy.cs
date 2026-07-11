@@ -12,26 +12,26 @@ public static class PshopPurchasePolicy
         Success,
         UnknownItem,
 
-                BarredFromShopSale,
+        BarredFromShopSale,
 
         PriceOutOfRange,
         InvalidStackQuantity,
 
-                InventoryMismatch
+        InventoryMismatch
     }
 
     public enum PurchaseOutcome
     {
         Success,
 
-                DestinationConflict
+        DestinationConflict
     }
 
     public const int MaxPages = 5;
     public const int MaxSlots = 5;
     public const int FieldsPerSlot = 9;
 
-        public const int MaxSellPrice = 999_999_999;
+    public const int MaxSellPrice = 999_999_999;
 
     public static int FlatIndex(int page, int slot)
     {
@@ -45,7 +45,7 @@ public static class PshopPurchasePolicy
         return new SlotView(a[i], a[i + 1], a[i + 2], a[i + 3], a[i + 4], a[i + 5], a[i + 6], a[i + 7], a[i + 8]);
     }
 
-        public static OpenSlotOutcome ValidateOpenSlot(SlotView slot, ItemDefinition? itemDefinition, ItemStack? liveSlot)
+    public static OpenSlotOutcome ValidateOpenSlot(SlotView slot, ItemDefinition? itemDefinition, ItemStack? liveSlot)
     {
         if (itemDefinition is null)
             return OpenSlotOutcome.UnknownItem;
@@ -67,7 +67,7 @@ public static class PshopPurchasePolicy
         return OpenSlotOutcome.Success;
     }
 
-        public static PurchaseResult ResolvePurchase(SlotView listing, ItemDefinition itemDefinition,
+    public static PurchaseResult ResolvePurchase(SlotView listing, ItemDefinition itemDefinition,
         ItemStack? destinationSlot)
     {
         var (enchant, combine, refine, socket) = ItemValueCodec.Decode(listing.Value);

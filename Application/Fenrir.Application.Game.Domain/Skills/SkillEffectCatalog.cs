@@ -76,8 +76,7 @@ public static class SkillEffectCatalog
 
 public enum SkillEffectKind
 {
-
-        None,
+    None,
 
     SelfBuff,
     HealLife,

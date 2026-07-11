@@ -12,14 +12,14 @@ public static class SkillBookCraftCatalog
     public const int WarGodMaterial3ItemId = 99303;
     public const int WarGodMaterial4ItemId = 99304;
 
-        public static readonly (int Material1, int Material2, int Material3, int Material4, int ResultItemId)[] Recipes =
+    public static readonly (int Material1, int Material2, int Material3, int Material4, int ResultItemId)[] Recipes =
     [
         (1054, 1055, 1056, 1057, 90567),
         (1058, 1059, 1060, 1061, 90568),
         (1062, 1063, 1064, 1065, 90569)
     ];
 
-        public static readonly int[][] WarGodSkillsByTribe =
+    public static readonly int[][] WarGodSkillsByTribe =
     [
         [90787, 90786, 90788],
         [90789, 90790, 90791],

@@ -4,8 +4,7 @@ namespace Fenrir.Application.Game.Domain.Combat;
 
 public static class KillFeedEndOfBattleRewardCalculator
 {
-
-        public static ImmutableArray<RankReward> ComputeRankRewards(ImmutableArray<KillFeedRankedEntry> topThree,
+    public static ImmutableArray<RankReward> ComputeRankRewards(ImmutableArray<KillFeedRankedEntry> topThree,
         bool isFfaMap, bool isZone267)
     {
         if (topThree.IsDefaultOrEmpty)
@@ -35,5 +34,5 @@ public static class KillFeedEndOfBattleRewardCalculator
         return builder.MoveToImmutable();
     }
 
-        public readonly record struct RankReward(int CharacterId, int ContributionPoints);
+    public readonly record struct RankReward(int CharacterId, int ContributionPoints);
 }

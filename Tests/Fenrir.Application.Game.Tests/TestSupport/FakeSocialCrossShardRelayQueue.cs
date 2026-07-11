@@ -6,7 +6,7 @@ internal sealed class FakeSocialCrossShardRelayQueue : ISocialCrossShardRelayQue
 {
     public List<SocialCrossShardRelayEntry> Enqueued { get; } = [];
 
-        public bool RejectNext { get; set; }
+    public bool RejectNext { get; set; }
 
     public bool Enqueue(SocialCrossShardRelayEntry entry)
     {

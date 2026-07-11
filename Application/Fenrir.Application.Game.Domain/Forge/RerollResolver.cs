@@ -16,7 +16,7 @@ public static class RerollResolver
     private const int MaxBaseLevel = 145;
     private const int MaxMartialLevel = 12;
 
-        private const int Mg5OriginRareTopPrice = 250_000_000;
+    private const int Mg5OriginRareTopPrice = 250_000_000;
 
     private const int Mg5OriginEliteTopPrice = 500_000_000;
 
@@ -42,7 +42,7 @@ public static class RerollResolver
     private static readonly short[] EliteLevelTiers =
         [100, 110, 113, 115, 118, 121, 124, 127, 130, 133, 136, 139, 142];
 
-        public static RerollResult Resolve(
+    public static RerollResult Resolve(
         ItemRowDto targetItem, byte previousTribe,
         IEnumerable<ItemRowDto> catalog, IRandomSource random)
     {
@@ -142,7 +142,7 @@ public static class RerollResolver
         return candidates.Count == 0 ? null : candidates[random.NextInt32(candidates.Count)];
     }
 
-        private static int GetExchangeMoney(ItemRowDto item)
+    private static int GetExchangeMoney(ItemRowDto item)
     {
         var isRare = item.Type == RareItemType;
 

@@ -254,7 +254,7 @@ public class LoginTrainTests
         return result;
     }
 
-        private sealed class CharacterRosterDtoBuilder(
+    private sealed class CharacterRosterDtoBuilder(
         int characterId,
         byte slot,
         string name,

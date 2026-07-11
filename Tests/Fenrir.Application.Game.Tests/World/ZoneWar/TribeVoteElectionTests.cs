@@ -33,7 +33,7 @@ public class TribeVoteElectionTests
         return service;
     }
 
-        private static PlayerRuntimeState CreatePlayer(int characterId, byte tribe, short level = 145,
+    private static PlayerRuntimeState CreatePlayer(int characterId, byte tribe, short level = 145,
         int contributionPoints = 1000, int rebirthCount = 6, short level2 = 12)
     {
         var (session, _) = ZoneTestKit.CreateSession(characterId);

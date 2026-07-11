@@ -39,39 +39,39 @@ public sealed class UseInventoryItemService(
 {
     private const byte BottleSort = 26;
 
-        private const int TowerConstructItemId = 665;
+    private const int TowerConstructItemId = 665;
 
-        private const int TowerHealItemId = 667;
+    private const int TowerHealItemId = 667;
 
-        private const byte SkillGrimoireSort = 5;
+    private const byte SkillGrimoireSort = 5;
 
-        private const short SkillGrimoireItemConsumedEventCode = 2;
+    private const short SkillGrimoireItemConsumedEventCode = 2;
 
-        private const short SkillGrimoireSkillLearnedEventCode = 3;
+    private const short SkillGrimoireSkillLearnedEventCode = 3;
 
-        private const byte SkillGrimoireLearnSuccessOutcome = 1;
+    private const byte SkillGrimoireLearnSuccessOutcome = 1;
 
-        private const byte GpTicketCashCreditReason = 2;
+    private const byte GpTicketCashCreditReason = 2;
 
-        private const short GpTicketRedeemedEventCode = 1;
+    private const short GpTicketRedeemedEventCode = 1;
 
-        private const short ProxyShopRentalExtensionEventCode = 2;
+    private const short ProxyShopRentalExtensionEventCode = 2;
 
-        private const short PetExpBoostPillUsedEventCode = 3;
+    private const short PetExpBoostPillUsedEventCode = 3;
 
     private const int LodTicketItemId = 1434;
     private const int FactionNoticeItemId = 566;
     private const int TaiyanKeyItemId = 1049;
 
-        private const short TeleportRecallScrollUsedEventCode = 1;
+    private const short TeleportRecallScrollUsedEventCode = 1;
 
-        private const byte TeleportRecallScrollSuccessOutcome = 1;
+    private const byte TeleportRecallScrollSuccessOutcome = 1;
 
-        private const short StatPotionUsedEventCode = 4;
+    private const short StatPotionUsedEventCode = 4;
 
-        private const byte StatPotionSuccessOutcome = 1;
+    private const byte StatPotionSuccessOutcome = 1;
 
-        private static readonly ImmutableHashSet<int> TribeConversionBookItemIds =
+    private static readonly ImmutableHashSet<int> TribeConversionBookItemIds =
         ImmutableHashSet.Create(99014, 99015, 99016);
 
     public async ValueTask<UseInventoryItemResponse> ResolveAsync(Zone zone, PlayerRuntimeState state,
@@ -164,7 +164,7 @@ public sealed class UseInventoryItemService(
         return Fail(characterId, item, page, index);
     }
 
-        private static short StatPotionSubTypeEventCode(StatPotionKind kind, StatPotionTier tier)
+    private static short StatPotionSubTypeEventCode(StatPotionKind kind, StatPotionTier tier)
     {
         var isG12 = tier == StatPotionTier.G12;
         return kind switch
@@ -216,7 +216,7 @@ public sealed class UseInventoryItemService(
         return response;
     }
 
-        private async ValueTask<UseInventoryItemResponse> ResolveSkillGrimoireAsync(Zone zone, PlayerRuntimeState state,
+    private async ValueTask<UseInventoryItemResponse> ResolveSkillGrimoireAsync(Zone zone, PlayerRuntimeState state,
         int characterId, int accountId, byte page, byte index, ItemStack item, ItemDefinition itemDefinition,
         CancellationToken cancellationToken)
     {
@@ -255,7 +255,7 @@ public sealed class UseInventoryItemService(
         return await ConsumeAndMirrorAsync(zone, state, characterId, page, index, item, cancellationToken);
     }
 
-        private async ValueTask<UseInventoryItemResponse> ResolveGpTicketAsync(Zone zone, PlayerRuntimeState state,
+    private async ValueTask<UseInventoryItemResponse> ResolveGpTicketAsync(Zone zone, PlayerRuntimeState state,
         int characterId, int accountId, byte page, byte index, ItemStack item, int creditAmount,
         CancellationToken cancellationToken)
     {
@@ -296,7 +296,7 @@ public sealed class UseInventoryItemService(
         return response;
     }
 
-        private async ValueTask<UseInventoryItemResponse> ResolveGuildScrollAsync(Zone zone, PlayerRuntimeState state,
+    private async ValueTask<UseInventoryItemResponse> ResolveGuildScrollAsync(Zone zone, PlayerRuntimeState state,
         int characterId, byte page, byte index, ItemStack item, int minutes, CancellationToken cancellationToken)
     {
         if (state.GuildId is not { } guildId)
@@ -322,7 +322,7 @@ public sealed class UseInventoryItemService(
         return await ConsumeAndMirrorAsync(zone, state, characterId, page, index, item, cancellationToken);
     }
 
-        private async ValueTask<UseInventoryItemResponse> ResolveProxyShopRentalExtensionAsync(Zone zone,
+    private async ValueTask<UseInventoryItemResponse> ResolveProxyShopRentalExtensionAsync(Zone zone,
         PlayerRuntimeState state, int characterId, byte page, byte index, ItemStack item,
         CancellationToken cancellationToken)
     {
@@ -387,7 +387,7 @@ public sealed class UseInventoryItemService(
         return response;
     }
 
-        private async ValueTask<UseInventoryItemResponse> ResolveTeleportRecallScrollAsync(int characterId,
+    private async ValueTask<UseInventoryItemResponse> ResolveTeleportRecallScrollAsync(int characterId,
         int accountId, byte page, byte index, ItemStack item, int value, CancellationToken cancellationToken)
     {
         if (item.Quantity < 1)
@@ -409,7 +409,7 @@ public sealed class UseInventoryItemService(
         return itemId is 1109 or 1224 or 1026;
     }
 
-        private static StatPotionSpec? ResolveStatPotionSpec(int itemId)
+    private static StatPotionSpec? ResolveStatPotionSpec(int itemId)
     {
         return itemId switch
         {
@@ -441,7 +441,7 @@ public sealed class UseInventoryItemService(
         };
     }
 
-        private static int CurrentStatPotionSubValue(PlayerRuntimeState state, StatPotionKind kind)
+    private static int CurrentStatPotionSubValue(PlayerRuntimeState state, StatPotionKind kind)
     {
         return kind switch
         {
@@ -455,7 +455,7 @@ public sealed class UseInventoryItemService(
         };
     }
 
-        private static int ResolvedStatPotionRawCounter(PlayerRuntimeState state, StatPotionKind kind, int newSubValue)
+    private static int ResolvedStatPotionRawCounter(PlayerRuntimeState state, StatPotionKind kind, int newSubValue)
     {
         return kind switch
         {
@@ -467,7 +467,7 @@ public sealed class UseInventoryItemService(
         };
     }
 
-        private async ValueTask<UseInventoryItemResponse> ResolveStatPotionAsync(Zone zone, PlayerRuntimeState state,
+    private async ValueTask<UseInventoryItemResponse> ResolveStatPotionAsync(Zone zone, PlayerRuntimeState state,
         int characterId, int accountId, byte page, byte index, ItemStack item, StatPotionKind kind,
         StatPotionTier tier, int requestedValue, CancellationToken cancellationToken)
     {
@@ -563,7 +563,7 @@ public sealed class UseInventoryItemService(
             { Result = 0, Page = page, Index = index, Value = requestedValue, Value2 = 0 };
     }
 
-        private async ValueTask<UseInventoryItemResponse> ResolveLodTicketAsync(Zone zone, PlayerRuntimeState state,
+    private async ValueTask<UseInventoryItemResponse> ResolveLodTicketAsync(Zone zone, PlayerRuntimeState state,
         int characterId, byte page, byte index, ItemStack item, CancellationToken cancellationToken)
     {
         var resolved = LodTicketResolver.Resolve(state.Level, state.RebirthCount, item.Quantity, state.LodRounds);
@@ -580,7 +580,7 @@ public sealed class UseInventoryItemService(
         return consumed with { Value = resolved.NewLodRounds };
     }
 
-        private static StatResetResolver.LevelBand? ResolveStatsClearBand(int itemId)
+    private static StatResetResolver.LevelBand? ResolveStatsClearBand(int itemId)
     {
         return itemId switch
         {
@@ -592,7 +592,7 @@ public sealed class UseInventoryItemService(
         };
     }
 
-        private static StatResetResolver.LevelBand? ResolveStatCleanseBand(int itemId)
+    private static StatResetResolver.LevelBand? ResolveStatCleanseBand(int itemId)
     {
         return itemId switch
         {
@@ -604,7 +604,7 @@ public sealed class UseInventoryItemService(
         };
     }
 
-        private async ValueTask<UseInventoryItemResponse> ResolveStatsClearAsync(Zone zone, PlayerRuntimeState state,
+    private async ValueTask<UseInventoryItemResponse> ResolveStatsClearAsync(Zone zone, PlayerRuntimeState state,
         int characterId, byte page, byte index, ItemStack item, StatResetResolver.LevelBand requiredBand,
         CancellationToken cancellationToken)
     {
@@ -628,7 +628,7 @@ public sealed class UseInventoryItemService(
         return await ConsumeAndMirrorAsync(zone, state, characterId, page, index, item, cancellationToken);
     }
 
-        private async ValueTask<UseInventoryItemResponse> ResolveStatCleanseAsync(Zone zone, PlayerRuntimeState state,
+    private async ValueTask<UseInventoryItemResponse> ResolveStatCleanseAsync(Zone zone, PlayerRuntimeState state,
         int characterId, byte page, byte index, ItemStack item, StatResetResolver.LevelBand requiredBand, int selector,
         CancellationToken cancellationToken)
     {
@@ -697,10 +697,10 @@ public sealed class UseInventoryItemService(
         var petContribution = PetGrowthCalculator.Compute(petItemId, state.PetGrowth, state.PetActivity,
             worldData.ItemsById);
         return EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData, state.Buffs,
-            petContribution, runtimeState: state, consumableOverride: consumableOverride);
+            petContribution, state, consumableOverride);
     }
 
-        private static CharmChargeSpec? ResolveCharmFamily(int itemId)
+    private static CharmChargeSpec? ResolveCharmFamily(int itemId)
     {
         return itemId switch
         {
@@ -715,7 +715,7 @@ public sealed class UseInventoryItemService(
         };
     }
 
-        private async ValueTask<UseInventoryItemResponse> ResolveProtectionCharmAsync(Zone zone, PlayerRuntimeState state,
+    private async ValueTask<UseInventoryItemResponse> ResolveProtectionCharmAsync(Zone zone, PlayerRuntimeState state,
         int characterId, byte page, byte index, ItemStack item, int requestedValue,
         ProtectionCharmCounterKind kind, int perUnitAmount, CancellationToken cancellationToken)
     {
@@ -783,7 +783,7 @@ public sealed class UseInventoryItemService(
         };
     }
 
-        private static ScrollChargeSpec? ResolveScrollFamily(int itemId)
+    private static ScrollChargeSpec? ResolveScrollFamily(int itemId)
     {
         return itemId switch
         {
@@ -801,7 +801,7 @@ public sealed class UseInventoryItemService(
         };
     }
 
-        private async ValueTask<UseInventoryItemResponse> ResolveProtectionScrollAsync(Zone zone, PlayerRuntimeState state,
+    private async ValueTask<UseInventoryItemResponse> ResolveProtectionScrollAsync(Zone zone, PlayerRuntimeState state,
         int characterId, byte page, byte index, ItemStack item, ProtectionScrollCounterKind kind, int fixedAmount,
         CancellationToken cancellationToken)
     {
@@ -839,7 +839,7 @@ public sealed class UseInventoryItemService(
         return await ConsumeAndMirrorAsync(zone, state, characterId, page, index, item, cancellationToken);
     }
 
-        private async ValueTask<UseInventoryItemResponse> ResolvePetExpBoostPillAsync(Zone zone,
+    private async ValueTask<UseInventoryItemResponse> ResolvePetExpBoostPillAsync(Zone zone,
         PlayerRuntimeState state, int characterId, int accountId, byte page, byte index, ItemStack item,
         int requestedValue, CancellationToken cancellationToken)
     {
@@ -887,7 +887,7 @@ public sealed class UseInventoryItemService(
         };
     }
 
-        private async ValueTask<UseInventoryItemResponse> ResolveRebirthPillAsync(Zone zone, PlayerRuntimeState state,
+    private async ValueTask<UseInventoryItemResponse> ResolveRebirthPillAsync(Zone zone, PlayerRuntimeState state,
         int characterId, byte page, byte index, ItemStack item, CancellationToken cancellationToken)
     {
         if (!RebirthProgression.IsHighLevelExperienceFull(state.Level2, state.Exp2) ||
@@ -904,7 +904,7 @@ public sealed class UseInventoryItemService(
         var petContribution = PetGrowthCalculator.Compute(petItemId, state.PetGrowth, state.PetActivity,
             worldData.ItemsById);
         var updatedStats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData, state.Buffs,
-            petContribution, runtimeState: state);
+            petContribution, state);
 
         var response = await ConsumeAndMirrorAsync(zone, state, characterId, page, index, item, cancellationToken);
 
@@ -922,7 +922,7 @@ public sealed class UseInventoryItemService(
         return response;
     }
 
-        private async ValueTask<UseInventoryItemResponse> ResolveFactionNoticeAsync(Zone zone, PlayerRuntimeState state,
+    private async ValueTask<UseInventoryItemResponse> ResolveFactionNoticeAsync(Zone zone, PlayerRuntimeState state,
         int characterId, byte page, byte index, ItemStack item, CancellationToken cancellationToken)
     {
         var resolved = CashTimerResolver.ResolveFactionNotice(state.TribeNotifyScrollCount);
@@ -939,7 +939,7 @@ public sealed class UseInventoryItemService(
         return await ConsumeAndMirrorAsync(zone, state, characterId, page, index, item, cancellationToken);
     }
 
-        private async ValueTask<UseInventoryItemResponse> ResolveTaiyanKeyAsync(Zone zone, PlayerRuntimeState state,
+    private async ValueTask<UseInventoryItemResponse> ResolveTaiyanKeyAsync(Zone zone, PlayerRuntimeState state,
         int characterId, byte page, byte index, ItemStack item, CancellationToken cancellationToken)
     {
         var resolved = CashTimerResolver.ResolveTaiyanKey(state.Level, state.TaiyanKeyTimer);
@@ -955,7 +955,7 @@ public sealed class UseInventoryItemService(
         return await ConsumeAndMirrorAsync(zone, state, characterId, page, index, item, cancellationToken);
     }
 
-        private async ValueTask<UseInventoryItemResponse> ConsumeAndMirrorAsync(Zone zone, PlayerRuntimeState state,
+    private async ValueTask<UseInventoryItemResponse> ConsumeAndMirrorAsync(Zone zone, PlayerRuntimeState state,
         int characterId, byte page, byte index, ItemStack item, CancellationToken cancellationToken,
         [CallerMemberName] string resolver = "")
     {
@@ -984,7 +984,7 @@ public sealed class UseInventoryItemService(
         return response;
     }
 
-        private static int? GuildScrollBuffMinutes(int itemId)
+    private static int? GuildScrollBuffMinutes(int itemId)
     {
         return itemId switch
         {
@@ -994,17 +994,17 @@ public sealed class UseInventoryItemService(
         };
     }
 
-        private static bool IsPetExpBoostPill(int itemId)
+    private static bool IsPetExpBoostPill(int itemId)
     {
         return itemId is 1190 or 17035 or 8413;
     }
 
-        private static bool IsRebirthPill(int itemId)
+    private static bool IsRebirthPill(int itemId)
     {
         return itemId is 632 or 1241 or 2462;
     }
 
-        private UseInventoryItemResponse Fail(int characterId, ItemStack? item, byte page, byte index,
+    private UseInventoryItemResponse Fail(int characterId, ItemStack? item, byte page, byte index,
         [CallerMemberName] string resolver = "")
     {
         if (logger.IsEnabled(LogLevel.Debug))
@@ -1022,7 +1022,7 @@ public sealed class UseInventoryItemService(
         return list;
     }
 
-        private enum StatPotionKind
+    private enum StatPotionKind
     {
         Life,
         Mana,
@@ -1032,7 +1032,7 @@ public sealed class UseInventoryItemService(
         ElementalDefense
     }
 
-        private enum StatPotionTier
+    private enum StatPotionTier
     {
         Single,
         TenStack,

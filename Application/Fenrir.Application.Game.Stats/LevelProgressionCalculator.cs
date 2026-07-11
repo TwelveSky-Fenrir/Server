@@ -10,10 +10,9 @@ public readonly record struct LevelUpResult(
 
 public static class LevelProgressionCalculator
 {
+    public const short MaxLevel = 145;
 
-        public const short MaxLevel = 145;
-
-        public static LevelUpResult ResolveLevelUp(long currentExperience, long experienceGain,
+    public static LevelUpResult ResolveLevelUp(long currentExperience, long experienceGain,
         FrozenDictionary<short, LevelRowDto> levels)
     {
         var presentLevel = ReturnLevel(currentExperience, levels);
@@ -41,7 +40,7 @@ public static class LevelProgressionCalculator
         return new LevelUpResult(nextLevel, statPoints, skillPoints, true);
     }
 
-        private static short ReturnLevel(long experience, FrozenDictionary<short, LevelRowDto> levels)
+    private static short ReturnLevel(long experience, FrozenDictionary<short, LevelRowDto> levels)
     {
         if (!levels.TryGetValue(1, out var firstRow) || experience < firstRow.ExpRangeMin)
             return 1;

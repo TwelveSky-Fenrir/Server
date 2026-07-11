@@ -36,14 +36,15 @@ public class ZoneValleyWarBossSummonTests
         return (system, killRegistry, registry);
     }
 
-        private static void EnterPlayer(ZoneRegistry registry, int characterId, byte tribe)
+    private static void EnterPlayer(ZoneRegistry registry, int characterId, byte tribe)
     {
         var (session, _) = ZoneTestKit.CreateSession(characterId);
-        registry[ValleyMapId].Post(ZoneCommand.Enter(characterId, ZoneTestKit.EnterData(session, ValleyMapId, tribe: tribe)));
+        registry[ValleyMapId]
+            .Post(ZoneCommand.Enter(characterId, ZoneTestKit.EnterData(session, ValleyMapId, tribe: tribe)));
         registry[ValleyMapId].Tick(TimeSpan.FromMilliseconds(50));
     }
 
-        private static void AdvanceToKillRaceStart(ValleyWarSystem system, ValleyWarKillRegistry killRegistry, Zone zone)
+    private static void AdvanceToKillRaceStart(ValleyWarSystem system, ValleyWarKillRegistry killRegistry, Zone zone)
     {
         system.Simulate(zone,
             ValleyWarSchedule.IdleWaitTicks +
@@ -59,7 +60,7 @@ public class ZoneValleyWarBossSummonTests
     {
         var (system, killRegistry, registry) = CreateSystem(CacheWithBoss756());
         var zone = registry[ValleyMapId];
-        EnterPlayer(registry, 1, tribe: 0);
+        EnterPlayer(registry, 1, 0);
 
         AdvanceToKillRaceStart(system, killRegistry, zone);
         killRegistry.GetOrCreate(ValleyMapId).ForceZeroTribeQuota(0);
@@ -77,7 +78,7 @@ public class ZoneValleyWarBossSummonTests
     {
         var (system, killRegistry, registry) = CreateSystem(ZoneTestKit.EmptyWorldData());
         var zone = registry[ValleyMapId];
-        EnterPlayer(registry, 1, tribe: 0);
+        EnterPlayer(registry, 1, 0);
 
         AdvanceToKillRaceStart(system, killRegistry, zone);
         killRegistry.GetOrCreate(ValleyMapId).ForceZeroTribeQuota(0);
@@ -91,7 +92,7 @@ public class ZoneValleyWarBossSummonTests
     {
         var (system, killRegistry, registry) = CreateSystem(CacheWithBoss756());
         var zone = registry[ValleyMapId];
-        EnterPlayer(registry, 1, tribe: 0);
+        EnterPlayer(registry, 1, 0);
 
         AdvanceToKillRaceStart(system, killRegistry, zone);
         killRegistry.GetOrCreate(ValleyMapId).ForceZeroTribeQuota(0);
@@ -119,7 +120,7 @@ public class ZoneValleyWarBossSummonTests
         var logger = new CapturingLogger<ValleyWarSystem>();
         var (system, killRegistry, registry) = CreateSystem(CacheWithBoss756(), logger);
         var zone = registry[ValleyMapId];
-        EnterPlayer(registry, 1, tribe: 0);
+        EnterPlayer(registry, 1, 0);
 
         AdvanceToKillRaceStart(system, killRegistry, zone);
 
@@ -132,7 +133,7 @@ public class ZoneValleyWarBossSummonTests
     {
         var (system, killRegistry, registry) = CreateSystem(CacheWithBoss756());
         var zone = registry[ValleyMapId];
-        EnterPlayer(registry, 1, tribe: 0);
+        EnterPlayer(registry, 1, 0);
 
         AdvanceToKillRaceStart(system, killRegistry, zone);
         killRegistry.GetOrCreate(ValleyMapId).ForceZeroTribeQuota(0);

@@ -214,7 +214,7 @@ public class ZoneHandshakeServiceTests
                 { ShardId = ShardId, TribeQuotaGroup = quotaGroup, Capacity = capacity }));
     }
 
-        private static string EncodeObfuscatedAccountId(int accountId)
+    private static string EncodeObfuscatedAccountId(int accountId)
     {
         var bytes = Encoding.Latin1.GetBytes("MG" + accountId);
         WireXor.ApplyUidXor(bytes);

@@ -12,8 +12,7 @@ public sealed record GuardPostDefinition(
     ImmutableArray<GuardSlotCoordinate> Slots,
     byte? RequiresTribeSymbolOwnedBy = null)
 {
-
-        public const int SlotsPerPost = 5;
+    public const int SlotsPerPost = 5;
 }
 
 public sealed class GuardPostCatalog(
@@ -22,7 +21,7 @@ public sealed class GuardPostCatalog(
 {
     public static readonly GuardPostCatalog Empty = new([], []);
 
-        public ImmutableArray<GuardPostDefinition> OrdinaryPosts { get; } = ordinaryPosts;
+    public ImmutableArray<GuardPostDefinition> OrdinaryPosts { get; } = ordinaryPosts;
 
-        public ImmutableArray<GuardPostDefinition> Zone038WinnerPosts { get; } = zone038WinnerPosts;
+    public ImmutableArray<GuardPostDefinition> Zone038WinnerPosts { get; } = zone038WinnerPosts;
 }

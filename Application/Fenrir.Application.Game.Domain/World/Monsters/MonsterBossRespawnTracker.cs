@@ -10,7 +10,7 @@ public sealed class MonsterBossRespawnTracker(ILogger<MonsterBossRespawnTracker>
 
     private bool _initialized;
 
-        public async Task InitializeAsync(IMonsterBossRespawnTimerRepository repository, CancellationToken ct)
+    public async Task InitializeAsync(IMonsterBossRespawnTimerRepository repository, CancellationToken ct)
     {
         if (_initialized)
             throw new InvalidOperationException(
@@ -23,18 +23,18 @@ public sealed class MonsterBossRespawnTracker(ILogger<MonsterBossRespawnTracker>
         _initialized = true;
     }
 
-        public bool TryGetNextSpawnUtc(int monsterSpawnRegionId, out DateTime nextSpawnUtc)
+    public bool TryGetNextSpawnUtc(int monsterSpawnRegionId, out DateTime nextSpawnUtc)
     {
         return _nextSpawnUtc.TryGetValue(monsterSpawnRegionId, out nextSpawnUtc);
     }
 
-        public void SetNextSpawnUtc(int monsterSpawnRegionId, DateTime nextSpawnUtc)
+    public void SetNextSpawnUtc(int monsterSpawnRegionId, DateTime nextSpawnUtc)
     {
         _nextSpawnUtc[monsterSpawnRegionId] = nextSpawnUtc;
         _dirty[monsterSpawnRegionId] = 0;
     }
 
-        public async ValueTask FlushDirtyAsync(IMonsterBossRespawnTimerRepository repository, CancellationToken ct)
+    public async ValueTask FlushDirtyAsync(IMonsterBossRespawnTimerRepository repository, CancellationToken ct)
     {
         if (_dirty.IsEmpty)
             return;

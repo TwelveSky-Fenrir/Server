@@ -2,24 +2,22 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 
 public enum TribeVoteCalendarTransition
 {
+    None,
 
-        None,
+    OpenRegistration,
 
-        OpenRegistration,
+    OpenVoting,
 
-        OpenVoting,
+    CloseVoting,
 
-        CloseVoting,
+    AnnounceResults,
 
-        AnnounceResults,
-
-        ResetToIdle
+    ResetToIdle
 }
 
 public static class TribeVoteElectionCalendar
 {
-
-        public static TribeVoteCalendarTransition Evaluate(TribeVotePhase currentPhase, int dayOfMonth, int hourOfDay,
+    public static TribeVoteCalendarTransition Evaluate(TribeVotePhase currentPhase, int dayOfMonth, int hourOfDay,
         bool testMode)
     {
         if (testMode)

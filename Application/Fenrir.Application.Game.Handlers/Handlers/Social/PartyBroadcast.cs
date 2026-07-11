@@ -7,8 +7,7 @@ namespace Fenrir.Application.Game.Handlers.Handlers.Social;
 
 internal static class PartyBroadcast
 {
-
-        public static PartyRosterResponse BuildRoster(ZoneRegistry zones, int sort, IReadOnlyList<int> memberIds)
+    public static PartyRosterResponse BuildRoster(ZoneRegistry zones, int sort, IReadOnlyList<int> memberIds)
     {
         Span<string> names = ["", "", "", "", ""];
         for (var i = 0; i < memberIds.Count && i < 5; i++)
@@ -26,7 +25,7 @@ internal static class PartyBroadcast
         };
     }
 
-        public static void SendOrRelayNotice<TPacket>(ZoneRegistry zones, IPartyResyncRelayQueue relay,
+    public static void SendOrRelayNotice<TPacket>(ZoneRegistry zones, IPartyResyncRelayQueue relay,
         byte shardId, int memberId, in TPacket localPacket, PartyResyncRelaySort remoteSort, string actorAvatarName)
         where TPacket : struct, IOutgoingPacket
     {

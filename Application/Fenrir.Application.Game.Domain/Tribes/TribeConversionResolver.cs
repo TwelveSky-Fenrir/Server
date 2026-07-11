@@ -68,12 +68,12 @@ public sealed class TribeConversionResolver
         _costumeIdByGroupTribe = costumeById.ToFrozenDictionary();
     }
 
-        public static bool IsPlayableTribe(byte tribe)
+    public static bool IsPlayableTribe(byte tribe)
     {
         return tribe <= GrandTiger;
     }
 
-        public bool TryGetBookTargetTribe(int itemId, out byte toTribe)
+    public bool TryGetBookTargetTribe(int itemId, out byte toTribe)
     {
         switch (itemId)
         {
@@ -92,7 +92,7 @@ public sealed class TribeConversionResolver
         }
     }
 
-        public bool TryRemapItem(byte fromTribe, byte toTribe, int itemId, out int newItemId)
+    public bool TryRemapItem(byte fromTribe, byte toTribe, int itemId, out int newItemId)
     {
         newItemId = itemId;
 
@@ -108,7 +108,7 @@ public sealed class TribeConversionResolver
         return true;
     }
 
-        public bool TryRemapSkill(byte fromTribe, byte toTribe, int skillId, out int newSkillId)
+    public bool TryRemapSkill(byte fromTribe, byte toTribe, int skillId, out int newSkillId)
     {
         newSkillId = skillId;
 
@@ -121,7 +121,7 @@ public sealed class TribeConversionResolver
         return true;
     }
 
-        public bool TryRemapCostume(byte fromTribe, byte toTribe, int itemId, out int newItemId)
+    public bool TryRemapCostume(byte fromTribe, byte toTribe, int itemId, out int newItemId)
     {
         newItemId = itemId;
 
@@ -134,7 +134,7 @@ public sealed class TribeConversionResolver
         return true;
     }
 
-        public bool AreAllItemsMappable(byte fromTribe, byte toTribe, IReadOnlyList<int> equippedItemIds)
+    public bool AreAllItemsMappable(byte fromTribe, byte toTribe, IReadOnlyList<int> equippedItemIds)
     {
         ArgumentNullException.ThrowIfNull(equippedItemIds);
 

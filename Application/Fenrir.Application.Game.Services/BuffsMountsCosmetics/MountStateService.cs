@@ -14,14 +14,13 @@ public sealed class MountStateService(
     ILogger<MountStateService> logger)
     : IMountStateService
 {
+    private const int DeleteMountContributionPointsGrant = 250;
 
-        private const int DeleteMountContributionPointsGrant = 250;
+    private const int AttributeDeleteItemId = 1225;
 
-        private const int AttributeDeleteItemId = 1225;
+    private const int AttributeTransferItemIdPrimary = 8425;
 
-        private const int AttributeTransferItemIdPrimary = 8425;
-
-        private const int AttributeTransferItemIdSecondary = 1226;
+    private const int AttributeTransferItemIdSecondary = 1226;
 
     private const short MountDeleteEventCode = 1;
     private const short MountAttributeDeleteEventCode = 2;
@@ -106,7 +105,7 @@ public sealed class MountStateService(
         }
     }
 
-        private async ValueTask ApplyDeleteMountAsync(Zone zone, PlayerRuntimeState state, int characterId,
+    private async ValueTask ApplyDeleteMountAsync(Zone zone, PlayerRuntimeState state, int characterId,
         int accountId, int garageSlot, CancellationToken cancellationToken)
     {
         var newContributionPoints = state.ContributionPoints + DeleteMountContributionPointsGrant;
@@ -132,7 +131,7 @@ public sealed class MountStateService(
             garageSlot, DeleteMountContributionPointsGrant);
     }
 
-        private async ValueTask ApplyDeleteAttributeAsync(Zone zone, PlayerRuntimeState state, int characterId,
+    private async ValueTask ApplyDeleteAttributeAsync(Zone zone, PlayerRuntimeState state, int characterId,
         int accountId, int garageSlot, int statSlotIndex, byte materialPage, byte materialSlot,
         CancellationToken cancellationToken)
     {
@@ -163,7 +162,7 @@ public sealed class MountStateService(
             characterId, garageSlot, statSlotIndex + 1);
     }
 
-        private static bool TryFindItem(ImmutableDictionary<byte, ItemStack> page0,
+    private static bool TryFindItem(ImmutableDictionary<byte, ItemStack> page0,
         ImmutableDictionary<byte, ItemStack> page1, int itemId, out byte page, out byte slot)
     {
         for (var i = 0; i <= 63; i++)

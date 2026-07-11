@@ -13,7 +13,7 @@ public class RuneStatContributionTests
     private static CharacterBaseAttributes Attrs(int vit = 100, int str = 80, int intel = 60, int dex = 40)
     {
         return new CharacterBaseAttributes(vit, str, intel, dex,
-            Level: 100, Tribe: 0, PreviousTribe: 0, Title: 0, Halo: 0, RebirthCount: 0);
+            100, 0, 0, 0, 0, 0);
     }
 
     private static FrozenDictionary<short, LevelRowDto> Levels()

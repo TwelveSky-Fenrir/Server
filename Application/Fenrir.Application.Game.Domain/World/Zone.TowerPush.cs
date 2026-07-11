@@ -9,12 +9,11 @@ namespace Fenrir.Application.Game.Domain.World;
 
 public partial class Zone
 {
-
-        private const int TowerInfoPushLegacyTicks = 60;
+    private const int TowerInfoPushLegacyTicks = 60;
 
     private int _towerInfoPushAccrualTicks;
 
-        internal void TickTowerInfoPush(int legacyTicksElapsed)
+    internal void TickTowerInfoPush(int legacyTicksElapsed)
     {
         if (towerWar is null || legacyTicksElapsed <= 0)
             return;

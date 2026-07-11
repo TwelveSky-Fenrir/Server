@@ -50,7 +50,7 @@ public class NpcShopTradeServiceTests
         return WorldDataTestRows.Item(itemId) with { Sort = sort, BuyCost = buyCost, CheckNpcShop = 2 };
     }
 
-        private static WorldDataCache BuildWorldData(ItemRowDto[] itemsById, int[]? shopCatalogItemIds = null)
+    private static WorldDataCache BuildWorldData(ItemRowDto[] itemsById, int[]? shopCatalogItemIds = null)
     {
         var catalogIds = shopCatalogItemIds ?? itemsById.Select(row => row.ItemId).ToArray();
 

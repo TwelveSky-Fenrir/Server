@@ -14,12 +14,12 @@ public static class FfaEqualStatsOverride
     private const int FixedCriticalDefence = 65;
     private const int FixedLuck = 300;
 
-        public static bool IsEqualStatsZone(short zoneId)
+    public static bool IsEqualStatsZone(short zoneId)
     {
         return zoneId == PvpKillRewardZoneCatalog.FfaMapNumber;
     }
 
-        public static EffectiveStats Apply(short zoneId, EffectiveStats realStats)
+    public static EffectiveStats Apply(short zoneId, EffectiveStats realStats)
     {
         if (!IsEqualStatsZone(zoneId))
             return realStats;

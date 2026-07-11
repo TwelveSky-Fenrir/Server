@@ -5,30 +5,27 @@ namespace Fenrir.Application.Game.Stats;
 
 public static partial class StatCalculator
 {
-
-        public enum OrnamentSort
+    public enum OrnamentSort
     {
+        Hp = 0,
 
-                Hp = 0,
+        Mp = 1,
 
-                Mp = 1,
+        Dmg = 2,
 
-                Dmg = 2,
-
-                Def = 3
+        Def = 3
     }
 
-        public enum OrnamentTier
+    public enum OrnamentTier
     {
+        NotActive = 0,
 
-                NotActive = 0,
+        Gold = 1,
 
-                Gold = 1,
-
-                Silver = 2
+        Silver = 2
     }
 
-        public static readonly FrozenDictionary<OrnamentSort, OrnamentBonusRow> OrnamentBonusTable =
+    public static readonly FrozenDictionary<OrnamentSort, OrnamentBonusRow> OrnamentBonusTable =
         new Dictionary<OrnamentSort, OrnamentBonusRow>
         {
             [OrnamentSort.Hp] = new(825, 550),
@@ -37,9 +34,9 @@ public static partial class StatCalculator
             [OrnamentSort.Def] = new(825, 550)
         }.ToFrozenDictionary();
 
-        public static readonly FrozenSet<int> OrnamentDecorationSlots = new[] { 9, 10, 11, 12 }.ToFrozenSet();
+    public static readonly FrozenSet<int> OrnamentDecorationSlots = new[] { 9, 10, 11, 12 }.ToFrozenSet();
 
-        public static OrnamentTier ResolveOrnamentTier(ZoneContext zone, EquippedItemSlot?[] bySlot)
+    public static OrnamentTier ResolveOrnamentTier(ZoneContext zone, EquippedItemSlot?[] bySlot)
     {
         if (!zone.OrnamentInUse)
             return OrnamentTier.NotActive;
@@ -55,7 +52,7 @@ public static partial class StatCalculator
         return OrnamentTier.NotActive;
     }
 
-        public static int GetOrnamentBonus(OrnamentSort sort, OrnamentTier tier)
+    public static int GetOrnamentBonus(OrnamentSort sort, OrnamentTier tier)
     {
         if (!OrnamentBonusTable.TryGetValue(sort, out var row))
             return 0;
@@ -68,25 +65,25 @@ public static partial class StatCalculator
         };
     }
 
-        public static int OrnamentLifeContribution(ZoneContext zone, EquippedItemSlot?[] bySlot)
+    public static int OrnamentLifeContribution(ZoneContext zone, EquippedItemSlot?[] bySlot)
     {
         return GetOrnamentBonus(OrnamentSort.Hp, ResolveOrnamentTier(zone, bySlot));
     }
 
-        public static int OrnamentManaContribution(ZoneContext zone, EquippedItemSlot?[] bySlot)
+    public static int OrnamentManaContribution(ZoneContext zone, EquippedItemSlot?[] bySlot)
     {
         return GetOrnamentBonus(OrnamentSort.Mp, ResolveOrnamentTier(zone, bySlot));
     }
 
-        public static int OrnamentAttackContribution(ZoneContext zone, EquippedItemSlot?[] bySlot)
+    public static int OrnamentAttackContribution(ZoneContext zone, EquippedItemSlot?[] bySlot)
     {
         return GetOrnamentBonus(OrnamentSort.Dmg, ResolveOrnamentTier(zone, bySlot));
     }
 
-        public static int OrnamentDefenseContribution(ZoneContext zone, EquippedItemSlot?[] bySlot)
+    public static int OrnamentDefenseContribution(ZoneContext zone, EquippedItemSlot?[] bySlot)
     {
         return GetOrnamentBonus(OrnamentSort.Def, ResolveOrnamentTier(zone, bySlot));
     }
 
-        public readonly record struct OrnamentBonusRow(int Gold, int Silver);
+    public readonly record struct OrnamentBonusRow(int Gold, int Silver);
 }

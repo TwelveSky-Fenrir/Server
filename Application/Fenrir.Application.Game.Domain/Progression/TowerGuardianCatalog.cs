@@ -2,8 +2,7 @@ namespace Fenrir.Application.Game.Domain.Progression;
 
 public static class TowerGuardianCatalog
 {
-
-        public static int ResolveMonsterId(int level, int towerType)
+    public static int ResolveMonsterId(int level, int towerType)
     {
         var levelIndex = level switch
         {
@@ -25,7 +24,7 @@ public static class TowerGuardianCatalog
         return typeBase + levelIndex;
     }
 
-        public static bool TryGetGuardianLocation(short zoneNumber, out float x, out float y, out float z)
+    public static bool TryGetGuardianLocation(short zoneNumber, out float x, out float y, out float z)
     {
         (x, y, z) = zoneNumber switch
         {

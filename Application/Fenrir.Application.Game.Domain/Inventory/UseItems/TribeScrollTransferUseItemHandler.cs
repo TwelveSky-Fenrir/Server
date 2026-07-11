@@ -3,7 +3,6 @@ using Fenrir.Application.Game.Domain.Pets;
 using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.Tribes;
-using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Network.Dispatch.Sessions;
 using Fenrir.Network.Serialization.Zone.Packets.Zone;
@@ -21,8 +20,7 @@ public sealed class TribeScrollTransferUseItemHandler(
     GameServerOptions options,
     ILogger<TribeScrollTransferUseItemHandler> logger) : IUseItemHandler
 {
-
-        public static readonly ImmutableArray<int> HandledItemIds = [8153, 8154];
+    public static readonly ImmutableArray<int> HandledItemIds = [8153, 8154];
 
     public async ValueTask<UseInventoryItemResponse> HandleAsync(UseItemContext context,
         CancellationToken cancellationToken)
@@ -32,7 +30,7 @@ public sealed class TribeScrollTransferUseItemHandler(
         var toTribe = context.Value is >= 0 and <= 255 ? (byte)context.Value : (byte)255;
 
         var homeZoneOnline = await IsFactionTransferHomeZoneOnlineAsync(cancellationToken);
-        var cape = state.Inventory.GetSlot(ContainerMatrix.Equipment, (byte)SkillGradeAuthority.CapeSlotIndex);
+        var cape = state.Inventory.GetSlot(ContainerMatrix.Equipment, SkillGradeAuthority.CapeSlotIndex);
 
         var outcome = TribeScrollTransferGate.Evaluate(new TribeScrollTransferEligibilityContext(
             toTribe, state.Tribe, state.PreviousTribe, state.Level, state.TribeRole, state.GuildId,
@@ -135,7 +133,7 @@ public sealed class TribeScrollTransferUseItemHandler(
         return list;
     }
 
-        private async ValueTask<bool> IsFactionTransferHomeZoneOnlineAsync(CancellationToken cancellationToken)
+    private async ValueTask<bool> IsFactionTransferHomeZoneOnlineAsync(CancellationToken cancellationToken)
     {
         var mapId = options.FactionTransferHomeZoneMapId;
         if (mapId <= 0)

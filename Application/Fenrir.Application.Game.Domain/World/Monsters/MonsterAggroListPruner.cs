@@ -2,16 +2,7 @@ namespace Fenrir.Application.Game.Domain.World.Monsters;
 
 public static class MonsterAggroListPruner
 {
-
-        public readonly record struct Survivor(int CharacterId, object SessionToken, long CumulativeDamage,
-        float DistanceSquared);
-
-        public readonly record struct Result(IReadOnlyList<Survivor> Survivors)
-    {
-        public bool HasValidAttackers => Survivors.Count > 0;
-    }
-
-        public static Result Prune(Zone zone, MonsterEntity monster, IEnumerable<MonsterEntity> allMonsters,
+    public static Result Prune(Zone zone, MonsterEntity monster, IEnumerable<MonsterEntity> allMonsters,
         List<Survivor>? resultBuffer = null)
     {
         var survivors = resultBuffer ?? [];
@@ -39,7 +30,7 @@ public static class MonsterAggroListPruner
         return new Result(survivors);
     }
 
-        private static bool TryEvaluateEntry(Zone zone, MonsterEntity monster, IEnumerable<MonsterEntity> allMonsters,
+    private static bool TryEvaluateEntry(Zone zone, MonsterEntity monster, IEnumerable<MonsterEntity> allMonsters,
         MonsterAttackDamageEntry entry, float meleeRadiusSq, float leashRadiusSq, out float distanceSquared)
     {
         distanceSquared = 0f;
@@ -65,13 +56,13 @@ public static class MonsterAggroListPruner
         return true;
     }
 
-        private static bool IsHiding(PlayerRuntimeState player)
+    private static bool IsHiding(PlayerRuntimeState player)
     {
         _ = player;
         return false;
     }
 
-        private static int CountOtherPursuers(IEnumerable<MonsterEntity> allMonsters, MonsterEntity monster,
+    private static int CountOtherPursuers(IEnumerable<MonsterEntity> allMonsters, MonsterEntity monster,
         int candidateCharacterId)
     {
         var count = 0;
@@ -91,10 +82,21 @@ public static class MonsterAggroListPruner
         return count;
     }
 
-        private static float DistanceSquared(float x1, float z1, float x2, float z2)
+    private static float DistanceSquared(float x1, float z1, float x2, float z2)
     {
         var dx = x1 - x2;
         var dz = z1 - z2;
         return dx * dx + dz * dz;
+    }
+
+    public readonly record struct Survivor(
+        int CharacterId,
+        object SessionToken,
+        long CumulativeDamage,
+        float DistanceSquared);
+
+    public readonly record struct Result(IReadOnlyList<Survivor> Survivors)
+    {
+        public bool HasValidAttackers => Survivors.Count > 0;
     }
 }

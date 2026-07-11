@@ -6,7 +6,7 @@ internal sealed class FakeTradeCommitRepository : ITradeCommitRepository
 {
     public List<TradeCommitCall> Calls { get; } = [];
 
-        public Exception? ThrowOnNextExecute { get; set; }
+    public Exception? ThrowOnNextExecute { get; set; }
 
     public ValueTask ExecuteIdempotentAsync(
         Guid tradeToken,

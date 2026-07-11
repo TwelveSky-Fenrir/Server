@@ -2,21 +2,20 @@ namespace Fenrir.Application.Game.Domain.World.WorldState;
 
 public static class TribePointLevelRecompute
 {
+    public const int Baseline = 1000;
 
-        public const int Baseline = 1000;
+    public const int LevelThreshold = 145;
 
-        public const int LevelThreshold = 145;
-
-        public const int LevelOffset = 112;
+    public const int LevelOffset = 112;
 
     public const int SecondaryLevelMultiplier = 3;
     public const int RebirthMultiplier = 3;
 
-        public const byte BonusTribeId = 3;
+    public const byte BonusTribeId = 3;
 
     public const int BonusTribeBonus = 800;
 
-        public static int[] ComputeTotals(IReadOnlyList<TribeRosterCharacterSnapshot> roster)
+    public static int[] ComputeTotals(IReadOnlyList<TribeRosterCharacterSnapshot> roster)
     {
         var totals = new int[WorldStateService.TribeCount];
         Array.Fill(totals, Baseline);

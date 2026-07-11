@@ -4,17 +4,16 @@ public static class AutoBuffActivationResolver
 {
     public enum ResultKind
     {
+        NoReply,
 
-                NoReply,
-
-                Disconnect,
+        Disconnect,
         Activate,
         Tick
     }
 
-        public const int ChannelingActionSort = 41;
+    public const int ChannelingActionSort = 41;
 
-        public static int ManaAfterActivation(int mana)
+    public static int ManaAfterActivation(int mana)
     {
         return mana - (int)(mana * 0.9f);
     }

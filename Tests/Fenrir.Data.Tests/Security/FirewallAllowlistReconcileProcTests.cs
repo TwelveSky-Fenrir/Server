@@ -82,12 +82,12 @@ public class FirewallAllowlistReconcileProcTests
         Assert.True(await RowExistsAsync(blockIp));
     }
 
-        private static string UniqueIp()
+    private static string UniqueIp()
     {
         return $"203.0.113.{Guid.NewGuid():N}"[..30];
     }
 
-        private async Task<bool> RowExistsAsync(string ipAddress)
+    private async Task<bool> RowExistsAsync(string ipAddress)
     {
         await using var connection = new SqlConnection(_connectionString);
         await connection.OpenAsync();

@@ -4,7 +4,7 @@ public sealed class DailyResetBroadcastScheduler
 {
     private int _lastMinuteOfDay = -1;
 
-        public bool TryConsumeDueFire(DateTime utcNow)
+    public bool TryConsumeDueFire(DateTime utcNow)
     {
         var minuteOfDay = utcNow.Hour * 60 + utcNow.Minute;
         if (minuteOfDay == _lastMinuteOfDay)

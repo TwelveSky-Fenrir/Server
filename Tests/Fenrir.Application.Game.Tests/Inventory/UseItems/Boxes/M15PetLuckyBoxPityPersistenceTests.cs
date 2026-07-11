@@ -84,10 +84,10 @@ public class M15PetLuckyBoxPityPersistenceTests
     private static void SeedBox(Zone zone, ItemStack box)
     {
         zone.PostInventoryCommand(new InventoryZoneCommand(CharacterId,
-            [
-                new InventoryContainerSnapshot(ContainerMatrix.InventoryPage0,
-                    ImmutableDictionary<byte, ItemStack>.Empty.SetItem(0, box))
-            ], null));
+        [
+            new InventoryContainerSnapshot(ContainerMatrix.InventoryPage0,
+                ImmutableDictionary<byte, ItemStack>.Empty.SetItem(0, box))
+        ], null));
         zone.Tick(TimeSpan.FromMilliseconds(50));
     }
 

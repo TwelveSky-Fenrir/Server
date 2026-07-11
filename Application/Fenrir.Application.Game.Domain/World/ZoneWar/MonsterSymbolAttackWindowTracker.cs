@@ -7,7 +7,7 @@ public sealed class MonsterSymbolAttackWindowTracker
     private byte? _lastHolder;
     private bool _notified;
 
-        public bool ShouldNotifyNow(byte holderTribe, int legacyTicksElapsed, int delayLegacyTicks)
+    public bool ShouldNotifyNow(byte holderTribe, int legacyTicksElapsed, int delayLegacyTicks)
     {
         lock (_lock)
         {

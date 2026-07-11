@@ -6,7 +6,7 @@ internal sealed class FakeProxyShopExpirationRelayQueue : IProxyShopExpirationRe
 {
     public List<ProxyShopExpirationRelayEntry> Enqueued { get; } = [];
 
-        public bool RejectNext { get; set; }
+    public bool RejectNext { get; set; }
 
     public bool Enqueue(ProxyShopExpirationRelayEntry entry)
     {

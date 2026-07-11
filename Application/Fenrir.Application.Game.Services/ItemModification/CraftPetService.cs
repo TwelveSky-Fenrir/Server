@@ -17,12 +17,11 @@ public sealed class CraftPetService(
     ILogger<CraftPetService> logger)
     : ICraftPetService
 {
+    private const short FourSlotRecipeEventCode = 1;
 
-        private const short FourSlotRecipeEventCode = 1;
+    private const short TwoSlotRecipeEventCode = 2;
 
-        private const short TwoSlotRecipeEventCode = 2;
-
-        public async ValueTask<CraftPetResult> ResolveFourSlotRecipeAsync(CraftPetRequest packet, Zone zone,
+    public async ValueTask<CraftPetResult> ResolveFourSlotRecipeAsync(CraftPetRequest packet, Zone zone,
         PlayerRuntimeState state, int characterId, int accountId, CancellationToken cancellationToken)
     {
         if (!IsValidSlot(packet.Page1, packet.Index1) || !IsValidSlot(packet.Page2, packet.Index2) ||
@@ -76,7 +75,7 @@ public sealed class CraftPetService(
             working, resolved, newPet, 10000, RecipeLabel(packet.Sort), cancellationToken);
     }
 
-        public async ValueTask<CraftPetResult> ResolveTwoSlotRecipeAsync(CraftPetRequest packet, Zone zone,
+    public async ValueTask<CraftPetResult> ResolveTwoSlotRecipeAsync(CraftPetRequest packet, Zone zone,
         PlayerRuntimeState state, int characterId, int accountId, CancellationToken cancellationToken)
     {
         if (!IsValidSlot(packet.Page1, packet.Index1) || !IsValidSlot(packet.Page2, packet.Index2))
@@ -115,7 +114,7 @@ public sealed class CraftPetService(
             resolved, newPet, 0, RecipeLabel(packet.Sort), cancellationToken);
     }
 
-        private static string RecipeLabel(int sort)
+    private static string RecipeLabel(int sort)
     {
         return $"pet-recipe-{sort + 1}";
     }

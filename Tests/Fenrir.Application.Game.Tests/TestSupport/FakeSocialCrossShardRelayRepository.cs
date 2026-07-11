@@ -7,9 +7,9 @@ internal sealed class FakeSocialCrossShardRelayRepository : ISocialCrossShardRel
 {
     public List<SocialCrossShardRelayEntry> Published { get; } = [];
 
-        public List<SocialCrossShardRelayDto> NextPoll { get; set; } = [];
+    public List<SocialCrossShardRelayDto> NextPoll { get; set; } = [];
 
-        public Exception? ThrowOnPublish { get; set; }
+    public Exception? ThrowOnPublish { get; set; }
 
     public ValueTask PublishAsync(SocialCrossShardRelayEntry entry, CancellationToken ct)
     {

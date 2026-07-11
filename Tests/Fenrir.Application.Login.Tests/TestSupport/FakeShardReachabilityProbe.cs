@@ -6,9 +6,9 @@ internal sealed class FakeShardReachabilityProbe : IShardReachabilityProbe
 {
     private readonly HashSet<(string Host, int Port)> _unreachableHostPorts = [];
 
-        public List<(string Host, int Port)> ProbedHostPorts { get; } = [];
+    public List<(string Host, int Port)> ProbedHostPorts { get; } = [];
 
-        public bool Reachable { get; set; } = true;
+    public bool Reachable { get; set; } = true;
 
     public ValueTask<bool> IsReachableAsync(string host, int port, CancellationToken ct)
     {
@@ -17,7 +17,7 @@ internal sealed class FakeShardReachabilityProbe : IShardReachabilityProbe
         return ValueTask.FromResult(reachable);
     }
 
-        public FakeShardReachabilityProbe MarkUnreachable(string host, int port)
+    public FakeShardReachabilityProbe MarkUnreachable(string host, int port)
     {
         _unreachableHostPorts.Add((host, port));
         return this;

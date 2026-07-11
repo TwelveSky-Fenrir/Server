@@ -6,7 +6,7 @@ internal sealed class FakeGuildTribeBroadcastRelayQueue : IGuildTribeBroadcastRe
 {
     public List<GuildTribeBroadcastRelayEntry> Enqueued { get; } = [];
 
-        public bool RejectNext { get; set; }
+    public bool RejectNext { get; set; }
 
     public bool Enqueue(GuildTribeBroadcastRelayEntry entry)
     {

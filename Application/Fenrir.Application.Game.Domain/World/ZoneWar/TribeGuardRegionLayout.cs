@@ -4,20 +4,19 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 
 public static class TribeGuardRegionLayout
 {
+    public const int NormalGuardRegionLegacyStart = 3400;
 
-        public const int NormalGuardRegionLegacyStart = 3400;
+    public const int TribeGuardRegionLegacyStart = 3500;
 
-        public const int TribeGuardRegionLegacyStart = 3500;
+    public const int RegionSlotCount = 100;
 
-        public const int RegionSlotCount = 100;
+    public const int SlotsPerTribeSlot = 5;
 
-        public const int SlotsPerTribeSlot = 5;
+    public const int TribeSlotCount = 5;
 
-        public const int TribeSlotCount = 5;
+    public const int MaxUsedSlots = TribeSlotCount * SlotsPerTribeSlot;
 
-        public const int MaxUsedSlots = TribeSlotCount * SlotsPerTribeSlot;
-
-        public static int RelativeReservedIndex(int tribeSlotOrdinal, int postWithinSlot)
+    public static int RelativeReservedIndex(int tribeSlotOrdinal, int postWithinSlot)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(tribeSlotOrdinal);
         ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(tribeSlotOrdinal, TribeSlotCount);
@@ -27,7 +26,7 @@ public static class TribeGuardRegionLayout
         return SlotsPerTribeSlot * tribeSlotOrdinal + postWithinSlot;
     }
 
-        public static ImmutableArray<GuardSlotCoordinate> BuildDeterministicSlots(int tribeSlotOrdinal,
+    public static ImmutableArray<GuardSlotCoordinate> BuildDeterministicSlots(int tribeSlotOrdinal,
         IReadOnlyList<(float X, float Y, float Z)> coordinates)
     {
         ArgumentNullException.ThrowIfNull(coordinates);

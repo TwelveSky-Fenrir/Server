@@ -7,8 +7,7 @@ public sealed class TribePointLevelRecomputeService(
     WorldStateService worldState,
     ILogger<TribePointLevelRecomputeService> logger)
 {
-
-        public async Task RecomputeAsync(CancellationToken ct)
+    public async Task RecomputeAsync(CancellationToken ct)
     {
         IReadOnlyList<TribeRosterCharacterSnapshot>? roster;
         try

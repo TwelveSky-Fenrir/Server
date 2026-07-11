@@ -69,7 +69,7 @@ public class GmSummonMonsterServiceTests
         return data;
     }
 
-        private static async Task AssertResponseSentAsync(FakeDuplexPipe pipe, GenericActionResponse expected)
+    private static async Task AssertResponseSentAsync(FakeDuplexPipe pipe, GenericActionResponse expected)
     {
         var actual = await PacketAssert.ReadSentBytesAsync(pipe);
         var frame = new byte[FrameWriter.FrameSizeOf<GenericActionResponse>()];

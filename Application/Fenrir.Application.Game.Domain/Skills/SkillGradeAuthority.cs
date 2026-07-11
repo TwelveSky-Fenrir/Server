@@ -6,24 +6,23 @@ namespace Fenrir.Application.Game.Domain.Skills;
 
 public static class SkillGradeAuthority
 {
+    public const int EquipSlotCount = 13;
 
-        public const int EquipSlotCount = 13;
+    public const int CapeSlotIndex = 1;
 
-        public const int CapeSlotIndex = 1;
+    public const int GodOfWarriorCapeItemId = 1404;
 
-        public const int GodOfWarriorCapeItemId = 1404;
+    public const int PetSlotIndex = PetSlots.EquipmentSlot;
 
-        public const int PetSlotIndex = PetSlots.EquipmentSlot;
+    private const int PetAmuletSort = 28;
 
-        private const int PetAmuletSort = 28;
+    private const int GuildBuffFlatBonusType = 3;
 
-        private const int GuildBuffFlatBonusType = 3;
+    private const int GuildBuffFlatBonusAmount = 1;
 
-        private const int GuildBuffFlatBonusAmount = 1;
+    private const int BuffCategorySkillType = 2;
 
-        private const int BuffCategorySkillType = 2;
-
-        public static int GetMaxSkillGradeNum(int skillId, IReadOnlyDictionary<byte, LearnedSkill> learnedSkills)
+    public static int GetMaxSkillGradeNum(int skillId, IReadOnlyDictionary<byte, LearnedSkill> learnedSkills)
     {
         foreach (var learned in learnedSkills.Values)
             if (learned.SkillId == skillId)
@@ -32,7 +31,7 @@ public static class SkillGradeAuthority
         return -1;
     }
 
-        public static int GetBonusSkillValue(
+    public static int GetBonusSkillValue(
         int skillId,
         ReadOnlySpan<ItemDefinition?> equipSlotItems,
         int petPackedValue,
@@ -75,7 +74,7 @@ public static class SkillGradeAuthority
         return total;
     }
 
-        private static bool IsBuffCategorySkill(SkillDefinition? skillDefinition)
+    private static bool IsBuffCategorySkill(SkillDefinition? skillDefinition)
     {
         return skillDefinition is not null && skillDefinition.Skill.Type == BuffCategorySkillType;
     }

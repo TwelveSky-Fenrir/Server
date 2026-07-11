@@ -27,7 +27,7 @@ public sealed class MentorAskService(
 {
     private const int MinimumMasterLevel = 113;
 
-        public async ValueTask<MentorAskResult> AskAsync(Zone zone, PlayerRuntimeState master, string targetAvatarName,
+    public async ValueTask<MentorAskResult> AskAsync(Zone zone, PlayerRuntimeState master, string targetAvatarName,
         CancellationToken cancellationToken)
     {
         if (master.Level < MinimumMasterLevel || master.TeacherCharacterId is not null ||
@@ -100,7 +100,7 @@ public sealed class MentorAskService(
         }
     }
 
-        private async ValueTask<MentorAskResult> AskCrossShardAsync(PlayerRuntimeState master, string targetAvatarName,
+    private async ValueTask<MentorAskResult> AskCrossShardAsync(PlayerRuntimeState master, string targetAvatarName,
         CancellationToken cancellationToken)
     {
         var remote = await characterShardLocations.FindByNameAsync(targetAvatarName, cancellationToken)

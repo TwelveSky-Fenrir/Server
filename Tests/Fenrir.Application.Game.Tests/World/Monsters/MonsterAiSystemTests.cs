@@ -232,7 +232,7 @@ public class MonsterAiSystemTests
         Assert.Equal(11, reengaged!.TargetCharacterId);
     }
 
-        private sealed class ZeroScatterRandom : Random
+    private sealed class ZeroScatterRandom : Random
     {
         public override double NextDouble()
         {

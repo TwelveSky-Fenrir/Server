@@ -10,7 +10,7 @@ internal sealed record TypeModel
 
     public required string FullTypeName { get; init; }
 
-        public required bool IsPacket { get; init; }
+    public required bool IsPacket { get; init; }
 
     public FenrirServer Server { get; init; }
 
@@ -32,9 +32,9 @@ internal sealed record TypeModel
 
     public required EquatableArray<FieldModel> Fields { get; init; }
 
-        public required int FieldsSize { get; init; }
+    public required int FieldsSize { get; init; }
 
-        public int PayloadOrWireSize => FieldsSize;
+    public int PayloadOrWireSize => FieldsSize;
 
     public required Location Location { get; init; }
 }

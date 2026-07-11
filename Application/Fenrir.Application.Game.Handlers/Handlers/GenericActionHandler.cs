@@ -39,8 +39,7 @@ public sealed class GenericActionHandler(
     ILogger<GenericActionHandler> logger)
     : IAsyncPacketHandler<GenericActionRequest>
 {
-
-        private const int PetExperienceStatSort = 14;
+    private const int PetExperienceStatSort = 14;
 
     public async ValueTask HandleAsync(GenericActionRequest packet, IPacketSession session,
         CancellationToken cancellationToken)

@@ -2,8 +2,7 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 
 public static class TribeGuardForceResetSweep
 {
-
-        public static int Wipe(Zone zone, int poolServerIndexBase)
+    public static int Wipe(Zone zone, int poolServerIndexBase)
     {
         ArgumentNullException.ThrowIfNull(zone);
 

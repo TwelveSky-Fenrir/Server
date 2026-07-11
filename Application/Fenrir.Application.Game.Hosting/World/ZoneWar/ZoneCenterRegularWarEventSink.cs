@@ -9,14 +9,13 @@ public sealed class ZoneCenterRegularWarEventSink(
     ZoneCenterBroadcastIngestor ingestor,
     ILogger<ZoneCenterRegularWarEventSink> logger) : IRegularWarEventSink
 {
+    private const int CountdownAnnounceSubCode = 1;
 
-        private const int CountdownAnnounceSubCode = 1;
+    private const int ActiveWarStartedSubCode = 4;
 
-        private const int ActiveWarStartedSubCode = 4;
+    private const int WarConcludedSubCode = 6;
 
-        private const int WarConcludedSubCode = 6;
-
-        private const int WarEndedToIdleSubCode = 9;
+    private const int WarEndedToIdleSubCode = 9;
 
     public void OnCountdownAnnounced(short mapId, int remainingMinutes)
     {
@@ -31,7 +30,7 @@ public sealed class ZoneCenterRegularWarEventSink(
         ingestor.Ingest(CountdownAnnounceSubCode, payload);
     }
 
-        public void OnSmallestTribeFlagged(short mapId, byte tribeId)
+    public void OnSmallestTribeFlagged(short mapId, byte tribeId)
     {
     }
 
@@ -46,7 +45,7 @@ public sealed class ZoneCenterRegularWarEventSink(
         IngestForSlot(mapId, WarConcludedSubCode);
     }
 
-        public void OnMonstersShouldDespawn(short mapId)
+    public void OnMonstersShouldDespawn(short mapId)
     {
     }
 

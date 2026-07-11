@@ -2,26 +2,25 @@ namespace Fenrir.Application.Game.Domain.Combat;
 
 public static class PvpKillContributionPointCalculator
 {
+    public const int BasePerKillAmount = 2;
 
-        public const int BasePerKillAmount = 2;
+    public const int PremiumStatusBonus = 2;
 
-        public const int PremiumStatusBonus = 2;
+    public const int WarriorScrollBuffBonus = 1;
 
-        public const int WarriorScrollBuffBonus = 1;
+    public const int PlaceholderHardCap = 2_000_000_000;
 
-        public const int PlaceholderHardCap = 2_000_000_000;
+    public const int FfaOverrideFlatAmount = 20;
 
-        public const int FfaOverrideFlatAmount = 20;
+    public const int RegularWarOverrideFlatCpAmount = 20;
 
-        public const int RegularWarOverrideFlatCpAmount = 20;
+    public const int RegularWarOverrideWarPointAmount = 2;
 
-        public const int RegularWarOverrideWarPointAmount = 2;
+    public const int RegularWarOverrideBloodPointAmount = 2;
 
-        public const int RegularWarOverrideBloodPointAmount = 2;
+    public static readonly TimeSpan FlatOverrideCooldown = TimeSpan.FromMinutes(2);
 
-        public static readonly TimeSpan FlatOverrideCooldown = TimeSpan.FromMinutes(2);
-
-        public static int ComputeBaseAmount(
+    public static int ComputeBaseAmount(
         bool hasPremiumStatus,
         bool hasWarriorScrollBuff,
         int perCharacterOverride = 0,
@@ -39,7 +38,7 @@ public static class PvpKillContributionPointCalculator
         return amount;
     }
 
-        public static int ClampGrant(int currentTotal, int amountToAdd, int cap)
+    public static int ClampGrant(int currentTotal, int amountToAdd, int cap)
     {
         return Math.Min(amountToAdd, cap - currentTotal);
     }

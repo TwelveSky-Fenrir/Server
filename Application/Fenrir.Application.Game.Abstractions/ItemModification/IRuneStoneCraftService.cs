@@ -5,8 +5,7 @@ namespace Fenrir.Application.Game.Abstractions.ItemModification;
 
 public interface IRuneStoneCraftService
 {
-
-        public ValueTask<RuneStoneCraftResult> CraftAsync(
+    public ValueTask<RuneStoneCraftResult> CraftAsync(
         int sourcePage, int sourceSlot,
         int destinationPage, int destinationSlot,
         int statSlotSelector, int destinationPackedStat,

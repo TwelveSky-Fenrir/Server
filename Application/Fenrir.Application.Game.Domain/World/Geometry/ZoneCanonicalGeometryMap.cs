@@ -6,7 +6,7 @@ public static class ZoneCanonicalGeometryMap
 {
     private static readonly FrozenDictionary<short, short> Redirects = Build();
 
-        public static short ResolveCanonicalMapId(short mapId)
+    public static short ResolveCanonicalMapId(short mapId)
     {
         return Redirects.GetValueOrDefault(mapId, mapId);
     }

@@ -1,6 +1,5 @@
 using System.Buffers.Binary;
 using System.Collections.Frozen;
-using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Data.Abstractions.World;
@@ -48,7 +47,7 @@ public class ZoneLevelMilestoneBonusTests
         return (zone, pipe, CharacterId);
     }
 
-        private static (int Sort, int Value01, int Value02, int Value03) ReadStateFlagFrame(byte[] buffer, int index)
+    private static (int Sort, int Value01, int Value02, int Value03) ReadStateFlagFrame(byte[] buffer, int index)
     {
         var offset = index * StateFlagFrame + 1;
         var body = buffer.AsSpan(offset);

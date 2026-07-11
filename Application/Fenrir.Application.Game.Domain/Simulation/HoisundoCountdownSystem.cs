@@ -43,7 +43,7 @@ public sealed class HoisundoCountdownSystem : ISimulationSystem
                 client.Abort(DisconnectReason.TimedZoneExpired);
     }
 
-        private static int? ResolveBroadcastSort(short mapId)
+    private static int? ResolveBroadcastSort(short mapId)
     {
         return mapId switch
         {

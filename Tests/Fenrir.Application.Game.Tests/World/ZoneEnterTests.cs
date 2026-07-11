@@ -45,7 +45,7 @@ public class ZoneEnterTests
         Assert.Equal(OneFrame, aInbox.Length);
     }
 
-        [Fact]
+    [Fact]
     public void Enter_StalePriorSessionForSameCharacter_IsEvictedAndReplacedByTheNewerSession()
     {
         var zone = ZoneTestKit.CreateZone(1);
@@ -70,7 +70,7 @@ public class ZoneEnterTests
         Assert.Equal(20f, tracked.PosZ);
     }
 
-        [Fact]
+    [Fact]
     public void Enter_TrueDuplicateForTheSameSession_IsIgnored_NotEvicted()
     {
         var zone = ZoneTestKit.CreateZone(1);

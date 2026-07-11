@@ -4,17 +4,15 @@ namespace Fenrir.Application.Game.Abstractions.ZoneLifecycle;
 
 public enum UseHotkeyItemOutcome
 {
+    Disconnect,
 
-        Disconnect,
+    RejectedClean,
 
-        RejectedClean,
-
-        Success
+    Success
 }
 
 public interface IUseHotkeyItemService
 {
-
-        public ValueTask<UseHotkeyItemOutcome> UseAsync(Zone zone, PlayerRuntimeState state, int characterId, int page,
+    public ValueTask<UseHotkeyItemOutcome> UseAsync(Zone zone, PlayerRuntimeState state, int characterId, int page,
         int index, CancellationToken cancellationToken);
 }

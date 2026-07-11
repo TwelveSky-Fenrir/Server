@@ -1,4 +1,3 @@
-
 using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Commerce;
 using Fenrir.Application.Game.Domain.Extensions;

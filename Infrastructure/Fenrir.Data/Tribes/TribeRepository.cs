@@ -10,8 +10,7 @@ namespace Fenrir.Data.Tribes;
 
 public sealed record TribeRepository(ICaeriusNetDbContext Db) : ITribeRepository
 {
-
-        public async ValueTask<byte> GetRoleForCharacterAsync(int characterId, CancellationToken ct)
+    public async ValueTask<byte> GetRoleForCharacterAsync(int characterId, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_TribeRole_GetForCharacter", 1)
             .AddParameter("CharacterId", characterId, SqlDbType.Int)
@@ -20,14 +19,14 @@ public sealed record TribeRepository(ICaeriusNetDbContext Db) : ITribeRepository
         return await Db.ExecuteScalarAsync<byte>(sp, ct);
     }
 
-        public async ValueTask<ReadOnlyCollection<TribeSummaryDto>> GetAllAsync(CancellationToken ct)
+    public async ValueTask<ReadOnlyCollection<TribeSummaryDto>> GetAllAsync(CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Tribe_GetAll", 4).Build();
 
         return await Db.QueryAsReadOnlyCollectionAsync<TribeSummaryDto>(sp, ct);
     }
 
-        public async ValueTask SetMasterAsync(byte tribeId, int? newMasterCharacterId, CancellationToken ct)
+    public async ValueTask SetMasterAsync(byte tribeId, int? newMasterCharacterId, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_Tribe_SetMaster", 0)
             .AddParameter("TribeId", tribeId, SqlDbType.TinyInt)
@@ -37,7 +36,7 @@ public sealed record TribeRepository(ICaeriusNetDbContext Db) : ITribeRepository
         await Db.ExecuteAsync(sp, ct);
     }
 
-        public async ValueTask<ReadOnlyCollection<TribeSubMasterDto>> GetSubMastersAsync(byte tribeId, CancellationToken ct)
+    public async ValueTask<ReadOnlyCollection<TribeSubMasterDto>> GetSubMastersAsync(byte tribeId, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_TribeSubMaster_GetByTribe", 12)
             .AddParameter("TribeId", tribeId, SqlDbType.TinyInt)
@@ -46,7 +45,7 @@ public sealed record TribeRepository(ICaeriusNetDbContext Db) : ITribeRepository
         return await Db.QueryAsReadOnlyCollectionAsync<TribeSubMasterDto>(sp, ct);
     }
 
-        public async ValueTask SetSubMasterAsync(byte tribeId, byte slotIndex, int characterId, CancellationToken ct)
+    public async ValueTask SetSubMasterAsync(byte tribeId, byte slotIndex, int characterId, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_TribeSubMaster_Set", 0)
             .AddParameter("TribeId", tribeId, SqlDbType.TinyInt)
@@ -57,7 +56,7 @@ public sealed record TribeRepository(ICaeriusNetDbContext Db) : ITribeRepository
         await Db.ExecuteAsync(sp, ct);
     }
 
-        public async ValueTask ClearSubMasterAsync(byte tribeId, int characterId, CancellationToken ct)
+    public async ValueTask ClearSubMasterAsync(byte tribeId, int characterId, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_TribeSubMaster_Clear", 0)
             .AddParameter("TribeId", tribeId, SqlDbType.TinyInt)
@@ -67,7 +66,7 @@ public sealed record TribeRepository(ICaeriusNetDbContext Db) : ITribeRepository
         await Db.ExecuteAsync(sp, ct);
     }
 
-        public async ValueTask<ReadOnlyCollection<TribeBankSlotDto>> GetBankAsync(byte tribeId, CancellationToken ct)
+    public async ValueTask<ReadOnlyCollection<TribeBankSlotDto>> GetBankAsync(byte tribeId, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_TribeBank_GetByTribe", 50)
             .AddParameter("TribeId", tribeId, SqlDbType.TinyInt)
@@ -76,7 +75,7 @@ public sealed record TribeRepository(ICaeriusNetDbContext Db) : ITribeRepository
         return await Db.QueryAsReadOnlyCollectionAsync<TribeBankSlotDto>(sp, ct);
     }
 
-        public async ValueTask<long> WithdrawBankAsync(byte tribeId, byte slotIndex, int characterId, CancellationToken ct)
+    public async ValueTask<long> WithdrawBankAsync(byte tribeId, byte slotIndex, int characterId, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_TribeBank_Withdraw", 1)
             .AddParameter("TribeId", tribeId, SqlDbType.TinyInt)
@@ -87,7 +86,7 @@ public sealed record TribeRepository(ICaeriusNetDbContext Db) : ITribeRepository
         return await Db.ExecuteScalarAsync<long>(sp, ct);
     }
 
-        public async ValueTask<long> DepositBankAsync(byte tribeId, byte slotIndex, int characterId, CancellationToken ct)
+    public async ValueTask<long> DepositBankAsync(byte tribeId, byte slotIndex, int characterId, CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("game", "usp_TribeBank_DepositFromCharacter", 1)
             .AddParameter("TribeId", tribeId, SqlDbType.TinyInt)

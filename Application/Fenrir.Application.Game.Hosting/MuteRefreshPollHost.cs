@@ -29,7 +29,7 @@ public sealed class MuteRefreshPollHost(
         } while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false));
     }
 
-        public async ValueTask PollOnceAsync(CancellationToken ct)
+    public async ValueTask PollOnceAsync(CancellationToken ct)
     {
         var tracked = new Dictionary<int, (Zone Zone, bool WasMuted)>();
         foreach (var zone in zones.Zones)

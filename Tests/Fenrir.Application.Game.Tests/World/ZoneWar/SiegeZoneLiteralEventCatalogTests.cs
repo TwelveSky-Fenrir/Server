@@ -85,13 +85,15 @@ public class SiegeZoneLiteralEventCatalogTests
     }
 
     [Theory]
-    [InlineData(SiegeZoneLiteralEventCatalog.Zone241ChallengeStartedEventCode, "Den of Rebirth Challenge 0 - 11 // 0 // Name")]
+    [InlineData(SiegeZoneLiteralEventCatalog.Zone241ChallengeStartedEventCode,
+        "Den of Rebirth Challenge 0 - 11 // 0 // Name")]
     [InlineData(SiegeZoneLiteralEventCatalog.Zone241FailureEventCodeA, "Den of Rebirth Failure 0 - 11 // 0 // Name")]
     [InlineData(SiegeZoneLiteralEventCatalog.Zone241FailureEventCodeB, "Den of Rebirth Failure 0 - 11 // 0 // Name")]
     [InlineData(SiegeZoneLiteralEventCatalog.Zone241SuccessEventCode, "Den of Rebirth Success 0 - 11 // 0 // Name")]
     [InlineData(SiegeZoneLiteralEventCatalog.Zone241ReturnTownEventCode, "Den of Rebirth Return Town 0 - 11 //")]
     [InlineData(SiegeZoneLiteralEventCatalog.WarHasStartedEventCode, "The War has started")]
-    [InlineData(SiegeZoneLiteralEventCatalog.InstinctDefenseFormationInUseEventCode, "Instinct defense formation in use")]
+    [InlineData(SiegeZoneLiteralEventCatalog.InstinctDefenseFormationInUseEventCode,
+        "Instinct defense formation in use")]
     [InlineData(SiegeZoneLiteralEventCatalog.ReturnToOriginalFactionEventCode, "return to original faction")]
     [InlineData(SiegeZoneLiteralEventCatalog.RemainToFolBeginEventCode, "remain to FoL begin")]
     [InlineData(SiegeZoneLiteralEventCatalog.FolBeganEventCode, "FoL began")]

@@ -2,8 +2,7 @@ namespace Fenrir.Data.Security;
 
 public static class MacAddressFormatter
 {
-
-        public static string Format(ReadOnlySpan<byte> address, uint length)
+    public static string Format(ReadOnlySpan<byte> address, uint length)
     {
         var count = (int)Math.Min(length, (uint)address.Length);
         if (count <= 0)

@@ -16,9 +16,9 @@ internal sealed record FieldModel
 
     public int NestedSize { get; init; }
 
-        public bool IsLegacyUidField { get; init; }
+    public bool IsLegacyUidField { get; init; }
 
-        public AvatarXorKind AvatarXor { get; init; } = AvatarXorKind.None;
+    public AvatarXorKind AvatarXor { get; init; } = AvatarXorKind.None;
 
     public int AvatarXorRowLength { get; init; }
 

@@ -17,7 +17,7 @@ public sealed class QuestCatalog
             .ToFrozenDictionary(g => g.Key, g => g.Max(q => q.Quest.Step));
     }
 
-        public QuestDefinition? TryGet(byte tribe, int step)
+    public QuestDefinition? TryGet(byte tribe, int step)
     {
         if (step is < 0 or > short.MaxValue)
             return null;
@@ -25,7 +25,7 @@ public sealed class QuestCatalog
         return _byCategoryStep.TryGetValue(((byte)(tribe + 1), (short)step), out var quest) ? quest : null;
     }
 
-        public short MaxStep(byte tribe)
+    public short MaxStep(byte tribe)
     {
         return _maxStepByCategory.TryGetValue((byte)(tribe + 1), out var step) ? step : (short)0;
     }

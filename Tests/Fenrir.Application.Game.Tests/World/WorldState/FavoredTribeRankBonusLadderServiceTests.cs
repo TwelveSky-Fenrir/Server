@@ -34,7 +34,7 @@ public class FavoredTribeRankBonusLadderServiceTests
         return registry;
     }
 
-        private static (FavoredTribeRankBonusLadderService Service, FakeDuplexPipe Pipe)
+    private static (FavoredTribeRankBonusLadderService Service, FakeDuplexPipe Pipe)
         CreateServiceWithOneConnectedZone(WorldStateService worldState)
     {
         var registry = CreateRegistry(1);

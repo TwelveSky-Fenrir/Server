@@ -17,8 +17,7 @@ public sealed class PetBagActionService(
     ILogger<PetBagActionService> logger)
     : IPetBagActionService
 {
-
-        private const byte InvalidByte = 0xFF;
+    private const byte InvalidByte = 0xFF;
 
     public async ValueTask<GenericActionResult> DepositAsync(Zone zone, PlayerRuntimeState state, int characterId,
         DefaultPData move, bool petBagUpperHalfEntitlementActive, bool secondInventoryPageEntitlementActive,
@@ -192,7 +191,7 @@ public sealed class PetBagActionService(
         return GenericActionResult.Succeeded;
     }
 
-        private static bool IsPetEquipped(PlayerRuntimeState state)
+    private static bool IsPetEquipped(PlayerRuntimeState state)
     {
         var petStack = state.Inventory.GetSlot(ContainerMatrix.Equipment, PetSlots.EquipmentSlot);
         return petStack is { ItemId: >= 1 };

@@ -17,12 +17,11 @@ public sealed class WarPointShopService(
     WorldDataCache worldData,
     ILogger<WarPointShopService> logger) : IWarPointShopService
 {
+    private const int WarPointBalanceUpdateSort = 905;
 
-        private const int WarPointBalanceUpdateSort = 905;
+    private const int ContributionPointBalanceUpdateSort = 3;
 
-        private const int ContributionPointBalanceUpdateSort = 3;
-
-        private const short WarPointShopBuyEventCode = 3;
+    private const short WarPointShopBuyEventCode = 3;
 
     private const byte NpcShopTradeOutcome = 1;
 

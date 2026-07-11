@@ -7,11 +7,11 @@ public sealed class FenrirPacketAttribute(FenrirServer server, FenrirDirection d
     public FenrirDirection Direction { get; } = direction;
     public byte Opcode { get; } = opcode;
 
-        public WireObfuscationMode Obfuscation { get; init; } = WireObfuscationMode.None;
+    public WireObfuscationMode Obfuscation { get; init; } = WireObfuscationMode.None;
 
-        public bool Compressed { get; init; }
+    public bool Compressed { get; init; }
 
-        public int ExpectedSize { get; init; } = -1;
+    public int ExpectedSize { get; init; } = -1;
 
-        public byte[] AllowedStates { get; init; } = [];
+    public byte[] AllowedStates { get; init; } = [];
 }

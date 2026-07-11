@@ -15,8 +15,7 @@ namespace Fenrir.Application.Game.Tests.Handlers.Commerce;
 
 public class OpenShopStallServiceCapacityTests
 {
-
-        private static async Task<OpenShopStallResponse> RunToCompletionAsync(ValueTask<OpenShopStallResponse> pending,
+    private static async Task<OpenShopStallResponse> RunToCompletionAsync(ValueTask<OpenShopStallResponse> pending,
         Zone zone)
     {
         var task = pending.AsTask();
@@ -47,7 +46,7 @@ public class OpenShopStallServiceCapacityTests
         };
     }
 
-        private static void FillZoneToCapacity(Zone zone, int count, int shopDate)
+    private static void FillZoneToCapacity(Zone zone, int count, int shopDate)
     {
         for (var characterId = 1; characterId <= count; characterId++)
             zone.RegisterProxyShop(new ProxyShopBroadcastEntry(characterId, characterId * 2 + 1, "Filler",
@@ -181,7 +180,7 @@ public class OpenShopStallServiceCapacityTests
         Assert.Equal(Zone.MaxProxyShopSlots, zone.ProxyShopCount);
     }
 
-        private sealed class CapacityTrackingOfflineShopRepository : IOfflineShopRepository
+    private sealed class CapacityTrackingOfflineShopRepository : IOfflineShopRepository
     {
         public List<(int CharacterId, byte ShopState)> ClosedStates { get; } = [];
         public int? LastOpenedCharacterId { get; private set; }

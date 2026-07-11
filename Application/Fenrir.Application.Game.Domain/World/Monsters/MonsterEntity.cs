@@ -5,8 +5,7 @@ namespace Fenrir.Application.Game.Domain.World.Monsters;
 
 public sealed class MonsterEntity
 {
-
-        private const int MaxAttackDamageEntries = 50;
+    private const int MaxAttackDamageEntries = 50;
 
     private readonly List<MonsterAttackDamageEntry> _attackDamage = [];
     private readonly Lock _attackDamageLock = new();
@@ -18,41 +17,41 @@ public sealed class MonsterEntity
     public required uint UniqueNumber { get; init; }
     public required MonsterRowDto Template { get; init; }
 
-        public byte SpecialSort { get; init; }
+    public byte SpecialSort { get; init; }
 
-        public required int SpawnSlotId { get; init; }
+    public required int SpawnSlotId { get; init; }
 
-        public int? InstanceId { get; init; }
+    public int? InstanceId { get; init; }
 
-        public string? OwnerName { get; init; }
+    public string? OwnerName { get; init; }
 
-        public TimeSpan? OwnerNameLockExemptionArmedAt { get; init; }
+    public TimeSpan? OwnerNameLockExemptionArmedAt { get; init; }
 
     public float PosX { get; set; }
     public float PosY { get; set; }
     public float PosZ { get; set; }
     public float Heading { get; set; }
 
-        public (int X, int Z) CurrentCell { get; set; }
+    public (int X, int Z) CurrentCell { get; set; }
 
-        public required float HomeX { get; init; }
+    public required float HomeX { get; init; }
 
     public required float HomeY { get; init; }
     public required float HomeZ { get; init; }
 
-        public required float LeashRadius { get; init; }
+    public required float LeashRadius { get; init; }
 
     public int MaxLife { get; init; }
 
     public MonsterAiState AiState { get; set; } = MonsterAiState.Spawning;
 
-        public int StateTicks { get; set; }
+    public int StateTicks { get; set; }
 
-        public int? TargetCharacterId { get; private set; }
+    public int? TargetCharacterId { get; private set; }
 
-        public uint TargetUniqueNumber { get; private set; }
+    public uint TargetUniqueNumber { get; private set; }
 
-        public float TargetLocationX { get; set; }
+    public float TargetLocationX { get; set; }
 
     public float TargetLocationY { get; set; }
 
@@ -60,37 +59,37 @@ public sealed class MonsterEntity
 
     public TimeSpan LastRebroadcastAt { get; set; }
 
-        public List<Vector2> PathWaypoints { get; } = [];
+    public List<Vector2> PathWaypoints { get; } = [];
 
-        public int WaypointCursor { get; set; }
+    public int WaypointCursor { get; set; }
 
-        public float PathGoalX { get; set; }
+    public float PathGoalX { get; set; }
 
-        public float PathGoalZ { get; set; }
+    public float PathGoalZ { get; set; }
 
-        public int DetectionThrottleTicks { get; set; }
+    public int DetectionThrottleTicks { get; set; }
 
-        public int ShortRangeRetargetThrottleTicks { get; set; }
+    public int ShortRangeRetargetThrottleTicks { get; set; }
 
-        public int IdleReturnElapsedTicks { get; set; }
+    public int IdleReturnElapsedTicks { get; set; }
 
-        public int IdleWanderElapsedTicks { get; set; }
+    public int IdleWanderElapsedTicks { get; set; }
 
-        public float WanderTargetX { get; set; }
+    public float WanderTargetX { get; set; }
 
-        public float WanderTargetZ { get; set; }
+    public float WanderTargetZ { get; set; }
 
-        public int PursuerCapacity { get; init; }
+    public int PursuerCapacity { get; init; }
 
-        public int Life => Volatile.Read(ref _life);
+    public int Life => Volatile.Read(ref _life);
 
-        public void ClearPath()
+    public void ClearPath()
     {
         PathWaypoints.Clear();
         WaypointCursor = 0;
     }
 
-        public void AssignTarget(int characterId, uint uniqueNumber, float x, float y, float z)
+    public void AssignTarget(int characterId, uint uniqueNumber, float x, float y, float z)
     {
         TargetCharacterId = characterId;
         TargetUniqueNumber = uniqueNumber;
@@ -99,13 +98,13 @@ public sealed class MonsterEntity
         TargetLocationZ = z;
     }
 
-        public void ReleaseTarget()
+    public void ReleaseTarget()
     {
         TargetCharacterId = null;
         TargetUniqueNumber = 0;
     }
 
-        public static MonsterEntity Create(int serverIndex, uint uniqueNumber, MonsterRowDto template, int spawnSlotId,
+    public static MonsterEntity Create(int serverIndex, uint uniqueNumber, MonsterRowDto template, int spawnSlotId,
         float homeX, float homeY, float homeZ, float leashRadius, int? instanceId = null,
         IRandomSource? random = null, byte? specialSort = null)
     {
@@ -142,7 +141,7 @@ public sealed class MonsterEntity
         return entity;
     }
 
-        public bool TakeDamage(int amount, out int remainingLife)
+    public bool TakeDamage(int amount, out int remainingLife)
     {
         if (amount < 0)
             amount = 0;
@@ -164,7 +163,7 @@ public sealed class MonsterEntity
         return newLife == 0 && Interlocked.CompareExchange(ref _deathClaimed, 1, 0) == 0;
     }
 
-        public void Heal(int amount)
+    public void Heal(int amount)
     {
         if (amount <= 0)
             return;
@@ -180,7 +179,7 @@ public sealed class MonsterEntity
         } while (Interlocked.CompareExchange(ref _life, newLife, oldLife) != oldLife);
     }
 
-        internal void RegisterAttackDamage(int attackerCharacterId, object sessionToken, int damage)
+    internal void RegisterAttackDamage(int attackerCharacterId, object sessionToken, int damage)
     {
         if (damage <= 0)
             return;
@@ -188,12 +187,12 @@ public sealed class MonsterEntity
         WriteAttackDamageSlot(attackerCharacterId, sessionToken, damage);
     }
 
-        internal void RegisterAcquisition(int characterId, object sessionToken)
+    internal void RegisterAcquisition(int characterId, object sessionToken)
     {
         WriteAttackDamageSlot(characterId, sessionToken, 0);
     }
 
-        private void WriteAttackDamageSlot(int characterId, object sessionToken, int damage)
+    private void WriteAttackDamageSlot(int characterId, object sessionToken, int damage)
     {
         lock (_attackDamageLock)
         {
@@ -218,7 +217,7 @@ public sealed class MonsterEntity
         }
     }
 
-        internal IReadOnlyList<MonsterAttackDamageEntry> SnapshotAttackDamage()
+    internal IReadOnlyList<MonsterAttackDamageEntry> SnapshotAttackDamage()
     {
         lock (_attackDamageLock)
         {
@@ -226,7 +225,7 @@ public sealed class MonsterEntity
         }
     }
 
-        internal bool HasTrackedAttackers()
+    internal bool HasTrackedAttackers()
     {
         lock (_attackDamageLock)
         {
@@ -234,20 +233,18 @@ public sealed class MonsterEntity
         }
     }
 
-        internal void ReplaceAttackDamage(IReadOnlyList<MonsterAggroListPruner.Survivor> survivors)
+    internal void ReplaceAttackDamage(IReadOnlyList<MonsterAggroListPruner.Survivor> survivors)
     {
         lock (_attackDamageLock)
         {
             _attackDamage.Clear();
             foreach (var survivor in survivors)
-            {
                 _attackDamage.Add(new MonsterAttackDamageEntry
                 {
                     CharacterId = survivor.CharacterId,
                     SessionToken = survivor.SessionToken,
                     CumulativeDamage = survivor.CumulativeDamage
                 });
-            }
         }
     }
 }

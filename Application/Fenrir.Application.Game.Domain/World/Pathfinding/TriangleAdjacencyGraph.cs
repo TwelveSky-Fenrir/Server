@@ -23,9 +23,9 @@ public sealed class TriangleAdjacencyGraph
         _walkable = walkable;
     }
 
-        public int TriangleCount => _centroidsXz.Length;
+    public int TriangleCount => _centroidsXz.Length;
 
-        public static TriangleAdjacencyGraph Build(IReadOnlyList<WorldTriangle> triangles)
+    public static TriangleAdjacencyGraph Build(IReadOnlyList<WorldTriangle> triangles)
     {
         var count = triangles.Count;
         var walkable = new bool[count];
@@ -101,32 +101,32 @@ public sealed class TriangleAdjacencyGraph
         return new Vector2(x, z);
     }
 
-        public bool IsWalkable(int triangleIndex)
+    public bool IsWalkable(int triangleIndex)
     {
         return _walkable[triangleIndex];
     }
 
-        public Vector2 CentroidXz(int triangleIndex)
+    public Vector2 CentroidXz(int triangleIndex)
     {
         return _centroidsXz[triangleIndex];
     }
 
-        public int NeighborStart(int triangleIndex)
+    public int NeighborStart(int triangleIndex)
     {
         return _adjacencyStart[triangleIndex];
     }
 
-        public int NeighborEnd(int triangleIndex)
+    public int NeighborEnd(int triangleIndex)
     {
         return _adjacencyStart[triangleIndex + 1];
     }
 
-        public int NeighborAt(int slot)
+    public int NeighborAt(int slot)
     {
         return _neighborTriangles[slot];
     }
 
-        public bool AreAdjacent(int a, int b)
+    public bool AreAdjacent(int a, int b)
     {
         for (var slot = _adjacencyStart[a]; slot < _adjacencyStart[a + 1]; slot++)
             if (_neighborTriangles[slot] == b)
@@ -135,7 +135,7 @@ public sealed class TriangleAdjacencyGraph
         return false;
     }
 
-        public bool TryGetPortal(int fromTriangle, int toTriangle, out Vector2 a, out Vector2 b)
+    public bool TryGetPortal(int fromTriangle, int toTriangle, out Vector2 a, out Vector2 b)
     {
         for (var slot = _adjacencyStart[fromTriangle]; slot < _adjacencyStart[fromTriangle + 1]; slot++)
             if (_neighborTriangles[slot] == toTriangle)
@@ -150,7 +150,7 @@ public sealed class TriangleAdjacencyGraph
         return false;
     }
 
-        private readonly record struct EdgeKey(Vector3 First, Vector3 Second)
+    private readonly record struct EdgeKey(Vector3 First, Vector3 Second)
     {
         public static EdgeKey Of(Vector3 p, Vector3 q)
         {

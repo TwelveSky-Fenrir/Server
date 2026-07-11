@@ -1,4 +1,3 @@
-using Fenrir.Network.Serialization.Shared.Packets.Shared;
 using Fenrir.Network.Serialization.Wire;
 using Fenrir.Network.Serialization.Wire.Attributes;
 using Fenrir.Network.Serialization.Zone.Wire;

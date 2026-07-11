@@ -108,7 +108,7 @@ public class UseInventoryItemTowerServiceTests
         return await task;
     }
 
-        [Theory]
+    [Theory]
     [InlineData(1)]
     [InlineData(2)]
     [InlineData(3)]
@@ -128,12 +128,12 @@ public class UseInventoryItemTowerServiceTests
         Assert.DoesNotContain(characters.LastReplacedContainer!.Value.Items, i => i.ItemId == ConstructItemId);
     }
 
-        [Fact]
+    [Fact]
     public async Task HealItem_RoutesToTowerUpgradeService_ConsumesItemAndArmsTheTickSideHeal()
     {
         var (session, _, zone, state, characters, towerWar, service) = SetUp();
         SeedItem(zone, HealItemId);
-        SpawnGuardian(zone, damaged: true);
+        SpawnGuardian(zone, true);
         PlaceAtGuardian(state);
 
         var response = await RunToCompletionAsync(
@@ -147,7 +147,7 @@ public class UseInventoryItemTowerServiceTests
         Assert.DoesNotContain(characters.LastReplacedContainer!.Value.Items, i => i.ItemId == HealItemId);
     }
 
-        [Fact]
+    [Fact]
     public async Task UnrelatedItemId_StillFallsThroughToGenericFailure_TowerStateNeverTouched()
     {
         var (_, _, zone, state, characters, towerWar, service) = SetUp();

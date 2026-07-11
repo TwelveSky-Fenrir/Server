@@ -5,8 +5,7 @@ namespace Fenrir.Application.Game.Domain.Guilds;
 
 public static class GuildRankingProjection
 {
-
-        public static WorldInfo Apply(WorldInfo template, ImmutableArray<GuildRankingRowDto> top)
+    public static WorldInfo Apply(WorldInfo template, ImmutableArray<GuildRankingRowDto> top)
     {
         var names = new string[GuildRankingCache.TopCount];
         var scores = new int[GuildRankingCache.TopCount];

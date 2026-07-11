@@ -8,7 +8,7 @@ public static class GuildInfoProjection
     private const int MaxMembers = 50;
     private const int MaxNotices = 4;
 
-        public static GuildInfo Empty()
+    public static GuildInfo Empty()
     {
         return new GuildInfo
         {
@@ -29,7 +29,7 @@ public static class GuildInfoProjection
         };
     }
 
-        public static GuildInfo Build(GuildSummaryDto guild, IReadOnlyList<GuildRosterRowDto> roster,
+    public static GuildInfo Build(GuildSummaryDto guild, IReadOnlyList<GuildRosterRowDto> roster,
         IReadOnlyList<GuildNoticeRowDto> notices)
     {
         var memberNames = NewEmptyStringArray(MaxMembers);

@@ -4,10 +4,9 @@ public static class RankBuffResolver
 {
     public enum Outcome
     {
+        Rejected,
 
-                Rejected,
-
-                WorldBattleActive,
+        WorldBattleActive,
 
         Success
     }

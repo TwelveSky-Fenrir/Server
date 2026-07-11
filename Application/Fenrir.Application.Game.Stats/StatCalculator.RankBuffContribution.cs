@@ -19,7 +19,7 @@ public static partial class StatCalculator
 
     private static readonly FrozenSet<short> RankBuffSuppressedZones = ((short[])[124, 335]).ToFrozenSet();
 
-        private static int RankBuffBonusFor(RankBuffStat stat, ZoneContext zone)
+    private static int RankBuffBonusFor(RankBuffStat stat, ZoneContext zone)
     {
         if (zone.RankBuffType == 0)
             return 0;
@@ -32,42 +32,42 @@ public static partial class StatCalculator
     }
 
 
-        public static int RankBuffMaxLifeBonus(ZoneContext zone)
+    public static int RankBuffMaxLifeBonus(ZoneContext zone)
     {
         return RankBuffBonusFor(RankBuffStat.MaxLife, zone);
     }
 
-        public static int RankBuffDefensePowerBonus(ZoneContext zone)
+    public static int RankBuffDefensePowerBonus(ZoneContext zone)
     {
         return RankBuffBonusFor(RankBuffStat.DefensePower, zone);
     }
 
-        public static int RankBuffElementDefensePowerBonus(ZoneContext zone)
+    public static int RankBuffElementDefensePowerBonus(ZoneContext zone)
     {
         return RankBuffBonusFor(RankBuffStat.ElementDefensePower, zone);
     }
 
-        public static int RankBuffElementAttackPowerBonus(ZoneContext zone)
+    public static int RankBuffElementAttackPowerBonus(ZoneContext zone)
     {
         return RankBuffBonusFor(RankBuffStat.ElementAttackPower, zone);
     }
 
-        public static int RankBuffAttackBlockBonus(ZoneContext zone)
+    public static int RankBuffAttackBlockBonus(ZoneContext zone)
     {
         return RankBuffBonusFor(RankBuffStat.AttackBlock, zone);
     }
 
-        public static int RankBuffAttackSuccessBonus(ZoneContext zone)
+    public static int RankBuffAttackSuccessBonus(ZoneContext zone)
     {
         return RankBuffBonusFor(RankBuffStat.AttackSuccess, zone);
     }
 
-        public static int RankBuffAttackPowerBonus(ZoneContext zone)
+    public static int RankBuffAttackPowerBonus(ZoneContext zone)
     {
         return RankBuffBonusFor(RankBuffStat.AttackPower, zone);
     }
 
-        private enum RankBuffStat
+    private enum RankBuffStat
     {
         None = 0,
         DefensePower = 1,
@@ -79,5 +79,5 @@ public static partial class StatCalculator
         AttackPower = 7
     }
 
-        private readonly record struct RankBuffEffect(RankBuffStat Stat, int Magnitude);
+    private readonly record struct RankBuffEffect(RankBuffStat Stat, int Magnitude);
 }

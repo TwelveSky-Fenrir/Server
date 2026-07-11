@@ -2,12 +2,11 @@ namespace Fenrir.Application.Game.Domain.Combat;
 
 public static class HolyShieldResolver
 {
+    public const int BaseSlot = 9;
 
-        public const int BaseSlot = 9;
+    public static readonly int[] TieredSlots = [29, 30, 31, 32, 33, 34];
 
-        public static readonly int[] TieredSlots = [29, 30, 31, 32, 33, 34];
-
-        public static int Absorb(int[] buff, int incomingDamage)
+    public static int Absorb(int[] buff, int incomingDamage)
     {
         if (incomingDamage <= 0)
             return 0;
@@ -25,7 +24,7 @@ public static class HolyShieldResolver
         return absorbed;
     }
 
-        public static bool RemoveAll(int[] buff)
+    public static bool RemoveAll(int[] buff)
     {
         var any = ClearSlot(buff, BaseSlot);
         foreach (var slot in TieredSlots)
@@ -33,7 +32,7 @@ public static class HolyShieldResolver
         return any;
     }
 
-        private static int ResolveActiveSlot(int[] buff)
+    private static int ResolveActiveSlot(int[] buff)
     {
         foreach (var slot in TieredSlots)
             if (buff[slot * 2] > 0)

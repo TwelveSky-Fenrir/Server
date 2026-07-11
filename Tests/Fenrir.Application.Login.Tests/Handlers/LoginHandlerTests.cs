@@ -582,7 +582,7 @@ public class LoginHandlerTests
             NullLogger<LoginHandler>.Instance);
     }
 
-        private static LoginCapacityState AllowedCapacity()
+    private static LoginCapacityState AllowedCapacity()
     {
         var state = new LoginCapacityState();
         state.SetMaxPlayers(10_000);
@@ -621,7 +621,7 @@ public class LoginHandlerTests
         return mac.Split('-').Select(b => Convert.ToByte(b, 16)).ToArray();
     }
 
-        private static CharacterRosterDto ToRosterDto(CharacterSummaryDto summary)
+    private static CharacterRosterDto ToRosterDto(CharacterSummaryDto summary)
     {
         return new CharacterRosterDto(
             summary.CharacterId,
@@ -653,12 +653,12 @@ public class LoginHandlerTests
             0);
     }
 
-        private static SqlException CreateFakeSqlException()
+    private static SqlException CreateFakeSqlException()
     {
         return (SqlException)RuntimeHelpers.GetUninitializedObject(typeof(SqlException));
     }
 
-        private static async Task AssertFirstResponseAsync(FakeDuplexPipe pipe, LoginResponse expected)
+    private static async Task AssertFirstResponseAsync(FakeDuplexPipe pipe, LoginResponse expected)
     {
         var actual = await PacketAssert.ReadSentBytesAsync(pipe);
         var expectedFrame = new byte[FrameWriter.FrameSizeOf<LoginResponse>()];

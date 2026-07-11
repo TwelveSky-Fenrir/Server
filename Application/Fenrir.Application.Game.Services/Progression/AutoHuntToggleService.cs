@@ -11,8 +11,7 @@ namespace Fenrir.Application.Game.Services.Progression;
 public sealed class AutoHuntToggleService(ICharacterRepository characters, ILogger<AutoHuntToggleService> logger)
     : IAutoHuntToggleService
 {
-
-        private const byte WeaponSlot = 7;
+    private const byte WeaponSlot = 7;
 
     public async ValueTask<AutoHuntToggleResult> ToggleAsync(int characterId, Zone zone, PlayerRuntimeState state,
         AutoHuntToggleRequest packet, CancellationToken cancellationToken)
@@ -36,8 +35,8 @@ public sealed class AutoHuntToggleService(ICharacterRepository characters, ILogg
                                  (packet.AutoHunt.AttackType[0] != 0 || packet.AutoHunt.AttackType[2] != 0);
 
             var enableBlocked = AutoHuntEnableGate.IsEnableBlocked(zone.MapId) ||
-                                 AutoHuntBattleZoneEligibilityCatalog.IsBlocked(zone.MapId, state.CombinedLevel,
-                                     state.RebirthCount);
+                                AutoHuntBattleZoneEligibilityCatalog.IsBlocked(zone.MapId, state.CombinedLevel,
+                                    state.RebirthCount);
             if (enableBlocked || !hasWeapon || !hasAttackSkill)
             {
                 logger.LogDebug(

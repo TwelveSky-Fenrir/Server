@@ -12,7 +12,7 @@ public class MonsterPathfinderMeshTetherTests
     private const float GroundY = 10f;
     private static readonly Vector4 FloorPlane = new(0f, 1f, 0f, GroundY);
 
-        private static ZoneGeometry GridGeometry(params (int Col, int Row)[] cells)
+    private static ZoneGeometry GridGeometry(params (int Col, int Row)[] cells)
     {
         var triangles = new List<WorldTriangle>(cells.Length * 2);
         float minX = float.MaxValue, minZ = float.MaxValue, maxX = float.MinValue, maxZ = float.MinValue;
@@ -48,7 +48,7 @@ public class MonsterPathfinderMeshTetherTests
         return new ZoneGeometry(triangles.ToArray(), [root]);
     }
 
-        private static ZoneGeometry OpenGround()
+    private static ZoneGeometry OpenGround()
     {
         return GridGeometry(
             (0, 0), (1, 0), (2, 0),
@@ -56,7 +56,7 @@ public class MonsterPathfinderMeshTetherTests
             (0, 2), (1, 2), (2, 2));
     }
 
-        private static ZoneGeometry GapWithTopDetour()
+    private static ZoneGeometry GapWithTopDetour()
     {
         return GridGeometry(
             (0, 0), (0, 1), (0, 2),

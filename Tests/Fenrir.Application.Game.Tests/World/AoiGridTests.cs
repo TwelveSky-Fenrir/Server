@@ -87,7 +87,7 @@ public class AoiGridTests
         Assert.True(grid.HasAnyNeighbor((50, 50)));
     }
 
-        [Fact]
+    [Fact]
     public void HasAnyNeighbor_AgreesWithNeighbors_AcrossARandomlyPopulatedGrid()
     {
         var grid = new AoiGrid(CellSize);

@@ -6,34 +6,34 @@ public static class BigMoneyTransferPolicy
     {
         Success,
 
-                QuantityBelowMinimum,
+        QuantityBelowMinimum,
 
-                InsufficientSourceBalance,
+        InsufficientSourceBalance,
 
-                DestinationOverflow
+        DestinationOverflow
     }
 
-        public const long BigMoneyCap = 999;
+    public const long BigMoneyCap = 999;
 
-        public static TransferResult ResolveInventoryToStore(
+    public static TransferResult ResolveInventoryToStore(
         long requestedQuantity, long inventoryBigMoney, long storeBigMoney)
     {
         return Resolve(requestedQuantity, inventoryBigMoney, storeBigMoney);
     }
 
-        public static TransferResult ResolveStoreToInventory(
+    public static TransferResult ResolveStoreToInventory(
         long requestedQuantity, long storeBigMoney, long inventoryBigMoney)
     {
         return Resolve(requestedQuantity, storeBigMoney, inventoryBigMoney);
     }
 
-        public static TransferResult ResolveInventoryToBank(
+    public static TransferResult ResolveInventoryToBank(
         long requestedQuantity, long inventoryBigMoney, long bankBigMoney)
     {
         return Resolve(requestedQuantity, inventoryBigMoney, bankBigMoney);
     }
 
-        public static TransferResult ResolveBankToInventory(
+    public static TransferResult ResolveBankToInventory(
         long requestedQuantity, long bankBigMoney, long inventoryBigMoney)
     {
         return Resolve(requestedQuantity, bankBigMoney, inventoryBigMoney);
@@ -54,7 +54,7 @@ public static class BigMoneyTransferPolicy
         return new TransferResult(TransferOutcome.Success, sourceBigMoney - requestedQuantity, projectedDestination);
     }
 
-        public readonly record struct TransferResult(
+    public readonly record struct TransferResult(
         TransferOutcome Outcome,
         long NewSourceBigMoney,
         long NewDestinationBigMoney)

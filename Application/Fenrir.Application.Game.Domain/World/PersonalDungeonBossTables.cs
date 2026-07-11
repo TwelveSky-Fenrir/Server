@@ -2,8 +2,11 @@ namespace Fenrir.Application.Game.Domain.World;
 
 public static class PersonalDungeonBossTables
 {
+    public static (float X, float Y, float Z) CatalogAAndESummonPosition => (1f, 21f, 0f);
 
-        public static int ResolveCatalogA(int rebirthTier)
+    public static (float X, float Y, float Z) CatalogDSummonPosition => (0f, 21f, 0f);
+
+    public static int ResolveCatalogA(int rebirthTier)
     {
         return rebirthTier switch
         {
@@ -22,7 +25,7 @@ public static class PersonalDungeonBossTables
         };
     }
 
-        public static int ResolveCatalogD(int serverNumber)
+    public static int ResolveCatalogD(int serverNumber)
     {
         return serverNumber switch
         {
@@ -36,7 +39,7 @@ public static class PersonalDungeonBossTables
         };
     }
 
-        public static int ResolveCatalogE(int rebirthTier)
+    public static int ResolveCatalogE(int rebirthTier)
     {
         return rebirthTier switch
         {
@@ -54,8 +57,4 @@ public static class PersonalDungeonBossTables
             _ => 750
         };
     }
-
-        public static (float X, float Y, float Z) CatalogAAndESummonPosition => (1f, 21f, 0f);
-
-        public static (float X, float Y, float Z) CatalogDSummonPosition => (0f, 21f, 0f);
 }

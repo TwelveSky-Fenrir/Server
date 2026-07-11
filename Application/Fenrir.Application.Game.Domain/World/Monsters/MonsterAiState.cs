@@ -1,25 +1,22 @@
-using Fenrir.Network.Serialization.Shared.Packets.Shared;
-
 namespace Fenrir.Application.Game.Domain.World.Monsters;
 
 public enum MonsterAiState : byte
 {
+    Spawning = 0,
 
-        Spawning = 0,
+    Decision = 1,
 
-        Decision = 1,
+    Patrol = 3,
 
-        Patrol = 3,
+    Chase = 4,
 
-        Chase = 4,
+    AttackWindup = 5,
 
-        AttackWindup = 5,
+    RangedAttackWindup = 7,
 
-        RangedAttackWindup = 7,
+    Flinch = 8,
 
-        Flinch = 8,
+    ReturnToSpawn = 19,
 
-        ReturnToSpawn = 19,
-
-        Dead = 12
+    Dead = 12
 }

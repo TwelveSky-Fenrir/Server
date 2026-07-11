@@ -1,4 +1,3 @@
-using Fenrir.Network.Serialization.Wire;
 using Fenrir.Application.Game.Abstractions.ZoneLifecycle;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Handlers.Handlers;

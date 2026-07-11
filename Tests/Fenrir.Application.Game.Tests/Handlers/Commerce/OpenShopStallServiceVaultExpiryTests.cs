@@ -34,7 +34,7 @@ public class OpenShopStallServiceVaultExpiryTests
         return state;
     }
 
-        private static void SeedLiveSlot(PlayerRuntimeState state, byte page, byte index, ItemStack? stack)
+    private static void SeedLiveSlot(PlayerRuntimeState state, byte page, byte index, ItemStack? stack)
     {
         var updated = stack is { } s
             ? state.Inventory.GetContainer(page).SetItem(index, s)
@@ -42,7 +42,7 @@ public class OpenShopStallServiceVaultExpiryTests
         state.Inventory.ReplaceContainer(page, updated);
     }
 
-        private static OpenShopStallRequest RequestWithOneOccupiedSlot(byte inventoryPage, byte inventoryIndex)
+    private static OpenShopStallRequest RequestWithOneOccupiedSlot(byte inventoryPage, byte inventoryIndex)
     {
         var itemInfo = new int[225];
         var i = PshopPurchasePolicy.FlatIndex(0, 0);

@@ -1,5 +1,4 @@
 using Fenrir.Application.Game.Abstractions.Social;
-using Fenrir.Application.Game.Domain.Social.Mentor;
 using Fenrir.Application.Game.Domain.World;
 using Microsoft.Extensions.Logging;
 

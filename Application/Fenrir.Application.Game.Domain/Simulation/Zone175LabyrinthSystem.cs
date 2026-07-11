@@ -26,7 +26,7 @@ public sealed class Zone175LabyrinthSystem(
             _timeProvider.GetUtcNow(), legacyTicksElapsed);
     }
 
-        public bool TryGetPhase(short mapId, out Zone175MissionPhase phase)
+    public bool TryGetPhase(short mapId, out Zone175MissionPhase phase)
     {
         if (_runtimeByZone.TryGetValue(mapId, out var runtime))
         {
@@ -38,7 +38,7 @@ public sealed class Zone175LabyrinthSystem(
         return false;
     }
 
-        private sealed class Zone175ZoneRuntime(Zone175MissionState state, IZone175MissionEffects effects)
+    private sealed class Zone175ZoneRuntime(Zone175MissionState state, IZone175MissionEffects effects)
     {
         public Zone175MissionState State { get; } = state;
         public IZone175MissionEffects Effects { get; } = effects;

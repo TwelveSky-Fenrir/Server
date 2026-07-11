@@ -4,13 +4,13 @@ public static class LegendaryPetCraftCatalog
 {
     public const int Sort = 2;
 
-        public const byte Material1RequiredSort1 = 31;
+    public const byte Material1RequiredSort1 = 31;
 
     public const byte Material1RequiredSort2 = 32;
 
     public const int ContributionPointCost = 10000;
 
-        public const int WireResult = 21;
+    public const int WireResult = 21;
 
     public static readonly IReadOnlySet<int> CatalystItemIds = new HashSet<int> { 1878, 2150 };
 

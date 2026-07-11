@@ -2,14 +2,13 @@ namespace Fenrir.Application.Game.Domain.Combat;
 
 public static class PvpKillExperienceScaling
 {
+    public const float PerLevelScaleStep = 0.1f;
 
-        public const float PerLevelScaleStep = 0.1f;
+    public const int UnfavorableLevelGapZeroThreshold = 9;
 
-        public const int UnfavorableLevelGapZeroThreshold = 9;
+    public const int RegularWarXpMultiplier = 150;
 
-        public const int RegularWarXpMultiplier = 150;
-
-        public static int Scale(int baseXp, int attackerCombinedLevel, int victimCombinedLevel)
+    public static int Scale(int baseXp, int attackerCombinedLevel, int victimCombinedLevel)
     {
         if (attackerCombinedLevel is < PvpKillExperienceBaseTable.MinCombinedLevel
             or > PvpKillExperienceBaseTable.MaxCombinedLevel)
@@ -32,7 +31,7 @@ public static class PvpKillExperienceScaling
         return (int)(baseXp - baseXp * (unfavorableGap * PerLevelScaleStep));
     }
 
-        public static int ResolveZoneMultiplier(bool isRegularWarServer, int crossTribeXpRatio)
+    public static int ResolveZoneMultiplier(bool isRegularWarServer, int crossTribeXpRatio)
     {
         return isRegularWarServer ? RegularWarXpMultiplier : crossTribeXpRatio;
     }

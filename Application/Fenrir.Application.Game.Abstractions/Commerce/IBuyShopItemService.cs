@@ -6,14 +6,13 @@ namespace Fenrir.Application.Game.Abstractions.Commerce;
 
 public enum BuyShopItemSellerOutcome
 {
+    Abort,
 
-        Abort,
+    Reply,
 
-        Reply,
+    Proceed,
 
-        Proceed,
-
-        ProxyProceed
+    ProxyProceed
 }
 
 public readonly record struct BuyShopItemSellerResult(
@@ -30,15 +29,14 @@ public readonly record struct BuyShopItemCommitResult(
 
 public interface IBuyShopItemService
 {
-
-        public ValueTask<BuyShopItemSellerResult> FindSellerAsync(BuyShopItemRequest packet, Zone zone,
+    public ValueTask<BuyShopItemSellerResult> FindSellerAsync(BuyShopItemRequest packet, Zone zone,
         PlayerRuntimeState buyer, int buyerId, CancellationToken cancellationToken);
 
-        public ValueTask<BuyShopItemCommitResult> CommitAsync(BuyShopItemRequest packet, Zone zone,
+    public ValueTask<BuyShopItemCommitResult> CommitAsync(BuyShopItemRequest packet, Zone zone,
         PlayerRuntimeState buyer,
         PlayerRuntimeState seller, PshopPurchasePolicy.SlotView slot, CancellationToken cancellationToken);
 
-        public ValueTask<BuyShopItemCommitResult> CommitProxyPurchaseAsync(BuyShopItemRequest packet, Zone zone,
+    public ValueTask<BuyShopItemCommitResult> CommitProxyPurchaseAsync(BuyShopItemRequest packet, Zone zone,
         PlayerRuntimeState buyer, int sellerId, int accountId, PshopPurchasePolicy.SlotView slot,
         CancellationToken cancellationToken);
 }

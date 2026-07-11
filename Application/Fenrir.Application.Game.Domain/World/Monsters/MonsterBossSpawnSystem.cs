@@ -24,7 +24,7 @@ public sealed class MonsterBossSpawnSystem(
         MonsterBossSpawnMachine.Advance(state, legacyTicksElapsed);
     }
 
-        public int LiveBossCountFor(Zone zone)
+    public int LiveBossCountFor(Zone zone)
     {
         if (_catalog.CandidatesFor(zone.MapId).Length < 1)
             return 0;
@@ -49,7 +49,7 @@ public sealed class MonsterBossSpawnSystem(
         };
     }
 
-        private sealed class ZoneBossSpawnSink(Zone zone, WorldDataCache worldData, Random random) : IMonsterBossSpawnSink
+    private sealed class ZoneBossSpawnSink(Zone zone, WorldDataCache worldData, Random random) : IMonsterBossSpawnSink
     {
         private MonsterRowDto? _resolvedTemplate;
 

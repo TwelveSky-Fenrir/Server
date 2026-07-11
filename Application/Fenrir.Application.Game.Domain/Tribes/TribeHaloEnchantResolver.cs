@@ -4,20 +4,18 @@ namespace Fenrir.Application.Game.Domain.Tribes;
 
 public enum TribeHaloEnchantOutcome
 {
+    Success,
 
-        Success,
+    ProtectionConsumed,
 
-        ProtectionConsumed,
+    Downgraded,
 
-        Downgraded,
-
-        NeutralFail
+    NeutralFail
 }
 
 public static class TribeHaloEnchantResolver
 {
-
-        public static (int SuccessRate, int DecreaseRate) GetRates(int currentHalo)
+    public static (int SuccessRate, int DecreaseRate) GetRates(int currentHalo)
     {
         var pCurrentImprove = currentHalo + 1;
 
@@ -38,7 +36,7 @@ public static class TribeHaloEnchantResolver
         return (15, decrease);
     }
 
-        public static (TribeHaloEnchantOutcome Outcome, int NewHalo, int NewProtectForHalo) Resolve(
+    public static (TribeHaloEnchantOutcome Outcome, int NewHalo, int NewProtectForHalo) Resolve(
         int currentHalo, int currentProtectForHalo, IRandomSource random)
     {
         var (successRate, decreaseRate) = GetRates(currentHalo);

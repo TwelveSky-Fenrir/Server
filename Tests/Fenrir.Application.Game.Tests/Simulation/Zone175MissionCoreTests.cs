@@ -136,7 +136,7 @@ public sealed class Zone175MissionCoreTests
     [Fact]
     public void Combat_BossStillAlive_KeepsRunningAndTricklesEvery20SubTicks()
     {
-        var (state, config, effects) = OpenAndReachWaveOneCombat(livingBosses: 1);
+        var (state, config, effects) = OpenAndReachWaveOneCombat(1);
 
         Zone175MissionCore.Advance(state, in config, effects, NextSunday2100(), 20);
         Assert.Equal(Zone175MissionPhase.WaveCombat, state.Phase);
@@ -150,7 +150,7 @@ public sealed class Zone175MissionCoreTests
     [Fact]
     public void Combat_BossCleared_RemovesMonstersRewardsAndAdvancesWhenDepthAllows()
     {
-        var (state, config, effects) = OpenAndReachWaveOneCombat(livingBosses: 0);
+        var (state, config, effects) = OpenAndReachWaveOneCombat(0);
 
         Zone175MissionCore.Advance(state, in config, effects, NextSunday2100(), 1);
 
@@ -164,7 +164,7 @@ public sealed class Zone175MissionCoreTests
     [Fact]
     public void Combat_BossCleared_DepthGateStopsProgressionForLowIndex2()
     {
-        var (state, config, effects) = OpenAndReachWaveOneCombat(livingBosses: 0, index2: 0);
+        var (state, config, effects) = OpenAndReachWaveOneCombat(0, 0);
 
         Zone175MissionCore.Advance(state, in config, effects, NextSunday2100(), 1);
 
@@ -177,7 +177,7 @@ public sealed class Zone175MissionCoreTests
     [Fact]
     public void FifthWaveClear_WritesMissionEndAndEntersTerminal()
     {
-        var (state, config, effects) = OpenAndReachWaveOneCombat(livingBosses: 0, index2: 4);
+        var (state, config, effects) = OpenAndReachWaveOneCombat(0, 4);
 
         for (var wave = 1; wave <= Zone175RewardTables.WaveCount; wave++)
         {
@@ -194,7 +194,7 @@ public sealed class Zone175MissionCoreTests
     [Fact]
     public void Combat_NoQualifyingPlayer_EmptyAbortsToTerminal()
     {
-        var (state, config, effects) = OpenAndReachWaveOneCombat(livingBosses: 1);
+        var (state, config, effects) = OpenAndReachWaveOneCombat(1);
         effects.PlayerPresent = false;
 
         Zone175MissionCore.Advance(state, in config, effects, NextSunday2100(), 1);
@@ -208,7 +208,7 @@ public sealed class Zone175MissionCoreTests
     [Fact]
     public void Combat_TimeoutAbortsToTerminal()
     {
-        var (state, config, effects) = OpenAndReachWaveOneCombat(livingBosses: 1);
+        var (state, config, effects) = OpenAndReachWaveOneCombat(1);
 
         Zone175MissionCore.Advance(state, in config, effects, NextSunday2100(),
             Zone175RewardTables.WaveTimeoutLegacyTicks);
@@ -221,7 +221,7 @@ public sealed class Zone175MissionCoreTests
     [Fact]
     public void Terminal_AfterHold_KicksEveryoneAndResetsToIdle()
     {
-        var (state, config, effects) = OpenAndReachWaveOneCombat(livingBosses: 1);
+        var (state, config, effects) = OpenAndReachWaveOneCombat(1);
         effects.PlayerPresent = false;
         Zone175MissionCore.Advance(state, in config, effects, NextSunday2100(), 1);
         Assert.Equal(Zone175MissionPhase.Terminal, state.Phase);

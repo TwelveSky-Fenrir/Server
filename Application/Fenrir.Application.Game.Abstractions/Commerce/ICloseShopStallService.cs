@@ -5,8 +5,7 @@ namespace Fenrir.Application.Game.Abstractions.Commerce;
 
 public interface ICloseShopStallService
 {
+    public CloseShopStallResponse? CloseLiveShop(PlayerRuntimeState state);
 
-        public CloseShopStallResponse? CloseLiveShop(PlayerRuntimeState state);
-
-        public ValueTask CloseOfflineShopAsync(int characterId, Zone zone, CancellationToken cancellationToken);
+    public ValueTask CloseOfflineShopAsync(int characterId, Zone zone, CancellationToken cancellationToken);
 }

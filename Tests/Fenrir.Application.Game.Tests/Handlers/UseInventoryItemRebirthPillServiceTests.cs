@@ -216,7 +216,7 @@ public class UseInventoryItemRebirthPillServiceTests
         Assert.Equal(RebirthProgression.MaxRebirthGeneration, state.RebirthCount);
     }
 
-        [Fact]
+    [Fact]
     public async Task RebirthPill_FromGeneration11_ReachesTheAbsoluteCapOf12()
     {
         var (session, _, zone, state, characters) =
@@ -234,7 +234,7 @@ public class UseInventoryItemRebirthPillServiceTests
         Assert.Equal(RebirthProgression.MaxRebirthGeneration, after!.RebirthCount);
     }
 
-        [Fact]
+    [Fact]
     public async Task RebirthPill_SecondAttemptAgainstTheSameNowEmptySlot_FailsCleanly_NoDoubleSpend()
     {
         var (session, _, zone, state, characters) = SetUp(rebirthCount: 0);

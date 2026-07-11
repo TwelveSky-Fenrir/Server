@@ -4,6 +4,5 @@ namespace Fenrir.Application.Game.Abstractions.Tribes;
 
 public interface ITribePopulationService
 {
-
-        public IReadOnlyList<int> GetConnectedUserCounts(Zone zone);
+    public IReadOnlyList<int> GetConnectedUserCounts(Zone zone);
 }

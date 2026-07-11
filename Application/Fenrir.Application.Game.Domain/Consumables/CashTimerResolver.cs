@@ -8,9 +8,9 @@ public static class CashTimerResolver
     {
         Success,
 
-                WouldExceedCeiling,
+        WouldExceedCeiling,
 
-                LevelCapNotMet
+        LevelCapNotMet
     }
 
     public const int FactionNoticeAddAmount = 5;

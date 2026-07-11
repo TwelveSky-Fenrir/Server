@@ -4,13 +4,15 @@ namespace Fenrir.Application.Game.Tests.Combat;
 
 public class FormationCombatResolverTests
 {
-
     [Fact]
     public void ScaleAttackPower_Code1_ScalesUpByOneTenth_IntegerTruncated()
     {
-        Assert.Equal(1100, FormationCombatResolver.ScaleAttackPower(1000, FormationCombatResolver.AttackerPowerBoostCode));
-        Assert.Equal(13579, FormationCombatResolver.ScaleAttackPower(12345, FormationCombatResolver.AttackerPowerBoostCode));
-        Assert.Equal(107 + 10, FormationCombatResolver.ScaleAttackPower(107, FormationCombatResolver.AttackerPowerBoostCode));
+        Assert.Equal(1100,
+            FormationCombatResolver.ScaleAttackPower(1000, FormationCombatResolver.AttackerPowerBoostCode));
+        Assert.Equal(13579,
+            FormationCombatResolver.ScaleAttackPower(12345, FormationCombatResolver.AttackerPowerBoostCode));
+        Assert.Equal(107 + 10,
+            FormationCombatResolver.ScaleAttackPower(107, FormationCombatResolver.AttackerPowerBoostCode));
     }
 
     [Theory]
@@ -28,7 +30,8 @@ public class FormationCombatResolverTests
     [Fact]
     public void ScaleDefensePower_Code2_ScalesUpByOneTenth()
     {
-        Assert.Equal(880, FormationCombatResolver.ScaleDefensePower(800, FormationCombatResolver.DefenderDefenseBoostCode));
+        Assert.Equal(880,
+            FormationCombatResolver.ScaleDefensePower(800, FormationCombatResolver.DefenderDefenseBoostCode));
     }
 
     [Theory]

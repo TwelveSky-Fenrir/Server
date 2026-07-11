@@ -5,16 +5,15 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 
 public static class Zone051Zone053BroadcastResolver
 {
-
-        public const int Zone051RangeStart = 10;
+    public const int Zone051RangeStart = 10;
 
     public const int Zone051RangeEnd = 18;
 
-        public const int Zone053RangeStart = 19;
+    public const int Zone053RangeStart = 19;
 
     public const int Zone053RangeEnd = 30;
 
-        public static void ApplyZone051(Zone051Zone053SiegeState state, int selector, ReadOnlySpan<byte> data,
+    public static void ApplyZone051(Zone051Zone053SiegeState state, int selector, ReadOnlySpan<byte> data,
         ILogger logger)
     {
         var slot = ReadInt32(data, 0);
@@ -29,7 +28,7 @@ public static class Zone051Zone053BroadcastResolver
             state.SetZone051(slot, mapped);
     }
 
-        public static void ApplyZone053(Zone051Zone053SiegeState state, int selector, ReadOnlySpan<byte> data,
+    public static void ApplyZone053(Zone051Zone053SiegeState state, int selector, ReadOnlySpan<byte> data,
         ILogger logger)
     {
         var slot = ReadInt32(data, 0);

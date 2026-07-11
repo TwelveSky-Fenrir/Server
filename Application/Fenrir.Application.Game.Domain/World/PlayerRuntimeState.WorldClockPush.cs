@@ -2,6 +2,5 @@ namespace Fenrir.Application.Game.Domain.World;
 
 public partial class PlayerRuntimeState
 {
-
-        public int WorldClockPushThrottleState { get; set; }
+    public int WorldClockPushThrottleState { get; set; }
 }

@@ -4,7 +4,6 @@ namespace Fenrir.Application.Game.Tests.Stats;
 
 public class DecoUpgradeContributionTests
 {
-
     [Theory]
     [InlineData(99, 18)]
     [InlineData(100, 18)]

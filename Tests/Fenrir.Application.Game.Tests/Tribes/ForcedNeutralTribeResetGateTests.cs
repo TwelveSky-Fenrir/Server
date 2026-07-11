@@ -7,14 +7,14 @@ public class ForcedNeutralTribeResetGateTests
     private static ForcedNeutralTribeResetEligibilityContext Eligible()
     {
         return new ForcedNeutralTribeResetEligibilityContext(
-            Level: ForcedNeutralTribeResetGate.MinLevel,
-            CurrentTribe: 0,
-            TribeRole: 0,
-            GuildId: null,
-            TeacherCharacterId: null,
-            StudentCharacterId: null,
-            HasAnyFriend: false,
-            NeutralHomeZoneOnline: true);
+            ForcedNeutralTribeResetGate.MinLevel,
+            0,
+            0,
+            null,
+            null,
+            null,
+            false,
+            true);
     }
 
     [Fact]

@@ -58,7 +58,7 @@ public class TowerFriendlyFireGateTests
         Assert.True(allowed);
     }
 
-        [Fact]
+    [Fact]
     public void PassingAllyOfAttackerInsteadOfOwner_WouldNeverExemptAnyone_DemonstratingWhyTheFixMatters()
     {
         const byte attackerTribe = 2;

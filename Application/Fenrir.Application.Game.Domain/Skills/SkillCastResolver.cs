@@ -10,12 +10,12 @@ public static class SkillCastResolver
         None,
         UnknownSkill,
 
-                NotCastable,
+        NotCastable,
         InsufficientMana,
         WrongWeaponClass
     }
 
-        public static Result TryCast(SkillDefinition? skill, int gradePoints, int casterMana, int casterMaxLife,
+    public static Result TryCast(SkillDefinition? skill, int gradePoints, int casterMana, int casterMaxLife,
         int? equippedWeaponSort, int supportSkillTimeUpRatio)
     {
         if (skill is not { } skillDef)
@@ -67,10 +67,8 @@ public static class SkillCastResolver
         int ManaCost,
         ImmutableArray<BuffWrite> BuffWrites,
         SkillEffectKind Kind,
-
-                int HealAmount,
-
-                bool RequiresFullParty = false)
+        int HealAmount,
+        bool RequiresFullParty = false)
     {
         public static Result Fail(FailureReason reason)
         {

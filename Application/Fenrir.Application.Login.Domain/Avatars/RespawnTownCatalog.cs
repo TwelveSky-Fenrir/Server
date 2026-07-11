@@ -12,7 +12,7 @@ public static class RespawnTownCatalog
         (140, 0f, 0f, -6f)
     ];
 
-        public static bool TryGetTownLocation(byte tribe, out short zoneId, out float x, out float y, out float z)
+    public static bool TryGetTownLocation(byte tribe, out short zoneId, out float x, out float y, out float z)
     {
         if (tribe < TribeCount)
         {

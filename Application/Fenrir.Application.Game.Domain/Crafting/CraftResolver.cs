@@ -15,7 +15,7 @@ public static class CraftResolver
     {
         Success,
 
-                Failed,
+        Failed,
 
         Rejected
     }
@@ -28,8 +28,7 @@ public static class CraftResolver
 
     public enum JadeOutcome
     {
-
-                Success,
+        Success,
 
         Rejected
     }
@@ -68,7 +67,7 @@ public static class CraftResolver
         DustConsolation
     }
 
-        public static JadeResult ResolveJadeUpgrade(ItemStack material1, ItemStack material2)
+    public static JadeResult ResolveJadeUpgrade(ItemStack material1, ItemStack material2)
     {
         if (material1.ItemId != CraftRecipeCatalog.PurpleJadeItemId ||
             material2.ItemId != CraftRecipeCatalog.PurpleJadeItemId)
@@ -85,7 +84,7 @@ public static class CraftResolver
         return new JadeResult(JadeOutcome.Success, result);
     }
 
-        public static ElixirResult ResolveAdvancedElixir(ItemStack material, bool hasFreeInventorySlot,
+    public static ElixirResult ResolveAdvancedElixir(ItemStack material, bool hasFreeInventorySlot,
         IRandomSource random)
     {
         if (!CraftRecipeCatalog.AdvancedElixirBaseItemIds.Contains(material.ItemId))
@@ -110,7 +109,7 @@ public static class CraftResolver
         return new ElixirResult(ElixirOutcome.Failed, remaining, null);
     }
 
-        public static StoneMatResult ResolveStoneMatCombine(ItemStack material1, ItemStack material2,
+    public static StoneMatResult ResolveStoneMatCombine(ItemStack material1, ItemStack material2,
         ItemStack material3, ItemStack material4, IRandomSource random)
     {
         if (material1.ItemId != CraftRecipeCatalog.StoneMatMaterialItemId ||
@@ -126,7 +125,7 @@ public static class CraftResolver
         return new StoneMatResult(StoneMatOutcome.Success, pool[random.NextInt32(pool.Count)]);
     }
 
-        public static MountFusionResult ResolveMountFusion(int sort, int material1ItemId, int material2ItemId,
+    public static MountFusionResult ResolveMountFusion(int sort, int material1ItemId, int material2ItemId,
         int material3ItemId, int catalystItemId, IRandomSource random)
     {
         var isTier2 = sort == CraftRecipeCatalog.MountFusionTier2Sort;
@@ -162,7 +161,7 @@ public static class CraftResolver
         return new MountFusionResult(MountFusionOutcome.DustConsolation, CraftRecipeCatalog.DustItemId, dustQuantity);
     }
 
-        public static WingAssemblyResult ResolveWingAssembly(bool isTownZone, bool hasSufficientContributionPoints,
+    public static WingAssemblyResult ResolveWingAssembly(bool isTownZone, bool hasSufficientContributionPoints,
         int material1ItemId, int material2ItemId, int material3ItemId, int catalystItemId, byte previousTribe,
         IRandomSource random)
     {
@@ -193,7 +192,7 @@ public static class CraftResolver
             CraftRecipeCatalog.WingTierItemId(tier, previousTribe));
     }
 
-        public static FeatherTierUpResult ResolveFeatherTierUp(int sort, int materialItemId, int materialQuantity)
+    public static FeatherTierUpResult ResolveFeatherTierUp(int sort, int materialItemId, int materialQuantity)
     {
         var (checkItemId, gainItemId) = sort == CraftRecipeCatalog.FeatherTierUpBlackToGoldSort
             ? (CraftRecipeCatalog.WingFeatherBlackItemId, CraftRecipeCatalog.WingFeatherGoldItemId)
@@ -205,7 +204,7 @@ public static class CraftResolver
         return new FeatherTierUpResult(FeatherTierUpOutcome.Success, gainItemId);
     }
 
-        public static WingTierRerollResult ResolveWingTierReroll(int material1ItemId, int material2ItemId,
+    public static WingTierRerollResult ResolveWingTierReroll(int material1ItemId, int material2ItemId,
         int material3ItemId, int catalystItemId, int catalystQuantity, byte previousTribe, IRandomSource random)
     {
         var tier1ItemId = CraftRecipeCatalog.WingTierItemId(1, previousTribe);
@@ -229,7 +228,7 @@ public static class CraftResolver
                 CraftRecipeCatalog.WingTierItemId(tier, previousTribe));
     }
 
-        public static WingFifthTierResult ResolveWingFifthTier(int sort, int material1ItemId, int material2ItemId,
+    public static WingFifthTierResult ResolveWingFifthTier(int sort, int material1ItemId, int material2ItemId,
         int material3ItemId, int catalystItemId, IRandomSource random)
     {
         if (sort == CraftRecipeCatalog.WingSixthTierUnvalidatedSort)
@@ -246,7 +245,7 @@ public static class CraftResolver
             : new WingFifthTierResult(WingFifthTierOutcome.DustConsolation, CraftRecipeCatalog.DustItemId);
     }
 
-        public static DustRecycleResult ResolveDustRecycle(int sort, int materialItemId, int materialQuantity,
+    public static DustRecycleResult ResolveDustRecycle(int sort, int materialItemId, int materialQuantity,
         byte previousTribe, IRandomSource random)
     {
         var threshold = DustRecycleThreshold(sort);
@@ -267,7 +266,7 @@ public static class CraftResolver
         return new DustRecycleResult(DustRecycleOutcome.Success, resultItemId);
     }
 
-        public static int DustRecycleThreshold(int sort)
+    public static int DustRecycleThreshold(int sort)
     {
         return sort switch
         {

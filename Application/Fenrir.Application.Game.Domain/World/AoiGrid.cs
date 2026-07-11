@@ -4,19 +4,19 @@ public sealed class AoiGrid(float cellSize)
 {
     private readonly Dictionary<(int X, int Z), HashSet<int>> _cells = new();
 
-        private readonly Dictionary<int, (float X, float Y, float Z)> _positions = new();
+    private readonly Dictionary<int, (float X, float Y, float Z)> _positions = new();
 
     public (int X, int Z) CellOf(float posX, float posZ)
     {
         return ((int)MathF.Floor(posX / cellSize), (int)MathF.Floor(posZ / cellSize));
     }
 
-        public void Add(int characterId, (int X, int Z) cell)
+    public void Add(int characterId, (int X, int Z) cell)
     {
         AddMembership(characterId, cell);
     }
 
-        public void Add(int characterId, (int X, int Z) cell, float posX, float posY, float posZ)
+    public void Add(int characterId, (int X, int Z) cell, float posX, float posY, float posZ)
     {
         AddMembership(characterId, cell);
         _positions[characterId] = (posX, posY, posZ);
@@ -28,7 +28,7 @@ public sealed class AoiGrid(float cellSize)
         _positions.Remove(characterId);
     }
 
-        public void Move(int characterId, (int X, int Z) from, (int X, int Z) to)
+    public void Move(int characterId, (int X, int Z) from, (int X, int Z) to)
     {
         if (from == to)
             return;
@@ -37,7 +37,7 @@ public sealed class AoiGrid(float cellSize)
         AddMembership(characterId, to);
     }
 
-        public void Move(int characterId, (int X, int Z) from, (int X, int Z) to, float posX, float posY, float posZ)
+    public void Move(int characterId, (int X, int Z) from, (int X, int Z) to, float posX, float posY, float posZ)
     {
         if (from != to)
         {
@@ -66,7 +66,7 @@ public sealed class AoiGrid(float cellSize)
             _cells.Remove(cell);
     }
 
-        public IEnumerable<int> Neighbors((int X, int Z) cell)
+    public IEnumerable<int> Neighbors((int X, int Z) cell)
     {
         for (var dx = -1; dx <= 1; dx++)
         for (var dz = -1; dz <= 1; dz++)
@@ -75,7 +75,7 @@ public sealed class AoiGrid(float cellSize)
                     yield return id;
     }
 
-        public IEnumerable<int> Neighbors((int X, int Z) cell, float originX, float originY, float originZ, int scale = 1)
+    public IEnumerable<int> Neighbors((int X, int Z) cell, float originX, float originY, float originZ, int scale = 1)
     {
         var radiusSquared = ExactRadiusSquared(scale);
         for (var dx = -scale; dx <= scale; dx++)
@@ -86,7 +86,7 @@ public sealed class AoiGrid(float cellSize)
                         yield return id;
     }
 
-        public bool HasAnyNeighbor((int X, int Z) cell, int scale = 1)
+    public bool HasAnyNeighbor((int X, int Z) cell, int scale = 1)
     {
         for (var dx = -scale; dx <= scale; dx++)
         for (var dz = -scale; dz <= scale; dz++)
@@ -96,7 +96,7 @@ public sealed class AoiGrid(float cellSize)
         return false;
     }
 
-        public void NeighborsExcludingSelf(List<int> buffer, (int X, int Z) cell, int excludeCharacterId)
+    public void NeighborsExcludingSelf(List<int> buffer, (int X, int Z) cell, int excludeCharacterId)
     {
         for (var dx = -1; dx <= 1; dx++)
         for (var dz = -1; dz <= 1; dz++)
@@ -106,7 +106,7 @@ public sealed class AoiGrid(float cellSize)
                         buffer.Add(id);
     }
 
-        public void NeighborsExcludingSelf(List<int> buffer, (int X, int Z) cell, int excludeCharacterId,
+    public void NeighborsExcludingSelf(List<int> buffer, (int X, int Z) cell, int excludeCharacterId,
         float originX, float originY, float originZ, int scale = 1)
     {
         var radiusSquared = ExactRadiusSquared(scale);
@@ -118,7 +118,7 @@ public sealed class AoiGrid(float cellSize)
                         buffer.Add(id);
     }
 
-        public void Neighbors(List<int> buffer, (int X, int Z) cell)
+    public void Neighbors(List<int> buffer, (int X, int Z) cell)
     {
         for (var dx = -1; dx <= 1; dx++)
         for (var dz = -1; dz <= 1; dz++)
@@ -127,7 +127,7 @@ public sealed class AoiGrid(float cellSize)
                     buffer.Add(id);
     }
 
-        public void Neighbors(List<int> buffer, (int X, int Z) cell, float originX, float originY, float originZ,
+    public void Neighbors(List<int> buffer, (int X, int Z) cell, float originX, float originY, float originZ,
         int scale = 1)
     {
         var radiusSquared = ExactRadiusSquared(scale);
@@ -145,7 +145,7 @@ public sealed class AoiGrid(float cellSize)
         return radius * radius;
     }
 
-        private bool WithinExactRadius(int characterId, float originX, float originY, float originZ,
+    private bool WithinExactRadius(int characterId, float originX, float originY, float originZ,
         float radiusSquared)
     {
         if (!_positions.TryGetValue(characterId, out var position))

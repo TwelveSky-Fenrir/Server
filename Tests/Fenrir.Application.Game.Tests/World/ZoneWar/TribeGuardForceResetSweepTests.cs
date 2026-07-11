@@ -3,7 +3,6 @@ using Fenrir.Application.Game.Domain.World.Monsters;
 using Fenrir.Application.Game.Domain.World.ZoneWar;
 using Fenrir.Application.Game.Tests.GameData;
 using Fenrir.Application.Game.Tests.TestSupport;
-using Fenrir.Data.Abstractions.World;
 
 namespace Fenrir.Application.Game.Tests.World.ZoneWar;
 

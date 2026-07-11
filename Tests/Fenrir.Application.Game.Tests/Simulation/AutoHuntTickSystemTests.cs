@@ -39,7 +39,7 @@ public class AutoHuntTickSystemTests
         return (zone, state!);
     }
 
-        private static AutoHunt Config(params int[] buffStorePairs)
+    private static AutoHunt Config(params int[] buffStorePairs)
     {
         var buffStore = new int[16];
         Array.Copy(buffStorePairs, buffStore, buffStorePairs.Length);
@@ -309,7 +309,7 @@ public class AutoHuntTickSystemTests
         Assert.Equal(manaBefore, state.Mana);
     }
 
-        [Fact]
+    [Fact]
     public void Stunned_DoesNothing()
     {
         var skillsById = new Dictionary<int, SkillDefinition> { [82] = HolyShieldSkill(10, 30, 20, 40) }
@@ -328,7 +328,7 @@ public class AutoHuntTickSystemTests
         Assert.Equal(0, state.Buffs.Buff[9 * 2]);
     }
 
-        [Fact]
+    [Fact]
     public void RegularWarMap_DoesNothing()
     {
         var skillsById = new Dictionary<int, SkillDefinition> { [82] = HolyShieldSkill(10, 30, 20, 40) }
@@ -346,7 +346,7 @@ public class AutoHuntTickSystemTests
         Assert.Equal(0, state.Buffs.Buff[9 * 2]);
     }
 
-        [Fact]
+    [Fact]
     public void HolyStoneMapArmed_DoesNothing()
     {
         var skillsById = new Dictionary<int, SkillDefinition> { [82] = HolyShieldSkill(10, 30, 20, 40) }
@@ -367,7 +367,7 @@ public class AutoHuntTickSystemTests
         Assert.Equal(0, state.Buffs.Buff[9 * 2]);
     }
 
-        [Fact]
+    [Fact]
     public void HolyStoneMapIdWithoutArmedFlag_StillCasts()
     {
         var skillsById = new Dictionary<int, SkillDefinition> { [82] = HolyShieldSkill(10, 30, 20, 40) }
@@ -388,7 +388,7 @@ public class AutoHuntTickSystemTests
         Assert.Equal(168, state.Buffs.Buff[9 * 2]);
     }
 
-        [Fact]
+    [Fact]
     public void Zone241DungeonMap_DoesNothing()
     {
         var skillsById = new Dictionary<int, SkillDefinition> { [82] = HolyShieldSkill(10, 30, 20, 40) }
@@ -408,7 +408,7 @@ public class AutoHuntTickSystemTests
         Assert.Equal(0, state.Buffs.Buff[9 * 2]);
     }
 
-        [Fact]
+    [Fact]
     public void OrdinaryMap_UnaffectedByZoneServerTypeGate()
     {
         var skillsById = new Dictionary<int, SkillDefinition> { [82] = HolyShieldSkill(10, 30, 20, 40) }

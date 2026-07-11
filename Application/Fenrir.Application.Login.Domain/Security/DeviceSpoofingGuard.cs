@@ -6,9 +6,9 @@ public static class DeviceSpoofingGuard
     private const string PlaceholderAdapterGuid = "{0-0-0-0-0}";
     private const string PlaceholderRemoteIp = "127.0.0.1";
 
-        public const int GmGradeThreshold = 1;
+    public const int GmGradeThreshold = 1;
 
-        public static bool IsSpoofedDeviceTuple(int accountGrade, string declaredMacAddress,
+    public static bool IsSpoofedDeviceTuple(int accountGrade, string declaredMacAddress,
         string declaredAdapterGuid, string? observedRemoteIp)
     {
         if (accountGrade >= GmGradeThreshold)

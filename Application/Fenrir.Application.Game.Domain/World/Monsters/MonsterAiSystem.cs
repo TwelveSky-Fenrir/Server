@@ -9,24 +9,23 @@ namespace Fenrir.Application.Game.Domain.World.Monsters;
 
 public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISimulationSystem
 {
+    private const float TickSeconds = SimulationClock.LegacyTickMilliseconds / 1000f;
 
-        private const float TickSeconds = SimulationClock.LegacyTickMilliseconds / 1000f;
+    private const float ArrivalEpsilon = 1f;
 
-        private const float ArrivalEpsilon = 1f;
+    private const float PathReplanGoalMoveThreshold = 40f;
 
-        private const float PathReplanGoalMoveThreshold = 40f;
+    private const float WanderMinRadius = 50f;
 
-        private const float WanderMinRadius = 50f;
+    private const int WanderRadiusRollSpan = 51;
 
-        private const int WanderRadiusRollSpan = 51;
-
-        private const int WanderDirectionRollSpan = 201;
+    private const int WanderDirectionRollSpan = 201;
 
     private const int WanderDirectionRollHalfSpan = 100;
 
-        private const float WanderMinDisplacement = 50f;
+    private const float WanderMinDisplacement = 50f;
 
-        private readonly IRandomSource _random = random ?? SystemRandomSource.Instance;
+    private readonly IRandomSource _random = random ?? SystemRandomSource.Instance;
 
     public void Simulate(Zone zone, int legacyTicksElapsed)
     {
@@ -136,7 +135,7 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISim
         zone.SyncMonsterCell(monster);
     }
 
-        private void RunDecision(Zone zone, MonsterEntity monster, int legacyTicksElapsed,
+    private void RunDecision(Zone zone, MonsterEntity monster, int legacyTicksElapsed,
         IEnumerable<MonsterEntity> allMonsters)
     {
         if (IsZone175TypeBoss(monster.Template.SpecialType))
@@ -170,23 +169,20 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISim
         }
     }
 
-        private void RunStandardDecision(Zone zone, MonsterEntity monster, int legacyTicksElapsed,
+    private void RunStandardDecision(Zone zone, MonsterEntity monster, int legacyTicksElapsed,
         IEnumerable<MonsterEntity> allMonsters)
     {
         if (!monster.HasTrackedAttackers())
-        {
-            if (!TryAcquireTarget(zone, monster, legacyTicksElapsed, allMonsters, transitionToChaseOnAcquire: false))
+            if (!TryAcquireTarget(zone, monster, legacyTicksElapsed, allMonsters, false))
             {
                 RunIdleWanderOrReturnHome(zone, monster, legacyTicksElapsed);
                 return;
             }
 
-        }
-
         RunPrunedAttackerEngagement(zone, monster, allMonsters);
     }
 
-        private void RunIdleWanderOrReturnHome(Zone zone, MonsterEntity monster, int legacyTicksElapsed)
+    private void RunIdleWanderOrReturnHome(Zone zone, MonsterEntity monster, int legacyTicksElapsed)
     {
         monster.IdleReturnElapsedTicks += legacyTicksElapsed;
         if (monster.IdleReturnElapsedTicks > SimulationClock.MonsterIdleReturnHomeLegacyTicks)
@@ -203,7 +199,6 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISim
                 zone.BroadcastMonsterActionChange(monster);
                 return;
             }
-
         }
 
         monster.IdleWanderElapsedTicks += legacyTicksElapsed;
@@ -226,7 +221,7 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISim
         zone.BroadcastMonsterActionChange(monster);
     }
 
-        private void RunPrunedAttackerEngagement(Zone zone, MonsterEntity monster, IEnumerable<MonsterEntity> allMonsters)
+    private void RunPrunedAttackerEngagement(Zone zone, MonsterEntity monster, IEnumerable<MonsterEntity> allMonsters)
     {
         var pruneResult = MonsterAggroListPruner.Prune(zone, monster, allMonsters);
         monster.ReplaceAttackDamage(pruneResult.Survivors);
@@ -291,7 +286,7 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISim
         }
     }
 
-        private void ComputeArcApproachPoint(MonsterEntity monster, float targetX, float targetZ, int meleeRadius,
+    private void ComputeArcApproachPoint(MonsterEntity monster, float targetX, float targetZ, int meleeRadius,
         out float approachX, out float approachZ)
     {
         var dx = targetX - monster.PosX;
@@ -317,7 +312,7 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISim
         approachZ = monster.PosZ + (dx * sin + dz * cos);
     }
 
-        private static bool CanReachPoint(Zone zone, MonsterEntity monster, float destX, float destZ)
+    private static bool CanReachPoint(Zone zone, MonsterEntity monster, float destX, float destZ)
     {
         if (zone.Geometry is not { } geometry)
             return true;
@@ -329,7 +324,7 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISim
         return geometry.IsWalkable(destX, destZ);
     }
 
-        private bool TryComputeWanderDestination(Zone zone, MonsterEntity monster, out float destX, out float destZ)
+    private bool TryComputeWanderDestination(Zone zone, MonsterEntity monster, out float destX, out float destZ)
     {
         var dirX = (float)(_random.NextInt32(WanderDirectionRollSpan) - WanderDirectionRollHalfSpan);
         var dirZ = (float)(_random.NextInt32(WanderDirectionRollSpan) - WanderDirectionRollHalfSpan);
@@ -354,7 +349,7 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISim
                WanderMinDisplacement * WanderMinDisplacement;
     }
 
-        private bool TryAcquireTarget(Zone zone, MonsterEntity monster, int legacyTicksElapsed,
+    private bool TryAcquireTarget(Zone zone, MonsterEntity monster, int legacyTicksElapsed,
         IEnumerable<MonsterEntity> allMonsters, bool transitionToChaseOnAcquire = true)
     {
         if (monster.Template.AttackType is not (1 or 3 or 6))
@@ -407,7 +402,7 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISim
         return false;
     }
 
-        private static int CountOtherPursuers(IEnumerable<MonsterEntity> allMonsters, MonsterEntity monster,
+    private static int CountOtherPursuers(IEnumerable<MonsterEntity> allMonsters, MonsterEntity monster,
         int candidateCharacterId)
     {
         var count = 0;
@@ -427,18 +422,18 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISim
         return count;
     }
 
-        private static bool IsCandidateValid([NotNullWhen(true)] PlayerRuntimeState? player)
+    private static bool IsCandidateValid([NotNullWhen(true)] PlayerRuntimeState? player)
     {
         return player is not null && !player.IsMovingZone && !IsHiding(player) && !player.IsDead;
     }
 
-        private static bool IsHiding(PlayerRuntimeState player)
+    private static bool IsHiding(PlayerRuntimeState player)
     {
         _ = player;
         return false;
     }
 
-        private PlayerRuntimeState TryShortRangeRetarget(Zone zone, MonsterEntity monster, PlayerRuntimeState current,
+    private PlayerRuntimeState TryShortRangeRetarget(Zone zone, MonsterEntity monster, PlayerRuntimeState current,
         int legacyTicksElapsed)
     {
         if (monster.Template.AttackType is not (1 or 3 or 6))
@@ -536,15 +531,15 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISim
         }
 
         MoveToward(zone, monster, target.PosX, target.PosZ, monster.Template.RunSpeed, dt,
-            tetherRadius: monster.Template.RadiusInfo1);
+            monster.Template.RadiusInfo1);
     }
 
-        private static bool IsZone175TypeBoss(byte specialType)
+    private static bool IsZone175TypeBoss(byte specialType)
     {
         return specialType is >= 40 and <= 44;
     }
 
-        private static void MoveToward(Zone zone, MonsterEntity monster, float targetX, float targetZ, float speed,
+    private static void MoveToward(Zone zone, MonsterEntity monster, float targetX, float targetZ, float speed,
         float dt, float? tetherRadius = null)
     {
         if (zone.Geometry is not { } geometry)
@@ -562,7 +557,7 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISim
         StepToward(monster, targetX, targetZ, speed, dt, geometry, true);
     }
 
-        private static void MoveAlongPath(MonsterPathfinder pathfinder, ZoneGeometry geometry, MonsterEntity monster,
+    private static void MoveAlongPath(MonsterPathfinder pathfinder, ZoneGeometry geometry, MonsterEntity monster,
         float targetX, float targetZ, float speed, float dt, float? tetherRadius)
     {
         var exhausted = monster.WaypointCursor >= monster.PathWaypoints.Count;
@@ -577,7 +572,8 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISim
                 var from = new Vector3(monster.PosX, monster.PosY, monster.PosZ);
                 var to = new Vector3(targetX, monster.PosY, targetZ);
                 var found = tetherRadius is { } radius
-                    ? pathfinder.TryFindPursuitPath(from, to, new Vector2(targetX, targetZ), radius, monster.PathWaypoints)
+                    ? pathfinder.TryFindPursuitPath(from, to, new Vector2(targetX, targetZ), radius,
+                        monster.PathWaypoints)
                     : pathfinder.TryFindPathClamped(from, to, monster.PathWaypoints);
                 if (found)
                 {
@@ -597,13 +593,12 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISim
                 StepToward(monster, targetX, targetZ, speed, dt, geometry, true);
                 return;
             }
-
         }
 
         FollowWaypoints(monster, geometry, speed, dt);
     }
 
-        private static void FollowWaypoints(MonsterEntity monster, ZoneGeometry geometry, float speed, float dt)
+    private static void FollowWaypoints(MonsterEntity monster, ZoneGeometry geometry, float speed, float dt)
     {
         var remainingStep = speed * dt;
         if (remainingStep <= 0f)
@@ -639,7 +634,7 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISim
         }
     }
 
-        private static bool StepToward(MonsterEntity monster, float destX, float destZ, float speed, float dt,
+    private static bool StepToward(MonsterEntity monster, float destX, float destZ, float speed, float dt,
         ZoneGeometry? geometry, bool refuseBlockedStep)
     {
         var dx = destX - monster.PosX;
@@ -690,14 +685,14 @@ public sealed partial class MonsterAiSystem(IRandomSource? random = null) : ISim
             monster.PosY = groundY;
     }
 
-        private static bool PathGoalMoved(MonsterEntity monster, float targetX, float targetZ)
+    private static bool PathGoalMoved(MonsterEntity monster, float targetX, float targetZ)
     {
         var dx = targetX - monster.PathGoalX;
         var dz = targetZ - monster.PathGoalZ;
         return dx * dx + dz * dz > PathReplanGoalMoveThreshold * PathReplanGoalMoveThreshold;
     }
 
-        private static bool NextStepBlocked(MonsterEntity monster, ZoneGeometry geometry, float speed, float dt)
+    private static bool NextStepBlocked(MonsterEntity monster, ZoneGeometry geometry, float speed, float dt)
     {
         if (monster.WaypointCursor >= monster.PathWaypoints.Count)
             return false;

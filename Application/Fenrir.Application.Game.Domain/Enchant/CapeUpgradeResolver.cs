@@ -11,7 +11,7 @@ public static class CapeUpgradeResolver
         Failed
     }
 
-        public const int Cost = 20_000_000;
+    public const int Cost = 20_000_000;
 
     private const int PremiumDiscountPercent = 20;
 
@@ -20,7 +20,7 @@ public static class CapeUpgradeResolver
     private static readonly HashSet<int> ValidTargetItemIds = [1401, 1403, 1404, 1406, 2208, 2218, 2228, 2238];
     private static readonly HashSet<int> ValidMaterialItemIds = [984, 2394];
 
-        public static int GetCost(bool premiumActive)
+    public static int GetCost(bool premiumActive)
     {
         return premiumActive ? Cost - Cost * PremiumDiscountPercent / 100 : Cost;
     }

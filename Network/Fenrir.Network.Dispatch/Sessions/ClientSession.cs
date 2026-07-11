@@ -18,7 +18,7 @@ public abstract class ClientSession(
 {
     private const int SlowConsumerBackpressureStreakLimit = 5;
 
-        private readonly Channel<byte[]> _pendingSends =
+    private readonly Channel<byte[]> _pendingSends =
         Channel.CreateUnbounded<byte[]>(new UnboundedChannelOptions { SingleReader = true });
 
     private readonly SemaphoreSlim _sendLock = new(1, 1);
@@ -30,17 +30,17 @@ public abstract class ClientSession(
 
     public FenrirServer Server { get; } = server;
 
-        public IPEndPoint? RemoteEndPoint { get; } = remoteEndPoint;
+    public IPEndPoint? RemoteEndPoint { get; } = remoteEndPoint;
 
-        public byte InboundStreamXorKey { get; set; }
+    public byte InboundStreamXorKey { get; set; }
 
     public DisconnectReason? DisconnectReason { get; private set; }
 
-        public DateTimeOffset LastActivityUtc { get; private set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset LastActivityUtc { get; private set; } = DateTimeOffset.UtcNow;
 
-        public long SessionId { get; } = sessionId;
+    public long SessionId { get; } = sessionId;
 
-        public void Send<TPacket>(in TPacket packet) where TPacket : struct, IOutgoingPacket
+    public void Send<TPacket>(in TPacket packet) where TPacket : struct, IOutgoingPacket
     {
         if (Volatile.Read(ref _completed) != 0)
             return;
@@ -79,12 +79,12 @@ public abstract class ClientSession(
         FlushLocked();
     }
 
-        public void Touch()
+    public void Touch()
     {
         LastActivityUtc = DateTimeOffset.UtcNow;
     }
 
-        public abstract bool IsOpcodeAllowed(byte opcode);
+    public abstract bool IsOpcodeAllowed(byte opcode);
 
     public void SendRaw(ReadOnlySpan<byte> rawFrame)
     {
@@ -115,17 +115,17 @@ public abstract class ClientSession(
         FlushLocked();
     }
 
-        private static byte OpcodeOf(ReadOnlySpan<byte> rawFrame)
+    private static byte OpcodeOf(ReadOnlySpan<byte> rawFrame)
     {
         return rawFrame.IsEmpty ? (byte)0 : rawFrame[0];
     }
 
-        private void LogPacketSent(byte opcode, int byteSize)
+    private void LogPacketSent(byte opcode, int byteSize)
     {
         logger?.PacketSent(SessionId, opcode, byteSize);
     }
 
-        protected void LogSessionStateChanged<TState>(TState previousState, TState newState) where TState : struct, Enum
+    protected void LogSessionStateChanged<TState>(TState previousState, TState newState) where TState : struct, Enum
     {
         logger?.LogInformation(
             "Session {SessionId} ({Server}) state changed: {PreviousState} -> {NewState}",
@@ -223,7 +223,7 @@ public abstract class ClientSession(
         }
     }
 
-        public void Abort(DisconnectReason reason)
+    public void Abort(DisconnectReason reason)
     {
         if (Interlocked.CompareExchange(ref _completed, 1, 0) != 0)
             return;

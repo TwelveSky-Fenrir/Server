@@ -3,7 +3,6 @@ using Fenrir.Application.Game.Domain.World.Monsters;
 using Fenrir.Application.Game.Stats;
 using Fenrir.Application.Game.Tests.GameData;
 using Fenrir.Application.Game.Tests.TestSupport;
-using Fenrir.Network.Serialization.Shared.Packets.Shared;
 
 namespace Fenrir.Application.Game.Tests.Combat;
 

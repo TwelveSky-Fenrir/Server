@@ -28,6 +28,8 @@ using Fenrir.Data.Tribes;
 using Fenrir.Data.World;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using BigMoneyRepository = Fenrir.Data.Inventory.BigMoneyRepository;
+using IBigMoneyRepository = Fenrir.Data.Abstractions.Inventory.IBigMoneyRepository;
 
 namespace Fenrir.Data;
 
@@ -55,7 +57,7 @@ public static class FenrirDataServiceCollectionExtensions
         builder.Services.AddSingleton<IPetBagRepository, PetBagRepository>();
 
         builder.Services
-            .AddSingleton<Fenrir.Data.Abstractions.Inventory.IBigMoneyRepository, Inventory.BigMoneyRepository>();
+            .AddSingleton<IBigMoneyRepository, BigMoneyRepository>();
 
         builder.Services.AddSingleton<IRuneRepository, RuneRepository>();
 

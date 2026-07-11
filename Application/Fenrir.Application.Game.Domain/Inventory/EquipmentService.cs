@@ -10,8 +10,7 @@ namespace Fenrir.Application.Game.Domain.Inventory;
 
 public static class EquipmentService
 {
-
-        public static ImmutableArray<EquippedItemSlot> BuildEquippedSlots(
+    public static ImmutableArray<EquippedItemSlot> BuildEquippedSlots(
         IReadOnlyDictionary<byte, ItemStack> equipmentContainer,
         FrozenDictionary<int, ItemDefinition> itemsById)
     {
@@ -29,7 +28,7 @@ public static class EquipmentService
         return builder.ToImmutable();
     }
 
-        public static EffectiveStats RecomputeStats(
+    public static EffectiveStats RecomputeStats(
         CharacterBaseAttributes attributes,
         IReadOnlyDictionary<byte, ItemStack> equipmentContainer,
         WorldDataCache worldData,
@@ -52,7 +51,7 @@ public static class EquipmentService
             worldData.GemSocketsByTypeAndValue);
     }
 
-        private static (CosmeticContext Cosmetic, ZoneContext Zone, ConsumableContext Consumable, MountContext Mount)
+    private static (CosmeticContext Cosmetic, ZoneContext Zone, ConsumableContext Consumable, MountContext Mount)
         AssembleStatContexts(PlayerRuntimeState? state, WorldDataCache worldData)
     {
         if (state is null)

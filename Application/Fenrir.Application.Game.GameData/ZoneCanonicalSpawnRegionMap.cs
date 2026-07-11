@@ -6,23 +6,22 @@ public readonly record struct SpawnRegionCanonicalZone(short CanonicalZoneId, bo
 
 public static class ZoneCanonicalSpawnRegionMap
 {
-
-        private static readonly FrozenSet<short> FixSuffixZones =
+    private static readonly FrozenSet<short> FixSuffixZones =
         new short[] { 39, 144, 145, 313, 74 }.ToFrozenSet();
 
     private static readonly FrozenDictionary<short, short> CanonicalRedirects = BuildCanonicalRedirects();
 
-        public static short ResolveCanonicalSpawnZoneId(short physicalZoneId)
+    public static short ResolveCanonicalSpawnZoneId(short physicalZoneId)
     {
         return CanonicalRedirects.GetValueOrDefault(physicalZoneId, physicalZoneId);
     }
 
-        public static bool UsesFixSuffix(short physicalZoneId)
+    public static bool UsesFixSuffix(short physicalZoneId)
     {
         return FixSuffixZones.Contains(physicalZoneId);
     }
 
-        public static SpawnRegionCanonicalZone Resolve(short physicalZoneId)
+    public static SpawnRegionCanonicalZone Resolve(short physicalZoneId)
     {
         return new SpawnRegionCanonicalZone(ResolveCanonicalSpawnZoneId(physicalZoneId), UsesFixSuffix(physicalZoneId));
     }
@@ -49,7 +48,6 @@ public static class ZoneCanonicalSpawnRegionMap
         Group(129, 133, 137, 174);
 
         Group(310, 336);
-
 
 
         return map.ToFrozenDictionary();

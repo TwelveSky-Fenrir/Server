@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.Services.Gm;
 using Fenrir.Application.Game.Tests.TestSupport;
@@ -25,7 +26,7 @@ public class GmClearInventoryServiceTests
         var (registry, zone) = GmBasicTestSupport.CreateWorld();
         var (session, pipe, state) = GmBasicTestSupport.Enter(zone, CallerId, "NotAGm");
         state.Inventory.ReplaceContainer(ContainerMatrix.InventoryPage0,
-            System.Collections.Immutable.ImmutableDictionary<byte, ItemStack>.Empty.Add(0, Stack(1001)));
+            ImmutableDictionary<byte, ItemStack>.Empty.Add(0, Stack(1001)));
         var characters = new FakeCharacterRepository();
         var eventLog = new FakeEventLogRepository();
         var service = new GmClearInventoryService(characters, eventLog, NullLogger<GmClearInventoryService>.Instance);
@@ -47,9 +48,9 @@ public class GmClearInventoryServiceTests
         var (registry, zone) = GmBasicTestSupport.CreateWorld();
         var (session, pipe, state) = GmBasicTestSupport.Enter(zone, CallerId, "TheGm", 1);
         state.Inventory.ReplaceContainer(ContainerMatrix.InventoryPage0,
-            System.Collections.Immutable.ImmutableDictionary<byte, ItemStack>.Empty.Add(0, Stack(1001)));
+            ImmutableDictionary<byte, ItemStack>.Empty.Add(0, Stack(1001)));
         state.Inventory.ReplaceContainer(ContainerMatrix.InventoryPage1,
-            System.Collections.Immutable.ImmutableDictionary<byte, ItemStack>.Empty.Add(0, Stack(1002)));
+            ImmutableDictionary<byte, ItemStack>.Empty.Add(0, Stack(1002)));
         var characters = new FakeCharacterRepository();
         var eventLog = new FakeEventLogRepository();
         var service = new GmClearInventoryService(characters, eventLog, NullLogger<GmClearInventoryService>.Instance);
@@ -84,9 +85,9 @@ public class GmClearInventoryServiceTests
         var (registry, zone) = GmBasicTestSupport.CreateWorld();
         var (session, pipe, state) = GmBasicTestSupport.Enter(zone, CallerId, "TheGm", 1);
         state.Inventory.ReplaceContainer(ContainerMatrix.InventoryPage0,
-            System.Collections.Immutable.ImmutableDictionary<byte, ItemStack>.Empty.Add(0, Stack(1001)));
+            ImmutableDictionary<byte, ItemStack>.Empty.Add(0, Stack(1001)));
         state.Inventory.ReplaceContainer(ContainerMatrix.InventoryPage1,
-            System.Collections.Immutable.ImmutableDictionary<byte, ItemStack>.Empty.Add(0, Stack(1002)));
+            ImmutableDictionary<byte, ItemStack>.Empty.Add(0, Stack(1002)));
         var characters = new FakeCharacterRepository();
         var eventLog = new FakeEventLogRepository();
         var service = new GmClearInventoryService(characters, eventLog, NullLogger<GmClearInventoryService>.Instance);
@@ -116,9 +117,9 @@ public class GmClearInventoryServiceTests
         var (registry, zone) = GmBasicTestSupport.CreateWorld();
         var (session, pipe, state) = GmBasicTestSupport.Enter(zone, CallerId, "TheGm", 1);
         state.Inventory.ReplaceContainer(ContainerMatrix.InventoryPage0,
-            System.Collections.Immutable.ImmutableDictionary<byte, ItemStack>.Empty.Add(0, Stack(1001)));
+            ImmutableDictionary<byte, ItemStack>.Empty.Add(0, Stack(1001)));
         state.Inventory.ReplaceContainer(ContainerMatrix.InventoryPage1,
-            System.Collections.Immutable.ImmutableDictionary<byte, ItemStack>.Empty.Add(0, Stack(1002)));
+            ImmutableDictionary<byte, ItemStack>.Empty.Add(0, Stack(1002)));
         var characters = new FakeCharacterRepository();
         var eventLog = new FakeEventLogRepository();
         var service = new GmClearInventoryService(characters, eventLog, NullLogger<GmClearInventoryService>.Instance);

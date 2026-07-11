@@ -15,22 +15,22 @@
 -- 50268/50269 as usp_CharacterTrade_Execute (identical failure kinds -- character A / character B unknown or
 -- insufficient balance), so no new error-catalog codes are introduced.
 CREATE PROCEDURE game.usp_CharacterTradeCommit_ExecuteIdempotent @TradeToken UNIQUEIDENTIFIER,
-                                                                @CharacterA INT,
-                                                                @ItemsA0 game.tvp_CharacterItemSlot READONLY,
-                                                                @ItemsA1 game.tvp_CharacterItemSlot READONLY,
-                                                                @DeltaMoneyA BIGINT,
-                                                                @DeltaBigMoneyA INT,
-                                                                @CharacterB INT,
-                                                                @ItemsB0 game.tvp_CharacterItemSlot READONLY,
-                                                                @ItemsB1 game.tvp_CharacterItemSlot READONLY,
-                                                                @DeltaMoneyB BIGINT,
-                                                                @DeltaBigMoneyB INT,
-                                                                @TradedItemsA game.tvp_CharacterItemSlot READONLY,
-                                                                @TradedItemsB game.tvp_CharacterItemSlot READONLY,
-                                                                @OfferedMoneyA BIGINT = 0,
-                                                                @OfferedBigMoneyA INT = 0,
-                                                                @OfferedMoneyB BIGINT = 0,
-                                                                @OfferedBigMoneyB INT = 0
+                                                                 @CharacterA INT,
+                                                                 @ItemsA0 game.tvp_CharacterItemSlot READONLY,
+                                                                 @ItemsA1 game.tvp_CharacterItemSlot READONLY,
+                                                                 @DeltaMoneyA BIGINT,
+                                                                 @DeltaBigMoneyA INT,
+                                                                 @CharacterB INT,
+                                                                 @ItemsB0 game.tvp_CharacterItemSlot READONLY,
+                                                                 @ItemsB1 game.tvp_CharacterItemSlot READONLY,
+                                                                 @DeltaMoneyB BIGINT,
+                                                                 @DeltaBigMoneyB INT,
+                                                                 @TradedItemsA game.tvp_CharacterItemSlot READONLY,
+                                                                 @TradedItemsB game.tvp_CharacterItemSlot READONLY,
+                                                                 @OfferedMoneyA BIGINT = 0,
+                                                                 @OfferedBigMoneyA INT = 0,
+                                                                 @OfferedMoneyB BIGINT = 0,
+                                                                 @OfferedBigMoneyB INT = 0
 AS
 BEGIN
     SET NOCOUNT ON;

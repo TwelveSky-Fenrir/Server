@@ -7,23 +7,22 @@ namespace Fenrir.Application.Game.Domain.World;
 
 public sealed partial class Zone
 {
+    private const int HolyStoneBattleRankResetInboxCapacity = 4;
 
-        private const int HolyStoneBattleRankResetInboxCapacity = 4;
+    private const int HolyStoneBattleRankResetInboxDrainCapPerTick = HolyStoneBattleRankResetInboxCapacity / 2;
 
-        private const int HolyStoneBattleRankResetInboxDrainCapPerTick = HolyStoneBattleRankResetInboxCapacity / 2;
+    private const int RankPointClearedStatSort = 66;
 
-        private const int RankPointClearedStatSort = 66;
+    private const int RankPointDateResetStatSort = 67;
 
-        private const int RankPointDateResetStatSort = 67;
+    private const int RankBuffClearedStatSort = 68;
 
-        private const int RankBuffClearedStatSort = 68;
-
-        private readonly Channel<HolyStoneBattleRankResetZoneCommand> _holyStoneBattleRankResetInbox =
+    private readonly Channel<HolyStoneBattleRankResetZoneCommand> _holyStoneBattleRankResetInbox =
         Channel.CreateBounded<HolyStoneBattleRankResetZoneCommand>(
             new BoundedChannelOptions(HolyStoneBattleRankResetInboxCapacity)
                 { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
-        public bool PostHolyStoneBattleRankReset()
+    public bool PostHolyStoneBattleRankReset()
     {
         return _holyStoneBattleRankResetInbox.Writer.TryWrite(default);
     }
@@ -50,7 +49,7 @@ public sealed partial class Zone
                 HolyStoneBattleRankResetInboxDrainCapPerTick);
     }
 
-        private void ApplyHolyStoneBattleRankReset()
+    private void ApplyHolyStoneBattleRankReset()
     {
         logger.LogDebug(
             "Zone {MapId} HSB rank reset: HSB-countdown eviction worker (S07_MyGame08.cpp:231) not modeled -- see C15-hsb-reset contract Open Questions",

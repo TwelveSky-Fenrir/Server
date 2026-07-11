@@ -53,7 +53,7 @@ public class StellarBox8112RewardTableTests
         Assert.Equal(expectedRewardId, Spec.RollRewardId(random));
     }
 
-        private sealed class ScriptedRandom(params int[] values) : Random
+    private sealed class ScriptedRandom(params int[] values) : Random
     {
         private int _index;
 

@@ -4,11 +4,11 @@ public enum ClaimGiftOutcome
 {
     Success,
 
-        GiftUnavailable,
+    GiftUnavailable,
 
-        VaultFull,
+    VaultFull,
 
-        PersistenceFailure
+    PersistenceFailure
 }
 
 public readonly record struct ClaimGiftResult(ClaimGiftOutcome Outcome);

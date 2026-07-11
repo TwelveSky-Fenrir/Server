@@ -14,67 +14,66 @@ namespace Fenrir.Application.Game.Domain.World;
 
 public sealed partial class Zone
 {
+    private const int GuildInboxCapacity = 512;
 
-        private const int GuildInboxCapacity = 512;
+    private const int GuildInboxDrainCapPerTick = GuildInboxCapacity / 2;
 
-        private const int GuildInboxDrainCapPerTick = GuildInboxCapacity / 2;
+    private const int InventoryInboxCapacity = 2048;
 
-        private const int InventoryInboxCapacity = 2048;
+    private const int InventoryInboxDrainCapPerTick = InventoryInboxCapacity / 2;
 
-        private const int InventoryInboxDrainCapPerTick = InventoryInboxCapacity / 2;
+    private const int MentorInboxCapacity = 256;
 
-        private const int MentorInboxCapacity = 256;
+    private const int MentorInboxDrainCapPerTick = MentorInboxCapacity / 2;
 
-        private const int MentorInboxDrainCapPerTick = MentorInboxCapacity / 2;
+    private const int MissionInboxCapacity = 256;
 
-        private const int MissionInboxCapacity = 256;
+    private const int MissionInboxDrainCapPerTick = MissionInboxCapacity / 2;
 
-        private const int MissionInboxDrainCapPerTick = MissionInboxCapacity / 2;
+    private const int QuestInboxCapacity = 512;
 
-        private const int QuestInboxCapacity = 512;
+    private const int QuestInboxDrainCapPerTick = QuestInboxCapacity / 2;
 
-        private const int QuestInboxDrainCapPerTick = QuestInboxCapacity / 2;
+    private const int SkillInboxCapacity = 1024;
 
-        private const int SkillInboxCapacity = 1024;
+    private const int SkillInboxDrainCapPerTick = SkillInboxCapacity / 2;
 
-        private const int SkillInboxDrainCapPerTick = SkillInboxCapacity / 2;
+    private const int TribeInboxCapacity = 512;
 
-        private const int TribeInboxCapacity = 512;
+    private const int TribeInboxDrainCapPerTick = TribeInboxCapacity / 2;
 
-        private const int TribeInboxDrainCapPerTick = TribeInboxCapacity / 2;
+    private readonly List<int> _gmTeleportNeighborScratch = [];
 
-        private readonly List<int> _gmTeleportNeighborScratch = [];
-
-        private readonly Channel<GuildMembershipZoneCommand> _guildInbox =
+    private readonly Channel<GuildMembershipZoneCommand> _guildInbox =
         Channel.CreateBounded<GuildMembershipZoneCommand>(
             new BoundedChannelOptions(GuildInboxCapacity)
                 { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
-        private readonly Channel<InventoryZoneCommand> _inventoryInbox = Channel.CreateBounded<InventoryZoneCommand>(
+    private readonly Channel<InventoryZoneCommand> _inventoryInbox = Channel.CreateBounded<InventoryZoneCommand>(
         new BoundedChannelOptions(InventoryInboxCapacity)
             { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
-        private readonly Channel<MentorZoneCommand> _mentorInbox =
+    private readonly Channel<MentorZoneCommand> _mentorInbox =
         Channel.CreateBounded<MentorZoneCommand>(
             new BoundedChannelOptions(MentorInboxCapacity)
                 { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
-        private readonly Channel<MissionZoneCommand> _missionInbox =
+    private readonly Channel<MissionZoneCommand> _missionInbox =
         Channel.CreateBounded<MissionZoneCommand>(
             new BoundedChannelOptions(MissionInboxCapacity)
                 { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
-        private readonly Channel<QuestZoneCommand> _questInbox = Channel.CreateBounded<QuestZoneCommand>(
+    private readonly Channel<QuestZoneCommand> _questInbox = Channel.CreateBounded<QuestZoneCommand>(
         new BoundedChannelOptions(QuestInboxCapacity)
             { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
-        private readonly Channel<SkillZoneCommand> _skillInbox = Channel.CreateBounded<SkillZoneCommand>(
+    private readonly Channel<SkillZoneCommand> _skillInbox = Channel.CreateBounded<SkillZoneCommand>(
         new BoundedChannelOptions(SkillInboxCapacity)
             { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
-        private readonly List<int> _statPotionFullActionNeighborScratch = [];
+    private readonly List<int> _statPotionFullActionNeighborScratch = [];
 
-        private readonly Channel<TribeProgressZoneCommand> _tribeInbox =
+    private readonly Channel<TribeProgressZoneCommand> _tribeInbox =
         Channel.CreateBounded<TribeProgressZoneCommand>(
             new BoundedChannelOptions(TribeInboxCapacity)
                 { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
@@ -84,7 +83,7 @@ public sealed partial class Zone
         return _inventoryInbox.Writer.TryWrite(command);
     }
 
-        public async Task<bool> PostInventoryCommandAndWaitAsync(InventoryZoneCommand command, CancellationToken ct,
+    public async Task<bool> PostInventoryCommandAndWaitAsync(InventoryZoneCommand command, CancellationToken ct,
         TimeSpan? timeout = null)
     {
         var applied = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -119,7 +118,7 @@ public sealed partial class Zone
         return _guildInbox.Writer.TryWrite(command);
     }
 
-        public async Task<bool> PostGuildCommandAndWaitAsync(GuildMembershipZoneCommand command,
+    public async Task<bool> PostGuildCommandAndWaitAsync(GuildMembershipZoneCommand command,
         CancellationToken ct, TimeSpan? timeout = null)
     {
         var applied = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -144,7 +143,7 @@ public sealed partial class Zone
         return _tribeInbox.Writer.TryWrite(command);
     }
 
-        public async Task<bool> PostTribeProgressCommandAndWaitAsync(TribeProgressZoneCommand command,
+    public async Task<bool> PostTribeProgressCommandAndWaitAsync(TribeProgressZoneCommand command,
         CancellationToken ct, TimeSpan? timeout = null)
     {
         var applied = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -169,7 +168,7 @@ public sealed partial class Zone
         return _questInbox.Writer.TryWrite(command);
     }
 
-        public async Task<bool> PostQuestCommandAndWaitAsync(QuestZoneCommand command, CancellationToken ct,
+    public async Task<bool> PostQuestCommandAndWaitAsync(QuestZoneCommand command, CancellationToken ct,
         TimeSpan? timeout = null)
     {
         var applied = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -194,7 +193,7 @@ public sealed partial class Zone
         return _missionInbox.Writer.TryWrite(command);
     }
 
-        public async Task<bool> PostMissionCommandAndWaitAsync(MissionZoneCommand command,
+    public async Task<bool> PostMissionCommandAndWaitAsync(MissionZoneCommand command,
         CancellationToken ct, TimeSpan? timeout = null)
     {
         var applied = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -237,7 +236,7 @@ public sealed partial class Zone
             LogDrainCapEngaged(_inventoryInbox.Reader, "inventory", InventoryInboxDrainCapPerTick);
     }
 
-        private void ApplyInventoryCommand(in InventoryZoneCommand command)
+    private void ApplyInventoryCommand(in InventoryZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state))
             return;
@@ -298,7 +297,7 @@ public sealed partial class Zone
             LogDrainCapEngaged(_skillInbox.Reader, "skill", SkillInboxDrainCapPerTick);
     }
 
-        private void ApplySkillCommand(in SkillZoneCommand command)
+    private void ApplySkillCommand(in SkillZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state))
             return;
@@ -329,7 +328,7 @@ public sealed partial class Zone
             LogDrainCapEngaged(_mentorInbox.Reader, "mentor", MentorInboxDrainCapPerTick);
     }
 
-        private void ApplyMentorCommand(in MentorZoneCommand command)
+    private void ApplyMentorCommand(in MentorZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state))
             return;
@@ -360,7 +359,7 @@ public sealed partial class Zone
             LogDrainCapEngaged(_guildInbox.Reader, "guild", GuildInboxDrainCapPerTick);
     }
 
-        private void ApplyGuildMembershipCommand(in GuildMembershipZoneCommand command)
+    private void ApplyGuildMembershipCommand(in GuildMembershipZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state))
             return;
@@ -394,7 +393,7 @@ public sealed partial class Zone
             LogDrainCapEngaged(_tribeInbox.Reader, "tribe-progress", TribeInboxDrainCapPerTick);
     }
 
-        private void ApplyTribeProgressCommand(in TribeProgressZoneCommand command)
+    private void ApplyTribeProgressCommand(in TribeProgressZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state))
             return;
@@ -806,7 +805,7 @@ public sealed partial class Zone
             LogDrainCapEngaged(_questInbox.Reader, "quest", QuestInboxDrainCapPerTick);
     }
 
-        private void ApplyQuestCommand(in QuestZoneCommand command)
+    private void ApplyQuestCommand(in QuestZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state))
             return;
@@ -853,7 +852,7 @@ public sealed partial class Zone
             LogDrainCapEngaged(_missionInbox.Reader, "mission", MissionInboxDrainCapPerTick);
     }
 
-        private void ApplyMissionCommand(in MissionZoneCommand command)
+    private void ApplyMissionCommand(in MissionZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state))
             return;

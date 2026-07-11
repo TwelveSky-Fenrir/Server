@@ -67,7 +67,7 @@ public class GuildInfoBroadcasterAllocationTests
         return array;
     }
 
-        private static long MeasureAllocatedBytes(ZoneRegistry zones, IReadOnlyList<FakeDuplexPipe> pipes, int iterations)
+    private static long MeasureAllocatedBytes(ZoneRegistry zones, IReadOnlyList<FakeDuplexPipe> pipes, int iterations)
     {
         var info = MinimalGuildInfo();
 

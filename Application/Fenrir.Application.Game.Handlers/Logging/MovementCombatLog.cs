@@ -4,8 +4,7 @@ namespace Fenrir.Application.Game.Handlers.Logging;
 
 internal static partial class MovementCombatLog
 {
-
-        [LoggerMessage(
+    [LoggerMessage(
         EventId = 5001,
         EventName = "AvatarActionReceived",
         Level = LogLevel.Debug,
@@ -19,7 +18,7 @@ internal static partial class MovementCombatLog
         int actionType,
         int actionSort);
 
-        [LoggerMessage(
+    [LoggerMessage(
         EventId = 5002,
         EventName = "AttackReceived",
         Level = LogLevel.Debug,

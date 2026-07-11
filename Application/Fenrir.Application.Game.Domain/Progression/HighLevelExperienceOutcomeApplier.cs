@@ -4,8 +4,7 @@ namespace Fenrir.Application.Game.Domain.Progression;
 
 public static class HighLevelExperienceOutcomeApplier
 {
-
-        public static void Apply(PlayerRuntimeState target, in HighLevelExperienceOutcome outcome)
+    public static void Apply(PlayerRuntimeState target, in HighLevelExperienceOutcome outcome)
     {
         switch (outcome.Kind)
         {

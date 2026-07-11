@@ -8,8 +8,7 @@ namespace Fenrir.Application.Game.Services.ZoneLifecycle;
 
 public sealed class AvatarActionService(ILogger<AvatarActionService> logger) : IAvatarActionService
 {
-
-        private const int StandUpActionSort = 30;
+    private const int StandUpActionSort = 30;
 
     public void PostAction(Zone zone, int characterId, in ActionInfo action, bool isResumeAction = false)
     {

@@ -130,7 +130,7 @@ public static class HostingServiceCollectionExtensions
         return services;
     }
 
-        private static void AddWorldState(IServiceCollection services)
+    private static void AddWorldState(IServiceCollection services)
     {
         services.AddSingleton<IWorldStateRepository, WorldStateRepository>();
         services.AddSingleton<WorldStateService>();
@@ -147,7 +147,7 @@ public static class HostingServiceCollectionExtensions
         services.AddHostedService<TribePointRecomputeHost>();
     }
 
-        private static void AddZoneWar(IServiceCollection services)
+    private static void AddZoneWar(IServiceCollection services)
     {
         services.AddSingleton<TribeVoteElection>();
         services.AddSingleton<ZoneEventBroadcaster>();
@@ -239,7 +239,7 @@ public static class HostingServiceCollectionExtensions
         AddHolyStoneScheduling(services);
     }
 
-        private static void AddHolyStoneScheduling(IServiceCollection services)
+    private static void AddHolyStoneScheduling(IServiceCollection services)
     {
         services.TryAddSingleton<IHolyStoneCaptureRewardGateway, LoggingOnlyHolyStoneCaptureRewardGateway>();
         services.TryAddSingleton<IHolyStoneForcedReturnGateway, LoggingOnlyHolyStoneForcedReturnGateway>();
@@ -287,7 +287,7 @@ public static class HostingServiceCollectionExtensions
         services.AddHostedService<HolyStoneTerritoryEvictionSweepHost>();
     }
 
-        private static void AddMonsterBossRespawnTracking(IServiceCollection services)
+    private static void AddMonsterBossRespawnTracking(IServiceCollection services)
     {
         services.AddSingleton<IMonsterBossRespawnTimerRepository, MonsterBossRespawnTimerRepository>();
         services.AddSingleton<MonsterBossRespawnTracker>();

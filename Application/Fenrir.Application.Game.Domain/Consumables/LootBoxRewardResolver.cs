@@ -4,10 +4,9 @@ namespace Fenrir.Application.Game.Domain.Consumables;
 
 public static class LootBoxRewardResolver
 {
+    public const int RateScale = 10_000;
 
-        public const int RateScale = 10_000;
-
-        public static int RollWeighted(Random random, ImmutableArray<WeightedReward> tiers)
+    public static int RollWeighted(Random random, ImmutableArray<WeightedReward> tiers)
     {
         var totalWeight = 0;
         foreach (var tier in tiers)
@@ -29,7 +28,7 @@ public static class LootBoxRewardResolver
         return tiers[^1].ItemId;
     }
 
-        public static int RollBandedThenWeighted(Random random, ImmutableArray<RewardBand> bands,
+    public static int RollBandedThenWeighted(Random random, ImmutableArray<RewardBand> bands,
         ImmutableArray<WeightedReward> fallbackTiers)
     {
         var roll = random.Next(0, RateScale);
@@ -44,7 +43,7 @@ public static class LootBoxRewardResolver
         return RollWeighted(random, fallbackTiers);
     }
 
-        public static CloakRollResult RollCloak(Random random, int pityCounter, int pityCeiling,
+    public static CloakRollResult RollCloak(Random random, int pityCounter, int pityCeiling,
         int guaranteedRewardItemId, int flatRareThresholdPer10000, int flatRareRewardItemId,
         ImmutableArray<WeightedReward> fallbackTiers)
     {
@@ -58,7 +57,7 @@ public static class LootBoxRewardResolver
         return new CloakRollResult(RollWeighted(random, fallbackTiers), newPity, false);
     }
 
-        public static int RollUniform(Random random, ImmutableArray<int> candidateItemIds)
+    public static int RollUniform(Random random, ImmutableArray<int> candidateItemIds)
     {
         if (candidateItemIds.IsDefaultOrEmpty)
             throw new ArgumentException("Uniform reward roll requires at least one candidate item id.",
@@ -67,7 +66,7 @@ public static class LootBoxRewardResolver
         return candidateItemIds[random.Next(0, candidateItemIds.Length)];
     }
 
-        public static int RollPools(Random random, ImmutableArray<RewardPool> pools)
+    public static int RollPools(Random random, ImmutableArray<RewardPool> pools)
     {
         if (pools.IsDefaultOrEmpty)
             throw new ArgumentException("Pool roll requires at least one pool.", nameof(pools));
@@ -81,7 +80,7 @@ public static class LootBoxRewardResolver
         return RollUniform(random, pools[^1].Ids);
     }
 
-        public static int RollRareBandThenPools(Random random, ImmutableArray<RewardBand> rareBands,
+    public static int RollRareBandThenPools(Random random, ImmutableArray<RewardBand> rareBands,
         ImmutableArray<RewardPool> pools)
     {
         var roll = random.Next(0, RateScale);
@@ -96,7 +95,7 @@ public static class LootBoxRewardResolver
         return RollPools(random, pools);
     }
 
-        public static PityStepResult PityStep(int pityCounter, int pityCeiling)
+    public static PityStepResult PityStep(int pityCounter, int pityCeiling)
     {
         var next = pityCounter + 1;
         return next >= pityCeiling
@@ -104,13 +103,13 @@ public static class LootBoxRewardResolver
             : new PityStepResult(false, next);
     }
 
-        public readonly record struct WeightedReward(int ItemId, int Weight);
+    public readonly record struct WeightedReward(int ItemId, int Weight);
 
-        public readonly record struct RewardBand(int ThresholdPer10000, int RewardItemId);
+    public readonly record struct RewardBand(int ThresholdPer10000, int RewardItemId);
 
-        public readonly record struct RewardPool(int ThresholdCeilingInclusive, ImmutableArray<int> Ids);
+    public readonly record struct RewardPool(int ThresholdCeilingInclusive, ImmutableArray<int> Ids);
 
     public readonly record struct CloakRollResult(int RewardItemId, int NewPityCounter, bool WasGuaranteed);
 
-        public readonly record struct PityStepResult(bool Triggered, int NewCounter);
+    public readonly record struct PityStepResult(bool Triggered, int NewCounter);
 }

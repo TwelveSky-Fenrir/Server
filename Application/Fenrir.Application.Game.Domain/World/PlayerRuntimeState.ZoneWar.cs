@@ -1,11 +1,8 @@
-using Fenrir.Application.Game.Domain.World.ZoneWar;
-
 namespace Fenrir.Application.Game.Domain.World;
 
 public partial class PlayerRuntimeState
 {
+    public int AntiCampingProximityCounter { get; set; }
 
-        public int AntiCampingProximityCounter { get; set; }
-
-        public int AfkTick { get; set; }
+    public int AfkTick { get; set; }
 }

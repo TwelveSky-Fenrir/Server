@@ -10,7 +10,7 @@ internal sealed class FakeAccountSessionRepository : IAccountSessionRepository
     public byte? PreviousShardId { get; set; }
     public bool TransitionResult { get; set; } = true;
 
-        public SqlException? ClaimException { get; set; }
+    public SqlException? ClaimException { get; set; }
 
     public ImmutableArray<ReapedAccountSessionDto> ReapResult { get; set; } =
         ImmutableArray<ReapedAccountSessionDto>.Empty;

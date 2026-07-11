@@ -22,8 +22,7 @@ public sealed class DuelService(
     GuildInviteRegistry guildInvites,
     ILogger<DuelService> logger) : IDuelService
 {
-
-        public ValueTask<DuelAskResultKind> AskAsync(Zone zone, PlayerRuntimeState challenger,
+    public ValueTask<DuelAskResultKind> AskAsync(Zone zone, PlayerRuntimeState challenger,
         string targetAvatarName, int sort, CancellationToken cancellationToken)
     {
         if (zone.MapId == 124)

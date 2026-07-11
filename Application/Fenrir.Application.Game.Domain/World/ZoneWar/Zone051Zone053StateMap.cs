@@ -2,8 +2,7 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 
 public static class Zone051Zone053StateMap
 {
-
-        public static bool TryMapZone051(int selector, out int state)
+    public static bool TryMapZone051(int selector, out int state)
     {
         state = selector switch
         {
@@ -21,7 +20,7 @@ public static class Zone051Zone053StateMap
         return state >= 0;
     }
 
-        public static bool TryMapZone053(int selector, out int state)
+    public static bool TryMapZone053(int selector, out int state)
     {
         state = selector switch
         {

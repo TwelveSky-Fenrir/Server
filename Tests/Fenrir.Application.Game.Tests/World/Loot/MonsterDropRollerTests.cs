@@ -10,7 +10,7 @@ public class MonsterDropRollerTests
 {
     private static readonly Func<int, bool> NeverHasItem = _ => false;
 
-        private static WorldDataCache EmptyCache()
+    private static WorldDataCache EmptyCache()
     {
         return WorldDataCacheBuilder.Build(WorldDataTestRows.MinimalRows()).Cache;
     }

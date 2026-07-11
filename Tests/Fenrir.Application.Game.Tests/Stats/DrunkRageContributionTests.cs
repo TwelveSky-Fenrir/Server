@@ -5,7 +5,6 @@ namespace Fenrir.Application.Game.Tests.Stats;
 
 public class DrunkRageContributionTests
 {
-
     [Fact]
     public void DrunkPotionIds_AreExactlyTheFiveRecognisedPotions()
     {

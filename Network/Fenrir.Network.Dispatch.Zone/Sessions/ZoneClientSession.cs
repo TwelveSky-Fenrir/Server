@@ -24,21 +24,21 @@ public sealed class ZoneClientSession(
 {
     public ZoneSessionState State { get; private set; } = ZoneSessionState.Connected;
 
-        public int? AccountId { get; private set; }
+    public int? AccountId { get; private set; }
 
-        public int? CharacterId { get; private set; }
+    public int? CharacterId { get; private set; }
 
-        public Guid? AccountSessionToken { get; private set; }
+    public Guid? AccountSessionToken { get; private set; }
 
-        public short AccountGrade { get; private set; }
+    public short AccountGrade { get; private set; }
 
-        public bool IsGm => MeetsGmTier(GmCommandTier.Basic);
+    public bool IsGm => MeetsGmTier(GmCommandTier.Basic);
 
     public IZoneActor? CurrentZone { get; set; }
 
-        public bool IsCrossShardTransferPending { get; private set; }
+    public bool IsCrossShardTransferPending { get; private set; }
 
-        public bool MeetsGmTier(GmCommandTier tier)
+    public bool MeetsGmTier(GmCommandTier tier)
     {
         return AccountGrade >= (short)tier;
     }
@@ -73,7 +73,7 @@ public sealed class ZoneClientSession(
         LogSessionStateChanged(previous, State);
     }
 
-        public void MarkCrossShardTransferPending()
+    public void MarkCrossShardTransferPending()
     {
         IsCrossShardTransferPending = true;
     }

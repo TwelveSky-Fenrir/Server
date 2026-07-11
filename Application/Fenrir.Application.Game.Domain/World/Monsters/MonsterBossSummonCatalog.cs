@@ -12,15 +12,15 @@ public sealed class MonsterBossSummonCatalog
         _byMapId = byMapId.ToFrozenDictionary();
     }
 
-        public static MonsterBossSummonCatalog Empty { get; } =
+    public static MonsterBossSummonCatalog Empty { get; } =
         new(FrozenDictionary<short, ImmutableArray<MonsterBossSummonCandidate>>.Empty);
 
-        public ImmutableArray<MonsterBossSummonCandidate> CandidatesFor(short mapId)
+    public ImmutableArray<MonsterBossSummonCandidate> CandidatesFor(short mapId)
     {
         return _byMapId.TryGetValue(mapId, out var pool) ? pool : [];
     }
 
-        public static ImmutableArray<MonsterBossSummonCandidate> NormalizeBossRows(
+    public static ImmutableArray<MonsterBossSummonCandidate> NormalizeBossRows(
         IReadOnlyList<MonsterBossSummonCandidate> rows)
     {
         var count = rows.Count;

@@ -96,7 +96,7 @@ public class MonsterActionBroadcastTests
         }
     }
 
-        private static List<(int ServerIndex, ObjectForMonster Data, int CheckChangeActionState)> ParseMonsterFrames(
+    private static List<(int ServerIndex, ObjectForMonster Data, int CheckChangeActionState)> ParseMonsterFrames(
         byte[] bytes)
     {
         var frames = new List<(int, ObjectForMonster, int)>();

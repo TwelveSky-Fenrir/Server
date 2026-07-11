@@ -8,16 +8,15 @@ public sealed class FourGuildScoringService(
     IFourGuildScoringRepository scoring,
     ILogger<FourGuildScoringService> logger)
 {
+    public const int KillPointDelta = 1;
 
-        public const int KillPointDelta = 1;
-
-        public const int LeaderboardSize = 3;
+    public const int LeaderboardSize = 3;
 
     private volatile IReadOnlyList<FourGuildStanding> _standings = [];
 
-        public IReadOnlyList<FourGuildStanding> CurrentStandings => _standings;
+    public IReadOnlyList<FourGuildStanding> CurrentStandings => _standings;
 
-        public async Task AccrueKillPointAsync(int guildId, CancellationToken ct)
+    public async Task AccrueKillPointAsync(int guildId, CancellationToken ct)
     {
         try
         {
@@ -31,7 +30,7 @@ public sealed class FourGuildScoringService(
         }
     }
 
-        public async Task RecomputeAsync(CancellationToken ct)
+    public async Task RecomputeAsync(CancellationToken ct)
     {
         IReadOnlyList<GuildRankingRowDto> rows;
         try

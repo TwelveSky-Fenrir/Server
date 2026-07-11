@@ -14,7 +14,7 @@ public readonly partial record struct LoginRequest : IIncomingPacket<LoginReques
     public required int Version { get; init; }
     public required LoginAdapterInfo Adapter { get; init; }
 
-        public override string ToString()
+    public override string ToString()
     {
         return $"LoginRequest {{ Id = {Id}, Password = [REDACTED], Version = {Version}, Adapter = {Adapter} }}";
     }

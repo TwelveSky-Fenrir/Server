@@ -9,7 +9,6 @@ using Fenrir.Application.Game.Stats;
 using Fenrir.Application.Game.Tests.GameData;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Network.Serialization.Shared.Packets.Shared;
-using Fenrir.Network.Serialization.Zone.Packets.Zone;
 
 namespace Fenrir.Application.Game.Tests.World.Monsters;
 
@@ -103,7 +102,7 @@ public class ZoneMonsterCombatTribeSymbolMalusTests
     [Fact]
     public void AttackerTribeMalused_AndAboveLevelThreshold_DamageIsReduced()
     {
-        var (zone, _, modifiers, _) = CreateZoneWithSpawnedMonster(attackerLevel: 113, malusTribe1: true);
+        var (zone, _, modifiers, _) = CreateZoneWithSpawnedMonster(113, true);
         Assert.True(zone.TryGetMonster(1, out var monster));
         Assert.Equal(TribeSymbolCombatModifiers.OwnSymbolLostDamageDownPenalty, modifiers.GetDamageDownPenalty(1));
         var startingLife = monster!.Life;
@@ -120,8 +119,8 @@ public class ZoneMonsterCombatTribeSymbolMalusTests
     public void AttackerTribeMalused_ButAtOrBelowLevelThreshold_DamageIsNotReduced()
     {
         var (zone, _, modifiers, _) =
-            CreateZoneWithSpawnedMonster(attackerLevel: MonsterCombatResolver.MalusMinimumAttackerLevel,
-                malusTribe1: true);
+            CreateZoneWithSpawnedMonster(MonsterCombatResolver.MalusMinimumAttackerLevel,
+                true);
         Assert.True(zone.TryGetMonster(1, out var monster));
         Assert.Equal(TribeSymbolCombatModifiers.OwnSymbolLostDamageDownPenalty, modifiers.GetDamageDownPenalty(1));
         var startingLife = monster!.Life;
@@ -137,7 +136,7 @@ public class ZoneMonsterCombatTribeSymbolMalusTests
     [Fact]
     public void AttackerTribeNotMalused_AboveLevelThreshold_DamageIsNotReduced()
     {
-        var (zone, _, modifiers, _) = CreateZoneWithSpawnedMonster(attackerLevel: 113, malusTribe1: false);
+        var (zone, _, modifiers, _) = CreateZoneWithSpawnedMonster(113, false);
         Assert.True(zone.TryGetMonster(1, out var monster));
         Assert.Equal(0f, modifiers.GetDamageDownPenalty(1));
         var startingLife = monster!.Life;

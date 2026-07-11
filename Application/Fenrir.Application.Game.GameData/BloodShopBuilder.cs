@@ -6,9 +6,9 @@ public static class BloodShopBuilder
 {
     public const int MaxBloodSlots = 50;
 
-        private const byte ItemSort99 = 99;
+    private const byte ItemSort99 = 99;
 
-        public static BloodShop Build(IEnumerable<BloodExchangeCatalogRowDto> rows,
+    public static BloodShop Build(IEnumerable<BloodExchangeCatalogRowDto> rows,
         IReadOnlyDictionary<int, ItemDefinition> itemsById)
     {
         var data = new BloodItem[MaxBloodSlots];
@@ -35,7 +35,7 @@ public static class BloodShopBuilder
         return new BloodShop { BloodNum = MaxBloodSlots, Data = data };
     }
 
-        public static int ResolveVersion(IEnumerable<BloodExchangeCatalogRowDto> rows)
+    public static int ResolveVersion(IEnumerable<BloodExchangeCatalogRowDto> rows)
     {
         foreach (var row in rows)
             if (row.BloodExchangeSlot == 100000)

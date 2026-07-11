@@ -11,19 +11,18 @@ namespace Fenrir.Application.Game.Domain.World;
 
 public sealed partial class Zone
 {
+    private const int ChatInboxCapacity = 2048;
 
-        private const int ChatInboxCapacity = 2048;
+    private const int ChatInboxDrainCapPerTick = ChatInboxCapacity / 2;
 
-        private const int ChatInboxDrainCapPerTick = ChatInboxCapacity / 2;
-
-        private readonly Channel<ChatZoneCommand> _chatInbox =
+    private readonly Channel<ChatZoneCommand> _chatInbox =
         Channel.CreateBounded<ChatZoneCommand>(
             new BoundedChannelOptions(ChatInboxCapacity)
                 { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
-        private readonly List<int> _localChatNeighborScratch = [];
+    private readonly List<int> _localChatNeighborScratch = [];
 
-        private readonly List<int> _localChatRecipientScratch = [];
+    private readonly List<int> _localChatRecipientScratch = [];
 
     public bool PostChatCommand(in ChatZoneCommand command)
     {
@@ -51,7 +50,7 @@ public sealed partial class Zone
             LogDrainCapEngaged(_chatInbox.Reader, "chat", ChatInboxDrainCapPerTick);
     }
 
-        private void ApplyChatCommand(in ChatZoneCommand command)
+    private void ApplyChatCommand(in ChatZoneCommand command)
     {
         if (!_players.TryGetValue(command.SenderCharacterId, out var sender))
             return;
@@ -94,7 +93,7 @@ public sealed partial class Zone
         }
     }
 
-        private void BroadcastChatFrame<TPacket>(in TPacket response, IEnumerable<int> recipientIds)
+    private void BroadcastChatFrame<TPacket>(in TPacket response, IEnumerable<int> recipientIds)
         where TPacket : struct, IOutgoingPacket
     {
         var total = FrameWriter.FrameSizeOf<TPacket>();
@@ -123,7 +122,7 @@ public sealed partial class Zone
         }
     }
 
-        private bool IsAlliedOrSameTribe(byte senderTribe, byte candidateTribe)
+    private bool IsAlliedOrSameTribe(byte senderTribe, byte candidateTribe)
     {
         return candidateTribe == senderTribe || worldState?.GetAllyOf(senderTribe) == candidateTribe;
     }

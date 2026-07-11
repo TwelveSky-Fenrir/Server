@@ -454,7 +454,7 @@ public class StatCalculatorTests
         var attributes = Attributes(level: 1);
         var levels = Levels(LevelRow(1));
         var deco = Item(90012, type: 5, equipInfo2: 11);
-        IReadOnlyList<EquippedItemSlot> withDeco = [Equip(9, deco, enchant: 45, combine: 99)];
+        IReadOnlyList<EquippedItemSlot> withDeco = [Equip(9, deco, 45, 99)];
 
         var without = StatCalculator.ComputeBaseStats(attributes, NoEquipment, levels);
         var with = StatCalculator.ComputeBaseStats(attributes, withDeco, levels);
@@ -468,7 +468,7 @@ public class StatCalculatorTests
         var attributes = Attributes(level: 1);
         var levels = Levels(LevelRow(1));
         var wrongCategory = Item(90013, type: 5, equipInfo2: 10);
-        IReadOnlyList<EquippedItemSlot> equipment = [Equip(9, wrongCategory, enchant: 45)];
+        IReadOnlyList<EquippedItemSlot> equipment = [Equip(9, wrongCategory, 45)];
 
         var without = StatCalculator.ComputeBaseStats(attributes, NoEquipment, levels);
         var with = StatCalculator.ComputeBaseStats(attributes, equipment, levels);

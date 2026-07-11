@@ -1,6 +1,5 @@
 using System.Collections.Frozen;
 using System.Collections.Immutable;
-using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.Domain.World;
@@ -75,7 +74,7 @@ public class AutoHuntTickSystemZone126ConfigTests
     [Fact]
     public void MapId126_NotInConfiguredZone126Set_NeverEscalates()
     {
-        var (zone, state, system) = SetUp(Literal126MapId, zone126TypeMapIds: new HashSet<short>());
+        var (zone, state, system) = SetUp(Literal126MapId, new HashSet<short>());
 
         for (var i = 0; i < 5; i++)
             system.Simulate(zone, 1);
@@ -87,7 +86,7 @@ public class AutoHuntTickSystemZone126ConfigTests
     public void ConfiguredNonLiteralMapId_Escalates()
     {
         var (zone, state, system) = SetUp(ArbitraryConfiguredMapId,
-            zone126TypeMapIds: new HashSet<short> { ArbitraryConfiguredMapId });
+            new HashSet<short> { ArbitraryConfiguredMapId });
 
         system.Simulate(zone, 1);
 
@@ -98,7 +97,7 @@ public class AutoHuntTickSystemZone126ConfigTests
     public void MapId126_ConfiguredInZone126Set_Escalates()
     {
         var (zone, state, system) = SetUp(Literal126MapId,
-            zone126TypeMapIds: new HashSet<short> { Literal126MapId });
+            new HashSet<short> { Literal126MapId });
 
         system.Simulate(zone, 1);
 

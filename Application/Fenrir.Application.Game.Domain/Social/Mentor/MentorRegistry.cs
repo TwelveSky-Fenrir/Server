@@ -11,16 +11,15 @@ public enum MentorAskOutcome
 
 public sealed class MentorRegistry
 {
+    private readonly Dictionary<int, int> _acceptedByMaster = new();
 
-        private readonly Dictionary<int, int> _acceptedByMaster = new();
-
-        private readonly CrossShardNegotiationTracker _crossShard = new();
+    private readonly CrossShardNegotiationTracker _crossShard = new();
 
     private readonly Lock _lock = new();
     private readonly Dictionary<int, int> _pendingByMaster = new();
     private readonly Dictionary<int, int> _pendingByStudent = new();
 
-        public bool IsNegotiating(int characterId)
+    public bool IsNegotiating(int characterId)
     {
         lock (_lock)
         {
@@ -30,7 +29,7 @@ public sealed class MentorRegistry
         }
     }
 
-        public bool TryPeekPending(int characterId, out int counterpartId, out bool isMaster)
+    public bool TryPeekPending(int characterId, out int counterpartId, out bool isMaster)
     {
         lock (_lock)
         {
@@ -51,7 +50,7 @@ public sealed class MentorRegistry
         }
     }
 
-        public MentorAskOutcome TryAskCrossShard(int masterId, CrossShardOutboundAsk ask)
+    public MentorAskOutcome TryAskCrossShard(int masterId, CrossShardOutboundAsk ask)
     {
         lock (_lock)
         {
@@ -118,7 +117,7 @@ public sealed class MentorRegistry
         }
     }
 
-        public bool TryConsumeStart(int masterId, out int studentId)
+    public bool TryConsumeStart(int masterId, out int studentId)
     {
         lock (_lock)
         {

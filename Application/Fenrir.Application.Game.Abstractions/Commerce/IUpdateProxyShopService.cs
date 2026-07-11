@@ -8,14 +8,13 @@ public readonly record struct UpdateProxyShopValidation(bool Abort, short SlotIn
 
 public interface IUpdateProxyShopService
 {
+    public UpdateProxyShopValidation Validate(UpdateProxyShopRequest packet);
 
-        public UpdateProxyShopValidation Validate(UpdateProxyShopRequest packet);
-
-        public ValueTask<UpdateProxyShopResponse?> RetrieveAsync(UpdateProxyShopRequest packet, Zone zone,
+    public ValueTask<UpdateProxyShopResponse?> RetrieveAsync(UpdateProxyShopRequest packet, Zone zone,
         PlayerRuntimeState state, int characterId, int accountId, short slotIndex, ItemDefinition itemDefinition,
         CancellationToken cancellationToken);
 
-        public ValueTask<UpdateProxyShopResponse?> PurchaseAsync(UpdateProxyShopRequest packet, Zone zone,
+    public ValueTask<UpdateProxyShopResponse?> PurchaseAsync(UpdateProxyShopRequest packet, Zone zone,
         PlayerRuntimeState state, int characterId, int accountId, short slotIndex, ItemDefinition itemDefinition,
         CancellationToken cancellationToken);
 }

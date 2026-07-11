@@ -94,7 +94,7 @@ public class PopupEventZoneCatalogTests
     public void PopupEventState_DefaultsAllDisabled_AndTogglesPerType()
     {
         var state = new PopupEventState();
-        foreach (PopupEventType type in Enum.GetValues<PopupEventType>())
+        foreach (var type in Enum.GetValues<PopupEventType>())
             Assert.False(state.IsEnabled(type));
 
         state.SetEnabled(PopupEventType.YanggokPvp, true);

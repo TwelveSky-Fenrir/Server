@@ -6,7 +6,7 @@ public static class StatResetResolver
     {
         Success,
 
-                AlreadyAtFloor
+        AlreadyAtFloor
     }
 
     public enum LevelBand
@@ -17,7 +17,7 @@ public static class StatResetResolver
         Level145PlusWithRebirth
     }
 
-        public enum StatSelector
+    public enum StatSelector
     {
         Strength = 1,
         Dexterity = 2,
@@ -27,7 +27,7 @@ public static class StatResetResolver
 
     public const int StatFloor = 1;
 
-        public static bool TryResolveLevelBand(short level, int rebirthCount, out LevelBand band)
+    public static bool TryResolveLevelBand(short level, int rebirthCount, out LevelBand band)
     {
         switch (level)
         {
@@ -49,13 +49,13 @@ public static class StatResetResolver
         }
     }
 
-        public static ClearResult ResolveStatsClear(int statVit, int statStr, int statInt, int statDex)
+    public static ClearResult ResolveStatsClear(int statVit, int statStr, int statInt, int statDex)
     {
         var refund = AboveFloor(statVit) + AboveFloor(statStr) + AboveFloor(statInt) + AboveFloor(statDex);
         return new ClearResult(StatFloor, StatFloor, StatFloor, StatFloor, refund);
     }
 
-        public static CleanseResult ResolveStatCleanse(int currentValue)
+    public static CleanseResult ResolveStatCleanse(int currentValue)
     {
         if (currentValue <= StatFloor)
             return new CleanseResult(CleanseOutcome.AlreadyAtFloor, currentValue, 0);

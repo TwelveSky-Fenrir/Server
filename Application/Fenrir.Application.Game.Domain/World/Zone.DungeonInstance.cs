@@ -5,29 +5,27 @@ namespace Fenrir.Application.Game.Domain.World;
 
 public enum DungeonInstanceEntryOutcome
 {
+    NotZone241Type,
 
-        NotZone241Type,
+    QuotaExhausted,
 
-        QuotaExhausted,
+    SummonFailed,
 
-        SummonFailed,
-
-        Entered
+    Entered
 }
 
 public sealed partial class Zone
 {
+    private const int PersonalDungeonBattleBroadcastCadenceTicks = 20;
 
-        private const int PersonalDungeonBattleBroadcastCadenceTicks = 20;
+    private const float PersonalDungeonBossLeashRadius = 200f;
 
-        private const float PersonalDungeonBossLeashRadius = 200f;
-
-        public IPersonalDungeonBossCatalog PersonalDungeonBossCatalog { get; set; } =
+    public IPersonalDungeonBossCatalog PersonalDungeonBossCatalog { get; set; } =
         NullPersonalDungeonBossCatalog.Instance;
 
-        public bool IsZone241TypeZone => options.Zone241DungeonMapIds.Contains(MapId);
+    public bool IsZone241TypeZone => options.Zone241DungeonMapIds.Contains(MapId);
 
-        public DungeonInstanceEntryOutcome TryEnterZone241PersonalInstance(int characterId)
+    public DungeonInstanceEntryOutcome TryEnterZone241PersonalInstance(int characterId)
     {
         if (!IsZone241TypeZone)
             return DungeonInstanceEntryOutcome.NotZone241Type;
@@ -56,7 +54,7 @@ public sealed partial class Zone
         return DungeonInstanceEntryOutcome.Entered;
     }
 
-        private void SummonPersonalBoss(PlayerRuntimeState state, MonsterRowDto template)
+    private void SummonPersonalBoss(PlayerRuntimeState state, MonsterRowDto template)
     {
         var serverIndex = state.CharacterId;
 
@@ -69,7 +67,7 @@ public sealed partial class Zone
         SpawnMonster(boss);
     }
 
-        private void TearDownFailedEntry(PlayerRuntimeState state)
+    private void TearDownFailedEntry(PlayerRuntimeState state)
     {
         ClearZone241PersonalDungeonInstance(state);
 
@@ -77,7 +75,7 @@ public sealed partial class Zone
         state.DungeonInstanceLifecycleState = DungeonInstanceLifecycle.Idle;
     }
 
-        private void ClearDungeonInstanceOnDisconnect(PlayerRuntimeState state)
+    private void ClearDungeonInstanceOnDisconnect(PlayerRuntimeState state)
     {
         if (!IsZone241TypeZone)
             return;
@@ -88,7 +86,7 @@ public sealed partial class Zone
         state.DungeonInstanceLifecycleState = DungeonInstanceLifecycle.Idle;
     }
 
-        private void ClearZone241PersonalDungeonInstance(PlayerRuntimeState state)
+    private void ClearZone241PersonalDungeonInstance(PlayerRuntimeState state)
     {
         if (state.DungeonInstanceLifecycleState != DungeonInstanceLifecycle.Summoning)
             return;
@@ -105,12 +103,12 @@ public sealed partial class Zone
                 _groundItems.TryRemove(index, out _);
     }
 
-        private static bool IsVisibleAcrossDungeonInstance(int? objectInstanceId, int? viewerInstanceId)
+    private static bool IsVisibleAcrossDungeonInstance(int? objectInstanceId, int? viewerInstanceId)
     {
         return objectInstanceId is not { } required || required == viewerInstanceId;
     }
 
-        public void AdvanceZone241PersonalDungeonInstances(int legacyTicksElapsed)
+    public void AdvanceZone241PersonalDungeonInstances(int legacyTicksElapsed)
     {
         if (!IsZone241TypeZone)
             return;

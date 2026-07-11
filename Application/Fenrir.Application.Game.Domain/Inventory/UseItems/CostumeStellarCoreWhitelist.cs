@@ -5,14 +5,13 @@ namespace Fenrir.Application.Game.Domain.Inventory.UseItems;
 
 public static class CostumeStellarCoreWhitelist
 {
-
-        private const int Tier1Start = 76527;
+    private const int Tier1Start = 76527;
 
     private const int Tier1End = 76540;
     private const int Tier2Start = 93500;
     private const int Tier2End = 93513;
 
-        public static readonly FrozenSet<int> ValidStellarCoreIds = BuildValidStellarCoreIds();
+    public static readonly FrozenSet<int> ValidStellarCoreIds = BuildValidStellarCoreIds();
 
     private static FrozenSet<int> BuildValidStellarCoreIds()
     {
@@ -24,17 +23,17 @@ public static class CostumeStellarCoreWhitelist
         return ids.ToFrozenSet();
     }
 
-        public static bool IsValidCostume(int itemId)
+    public static bool IsValidCostume(int itemId)
     {
         return StatCalculator.ValidCostumeIds.Contains(itemId);
     }
 
-        public static bool IsValidStellarCore(int itemId)
+    public static bool IsValidStellarCore(int itemId)
     {
         return ValidStellarCoreIds.Contains(itemId);
     }
 
-        public static bool ClaimsItem(int itemId)
+    public static bool ClaimsItem(int itemId)
     {
         return IsValidCostume(itemId) || IsValidStellarCore(itemId);
     }

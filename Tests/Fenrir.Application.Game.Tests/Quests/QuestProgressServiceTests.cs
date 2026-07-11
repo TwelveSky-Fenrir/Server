@@ -38,7 +38,7 @@ public class QuestProgressServiceTests
         return await task;
     }
 
-        private static QuestRowDto KillQuestAtStep3()
+    private static QuestRowDto KillQuestAtStep3()
     {
         return WorldDataTestRows.Quest(QuestId) with
         {

@@ -88,7 +88,7 @@ public sealed class PartyInviteService(
         }
     }
 
-        private async ValueTask<PartyInviteResult> InviteCrossShardAsync(PlayerRuntimeState inviter,
+    private async ValueTask<PartyInviteResult> InviteCrossShardAsync(PlayerRuntimeState inviter,
         string targetAvatarName, CancellationToken cancellationToken)
     {
         var remote = await characterShardLocations.FindByNameAsync(targetAvatarName, cancellationToken)

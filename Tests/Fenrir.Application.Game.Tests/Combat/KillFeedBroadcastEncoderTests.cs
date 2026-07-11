@@ -41,9 +41,9 @@ public class KillFeedBroadcastEncoderTests
     {
         ImmutableArray<KillFeedTopEntry> top3 =
         [
-            new KillFeedTopEntry("First", 0, 9),
-            new KillFeedTopEntry("Second", 1, 5),
-            new KillFeedTopEntry("Third", 2, 1)
+            new("First", 0, 9),
+            new("Second", 1, 5),
+            new("Third", 2, 1)
         ];
 
         var payload = new KillFeedBroadcastPayload("Killer", 0, "Victim", 1, top3);
@@ -67,7 +67,7 @@ public class KillFeedBroadcastEncoderTests
     [Fact]
     public void Encode_FewerThanThreeTopEntries_BlankPadsTheRest()
     {
-        ImmutableArray<KillFeedTopEntry> top3 = [new KillFeedTopEntry("Only", 0, 2)];
+        ImmutableArray<KillFeedTopEntry> top3 = [new("Only", 0, 2)];
         var payload = new KillFeedBroadcastPayload("Killer", 0, "Victim", 1, top3);
 
         var data = KillFeedBroadcastEncoder.Encode(payload);

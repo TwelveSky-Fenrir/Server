@@ -3,7 +3,6 @@ using Fenrir.Application.Game.Abstractions.Inventory;
 using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.Domain.World;
-using Fenrir.Data.Abstractions.Game;
 using Fenrir.Network.Serialization.Shared.Packets.Shared;
 using Microsoft.Extensions.Logging;
 using IBigMoneyRepository = Fenrir.Data.Abstractions.Inventory.IBigMoneyRepository;
@@ -64,7 +63,7 @@ public sealed class BigMoneyTransferService(
         var (storeFromDelta, storeToDelta) = isDeposit
             ? (deltaInventoryBigMoney, deltaStoreBigMoney)
             : (deltaStoreBigMoney, deltaInventoryBigMoney);
-        await eventLog.LogBigMoneyConversionAsync(storeEventCode, accountId: null, characterId, storeFromDelta,
+        await eventLog.LogBigMoneyConversionAsync(storeEventCode, null, characterId, storeFromDelta,
             storeToDelta, cancellationToken);
 
         return GenericActionResult.Succeeded;

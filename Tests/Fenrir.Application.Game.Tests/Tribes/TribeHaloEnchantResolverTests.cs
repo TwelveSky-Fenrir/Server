@@ -82,7 +82,7 @@ public class TribeHaloEnchantResolverTests
         Assert.Equal(2, newProtect);
     }
 
-        private sealed class ScriptedRandomSource(int[] draws) : IRandomSource
+    private sealed class ScriptedRandomSource(int[] draws) : IRandomSource
     {
         private int _index;
 

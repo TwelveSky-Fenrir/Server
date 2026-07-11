@@ -1,7 +1,6 @@
 using Fenrir.Tools.LegacyDataImport.Legacy.Seeding;
 using Fenrir.Tools.LegacyDataImport.Legacy.Validation;
 
-
 if (args.Length < 1)
 {
     Console.Error.WriteLine(

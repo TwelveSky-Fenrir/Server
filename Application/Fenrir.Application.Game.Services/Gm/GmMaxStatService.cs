@@ -10,12 +10,11 @@ namespace Fenrir.Application.Game.Services.Gm;
 public sealed class GmMaxStatService(IEventLogRepository eventLog, ILogger<GmMaxStatService> logger)
     : IGmMaxStatService
 {
+    private const byte AppliedOutcome = 1;
 
-        private const byte AppliedOutcome = 1;
+    private const int MaxStatValue = 10000;
 
-        private const int MaxStatValue = 10000;
-
-        private const int MaxSkillPoints = 3000;
+    private const int MaxSkillPoints = 3000;
 
     public async ValueTask HandleAsync(ZoneClientSession zoneSession, PlayerRuntimeState state, Zone zone,
         CancellationToken cancellationToken)

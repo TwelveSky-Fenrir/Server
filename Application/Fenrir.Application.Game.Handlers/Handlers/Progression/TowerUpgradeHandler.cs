@@ -1,5 +1,4 @@
 using Fenrir.Application.Game.Abstractions.Progression;
-using Fenrir.Application.Game.Domain.Progression;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;

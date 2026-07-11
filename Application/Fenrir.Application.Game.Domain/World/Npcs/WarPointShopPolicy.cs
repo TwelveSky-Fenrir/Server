@@ -7,28 +7,27 @@ public static class WarPointShopPolicy
 {
     public enum BuyOutcome
     {
+        NotWarPointItem,
 
-                NotWarPointItem,
+        Proceed,
 
-                Proceed,
+        WrongNpc,
 
-                WrongNpc,
+        DestinationConflict,
 
-                DestinationConflict,
-
-                InsufficientContributionPoints
+        InsufficientContributionPoints
     }
 
-        private const int FixedStateStampRangeStart = 86700;
+    private const int FixedStateStampRangeStart = 86700;
 
-        private const int FixedStateStampRangeEndInclusive = 86725;
+    private const int FixedStateStampRangeEndInclusive = 86725;
 
-        public static bool IsFixedStateStampItem(int itemId)
+    public static bool IsFixedStateStampItem(int itemId)
     {
         return itemId is >= FixedStateStampRangeStart and <= FixedStateStampRangeEndInclusive;
     }
 
-        public static BuyResolution ResolveBuy(WarPointShopCatalog catalog, int npcId, ItemDefinition itemDefinition,
+    public static BuyResolution ResolveBuy(WarPointShopCatalog catalog, int npcId, ItemDefinition itemDefinition,
         int requestedQuantity, ItemStack? destinationSlot, int playerContributionPoints)
     {
         var item = itemDefinition.Item;
@@ -66,7 +65,7 @@ public static class WarPointShopPolicy
             new ItemStack(item.ItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0));
     }
 
-        private static BuyResolution Cost(WarPointPriceEntry price, int quantity, int playerContributionPoints,
+    private static BuyResolution Cost(WarPointPriceEntry price, int quantity, int playerContributionPoints,
         ItemStack newDestinationStack)
     {
         var effectiveQuantity = quantity > 0 ? quantity : 1;

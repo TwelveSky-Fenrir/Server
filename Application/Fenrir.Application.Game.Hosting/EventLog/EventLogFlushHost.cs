@@ -22,7 +22,7 @@ public sealed class EventLogFlushHost : BackgroundService, IEventLogQueue
                 count, count == 1 ? "y" : "ies"));
     }
 
-        public bool Enqueue(EventLogEntryTvp entry)
+    public bool Enqueue(EventLogEntryTvp entry)
     {
         return _queue.Enqueue(entry);
     }
@@ -32,7 +32,7 @@ public sealed class EventLogFlushHost : BackgroundService, IEventLogQueue
         return _queue.RunAsync(stoppingToken);
     }
 
-        public override async Task StopAsync(CancellationToken cancellationToken)
+    public override async Task StopAsync(CancellationToken cancellationToken)
     {
         await base.StopAsync(cancellationToken).ConfigureAwait(false);
         await _queue.DisposeAsync().ConfigureAwait(false);

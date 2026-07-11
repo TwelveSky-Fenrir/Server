@@ -9,8 +9,7 @@ public enum LoginCapacityOutcome
 
 public static class LoginCapacityGate
 {
-
-        public static LoginCapacityOutcome Evaluate(int maxPlayers, int currentPlayers)
+    public static LoginCapacityOutcome Evaluate(int maxPlayers, int currentPlayers)
     {
         if (maxPlayers == 0)
             return LoginCapacityOutcome.Maintenance;

@@ -4,8 +4,7 @@ namespace Fenrir.Application.Game.Domain.Combat;
 
 public readonly record struct KillFeedTopEntry(string Name, byte Tribe, int Kills)
 {
-
-        public static readonly KillFeedTopEntry Blank = new(" ", 0, 0);
+    public static readonly KillFeedTopEntry Blank = new(" ", 0, 0);
 }
 
 public readonly record struct KillFeedBroadcastPayload(
@@ -15,8 +14,7 @@ public readonly record struct KillFeedBroadcastPayload(
     byte VictimTribe,
     ImmutableArray<KillFeedTopEntry> TopThree)
 {
-
-        public static KillFeedBroadcastPayload Create(string killerName, byte killerTribe, string victimName,
+    public static KillFeedBroadcastPayload Create(string killerName, byte killerTribe, string victimName,
         byte victimTribe, ImmutableArray<KillFeedRankedEntry> topThree)
     {
         var builder = ImmutableArray.CreateBuilder<KillFeedTopEntry>(3);

@@ -8,8 +8,7 @@ public readonly record struct TowerTribeRewardBonus(
     int CpForPvpBonus,
     float XpRatio)
 {
-
-        public static readonly TowerTribeRewardBonus None = default;
+    public static readonly TowerTribeRewardBonus None = default;
 }
 
 public static class TowerRewardBonusFormulas
@@ -26,7 +25,7 @@ public static class TowerRewardBonusFormulas
         };
     }
 
-        public static int CpForPvmBonus(int builtLevel)
+    public static int CpForPvmBonus(int builtLevel)
     {
         return builtLevel switch
         {
@@ -38,7 +37,7 @@ public static class TowerRewardBonusFormulas
         };
     }
 
-        public static int CpForPvpBonus(int builtLevel)
+    public static int CpForPvpBonus(int builtLevel)
     {
         return builtLevel switch
         {
@@ -68,7 +67,7 @@ public static class TowerRewardBonusTable
     public const int TribeCount = 4;
     public const int TowersPerTribe = 3;
 
-        public static ImmutableArray<TowerTribeRewardBonus> Recompute(ReadOnlySpan<int> packedStateByTowerIndex)
+    public static ImmutableArray<TowerTribeRewardBonus> Recompute(ReadOnlySpan<int> packedStateByTowerIndex)
     {
         var bonuses = new TowerTribeRewardBonus[TribeCount];
 

@@ -8,7 +8,7 @@ internal static class ZoneSeedGenerator
 {
     private const int ChunkSize = 500;
 
-        public static string Generate(string dataDir, string outputDir)
+    public static string Generate(string dataDir, string outputDir)
     {
         Directory.CreateDirectory(outputDir);
 

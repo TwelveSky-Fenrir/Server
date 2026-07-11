@@ -195,7 +195,8 @@ public class LootBoxCatalogTests
     [Fact]
     public void BulkOpenWhitelist_MatchesTheCitedIsBulkBoxNoStellarList()
     {
-        foreach (var id in new[] { 512, 601, 602, 8112, 8113, 664, 720, 1236, 1240, 2249, 7105, 8108, 8111, 76543, 76544, 8005 })
+        foreach (var id in new[]
+                     { 512, 601, 602, 8112, 8113, 664, 720, 1236, 1240, 2249, 7105, 8108, 8111, 76543, 76544, 8005 })
             Assert.True(LootBoxCatalog.BulkOpenWhitelist.Contains(id), $"expected {id} in bulk whitelist");
 
         Assert.DoesNotContain(635, (IEnumerable<int>)LootBoxCatalog.BulkOpenWhitelist);

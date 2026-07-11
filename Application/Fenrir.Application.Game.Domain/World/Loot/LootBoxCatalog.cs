@@ -54,20 +54,20 @@ public sealed class LootBoxCatalog
         RegisteredBoxIds = specs.Select(spec => spec.BoxId).ToImmutableArray();
     }
 
-        public static LootBoxCatalog Default { get; } = new();
+    public static LootBoxCatalog Default { get; } = new();
 
-        public ImmutableArray<int> RegisteredBoxIds { get; }
+    public ImmutableArray<int> RegisteredBoxIds { get; }
 
-        public static FrozenSet<int> BulkOpenWhitelist { get; } = new[]
+    public static FrozenSet<int> BulkOpenWhitelist { get; } = new[]
     {
         512, 601, 602, 8112, 8113, 664, 720, 1236, 1240, 2249, 7105, 8108, 8111, 76543, 76544, 8005
     }.ToFrozenSet();
 
-        public static FrozenSet<int> EliteOnlyNoticeBoxIds { get; } = new[] { 1035, 1036, 1037 }.ToFrozenSet();
+    public static FrozenSet<int> EliteOnlyNoticeBoxIds { get; } = new[] { 1035, 1036, 1037 }.ToFrozenSet();
 
-        public static FrozenSet<int> NoticeRewardWhitelist { get; } = new[] { 1012, 1016 }.ToFrozenSet();
+    public static FrozenSet<int> NoticeRewardWhitelist { get; } = new[] { 1012, 1016 }.ToFrozenSet();
 
-        public BoxRewardSpec? TryGetSpec(int boxId)
+    public BoxRewardSpec? TryGetSpec(int boxId)
     {
         return _byBoxId.TryGetValue(boxId, out var spec) ? spec : null;
     }

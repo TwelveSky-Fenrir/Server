@@ -13,13 +13,13 @@ public sealed partial class Zone
 {
     private const int KillFeedBroadcastSort = 3000;
 
-        private readonly HashSet<int> _ffaParticipantBundleGranted = [];
+    private readonly HashSet<int> _ffaParticipantBundleGranted = [];
 
-        private KillCooldownTracker _ffaKillFeedAntiFarmCooldown = new();
+    private KillCooldownTracker _ffaKillFeedAntiFarmCooldown = new();
 
     private KillFeedLeaderboard? _killFeedLeaderboard;
 
-        private KillFeedLeaderboard? ResolveKillFeedLeaderboard()
+    private KillFeedLeaderboard? ResolveKillFeedLeaderboard()
     {
         if (_killFeedLeaderboard is not null)
             return _killFeedLeaderboard;
@@ -27,7 +27,7 @@ public sealed partial class Zone
         return KillFeedZoneCatalog.HasLeaderboardStore(MapId) ? _killFeedLeaderboard = new KillFeedLeaderboard() : null;
     }
 
-        public void RecordEnemyKillForFeed(PlayerRuntimeState killer, PlayerRuntimeState victim, bool isStunTrigger,
+    public void RecordEnemyKillForFeed(PlayerRuntimeState killer, PlayerRuntimeState victim, bool isStunTrigger,
         bool warStateActive)
     {
         if (isStunTrigger)
@@ -55,7 +55,7 @@ public sealed partial class Zone
             ApplyFfaKillFeedPointsAward(killer, victim);
     }
 
-        private void ApplyFfaKillFeedPointsAward(PlayerRuntimeState killer, PlayerRuntimeState victim)
+    private void ApplyFfaKillFeedPointsAward(PlayerRuntimeState killer, PlayerRuntimeState victim)
     {
         if (!_ffaKillFeedAntiFarmCooldown.TryRegisterKill(killer.CharacterId, victim.CharacterId, DateTime.UtcNow,
                 KillFeedRewardConstants.FfaAntiFarmCooldown))
@@ -98,7 +98,7 @@ public sealed partial class Zone
         }
     }
 
-        public void ApplyKillFeedEndOfBattleRewards(bool isFfaMap, bool isZone267)
+    public void ApplyKillFeedEndOfBattleRewards(bool isFfaMap, bool isZone267)
     {
         var leaderboard = _killFeedLeaderboard;
         if (leaderboard is null)
@@ -125,7 +125,7 @@ public sealed partial class Zone
         }
     }
 
-        public void ClearKillFeedLeaderboard()
+    public void ClearKillFeedLeaderboard()
     {
         if (_killFeedLeaderboard is null)
             return;

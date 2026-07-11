@@ -5,10 +5,9 @@ namespace Fenrir.Application.Game.Stats;
 
 public static partial class StatCalculator
 {
+    private static readonly FrozenSet<short> TribeRoleSuppressedZones = ((short[])[124]).ToFrozenSet();
 
-        private static readonly FrozenSet<short> TribeRoleSuppressedZones = ((short[])[124]).ToFrozenSet();
-
-        private static int TribeRoleAttackDefenseBonus(ZoneContext zone)
+    private static int TribeRoleAttackDefenseBonus(ZoneContext zone)
     {
         if (TribeRoleSuppressedZones.Contains(zone.ZoneNumber))
             return 0;
@@ -22,17 +21,17 @@ public static partial class StatCalculator
     }
 
 
-        public static int TribeRoleAttackPowerBonus(ZoneContext zone)
+    public static int TribeRoleAttackPowerBonus(ZoneContext zone)
     {
         return TribeRoleAttackDefenseBonus(zone);
     }
 
-        public static int TribeRoleDefensePowerBonus(ZoneContext zone)
+    public static int TribeRoleDefensePowerBonus(ZoneContext zone)
     {
         return TribeRoleAttackDefenseBonus(zone);
     }
 
-        public static int TribeRoleCriticalBonus(ZoneContext zone)
+    public static int TribeRoleCriticalBonus(ZoneContext zone)
     {
         if (TribeRoleSuppressedZones.Contains(zone.ZoneNumber))
             return 0;
@@ -40,7 +39,7 @@ public static partial class StatCalculator
         return (TribeRoleKind)zone.TribeRole == TribeRoleKind.Master ? 2 : 0;
     }
 
-        private enum TribeRoleKind : byte
+    private enum TribeRoleKind : byte
     {
         None = 0,
         Master = 1,

@@ -9,8 +9,7 @@ namespace Fenrir.Application.Game.Domain.Guilds;
 
 public static class GuildInfoBroadcaster
 {
-
-        public static void BroadcastGuildInfo(ZoneRegistry zones, int guildId, int sort, GuildInfo info,
+    public static void BroadcastGuildInfo(ZoneRegistry zones, int guildId, int sort, GuildInfo info,
         int excludeCharacterId = -1)
     {
         var response = new GuildActionResponse { Result = 0, Sort = sort, GuildInfo = info };

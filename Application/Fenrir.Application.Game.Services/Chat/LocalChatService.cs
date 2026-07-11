@@ -91,7 +91,7 @@ public sealed class LocalChatService(
         }
     }
 
-        private void HandleYgDrop(PlayerRuntimeState sender, string? argument)
+    private void HandleYgDrop(PlayerRuntimeState sender, string? argument)
     {
         switch (argument)
         {
@@ -118,7 +118,7 @@ public sealed class LocalChatService(
         }
     }
 
-        private void HandleBoss(Zone zone, PlayerRuntimeState sender, string? argument)
+    private void HandleBoss(Zone zone, PlayerRuntimeState sender, string? argument)
     {
         if (!int.TryParse(argument, NumberStyles.Integer, CultureInfo.InvariantCulture, out var monsterId) ||
             monsterId < 1)
@@ -136,7 +136,7 @@ public sealed class LocalChatService(
         worldNotice.Broadcast($"A boss (id {monsterId}) has been summoned.");
     }
 
-        private void HandleKill200(PlayerRuntimeState sender)
+    private void HandleKill200(PlayerRuntimeState sender)
     {
         SendChatAs(sender, sender.Name, "kill200");
         logger.LogWarning(

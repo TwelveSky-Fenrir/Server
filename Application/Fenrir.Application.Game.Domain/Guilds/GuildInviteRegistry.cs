@@ -11,22 +11,21 @@ public enum GuildInviteAskOutcome
 
 public sealed class GuildInviteRegistry
 {
+    private readonly Dictionary<int, int> _acceptedFor = new();
 
-        private readonly Dictionary<int, int> _acceptedFor = new();
-
-        private readonly CrossShardNegotiationTracker _crossShard = new();
+    private readonly CrossShardNegotiationTracker _crossShard = new();
 
     private readonly Lock _lock = new();
     private readonly Dictionary<int, int> _pendingByAsker = new();
     private readonly Dictionary<int, int> _pendingByTarget = new();
 
-        public bool IsNegotiating(int characterId)
+    public bool IsNegotiating(int characterId)
     {
         return _pendingByAsker.ContainsKey(characterId) || _pendingByTarget.ContainsKey(characterId) ||
                _crossShard.IsPending(characterId);
     }
 
-        public bool TryPeekPending(int characterId, out int counterpartId, out bool isAsker)
+    public bool TryPeekPending(int characterId, out int counterpartId, out bool isAsker)
     {
         lock (_lock)
         {
@@ -47,7 +46,7 @@ public sealed class GuildInviteRegistry
         }
     }
 
-        public GuildInviteAskOutcome TryAskCrossShard(int askerId, CrossShardOutboundAsk ask)
+    public GuildInviteAskOutcome TryAskCrossShard(int askerId, CrossShardOutboundAsk ask)
     {
         lock (_lock)
         {
@@ -60,7 +59,7 @@ public sealed class GuildInviteRegistry
         }
     }
 
-        public GuildInviteAskOutcome TryAsk(int askerId, int targetId)
+    public GuildInviteAskOutcome TryAsk(int askerId, int targetId)
     {
         lock (_lock)
         {
@@ -75,7 +74,7 @@ public sealed class GuildInviteRegistry
         }
     }
 
-        public bool TryCancel(int askerId, out int targetId)
+    public bool TryCancel(int askerId, out int targetId)
     {
         lock (_lock)
         {
@@ -95,7 +94,7 @@ public sealed class GuildInviteRegistry
         }
     }
 
-        public bool TryAnswer(int targetId, bool accepted, out int askerId)
+    public bool TryAnswer(int targetId, bool accepted, out int askerId)
     {
         lock (_lock)
         {
@@ -111,7 +110,7 @@ public sealed class GuildInviteRegistry
         }
     }
 
-        public bool TryConsumeAccepted(int askerId, out int targetId)
+    public bool TryConsumeAccepted(int askerId, out int targetId)
     {
         lock (_lock)
         {
@@ -119,7 +118,7 @@ public sealed class GuildInviteRegistry
         }
     }
 
-        public bool TryRegisterCrossShardInbound(int targetId, CrossShardInboundAsk ask)
+    public bool TryRegisterCrossShardInbound(int targetId, CrossShardInboundAsk ask)
     {
         lock (_lock)
         {
@@ -130,7 +129,7 @@ public sealed class GuildInviteRegistry
         }
     }
 
-        public bool TryConsumeCrossShardInbound(int targetId, out CrossShardInboundAsk ask)
+    public bool TryConsumeCrossShardInbound(int targetId, out CrossShardInboundAsk ask)
     {
         lock (_lock)
         {
@@ -138,7 +137,7 @@ public sealed class GuildInviteRegistry
         }
     }
 
-        public bool TryConsumeCrossShardOutbound(int askerId, out CrossShardOutboundAsk ask)
+    public bool TryConsumeCrossShardOutbound(int askerId, out CrossShardOutboundAsk ask)
     {
         lock (_lock)
         {
@@ -146,7 +145,7 @@ public sealed class GuildInviteRegistry
         }
     }
 
-        public void MarkAccepted(int askerId, int targetId)
+    public void MarkAccepted(int askerId, int targetId)
     {
         lock (_lock)
         {

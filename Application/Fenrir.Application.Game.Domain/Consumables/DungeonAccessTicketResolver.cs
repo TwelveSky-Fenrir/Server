@@ -6,9 +6,9 @@ public static class DungeonAccessTicketResolver
     {
         Success,
 
-                InsufficientQuantity,
+        InsufficientQuantity,
 
-                WouldExceedCeiling
+        WouldExceedCeiling
     }
 
     public const int EliteDungeonTicketLargeItemId = 1047;
@@ -25,7 +25,7 @@ public static class DungeonAccessTicketResolver
     public const int IvyHallTicketSmallAmount = 180;
     public const int IvyHallTicketLargeAmount = 360;
 
-        public static Result Resolve(int currentCounter, int perUnitAmount, int slotQuantity,
+    public static Result Resolve(int currentCounter, int perUnitAmount, int slotQuantity,
         int ceiling = BankedCounterMath.GlobalCeiling)
     {
         if (slotQuantity < 1)

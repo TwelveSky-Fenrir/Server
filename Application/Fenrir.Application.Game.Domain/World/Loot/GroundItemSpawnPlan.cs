@@ -1,5 +1,3 @@
-using Fenrir.Application.Game.Domain.Inventory;
-
 namespace Fenrir.Application.Game.Domain.World.Loot;
 
 public readonly record struct GroundItemSpawnPlan(
@@ -20,7 +18,7 @@ public enum GroundItemSpawnEligibility
 {
     Eligible,
 
-        UnsupportedItemType,
+    UnsupportedItemType,
 
-        InvalidPackedValue
+    InvalidPackedValue
 }

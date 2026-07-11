@@ -52,7 +52,7 @@ public sealed class TribeSymbolDamageModifierSystem(
         return ownerTribeId == tribeId || (ally is { } allyId && ownerTribeId == allyId);
     }
 
-        private bool IsStrictlyLowestEligibleTribeByCombinedPoints(byte tribeId)
+    private bool IsStrictlyLowestEligibleTribeByCombinedPoints(byte tribeId)
     {
         var combined = new int[WorldStateService.TribeCount];
         for (byte i = 0; i < WorldStateService.TribeCount; i++)

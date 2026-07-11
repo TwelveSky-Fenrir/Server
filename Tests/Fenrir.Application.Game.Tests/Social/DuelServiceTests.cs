@@ -75,7 +75,7 @@ public class DuelServiceTests
         Assert.Equal(DuelAskResultKind.ChallengerBusy, result);
     }
 
-        [Fact]
+    [Fact]
     public async Task Ask_ChallengerBusy_AndTargetNameDoesNotExist_ReturnsChallengerBusy_NotTargetNotFound()
     {
         var (service, zones, duels) = CreateService(1);
@@ -89,7 +89,7 @@ public class DuelServiceTests
         Assert.Equal(DuelAskResultKind.ChallengerBusy, result);
     }
 
-        [Fact]
+    [Fact]
     public async Task Ask_ChallengerAlreadyActivelyDueling_AndTargetNameDoesNotExist_ReturnsChallengerAlreadyDueling()
     {
         var (service, zones, duels) = CreateService(1);
@@ -105,7 +105,7 @@ public class DuelServiceTests
         Assert.Equal(DuelAskResultKind.ChallengerAlreadyDueling, result);
     }
 
-        [Fact]
+    [Fact]
     public async Task Ask_TargetNameNotFoundInThisZone_ReturnsTargetNotFound_Immediately_NoCrossShardAttempt()
     {
         var (service, zones, _) = CreateService(1);

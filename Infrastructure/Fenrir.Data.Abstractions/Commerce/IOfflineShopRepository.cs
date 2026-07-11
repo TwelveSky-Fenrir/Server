@@ -8,7 +8,7 @@ public interface IOfflineShopRepository
     public ValueTask<(OfflineShopRowDto? Shop, IReadOnlyList<OfflineShopItemRowDto> Items)> GetByCharacterAsync(
         int characterId, CancellationToken ct);
 
-        public ValueTask<ReadOnlyCollection<OfflineShopOpenListingRowDto>> GetAllOpenAsync(CancellationToken ct);
+    public ValueTask<ReadOnlyCollection<OfflineShopOpenListingRowDto>> GetAllOpenAsync(CancellationToken ct);
 
     public ValueTask OpenAndReplaceContainersAsync(
         int characterId, short? zoneNumber, int shopDate, string shopName, int locationX, int locationY,
@@ -27,12 +27,12 @@ public interface IOfflineShopRepository
         int expectedQuantity, int expectedValue, int price, int buyerCharacterId, byte buyerContainer,
         IReadOnlyList<CharacterItemSlotTvp> buyerItems, CancellationToken ct);
 
-        public ValueTask WithdrawMoneyAsync(int characterId, int expectedMoney, int expectedBigMoney, int todayDate,
+    public ValueTask WithdrawMoneyAsync(int characterId, int expectedMoney, int expectedBigMoney, int todayDate,
         CancellationToken ct);
 
     public ValueTask<ProxyShopNameRowDto?> GetProxyShopNameAsync(int characterId, CancellationToken ct);
 
     public ValueTask SetProxyShopNameAsync(int characterId, string shopName, CancellationToken ct);
 
-        public ValueTask ExtendRentalAsync(int characterId, int newShopDate, CancellationToken ct);
+    public ValueTask ExtendRentalAsync(int characterId, int newShopDate, CancellationToken ct);
 }

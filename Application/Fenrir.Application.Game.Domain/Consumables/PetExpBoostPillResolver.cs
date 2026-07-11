@@ -6,12 +6,12 @@ public static class PetExpBoostPillResolver
     {
         Success,
 
-                WouldExceedCeiling
+        WouldExceedCeiling
     }
 
-        public const int PerUnitAmount = 180;
+    public const int PerUnitAmount = 180;
 
-        public static ChargeResult ResolveCharge(int currentPetExpX2Time, int bulkUnitCount)
+    public static ChargeResult ResolveCharge(int currentPetExpX2Time, int bulkUnitCount)
     {
         var totalAmount = (long)PerUnitAmount * bulkUnitCount;
         var added = BankedCounterMath.AddWideSafe(currentPetExpX2Time, totalAmount);

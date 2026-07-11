@@ -14,7 +14,6 @@ using Fenrir.Application.Game.Services.WarPoint;
 using Fenrir.Application.Game.Tests.GameData;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Data.Abstractions.Characters;
-using Fenrir.Data.Abstractions.Game;
 using Fenrir.Data.Abstractions.World;
 using Fenrir.Network.Serialization.Shared.Packets.Shared;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -27,9 +26,9 @@ public class WarPointNpcShopDispatchTests
     private const int CharacterId = 10;
     private const short ZoneNumber = 1;
 
-        private const int ShopNpcId = WarPointShopCatalog.NobleDragonNpcId;
+    private const int ShopNpcId = WarPointShopCatalog.NobleDragonNpcId;
 
-        private const int OtherWpNpcId = WarPointShopCatalog.RoyalSerpentNpcId;
+    private const int OtherWpNpcId = WarPointShopCatalog.RoyalSerpentNpcId;
 
     private const int WpItemId = 90200;
     private const int WpItemWarPointPrice = 500;
@@ -52,7 +51,7 @@ public class WarPointNpcShopDispatchTests
         return await task;
     }
 
-        private static WorldDataCache BuildWorldData()
+    private static WorldDataCache BuildWorldData()
     {
         var wpItem = WorldDataTestRows.Item(WpItemId) with { Sort = NonStackableSort };
         var ordinaryItem = WorldDataTestRows.Item(OrdinaryItemId) with
@@ -229,7 +228,7 @@ public class WarPointNpcShopDispatchTests
     {
         var worldData = BuildWorldData();
         var (zone, state, characters, eventLog) = SetUp(worldData);
-        var service = CreateService(worldData, characters, eventLog, warPointShop: null);
+        var service = CreateService(worldData, characters, eventLog, null);
 
         var result = await service.BuyFromNpcShopAsync(zone, state, AccountId, CharacterId,
             BuyMove(ShopNpcId, WpItemId, 1), CancellationToken.None);
@@ -244,7 +243,7 @@ public class WarPointNpcShopDispatchTests
     {
         var worldData = BuildWorldData();
         var (zone, state, characters, eventLog) = SetUp(worldData);
-        var service = CreateService(worldData, characters, eventLog, warPointShop: null);
+        var service = CreateService(worldData, characters, eventLog, null);
 
         var result = await RunToCompletionAsync(
             service.BuyFromNpcShopAsync(zone, state, AccountId, CharacterId, BuyMove(ShopNpcId, OrdinaryItemId, 0),

@@ -16,10 +16,9 @@ public sealed class HotkeyActionService(
     ILogger<HotkeyActionService> logger)
     : IHotkeyActionService
 {
+    private const byte HotkeyBindableItemSort = 2;
 
-        private const byte HotkeyBindableItemSort = 2;
-
-        private const int ExcludedPotionType1A = 7;
+    private const int ExcludedPotionType1A = 7;
 
     private const int ExcludedPotionType1B = 8;
 
@@ -268,7 +267,7 @@ public sealed class HotkeyActionService(
         return GenericActionResult.Succeeded;
     }
 
-        private async ValueTask PersistAndMirrorSingleSlotAsync(Zone zone, int characterId, byte page, byte index,
+    private async ValueTask PersistAndMirrorSingleSlotAsync(Zone zone, int characterId, byte page, byte index,
         HotkeySlot newSlot, CancellationToken cancellationToken)
     {
         await characters.UpsertHotkeySlotAsync(characterId, page, index, newSlot.Value1, newSlot.Value2,
@@ -290,7 +289,7 @@ public sealed class HotkeyActionService(
             : HotkeySlot.Empty;
     }
 
-        private static ItemStack? ResolveInventorySlotOrNull(PlayerRuntimeState state, int page, int index)
+    private static ItemStack? ResolveInventorySlotOrNull(PlayerRuntimeState state, int page, int index)
     {
         return page is ContainerMatrix.InventoryPage0 or ContainerMatrix.InventoryPage1 &&
                ContainerMatrix.IsValidSlot((byte)page, index)

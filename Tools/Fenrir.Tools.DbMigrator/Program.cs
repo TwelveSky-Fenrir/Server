@@ -3,7 +3,6 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Data.SqlClient;
 
-
 var connectionString =
     Environment.GetEnvironmentVariable("ConnectionStrings__FenrirDb") ??
     Environment.GetEnvironmentVariable("FENRIR_DB_CONNECTION_STRING") ??

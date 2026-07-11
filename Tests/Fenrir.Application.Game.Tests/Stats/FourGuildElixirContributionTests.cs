@@ -5,13 +5,13 @@ namespace Fenrir.Application.Game.Tests.Stats;
 
 public class FourGuildElixirContributionTests
 {
-    private static readonly ZoneContext EligibleZone = new(ZoneNumber: 1);
+    private static readonly ZoneContext EligibleZone = new(1);
 
 
     [Fact]
     public void AllFamilies_DefaultOverrides_ReproduceB2RawFloor()
     {
-        var life = new ConsumableContext(EatLifePotion: 50);
+        var life = new ConsumableContext(50);
         var mana = new ConsumableContext(EatManaPotion: 50);
         var str = new ConsumableContext(EatStrPotion: 50);
         var dex = new ConsumableContext(EatDexPotion: 50);
@@ -26,9 +26,9 @@ public class FourGuildElixirContributionTests
     [Fact]
     public void LifeRawFloor_HoldsInReEnableBandAndNormalZone()
     {
-        var consumable = new ConsumableContext(EatLifePotion: 10);
+        var consumable = new ConsumableContext(10);
 
-        foreach (short zoneNumber in (short[])[1, 319, 320, 323])
+        foreach (var zoneNumber in (short[])[1, 319, 320, 323])
         {
             var delta = StatCalculator.LifeElixirContributionWithOverride(consumable, new ZoneContext(zoneNumber));
             Assert.Equal(20 * 10, delta);
@@ -44,10 +44,10 @@ public class FourGuildElixirContributionTests
     [InlineData(-1, 1, false)]
     public void HpFixedOverride_ArmsForSlotsZeroAndOne_WithFlagSet(int slot, int flag, bool expectFixed)
     {
-        var consumable = new ConsumableContext(EatLifePotion: 50);
+        var consumable = new ConsumableContext(50);
 
         var delta = StatCalculator.LifeElixirContributionWithOverride(consumable, EligibleZone,
-            fourGuildSlot: slot, hpElixirB4GFlag: flag);
+            slot, flag);
 
         Assert.Equal(expectFixed ? 4000 : 20 * 50, delta);
     }
@@ -63,7 +63,7 @@ public class FourGuildElixirContributionTests
         var consumable = new ConsumableContext(EatManaPotion: 40);
 
         var delta = StatCalculator.ManaElixirContributionWithOverride(consumable, EligibleZone,
-            fourGuildSlot: slot, mpElixirB4GFlag: 1);
+            slot, 1);
 
         Assert.Equal(expectFixed ? 5000 : 25 * 40, delta);
     }
@@ -78,7 +78,7 @@ public class FourGuildElixirContributionTests
         var consumable = new ConsumableContext(EatStrPotion: 50);
 
         var delta = StatCalculator.StrengthElixirAttackContributionWithOverride(consumable, EligibleZone,
-            fourGuildSlot: slot, strElixirB4GFlag: flag);
+            slot, flag);
 
         Assert.Equal(expectFixed ? 600 : 3 * 50, delta);
     }
@@ -94,9 +94,9 @@ public class FourGuildElixirContributionTests
         var consumable = new ConsumableContext(EatDexPotion: 50);
 
         var accuracy = StatCalculator.AccuracyElixirContributionWithOverride(consumable, EligibleZone,
-            fourGuildSlot: slot, dexElixirB4GFlag: 1);
+            slot, 1);
         var block = StatCalculator.BlockElixirContributionWithOverride(consumable, EligibleZone,
-            fourGuildSlot: slot, dexElixirB4GFlag: 1);
+            slot, 1);
 
         Assert.Equal(expectFixed ? 400 : 2 * 50, accuracy);
         Assert.Equal(expectFixed ? 400 : 2 * 50, block);
@@ -108,9 +108,9 @@ public class FourGuildElixirContributionTests
         var consumable = new ConsumableContext(EatDexPotion: 100);
 
         var accuracyFixed = StatCalculator.AccuracyElixirContributionWithOverride(consumable, EligibleZone,
-            fourGuildSlot: 0, dexElixirB4GFlag: 1);
+            0, 1);
         var blockFixed = StatCalculator.BlockElixirContributionWithOverride(consumable, EligibleZone,
-            fourGuildSlot: 0, dexElixirB4GFlag: 1);
+            0, 1);
         Assert.Equal(400, accuracyFixed);
         Assert.Equal(400, blockFixed);
 
@@ -123,10 +123,10 @@ public class FourGuildElixirContributionTests
     [Fact]
     public void FixedOverride_BeatsAMatchingEvent_LayerOneWins()
     {
-        var consumable = new ConsumableContext(EatLifePotion: 50, MaxPotionEventNum: 10);
+        var consumable = new ConsumableContext(50, MaxPotionEventNum: 10);
 
         var delta = StatCalculator.LifeElixirContributionWithOverride(consumable, EligibleZone,
-            fourGuildSlot: 0, hpElixirB4GFlag: 1, avatarTribe: 0, eventTribe: 0);
+            0, 1, 0, 0);
 
         Assert.Equal(4000, delta);
     }
@@ -141,7 +141,7 @@ public class FourGuildElixirContributionTests
     [InlineData(99, 50, 20 * 50)]
     public void HpEventTier_MatchingTribe_AppliesCapsAndFlats(int tier, int count, int expected)
     {
-        var consumable = new ConsumableContext(EatLifePotion: count, MaxPotionEventNum: tier);
+        var consumable = new ConsumableContext(count, MaxPotionEventNum: tier);
 
         var delta = StatCalculator.LifeElixirContributionWithOverride(consumable, EligibleZone,
             avatarTribe: 0, eventTribe: 0);
@@ -178,7 +178,7 @@ public class FourGuildElixirContributionTests
     [Fact]
     public void EventDisabledByDefault_FallsToRawFloor_AndDoesNotFalseMatchUnknownTribe()
     {
-        var consumable = new ConsumableContext(EatLifePotion: 50, MaxPotionEventNum: 10);
+        var consumable = new ConsumableContext(50, MaxPotionEventNum: 10);
 
         var disabledDefault = StatCalculator.LifeElixirContributionWithOverride(consumable, EligibleZone);
         var unknownTribeTrap = StatCalculator.LifeElixirContributionWithOverride(consumable, EligibleZone,
@@ -191,7 +191,7 @@ public class FourGuildElixirContributionTests
     [Fact]
     public void EventTribeMismatch_FallsToRawFloor()
     {
-        var consumable = new ConsumableContext(EatLifePotion: 50, MaxPotionEventNum: 10);
+        var consumable = new ConsumableContext(50, MaxPotionEventNum: 10);
 
         var delta = StatCalculator.LifeElixirContributionWithOverride(consumable, EligibleZone,
             avatarTribe: 0, eventTribe: 1);
@@ -237,9 +237,9 @@ public class FourGuildElixirContributionTests
         var slot = StatCalculator.ResolveFourGuildSlot(0, "Royal", tribe0Names);
         Assert.Equal(0, slot);
 
-        var consumable = new ConsumableContext(EatLifePotion: 5);
+        var consumable = new ConsumableContext(5);
         var delta = StatCalculator.LifeElixirContributionWithOverride(consumable, EligibleZone,
-            fourGuildSlot: slot, hpElixirB4GFlag: 1);
+            slot, 1);
 
         Assert.Equal(4000, delta);
     }

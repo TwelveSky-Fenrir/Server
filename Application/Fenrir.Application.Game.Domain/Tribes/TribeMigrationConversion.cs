@@ -4,8 +4,7 @@ namespace Fenrir.Application.Game.Domain.Tribes;
 
 public static class TribeMigrationConversion
 {
-
-        public static TribeMigrationResult Resolve(byte currentTribe, byte previousTribe, QuestCatalog questCatalog)
+    public static TribeMigrationResult Resolve(byte currentTribe, byte previousTribe, QuestCatalog questCatalog)
     {
         if (currentTribe != TribeMigrationGate.TribeFour)
             return new TribeMigrationResult(TribeMigrationGate.TribeFour, QuestProgress.None);

@@ -116,7 +116,7 @@ public class PopupEventScheduleTimerTests
         var state = new PopupEventState();
         var timer = new PopupEventScheduleTimer(state, NullLogger<PopupEventScheduleTimer>.Instance);
 
-        timer.Tick(Utc(0, 59, 0));
+        timer.Tick(Utc(0, 59));
         Assert.True(state.IsEnabled(PopupEventType.YanggokPvp));
 
         state.SetEnabled(PopupEventType.YanggokPvp, false);

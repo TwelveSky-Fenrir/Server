@@ -6,7 +6,6 @@ namespace Fenrir.Application.Game.Domain.World;
 
 public sealed partial class Zone
 {
-
     private const int GuildBuffActivationInboxCapacity = 64;
 
     private const int GuildBuffActivationInboxDrainCapPerTick = GuildBuffActivationInboxCapacity / 2;
@@ -16,7 +15,7 @@ public sealed partial class Zone
             new BoundedChannelOptions(GuildBuffActivationInboxCapacity)
                 { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
-        public bool PostGuildBuffActivationCommand(in GuildBuffActivationZoneCommand command)
+    public bool PostGuildBuffActivationCommand(in GuildBuffActivationZoneCommand command)
     {
         return _guildBuffActivationInbox.Writer.TryWrite(command);
     }

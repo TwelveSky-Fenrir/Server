@@ -2,6 +2,5 @@ namespace Fenrir.Application.Game.Domain.World;
 
 public partial class PlayerRuntimeState
 {
-
-        public bool HsbStoneRewardClaimed { get; set; }
+    public bool HsbStoneRewardClaimed { get; set; }
 }

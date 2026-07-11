@@ -5,7 +5,6 @@ namespace Fenrir.Application.Game.Abstractions.Commerce;
 
 public interface ISearchShopListingsService
 {
-
-        public ValueTask<IReadOnlyList<SearchShopListingsResponse>> SearchAsync(SearchShopListingsRequest packet,
+    public ValueTask<IReadOnlyList<SearchShopListingsResponse>> SearchAsync(SearchShopListingsRequest packet,
         Zone zone, CancellationToken cancellationToken);
 }

@@ -16,16 +16,15 @@ public sealed class GmPetExperienceGrantService(
     IEventLogRepository eventLog,
     ILogger<GmPetExperienceGrantService> logger) : IGmPetExperienceGrantService
 {
+    private const byte EligiblePetFoundOutcome = 1;
 
-        private const byte EligiblePetFoundOutcome = 1;
+    private const byte NoEligiblePetOutcome = 0;
 
-        private const byte NoEligiblePetOutcome = 0;
+    private const int NoPetSentinel = -1;
 
-        private const int NoPetSentinel = -1;
+    private const int AcceptedResult = 0;
 
-        private const int AcceptedResult = 0;
-
-        private const byte PetItemCatalogSort = 22;
+    private const byte PetItemCatalogSort = 22;
 
     public async ValueTask HandleAsync(byte[] data, ZoneClientSession zoneSession, PlayerRuntimeState state,
         CancellationToken cancellationToken)

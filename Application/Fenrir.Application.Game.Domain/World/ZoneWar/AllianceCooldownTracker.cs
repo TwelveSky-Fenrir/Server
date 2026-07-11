@@ -7,7 +7,7 @@ public sealed class AllianceCooldownTracker
     private readonly DateOnly?[] _cooldownUntil = new DateOnly?[WorldStateService.TribeCount];
     private readonly Lock _lock = new();
 
-        public DateOnly? GetCooldownUntil(byte tribeId)
+    public DateOnly? GetCooldownUntil(byte tribeId)
     {
         ValidateTribeId(tribeId);
         lock (_lock)
@@ -16,7 +16,7 @@ public sealed class AllianceCooldownTracker
         }
     }
 
-        public bool IsInCooldown(byte tribeId, DateOnly today)
+    public bool IsInCooldown(byte tribeId, DateOnly today)
     {
         return GetCooldownUntil(tribeId) is { } until && today < until;
     }

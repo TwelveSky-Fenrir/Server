@@ -185,7 +185,7 @@ public class ZoneGroundItemTests
         Assert.Equal(0, zone.GroundItemCount);
     }
 
-        [Fact]
+    [Fact]
     public void SpawnGroundItem_WithNoNeighborsAnywhere_SendsNothing_AndDoesNotThrow()
     {
         var zone = ZoneTestKit.CreateZone(1);
@@ -211,7 +211,7 @@ public class ZoneGroundItemTests
             ZoneTestKit.DrainOutbound(pipe).Length);
     }
 
-        private sealed class MaxValueRandom : Random
+    private sealed class MaxValueRandom : Random
     {
         public override int Next(int minValue, int maxValue)
         {

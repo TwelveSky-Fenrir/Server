@@ -8,5 +8,5 @@ public interface ITradeStartService
 {
     public TradeStartResult Start(int callerId);
 
-        public void AbortStart(int callerId);
+    public void AbortStart(int callerId);
 }

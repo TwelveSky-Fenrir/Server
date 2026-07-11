@@ -12,8 +12,7 @@ public sealed class Zone195NokSanBroadcaster(
     ZoneRegistry zones,
     ILogger<Zone195NokSanBroadcaster> logger) : IZone195NokSanBroadcaster
 {
-
-        private const int DataSize = 130;
+    private const int DataSize = 130;
 
     private const int ChallengerAppearedSort = 771;
     private const int CaptureCancelledSort = 772;
@@ -75,7 +74,7 @@ public sealed class Zone195NokSanBroadcaster(
         BroadcastToEveryZone(in response);
     }
 
-        private void BroadcastToEveryZone<TPacket>(in TPacket response) where TPacket : struct, IOutgoingPacket
+    private void BroadcastToEveryZone<TPacket>(in TPacket response) where TPacket : struct, IOutgoingPacket
     {
         var total = FrameWriter.FrameSizeOf<TPacket>();
         var rented = ArrayPool<byte>.Shared.Rent(total);

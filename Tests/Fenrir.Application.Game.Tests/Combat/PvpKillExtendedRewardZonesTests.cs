@@ -15,7 +15,7 @@ public class PvpKillExtendedRewardZonesTests
     public void SymbolBattleZone_WhenBattleActive_GrantsFullSet(short zoneId)
     {
         var profile = PvpKillExtendedRewardZones.TryResolve(zoneId, false,
-            new PvpKillRewardZoneRuntimeState(SymbolBattleActive: true));
+            new PvpKillRewardZoneRuntimeState(true));
 
         Assert.NotNull(profile);
         Assert.Equal(FullReward, profile.Value);
@@ -35,7 +35,7 @@ public class PvpKillExtendedRewardZonesTests
     [Fact]
     public void SymbolBattleZone_IsUnaffectedByStunTrigger()
     {
-        var active = new PvpKillRewardZoneRuntimeState(SymbolBattleActive: true);
+        var active = new PvpKillRewardZoneRuntimeState(true);
 
         Assert.Equal(
             PvpKillExtendedRewardZones.TryResolve(2, false, active),

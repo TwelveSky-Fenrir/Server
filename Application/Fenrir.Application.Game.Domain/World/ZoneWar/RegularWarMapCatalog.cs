@@ -6,9 +6,9 @@ public enum RegularWarCpBonusCriterion : byte
 {
     None = 0,
 
-        RebirthTierExactly11 = 1,
+    RebirthTierExactly11 = 1,
 
-        RebirthCount0To6 = 2
+    RebirthCount0To6 = 2
 }
 
 public readonly record struct RegularWarCpBonusRule(
@@ -16,8 +16,7 @@ public readonly record struct RegularWarCpBonusRule(
     int LosingSideAmount,
     RegularWarCpBonusCriterion Criterion)
 {
-
-        public bool IsSatisfiedBy(short rebirthTier, int rebirthCount)
+    public bool IsSatisfiedBy(short rebirthTier, int rebirthCount)
     {
         return Criterion switch
         {

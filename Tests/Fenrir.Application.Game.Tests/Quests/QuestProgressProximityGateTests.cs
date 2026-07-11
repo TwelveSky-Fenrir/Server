@@ -19,7 +19,7 @@ public class QuestProgressProximityGateTests
     private const byte Category = Tribe + 1;
     private const int QuestId = 1;
 
-        private const int AnchorNpc = 777;
+    private const int AnchorNpc = 777;
 
     private static async Task<QuestActionResult> RunToCompletionAsync(ValueTask<QuestActionResult> pending, Zone zone)
     {
@@ -73,7 +73,7 @@ public class QuestProgressProximityGateTests
         state.PosZ = z;
     }
 
-        private static void MarkKillQuestEndConditionMet(PlayerRuntimeState state, QuestRowDto quest)
+    private static void MarkKillQuestEndConditionMet(PlayerRuntimeState state, QuestRowDto quest)
     {
         state.QuestStepPermanent = quest.Step;
         state.QuestActiveFlag = 1;
@@ -82,7 +82,7 @@ public class QuestProgressProximityGateTests
         state.QuestKillCounter = 1;
     }
 
-        private static void MarkIdleAtStep2(PlayerRuntimeState state)
+    private static void MarkIdleAtStep2(PlayerRuntimeState state)
     {
         state.QuestStepPermanent = 2;
         state.QuestActiveFlag = 0;

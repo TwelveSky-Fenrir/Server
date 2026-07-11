@@ -5,6 +5,5 @@ namespace Fenrir.Application.Game.Abstractions.ZoneLifecycle;
 
 public interface IAvatarActionService
 {
-
-        public void PostAction(Zone zone, int characterId, in ActionInfo action, bool isResumeAction = false);
+    public void PostAction(Zone zone, int characterId, in ActionInfo action, bool isResumeAction = false);
 }

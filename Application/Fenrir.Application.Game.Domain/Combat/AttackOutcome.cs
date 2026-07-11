@@ -7,27 +7,27 @@ public enum AttackRejectReason
     AttackerDead,
     DefenderDead,
 
-        ZonePvpDisabled,
+    ZonePvpDisabled,
 
-        SameOrAlliedTribe,
+    SameOrAlliedTribe,
     OutOfRange,
     AttackerProtected,
     DefenderProtected,
     AttackerHasNoAttackSuccess,
 
-        DuelNotAuthorized,
+    DuelNotAuthorized,
 
-        DefenderShopOpen,
+    DefenderShopOpen,
 
-        DefenderActionStateBlocksTargeting,
+    DefenderActionStateBlocksTargeting,
 
-        NewbieProtectionLevelGap,
+    NewbieProtectionLevelGap,
 
-        InvalidAttackModeSelector,
+    InvalidAttackModeSelector,
 
-        AntiCheatEchoMismatch,
+    AntiCheatEchoMismatch,
 
-        OwnerNameLocked
+    OwnerNameLocked
 }
 
 public readonly record struct AttackOutcome(
@@ -45,7 +45,7 @@ public readonly record struct AttackOutcome(
         return new AttackOutcome(true, reason, false, false, 0, 0, 0, false);
     }
 
-        public static AttackOutcome Miss(bool chargeConsumed = false)
+    public static AttackOutcome Miss(bool chargeConsumed = false)
     {
         return new AttackOutcome(false, AttackRejectReason.None, false, false, 0, 0, 0, chargeConsumed);
     }

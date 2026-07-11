@@ -14,8 +14,7 @@ namespace Fenrir.Application.Game.Tests.World;
 
 public class ZoneSkillCastTests
 {
-
-        private static void SeedSkillHotkey(PlayerRuntimeState state, int skillId, int investedGrade, byte page = 0,
+    private static void SeedSkillHotkey(PlayerRuntimeState state, int skillId, int investedGrade, byte page = 0,
         byte index = 0)
     {
         state.Hotkeys = state.Hotkeys.SetItem((page, index), new HotkeySlot(HotkeyBindingKind.Skill, skillId,
@@ -34,7 +33,7 @@ public class ZoneSkillCastTests
         return new SkillDefinition(row, ImmutableArray<SkillDescriptionRowDto>.Empty, [grade0, grade1]);
     }
 
-        private static SkillDefinition HolyShieldSkillGraded(byte maxUpgradePoint,
+    private static SkillDefinition HolyShieldSkillGraded(byte maxUpgradePoint,
         (short Mana, byte Shield, short RunTime) grade0, (short Mana, byte Shield, short RunTime) grade1)
     {
         var row = new SkillRowDto(82, "Holy Shield", 0, 0, 0, 0, 0, 1, maxUpgradePoint, 1, 0);
@@ -55,7 +54,7 @@ public class ZoneSkillCastTests
         return new SkillDefinition(row, ImmutableArray<SkillDescriptionRowDto>.Empty, [grade0, grade1]);
     }
 
-        private static ActionInfo SkillCastStartAction(int skillNumber, int gradeNum1, int gradeNum2 = 0)
+    private static ActionInfo SkillCastStartAction(int skillNumber, int gradeNum1, int gradeNum2 = 0)
     {
         return new ActionInfo
         {
@@ -68,7 +67,7 @@ public class ZoneSkillCastTests
         };
     }
 
-        private static ActionInfo SkillEffectConfirmAction(int skillNumber, int gradeNum1, int targetCharacterId = 0,
+    private static ActionInfo SkillEffectConfirmAction(int skillNumber, int gradeNum1, int targetCharacterId = 0,
         int gradeNum2 = 0)
     {
         return new ActionInfo
@@ -114,7 +113,7 @@ public class ZoneSkillCastTests
         Assert.Equal(40, state.Buffs.Buff[9 * 2 + 1]);
     }
 
-        [Fact]
+    [Fact]
     public void SkillCast_ManaUsesInvestedGradeOnly_EffectUsesInvestedPlusItemBonusGrade()
     {
         var skillsById = new Dictionary<int, SkillDefinition>

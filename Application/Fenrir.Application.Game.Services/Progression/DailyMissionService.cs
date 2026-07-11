@@ -16,17 +16,16 @@ public sealed class DailyMissionService(
     WorldDataCache worldData,
     ILogger<DailyMissionService> logger) : IDailyMissionService
 {
-
-        private const int MinimumClaimLevel = ExperienceFormulas.RebirthDivisorLevelThreshold;
+    private const int MinimumClaimLevel = ExperienceFormulas.RebirthDivisorLevelThreshold;
 
     private const int RequiredJoinWar = 1;
     private const int RequiredKillOtherTribe = 10;
 
-        private const int Zone241TimeAvatarChangeInfoSort = 14;
+    private const int Zone241TimeAvatarChangeInfoSort = 14;
 
     private static readonly byte[] InventoryPages = [ContainerMatrix.InventoryPage0, ContainerMatrix.InventoryPage1];
 
-        public async ValueTask<DailyMissionClaimResult> ClaimAsync(int characterId, Zone zone, PlayerRuntimeState state,
+    public async ValueTask<DailyMissionClaimResult> ClaimAsync(int characterId, Zone zone, PlayerRuntimeState state,
         CancellationToken cancellationToken)
     {
         if (state.CombinedLevel < MinimumClaimLevel || state.MissionJoinWar < RequiredJoinWar ||
@@ -76,7 +75,7 @@ public sealed class DailyMissionService(
         return new DailyMissionClaimResult(DailyMissionClaimOutcome.Success, newJoinWar, newKillOtherTribe);
     }
 
-        private async ValueTask GrantSecondTierZone241TimeBonusAsync(Zone zone, PlayerRuntimeState state,
+    private async ValueTask GrantSecondTierZone241TimeBonusAsync(Zone zone, PlayerRuntimeState state,
         int characterId, CancellationToken cancellationToken)
     {
         int newZone241Time;
@@ -113,7 +112,7 @@ public sealed class DailyMissionService(
             characterId, newZone241Time);
     }
 
-        private static bool TryFindEmptySlot(PlayerRuntimeState state, out byte container, out byte slot)
+    private static bool TryFindEmptySlot(PlayerRuntimeState state, out byte container, out byte slot)
     {
         foreach (var page in InventoryPages)
         {

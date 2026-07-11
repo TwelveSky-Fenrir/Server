@@ -144,12 +144,12 @@ public class ChestBox720RewardTableTests
         Assert.Equal(expected, ChestBox720RewardTable.ElixirPlusPoolIds.ToArray());
     }
 
-        [Fact]
+    [Fact]
     public void Roll_AcrossManyRealRandomDraws_EveryRewardIsAlwaysWithinTheKnownTable()
     {
         var random = new Random(20260711);
 
-        foreach (byte tribe in new byte[] { 0, 1, 2 })
+        foreach (var tribe in new byte[] { 0, 1, 2 })
             for (var i = 0; i < 5_000; i++)
             {
                 var result = ChestBox720RewardTable.Roll(tribe, random);
@@ -159,7 +159,7 @@ public class ChestBox720RewardTableTests
             }
     }
 
-        private sealed class ScriptedRandom(params int[] values) : Random
+    private sealed class ScriptedRandom(params int[] values) : Random
     {
         private int _index;
 

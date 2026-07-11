@@ -66,11 +66,11 @@ public class EquipSwapResolverTests
     [Fact]
     public void Resolve_IntoEmptyEquipSlot_Succeeds_WithNoItemComingBack()
     {
-        var used = Stack(1000, serial: 42);
+        var used = Stack(1000, 42);
 
-        var result = EquipSwapResolver.Resolve(used, Candidate(equipPartTag: 2),
-            ImmutableDictionary<byte, ItemStack>.Empty, IdleActionSort, characterTribe: 1, CombinedLevel,
-            rebirthCount: 0);
+        var result = EquipSwapResolver.Resolve(used, Candidate(2),
+            ImmutableDictionary<byte, ItemStack>.Empty, IdleActionSort, 1, CombinedLevel,
+            0);
 
         Assert.True(result.Succeeded);
         Assert.Equal((byte)0, result.TargetEquipSlot);
@@ -81,12 +81,12 @@ public class EquipSwapResolverTests
     [Fact]
     public void Resolve_IntoOccupiedEquipSlot_SwapsThePreviouslyEquippedPieceBack()
     {
-        var used = Stack(1000, serial: 42);
-        var alreadyEquipped = Stack(2000, serial: 7);
+        var used = Stack(1000, 42);
+        var alreadyEquipped = Stack(2000, 7);
         var equipment = ImmutableDictionary<byte, ItemStack>.Empty.SetItem(0, alreadyEquipped);
 
-        var result = EquipSwapResolver.Resolve(used, Candidate(equipPartTag: 2), equipment, IdleActionSort,
-            characterTribe: 1, CombinedLevel, rebirthCount: 0);
+        var result = EquipSwapResolver.Resolve(used, Candidate(2), equipment, IdleActionSort,
+            1, CombinedLevel, 0);
 
         Assert.True(result.Succeeded);
         Assert.Equal(used, result.NewEquipStack);
@@ -96,9 +96,9 @@ public class EquipSwapResolverTests
     [Fact]
     public void Resolve_NotIdle_IsRejectedBeforeAnythingElse()
     {
-        var result = EquipSwapResolver.Resolve(Stack(1000), Candidate(equipPartTag: 2),
-            ImmutableDictionary<byte, ItemStack>.Empty, actionSort: 2, characterTribe: 1, CombinedLevel,
-            rebirthCount: 0);
+        var result = EquipSwapResolver.Resolve(Stack(1000), Candidate(2),
+            ImmutableDictionary<byte, ItemStack>.Empty, 2, 1, CombinedLevel,
+            0);
 
         Assert.Equal(EquipSwapResolver.Outcome.NotIdle, result.Outcome);
     }
@@ -106,9 +106,9 @@ public class EquipSwapResolverTests
     [Fact]
     public void Resolve_ItemFailsEligibilityGate_IsNotEquippable()
     {
-        var result = EquipSwapResolver.Resolve(Stack(1000), Candidate(equipPartTag: 2, levelLimit: 999),
-            ImmutableDictionary<byte, ItemStack>.Empty, IdleActionSort, characterTribe: 1, CombinedLevel,
-            rebirthCount: 0);
+        var result = EquipSwapResolver.Resolve(Stack(1000), Candidate(2, levelLimit: 999),
+            ImmutableDictionary<byte, ItemStack>.Empty, IdleActionSort, 1, CombinedLevel,
+            0);
 
         Assert.Equal(EquipSwapResolver.Outcome.NotEquippable, result.Outcome);
     }
@@ -117,7 +117,7 @@ public class EquipSwapResolverTests
     public void Resolve_NullCandidate_IsNotEquippable()
     {
         var result = EquipSwapResolver.Resolve(Stack(1000), null, ImmutableDictionary<byte, ItemStack>.Empty,
-            IdleActionSort, characterTribe: 1, CombinedLevel, rebirthCount: 0);
+            IdleActionSort, 1, CombinedLevel, 0);
 
         Assert.Equal(EquipSwapResolver.Outcome.NotEquippable, result.Outcome);
     }
@@ -128,8 +128,8 @@ public class EquipSwapResolverTests
     public void Resolve_EligibleButTagMapsToNoSlot_IsInvalidTargetSlot(int equipPartTag)
     {
         var result = EquipSwapResolver.Resolve(Stack(1000), Candidate(equipPartTag),
-            ImmutableDictionary<byte, ItemStack>.Empty, IdleActionSort, characterTribe: 1, CombinedLevel,
-            rebirthCount: 0);
+            ImmutableDictionary<byte, ItemStack>.Empty, IdleActionSort, 1, CombinedLevel,
+            0);
 
         Assert.Equal(EquipSwapResolver.Outcome.InvalidTargetSlot, result.Outcome);
     }

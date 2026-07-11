@@ -165,7 +165,7 @@ public class WingLuckyBox8005RewardTableTests
         Assert.Equal(1237, result.RewardItemId);
     }
 
-        private sealed class ScriptedRandom(params int[] values) : Random
+    private sealed class ScriptedRandom(params int[] values) : Random
     {
         private int _index;
 

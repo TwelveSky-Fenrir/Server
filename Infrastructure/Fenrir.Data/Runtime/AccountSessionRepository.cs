@@ -43,7 +43,7 @@ public sealed record AccountSessionRepository(ICaeriusNetDbContext Db) : IAccoun
         }
     }
 
-        public async ValueTask<bool> TransitionToGameAsync(int accountId, Guid expectedSessionToken, byte shardId,
+    public async ValueTask<bool> TransitionToGameAsync(int accountId, Guid expectedSessionToken, byte shardId,
         CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("runtime", "usp_AccountSession_TransitionToGame", 1,
@@ -84,7 +84,7 @@ public sealed record AccountSessionRepository(ICaeriusNetDbContext Db) : IAccoun
         await Db.ExecuteAsync(sp, ct);
     }
 
-        public async ValueTask<ImmutableArray<KickedAccountDto>> RefreshAndGetKickedAsync(
+    public async ValueTask<ImmutableArray<KickedAccountDto>> RefreshAndGetKickedAsync(
         AccountSessionServerKind serverKind, byte? shardId, IReadOnlyCollection<int> accountIds, CancellationToken ct)
     {
         if (accountIds.Count == 0)
@@ -111,7 +111,7 @@ public sealed record AccountSessionRepository(ICaeriusNetDbContext Db) : IAccoun
         return await Db.QueryAsImmutableArrayAsync<ReapedAccountSessionDto>(sp, ct);
     }
 
-        public async ValueTask<int> GetActiveSessionCountAsync(CancellationToken ct)
+    public async ValueTask<int> GetActiveSessionCountAsync(CancellationToken ct)
     {
         var sp = new StoredProcedureParametersBuilder("runtime", "usp_AccountSession_GetActiveCount", 1,
                 CommandTimeoutSeconds)

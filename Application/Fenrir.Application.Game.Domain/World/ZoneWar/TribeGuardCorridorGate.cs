@@ -9,10 +9,9 @@ public enum TribeGuardCorridorMoveOutcome
 
 public static class TribeGuardCorridorGate
 {
+    public const short HardDisconnectZoneId = 37;
 
-        public const short HardDisconnectZoneId = 37;
-
-        public static TribeGuardCorridorMoveOutcome Evaluate(
+    public static TribeGuardCorridorMoveOutcome Evaluate(
         TribeGuardCorridorCatalog catalog,
         TribeGuardCorridorState state,
         byte requesterTribe,

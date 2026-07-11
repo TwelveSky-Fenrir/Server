@@ -1,4 +1,3 @@
-using Fenrir.Application.Game.Domain.AntiCheat;
 using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Stats;
@@ -97,13 +96,13 @@ public class ZonePvpSameOriginKillCreditGuardTests
 
         Assert.True(zone.TryGetPlayer(1, out var attacker));
         var expectedCp = PvpKillContributionPointCalculator.ComputeBaseAmount(false, false,
-                basePerKillAmount: PvpKillContributionPointBonuses.ComputeGameWideAddValue(3))
-            + PvpKillContributionPointBonuses.ComputeConditionalBonuses(1, 0, addedCpTribe: -1,
-                attackerBaseLevel: 42, symbolBattleActive: false);
+                             basePerKillAmount: PvpKillContributionPointBonuses.ComputeGameWideAddValue(3))
+                         + PvpKillContributionPointBonuses.ComputeConditionalBonuses(1, 0, -1,
+                             42, false);
         Assert.Equal(expectedCp, attacker!.ContributionPoints);
     }
 
-        [Fact]
+    [Fact]
     public void BothSourceIpsNull_DoesNotFalselyBlockReward()
     {
         var zone = SetUpZone(1, null, null);
@@ -123,7 +122,7 @@ public class ZonePvpSameOriginKillCreditGuardTests
         Assert.True(attacker!.ContributionPoints > 0);
     }
 
-        [Fact]
+    [Fact]
     public void SameSourceIp_WithinLevelGap_StillGrantsNothing()
     {
         var zone = SetUpZone(1, "203.0.113.7", "203.0.113.7");

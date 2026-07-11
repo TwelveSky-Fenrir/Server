@@ -57,7 +57,7 @@ public class BossDropKillIntegrationTests
         Assert.Equal(SantaGiftItemId, item!.ItemId);
     }
 
-        private sealed class MaxValueRandom : Random
+    private sealed class MaxValueRandom : Random
     {
         public override int Next(int minValue, int maxValue)
         {

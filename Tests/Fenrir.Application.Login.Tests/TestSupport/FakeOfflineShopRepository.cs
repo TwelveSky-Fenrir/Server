@@ -9,7 +9,7 @@ internal sealed class FakeOfflineShopRepository : IOfflineShopRepository
     private readonly Dictionary<int, (OfflineShopRowDto? Shop, IReadOnlyList<OfflineShopItemRowDto> Items)>
         _byCharacterId = new();
 
-        public List<int> QueriedCharacterIds { get; } = [];
+    public List<int> QueriedCharacterIds { get; } = [];
 
     public ValueTask<(OfflineShopRowDto? Shop, IReadOnlyList<OfflineShopItemRowDto> Items)> GetByCharacterAsync(
         int characterId, CancellationToken ct)
@@ -76,7 +76,7 @@ internal sealed class FakeOfflineShopRepository : IOfflineShopRepository
         throw new NotSupportedException();
     }
 
-        public static FakeOfflineShopRepository Empty()
+    public static FakeOfflineShopRepository Empty()
     {
         return new FakeOfflineShopRepository();
     }

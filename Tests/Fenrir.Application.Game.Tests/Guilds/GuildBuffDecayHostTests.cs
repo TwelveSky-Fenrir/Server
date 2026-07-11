@@ -258,7 +258,7 @@ public class GuildBuffDecayHostTests
         }
     }
 
-        private sealed class ThrowingSetBuffGuildRepository : IGuildRepository
+    private sealed class ThrowingSetBuffGuildRepository : IGuildRepository
     {
         public ValueTask<CharacterGuildMembershipDto?> GetByCharacterAsync(int characterId, CancellationToken ct)
         {

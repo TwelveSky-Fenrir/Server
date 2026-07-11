@@ -2,12 +2,11 @@ namespace Fenrir.Application.Game.Domain.Tribes;
 
 public static class TribeMigrationGate
 {
+    public const short MinLevel = 145;
 
-        public const short MinLevel = 145;
+    public const int MinOutboundTribePoints = 100;
 
-        public const int MinOutboundTribePoints = 100;
-
-        public const byte TribeFour = 3;
+    public const byte TribeFour = 3;
 
     public static TribeMigrationOutcome Evaluate(TribeMigrationEligibilityContext ctx)
     {
@@ -29,7 +28,7 @@ public static class TribeMigrationGate
         return EvaluateCommon(ctx);
     }
 
-        public static bool IsWithinConversionWindow(DateTime nowLocal)
+    public static bool IsWithinConversionWindow(DateTime nowLocal)
     {
         return nowLocal.DayOfWeek == DayOfWeek.Saturday && nowLocal.Hour is >= 16 and <= 18;
     }
@@ -79,7 +78,7 @@ public static class TribeMigrationGate
         return TribeMigrationOutcome.Success;
     }
 
-        private static bool PassesAllianceAdjustedWorldState(TribeMigrationEligibilityContext ctx)
+    private static bool PassesAllianceAdjustedWorldState(TribeMigrationEligibilityContext ctx)
     {
         var adjusted = new int[3];
         for (byte tribe = 0; tribe < 3; tribe++)
@@ -105,7 +104,7 @@ public static class TribeMigrationGate
         return false;
     }
 
-        private static bool IsRawDominantTribe(byte tribe, IReadOnlyList<int> tribePoints)
+    private static bool IsRawDominantTribe(byte tribe, IReadOnlyList<int> tribePoints)
     {
         var mine = tribePoints[tribe];
         for (byte other = 0; other < 3; other++)

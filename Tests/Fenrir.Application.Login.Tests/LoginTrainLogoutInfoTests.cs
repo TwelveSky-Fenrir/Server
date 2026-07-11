@@ -9,8 +9,8 @@ public class LoginTrainLogoutInfoTests
     [Fact]
     public void OccupiedSlot_PopulatesLogoutInfoFromPersistedPlacement_ZonePositionLifeMana()
     {
-        var entry = EntryFor(RosterCharacter(mapId: 101, posX: 1500f, posY: -200f, posZ: 30f, life: 850,
-            mana: 320));
+        var entry = EntryFor(RosterCharacter(101, 1500f, -200f, 30f, 850,
+            320));
 
         var slots = LoginTrain.BuildAvatarSlots([entry]);
 
@@ -21,8 +21,8 @@ public class LoginTrainLogoutInfoTests
     [Fact]
     public void OccupiedSlot_TruncatesFractionalPositionTowardZero()
     {
-        var entry = EntryFor(RosterCharacter(mapId: 3, posX: 6.9f, posY: 0.4f, posZ: -7.9f, life: 100,
-            mana: 50));
+        var entry = EntryFor(RosterCharacter(3, 6.9f, 0.4f, -7.9f, 100,
+            50));
 
         var slots = LoginTrain.BuildAvatarSlots([entry]);
 
@@ -35,7 +35,7 @@ public class LoginTrainLogoutInfoTests
     [Fact]
     public void OccupiedSlot_AppliesLoginTailVitalsFloor_LifeFlooredToOne_ManaFlooredToZero()
     {
-        var entry = EntryFor(RosterCharacter(mapId: 5, posX: 0f, posY: 0f, posZ: 0f, life: 0, mana: -5));
+        var entry = EntryFor(RosterCharacter(5, 0f, 0f, 0f, 0, -5));
 
         var slots = LoginTrain.BuildAvatarSlots([entry]);
 
@@ -46,7 +46,7 @@ public class LoginTrainLogoutInfoTests
     [Fact]
     public void OccupiedSlot_HealthyVitals_AreCarriedThroughUnchangedByTheFloor()
     {
-        var entry = EntryFor(RosterCharacter(mapId: 5, posX: 0f, posY: 0f, posZ: 0f, life: 850, mana: 320));
+        var entry = EntryFor(RosterCharacter(5, 0f, 0f, 0f, 850, 320));
 
         var slots = LoginTrain.BuildAvatarSlots([entry]);
 
@@ -57,8 +57,10 @@ public class LoginTrainLogoutInfoTests
     [Fact]
     public void EmptySlot_LeavesLogoutInfoAtTheAllZeroTemplate()
     {
-        var slots = LoginTrain.BuildAvatarSlots([EntryFor(RosterCharacter(mapId: 7, posX: 1f, posY: 2f,
-            posZ: 3f, life: 10, mana: 20, slot: 0))]);
+        var slots = LoginTrain.BuildAvatarSlots([
+            EntryFor(RosterCharacter(7, 1f, 2f,
+                3f, 10, 20, 0))
+        ]);
 
         Assert.Equal(6, slots[1].LogoutInfo.Length);
         Assert.All(slots[1].LogoutInfo, value => Assert.Equal(0, value));

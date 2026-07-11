@@ -17,15 +17,14 @@ public enum GemSocketStatRequest
 
 public static class GemSocketContributionResolver
 {
+    public const int MaxSocketsPerItem = 5;
 
-        public const int MaxSocketsPerItem = 5;
-
-        public static bool IsLiveInProduction(GemSocketStatRequest statType)
+    public static bool IsLiveInProduction(GemSocketStatRequest statType)
     {
         return statType == GemSocketStatRequest.AttackPower;
     }
 
-        public static ImmutableArray<SocketEntry> UnpackActiveSockets(int packedSockets1, int packedSockets2,
+    public static ImmutableArray<SocketEntry> UnpackActiveSockets(int packedSockets1, int packedSockets2,
         int packedSockets3)
     {
         Span<byte> bytes = stackalloc byte[12];
@@ -44,7 +43,7 @@ public static class GemSocketContributionResolver
         return builder.MoveToImmutable();
     }
 
-        public static int GetSocketInfo(
+    public static int GetSocketInfo(
         GemSocketStatRequest statType,
         int packedSockets1, int packedSockets2, int packedSockets3,
         Func<GemSocketStatRequest, SocketEntry, int> socketValueLookup)
@@ -57,5 +56,5 @@ public static class GemSocketContributionResolver
         return total;
     }
 
-        public readonly record struct SocketEntry(byte GemType, byte GemTier);
+    public readonly record struct SocketEntry(byte GemType, byte GemTier);
 }

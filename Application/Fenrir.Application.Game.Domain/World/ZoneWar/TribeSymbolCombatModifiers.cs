@@ -4,18 +4,17 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 
 public sealed class TribeSymbolCombatModifiers
 {
+    public const float OwnSymbolLostDamageDownPenalty = 0.2f;
 
-        public const float OwnSymbolLostDamageDownPenalty = 0.2f;
+    public const int MaxDamageUpBonusIncrementCount = 4;
 
-        public const int MaxDamageUpBonusIncrementCount = 4;
-
-        public const int SmallTribeAdvantagePointFloor = 10;
+    public const int SmallTribeAdvantagePointFloor = 10;
+    private readonly float[] _damageDownPenalty = new float[WorldStateService.TribeCount];
 
     private readonly int[] _damageUpBonusIncrementCount = new int[WorldStateService.TribeCount];
-    private readonly float[] _damageDownPenalty = new float[WorldStateService.TribeCount];
     private readonly Lock _lock = new();
 
-        public float GetDamageDownPenalty(byte tribeId)
+    public float GetDamageDownPenalty(byte tribeId)
     {
         ValidateTribeId(tribeId);
         lock (_lock)
@@ -33,7 +32,7 @@ public sealed class TribeSymbolCombatModifiers
         }
     }
 
-        public int GetDamageUpBonusIncrementCount(byte tribeId)
+    public int GetDamageUpBonusIncrementCount(byte tribeId)
     {
         ValidateTribeId(tribeId);
         lock (_lock)

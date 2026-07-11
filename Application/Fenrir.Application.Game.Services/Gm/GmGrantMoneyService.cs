@@ -12,9 +12,9 @@ public sealed class GmGrantMoneyService(
 {
     private const int Sort = 504;
 
-        private const int NotOverwrittenResult = 1;
+    private const int NotOverwrittenResult = 1;
 
-        private const byte NoOpOutcome = 0;
+    private const byte NoOpOutcome = 0;
 
     public async ValueTask HandleAsync(byte[] data, ZoneClientSession zoneSession, CancellationToken cancellationToken)
     {

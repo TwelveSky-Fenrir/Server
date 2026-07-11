@@ -5,8 +5,7 @@ namespace Fenrir.Application.Game.Domain.Inventory.UseItems;
 
 public sealed class MountBoxUseItemHandler(ILogger<MountBoxUseItemHandler> logger) : IUseItemHandler
 {
-
-        public const int ItemId = 635;
+    public const int ItemId = 635;
 
     public ValueTask<UseInventoryItemResponse> HandleAsync(UseItemContext context, CancellationToken cancellationToken)
     {

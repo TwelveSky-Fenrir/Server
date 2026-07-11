@@ -30,7 +30,7 @@ public class ProxyShopExpiryFlushHostTests
         return new ProxyShopBroadcastEntry(characterId, characterId * 2 + 1, "Owner", "Shop", 0f, 0f, 0f, shopDate);
     }
 
-        private static ZoneRegistry RegistryWithOneExpiredShop(int characterId)
+    private static ZoneRegistry RegistryWithOneExpiredShop(int characterId)
     {
         var registry = CreateRegistry(ProxyShopZonePolicy.ZoneNumber);
         var zone = registry[ProxyShopZonePolicy.ZoneNumber];
@@ -91,7 +91,7 @@ public class ProxyShopExpiryFlushHostTests
         Assert.Empty(repository.NameClears);
     }
 
-        private sealed class RecordingOfflineShopRepository : IOfflineShopRepository
+    private sealed class RecordingOfflineShopRepository : IOfflineShopRepository
     {
         public List<int> ClosedCharacterIds { get; } = [];
         public List<(int CharacterId, string ShopName)> NameClears { get; } = [];

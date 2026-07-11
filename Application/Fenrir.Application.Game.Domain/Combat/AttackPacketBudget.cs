@@ -1,12 +1,10 @@
-using Fenrir.Application.Game.Domain.Movement;
 using Fenrir.Application.Game.Domain.World;
 
 namespace Fenrir.Application.Game.Domain.Combat;
 
 public static class AttackPacketBudget
 {
-
-        public static bool TryConsume(PlayerRuntimeState state, int attackActionValue4, bool countAttempt = true)
+    public static bool TryConsume(PlayerRuntimeState state, int attackActionValue4, bool countAttempt = true)
     {
         if (!state.AttackBudgetEnforced)
             return true;

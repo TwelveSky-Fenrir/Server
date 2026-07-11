@@ -32,7 +32,7 @@ public class StatAllocationResolverTests
         Assert.Equal(StatAllocationResolver.Outcome.Disconnect, result.Outcome);
     }
 
-        [Fact]
+    [Fact]
     public void SmallFixedCategory_AddValueIgnored()
     {
         var withZero = StatAllocationResolver.Resolve(1, 0, 10);

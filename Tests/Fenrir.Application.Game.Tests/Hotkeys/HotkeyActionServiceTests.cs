@@ -53,7 +53,8 @@ public class HotkeyActionServiceTests
             state.Inventory.GetContainer(ContainerMatrix.InventoryPage0)
                 .SetItem(5, new ItemStack(StackableConsumableItemId, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0)));
 
-        var move = new DefaultPData { Page1 = 0, Index1 = 5, Quantity1 = 3, Page2 = 0, Index2 = 0, XPost2 = 0, YPost2 = 0 };
+        var move = new DefaultPData
+            { Page1 = 0, Index1 = 5, Quantity1 = 3, Page2 = 0, Index2 = 0, XPost2 = 0, YPost2 = 0 };
         var outcome = await service.BindItemAsync(zone, state, 10, move, CancellationToken.None);
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
@@ -85,7 +86,8 @@ public class HotkeyActionServiceTests
             state.Inventory.GetContainer(ContainerMatrix.InventoryPage0)
                 .SetItem(5, new ItemStack(NonStackableItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0)));
 
-        var move = new DefaultPData { Page1 = 0, Index1 = 5, Quantity1 = 1, Page2 = 0, Index2 = 0, XPost2 = 0, YPost2 = 0 };
+        var move = new DefaultPData
+            { Page1 = 0, Index1 = 5, Quantity1 = 1, Page2 = 0, Index2 = 0, XPost2 = 0, YPost2 = 0 };
         var outcome = await service.BindItemAsync(zone, state, 10, move, CancellationToken.None);
 
         Assert.Equal(GenericActionStatus.Aborted, outcome.Status);
@@ -116,7 +118,8 @@ public class HotkeyActionServiceTests
         var characters = new FakeCharacterRepository();
         var service = new HotkeyActionService(characters, worldData, NullLogger<HotkeyActionService>.Instance);
 
-        var move = new DefaultPData { Page1 = 0, Index1 = 5, Quantity1 = 3, Page2 = 0, Index2 = 0, XPost2 = 0, YPost2 = 0 };
+        var move = new DefaultPData
+            { Page1 = 0, Index1 = 5, Quantity1 = 3, Page2 = 0, Index2 = 0, XPost2 = 0, YPost2 = 0 };
         var outcome = await service.BindItemAsync(zone, state, 10, move, CancellationToken.None);
 
         Assert.Equal(GenericActionStatus.Aborted, outcome.Status);
@@ -156,7 +159,8 @@ public class HotkeyActionServiceTests
         var (zone, state, characters, service) = SetUp();
         state.SetHotkeySlot(1, 2, new HotkeySlot(HotkeyBindingKind.Emoticon, 3, 0));
 
-        var move = new DefaultPData { Page1 = 1, Index1 = 2, Quantity1 = 0, Page2 = 1, Index2 = 2, XPost2 = 0, YPost2 = 0 };
+        var move = new DefaultPData
+            { Page1 = 1, Index1 = 2, Quantity1 = 0, Page2 = 1, Index2 = 2, XPost2 = 0, YPost2 = 0 };
         var outcome = await service.RearrangeAsync(zone, state, 10, move, CancellationToken.None);
 
         Assert.Equal(GenericActionStatus.Succeeded, outcome.Status);
@@ -173,7 +177,8 @@ public class HotkeyActionServiceTests
         var (zone, state, _, service) = SetUp();
         state.SetHotkeySlot(0, 0, new HotkeySlot(HotkeyBindingKind.Emoticon, 4, 0));
 
-        var move = new DefaultPData { Page1 = 0, Index1 = 0, Quantity1 = 0, Page2 = 0, Index2 = 1, XPost2 = 0, YPost2 = 0 };
+        var move = new DefaultPData
+            { Page1 = 0, Index1 = 0, Quantity1 = 0, Page2 = 0, Index2 = 1, XPost2 = 0, YPost2 = 0 };
         var outcome = await service.RearrangeAsync(zone, state, 10, move, CancellationToken.None);
         zone.Tick(TimeSpan.FromMilliseconds(50));
 

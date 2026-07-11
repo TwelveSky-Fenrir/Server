@@ -2,34 +2,32 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 
 public enum Zone195CapturePhase : byte
 {
+    IdleSearching = 0,
 
-        IdleSearching = 0,
+    Settle = 1,
 
-        Settle = 1,
+    Countdown = 2,
 
-        Countdown = 2,
-
-        Commit = 3
+    Commit = 3
 }
 
 public sealed class Zone195CaptureMachine
 {
-
-        public const int NoCapturer = -1;
+    public const int NoCapturer = -1;
 
     public Zone195CapturePhase Phase { get; set; } = Zone195CapturePhase.IdleSearching;
 
-        public int CapturerCharacterId { get; set; } = NoCapturer;
+    public int CapturerCharacterId { get; set; } = NoCapturer;
 
-        public byte CapturerTribe { get; set; }
+    public byte CapturerTribe { get; set; }
 
-        public string CapturerName { get; set; } = string.Empty;
+    public string CapturerName { get; set; } = string.Empty;
 
-        public int RemainingTime { get; set; }
+    public int RemainingTime { get; set; }
 
-        public int PhaseAccumulatorTicks { get; set; }
+    public int PhaseAccumulatorTicks { get; set; }
 
-        public void ResetToIdle()
+    public void ResetToIdle()
     {
         Phase = Zone195CapturePhase.IdleSearching;
         CapturerCharacterId = NoCapturer;

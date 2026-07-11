@@ -4,8 +4,7 @@ namespace Fenrir.Application.Game.Domain.Pets;
 
 public static class PetExperienceCreditCalculator
 {
-
-        private static readonly FrozenDictionary<int, int> CategoryByItemId = new Dictionary<int, int>
+    private static readonly FrozenDictionary<int, int> CategoryByItemId = new Dictionary<int, int>
     {
         [541] = 0, [542] = 0, [547] = 0, [560] = 0,
         [543] = 1, [544] = 1, [548] = 1, [561] = 1, [1452] = 1, [86819] = 1,
@@ -18,12 +17,12 @@ public static class PetExperienceCreditCalculator
         [17055] = 7, [17056] = 7, [17057] = 7
     }.ToFrozenDictionary();
 
-        public static bool TryResolveCategory(int petItemId, out int categoryIndex)
+    public static bool TryResolveCategory(int petItemId, out int categoryIndex)
     {
         return CategoryByItemId.TryGetValue(petItemId, out categoryIndex);
     }
 
-        public static int ComputeCreditedAmount(int petItemId, int currentGrowth, int requestedAmount)
+    public static int ComputeCreditedAmount(int petItemId, int currentGrowth, int requestedAmount)
     {
         if (requestedAmount <= 0)
             return 0;

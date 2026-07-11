@@ -75,7 +75,7 @@ internal static class QuestReader
             callSpeech, callSpeechColor);
     }
 
-        private static (string[] Lines, int[] Colors) ReadSpeechBlock(ref LegacySpanReader reader)
+    private static (string[] Lines, int[] Colors) ReadSpeechBlock(ref LegacySpanReader reader)
     {
         var lines = new string[15];
         for (var i = 0; i < 15; i++) lines[i] = reader.ReadFixedString(51);

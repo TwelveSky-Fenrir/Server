@@ -34,7 +34,7 @@ public sealed class SessionLoopMidDrainDisconnectTests
     public async Task RunAsync_TwoFramesInOneBuffer_FirstHandlerAborts_SecondFrameNeverDispatched()
     {
         var (session, pipe) = InWorldSession(2);
-        var dispatcher = new RecordingAbortingDispatcher(abortOnCall: 1, abortReason: DisconnectReason.GmKicked);
+        var dispatcher = new RecordingAbortingDispatcher(1, DisconnectReason.GmKicked);
 
         await pipe.PeerToSession.WriteAsync(TwoFrames());
         await pipe.PeerToSession.CompleteAsync();

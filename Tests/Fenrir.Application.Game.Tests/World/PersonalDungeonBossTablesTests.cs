@@ -71,7 +71,8 @@ public class PersonalDungeonBossTablesTests
     [InlineData(12)]
     public void CatalogAAndCatalogE_AgreeOutsideTiersTwoThroughFive(int rebirthTier)
     {
-        Assert.Equal(PersonalDungeonBossTables.ResolveCatalogA(rebirthTier), PersonalDungeonBossTables.ResolveCatalogE(rebirthTier));
+        Assert.Equal(PersonalDungeonBossTables.ResolveCatalogA(rebirthTier),
+            PersonalDungeonBossTables.ResolveCatalogE(rebirthTier));
     }
 
     [Theory]
@@ -81,7 +82,8 @@ public class PersonalDungeonBossTablesTests
     [InlineData(5)]
     public void CatalogAAndCatalogE_DivergeAtTiersTwoThroughFive_ConfirmingTheRaceHasVisibleConsequence(int rebirthTier)
     {
-        Assert.NotEqual(PersonalDungeonBossTables.ResolveCatalogA(rebirthTier), PersonalDungeonBossTables.ResolveCatalogE(rebirthTier));
+        Assert.NotEqual(PersonalDungeonBossTables.ResolveCatalogA(rebirthTier),
+            PersonalDungeonBossTables.ResolveCatalogE(rebirthTier));
     }
 
     [Fact]

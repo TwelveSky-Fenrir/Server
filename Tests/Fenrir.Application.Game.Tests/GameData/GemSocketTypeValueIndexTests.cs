@@ -11,7 +11,7 @@ public class GemSocketTypeValueIndexTests
     {
         var rows = WorldDataTestRows.MinimalRows() with
         {
-            GemSockets = [new GemSocketRowDto(GemSocketId: 42, Type: 2, Value01: 0, Value02: 50, Value03: 100, Value04: 7)]
+            GemSockets = [new GemSocketRowDto(42, 2, 0, 50, 100, 7)]
         };
 
         var (cache, _) = WorldDataCacheBuilder.Build(rows);

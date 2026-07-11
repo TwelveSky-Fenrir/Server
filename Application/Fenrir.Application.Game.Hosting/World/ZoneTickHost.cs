@@ -13,7 +13,7 @@ public sealed class ZoneTickHost(ZoneRegistry zones, ILogger<ZoneTickHost> logge
         return Task.WhenAll(zones.Zones.Select(zone => SuperviseZoneAsync(zone, stoppingToken)));
     }
 
-        private async Task SuperviseZoneAsync(Zone zone, CancellationToken stoppingToken)
+    private async Task SuperviseZoneAsync(Zone zone, CancellationToken stoppingToken)
     {
         while (!stoppingToken.IsCancellationRequested)
         {

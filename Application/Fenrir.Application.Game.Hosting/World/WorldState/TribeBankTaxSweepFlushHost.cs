@@ -12,7 +12,7 @@ public sealed class TribeBankTaxSweepFlushHost(
 {
     private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(2);
 
-        public async Task FlushOnceAsync(CancellationToken ct)
+    public async Task FlushOnceAsync(CancellationToken ct)
     {
         foreach (var zone in zones.Zones)
         {

@@ -52,7 +52,8 @@ public class PetBagActionServiceTests
             state.Inventory.GetContainer(ContainerMatrix.InventoryPage0)
                 .SetItem(5, new ItemStack(PetEligibleItemId, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)));
 
-        var move = new DefaultPData { Page1 = 0, Index1 = 5, Quantity1 = 0, Page2 = 3, Index2 = 0, XPost2 = 0, YPost2 = 0 };
+        var move = new DefaultPData
+            { Page1 = 0, Index1 = 5, Quantity1 = 0, Page2 = 3, Index2 = 0, XPost2 = 0, YPost2 = 0 };
         var outcome = await service.DepositAsync(zone, state, 10, move, false, true, CancellationToken.None);
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
@@ -69,12 +70,13 @@ public class PetBagActionServiceTests
     [Fact]
     public async Task DepositAsync_PetNotEquipped_Disconnects()
     {
-        var (zone, state, repo, service) = SetUp(petEquippedItemId: 0);
+        var (zone, state, repo, service) = SetUp(0);
         state.Inventory.ReplaceContainer(ContainerMatrix.InventoryPage0,
             state.Inventory.GetContainer(ContainerMatrix.InventoryPage0)
                 .SetItem(5, new ItemStack(PetEligibleItemId, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)));
 
-        var move = new DefaultPData { Page1 = 0, Index1 = 5, Quantity1 = 0, Page2 = 3, Index2 = 0, XPost2 = 0, YPost2 = 0 };
+        var move = new DefaultPData
+            { Page1 = 0, Index1 = 5, Quantity1 = 0, Page2 = 3, Index2 = 0, XPost2 = 0, YPost2 = 0 };
         var outcome = await service.DepositAsync(zone, state, 10, move, false, true, CancellationToken.None);
 
         Assert.Equal(GenericActionStatus.Aborted, outcome.Status);
@@ -87,7 +89,8 @@ public class PetBagActionServiceTests
         var (zone, state, repo, service) = SetUp();
         state.SetPetBagSlot(2, PetEligibleItemId);
 
-        var move = new DefaultPData { Page1 = 0, Index1 = 2, Quantity1 = 0, Page2 = 7, Index2 = 1, XPost2 = 1, YPost2 = 0 };
+        var move = new DefaultPData
+            { Page1 = 0, Index1 = 2, Quantity1 = 0, Page2 = 7, Index2 = 1, XPost2 = 1, YPost2 = 0 };
         var outcome = await service.WithdrawAsync(zone, state, 10, move, false, true, CancellationToken.None);
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
@@ -107,7 +110,8 @@ public class PetBagActionServiceTests
         var (zone, state, repo, service) = SetUp();
         state.SetPetBagSlot(4, PetEligibleItemId);
 
-        var move = new DefaultPData { Page1 = 0, Index1 = 4, Quantity1 = 0, Page2 = 4, Index2 = 0, XPost2 = 0, YPost2 = 0 };
+        var move = new DefaultPData
+            { Page1 = 0, Index1 = 4, Quantity1 = 0, Page2 = 4, Index2 = 0, XPost2 = 0, YPost2 = 0 };
         var outcome = await service.RearrangeAsync(zone, state, 10, move, false, CancellationToken.None);
 
         Assert.Equal(GenericActionStatus.Succeeded, outcome.Status);
@@ -121,7 +125,8 @@ public class PetBagActionServiceTests
         var (zone, state, repo, service) = SetUp();
         state.SetPetBagSlot(1, PetEligibleItemId);
 
-        var move = new DefaultPData { Page1 = 0, Index1 = 1, Quantity1 = 0, Page2 = 6, Index2 = 0, XPost2 = 0, YPost2 = 0 };
+        var move = new DefaultPData
+            { Page1 = 0, Index1 = 1, Quantity1 = 0, Page2 = 6, Index2 = 0, XPost2 = 0, YPost2 = 0 };
         var outcome = await service.RearrangeAsync(zone, state, 10, move, false, CancellationToken.None);
         zone.Tick(TimeSpan.FromMilliseconds(50));
 

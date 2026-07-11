@@ -12,8 +12,7 @@ public sealed class TribeGuardCorridorStateDerivationSystem(
     TribeGuardCorridorCatalog catalog,
     TribeGuardCorridorState state) : ISimulationSystem
 {
-
-        public const int GuardPostsPerSegment = 5;
+    public const int GuardPostsPerSegment = 5;
 
     private readonly ConcurrentDictionary<short, CorridorZoneState> _stateByZone = new();
 

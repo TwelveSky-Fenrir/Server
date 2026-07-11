@@ -2,8 +2,7 @@ namespace Fenrir.Application.Game.Domain.Simulation;
 
 public static class GameDate
 {
-
-        public const int Invalid = -1;
+    public const int Invalid = -1;
 
     public static int Today()
     {
@@ -11,7 +10,7 @@ public static class GameDate
         return now.Year * 10000 + now.Month * 100 + now.Day;
     }
 
-        public static bool TryAddDays(int compactDate, int days, out int result)
+    public static bool TryAddDays(int compactDate, int days, out int result)
     {
         result = Invalid;
 

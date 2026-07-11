@@ -6,7 +6,7 @@ internal sealed class FakeMentorRepository : IMentorRepository
 {
     private readonly Dictionary<int, CharacterMentorDto> _mentorByCharacterId = new();
 
-        public List<int> QueriedCharacterIds { get; } = [];
+    public List<int> QueriedCharacterIds { get; } = [];
 
     public ValueTask<CharacterMentorDto?> GetForCharacterAsync(int characterId, CancellationToken ct)
     {
@@ -24,7 +24,7 @@ internal sealed class FakeMentorRepository : IMentorRepository
         throw new NotSupportedException();
     }
 
-        public static FakeMentorRepository Empty()
+    public static FakeMentorRepository Empty()
     {
         return new FakeMentorRepository();
     }

@@ -12,29 +12,28 @@ namespace Fenrir.Application.Game.Domain.World;
 
 public sealed partial class Zone
 {
-
-        public const int MaxProxyShopSlots = 500;
+    public const int MaxProxyShopSlots = 500;
 
     private readonly ConcurrentQueue<int> _pendingProxyShopCloses = new();
 
-        private readonly List<int> _proxyShopNeighborScratch = [];
+    private readonly List<int> _proxyShopNeighborScratch = [];
 
     private readonly ConcurrentDictionary<int, ProxyShopBroadcastEntry> _proxyShops = new();
 
     public int ProxyShopCount => _proxyShops.Count;
 
-        public void RegisterProxyShop(ProxyShopBroadcastEntry entry)
+    public void RegisterProxyShop(ProxyShopBroadcastEntry entry)
     {
         entry.LastBroadcastAt = _clock;
         _proxyShops[entry.CharacterId] = entry;
     }
 
-        public void RemoveProxyShop(int characterId)
+    public void RemoveProxyShop(int characterId)
     {
         _proxyShops.TryRemove(characterId, out _);
     }
 
-        public bool TryUpdateProxyShopExpiration(int characterId, int newShopDate)
+    public bool TryUpdateProxyShopExpiration(int characterId, int newShopDate)
     {
         if (!_proxyShops.TryGetValue(characterId, out var entry))
             return false;
@@ -43,7 +42,7 @@ public sealed partial class Zone
         return true;
     }
 
-        public IReadOnlyList<int> DrainPendingProxyShopCloses()
+    public IReadOnlyList<int> DrainPendingProxyShopCloses()
     {
         if (_pendingProxyShopCloses.IsEmpty)
             return [];
@@ -55,7 +54,7 @@ public sealed partial class Zone
         return (IReadOnlyList<int>?)closed ?? [];
     }
 
-        private void RebroadcastProxyShops()
+    private void RebroadcastProxyShops()
     {
         if (MapId != ProxyShopZonePolicy.ZoneNumber || _proxyShops.IsEmpty)
             return;
@@ -83,7 +82,7 @@ public sealed partial class Zone
         }
     }
 
-        private void BroadcastProxyShopState(ProxyShopBroadcastEntry entry, int checkChangeActionState)
+    private void BroadcastProxyShopState(ProxyShopBroadcastEntry entry, int checkChangeActionState)
     {
         var cell = _grid.CellOf(entry.PosX, entry.PosZ);
         if (!_grid.HasAnyNeighbor(cell))

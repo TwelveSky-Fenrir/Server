@@ -20,7 +20,7 @@ public static class RuneSocketResolver
     public const int SlotCount = 4;
     public const int BaseItemId = 93514;
 
-        public static InsertResult ResolveInsert(int runeIndex, int sourceItemId, ImmutableArray<int> runeSystem)
+    public static InsertResult ResolveInsert(int runeIndex, int sourceItemId, ImmutableArray<int> runeSystem)
     {
         if (runeIndex is < 0 or >= SlotCount || sourceItemId is < BaseItemId or >= BaseItemId + SlotCount ||
             runeSystem[runeIndex] != 0)

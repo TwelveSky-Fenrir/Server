@@ -71,7 +71,7 @@ public class HolyStoneWarCycleDtmTests
             ZoneTestKit.EnterData(session, StoneMapId, tribe: 1, posX: Site.StoneX, posZ: Site.StoneZ)));
         registry[StoneMapId].Tick(TimeSpan.FromMilliseconds(50));
 
-        var cycle = CreateCycle(worldState, registry, siegeState, bonusRoll: 1);
+        var cycle = CreateCycle(worldState, registry, siegeState, 1);
         DriveThroughCapture(cycle);
 
         Assert.Equal((byte?)1, worldState.World.Zone038WinTribe);
@@ -91,7 +91,7 @@ public class HolyStoneWarCycleDtmTests
             ZoneTestKit.EnterData(session, StoneMapId, tribe: 1, posX: Site.StoneX, posZ: Site.StoneZ)));
         registry[StoneMapId].Tick(TimeSpan.FromMilliseconds(50));
 
-        var cycle = CreateCycle(worldState, registry, siegeState, bonusRoll: 2);
+        var cycle = CreateCycle(worldState, registry, siegeState, 2);
         DriveThroughCapture(cycle);
 
         Assert.Equal((byte?)1, worldState.World.Zone038WinTribe);

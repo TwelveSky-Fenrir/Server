@@ -12,15 +12,15 @@ public enum StunRejectReason
     DefenderDead,
     DefenderShopOpen,
 
-        DefenderActionStateBlocksTargeting,
+    DefenderActionStateBlocksTargeting,
 
     DefenderProtected,
 
-        NotAuthorized,
+    NotAuthorized,
 
-        AntiCheatEchoMismatch,
+    AntiCheatEchoMismatch,
 
-        NoStunSuccessValue
+    NoStunSuccessValue
 }
 
 public readonly record struct StunAttemptOutcome(
@@ -60,20 +60,19 @@ public readonly record struct StunAttemptRequest(
 
 public static class StunResolver
 {
+    public const int TeamStunSkillId = 80;
 
-        public const int TeamStunSkillId = 80;
+    private const int NoActionYetSort = 0;
 
-        private const int NoActionYetSort = 0;
+    private const int DeathPoseSort = 12;
 
-        private const int DeathPoseSort = 12;
-
-        private const int TeamStunRollRange = 100;
+    private const int TeamStunRollRange = 100;
 
     private const int OrdinaryStunRollRange = 500;
 
-        private const int StunDefenseBuffBlockValue = 100;
+    private const int StunDefenseBuffBlockValue = 100;
 
-        public static readonly ImmutableArray<int> StunResistSkillIds = [5, 24, 43];
+    public static readonly ImmutableArray<int> StunResistSkillIds = [5, 24, 43];
 
     public static StunAttemptOutcome Resolve(StunAttemptRequest request, TimeSpan zoneClock, IRandomSource rng)
     {

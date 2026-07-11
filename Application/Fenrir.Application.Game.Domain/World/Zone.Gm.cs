@@ -7,12 +7,11 @@ namespace Fenrir.Application.Game.Domain.World;
 
 public sealed partial class Zone
 {
+    private const int GmExperienceInboxCapacity = 64;
 
-        private const int GmExperienceInboxCapacity = 64;
+    private const int GmExperienceInboxDrainCapPerTick = GmExperienceInboxCapacity / 2;
 
-        private const int GmExperienceInboxDrainCapPerTick = GmExperienceInboxCapacity / 2;
-
-        private const long GmMaxExperience = 2_000_000_000;
+    private const long GmMaxExperience = 2_000_000_000;
 
     private readonly Channel<GmSelfExperienceGrantZoneCommand> _gmExperienceInbox =
         Channel.CreateBounded<GmSelfExperienceGrantZoneCommand>(
@@ -24,7 +23,7 @@ public sealed partial class Zone
         return _gmExperienceInbox.Writer.TryWrite(command);
     }
 
-        public async Task<bool> PostGmSelfExperienceGrantCommandAndWaitAsync(GmSelfExperienceGrantZoneCommand command,
+    public async Task<bool> PostGmSelfExperienceGrantCommandAndWaitAsync(GmSelfExperienceGrantZoneCommand command,
         CancellationToken ct, TimeSpan? timeout = null)
     {
         var applied = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -67,7 +66,7 @@ public sealed partial class Zone
             LogDrainCapEngaged(_gmExperienceInbox.Reader, "gm-experience", GmExperienceInboxDrainCapPerTick);
     }
 
-        private void ApplyGmSelfExperienceGrantCommand(in GmSelfExperienceGrantZoneCommand command)
+    private void ApplyGmSelfExperienceGrantCommand(in GmSelfExperienceGrantZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state) || state.IsMovingZone)
             return;
@@ -82,11 +81,10 @@ public sealed partial class Zone
                 if (command.Magnitude >= 1)
                     CreditPetGrowth(state, command.Magnitude);
                 break;
-
         }
     }
 
-        private void ApplyGmCharacterExperienceGrant(PlayerRuntimeState state, int magnitude)
+    private void ApplyGmCharacterExperienceGrant(PlayerRuntimeState state, int magnitude)
     {
         if (state.Experience >= GmMaxExperience)
             return;

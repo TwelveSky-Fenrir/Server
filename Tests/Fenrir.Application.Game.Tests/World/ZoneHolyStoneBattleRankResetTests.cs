@@ -8,12 +8,11 @@ namespace Fenrir.Application.Game.Tests.World;
 
 public class ZoneHolyStoneBattleRankResetTests
 {
+    private const int RankPointClearedStatSort = 66;
 
-        private const int RankPointClearedStatSort = 66;
+    private const int RankPointDateResetStatSort = 67;
 
-        private const int RankPointDateResetStatSort = 67;
-
-        private const int RankBuffClearedStatSort = 68;
+    private const int RankBuffClearedStatSort = 68;
 
     private static byte[] ExpectedFrames(params ReadOnlySpan<AvatarStatUpdateResponse> packets)
     {

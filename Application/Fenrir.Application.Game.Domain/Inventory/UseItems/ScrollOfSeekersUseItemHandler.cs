@@ -11,12 +11,11 @@ public sealed class ScrollOfSeekersUseItemHandler(
     IEventLogRepository eventLog,
     ILogger<ScrollOfSeekersUseItemHandler> logger) : IUseItemHandler
 {
-
-        public static IEnumerable<int> HandledItemIds => ScrollOfSeekersResolver.HandledItemIds;
-
-        private const short ScrollOfSeekersGrantEventCode = 33;
+    private const short ScrollOfSeekersGrantEventCode = 33;
 
     private const byte SuccessOutcome = 1;
+
+    public static IEnumerable<int> HandledItemIds => ScrollOfSeekersResolver.HandledItemIds;
 
     public async ValueTask<UseInventoryItemResponse> HandleAsync(UseItemContext context,
         CancellationToken cancellationToken)

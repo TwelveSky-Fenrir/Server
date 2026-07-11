@@ -5,14 +5,13 @@ namespace Fenrir.Application.Login.Tests.TestSupport;
 
 internal sealed class FakeAccountPinRepository : IAccountPinRepository
 {
-
-        public bool ThrowOnSet { get; set; }
+    public bool ThrowOnSet { get; set; }
 
     public int SetCallCount { get; private set; }
 
-        public int RecordAttemptCallCount { get; private set; }
+    public int RecordAttemptCallCount { get; private set; }
 
-        public AccountPinDto? Stored { get; private set; }
+    public AccountPinDto? Stored { get; private set; }
 
     public ValueTask<AccountPinDto?> GetAsync(int accountId, CancellationToken ct)
     {
@@ -64,7 +63,7 @@ internal sealed class FakeAccountPinRepository : IAccountPinRepository
         return new FakeAccountPinRepository { Stored = new AccountPinDto(hash, salt) };
     }
 
-        public static FakeAccountPinRepository WithLockedPin(string pin, DateTime lockedUntilUtc)
+    public static FakeAccountPinRepository WithLockedPin(string pin, DateTime lockedUntilUtc)
     {
         var (hash, salt) = PasswordHasher.Hash(pin);
         return new FakeAccountPinRepository

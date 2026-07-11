@@ -4,27 +4,27 @@ public enum TribeScrollTransferOutcome
 {
     Success,
 
-        InvalidDestinationTribe,
+    InvalidDestinationTribe,
 
-        AlreadyTargetTribe,
+    AlreadyTargetTribe,
 
-        LevelTooLow,
+    LevelTooLow,
 
-        HomeZoneOffline,
+    HomeZoneOffline,
 
-        WrongLocation,
+    WrongLocation,
 
-        HoldsTribeRole,
+    HoldsTribeRole,
 
-        IsMentor,
+    IsMentor,
 
-        IsMentee,
+    IsMentee,
 
-        InParty,
+    InParty,
 
-        HasGuild,
+    HasGuild,
 
-        CapeEquipped,
+    CapeEquipped,
 
-        HasRegisteredFriends
+    HasRegisteredFriends
 }

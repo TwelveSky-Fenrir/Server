@@ -7,7 +7,7 @@ internal sealed class FakeGuildRepository : IGuildRepository
 {
     private readonly Dictionary<int, CharacterGuildMembershipDto> _membershipByCharacterId = new();
 
-        public List<int> QueriedCharacterIds { get; } = [];
+    public List<int> QueriedCharacterIds { get; } = [];
 
     public ValueTask<CharacterGuildMembershipDto?> GetByCharacterAsync(int characterId, CancellationToken ct)
     {
@@ -113,7 +113,7 @@ internal sealed class FakeGuildRepository : IGuildRepository
         throw new NotSupportedException();
     }
 
-        public static FakeGuildRepository Empty()
+    public static FakeGuildRepository Empty()
     {
         return new FakeGuildRepository();
     }

@@ -5,8 +5,7 @@ namespace Fenrir.Application.Game.Tests.World.WorldState;
 
 public class WorldInfoBootResetTests
 {
-
-        private static WorldInfo Poisoned()
+    private static WorldInfo Poisoned()
     {
         return WorldStateTemplates.ZeroedWorldInfo with
         {

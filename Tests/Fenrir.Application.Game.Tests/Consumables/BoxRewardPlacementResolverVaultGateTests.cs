@@ -21,7 +21,7 @@ public class BoxRewardPlacementResolverVaultGateTests
             .SetItem(0, new ItemStack(500, 10, 0, 0, 0, 0, 0, 0, 0, 0, 2));
 
         var result = BoxRewardPlacementResolver.Resolve(Reward(500, 4, true), 0, 0, page0, page1,
-            secondPageAccessible: false);
+            false);
 
         Assert.Equal(BoxRewardPlacementResolver.Outcome.PlacedInEmptySlot, result.Outcome);
         Assert.Equal(ContainerMatrix.InventoryPage0, result.Container);
@@ -38,7 +38,7 @@ public class BoxRewardPlacementResolverVaultGateTests
         var fullPage0 = builder.ToImmutable();
 
         var result = BoxRewardPlacementResolver.Resolve(Reward(700, 1, false), 0, 0, fullPage0,
-            ImmutableDictionary<byte, ItemStack>.Empty, secondPageAccessible: false);
+            ImmutableDictionary<byte, ItemStack>.Empty, false);
 
         Assert.Equal(BoxRewardPlacementResolver.Outcome.InventoryFull, result.Outcome);
         Assert.False(result.Succeeded);
@@ -54,7 +54,7 @@ public class BoxRewardPlacementResolverVaultGateTests
         var fullPage0 = builder.ToImmutable();
 
         var result = BoxRewardPlacementResolver.Resolve(Reward(700, 1, false), 0, 0, fullPage0,
-            ImmutableDictionary<byte, ItemStack>.Empty, secondPageAccessible: true);
+            ImmutableDictionary<byte, ItemStack>.Empty, true);
 
         Assert.Equal(BoxRewardPlacementResolver.Outcome.PlacedInEmptySlot, result.Outcome);
         Assert.Equal(ContainerMatrix.InventoryPage1, result.Container);

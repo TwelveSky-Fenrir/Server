@@ -5,14 +5,13 @@ namespace Fenrir.Application.Game.Domain.World;
 
 public sealed partial class Zone
 {
+    private const int RegularWarBossPoolServerIndexBase = 1_004_000;
 
-        private const int RegularWarBossPoolServerIndexBase = 1_004_000;
+    private const int RegularWarBossPoolSize = 100;
 
-        private const int RegularWarBossPoolSize = 100;
+    private const float RegularWarBossLeashRadius = 200f;
 
-        private const float RegularWarBossLeashRadius = 200f;
-
-        private void HandleSummonRegularWarBoss()
+    private void HandleSummonRegularWarBoss()
     {
         if (!worldData.MonstersById.TryGetValue(RegularWarBossSummonCatalog.BossMonsterId, out var definition))
             return;

@@ -9,12 +9,12 @@ public static class FishingRewardResolver
     private const int PetKoiItemId = 584;
     private const int TicketKoiItemId = 586;
 
-        public static bool RollBite(IRandomSource random)
+    public static bool RollBite(IRandomSource random)
     {
         return random.NextInt32(10) == 0;
     }
 
-        public static int RollRewardItem(IRandomSource random)
+    public static int RollRewardItem(IRandomSource random)
     {
         var roll = random.NextInt32(15);
         if (roll == 0)

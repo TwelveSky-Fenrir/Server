@@ -26,7 +26,7 @@ public class HighLevelExperienceOutcomeApplierTests
     [Fact]
     public void Apply_None_MutatesNothing()
     {
-        var (zone, id) = SetUpCharacter(experience: 555, level2: 3, exp2: 777, statPoints: 10, skillPoints: 20);
+        var (zone, id) = SetUpCharacter(555, 3, 777, 10, 20);
         zone.TryGetPlayer(id, out var target);
 
         HighLevelExperienceOutcomeApplier.Apply(target!, HighLevelExperienceOutcome.None);
@@ -43,7 +43,7 @@ public class HighLevelExperienceOutcomeApplierTests
     {
         var (zone, id) = SetUpCharacter(statPoints: 5);
         zone.TryGetPlayer(id, out var target);
-        var outcome = HighLevelExperienceOutcome.MainPoolFill(newMainExperience: 1_950_000_000, statPointsGranted: 7);
+        var outcome = HighLevelExperienceOutcome.MainPoolFill(1_950_000_000, 7);
 
         HighLevelExperienceOutcomeApplier.Apply(target!, outcome);
 
@@ -56,7 +56,7 @@ public class HighLevelExperienceOutcomeApplierTests
     {
         var (zone, id) = SetUpCharacter(level2: 3, exp2: 999_999_999, skillPoints: 40);
         zone.TryGetPlayer(id, out var target);
-        var outcome = HighLevelExperienceOutcome.LevelUp(newLevel2: 4, skillPointsGranted: 100, zone101TimeBonus: 0);
+        var outcome = HighLevelExperienceOutcome.LevelUp(4, 100, 0);
 
         HighLevelExperienceOutcomeApplier.Apply(target!, outcome);
 
@@ -71,8 +71,8 @@ public class HighLevelExperienceOutcomeApplierTests
         var (zone, id) = SetUpCharacter(level2: 0, exp2: 0);
         zone.TryGetPlayer(id, out var target);
         target!.Zone101Time = 500;
-        var outcome = HighLevelExperienceOutcome.LevelUp(newLevel2: 1, skillPointsGranted: 100,
-            zone101TimeBonus: HighLevelExperienceResolver.Zone101TimeGrantOnFirstRebirthTier);
+        var outcome = HighLevelExperienceOutcome.LevelUp(1, 100,
+            HighLevelExperienceResolver.Zone101TimeGrantOnFirstRebirthTier);
 
         HighLevelExperienceOutcomeApplier.Apply(target, outcome);
 
@@ -85,7 +85,7 @@ public class HighLevelExperienceOutcomeApplierTests
         var (zone, id) = SetUpCharacter(level2: 1, exp2: 0);
         zone.TryGetPlayer(id, out var target);
         target!.Zone101Time = 500;
-        var outcome = HighLevelExperienceOutcome.LevelUp(newLevel2: 2, skillPointsGranted: 100, zone101TimeBonus: 0);
+        var outcome = HighLevelExperienceOutcome.LevelUp(2, 100, 0);
 
         HighLevelExperienceOutcomeApplier.Apply(target, outcome);
 
@@ -97,7 +97,7 @@ public class HighLevelExperienceOutcomeApplierTests
     {
         var (zone, id) = SetUpCharacter(level2: 2, exp2: 100_000_000, statPoints: 15);
         zone.TryGetPlayer(id, out var target);
-        var outcome = HighLevelExperienceOutcome.Accrual(newExp2: 200_000_000, statPointsGranted: 10);
+        var outcome = HighLevelExperienceOutcome.Accrual(200_000_000, 10);
 
         HighLevelExperienceOutcomeApplier.Apply(target!, outcome);
 

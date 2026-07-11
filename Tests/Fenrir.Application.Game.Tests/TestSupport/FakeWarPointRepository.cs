@@ -6,9 +6,9 @@ internal sealed class FakeWarPointRepository : IWarPointRepository
 {
     public Call? LastCall { get; private set; }
 
-        public WarPointPurchaseResult NextResult { get; set; } = new(true, 0);
+    public WarPointPurchaseResult NextResult { get; set; } = new(true, 0);
 
-        public bool ThrowOnNextCall { get; set; }
+    public bool ThrowOnNextCall { get; set; }
 
     public int CallCount { get; private set; }
 

@@ -17,17 +17,16 @@ public sealed class GmCreateItemService(
     IEventLogRepository eventLog,
     ILogger<GmCreateItemService> logger) : IGmCreateItemService
 {
+    private const int RejectedResult = 1;
 
-        private const int RejectedResult = 1;
+    private const int AcceptedResult = 0;
 
-        private const int AcceptedResult = 0;
-
-        private const int StackableQuantityRejectedResult = 2;
+    private const int StackableQuantityRejectedResult = 2;
 
     private const int MinItemId = 2;
     private const int MaxItemId = 99999;
 
-        private const short ItemCreateEventCode = 1;
+    private const short ItemCreateEventCode = 1;
 
     private const byte ItemCreateOutcome = 1;
 
@@ -102,7 +101,7 @@ public sealed class GmCreateItemService(
         zoneSession.Send(new GenericActionResponse { Result = resultCode, Sort = sort, Data = data, RuneValue = 0 });
     }
 
-        private static List<TribeGroundItemDrop> ResolveDrops(int sort, int itemId, int requestedQuantity,
+    private static List<TribeGroundItemDrop> ResolveDrops(int sort, int itemId, int requestedQuantity,
         byte itemCatalogSort)
     {
         var drops = new List<TribeGroundItemDrop>();

@@ -24,7 +24,7 @@ public sealed class ZoneEventBroadcaster(
 {
     private const int DataSize = 130;
 
-        public void AnnounceZone038Winner(byte tribeId)
+    public void AnnounceZone038Winner(byte tribeId)
     {
         worldState.SetZone038Winner(tribeId);
         var data = Broadcast(38, tribeId);
@@ -38,7 +38,7 @@ public sealed class ZoneEventBroadcaster(
         EnqueueForOtherShards(38, data);
     }
 
-        public void AnnounceTribeSymbolBattleCountdown()
+    public void AnnounceTribeSymbolBattleCountdown()
     {
         var data = Broadcast(39);
 
@@ -49,7 +49,7 @@ public sealed class ZoneEventBroadcaster(
         EnqueueForOtherShards(39, data);
     }
 
-        public void AnnounceTribeSymbolBattleStarted()
+    public void AnnounceTribeSymbolBattleStarted()
     {
         using var scope = logger.BeginScope("SymbolBattle {SymbolBattlePhase}", "Started");
 
@@ -72,7 +72,7 @@ public sealed class ZoneEventBroadcaster(
         logger.LogInformation("Tribe symbol battle opened; every tribe reset to its own symbol");
     }
 
-        public void AnnounceTribeSymbolBattleEnded()
+    public void AnnounceTribeSymbolBattleEnded()
     {
         using var scope = logger.BeginScope("SymbolBattle {SymbolBattlePhase}", "Ended");
 
@@ -83,7 +83,7 @@ public sealed class ZoneEventBroadcaster(
         logger.LogInformation("Tribe symbol battle closed");
     }
 
-        public void AnnounceSymbolResolved(byte symbolIndex, byte winnerTribeId)
+    public void AnnounceSymbolResolved(byte symbolIndex, byte winnerTribeId)
     {
         using var scope = logger.BeginScope("SymbolBattle {SymbolIndex} {WinnerTribeId}", symbolIndex, winnerTribeId);
 
@@ -98,26 +98,26 @@ public sealed class ZoneEventBroadcaster(
         logger.LogInformation("Symbol {SymbolIndex} resolved to tribe {WinnerTribeId}", symbolIndex, winnerTribeId);
     }
 
-        public void AnnounceAllianceOffer(byte fromTribeId, byte toTribeId, bool isAccepted)
+    public void AnnounceAllianceOffer(byte fromTribeId, byte toTribeId, bool isAccepted)
     {
         worldState.SetAllianceOffer(fromTribeId, toTribeId, isAccepted);
         var data = Broadcast(46, fromTribeId, toTribeId, isAccepted ? 1 : 0);
         EnqueueForOtherShards(46, data);
     }
 
-        public void AnnounceAllianceDissolved(byte tribeA, byte tribeB)
+    public void AnnounceAllianceDissolved(byte tribeA, byte tribeB)
     {
         worldState.DissolveAlliance(tribeA, tribeB);
         var data = Broadcast(47, tribeA, tribeB);
         EnqueueForOtherShards(47, data);
     }
 
-        public void AnnounceMonsterSymbolAttackWindow()
+    public void AnnounceMonsterSymbolAttackWindow()
     {
         Broadcast(401);
     }
 
-        public void AnnounceTribePointTotals(IReadOnlyList<int> totals)
+    public void AnnounceTribePointTotals(IReadOnlyList<int> totals)
     {
         if (totals.Count != WorldStateService.TribeCount)
             throw new ArgumentException($"Expected exactly {WorldStateService.TribeCount} totals.", nameof(totals));
@@ -125,14 +125,14 @@ public sealed class ZoneEventBroadcaster(
         Broadcast(1234, totals[0], totals[1], totals[2], totals[3]);
     }
 
-        public void AnnounceTowerStatus(TowerWarState towerWar)
+    public void AnnounceTowerStatus(TowerWarState towerWar)
     {
         var response = towerWar.BuildStatusSnapshot();
 
         BroadcastToEveryZone(in response);
     }
 
-        public void AnnounceFfaCountdown(int minutesRemaining)
+    public void AnnounceFfaCountdown(int minutesRemaining)
     {
         Broadcast(1501, minutesRemaining);
     }
@@ -161,7 +161,7 @@ public sealed class ZoneEventBroadcaster(
         Broadcast(1505);
     }
 
-        public void AnnounceFfaClosedNotice()
+    public void AnnounceFfaClosedNotice()
     {
         siegeState?.SetZone335(5);
         Broadcast(1506);
@@ -173,47 +173,47 @@ public sealed class ZoneEventBroadcaster(
         Broadcast(1507);
     }
 
-        public void AnnounceValleyWarGateCountdown(int remainingCount)
+    public void AnnounceValleyWarGateCountdown(int remainingCount)
     {
         Broadcast(659, remainingCount);
     }
 
-        public void AnnounceValleyWarGateOpened()
+    public void AnnounceValleyWarGateOpened()
     {
         Broadcast(660);
     }
 
-        public void AnnounceValleyWarGateClosed()
+    public void AnnounceValleyWarGateClosed()
     {
         Broadcast(662);
     }
 
-        public void AnnounceValleyWarDoorOpened()
+    public void AnnounceValleyWarDoorOpened()
     {
         Broadcast(663);
     }
 
-        public void AnnounceValleyWarTribeWin(byte winningTribe)
+    public void AnnounceValleyWarTribeWin(byte winningTribe)
     {
         Broadcast(666, winningTribe);
     }
 
-        public void AnnounceValleyWarBattleScrollDeleted()
+    public void AnnounceValleyWarBattleScrollDeleted()
     {
         Broadcast(667);
     }
 
-        public void AnnounceValleyWarBossDefeated()
+    public void AnnounceValleyWarBossDefeated()
     {
         Broadcast(668);
     }
 
-        public void AnnounceValleyWarReturnToTown()
+    public void AnnounceValleyWarReturnToTown()
     {
         Broadcast(669);
     }
 
-        private byte[] Broadcast(int sort, params ReadOnlySpan<int> fields)
+    private byte[] Broadcast(int sort, params ReadOnlySpan<int> fields)
     {
         var data = new byte[DataSize];
         for (var i = 0; i < fields.Length; i++)
@@ -226,7 +226,7 @@ public sealed class ZoneEventBroadcaster(
         return data;
     }
 
-        private void EnqueueForOtherShards(int sort, byte[] data)
+    private void EnqueueForOtherShards(int sort, byte[] data)
     {
         if (relayQueue is null)
             return;
@@ -235,7 +235,7 @@ public sealed class ZoneEventBroadcaster(
         relayQueue.Enqueue(new RvrSiegeEventRelayEntry(shardId, sort, data));
     }
 
-        public void ApplyRelayedEvent(int sort, ReadOnlySpan<byte> data)
+    public void ApplyRelayedEvent(int sort, ReadOnlySpan<byte> data)
     {
         if (data.Length != DataSize)
             throw new ArgumentException($"RvR-siege relay payload must be exactly {DataSize} bytes.", nameof(data));
@@ -271,7 +271,6 @@ public sealed class ZoneEventBroadcaster(
             case 47:
                 worldState.DissolveAlliance((byte)ReadInt32(data, 0), (byte)ReadInt32(data, 4));
                 break;
-
         }
 
         var response = new ZoneEventInfoResponse { Sort = sort, Data = data.ToArray() };
@@ -305,7 +304,6 @@ public sealed class ZoneEventBroadcaster(
                 foreach (var zone in zones.Zones)
                     zone.PostHolyStoneBattleRankReset();
                 break;
-
         }
     }
 
@@ -314,7 +312,7 @@ public sealed class ZoneEventBroadcaster(
         return BinaryPrimitives.ReadInt32LittleEndian(data[offset..]);
     }
 
-        private void BroadcastToEveryZone<TPacket>(in TPacket response) where TPacket : struct, IOutgoingPacket
+    private void BroadcastToEveryZone<TPacket>(in TPacket response) where TPacket : struct, IOutgoingPacket
     {
         var total = FrameWriter.FrameSizeOf<TPacket>();
         var rented = ArrayPool<byte>.Shared.Rent(total);

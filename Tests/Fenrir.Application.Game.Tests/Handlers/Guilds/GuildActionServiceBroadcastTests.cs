@@ -165,7 +165,7 @@ public class GuildActionServiceBroadcastTests
             NullLogger<GuildActionService>.Instance);
     }
 
-        private static void Respond(ZoneClientSession session, GuildActionResult result)
+    private static void Respond(ZoneClientSession session, GuildActionResult result)
     {
         if (result.Abort)
         {

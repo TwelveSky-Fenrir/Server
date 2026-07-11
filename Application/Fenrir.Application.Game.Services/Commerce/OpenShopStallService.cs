@@ -19,10 +19,9 @@ public sealed class OpenShopStallService(
     IEventLogRepository eventLog,
     ILogger<OpenShopStallService> logger) : IOpenShopStallService
 {
+    private const int IdleActionSort = 1;
 
-        private const int IdleActionSort = 1;
-
-        private const short ProxyShopListEventCode = 1;
+    private const short ProxyShopListEventCode = 1;
 
     public async ValueTask<OpenShopStallPrepareResult> PrepareAsync(OpenShopStallRequest packet,
         PlayerRuntimeState state, CancellationToken cancellationToken)
@@ -225,7 +224,7 @@ public sealed class OpenShopStallService(
         return new OpenShopStallPrepareResult(OpenShopStallPrepareOutcome.Abort, null, default, null);
     }
 
-        private OpenShopStallPrepareResult Blocked(int result, PshopInfo pshopInfo, int characterId, string reason)
+    private OpenShopStallPrepareResult Blocked(int result, PshopInfo pshopInfo, int characterId, string reason)
     {
         logger.LogInformation("Open shop stall blocked: character {CharacterId} result {Result} ({Reason})",
             characterId, result, reason);
@@ -241,7 +240,7 @@ public sealed class OpenShopStallService(
         return list;
     }
 
-        private readonly record struct ProxyShopListAuditEntry(
+    private readonly record struct ProxyShopListAuditEntry(
         int ItemId,
         int Quantity,
         int Value,

@@ -59,14 +59,13 @@ public class GemSocketAttackPowerWiringTests
 
     private static FrozenDictionary<int, GemSocketRowDto> EffectTable(params GemSocketRowDto[] rows)
     {
-        return rows.ToFrozenDictionary(
-            static r => StatCalculator.GemSocketTypeValueKey((byte)r.Type, (byte)r.Value02));
+        return rows.ToFrozenDictionary(static r => StatCalculator.GemSocketTypeValueKey((byte)r.Type, (byte)r.Value02));
     }
 
     [Fact]
     public void ComputeAttackPower_NoGemSocketTableSupplied_IgnoresPopulatedSocketBlob()
     {
-        var attributes = Attributes(strength: 100, level: 1);
+        var attributes = Attributes(100, level: 1);
         var levels = Levels(LevelRow(1));
         var (p1, p2, p3) = Pack(1, (2, 50));
         var equipment = new[] { new EquippedItemSlot(0, Item(1), 0, 0, 0, 0, p1, p2, p3) };
@@ -80,7 +79,7 @@ public class GemSocketAttackPowerWiringTests
     [Fact]
     public void ComputeAttackPower_FoldsGemSocketContribution_FromASingleEquippedSlot()
     {
-        var attributes = Attributes(strength: 100, level: 1);
+        var attributes = Attributes(100, level: 1);
         var levels = Levels(LevelRow(1));
         var (p1, p2, p3) = Pack(1, (2, 50));
         var equipment = new[] { new EquippedItemSlot(0, Item(1), 0, 0, 0, 0, p1, p2, p3) };
@@ -96,7 +95,7 @@ public class GemSocketAttackPowerWiringTests
     [Fact]
     public void ComputeAttackPower_SumsGemSocketContribution_AcrossMultipleOccupiedSlots()
     {
-        var attributes = Attributes(strength: 100, level: 1);
+        var attributes = Attributes(100, level: 1);
         var levels = Levels(LevelRow(1));
         var (slot0P1, slot0P2, slot0P3) = Pack(1, (2, 50));
         var (slot1P1, slot1P2, slot1P3) = Pack(1, (3, 10));
@@ -119,7 +118,7 @@ public class GemSocketAttackPowerWiringTests
     [Fact]
     public void ComputeAttackPower_UnmatchedGemSocketRow_ContributesZero_NoThrow()
     {
-        var attributes = Attributes(strength: 100, level: 1);
+        var attributes = Attributes(100, level: 1);
         var levels = Levels(LevelRow(1));
         var (p1, p2, p3) = Pack(1, (2, 99));
         var equipment = new[] { new EquippedItemSlot(0, Item(1), 0, 0, 0, 0, p1, p2, p3) };
@@ -135,7 +134,7 @@ public class GemSocketAttackPowerWiringTests
     [Fact]
     public void ComputeEffectiveStats_ThreadsGemSocketTable_ThroughToComputeBaseStats()
     {
-        var attributes = Attributes(strength: 100, level: 1);
+        var attributes = Attributes(100, level: 1);
         var levels = Levels(LevelRow(1));
         var (p1, p2, p3) = Pack(1, (2, 50));
         var equipment = new[] { new EquippedItemSlot(0, Item(1), 0, 0, 0, 0, p1, p2, p3) };

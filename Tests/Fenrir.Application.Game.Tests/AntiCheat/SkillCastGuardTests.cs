@@ -81,14 +81,14 @@ public class SkillCastGuardTests
     [Fact]
     public void CategoryTwoAutoState_UsesLearnedSlots_PresentAllows()
     {
-        var context = Context(2, isAutoState: true, hotkeys: ImmutableDictionary<(byte, byte), HotkeySlot>.Empty);
+        var context = Context(2, true, hotkeys: ImmutableDictionary<(byte, byte), HotkeySlot>.Empty);
         Assert.Equal(SkillCastOffense.None, SkillCastGuard.Evaluate(context));
     }
 
     [Fact]
     public void CategoryTwoAutoState_LearnedSkillMissing_Disconnects()
     {
-        var context = Context(2, isAutoState: true, learned: LearnedWith(SkillNumber + 100),
+        var context = Context(2, true, learned: LearnedWith(SkillNumber + 100),
             hotkeys: ImmutableDictionary<(byte, byte), HotkeySlot>.Empty);
         Assert.Equal(SkillCastOffense.LearnedSkillMissing, SkillCastGuard.Evaluate(context));
     }

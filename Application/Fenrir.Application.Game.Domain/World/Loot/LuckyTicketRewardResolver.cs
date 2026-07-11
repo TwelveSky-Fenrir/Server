@@ -4,26 +4,25 @@ namespace Fenrir.Application.Game.Domain.World.Loot;
 
 public static class LuckyTicketRewardResolver
 {
+    public const int Common = 1;
 
-        public const int Common = 1;
+    public const int Unique = 2;
 
-        public const int Unique = 2;
+    public const int Rare = 3;
 
-        public const int Rare = 3;
+    public const int Elite = 4;
 
-        public const int Elite = 4;
+    private const int MaxItemLevel = 145;
 
-        private const int MaxItemLevel = 145;
+    private const int RollCeilingExclusive = 10000;
 
-        private const int RollCeilingExclusive = 10000;
+    private const int TopBracketFloor = 9000;
 
-        private const int TopBracketFloor = 9000;
+    private const int MaxDrawAttempts = 3;
 
-        private const int MaxDrawAttempts = 3;
+    public const bool ShippedProductionEliteTierEnabled = false;
 
-        public const bool ShippedProductionEliteTierEnabled = false;
-
-        public static bool TryGetThresholds(int ticketItemId, out int firstThreshold, out int secondThreshold)
+    public static bool TryGetThresholds(int ticketItemId, out int firstThreshold, out int secondThreshold)
     {
         switch (ticketItemId)
         {
@@ -46,12 +45,12 @@ public static class LuckyTicketRewardResolver
         }
     }
 
-        public static int ResolveFamilySerial(int ticketItemId)
+    public static int ResolveFamilySerial(int ticketItemId)
     {
         return 100000001 + (ticketItemId - 1035);
     }
 
-        public static (int Low, int High) ResolveItemLevelWindow(int level1, int level2)
+    public static (int Low, int High) ResolveItemLevelWindow(int level1, int level2)
     {
         if (level2 < 1)
         {
@@ -64,11 +63,10 @@ public static class LuckyTicketRewardResolver
         return (fixedLevel, fixedLevel);
     }
 
-        public static int ResolveTier(int roll, int level1, bool eliteTierEnabled, int firstThreshold,
+    public static int ResolveTier(int roll, int level1, bool eliteTierEnabled, int firstThreshold,
         int secondThreshold)
     {
         if (roll < firstThreshold)
-        {
             return level1 switch
             {
                 < 5 => Common,
@@ -76,17 +74,14 @@ public static class LuckyTicketRewardResolver
                 < 100 => Rare,
                 _ => eliteTierEnabled ? Elite : Rare
             };
-        }
 
         if (roll < secondThreshold)
-        {
             return level1 switch
             {
                 < 5 => Common,
                 < 45 => Unique,
                 _ => Rare
             };
-        }
 
         if (roll < TopBracketFloor)
             return level1 >= 5 ? Unique : Common;
@@ -94,7 +89,7 @@ public static class LuckyTicketRewardResolver
         return Common;
     }
 
-        public static bool TryDraw(WorldDataCache worldData, Random random, int ticketItemId, byte previousTribe,
+    public static bool TryDraw(WorldDataCache worldData, Random random, int ticketItemId, byte previousTribe,
         int level1, int level2, bool eliteTierEnabled, out int rewardItemId)
     {
         if (!TryGetThresholds(ticketItemId, out var firstThreshold, out var secondThreshold))
@@ -109,14 +104,12 @@ public static class LuckyTicketRewardResolver
         var includeCape = tier == Rare;
 
         for (var attempt = 0; attempt < MaxDrawAttempts; attempt++)
-        {
             if (GeneralItemDropResolver.Resolve(worldData, random, previousTribe, tier, levelLow, levelHigh,
                     includeCape, false) is { } candidate)
             {
                 rewardItemId = candidate;
                 return true;
             }
-        }
 
         rewardItemId = 0;
         return false;

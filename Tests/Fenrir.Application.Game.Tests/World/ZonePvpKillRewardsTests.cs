@@ -81,9 +81,9 @@ public class ZonePvpKillRewardsTests
 
         Assert.True(zone.TryGetPlayer(1, out var attacker));
         var expectedCp = PvpKillContributionPointCalculator.ComputeBaseAmount(false, false,
-                basePerKillAmount: PvpKillContributionPointBonuses.ComputeGameWideAddValue(3))
-            + PvpKillContributionPointBonuses.ComputeConditionalBonuses(1, 0, addedCpTribe: -1,
-                attackerBaseLevel: 42, symbolBattleActive: false);
+                             basePerKillAmount: PvpKillContributionPointBonuses.ComputeGameWideAddValue(3))
+                         + PvpKillContributionPointBonuses.ComputeConditionalBonuses(1, 0, -1,
+                             42, false);
         Assert.Equal(expectedCp, attacker!.ContributionPoints);
     }
 
@@ -187,9 +187,9 @@ public class ZonePvpKillRewardsTests
 
         Assert.True(zone.TryGetPlayer(1, out var attacker));
         var expectedCp = PvpKillContributionPointCalculator.ComputeBaseAmount(false, false,
-                basePerKillAmount: PvpKillContributionPointBonuses.ComputeGameWideAddValue(3))
-            + PvpKillContributionPointBonuses.ComputeConditionalBonuses(1, 0, addedCpTribe: -1,
-                attackerBaseLevel: 53, symbolBattleActive: false);
+                             basePerKillAmount: PvpKillContributionPointBonuses.ComputeGameWideAddValue(3))
+                         + PvpKillContributionPointBonuses.ComputeConditionalBonuses(1, 0, -1,
+                             53, false);
         Assert.Equal(expectedCp, attacker!.ContributionPoints);
     }
 }

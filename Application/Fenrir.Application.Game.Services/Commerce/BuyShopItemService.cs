@@ -20,14 +20,13 @@ public sealed class BuyShopItemService(
     WorldDataCache worldData,
     ILogger<BuyShopItemService> logger) : IBuyShopItemService
 {
+    private const int SellerMoneyCapExceededErrorNumber = 50275;
 
-        private const int SellerMoneyCapExceededErrorNumber = 50275;
+    private const int ProxyListingStaleErrorNumber = 50272;
 
-        private const int ProxyListingStaleErrorNumber = 50272;
+    private const int ProxyBigMoneyCapExceededErrorNumber = 50273;
 
-        private const int ProxyBigMoneyCapExceededErrorNumber = 50273;
-
-        private const short ProxyShopPurchaseEventCode = 3;
+    private const short ProxyShopPurchaseEventCode = 3;
 
     public async ValueTask<BuyShopItemSellerResult> FindSellerAsync(BuyShopItemRequest packet, Zone zone,
         PlayerRuntimeState buyer, int buyerId, CancellationToken cancellationToken)
@@ -303,7 +302,7 @@ public sealed class BuyShopItemService(
         return new BuyShopItemCommitResult(false, response, null);
     }
 
-        private async ValueTask<BuyShopItemSellerResult?> TryResolveProxySellerAsync(BuyShopItemRequest packet,
+    private async ValueTask<BuyShopItemSellerResult?> TryResolveProxySellerAsync(BuyShopItemRequest packet,
         int buyerId, CancellationToken cancellationToken)
     {
         var sellerId = await characters.GetIdByNameAsync(packet.AvatarName, cancellationToken);

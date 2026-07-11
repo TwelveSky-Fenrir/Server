@@ -8,8 +8,7 @@ namespace Fenrir.Application.Game.Tests.World.Monsters;
 
 public class MonsterAggroListPrunerTests
 {
-
-        private static Zone CreateZoneWithMonster(short meleeRadius, short leashRadius, short pursuerCapacity,
+    private static Zone CreateZoneWithMonster(short meleeRadius, short leashRadius, short pursuerCapacity,
         out MonsterEntity monster)
     {
         var zone = ZoneTestKit.CreateZone(1);
@@ -25,18 +24,18 @@ public class MonsterAggroListPrunerTests
         return zone;
     }
 
-        private static PlayerRuntimeState EnterCharacter(Zone zone, int characterId, string name, float posX = 0f,
+    private static PlayerRuntimeState EnterCharacter(Zone zone, int characterId, string name, float posX = 0f,
         float posZ = 0f)
     {
         var (session, _) = ZoneTestKit.CreateSession(characterId);
         zone.Post(ZoneCommand.Enter(characterId,
-            ZoneTestKit.EnterData(session, 1, name, posX: posX, posZ: posZ)));
+            ZoneTestKit.EnterData(session, 1, name, posX, posZ: posZ)));
         zone.Tick(SimulationClock.LegacyTick);
         Assert.True(zone.TryGetPlayer(characterId, out var player));
         return player!;
     }
 
-        private static void RecordDamage(Zone zone, MonsterEntity monster, int attackerCharacterId, int damage)
+    private static void RecordDamage(Zone zone, MonsterEntity monster, int attackerCharacterId, int damage)
     {
         Assert.True(zone.TryDamageMonster(monster.ServerIndex, damage, attackerCharacterId, out var died, out _));
         Assert.False(died);
@@ -57,7 +56,7 @@ public class MonsterAggroListPrunerTests
     public void Prune_NonPositiveMeleeRadius_WipesListUnconditionally_EvenWithAValidAttacker()
     {
         var zone = CreateZoneWithMonster(0, 200, 5, out var monster);
-        EnterCharacter(zone, 10, "A", posX: 5, posZ: 0);
+        EnterCharacter(zone, 10, "A", 5, 0);
         RecordDamage(zone, monster, 10, 5);
 
         var result = MonsterAggroListPruner.Prune(zone, monster, [monster]);
@@ -70,7 +69,7 @@ public class MonsterAggroListPrunerTests
     public void Prune_NonPositiveLeashRadius_WipesListUnconditionally_EvenWithAValidAttacker()
     {
         var zone = CreateZoneWithMonster(100, 0, 5, out var monster);
-        EnterCharacter(zone, 10, "A", posX: 5, posZ: 0);
+        EnterCharacter(zone, 10, "A", 5, 0);
         RecordDamage(zone, monster, 10, 5);
 
         var result = MonsterAggroListPruner.Prune(zone, monster, [monster]);
@@ -83,7 +82,7 @@ public class MonsterAggroListPrunerTests
     public void Prune_NearRangeValidAttacker_Survives_WithRefreshedDistanceAndUnchangedDamage()
     {
         var zone = CreateZoneWithMonster(100, 200, 5, out var monster);
-        EnterCharacter(zone, 10, "A", posX: 10, posZ: 0);
+        EnterCharacter(zone, 10, "A", 10, 0);
         RecordDamage(zone, monster, 10, 7);
 
         var result = MonsterAggroListPruner.Prune(zone, monster, [monster]);
@@ -99,7 +98,7 @@ public class MonsterAggroListPrunerTests
     public void Prune_AttackerBeyondLeashRadius_IsDropped()
     {
         var zone = CreateZoneWithMonster(10, 20, 5, out var monster);
-        EnterCharacter(zone, 10, "A", posX: 1000, posZ: 0);
+        EnterCharacter(zone, 10, "A", 1000, 0);
         RecordDamage(zone, monster, 10, 5);
 
         var result = MonsterAggroListPruner.Prune(zone, monster, [monster]);
@@ -112,7 +111,7 @@ public class MonsterAggroListPrunerTests
     public void Prune_DisconnectedAttacker_IsDropped()
     {
         var zone = CreateZoneWithMonster(100, 200, 5, out var monster);
-        EnterCharacter(zone, 10, "A", posX: 5, posZ: 0);
+        EnterCharacter(zone, 10, "A", 5, 0);
         RecordDamage(zone, monster, 10, 5);
 
         zone.Post(ZoneCommand.Leave(10));
@@ -129,12 +128,12 @@ public class MonsterAggroListPrunerTests
     public void Prune_ReconnectedAttackerWithNewSession_IsDroppedAsStaleReference()
     {
         var zone = CreateZoneWithMonster(100, 200, 5, out var monster);
-        EnterCharacter(zone, 10, "A", posX: 5, posZ: 0);
+        EnterCharacter(zone, 10, "A", 5, 0);
         RecordDamage(zone, monster, 10, 5);
 
         zone.Post(ZoneCommand.Leave(10));
         zone.Tick(SimulationClock.LegacyTick);
-        EnterCharacter(zone, 10, "A", posX: 5, posZ: 0);
+        EnterCharacter(zone, 10, "A", 5, 0);
 
         var result = MonsterAggroListPruner.Prune(zone, monster, [monster]);
 
@@ -146,7 +145,7 @@ public class MonsterAggroListPrunerTests
     public void Prune_MovingZoneAttacker_IsDropped()
     {
         var zone = CreateZoneWithMonster(100, 200, 5, out var monster);
-        var player = EnterCharacter(zone, 10, "A", posX: 5, posZ: 0);
+        var player = EnterCharacter(zone, 10, "A", 5, 0);
         RecordDamage(zone, monster, 10, 5);
         player.IsMovingZone = true;
 
@@ -160,7 +159,7 @@ public class MonsterAggroListPrunerTests
     public void Prune_DeadAttacker_IsDropped()
     {
         var zone = CreateZoneWithMonster(100, 200, 5, out var monster);
-        var player = EnterCharacter(zone, 10, "A", posX: 5, posZ: 0);
+        var player = EnterCharacter(zone, 10, "A", 5, 0);
         RecordDamage(zone, monster, 10, 5);
         player.IsDead = true;
 
@@ -174,7 +173,7 @@ public class MonsterAggroListPrunerTests
     public void Prune_MidRangeAttacker_DroppedWhenOtherPursuersAlreadyMeetCap()
     {
         var zone = CreateZoneWithMonster(10, 200, 1, out var monster);
-        EnterCharacter(zone, 10, "A", posX: 50, posZ: 0);
+        EnterCharacter(zone, 10, "A", 50, 0);
         RecordDamage(zone, monster, 10, 5);
 
         var otherPursuer = MonsterEntity.Create(2, 2, WorldDataTestRows.Monster(601), 1, 0, 0, 0, 50);
@@ -191,7 +190,7 @@ public class MonsterAggroListPrunerTests
     public void Prune_MidRangeAttacker_SurvivesWhenOtherPursuersAreUnderCap()
     {
         var zone = CreateZoneWithMonster(10, 200, 2, out var monster);
-        EnterCharacter(zone, 10, "A", posX: 50, posZ: 0);
+        EnterCharacter(zone, 10, "A", 50, 0);
         RecordDamage(zone, monster, 10, 5);
 
         var otherPursuer = MonsterEntity.Create(2, 2, WorldDataTestRows.Monster(601), 1, 0, 0, 0, 50);
@@ -209,7 +208,7 @@ public class MonsterAggroListPrunerTests
     public void Prune_MidRangeAttacker_OtherMonsterNotActuallyPursuingDoesNotCountTowardCap()
     {
         var zone = CreateZoneWithMonster(10, 200, 1, out var monster);
-        EnterCharacter(zone, 10, "A", posX: 50, posZ: 0);
+        EnterCharacter(zone, 10, "A", 50, 0);
         RecordDamage(zone, monster, 10, 5);
 
         var idleMonster = MonsterEntity.Create(2, 2, WorldDataTestRows.Monster(601), 1, 0, 0, 0, 50);
@@ -226,9 +225,9 @@ public class MonsterAggroListPrunerTests
     public void Prune_PreservesRelativeOrderAndCompactsDroppedEntries()
     {
         var zone = CreateZoneWithMonster(100, 200, 5, out var monster);
-        EnterCharacter(zone, 10, "A", posX: 5, posZ: 0);
-        var dropped = EnterCharacter(zone, 11, "B", posX: 5, posZ: 0);
-        EnterCharacter(zone, 12, "C", posX: 5, posZ: 0);
+        EnterCharacter(zone, 10, "A", 5, 0);
+        var dropped = EnterCharacter(zone, 11, "B", 5, 0);
+        EnterCharacter(zone, 12, "C", 5, 0);
 
         RecordDamage(zone, monster, 10, 1);
         RecordDamage(zone, monster, 11, 2);
@@ -246,7 +245,7 @@ public class MonsterAggroListPrunerTests
     public void Prune_ReusedResultBuffer_IsClearedBetweenCalls_NotAppendedTo()
     {
         var zone = CreateZoneWithMonster(100, 200, 5, out var monster);
-        EnterCharacter(zone, 10, "A", posX: 5, posZ: 0);
+        EnterCharacter(zone, 10, "A", 5, 0);
         RecordDamage(zone, monster, 10, 5);
 
         var buffer = new List<MonsterAggroListPruner.Survivor>();

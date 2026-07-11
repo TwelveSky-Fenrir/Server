@@ -139,7 +139,7 @@ public class MonsterAiSystemBossAndFlinchTests
         Assert.Equal(0, monster.StateTicks);
     }
 
-        private sealed class ZeroScatterRandom : Random
+    private sealed class ZeroScatterRandom : Random
     {
         public override double NextDouble()
         {

@@ -11,29 +11,29 @@ public class WarZoneEntryGateTests
     [InlineData((short)38)]
     public void ZoneOutsideTheCatalog_IsAlwaysAllowed_RegardlessOfLevelOrRebirth(short zoneNumber)
     {
-        Assert.Equal(WarZoneEntryOutcome.Allowed, WarZoneEntryGate.Evaluate(zoneNumber, combinedLevel: 1, rebirthCount: 0));
-        Assert.Equal(WarZoneEntryOutcome.Allowed, WarZoneEntryGate.Evaluate(zoneNumber, combinedLevel: 999, rebirthCount: 999));
+        Assert.Equal(WarZoneEntryOutcome.Allowed, WarZoneEntryGate.Evaluate(zoneNumber, 1, 0));
+        Assert.Equal(WarZoneEntryOutcome.Allowed, WarZoneEntryGate.Evaluate(zoneNumber, 999, 999));
     }
 
     [Fact]
     public void Zone164_ExactMaxLevelAndRebirthWithinBand_IsAllowed()
     {
-        Assert.Equal(WarZoneEntryOutcome.Allowed, WarZoneEntryGate.Evaluate(164, combinedLevel: 157, rebirthCount: 0));
-        Assert.Equal(WarZoneEntryOutcome.Allowed, WarZoneEntryGate.Evaluate(164, combinedLevel: 157, rebirthCount: 6));
+        Assert.Equal(WarZoneEntryOutcome.Allowed, WarZoneEntryGate.Evaluate(164, 157, 0));
+        Assert.Equal(WarZoneEntryOutcome.Allowed, WarZoneEntryGate.Evaluate(164, 157, 6));
     }
 
     [Fact]
     public void Zone164_BelowMaxLevel_IsRejected()
     {
         Assert.Equal(WarZoneEntryOutcome.RejectedOutOfRange,
-            WarZoneEntryGate.Evaluate(164, combinedLevel: 156, rebirthCount: 0));
+            WarZoneEntryGate.Evaluate(164, 156, 0));
     }
 
     [Fact]
     public void Zone164_RebirthAboveSix_IsRejected()
     {
         Assert.Equal(WarZoneEntryOutcome.RejectedOutOfRange,
-            WarZoneEntryGate.Evaluate(164, combinedLevel: 157, rebirthCount: 7));
+            WarZoneEntryGate.Evaluate(164, 157, 7));
     }
 
     [Theory]
@@ -42,7 +42,7 @@ public class WarZoneEntryGateTests
     public void LowRebirthTierZones_RebirthSeven_IsRejected(short zoneNumber)
     {
         Assert.Equal(WarZoneEntryOutcome.RejectedOutOfRange,
-            WarZoneEntryGate.Evaluate(zoneNumber, combinedLevel: 157, rebirthCount: 7));
+            WarZoneEntryGate.Evaluate(zoneNumber, 157, 7));
     }
 
     [Theory]
@@ -51,7 +51,7 @@ public class WarZoneEntryGateTests
     public void LowRebirthTierZones_RebirthSix_IsAllowed(short zoneNumber)
     {
         Assert.Equal(WarZoneEntryOutcome.Allowed,
-            WarZoneEntryGate.Evaluate(zoneNumber, combinedLevel: 157, rebirthCount: 6));
+            WarZoneEntryGate.Evaluate(zoneNumber, 157, 6));
     }
 
     [Theory]
@@ -60,7 +60,7 @@ public class WarZoneEntryGateTests
     public void HighRebirthTierZones_RebirthSix_IsRejected(short zoneNumber)
     {
         Assert.Equal(WarZoneEntryOutcome.RejectedOutOfRange,
-            WarZoneEntryGate.Evaluate(zoneNumber, combinedLevel: 157, rebirthCount: 6));
+            WarZoneEntryGate.Evaluate(zoneNumber, 157, 6));
     }
 
     [Theory]
@@ -69,7 +69,7 @@ public class WarZoneEntryGateTests
     public void HighRebirthTierZones_RebirthSeven_IsAllowed(short zoneNumber)
     {
         Assert.Equal(WarZoneEntryOutcome.Allowed,
-            WarZoneEntryGate.Evaluate(zoneNumber, combinedLevel: 157, rebirthCount: 7));
+            WarZoneEntryGate.Evaluate(zoneNumber, 157, 7));
     }
 
     [Theory]
@@ -78,7 +78,7 @@ public class WarZoneEntryGateTests
     public void Zone335_OutsideLevelBand_IsRejected(int combinedLevel)
     {
         Assert.Equal(WarZoneEntryOutcome.RejectedOutOfRange,
-            WarZoneEntryGate.Evaluate(335, combinedLevel, rebirthCount: 0));
+            WarZoneEntryGate.Evaluate(335, combinedLevel, 0));
     }
 
     [Theory]
@@ -87,14 +87,14 @@ public class WarZoneEntryGateTests
     public void Zone335_LevelBandEndpoints_AreInclusiveAndAllowed(int combinedLevel)
     {
         Assert.Equal(WarZoneEntryOutcome.Allowed,
-            WarZoneEntryGate.Evaluate(335, combinedLevel, rebirthCount: 0));
+            WarZoneEntryGate.Evaluate(335, combinedLevel, 0));
     }
 
     [Fact]
     public void Zone335_RebirthTwelve_IsAllowed_RebirthThirteen_IsRejected()
     {
-        Assert.Equal(WarZoneEntryOutcome.Allowed, WarZoneEntryGate.Evaluate(335, combinedLevel: 150, rebirthCount: 12));
+        Assert.Equal(WarZoneEntryOutcome.Allowed, WarZoneEntryGate.Evaluate(335, 150, 12));
         Assert.Equal(WarZoneEntryOutcome.RejectedOutOfRange,
-            WarZoneEntryGate.Evaluate(335, combinedLevel: 150, rebirthCount: 13));
+            WarZoneEntryGate.Evaluate(335, 150, 13));
     }
 }

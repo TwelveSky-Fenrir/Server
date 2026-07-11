@@ -26,7 +26,7 @@ public static class RuneStoneStatRollTable
         return RollFromDraw(random.NextInt32(DrawRange));
     }
 
-        public static int RollFromDraw(int draw)
+    public static int RollFromDraw(int draw)
     {
         var value = draw switch
         {

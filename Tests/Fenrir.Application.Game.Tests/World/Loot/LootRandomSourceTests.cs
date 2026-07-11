@@ -40,7 +40,7 @@ public class LootRandomSourceTests
         }
     }
 
-        private sealed class ScriptedRandom(params int[] sequence) : Random
+    private sealed class ScriptedRandom(params int[] sequence) : Random
     {
         private int _index;
 

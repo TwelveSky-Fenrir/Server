@@ -7,7 +7,7 @@ public static class EquipmentViewCodec
 {
     private const int EquipmentSlotCount = 13;
 
-        public static int[] BuildEquipForView(IReadOnlyList<CharacterItemSlotDto> items)
+    public static int[] BuildEquipForView(IReadOnlyList<CharacterItemSlotDto> items)
     {
         var view = new int[EquipmentSlotCount * 2];
 
@@ -25,7 +25,7 @@ public static class EquipmentViewCodec
         return view;
     }
 
-        public static int[] BuildEquipForView(IReadOnlyDictionary<byte, ItemStack> equipmentContainer)
+    public static int[] BuildEquipForView(IReadOnlyDictionary<byte, ItemStack> equipmentContainer)
     {
         var view = new int[EquipmentSlotCount * 2];
 

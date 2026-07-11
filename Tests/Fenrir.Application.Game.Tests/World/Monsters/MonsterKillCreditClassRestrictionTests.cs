@@ -8,8 +8,7 @@ namespace Fenrir.Application.Game.Tests.World.Monsters;
 
 public class MonsterKillCreditClassRestrictionTests
 {
-
-        private static Zone CreateZoneWithManualMonster(int serverIndex, int life, byte specialSort, int monsterId,
+    private static Zone CreateZoneWithManualMonster(int serverIndex, int life, byte specialSort, int monsterId,
         out MonsterEntity monster)
     {
         var zone = ZoneTestKit.CreateZone(1);
@@ -20,7 +19,7 @@ public class MonsterKillCreditClassRestrictionTests
         return zone;
     }
 
-        private static void EnterCharacter(Zone zone, int characterId, string name)
+    private static void EnterCharacter(Zone zone, int characterId, string name)
     {
         var (session, _) = ZoneTestKit.CreateSession(characterId);
         zone.Post(ZoneCommand.Enter(characterId, ZoneTestKit.EnterData(session, 1, name)));

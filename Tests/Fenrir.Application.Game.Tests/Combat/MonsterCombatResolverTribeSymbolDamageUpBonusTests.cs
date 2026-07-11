@@ -67,9 +67,9 @@ public class MonsterCombatResolverTribeSymbolDamageUpBonusTests
     {
         var monster = Monster();
         var outcome = MonsterCombatResolver.ResolvePvmAttack(Attacker(), monster, MeleeRequest(monster),
-            TimeSpan.Zero, NoVarianceRng(), attackerAttackBudgetEnforced: false, attackerActionSkillNumber: 0,
-            attackerActionSkillGradePoints: 0, attackerSymbolDamageDownPenalty: 0f,
-            attackerSymbolDamageUpBonusIncrementCount: incrementCount);
+            TimeSpan.Zero, NoVarianceRng(), false, 0,
+            0, 0f,
+            incrementCount);
 
         Assert.True(outcome.Hit);
         Assert.Equal(expectedDamage, outcome.DamageApplied);
@@ -81,9 +81,9 @@ public class MonsterCombatResolverTribeSymbolDamageUpBonusTests
     {
         var monster = Monster();
         var outcome = MonsterCombatResolver.ResolvePvmAttack(Attacker(), monster, MeleeRequest(monster),
-            TimeSpan.Zero, NoVarianceRng(), attackerAttackBudgetEnforced: false, attackerActionSkillNumber: 0,
-            attackerActionSkillGradePoints: 0, attackerSymbolDamageDownPenalty: 0f,
-            attackerSymbolDamageUpBonusIncrementCount: 0);
+            TimeSpan.Zero, NoVarianceRng(), false, 0,
+            0, 0f,
+            0);
 
         Assert.True(outcome.Hit);
         Assert.Equal(AttackerAttackPower, outcome.DamageApplied);
@@ -105,10 +105,10 @@ public class MonsterCombatResolverTribeSymbolDamageUpBonusTests
     {
         var monster = Monster();
         var outcome = MonsterCombatResolver.ResolvePvmAttack(Attacker(113), monster, MeleeRequest(monster),
-            TimeSpan.Zero, NoVarianceRng(), attackerAttackBudgetEnforced: false, attackerActionSkillNumber: 0,
-            attackerActionSkillGradePoints: 0,
-            attackerSymbolDamageDownPenalty: TribeSymbolCombatModifiers.OwnSymbolLostDamageDownPenalty,
-            attackerSymbolDamageUpBonusIncrementCount: 1);
+            TimeSpan.Zero, NoVarianceRng(), false, 0,
+            0,
+            TribeSymbolCombatModifiers.OwnSymbolLostDamageDownPenalty,
+            1);
 
         Assert.True(outcome.Hit);
         Assert.Equal(1_200, outcome.DamageApplied);

@@ -29,17 +29,17 @@ public static class WrapCheckSpecialDestinationCatalog
     private static readonly FrozenSet<short> InstancedDestinations =
         new short[] { 325, 326, 327, 328, 329, 330 }.ToFrozenSet();
 
-        public static bool IsWinZone038Destination(short zoneId)
+    public static bool IsWinZone038Destination(short zoneId)
     {
         return WinZone038Destinations.Contains(zoneId);
     }
 
-        public static bool TryGetRequiredRebirthCount(short zoneId, out int requiredRebirthCount)
+    public static bool TryGetRequiredRebirthCount(short zoneId, out int requiredRebirthCount)
     {
         return RequiredRebirthCountByDestination.TryGetValue(zoneId, out requiredRebirthCount);
     }
 
-        public static bool IsInstancedDestination(short zoneId)
+    public static bool IsInstancedDestination(short zoneId)
     {
         return InstancedDestinations.Contains(zoneId);
     }

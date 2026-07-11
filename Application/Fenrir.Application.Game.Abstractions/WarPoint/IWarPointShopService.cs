@@ -4,14 +4,13 @@ namespace Fenrir.Application.Game.Abstractions.WarPoint;
 
 public enum WarPointBuyStatus
 {
+    NotHandled,
 
-        NotHandled,
+    Aborted,
 
-        Aborted,
+    SoftRejected,
 
-        SoftRejected,
-
-        Succeeded
+    Succeeded
 }
 
 public readonly record struct WarPointBuyServiceResult(WarPointBuyStatus Status)
@@ -24,8 +23,7 @@ public readonly record struct WarPointBuyServiceResult(WarPointBuyStatus Status)
 
 public interface IWarPointShopService
 {
-
-        public ValueTask<WarPointBuyServiceResult> TryBuyAsync(Zone zone, PlayerRuntimeState state, int accountId,
+    public ValueTask<WarPointBuyServiceResult> TryBuyAsync(Zone zone, PlayerRuntimeState state, int accountId,
         int characterId, int npcId, int itemId, int requestedQuantity, byte destinationPage, byte destinationSlot,
         CancellationToken ct);
 }

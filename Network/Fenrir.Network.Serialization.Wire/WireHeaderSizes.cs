@@ -2,10 +2,9 @@ namespace Fenrir.Network.Serialization.Wire;
 
 public static class WireHeaderSizes
 {
+    public const int ClientPacketSize = 9;
 
-        public const int ClientPacketSize = 9;
-
-        public const int DefaultPacketSize = 1;
+    public const int DefaultPacketSize = 1;
 
     public static int SizeFor(FenrirDirection direction)
     {

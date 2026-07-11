@@ -1,5 +1,4 @@
 using Fenrir.Application.Game.Domain.Social.Duel;
-using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Services.Gm;
 using Fenrir.Application.Game.Tests.TestSupport;
 using Fenrir.Data.Abstractions.Game;
@@ -22,7 +21,7 @@ public class GmCallPvpServiceTests
     private static (float X, float Y, float Z) Slot1Coordinate => (-232f, 36f, 2f);
     private static (float X, float Y, float Z) Slot2Coordinate => (232f, 36f, 2f);
 
-        private static async Task AssertHeadFrameAsync<TPacket>(FakeDuplexPipe pipe, TPacket expected)
+    private static async Task AssertHeadFrameAsync<TPacket>(FakeDuplexPipe pipe, TPacket expected)
         where TPacket : struct, IOutgoingPacket
     {
         var actual = await PacketAssert.ReadSentBytesAsync(pipe);

@@ -2,10 +2,9 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 
 public sealed class Zone051Zone053SiegeState
 {
+    public const int Zone051Slots = 6;
 
-        public const int Zone051Slots = 6;
-
-        public const int Zone053Slots = 10;
+    public const int Zone053Slots = 10;
 
     private readonly Lock _lock = new();
     private readonly int[] _zone051State = new int[Zone051Slots];
@@ -30,7 +29,7 @@ public sealed class Zone051Zone053SiegeState
         }
     }
 
-        public void SetZone051(int slot, int state)
+    public void SetZone051(int slot, int state)
     {
         ValidateZone051Slot(slot);
         lock (_lock)
@@ -48,7 +47,7 @@ public sealed class Zone051Zone053SiegeState
         }
     }
 
-        public void SetZone053(int slot, int state)
+    public void SetZone053(int slot, int state)
     {
         ValidateZone053Slot(slot);
         lock (_lock)

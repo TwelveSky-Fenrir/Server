@@ -8,11 +8,11 @@ public static class LodTicketResolver
     {
         Success,
 
-                PreconditionFailed,
+        PreconditionFailed,
 
-                InsufficientQuantity,
+        InsufficientQuantity,
 
-                WouldExceedCeiling
+        WouldExceedCeiling
     }
 
     public static Result Resolve(short characterLevel, int rebirthCount, int slotQuantity, int currentLodRounds)

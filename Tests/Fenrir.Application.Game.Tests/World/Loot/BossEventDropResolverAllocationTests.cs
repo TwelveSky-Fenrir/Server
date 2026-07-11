@@ -1,5 +1,4 @@
 using Fenrir.Application.Game.Domain.World.Loot;
-using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Tests.TestSupport;
 
 namespace Fenrir.Application.Game.Tests.World.Loot;
@@ -13,7 +12,7 @@ public class BossEventDropResolverAllocationTests
     public void Resolve_NonBossMonster_AllocatesNothing()
     {
         var catalog = BossDropCatalog.Default;
-        WorldDataCache worldData = ZoneTestKit.EmptyWorldData();
+        var worldData = ZoneTestKit.EmptyWorldData();
         var random = new Random(1);
 
         for (var i = 0; i < 1_000; i++)

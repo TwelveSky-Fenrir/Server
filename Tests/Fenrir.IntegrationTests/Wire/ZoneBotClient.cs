@@ -50,7 +50,7 @@ public sealed class ZoneBotClient : IAsyncDisposable
         return bot;
     }
 
-        private async Task ReadGreetingAsync(CancellationToken ct)
+    private async Task ReadGreetingAsync(CancellationToken ct)
     {
         var frame = await _connection.ReadExactAsync(1 + ZoneGreetingResponse.PayloadSize, ct);
         if (frame[0] != ZoneGreetingResponse.Opcode)
@@ -61,7 +61,7 @@ public sealed class ZoneBotClient : IAsyncDisposable
         _connection.SeedOutboundStreamKey(randomNumber);
     }
 
-        public async Task<int> HandshakeAsync(int accountId, int tribe, int userSort, CancellationToken ct)
+    public async Task<int> HandshakeAsync(int accountId, int tribe, int userSort, CancellationToken ct)
     {
         var payload = new byte[ZoneHandshakeRequest.PayloadSize];
         WriteObfuscatedAccountId(payload.AsSpan(0, 255), accountId);
@@ -76,7 +76,7 @@ public sealed class ZoneBotClient : IAsyncDisposable
         return WireScalars.ReadInt32(frame.AsSpan(1, 4));
     }
 
-        public async Task<EnterWorldResult> EnterWorldAsync(int accountId, string avatarName, CancellationToken ct)
+    public async Task<EnterWorldResult> EnterWorldAsync(int accountId, string avatarName, CancellationToken ct)
     {
         var payload = new byte[EnterWorldRequest.PayloadSize];
         WriteObfuscatedAccountId(payload.AsSpan(0, 255), accountId);
@@ -108,7 +108,7 @@ public sealed class ZoneBotClient : IAsyncDisposable
         return new EnterWorldResult(avatarInfo, selfServerIndex, selfUniqueNumber, selfObject);
     }
 
-        public async Task ReadyAsync(int tribe, CancellationToken ct)
+    public async Task ReadyAsync(int tribe, CancellationToken ct)
     {
         var payload = new byte[ZoneReadyRequest.PayloadSize];
         WireScalars.WriteInt32(payload.AsSpan(0, 4), tribe);
@@ -202,7 +202,7 @@ public sealed class ZoneBotClient : IAsyncDisposable
         return _zoneMoveResults.TryDequeue(out result);
     }
 
-        public async Task MoveAsync(float x, float y, float z, float heading, CancellationToken ct)
+    public async Task MoveAsync(float x, float y, float z, float heading, CancellationToken ct)
     {
         var payload = new byte[AvatarActionRequest.PayloadSize];
         var action = new ActionInfo
@@ -230,7 +230,7 @@ public sealed class ZoneBotClient : IAsyncDisposable
         await SendAsync(AvatarActionRequest.Opcode, payload, ct);
     }
 
-        public async Task AttackMonsterAsync(int attackerServerIndex, uint attackerUniqueNumber, int monsterServerIndex,
+    public async Task AttackMonsterAsync(int attackerServerIndex, uint attackerUniqueNumber, int monsterServerIndex,
         uint monsterUniqueNumber, float x, float y, float z, CancellationToken ct)
     {
         const int singleHitSwingSort = 5;
@@ -283,7 +283,7 @@ public sealed class ZoneBotClient : IAsyncDisposable
         await SendAsync(AttackRequest.Opcode, payload, ct);
     }
 
-        public async Task PickupGroundItemAsync(int itemServerIndex, uint itemUniqueNumber, byte destinationContainer,
+    public async Task PickupGroundItemAsync(int itemServerIndex, uint itemUniqueNumber, byte destinationContainer,
         byte destinationSlot, CancellationToken ct)
     {
         var move = new DefaultPData
@@ -299,7 +299,7 @@ public sealed class ZoneBotClient : IAsyncDisposable
         await SendGenericActionAsync(201, move, ct);
     }
 
-        public async Task BuyFromNpcShopAsync(int npcId, int itemId, int quantity, byte destinationContainer,
+    public async Task BuyFromNpcShopAsync(int npcId, int itemId, int quantity, byte destinationContainer,
         byte destinationSlot, CancellationToken ct)
     {
         var move = new DefaultPData
@@ -325,7 +325,7 @@ public sealed class ZoneBotClient : IAsyncDisposable
         await SendAsync(GenericActionRequest.Opcode, payload, ct);
     }
 
-        public async Task AllocateStatPointAsync(int statSort, int addValue, CancellationToken ct)
+    public async Task AllocateStatPointAsync(int statSort, int addValue, CancellationToken ct)
     {
         var payload = new byte[GenericActionRequest.PayloadSize];
         WireScalars.WriteInt32(payload.AsSpan(0, 4), 206);
@@ -336,7 +336,7 @@ public sealed class ZoneBotClient : IAsyncDisposable
         await SendAsync(GenericActionRequest.Opcode, payload, ct);
     }
 
-        public async Task ZoneMoveAsync(int targetZoneNumber, int presentZoneNumber, CancellationToken ct)
+    public async Task ZoneMoveAsync(int targetZoneNumber, int presentZoneNumber, CancellationToken ct)
     {
         var payload = new byte[ZoneMoveRequest.PayloadSize];
         WireScalars.WriteInt32(payload.AsSpan(0, 4), 4);
@@ -345,7 +345,7 @@ public sealed class ZoneBotClient : IAsyncDisposable
         await SendAsync(ZoneMoveRequest.Opcode, payload, ct);
     }
 
-        public async Task LocalChatAsync(string content, CancellationToken ct)
+    public async Task LocalChatAsync(string content, CancellationToken ct)
     {
         var payload = new byte[LocalChatRequest.PayloadSize];
         WireScalars.WriteFixedString(payload.AsSpan(0, 61), content);
@@ -379,7 +379,7 @@ public sealed class ZoneBotClient : IAsyncDisposable
         };
     }
 
-        private static void WriteObfuscatedAccountId(Span<byte> destination, int accountId)
+    private static void WriteObfuscatedAccountId(Span<byte> destination, int accountId)
     {
         WireScalars.WriteFixedString(destination, "MG" + accountId);
         WireXor.ApplyUidXor(destination);
@@ -393,7 +393,7 @@ public sealed class ZoneBotClient : IAsyncDisposable
         return await ReadCompressedBodyAsync(ct);
     }
 
-        private async Task<byte[]> ReadCompressedBodyAsync(CancellationToken ct)
+    private async Task<byte[]> ReadCompressedBodyAsync(CancellationToken ct)
     {
         var header = await _connection.ReadExactAsync(12, ct);
         var isCompress = BinaryPrimitives.ReadInt32LittleEndian(header.AsSpan(0, 4));
@@ -413,7 +413,7 @@ public sealed class ZoneBotClient : IAsyncDisposable
         return decoded;
     }
 
-        private async Task SendAsync(byte opcode, byte[] payload, CancellationToken ct)
+    private async Task SendAsync(byte opcode, byte[] payload, CancellationToken ct)
     {
         var frame = new byte[WireHeaderSizes.ClientPacketSize + payload.Length];
         frame[8] = opcode;

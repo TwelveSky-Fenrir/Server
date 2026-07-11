@@ -1,4 +1,3 @@
-using Fenrir.Application.Game.Domain.Consumables;
 using Fenrir.Application.Game.Domain.World;
 
 namespace Fenrir.Application.Game.Abstractions.FishingConsumables;

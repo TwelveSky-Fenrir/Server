@@ -5,12 +5,11 @@ namespace Fenrir.Application.Game.Services.ItemModification;
 
 internal static class CenterRelayNoticeLog
 {
+    private const byte NotableItemTypeThreshold = 4;
 
-        private const byte NotableItemTypeThreshold = 4;
+    public const int EnchantCapValue = 40;
 
-        public const int EnchantCapValue = 40;
-
-        public static void LogNotableCraft(ILogger logger, WorldDataCache worldData, byte tribe, string characterName,
+    public static void LogNotableCraft(ILogger logger, WorldDataCache worldData, byte tribe, string characterName,
         int resultItemId, string recipeLabel)
     {
         if (!worldData.ItemsById.TryGetValue(resultItemId, out var definition) ||
@@ -24,7 +23,7 @@ internal static class CenterRelayNoticeLog
             tribe, characterName, resultItemId, definition.Item.Name, recipeLabel);
     }
 
-        public static void LogEnchantCap(ILogger logger, byte tribe, string characterName, int enchantValue, bool isWing)
+    public static void LogEnchantCap(ILogger logger, byte tribe, string characterName, int enchantValue, bool isWing)
     {
         logger.LogInformation(
             "Enchant-cap notice (legacy relay sort {RelaySort}, not client-broadcast -- see CenterRelayNoticeLog " +
@@ -32,7 +31,7 @@ internal static class CenterRelayNoticeLog
             isWing ? 115 : 2001, tribe, characterName, enchantValue, isWing ? "wing" : "non-wing");
     }
 
-        public static void LogWarlordSwap(ILogger logger, byte tribe, string characterName, int replacementItemId)
+    public static void LogWarlordSwap(ILogger logger, byte tribe, string characterName, int replacementItemId)
     {
         logger.LogInformation(
             "Warlord-swap notice (legacy MakeNotice, Center relay sort 2000, not client-broadcast -- see " +

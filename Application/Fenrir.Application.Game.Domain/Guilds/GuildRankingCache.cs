@@ -4,8 +4,7 @@ namespace Fenrir.Application.Game.Domain.Guilds;
 
 public sealed class GuildRankingCache
 {
-
-        public const int TopCount = 3;
+    public const int TopCount = 3;
 
     private readonly Lock _lock = new();
     private ImmutableArray<GuildRankingRowDto> _top = [];
@@ -21,7 +20,7 @@ public sealed class GuildRankingCache
         }
     }
 
-        public async Task RefreshAsync(IGuildRepository guilds, CancellationToken ct)
+    public async Task RefreshAsync(IGuildRepository guilds, CancellationToken ct)
     {
         var top = await guilds.GetTopByPointsAsync(TopCount, ct).ConfigureAwait(false);
 

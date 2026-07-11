@@ -10,14 +10,12 @@ using Fenrir.Application.Game.Domain.Movement;
 using Fenrir.Application.Game.Domain.Pets;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.Skills;
-using Fenrir.Application.Game.Domain.Social.Duel;
 using Fenrir.Application.Game.Domain.Social.Party;
 using Fenrir.Application.Game.Domain.Social.Trade;
 using Fenrir.Application.Game.Domain.Tribes;
 using Fenrir.Application.Game.GameData;
 using Fenrir.Application.Game.Stats;
 using Fenrir.Data.Abstractions.Game;
-using Fenrir.Data.Abstractions.Runtime;
 using Fenrir.Data.WriteBehind;
 using Fenrir.Network.Abstractions;
 using Fenrir.Network.Dispatch.Sessions;
@@ -31,58 +29,57 @@ namespace Fenrir.Application.Game.Domain.World;
 
 public sealed partial class Zone
 {
+    private const short CharacterDeathEventCode = 1;
 
-        private const short CharacterDeathEventCode = 1;
+    private const short DeathExperienceLossEventCode = 2;
 
-        private const short DeathExperienceLossEventCode = 2;
+    private const byte ExperienceLossOutcome = 0;
 
-        private const byte ExperienceLossOutcome = 0;
+    private const byte ContributionPointsLossOutcome = 1;
 
-        private const byte ContributionPointsLossOutcome = 1;
+    private const int SkillCastEffectCategoryCode = 2;
 
-        private const int SkillCastEffectCategoryCode = 2;
+    private const int RestActionSort = 0;
 
-        private const int RestActionSort = 0;
+    private const int SkillEffectConfirmActionSort = 1;
 
-        private const int SkillEffectConfirmActionSort = 1;
+    private const int HolyShieldSkillId = 82;
 
-        private const int HolyShieldSkillId = 82;
+    private const short HolyShieldCooldownZoneId = 124;
 
-        private const short HolyShieldCooldownZoneId = 124;
+    private const int CharacterHpStatSort = 10;
 
-        private const int CharacterHpStatSort = 10;
+    private static readonly TimeSpan HolyShieldReapplyCooldown = TimeSpan.FromSeconds(10);
 
-        private static readonly TimeSpan HolyShieldReapplyCooldown = TimeSpan.FromSeconds(10);
+    private readonly List<int> _buffStateNeighborScratch = [];
 
-        private readonly List<int> _buffStateNeighborScratch = [];
+    private readonly SemaphoreSlim _deathEventLogSignal = new(0, int.MaxValue);
 
-        private readonly SemaphoreSlim _deathEventLogSignal = new(0, int.MaxValue);
+    private readonly List<int> _deathNeighborScratch = [];
 
-        private readonly List<int> _deathNeighborScratch = [];
+    private readonly List<int> _enterNeighborScratch = [];
 
-        private readonly List<int> _enterNeighborScratch = [];
-
-        private readonly List<int> _moveNeighborScratch = [];
+    private readonly List<int> _moveNeighborScratch = [];
 
     private readonly ConcurrentQueue<PendingDeathEventLog> _pendingDeathEventLogs = new();
 
-        private readonly List<int> _rebroadcastNeighborScratch = [];
+    private readonly List<int> _rebroadcastNeighborScratch = [];
 
-        private readonly List<int> _reviveNeighborScratch = [];
+    private readonly List<int> _reviveNeighborScratch = [];
 
-        private void QueueDeathEventLog(short eventCode, int characterId, byte? outcome, string? payload)
+    private void QueueDeathEventLog(short eventCode, int characterId, byte? outcome, string? payload)
     {
         _pendingDeathEventLogs.Enqueue(new PendingDeathEventLog(eventCode, characterId, options.ShardId, outcome,
             payload));
         _deathEventLogSignal.Release();
     }
 
-        public Task WaitForDeathEventLogAsync(CancellationToken ct)
+    public Task WaitForDeathEventLogAsync(CancellationToken ct)
     {
         return _deathEventLogSignal.WaitAsync(ct);
     }
 
-        public IReadOnlyList<PendingDeathEventLog> DrainPendingDeathEventLogs()
+    public IReadOnlyList<PendingDeathEventLog> DrainPendingDeathEventLogs()
     {
         if (_pendingDeathEventLogs.IsEmpty)
             return [];
@@ -94,7 +91,7 @@ public sealed partial class Zone
         return (IReadOnlyList<PendingDeathEventLog>?)entries ?? [];
     }
 
-        private void RebroadcastAvatars()
+    private void RebroadcastAvatars()
     {
         foreach (var (characterId, state) in _players)
         {
@@ -303,7 +300,7 @@ public sealed partial class Zone
         TryPublishPartyResyncRequest(characterId, state.Name);
     }
 
-        private void TryPublishPartyResyncRequest(int characterId, string avatarName)
+    private void TryPublishPartyResyncRequest(int characterId, string avatarName)
     {
         if (_partyResyncRelayQueue is null || _partyRegistry.IsInParty(characterId))
             return;
@@ -355,7 +352,7 @@ public sealed partial class Zone
             characterId, MapId, handoffTarget.MapId);
     }
 
-        private void BreakPartyOnDisconnect(int characterId, string disconnectingName)
+    private void BreakPartyOnDisconnect(int characterId, string disconnectingName)
     {
         var result = _partyRegistry.LeaveForDisconnect(characterId);
 
@@ -404,7 +401,7 @@ public sealed partial class Zone
         }
     }
 
-        private void ClearTradeOnDisconnect(int characterId)
+    private void ClearTradeOnDisconnect(int characterId)
     {
         var result = _tradeRegistry.ClearForDisconnect(characterId);
 
@@ -422,7 +419,7 @@ public sealed partial class Zone
         }
     }
 
-        private void RestoreStagedBigMoney(int characterId, int amount)
+    private void RestoreStagedBigMoney(int characterId, int amount)
     {
         if (amount == 0)
             return;
@@ -437,7 +434,7 @@ public sealed partial class Zone
             otherZone.PostTribeProgressCommand(new TribeProgressZoneCommand(characterId, BigMoneyDelta: amount));
     }
 
-        private PartyRosterResponse BuildPartyRoster(int sort, IReadOnlyList<int> memberIds)
+    private PartyRosterResponse BuildPartyRoster(int sort, IReadOnlyList<int> memberIds)
     {
         Span<string> names = ["", "", "", "", ""];
         for (var i = 0; i < memberIds.Count && i < 5; i++)
@@ -455,7 +452,7 @@ public sealed partial class Zone
         };
     }
 
-        private void SendToCharacter<TPacket>(int characterId, in TPacket packet) where TPacket : struct, IOutgoingPacket
+    private void SendToCharacter<TPacket>(int characterId, in TPacket packet) where TPacket : struct, IOutgoingPacket
     {
         if (TryFindPlayer(characterId, out var member))
             member.Session.Send(packet);
@@ -469,19 +466,19 @@ public sealed partial class Zone
         return _zoneRegistry is not null && _zoneRegistry.TryGetPlayer(characterId, out state);
     }
 
-        private void HandleMarkZoneTransferPending(int characterId)
+    private void HandleMarkZoneTransferPending(int characterId)
     {
         if (_players.TryGetValue(characterId, out var state))
             state.IsMovingZone = true;
     }
 
-        private void HandleSetMuted(int characterId, bool muted)
+    private void HandleSetMuted(int characterId, bool muted)
     {
         if (_players.TryGetValue(characterId, out var state))
             state.IsMuted = muted;
     }
 
-        private async Task CleanupShardLocationAsync(int characterId)
+    private async Task CleanupShardLocationAsync(int characterId)
     {
         try
         {
@@ -564,7 +561,7 @@ public sealed partial class Zone
         BroadcastAvatarAction(_deathNeighborScratch, state, deathAction);
     }
 
-        private void ClearAllBuffs(PlayerRuntimeState state)
+    private void ClearAllBuffs(PlayerRuntimeState state)
     {
         var changedSlots = state.BuffChangeScratch;
         var anyChanged = false;
@@ -590,7 +587,7 @@ public sealed partial class Zone
             RecomputeStatsAndBroadcastBuffs(state, changedSlots);
     }
 
-        private void ApplyDeathExperienceLoss(PlayerRuntimeState state)
+    private void ApplyDeathExperienceLoss(PlayerRuntimeState state)
     {
         switch (state.Level)
         {
@@ -772,7 +769,7 @@ public sealed partial class Zone
         }
     }
 
-        private bool EvaluateSkillCastTamperGuard(PlayerRuntimeState state, ActionInfo action)
+    private bool EvaluateSkillCastTamperGuard(PlayerRuntimeState state, ActionInfo action)
     {
         worldData.SkillsById.TryGetValue(action.SkillNumber, out var skillDef);
 
@@ -789,8 +786,8 @@ public sealed partial class Zone
         var serverMaxGrade = SkillGradeAuthority.GetMaxSkillGradeNum(action.SkillNumber, state.LearnedSkills);
 
         var isRealSkillCast = action.SkillNumber != 0 &&
-            !FormationSkillCatalog.IsExemptFromGradeBoundCheck(action.SkillNumber, action.Sort,
-                isPrimaryHandler: true);
+                              !FormationSkillCatalog.IsExemptFromGradeBoundCheck(action.SkillNumber, action.Sort,
+                                  true);
 
         var offense = SkillCastGuard.Evaluate(new SkillCastGuardContext(
             SkillCastEffectCategoryCode,
@@ -833,7 +830,7 @@ public sealed partial class Zone
         return false;
     }
 
-        private void ApplyRestActionProtectionAndHeal(PlayerRuntimeState state)
+    private void ApplyRestActionProtectionAndHeal(PlayerRuntimeState state)
     {
         state.ZoneEntryAtZoneClock = _clock;
 
@@ -845,7 +842,7 @@ public sealed partial class Zone
             { Sort = CharacterHpStatSort, Value = state.Life, Value2 = 0 });
     }
 
-        private void HandlePetAction(int characterId, in ActionInfo action)
+    private void HandlePetAction(int characterId, in ActionInfo action)
     {
         if (!_players.TryGetValue(characterId, out var state))
             return;
@@ -860,7 +857,7 @@ public sealed partial class Zone
         state.PetActionTargetLocationZ = action.PetTargetLocation[2];
     }
 
-        private void ApplySkillCastManaCharge(PlayerRuntimeState state, ActionInfo action)
+    private void ApplySkillCastManaCharge(PlayerRuntimeState state, ActionInfo action)
     {
         if (state.LastSkillCastAtZoneClock is { } lastCast && _clock - lastCast < SimulationClock.LegacyTick)
             return;
@@ -881,11 +878,9 @@ public sealed partial class Zone
         state.LastSkillCastAtZoneClock = _clock;
         state.Mana -= result.ManaCost;
         state.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
-
-
     }
 
-        private void ApplySkillEffectConfirm(PlayerRuntimeState state, ActionInfo action, int previousSkillNumber,
+    private void ApplySkillEffectConfirm(PlayerRuntimeState state, ActionInfo action, int previousSkillNumber,
         int previousGradeNum1, int previousGradeNum2)
     {
         if (action.SkillNumber != previousSkillNumber ||
@@ -937,7 +932,7 @@ public sealed partial class Zone
         }
     }
 
-        private bool HasFullPartyPresent(int characterId)
+    private bool HasFullPartyPresent(int characterId)
     {
         var members = _partyRegistry.GetMembers(characterId);
         if (members.Count != PartyRegistry.MaxMembers)
@@ -951,7 +946,7 @@ public sealed partial class Zone
         return presentCount == PartyRegistry.MaxMembers;
     }
 
-        internal void ApplyBuffWrites(PlayerRuntimeState state, ImmutableArray<SkillCastResolver.BuffWrite> writes)
+    internal void ApplyBuffWrites(PlayerRuntimeState state, ImmutableArray<SkillCastResolver.BuffWrite> writes)
     {
         if (writes.IsEmpty)
             return;
@@ -969,7 +964,7 @@ public sealed partial class Zone
         RecomputeStatsAndBroadcastBuffs(state, changedSlots);
     }
 
-        private void ApplyTargetedHeal(ActionInfo action, bool isLife, int rawAmount)
+    private void ApplyTargetedHeal(ActionInfo action, bool isLife, int rawAmount)
     {
         if (rawAmount < 1)
             return;
@@ -998,7 +993,7 @@ public sealed partial class Zone
         target.MarkProgressDirty(dirtyTracker, DirtyFlags.Vitals);
     }
 
-        public void RecomputeStatsAndBroadcastBuffs(PlayerRuntimeState state, int[] changedSlots)
+    public void RecomputeStatsAndBroadcastBuffs(PlayerRuntimeState state, int[] changedSlots)
     {
         var attributes = new CharacterBaseAttributes(state.StatVit, state.StatStr, state.StatInt, state.StatDex,
             state.Level, state.Tribe, state.PreviousTribe, state.Title, state.Halo, state.RebirthCount, state.Level2);
@@ -1011,7 +1006,7 @@ public sealed partial class Zone
             worldData.ItemsById);
 
         state.Stats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData, state.Buffs,
-            petContribution, runtimeState: state);
+            petContribution, state);
 
         var response = new AvatarEffectStateResponse
         {
@@ -1062,12 +1057,12 @@ public sealed partial class Zone
         session.Send(BuildAvatarActionRecv(state));
     }
 
-        private void SendAvatarAction(IPacketSession session, PlayerRuntimeState state, ActionInfo action)
+    private void SendAvatarAction(IPacketSession session, PlayerRuntimeState state, ActionInfo action)
     {
         session.Send(BuildAvatarActionRecv(state, action));
     }
 
-        private void BroadcastAvatarAction(IReadOnlyList<int> recipientCharacterIds, PlayerRuntimeState state,
+    private void BroadcastAvatarAction(IReadOnlyList<int> recipientCharacterIds, PlayerRuntimeState state,
         ActionInfo? action = null)
     {
         if (recipientCharacterIds.Count == 0)
@@ -1101,7 +1096,7 @@ public sealed partial class Zone
         }
     }
 
-        private bool IsReviveHackBroadcastSuppressed(PlayerRuntimeState recipient)
+    private bool IsReviveHackBroadcastSuppressed(PlayerRuntimeState recipient)
     {
         if (MapId == ReviveEligibilityZones.BroadcastSuppressionExemptZoneId)
             return false;
@@ -1137,7 +1132,7 @@ public sealed partial class Zone
         });
     }
 
-        private static (float[] PetLocation, float[] PetTargetLocation, float PetFront, int PetSort) PetActionFieldsOf(
+    private static (float[] PetLocation, float[] PetTargetLocation, float PetFront, int PetSort) PetActionFieldsOf(
         PlayerRuntimeState state)
     {
         return (
@@ -1147,7 +1142,7 @@ public sealed partial class Zone
             state.PetActionSort);
     }
 
-        public AvatarActionResponse BuildAvatarActionRecv(PlayerRuntimeState state, ActionInfo action)
+    public AvatarActionResponse BuildAvatarActionRecv(PlayerRuntimeState state, ActionInfo action)
     {
         return new AvatarActionResponse
         {
@@ -1213,7 +1208,7 @@ public sealed partial class Zone
         };
     }
 
-        private static int[] BuildEffectValueForView(PlayerRuntimeState state)
+    private static int[] BuildEffectValueForView(PlayerRuntimeState state)
     {
         var view = new int[35];
         for (var slot = 0; slot < 35; slot++)
@@ -1222,14 +1217,14 @@ public sealed partial class Zone
         return view;
     }
 
-        private int[] ResolveDuelStateForView(int characterId)
+    private int[] ResolveDuelStateForView(int characterId)
     {
         return _duelRegistry.TryGetActiveDuel(characterId, out var duel) && duel is not null
             ? [1, duel.UniqueNumber, characterId == duel.PlayerA ? 1 : 2]
             : new int[3];
     }
 
-        public readonly record struct PendingDeathEventLog(
+    public readonly record struct PendingDeathEventLog(
         short EventCode,
         int ActorCharacterId,
         short? ShardId,

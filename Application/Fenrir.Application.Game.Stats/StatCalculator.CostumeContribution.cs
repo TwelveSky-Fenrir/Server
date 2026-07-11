@@ -1,12 +1,10 @@
 using System.Collections.Frozen;
-using Fenrir.Application.Game.Stats.Context;
 
 namespace Fenrir.Application.Game.Stats;
 
 public static partial class StatCalculator
 {
-
-        public static readonly FrozenSet<int> ValidCostumeIds = BuildValidCostumeIds();
+    public static readonly FrozenSet<int> ValidCostumeIds = BuildValidCostumeIds();
 
     private static FrozenSet<int> BuildValidCostumeIds()
     {
@@ -34,18 +32,18 @@ public static partial class StatCalculator
             set.Add(id);
     }
 
-        public static bool IsValidCostume(int costumeId)
+    public static bool IsValidCostume(int costumeId)
     {
         return ValidCostumeIds.Contains(costumeId);
     }
 
-        public static bool IsDecoStatCostume(int costumeId)
+    public static bool IsDecoStatCostume(int costumeId)
     {
         return IsCustomDecoStatItem(costumeId);
     }
 
 
-        public static CostumeBaseStatBlock ComputeCostumeBaseStatBlock(
+    public static CostumeBaseStatBlock ComputeCostumeBaseStatBlock(
         int costumeId,
         bool itemFound,
         int itemVitality,
@@ -81,7 +79,7 @@ public static partial class StatCalculator
     }
 
 
-        public static int DecodeCostumeEnchantCs(int costumeIndex, ReadOnlySpan<int> costumeDate)
+    public static int DecodeCostumeEnchantCs(int costumeIndex, ReadOnlySpan<int> costumeDate)
     {
         if (costumeIndex is < 10 or > 19)
             return 0;
@@ -93,38 +91,38 @@ public static partial class StatCalculator
         return ReadSignedLowByte(costumeDate[slot]);
     }
 
-        public static int ReadSignedLowByte(int packedWord)
+    public static int ReadSignedLowByte(int packedWord)
     {
         return (sbyte)(packedWord & 0xFF);
     }
 
 
-        public static int CostumeVitalityContribution(CostumeBaseStatBlock block, int cs)
+    public static int CostumeVitalityContribution(CostumeBaseStatBlock block, int cs)
     {
         return block.Vitality + cs;
     }
 
-        public static int CostumeKiContribution(CostumeBaseStatBlock block, int cs)
+    public static int CostumeKiContribution(CostumeBaseStatBlock block, int cs)
     {
         return block.Intelligence + cs;
     }
 
-        public static int CostumeStrengthContribution(CostumeBaseStatBlock block, int cs)
+    public static int CostumeStrengthContribution(CostumeBaseStatBlock block, int cs)
     {
         return block.Strength + cs;
     }
 
-        public static int CostumeWisdomContribution(CostumeBaseStatBlock block, int cs)
+    public static int CostumeWisdomContribution(CostumeBaseStatBlock block, int cs)
     {
         return block.Dexterity + cs;
     }
 
-        public static int CostumeCriticalContribution(int cs)
+    public static int CostumeCriticalContribution(int cs)
     {
         return cs == 96 ? 10 : cs > 0 ? cs / 10 : 0;
     }
 
-        public static int CostumeLuckContribution(int costumeId, int cs)
+    public static int CostumeLuckContribution(int costumeId, int cs)
     {
         return cs * 2 + (IsValidCostume(costumeId) ? 100 : 0);
     }

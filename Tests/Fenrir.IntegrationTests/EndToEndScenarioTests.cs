@@ -165,7 +165,7 @@ public sealed class EndToEndScenarioTests
         return (int)(await command.ExecuteScalarAsync(ct))!;
     }
 
-        private async Task SeedCombatStagingAsync(int characterId, EncounterPlan plan, long money,
+    private async Task SeedCombatStagingAsync(int characterId, EncounterPlan plan, long money,
         CancellationToken ct)
     {
         await using var connection = await _environment.OpenConnectionAsync();
@@ -183,7 +183,7 @@ public sealed class EndToEndScenarioTests
         await command.ExecuteNonQueryAsync(ct);
     }
 
-        private async Task<EncounterPlan> BuildEncounterPlanAsync(short zoneNumber, CancellationToken ct)
+    private async Task<EncounterPlan> BuildEncounterPlanAsync(short zoneNumber, CancellationToken ct)
     {
         await using var connection = await _environment.OpenConnectionAsync();
 
@@ -396,7 +396,7 @@ public sealed class EndToEndScenarioTests
             $"Monster {target.ServerIndex}/{target.UniqueNumber} never died within the combat time budget.");
     }
 
-        private static async Task<(float X, float Y, float Z)> MoveToAsync(ZoneBotClient zone, float x, float y,
+    private static async Task<(float X, float Y, float Z)> MoveToAsync(ZoneBotClient zone, float x, float y,
         float z, float targetX, float targetY, float targetZ, CancellationToken ct)
     {
         const float maxPlausibleMoveDistance = 666f;

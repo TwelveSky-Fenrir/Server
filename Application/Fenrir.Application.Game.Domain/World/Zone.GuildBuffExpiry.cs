@@ -7,19 +7,18 @@ namespace Fenrir.Application.Game.Domain.World;
 
 public sealed partial class Zone
 {
+    private const int GuildBuffExpiredStatSort = 59;
 
-        private const int GuildBuffExpiredStatSort = 59;
+    private const int GuildBuffExpiryInboxCapacity = 64;
 
-        private const int GuildBuffExpiryInboxCapacity = 64;
-
-        private const int GuildBuffExpiryInboxDrainCapPerTick = GuildBuffExpiryInboxCapacity / 2;
+    private const int GuildBuffExpiryInboxDrainCapPerTick = GuildBuffExpiryInboxCapacity / 2;
 
     private readonly Channel<GuildBuffExpiryZoneCommand> _guildBuffExpiryInbox =
         Channel.CreateBounded<GuildBuffExpiryZoneCommand>(
             new BoundedChannelOptions(GuildBuffExpiryInboxCapacity)
                 { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
-        public bool PostGuildBuffExpiryCommand(in GuildBuffExpiryZoneCommand command)
+    public bool PostGuildBuffExpiryCommand(in GuildBuffExpiryZoneCommand command)
     {
         return _guildBuffExpiryInbox.Writer.TryWrite(command);
     }
@@ -47,7 +46,7 @@ public sealed partial class Zone
                 GuildBuffExpiryInboxDrainCapPerTick);
     }
 
-        private void ApplyGuildBuffExpiryCommand(in GuildBuffExpiryZoneCommand command)
+    private void ApplyGuildBuffExpiryCommand(in GuildBuffExpiryZoneCommand command)
     {
         foreach (var state in _players.Values)
         {

@@ -6,12 +6,12 @@ public static class BankedCounterMath
     {
         Success,
 
-                WouldExceedCeiling
+        WouldExceedCeiling
     }
 
-        public const int GlobalCeiling = 2_000_000_000;
+    public const int GlobalCeiling = 2_000_000_000;
 
-        public static AddResult AddWideSafe(int current, long amount, int ceiling = GlobalCeiling)
+    public static AddResult AddWideSafe(int current, long amount, int ceiling = GlobalCeiling)
     {
         var projected = current + amount;
         return projected > ceiling
@@ -19,7 +19,7 @@ public static class BankedCounterMath
             : new AddResult(AddOutcome.Success, (int)projected);
     }
 
-        public static AddResult AddNarrow(int current, int amount, int ceiling = GlobalCeiling)
+    public static AddResult AddNarrow(int current, int amount, int ceiling = GlobalCeiling)
     {
         unchecked
         {
@@ -30,7 +30,7 @@ public static class BankedCounterMath
         }
     }
 
-        public static int CoerceBulkToHeadroom(int current, int cap, int perUnitAmount, int requestedCount)
+    public static int CoerceBulkToHeadroom(int current, int cap, int perUnitAmount, int requestedCount)
     {
         if (perUnitAmount <= 0 || requestedCount <= 0)
             return 0;

@@ -120,7 +120,7 @@ public sealed class HandlerDispatchIncrementalGenerator : IIncrementalGenerator
         context.AddSource("MessageDispatcher.g.cs", writer.ToString());
     }
 
-        private static void EmitRegistration(IndentedWriter writer, ImmutableArray<HandlerModel> handlers)
+    private static void EmitRegistration(IndentedWriter writer, ImmutableArray<HandlerModel> handlers)
     {
         var handlerTypes = handlers
             .Select(h => h.HandlerTypeFullName)
@@ -145,7 +145,7 @@ public sealed class HandlerDispatchIncrementalGenerator : IIncrementalGenerator
         writer.CloseBrace();
     }
 
-        private static void ReportCollisions(SourceProductionContext context, IEnumerable<HandlerModel> handlers)
+    private static void ReportCollisions(SourceProductionContext context, IEnumerable<HandlerModel> handlers)
     {
         var (_, diagnostics) = HandlerCollisionChecker.Check(handlers.ToImmutableArray());
 

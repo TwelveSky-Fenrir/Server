@@ -4,10 +4,9 @@ namespace Fenrir.Application.Game.Stats;
 
 public static partial class StatCalculator
 {
+    private const int PetAmuletSort = 28;
 
-        private const int PetAmuletSort = 28;
-
-        private static readonly FrozenSet<int> PetGradedAmuletExcludedIds =
+    private static readonly FrozenSet<int> PetGradedAmuletExcludedIds =
         new[] { 2253, 2254, 2261, 2262, 2300, 2301 }.ToFrozenSet();
 
 
@@ -30,7 +29,7 @@ public static partial class StatCalculator
     private static readonly float[] PetImLadderType4 =
         [100f, 200f, 300f, 400f, 500f, 600f, 700f, 800f, 900f, 1000f];
 
-        private static readonly float[] PetImLadderType5 = [0.3f, 0.3f, 0.9f, 1.2f, 1.5f, 1.8f, 2.1f, 2.4f, 2.7f, 3.0f];
+    private static readonly float[] PetImLadderType5 = [0.3f, 0.3f, 0.9f, 1.2f, 1.5f, 1.8f, 2.1f, 2.4f, 2.7f, 3.0f];
 
 
     private static readonly FrozenDictionary<int, int> PetAmuletAttackTable = new Dictionary<int, int>
@@ -59,25 +58,25 @@ public static partial class StatCalculator
         [76007] = 12500
     }.ToFrozenDictionary();
 
-        private static readonly FrozenSet<int> PetAmuletPhoenixOverlapIds = new[] { 76005, 76006, 76007 }.ToFrozenSet();
+    private static readonly FrozenSet<int> PetAmuletPhoenixOverlapIds = new[] { 76005, 76006, 76007 }.ToFrozenSet();
 
 
-        public static int DecodePetIsByte(int packedValue)
+    public static int DecodePetIsByte(int packedValue)
     {
         return unchecked((sbyte)packedValue);
     }
 
-        public static int DecodePetIuByte(int packedValue)
+    public static int DecodePetIuByte(int packedValue)
     {
         return unchecked((sbyte)(packedValue >> 8));
     }
 
-        public static int DecodePetImByte(int packedValue)
+    public static int DecodePetImByte(int packedValue)
     {
         return unchecked((sbyte)(packedValue >> 16));
     }
 
-        public static int DecodePetIzByte(int packedValue)
+    public static int DecodePetIzByte(int packedValue)
     {
         return unchecked((sbyte)(packedValue >> 24));
     }
@@ -87,7 +86,7 @@ public static partial class StatCalculator
         return petSort == PetAmuletSort && !PetGradedAmuletExcludedIds.Contains(petItemId);
     }
 
-        public static int PetGradedIsBonus(int petItemId, int petSort, int packedValue, int statType)
+    public static int PetGradedIsBonus(int petItemId, int petSort, int packedValue, int statType)
     {
         if (!IsGradedAmuletEligible(petItemId, petSort))
             return 0;
@@ -115,7 +114,7 @@ public static partial class StatCalculator
     }
 
 
-        public static int PetGradedIuBonus(int petItemId, int petSort, int packedValue, int statType)
+    public static int PetGradedIuBonus(int petItemId, int petSort, int packedValue, int statType)
     {
         if (!IsGradedAmuletEligible(petItemId, petSort))
             return 0;
@@ -128,7 +127,7 @@ public static partial class StatCalculator
         return grade is < 0 or > 9 ? 0 : grade;
     }
 
-        public static float PetGradedImBonus(int petItemId, int petSort, int packedValue, int statType)
+    public static float PetGradedImBonus(int petItemId, int petSort, int packedValue, int statType)
     {
         if (!IsGradedAmuletEligible(petItemId, petSort))
             return 0f;
@@ -154,18 +153,18 @@ public static partial class StatCalculator
         return ladder is null ? 0f : ladder[grade];
     }
 
-        public static int PetAmuletAttackBonus(int petItemId, int petSort)
+    public static int PetAmuletAttackBonus(int petItemId, int petSort)
     {
         return petSort == PetAmuletSort && PetAmuletAttackTable.TryGetValue(petItemId, out var value) ? value : 0;
     }
 
-        public static int PetAmuletDefenseBonus(int petItemId, int petSort)
+    public static int PetAmuletDefenseBonus(int petItemId, int petSort)
     {
         return petSort == PetAmuletSort && PetAmuletDefenseTable.TryGetValue(petItemId, out var value) ? value : 0;
     }
 
 
-        private static float PetGrowthPercentRaw(int growValue, int tierMax)
+    private static float PetGrowthPercentRaw(int growValue, int tierMax)
     {
         if (tierMax <= 0)
             return 0f;
@@ -177,7 +176,7 @@ public static partial class StatCalculator
         return growValue / reducedMax / 1000f;
     }
 
-        public static float PetGrowPercent(int growValue, int tierMax)
+    public static float PetGrowPercent(int growValue, int tierMax)
     {
         if (growValue < 1)
             return 0f;
@@ -185,7 +184,7 @@ public static partial class StatCalculator
         return PetGrowthPercentRaw(growValue, tierMax);
     }
 
-        public static int PetSteppedAttackBonus(int growValue, int tierMax, int activity)
+    public static int PetSteppedAttackBonus(int growValue, int tierMax, int activity)
     {
         if (activity < 1 || tierMax <= 0)
             return 0;
@@ -203,17 +202,17 @@ public static partial class StatCalculator
     }
 
 
-        public static int PetGrowthValueAttackGrade(int packedValue)
+    public static int PetGrowthValueAttackGrade(int packedValue)
     {
         return DecodePetIsByte(packedValue) switch { 1 => 1, 2 => 2, 3 => 3, _ => 0 };
     }
 
-        public static int PetGrowthValueBonusSkillGrade(int packedValue)
+    public static int PetGrowthValueBonusSkillGrade(int packedValue)
     {
         return DecodePetIuByte(packedValue) switch { 11 => 1, 12 => 2, 13 => 3, _ => 0 };
     }
 
-        public static int PetBonusSkillStatType(int skillIndex)
+    public static int PetBonusSkillStatType(int skillIndex)
     {
         return skillIndex switch
         {

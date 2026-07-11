@@ -4,16 +4,14 @@ namespace Fenrir.Application.Game.Abstractions.Chat;
 
 public interface IWorldChatService
 {
-
-        public WorldChatOutcome TrySendChat(PlayerRuntimeState sender, string content);
+    public WorldChatOutcome TrySendChat(PlayerRuntimeState sender, string content);
 }
 
 public enum WorldChatOutcome
 {
+    LevelTooLow,
 
-        LevelTooLow,
+    Muted,
 
-        Muted,
-
-        Sent
+    Sent
 }

@@ -6,10 +6,9 @@ namespace Fenrir.Application.Game.Domain.World;
 
 public sealed partial class Zone
 {
+    private const int PetBagInboxCapacity = 256;
 
-        private const int PetBagInboxCapacity = 256;
-
-        private const int PetBagInboxDrainCapPerTick = PetBagInboxCapacity / 2;
+    private const int PetBagInboxDrainCapPerTick = PetBagInboxCapacity / 2;
 
     private readonly Channel<PetBagZoneCommand> _petBagInbox =
         Channel.CreateBounded<PetBagZoneCommand>(
@@ -21,7 +20,7 @@ public sealed partial class Zone
         return _petBagInbox.Writer.TryWrite(command);
     }
 
-        public async Task<bool> PostPetBagCommandAndWaitAsync(PetBagZoneCommand command, CancellationToken ct,
+    public async Task<bool> PostPetBagCommandAndWaitAsync(PetBagZoneCommand command, CancellationToken ct,
         TimeSpan? timeout = null)
     {
         var applied = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -64,7 +63,7 @@ public sealed partial class Zone
             LogDrainCapEngaged(_petBagInbox.Reader, "pet-bag", PetBagInboxDrainCapPerTick);
     }
 
-        private void ApplyPetBagCommand(in PetBagZoneCommand command)
+    private void ApplyPetBagCommand(in PetBagZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state))
             return;

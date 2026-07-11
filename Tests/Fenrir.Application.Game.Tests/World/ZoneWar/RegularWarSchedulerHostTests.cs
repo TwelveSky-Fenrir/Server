@@ -15,8 +15,7 @@ namespace Fenrir.Application.Game.Tests.World.ZoneWar;
 
 public class RegularWarSchedulerHostTests
 {
-
-        private static int TicksToActiveWar =>
+    private static int TicksToActiveWar =>
         RegularWarSchedule.CooldownTicks +
         RegularWarSchedule.CountdownAnnounceStartValue * RegularWarSchedule.CountdownAnnounceIntervalTicks +
         RegularWarSchedule.FinalWaitTicks +

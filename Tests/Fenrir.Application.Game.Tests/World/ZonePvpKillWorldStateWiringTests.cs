@@ -10,10 +10,9 @@ namespace Fenrir.Application.Game.Tests.World;
 
 public class ZonePvpKillWorldStateWiringTests
 {
+    private const short SymbolBattleZoneId = 2;
 
-        private const short SymbolBattleZoneId = 2;
-
-        private const short SymbolBattleCpBonusServerId = PvpKillContributionPointBonuses.SymbolBattleServerId;
+    private const short SymbolBattleCpBonusServerId = PvpKillContributionPointBonuses.SymbolBattleServerId;
 
     private static readonly EffectiveStats StrongAttacker =
         new(1000, 1000, 1000, 0, 100, 0, 0, 0, 0, 0, 0);
@@ -146,9 +145,9 @@ public class ZonePvpKillWorldStateWiringTests
 
         Assert.True(zone.TryGetPlayer(1, out var attacker));
         var expectedCp = PvpKillContributionPointCalculator.ComputeBaseAmount(false, false,
-                basePerKillAmount: PvpKillContributionPointBonuses.ComputeGameWideAddValue(9))
-            + PvpKillContributionPointBonuses.ComputeConditionalBonuses(1, 0, addedCpTribe: -1,
-                attackerBaseLevel: 42, symbolBattleActive: false);
+                             basePerKillAmount: PvpKillContributionPointBonuses.ComputeGameWideAddValue(9))
+                         + PvpKillContributionPointBonuses.ComputeConditionalBonuses(1, 0, -1,
+                             42, false);
         Assert.Equal(expectedCp, attacker!.ContributionPoints);
         Assert.NotEqual(
             PvpKillContributionPointCalculator.ComputeBaseAmount(false, false,

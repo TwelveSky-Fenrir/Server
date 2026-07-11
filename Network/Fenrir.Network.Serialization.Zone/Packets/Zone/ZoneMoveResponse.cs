@@ -7,8 +7,7 @@ namespace Fenrir.Network.Serialization.Zone.Packets.Zone;
     ExpectedSize = 25)]
 public readonly partial record struct ZoneMoveResponse : IOutgoingPacket
 {
-
-        public required int Result { get; init; }
+    public required int Result { get; init; }
 
     [FixedString(16)] public required string Ip { get; init; }
 

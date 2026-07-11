@@ -10,8 +10,7 @@ public sealed class MonsterSymbolAttackWindowNotifySystem(
     Lazy<ZoneEventBroadcaster> broadcaster,
     IOptions<GameServerOptions> options) : ISimulationSystem
 {
-
-        private const int LegacyTicksPerMinute = 120;
+    private const int LegacyTicksPerMinute = 120;
 
     public void Simulate(Zone zone, int legacyTicksElapsed)
     {

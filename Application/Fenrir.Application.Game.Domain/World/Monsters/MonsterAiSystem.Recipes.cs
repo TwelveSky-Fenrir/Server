@@ -4,14 +4,13 @@ namespace Fenrir.Application.Game.Domain.World.Monsters;
 
 public sealed partial class MonsterAiSystem
 {
+    private const float ThrowCarInnerRadiusRatio = 0.25f;
 
-        private const float ThrowCarInnerRadiusRatio = 0.25f;
+    private const int ThrowerWanderRollSpan = 100;
 
-        private const int ThrowerWanderRollSpan = 100;
+    private const int Zone175BossAggroCapacity = 50;
 
-        private const int Zone175BossAggroCapacity = 50;
-
-        private void RunThrowerDecision(Zone zone, MonsterEntity monster)
+    private void RunThrowerDecision(Zone zone, MonsterEntity monster)
     {
         if (monster.Template.WalkSpeed >= 1 && _random.NextInt32(ThrowerWanderRollSpan) == 0)
         {
@@ -32,7 +31,7 @@ public sealed partial class MonsterAiSystem
         TryThrowCarAcquire(zone, monster);
     }
 
-        private void TryThrowCarAcquire(Zone zone, MonsterEntity monster)
+    private void TryThrowCarAcquire(Zone zone, MonsterEntity monster)
     {
         if (monster.Template.AttackType is not (1 or 3 or 6))
             return;
@@ -67,7 +66,7 @@ public sealed partial class MonsterAiSystem
         }
     }
 
-        private void RunZone175BossDecision(Zone zone, MonsterEntity monster, int legacyTicksElapsed)
+    private void RunZone175BossDecision(Zone zone, MonsterEntity monster, int legacyTicksElapsed)
     {
         monster.DetectionThrottleTicks += legacyTicksElapsed;
         if (monster.DetectionThrottleTicks < SimulationClock.MonsterDetectionThrottleLegacyTicks)
@@ -101,7 +100,7 @@ public sealed partial class MonsterAiSystem
             near.DistanceSquared <= meleeRadiusSq ? MonsterAiState.AttackWindup : MonsterAiState.Chase);
     }
 
-        private List<MonsterAggroCandidate> AcquireZone175BossCandidates(Zone zone, MonsterEntity monster,
+    private List<MonsterAggroCandidate> AcquireZone175BossCandidates(Zone zone, MonsterEntity monster,
         float wideRadiusSq)
     {
         var aggro = zone.BorrowBossAggroScratch();
@@ -132,7 +131,7 @@ public sealed partial class MonsterAiSystem
         return aggro;
     }
 
-        private bool TryPickBossTarget(List<MonsterAggroCandidate> aggro, float meleeRadiusSq, bool wantFar,
+    private bool TryPickBossTarget(List<MonsterAggroCandidate> aggro, float meleeRadiusSq, bool wantFar,
         out MonsterAggroCandidate picked)
     {
         foreach (var candidate in aggro)
@@ -154,7 +153,7 @@ public sealed partial class MonsterAiSystem
         return false;
     }
 
-        private static void CommitBossTarget(Zone zone, MonsterEntity monster, MonsterAggroCandidate target,
+    private static void CommitBossTarget(Zone zone, MonsterEntity monster, MonsterAggroCandidate target,
         MonsterAiState nextState)
     {
         monster.AssignTarget(target.CharacterId, target.UniqueNumber, target.PosX, target.PosY, target.PosZ);
@@ -163,7 +162,7 @@ public sealed partial class MonsterAiSystem
         zone.BroadcastMonsterActionChange(monster);
     }
 
-        private static float Distance3D(MonsterEntity monster, PlayerRuntimeState player)
+    private static float Distance3D(MonsterEntity monster, PlayerRuntimeState player)
     {
         var dx = monster.PosX - player.PosX;
         var dy = monster.PosY - player.PosY;
@@ -171,7 +170,7 @@ public sealed partial class MonsterAiSystem
         return MathF.Sqrt(dx * dx + dy * dy + dz * dz);
     }
 
-        private void RunGuardDecision(Zone zone, MonsterEntity monster, int legacyTicksElapsed)
+    private void RunGuardDecision(Zone zone, MonsterEntity monster, int legacyTicksElapsed)
     {
         monster.DetectionThrottleTicks += legacyTicksElapsed;
         if (monster.DetectionThrottleTicks < SimulationClock.MonsterDetectionThrottleLegacyTicks)

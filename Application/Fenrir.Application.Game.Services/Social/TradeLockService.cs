@@ -128,7 +128,7 @@ public sealed class TradeLockService(
         return list;
     }
 
-        private static List<CharacterItemSlotTvp> ToTradedTvps(TradeOfferSide side)
+    private static List<CharacterItemSlotTvp> ToTradedTvps(TradeOfferSide side)
     {
         var list = new List<CharacterItemSlotTvp>(TradeLimits.SlotCount);
         for (byte i = 0; i < TradeLimits.SlotCount; i++)

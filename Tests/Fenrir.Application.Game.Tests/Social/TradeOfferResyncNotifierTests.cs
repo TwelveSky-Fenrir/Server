@@ -17,8 +17,8 @@ public class TradeOfferResyncNotifierTests
 
         var (sessionA, pipeA) = ZoneTestKit.CreateSession(1);
         var (sessionB, pipeB) = ZoneTestKit.CreateSession(2);
-        zone.Post(ZoneCommand.Enter(1, ZoneTestKit.EnterData(sessionA, mapId, name: "Alice")));
-        zone.Post(ZoneCommand.Enter(2, ZoneTestKit.EnterData(sessionB, mapId, name: "Bob")));
+        zone.Post(ZoneCommand.Enter(1, ZoneTestKit.EnterData(sessionA, mapId, "Alice")));
+        zone.Post(ZoneCommand.Enter(2, ZoneTestKit.EnterData(sessionB, mapId, "Bob")));
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
         ZoneTestKit.DrainOutbound(pipeA);
@@ -96,11 +96,11 @@ public class TradeOfferResyncNotifierTests
     public void OpponentNoLongerOnline_SilentlyDoesNothing()
     {
         var registry = ZoneTestKit.CreateRegistry();
-        registry.Initialize([(short)37]);
-        var zone = registry[(short)37];
+        registry.Initialize([37]);
+        var zone = registry[37];
 
         var (sessionA, pipeA) = ZoneTestKit.CreateSession(1);
-        zone.Post(ZoneCommand.Enter(1, ZoneTestKit.EnterData(sessionA, 37, name: "Alice")));
+        zone.Post(ZoneCommand.Enter(1, ZoneTestKit.EnterData(sessionA, 37, "Alice")));
         zone.Tick(TimeSpan.FromMilliseconds(50));
         ZoneTestKit.DrainOutbound(pipeA);
 

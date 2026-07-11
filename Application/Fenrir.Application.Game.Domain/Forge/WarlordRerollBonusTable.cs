@@ -7,19 +7,18 @@ public static class WarlordRerollBonusTable
 {
     public enum WarlordRerollOutcome
     {
+        NoCandidate,
 
-                NoCandidate,
+        Top,
 
-                Top,
+        Mid,
 
-                Mid,
-
-                Base
+        Base
     }
 
-        private const int RareTribeStride = 21;
+    private const int RareTribeStride = 21;
 
-        private const int EliteTribeStride = 22;
+    private const int EliteTribeStride = 22;
 
     private const byte IAmulet = 7;
     private const byte IArmor = 9;
@@ -55,7 +54,7 @@ public static class WarlordRerollBonusTable
             [IScepter] = new(WarlordSlotGroup.LongBladeFamily, 2, true)
         }.ToFrozenDictionary();
 
-        private static readonly FrozenDictionary<WarlordSlotGroup, BonusRow> RareRows =
+    private static readonly FrozenDictionary<WarlordSlotGroup, BonusRow> RareRows =
         new Dictionary<WarlordSlotGroup, BonusRow>
         {
             [WarlordSlotGroup.Amulet] = new(87020, 5, null, 0, 87001),
@@ -68,7 +67,7 @@ public static class WarlordRerollBonusTable
             [WarlordSlotGroup.LongBladeFamily] = new(87055, 5, 87051, 16, 87044)
         }.ToFrozenDictionary();
 
-        private static readonly FrozenDictionary<WarlordSlotGroup, BonusRow> EliteRows =
+    private static readonly FrozenDictionary<WarlordSlotGroup, BonusRow> EliteRows =
         new Dictionary<WarlordSlotGroup, BonusRow>
         {
             [WarlordSlotGroup.Amulet] = new(87084, 1, null, 0, 87064),
@@ -81,7 +80,7 @@ public static class WarlordRerollBonusTable
             [WarlordSlotGroup.LongBladeFamily] = new(87121, 1, 87115, 15, 87109)
         }.ToFrozenDictionary();
 
-        public static WarlordRerollDrawResult TryDrawReplacement(
+    public static WarlordRerollDrawResult TryDrawReplacement(
         byte sort, byte itemType, byte previousTribe, WarlordPityLockState pityLock, IRandomSource random)
     {
         if (itemType is not (RankChangeResolver.RareItemType or RankChangeResolver.EliteItemType))
@@ -119,7 +118,7 @@ public static class WarlordRerollBonusTable
         return new WarlordRerollDrawResult(WarlordRerollOutcome.Base, row.BaseId + offset, false, false);
     }
 
-        public static bool NoticeReachesRecipients(byte itemType)
+    public static bool NoticeReachesRecipients(byte itemType)
     {
         return itemType == RankChangeResolver.EliteItemType;
     }

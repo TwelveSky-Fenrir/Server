@@ -37,7 +37,7 @@ internal ref struct LegacySpanReader(ReadOnlySpan<byte> data)
         return values;
     }
 
-        public string ReadFixedString(int length)
+    public string ReadFixedString(int length)
     {
         var slice = _data.Slice(Position, length);
         Position += length;

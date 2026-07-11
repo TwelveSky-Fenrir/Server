@@ -17,10 +17,9 @@ public sealed class UpdateProxyShopService(
     IEventLogRepository eventLog,
     ILogger<UpdateProxyShopService> logger) : IUpdateProxyShopService
 {
+    private const short ProxyShopRetrieveEventCode = 2;
 
-        private const short ProxyShopRetrieveEventCode = 2;
-
-        private const short ProxyShopPurchaseEventCode = 3;
+    private const short ProxyShopPurchaseEventCode = 3;
 
     public UpdateProxyShopValidation Validate(UpdateProxyShopRequest packet)
     {

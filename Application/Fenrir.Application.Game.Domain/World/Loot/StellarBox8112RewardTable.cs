@@ -1,12 +1,10 @@
 using Fenrir.Application.Game.Domain.Consumables;
-using Fenrir.Application.Game.Domain.Inventory.UseItems.Boxes;
 
 namespace Fenrir.Application.Game.Domain.World.Loot;
 
 public static class StellarBox8112RewardTable
 {
-
-        public static readonly BoxRewardSpec Spec = BoxRewardSpec.Weighted(8112,
+    public static readonly BoxRewardSpec Spec = BoxRewardSpec.Weighted(8112,
     [
         new LootBoxRewardResolver.WeightedReward(93500, 350),
         new LootBoxRewardResolver.WeightedReward(93501, 200),

@@ -13,7 +13,7 @@ internal sealed class FakeStarterKitRepository(StarterKitBundle bundle) : IStart
         return ValueTask.FromResult(bundle);
     }
 
-        public static FakeStarterKitRepository NobleDragonKit(StarterKitSpawnRowDto? spawn = null)
+    public static FakeStarterKitRepository NobleDragonKit(StarterKitSpawnRowDto? spawn = null)
     {
         var equipment = new ReadOnlyCollection<StarterKitEquipmentRowDto>([
             new StarterKitEquipmentRowDto(0, 84671, null),
@@ -43,7 +43,7 @@ internal sealed class FakeStarterKitRepository(StarterKitBundle bundle) : IStart
             spawn ?? new StarterKitSpawnRowDto(6, 0, -7)));
     }
 
-        public static FakeStarterKitRepository RoyalSerpentKit(StarterKitSpawnRowDto? spawn = null)
+    public static FakeStarterKitRepository RoyalSerpentKit(StarterKitSpawnRowDto? spawn = null)
     {
         var equipment = new ReadOnlyCollection<StarterKitEquipmentRowDto>([
             new StarterKitEquipmentRowDto(0, 85671, null),
@@ -72,7 +72,7 @@ internal sealed class FakeStarterKitRepository(StarterKitBundle bundle) : IStart
             spawn ?? new StarterKitSpawnRowDto(-190, 0, 1270)));
     }
 
-        public static FakeStarterKitRepository GrandTigerKit(StarterKitSpawnRowDto? spawn = null)
+    public static FakeStarterKitRepository GrandTigerKit(StarterKitSpawnRowDto? spawn = null)
     {
         var equipment = new ReadOnlyCollection<StarterKitEquipmentRowDto>([
             new StarterKitEquipmentRowDto(0, 86671, null),
@@ -101,7 +101,7 @@ internal sealed class FakeStarterKitRepository(StarterKitBundle bundle) : IStart
             spawn ?? new StarterKitSpawnRowDto(447, 1, 440)));
     }
 
-        public static FakeStarterKitRepository UnseededPreviousTribeKit(StarterKitSpawnRowDto? spawn = null)
+    public static FakeStarterKitRepository UnseededPreviousTribeKit(StarterKitSpawnRowDto? spawn = null)
     {
         var inventory = new ReadOnlyCollection<StarterKitInventoryRowDto>([
             new StarterKitInventoryRowDto(0, 1026, 999),

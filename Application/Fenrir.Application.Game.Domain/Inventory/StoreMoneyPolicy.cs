@@ -6,21 +6,21 @@ public static class StoreMoneyPolicy
     {
         Success,
 
-                InvalidQuantity,
+        InvalidQuantity,
 
-                InsufficientSource,
+        InsufficientSource,
 
-                DestinationOverflow
+        DestinationOverflow
     }
 
-        public const long MaxMoney = 2_000_000_000;
+    public const long MaxMoney = 2_000_000_000;
 
-        public static TransferResult ResolveDeposit(long requestedAmount, long walletMoney, long storeMoney)
+    public static TransferResult ResolveDeposit(long requestedAmount, long walletMoney, long storeMoney)
     {
         return Resolve(requestedAmount, walletMoney, storeMoney);
     }
 
-        public static TransferResult ResolveWithdraw(long requestedAmount, long storeMoney, long walletMoney)
+    public static TransferResult ResolveWithdraw(long requestedAmount, long storeMoney, long walletMoney)
     {
         return Resolve(requestedAmount, storeMoney, walletMoney);
     }

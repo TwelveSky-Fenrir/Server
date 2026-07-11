@@ -2,25 +2,22 @@ namespace Fenrir.Application.Game.Stats;
 
 public enum DecorationStatKind
 {
+    MaxLife = 1,
 
-        MaxLife = 1,
+    MaxMana = 2,
 
-        MaxMana = 2,
+    AttackPower = 3,
 
-        AttackPower = 3,
+    DefensePower = 4,
 
-        DefensePower = 4,
+    AttackBlock = 6,
 
-        AttackBlock = 6,
-
-        ElementDefensePower = 8
+    ElementDefensePower = 8
 }
 
 public static partial class StatCalculator
 {
-
-
-        public static int ReturnIUEffectValue(int effectSort, int itemSort, int itemLevel)
+    public static int ReturnIUEffectValue(int effectSort, int itemSort, int itemLevel)
     {
         if (ResolveIuEffectCoefficients(effectSort, itemSort) is not { } coefficients)
             return 0;
@@ -40,12 +37,12 @@ public static partial class StatCalculator
         return (int)(coefficients.Base + r * coefficients.K);
     }
 
-        public static int IUEffectSlotContribution(int effectSort, int itemSort, int itemLevel, int iuPointCount)
+    public static int IUEffectSlotContribution(int effectSort, int itemSort, int itemLevel, int iuPointCount)
     {
         return ReturnIUEffectValue(effectSort, itemSort, itemLevel) * iuPointCount;
     }
 
-        private static (float Base, float K)? ResolveIuEffectCoefficients(int effectSort, int itemSort)
+    private static (float Base, float K)? ResolveIuEffectCoefficients(int effectSort, int itemSort)
     {
         return (effectSort, itemSort) switch
         {
@@ -71,12 +68,12 @@ public static partial class StatCalculator
     }
 
 
-        public static bool IsDecorationItem(int itemType, int equipInfoCategory)
+    public static bool IsDecorationItem(int itemType, int equipInfoCategory)
     {
         return itemType == 5 && equipInfoCategory is 11 or 12 or 13 or 14;
     }
 
-        public static int DecorationStatContribution(DecorationStatKind stat, EquippedItemSlot?[] bySlot)
+    public static int DecorationStatContribution(DecorationStatKind stat, EquippedItemSlot?[] bySlot)
     {
         var total = 0;
         for (var d = 9; d <= 12; d++)
@@ -91,7 +88,7 @@ public static partial class StatCalculator
         return total;
     }
 
-        public static int ReturnNewStat(DecorationStatKind stat, int packedUpgradeValue)
+    public static int ReturnNewStat(DecorationStatKind stat, int packedUpgradeValue)
     {
         if (packedUpgradeValue == 0)
             return 0;
@@ -107,7 +104,7 @@ public static partial class StatCalculator
                + ReturnNewValue(2, stat, octetIz);
     }
 
-        public static int ReturnNewValue(int tableSort, DecorationStatKind stat, int octet)
+    public static int ReturnNewValue(int tableSort, DecorationStatKind stat, int octet)
     {
         return tableSort switch
         {
@@ -117,7 +114,7 @@ public static partial class StatCalculator
         };
     }
 
-        public static int PackDecorationUpgradeOctets(int octetIs, int octetIu, int octetIm, int octetIz)
+    public static int PackDecorationUpgradeOctets(int octetIs, int octetIu, int octetIm, int octetIz)
     {
         return (byte)(sbyte)octetIs
                | ((byte)(sbyte)octetIu << 8)

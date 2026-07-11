@@ -11,8 +11,7 @@ public sealed class IvyHallTicketUseItemHandler(
     IEventLogRepository eventLog,
     ILogger<IvyHallTicketUseItemHandler> logger) : IUseItemHandler
 {
-
-        private const short IvyHallTicketGrantEventCode = 32;
+    private const short IvyHallTicketGrantEventCode = 32;
 
     private const byte SuccessOutcome = 1;
 

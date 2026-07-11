@@ -8,6 +8,6 @@ public interface ITowerRepository
 
     public ValueTask<ReadOnlyCollection<TowerStateRowDto>> GetAllAsync(CancellationToken ct);
 
-        public ValueTask SetProgressAsync(byte towerIndex, byte level, byte towerType, byte? controllingTribeId,
+    public ValueTask SetProgressAsync(byte towerIndex, byte level, byte towerType, byte? controllingTribeId,
         CancellationToken ct);
 }

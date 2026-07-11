@@ -4,17 +4,16 @@ public static class AutoHuntBudgetPolicy
 {
     public enum Signal
     {
+        None,
 
-                None,
+        DayBudgetExpired,
 
-                DayBudgetExpired,
+        MinuteBudgetDecremented,
 
-                MinuteBudgetDecremented,
-
-                Exhausted
+        Exhausted
     }
 
-        public static Result Advance(int dayBudget, int minuteBudget, int minuteAccrualTicks, int legacyTicksElapsed,
+    public static Result Advance(int dayBudget, int minuteBudget, int minuteAccrualTicks, int legacyTicksElapsed,
         int todayDate)
     {
         if (dayBudget <= 0 && minuteBudget <= 0)
@@ -43,5 +42,5 @@ public static class AutoHuntBudgetPolicy
             : new Result(0, 0, minuteAccrualTicks, Signal.Exhausted);
     }
 
-        public readonly record struct Result(int DayBudget, int MinuteBudget, int MinuteAccrualTicks, Signal Signal);
+    public readonly record struct Result(int DayBudget, int MinuteBudget, int MinuteAccrualTicks, Signal Signal);
 }

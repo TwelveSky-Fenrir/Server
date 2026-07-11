@@ -7,7 +7,7 @@ public sealed class ProgressWriteBehindHost(ZoneRegistry zones, ICharacterReposi
 {
     private const DirtyFlags ProgressFlags = DirtyFlags.Vitals | DirtyFlags.Progression;
 
-        public async ValueTask<IReadOnlySet<int>> FlushAsync(IReadOnlyDictionary<int, DirtyFlags> dirty,
+    public async ValueTask<IReadOnlySet<int>> FlushAsync(IReadOnlyDictionary<int, DirtyFlags> dirty,
         CancellationToken ct)
     {
         var rows = new List<CharacterProgressTvp>(dirty.Count);

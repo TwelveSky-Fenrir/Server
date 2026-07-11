@@ -28,7 +28,7 @@ public class RegularWarScheduleTests
         return result;
     }
 
-        private static RegularWarSchedule AdvanceToActive(RegularWarMapConfig config,
+    private static RegularWarSchedule AdvanceToActive(RegularWarMapConfig config,
         RegularWarEnvironmentSnapshot? preWarSnapshot = null)
     {
         var schedule = new RegularWarSchedule(config);

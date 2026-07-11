@@ -5,8 +5,7 @@ namespace Fenrir.Application.Game.Domain.World.Loot;
 
 public sealed class BossDropCatalog
 {
-
-        public const int SharedRandomPoolElixirSlotIndex = 3;
+    public const int SharedRandomPoolElixirSlotIndex = 3;
 
     private BossDropCatalog()
     {
@@ -45,27 +44,27 @@ public sealed class BossDropCatalog
         SharedRandomPoolFixedIds = [1023, 1022, 8102, 695, 696];
     }
 
-        public static BossDropCatalog Default { get; } = new();
+    public static BossDropCatalog Default { get; } = new();
 
-        public IReadOnlyList<DroppedItem> NineItemEventList { get; }
+    public IReadOnlyList<DroppedItem> NineItemEventList { get; }
 
-        public IReadOnlyList<DroppedItem> HolyUnicornPersonalList { get; }
+    public IReadOnlyList<DroppedItem> HolyUnicornPersonalList { get; }
 
-        public IReadOnlyList<DroppedItem> ThreeItemEventList { get; }
+    public IReadOnlyList<DroppedItem> ThreeItemEventList { get; }
 
-        public IReadOnlyList<DroppedItem> EliteBossGuaranteedList { get; }
+    public IReadOnlyList<DroppedItem> EliteBossGuaranteedList { get; }
 
-        public FrozenDictionary<int, IReadOnlyList<DroppedItem>> CustomTimedBossLists { get; }
+    public FrozenDictionary<int, IReadOnlyList<DroppedItem>> CustomTimedBossLists { get; }
 
-        public ImmutableArray<int> DemonLordItemPool { get; }
+    public ImmutableArray<int> DemonLordItemPool { get; }
 
-        public ImmutableArray<int> FifteenMinuteBossLowMidFixedIds { get; }
+    public ImmutableArray<int> FifteenMinuteBossLowMidFixedIds { get; }
 
-        public ImmutableArray<int> FifteenMinuteBossMidTierPool { get; }
+    public ImmutableArray<int> FifteenMinuteBossMidTierPool { get; }
 
-        public ImmutableArray<int> FifteenMinuteBossHighTierPool { get; }
+    public ImmutableArray<int> FifteenMinuteBossHighTierPool { get; }
 
-        public ImmutableArray<int> SharedRandomPoolFixedIds { get; }
+    public ImmutableArray<int> SharedRandomPoolFixedIds { get; }
 
     private static IReadOnlyList<DroppedItem> Guaranteed(ReadOnlySpan<(int ItemId, int Quantity)> entries)
     {

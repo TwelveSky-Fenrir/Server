@@ -13,14 +13,13 @@ public sealed class TitleUpgradeUseItemHandler(
     IEventLogRepository eventLog,
     ILogger<TitleUpgradeUseItemHandler> logger) : IUseItemHandler
 {
-
-        public const int ItemId = 891;
+    public const int ItemId = 891;
 
     private const int RequiredTitleLevel = 12;
     private const int TitleLevelModulus = 100;
     private const int RequiredContributionPoints = 10000;
 
-        private const short TitleUpgradeSpendEventCode = 2;
+    private const short TitleUpgradeSpendEventCode = 2;
 
     private const byte SuccessOutcome = 1;
 

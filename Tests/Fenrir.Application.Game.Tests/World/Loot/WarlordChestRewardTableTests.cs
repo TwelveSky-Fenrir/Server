@@ -142,7 +142,7 @@ public class WarlordChestRewardTableTests
             previousTribe, new ScriptedRandom(0), out _));
     }
 
-        private sealed class ScriptedRandom(params int[] values) : Random
+    private sealed class ScriptedRandom(params int[] values) : Random
     {
         private int _index;
 

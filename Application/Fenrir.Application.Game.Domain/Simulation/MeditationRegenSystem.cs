@@ -11,9 +11,9 @@ public sealed class MeditationRegenSystem(WorldDataCache worldData, DirtyTracker
 {
     private const int MeditationActionSort = 31;
 
-        private const int CharacterHpStatSort = 10;
+    private const int CharacterHpStatSort = 10;
 
-        private const int CharacterMpStatSort = 11;
+    private const int CharacterMpStatSort = 11;
 
     public void Simulate(Zone zone, int legacyTicksElapsed)
     {

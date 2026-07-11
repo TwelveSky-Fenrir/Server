@@ -7,13 +7,13 @@ public class RespawnTownRelocationTests
     [Fact]
     public void RequiresRelocation_OwningTribeDiffersFromAvatarTribe_ReturnsTrue()
     {
-        Assert.True(RespawnTownRelocation.RequiresRelocation(avatarTribe: 0, owningTribeOfLoggedOutZone: 1));
+        Assert.True(RespawnTownRelocation.RequiresRelocation(0, 1));
     }
 
     [Fact]
     public void RequiresRelocation_OwningTribeMatchesAvatarTribe_ReturnsFalse()
     {
-        Assert.False(RespawnTownRelocation.RequiresRelocation(avatarTribe: 2, owningTribeOfLoggedOutZone: 2));
+        Assert.False(RespawnTownRelocation.RequiresRelocation(2, 2));
     }
 
     [Theory]

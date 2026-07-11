@@ -16,8 +16,7 @@ public sealed class ZoneHandshakeService(
     IOptions<GameServerOptions> options,
     ILogger<ZoneHandshakeService>? logger = null) : IZoneHandshakeService
 {
-
-        private const short ZoneTransferAcceptedEventCode = 3;
+    private const short ZoneTransferAcceptedEventCode = 3;
 
     public async ValueTask<ZoneHandshakeResult> ConsumeTicketAsync(string obfuscatedId, int declaredTribe,
         ZoneClientSession session, CancellationToken cancellationToken)

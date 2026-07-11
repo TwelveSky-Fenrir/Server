@@ -10,15 +10,14 @@ public enum KillCreditDenial : byte
 
 public static class PvpKillCreditGuard
 {
+    public const int MaxKillerCombinedLevelAdvantage = 13;
 
-        public const int MaxKillerCombinedLevelAdvantage = 13;
-
-        public static bool AreBothReady(bool killerReady, bool victimReady)
+    public static bool AreBothReady(bool killerReady, bool victimReady)
     {
         return killerReady && victimReady;
     }
 
-        public static bool IsSameOrigin(string? killerIp, string? victimIp, int? killerAccountId = null,
+    public static bool IsSameOrigin(string? killerIp, string? victimIp, int? killerAccountId = null,
         int? victimAccountId = null)
     {
         if (killerAccountId is { } killer && victimAccountId is { } victim && killer == victim)
@@ -27,12 +26,12 @@ public static class PvpKillCreditGuard
         return SessionSourceIp.AreSameHost(killerIp, victimIp);
     }
 
-        public static bool ExceedsLevelGap(int killerCombinedLevel, int victimCombinedLevel)
+    public static bool ExceedsLevelGap(int killerCombinedLevel, int victimCombinedLevel)
     {
         return killerCombinedLevel - victimCombinedLevel > MaxKillerCombinedLevelAdvantage;
     }
 
-        public static KillCreditDenial Evaluate(in PvpKillCreditRequest request)
+    public static KillCreditDenial Evaluate(in PvpKillCreditRequest request)
     {
         if (!AreBothReady(request.KillerReady, request.VictimReady))
             return KillCreditDenial.NotReady;
@@ -47,7 +46,7 @@ public static class PvpKillCreditGuard
         return KillCreditDenial.None;
     }
 
-        public static bool IsCreditAllowed(in PvpKillCreditRequest request)
+    public static bool IsCreditAllowed(in PvpKillCreditRequest request)
     {
         return Evaluate(request) == KillCreditDenial.None;
     }

@@ -11,7 +11,6 @@ namespace Fenrir.Application.Game.Tests.World.Monsters;
 
 public class MonsterAiSystemRecipesTests
 {
-
     [Fact]
     public void SpecialSort_OrdinaryMonster_DerivesToStandard()
     {
@@ -62,8 +61,8 @@ public class MonsterAiSystemRecipesTests
     [Fact]
     public void ThrowCar_TargetInsideTheAnnulusBand_CommitsMeleeAttack()
     {
-        var (zone, monster) = CreateZoneWithManualMonster(meleeRadius: 100, ai: new ScriptedRandomSource(5, 0));
-        EnterPlayerAt(zone, 10, posX: 50, posZ: 0);
+        var (zone, monster) = CreateZoneWithManualMonster(100, new ScriptedRandomSource(5, 0));
+        EnterPlayerAt(zone, 10, 50, 0);
 
         zone.Tick(SimulationClock.LegacyTick);
         Assert.Equal(MonsterAiState.Decision, monster.AiState);
@@ -76,8 +75,8 @@ public class MonsterAiSystemRecipesTests
     [Fact]
     public void ThrowCar_TargetInsideTheInnerDeadZone_IsNotAcquired()
     {
-        var (zone, monster) = CreateZoneWithManualMonster(meleeRadius: 100, ai: new ScriptedRandomSource(5));
-        EnterPlayerAt(zone, 10, posX: 10, posZ: 0);
+        var (zone, monster) = CreateZoneWithManualMonster(100, new ScriptedRandomSource(5));
+        EnterPlayerAt(zone, 10, 10, 0);
 
         for (var i = 0; i < 5; i++)
             zone.Tick(SimulationClock.LegacyTick);
@@ -89,7 +88,7 @@ public class MonsterAiSystemRecipesTests
     [Fact]
     public void ThrowCar_WanderTrigger_EntersPatrol()
     {
-        var (zone, monster) = CreateZoneWithManualMonster(meleeRadius: 100, ai: new ScriptedRandomSource(0));
+        var (zone, monster) = CreateZoneWithManualMonster(100, new ScriptedRandomSource(0));
 
         zone.Tick(SimulationClock.LegacyTick);
         zone.Tick(SimulationClock.LegacyTick);
@@ -102,8 +101,8 @@ public class MonsterAiSystemRecipesTests
     public void Zone175Boss_MultiCandidate_WritesEveryInRangeCandidateToTheSharedTable()
     {
         var zone = CreateBossZone();
-        EnterPlayerAt(zone, 10, posX: 5, posZ: 0);
-        EnterPlayerAt(zone, 11, posX: 8, posZ: 0);
+        EnterPlayerAt(zone, 10, 5, 0);
+        EnterPlayerAt(zone, 11, 8, 0);
 
         var boss = AcquireBossTarget(zone);
         var lockedId = boss.TargetCharacterId!.Value;
@@ -141,7 +140,7 @@ public class MonsterAiSystemRecipesTests
     public void AdjustValidAttackTarget_DropsAMidCrossShardTransferTarget()
     {
         var zone = CreateStandardChaseZone();
-        EnterPlayerAt(zone, 10, posX: 20, posZ: 0);
+        EnterPlayerAt(zone, 10, 20, 0);
 
         var monster = AcquireChaseTarget(zone, 10);
 
@@ -155,7 +154,7 @@ public class MonsterAiSystemRecipesTests
     }
 
 
-        private static (Zone Zone, MonsterEntity Monster) CreateZoneWithManualMonster(short meleeRadius,
+    private static (Zone Zone, MonsterEntity Monster) CreateZoneWithManualMonster(short meleeRadius,
         IRandomSource ai)
     {
         var template = WorldDataTestRows.Monster(600) with
@@ -271,7 +270,7 @@ public class MonsterAiSystemRecipesTests
         throw new InvalidOperationException("monster never acquired the expected chase target");
     }
 
-        private sealed class ZeroScatterRandom : Random
+    private sealed class ZeroScatterRandom : Random
     {
         public override double NextDouble()
         {

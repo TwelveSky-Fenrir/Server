@@ -10,8 +10,7 @@ public readonly record struct TribeRosterCharacterSnapshot(
 
 public interface ITribePointRosterGateway
 {
-
-        public Task<IReadOnlyList<TribeRosterCharacterSnapshot>?> GetRosterAsync(CancellationToken ct);
+    public Task<IReadOnlyList<TribeRosterCharacterSnapshot>?> GetRosterAsync(CancellationToken ct);
 }
 
 public sealed class LoggingOnlyTribePointRosterGateway(ILogger<LoggingOnlyTribePointRosterGateway> logger)

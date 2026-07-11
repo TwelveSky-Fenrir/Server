@@ -61,7 +61,7 @@ public class DowngradeItemRankServiceTests
         zone.Tick(TimeSpan.FromMilliseconds(50));
     }
 
-        private static ItemRowDto TargetRow()
+    private static ItemRowDto TargetRow()
     {
         return WorldDataTestRows.Item(TargetItemId) with
         {
@@ -69,7 +69,7 @@ public class DowngradeItemRankServiceTests
         };
     }
 
-        private static ItemRowDto CandidateRow()
+    private static ItemRowDto CandidateRow()
     {
         return WorldDataTestRows.Item(CandidateItemId) with
         {

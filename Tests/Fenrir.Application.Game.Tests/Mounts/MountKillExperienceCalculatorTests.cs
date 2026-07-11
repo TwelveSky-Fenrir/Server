@@ -10,59 +10,59 @@ public class MountKillExperienceCalculatorTests
     public void ComputeGain_MountedAndFedAndBelowCap_ReturnsBaseAmount()
     {
         Assert.Equal(Base, MountKillExperienceCalculator.ComputeGain(
-            isMounted: true, mountActivity: 50, mountExperience: 0,
-            hasDoubleExp: false, hasSessionExpUp: false));
+            true, 50, 0,
+            false, false));
     }
 
     [Fact]
     public void ComputeGain_DoubleExpFlag_DoublesTheAmount()
     {
         Assert.Equal(Base * 2, MountKillExperienceCalculator.ComputeGain(
-            true, 50, 0, hasDoubleExp: true, hasSessionExpUp: false));
+            true, 50, 0, true, false));
     }
 
     [Fact]
     public void ComputeGain_SessionExpUpFlag_DoublesTheAmount()
     {
         Assert.Equal(Base * 2, MountKillExperienceCalculator.ComputeGain(
-            true, 50, 0, hasDoubleExp: false, hasSessionExpUp: true));
+            true, 50, 0, false, true));
     }
 
     [Fact]
     public void ComputeGain_BothMultipliers_Quadruple()
     {
         Assert.Equal(Base * 4, MountKillExperienceCalculator.ComputeGain(
-            true, 50, 0, hasDoubleExp: true, hasSessionExpUp: true));
+            true, 50, 0, true, true));
     }
 
     [Fact]
     public void ComputeGain_NotMounted_IsZero()
     {
         Assert.Equal(0, MountKillExperienceCalculator.ComputeGain(
-            isMounted: false, mountActivity: 50, mountExperience: 0, hasDoubleExp: true, hasSessionExpUp: true));
+            false, 50, 0, true, true));
     }
 
     [Fact]
     public void ComputeGain_UnfedMount_IsZero()
     {
         Assert.Equal(0, MountKillExperienceCalculator.ComputeGain(
-            true, mountActivity: 0, mountExperience: 0, hasDoubleExp: false, hasSessionExpUp: false));
+            true, 0, 0, false, false));
     }
 
     [Fact]
     public void ComputeGain_AtOrAboveExperienceCap_IsZero()
     {
         Assert.Equal(0, MountKillExperienceCalculator.ComputeGain(
-            true, 50, mountExperience: MountActivityExpCodec.MaxExp, hasDoubleExp: false, hasSessionExpUp: false));
+            true, 50, MountActivityExpCodec.MaxExp, false, false));
         Assert.Equal(Base, MountKillExperienceCalculator.ComputeGain(
-            true, 50, mountExperience: MountActivityExpCodec.MaxExp - 1, hasDoubleExp: false,
-            hasSessionExpUp: false));
+            true, 50, MountActivityExpCodec.MaxExp - 1, false,
+            false));
     }
 
     [Fact]
     public void ComputeGain_HonorsAConfiguredBaseAmount()
     {
         Assert.Equal(25, MountKillExperienceCalculator.ComputeGain(
-            true, 1, 0, hasDoubleExp: false, hasSessionExpUp: false, baseAmount: 25));
+            true, 1, 0, false, false, 25));
     }
 }

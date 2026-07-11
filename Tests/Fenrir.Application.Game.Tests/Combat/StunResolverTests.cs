@@ -13,7 +13,7 @@ public class StunResolverTests
         return new CombatantSnapshot(characterId, tribe, isDead, 1000, 1000, 0, 0, 0, zoneEntryAt, default, 0);
     }
 
-        private static SkillDefinition FlatSkill(int skillId, int stunAttack = 0, int stunDefense = 0, int runTime = 0)
+    private static SkillDefinition FlatSkill(int skillId, int stunAttack = 0, int stunDefense = 0, int runTime = 0)
     {
         var skill = WorldDataTestRows.Skill(skillId) with { MaxUpgradePoint = 20 };
         var grade0 = WorldDataTestRows.SkillGrade(skillId, 0) with

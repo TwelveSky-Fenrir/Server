@@ -20,10 +20,9 @@ public sealed class EnchantItemService(
     ILogger<EnchantItemService> logger)
     : IEnchantItemService
 {
+    private const short EnchantEventCode = 24;
 
-        private const short EnchantEventCode = 24;
-
-        public async ValueTask<EnchantItemResult> EnchantAsync(EnchantItemRequest packet, Zone zone,
+    public async ValueTask<EnchantItemResult> EnchantAsync(EnchantItemRequest packet, Zone zone,
         PlayerRuntimeState state, int characterId, CancellationToken cancellationToken)
     {
         if (!NpcShopPolicy.TownZoneNumbers.Contains(zone.MapId))
@@ -162,7 +161,8 @@ public sealed class EnchantItemService(
         {
             zone.CreditNpcServiceTribeTax(state.Tribe, resolved.Cost);
 
-            if (newProtectForDestroy is not null || newProtectForDestroy2 is not null || newImproveItemValue is not null)
+            if (newProtectForDestroy is not null || newProtectForDestroy2 is not null ||
+                newImproveItemValue is not null)
                 if (!await zone.PostTribeProgressCommandAndWaitAsync(
                         new TribeProgressZoneCommand(characterId, ProtectForDestroy: newProtectForDestroy,
                             ProtectForDestroy2: newProtectForDestroy2, ImproveItemValue: newImproveItemValue),
@@ -216,7 +216,7 @@ public sealed class EnchantItemService(
         return new EnchantItemResult(EnchantItemOutcome.Applied, resultCode, resolved.Cost, resolved.NewEnchant);
     }
 
-        private static int MapResultCode(EnchantResolver.EnchantOutcome outcome, bool isWing)
+    private static int MapResultCode(EnchantResolver.EnchantOutcome outcome, bool isWing)
     {
         return outcome switch
         {

@@ -14,8 +14,7 @@ public sealed class CostumeStateService(
     IEventLogRepository eventLog,
     ILogger<CostumeStateService> logger) : ICostumeStateService
 {
-
-        private const short CostumeReturnEventCode = 1;
+    private const short CostumeReturnEventCode = 1;
 
     public async ValueTask<CostumeStateResult> ApplyAsync(Zone zone, PlayerRuntimeState state, int characterId,
         int accountId, int sort, int value, CancellationToken cancellationToken)

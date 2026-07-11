@@ -382,7 +382,7 @@ public class GuildProcTests
             CancellationToken.None);
     }
 
-        private async Task<int> CreateCharacterWithMoneyAsync(long money)
+    private async Task<int> CreateCharacterWithMoneyAsync(long money)
     {
         var characterId = await CreateCharacterAsync();
         await _characters.AdjustMoneyAsync(characterId, money, 0, CancellationToken.None);

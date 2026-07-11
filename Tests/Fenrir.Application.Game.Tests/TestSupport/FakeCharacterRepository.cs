@@ -25,15 +25,15 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
     public bool ThrowOnReplaceContainer { get; set; }
     public bool ThrowOnAdjustMoney { get; set; }
 
-        public CharacterWorldEntryDto? WorldEntryToReturn { get; set; }
+    public CharacterWorldEntryDto? WorldEntryToReturn { get; set; }
 
-        public CharacterWorldEntryBundle? WorldEntryBundleToReturn { get; set; }
+    public CharacterWorldEntryBundle? WorldEntryBundleToReturn { get; set; }
 
-        public List<CharacterPositionTvp> PersistedPositionRows { get; } = [];
+    public List<CharacterPositionTvp> PersistedPositionRows { get; } = [];
 
-        public List<CharacterProgressTvp> PersistedProgressRows { get; } = [];
+    public List<CharacterProgressTvp> PersistedProgressRows { get; } = [];
 
-        public List<(int CharacterId, int StepPermanent, int ActiveQuestId, int QSort, int TargetPhase, int KillCounter,
+    public List<(int CharacterId, int StepPermanent, int ActiveQuestId, int QSort, int TargetPhase, int KillCounter,
         long DeltaMoney, byte? Container1, IReadOnlyList<CharacterItemSlotTvp> Items1, byte? Container2,
         IReadOnlyList<CharacterItemSlotTvp> Items2)> QuestTransitions { get; } = [];
 
@@ -41,7 +41,7 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
 
     public (int CharacterId, int Delta)? LastGrantTribeTransferPermit { get; private set; }
 
-        public (int CharacterId, byte Page, byte KeyIndex, int Sort, int Value1, int Value2)? LastUpsertHotkeySlot
+    public (int CharacterId, byte Page, byte KeyIndex, int Sort, int Value1, int Value2)? LastUpsertHotkeySlot
     {
         get;
         private set;
@@ -49,7 +49,7 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
 
     public (int CharacterId, long DeltaMoney, long DeltaStoreMoney)? LastAdjustStoreMoney { get; private set; }
 
-        public (int CharacterId, long DeltaMoney, int DeltaBigMoney)? LastAdjustMoney { get; private set; }
+    public (int CharacterId, long DeltaMoney, int DeltaBigMoney)? LastAdjustMoney { get; private set; }
 
     public bool ThrowOnAdjustZone241Time { get; set; }
 
@@ -57,7 +57,7 @@ internal sealed class FakeCharacterRepository : ICharacterRepository
 
     public int Zone241Time { get; private set; }
 
-        public List<(int CharacterId, byte NewTribe, int StepPermanent, int ActiveQuestId, int QSort, int TargetPhase,
+    public List<(int CharacterId, byte NewTribe, int StepPermanent, int ActiveQuestId, int QSort, int TargetPhase,
         int KillCounter)> TribeFourConversions { get; } = [];
 
     public ValueTask ReplaceContainerAsync(int characterId, byte container,

@@ -2,8 +2,7 @@ namespace Fenrir.Application.Game.Domain.Social;
 
 public static class GuildRoleCodec
 {
-
-        public static int DbRoleToWire(byte dbRole)
+    public static int DbRoleToWire(byte dbRole)
     {
         return dbRole switch
         {
@@ -14,17 +13,17 @@ public static class GuildRoleCodec
         };
     }
 
-        public static byte WireRoleToDb(int wireRole)
+    public static byte WireRoleToDb(int wireRole)
     {
         return (byte)DbRoleToWire((byte)wireRole);
     }
 
-        public static bool IsMaster(byte dbRole)
+    public static bool IsMaster(byte dbRole)
     {
         return dbRole == 2;
     }
 
-        public static bool IsMasterOrSubMaster(byte dbRole)
+    public static bool IsMasterOrSubMaster(byte dbRole)
     {
         return dbRole is 1 or 2;
     }

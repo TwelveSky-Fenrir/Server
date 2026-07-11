@@ -9,19 +9,18 @@ public sealed class TribePointRecomputeHost(
     FavoredTribeRankBonusLadderService ladder,
     ILogger<TribePointRecomputeHost> logger) : BackgroundService
 {
+    public const int TickGate = 6;
 
-        public const int TickGate = 6;
-
-        public static readonly TimeSpan CenterTick = TimeSpan.FromSeconds(1);
+    public static readonly TimeSpan CenterTick = TimeSpan.FromSeconds(1);
 
     private int _tickCount;
 
-        public Task RunBootRecomputeAsync(CancellationToken ct)
+    public Task RunBootRecomputeAsync(CancellationToken ct)
     {
         return RunOnceAsync(ct);
     }
 
-        public async Task TickAsync(CancellationToken ct)
+    public async Task TickAsync(CancellationToken ct)
     {
         _tickCount++;
         if (_tickCount % TickGate != 0)

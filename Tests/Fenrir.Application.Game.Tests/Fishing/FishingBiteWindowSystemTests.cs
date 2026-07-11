@@ -33,7 +33,7 @@ public class FishingBiteWindowSystemTests
         return (zone, pipe, state!);
     }
 
-        [Fact]
+    [Fact]
     public void Simulate_Step2CastOverAMinuteAgo_AdvancesToStep3AndPushesUnsolicited()
     {
         var (zone, pipe, state) = SetUp(FishingLineHandler.FishingZoneNumber);

@@ -4,24 +4,22 @@ namespace Fenrir.Application.Game.Domain.Hotkeys;
 
 public static class BotHotKeyResupplyPolicy
 {
-
-        public enum ResupplyCategory
+    public enum ResupplyCategory
     {
+        None,
 
-                None,
+        Hp,
 
-                Hp,
+        Mp,
 
-                Mp,
+        HpMp,
 
-                HpMp,
+        PetPrey,
 
-                PetPrey,
-
-                PetFood
+        PetFood
     }
 
-        public static ResupplyCategory ClassifyHpMpByPotionType(int potionType1)
+    public static ResupplyCategory ClassifyHpMpByPotionType(int potionType1)
     {
         return potionType1 switch
         {
@@ -32,7 +30,7 @@ public static class BotHotKeyResupplyPolicy
         };
     }
 
-        public static ImmutableArray<ResupplyMove> Resolve(
+    public static ImmutableArray<ResupplyMove> Resolve(
         BoundCategories boundCategories,
         IReadOnlyList<InventoryCandidate> inventoryCandidates,
         IReadOnlyList<HotkeyAddress> emptyHotkeySlots,
@@ -84,23 +82,23 @@ public static class BotHotKeyResupplyPolicy
         }
     }
 
-        public readonly record struct BoundCategories(
+    public readonly record struct BoundCategories(
         bool HasHp,
         bool HasMp,
         bool HasHpMp,
         bool HasPetPrey,
         bool HasPetFood);
 
-        public readonly record struct InventoryCandidate(
+    public readonly record struct InventoryCandidate(
         byte Page,
         byte Slot,
         int ItemId,
         int Quantity,
         ResupplyCategory Category);
 
-        public readonly record struct HotkeyAddress(byte Page, byte Index);
+    public readonly record struct HotkeyAddress(byte Page, byte Index);
 
-        public readonly record struct ResupplyMove(
+    public readonly record struct ResupplyMove(
         byte SourcePage,
         byte SourceSlot,
         byte DestinationPage,

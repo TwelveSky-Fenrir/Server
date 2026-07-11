@@ -399,7 +399,7 @@ public class Zone241PersonalDungeonInstanceTests
         }
     }
 
-        private sealed class MaxValueRandom : Random
+    private sealed class MaxValueRandom : Random
     {
         public override int Next(int minValue, int maxValue)
         {

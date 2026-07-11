@@ -78,7 +78,7 @@ public class ZoneHighLevelExperienceTests
     public void StageB_ZeroToOneLevelUp_GrantsSkillPointsResetsPoolAndGrantsZone101Bonus()
     {
         var (zone, _, _, target) = SetUpCharacter(145, HighLevelExperienceResolver.MaxMainExperience,
-            level2: 0, exp2: 0);
+            0, 0);
         var priorZone101 = target.Zone101Time;
         var priorSkillPoints = target.SkillPoints;
 
@@ -96,7 +96,7 @@ public class ZoneHighLevelExperienceTests
     public void StageB_LevelUp_RecomputesMaxStatsAndFullHealsWhenAlive()
     {
         var (zone, _, _, target) = SetUpCharacter(145, HighLevelExperienceResolver.MaxMainExperience,
-            level2: 0, exp2: 0, life: 1, maxLife: 500);
+            0, 0, 1, 500);
 
         zone.ApplyHighLevelExperienceGain(target, 5000);
 
@@ -111,7 +111,7 @@ public class ZoneHighLevelExperienceTests
     public void StageB_LevelUp_DeadCharacter_RefreshesMaxButDoesNotHeal()
     {
         var (zone, _, _, target) = SetUpCharacter(145, HighLevelExperienceResolver.MaxMainExperience,
-            level2: 0, exp2: 0, life: 0, maxLife: 500);
+            0, 0, 0, 500);
 
         zone.ApplyHighLevelExperienceGain(target, 5000);
 
@@ -123,7 +123,7 @@ public class ZoneHighLevelExperienceTests
     public void StageB_LevelUp_MarksProgressionAndVitalsDirtyAndSendsABroadcast()
     {
         var (zone, dirtyTracker, pipe, target) = SetUpCharacter(145, HighLevelExperienceResolver.MaxMainExperience,
-            level2: 0, exp2: 0);
+            0, 0);
 
         zone.ApplyHighLevelExperienceGain(target, 5000);
 
@@ -140,7 +140,7 @@ public class ZoneHighLevelExperienceTests
     {
         var threshold1 = RebirthProgression.HighLevelExpTable[0];
         var (zone, _, _, target) = SetUpCharacter(145, HighLevelExperienceResolver.MaxMainExperience,
-            level2: 1, exp2: threshold1);
+            1, threshold1);
         var priorZone101 = target.Zone101Time;
 
         zone.ApplyHighLevelExperienceGain(target, 50);
@@ -154,7 +154,7 @@ public class ZoneHighLevelExperienceTests
     {
         var threshold1 = RebirthProgression.HighLevelExpTable[0];
         var (zone, dirtyTracker, pipe, target) = SetUpCharacter(145, HighLevelExperienceResolver.MaxMainExperience,
-            level2: 1, exp2: 0);
+            1, 0);
         var priorStatPoints = target.StatPoints;
         var gain = 100_000_000;
 
@@ -175,7 +175,7 @@ public class ZoneHighLevelExperienceTests
     public void StageB_Level12FullyMaxed_IsSilentNoOp()
     {
         var (zone, dirtyTracker, pipe, target) = SetUpCharacter(145, HighLevelExperienceResolver.MaxMainExperience,
-            level2: 12, exp2: HighLevelExperienceResolver.RebirthTierExperienceCeiling);
+            12, HighLevelExperienceResolver.RebirthTierExperienceCeiling);
 
         zone.ApplyHighLevelExperienceGain(target, 1_000_000);
 
@@ -188,9 +188,9 @@ public class ZoneHighLevelExperienceTests
     public void StageB_AntiCheatFlagged_IsSilentNoOp()
     {
         var (zone, dirtyTracker, pipe, target) = SetUpCharacter(145, HighLevelExperienceResolver.MaxMainExperience,
-            level2: 3, exp2: 100);
+            3, 100);
 
-        zone.ApplyHighLevelExperienceGain(target, 5_000_000, antiCheatExperienceFlagged: true);
+        zone.ApplyHighLevelExperienceGain(target, 5_000_000, true);
 
         Assert.Equal(100, target.Exp2);
         Assert.Empty(dirtyTracker.DrainAll());

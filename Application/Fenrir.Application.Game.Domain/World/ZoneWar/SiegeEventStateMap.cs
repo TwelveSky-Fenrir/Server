@@ -2,8 +2,7 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 
 public static class SiegeEventStateMap
 {
-
-        public static bool TryMapZone175(int eventCode, out int state)
+    public static bool TryMapZone175(int eventCode, out int state)
     {
         state = eventCode switch
         {
@@ -36,7 +35,7 @@ public static class SiegeEventStateMap
         return state >= 0;
     }
 
-        public static bool TryMapZone267(int eventCode, out int state)
+    public static bool TryMapZone267(int eventCode, out int state)
     {
         state = eventCode switch
         {
@@ -54,7 +53,7 @@ public static class SiegeEventStateMap
         return state >= 0;
     }
 
-        public static bool TryMapZone335(int eventCode, out int state)
+    public static bool TryMapZone335(int eventCode, out int state)
     {
         state = eventCode switch
         {
@@ -70,7 +69,7 @@ public static class SiegeEventStateMap
         return state >= 0;
     }
 
-        public static bool TryMapZone241(int eventCode, out DenOfRebirthChallengeState state)
+    public static bool TryMapZone241(int eventCode, out DenOfRebirthChallengeState state)
     {
         switch (eventCode)
         {

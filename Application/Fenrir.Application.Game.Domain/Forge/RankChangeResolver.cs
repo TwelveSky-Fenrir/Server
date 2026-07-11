@@ -19,9 +19,9 @@ public static class RankChangeResolver
     private const int MaxBaseLevel = 145;
     private const int MaxMartialLevel = 12;
 
-        private const int WarlordRerollEncodedLevel = MaxBaseLevel + MaxMartialLevel;
+    private const int WarlordRerollEncodedLevel = MaxBaseLevel + MaxMartialLevel;
 
-        private const byte CapeSort = 8;
+    private const byte CapeSort = 8;
 
     private const int RareUp145P1024 = 10;
     private const int RareUp145POther = 20;
@@ -205,7 +205,7 @@ public static class RankChangeResolver
         return (144 + target.MartialLevel, materialItemId == 1024 ? p1024Rest : pOtherRest);
     }
 
-        private static int GetTieredMoney(short[] baseLevels, int increment, int maxMartialInclusive, short level,
+    private static int GetTieredMoney(short[] baseLevels, int increment, int maxMartialInclusive, short level,
         byte martialLevel)
     {
         var index = Array.IndexOf(baseLevels, level);
@@ -218,7 +218,7 @@ public static class RankChangeResolver
         return increment * (index + 1);
     }
 
-        private static ItemDefinition? FindReplacement(
+    private static ItemDefinition? FindReplacement(
         ItemDefinition target, int encodedLevel, bool isUpgrade,
         IEnumerable<ItemDefinition> catalog, IRandomSource random)
     {
@@ -288,7 +288,7 @@ public static class RankChangeResolver
         return 0;
     }
 
-        public readonly record struct RankChangeResult(
+    public readonly record struct RankChangeResult(
         RankChangeOutcome Outcome,
         int Cost,
         int ResultItemId,

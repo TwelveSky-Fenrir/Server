@@ -17,7 +17,7 @@ public sealed class PartyCrossShardRelayHandler(
 {
     public SocialCrossShardRelayKind Kind => SocialCrossShardRelayKind.Party;
 
-        public ValueTask HandleAskAsync(SocialCrossShardRelayDto ask, CancellationToken ct)
+    public ValueTask HandleAskAsync(SocialCrossShardRelayDto ask, CancellationToken ct)
     {
         if (!zones.TryGetPlayer(ask.TargetCharacterId, out var target))
         {
@@ -40,7 +40,7 @@ public sealed class PartyCrossShardRelayHandler(
         return ValueTask.CompletedTask;
     }
 
-        public ValueTask HandleAnswerAsync(SocialCrossShardRelayDto answer, CancellationToken ct)
+    public ValueTask HandleAnswerAsync(SocialCrossShardRelayDto answer, CancellationToken ct)
     {
         if (!parties.TryConsumeCrossShardOutbound(answer.TargetCharacterId, out _))
         {
@@ -105,7 +105,7 @@ public sealed class PartyCrossShardRelayHandler(
             ask.RelayId));
     }
 
-        private PartyRosterResponse BuildRosterLocalOnly(int sort, IReadOnlyList<int> memberIds)
+    private PartyRosterResponse BuildRosterLocalOnly(int sort, IReadOnlyList<int> memberIds)
     {
         Span<string> names = ["", "", "", "", ""];
         for (var i = 0; i < memberIds.Count && i < 5; i++)

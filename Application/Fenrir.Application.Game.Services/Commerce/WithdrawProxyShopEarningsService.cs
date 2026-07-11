@@ -12,10 +12,9 @@ public sealed class WithdrawProxyShopEarningsService(
     IEventLogRepository eventLog,
     ILogger<WithdrawProxyShopEarningsService> logger) : IWithdrawProxyShopEarningsService
 {
+    private const short ProxyShopWithdrawEventCode = 4;
 
-        private const short ProxyShopWithdrawEventCode = 4;
-
-        private const int NothingToWithdrawErrorNumber = 50340;
+    private const int NothingToWithdrawErrorNumber = 50340;
 
     public async ValueTask<WithdrawProxyShopEarningsResponse> WithdrawAsync(int characterId, int accountId,
         int money, int bigMoney, CancellationToken cancellationToken)

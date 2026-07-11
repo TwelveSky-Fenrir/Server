@@ -2,10 +2,9 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 
 public interface IRegularWarRewardValueProvider
 {
+    public long GetMoneyReward(short rebirthTier);
 
-        public long GetMoneyReward(short rebirthTier);
-
-        public int GetExperienceReward(short level);
+    public int GetExperienceReward(short level);
 }
 
 public sealed class UnavailableRegularWarRewardValueProvider : IRegularWarRewardValueProvider

@@ -4,12 +4,11 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 
 public interface IHolyStoneCaptureRewardGateway
 {
+    public void GrantCaptureReward(PlayerRuntimeState capturer);
 
-        public void GrantCaptureReward(PlayerRuntimeState capturer);
+    public void GrantParticipationReward(PlayerRuntimeState tribemate);
 
-        public void GrantParticipationReward(PlayerRuntimeState tribemate);
-
-        public void AdvanceQuestProgress(PlayerRuntimeState tribemate);
+    public void AdvanceQuestProgress(PlayerRuntimeState tribemate);
 }
 
 public sealed class LoggingOnlyHolyStoneCaptureRewardGateway(ILogger<LoggingOnlyHolyStoneCaptureRewardGateway> logger)

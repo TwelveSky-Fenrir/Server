@@ -79,7 +79,7 @@ public class FormationSkillCatalogTests
     public void IsFormationSkillZoneLocked_True_InThe124TypeZone(int skillNumber)
     {
         Assert.True(FormationSkillCatalog.IsFormationSkillZoneLocked(skillNumber,
-            FormationSkillCatalog.Zone124TypeMapId, isRegularWarMap: false));
+            FormationSkillCatalog.Zone124TypeMapId, false));
     }
 
     [Theory]
@@ -92,7 +92,7 @@ public class FormationSkillCatalogTests
     public void IsFormationSkillZoneLocked_True_InA049TypeRegularWarZone(int skillNumber)
     {
         Assert.True(FormationSkillCatalog.IsFormationSkillZoneLocked(skillNumber, RegularWarMapId,
-            isRegularWarMap: true));
+            true));
     }
 
     [Theory]
@@ -101,7 +101,7 @@ public class FormationSkillCatalogTests
     public void IsFormationSkillZoneLocked_False_InAnOrdinaryNonWarZone(int skillNumber)
     {
         Assert.False(FormationSkillCatalog.IsFormationSkillZoneLocked(skillNumber, OrdinaryZoneId,
-            isRegularWarMap: false));
+            false));
     }
 
     [Theory]
@@ -111,7 +111,7 @@ public class FormationSkillCatalogTests
     public void IsFormationSkillZoneLocked_False_ForNonFormationSkills_EvenInA124TypeZone(int skillNumber)
     {
         Assert.False(FormationSkillCatalog.IsFormationSkillZoneLocked(skillNumber,
-            FormationSkillCatalog.Zone124TypeMapId, isRegularWarMap: true));
+            FormationSkillCatalog.Zone124TypeMapId, true));
     }
 
     [Fact]
@@ -205,10 +205,10 @@ public class FormationSkillCatalogTests
     [InlineData(81)]
     public void IsExemptFromGradeBoundCheck_True_ForPartyBuffSkills_InBothHandlers(int skillNumber)
     {
-        Assert.True(FormationSkillCatalog.IsExemptFromGradeBoundCheck(skillNumber, actionSort: 64,
-            isPrimaryHandler: true));
-        Assert.True(FormationSkillCatalog.IsExemptFromGradeBoundCheck(skillNumber, actionSort: 65,
-            isPrimaryHandler: false));
+        Assert.True(FormationSkillCatalog.IsExemptFromGradeBoundCheck(skillNumber, 64,
+            true));
+        Assert.True(FormationSkillCatalog.IsExemptFromGradeBoundCheck(skillNumber, 65,
+            false));
     }
 
     [Theory]
@@ -216,27 +216,27 @@ public class FormationSkillCatalogTests
     [InlineData(80)]
     public void IsExemptFromGradeBoundCheck_True_ForEmptyCaseSkills_InBothHandlers(int skillNumber)
     {
-        Assert.True(FormationSkillCatalog.IsExemptFromGradeBoundCheck(skillNumber, actionSort: 0,
-            isPrimaryHandler: true));
-        Assert.True(FormationSkillCatalog.IsExemptFromGradeBoundCheck(skillNumber, actionSort: 0,
-            isPrimaryHandler: false));
+        Assert.True(FormationSkillCatalog.IsExemptFromGradeBoundCheck(skillNumber, 0,
+            true));
+        Assert.True(FormationSkillCatalog.IsExemptFromGradeBoundCheck(skillNumber, 0,
+            false));
     }
 
     [Fact]
     public void IsExemptFromGradeBoundCheck_BottleSort16_ExemptInPrimaryHandlerOnly()
     {
         Assert.True(FormationSkillCatalog.IsExemptFromGradeBoundCheck(FormationSkillCatalog.BottleSkillNumber,
-            FormationSkillCatalog.BottleExemptionActionSort, isPrimaryHandler: true));
+            FormationSkillCatalog.BottleExemptionActionSort, true));
 
         Assert.False(FormationSkillCatalog.IsExemptFromGradeBoundCheck(FormationSkillCatalog.BottleSkillNumber,
-            FormationSkillCatalog.BottleExemptionActionSort, isPrimaryHandler: false));
+            FormationSkillCatalog.BottleExemptionActionSort, false));
     }
 
     [Fact]
     public void IsExemptFromGradeBoundCheck_Bottle_NotExempt_ForOtherActionSort()
     {
         Assert.False(FormationSkillCatalog.IsExemptFromGradeBoundCheck(FormationSkillCatalog.BottleSkillNumber,
-            actionSort: 15, isPrimaryHandler: true));
+            15, true));
     }
 
     [Theory]
@@ -245,8 +245,8 @@ public class FormationSkillCatalogTests
     public void IsExemptFromGradeBoundCheck_False_ForDefaultCaseSkills(int skillNumber, int actionSort)
     {
         Assert.False(FormationSkillCatalog.IsExemptFromGradeBoundCheck(skillNumber, actionSort,
-            isPrimaryHandler: true));
+            true));
         Assert.False(FormationSkillCatalog.IsExemptFromGradeBoundCheck(skillNumber, actionSort,
-            isPrimaryHandler: false));
+            false));
     }
 }

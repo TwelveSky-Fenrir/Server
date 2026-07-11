@@ -7,8 +7,7 @@ namespace Fenrir.Application.Game.Hosting.World;
 
 public interface ICharacterWriteBehindFlusher : IWriteBehindFlusher
 {
-
-        public ValueTask FlushCharacterNowAsync(int characterId, CancellationToken ct);
+    public ValueTask FlushCharacterNowAsync(int characterId, CancellationToken ct);
 }
 
 public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWriteBehindFlusher
@@ -69,7 +68,7 @@ public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWrite
         _flusher.RequestImmediateFlush();
     }
 
-        public async ValueTask FlushCharacterNowAsync(int characterId, CancellationToken ct)
+    public async ValueTask FlushCharacterNowAsync(int characterId, CancellationToken ct)
     {
         await _flushGate.WaitAsync(ct).ConfigureAwait(false);
         try
@@ -99,7 +98,7 @@ public sealed class PositionWriteBehindHost : BackgroundService, ICharacterWrite
         }
     }
 
-        public async ValueTask DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         await _flusher.DisposeAsync().ConfigureAwait(false);
         _flushGate.Dispose();

@@ -5,7 +5,6 @@ namespace Fenrir.Application.Game.Tests.Stats;
 
 public class CostumeContributionTests
 {
-
     [Theory]
     [InlineData(301)]
     [InlineData(402)]
@@ -84,7 +83,11 @@ public class CostumeContributionTests
         foreach (var id in StatCalculator.ValidCostumeIds)
             Assert.False(StatCalculator.IsDecoStatCostume(id));
 
-        int[] decoIds = [101, 151, 594, 595, 596, 1385, 1389, 1393, 1483, 1484, 1485, 2307, 2308, 2309, 8010, 8011, 8012, 91483, 91488];
+        int[] decoIds =
+        [
+            101, 151, 594, 595, 596, 1385, 1389, 1393, 1483, 1484, 1485, 2307, 2308, 2309, 8010, 8011, 8012, 91483,
+            91488
+        ];
         foreach (var id in decoIds)
             Assert.False(StatCalculator.IsValidCostume(id));
     }
@@ -93,35 +96,35 @@ public class CostumeContributionTests
     [Fact]
     public void CostumeBaseStatBlock_ItemNotFound_IsAllZero()
     {
-        var block = StatCalculator.ComputeCostumeBaseStatBlock(301, itemFound: false, 50, 60, 70, 80);
-        Assert.Equal(default(CostumeBaseStatBlock), block);
+        var block = StatCalculator.ComputeCostumeBaseStatBlock(301, false, 50, 60, 70, 80);
+        Assert.Equal(default, block);
     }
 
     [Fact]
     public void CostumeBaseStatBlock_PlainItem_CopiesRawStats()
     {
-        var block = StatCalculator.ComputeCostumeBaseStatBlock(500, itemFound: true, 5, 6, 7, 8);
+        var block = StatCalculator.ComputeCostumeBaseStatBlock(500, true, 5, 6, 7, 8);
         Assert.Equal(new CostumeBaseStatBlock(5, 6, 7, 8), block);
     }
 
     [Fact]
     public void CostumeBaseStatBlock_ValidCostume_AddsFlat100ToEachStat()
     {
-        var block = StatCalculator.ComputeCostumeBaseStatBlock(301, itemFound: true, 10, 20, 30, 40);
+        var block = StatCalculator.ComputeCostumeBaseStatBlock(301, true, 10, 20, 30, 40);
         Assert.Equal(new CostumeBaseStatBlock(110, 120, 130, 140), block);
     }
 
     [Fact]
     public void CostumeBaseStatBlock_DecoItem_ClampsEachStatUpTo100()
     {
-        var block = StatCalculator.ComputeCostumeBaseStatBlock(101, itemFound: true, 10, 20, 30, 40);
+        var block = StatCalculator.ComputeCostumeBaseStatBlock(101, true, 10, 20, 30, 40);
         Assert.Equal(new CostumeBaseStatBlock(100, 100, 100, 100), block);
     }
 
     [Fact]
     public void CostumeBaseStatBlock_DecoItem_LeavesStatsAtOrAbove100Unchanged()
     {
-        var block = StatCalculator.ComputeCostumeBaseStatBlock(151, itemFound: true, 150, 20, 200, 99);
+        var block = StatCalculator.ComputeCostumeBaseStatBlock(151, true, 150, 20, 200, 99);
         Assert.Equal(new CostumeBaseStatBlock(150, 100, 200, 100), block);
     }
 
@@ -188,7 +191,7 @@ public class CostumeContributionTests
     [Fact]
     public void VitKiStrWisContributions_AddCsWithoutPositiveGuard()
     {
-        var block = new CostumeBaseStatBlock(Vitality: 110, Strength: 120, Intelligence: 130, Dexterity: 140);
+        var block = new CostumeBaseStatBlock(110, 120, 130, 140);
 
         Assert.Equal(115, StatCalculator.CostumeVitalityContribution(block, 5));
         Assert.Equal(135, StatCalculator.CostumeKiContribution(block, 5));
@@ -204,7 +207,7 @@ public class CostumeContributionTests
     [Fact]
     public void KiContribution_ReadsIntelligence_WisdomContribution_ReadsDexterity()
     {
-        var block = new CostumeBaseStatBlock(Vitality: 1, Strength: 2, Intelligence: 3, Dexterity: 4);
+        var block = new CostumeBaseStatBlock(1, 2, 3, 4);
 
         Assert.Equal(3, StatCalculator.CostumeKiContribution(block, 0));
         Assert.Equal(4, StatCalculator.CostumeWisdomContribution(block, 0));

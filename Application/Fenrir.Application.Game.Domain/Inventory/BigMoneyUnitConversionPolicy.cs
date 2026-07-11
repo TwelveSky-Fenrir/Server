@@ -6,20 +6,20 @@ public static class BigMoneyUnitConversionPolicy
     {
         Success,
 
-                QuantityBelowMinimum,
+        QuantityBelowMinimum,
 
-                InsufficientSourceBalance,
+        InsufficientSourceBalance,
 
-                DestinationOverflow
+        DestinationOverflow
     }
 
-        public const long MoneyCeiling = 2_000_000_000;
+    public const long MoneyCeiling = 2_000_000_000;
 
-        public const long BigMoneyUnitValue = 1_000_000_000;
+    public const long BigMoneyUnitValue = 1_000_000_000;
 
-        public const long BigMoneyCap = 999;
+    public const long BigMoneyCap = 999;
 
-        public static BigMoneyUnitConversionResult ResolveMoneyToBigMoney(
+    public static BigMoneyUnitConversionResult ResolveMoneyToBigMoney(
         long requestedQuantity, long inventoryMoney, long inventoryBigMoney)
     {
         if (requestedQuantity < BigMoneyUnitValue)
@@ -39,7 +39,7 @@ public static class BigMoneyUnitConversionPolicy
             inventoryMoney - requestedQuantity, newInventoryBigMoney);
     }
 
-        public static BigMoneyUnitConversionResult ResolveBigMoneyToMoney(
+    public static BigMoneyUnitConversionResult ResolveBigMoneyToMoney(
         long requestedQuantity, long inventoryBigMoney, long inventoryMoney)
     {
         if (requestedQuantity < 1)
@@ -59,7 +59,7 @@ public static class BigMoneyUnitConversionPolicy
             newInventoryMoney, inventoryBigMoney - 1);
     }
 
-        public readonly record struct BigMoneyUnitConversionResult(
+    public readonly record struct BigMoneyUnitConversionResult(
         BigMoneyUnitConversionOutcome Outcome,
         long NewInventoryMoney,
         long NewInventoryBigMoney)

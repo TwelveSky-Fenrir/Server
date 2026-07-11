@@ -7,7 +7,6 @@ namespace Fenrir.Network.Serialization.Tests.Packets.Login;
 
 public class LcUserAvatarRecv2Tests
 {
-
     private const byte GoldenFirstKey = 0x10;
     private const byte GoldenSteadyKey = 0xFE;
 

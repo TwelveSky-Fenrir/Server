@@ -17,8 +17,7 @@ namespace Fenrir.Application.Game.Tests.Social;
 
 public class GuildInviteServiceTests
 {
-
-        private static (ZoneRegistry Zones, PlayerRuntimeState Asker, PlayerRuntimeState Target) MakeAskerAndTarget(
+    private static (ZoneRegistry Zones, PlayerRuntimeState Asker, PlayerRuntimeState Target) MakeAskerAndTarget(
         byte tribe = 1, short mapId = 5)
     {
         var zones = ZoneTestKit.CreateRegistry();
@@ -67,7 +66,7 @@ public class GuildInviteServiceTests
         Assert.Equal(GuildInviteAskResultKind.Sent, result);
     }
 
-        [Fact]
+    [Fact]
     public async Task Ask_TargetOnDifferentMapSameShard_Sends()
     {
         var zones = ZoneTestKit.CreateRegistry();
@@ -220,7 +219,7 @@ public class GuildInviteServiceTests
         Assert.Equal(GuildInviteAskResultKind.TargetBusy, result);
     }
 
-        [Fact]
+    [Fact]
     public async Task Ask_TargetMovingZone_ReturnsTargetBusy()
     {
         var (zones, asker, target) = MakeAskerAndTarget();
@@ -232,7 +231,7 @@ public class GuildInviteServiceTests
         Assert.Equal(GuildInviteAskResultKind.TargetBusy, result);
     }
 
-        [Fact]
+    [Fact]
     public async Task Ask_AskerMovingZone_DoesNotBlockAsk()
     {
         var (zones, asker, target) = MakeAskerAndTarget();
@@ -244,7 +243,7 @@ public class GuildInviteServiceTests
         Assert.Equal(GuildInviteAskResultKind.Sent, result);
     }
 
-        [Fact]
+    [Fact]
     public async Task Ask_SameShardMiss_ResolvesCrossShard_PublishesAskAndReturnsSentCrossShard()
     {
         var (zones, asker, _) = MakeAskerAndTarget();

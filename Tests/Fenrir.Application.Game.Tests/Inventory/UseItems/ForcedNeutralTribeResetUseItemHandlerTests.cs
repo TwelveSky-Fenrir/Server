@@ -37,7 +37,7 @@ public class ForcedNeutralTribeResetUseItemHandlerTests
 
     private static (Zone Zone, PlayerRuntimeState State, FakeCharacterRepository Characters,
         ForcedNeutralTribeResetUseItemHandler Handler) SetUp(bool neutralHomeZoneOnline = true,
-        short configuredHomeMapId = HomeMapId)
+            short configuredHomeMapId = HomeMapId)
     {
         var zone = ZoneTestKit.CreateZone(1);
         var (session, pipe) = ZoneTestKit.CreateSession(CharacterId);
@@ -193,7 +193,7 @@ public class ForcedNeutralTribeResetUseItemHandlerTests
     [Fact]
     public async Task NeutralHomeZoneNotHostedByAnyLiveShard_FailsCleanly_EvenWhenEveryOtherPreconditionPasses()
     {
-        var (zone, state, characters, handler) = SetUp(neutralHomeZoneOnline: false);
+        var (zone, state, characters, handler) = SetUp(false);
         state.Tribe = 0;
         state.Level = 120;
 

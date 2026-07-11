@@ -24,7 +24,7 @@ public static class AvatarActionResumeWhitelist
         [95] = AllTypes
     }.ToFrozenDictionary();
 
-        public static bool IsLegal(int sort, int type)
+    public static bool IsLegal(int sort, int type)
     {
         return type is >= 0 and <= 7 && TypeMasksBySort.TryGetValue(sort, out var mask) &&
                (mask & (1 << type)) != 0;

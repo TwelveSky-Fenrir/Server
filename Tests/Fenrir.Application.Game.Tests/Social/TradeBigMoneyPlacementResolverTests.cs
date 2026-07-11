@@ -4,7 +4,6 @@ namespace Fenrir.Application.Game.Tests.Social;
 
 public class TradeBigMoneyPlacementResolverTests
 {
-
     [Fact]
     public void ResolveToTradeOffer_NeitherSideConfirmed_IsNotLocked()
     {

@@ -5,14 +5,13 @@ namespace Fenrir.Application.Game.Domain.World.Loot;
 
 public static class MountVariantBox8115RewardTable
 {
+    public const int BoxId = 8115;
 
-        public const int BoxId = 8115;
+    public const int PityCeiling = 200;
 
-        public const int PityCeiling = 200;
+    public static readonly ImmutableArray<int> PityRewardItemIds = [1307, 1315];
 
-        public static readonly ImmutableArray<int> PityRewardItemIds = [1307, 1315];
-
-        public static readonly ImmutableArray<LootBoxRewardResolver.RewardPool> Pools =
+    public static readonly ImmutableArray<LootBoxRewardResolver.RewardPool> Pools =
     [
         new(49, [1307, 1315, 1319]),
         new(69, [1308, 1309, 1322, 1325, 1328]),
@@ -22,10 +21,10 @@ public static class MountVariantBox8115RewardTable
         new(149, [1166, 1118, 1103, 1222, 1145, 1237, 8101, 8102, 8106])
     ];
 
-        public static readonly BoxRewardSpec Spec =
+    public static readonly BoxRewardSpec Spec =
         BoxRewardSpec.RareBandThenPools(BoxId, ImmutableArray<LootBoxRewardResolver.RewardBand>.Empty, Pools);
 
-        public static MountVariantBoxRollResult Roll(int currentPityCounter, Random random)
+    public static MountVariantBoxRollResult Roll(int currentPityCounter, Random random)
     {
         var pity = LootBoxRewardResolver.PityStep(currentPityCounter, PityCeiling);
         if (pity.Triggered)
@@ -38,6 +37,8 @@ public static class MountVariantBox8115RewardTable
         return new MountVariantBoxRollResult(rewardId, pity.NewCounter, false);
     }
 
-        public readonly record struct MountVariantBoxRollResult(int RewardItemId, int NewPityCounter,
+    public readonly record struct MountVariantBoxRollResult(
+        int RewardItemId,
+        int NewPityCounter,
         bool WasPityTriggered);
 }

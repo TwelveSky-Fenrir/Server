@@ -5,10 +5,9 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 
 public enum TribeSymbolBattleSchedulePhase : byte
 {
+    WaitingForHour,
 
-        WaitingForHour,
-
-        Counting
+    Counting
 }
 
 public sealed class TribeSymbolBattleScheduler(
@@ -18,26 +17,25 @@ public sealed class TribeSymbolBattleScheduler(
     IReadOnlySet<DayOfWeek>? allowedDays = null,
     bool testMode = false)
 {
+    public const int OpenHour = 20;
 
-        public const int OpenHour = 20;
+    public const int CloseHour = 22;
 
-        public const int CloseHour = 22;
-
-        public const int CountdownMinutes = 10;
+    public const int CountdownMinutes = 10;
 
     private readonly MinuteCountdown _countdown = new();
 
-        public IReadOnlySet<DayOfWeek> AllowedDays { get; } = allowedDays ?? new HashSet<DayOfWeek>();
+    public IReadOnlySet<DayOfWeek> AllowedDays { get; } = allowedDays ?? new HashSet<DayOfWeek>();
 
     public TribeSymbolBattleSchedulePhase Phase { get; private set; } = TribeSymbolBattleSchedulePhase.WaitingForHour;
 
-        public int MinutesRemainingInCountdown =>
+    public int MinutesRemainingInCountdown =>
         Phase != TribeSymbolBattleSchedulePhase.Counting ||
         _countdown.MinutesElapsed is 0 or > CountdownMinutes
             ? 0
             : CountdownMinutes + 1 - _countdown.MinutesElapsed;
 
-        public void Tick(TimeSpan elapsed, DateTime utcNow)
+    public void Tick(TimeSpan elapsed, DateTime utcNow)
     {
         switch (Phase)
         {

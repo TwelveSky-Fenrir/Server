@@ -11,18 +11,17 @@ public enum DuelAskResultKind
     TargetBusy,
     Sent,
 
-        ChallengerAlreadyDueling
+    ChallengerAlreadyDueling
 }
 
 public interface IDuelService
 {
-
-        public ValueTask<DuelAskResultKind> AskAsync(Zone zone, PlayerRuntimeState challenger, string targetAvatarName,
+    public ValueTask<DuelAskResultKind> AskAsync(Zone zone, PlayerRuntimeState challenger, string targetAvatarName,
         int sort, CancellationToken cancellationToken);
 
-        public void Answer(int targetId, int answerCode);
+    public void Answer(int targetId, int answerCode);
 
-        public void Cancel(int challengerId);
+    public void Cancel(int challengerId);
 
-        public void Start(int callerId);
+    public void Start(int callerId);
 }

@@ -8,13 +8,12 @@ namespace Fenrir.Application.Game.Domain.Inventory.UseItems;
 
 public static class UseItemStatRecompute
 {
-
-        public static EffectiveStats WithTitleHalo(PlayerRuntimeState state, WorldDataCache worldData, int title, int halo)
+    public static EffectiveStats WithTitleHalo(PlayerRuntimeState state, WorldDataCache worldData, int title, int halo)
     {
         return Recompute(state, worldData, state.Inventory.GetContainer(ContainerMatrix.Equipment), title, halo);
     }
 
-        public static EffectiveStats WithEquipment(PlayerRuntimeState state, WorldDataCache worldData,
+    public static EffectiveStats WithEquipment(PlayerRuntimeState state, WorldDataCache worldData,
         ImmutableDictionary<byte, ItemStack> equipmentContainer)
     {
         return Recompute(state, worldData, equipmentContainer, state.Title, state.Halo);
@@ -33,6 +32,6 @@ public static class UseItemStatRecompute
             worldData.ItemsById);
 
         return EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData, state.Buffs,
-            petContribution, runtimeState: state);
+            petContribution, state);
     }
 }

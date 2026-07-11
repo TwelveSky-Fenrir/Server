@@ -6,17 +6,17 @@ public static class StatPotionResolver
     {
         Success,
 
-                AlreadyMaxed,
+        AlreadyMaxed,
 
-                PreconditionFailed
+        PreconditionFailed
     }
 
     public const int OrdinaryTierCap = 200;
     public const int G12TierCap = 400;
 
-        public const int RequiredLevel2 = 12;
+    public const int RequiredLevel2 = 12;
 
-        public static OrdinaryResult ResolveOrdinary(int currentCount, int perUnitAmount, int requestedBulkCount)
+    public static OrdinaryResult ResolveOrdinary(int currentCount, int perUnitAmount, int requestedBulkCount)
     {
         var coercedCount =
             BankedCounterMath.CoerceBulkToHeadroom(currentCount, OrdinaryTierCap, perUnitAmount, requestedBulkCount);
@@ -27,7 +27,7 @@ public static class StatPotionResolver
         return new OrdinaryResult(Outcome.Success, currentCount + perUnitAmount * coercedCount, coercedCount);
     }
 
-        public static G12Result ResolveG12(int currentCount, int level2, int requestedBulkCount)
+    public static G12Result ResolveG12(int currentCount, int level2, int requestedBulkCount)
     {
         if (currentCount < OrdinaryTierCap || currentCount >= G12TierCap || level2 < RequiredLevel2)
             return new G12Result(Outcome.PreconditionFailed, currentCount, 0);

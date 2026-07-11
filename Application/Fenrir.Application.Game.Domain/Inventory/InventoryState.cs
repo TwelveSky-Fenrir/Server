@@ -17,12 +17,12 @@ public sealed class InventoryState
         return GetContainer(container).TryGetValue(slot, out var stack) ? stack : null;
     }
 
-        public void ReplaceContainer(byte container, ImmutableDictionary<byte, ItemStack> slots)
+    public void ReplaceContainer(byte container, ImmutableDictionary<byte, ItemStack> slots)
     {
         _containers[container] = slots;
     }
 
-        public void Seed(IReadOnlyList<CharacterItemSlotDto> rows)
+    public void Seed(IReadOnlyList<CharacterItemSlotDto> rows)
     {
         var builders = new Dictionary<byte, ImmutableDictionary<byte, ItemStack>.Builder>();
 

@@ -15,8 +15,7 @@ namespace Fenrir.Application.Game.Tests.Handlers.Commerce;
 
 public class OpenShopStallServiceProxyRegistrationTests
 {
-
-        private static async Task<OpenShopStallResponse> RunToCompletionAsync(ValueTask<OpenShopStallResponse> pending,
+    private static async Task<OpenShopStallResponse> RunToCompletionAsync(ValueTask<OpenShopStallResponse> pending,
         Zone zone)
     {
         var task = pending.AsTask();
@@ -123,7 +122,7 @@ public class OpenShopStallServiceProxyRegistrationTests
         Assert.Contains((characterId, (byte)0), offlineShops.ClosedStates);
     }
 
-        private sealed class OpenTrackingOfflineShopRepository : IOfflineShopRepository
+    private sealed class OpenTrackingOfflineShopRepository : IOfflineShopRepository
     {
         public List<(int CharacterId, byte ShopState)> ClosedStates { get; } = [];
         public int? LastOpenedCharacterId { get; private set; }

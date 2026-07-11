@@ -4,11 +4,11 @@
 -- checks); the re-verification here (occupied destination slot) closes the same TOCTOU window
 -- usp_Character_AdjustStoreMoney's own guarded UPDATE closes for its family, not a duplicate of app-side
 -- validation.
-CREATE PROCEDURE game.usp_CharacterPetBag_Deposit @CharacterId        INT,
-                                                   @InventoryContainer TINYINT,
-                                                   @InventoryItems     game.tvp_CharacterItemSlot READONLY,
-                                                   @PetBagSlot         TINYINT,
-                                                   @PetItemId          INT
+CREATE PROCEDURE game.usp_CharacterPetBag_Deposit @CharacterId INT,
+                                                  @InventoryContainer TINYINT,
+                                                  @InventoryItems game.tvp_CharacterItemSlot READONLY,
+                                                  @PetBagSlot TINYINT,
+                                                  @PetItemId INT
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -19,7 +19,8 @@ BEGIN
     IF EXISTS (SELECT 1 FROM game.CharacterPetBag WHERE CharacterId = @CharacterId AND Slot = @PetBagSlot)
         THROW 50350, N'Pet-bag destination slot already occupied.', 1;
 
-    DELETE FROM game.CharacterItems
+    DELETE
+    FROM game.CharacterItems
     WHERE CharacterId = @CharacterId
       AND Container = @InventoryContainer;
 

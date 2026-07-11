@@ -2,18 +2,16 @@ namespace Fenrir.Application.Game.Domain.World;
 
 public enum PortalProximityOutcome
 {
+    Allowed,
 
-        Allowed,
-
-        RejectedNotNearRegisteredPortal
+    RejectedNotNearRegisteredPortal
 }
 
 public static class PortalProximityGate
 {
+    public const int PortalMoveReasonSort = 4;
 
-        public const int PortalMoveReasonSort = 4;
-
-        public const float ProximityRadius = 30f;
+    public const float ProximityRadius = 30f;
 
     private const float ProximityRadiusSquared = ProximityRadius * ProximityRadius;
 

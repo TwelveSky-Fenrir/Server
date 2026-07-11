@@ -83,7 +83,7 @@ public static class QuestStateMachine
         };
     }
 
-        public static AcceptResult Accept(QuestProgress progress, byte tribe, short level, QuestCatalog catalog,
+    public static AcceptResult Accept(QuestProgress progress, byte tribe, short level, QuestCatalog catalog,
         Func<int, bool> hasItem)
     {
         if (ComputePresentState(progress, tribe, level, catalog, hasItem) != StateCanAccept)
@@ -107,7 +107,7 @@ public static class QuestStateMachine
         return new AcceptResult(true, newProgress, depositItemId);
     }
 
-        public static CompleteResult Complete(QuestProgress progress, byte tribe, short level, QuestCatalog catalog,
+    public static CompleteResult Complete(QuestProgress progress, byte tribe, short level, QuestCatalog catalog,
         Func<int, bool> hasItem, Func<int, byte?> itemSort)
     {
         if (!ComputeEndConditionMet(progress, tribe, level, catalog, hasItem))
@@ -156,7 +156,7 @@ public static class QuestStateMachine
             teacherPoint);
     }
 
-        public static bool TryReceive(QuestProgress progress, byte tribe, short level, QuestCatalog catalog,
+    public static bool TryReceive(QuestProgress progress, byte tribe, short level, QuestCatalog catalog,
         Func<int, bool> hasItem, out int depositItemId)
     {
         depositItemId = 0;
@@ -195,7 +195,7 @@ public static class QuestStateMachine
         return new ExchangeResult(true, newProgress, q.Solution1 ?? 0, q.Solution2 ?? 0);
     }
 
-        public static bool TryAbandon(QuestProgress progress, byte tribe, short level, QuestCatalog catalog,
+    public static bool TryAbandon(QuestProgress progress, byte tribe, short level, QuestCatalog catalog,
         Func<int, bool> hasItem, out QuestProgress newProgress)
     {
         newProgress = progress;

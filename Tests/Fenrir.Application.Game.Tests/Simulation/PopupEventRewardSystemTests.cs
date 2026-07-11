@@ -21,7 +21,7 @@ public class PopupEventRewardSystemTests
     {
         var (session, _) = ZoneTestKit.CreateSession(characterId);
         zone.Post(ZoneCommand.Enter(characterId,
-            ZoneTestKit.EnterData(session, zone.MapId, name: $"P{characterId}", tribe: tribe, level: level)));
+            ZoneTestKit.EnterData(session, zone.MapId, $"P{characterId}", tribe: tribe, level: level)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
         Assert.True(zone.TryGetPlayer(characterId, out var state));
         return state!;
@@ -193,7 +193,7 @@ public class PopupEventRewardSystemTests
         var killer = Enter(zone, 1);
 
         for (var i = 0; i < 400; i++)
-            system.NotifyMonsterKill(zone, killer, dropEligible: false);
+            system.NotifyMonsterKill(zone, killer, false);
         Tick(zone);
 
         Assert.Equal(0, killer.WarPoint);
@@ -206,16 +206,16 @@ public class PopupEventRewardSystemTests
         var killer = Enter(zone, 1);
 
         for (var i = 0; i < 399; i++)
-            system.NotifyMonsterKill(zone, killer, dropEligible: true);
+            system.NotifyMonsterKill(zone, killer, true);
         Tick(zone);
         Assert.Equal(0, killer.WarPoint);
 
-        system.NotifyMonsterKill(zone, killer, dropEligible: true);
+        system.NotifyMonsterKill(zone, killer, true);
         Tick(zone);
         Assert.Equal(1, killer.WarPoint);
 
         for (var i = 0; i < 400; i++)
-            system.NotifyMonsterKill(zone, killer, dropEligible: true);
+            system.NotifyMonsterKill(zone, killer, true);
         Tick(zone);
         Assert.Equal(2, killer.WarPoint);
     }
@@ -227,7 +227,7 @@ public class PopupEventRewardSystemTests
         var killer = Enter(zone, 1);
 
         for (var i = 0; i < 400; i++)
-            system.NotifyMonsterKill(zone, killer, dropEligible: true);
+            system.NotifyMonsterKill(zone, killer, true);
         Tick(zone);
 
         Assert.Equal(0, killer.WarPoint);

@@ -6,7 +6,7 @@ public enum AntiCheatCadence : byte
     OneSecondProtect,
     ThreeSecond,
 
-        TenSecond,
+    TenSecond,
     ThirtySecond,
     OneMinute,
     OneMinuteHealth,
@@ -32,7 +32,7 @@ public struct PlayerCadenceTimers
     public TimeSpan TenMinute;
     public TimeSpan SixtyMinute;
 
-        public void ResetAll(TimeSpan zoneClockNow)
+    public void ResetAll(TimeSpan zoneClockNow)
     {
         OneSecond = zoneClockNow;
         OneSecondProtect = zoneClockNow;
@@ -48,7 +48,7 @@ public struct PlayerCadenceTimers
         SixtyMinute = zoneClockNow;
     }
 
-        public static TimeSpan IntervalOf(AntiCheatCadence cadence)
+    public static TimeSpan IntervalOf(AntiCheatCadence cadence)
     {
         return cadence switch
         {
@@ -68,7 +68,7 @@ public struct PlayerCadenceTimers
         };
     }
 
-        public readonly TimeSpan Baseline(AntiCheatCadence cadence)
+    public readonly TimeSpan Baseline(AntiCheatCadence cadence)
     {
         return cadence switch
         {
@@ -88,7 +88,7 @@ public struct PlayerCadenceTimers
         };
     }
 
-        public void Restamp(AntiCheatCadence cadence, TimeSpan zoneClockNow)
+    public void Restamp(AntiCheatCadence cadence, TimeSpan zoneClockNow)
     {
         switch (cadence)
         {
@@ -108,7 +108,7 @@ public struct PlayerCadenceTimers
         }
     }
 
-        public readonly bool HasElapsed(AntiCheatCadence cadence, TimeSpan zoneClockNow)
+    public readonly bool HasElapsed(AntiCheatCadence cadence, TimeSpan zoneClockNow)
     {
         return zoneClockNow - Baseline(cadence) >= IntervalOf(cadence);
     }

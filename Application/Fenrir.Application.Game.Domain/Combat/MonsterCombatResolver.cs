@@ -5,18 +5,17 @@ namespace Fenrir.Application.Game.Domain.Combat;
 
 public static class MonsterCombatResolver
 {
+    private const int OwnerNameLockExemptMonsterId = 9002;
 
-        private const int OwnerNameLockExemptMonsterId = 9002;
+    public const int CatapultAttackPowerBonus = 15000;
 
-        public const int CatapultAttackPowerBonus = 15000;
+    public const short MalusMinimumAttackerLevel = 112;
 
-        public static readonly TimeSpan OwnerNameLockExemptionCooldown = TimeSpan.FromMinutes(1);
+    public const int DamageUpBonusFlatPerIncrement = 500;
 
-        public const short MalusMinimumAttackerLevel = 112;
+    public static readonly TimeSpan OwnerNameLockExemptionCooldown = TimeSpan.FromMinutes(1);
 
-        public const int DamageUpBonusFlatPerIncrement = 500;
-
-        public static AttackOutcome ResolvePvmAttack(
+    public static AttackOutcome ResolvePvmAttack(
         CombatantSnapshot attacker,
         MonsterEntity monster,
         AttackForProtocol request,
@@ -113,7 +112,7 @@ public static class MonsterCombatResolver
             chargeConsumed);
     }
 
-        public static AttackOutcome ResolveMvpAttack(
+    public static AttackOutcome ResolveMvpAttack(
         MonsterEntity monster,
         CombatantSnapshot defender,
         TimeSpan zoneClock,

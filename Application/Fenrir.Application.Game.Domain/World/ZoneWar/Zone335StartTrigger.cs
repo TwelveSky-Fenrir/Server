@@ -6,7 +6,7 @@ public sealed class Zone335StartTrigger
     private int _remainingTicks;
     private bool _startRequested;
 
-        public int RemainingTicks
+    public int RemainingTicks
     {
         get
         {
@@ -17,7 +17,7 @@ public sealed class Zone335StartTrigger
         }
     }
 
-        public bool StartRequested
+    public bool StartRequested
     {
         get
         {
@@ -28,7 +28,7 @@ public sealed class Zone335StartTrigger
         }
     }
 
-        public void Request(int countdownTicks)
+    public void Request(int countdownTicks)
     {
         lock (_lock)
         {
@@ -37,7 +37,7 @@ public sealed class Zone335StartTrigger
         }
     }
 
-        public bool ConsumeStartRequest()
+    public bool ConsumeStartRequest()
     {
         lock (_lock)
         {

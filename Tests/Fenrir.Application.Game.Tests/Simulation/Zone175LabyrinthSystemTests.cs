@@ -203,9 +203,9 @@ public sealed class Zone175LabyrinthSystemTests
         Assert.Equal(Zone175MissionPhase.Idle, afterReset);
     }
 
-        private sealed class MutableTimeProvider(DateTimeOffset now) : TimeProvider
+    private sealed class MutableTimeProvider(DateTimeOffset now) : TimeProvider
     {
-        public DateTimeOffset Now { get; set; } = now;
+        public DateTimeOffset Now { get; } = now;
 
         public override DateTimeOffset GetUtcNow()
         {

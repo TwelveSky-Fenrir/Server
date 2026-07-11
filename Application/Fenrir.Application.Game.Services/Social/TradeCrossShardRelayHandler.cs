@@ -27,7 +27,7 @@ public sealed class TradeCrossShardRelayHandler(
 {
     public SocialCrossShardRelayKind Kind => SocialCrossShardRelayKind.Trade;
 
-        public ValueTask HandleAskAsync(SocialCrossShardRelayDto ask, CancellationToken ct)
+    public ValueTask HandleAskAsync(SocialCrossShardRelayDto ask, CancellationToken ct)
     {
         if (!zones.TryGetPlayer(ask.TargetCharacterId, out var target))
         {
@@ -56,7 +56,7 @@ public sealed class TradeCrossShardRelayHandler(
         return ValueTask.CompletedTask;
     }
 
-        public ValueTask HandleAnswerAsync(SocialCrossShardRelayDto answer, CancellationToken ct)
+    public ValueTask HandleAnswerAsync(SocialCrossShardRelayDto answer, CancellationToken ct)
     {
         if (!trades.TryConsumeCrossShardOutbound(answer.TargetCharacterId, out _))
         {
@@ -93,7 +93,7 @@ public sealed class TradeCrossShardRelayHandler(
             ask.RelayId));
     }
 
-        private bool IsExcludedByCommunityWork(PlayerRuntimeState player)
+    private bool IsExcludedByCommunityWork(PlayerRuntimeState player)
     {
         return player.PshopOpen
                || duels.IsNegotiating(player.CharacterId)

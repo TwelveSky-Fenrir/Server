@@ -1,6 +1,5 @@
 using System.Collections.Frozen;
 using System.Collections.Immutable;
-using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.Skills;
 using Fenrir.Application.Game.Domain.World;
@@ -86,7 +85,7 @@ public class AutoHuntTickSystemBotUpkeepTests
     [Fact]
     public void Zone126_SelectedBuffCannotAffordMana_IncrementsNoManaCounter()
     {
-        var (zone, state, _, _, system) = SetUp(Zone126MapId, manaUse: 9999);
+        var (zone, state, _, _, system) = SetUp(Zone126MapId, 9999);
 
         system.Simulate(zone, 1);
         Assert.Equal(1, state.NoManaCount);
@@ -98,7 +97,7 @@ public class AutoHuntTickSystemBotUpkeepTests
     [Fact]
     public void Zone126_NoManaCounterReachesExactly1000_RelocatesToAutoZone_NoDisconnect()
     {
-        var (zone, state, session, pipe, system) = SetUp(Zone126MapId, manaUse: 9999);
+        var (zone, state, session, pipe, system) = SetUp(Zone126MapId, 9999);
         state.NoManaCount = 999;
 
         system.Simulate(zone, 1);
@@ -111,7 +110,7 @@ public class AutoHuntTickSystemBotUpkeepTests
     [Fact]
     public void Zone126_NoManaCounterExceeds1000_DisconnectsSession()
     {
-        var (zone, state, session, _, system) = SetUp(Zone126MapId, manaUse: 9999);
+        var (zone, state, session, _, system) = SetUp(Zone126MapId, 9999);
         state.NoManaCount = 1000;
 
         system.Simulate(zone, 1);
@@ -123,7 +122,7 @@ public class AutoHuntTickSystemBotUpkeepTests
     [Fact]
     public void ProceedingCast_ResetsNoManaCounter()
     {
-        var (zone, state, _, _, system) = SetUp(Zone126MapId, manaUse: 30);
+        var (zone, state, _, _, system) = SetUp(Zone126MapId, 30);
         state.NoManaCount = 500;
         var manaBefore = state.Mana;
 
@@ -136,7 +135,7 @@ public class AutoHuntTickSystemBotUpkeepTests
     [Fact]
     public void NonZone126_InsufficientMana_NeverEscalates()
     {
-        var (zone, state, session, pipe, system) = SetUp(OrdinaryMapId, manaUse: 9999);
+        var (zone, state, session, pipe, system) = SetUp(OrdinaryMapId, 9999);
 
         for (var i = 0; i < 5; i++)
             system.Simulate(zone, 1);
@@ -150,7 +149,7 @@ public class AutoHuntTickSystemBotUpkeepTests
     [Fact]
     public void Budget_BothTiersZero_IsInert_BuffStillCasts()
     {
-        var (zone, state, _, pipe, system) = SetUp(OrdinaryMapId, manaUse: 30);
+        var (zone, state, _, pipe, system) = SetUp(OrdinaryMapId, 30);
         var manaBefore = state.Mana;
 
         system.Simulate(zone, 1);
@@ -163,7 +162,7 @@ public class AutoHuntTickSystemBotUpkeepTests
     [Fact]
     public void Budget_PresentAndValidDayTier_DoesNotRelocate_BuffStillCasts()
     {
-        var (zone, state, _, _, system) = SetUp(OrdinaryMapId, manaUse: 30);
+        var (zone, state, _, _, system) = SetUp(OrdinaryMapId, 30);
         state.AutoHuntPaidDayBudget = 99_991_231;
         var manaBefore = state.Mana;
 
@@ -176,7 +175,7 @@ public class AutoHuntTickSystemBotUpkeepTests
     [Fact]
     public void Budget_DayTierExpiredWithNoMinute_RelocatesAndAbandonsBuff()
     {
-        var (zone, state, session, pipe, system) = SetUp(OrdinaryMapId, manaUse: 30);
+        var (zone, state, session, pipe, system) = SetUp(OrdinaryMapId, 30);
         state.AutoHuntPaidDayBudget = 20_000_101;
         var manaBefore = state.Mana;
 
@@ -192,7 +191,7 @@ public class AutoHuntTickSystemBotUpkeepTests
     [Fact]
     public void Budget_MinuteTierHitsZero_RelocatesAndAbandonsBuff()
     {
-        var (zone, state, _, pipe, system) = SetUp(OrdinaryMapId, manaUse: 30);
+        var (zone, state, _, pipe, system) = SetUp(OrdinaryMapId, 30);
         state.AutoHuntPaidMinuteBudget = 1;
         state.AutoHuntBudgetMinuteAccrualTicks = SimulationClock.PlayTimeAccrualLegacyTicks - 1;
         var manaBefore = state.Mana;
@@ -207,7 +206,7 @@ public class AutoHuntTickSystemBotUpkeepTests
     [Fact]
     public void Budget_MinuteTierWithTimeLeft_DecrementsButDoesNotRelocate()
     {
-        var (zone, state, _, pipe, system) = SetUp(OrdinaryMapId, manaUse: 30);
+        var (zone, state, _, pipe, system) = SetUp(OrdinaryMapId, 30);
         state.AutoHuntPaidMinuteBudget = 5;
         state.AutoHuntBudgetMinuteAccrualTicks = SimulationClock.PlayTimeAccrualLegacyTicks - 1;
 
@@ -220,7 +219,7 @@ public class AutoHuntTickSystemBotUpkeepTests
     [Fact]
     public void Budget_DecrementRunsEvenWhenBuffGateWouldReject_Stunned()
     {
-        var (zone, state, _, pipe, system) = SetUp(OrdinaryMapId, manaUse: 30);
+        var (zone, state, _, pipe, system) = SetUp(OrdinaryMapId, 30);
         state.IsStunned = true;
         state.AutoHuntPaidDayBudget = 20_000_101;
 

@@ -5,26 +5,25 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 
 public sealed class Zone195NokSanState
 {
+    public const int StoneSlotCount = 9;
 
-        public const int StoneSlotCount = 9;
+    public const int MaxStonesPerTribe = 4;
 
-        public const int MaxStonesPerTribe = 4;
+    public const int MonsterDamageBonusPerStone = 100;
 
-        public const int MonsterDamageBonusPerStone = 100;
+    public const float DefaultCaptureRadius = 12.5f;
 
-        public const float DefaultCaptureRadius = 12.5f;
+    public const float DefaultPostX = -20.0f;
 
-        public const float DefaultPostX = -20.0f;
+    public const float DefaultPostZ = 2510.0f;
 
-        public const float DefaultPostZ = 2510.0f;
-
-        public static readonly int TribeCount = WorldStateService.TribeCount;
+    public static readonly int TribeCount = WorldStateService.TribeCount;
 
     private readonly Lock _lock = new();
 
-        private readonly int[] _owners = new int[StoneSlotCount];
+    private readonly int[] _owners = new int[StoneSlotCount];
 
-        private readonly int[] _stonesHeld = new int[TribeCount];
+    private readonly int[] _stonesHeld = new int[TribeCount];
 
     public static bool IsValidSlot(int slotIndex)
     {
@@ -36,7 +35,7 @@ public sealed class Zone195NokSanState
         return tribeId is >= 0 && tribeId < TribeCount;
     }
 
-        public int GetOwner(int slotIndex)
+    public int GetOwner(int slotIndex)
     {
         ValidateSlot(slotIndex);
         lock (_lock)
@@ -45,7 +44,7 @@ public sealed class Zone195NokSanState
         }
     }
 
-        public byte? GetOwningTribe(int slotIndex)
+    public byte? GetOwningTribe(int slotIndex)
     {
         var raw = GetOwner(slotIndex);
         return raw == 0 ? null : (byte)(raw - 1);
@@ -60,7 +59,7 @@ public sealed class Zone195NokSanState
         }
     }
 
-        public int GetMonsterDamageBonus(byte tribeId)
+    public int GetMonsterDamageBonus(byte tribeId)
     {
         if (!IsValidTribe(tribeId))
             return 0;
@@ -68,7 +67,7 @@ public sealed class Zone195NokSanState
         return GetStonesHeld(tribeId) * MonsterDamageBonusPerStone;
     }
 
-        public void CommitCapture(int slotIndex, byte capturingTribe)
+    public void CommitCapture(int slotIndex, byte capturingTribe)
     {
         ValidateSlot(slotIndex);
         ValidateTribe(capturingTribe);
@@ -88,7 +87,7 @@ public sealed class Zone195NokSanState
         }
     }
 
-        public Zone195NokSanStateSnapshot Snapshot()
+    public Zone195NokSanStateSnapshot Snapshot()
     {
         lock (_lock)
         {

@@ -20,7 +20,7 @@ public class PetGrowthCalculatorSteppedAttackBonusTests
     {
         var items = Items((1004, 22));
 
-        var result = PetGrowthCalculator.Compute(1004, growth: 80_000_000, activity: 1, items);
+        var result = PetGrowthCalculator.Compute(1004, 80_000_000, 1, items);
 
         Assert.Equal(250, result.SteppedAttackBonus);
     }
@@ -30,7 +30,7 @@ public class PetGrowthCalculatorSteppedAttackBonusTests
     {
         var items = Items((541, 22));
 
-        var result = PetGrowthCalculator.Compute(541, growth: 80_000_000, activity: 1, items);
+        var result = PetGrowthCalculator.Compute(541, 80_000_000, 1, items);
 
         Assert.True(result.AttackPower > 0);
         Assert.Equal(0, result.SteppedAttackBonus);
@@ -41,7 +41,7 @@ public class PetGrowthCalculatorSteppedAttackBonusTests
     {
         var items = Items((1004, 22));
 
-        var inactive = PetGrowthCalculator.Compute(1004, growth: 80_000_000, activity: 0, items);
+        var inactive = PetGrowthCalculator.Compute(1004, 80_000_000, 0, items);
 
         Assert.Equal(0, inactive.SteppedAttackBonus);
     }
@@ -51,7 +51,7 @@ public class PetGrowthCalculatorSteppedAttackBonusTests
     {
         var items = Items((1004, 22));
 
-        var result = PetGrowthCalculator.Compute(1004, growth: 1_000_000, activity: 1, items);
+        var result = PetGrowthCalculator.Compute(1004, 1_000_000, 1, items);
 
         Assert.Equal(0, result.SteppedAttackBonus);
     }

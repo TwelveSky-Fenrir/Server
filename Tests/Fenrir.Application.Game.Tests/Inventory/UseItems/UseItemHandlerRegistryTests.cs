@@ -114,14 +114,14 @@ public class UseItemHandlerRegistryTests
     public void Resolve_EquipItem_RoutesToEquipSwapHandler()
     {
         var (registry, _, _, _, equip) = BuildRegistry();
-        Assert.Same(equip, registry.Resolve(Stack(1000), Def(1000, sort: 6, equipInfo2: 2)));
+        Assert.Same(equip, registry.Resolve(Stack(1000), Def(1000, 6, 2)));
     }
 
     [Fact]
     public void Resolve_UnclaimedItem_ReturnsNull()
     {
         var (registry, _, _, _, _) = BuildRegistry();
-        Assert.Null(registry.Resolve(Stack(999999), Def(999999, sort: 3)));
+        Assert.Null(registry.Resolve(Stack(999999), Def(999999, 3)));
     }
 
     [Fact]
@@ -142,6 +142,6 @@ public class UseItemHandlerRegistryTests
     public void Resolve_IdKeyedHandlerWinsOverCategory_EvenIfItAlsoLooksEquip()
     {
         var (registry, _, title, _, _) = BuildRegistry();
-        Assert.Same(title, registry.Resolve(Stack(891), Def(891, sort: 6, equipInfo2: 2)));
+        Assert.Same(title, registry.Resolve(Stack(891), Def(891, 6, 2)));
     }
 }

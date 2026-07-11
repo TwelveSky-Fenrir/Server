@@ -14,18 +14,17 @@ public enum AllianceCeremonyPhase
 
 public enum AllianceCeremonyNotice
 {
+    None,
 
-        None,
+    Rejected,
 
-        Rejected,
+    NewAllianceProgress,
 
-        NewAllianceProgress,
+    NewAllianceAborted,
 
-        NewAllianceAborted,
+    AlreadyAlliedProgress,
 
-        AlreadyAlliedProgress,
-
-        AlreadyAlliedAborted
+    AlreadyAlliedAborted
 }
 
 public readonly record struct AllianceCeremonyCandidate(int CharacterId, byte TribeId);
@@ -41,16 +40,15 @@ public readonly record struct AllianceCeremonyTickResult(
 
 public sealed class AllianceDiplomacyCeremony
 {
+    public const int MinimumAllyAdjustedPoints = 100;
 
-        public const int MinimumAllyAdjustedPoints = 100;
+    public const int RejectionMessageDurationRawTicks = 120;
 
-        public const int RejectionMessageDurationRawTicks = 120;
+    public const int PostNegotiationCooldownDurationRawTicks = 7200;
 
-        public const int PostNegotiationCooldownDurationRawTicks = 7200;
+    public const int NegotiationConfirmationDurationRawTicks = 60;
 
-        public const int NegotiationConfirmationDurationRawTicks = 60;
-
-        public const int ReAllianceCooldownDays = 14;
+    public const int ReAllianceCooldownDays = 14;
 
     private readonly int _alreadyAlliedNegotiationDurationRawTicks;
     private readonly ZoneEventBroadcaster _broadcaster;
@@ -68,7 +66,7 @@ public sealed class AllianceDiplomacyCeremony
     private int _rawTick;
     private int _remainingCountdown;
 
-        public AllianceDiplomacyCeremony(
+    public AllianceDiplomacyCeremony(
         WorldStateService worldState,
         AllianceCooldownTracker cooldowns,
         ZoneEventBroadcaster broadcaster,
@@ -102,7 +100,7 @@ public sealed class AllianceDiplomacyCeremony
         }
     }
 
-        public AllianceCeremonyTickResult Tick(AllianceCeremonyCandidate? postOneLeader,
+    public AllianceCeremonyTickResult Tick(AllianceCeremonyCandidate? postOneLeader,
         AllianceCeremonyCandidate? postTwoLeader, DateOnly today)
     {
         lock (_lock)
@@ -248,7 +246,7 @@ public sealed class AllianceDiplomacyCeremony
         _leaderTwo = null;
     }
 
-        private bool IsDisqualified(byte tribeA, byte tribeB, DateOnly today)
+    private bool IsDisqualified(byte tribeA, byte tribeB, DateOnly today)
     {
         var highestTribe = GetHighestAllyAdjustedPointsTribe();
         if (highestTribe == tribeA || highestTribe == tribeB)
@@ -264,7 +262,7 @@ public sealed class AllianceDiplomacyCeremony
         return _cooldowns.IsInCooldown(tribeA, today) || _cooldowns.IsInCooldown(tribeB, today);
     }
 
-        private int GetAllyAdjustedPoints(byte tribeId)
+    private int GetAllyAdjustedPoints(byte tribeId)
     {
         var points = _worldState.GetTribe(tribeId).Points;
         if (_worldState.GetAllyOf(tribeId) is { } allyTribeId)
@@ -273,7 +271,7 @@ public sealed class AllianceDiplomacyCeremony
         return points;
     }
 
-        private byte? GetHighestAllyAdjustedPointsTribe()
+    private byte? GetHighestAllyAdjustedPointsTribe()
     {
         Span<int> points = stackalloc int[WorldStateService.TribeCount];
         for (byte tribeId = 0; tribeId < WorldStateService.TribeCount; tribeId++)

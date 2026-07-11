@@ -9,28 +9,28 @@ public sealed partial class Zone
 
     private readonly TribeBankTaxAccumulator _tribeBankTax = tribeBankTax ?? new TribeBankTaxAccumulator();
 
-        public long GetTribeBankTaxTotal(byte tribeId)
+    public long GetTribeBankTaxTotal(byte tribeId)
     {
         return _tribeBankTax.GetTotal(tribeId);
     }
 
-        public void CreditMonsterKillTribeTax(byte killerTribe, long postReductionAmount)
+    public void CreditMonsterKillTribeTax(byte killerTribe, long postReductionAmount)
     {
         _tribeBankTax.CreditMonsterKillCurrencyTax(killerTribe, postReductionAmount);
     }
 
-        public void CreditNpcServiceTribeTax(byte payingTribe, int cost)
+    public void CreditNpcServiceTribeTax(byte payingTribe, int cost)
     {
         _tribeBankTax.CreditNpcServiceTax(payingTribe, cost);
     }
 
-        private void TryFlushTribeBankTax()
+    private void TryFlushTribeBankTax()
     {
         if (_tribeBankTax.TrySweep(_clock, out var payload))
             _pendingTribeBankTaxSweeps.Enqueue(payload);
     }
 
-        public IReadOnlyList<TribeBankTaxSweepPayload> DrainPendingTribeBankTaxSweeps()
+    public IReadOnlyList<TribeBankTaxSweepPayload> DrainPendingTribeBankTaxSweeps()
     {
         if (_pendingTribeBankTaxSweeps.IsEmpty)
             return [];

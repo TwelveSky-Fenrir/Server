@@ -1,6 +1,5 @@
 using Fenrir.Application.Game.Domain;
 using Fenrir.Application.Game.Domain.Guilds;
-using Fenrir.Application.Game.Domain.Simulation;
 using Fenrir.Application.Game.Domain.World;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -15,8 +14,7 @@ public sealed class GuildBuffDecayHost(
     IOptions<GameServerOptions> options,
     ILogger<GuildBuffDecayHost> logger) : BackgroundService
 {
-
-        public static readonly TimeSpan Interval = TimeSpan.FromSeconds(30);
+    public static readonly TimeSpan Interval = TimeSpan.FromSeconds(30);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -32,7 +30,7 @@ public sealed class GuildBuffDecayHost(
         }
     }
 
-        public async Task DecayOnceAsync(CancellationToken ct)
+    public async Task DecayOnceAsync(CancellationToken ct)
     {
         IReadOnlyList<GuildSummaryDto> all;
         try
@@ -71,7 +69,7 @@ public sealed class GuildBuffDecayHost(
         }
     }
 
-        private void PushExpiry(int guildId, int newBuffTime)
+    private void PushExpiry(int guildId, int newBuffTime)
     {
         var command = new GuildBuffExpiryZoneCommand(guildId, newBuffTime);
         foreach (var zone in zones.Zones)

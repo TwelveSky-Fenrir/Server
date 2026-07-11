@@ -10,7 +10,7 @@ public sealed class BuffExpirySystem : ISimulationSystem
             TickPlayer(zone, state, legacyTicksElapsed);
     }
 
-        private static void TickPlayer(Zone zone, PlayerRuntimeState state, int legacyTicksElapsed)
+    private static void TickPlayer(Zone zone, PlayerRuntimeState state, int legacyTicksElapsed)
     {
         var changedSlots = state.BuffChangeScratch;
         var anyChanged = false;

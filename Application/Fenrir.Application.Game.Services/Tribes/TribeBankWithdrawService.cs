@@ -9,7 +9,7 @@ public sealed class TribeBankWithdrawService(ITribeRepository tribes, ILogger<Tr
     private const int SlotCount = 50;
     private const int RequiredSubMasterCount = 3;
 
-        public async ValueTask<TribeBankResult> WithdrawAsync(int slotValue, PlayerRuntimeState state, int characterId,
+    public async ValueTask<TribeBankResult> WithdrawAsync(int slotValue, PlayerRuntimeState state, int characterId,
         CancellationToken ct)
     {
         if (slotValue < 0 || slotValue >= SlotCount || state.TribeRole != 1)

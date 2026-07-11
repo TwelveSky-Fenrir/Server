@@ -6,20 +6,23 @@ public static class ScrollOfSeekersResolver
     {
         Success,
 
-                WouldExceedCeiling
+        WouldExceedCeiling
     }
 
-        public const int ScrollOfSeekersItemId = 1124;
+    public const int ScrollOfSeekersItemId = 1124;
 
-        public const int ScrollOfSeekersLItemId = 1187;
+    public const int ScrollOfSeekersLItemId = 1187;
 
-        public const int ScrollOfSeekers15HourItemId = 7016;
+    public const int ScrollOfSeekers15HourItemId = 7016;
 
-        public const int ScrollOfSeekers3HourItemId = 8409;
+    public const int ScrollOfSeekers3HourItemId = 8409;
 
-        public const int ScrollOfSeekers15HourAltItemId = 8410;
+    public const int ScrollOfSeekers15HourAltItemId = 8410;
 
-        public static IEnumerable<int> HandledItemIds { get; } =
+    public const int DefaultAddAmount = 180;
+    public const int OverrideAddAmount = 900;
+
+    public static IEnumerable<int> HandledItemIds { get; } =
     [
         ScrollOfSeekersItemId,
         ScrollOfSeekersLItemId,
@@ -28,10 +31,7 @@ public static class ScrollOfSeekersResolver
         ScrollOfSeekers15HourAltItemId
     ];
 
-    public const int DefaultAddAmount = 180;
-    public const int OverrideAddAmount = 900;
-
-        public static int AmountFor(int itemId)
+    public static int AmountFor(int itemId)
     {
         return itemId switch
         {

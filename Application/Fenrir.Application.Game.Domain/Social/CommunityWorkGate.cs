@@ -10,8 +10,7 @@ namespace Fenrir.Application.Game.Domain.Social;
 
 public static class CommunityWorkGate
 {
-
-        public static bool IsBusy(PlayerRuntimeState player, DuelRegistry duels, TradeRegistry trades,
+    public static bool IsBusy(PlayerRuntimeState player, DuelRegistry duels, TradeRegistry trades,
         FriendRegistry friends, PartyRegistry parties, MentorRegistry mentors, GuildInviteRegistry guildInvites)
     {
         return player.PshopOpen

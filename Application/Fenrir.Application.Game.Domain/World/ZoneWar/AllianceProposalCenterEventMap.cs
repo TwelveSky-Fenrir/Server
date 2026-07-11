@@ -5,20 +5,19 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 
 public static class AllianceProposalCenterEventMap
 {
+    public const int FinalizeNewAllianceEventCode = 46;
 
-        public const int FinalizeNewAllianceEventCode = 46;
+    public const int BreakAllianceViaRitualEventCode = 47;
 
-        public const int BreakAllianceViaRitualEventCode = 47;
+    public const int AllianceStoneUnderAttackEventCode = 48;
 
-        public const int AllianceStoneUnderAttackEventCode = 48;
+    public const int BreakAllianceViaStoneCaptureEventCode = 49;
 
-        public const int BreakAllianceViaStoneCaptureEventCode = 49;
-
-        public const int EventCodeRangeStart = FinalizeNewAllianceEventCode;
+    public const int EventCodeRangeStart = FinalizeNewAllianceEventCode;
 
     public const int EventCodeRangeEnd = BreakAllianceViaStoneCaptureEventCode;
 
-        public static void Apply(int eventCode, ReadOnlySpan<byte> data, AllianceProposalCenterState state,
+    public static void Apply(int eventCode, ReadOnlySpan<byte> data, AllianceProposalCenterState state,
         ILogger logger)
     {
         switch (eventCode)
@@ -37,7 +36,7 @@ public static class AllianceProposalCenterEventMap
         }
     }
 
-        private static void ApplyFinalizeNewAlliance(ReadOnlySpan<byte> data, AllianceProposalCenterState state,
+    private static void ApplyFinalizeNewAlliance(ReadOnlySpan<byte> data, AllianceProposalCenterState state,
         ILogger logger)
     {
         var tribeA = ReadInt32(data, 0);
@@ -49,7 +48,7 @@ public static class AllianceProposalCenterEventMap
         state.ApplyFinalize((byte)tribeA, (byte)tribeB);
     }
 
-        private static void ApplyBreakAlliance(int eventCode, ReadOnlySpan<byte> data, AllianceProposalCenterState state,
+    private static void ApplyBreakAlliance(int eventCode, ReadOnlySpan<byte> data, AllianceProposalCenterState state,
         ILogger logger)
     {
         var tribeA = ReadInt32(data, 0);

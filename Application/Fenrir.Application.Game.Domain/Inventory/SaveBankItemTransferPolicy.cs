@@ -6,36 +6,36 @@ public static class SaveBankItemTransferPolicy
     {
         Success,
 
-                NoOp,
+        NoOp,
 
         SourceOutOfRange,
         DestinationOutOfRange,
 
-                DestinationCoordinateOutOfRange,
+        DestinationCoordinateOutOfRange,
 
-                SecondInventoryPageExpired,
+        SecondInventoryPageExpired,
 
-                SourceEmpty,
+        SourceEmpty,
 
-                SourceItemBlocked,
+        SourceItemBlocked,
 
-                InvalidQuantity,
+        InvalidQuantity,
 
-                DestinationConflict
+        DestinationConflict
     }
 
-        public const int SlotCount = 28;
+    public const int SlotCount = 28;
 
     public const int MaxSlotInclusive = SlotCount - 1;
 
-        private const int DepositBlockedItemId = 8290;
+    private const int DepositBlockedItemId = 8290;
 
     public static bool IsValidSlot(int slot)
     {
         return slot is >= 0 and <= MaxSlotInclusive;
     }
 
-        public static TransferResult ResolveDepositFromInventory(
+    public static TransferResult ResolveDepositFromInventory(
         byte inventoryContainer, int inventorySlot, int requestedQuantity, int bankSlot,
         ItemStack? source, ItemStack? destination,
         bool sourceIsStackable, bool sourceSupportsSocket, bool secondInventoryPageAccessible)
@@ -58,7 +58,7 @@ public static class SaveBankItemTransferPolicy
         return ResolveTransfer(requestedQuantity, src, destination, sourceIsStackable, sourceSupportsSocket);
     }
 
-        public static TransferResult ResolveWithdrawToInventory(
+    public static TransferResult ResolveWithdrawToInventory(
         int bankSlot, int requestedQuantity, byte inventoryContainer, int inventorySlot,
         int destinationXPost, int destinationYPost,
         ItemStack? source, ItemStack? destination,
@@ -82,7 +82,7 @@ public static class SaveBankItemTransferPolicy
         return ResolveTransfer(requestedQuantity, src, destination, sourceIsStackable, sourceSupportsSocket);
     }
 
-        public static TransferResult ResolveRearrangeWithinBank(
+    public static TransferResult ResolveRearrangeWithinBank(
         int sourceBankSlot, int requestedQuantity, int destinationBankSlot,
         ItemStack? source, ItemStack? destination,
         bool sourceIsStackable, bool sourceSupportsSocket)
@@ -102,7 +102,7 @@ public static class SaveBankItemTransferPolicy
         return ResolveTransfer(requestedQuantity, src, destination, sourceIsStackable, sourceSupportsSocket);
     }
 
-        private static TransferResult ResolveTransfer(
+    private static TransferResult ResolveTransfer(
         int requestedQuantity, ItemStack source, ItemStack? destination,
         bool sourceIsStackable, bool sourceSupportsSocket)
     {
@@ -168,7 +168,7 @@ public static class SaveBankItemTransferPolicy
         return new TransferResult(outcome, null, null, false);
     }
 
-        public readonly record struct TransferResult(
+    public readonly record struct TransferResult(
         TransferOutcome Outcome,
         ItemStack? NewSource,
         ItemStack? NewDestination,

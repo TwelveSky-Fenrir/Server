@@ -54,7 +54,7 @@ public static class AvatarInfoFactory
         };
     }
 
-        public static int[] BuildEquipArray(IReadOnlyList<CharacterItemSlotTvp> equipment, int petGrowth = 0,
+    public static int[] BuildEquipArray(IReadOnlyList<CharacterItemSlotTvp> equipment, int petGrowth = 0,
         byte petActivity = 0)
     {
         var equip = new int[EquipSlotCount * EquipWireIntsPerSlot];
@@ -82,7 +82,7 @@ public static class AvatarInfoFactory
         return equip;
     }
 
-        public static int[] BuildInventoryArray(IReadOnlyList<CharacterItemSlotTvp> page0Items)
+    public static int[] BuildInventoryArray(IReadOnlyList<CharacterItemSlotTvp> page0Items)
     {
         var inventory = new int[2 * InventorySlotsPerPage * InventoryWireIntsPerSlot];
 
@@ -100,7 +100,7 @@ public static class AvatarInfoFactory
         return inventory;
     }
 
-        public static int[] BuildSkillArray(IReadOnlyList<CharacterSkillSlotTvp> skills)
+    public static int[] BuildSkillArray(IReadOnlyList<CharacterSkillSlotTvp> skills)
     {
         var skill = new int[SkillSlotCount * SkillWireIntsPerSlot];
 
@@ -117,7 +117,7 @@ public static class AvatarInfoFactory
         return skill;
     }
 
-        public static int[] BuildEquipArrayFromRosterItems(IReadOnlyList<CharacterRosterItemDto> items,
+    public static int[] BuildEquipArrayFromRosterItems(IReadOnlyList<CharacterRosterItemDto> items,
         int petGrowth = 0, byte petActivity = 0)
     {
         var equip = new int[EquipSlotCount * EquipWireIntsPerSlot];
@@ -145,7 +145,7 @@ public static class AvatarInfoFactory
         return equip;
     }
 
-        public static int[] BuildInventoryArrayFromRosterItems(IReadOnlyList<CharacterRosterItemDto> items)
+    public static int[] BuildInventoryArrayFromRosterItems(IReadOnlyList<CharacterRosterItemDto> items)
     {
         var inventory = new int[InventoryPageCount * InventorySlotsPerPage * InventoryWireIntsPerSlot];
 
@@ -170,7 +170,7 @@ public static class AvatarInfoFactory
         return inventory;
     }
 
-        public static int[] BuildStoreItemArrayFromRosterItems(IReadOnlyList<CharacterRosterItemDto> items)
+    public static int[] BuildStoreItemArrayFromRosterItems(IReadOnlyList<CharacterRosterItemDto> items)
     {
         var store = new int[StorePageCount * StoreSlotsPerPage * StoreWireIntsPerSlot];
 
@@ -195,7 +195,7 @@ public static class AvatarInfoFactory
         return store;
     }
 
-        public static int[] BuildHotKeyArray(IReadOnlyList<CharacterHotkeySlotTvp> hotkeys)
+    public static int[] BuildHotKeyArray(IReadOnlyList<CharacterHotkeySlotTvp> hotkeys)
     {
         var hotkey = new int[HotkeyPageCount * HotkeyKeysPerPage * HotkeyWireIntsPerSlot];
 

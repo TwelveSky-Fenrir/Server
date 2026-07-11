@@ -7,10 +7,9 @@ namespace Fenrir.Application.Game.Domain.Movement;
 
 public sealed class MovementRules(IOptions<GameServerOptions> options)
 {
+    private const float MaxBelowGroundTolerance = 20f;
 
-        private const float MaxBelowGroundTolerance = 20f;
-
-        public bool IsPlausible(PlayerRuntimeState current, in ActionInfo intent, ZoneGeometry? geometry = null)
+    public bool IsPlausible(PlayerRuntimeState current, in ActionInfo intent, ZoneGeometry? geometry = null)
     {
         var dx = intent.Location[0] - current.PosX;
         var dy = intent.Location[1] - current.PosY;

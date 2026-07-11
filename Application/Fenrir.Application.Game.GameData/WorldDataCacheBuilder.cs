@@ -5,34 +5,33 @@ namespace Fenrir.Application.Game.GameData;
 
 public static class WorldDataCacheBuilder
 {
+    private const int MaxLevelIndex = 145;
 
-        private const int MaxLevelIndex = 145;
+    private const int MaxLevelCombatStat = 10000;
 
-        private const int MaxLevelCombatStat = 10000;
+    private const int MaxExpRangeBound = 2_000_000_000;
 
-        private const int MaxExpRangeBound = 2_000_000_000;
+    private const int MaxRangeInfo3 = 100;
 
-        private const int MaxRangeInfo3 = 100;
-
-        private const int MinQuestStep = 1;
+    private const int MinQuestStep = 1;
 
     private const int MaxQuestStep = 1000;
 
-        private const int MinQuestRewardAmount = 0;
+    private const int MinQuestRewardAmount = 0;
 
     private const int MaxQuestRewardAmount = 100_000_000;
 
-        private const int MaxItemCheckDateItem = 365;
+    private const int MaxItemCheckDateItem = 365;
 
-        private const int MaxItemDataNumber3D = 10000;
+    private const int MaxItemDataNumber3D = 10000;
 
-        private const int PotionType1RestrictedValue = 9;
+    private const int PotionType1RestrictedValue = 9;
 
     private const int MinPotionType2Restricted = 1;
     private const int MaxPotionType2Restricted = 3;
     private const int MaxPotionType2Default = MaxItemDataNumber3D;
 
-        private const int MinGemSocketType = 1;
+    private const int MinGemSocketType = 1;
 
     private const int MaxGemSocketType = 46;
 
@@ -77,13 +76,13 @@ public static class WorldDataCacheBuilder
     private const int MaxMonsterFrameInfo = 10000;
     private const int MaxMonsterHitFrame = 10000;
 
-        private const int MaxMonsterDropRate = 1_000_000;
+    private const int MaxMonsterDropRate = 1_000_000;
 
-        private const int MaxMonsterDropItemId = 99_999;
+    private const int MaxMonsterDropItemId = 99_999;
 
     private const int MaxMonsterDropMoneyAmount = 100_000_000;
 
-        private const int MinReferenceIndex = 1;
+    private const int MinReferenceIndex = 1;
 
     private const int MaxSkillIndex = 300;
     private const int MaxSkillNameLength = 24;
@@ -99,7 +98,7 @@ public static class WorldDataCacheBuilder
     private const int MinSkillTribeInfo2 = 1;
     private const int MaxSkillTribeInfo2 = 10;
 
-        private const int MinSkillLearnOrUpgradePoint = 1;
+    private const int MinSkillLearnOrUpgradePoint = 1;
 
     private const int MaxSkillTotalHitNumber = 10;
     private const int MaxSkillValidRadius = 1000;
@@ -126,7 +125,7 @@ public static class WorldDataCacheBuilder
     private const int MaxNpcSkillOfferId = 300;
     private const int MaxNpcGambleCost = 100_000_000;
 
-        public static (WorldDataCache Cache, WorldDataFilterStats Stats) Build(WorldDataRows rows)
+    public static (WorldDataCache Cache, WorldDataFilterStats Stats) Build(WorldDataRows rows)
     {
         EnsureCriticalDatasetNotEmpty(rows.Items.Count, "world.Items");
         EnsureCriticalDatasetNotEmpty(rows.Monsters.Count, "world.Monsters");
@@ -174,7 +173,7 @@ public static class WorldDataCacheBuilder
         return (cache, stats);
     }
 
-        private static void ValidateLevels(IReadOnlyList<LevelRowDto> levels)
+    private static void ValidateLevels(IReadOnlyList<LevelRowDto> levels)
     {
         var ordered = levels.OrderBy(static level => level.Level).ToArray();
 
@@ -228,7 +227,7 @@ public static class WorldDataCacheBuilder
         }
     }
 
-        private static void ValidateQuests(IReadOnlyList<QuestRowDto> quests, IReadOnlyList<QuestRewardRowDto> rewards)
+    private static void ValidateQuests(IReadOnlyList<QuestRowDto> quests, IReadOnlyList<QuestRewardRowDto> rewards)
     {
         foreach (var quest in quests.OrderBy(static quest => quest.QuestId))
             if (quest.Step is < MinQuestStep or > MaxQuestStep)
@@ -244,7 +243,7 @@ public static class WorldDataCacheBuilder
                     $"Amount={amount} outside the legacy {MinQuestRewardAmount}-{MaxQuestRewardAmount} bound.");
     }
 
-        private static void ValidateItems(IReadOnlyList<ItemRowDto> items)
+    private static void ValidateItems(IReadOnlyList<ItemRowDto> items)
     {
         foreach (var item in items.OrderBy(static item => item.ItemId))
         {
@@ -279,7 +278,7 @@ public static class WorldDataCacheBuilder
         }
     }
 
-        private static void ValidateGemSockets(IReadOnlyList<GemSocketRowDto> gemSockets)
+    private static void ValidateGemSockets(IReadOnlyList<GemSocketRowDto> gemSockets)
     {
         foreach (var gemSocket in gemSockets.OrderBy(static gemSocket => gemSocket.GemSocketId))
         {
@@ -313,7 +312,7 @@ public static class WorldDataCacheBuilder
         }
     }
 
-        private static FrozenDictionary<int, GemSocketRowDto> BuildGemSocketTypeValueIndex(
+    private static FrozenDictionary<int, GemSocketRowDto> BuildGemSocketTypeValueIndex(
         IReadOnlyList<GemSocketRowDto> gemSockets)
     {
         var byTypeAndValue = new Dictionary<int, GemSocketRowDto>(gemSockets.Count);
@@ -323,12 +322,12 @@ public static class WorldDataCacheBuilder
         return byTypeAndValue.ToFrozenDictionary();
     }
 
-        private static int GemSocketTypeValueKey(int type, int value02)
+    private static int GemSocketTypeValueKey(int type, int value02)
     {
         return ((type & 0xFF) << 8) | (value02 & 0xFF);
     }
 
-        private static void ValidateMonsters(
+    private static void ValidateMonsters(
         IReadOnlyList<MonsterRowDto> monsters,
         IReadOnlyList<MonsterDropMoneyRowDto> dropMoney,
         IReadOnlyList<MonsterDropPotionRowDto> dropPotions,
@@ -557,7 +556,7 @@ public static class WorldDataCacheBuilder
                     $"{MaxMonsterDropItemId}).");
     }
 
-        private static void ValidateSkills(
+    private static void ValidateSkills(
         IReadOnlyList<SkillRowDto> skills,
         IReadOnlyList<SkillDescriptionRowDto> descriptions,
         IReadOnlyList<SkillGradeRowDto> grades)
@@ -660,7 +659,7 @@ public static class WorldDataCacheBuilder
         }
     }
 
-        private static void ValidateNpcs(
+    private static void ValidateNpcs(
         IReadOnlyList<NpcRowDto> npcs,
         IReadOnlyList<NpcMenuOptionRowDto> menuOptions,
         IReadOnlyList<NpcShopItemRowDto> shopItems,
@@ -742,7 +741,7 @@ public static class WorldDataCacheBuilder
                     "bound.");
     }
 
-        private static void RunLowestIndexSelfTest(WorldDataRows rows)
+    private static void RunLowestIndexSelfTest(WorldDataRows rows)
     {
         if (!rows.Skills.Any(static skill => skill.SkillId == MinReferenceIndex))
             throw new InvalidOperationException(
@@ -757,7 +756,7 @@ public static class WorldDataCacheBuilder
                 "first element, so the GameServer must not begin serving (legacy MyGame::Init lowest-index probe).");
     }
 
-        public static FrozenDictionary<int, ItemDefinition> BuildItems(
+    public static FrozenDictionary<int, ItemDefinition> BuildItems(
         IReadOnlyList<ItemRowDto> items,
         IReadOnlyList<ItemBonusSkillRowDto> bonusSkills)
     {
@@ -770,7 +769,7 @@ public static class WorldDataCacheBuilder
         return result.ToFrozenDictionary();
     }
 
-        public static FrozenDictionary<int, SkillDefinition> BuildSkills(
+    public static FrozenDictionary<int, SkillDefinition> BuildSkills(
         IReadOnlyList<SkillRowDto> skills,
         IReadOnlyList<SkillDescriptionRowDto> descriptions,
         IReadOnlyList<SkillGradeRowDto> grades)
@@ -788,7 +787,7 @@ public static class WorldDataCacheBuilder
         return result.ToFrozenDictionary();
     }
 
-        public static FrozenDictionary<int, MonsterDefinition> BuildMonsters(
+    public static FrozenDictionary<int, MonsterDefinition> BuildMonsters(
         IReadOnlyList<MonsterRowDto> monsters,
         IReadOnlyList<MonsterDropMoneyRowDto> dropMoney,
         IReadOnlyList<MonsterDropPotionRowDto> dropPotions,
@@ -821,7 +820,7 @@ public static class WorldDataCacheBuilder
         return result.ToFrozenDictionary();
     }
 
-        public static FrozenDictionary<int, NpcDefinition> BuildNpcs(
+    public static FrozenDictionary<int, NpcDefinition> BuildNpcs(
         IReadOnlyList<NpcRowDto> npcs,
         IReadOnlyList<NpcMenuOptionRowDto> menuOptions,
         IReadOnlyList<NpcShopItemRowDto> shopItems,
@@ -848,7 +847,7 @@ public static class WorldDataCacheBuilder
         return result.ToFrozenDictionary();
     }
 
-        public static FrozenDictionary<int, QuestDefinition> BuildQuests(
+    public static FrozenDictionary<int, QuestDefinition> BuildQuests(
         IReadOnlyList<QuestRowDto> quests,
         IReadOnlyList<QuestRewardRowDto> rewards,
         IReadOnlyList<QuestSpeechRowDto> speeches)
@@ -866,7 +865,7 @@ public static class WorldDataCacheBuilder
         return result.ToFrozenDictionary();
     }
 
-        public static (FrozenDictionary<short, ZoneDefinition> ZonesByNumber, WorldDataFilterStats Stats) BuildZones(
+    public static (FrozenDictionary<short, ZoneDefinition> ZonesByNumber, WorldDataFilterStats Stats) BuildZones(
         IReadOnlyList<ZoneRowDto> zones,
         IReadOnlyList<ZonePortalRowDto> portals,
         IReadOnlyList<ZoneSpawnPointRowDto> spawnPoints,
@@ -940,7 +939,7 @@ public static class WorldDataCacheBuilder
         return (result.ToFrozenDictionary(), stats);
     }
 
-        public static FrozenDictionary<int, ImmutableArray<RewardBundleItemRowDto>> BuildRewardBundles(
+    public static FrozenDictionary<int, ImmutableArray<RewardBundleItemRowDto>> BuildRewardBundles(
         IReadOnlyList<RewardBundleRowDto> bundles,
         IReadOnlyList<RewardBundleItemRowDto> bundleItems)
     {

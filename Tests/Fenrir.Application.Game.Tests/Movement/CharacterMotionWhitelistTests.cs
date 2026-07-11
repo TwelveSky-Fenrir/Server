@@ -4,8 +4,7 @@ namespace Fenrir.Application.Game.Tests.Movement;
 
 public class CharacterMotionWhitelistTests
 {
-
-        [Theory]
+    [Theory]
     [InlineData(0, 0, 0, true, 0, 0)]
     [InlineData(1, 0, 0, true, 0, 0)]
     [InlineData(1, 7, 0, true, 0, 0)]
@@ -92,7 +91,7 @@ public class CharacterMotionWhitelistTests
         Assert.Equal(expectedCeiling, evaluation.AttackSubPacketCeiling);
     }
 
-        [Theory]
+    [Theory]
     [InlineData(1)]
     [InlineData(2)]
     [InlineData(10)]
@@ -104,7 +103,7 @@ public class CharacterMotionWhitelistTests
             Assert.True(CharacterMotionWhitelist.TryEvaluate(sort, type, out _));
     }
 
-        [Theory]
+    [Theory]
     [InlineData(0, true)]
     [InlineData(1, false)]
     [InlineData(2, true)]
@@ -118,7 +117,7 @@ public class CharacterMotionWhitelistTests
         Assert.Equal(expectedLegal, CharacterMotionWhitelist.TryEvaluate(3, type, out _));
     }
 
-        [Theory]
+    [Theory]
     [InlineData(0, false)]
     [InlineData(1, true)]
     [InlineData(2, false)]
@@ -132,7 +131,7 @@ public class CharacterMotionWhitelistTests
         Assert.Equal(expectedLegal, CharacterMotionWhitelist.TryEvaluate(4, type, out _));
     }
 
-        [Theory]
+    [Theory]
     [InlineData(0)]
     [InlineData(1)]
     [InlineData(2)]
@@ -172,7 +171,7 @@ public class CharacterMotionWhitelistTests
         Assert.Equal(default, evaluation);
     }
 
-        [Fact]
+    [Fact]
     public void Sort31_DeadMobileOnlySibling_IsIllegal()
     {
         Assert.False(CharacterMotionWhitelist.TryEvaluate(31, 0, out _));
@@ -201,7 +200,7 @@ public class CharacterMotionWhitelistTests
         Assert.False(sort74.AttackBudgetEnforced);
     }
 
-        [Fact]
+    [Fact]
     public void Sort65_CeilingIsOne_Sort74_CeilingIsZero_DespiteBothDisablingEnforcement()
     {
         Assert.True(CharacterMotionWhitelist.TryEvaluate(65, 0, out var sort65));

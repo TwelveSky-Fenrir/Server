@@ -4,8 +4,7 @@ namespace Fenrir.Application.Game.Domain.Skills;
 
 public static class AutoBuffSkillResolver
 {
-
-        public const int SlotCount = 8;
+    public const int SlotCount = 8;
 
     public static ImmutableArray<(int SkillId, int Grade)> ResolveRegistration(IReadOnlyList<int> flatSkillGrades,
         IReadOnlyDictionary<byte, LearnedSkill> learnedSkills)

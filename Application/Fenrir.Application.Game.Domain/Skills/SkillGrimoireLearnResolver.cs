@@ -13,12 +13,12 @@ public static class SkillGrimoireLearnResolver
         UnknownSkill,
         InsufficientSkillPoints,
 
-                NoFreeSlot,
+        NoFreeSlot,
 
         Success
     }
 
-        public static Result Resolve(
+    public static Result Resolve(
         int itemTribeRestriction,
         int itemLevelLimit,
         int itemMartialLevelLimit,

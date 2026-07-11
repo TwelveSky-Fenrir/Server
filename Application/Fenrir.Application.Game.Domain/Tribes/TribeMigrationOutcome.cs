@@ -5,40 +5,39 @@ public enum TribeMigrationOutcome
     Success,
 
 
-        FeatureDisabled,
+    FeatureDisabled,
 
-        OutsideConversionWindow,
+    OutsideConversionWindow,
 
-        Tribe1CannotJoinTribeFour,
+    Tribe1CannotJoinTribeFour,
 
 
-        LevelTooLow,
+    LevelTooLow,
 
-        TribePointsBelowThreshold,
+    TribePointsBelowThreshold,
 
-        NotEligibleByWorldState,
+    NotEligibleByWorldState,
 
-        NotDominantTribe,
+    NotDominantTribe,
 
-        OriginTribeAheadOfTribeThree,
+    OriginTribeAheadOfTribeThree,
 
-        NoReturnAllowance,
+    NoReturnAllowance,
 
-        InvalidPreviousTribe,
+    InvalidPreviousTribe,
 
-        HoldsTribeRole,
+    HoldsTribeRole,
 
-        HasGuildOrMentorLink,
+    HasGuildOrMentorLink,
 
-        HasRegisteredFriends,
+    HasRegisteredFriends,
 
-        QuotaExhausted
+    QuotaExhausted
 }
 
 public static class TribeMigrationOutcomeExtensions
 {
-
-        public static bool RepliesWithFailure(this TribeMigrationOutcome outcome)
+    public static bool RepliesWithFailure(this TribeMigrationOutcome outcome)
     {
         return outcome is TribeMigrationOutcome.FeatureDisabled or TribeMigrationOutcome.OutsideConversionWindow
             or TribeMigrationOutcome.Tribe1CannotJoinTribeFour;

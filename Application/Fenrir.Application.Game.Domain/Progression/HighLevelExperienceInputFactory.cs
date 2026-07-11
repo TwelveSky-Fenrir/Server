@@ -6,8 +6,7 @@ namespace Fenrir.Application.Game.Domain.Progression;
 
 public static class HighLevelExperienceInputFactory
 {
-
-        public static HighLevelExperienceInput Build(PlayerRuntimeState target, int awardedExperience,
+    public static HighLevelExperienceInput Build(PlayerRuntimeState target, int awardedExperience,
         bool antiCheatExperienceFlagged, FrozenDictionary<short, LevelRowDto> levelsByLevel)
     {
         var mainExperienceFloor = levelsByLevel.TryGetValue(LevelProgressionCalculator.MaxLevel, out var maxLevelRow)

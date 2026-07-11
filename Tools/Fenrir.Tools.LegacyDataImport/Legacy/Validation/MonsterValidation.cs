@@ -144,7 +144,7 @@ internal static class MonsterValidation
             $"{mismatches} total mismatches ({textMismatches} text, {numericMismatches} numeric).");
     }
 
-        private static List<string> FlattenToCsvFields(MonsterRecord monster)
+    private static List<string> FlattenToCsvFields(MonsterRecord monster)
     {
         List<string> fields =
         [

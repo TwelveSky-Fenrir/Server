@@ -5,30 +5,29 @@ namespace Fenrir.Application.Game.Domain.World.Npcs;
 
 public sealed class WarPointShopCatalog
 {
+    public const int NangimNpcId = 52;
 
-        public const int NangimNpcId = 52;
+    public const int NobleDragonNpcId = 102;
 
-        public const int NobleDragonNpcId = 102;
+    public const int RoyalSerpentNpcId = 202;
 
-        public const int RoyalSerpentNpcId = 202;
+    public const int GrandTigerNpcId = 302;
 
-        public const int GrandTigerNpcId = 302;
+    public const int MaxPageCount = 3;
 
-        public const int MaxPageCount = 3;
+    public const int MaxSlotPerPage = 28;
 
-        public const int MaxSlotPerPage = 28;
-
-        public static readonly FrozenSet<int> WarPointNpcIds =
+    public static readonly FrozenSet<int> WarPointNpcIds =
         new[] { NangimNpcId, NobleDragonNpcId, RoyalSerpentNpcId, GrandTigerNpcId }.ToFrozenSet();
 
-        private static readonly ImmutableArray<int> AllFourNpcs =
+    private static readonly ImmutableArray<int> AllFourNpcs =
         [NangimNpcId, NobleDragonNpcId, RoyalSerpentNpcId, GrandTigerNpcId];
 
-        private static readonly ImmutableArray<int> NobleDragonOnly = [NobleDragonNpcId];
+    private static readonly ImmutableArray<int> NobleDragonOnly = [NobleDragonNpcId];
 
-        private static readonly ImmutableArray<int> RoyalSerpentOnly = [RoyalSerpentNpcId];
+    private static readonly ImmutableArray<int> RoyalSerpentOnly = [RoyalSerpentNpcId];
 
-        private static readonly ImmutableArray<int> GrandTigerOnly = [GrandTigerNpcId];
+    private static readonly ImmutableArray<int> GrandTigerOnly = [GrandTigerNpcId];
 
     private readonly FrozenDictionary<int, WarPointPriceEntry> _pricesByItemId;
 
@@ -37,21 +36,21 @@ public sealed class WarPointShopCatalog
         _pricesByItemId = entries.ToFrozenDictionary(entry => entry.ItemId);
     }
 
-        public static WarPointShopCatalog Production { get; } = new(BuildProductionEntries());
+    public static WarPointShopCatalog Production { get; } = new(BuildProductionEntries());
 
-        public int Count => _pricesByItemId.Count;
+    public int Count => _pricesByItemId.Count;
 
-        public static bool IsWarPointNpc(int npcId)
+    public static bool IsWarPointNpc(int npcId)
     {
         return WarPointNpcIds.Contains(npcId);
     }
 
-        public bool TryGetPrice(int itemId, out WarPointPriceEntry entry)
+    public bool TryGetPrice(int itemId, out WarPointPriceEntry entry)
     {
         return _pricesByItemId.TryGetValue(itemId, out entry);
     }
 
-        private static IReadOnlyList<WarPointPriceEntry> BuildProductionEntries()
+    private static IReadOnlyList<WarPointPriceEntry> BuildProductionEntries()
     {
         return
         [
@@ -115,8 +114,7 @@ public readonly record struct WarPointPriceEntry(
     int ContributionPointPrice,
     ImmutableArray<int> DisplayNpcIds)
 {
-
-        public bool DisplaysAtNpc(int npcId)
+    public bool DisplaysAtNpc(int npcId)
     {
         return !DisplayNpcIds.IsDefaultOrEmpty && DisplayNpcIds.Contains(npcId);
     }

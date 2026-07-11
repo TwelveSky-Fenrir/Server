@@ -63,22 +63,22 @@ public class ZoneFormationPartyBuffGateTests
         };
     }
 
-        private static ActionInfo PartyBuffCastAction(int skillNumber, int gradeNum1, int gradeNum2 = 0)
+    private static ActionInfo PartyBuffCastAction(int skillNumber, int gradeNum1, int gradeNum2 = 0)
     {
         return BaseAction(FormationSkillCatalog.PartyBuffArmActionSort, skillNumber, gradeNum1, gradeNum2);
     }
 
-        private static ActionInfo PartyBuffDoneAction(int skillNumber, int gradeNum1, int gradeNum2 = 0)
+    private static ActionInfo PartyBuffDoneAction(int skillNumber, int gradeNum1, int gradeNum2 = 0)
     {
         return BaseAction(FormationSkillCatalog.PartyBuffConfirmActionSort, skillNumber, gradeNum1, gradeNum2);
     }
 
-        private static ActionInfo RestAction(int skillNumber, int gradeNum1, int gradeNum2 = 0)
+    private static ActionInfo RestAction(int skillNumber, int gradeNum1, int gradeNum2 = 0)
     {
         return BaseAction(0, skillNumber, gradeNum1, gradeNum2);
     }
 
-        private static ActionInfo SkillEffectConfirmAction(int skillNumber, int gradeNum1, int gradeNum2 = 0,
+    private static ActionInfo SkillEffectConfirmAction(int skillNumber, int gradeNum1, int gradeNum2 = 0,
         int targetCharacterId = 0)
     {
         return BaseAction(1, skillNumber, gradeNum1, gradeNum2, targetCharacterId);
@@ -89,7 +89,7 @@ public class ZoneFormationPartyBuffGateTests
         return BaseAction(32, skillNumber, gradeNum1, gradeNum2);
     }
 
-        private static void SeedFullPartyPresent(Zone zone, PartyRegistry partyRegistry, int casterId)
+    private static void SeedFullPartyPresent(Zone zone, PartyRegistry partyRegistry, int casterId)
     {
         var allyIds = new[] { casterId + 1, casterId + 2, casterId + 3, casterId + 4 };
         foreach (var allyId in allyIds)
@@ -124,15 +124,15 @@ public class ZoneFormationPartyBuffGateTests
         SeedFullPartyPresent(zone, partyRegistry, 10);
         Assert.True(zone.TryGetPlayer(10, out var caster));
 
-        zone.Post(ZoneCommand.Move(10, PartyBuffCastAction(FormationSkillId, GradeNum1, GradeNum2)));
+        zone.Post(ZoneCommand.Move(10, PartyBuffCastAction(FormationSkillId, GradeNum1)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
         Assert.Equal(PartyBuffAction.Cast, caster!.PartyBuffAct);
 
-        zone.Post(ZoneCommand.Move(10, PartyBuffDoneAction(FormationSkillId, GradeNum1, GradeNum2)));
+        zone.Post(ZoneCommand.Move(10, PartyBuffDoneAction(FormationSkillId, GradeNum1)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
         Assert.Equal(PartyBuffAction.Done, caster.PartyBuffAct);
 
-        zone.Post(ZoneCommand.Move(10, SkillEffectConfirmAction(FormationSkillId, GradeNum1, GradeNum2), true));
+        zone.Post(ZoneCommand.Move(10, SkillEffectConfirmAction(FormationSkillId, GradeNum1), true));
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.Equal(15, caster.Buffs.Buff[FormationBuffSlot * 2]);
@@ -155,11 +155,11 @@ public class ZoneFormationPartyBuffGateTests
         SeedFullPartyPresent(zone, partyRegistry, 10);
         Assert.True(zone.TryGetPlayer(10, out var caster));
 
-        zone.Post(ZoneCommand.Move(10, PartyBuffCastAction(FormationSkillId, GradeNum1, GradeNum2)));
+        zone.Post(ZoneCommand.Move(10, PartyBuffCastAction(FormationSkillId, GradeNum1)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
         Assert.Equal(PartyBuffAction.Cast, caster!.PartyBuffAct);
 
-        zone.Post(ZoneCommand.Move(10, SkillEffectConfirmAction(FormationSkillId, GradeNum1, GradeNum2), true));
+        zone.Post(ZoneCommand.Move(10, SkillEffectConfirmAction(FormationSkillId, GradeNum1), true));
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.Equal(0, caster.Buffs.Buff[FormationBuffSlot * 2]);
@@ -182,11 +182,11 @@ public class ZoneFormationPartyBuffGateTests
         SeedFullPartyPresent(zone, partyRegistry, 10);
         Assert.True(zone.TryGetPlayer(10, out var caster));
 
-        zone.Post(ZoneCommand.Move(10, RestAction(FormationSkillId, GradeNum1, GradeNum2)));
+        zone.Post(ZoneCommand.Move(10, RestAction(FormationSkillId, GradeNum1)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
         Assert.Equal(PartyBuffAction.None, caster!.PartyBuffAct);
 
-        zone.Post(ZoneCommand.Move(10, SkillEffectConfirmAction(FormationSkillId, GradeNum1, GradeNum2), true));
+        zone.Post(ZoneCommand.Move(10, SkillEffectConfirmAction(FormationSkillId, GradeNum1), true));
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.Equal(0, caster.Buffs.Buff[FormationBuffSlot * 2]);
@@ -206,13 +206,13 @@ public class ZoneFormationPartyBuffGateTests
 
         Assert.True(zone.TryGetPlayer(10, out var caster));
 
-        zone.Post(ZoneCommand.Move(10, PartyBuffCastAction(FormationSkillId, GradeNum1, GradeNum2)));
+        zone.Post(ZoneCommand.Move(10, PartyBuffCastAction(FormationSkillId, GradeNum1)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
-        zone.Post(ZoneCommand.Move(10, PartyBuffDoneAction(FormationSkillId, GradeNum1, GradeNum2)));
+        zone.Post(ZoneCommand.Move(10, PartyBuffDoneAction(FormationSkillId, GradeNum1)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
         Assert.Equal(PartyBuffAction.Done, caster!.PartyBuffAct);
 
-        zone.Post(ZoneCommand.Move(10, SkillEffectConfirmAction(FormationSkillId, GradeNum1, GradeNum2), true));
+        zone.Post(ZoneCommand.Move(10, SkillEffectConfirmAction(FormationSkillId, GradeNum1), true));
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
         Assert.Equal(0, caster.Buffs.Buff[FormationBuffSlot * 2]);

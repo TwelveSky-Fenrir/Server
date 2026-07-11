@@ -5,15 +5,14 @@ namespace Fenrir.Application.Game.Domain.World.Geometry;
 
 public sealed class ZoneGeometry(WorldTriangle[] triangles, QuadtreeNode[] quadtree)
 {
-
-        private readonly Lazy<TriangleAdjacencyGraph> _navmesh = new(() => TriangleAdjacencyGraph.Build(triangles));
+    private readonly Lazy<TriangleAdjacencyGraph> _navmesh = new(() => TriangleAdjacencyGraph.Build(triangles));
 
     public IReadOnlyList<WorldTriangle> Triangles => triangles;
     public IReadOnlyList<QuadtreeNode> Quadtree => quadtree;
 
-        public TriangleAdjacencyGraph Navmesh => _navmesh.Value;
+    public TriangleAdjacencyGraph Navmesh => _navmesh.Value;
 
-        public bool TryGetGroundHeight(float x, float z, out float y, float? ceiling = null, bool checkTwoSide = false,
+    public bool TryGetGroundHeight(float x, float z, out float y, float? ceiling = null, bool checkTwoSide = false,
         bool firstHitOnly = false)
     {
         y = 0f;
@@ -53,7 +52,7 @@ public sealed class ZoneGeometry(WorldTriangle[] triangles, QuadtreeNode[] quadt
         return found;
     }
 
-        public bool IsWalkable(float x, float z)
+    public bool IsWalkable(float x, float z)
     {
         if (quadtree.Length == 0 || !TryDescend(x, z, out var nodeIndex))
             return false;
@@ -65,7 +64,7 @@ public sealed class ZoneGeometry(WorldTriangle[] triangles, QuadtreeNode[] quadt
         return false;
     }
 
-        public bool TryFindContainingWalkableTriangle(float x, float z, out int triangleIndex)
+    public bool TryFindContainingWalkableTriangle(float x, float z, out int triangleIndex)
     {
         triangleIndex = -1;
         if (quadtree.Length == 0 || !TryDescend(x, z, out var nodeIndex))
@@ -87,7 +86,7 @@ public sealed class ZoneGeometry(WorldTriangle[] triangles, QuadtreeNode[] quadt
         return false;
     }
 
-        public void Resolve(float x, float z, out bool walkable, out float groundY)
+    public void Resolve(float x, float z, out bool walkable, out float groundY)
     {
         walkable = false;
         groundY = 0f;
@@ -160,7 +159,7 @@ public sealed class ZoneGeometry(WorldTriangle[] triangles, QuadtreeNode[] quadt
         return true;
     }
 
-        private static bool IsPointInsideTriangleXyz(in WorldTriangle triangle, float x, float y, float z)
+    private static bool IsPointInsideTriangleXyz(in WorldTriangle triangle, float x, float y, float z)
     {
         var edge0 = triangle.Vertex1 - triangle.Vertex0;
         var edge1 = triangle.Vertex2 - triangle.Vertex0;
@@ -175,7 +174,7 @@ public sealed class ZoneGeometry(WorldTriangle[] triangles, QuadtreeNode[] quadt
         return TryResolveBarycentric(dot00, dot01, dot02, dot11, dot12);
     }
 
-        private static bool IsPointInsideTriangleXz(in WorldTriangle triangle, float x, float z)
+    private static bool IsPointInsideTriangleXz(in WorldTriangle triangle, float x, float z)
     {
         var edge0 = new Vector2(triangle.Vertex1.X - triangle.Vertex0.X, triangle.Vertex1.Z - triangle.Vertex0.Z);
         var edge1 = new Vector2(triangle.Vertex2.X - triangle.Vertex0.X, triangle.Vertex2.Z - triangle.Vertex0.Z);

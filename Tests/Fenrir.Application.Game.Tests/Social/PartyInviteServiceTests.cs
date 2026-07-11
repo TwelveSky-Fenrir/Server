@@ -89,7 +89,7 @@ public class PartyInviteServiceTests
         Assert.Equal(PartyInviteResultKind.TargetNotFound, result.Kind);
     }
 
-        [Fact]
+    [Fact]
     public async Task Invite_CombinedLevelGapWithinTolerance_Sends_EvenThoughOrdinaryLevelGapAlone_ExceedsIt()
     {
         var (service, zones, _) = CreateService(1);
@@ -115,7 +115,7 @@ public class PartyInviteServiceTests
         Assert.Equal(PartyInviteResultKind.InviterMustDisconnect, result.Kind);
     }
 
-        [Fact]
+    [Fact]
     public async Task Invite_SameShardMiss_ResolvesCrossShard_PublishesAskAndReturnsSentCrossShard()
     {
         var directory = new FakeCharacterShardLocationRepository();
@@ -137,14 +137,14 @@ public class PartyInviteServiceTests
         Assert.True(parties.IsNegotiating(1));
     }
 
-        [Fact]
+    [Fact]
     public async Task Invite_SameShardMiss_ResolvesCrossShard_TribeMismatch_ReturnsInviterMustDisconnect()
     {
         var directory = new FakeCharacterShardLocationRepository();
         directory.Seed(new CharacterShardLocationDto(2, 9, 77, "RemoteTarget", 2, DateTime.UtcNow));
         var relay = new FakeSocialCrossShardRelayQueue();
         var (service, zones, _) = CreateService(1, directory, relay);
-        var inviter = Enter(zones, 1, 1, "Inviter", 1);
+        var inviter = Enter(zones, 1, 1, "Inviter");
 
         var result = await service.InviteAsync(zones[1], inviter, "RemoteTarget", CancellationToken.None);
 

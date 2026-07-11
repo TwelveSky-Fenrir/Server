@@ -12,7 +12,7 @@ public static class LegendaryPetCraftResolver
 
     private static readonly Result Rejected = new(Outcome.Rejected, 0);
 
-        public static Result Resolve(byte material1Sort, int material2ItemId, int material3ItemId,
+    public static Result Resolve(byte material1Sort, int material2ItemId, int material3ItemId,
         int contributionPoints, IRandomSource random)
     {
         if ((material1Sort != LegendaryPetCraftCatalog.Material1RequiredSort1 &&

@@ -131,7 +131,7 @@ public sealed class CreateAvatarService(
         }
     }
 
-        private static bool TryResolveWeaponItemId(IReadOnlyList<StarterKitEquipmentRowDto> equipment,
+    private static bool TryResolveWeaponItemId(IReadOnlyList<StarterKitEquipmentRowDto> equipment,
         int requestedWeapon, out int weaponItemId)
     {
         foreach (var row in equipment)
@@ -145,7 +145,7 @@ public sealed class CreateAvatarService(
         return false;
     }
 
-        private static List<CharacterItemSlotTvp> BuildEquipmentRows(IReadOnlyList<StarterKitEquipmentRowDto> catalog,
+    private static List<CharacterItemSlotTvp> BuildEquipmentRows(IReadOnlyList<StarterKitEquipmentRowDto> catalog,
         int weaponItemId)
     {
         var rows = new List<CharacterItemSlotTvp>(2);
@@ -195,7 +195,7 @@ public sealed class CreateAvatarService(
         return rows;
     }
 
-        private static int TodayPlusDays(int days)
+    private static int TodayPlusDays(int days)
     {
         var future = DateTime.UtcNow.AddDays(days);
         return future.Year * 10000 + future.Month * 100 + future.Day;

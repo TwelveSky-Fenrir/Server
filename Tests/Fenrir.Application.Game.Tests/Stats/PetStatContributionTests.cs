@@ -11,7 +11,16 @@ public class PetStatContributionTests
 
     private const int Tier0Max = 40_000_000;
 
-        private static int Pack(int isByte, int iuByte = 0, int imByte = 0, int izByte = 0)
+
+    private static readonly CharacterBaseAttributes NeutralAttributes = new(
+        0, 0, 0, 0,
+        1, 0, 0, 0, 0, 0);
+
+    private static readonly FrozenDictionary<short, LevelRowDto> NeutralLevels =
+        new Dictionary<short, LevelRowDto> { [1] = new(1, 0, 100, 0, 0, 0, 0, 0, 0, 0, 0) }
+            .ToFrozenDictionary();
+
+    private static int Pack(int isByte, int iuByte = 0, int imByte = 0, int izByte = 0)
     {
         return (isByte & 0xFF) | ((iuByte & 0xFF) << 8) | ((imByte & 0xFF) << 16) | ((izByte & 0xFF) << 24);
     }
@@ -30,7 +39,7 @@ public class PetStatContributionTests
     [Fact]
     public void Decoders_AreSigned()
     {
-        var packed = Pack(0xFF, 0x80, 0, 0);
+        var packed = Pack(0xFF, 0x80);
         Assert.Equal(-1, StatCalculator.DecodePetIsByte(packed));
         Assert.Equal(-128, StatCalculator.DecodePetIuByte(packed));
     }
@@ -52,20 +61,20 @@ public class PetStatContributionTests
     [InlineData(6, 69, 1000)]
     public void GradedIsBonus_MatchesLadder(int statType, int isByte, int expected)
     {
-        var bonus = StatCalculator.PetGradedIsBonus(petItemId: 76500, petSort: AmuletSort, Pack(isByte), statType);
+        var bonus = StatCalculator.PetGradedIsBonus(76500, AmuletSort, Pack(isByte), statType);
         Assert.Equal(expected, bonus);
     }
 
     [Fact]
     public void GradedIsBonus_ZeroWhenTensDigitDoesNotMatchRequestedType()
     {
-        Assert.Equal(0, StatCalculator.PetGradedIsBonus(76500, AmuletSort, Pack(25), statType: 1));
+        Assert.Equal(0, StatCalculator.PetGradedIsBonus(76500, AmuletSort, Pack(25), 1));
     }
 
     [Fact]
     public void GradedIsBonus_ZeroForNonAmuletSort()
     {
-        Assert.Equal(0, StatCalculator.PetGradedIsBonus(76500, GrowPetSort, Pack(15), statType: 1));
+        Assert.Equal(0, StatCalculator.PetGradedIsBonus(76500, GrowPetSort, Pack(15), 1));
     }
 
     [Theory]
@@ -77,26 +86,26 @@ public class PetStatContributionTests
     [InlineData(2301)]
     public void GradedIsBonus_ZeroForExcludedIndices(int excludedId)
     {
-        Assert.Equal(0, StatCalculator.PetGradedIsBonus(excludedId, AmuletSort, Pack(15), statType: 1));
+        Assert.Equal(0, StatCalculator.PetGradedIsBonus(excludedId, AmuletSort, Pack(15), 1));
     }
 
 
     [Fact]
     public void GradedIuBonus_ReturnsRawGradeDigitWhenTensMatches()
     {
-        Assert.Equal(7, StatCalculator.PetGradedIuBonus(76500, AmuletSort, Pack(0, 27), statType: 2));
+        Assert.Equal(7, StatCalculator.PetGradedIuBonus(76500, AmuletSort, Pack(0, 27), 2));
     }
 
     [Fact]
     public void GradedIuBonus_ZeroWhenTensDoesNotMatch()
     {
-        Assert.Equal(0, StatCalculator.PetGradedIuBonus(76500, AmuletSort, Pack(0, 27), statType: 3));
+        Assert.Equal(0, StatCalculator.PetGradedIuBonus(76500, AmuletSort, Pack(0, 27), 3));
     }
 
     [Fact]
     public void GradedIuBonus_ZeroForExcludedIndex()
     {
-        Assert.Equal(0, StatCalculator.PetGradedIuBonus(2300, AmuletSort, Pack(0, 27), statType: 2));
+        Assert.Equal(0, StatCalculator.PetGradedIuBonus(2300, AmuletSort, Pack(0, 27), 2));
     }
 
 
@@ -123,14 +132,14 @@ public class PetStatContributionTests
     [InlineData(59, 3.0f)]
     public void GradedImBonus_Type5CriticalReplicatesGrade1Anomaly(int imByte, float expected)
     {
-        var bonus = StatCalculator.PetGradedImBonus(76500, AmuletSort, Pack(0, 0, imByte), statType: 5);
+        var bonus = StatCalculator.PetGradedImBonus(76500, AmuletSort, Pack(0, 0, imByte), 5);
         Assert.Equal(expected, bonus);
     }
 
     [Fact]
     public void GradedImBonus_HasNoType6Ladder()
     {
-        Assert.Equal(0f, StatCalculator.PetGradedImBonus(76500, AmuletSort, Pack(0, 0, 60), statType: 6));
+        Assert.Equal(0f, StatCalculator.PetGradedImBonus(76500, AmuletSort, Pack(0, 0, 60), 6));
     }
 
 
@@ -194,7 +203,7 @@ public class PetStatContributionTests
     [Fact]
     public void GrowPercent_ZeroForUnrecognisedIndex()
     {
-        Assert.Equal(0f, StatCalculator.PetGrowPercent(Tier0Max, tierMax: 0));
+        Assert.Equal(0f, StatCalculator.PetGrowPercent(Tier0Max, 0));
     }
 
 
@@ -209,19 +218,19 @@ public class PetStatContributionTests
     [InlineData(120_000_000, 250)]
     public void SteppedAttackBonus_StepsOnGrowthPercent(int growValue, int expected)
     {
-        Assert.Equal(expected, StatCalculator.PetSteppedAttackBonus(growValue, Tier0Max, activity: 1));
+        Assert.Equal(expected, StatCalculator.PetSteppedAttackBonus(growValue, Tier0Max, 1));
     }
 
     [Fact]
     public void SteppedAttackBonus_ZeroWhenInactive()
     {
-        Assert.Equal(0, StatCalculator.PetSteppedAttackBonus(80_000_000, Tier0Max, activity: 0));
+        Assert.Equal(0, StatCalculator.PetSteppedAttackBonus(80_000_000, Tier0Max, 0));
     }
 
     [Fact]
     public void SteppedAttackBonus_ZeroForUnrecognisedIndex()
     {
-        Assert.Equal(0, StatCalculator.PetSteppedAttackBonus(80_000_000, tierMax: 0, activity: 1));
+        Assert.Equal(0, StatCalculator.PetSteppedAttackBonus(80_000_000, 0, 1));
     }
 
 
@@ -260,15 +269,6 @@ public class PetStatContributionTests
     {
         Assert.Equal(expected, StatCalculator.PetBonusSkillStatType(skillIndex));
     }
-
-
-    private static readonly CharacterBaseAttributes NeutralAttributes = new(
-        Vitality: 0, Strength: 0, Intelligence: 0, Dexterity: 0,
-        Level: 1, Tribe: 0, PreviousTribe: 0, Title: 0, Halo: 0, RebirthCount: 0);
-
-    private static readonly FrozenDictionary<short, LevelRowDto> NeutralLevels =
-        new Dictionary<short, LevelRowDto> { [1] = new LevelRowDto(1, 0, 100, 0, 0, 0, 0, 0, 0, 0, 0) }
-            .ToFrozenDictionary();
 
     private static ItemRowDto AmuletItem(int itemId)
     {

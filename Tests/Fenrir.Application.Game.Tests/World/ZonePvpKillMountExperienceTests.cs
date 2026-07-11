@@ -135,7 +135,8 @@ public class ZonePvpKillMountExperienceTests
 
         KillDefender(zone);
 
-        Assert.Equal(MountKillExperienceCalculator.PlaceholderBaseExperiencePerKill * 4, attacker.MountAccumulatedExp[0]);
+        Assert.Equal(MountKillExperienceCalculator.PlaceholderBaseExperiencePerKill * 4,
+            attacker.MountAccumulatedExp[0]);
     }
 
     [Fact]

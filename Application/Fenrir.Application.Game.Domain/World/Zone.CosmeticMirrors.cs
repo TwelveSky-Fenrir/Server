@@ -19,125 +19,124 @@ namespace Fenrir.Application.Game.Domain.World;
 
 public sealed partial class Zone
 {
+    private const int HeroRankPointStatSort = 904;
 
-        private const int HeroRankPointStatSort = 904;
+    private const int AutoBuffInboxCapacity = 256;
 
-        private const int AutoBuffInboxCapacity = 256;
+    private const int AutoBuffInboxDrainCapPerTick = AutoBuffInboxCapacity / 2;
 
-        private const int AutoBuffInboxDrainCapPerTick = AutoBuffInboxCapacity / 2;
+    private const int AvatarBuffInboxCapacity = 256;
 
-        private const int AvatarBuffInboxCapacity = 256;
+    private const int AvatarBuffInboxDrainCapPerTick = AvatarBuffInboxCapacity / 2;
 
-        private const int AvatarBuffInboxDrainCapPerTick = AvatarBuffInboxCapacity / 2;
+    private const int BottleInboxCapacity = 256;
 
-        private const int BottleInboxCapacity = 256;
+    private const int BottleInboxDrainCapPerTick = BottleInboxCapacity / 2;
 
-        private const int BottleInboxDrainCapPerTick = BottleInboxCapacity / 2;
+    private const int HotkeySlotInboxCapacity = 256;
 
-        private const int HotkeySlotInboxCapacity = 256;
+    private const int HotkeySlotInboxDrainCapPerTick = HotkeySlotInboxCapacity / 2;
 
-        private const int HotkeySlotInboxDrainCapPerTick = HotkeySlotInboxCapacity / 2;
+    private const int CostumeInboxCapacity = 256;
 
-        private const int CostumeInboxCapacity = 256;
+    private const int CostumeInboxDrainCapPerTick = CostumeInboxCapacity / 2;
 
-        private const int CostumeInboxDrainCapPerTick = CostumeInboxCapacity / 2;
+    private const int FishingInboxCapacity = 512;
 
-        private const int FishingInboxCapacity = 512;
+    private const int FishingInboxDrainCapPerTick = FishingInboxCapacity / 2;
 
-        private const int FishingInboxDrainCapPerTick = FishingInboxCapacity / 2;
+    private const int HeroRankingInboxCapacity = 256;
 
-        private const int HeroRankingInboxCapacity = 256;
+    private const int HeroRankingInboxDrainCapPerTick = HeroRankingInboxCapacity / 2;
 
-        private const int HeroRankingInboxDrainCapPerTick = HeroRankingInboxCapacity / 2;
+    private const int HeroRankingRolloverInboxCapacity = 4;
 
-        private const int HeroRankingRolloverInboxCapacity = 4;
+    private const int HeroRankingRolloverInboxDrainCapPerTick = HeroRankingRolloverInboxCapacity / 2;
 
-        private const int HeroRankingRolloverInboxDrainCapPerTick = HeroRankingRolloverInboxCapacity / 2;
+    private const int MountInboxCapacity = 256;
 
-        private const int MountInboxCapacity = 256;
+    private const int MountInboxDrainCapPerTick = MountInboxCapacity / 2;
 
-        private const int MountInboxDrainCapPerTick = MountInboxCapacity / 2;
+    private const int PshopInboxCapacity = 256;
 
-        private const int PshopInboxCapacity = 256;
+    private const int PshopInboxDrainCapPerTick = PshopInboxCapacity / 2;
 
-        private const int PshopInboxDrainCapPerTick = PshopInboxCapacity / 2;
+    private const int RuneInboxCapacity = 256;
 
-        private const int RuneInboxCapacity = 256;
+    private const int RuneInboxDrainCapPerTick = RuneInboxCapacity / 2;
 
-        private const int RuneInboxDrainCapPerTick = RuneInboxCapacity / 2;
+    private const int StellarCoreInboxCapacity = 256;
 
-        private const int StellarCoreInboxCapacity = 256;
+    private const int StellarCoreInboxDrainCapPerTick = StellarCoreInboxCapacity / 2;
 
-        private const int StellarCoreInboxDrainCapPerTick = StellarCoreInboxCapacity / 2;
+    private const int CharacterMpStatSort = 11;
 
-        private const int CharacterMpStatSort = 11;
-
-        private readonly Channel<AutoBuffZoneCommand> _autoBuffInbox =
+    private readonly Channel<AutoBuffZoneCommand> _autoBuffInbox =
         Channel.CreateBounded<AutoBuffZoneCommand>(
             new BoundedChannelOptions(AutoBuffInboxCapacity)
                 { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
-        private readonly List<int> _autoBuffNeighborScratch = [];
+    private readonly List<int> _autoBuffNeighborScratch = [];
 
-        private readonly Channel<AvatarBuffZoneCommand> _avatarBuffInbox =
+    private readonly Channel<AvatarBuffZoneCommand> _avatarBuffInbox =
         Channel.CreateBounded<AvatarBuffZoneCommand>(
             new BoundedChannelOptions(AvatarBuffInboxCapacity)
                 { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
-        private readonly List<int> _avatarStateFlagNeighborScratch = [];
+    private readonly List<int> _avatarStateFlagNeighborScratch = [];
 
-        private readonly Channel<DrinkBottleZoneCommand> _bottleInbox =
+    private readonly Channel<DrinkBottleZoneCommand> _bottleInbox =
         Channel.CreateBounded<DrinkBottleZoneCommand>(
             new BoundedChannelOptions(BottleInboxCapacity)
                 { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
-        private readonly List<int> _costumeFullActionNeighborScratch = [];
+    private readonly List<int> _costumeFullActionNeighborScratch = [];
 
-        private readonly Channel<CostumeZoneCommand> _costumeInbox =
+    private readonly Channel<CostumeZoneCommand> _costumeInbox =
         Channel.CreateBounded<CostumeZoneCommand>(
             new BoundedChannelOptions(CostumeInboxCapacity)
                 { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
-        private readonly Channel<FishingZoneCommand> _fishingInbox =
+    private readonly Channel<FishingZoneCommand> _fishingInbox =
         Channel.CreateBounded<FishingZoneCommand>(
             new BoundedChannelOptions(FishingInboxCapacity)
                 { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
-        private readonly List<int> _fishingNeighborScratch = [];
+    private readonly List<int> _fishingNeighborScratch = [];
 
-        private readonly Channel<HeroRankingQueryZoneCommand> _heroRankingInbox =
+    private readonly Channel<HeroRankingQueryZoneCommand> _heroRankingInbox =
         Channel.CreateBounded<HeroRankingQueryZoneCommand>(
             new BoundedChannelOptions(HeroRankingInboxCapacity)
                 { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
-        private readonly Channel<HeroRankingRolloverZoneCommand> _heroRankingRolloverInbox =
+    private readonly Channel<HeroRankingRolloverZoneCommand> _heroRankingRolloverInbox =
         Channel.CreateBounded<HeroRankingRolloverZoneCommand>(
             new BoundedChannelOptions(HeroRankingRolloverInboxCapacity)
                 { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
-        private readonly Channel<HotkeySlotMirrorZoneCommand> _hotkeySlotInbox =
+    private readonly Channel<HotkeySlotMirrorZoneCommand> _hotkeySlotInbox =
         Channel.CreateBounded<HotkeySlotMirrorZoneCommand>(
             new BoundedChannelOptions(HotkeySlotInboxCapacity)
                 { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
-        private readonly Channel<MountZoneCommand> _mountInbox =
+    private readonly Channel<MountZoneCommand> _mountInbox =
         Channel.CreateBounded<MountZoneCommand>(
             new BoundedChannelOptions(MountInboxCapacity)
                 { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
-        private readonly List<int> _pshopCloseFullActionNeighborScratch = [];
+    private readonly List<int> _pshopCloseFullActionNeighborScratch = [];
 
-        private readonly Channel<PshopZoneCommand> _pshopInbox =
+    private readonly Channel<PshopZoneCommand> _pshopInbox =
         Channel.CreateBounded<PshopZoneCommand>(
             new BoundedChannelOptions(PshopInboxCapacity)
                 { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
-        private readonly Channel<RuneSocketZoneCommand> _runeInbox =
+    private readonly Channel<RuneSocketZoneCommand> _runeInbox =
         Channel.CreateBounded<RuneSocketZoneCommand>(
             new BoundedChannelOptions(RuneInboxCapacity)
                 { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
 
-        private readonly Channel<StellarCoreZoneCommand> _stellarCoreInbox =
+    private readonly Channel<StellarCoreZoneCommand> _stellarCoreInbox =
         Channel.CreateBounded<StellarCoreZoneCommand>(
             new BoundedChannelOptions(StellarCoreInboxCapacity)
                 { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
@@ -147,7 +146,7 @@ public sealed partial class Zone
         return _pshopInbox.Writer.TryWrite(command);
     }
 
-        public async Task<bool> PostPshopCommandAndWaitAsync(PshopZoneCommand command, CancellationToken ct,
+    public async Task<bool> PostPshopCommandAndWaitAsync(PshopZoneCommand command, CancellationToken ct,
         TimeSpan? timeout = null)
     {
         var applied = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -182,7 +181,7 @@ public sealed partial class Zone
         return _heroRankingInbox.Writer.TryWrite(command);
     }
 
-        public bool PostHeroRankingRolloverReset()
+    public bool PostHeroRankingRolloverReset()
     {
         return _heroRankingRolloverInbox.Writer.TryWrite(default);
     }
@@ -192,7 +191,7 @@ public sealed partial class Zone
         return _fishingInbox.Writer.TryWrite(command);
     }
 
-        public async Task<bool> PostFishingCommandAndWaitAsync(FishingZoneCommand command, CancellationToken ct,
+    public async Task<bool> PostFishingCommandAndWaitAsync(FishingZoneCommand command, CancellationToken ct,
         TimeSpan? timeout = null)
     {
         var applied = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -217,7 +216,7 @@ public sealed partial class Zone
         return _mountInbox.Writer.TryWrite(command);
     }
 
-        public async Task<bool> PostMountCommandAndWaitAsync(MountZoneCommand command, CancellationToken ct,
+    public async Task<bool> PostMountCommandAndWaitAsync(MountZoneCommand command, CancellationToken ct,
         TimeSpan? timeout = null)
     {
         var applied = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -257,7 +256,7 @@ public sealed partial class Zone
         return _runeInbox.Writer.TryWrite(command);
     }
 
-        public async Task<bool> PostRuneSocketCommandAndWaitAsync(RuneSocketZoneCommand command, CancellationToken ct,
+    public async Task<bool> PostRuneSocketCommandAndWaitAsync(RuneSocketZoneCommand command, CancellationToken ct,
         TimeSpan? timeout = null)
     {
         var applied = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -342,7 +341,7 @@ public sealed partial class Zone
             LogDrainCapEngaged(_hotkeySlotInbox.Reader, "hotkey-slot", HotkeySlotInboxDrainCapPerTick);
     }
 
-        private void ApplyHotkeySlotMirrorCommand(in HotkeySlotMirrorZoneCommand command)
+    private void ApplyHotkeySlotMirrorCommand(in HotkeySlotMirrorZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state))
             return;
@@ -395,7 +394,7 @@ public sealed partial class Zone
             LogDrainCapEngaged(_heroRankingInbox.Reader, "hero-ranking-query", HeroRankingInboxDrainCapPerTick);
     }
 
-        private void ApplyHeroRankingQueryCommand(in HeroRankingQueryZoneCommand command)
+    private void ApplyHeroRankingQueryCommand(in HeroRankingQueryZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state))
             return;
@@ -428,7 +427,7 @@ public sealed partial class Zone
                 HeroRankingRolloverInboxDrainCapPerTick);
     }
 
-        private void ApplyHeroRankingRolloverReset()
+    private void ApplyHeroRankingRolloverReset()
     {
         foreach (var state in _players.Values)
         {
@@ -463,7 +462,7 @@ public sealed partial class Zone
             LogDrainCapEngaged(_fishingInbox.Reader, "fishing", FishingInboxDrainCapPerTick);
     }
 
-        private void ApplyFishingCommand(in FishingZoneCommand command)
+    private void ApplyFishingCommand(in FishingZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state))
             return;
@@ -535,7 +534,7 @@ public sealed partial class Zone
             LogDrainCapEngaged(_mountInbox.Reader, "mount", MountInboxDrainCapPerTick);
     }
 
-        private void ApplyMountCommand(in MountZoneCommand command)
+    private void ApplyMountCommand(in MountZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state))
             return;
@@ -610,7 +609,7 @@ public sealed partial class Zone
         }
     }
 
-        private void BroadcastAvatarStateFlag(PlayerRuntimeState state, int sort, int value01, int value02, int value03)
+    private void BroadcastAvatarStateFlag(PlayerRuntimeState state, int sort, int value01, int value02, int value03)
     {
         var response = new AvatarStateFlagResponse
         {
@@ -681,7 +680,7 @@ public sealed partial class Zone
             LogDrainCapEngaged(_costumeInbox.Reader, "costume", CostumeInboxDrainCapPerTick);
     }
 
-        private void ApplyCostumeCommand(in CostumeZoneCommand command)
+    private void ApplyCostumeCommand(in CostumeZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state))
             return;
@@ -770,7 +769,7 @@ public sealed partial class Zone
             LogDrainCapEngaged(_stellarCoreInbox.Reader, "stellar-core", StellarCoreInboxDrainCapPerTick);
     }
 
-        private void ApplyStellarCoreCommand(in StellarCoreZoneCommand command)
+    private void ApplyStellarCoreCommand(in StellarCoreZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state))
             return;
@@ -825,7 +824,7 @@ public sealed partial class Zone
         }
     }
 
-        private static ImmutableArray<int> CompactStellarCoreWardrobe(ImmutableArray<int> wardrobe, int clearedSlot)
+    private static ImmutableArray<int> CompactStellarCoreWardrobe(ImmutableArray<int> wardrobe, int clearedSlot)
     {
         var builder = wardrobe.ToBuilder();
         for (var i = clearedSlot; i < builder.Count - 1; i++)
@@ -857,7 +856,7 @@ public sealed partial class Zone
             LogDrainCapEngaged(_avatarBuffInbox.Reader, "avatar-buff", AvatarBuffInboxDrainCapPerTick);
     }
 
-        private void ApplyAvatarBuffCommand(in AvatarBuffZoneCommand command)
+    private void ApplyAvatarBuffCommand(in AvatarBuffZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state))
             return;
@@ -910,7 +909,7 @@ public sealed partial class Zone
             LogDrainCapEngaged(_runeInbox.Reader, "rune-socket", RuneInboxDrainCapPerTick);
     }
 
-        private void ApplyRuneSocketCommand(in RuneSocketZoneCommand command)
+    private void ApplyRuneSocketCommand(in RuneSocketZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state))
             return;
@@ -929,7 +928,7 @@ public sealed partial class Zone
             worldData.ItemsById);
 
         state.Stats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData, state.Buffs,
-            petContribution, runtimeState: state);
+            petContribution, state);
 
         if (command.UpdatedStats is { } stats)
             state.Stats = stats;
@@ -958,7 +957,7 @@ public sealed partial class Zone
             LogDrainCapEngaged(_autoBuffInbox.Reader, "auto-buff", AutoBuffInboxDrainCapPerTick);
     }
 
-        private void ApplyAutoBuffCommand(in AutoBuffZoneCommand command)
+    private void ApplyAutoBuffCommand(in AutoBuffZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state))
             return;
@@ -1036,7 +1035,7 @@ public sealed partial class Zone
             LogDrainCapEngaged(_pshopInbox.Reader, "pshop", PshopInboxDrainCapPerTick);
     }
 
-        private void ApplyPshopCommand(in PshopZoneCommand command)
+    private void ApplyPshopCommand(in PshopZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state) || state.PshopListing is not { } listing)
             return;

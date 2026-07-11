@@ -5,7 +5,6 @@ namespace Fenrir.Application.Game.Stats;
 
 public static partial class StatCalculator
 {
-
     private static int ComputeAttackPower(int strength, int ki, LevelRowDto levelRow, int setNumber,
         EquippedItemSlot?[] bySlot, CosmeticContext cosmetic = default, ZoneContext zone = default,
         MountContext mount = default, ConsumableContext consumable = default,
@@ -108,7 +107,7 @@ public static partial class StatCalculator
         return total;
     }
 
-        private static int WeaponAttackEffectValue(ItemRowDto weapon)
+    private static int WeaponAttackEffectValue(ItemRowDto weapon)
     {
         if (weapon.Sort != 4 && weapon.Sort is < 13 or > 21) return 0;
 

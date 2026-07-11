@@ -9,49 +9,49 @@ public static class TradeItemPlacementResolver
     {
         Success,
 
-                SourceEmpty,
+        SourceEmpty,
 
-                UnknownItem,
+        UnknownItem,
 
-                UntradeableItem,
+        UntradeableItem,
 
-                QuantityOutOfRange,
+        QuantityOutOfRange,
 
-                InsufficientSourceQuantity,
+        InsufficientSourceQuantity,
 
-                DestinationIncompatible
+        DestinationIncompatible
     }
 
-        public const int MinQuantity = 1;
+    public const int MinQuantity = 1;
 
     public const int MaxQuantity = 999;
 
-        public static bool IsValidTradeSlot(int slot)
+    public static bool IsValidTradeSlot(int slot)
     {
         return slot >= 0 && slot < TradeLimits.SlotCount;
     }
 
-        public static bool IsValidInventoryPage(int page)
+    public static bool IsValidInventoryPage(int page)
     {
         return page is ContainerMatrix.InventoryPage0 or ContainerMatrix.InventoryPage1;
     }
 
-        public static bool IsValidInventorySlot(int slot)
+    public static bool IsValidInventorySlot(int slot)
     {
         return slot is >= 0 and <= 63;
     }
 
-        public static bool IsValidGridCoordinate(int coordinate)
+    public static bool IsValidGridCoordinate(int coordinate)
     {
         return coordinate is >= 0 and <= 7;
     }
 
-        public static bool IsPremiumPageAccessAllowed(long premiumExpireUnixSeconds, long nowUnixSeconds)
+    public static bool IsPremiumPageAccessAllowed(long premiumExpireUnixSeconds, long nowUnixSeconds)
     {
         return premiumExpireUnixSeconds >= nowUnixSeconds;
     }
 
-        public static PlacementResult ResolveDeposit(
+    public static PlacementResult ResolveDeposit(
         ItemStack? source,
         int requestedQuantity,
         ItemStack? destination,
@@ -70,7 +70,7 @@ public static class TradeItemPlacementResolver
         return ResolveTransfer(src, requestedQuantity, destination, sourceItemDefinition, sourceIsSocketEligible);
     }
 
-        public static PlacementResult ResolveWithdrawal(
+    public static PlacementResult ResolveWithdrawal(
         ItemStack? source,
         int requestedQuantity,
         ItemStack? destination,
@@ -86,7 +86,7 @@ public static class TradeItemPlacementResolver
         return ResolveTransfer(src, requestedQuantity, destination, sourceItemDefinition, sourceIsSocketEligible);
     }
 
-        public static PlacementResult ResolveRearrange(
+    public static PlacementResult ResolveRearrange(
         ItemStack? source,
         int requestedQuantity,
         ItemStack? destination,
@@ -166,7 +166,7 @@ public static class TradeItemPlacementResolver
         return new PlacementResult(PlacementOutcome.Success, null, newDestination);
     }
 
-        public readonly record struct PlacementResult(
+    public readonly record struct PlacementResult(
         PlacementOutcome Outcome,
         ItemStack? NewSource,
         ItemStack? NewDestination)

@@ -6,8 +6,7 @@ namespace Fenrir.Application.Game.Abstractions.Progression;
 
 public enum TowerUpgradeOutcome
 {
-
-        Aborted,
+    Aborted,
 
     Success
 }
@@ -19,9 +18,9 @@ public interface ITowerUpgradeService
     public ValueTask<TowerUpgradeResult> UpgradeAsync(int characterId, Zone zone, PlayerRuntimeState state,
         TowerUpgradeRequest packet, CancellationToken cancellationToken);
 
-        public ValueTask<UseInventoryItemResponse> ConstructAsync(int characterId, Zone zone, PlayerRuntimeState state,
+    public ValueTask<UseInventoryItemResponse> ConstructAsync(int characterId, Zone zone, PlayerRuntimeState state,
         byte page, byte index, ItemStack item, int constructType, CancellationToken cancellationToken);
 
-        public ValueTask<UseInventoryItemResponse> HealAsync(int characterId, Zone zone, PlayerRuntimeState state,
+    public ValueTask<UseInventoryItemResponse> HealAsync(int characterId, Zone zone, PlayerRuntimeState state,
         byte page, byte index, ItemStack item, CancellationToken cancellationToken);
 }

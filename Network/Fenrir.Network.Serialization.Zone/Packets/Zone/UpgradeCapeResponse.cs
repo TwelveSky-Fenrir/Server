@@ -10,5 +10,5 @@ public readonly partial record struct UpgradeCapeResponse : IOutgoingPacket
 
     [FixedArray(6)] public required int[] Value { get; init; }
 
-        public required byte Padding { get; init; }
+    public required byte Padding { get; init; }
 }

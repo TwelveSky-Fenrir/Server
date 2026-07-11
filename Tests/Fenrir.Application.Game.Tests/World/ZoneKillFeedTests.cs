@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using System.Text;
 using Fenrir.Application.Game.Domain.Combat;
 using Fenrir.Application.Game.Domain.World;
 using Fenrir.Application.Game.Tests.TestSupport;
@@ -38,7 +39,7 @@ public class ZoneKillFeedTests
         Assert.True(zone.TryGetPlayer(1, out var killer));
         Assert.True(zone.TryGetPlayer(2, out var victim));
 
-        zone.RecordEnemyKillForFeed(killer!, victim!, isStunTrigger: false, warStateActive: true);
+        zone.RecordEnemyKillForFeed(killer!, victim!, false, true);
 
         Assert.Equal(0, killer!.SessionKillCount);
         Assert.Empty(ZoneTestKit.DrainOutbound(killerPipe));
@@ -51,7 +52,7 @@ public class ZoneKillFeedTests
         Assert.True(zone.TryGetPlayer(1, out var killer));
         Assert.True(zone.TryGetPlayer(2, out var victim));
 
-        zone.RecordEnemyKillForFeed(killer!, victim!, isStunTrigger: false, warStateActive: true);
+        zone.RecordEnemyKillForFeed(killer!, victim!, false, true);
 
         Assert.Equal(1, killer!.SessionKillCount);
 
@@ -79,7 +80,7 @@ public class ZoneKillFeedTests
         Assert.True(zone.TryGetPlayer(1, out var killer));
         Assert.True(zone.TryGetPlayer(2, out var victim));
 
-        zone.RecordEnemyKillForFeed(killer!, victim!, isStunTrigger: false, warStateActive: false);
+        zone.RecordEnemyKillForFeed(killer!, victim!, false, false);
 
         Assert.Equal(0, killer!.SessionKillCount);
 
@@ -100,7 +101,7 @@ public class ZoneKillFeedTests
         Assert.True(zone.TryGetPlayer(1, out var killer));
         Assert.True(zone.TryGetPlayer(2, out var victim));
 
-        zone.RecordEnemyKillForFeed(killer!, victim!, isStunTrigger: true, warStateActive: true);
+        zone.RecordEnemyKillForFeed(killer!, victim!, true, true);
 
         Assert.Equal(0, killer!.SessionKillCount);
         Assert.Empty(ZoneTestKit.DrainOutbound(killerPipe));
@@ -113,7 +114,7 @@ public class ZoneKillFeedTests
         Assert.True(zone.TryGetPlayer(1, out var killer));
         Assert.True(zone.TryGetPlayer(2, out var victim));
 
-        zone.RecordEnemyKillForFeed(killer!, victim!, isStunTrigger: false, warStateActive: true);
+        zone.RecordEnemyKillForFeed(killer!, victim!, false, true);
 
         Assert.Equal(KillFeedRewardConstants.FfaWarPointPerKill, killer!.WarPoint);
         Assert.Equal(KillFeedRewardConstants.FfaBloodPointPerKill, killer.BloodCoin);
@@ -126,8 +127,8 @@ public class ZoneKillFeedTests
         Assert.True(zone.TryGetPlayer(1, out var killer));
         Assert.True(zone.TryGetPlayer(2, out var victim));
 
-        zone.RecordEnemyKillForFeed(killer!, victim!, isStunTrigger: false, warStateActive: true);
-        zone.RecordEnemyKillForFeed(killer!, victim!, isStunTrigger: false, warStateActive: true);
+        zone.RecordEnemyKillForFeed(killer!, victim!, false, true);
+        zone.RecordEnemyKillForFeed(killer!, victim!, false, true);
 
         Assert.Equal(KillFeedRewardConstants.FfaWarPointPerKill, killer!.WarPoint);
         Assert.Equal(KillFeedRewardConstants.FfaBloodPointPerKill, killer.BloodCoin);
@@ -140,7 +141,7 @@ public class ZoneKillFeedTests
         Assert.True(zone.TryGetPlayer(1, out var killer));
         Assert.True(zone.TryGetPlayer(2, out var victim));
 
-        zone.RecordEnemyKillForFeed(killer!, victim!, isStunTrigger: false, warStateActive: true);
+        zone.RecordEnemyKillForFeed(killer!, victim!, false, true);
 
         Assert.Equal(0, killer!.WarPoint);
         Assert.Equal(0, killer.BloodCoin);
@@ -153,8 +154,8 @@ public class ZoneKillFeedTests
         Assert.True(zone.TryGetPlayer(1, out var killer));
         Assert.True(zone.TryGetPlayer(2, out var victim));
 
-        zone.RecordEnemyKillForFeed(killer!, victim!, isStunTrigger: false, warStateActive: true);
-        zone.ApplyKillFeedEndOfBattleRewards(isFfaMap: false, isZone267: false);
+        zone.RecordEnemyKillForFeed(killer!, victim!, false, true);
+        zone.ApplyKillFeedEndOfBattleRewards(false, false);
 
         Assert.Equal(KillFeedRewardConstants.NonFfaTop1ContributionPoints, killer!.ContributionPoints);
     }
@@ -166,12 +167,12 @@ public class ZoneKillFeedTests
         Assert.True(zone.TryGetPlayer(1, out var killer));
         Assert.True(zone.TryGetPlayer(2, out var victim));
 
-        zone.RecordEnemyKillForFeed(killer!, victim!, isStunTrigger: false, warStateActive: true);
+        zone.RecordEnemyKillForFeed(killer!, victim!, false, true);
 
         zone.Post(ZoneCommand.Leave(1));
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
-        zone.ApplyKillFeedEndOfBattleRewards(isFfaMap: false, isZone267: false);
+        zone.ApplyKillFeedEndOfBattleRewards(false, false);
 
         Assert.Equal(0, victim!.ContributionPoints);
     }
@@ -183,8 +184,8 @@ public class ZoneKillFeedTests
         Assert.True(zone.TryGetPlayer(1, out var killer));
         Assert.True(zone.TryGetPlayer(2, out var victim));
 
-        zone.RecordEnemyKillForFeed(killer!, victim!, isStunTrigger: false, warStateActive: true);
-        zone.ApplyKillFeedEndOfBattleRewards(isFfaMap: true, isZone267: false);
+        zone.RecordEnemyKillForFeed(killer!, victim!, false, true);
+        zone.ApplyKillFeedEndOfBattleRewards(true, false);
 
         Assert.Equal(KillFeedRewardConstants.FfaTop1ContributionPoints, killer!.ContributionPoints);
     }
@@ -196,14 +197,14 @@ public class ZoneKillFeedTests
         Assert.True(zone.TryGetPlayer(1, out var killer));
         Assert.True(zone.TryGetPlayer(2, out var victim));
 
-        zone.RecordEnemyKillForFeed(killer!, victim!, isStunTrigger: false, warStateActive: true);
+        zone.RecordEnemyKillForFeed(killer!, victim!, false, true);
         Assert.Equal(1, killer!.SessionKillCount);
 
         zone.ClearKillFeedLeaderboard();
 
         Assert.Equal(1, killer.SessionKillCount);
 
-        zone.ApplyKillFeedEndOfBattleRewards(isFfaMap: false, isZone267: false);
+        zone.ApplyKillFeedEndOfBattleRewards(false, false);
         Assert.Equal(0, killer.ContributionPoints);
     }
 
@@ -213,7 +214,7 @@ public class ZoneKillFeedTests
         var (zone, _, _) = SetUpZone(1);
 
         zone.ClearKillFeedLeaderboard();
-        zone.ApplyKillFeedEndOfBattleRewards(isFfaMap: false, isZone267: false);
+        zone.ApplyKillFeedEndOfBattleRewards(false, false);
     }
 
 
@@ -226,7 +227,7 @@ public class ZoneKillFeedTests
         Assert.True(zone.TryGetPlayer(2, out var victim));
         killer!.GuildId = 77;
 
-        zone.RecordEnemyKillForFeed(killer, victim!, isStunTrigger: false, warStateActive: true);
+        zone.RecordEnemyKillForFeed(killer, victim!, false, true);
 
         Assert.Equal([77], queue.EnqueuedGuildIds);
     }
@@ -240,7 +241,7 @@ public class ZoneKillFeedTests
         Assert.True(zone.TryGetPlayer(2, out var victim));
         Assert.Null(killer!.GuildId);
 
-        zone.RecordEnemyKillForFeed(killer, victim!, isStunTrigger: false, warStateActive: true);
+        zone.RecordEnemyKillForFeed(killer, victim!, false, true);
 
         Assert.Empty(queue.EnqueuedGuildIds);
     }
@@ -254,7 +255,7 @@ public class ZoneKillFeedTests
         Assert.True(zone.TryGetPlayer(2, out var victim));
         killer!.GuildId = 77;
 
-        zone.RecordEnemyKillForFeed(killer, victim!, isStunTrigger: false, warStateActive: true);
+        zone.RecordEnemyKillForFeed(killer, victim!, false, true);
 
         Assert.Empty(queue.EnqueuedGuildIds);
     }
@@ -268,7 +269,7 @@ public class ZoneKillFeedTests
         Assert.True(zone.TryGetPlayer(2, out var victim));
         killer!.GuildId = 77;
 
-        zone.RecordEnemyKillForFeed(killer, victim!, isStunTrigger: false, warStateActive: true);
+        zone.RecordEnemyKillForFeed(killer, victim!, false, true);
 
         Assert.Empty(queue.EnqueuedGuildIds);
     }
@@ -282,7 +283,7 @@ public class ZoneKillFeedTests
         Assert.True(zone.TryGetPlayer(2, out var victim));
         killer!.GuildId = 77;
 
-        zone.RecordEnemyKillForFeed(killer, victim!, isStunTrigger: true, warStateActive: true);
+        zone.RecordEnemyKillForFeed(killer, victim!, true, true);
 
         Assert.Empty(queue.EnqueuedGuildIds);
     }
@@ -296,7 +297,7 @@ public class ZoneKillFeedTests
         Assert.True(zone.TryGetPlayer(2, out var victim));
         killer!.GuildId = 77;
 
-        zone.RecordEnemyKillForFeed(killer, victim!, isStunTrigger: false, warStateActive: false);
+        zone.RecordEnemyKillForFeed(killer, victim!, false, false);
 
         Assert.Equal([77], queue.EnqueuedGuildIds);
     }
@@ -309,12 +310,12 @@ public class ZoneKillFeedTests
         Assert.True(zone.TryGetPlayer(2, out var victim));
         killer!.GuildId = 77;
 
-        zone.RecordEnemyKillForFeed(killer, victim!, isStunTrigger: false, warStateActive: true);
+        zone.RecordEnemyKillForFeed(killer, victim!, false, true);
     }
 
     private static string ReadFixedName(ReadOnlySpan<byte> data, int offset)
     {
-        var raw = System.Text.Encoding.ASCII.GetString(data.Slice(offset, 13));
+        var raw = Encoding.ASCII.GetString(data.Slice(offset, 13));
         var nullIndex = raw.IndexOf('\0');
         return nullIndex >= 0 ? raw[..nullIndex] : raw;
     }

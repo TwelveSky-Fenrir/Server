@@ -4,10 +4,9 @@ public readonly record struct ReflectOutcome(bool DestroyerSucceeded, bool Refle
 
 public static class ReflectResolver
 {
+    public const int DestroyerBuffSlot = 14;
 
-        public const int DestroyerBuffSlot = 14;
-
-        public const int ReflectBuffSlot = 12;
+    public const int ReflectBuffSlot = 12;
 
     private const int DestroyerActiveMin = 1;
     private const int DestroyerActiveMax = 201;

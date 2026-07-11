@@ -8,7 +8,8 @@ public class PortalProximityGateTests
     private const short SourceZone = 10;
     private const short TargetZone = 20;
 
-    private static PortalProximityCatalog CatalogWithOnePortal(float x, float y, float z, short destination = TargetZone)
+    private static PortalProximityCatalog CatalogWithOnePortal(float x, float y, float z,
+        short destination = TargetZone)
     {
         var portals = ImmutableDictionary<short, ImmutableArray<PortalRegistration>>.Empty
             .Add(SourceZone, [new PortalRegistration(x, y, z, destination)]);
@@ -19,8 +20,8 @@ public class PortalProximityGateTests
     public void EmptyCatalog_PortalMove_IsAllowed_DocumentedNoOpUntilDataLands()
     {
         var outcome = PortalProximityGate.Evaluate(PortalProximityCatalog.Empty, SourceZone,
-            requesterX: 0, requesterY: 0, requesterZ: 0,
-            moveReasonSort: PortalProximityGate.PortalMoveReasonSort, targetZoneNumber: TargetZone);
+            0, 0, 0,
+            PortalProximityGate.PortalMoveReasonSort, TargetZone);
 
         Assert.Equal(PortalProximityOutcome.Allowed, outcome);
     }
@@ -31,8 +32,8 @@ public class PortalProximityGateTests
         var catalog = CatalogWithOnePortal(0, 0, 0);
 
         var outcome = PortalProximityGate.Evaluate(catalog, SourceZone,
-            requesterX: 10_000, requesterY: 10_000, requesterZ: 10_000,
-            moveReasonSort: 7, targetZoneNumber: TargetZone);
+            10_000, 10_000, 10_000,
+            7, TargetZone);
 
         Assert.Equal(PortalProximityOutcome.Allowed, outcome);
     }
@@ -43,8 +44,8 @@ public class PortalProximityGateTests
         var catalog = CatalogWithOnePortal(100, 100, 0);
 
         var outcome = PortalProximityGate.Evaluate(catalog, SourceZone,
-            requesterX: 80, requesterY: 100, requesterZ: 0,
-            moveReasonSort: PortalProximityGate.PortalMoveReasonSort, targetZoneNumber: TargetZone);
+            80, 100, 0,
+            PortalProximityGate.PortalMoveReasonSort, TargetZone);
 
         Assert.Equal(PortalProximityOutcome.Allowed, outcome);
     }
@@ -55,8 +56,8 @@ public class PortalProximityGateTests
         var catalog = CatalogWithOnePortal(100, 100, 0);
 
         var outcome = PortalProximityGate.Evaluate(catalog, SourceZone,
-            requesterX: 60, requesterY: 100, requesterZ: 0,
-            moveReasonSort: PortalProximityGate.PortalMoveReasonSort, targetZoneNumber: TargetZone);
+            60, 100, 0,
+            PortalProximityGate.PortalMoveReasonSort, TargetZone);
 
         Assert.Equal(PortalProximityOutcome.RejectedNotNearRegisteredPortal, outcome);
     }
@@ -67,8 +68,8 @@ public class PortalProximityGateTests
         var catalog = CatalogWithOnePortal(0, 0, 0);
 
         var outcome = PortalProximityGate.Evaluate(catalog, SourceZone,
-            requesterX: 0, requesterY: 0, requesterZ: 40,
-            moveReasonSort: PortalProximityGate.PortalMoveReasonSort, targetZoneNumber: TargetZone);
+            0, 0, 40,
+            PortalProximityGate.PortalMoveReasonSort, TargetZone);
 
         Assert.Equal(PortalProximityOutcome.RejectedNotNearRegisteredPortal, outcome);
     }
@@ -76,11 +77,11 @@ public class PortalProximityGateTests
     [Fact]
     public void PortalMove_NearPortalLeadingElsewhere_IsRejected_DestinationMustMatch()
     {
-        var catalog = CatalogWithOnePortal(0, 0, 0, destination: (short)99);
+        var catalog = CatalogWithOnePortal(0, 0, 0, 99);
 
         var outcome = PortalProximityGate.Evaluate(catalog, SourceZone,
-            requesterX: 0, requesterY: 0, requesterZ: 0,
-            moveReasonSort: PortalProximityGate.PortalMoveReasonSort, targetZoneNumber: TargetZone);
+            0, 0, 0,
+            PortalProximityGate.PortalMoveReasonSort, TargetZone);
 
         Assert.Equal(PortalProximityOutcome.RejectedNotNearRegisteredPortal, outcome);
     }
@@ -90,9 +91,9 @@ public class PortalProximityGateTests
     {
         var catalog = CatalogWithOnePortal(0, 0, 0);
 
-        var outcome = PortalProximityGate.Evaluate(catalog, sourceZoneId: 999,
-            requesterX: 0, requesterY: 0, requesterZ: 0,
-            moveReasonSort: PortalProximityGate.PortalMoveReasonSort, targetZoneNumber: TargetZone);
+        var outcome = PortalProximityGate.Evaluate(catalog, 999,
+            0, 0, 0,
+            PortalProximityGate.PortalMoveReasonSort, TargetZone);
 
         Assert.Equal(PortalProximityOutcome.Allowed, outcome);
     }

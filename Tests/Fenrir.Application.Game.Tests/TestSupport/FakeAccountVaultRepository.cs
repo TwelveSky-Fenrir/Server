@@ -78,7 +78,7 @@ internal sealed class FakeAccountVaultRepository : IAccountVaultRepository
         return ValueTask.CompletedTask;
     }
 
-        public void Seed(int accountId, long money, long money2,
+    public void Seed(int accountId, long money, long money2,
         params (short SlotIndex, AccountVaultItemSlotDto Row)[] items)
     {
         var slots = items.ToDictionary(i => i.SlotIndex, i => i.Row);

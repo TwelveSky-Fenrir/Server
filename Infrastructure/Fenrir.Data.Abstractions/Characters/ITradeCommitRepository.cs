@@ -2,8 +2,7 @@ namespace Fenrir.Data.Abstractions.Characters;
 
 public interface ITradeCommitRepository
 {
-
-        public ValueTask ExecuteIdempotentAsync(
+    public ValueTask ExecuteIdempotentAsync(
         Guid tradeToken,
         int characterA, IReadOnlyList<CharacterItemSlotTvp> itemsA0, IReadOnlyList<CharacterItemSlotTvp> itemsA1,
         long deltaMoneyA, int deltaBigMoneyA,

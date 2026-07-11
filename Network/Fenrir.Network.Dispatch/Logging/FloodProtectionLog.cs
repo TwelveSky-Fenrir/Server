@@ -4,8 +4,7 @@ namespace Fenrir.Network.Dispatch.Logging;
 
 internal static partial class FloodProtectionLog
 {
-
-        [LoggerMessage(
+    [LoggerMessage(
         EventId = 4101,
         EventName = "IpBlocked",
         Level = LogLevel.Warning,
@@ -13,7 +12,7 @@ internal static partial class FloodProtectionLog
             "IP {IpAddress} blocked by the flood guard -- {KickedSessionCount} local session(s) aborted with DisconnectReason.IpBlocked")]
     public static partial void IpBlocked(this ILogger logger, string ipAddress, int kickedSessionCount);
 
-        [LoggerMessage(
+    [LoggerMessage(
         EventId = 4102,
         EventName = "IpBlockPersistFailed",
         Level = LogLevel.Error,

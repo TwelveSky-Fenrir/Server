@@ -18,10 +18,9 @@ public sealed class ZoneCenterBroadcastIngestor(
     Zone051Zone053SiegeState? zone051Zone053State = null,
     AllianceProposalCenterState? allianceState = null)
 {
+    public const int PayloadSize = 130;
 
-        public const int PayloadSize = 130;
-
-        public const int Zone049RangeStart = 1;
+    public const int Zone049RangeStart = 1;
 
     public const int Zone049RangeEnd = 9;
 
@@ -29,23 +28,23 @@ public sealed class ZoneCenterBroadcastIngestor(
     public const int Zone175RangeEnd = 100;
     public const int Zone175ResetEventCode = 110;
 
-        public const int Zone267RangeStart = 402;
+    public const int Zone267RangeStart = 402;
 
     public const int Zone267RangeEnd = 410;
 
-        public const int Zone241RangeStart = 411;
+    public const int Zone241RangeStart = 411;
 
     public const int Zone241RangeEnd = 415;
 
-        public const int Zone335RangeStart = 1501;
+    public const int Zone335RangeStart = 1501;
 
     public const int Zone335RangeEnd = 1507;
 
-        public const int DtmEventCode = 1510;
+    public const int DtmEventCode = 1510;
 
-        public const int PingEventCode = 4000;
+    public const int PingEventCode = 4000;
 
-        public void Ingest(int eventCode, ReadOnlySpan<byte> data)
+    public void Ingest(int eventCode, ReadOnlySpan<byte> data)
     {
         if (data.Length != PayloadSize)
             throw new ArgumentException($"Zone-center broadcast payload must be exactly {PayloadSize} bytes.",
@@ -62,7 +61,7 @@ public sealed class ZoneCenterBroadcastIngestor(
             EnqueueForOtherShards(eventCode, data);
     }
 
-        public void ApplyRelayedEvent(int eventCode, ReadOnlySpan<byte> data)
+    public void ApplyRelayedEvent(int eventCode, ReadOnlySpan<byte> data)
     {
         if (data.Length != PayloadSize)
             throw new ArgumentException($"Zone-center broadcast payload must be exactly {PayloadSize} bytes.",
@@ -105,12 +104,14 @@ public sealed class ZoneCenterBroadcastIngestor(
                 ApplyZone241(eventCode, data);
                 break;
 
-            case >= Zone051Zone053BroadcastResolver.Zone051RangeStart and <= Zone051Zone053BroadcastResolver.Zone051RangeEnd
+            case >= Zone051Zone053BroadcastResolver.Zone051RangeStart
+                and <= Zone051Zone053BroadcastResolver.Zone051RangeEnd
                 when zone051Zone053State is not null:
                 Zone051Zone053BroadcastResolver.ApplyZone051(zone051Zone053State, eventCode, data, logger);
                 break;
 
-            case >= Zone051Zone053BroadcastResolver.Zone053RangeStart and <= Zone051Zone053BroadcastResolver.Zone053RangeEnd
+            case >= Zone051Zone053BroadcastResolver.Zone053RangeStart
+                and <= Zone051Zone053BroadcastResolver.Zone053RangeEnd
                 when zone051Zone053State is not null:
                 Zone051Zone053BroadcastResolver.ApplyZone053(zone051Zone053State, eventCode, data, logger);
                 break;
@@ -137,11 +138,10 @@ public sealed class ZoneCenterBroadcastIngestor(
             case PingEventCode:
                 HsbRewardFlagResetReactor.Apply(zones);
                 break;
-
         }
     }
 
-        private void ApplyZone049(int eventCode, ReadOnlySpan<byte> data)
+    private void ApplyZone049(int eventCode, ReadOnlySpan<byte> data)
     {
         if (eventCode == Zone049RangeStart)
             return;
@@ -204,7 +204,7 @@ public sealed class ZoneCenterBroadcastIngestor(
             state.SetZone267((byte)tribeIndex, mapped);
     }
 
-        private void ApplyZone241(int eventCode, ReadOnlySpan<byte> data)
+    private void ApplyZone241(int eventCode, ReadOnlySpan<byte> data)
     {
         var instance = ReadInt32(data, 0);
 
@@ -233,7 +233,7 @@ public sealed class ZoneCenterBroadcastIngestor(
         state.SetZone038DtmValue((byte)tribeId, effectValue);
     }
 
-        private void BroadcastAllZonesPing()
+    private void BroadcastAllZonesPing()
     {
         var empty = new byte[PayloadSize];
         var response = new ZoneEventInfoResponse
@@ -249,7 +249,7 @@ public sealed class ZoneCenterBroadcastIngestor(
         BroadcastToEveryZone(in response);
     }
 
-        private void BroadcastToEveryZone<TPacket>(in TPacket response) where TPacket : struct, IOutgoingPacket
+    private void BroadcastToEveryZone<TPacket>(in TPacket response) where TPacket : struct, IOutgoingPacket
     {
         var total = FrameWriter.FrameSizeOf<TPacket>();
         var rented = ArrayPool<byte>.Shared.Rent(total);

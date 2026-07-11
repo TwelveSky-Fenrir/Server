@@ -45,7 +45,7 @@ public class ValleyWarSystemTests
         return (registry[mapId], session, pipe);
     }
 
-        private static void AdvanceToKillRaceStart(ValleyWarSystem system, ValleyWarKillRegistry killRegistry,
+    private static void AdvanceToKillRaceStart(ValleyWarSystem system, ValleyWarKillRegistry killRegistry,
         Zone valleyZone)
     {
         system.Simulate(valleyZone,
@@ -252,7 +252,7 @@ public class ValleyWarSystemTests
         Assert.Equal(ValleyWarPhase.Idle, killRegistry.GetOrCreate(ValleyMapId).Phase);
     }
 
-        [Fact]
+    [Fact]
     public void KillRegistry_RegisterMonsterKill_DecrementsTheSameScheduleInstanceTheSystemTicks()
     {
         var registry = ZoneTestKit.CreateRegistry();

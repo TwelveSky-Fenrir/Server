@@ -6,10 +6,9 @@ namespace Fenrir.Application.Game.Domain.World;
 
 public sealed partial class Zone
 {
+    private const int HotkeyMoveInboxCapacity = 512;
 
-        private const int HotkeyMoveInboxCapacity = 512;
-
-        private const int HotkeyMoveInboxDrainCapPerTick = HotkeyMoveInboxCapacity / 2;
+    private const int HotkeyMoveInboxDrainCapPerTick = HotkeyMoveInboxCapacity / 2;
 
     private readonly Channel<HotkeyMoveZoneCommand> _hotkeyMoveInbox =
         Channel.CreateBounded<HotkeyMoveZoneCommand>(
@@ -21,7 +20,7 @@ public sealed partial class Zone
         return _hotkeyMoveInbox.Writer.TryWrite(command);
     }
 
-        public async Task<bool> PostHotkeyMoveCommandAndWaitAsync(HotkeyMoveZoneCommand command, CancellationToken ct,
+    public async Task<bool> PostHotkeyMoveCommandAndWaitAsync(HotkeyMoveZoneCommand command, CancellationToken ct,
         TimeSpan? timeout = null)
     {
         var applied = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -64,7 +63,7 @@ public sealed partial class Zone
             LogDrainCapEngaged(_hotkeyMoveInbox.Reader, "hotkey-move", HotkeyMoveInboxDrainCapPerTick);
     }
 
-        private void ApplyHotkeyMoveCommand(in HotkeyMoveZoneCommand command)
+    private void ApplyHotkeyMoveCommand(in HotkeyMoveZoneCommand command)
     {
         if (!_players.TryGetValue(command.CharacterId, out var state))
             return;

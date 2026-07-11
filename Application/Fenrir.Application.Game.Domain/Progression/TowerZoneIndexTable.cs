@@ -2,8 +2,7 @@ namespace Fenrir.Application.Game.Domain.Progression;
 
 public static class TowerZoneIndexTable
 {
-
-        public static int GetTowerIndex(int zoneNumber)
+    public static int GetTowerIndex(int zoneNumber)
     {
         return zoneNumber switch
         {
@@ -23,7 +22,7 @@ public static class TowerZoneIndexTable
         };
     }
 
-        public static byte? GetOwningTribe(int zoneNumber)
+    public static byte? GetOwningTribe(int zoneNumber)
     {
         var towerIndex = GetTowerIndex(zoneNumber);
         return towerIndex < 0 ? null : (byte)(towerIndex / 3);

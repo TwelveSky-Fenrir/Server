@@ -7,12 +7,11 @@ namespace Fenrir.Application.Login.Abstractions.Login;
 
 public enum LoginOutcome
 {
-
-        RateLimited,
+    RateLimited,
     Failure,
     Success,
 
-        DuplicateSessionEvicted
+    DuplicateSessionEvicted
 }
 
 public sealed record LoginResult(
@@ -30,7 +29,7 @@ public sealed record LoginResult(
     public static LoginResult RateLimitedResult { get; } =
         new(LoginOutcome.RateLimited, 0, "", false, 0, false, "", []);
 
-        public static LoginResult SilentDropResult { get; } =
+    public static LoginResult SilentDropResult { get; } =
         new(LoginOutcome.DuplicateSessionEvicted, 0, "", false, 0, false, "", []);
 }
 

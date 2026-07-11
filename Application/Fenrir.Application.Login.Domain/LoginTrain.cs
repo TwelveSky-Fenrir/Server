@@ -6,12 +6,11 @@ namespace Fenrir.Application.Login.Domain;
 
 public static class LoginTrain
 {
+    public const int AvatarSlotCount = 3;
 
-        public const int AvatarSlotCount = 3;
+    public const string FailurePinMask = "0000";
 
-        public const string FailurePinMask = "0000";
-
-        public const string ExistingPinMask = "****";
+    public const string ExistingPinMask = "****";
 
     private static readonly WorldRecommendationResponse RecommandWorld = new()
         { AddKillOtherTribe0 = 0, AddKillOtherTribe1 = 0, AddKillOtherTribe2 = 0 };
@@ -53,7 +52,7 @@ public static class LoginTrain
         Costume = new int[10]
     };
 
-        public static LoginResponse BuildLoginRecv(int result, string id, int secondLoginSort, string mousePassword,
+    public static LoginResponse BuildLoginRecv(int result, string id, int secondLoginSort, string mousePassword,
         string resultString = "")
     {
         return new LoginResponse
@@ -73,7 +72,7 @@ public static class LoginTrain
         };
     }
 
-        public static AvatarRosterResponse[] BuildAvatarSlots(IReadOnlyCollection<AvatarRosterEntry> characters)
+    public static AvatarRosterResponse[] BuildAvatarSlots(IReadOnlyCollection<AvatarRosterEntry> characters)
     {
         var slots = new AvatarRosterResponse[AvatarSlotCount];
         for (var slot = 0; slot < AvatarSlotCount; slot++)
@@ -120,7 +119,7 @@ public static class LoginTrain
         };
     }
 
-        private static int[] BuildLogoutInfoArray(CharacterRosterDto character)
+    private static int[] BuildLogoutInfoArray(CharacterRosterDto character)
     {
         var (life, mana) = AvatarVitalsFloor.Clamp(character.Life, character.Mana);
         return
@@ -134,7 +133,7 @@ public static class LoginTrain
         ];
     }
 
-        private static string[] BuildFriendArray(IReadOnlyDictionary<byte, string> friendNameBySlot)
+    private static string[] BuildFriendArray(IReadOnlyDictionary<byte, string> friendNameBySlot)
     {
         var friends = new string[10];
         Array.Fill(friends, "");
@@ -146,12 +145,12 @@ public static class LoginTrain
         return friends;
     }
 
-        public static AvatarRosterResponse[] BuildEmptyAvatarSlots()
+    public static AvatarRosterResponse[] BuildEmptyAvatarSlots()
     {
         return [EmptyAvatarSlot, EmptyAvatarSlot, EmptyAvatarSlot];
     }
 
-        public static void Send(IPacketSession session, in LoginResponse loginRecv, AvatarRosterResponse[] avatarSlots)
+    public static void Send(IPacketSession session, in LoginResponse loginRecv, AvatarRosterResponse[] avatarSlots)
     {
         session.Send(loginRecv);
         foreach (var slot in avatarSlots)
@@ -161,7 +160,7 @@ public static class LoginTrain
         session.Send(RecommandWorld2);
     }
 
-        public static void SendFailure(IPacketSession session, int result, string requestId, string resultString = "")
+    public static void SendFailure(IPacketSession session, int result, string requestId, string resultString = "")
     {
         Send(session, BuildLoginRecv(result, requestId, 0, FailurePinMask, resultString), BuildEmptyAvatarSlots());
     }

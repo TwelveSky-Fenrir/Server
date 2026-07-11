@@ -7,8 +7,8 @@ namespace Fenrir.Application.Game.Domain.Inventory.UseItems;
 public sealed class UseItemHandlerRegistry
 {
     private readonly FrozenDictionary<int, IUseItemHandler> _byId;
-    private readonly EquipSwapUseItemHandler _equipSwap;
     private readonly CostumeStellarCoreUseItemHandler _costumeStellarCore;
+    private readonly EquipSwapUseItemHandler _equipSwap;
 
     public UseItemHandlerRegistry(
         TitleUpgradeUseItemHandler titleUpgrade,
@@ -54,7 +54,7 @@ public sealed class UseItemHandlerRegistry
         _costumeStellarCore = costumeStellarCore;
     }
 
-        public IUseItemHandler? Resolve(ItemStack item, ItemDefinition definition)
+    public IUseItemHandler? Resolve(ItemStack item, ItemDefinition definition)
     {
         if (_byId.TryGetValue(item.ItemId, out var handler))
             return handler;

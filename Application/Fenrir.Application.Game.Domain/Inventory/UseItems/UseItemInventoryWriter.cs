@@ -7,8 +7,7 @@ namespace Fenrir.Application.Game.Domain.Inventory.UseItems;
 
 public sealed class UseItemInventoryWriter(ICharacterRepository characters, ILogger<UseItemInventoryWriter> logger)
 {
-
-        public async ValueTask<ImmutableDictionary<byte, ItemStack>> ConsumeAndMirrorAsync(Zone zone,
+    public async ValueTask<ImmutableDictionary<byte, ItemStack>> ConsumeAndMirrorAsync(Zone zone,
         PlayerRuntimeState state, int characterId, byte page, byte index, ItemStack item, int remainingQuantity,
         EffectiveStats? stats, CancellationToken cancellationToken)
     {
@@ -29,7 +28,7 @@ public sealed class UseItemInventoryWriter(ICharacterRepository characters, ILog
         return projected;
     }
 
-        public async ValueTask ReplaceTwoAndMirrorAsync(Zone zone, int characterId, byte pageContainer,
+    public async ValueTask ReplaceTwoAndMirrorAsync(Zone zone, int characterId, byte pageContainer,
         ImmutableDictionary<byte, ItemStack> pageProjected, byte equipmentContainer,
         ImmutableDictionary<byte, ItemStack> equipmentProjected, EffectiveStats? stats,
         CancellationToken cancellationToken)
@@ -48,7 +47,7 @@ public sealed class UseItemInventoryWriter(ICharacterRepository characters, ILog
                 zone.MapId, characterId);
     }
 
-        public async ValueTask ReplaceProjectedPagesAndMirrorAsync(Zone zone, int characterId,
+    public async ValueTask ReplaceProjectedPagesAndMirrorAsync(Zone zone, int characterId,
         ImmutableDictionary<byte, ItemStack> originalPage0, ImmutableDictionary<byte, ItemStack> originalPage1,
         ImmutableDictionary<byte, ItemStack> projectedPage0, ImmutableDictionary<byte, ItemStack> projectedPage1,
         EffectiveStats? stats, CancellationToken cancellationToken)

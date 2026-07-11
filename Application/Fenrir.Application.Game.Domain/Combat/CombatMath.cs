@@ -2,10 +2,9 @@ namespace Fenrir.Application.Game.Domain.Combat;
 
 public static class CombatMath
 {
+    public const int AlwaysHitPercent = 100;
 
-        public const int AlwaysHitPercent = 100;
-
-        public static int ComputeHitChancePercent(int attackSuccess, int attackBlock)
+    public static int ComputeHitChancePercent(int attackSuccess, int attackBlock)
     {
         int determineValue;
         if (attackSuccess > attackBlock)
@@ -27,12 +26,12 @@ public static class CombatMath
         return rng.NextInt32(100) < hitChancePercent;
     }
 
-        public static bool RollCritical(int criticalChancePercent, IRandomSource rng)
+    public static bool RollCritical(int criticalChancePercent, IRandomSource rng)
     {
         return criticalChancePercent > 0 && rng.NextInt32(100) < criticalChancePercent;
     }
 
-        public static int ApplyVariance(int damage, IRandomSource rng)
+    public static int ApplyVariance(int damage, IRandomSource rng)
     {
         var addsInsteadOfSubtracts = rng.NextInt32(2) == 0;
         var magnitudePercent = rng.NextInt32(11);
@@ -45,7 +44,7 @@ public static class CombatMath
         return (int)(basePower * (ratioPercent + 100.0f) * 0.01f);
     }
 
-        public static bool IsInRange(float x1, float y1, float z1, float x2, float y2, float z2, float maxDistance)
+    public static bool IsInRange(float x1, float y1, float z1, float x2, float y2, float z2, float maxDistance)
     {
         var dx = x1 - x2;
         var dy = y1 - y2;

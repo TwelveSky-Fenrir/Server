@@ -8,20 +8,20 @@ public static class TradeBigMoneyPlacementResolver
     {
         Success,
 
-                TradeLocked,
+        TradeLocked,
 
-                QuantityOutOfRange,
+        QuantityOutOfRange,
 
-                InsufficientSourceBalance,
+        InsufficientSourceBalance,
 
-                DestinationOverflow
+        DestinationOverflow
     }
 
-        public const long BigMoneyCap = BigMoneyTransferPolicy.BigMoneyCap;
+    public const long BigMoneyCap = BigMoneyTransferPolicy.BigMoneyCap;
 
-        public const int LockedMenuState = 1;
+    public const int LockedMenuState = 1;
 
-        public static BigMoneyPlacementResult ResolveToTradeOffer(
+    public static BigMoneyPlacementResult ResolveToTradeOffer(
         int ownMenuState, long onHandBigMoney, long tradeOfferBigMoney, long amount)
     {
         if (ownMenuState >= LockedMenuState)
@@ -45,7 +45,7 @@ public static class TradeBigMoneyPlacementResolver
             newTradeOfferBigMoney);
     }
 
-        public static BigMoneyPlacementResult ResolveFromTradeOffer(
+    public static BigMoneyPlacementResult ResolveFromTradeOffer(
         int ownMenuState, long tradeOfferBigMoney, long onHandBigMoney, long amount)
     {
         if (ownMenuState >= LockedMenuState)
@@ -69,7 +69,7 @@ public static class TradeBigMoneyPlacementResolver
             tradeOfferBigMoney - amount);
     }
 
-        public readonly record struct BigMoneyPlacementResult(
+    public readonly record struct BigMoneyPlacementResult(
         BigMoneyPlacementOutcome Outcome,
         long NewOnHandBigMoney,
         long NewTradeOfferBigMoney)

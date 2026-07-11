@@ -2,8 +2,7 @@ namespace Fenrir.Application.Game.Domain.Stats;
 
 public static class StatAllocationResolver
 {
-
-        public enum BaseStat
+    public enum BaseStat
     {
         Strength,
         Dexterity,
@@ -13,25 +12,24 @@ public static class StatAllocationResolver
 
     public enum Outcome
     {
-
-                Disconnect,
+        Disconnect,
 
         Success
     }
 
-        public const int SmallFixedCategoryMin = 1;
+    public const int SmallFixedCategoryMin = 1;
 
     public const int SmallFixedCategoryMax = 4;
 
-        public const int LargeFixedCategoryMin = 5;
+    public const int LargeFixedCategoryMin = 5;
 
     public const int LargeFixedCategoryMax = 8;
 
-        public const int VariableCategoryMin = 9;
+    public const int VariableCategoryMin = 9;
 
     public const int VariableCategoryMax = 12;
 
-        public static Result Resolve(int statSort, int addValue, int currentStatPoints)
+    public static Result Resolve(int statSort, int addValue, int currentStatPoints)
     {
         return statSort switch
         {
@@ -65,7 +63,7 @@ public static class StatAllocationResolver
             : new Result(Outcome.Success, stat, addValue, currentStatPoints - addValue);
     }
 
-        public readonly record struct Result(Outcome Outcome, BaseStat Stat, int Amount, int NewStatPoints)
+    public readonly record struct Result(Outcome Outcome, BaseStat Stat, int Amount, int NewStatPoints)
     {
         public bool Succeeded => Outcome == Outcome.Success;
 

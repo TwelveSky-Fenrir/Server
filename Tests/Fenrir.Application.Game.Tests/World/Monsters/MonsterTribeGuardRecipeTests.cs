@@ -10,8 +10,7 @@ namespace Fenrir.Application.Game.Tests.World.Monsters;
 
 public class MonsterTribeGuardRecipeTests
 {
-
-        private static (Zone Zone, MonsterEntity Monster) CreateGuardZone(short meleeRadius, IRandomSource ai)
+    private static (Zone Zone, MonsterEntity Monster) CreateGuardZone(short meleeRadius, IRandomSource ai)
     {
         var template = WorldDataTestRows.Monster(600) with
         {
@@ -41,8 +40,8 @@ public class MonsterTribeGuardRecipeTests
     [Fact]
     public void CandidateWithinMeleeRange_EngagesImmediately_WithNoIntermediateChaseState()
     {
-        var (zone, _) = CreateGuardZone(meleeRadius: 50, ai: new ScriptedRandomSource(0));
-        EnterPlayerAt(zone, 10, posX: 20, posZ: 0);
+        var (zone, _) = CreateGuardZone(50, new ScriptedRandomSource(0));
+        EnterPlayerAt(zone, 10, 20, 0);
 
         zone.Tick(SimulationClock.LegacyTick);
         zone.Tick(SimulationClock.LegacyTick);
@@ -55,8 +54,8 @@ public class MonsterTribeGuardRecipeTests
     [Fact]
     public void CandidateBeyondMeleeRange_NeverEngages_NoChaseCapabilityAtAll()
     {
-        var (zone, _) = CreateGuardZone(meleeRadius: 5, ai: new ScriptedRandomSource(0));
-        EnterPlayerAt(zone, 10, posX: 500, posZ: 0);
+        var (zone, _) = CreateGuardZone(5, new ScriptedRandomSource(0));
+        EnterPlayerAt(zone, 10, 500, 0);
 
         for (var i = 0; i < 10; i++)
             zone.Tick(SimulationClock.LegacyTick);
@@ -69,8 +68,8 @@ public class MonsterTribeGuardRecipeTests
     [Fact]
     public void DeadCandidate_IsExcludedByTheSharedGauntlet_NeverEngages()
     {
-        var (zone, _) = CreateGuardZone(meleeRadius: 50, ai: new ScriptedRandomSource(0));
-        EnterPlayerAt(zone, 10, posX: 20, posZ: 0);
+        var (zone, _) = CreateGuardZone(50, new ScriptedRandomSource(0));
+        EnterPlayerAt(zone, 10, 20, 0);
         zone.Tick(SimulationClock.LegacyTick);
 
         Assert.True(zone.TryGetPlayer(10, out var candidate));
@@ -100,7 +99,7 @@ public class MonsterTribeGuardRecipeTests
             simulationSystems: [new MonsterAiSystem(new ScriptedRandomSource(0))]);
         zone.SpawnMonster(guardA);
         zone.SpawnMonster(guardB);
-        EnterPlayerAt(zone, 10, posX: 20, posZ: 0);
+        EnterPlayerAt(zone, 10, 20, 0);
 
         zone.Tick(SimulationClock.LegacyTick);
         zone.Tick(SimulationClock.LegacyTick);

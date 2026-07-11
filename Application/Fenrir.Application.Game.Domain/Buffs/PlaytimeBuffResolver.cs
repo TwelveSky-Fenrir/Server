@@ -2,10 +2,9 @@ namespace Fenrir.Application.Game.Domain.Buffs;
 
 public static class PlaytimeBuffResolver
 {
+    public const int PlayTimeClobberValue = 300;
 
-        public const int PlayTimeClobberValue = 300;
-
-        private static readonly int[] EffectTime = [120, 180, 240, 300, 360];
+    private static readonly int[] EffectTime = [120, 180, 240, 300, 360];
 
     public static Result Resolve(int sort)
     {

@@ -63,9 +63,9 @@ public class MonsterCombatResolverTribeSymbolMalusTests
     {
         var monster = Monster();
         var outcome = MonsterCombatResolver.ResolvePvmAttack(Attacker(113), monster, MeleeRequest(monster),
-            TimeSpan.Zero, NoVarianceRng(), attackerAttackBudgetEnforced: false, attackerActionSkillNumber: 0,
-            attackerActionSkillGradePoints: 0,
-            attackerSymbolDamageDownPenalty: TribeSymbolCombatModifiers.OwnSymbolLostDamageDownPenalty);
+            TimeSpan.Zero, NoVarianceRng(), false, 0,
+            0,
+            TribeSymbolCombatModifiers.OwnSymbolLostDamageDownPenalty);
 
         Assert.True(outcome.Hit);
         Assert.Equal(800, outcome.DamageApplied);
@@ -77,9 +77,9 @@ public class MonsterCombatResolverTribeSymbolMalusTests
     {
         var monster = Monster();
         var outcome = MonsterCombatResolver.ResolvePvmAttack(Attacker(MonsterCombatResolver.MalusMinimumAttackerLevel),
-            monster, MeleeRequest(monster), TimeSpan.Zero, NoVarianceRng(), attackerAttackBudgetEnforced: false,
-            attackerActionSkillNumber: 0, attackerActionSkillGradePoints: 0,
-            attackerSymbolDamageDownPenalty: TribeSymbolCombatModifiers.OwnSymbolLostDamageDownPenalty);
+            monster, MeleeRequest(monster), TimeSpan.Zero, NoVarianceRng(), false,
+            0, 0,
+            TribeSymbolCombatModifiers.OwnSymbolLostDamageDownPenalty);
 
         Assert.True(outcome.Hit);
         Assert.Equal(AttackerAttackPower, outcome.DamageApplied);
@@ -90,8 +90,8 @@ public class MonsterCombatResolverTribeSymbolMalusTests
     {
         var monster = Monster();
         var outcome = MonsterCombatResolver.ResolvePvmAttack(Attacker(113), monster, MeleeRequest(monster),
-            TimeSpan.Zero, NoVarianceRng(), attackerAttackBudgetEnforced: false, attackerActionSkillNumber: 0,
-            attackerActionSkillGradePoints: 0, attackerSymbolDamageDownPenalty: 0f);
+            TimeSpan.Zero, NoVarianceRng(), false, 0,
+            0, 0f);
 
         Assert.True(outcome.Hit);
         Assert.Equal(AttackerAttackPower, outcome.DamageApplied);

@@ -11,7 +11,7 @@ public static class CashCatalogBuilder
 
     public const int MaxCashNum = MaxCashType * MaxCashItemPerPage * MaxCashPage;
 
-        public static CashCatalog Build(IEnumerable<ItemMallProductRowDto> products)
+    public static CashCatalog Build(IEnumerable<ItemMallProductRowDto> products)
     {
         var costInfo = new CostInfoEntry[MaxCashNum];
         var grid = new int[MaxCashType * MaxCashPage * MaxCashItemPerPage * MaxCashItemDetail];
@@ -62,7 +62,7 @@ public static class CashCatalogBuilder
         return new CashCatalog { CostInfoByIndex = [.. costInfo], DisplayGrid = grid };
     }
 
-        public static int ResolveVersion(IEnumerable<ItemMallProductRowDto> products)
+    public static int ResolveVersion(IEnumerable<ItemMallProductRowDto> products)
     {
         foreach (var product in products)
             if (product.ItemMallProductId == 100000 && product.ProductType == 5)
@@ -71,7 +71,7 @@ public static class CashCatalogBuilder
         return 0;
     }
 
-        public static int ResolveCrc(IEnumerable<ItemMallProductRowDto> products)
+    public static int ResolveCrc(IEnumerable<ItemMallProductRowDto> products)
     {
         foreach (var product in products)
             if (product.ItemMallProductId == 100001 && product.ProductType == 5)
@@ -80,7 +80,7 @@ public static class CashCatalogBuilder
         return 0;
     }
 
-        public static bool ResolveSellEnabled(IEnumerable<ItemMallProductRowDto> products)
+    public static bool ResolveSellEnabled(IEnumerable<ItemMallProductRowDto> products)
     {
         foreach (var product in products)
             if (product.ItemMallProductId == 100002 && product.ProductType == 5)
@@ -89,16 +89,15 @@ public static class CashCatalogBuilder
         return true;
     }
 
-        public readonly record struct CostInfoEntry(int Cost, int ItemId, int Quantity, int Type, int ItemMallProductId)
+    public readonly record struct CostInfoEntry(int Cost, int ItemId, int Quantity, int Type, int ItemMallProductId)
     {
         public bool IsAssigned => ItemId >= 1;
     }
 
     public sealed class CashCatalog
     {
+        public required ImmutableArray<CostInfoEntry> CostInfoByIndex { get; init; }
 
-                public required ImmutableArray<CostInfoEntry> CostInfoByIndex { get; init; }
-
-                public required int[] DisplayGrid { get; init; }
+        public required int[] DisplayGrid { get; init; }
     }
 }

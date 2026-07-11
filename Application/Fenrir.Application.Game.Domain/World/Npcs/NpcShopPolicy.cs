@@ -1,6 +1,5 @@
 using Fenrir.Application.Game.Domain.Inventory;
 using Fenrir.Application.Game.GameData;
-using Fenrir.Data.Abstractions.Game;
 
 namespace Fenrir.Application.Game.Domain.World.Npcs;
 
@@ -10,47 +9,47 @@ public static class NpcShopPolicy
     {
         Success,
 
-                NotSellableHere,
+        NotSellableHere,
 
-                NotInCatalog,
+        NotInCatalog,
 
-                InvalidQuantity,
+        InvalidQuantity,
 
-                DestinationConflict,
+        DestinationConflict,
 
-                InsufficientContributionPoints,
+        InsufficientContributionPoints,
 
-                RentItemNotPurchasable,
+        RentItemNotPurchasable,
 
-                BelowMinimumLevel
+        BelowMinimumLevel
     }
 
     public enum SellOutcome
     {
         Success,
 
-                Rejected,
+        Rejected,
 
-                InvalidQuantity
+        InvalidQuantity
     }
 
-        private const byte RareItemType = 3;
+    private const byte RareItemType = 3;
 
-        public const byte SpecialShopNpcType = 13;
+    public const byte SpecialShopNpcType = 13;
 
     public const short SpecialShopMinimumLevel = 113;
 
-        private const int RentItemIdStart = 76500;
+    private const int RentItemIdStart = 76500;
 
     private const int RentItemIdEndInclusive = 76540;
 
-        private const int SellExemptRangeStart = 99703;
+    private const int SellExemptRangeStart = 99703;
 
     private const int SellExemptRangeEndInclusive = 99756;
 
-        public static readonly IReadOnlySet<short> TownZoneNumbers = new HashSet<short> { 1, 6, 11, 37, 140 };
+    public static readonly IReadOnlySet<short> TownZoneNumbers = new HashSet<short> { 1, 6, 11, 37, 140 };
 
-        private static readonly (int Start, int EndInclusive)[] CostumeItemIdRanges =
+    private static readonly (int Start, int EndInclusive)[] CostumeItemIdRanges =
     [
         (301, 402),
         (1801, 1803),
@@ -70,7 +69,7 @@ public static class NpcShopPolicy
         return itemId is >= RentItemIdStart and <= RentItemIdEndInclusive;
     }
 
-        public static bool IsSellExempt(int itemId)
+    public static bool IsSellExempt(int itemId)
     {
         return itemId is >= SellExemptRangeStart and <= SellExemptRangeEndInclusive;
     }
@@ -84,7 +83,7 @@ public static class NpcShopPolicy
         return false;
     }
 
-        public static SellResult ResolveSell(ItemDefinition itemDefinition, ItemStack sourceStack, int requestedQuantity)
+    public static SellResult ResolveSell(ItemDefinition itemDefinition, ItemStack sourceStack, int requestedQuantity)
     {
         var item = itemDefinition.Item;
 
@@ -124,7 +123,7 @@ public static class NpcShopPolicy
         return new SellResult(SellOutcome.Success, item.SellCost, null);
     }
 
-        public static BuyResult ResolveBuy(NpcDefinition npc, ItemDefinition itemDefinition, int requestedQuantity,
+    public static BuyResult ResolveBuy(NpcDefinition npc, ItemDefinition itemDefinition, int requestedQuantity,
         ItemStack? destinationSlot, short playerLevel, short currentZoneNumber, int playerContributionPoints)
     {
         var item = itemDefinition.Item;
@@ -192,7 +191,7 @@ public static class NpcShopPolicy
             new ItemStack(item.ItemId, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0));
     }
 
-        private static bool TryResolveCost(ItemRowDto item, int quantity, short currentZoneNumber,
+    private static bool TryResolveCost(ItemRowDto item, int quantity, short currentZoneNumber,
         int playerContributionPoints, out int moneyCost, out int cpCost, out BuyOutcome failureOutcome)
     {
         moneyCost = ResolveBuyCost(item, quantity, currentZoneNumber);
@@ -208,13 +207,13 @@ public static class NpcShopPolicy
         return true;
     }
 
-        private static int ResolveBuyCost(ItemRowDto item, int quantity, short currentZoneNumber)
+    private static int ResolveBuyCost(ItemRowDto item, int quantity, short currentZoneNumber)
     {
         var unitCost = currentZoneNumber == 291 ? (int)(item.BuyCost * 0.9f) : item.BuyCost;
         return ContainerMatrix.IsStackableSort(item.Sort) ? unitCost * quantity : unitCost;
     }
 
-        public readonly record struct SellResult(
+    public readonly record struct SellResult(
         SellOutcome Outcome,
         long MoneyGained,
         ItemStack? RemainingSourceStack)
@@ -222,7 +221,7 @@ public static class NpcShopPolicy
         public bool Succeeded => Outcome == SellOutcome.Success;
     }
 
-        public readonly record struct BuyResult(
+    public readonly record struct BuyResult(
         BuyOutcome Outcome,
         int MoneyCost,
         int CpCost,
@@ -230,7 +229,7 @@ public static class NpcShopPolicy
     {
         public bool Succeeded => Outcome == BuyOutcome.Success;
 
-                public bool IsCleanFailure => Outcome is BuyOutcome.NotSellableHere or BuyOutcome.InvalidQuantity
+        public bool IsCleanFailure => Outcome is BuyOutcome.NotSellableHere or BuyOutcome.InvalidQuantity
             or BuyOutcome.RentItemNotPurchasable;
     }
 }

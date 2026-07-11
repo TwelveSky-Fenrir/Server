@@ -112,14 +112,14 @@ public class TribeGuardCorridorCatalogFactoryTests
         var catalog = TribeGuardCorridorCatalogFactory.BuildLive();
         var state = new TribeGuardCorridorState();
 
-        var blocked = TribeGuardCorridorGate.Evaluate(catalog, state, requesterTribe: 1, originZoneId: 2,
-            destinationZoneId: 1, requesterIsGmOrAdminRank: false);
+        var blocked = TribeGuardCorridorGate.Evaluate(catalog, state, 1, 2,
+            1, false);
         Assert.Equal(TribeGuardCorridorMoveOutcome.RejectedSoft, blocked);
 
         state.TrySetOpen(0, 3, true);
 
-        var allowed = TribeGuardCorridorGate.Evaluate(catalog, state, requesterTribe: 1, originZoneId: 2,
-            destinationZoneId: 1, requesterIsGmOrAdminRank: false);
+        var allowed = TribeGuardCorridorGate.Evaluate(catalog, state, 1, 2,
+            1, false);
         Assert.Equal(TribeGuardCorridorMoveOutcome.Allowed, allowed);
     }
 
@@ -129,8 +129,8 @@ public class TribeGuardCorridorCatalogFactoryTests
         var catalog = TribeGuardCorridorCatalogFactory.BuildLive();
         var state = new TribeGuardCorridorState();
 
-        var outcome = TribeGuardCorridorGate.Evaluate(catalog, state, requesterTribe: 1, originZoneId: 1,
-            destinationZoneId: 2, requesterIsGmOrAdminRank: false);
+        var outcome = TribeGuardCorridorGate.Evaluate(catalog, state, 1, 1,
+            2, false);
 
         Assert.Equal(TribeGuardCorridorMoveOutcome.Allowed, outcome);
     }
@@ -142,8 +142,8 @@ public class TribeGuardCorridorCatalogFactoryTests
         var state = new TribeGuardCorridorState();
         state.TrySetOpen(0, 1, true);
 
-        var outcome = TribeGuardCorridorGate.Evaluate(catalog, state, requesterTribe: 1, originZoneId: 38,
-            destinationZoneId: 3, requesterIsGmOrAdminRank: false);
+        var outcome = TribeGuardCorridorGate.Evaluate(catalog, state, 1, 38,
+            3, false);
 
         Assert.Equal(TribeGuardCorridorMoveOutcome.RejectedSoft, outcome);
     }
@@ -154,8 +154,8 @@ public class TribeGuardCorridorCatalogFactoryTests
         var catalog = TribeGuardCorridorCatalogFactory.BuildLive();
         var state = new TribeGuardCorridorState();
 
-        var outcome = TribeGuardCorridorGate.Evaluate(catalog, state, requesterTribe: 0, originZoneId: 9999,
-            destinationZoneId: 1, requesterIsGmOrAdminRank: false);
+        var outcome = TribeGuardCorridorGate.Evaluate(catalog, state, 0, 9999,
+            1, false);
 
         Assert.Equal(TribeGuardCorridorMoveOutcome.Allowed, outcome);
     }

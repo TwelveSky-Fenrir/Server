@@ -31,9 +31,9 @@ public sealed class TribeActionService(
     private const int AlertCharmCpCost = 10;
     private const int RebirthCpCost = 10_000;
 
-        private const int MaxRebirth = 6;
+    private const int MaxRebirth = 6;
 
-        public async ValueTask<TribeActionOutcome> ResetStatsAsync(Zone zone, PlayerRuntimeState state, int characterId,
+    public async ValueTask<TribeActionOutcome> ResetStatsAsync(Zone zone, PlayerRuntimeState state, int characterId,
         CancellationToken ct)
     {
         if (state.Level > 39 || !IsValidTown(state.Tribe, zone.MapId))
@@ -58,7 +58,7 @@ public sealed class TribeActionService(
         return TribeActionOutcome.Ok();
     }
 
-        public async ValueTask<TribeActionOutcome> AppointSubMasterAsync(Zone zone, PlayerRuntimeState state, byte[] data,
+    public async ValueTask<TribeActionOutcome> AppointSubMasterAsync(Zone zone, PlayerRuntimeState state, byte[] data,
         CancellationToken ct)
     {
         if (state.TribeRole != 1 || !IsSubMasterCapitalZone(state.Tribe, zone.MapId) ||
@@ -134,7 +134,7 @@ public sealed class TribeActionService(
         return TribeActionOutcome.Ok();
     }
 
-        public async ValueTask<TribeActionOutcome> RemoveSubMasterAsync(Zone zone, PlayerRuntimeState state, byte[] data,
+    public async ValueTask<TribeActionOutcome> RemoveSubMasterAsync(Zone zone, PlayerRuntimeState state, byte[] data,
         CancellationToken ct)
     {
         if (state.TribeRole != 1 || !IsSubMasterCapitalZone(state.Tribe, zone.MapId) ||
@@ -159,7 +159,7 @@ public sealed class TribeActionService(
         return TribeActionOutcome.Ok();
     }
 
-        public async ValueTask<TribeActionOutcome> UseTribeWeaponAsync(Zone zone, PlayerRuntimeState state,
+    public async ValueTask<TribeActionOutcome> UseTribeWeaponAsync(Zone zone, PlayerRuntimeState state,
         int characterId, CancellationToken ct)
     {
         if (state.TribeRole is not (1 or 2) || !IsValidTown(state.Tribe, zone.MapId))
@@ -187,7 +187,7 @@ public sealed class TribeActionService(
         return TribeActionOutcome.Ok();
     }
 
-        public TribeActionOutcome ValidateTribeSkill(PlayerRuntimeState state, byte[] data)
+    public TribeActionOutcome ValidateTribeSkill(PlayerRuntimeState state, byte[] data)
     {
         if (state.TribeRole != 1)
             return TribeActionOutcome.Abort;
@@ -221,7 +221,7 @@ public sealed class TribeActionService(
         return TribeActionOutcome.Ok();
     }
 
-        public async ValueTask<TribeActionOutcome> PurchaseTitleAsync(Zone zone, PlayerRuntimeState state,
+    public async ValueTask<TribeActionOutcome> PurchaseTitleAsync(Zone zone, PlayerRuntimeState state,
         int characterId, byte[] data, CancellationToken ct)
     {
         if (!TribeWorkTitlePayload.TryRead(data, out var payload))
@@ -255,7 +255,7 @@ public sealed class TribeActionService(
         return TribeActionOutcome.Ok();
     }
 
-        public async ValueTask<TribeActionOutcome> HaloEnchantAsync(Zone zone, PlayerRuntimeState state, int characterId,
+    public async ValueTask<TribeActionOutcome> HaloEnchantAsync(Zone zone, PlayerRuntimeState state, int characterId,
         CancellationToken ct)
     {
         var now = DateTime.UtcNow;
@@ -317,7 +317,7 @@ public sealed class TribeActionService(
         return TribeActionOutcome.Ok(result);
     }
 
-        public async ValueTask<TribeActionOutcome> ClaimLevelBonusAsync(Zone zone, PlayerRuntimeState state,
+    public async ValueTask<TribeActionOutcome> ClaimLevelBonusAsync(Zone zone, PlayerRuntimeState state,
         int characterId, CancellationToken ct)
     {
         if (!LevelMilestoneBonus.TryResolveClaimDrops(state.BonusItemLevel, state.PreviousTribe, out var drops))
@@ -335,7 +335,7 @@ public sealed class TribeActionService(
         return TribeActionOutcome.Ok();
     }
 
-        public async ValueTask<TribeActionOutcome> SetOrnamentAsync(Zone zone, PlayerRuntimeState state, int characterId,
+    public async ValueTask<TribeActionOutcome> SetOrnamentAsync(Zone zone, PlayerRuntimeState state, int characterId,
         bool on, CancellationToken ct)
     {
         var attributes = new CharacterBaseAttributes(state.StatVit, state.StatStr, state.StatInt, state.StatDex,
@@ -343,7 +343,7 @@ public sealed class TribeActionService(
             state.Level2);
         var equipmentContainer = state.Inventory.GetContainer(ContainerMatrix.Equipment);
 
-        var zoneOverride = new ZoneContext(state.MapId, OrnamentInUse: on, RankBuffType: state.RankBuffType,
+        var zoneOverride = new ZoneContext(state.MapId, on, RankBuffType: state.RankBuffType,
             TribeRole: state.TribeRole, GuildBuffActive: state.GuildBuffActive, GuildId: state.GuildId ?? 0);
 
         var updatedStats = EquipmentService.RecomputeStats(attributes, equipmentContainer, worldData,
@@ -361,7 +361,7 @@ public sealed class TribeActionService(
         return TribeActionOutcome.Ok();
     }
 
-        public async ValueTask<TribeActionOutcome> RebirthAsync(Zone zone, PlayerRuntimeState state, int characterId,
+    public async ValueTask<TribeActionOutcome> RebirthAsync(Zone zone, PlayerRuntimeState state, int characterId,
         CancellationToken ct)
     {
         if (state.RebirthCount >= RebirthProgression.MaxRebirthGeneration ||
@@ -410,19 +410,19 @@ public sealed class TribeActionService(
         return TribeActionOutcome.Ok();
     }
 
-        public ValueTask<TribeActionOutcome> RedeemMapScrollAsync(Zone zone, PlayerRuntimeState state, int characterId,
+    public ValueTask<TribeActionOutcome> RedeemMapScrollAsync(Zone zone, PlayerRuntimeState state, int characterId,
         CancellationToken ct)
     {
         return RedeemScrollAsync(zone, state, characterId, 591, MapScrollCpCost, ct);
     }
 
-        public ValueTask<TribeActionOutcome> RedeemAlertCharmAsync(Zone zone, PlayerRuntimeState state, int characterId,
+    public ValueTask<TribeActionOutcome> RedeemAlertCharmAsync(Zone zone, PlayerRuntimeState state, int characterId,
         CancellationToken ct)
     {
         return RedeemScrollAsync(zone, state, characterId, 590, AlertCharmCpCost, ct);
     }
 
-        public async ValueTask<TribeActionOutcome> UseTowerScrollAsync(Zone zone, PlayerRuntimeState state,
+    public async ValueTask<TribeActionOutcome> UseTowerScrollAsync(Zone zone, PlayerRuntimeState state,
         int characterId, CancellationToken ct)
     {
         if (state.TribeRole is not (1 or 2))
@@ -448,7 +448,7 @@ public sealed class TribeActionService(
         return TribeActionOutcome.Ok();
     }
 
-        private async ValueTask<TribeActionOutcome> RedeemScrollAsync(Zone zone, PlayerRuntimeState state,
+    private async ValueTask<TribeActionOutcome> RedeemScrollAsync(Zone zone, PlayerRuntimeState state,
         int characterId, int itemId, int cpCost, CancellationToken ct)
     {
         if (state.TribeRole is not (1 or 2) || state.ContributionPoints < cpCost)
@@ -464,7 +464,7 @@ public sealed class TribeActionService(
         return TribeActionOutcome.Ok();
     }
 
-        private static bool IsValidTown(byte tribe, short mapId)
+    private static bool IsValidTown(byte tribe, short mapId)
     {
         return tribe switch
         {
@@ -476,7 +476,7 @@ public sealed class TribeActionService(
         };
     }
 
-        private static bool IsSubMasterCapitalZone(byte tribe, short mapId)
+    private static bool IsSubMasterCapitalZone(byte tribe, short mapId)
     {
         return tribe switch
         {

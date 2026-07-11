@@ -63,7 +63,7 @@ public sealed class SocketConnection : IDuplexPipe, IAsyncDisposable
         await Task.WhenAll(ReceiveLoopAsync(linked.Token), SendLoopAsync(linked.Token)).ConfigureAwait(false);
     }
 
-        public void Abort()
+    public void Abort()
     {
         try
         {

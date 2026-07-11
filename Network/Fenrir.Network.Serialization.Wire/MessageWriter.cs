@@ -7,13 +7,13 @@ public ref struct MessageWriter(Span<byte> destination)
     private readonly Span<byte> _destination = destination;
     private int _offset;
 
-        public void Skip(int length)
+    public void Skip(int length)
     {
         _destination.Slice(_offset, length).Clear();
         _offset += length;
     }
 
-        public Span<byte> Reserve(int length)
+    public Span<byte> Reserve(int length)
     {
         var slice = _destination.Slice(_offset, length);
         _offset += length;

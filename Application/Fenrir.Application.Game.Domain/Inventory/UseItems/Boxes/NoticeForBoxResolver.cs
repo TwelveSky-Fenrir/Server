@@ -4,8 +4,7 @@ namespace Fenrir.Application.Game.Domain.Inventory.UseItems.Boxes;
 
 public static class NoticeForBoxResolver
 {
-
-        public const byte EliteItemTypeThreshold = 4;
+    public const byte EliteItemTypeThreshold = 4;
 
     public static NoticeDecision Decide(int boxId, int rewardItemId, byte rewardItemType)
     {
@@ -20,5 +19,5 @@ public static class NoticeForBoxResolver
         return new NoticeDecision(whitelisted, false);
     }
 
-        public readonly record struct NoticeDecision(bool ShouldBroadcast, bool WriteEliteGainAudit);
+    public readonly record struct NoticeDecision(bool ShouldBroadcast, bool WriteEliteGainAudit);
 }

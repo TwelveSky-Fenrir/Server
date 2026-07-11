@@ -7,9 +7,9 @@ internal sealed class FakeRvrSiegeEventRelayRepository : IRvrSiegeEventRelayRepo
 {
     public List<RvrSiegeEventRelayEntry> Published { get; } = [];
 
-        public List<RvrSiegeEventRelayDto> NextPoll { get; set; } = [];
+    public List<RvrSiegeEventRelayDto> NextPoll { get; set; } = [];
 
-        public Exception? ThrowOnPublish { get; set; }
+    public Exception? ThrowOnPublish { get; set; }
 
     public ValueTask PublishAsync(RvrSiegeEventRelayEntry entry, CancellationToken ct)
     {

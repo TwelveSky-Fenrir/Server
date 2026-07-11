@@ -1,18 +1,16 @@
-using Fenrir.Application.Game.Domain.World;
 using Microsoft.Extensions.Logging;
 
 namespace Fenrir.Application.Game.Domain.Progression;
 
 public sealed class HeroRankPointAccumulator(ILogger<HeroRankPointAccumulator>? logger = null)
 {
-
-        public const byte CurrentPeriodKind = 0;
+    public const byte CurrentPeriodKind = 0;
 
     private readonly Lock _lock = new();
     private readonly Dictionary<int, (byte? TribeId, int? Level)> _pendingContext = new();
     private readonly Dictionary<int, int> _pendingDelta = new();
 
-        public void AddPending(int characterId, int delta, byte? tribeId, int? level)
+    public void AddPending(int characterId, int delta, byte? tribeId, int? level)
     {
         if (delta == 0)
             return;
@@ -24,7 +22,7 @@ public sealed class HeroRankPointAccumulator(ILogger<HeroRankPointAccumulator>? 
         }
     }
 
-        public async Task FlushDirtyAsync(IHeroRankingRepository heroRankings, CancellationToken ct)
+    public async Task FlushDirtyAsync(IHeroRankingRepository heroRankings, CancellationToken ct)
     {
         Dictionary<int, int> deltaSnapshot;
         Dictionary<int, (byte? TribeId, int? Level)> contextSnapshot;

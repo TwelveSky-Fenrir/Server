@@ -10,7 +10,7 @@ public class EventLogEmittersTests
     {
         var fake = new FakeEventLogRepository();
 
-        await fake.LogCashShopPurchaseAsync(accountId: 10, characterId: 20, itemId: 5001, quantity: 3, serial: 0,
+        await fake.LogCashShopPurchaseAsync(10, 20, 5001, 3, 0,
             CancellationToken.None);
 
         var e = Assert.Single(fake.LoggedEvents);
@@ -29,7 +29,7 @@ public class EventLogEmittersTests
     {
         var fake = new FakeEventLogRepository();
 
-        await fake.LogCashShopPurchaseAsync(1, 2, 3, 4, serial: 999, CancellationToken.None);
+        await fake.LogCashShopPurchaseAsync(1, 2, 3, 4, 999, CancellationToken.None);
 
         Assert.Equal("Serial=999", Assert.Single(fake.LoggedEvents).Payload);
     }
@@ -39,8 +39,8 @@ public class EventLogEmittersTests
     {
         var fake = new FakeEventLogRepository();
 
-        await fake.LogGroundItemGainAsync(accountId: 1, characterId: 2, itemId: 100, quantity: 1,
-            itemType: 1, CancellationToken.None);
+        await fake.LogGroundItemGainAsync(1, 2, 100, 1,
+            1, CancellationToken.None);
 
         var e = Assert.Single(fake.LoggedEvents);
         Assert.Equal(EventLogEmitters.GroundItemGainEventCode, e.EventCode);
@@ -54,7 +54,7 @@ public class EventLogEmittersTests
     {
         var fake = new FakeEventLogRepository();
 
-        await fake.LogGroundItemGainAsync(1, 2, 100, 1, itemType: EventLogEmitters.GroundItemEliteTypeThreshold,
+        await fake.LogGroundItemGainAsync(1, 2, 100, 1, EventLogEmitters.GroundItemEliteTypeThreshold,
             CancellationToken.None);
 
         Assert.Equal(2, fake.LoggedEvents.Count);
@@ -69,7 +69,7 @@ public class EventLogEmittersTests
         var fake = new FakeEventLogRepository();
 
         await fake.LogGroundItemGainAsync(1, 2, 100, 1,
-            itemType: (byte)(EventLogEmitters.GroundItemEliteTypeThreshold - 1), CancellationToken.None);
+            EventLogEmitters.GroundItemEliteTypeThreshold - 1, CancellationToken.None);
 
         Assert.Single(fake.LoggedEvents);
     }
@@ -79,7 +79,7 @@ public class EventLogEmittersTests
     {
         var fake = new FakeEventLogRepository();
 
-        await fake.LogBoxOpenEliteGainAsync(1, 2, boxItemId: 1035, rewardItemId: 9001, rewardQuantity: 1,
+        await fake.LogBoxOpenEliteGainAsync(1, 2, 1035, 9001, 1,
             CancellationToken.None);
 
         var e = Assert.Single(fake.LoggedEvents);
@@ -97,7 +97,7 @@ public class EventLogEmittersTests
     {
         var fake = new FakeEventLogRepository();
 
-        await fake.LogTradeItemStagedAsync(1, 2, toWindow, itemId: 55, quantity: 1, CancellationToken.None);
+        await fake.LogTradeItemStagedAsync(1, 2, toWindow, 55, 1, CancellationToken.None);
 
         var e = Assert.Single(fake.LoggedEvents);
         Assert.Equal(expectedCode, e.EventCode);
@@ -111,7 +111,7 @@ public class EventLogEmittersTests
     {
         var fake = new FakeEventLogRepository();
 
-        await fake.LogTradeMoneyStagedAsync(1, 2, toWindow, amount: 500, CancellationToken.None);
+        await fake.LogTradeMoneyStagedAsync(1, 2, toWindow, 500, CancellationToken.None);
 
         var e = Assert.Single(fake.LoggedEvents);
         Assert.Equal(expectedCode, e.EventCode);
@@ -141,7 +141,7 @@ public class EventLogEmittersTests
     {
         var fake = new FakeEventLogRepository();
 
-        await fake.LogPetInventoryTransferAsync(1, 2, intoPetBag, petItemId: 777, serial: 0, CancellationToken.None);
+        await fake.LogPetInventoryTransferAsync(1, 2, intoPetBag, 777, 0, CancellationToken.None);
 
         var e = Assert.Single(fake.LoggedEvents);
         Assert.Equal(expectedCode, e.EventCode);
@@ -155,8 +155,8 @@ public class EventLogEmittersTests
     {
         var fake = new FakeEventLogRepository();
 
-        await fake.LogBigMoneyConversionAsync(EventLogEmitters.BigMoneyConversionEventCode1, accountId: 1,
-            characterId: 2, fromLedgerDelta: -1_500_000_000, toLedgerDelta: 1, CancellationToken.None);
+        await fake.LogBigMoneyConversionAsync(EventLogEmitters.BigMoneyConversionEventCode1, 1,
+            2, -1_500_000_000, 1, CancellationToken.None);
 
         var e = Assert.Single(fake.LoggedEvents);
         Assert.Equal(EventLogCategory.BigMoneyConversion, e.Category);
@@ -169,8 +169,8 @@ public class EventLogEmittersTests
     {
         var fake = new FakeEventLogRepository();
 
-        await fake.LogBigMoneyConversionAsync(EventLogEmitters.BigMoneyConversionEventCode5, accountId: null,
-            characterId: 10, fromLedgerDelta: -5, toLedgerDelta: 5, CancellationToken.None);
+        await fake.LogBigMoneyConversionAsync(EventLogEmitters.BigMoneyConversionEventCode5, null,
+            10, -5, 5, CancellationToken.None);
 
         var e = Assert.Single(fake.LoggedEvents);
         Assert.Equal(EventLogEmitters.BigMoneyConversionEventCode5, e.EventCode);

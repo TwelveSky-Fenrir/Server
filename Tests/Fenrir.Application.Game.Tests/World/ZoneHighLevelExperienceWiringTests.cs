@@ -46,13 +46,13 @@ public class ZoneHighLevelExperienceWiringTests
     public void GrantMonsterKillExperience_KillerAtGeneralLevelCap_RoutesToHighLevelResolverInsteadOfOrdinaryLevelUp()
     {
         var (zone, dirtyTracker, pipe, killerId) = SetUpKillerAtCap(
-            level2: 0, exp2: 0, experience: HighLevelExperienceResolver.MaxMainExperience);
+            0, 0, HighLevelExperienceResolver.MaxMainExperience);
 
         zone.TryGetPlayer(killerId, out var before);
         var priorSkillPoints = before!.SkillPoints;
         var priorZone101 = before.Zone101Time;
 
-        zone.GrantMonsterKillExperience(killerId, monsterLevel: 335, monsterGeneralExperience: 500);
+        zone.GrantMonsterKillExperience(killerId, 335, 500);
 
         zone.TryGetPlayer(killerId, out var killer);
         Assert.NotNull(killer);
@@ -84,7 +84,7 @@ public class ZoneHighLevelExperienceWiringTests
         zone.Post(ZoneCommand.Enter(10, ZoneTestKit.EnterData(session, 1, "BelowCap", level: 50)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
 
-        zone.GrantMonsterKillExperience(10, monsterLevel: 50, monsterGeneralExperience: 1000);
+        zone.GrantMonsterKillExperience(10, 50, 1000);
 
         zone.TryGetPlayer(10, out var killer);
         Assert.NotNull(killer);

@@ -2,8 +2,7 @@ namespace Fenrir.Data.WriteBehind;
 
 public interface IWriteBehindFlusher : IAsyncDisposable
 {
-
-        public void RequestImmediateFlush();
+    public void RequestImmediateFlush();
 }
 
 public sealed class WriteBehindFlusher<TKey> : IWriteBehindFlusher where TKey : notnull
@@ -42,7 +41,7 @@ public sealed class WriteBehindFlusher<TKey> : IWriteBehindFlusher where TKey : 
         _timer = new PeriodicTimer(_interval);
     }
 
-        public void RequestImmediateFlush()
+    public void RequestImmediateFlush()
     {
         try
         {
@@ -53,7 +52,7 @@ public sealed class WriteBehindFlusher<TKey> : IWriteBehindFlusher where TKey : 
         }
     }
 
-        public async ValueTask DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         if (Interlocked.Exchange(ref _disposed, 1) != 0)
             return;
@@ -68,7 +67,7 @@ public sealed class WriteBehindFlusher<TKey> : IWriteBehindFlusher where TKey : 
         _immediateFlushSignal.Dispose();
     }
 
-        public async Task RunAsync(CancellationToken ct)
+    public async Task RunAsync(CancellationToken ct)
     {
         if (Interlocked.Exchange(ref _runStarted, 1) != 0)
             throw new InvalidOperationException(
@@ -117,7 +116,7 @@ public sealed class WriteBehindFlusher<TKey> : IWriteBehindFlusher where TKey : 
         }
     }
 
-        private async ValueTask FlushBatchAsync(IReadOnlyDictionary<TKey, DirtyFlags> batch, CancellationToken loopCt)
+    private async ValueTask FlushBatchAsync(IReadOnlyDictionary<TKey, DirtyFlags> batch, CancellationToken loopCt)
     {
         try
         {

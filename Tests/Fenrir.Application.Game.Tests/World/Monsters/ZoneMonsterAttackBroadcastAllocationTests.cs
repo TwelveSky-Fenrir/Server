@@ -62,7 +62,7 @@ public class ZoneMonsterAttackBroadcastAllocationTests
         };
     }
 
-        private static (Zone Zone, MonsterEntity Monster, List<FakeDuplexPipe> Pipes) BuildPvmZone(int bystanderCount)
+    private static (Zone Zone, MonsterEntity Monster, List<FakeDuplexPipe> Pipes) BuildPvmZone(int bystanderCount)
     {
         var zone = ZoneTestKit.CreateZone(1, randomSource: new ScriptedRandomSource(0, 0));
         var pipes = new List<FakeDuplexPipe>();
@@ -147,7 +147,7 @@ public class ZoneMonsterAttackBroadcastAllocationTests
             $"Per-attack allocation scaled with AOI neighbor count: {smallPerCall:F1} bytes/call at 2 neighbors vs. {largePerCall:F1} bytes/call at 40 neighbors.");
     }
 
-        private static (Zone Zone, MonsterEntity Monster, List<FakeDuplexPipe> Pipes) BuildMvpZone(int bystanderCount)
+    private static (Zone Zone, MonsterEntity Monster, List<FakeDuplexPipe> Pipes) BuildMvpZone(int bystanderCount)
     {
         var zone = ZoneTestKit.CreateZone(1, randomSource: new ScriptedRandomSource(0, 0));
         var pipes = new List<FakeDuplexPipe>();

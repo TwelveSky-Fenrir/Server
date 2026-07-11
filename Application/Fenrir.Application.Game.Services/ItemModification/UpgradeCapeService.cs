@@ -20,10 +20,9 @@ public sealed class UpgradeCapeService(
     ILogger<UpgradeCapeService> logger)
     : IUpgradeCapeService
 {
+    private const short UpgradeCapeEventCode = 127;
 
-        private const short UpgradeCapeEventCode = 127;
-
-        private const byte SuccessOutcome = 0;
+    private const byte SuccessOutcome = 0;
 
     private const byte FailedOutcome = 1;
 

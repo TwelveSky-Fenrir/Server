@@ -94,7 +94,7 @@ public class FirewallProcTests
         Assert.True(await _gmAllowlist.IsAllowedAsync(ip, CancellationToken.None));
     }
 
-        private static string UniqueIp()
+    private static string UniqueIp()
     {
         return $"203.0.113.{Guid.NewGuid():N}"[..30];
     }

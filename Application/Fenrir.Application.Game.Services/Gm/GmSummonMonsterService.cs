@@ -15,9 +15,9 @@ public sealed class GmSummonMonsterService(
 {
     private const int Sort = 506;
 
-        private const int AcceptedResult = 0;
+    private const int AcceptedResult = 0;
 
-        private const byte SuccessOutcome = 1;
+    private const byte SuccessOutcome = 1;
 
     public async ValueTask HandleAsync(GmSummonMonsterPayload packet, byte[] data, ZoneClientSession zoneSession,
         PlayerRuntimeState state, Zone zone, CancellationToken cancellationToken)

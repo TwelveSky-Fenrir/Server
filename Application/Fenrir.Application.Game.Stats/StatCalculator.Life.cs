@@ -4,7 +4,6 @@ namespace Fenrir.Application.Game.Stats;
 
 public static partial class StatCalculator
 {
-
     private const int LifeElixirRate = 20;
     private const int ManaElixirRate = 25;
     private const int StrengthElixirAttackRate = 3;
@@ -56,7 +55,7 @@ public static partial class StatCalculator
         return ApplyFreeForAllMaxLife(hp, zone.ZoneNumber);
     }
 
-        private static int ComputeG12CustomSetBonus(byte previousTribe, EquippedItemSlot?[] bySlot)
+    private static int ComputeG12CustomSetBonus(byte previousTribe, EquippedItemSlot?[] bySlot)
     {
         var range = previousTribe switch
         {
@@ -80,7 +79,7 @@ public static partial class StatCalculator
         return minCombine switch { >= 12 => 15000, >= 6 => 5000, _ => 0 };
     }
 
-        private static int ComputeIsIuForLifeBonus(EquippedItemSlot?[] bySlot)
+    private static int ComputeIsIuForLifeBonus(EquippedItemSlot?[] bySlot)
     {
         var total = 0;
         for (var i = 0; i <= 7; i++)
@@ -98,7 +97,7 @@ public static partial class StatCalculator
         return total;
     }
 
-        private static int ComputeG12LifeUpBonus(EquippedItemSlot?[] bySlot)
+    private static int ComputeG12LifeUpBonus(EquippedItemSlot?[] bySlot)
     {
         var v5 = 0;
         var v7 = 0;
@@ -143,29 +142,29 @@ public static partial class StatCalculator
         return ApplyFreeForAllMaxMana(mp, zone.ZoneNumber);
     }
 
-        private static bool IsElixirEligibleZone(short zoneNumber)
+    private static bool IsElixirEligibleZone(short zoneNumber)
     {
         if (zoneNumber is >= 319 and <= 323)
             return true;
         return !IsElixirSuppressedZone(zoneNumber);
     }
 
-        private static bool IsElixirSuppressedZone(short zoneNumber)
+    private static bool IsElixirSuppressedZone(short zoneNumber)
     {
         return false;
     }
 
-        private static bool IsElementElixirZoneAllowed(short zoneNumber)
+    private static bool IsElementElixirZoneAllowed(short zoneNumber)
     {
         return IsElixirEligibleZone(zoneNumber) && zoneNumber != 84;
     }
 
-        private static int DecodeElementAttackCount(int packedElePotion)
+    private static int DecodeElementAttackCount(int packedElePotion)
     {
         return packedElePotion / 1000;
     }
 
-        private static int DecodeElementDefenseCount(int packedElePotion)
+    private static int DecodeElementDefenseCount(int packedElePotion)
     {
         return packedElePotion % 1000;
     }

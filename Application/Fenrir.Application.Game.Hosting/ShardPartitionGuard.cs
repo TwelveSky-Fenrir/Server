@@ -4,8 +4,7 @@ namespace Fenrir.Application.Game.Hosting;
 
 public static class ShardPartitionGuard
 {
-
-        public static async Task EnsureNoOverlapAsync(byte thisShardId, IReadOnlyCollection<short> hostedMaps,
+    public static async Task EnsureNoOverlapAsync(byte thisShardId, IReadOnlyCollection<short> hostedMaps,
         IGameServerDirectoryRepository directory, IShardMapAssignmentRepository shardMapAssignments,
         CancellationToken ct)
     {

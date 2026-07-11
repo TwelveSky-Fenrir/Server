@@ -5,14 +5,13 @@ namespace Fenrir.Application.Game.Domain.World.Loot;
 
 public static class CloakVariantBox8114RewardTable
 {
+    public const int BoxId = 8114;
 
-        public const int BoxId = 8114;
+    public const int PityCeiling = 200;
 
-        public const int PityCeiling = 200;
+    public const int GuaranteedRewardItemId = 1403;
 
-        public const int GuaranteedRewardItemId = 1403;
-
-        public static readonly ImmutableArray<LootBoxRewardResolver.RewardPool> Pools =
+    public static readonly ImmutableArray<LootBoxRewardResolver.RewardPool> Pools =
     [
         new(1, [1403]),
         new(49, [92290, 1401]),
@@ -20,10 +19,10 @@ public static class CloakVariantBox8114RewardTable
         new(499, [1166, 1118, 1103, 1222, 1145, 1237, 8101, 8102, 8106])
     ];
 
-        public static readonly BoxRewardSpec Spec =
+    public static readonly BoxRewardSpec Spec =
         BoxRewardSpec.RareBandThenPools(BoxId, ImmutableArray<LootBoxRewardResolver.RewardBand>.Empty, Pools);
 
-        public static CloakVariantBoxRollResult Roll(int currentPityCounter, Random random)
+    public static CloakVariantBoxRollResult Roll(int currentPityCounter, Random random)
     {
         var pity = LootBoxRewardResolver.PityStep(currentPityCounter, PityCeiling);
         if (pity.Triggered)
@@ -33,6 +32,8 @@ public static class CloakVariantBox8114RewardTable
         return new CloakVariantBoxRollResult(rewardId, pity.NewCounter, false);
     }
 
-        public readonly record struct CloakVariantBoxRollResult(int RewardItemId, int NewPityCounter,
+    public readonly record struct CloakVariantBoxRollResult(
+        int RewardItemId,
+        int NewPityCounter,
         bool WasPityTriggered);
 }

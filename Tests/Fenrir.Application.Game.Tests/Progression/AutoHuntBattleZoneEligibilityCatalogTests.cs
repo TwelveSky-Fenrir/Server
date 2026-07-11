@@ -32,19 +32,19 @@ public class AutoHuntBattleZoneEligibilityCatalogTests
     [InlineData((short)164, 145, 151)]
     public void RecognizedServerNumbers_BlockExactlyWithinTheirLevelBand(short mapId, int lower, int upper)
     {
-        Assert.False(AutoHuntBattleZoneEligibilityCatalog.IsBlocked(mapId, lower - 1, rebirthTier: 0));
-        Assert.True(AutoHuntBattleZoneEligibilityCatalog.IsBlocked(mapId, lower, rebirthTier: 0));
-        Assert.True(AutoHuntBattleZoneEligibilityCatalog.IsBlocked(mapId, upper, rebirthTier: 0));
-        Assert.False(AutoHuntBattleZoneEligibilityCatalog.IsBlocked(mapId, upper + 1, rebirthTier: 0));
+        Assert.False(AutoHuntBattleZoneEligibilityCatalog.IsBlocked(mapId, lower - 1, 0));
+        Assert.True(AutoHuntBattleZoneEligibilityCatalog.IsBlocked(mapId, lower, 0));
+        Assert.True(AutoHuntBattleZoneEligibilityCatalog.IsBlocked(mapId, upper, 0));
+        Assert.False(AutoHuntBattleZoneEligibilityCatalog.IsBlocked(mapId, upper + 1, 0));
     }
 
     [Fact]
     public void Map154_BandCoversEveryAttainableLevel_SoItIsAnUnconditionalBlockInPractice()
     {
-        Assert.True(AutoHuntBattleZoneEligibilityCatalog.IsBlocked(154, combinedLevel: 1, rebirthTier: 0));
-        Assert.True(AutoHuntBattleZoneEligibilityCatalog.IsBlocked(154, combinedLevel: 157, rebirthTier: 0));
-        Assert.False(AutoHuntBattleZoneEligibilityCatalog.IsBlocked(154, combinedLevel: 0, rebirthTier: 0));
-        Assert.False(AutoHuntBattleZoneEligibilityCatalog.IsBlocked(154, combinedLevel: 158, rebirthTier: 0));
+        Assert.True(AutoHuntBattleZoneEligibilityCatalog.IsBlocked(154, 1, 0));
+        Assert.True(AutoHuntBattleZoneEligibilityCatalog.IsBlocked(154, 157, 0));
+        Assert.False(AutoHuntBattleZoneEligibilityCatalog.IsBlocked(154, 0, 0));
+        Assert.False(AutoHuntBattleZoneEligibilityCatalog.IsBlocked(154, 158, 0));
     }
 
     [Theory]
@@ -54,9 +54,9 @@ public class AutoHuntBattleZoneEligibilityCatalogTests
     public void Map295_BlocksOnlyAtLevel157AndOnlyBelowRebirthTier7(int rebirthTier)
     {
         var shouldBlock = rebirthTier < 7;
-        Assert.Equal(shouldBlock, AutoHuntBattleZoneEligibilityCatalog.IsBlocked(295, combinedLevel: 157, rebirthTier));
+        Assert.Equal(shouldBlock, AutoHuntBattleZoneEligibilityCatalog.IsBlocked(295, 157, rebirthTier));
 
-        Assert.False(AutoHuntBattleZoneEligibilityCatalog.IsBlocked(295, combinedLevel: 156, rebirthTier));
+        Assert.False(AutoHuntBattleZoneEligibilityCatalog.IsBlocked(295, 156, rebirthTier));
     }
 
     [Theory]
@@ -66,9 +66,9 @@ public class AutoHuntBattleZoneEligibilityCatalogTests
     public void Map296_BlocksOnlyAtLevel157AndOnlyAtOrAboveRebirthTier7(int rebirthTier)
     {
         var shouldBlock = rebirthTier >= 7;
-        Assert.Equal(shouldBlock, AutoHuntBattleZoneEligibilityCatalog.IsBlocked(296, combinedLevel: 157, rebirthTier));
+        Assert.Equal(shouldBlock, AutoHuntBattleZoneEligibilityCatalog.IsBlocked(296, 157, rebirthTier));
 
-        Assert.False(AutoHuntBattleZoneEligibilityCatalog.IsBlocked(296, combinedLevel: 156, rebirthTier));
+        Assert.False(AutoHuntBattleZoneEligibilityCatalog.IsBlocked(296, 156, rebirthTier));
     }
 
     [Theory]
@@ -77,7 +77,7 @@ public class AutoHuntBattleZoneEligibilityCatalogTests
     public void Map322_SameRebirthSplitAsMap295_EvenThoughMootUnderTermAB(int rebirthTier)
     {
         var shouldBlock = rebirthTier < 7;
-        Assert.Equal(shouldBlock, AutoHuntBattleZoneEligibilityCatalog.IsBlocked(322, combinedLevel: 157, rebirthTier));
+        Assert.Equal(shouldBlock, AutoHuntBattleZoneEligibilityCatalog.IsBlocked(322, 157, rebirthTier));
     }
 
     [Theory]
@@ -86,7 +86,7 @@ public class AutoHuntBattleZoneEligibilityCatalogTests
     public void Map323_SameRebirthSplitAsMap296_EvenThoughMootUnderTermAB(int rebirthTier)
     {
         var shouldBlock = rebirthTier >= 7;
-        Assert.Equal(shouldBlock, AutoHuntBattleZoneEligibilityCatalog.IsBlocked(323, combinedLevel: 157, rebirthTier));
+        Assert.Equal(shouldBlock, AutoHuntBattleZoneEligibilityCatalog.IsBlocked(323, 157, rebirthTier));
     }
 
     [Theory]
@@ -95,8 +95,8 @@ public class AutoHuntBattleZoneEligibilityCatalogTests
     [InlineData((short)321)]
     public void Maps319To321_AlwaysBlockRegardlessOfLevelOrRebirth(short mapId)
     {
-        Assert.True(AutoHuntBattleZoneEligibilityCatalog.IsBlocked(mapId, combinedLevel: 1, rebirthTier: 0));
-        Assert.True(AutoHuntBattleZoneEligibilityCatalog.IsBlocked(mapId, combinedLevel: 200, rebirthTier: 20));
+        Assert.True(AutoHuntBattleZoneEligibilityCatalog.IsBlocked(mapId, 1, 0));
+        Assert.True(AutoHuntBattleZoneEligibilityCatalog.IsBlocked(mapId, 200, 20));
     }
 
     [Theory]
@@ -107,7 +107,7 @@ public class AutoHuntBattleZoneEligibilityCatalogTests
     [InlineData((short)999)]
     public void UnrecognizedServerNumbers_ContributeNothingToBlocking(short mapId)
     {
-        Assert.False(AutoHuntBattleZoneEligibilityCatalog.IsBlocked(mapId, combinedLevel: 157, rebirthTier: 7));
-        Assert.False(AutoHuntBattleZoneEligibilityCatalog.IsBlocked(mapId, combinedLevel: 1, rebirthTier: 0));
+        Assert.False(AutoHuntBattleZoneEligibilityCatalog.IsBlocked(mapId, 157, 7));
+        Assert.False(AutoHuntBattleZoneEligibilityCatalog.IsBlocked(mapId, 1, 0));
     }
 }

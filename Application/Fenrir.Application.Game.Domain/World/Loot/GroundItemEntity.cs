@@ -1,5 +1,4 @@
 using Fenrir.Application.Game.Domain.Simulation;
-using Fenrir.Application.Game.Domain.Social.Party;
 
 namespace Fenrir.Application.Game.Domain.World.Loot;
 
@@ -22,19 +21,18 @@ public sealed record GroundItemEntity(
     int SocketGem3,
     int? InstanceId = null)
 {
+    public const int MonsterKillDropSort = 1;
 
-        public const int MonsterKillDropSort = 1;
+    public const int ManualGroundDropSort = 2;
 
-        public const int ManualGroundDropSort = 2;
-
-        public const int GmCreateItemDropSort = 13;
+    public const int GmCreateItemDropSort = 13;
 
     public bool IsExpired(TimeSpan nowZoneClock)
     {
         return nowZoneClock - CreatedAtZoneClock >= SimulationClock.GroundItemLifetime;
     }
 
-        public bool IsClaimableBy(string claimantName, string? claimantPartyName, TimeSpan nowZoneClock)
+    public bool IsClaimableBy(string claimantName, string? claimantPartyName, TimeSpan nowZoneClock)
     {
         if (IsExpired(nowZoneClock) || nowZoneClock - CreatedAtZoneClock >= SimulationClock.GroundItemFreeForAllDelay)
             return true;

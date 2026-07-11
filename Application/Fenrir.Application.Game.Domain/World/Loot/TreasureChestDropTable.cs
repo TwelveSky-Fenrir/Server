@@ -5,16 +5,14 @@ namespace Fenrir.Application.Game.Domain.World.Loot;
 
 public enum TreasureChestOutcomeKind
 {
+    FixedItem,
 
-        FixedItem,
-
-        RandomLevel1Pet
+    RandomLevel1Pet
 }
 
 public readonly record struct TreasureChestOutcome(TreasureChestOutcomeKind Kind, int ItemId)
 {
-
-        public static readonly TreasureChestOutcome RandomPet = new(TreasureChestOutcomeKind.RandomLevel1Pet, 0);
+    public static readonly TreasureChestOutcome RandomPet = new(TreasureChestOutcomeKind.RandomLevel1Pet, 0);
 
     public static TreasureChestOutcome Item(int itemId)
     {
@@ -24,22 +22,21 @@ public readonly record struct TreasureChestOutcome(TreasureChestOutcomeKind Kind
 
 public static class TreasureChestDropTable
 {
+    public const int JackpotItemId = 1145;
 
-        public const int JackpotItemId = 1145;
+    public const int SecondItemId = 8109;
 
-        public const int SecondItemId = 8109;
+    public const int FourthItemId = 8110;
 
-        public const int FourthItemId = 8110;
+    public const int RareItemId = 695;
 
-        public const int RareItemId = 695;
-
-        public const int RollExclusiveUpperBound = 100;
+    public const int RollExclusiveUpperBound = 100;
 
     private static readonly FrozenDictionary<int, TreasureChestOutcome> OutcomeByRoll = BuildTable();
 
-        public static ImmutableArray<int> Level1PetPool { get; } = [];
+    public static ImmutableArray<int> Level1PetPool { get; } = [];
 
-        public static TreasureChestOutcome Resolve(int roll)
+    public static TreasureChestOutcome Resolve(int roll)
     {
         if (roll is < 0 or >= RollExclusiveUpperBound)
             throw new ArgumentOutOfRangeException(nameof(roll), roll,
@@ -48,7 +45,7 @@ public static class TreasureChestDropTable
         return OutcomeByRoll[roll];
     }
 
-        public static TreasureChestOutcome Roll(Random random)
+    public static TreasureChestOutcome Roll(Random random)
     {
         return Resolve(random.Next(RollExclusiveUpperBound));
     }

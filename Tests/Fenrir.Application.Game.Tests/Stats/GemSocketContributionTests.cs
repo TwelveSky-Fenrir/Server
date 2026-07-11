@@ -7,7 +7,6 @@ namespace Fenrir.Application.Game.Tests.Stats;
 
 public class GemSocketContributionTests
 {
-
     private static GemSocketRowDto Row(int gemSocketId, int type, int value02, int value03, int value04)
     {
         return new GemSocketRowDto(gemSocketId, type, 0, value02, value03, value04);
@@ -15,8 +14,7 @@ public class GemSocketContributionTests
 
     private static FrozenDictionary<int, GemSocketRowDto> Table(params GemSocketRowDto[] rows)
     {
-        return rows.ToFrozenDictionary(
-            static r => StatCalculator.GemSocketTypeValueKey((byte)r.Type, (byte)r.Value02));
+        return rows.ToFrozenDictionary(static r => StatCalculator.GemSocketTypeValueKey((byte)r.Type, (byte)r.Value02));
     }
 
     private static (int P1, int P2, int P3) Pack(byte count, params (byte Type, byte Value)[] pairs)

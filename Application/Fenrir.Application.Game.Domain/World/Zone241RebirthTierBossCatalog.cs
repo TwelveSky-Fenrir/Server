@@ -8,7 +8,7 @@ public sealed class Zone241RebirthTierBossCatalog : IPersonalDungeonBossCatalog
     {
     }
 
-        public bool TryGetBossMonsterId(int rebirthTier, out int monsterId)
+    public bool TryGetBossMonsterId(int rebirthTier, out int monsterId)
     {
         monsterId = PersonalDungeonBossTables.ResolveCatalogE(rebirthTier);
         return true;

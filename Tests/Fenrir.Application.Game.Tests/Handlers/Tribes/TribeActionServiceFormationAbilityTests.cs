@@ -15,7 +15,7 @@ public class TribeActionServiceFormationAbilityTests
 {
     private const int CharacterId = 10;
 
-        private static int[] DefaultPassingTribePoints(byte requesterTribe)
+    private static int[] DefaultPassingTribePoints(byte requesterTribe)
     {
         var points = new int[4];
         for (byte i = 0; i < 4; i++)
@@ -72,7 +72,7 @@ public class TribeActionServiceFormationAbilityTests
     [Fact]
     public void ForceLeader_ValidCode_ArmsWorldStateFormationAbility_AndReturnsOk()
     {
-        var (state, worldState, service) = Setup(tribe: 2, tribeRole: 1);
+        var (state, worldState, service) = Setup(2, 1);
 
         var outcome = service.ValidateTribeSkill(state, SkillPayload(3));
 
@@ -89,7 +89,7 @@ public class TribeActionServiceFormationAbilityTests
     [InlineData(4)]
     public void ForceLeader_EveryInRangeCode_IsThreadedThroughVerbatim(int code)
     {
-        var (state, worldState, service) = Setup(tribe: 1, tribeRole: 1);
+        var (state, worldState, service) = Setup(1, 1);
 
         var outcome = service.ValidateTribeSkill(state, SkillPayload(code));
 
@@ -100,7 +100,7 @@ public class TribeActionServiceFormationAbilityTests
     [Fact]
     public void ArmsOnlyTheRequestersOwnTribeSlot_OtherTribesUntouched()
     {
-        var (state, worldState, service) = Setup(tribe: 2, tribeRole: 1);
+        var (state, worldState, service) = Setup(2, 1);
 
         service.ValidateTribeSkill(state, SkillPayload(4));
 
@@ -117,7 +117,7 @@ public class TribeActionServiceFormationAbilityTests
     [InlineData((byte)4)]
     public void NotForceLeader_Aborts_NeverArmsFormationAbility(byte tribeRole)
     {
-        var (state, worldState, service) = Setup(tribe: 2, tribeRole: tribeRole);
+        var (state, worldState, service) = Setup(2, tribeRole);
 
         var outcome = service.ValidateTribeSkill(state, SkillPayload(3));
 
@@ -131,7 +131,7 @@ public class TribeActionServiceFormationAbilityTests
     [InlineData(100)]
     public void OutOfRangePayload_Aborts_NeverArmsFormationAbility(int outOfRangeSort)
     {
-        var (state, worldState, service) = Setup(tribe: 2, tribeRole: 1);
+        var (state, worldState, service) = Setup(2, 1);
 
         var outcome = service.ValidateTribeSkill(state, SkillPayload(outOfRangeSort));
 
@@ -142,7 +142,7 @@ public class TribeActionServiceFormationAbilityTests
     [Fact]
     public void MalformedPayload_TooShort_Aborts_NeverArmsFormationAbility()
     {
-        var (state, worldState, service) = Setup(tribe: 2, tribeRole: 1);
+        var (state, worldState, service) = Setup(2, 1);
 
         var outcome = service.ValidateTribeSkill(state, new byte[3]);
 
@@ -153,7 +153,7 @@ public class TribeActionServiceFormationAbilityTests
     [Fact]
     public void ANewDeclaration_FullyReplacesThePreviousCode_NeverStacks()
     {
-        var (state, worldState, service) = Setup(tribe: 3, tribeRole: 1);
+        var (state, worldState, service) = Setup(3, 1);
 
         service.ValidateTribeSkill(state, SkillPayload(1));
         service.ValidateTribeSkill(state, SkillPayload(2));
@@ -166,7 +166,7 @@ public class TribeActionServiceFormationAbilityTests
     {
         var points = DefaultPassingTribePoints(2);
         points[0] = TribeFormationAbilityEligibility.PointFloor;
-        var (state, worldState, service) = Setup(tribe: 2, tribePoints: points);
+        var (state, worldState, service) = Setup(2, tribePoints: points);
 
         var outcome = service.ValidateTribeSkill(state, SkillPayload(3));
 
@@ -177,7 +177,7 @@ public class TribeActionServiceFormationAbilityTests
     [Fact]
     public void LowestTribeGate_RequesterTribeIsNotTheLowest_Aborts_NeverArmsFormationAbility()
     {
-        var (state, worldState, service) = Setup(tribe: 2, tribePoints: [1000, 101, 1000, 1000]);
+        var (state, worldState, service) = Setup(2, tribePoints: [1000, 101, 1000, 1000]);
 
         var outcome = service.ValidateTribeSkill(state, SkillPayload(3));
 
@@ -188,7 +188,7 @@ public class TribeActionServiceFormationAbilityTests
     [Fact]
     public void ShareGate_RequesterShareAtOrAboveTwentyPercent_Aborts_NeverArmsFormationAbility()
     {
-        var (state, worldState, service) = Setup(tribe: 0, tribePoints: [150, 200, 200, 200]);
+        var (state, worldState, service) = Setup(0, tribePoints: [150, 200, 200, 200]);
 
         var outcome = service.ValidateTribeSkill(state, SkillPayload(3));
 
@@ -199,7 +199,7 @@ public class TribeActionServiceFormationAbilityTests
     [Fact]
     public void SymbolBattleGate_Inactive_Aborts_NeverArmsFormationAbility()
     {
-        var (state, worldState, service) = Setup(tribe: 2, symbolBattleActive: false);
+        var (state, worldState, service) = Setup(2, symbolBattleActive: false);
 
         var outcome = service.ValidateTribeSkill(state, SkillPayload(3));
 
@@ -210,7 +210,7 @@ public class TribeActionServiceFormationAbilityTests
     [Fact]
     public void SymbolBattleGate_Active_PassesAlongsideEveryOtherGate()
     {
-        var (state, worldState, service) = Setup(tribe: 2, symbolBattleActive: true);
+        var (state, worldState, service) = Setup(2, symbolBattleActive: true);
 
         var outcome = service.ValidateTribeSkill(state, SkillPayload(3));
 
@@ -221,9 +221,9 @@ public class TribeActionServiceFormationAbilityTests
     [Fact]
     public void AllFiveGates_Pass_ReachesSetTribeFormationAbility()
     {
-        var (state, worldState, service) = Setup(tribe: 0, tribeRole: 1,
-            tribePoints: [TribeFormationAbilityEligibility.PointFloor + 1, 1000, 1000, 1000],
-            symbolBattleActive: true);
+        var (state, worldState, service) = Setup(0, 1,
+            [TribeFormationAbilityEligibility.PointFloor + 1, 1000, 1000, 1000],
+            true);
 
         var outcome = service.ValidateTribeSkill(state, SkillPayload(3));
 

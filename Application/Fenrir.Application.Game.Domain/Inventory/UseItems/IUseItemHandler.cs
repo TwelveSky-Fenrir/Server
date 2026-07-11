@@ -6,8 +6,7 @@ namespace Fenrir.Application.Game.Domain.Inventory.UseItems;
 
 public interface IUseItemHandler
 {
-
-        public ValueTask<UseInventoryItemResponse> HandleAsync(UseItemContext context, CancellationToken cancellationToken);
+    public ValueTask<UseInventoryItemResponse> HandleAsync(UseItemContext context, CancellationToken cancellationToken);
 }
 
 public readonly record struct UseItemContext(

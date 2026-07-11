@@ -2,12 +2,11 @@ namespace Fenrir.Application.Login.Domain.Avatars;
 
 public static class TribeDominanceGate
 {
+    public const int DominantTribeFloor = 100;
 
-        public const int DominantTribeFloor = 100;
+    public const int TribeSlotCount = 4;
 
-        public const int TribeSlotCount = 4;
-
-        public static bool BlocksCreation(byte requestedTribe, IReadOnlyList<TribeSummaryDto> standings)
+    public static bool BlocksCreation(byte requestedTribe, IReadOnlyList<TribeSummaryDto> standings)
     {
         var pointsByTribe = new int[TribeSlotCount];
 

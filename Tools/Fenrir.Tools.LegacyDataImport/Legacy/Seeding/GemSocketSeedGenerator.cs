@@ -10,7 +10,7 @@ public static class GemSocketSeedGenerator
 {
     private const int MaxRowsPerInsert = 500;
 
-        public static GemSocketSeedStats Generate(string dataDir, string outputDir)
+    public static GemSocketSeedStats Generate(string dataDir, string outputDir)
     {
         Directory.CreateDirectory(outputDir);
 

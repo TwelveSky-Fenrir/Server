@@ -18,8 +18,7 @@ public sealed class CraftLegendaryPetService(
     ILogger<CraftLegendaryPetService> logger)
     : ICraftLegendaryPetService
 {
-
-        private const short LegendaryPetCraftEventCode = 1;
+    private const short LegendaryPetCraftEventCode = 1;
 
     public async ValueTask<CraftLegendaryPetResult> ResolveAsync(CraftLegendaryPetRequest packet, Zone zone,
         PlayerRuntimeState state, int characterId, int accountId, CancellationToken cancellationToken)

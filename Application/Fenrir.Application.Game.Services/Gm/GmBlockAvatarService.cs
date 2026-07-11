@@ -57,6 +57,5 @@ public sealed class GmBlockAvatarService(
             callerCharacterId, target.CharacterId, target.Name);
 
         ((ZoneClientSession)target.Session).Abort(DisconnectReason.Banned);
-
     }
 }

@@ -72,7 +72,7 @@ public class ZoneCombatDepthTests
         zone.Tick(TimeSpan.FromMilliseconds(50));
     }
 
-        [Fact]
+    [Fact]
     public void ReflectedDamage_KillsAttacker_AndSpareTheDefender()
     {
         var zone = TwoPlayerZone([0, 0, 0, 0], out var attacker, out var defender);
@@ -100,7 +100,7 @@ public class ZoneCombatDepthTests
         Assert.Equal(defenderLifeBefore - 160, defender.Life);
     }
 
-        [Fact]
+    [Fact]
     public void HolyShield_AbsorbsFromDamage_ThenClearsWhenConsumed()
     {
         var zone = TwoPlayerZone([0, 0], out var attacker, out var defender);
@@ -128,7 +128,7 @@ public class ZoneCombatDepthTests
         Assert.Equal(840, defender.Buffs.Buff[ShieldBuffSlot * 2]);
     }
 
-        [Fact]
+    [Fact]
     public void DestroyerRoll_ClearsDefenderShield_ThenFullDamageLands()
     {
         var zone = TwoPlayerZone([0, 0, 0], out var attacker, out var defender);
@@ -142,7 +142,7 @@ public class ZoneCombatDepthTests
         Assert.Equal(160, defenderLifeBefore - defender.Life);
     }
 
-        [Fact]
+    [Fact]
     public void RvrCloseFightGate_Closed_AbortsCrossTribeAttack()
     {
         Assert.True(ZonePvpZoneCatalog.AllowsEnemyTribeAttack(146));

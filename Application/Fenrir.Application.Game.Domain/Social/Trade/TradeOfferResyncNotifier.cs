@@ -4,8 +4,7 @@ namespace Fenrir.Application.Game.Domain.Social.Trade;
 
 public static class TradeOfferResyncNotifier
 {
-
-        public static bool TryNotifyOpponent(TradeRegistry tradeRegistry, ZoneRegistry zoneRegistry,
+    public static bool TryNotifyOpponent(TradeRegistry tradeRegistry, ZoneRegistry zoneRegistry,
         int mutatingCharacterId)
     {
         if (!tradeRegistry.TryGetSession(mutatingCharacterId, out var session) || session is null)

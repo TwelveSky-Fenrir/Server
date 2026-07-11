@@ -6,17 +6,16 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 
 public static class TribeBonusRatioEventMap
 {
-
-        public const int EventCode = 301;
+    public const int EventCode = 301;
 
     private const int GeneralExperienceUpRatioFamilyBase = 21;
     private const int ItemDropUpRatioFamilyBase = 31;
     private const int ItemDropUpRatioForMyoungFamilyBase = 41;
     private const int KillOtherTribeAddValueFamilyBase = 51;
 
-        private const float RatioScale = 0.1f;
+    private const float RatioScale = 0.1f;
 
-        public static void Apply(ZoneCenterSiegeState state, ReadOnlySpan<byte> data, ILogger? logger = null)
+    public static void Apply(ZoneCenterSiegeState state, ReadOnlySpan<byte> data, ILogger? logger = null)
     {
         var eventSort = ReadInt32(data, 0);
         var eventValue = ReadInt32(data, 4);

@@ -54,7 +54,7 @@ public class LocalChatServiceGmCommandTests
         session.MarkInWorld();
         session.CurrentZone = zone;
 
-        zone.Post(ZoneCommand.Enter(CharacterId, ZoneTestKit.EnterData(session, MapId, HeroName)));
+        zone.Post(ZoneCommand.Enter(CharacterId, ZoneTestKit.EnterData(session, MapId)));
         zone.Tick(TimeSpan.FromMilliseconds(50));
         ZoneTestKit.DrainOutbound(pipe);
 

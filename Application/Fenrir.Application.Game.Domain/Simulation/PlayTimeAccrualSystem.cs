@@ -5,8 +5,7 @@ namespace Fenrir.Application.Game.Domain.Simulation;
 
 public sealed class PlayTimeAccrualSystem : ISimulationSystem
 {
-
-        private const int PlayTime2StatSort = 16;
+    private const int PlayTime2StatSort = 16;
 
     public void Simulate(Zone zone, int legacyTicksElapsed)
     {

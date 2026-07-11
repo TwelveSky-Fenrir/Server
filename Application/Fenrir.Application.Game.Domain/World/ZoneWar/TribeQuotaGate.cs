@@ -2,28 +2,25 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 
 public enum TribeQuotaGroup : byte
 {
+    None = 0,
 
-        None = 0,
+    ThreeWay = 1,
 
-        ThreeWay = 1,
+    FourWay = 2,
 
-        FourWay = 2,
-
-        RvrInstancedNoGate = 3
+    RvrInstancedNoGate = 3
 }
 
 public enum TribeQuotaOutcome
 {
+    Accepted,
 
-        Accepted,
-
-        QuotaFull
+    QuotaFull
 }
 
 public static class TribeQuotaGate
 {
-
-        public static bool IsDeclaredTribeInRange(TribeQuotaGroup group, int declaredTribe)
+    public static bool IsDeclaredTribeInRange(TribeQuotaGroup group, int declaredTribe)
     {
         return group switch
         {
@@ -33,7 +30,7 @@ public static class TribeQuotaGate
         };
     }
 
-        public static TribeQuotaOutcome Evaluate(TribeQuotaGroup group, int maxConcurrentConnections,
+    public static TribeQuotaOutcome Evaluate(TribeQuotaGroup group, int maxConcurrentConnections,
         int currentPopulationForDeclaredTribe)
     {
         var divisor = group switch

@@ -15,11 +15,11 @@ public static class EquipItemValidationGate
         Success
     }
 
-        public const int AnyTribeSentinel = 1;
+    public const int AnyTribeSentinel = 1;
 
-        public const int TribeRestrictionOffset = 2;
+    public const int TribeRestrictionOffset = 2;
 
-        public const int SkipSlotCheck = -1;
+    public const int SkipSlotCheck = -1;
 
     private const int MinSlotIndex = 0;
     private const int MaxSlotIndex = 12;
@@ -27,14 +27,14 @@ public static class EquipItemValidationGate
     private const int FinalCategoryLow = 6;
     private const int FinalCategoryHigh = 33;
 
-        private const int SetItemRebirthGateValue = 3;
+    private const int SetItemRebirthGateValue = 3;
 
-        private static readonly ImmutableArray<byte> EquipPartTagBySlot =
+    private static readonly ImmutableArray<byte> EquipPartTagBySlot =
         [2, 3, 4, 5, 6, 7, 0, 9, 10, 11, 12, 13, 14];
 
-        private static readonly ImmutableHashSet<int> Rebirth12ClassificationCodes = [1, 2, 4, 8, 29];
+    private static readonly ImmutableHashSet<int> Rebirth12ClassificationCodes = [1, 2, 4, 8, 29];
 
-        public static Outcome Evaluate(
+    public static Outcome Evaluate(
         EquipCandidate? item,
         int itemSortClassification,
         byte characterTribe,
@@ -90,7 +90,7 @@ public static class EquipItemValidationGate
         return true;
     }
 
-        public readonly record struct EquipCandidate(
+    public readonly record struct EquipCandidate(
         int ItemId,
         int TribeRestriction,
         int EquipPartTag,

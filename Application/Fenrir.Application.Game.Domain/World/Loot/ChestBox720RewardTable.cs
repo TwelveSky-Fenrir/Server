@@ -6,35 +6,34 @@ namespace Fenrir.Application.Game.Domain.World.Loot;
 
 public static class ChestBox720RewardTable
 {
+    public const int BoxId = 720;
 
-        public const int BoxId = 720;
+    public const int TribePoolThresholdExclusive = 15;
 
-        public const int TribePoolThresholdExclusive = 15;
+    public const int FixedRewardIdSlot2 = 1449;
 
-        public static readonly ImmutableArray<int> TribePoolBaseIds =
+    public const int FixedRewardIdSlot3 = 1072;
+
+    public const int FixedRewardIdSlot5 = 1437;
+
+    public const int FixedRewardIdSlot6 = 1178;
+
+    public const int FixedRewardIdSlot7 = 698;
+
+    public const int FixedRewardIdSlot8 = 1166;
+
+    public static readonly ImmutableArray<int> TribePoolBaseIds =
         [15157, 15267, 15135, 15179, 15223, 15245, 15289];
 
-        public static readonly FrozenDictionary<byte, int> TribeOffsetByPreviousTribe =
+    public static readonly FrozenDictionary<byte, int> TribeOffsetByPreviousTribe =
         new Dictionary<byte, int> { [0] = 0, [1] = 20000, [2] = 40000 }.ToFrozenDictionary();
 
 
-        public static readonly ImmutableArray<int> AnimalPoolIds = [1301, 1302, 1303, 1313, 1317, 1320, 1323, 1326];
+    public static readonly ImmutableArray<int> AnimalPoolIds = [1301, 1302, 1303, 1313, 1317, 1320, 1323, 1326];
 
-        public const int FixedRewardIdSlot2 = 1449;
+    public static readonly ImmutableArray<int> ElixirPlusPoolIds = [801, 802, 803, 804, 805, 806];
 
-        public const int FixedRewardIdSlot3 = 1072;
-
-        public static readonly ImmutableArray<int> ElixirPlusPoolIds = [801, 802, 803, 804, 805, 806];
-
-        public const int FixedRewardIdSlot5 = 1437;
-
-        public const int FixedRewardIdSlot6 = 1178;
-
-        public const int FixedRewardIdSlot7 = 698;
-
-        public const int FixedRewardIdSlot8 = 1166;
-
-        public static RollResult Roll(byte previousTribe, Random random)
+    public static RollResult Roll(byte previousTribe, Random random)
     {
         var outer = random.Next(0, 100);
 
@@ -61,7 +60,7 @@ public static class ChestBox720RewardTable
         };
     }
 
-        public readonly record struct RollResult(bool Success, int RewardItemId)
+    public readonly record struct RollResult(bool Success, int RewardItemId)
     {
         public static RollResult Failure { get; } = new(false, 0);
     }

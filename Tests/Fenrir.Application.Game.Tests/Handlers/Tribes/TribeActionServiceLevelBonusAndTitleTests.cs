@@ -145,7 +145,7 @@ public class TribeActionServiceLevelBonusAndTitleTests
     public async Task PurchaseTitle_Rank0_CostsExactlyTheFirstTitleContributionCostTableEntry()
     {
         var zone = ZoneTestKit.CreateZone(1);
-        var (_, _, state) = Setup(zone, CharacterId, contributionPoints: TitleContributionCost.CostTable[0]);
+        var (_, _, state) = Setup(zone, CharacterId, TitleContributionCost.CostTable[0]);
         state.Title = 0;
         var service = CreateService();
         var data = new byte[100];
@@ -163,7 +163,7 @@ public class TribeActionServiceLevelBonusAndTitleTests
     public async Task PurchaseTitle_InsufficientContributionPoints_Aborts()
     {
         var zone = ZoneTestKit.CreateZone(1);
-        var (_, _, state) = Setup(zone, CharacterId, contributionPoints: TitleContributionCost.CostTable[0] - 1);
+        var (_, _, state) = Setup(zone, CharacterId, TitleContributionCost.CostTable[0] - 1);
         state.Title = 0;
         var service = CreateService();
 

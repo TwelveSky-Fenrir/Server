@@ -13,8 +13,7 @@ public sealed class AccountSessionKickPollHost(
     IOptions<GameServerOptions> options,
     ILogger<AccountSessionKickPollHost> logger) : BackgroundService
 {
-
-        private const int LoginFromAnotherSort = 903;
+    private const int LoginFromAnotherSort = 903;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {

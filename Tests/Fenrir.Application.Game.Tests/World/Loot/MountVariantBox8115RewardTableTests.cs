@@ -90,7 +90,7 @@ public class MountVariantBox8115RewardTableTests
         Assert.False(result.WasPityTriggered);
     }
 
-        private sealed class ScriptedRandom(params int[] values) : Random
+    private sealed class ScriptedRandom(params int[] values) : Random
     {
         private int _index;
 

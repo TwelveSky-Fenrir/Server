@@ -72,7 +72,7 @@ public sealed class ZoneTransferService(
         return new ZoneTransferResult(ZoneTransferOutcome.Success, shard.Host, shard.Port, character.MapId);
     }
 
-        private async ValueTask ClampVitalsFloorIfNeededAsync(CharacterWorldEntryDto character,
+    private async ValueTask ClampVitalsFloorIfNeededAsync(CharacterWorldEntryDto character,
         CancellationToken cancellationToken)
     {
         var (life, mana) = AvatarVitalsFloor.Clamp(character.Life, character.Mana);

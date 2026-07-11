@@ -11,8 +11,7 @@ public sealed class WorldInfoBootResetVerifier(
     AllianceProposalCenterState allianceProposal,
     ILogger<WorldInfoBootResetVerifier> logger)
 {
-
-        public void Verify()
+    public void Verify()
     {
         var violations = 0;
 
@@ -50,7 +49,6 @@ public sealed class WorldInfoBootResetVerifier(
         }
 
         foreach (var type in Enum.GetValues<PopupEventType>())
-        {
             if (popup.IsEnabled(type))
             {
                 violations++;
@@ -58,7 +56,6 @@ public sealed class WorldInfoBootResetVerifier(
                     "WorldInfo boot reset violation: popup type {PopupType} is enabled at boot, expected disabled (Server/ts25center/S07_MyGame01.cpp:135-140)",
                     type);
             }
-        }
 
         for (byte tribeId = 0; tribeId < WorldStateService.TribeCount; tribeId++)
         {
@@ -73,7 +70,6 @@ public sealed class WorldInfoBootResetVerifier(
         }
 
         for (var slot = 0; slot < AllianceProposalCenterState.SlotCount; slot++)
-        {
             if (!allianceProposal.SlotIsEmpty(slot))
             {
                 violations++;
@@ -81,7 +77,6 @@ public sealed class WorldInfoBootResetVerifier(
                     "WorldInfo boot reset violation: alliance-state slot {Slot} is not empty at boot (Server/ts25center/S07_MyGame01.cpp:44-47)",
                     slot);
             }
-        }
 
         if (violations == 0)
             logger.LogInformation(

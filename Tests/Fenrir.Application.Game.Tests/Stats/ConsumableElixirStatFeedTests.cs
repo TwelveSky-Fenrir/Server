@@ -35,9 +35,9 @@ public class ConsumableElixirStatFeedTests
     public void MaxLife_LifeElixirInEligibleZone_AddsTwentyPerElixir()
     {
         var attributes = Attributes(100, level: 1);
-        var levels = Levels(LevelRow(1, life: 50));
-        var consumable = new ConsumableContext(EatLifePotion: 200);
-        var zone = new ZoneContext(ZoneNumber: 1);
+        var levels = Levels(LevelRow(1, 50));
+        var consumable = new ConsumableContext(200);
+        var zone = new ZoneContext(1);
 
         var stats = StatCalculator.ComputeBaseStats(attributes, NoEquipment, levels, consumable: consumable,
             zone: zone);
@@ -49,8 +49,8 @@ public class ConsumableElixirStatFeedTests
     public void MaxLife_LifeElixirAtGradeTwelveCap_AddsTwentyTimesFourHundred()
     {
         var attributes = Attributes(100, level: 1);
-        var levels = Levels(LevelRow(1, life: 50));
-        var consumable = new ConsumableContext(EatLifePotion: 400);
+        var levels = Levels(LevelRow(1, 50));
+        var consumable = new ConsumableContext(400);
 
         var stats = StatCalculator.ComputeBaseStats(attributes, NoEquipment, levels, consumable: consumable);
 
@@ -61,13 +61,13 @@ public class ConsumableElixirStatFeedTests
     public void MaxLife_LifeElixirZoneNumberInReEnableBand_StillApplies()
     {
         var attributes = Attributes(100, level: 1);
-        var levels = Levels(LevelRow(1, life: 50));
-        var consumable = new ConsumableContext(EatLifePotion: 10);
+        var levels = Levels(LevelRow(1, 50));
+        var consumable = new ConsumableContext(10);
 
-        foreach (short bandZone in (short[])[319, 320, 323])
+        foreach (var bandZone in (short[])[319, 320, 323])
         {
             var stats = StatCalculator.ComputeBaseStats(attributes, NoEquipment, levels, consumable: consumable,
-                zone: new ZoneContext(ZoneNumber: bandZone));
+                zone: new ZoneContext(bandZone));
             Assert.Equal(2050 + 20 * 10, stats.MaxLife);
         }
     }
@@ -76,11 +76,11 @@ public class ConsumableElixirStatFeedTests
     public void MaxLife_NoLifeElixir_MatchesEquipmentOnlyBaseline()
     {
         var attributes = Attributes(100, level: 1);
-        var levels = Levels(LevelRow(1, life: 50));
+        var levels = Levels(LevelRow(1, 50));
 
         var baseline = StatCalculator.ComputeBaseStats(attributes, NoEquipment, levels);
         var withDefaultConsumable = StatCalculator.ComputeBaseStats(attributes, NoEquipment, levels,
-            consumable: default, zone: new ZoneContext(ZoneNumber: 1));
+            consumable: default, zone: new ZoneContext(1));
 
         Assert.Equal(2050, baseline.MaxLife);
         Assert.Equal(baseline.MaxLife, withDefaultConsumable.MaxLife);
@@ -95,7 +95,7 @@ public class ConsumableElixirStatFeedTests
         var consumable = new ConsumableContext(EatManaPotion: 200);
 
         var stats = StatCalculator.ComputeBaseStats(attributes, NoEquipment, levels, consumable: consumable,
-            zone: new ZoneContext(ZoneNumber: 1));
+            zone: new ZoneContext(1));
 
         Assert.Equal(865 + 25 * 200, stats.MaxMana);
     }
@@ -170,12 +170,12 @@ public class ConsumableElixirStatFeedTests
     public void ComputeBaseStats_LifeManaAndElementElixirs_EachFoldsIntoItsOwnStatIndependently()
     {
         var attributes = Attributes(100, intelligence: 50, level: 1);
-        var levels = Levels(LevelRow(1, life: 50, mana: 100));
+        var levels = Levels(LevelRow(1, 50, 100));
         var consumable = new ConsumableContext(
-            EatLifePotion: 30,
-            EatManaPotion: 40,
+            30,
+            40,
             EatElePotion: 12_009);
-        var zone = new ZoneContext(ZoneNumber: 1);
+        var zone = new ZoneContext(1);
 
         var stats = StatCalculator.ComputeBaseStats(attributes, NoEquipment, levels, consumable: consumable,
             zone: zone);
@@ -190,9 +190,9 @@ public class ConsumableElixirStatFeedTests
     [Fact]
     public void MaxLife_LifeElixirContribution_IsFlatAdditive_NotScaledByBaseLife()
     {
-        var levels = Levels(LevelRow(1, life: 50));
-        var consumable = new ConsumableContext(EatLifePotion: 150);
-        var zone = new ZoneContext(ZoneNumber: 1);
+        var levels = Levels(LevelRow(1, 50));
+        var consumable = new ConsumableContext(150);
+        var zone = new ZoneContext(1);
 
         var lowBase = StatCalculator.ComputeBaseStats(Attributes(100, level: 1), NoEquipment, levels,
             consumable: consumable, zone: zone);
@@ -213,7 +213,7 @@ public class ConsumableElixirStatFeedTests
     {
         var attributes = Attributes(strength: 100, level: 1);
         var levels = Levels(LevelRow(1));
-        var zone = new ZoneContext(ZoneNumber: 1);
+        var zone = new ZoneContext(1);
 
         var baseline = StatCalculator.ComputeBaseStats(attributes, NoEquipment, levels, zone: zone);
         var withStrElixir = StatCalculator.ComputeBaseStats(attributes, NoEquipment, levels,
@@ -227,7 +227,7 @@ public class ConsumableElixirStatFeedTests
     {
         var attributes = Attributes(strength: 50, dexterity: 50, level: 1);
         var levels = Levels(LevelRow(1));
-        var zone = new ZoneContext(ZoneNumber: 1);
+        var zone = new ZoneContext(1);
 
         var baseline = StatCalculator.ComputeBaseStats(attributes, NoEquipment, levels, zone: zone);
         var withDexElixir = StatCalculator.ComputeBaseStats(attributes, NoEquipment, levels,

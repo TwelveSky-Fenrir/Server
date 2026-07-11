@@ -16,11 +16,11 @@ public class MonsterAiSystemMidChaseRetargetTests
     [Fact]
     public void HeightMismatchedCandidate_WithinHorizontalShortRadius_IsNeverRetargetedOnto()
     {
-        var (zone, monster) = CreateChaseZone(shortRadius: 200, largeRadius: 2000, bodyHeightHalfExtent: 5,
-            ai: new ScriptedRandomSource(0));
-        EnterPlayerAt(zone, NearCharacterId, posX: 500, posY: 0, posZ: 0);
-        EnterPlayerAt(zone, FarCharacterId, posX: 50, posY: 1000, posZ: 0);
-        LockInitialTarget(monster, NearCharacterId, posX: 500, posZ: 0);
+        var (zone, monster) = CreateChaseZone(200, 2000, 5,
+            new ScriptedRandomSource(0));
+        EnterPlayerAt(zone, NearCharacterId, 500, 0, 0);
+        EnterPlayerAt(zone, FarCharacterId, 50, 1000, 0);
+        LockInitialTarget(monster, NearCharacterId, 500, 0);
 
         for (var i = 0; i < 8; i++)
         {
@@ -34,11 +34,11 @@ public class MonsterAiSystemMidChaseRetargetTests
     [Fact]
     public void HeightMatchedCandidate_WithinShortRadius_GetsRetargetedOnto_ThenForcesAttackWait()
     {
-        var (zone, monster) = CreateChaseZone(shortRadius: 200, largeRadius: 2000, bodyHeightHalfExtent: 5,
-            ai: new ScriptedRandomSource(0));
-        EnterPlayerAt(zone, NearCharacterId, posX: 500, posY: 0, posZ: 0);
-        EnterPlayerAt(zone, FarCharacterId, posX: 50, posY: 0, posZ: 0);
-        LockInitialTarget(monster, NearCharacterId, posX: 500, posZ: 0);
+        var (zone, monster) = CreateChaseZone(200, 2000, 5,
+            new ScriptedRandomSource(0));
+        EnterPlayerAt(zone, NearCharacterId, 500, 0, 0);
+        EnterPlayerAt(zone, FarCharacterId, 50, 0, 0);
+        LockInitialTarget(monster, NearCharacterId, 500, 0);
 
         var retargeted = false;
         for (var i = 0; i < 8 && !retargeted; i++)
@@ -57,11 +57,11 @@ public class MonsterAiSystemMidChaseRetargetTests
     [Fact]
     public void ReselectThrottle_AccruesInRealElapsedTime_NotOncePerSimulateCall()
     {
-        var (zone, monster) = CreateChaseZone(shortRadius: 200, largeRadius: 2000, bodyHeightHalfExtent: 5,
-            ai: new ScriptedRandomSource(0));
-        EnterPlayerAt(zone, NearCharacterId, posX: 500, posY: 0, posZ: 0);
-        EnterPlayerAt(zone, FarCharacterId, posX: 50, posY: 0, posZ: 0);
-        LockInitialTarget(monster, NearCharacterId, posX: 500, posZ: 0);
+        var (zone, monster) = CreateChaseZone(200, 2000, 5,
+            new ScriptedRandomSource(0));
+        EnterPlayerAt(zone, NearCharacterId, 500, 0, 0);
+        EnterPlayerAt(zone, FarCharacterId, 50, 0, 0);
+        LockInitialTarget(monster, NearCharacterId, 500, 0);
 
         zone.Tick(TimeSpan.FromMilliseconds(1000));
 
@@ -73,11 +73,11 @@ public class MonsterAiSystemMidChaseRetargetTests
     [Fact]
     public void FailedRollOnOneWindow_DoesNotBlockASuccessfulRollOnTheNextWindow()
     {
-        var (zone, monster) = CreateChaseZone(shortRadius: 200, largeRadius: 2000, bodyHeightHalfExtent: 5,
-            ai: new ScriptedRandomSource(1, 0));
-        EnterPlayerAt(zone, NearCharacterId, posX: 500, posY: 0, posZ: 0);
-        EnterPlayerAt(zone, FarCharacterId, posX: 50, posY: 0, posZ: 0);
-        LockInitialTarget(monster, NearCharacterId, posX: 500, posZ: 0);
+        var (zone, monster) = CreateChaseZone(200, 2000, 5,
+            new ScriptedRandomSource(1, 0));
+        EnterPlayerAt(zone, NearCharacterId, 500, 0, 0);
+        EnterPlayerAt(zone, FarCharacterId, 50, 0, 0);
+        LockInitialTarget(monster, NearCharacterId, 500, 0);
 
         zone.Tick(SimulationClock.LegacyTick);
         zone.Tick(SimulationClock.LegacyTick);
@@ -95,11 +95,11 @@ public class MonsterAiSystemMidChaseRetargetTests
     [Fact]
     public void AttackTypeOutsideEligibleSet_NeverRetargets_EvenWithAPerfectCandidate()
     {
-        var (zone, monster) = CreateChaseZone(shortRadius: 200, largeRadius: 2000, bodyHeightHalfExtent: 5,
-            ai: new ScriptedRandomSource(0), attackType: 2);
-        EnterPlayerAt(zone, NearCharacterId, posX: 500, posY: 0, posZ: 0);
-        EnterPlayerAt(zone, FarCharacterId, posX: 5, posY: 0, posZ: 0);
-        LockInitialTarget(monster, NearCharacterId, posX: 500, posZ: 0);
+        var (zone, monster) = CreateChaseZone(200, 2000, 5,
+            new ScriptedRandomSource(0), 2);
+        EnterPlayerAt(zone, NearCharacterId, 500, 0, 0);
+        EnterPlayerAt(zone, FarCharacterId, 5, 0, 0);
+        LockInitialTarget(monster, NearCharacterId, 500, 0);
 
         for (var i = 0; i < 8; i++)
         {
@@ -111,7 +111,7 @@ public class MonsterAiSystemMidChaseRetargetTests
     }
 
 
-        private static (Zone Zone, MonsterEntity Monster) CreateChaseZone(short shortRadius, short largeRadius,
+    private static (Zone Zone, MonsterEntity Monster) CreateChaseZone(short shortRadius, short largeRadius,
         short bodyHeightHalfExtent, IRandomSource ai, byte attackType = 1)
     {
         var template = WorldDataTestRows.Monster(700) with

@@ -11,12 +11,11 @@ public sealed class CpTicketUseItemHandler(
     IEventLogRepository eventLog,
     ILogger<CpTicketUseItemHandler> logger) : IUseItemHandler
 {
-
-        private const short CpTicketCreditEventCode = 3;
+    private const short CpTicketCreditEventCode = 3;
 
     private const byte SuccessOutcome = 1;
 
-        public static IEnumerable<int> HandledItemIds => CpTicketResolver.HandledItemIds;
+    public static IEnumerable<int> HandledItemIds => CpTicketResolver.HandledItemIds;
 
     public async ValueTask<UseInventoryItemResponse> HandleAsync(UseItemContext context,
         CancellationToken cancellationToken)

@@ -7,19 +7,18 @@ public static class GroundItemPickupPolicy
 {
     public enum Outcome
     {
+        Money,
 
-                Money,
+        Stacked,
 
-                Stacked,
+        Placed,
 
-                Placed,
-
-                Rejected
+        Rejected
     }
 
-        public const float MaxPickupDistance = 100f;
+    public const float MaxPickupDistance = 100f;
 
-        public const int MaxStackQuantity = 999;
+    public const int MaxStackQuantity = 999;
 
     public static Result Resolve(ItemDefinition itemDefinition, GroundItemEntity groundItem, ItemStack? destinationSlot)
     {

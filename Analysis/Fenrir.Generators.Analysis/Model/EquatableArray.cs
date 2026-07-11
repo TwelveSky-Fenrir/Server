@@ -18,7 +18,7 @@ internal readonly struct EquatableArray<T> : IEquatable<EquatableArray<T>>, IRea
 
     private ImmutableArray<T> ArrayOrEmpty => _array.IsDefault ? ImmutableArray<T>.Empty : _array;
 
-        public int Length => ArrayOrEmpty.Length;
+    public int Length => ArrayOrEmpty.Length;
 
     int IReadOnlyCollection<T>.Count => Length;
 

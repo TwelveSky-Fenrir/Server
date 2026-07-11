@@ -26,8 +26,7 @@ namespace Fenrir.Application.Game.Domain.Extensions;
 
 public static class DomainServiceCollectionExtensions
 {
-
-        public static IServiceCollection AddGameDomain(this IServiceCollection services)
+    public static IServiceCollection AddGameDomain(this IServiceCollection services)
     {
         services.AddSingleton<IValidateOptions<GameServerOptions>, GameServerOptionsValidator>();
         services.AddOptions<GameServerOptions>().ValidateOnStart();

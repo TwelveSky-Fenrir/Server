@@ -37,7 +37,7 @@ public class ZoneDuelCombatTests
         };
     }
 
-        private static Zone TwoDuelingPlayers(DuelRegistry duels, out FakeDuplexPipe attackerPipe,
+    private static Zone TwoDuelingPlayers(DuelRegistry duels, out FakeDuplexPipe attackerPipe,
         out FakeDuplexPipe defenderPipe, byte attackerTribe = 0, byte defenderTribe = 0, short mapId = 1)
     {
         var zone = ZoneTestKit.CreateZone(mapId, randomSource: new ScriptedRandomSource(0, 0), duelRegistry: duels);
@@ -97,7 +97,7 @@ public class ZoneDuelCombatTests
         Assert.NotEmpty(ZoneTestKit.DrainOutbound(defenderPipe));
     }
 
-        [Fact]
+    [Fact]
     public void DuelAttack_SameTribe_DamageIsApplied()
     {
         var duels = new DuelRegistry();
@@ -137,7 +137,7 @@ public class ZoneDuelCombatTests
         Assert.Equal(lifeBefore, defender.Life);
     }
 
-        [Fact]
+    [Fact]
     public void DuelAttack_LethalHit_KillsDefenderWithDuelCause_GrantsNoPvpKillRewards()
     {
         var duels = new DuelRegistry();

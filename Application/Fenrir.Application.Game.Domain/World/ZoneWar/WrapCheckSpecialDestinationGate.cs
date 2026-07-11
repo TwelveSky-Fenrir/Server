@@ -2,8 +2,7 @@ namespace Fenrir.Application.Game.Domain.World.ZoneWar;
 
 public static class WrapCheckSpecialDestinationGate
 {
-
-        public static TribeGuardCorridorMoveOutcome Evaluate(
+    public static TribeGuardCorridorMoveOutcome Evaluate(
         TribeGuardCorridorCatalog corridorCatalog,
         TribeGuardCorridorState corridorState,
         byte requesterTribe,

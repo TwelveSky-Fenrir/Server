@@ -5,5 +5,5 @@ public sealed class AvatarXorKindAttribute(AvatarXorKind kind, int rowLength = 0
 {
     public AvatarXorKind Kind { get; } = kind;
 
-        public int RowLength { get; } = rowLength;
+    public int RowLength { get; } = rowLength;
 }

@@ -19,7 +19,7 @@ public class TribeMigrationServiceTests
 {
     private const int CharacterId = 500;
 
-        private static readonly TimeProvider SaturdayWithinWindow =
+    private static readonly TimeProvider SaturdayWithinWindow =
         new FixedTimeProvider(new DateTimeOffset(2024, 1, 6, 17, 0, 0, TimeSpan.Zero));
 
     private static async Task<T> RunToCompletionAsync<T>(ValueTask<T> pending, Zone zone)
@@ -208,7 +208,7 @@ public class TribeMigrationServiceTests
         Assert.Empty(characters.TribeFourConversions);
     }
 
-        private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
+    private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
     {
         public override TimeZoneInfo LocalTimeZone => TimeZoneInfo.Utc;
 

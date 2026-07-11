@@ -94,14 +94,14 @@ public class AntiCampingGuardPointCatalogDefaultTests
     }
 
     [Theory]
-    [InlineData((short)2, new float[] { -1810f, -1f, 3155f })]
-    [InlineData((short)4, new float[] { 7839f, 461f, 6520f })]
-    [InlineData((short)7, new float[] { -831f, 10f, -3392f })]
-    [InlineData((short)9, new float[] { -2438f, -590f, 6697f })]
-    [InlineData((short)12, new float[] { -4045f, 0f, 1648f })]
-    [InlineData((short)14, new float[] { 7174f, 336f, 6191f })]
-    [InlineData((short)141, new float[] { -1132f, 0f, 3486f })]
-    [InlineData((short)143, new float[] { -38f, 0f, 4432f })]
+    [InlineData((short)2, new[] { -1810f, -1f, 3155f })]
+    [InlineData((short)4, new[] { 7839f, 461f, 6520f })]
+    [InlineData((short)7, new[] { -831f, 10f, -3392f })]
+    [InlineData((short)9, new[] { -2438f, -590f, 6697f })]
+    [InlineData((short)12, new[] { -4045f, 0f, 1648f })]
+    [InlineData((short)14, new[] { 7174f, 336f, 6191f })]
+    [InlineData((short)141, new[] { -1132f, 0f, 3486f })]
+    [InlineData((short)143, new[] { -38f, 0f, 4432f })]
     public void SingleSymbolPointMaps_MatchContractTable(short mapId, float[] xyz)
     {
         var points = Points(mapId);

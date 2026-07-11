@@ -47,7 +47,7 @@ public class ZoneMoveServiceCrossShardTests
 
         var (session, _) = ZoneTestKit.CreateSession(1);
         var sessionToken = Guid.NewGuid();
-        session.MarkTicketConsumed(1, CharacterId, sessionToken, 0);
+        session.MarkTicketConsumed(1, CharacterId, sessionToken);
         var sourceZone = zones[SourceMapId];
         session.CurrentZone = sourceZone;
 

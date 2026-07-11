@@ -31,7 +31,7 @@ public sealed class FriendService(
 {
     private const int MaxFriends = 10;
 
-        public async ValueTask<FriendAskResultKind> AskAsync(Zone zone, PlayerRuntimeState asker, string targetAvatarName,
+    public async ValueTask<FriendAskResultKind> AskAsync(Zone zone, PlayerRuntimeState asker, string targetAvatarName,
         CancellationToken cancellationToken)
     {
         if (zone.MapId == 124)
@@ -114,7 +114,7 @@ public sealed class FriendService(
         return await AskCrossShardAsync(asker, targetAvatarName, cancellationToken).ConfigureAwait(false);
     }
 
-        public void Answer(int targetId, int answerCode)
+    public void Answer(int targetId, int answerCode)
     {
         if (friends.TryConsumeCrossShardInbound(targetId, out var inbound))
         {
@@ -263,7 +263,7 @@ public sealed class FriendService(
         return FriendRemoveResultKind.Removed;
     }
 
-        private async ValueTask<FriendAskResultKind> AskCrossShardAsync(PlayerRuntimeState asker,
+    private async ValueTask<FriendAskResultKind> AskCrossShardAsync(PlayerRuntimeState asker,
         string targetAvatarName, CancellationToken cancellationToken)
     {
         var remote = await characterShardLocations.FindByNameAsync(targetAvatarName, cancellationToken)

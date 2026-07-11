@@ -10,8 +10,7 @@ public readonly partial record struct AvatarEffectStateResponse : IOutgoingPacke
     public required int ServerIndex { get; init; }
     public required uint UniqueNumber { get; init; }
 
-        [FixedArray(70)]
-    public required int[] EffectValue { get; init; }
+    [FixedArray(70)] public required int[] EffectValue { get; init; }
 
     [FixedArray(35)] public required int[] EffectValueState { get; init; }
 }

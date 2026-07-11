@@ -4,8 +4,7 @@ namespace Fenrir.Application.Game.Tests.Inventory;
 
 public class GemSocketContributionResolverTests
 {
-
-        private static (int P1, int P2, int P3) Pack(byte num, params (byte Type, byte Tier)[] sockets)
+    private static (int P1, int P2, int P3) Pack(byte num, params (byte Type, byte Tier)[] sockets)
     {
         Span<byte> bytes = stackalloc byte[12];
         bytes[1] = num;

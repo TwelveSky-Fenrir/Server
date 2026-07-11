@@ -89,7 +89,7 @@ public class ZoneSkillCastTamperGuardTests
         Assert.Empty(eventLog.Enqueued);
     }
 
-        [Fact]
+    [Fact]
     public void MatchingHotkeyButClaimedBonusGradeMismatch_DisconnectsSession_AndQueuesAnAuditLogRow()
     {
         var (zone, session, state, eventLog) = SetUp();
@@ -133,7 +133,7 @@ public class ZoneSkillCastTamperGuardTests
         Assert.Empty(eventLog.Enqueued);
     }
 
-        [Fact]
+    [Fact]
     public void OrdinaryMove_NeverTriggersTheGuard()
     {
         var (zone, session, state, eventLog) = SetUp();

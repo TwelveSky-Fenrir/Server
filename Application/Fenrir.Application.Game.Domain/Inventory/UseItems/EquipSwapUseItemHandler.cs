@@ -49,7 +49,7 @@ public sealed class EquipSwapUseItemHandler(
         return UseItemResponses.Success(context.Page, context.Index);
     }
 
-        public static bool ClaimsItem(ItemRowDto item)
+    public static bool ClaimsItem(ItemRowDto item)
     {
         return EquipSwapResolver.ClaimsItem(item);
     }

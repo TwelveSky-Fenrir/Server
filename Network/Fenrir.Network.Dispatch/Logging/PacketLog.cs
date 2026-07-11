@@ -5,8 +5,7 @@ namespace Fenrir.Network.Dispatch.Logging;
 
 internal static partial class PacketLog
 {
-
-        [LoggerMessage(
+    [LoggerMessage(
         EventId = 4001,
         EventName = "PacketReceived",
         Level = LogLevel.Debug,
@@ -20,14 +19,14 @@ internal static partial class PacketLog
         int byteSize,
         double decodeMicroseconds);
 
-        [LoggerMessage(
+    [LoggerMessage(
         EventId = 4002,
         EventName = "PacketSent",
         Level = LogLevel.Debug,
         Message = "Session {SessionId}: packet sent, opcode {Opcode} ({ByteSize} bytes)")]
     public static partial void PacketSent(this ILogger logger, long sessionId, byte opcode, int byteSize);
 
-        [LoggerMessage(
+    [LoggerMessage(
         EventId = 4003,
         EventName = "PacketDispatched",
         Level = LogLevel.Debug,

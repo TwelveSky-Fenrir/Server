@@ -35,7 +35,7 @@ public static class QuestSeedGenerator
 
     private const int MaxRowsPerInsert = 500;
 
-        public static QuestSeedStats Generate(string dataDir, string outputDir)
+    public static QuestSeedStats Generate(string dataDir, string outputDir)
     {
         Directory.CreateDirectory(outputDir);
 

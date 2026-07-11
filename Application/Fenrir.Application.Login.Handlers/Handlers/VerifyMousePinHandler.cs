@@ -12,8 +12,7 @@ public sealed class VerifyMousePinHandler(
     ILogger<VerifyMousePinHandler> logger)
     : IAsyncPacketHandler<VerifyMousePinRequest>
 {
-
-        private const int MaxPinFailures = 3;
+    private const int MaxPinFailures = 3;
 
     public async ValueTask HandleAsync(VerifyMousePinRequest packet, IPacketSession session,
         CancellationToken cancellationToken)

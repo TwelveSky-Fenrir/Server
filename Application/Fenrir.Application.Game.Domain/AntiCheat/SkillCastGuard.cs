@@ -8,23 +8,22 @@ public enum SkillCastOffense : byte
 {
     None = 0,
 
-        HotkeyMismatch = 1,
+    HotkeyMismatch = 1,
 
-        LearnedSkillMissing = 2,
+    LearnedSkillMissing = 2,
 
-        BonusGradeMismatch = 3,
+    BonusGradeMismatch = 3,
 
-        SkillHack1 = 4
+    SkillHack1 = 4
 }
 
 public static class SkillCastGuard
 {
+    private const int HotkeyMatchCategory = 1;
 
-        private const int HotkeyMatchCategory = 1;
+    private const int SkillEffectCategory = 2;
 
-        private const int SkillEffectCategory = 2;
-
-        public static SkillCastOffense Evaluate(in SkillCastGuardContext context)
+    public static SkillCastOffense Evaluate(in SkillCastGuardContext context)
     {
         if (context.SkillCategoryCode is not (HotkeyMatchCategory or SkillEffectCategory))
             return SkillCastOffense.None;

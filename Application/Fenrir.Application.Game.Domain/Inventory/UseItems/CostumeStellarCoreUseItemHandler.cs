@@ -12,17 +12,11 @@ public sealed class CostumeStellarCoreUseItemHandler(
     IEventLogRepository eventLog,
     ILogger<CostumeStellarCoreUseItemHandler> logger) : IUseItemHandler
 {
+    private const short WardrobeItemConsumedEventCode = 1;
 
-        private const short WardrobeItemConsumedEventCode = 1;
-
-        private const short WardrobeGrantedEventCode = 2;
+    private const short WardrobeGrantedEventCode = 2;
 
     private const byte SuccessOutcome = 1;
-
-        public static bool ClaimsItem(int itemId)
-    {
-        return CostumeStellarCoreWhitelist.ClaimsItem(itemId);
-    }
 
     public async ValueTask<UseInventoryItemResponse> HandleAsync(UseItemContext context,
         CancellationToken cancellationToken)
@@ -39,6 +33,11 @@ public sealed class CostumeStellarCoreUseItemHandler(
             "Character {CharacterId} op23 costume/stellar-core dispatch reached for item {ItemId}, which matches neither whitelist -- registry routing bug",
             context.CharacterId, itemId);
         return UseItemResponses.Fail(context.Page, context.Index);
+    }
+
+    public static bool ClaimsItem(int itemId)
+    {
+        return CostumeStellarCoreWhitelist.ClaimsItem(itemId);
     }
 
     private async ValueTask<UseInventoryItemResponse> HandleCostumeAsync(UseItemContext context,

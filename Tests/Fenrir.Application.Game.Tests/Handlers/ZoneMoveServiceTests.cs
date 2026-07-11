@@ -60,7 +60,7 @@ public class ZoneMoveServiceTests
         return new ZoneMoveRequest { Sort = sort, ZoneNumber = targetZone, PresentZoneNumber = presentZone };
     }
 
-        private static (ZoneMoveService Service, ZoneClientSession Session, Zone SourceZone) CreateServiceWithGrade(
+    private static (ZoneMoveService Service, ZoneClientSession Session, Zone SourceZone) CreateServiceWithGrade(
         short sourceMapId, byte tribe, bool reviveHackFlag, short accountGrade, short[] destinationMapIds)
     {
         var worldData = ZoneTestKit.EmptyWorldData(zonesByNumber: destinationMapIds
@@ -302,7 +302,7 @@ public class ZoneMoveServiceTests
     {
         var (service, session, _) = CreateServiceWithGrade(2, 1, false, 1, [50]);
 
-        await service.HandleAsync(Request(2, 50, 4), session, CancellationToken.None);
+        await service.HandleAsync(Request(2, 50), session, CancellationToken.None);
 
         Assert.Null(session.DisconnectReason);
     }

@@ -17,7 +17,7 @@ public sealed class CrossShardNegotiationTracker
     private readonly Lock _lock = new();
     private readonly Dictionary<int, CrossShardOutboundAsk> _outboundByAsker = new();
 
-        public bool IsPending(int characterId)
+    public bool IsPending(int characterId)
     {
         lock (_lock)
         {
@@ -25,7 +25,7 @@ public sealed class CrossShardNegotiationTracker
         }
     }
 
-        public bool TryRegisterOutbound(int askerId, CrossShardOutboundAsk ask)
+    public bool TryRegisterOutbound(int askerId, CrossShardOutboundAsk ask)
     {
         lock (_lock)
         {
@@ -33,7 +33,7 @@ public sealed class CrossShardNegotiationTracker
         }
     }
 
-        public bool TryConsumeOutbound(int askerId, out CrossShardOutboundAsk ask)
+    public bool TryConsumeOutbound(int askerId, out CrossShardOutboundAsk ask)
     {
         lock (_lock)
         {
@@ -41,7 +41,7 @@ public sealed class CrossShardNegotiationTracker
         }
     }
 
-        public bool TryRegisterInbound(int targetId, CrossShardInboundAsk ask)
+    public bool TryRegisterInbound(int targetId, CrossShardInboundAsk ask)
     {
         lock (_lock)
         {
@@ -49,7 +49,7 @@ public sealed class CrossShardNegotiationTracker
         }
     }
 
-        public bool TryConsumeInbound(int targetId, out CrossShardInboundAsk ask)
+    public bool TryConsumeInbound(int targetId, out CrossShardInboundAsk ask)
     {
         lock (_lock)
         {

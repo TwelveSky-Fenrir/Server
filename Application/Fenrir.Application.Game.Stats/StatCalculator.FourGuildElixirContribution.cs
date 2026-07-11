@@ -5,20 +5,19 @@ namespace Fenrir.Application.Game.Stats;
 
 public static partial class StatCalculator
 {
+    public const int FourGuildSlotNone = -1;
 
-        public const int FourGuildSlotNone = -1;
+    private const int EventDisabledTribe = -1;
 
-        private const int EventDisabledTribe = -1;
+    private const int AllTribesEventTribeSentinel = 4;
 
-        private const int AllTribesEventTribeSentinel = 4;
+    private const int EventTier10CountCap = 100;
 
-        private const int EventTier10CountCap = 100;
+    private const int EventTier20CountCap = 200;
 
-        private const int EventTier20CountCap = 200;
+    private const int DexterityElixirRate = 2;
 
-        private const int DexterityElixirRate = 2;
-
-        private static readonly FrozenDictionary<FourGuildElixirStat, FourGuildElixirParams> FourGuildElixirTable =
+    private static readonly FrozenDictionary<FourGuildElixirStat, FourGuildElixirParams> FourGuildElixirTable =
         BuildFourGuildElixirTable();
 
     private static FrozenDictionary<FourGuildElixirStat, FourGuildElixirParams> BuildFourGuildElixirTable()
@@ -39,7 +38,7 @@ public static partial class StatCalculator
         }.ToFrozenDictionary();
     }
 
-        private static int ComputeFourGuildElixirDelta(
+    private static int ComputeFourGuildElixirDelta(
         FourGuildElixirStat stat,
         int potionCount,
         int b4gFlag,
@@ -67,7 +66,7 @@ public static partial class StatCalculator
         return p.RawRatePerPotion * potionCount;
     }
 
-        public static int LifeElixirContributionWithOverride(
+    public static int LifeElixirContributionWithOverride(
         ConsumableContext consumable,
         ZoneContext zone,
         int fourGuildSlot = FourGuildSlotNone,
@@ -81,7 +80,7 @@ public static partial class StatCalculator
             hpElixirB4GFlag, fourGuildSlot, avatarTribe, eventTribe, consumable.MaxPotionEventNum);
     }
 
-        public static int ManaElixirContributionWithOverride(
+    public static int ManaElixirContributionWithOverride(
         ConsumableContext consumable,
         ZoneContext zone,
         int fourGuildSlot = FourGuildSlotNone,
@@ -95,7 +94,7 @@ public static partial class StatCalculator
             mpElixirB4GFlag, fourGuildSlot, avatarTribe, eventTribe, consumable.MaxPotionEventNum);
     }
 
-        public static int StrengthElixirAttackContributionWithOverride(
+    public static int StrengthElixirAttackContributionWithOverride(
         ConsumableContext consumable,
         ZoneContext zone,
         int fourGuildSlot = FourGuildSlotNone,
@@ -109,7 +108,7 @@ public static partial class StatCalculator
             strElixirB4GFlag, fourGuildSlot, avatarTribe, eventTribe, consumable.MaxPotionEventNum);
     }
 
-        public static int AccuracyElixirContributionWithOverride(
+    public static int AccuracyElixirContributionWithOverride(
         ConsumableContext consumable,
         ZoneContext zone,
         int fourGuildSlot = FourGuildSlotNone,
@@ -123,7 +122,7 @@ public static partial class StatCalculator
             dexElixirB4GFlag, fourGuildSlot, avatarTribe, eventTribe, consumable.MaxPotionEventNum);
     }
 
-        public static int BlockElixirContributionWithOverride(
+    public static int BlockElixirContributionWithOverride(
         ConsumableContext consumable,
         ZoneContext zone,
         int fourGuildSlot = FourGuildSlotNone,
@@ -137,7 +136,7 @@ public static partial class StatCalculator
             dexElixirB4GFlag, fourGuildSlot, avatarTribe, eventTribe, consumable.MaxPotionEventNum);
     }
 
-        public static int ResolveFourGuildSlot(
+    public static int ResolveFourGuildSlot(
         int avatarTribe,
         ReadOnlySpan<char> guildName,
         ReadOnlySpan<string> tribeFourGuildNames)
@@ -158,7 +157,7 @@ public static partial class StatCalculator
         return FourGuildSlotNone;
     }
 
-        private enum FourGuildElixirStat : byte
+    private enum FourGuildElixirStat : byte
     {
         Life = 0,
         Mana = 1,
@@ -167,7 +166,7 @@ public static partial class StatCalculator
         Block = 4
     }
 
-        private readonly record struct FourGuildElixirParams(
+    private readonly record struct FourGuildElixirParams(
         int FixedOverride,
         FrozenSet<int> FixedOverrideSlots,
         int EventTier10Bonus,

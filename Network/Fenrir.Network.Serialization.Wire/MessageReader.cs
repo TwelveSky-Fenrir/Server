@@ -7,12 +7,12 @@ public ref struct MessageReader(ReadOnlySpan<byte> source)
     private readonly ReadOnlySpan<byte> _source = source;
     private int _offset;
 
-        public void Skip(int length)
+    public void Skip(int length)
     {
         _offset += length;
     }
 
-        public ReadOnlySpan<byte> ReadSlice(int length)
+    public ReadOnlySpan<byte> ReadSlice(int length)
     {
         var slice = _source.Slice(_offset, length);
         _offset += length;
